@@ -16,7 +16,7 @@ export default async function AuthPage({ params }: { params: Promise<{ path: str
     return (
         <main className="min-h-screen flex items-center justify-center p-4 md:p-6">
             <div className="w-full max-w-md">
-                <AuthView path={path} localization={authLocalization} callbackURL={"/app"} />
+                <AuthView path={path} localization={authLocalization} redirectTo="/app" />
             </div>
         </main>
     )
