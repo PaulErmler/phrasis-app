@@ -4,7 +4,9 @@
     "subtitle": "Lerne Redewendungen, übe die Aussprache und werde fließend in jeder Sprache",
     "signIn": "Anmelden",
     "getStarted": "Jetzt starten",
-    "redirecting": "Weiterleitung...",
+    "goToApp": "Zur App",
+    "welcomeBack": "Willkommen zurück",
+    "continueToApp": "Mach weiter, wo du aufgehört hast",
     "journeySection": {
       "title": "Starte deine Sprachreise",
       "description": "Erstelle ein Konto, um deinen Fortschritt zu speichern, dein Lernen zu verfolgen und überall auf deine Phrasen zuzugreifen."
@@ -24,29 +26,8 @@
       }
     },
     "authCard": {
-      "welcomeBack": "Willkommen zurück",
       "startLearning": "Heute mit dem Lernen beginnen",
-      "continueJourney": "Setze deine Sprachlernreise fort",
-      "createAccount": "Erstelle dein Konto und beginne, neue Sprachen zu meistern",
-      "signIn": "Anmelden",
-      "signUp": "Registrieren",
-      "email": "E-Mail",
-      "emailPlaceholder": "du@beispiel.de",
-      "password": "Passwort",
-      "passwordPlaceholder": "••••••••",
-      "name": "Name",
-      "namePlaceholder": "Max Mustermann",
-      "passwordHint": "Mindestens 8 Zeichen",
-      "signingIn": "Anmeldung läuft...",
-      "creatingAccount": "Konto wird erstellt...",
-      "createAccountBtn": "Konto erstellen",
-      "errors": {
-        "signInFailed": "Anmeldung fehlgeschlagen. Bitte überprüfe deine Anmeldedaten.",
-        "signUpFailed": "Konto konnte nicht erstellt werden. Bitte versuche es erneut.",
-        "emailAlreadyExists": "Ein Konto mit dieser E-Mail-Adresse existiert bereits.",
-        "invalidCredentials": "Ungültige E-Mail oder Passwort.",
-        "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut."
-      }
+      "createAccount": "Erstelle dein Konto und beginne, neue Sprachen zu meistern"
     }
   },
   "Footer": {

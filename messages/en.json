@@ -4,7 +4,9 @@
     "subtitle": "Learn phrases, practice pronunciation, and build fluency in any language",
     "signIn": "Sign In",
     "getStarted": "Get Started",
-    "redirecting": "Redirecting...",
+    "goToApp": "Go to App",
+    "welcomeBack": "Welcome back",
+    "continueToApp": "Continue where you left off",
     "journeySection": {
       "title": "Start Your Language Journey",
       "description": "Create an account to save your progress, track your learning, and access your phrases anywhere."
@@ -24,29 +26,8 @@
       }
     },
     "authCard": {
-      "welcomeBack": "Welcome back",
       "startLearning": "Start Learning Today",
-      "continueJourney": "Continue your language learning journey",
-      "createAccount": "Create your account and begin mastering new languages",
-      "signIn": "Sign In",
-      "signUp": "Sign Up",
-      "email": "Email",
-      "emailPlaceholder": "you@example.com",
-      "password": "Password",
-      "passwordPlaceholder": "••••••••",
-      "name": "Name",
-      "namePlaceholder": "John Doe",
-      "passwordHint": "Must be at least 8 characters",
-      "signingIn": "Signing in...",
-      "creatingAccount": "Creating account...",
-      "createAccountBtn": "Create Account",
-      "errors": {
-        "signInFailed": "Failed to sign in. Please check your credentials.",
-        "signUpFailed": "Failed to create account. Please try again.",
-        "emailAlreadyExists": "An account with this email already exists.",
-        "invalidCredentials": "Invalid email or password.",
-        "unexpectedError": "An unexpected error occurred. Please try again."
-      }
+      "createAccount": "Create your account and begin mastering new languages"
     }
   },
   "Footer": {

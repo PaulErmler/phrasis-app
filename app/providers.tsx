@@ -5,9 +5,9 @@ import { ThemeProvider } from "next-themes"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { ReactNode } from "react"
+import { NextIntlClientProvider } from "next-intl"
 
 import { authClient } from "@/lib/auth-client"
-import { NextIntlClientProvider } from "next-intl"
 
 type AuthMessages = Record<string, string>
 
