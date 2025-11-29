@@ -4,6 +4,8 @@ import "./globals.css";
 import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { Providers } from "./providers";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { getUserLocale } from "@/i18n/locale";
+import { getMessages } from "next-intl/server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -37,13 +39,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getUserLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -55,7 +60,7 @@ export default function RootLayout({
       >
         <ServiceWorkerRegistration />
         <ConvexClientProvider>
-          <Providers>
+          <Providers locale={locale} messages={messages}>
             {children}
           </Providers>
         </ConvexClientProvider>
