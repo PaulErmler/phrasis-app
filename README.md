@@ -92,6 +92,22 @@ pnpm lint
 ```
 
 ---
+# Working with LLMs
+Here are relevant tutorials for making LLMs in cursor more accuracte with the tech stack we are using: 
+
+MCP Servers and rules: 
+Convex: https://docs.convex.dev/ai/using-cursor
+BetterAuth: https://www.better-auth.com/docs/introduction#llmstxt
+Follow the turorials on the websites to add MCP servers and docs 
+
+LLM.txt files: 
+BetterAuth https://www.better-auth.com/llms.txt
+BetterAuthUi: https://better-auth-ui.com/llms.txt
+Shadcn: https://ui.shadcn.com/llms.txt
+To add these go Cursor->Cursor Settings->Indexing and Docs
+
+^
+---
 # More things that are not setup related
 ## Project Structure
 
