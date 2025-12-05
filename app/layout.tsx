@@ -5,7 +5,7 @@ import ConvexClientProvider from "@/components/ConvexClientProvider";
 import { Providers } from "./providers";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { getUserLocale } from "@/i18n/locale";
-import { getMessages } from "next-intl/server";
+import { getMessages, getTimeZone } from "next-intl/server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,6 +46,7 @@ export default async function RootLayout({
 }>) {
   const locale = await getUserLocale();
   const messages = await getMessages();
+  const timeZone = await getTimeZone();
 
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -60,7 +61,7 @@ export default async function RootLayout({
       >
         <ServiceWorkerRegistration />
         <ConvexClientProvider>
-          <Providers locale={locale} messages={messages}>
+          <Providers locale={locale} messages={messages} timeZone={timeZone}>
             {children}
           </Providers>
         </ConvexClientProvider>

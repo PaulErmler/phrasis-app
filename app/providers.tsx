@@ -15,16 +15,17 @@ type Props = {
     children: ReactNode
     locale: string
     messages: Record<string, unknown>
+    timeZone: string
 }
 
-export function Providers({ children, locale, messages }: Props) {
+export function Providers({ children, locale, messages, timeZone }: Props) {
     const router = useRouter()
     
     // Extract auth localization from messages
     const authLocalization = (messages.Auth as AuthMessages) || {}
 
     return (
-        <NextIntlClientProvider locale={locale} messages={messages}>
+        <NextIntlClientProvider locale={locale} messages={messages} timeZone={timeZone}>
             <ThemeProvider
                 attribute="class"
                 defaultTheme="system"
