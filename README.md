@@ -50,7 +50,6 @@ NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211
 # BETTER_AUTH_SECRET=your-secret-here # has to be the same as the one set in the convex dashboard
 SITE_URL=http://localhost:3000
 ```
-
 You also have to set SITE_URL and BETTER_AUTH_SECRET in the convex dashboard. 
 
 #### Develop Against Convex Dev/Prod Environment 
