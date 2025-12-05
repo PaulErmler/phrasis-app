@@ -53,6 +53,7 @@ SITE_URL=http://localhost:3000
 
 You also have to set SITE_URL and BETTER_AUTH_SECRET in the convex dashboard. 
 
+
 #### Develop Against Convex Dev/Prod Environment 
 
 For developing against the cloud instance, you can take the URLS and keys from the convex dashboard. 
