@@ -1,7 +1,5 @@
 # Phrasis
 
-A full-stack application built with Next.js, Convex, and Better Auth.
-
 ## Tech Stack
 
 - **Frontend**: [Next.js 16](https://nextjs.org/) with React 19
@@ -17,7 +15,7 @@ A full-stack application built with Next.js, Convex, and Better Auth.
 ### Prerequisites
 
 - Node.js 18+
-- pnpm (recommended) or npm
+- pnpm 
 
 ### Installation
 
@@ -26,9 +24,38 @@ A full-stack application built with Next.js, Convex, and Better Auth.
 pnpm install
 ```
 
-### Environment Variables
 
-Create a `.env.local` file in the root directory with:
+
+
+### Setup Environment Variables 
+#### Local Development 
+
+Make sure Docker is running and run: 
+```bash 
+docker compose up
+```
+
+Then run the following: 
+```bash 
+docker compose exec backend ./generate_admin_key.sh
+```
+
+Create a `.env.local` file in the root directory with and set the admin key and other variables: 
+
+```
+CONVEX_SELF_HOSTED_URL='http://127.0.0.1:3210'
+CONVEX_SELF_HOSTED_ADMIN_KEY='convex-self-hosted|XXX'
+NEXT_PUBLIC_CONVEX_URL=http://127.0.0.1:3210
+NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211
+# BETTER_AUTH_SECRET=your-secret-here # has to be the same as the one set in the convex dashboard
+SITE_URL=http://localhost:3000
+```
+
+You also have to set SITE_URL and BETTER_AUTH_SECRET in the convex dashboard. 
+
+#### Develop Against Convex Dev/Prod Environment 
+
+For developing against the cloud instance, you can take the URLS and keys from the convex dashboard. 
 
 ```env
 # Convex
@@ -40,9 +67,6 @@ NEXT_PUBLIC_CONVEX_SITE_URL=XXX
 # BETTER_AUTH_SECRET=your-secret-here # has to be the same as the one set in the convex dashboard
 SITE_URL=http://localhost:3000
 ```
-
-
-> **Note**: When running `pnpm dev` for the first time, Convex will guide you through setting up your deployment.
 
 ### Development
 
@@ -69,7 +93,7 @@ pnpm lint
 ```
 
 ---
-
+# More things that are not setup related
 ## Project Structure
 
 ```
@@ -93,6 +117,9 @@ phrasis-app/
 ```
 
 ---
+
+
+
 
 ## Recommended VS Code Extensions
 
