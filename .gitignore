@@ -40,3 +40,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# data preparation 
+data_preparation/data/intermediate_outputs
+data_preparation/data/inputs
+**/__pycache__/**
