@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { authClient } from "@/lib/auth-client";
 import { Footer } from "@/components/Footer";
-import { Bell, BellOff, BellRing } from "lucide-react";
+import { Bell, BellOff, BellRing, MessageSquare } from "lucide-react";
 
 export default function AppPage() {
   const router = useRouter();
@@ -77,6 +77,7 @@ export default function AppPage() {
 }
 
 function Content() {
+  const router = useRouter();
   const { viewer, numbers } = useQuery(api.myFunctions.listNumbers, { count: 10 }) ?? {};
   const addNumber = useMutation(api.myFunctions.addNumber);
   
@@ -241,6 +242,28 @@ function Content() {
                 : numbers?.join(", ") ?? "..."}
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Chat Button Card */}
+      <Card className="border-border/50 shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <MessageSquare className="h-5 w-5 text-emerald-500" />
+            Chat
+          </CardTitle>
+          <CardDescription>
+            Start a conversation or practice your language skills
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={() => router.push("/chat")}
+            className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
+          >
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Go to Chat
+          </Button>
         </CardContent>
       </Card>
     </div>
