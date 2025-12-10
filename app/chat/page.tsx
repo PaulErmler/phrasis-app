@@ -1,99 +1,183 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { SignedIn, SignedOut, UserButton } from "@daveyplate/better-auth-ui";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { SignedIn, SignedOut } from "@daveyplate/better-auth-ui";
 import { authClient } from "@/lib/auth-client";
 import { Footer } from "@/components/Footer";
-import { ArrowLeft, MessageSquare } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
+import { toast } from "sonner";
+import { Loader } from "@/components/ai-elements/loader";
+
+// Hooks
+import { useThreadManagement } from "@/hooks/use-thread-management";
+import { useVoiceRecording } from "@/hooks/use-voice-recording";
+import { useChatMessages } from "@/hooks/use-chat-messages";
+
+// Components
+import { ChatHeader } from "@/components/chat/ChatHeader";
+import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
+import { ChatMessages } from "@/components/chat/ChatMessages";
+import { ChatInput } from "@/components/chat/ChatInput";
+
+// Constants
+import { ERROR_MESSAGES, SUCCESS_MESSAGES, CHAT_STATUS } from "@/lib/constants/chat";
 
 export default function ChatPage() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
+  const [text, setText] = useState<string>("");
 
+  // Thread management
+  const {
+    threadId,
+    threads,
+    createThread,
+    setThreadId,
+    isLoading: isThreadLoading,
+    isCreating,
+  } = useThreadManagement({ session, isPending });
+
+  // Message management
+  const { messages, status, setStatus } = useChatMessages({ threadId });
+
+  // Voice recording
+  const { isRecording, isTranscribing, handleVoiceClick } = useVoiceRecording(
+    (transcript) => {
+      setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+    }
+  );
+
+  // Mutations
+  const sendMessage = useMutation(api.chat.messages.sendMessage);
+
+  // Redirect if not authenticated
   useEffect(() => {
     if (!session && !isPending) {
       router.push("/");
     }
   }, [session, isPending, router]);
 
+  // Handle message submission
+  const handleSubmit = useCallback(
+    async (message: PromptInputMessage) => {
+      if (!threadId) {
+        toast.error(ERROR_MESSAGES.CHAT_NOT_INITIALIZED);
+        return;
+      }
+
+      const hasText = Boolean(message.text);
+      const hasAttachments = Boolean(message.files?.length);
+
+      if (!(hasText || hasAttachments)) {
+        return;
+      }
+
+      setStatus(CHAT_STATUS.SUBMITTED);
+
+      if (message.files?.length) {
+        toast.success(SUCCESS_MESSAGES.FILES_ATTACHED, {
+          description: `${message.files.length} file(s) attached to message`,
+        });
+      }
+
+      try {
+        await sendMessage({
+          threadId,
+          prompt: message.text || "Sent with attachments",
+        });
+        setText("");
+        setStatus(CHAT_STATUS.SUBMITTED);
+      } catch (error) {
+        console.error("Failed to send message:", error);
+        toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
+        setStatus(CHAT_STATUS.ERROR);
+        setTimeout(() => setStatus(CHAT_STATUS.READY), 2000);
+      }
+    },
+    [threadId, sendMessage, setStatus]
+  );
+
+  // Handle suggestion click
+  const handleSuggestionClick = useCallback(
+    async (suggestion: string) => {
+      if (!threadId) {
+        toast.error(ERROR_MESSAGES.CHAT_NOT_INITIALIZED);
+        return;
+      }
+
+      setStatus(CHAT_STATUS.SUBMITTED);
+      try {
+        await sendMessage({
+          threadId,
+          prompt: suggestion,
+        });
+      } catch (error) {
+        console.error("Failed to send message:", error);
+        toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
+        setStatus(CHAT_STATUS.ERROR);
+        setTimeout(() => setStatus(CHAT_STATUS.READY), 2000);
+      }
+    },
+    [threadId, sendMessage, setStatus]
+  );
+
+  // Loading state
   if (isPending) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-          <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
-        </div>
+        <Loader size={24} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border">
-        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => router.push("/app")}
-              className="mr-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-            <div className="w-8 h-8 rounded-lg bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-              <span className="text-sm font-bold text-white">P</span>
-            </div>
-            <span className="font-semibold text-lg">Phrasis</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <SignedIn>
-              <UserButton size="icon" />
-            </SignedIn>
-          </div>
-        </div>
-      </header>
+      <ChatHeader onBack={() => router.push("/app")} />
 
       {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-8">
+      <main className="flex-1 flex flex-row overflow-hidden min-h-0">
         <SignedOut>
-          <div className="text-center py-12">
+          <div className="flex-1 flex items-center justify-center">
             <p className="text-muted-foreground">Redirecting to sign in...</p>
           </div>
         </SignedOut>
 
         <SignedIn>
-          <div className="max-w-xl mx-auto space-y-6">
-            <div className="text-center space-y-2">
-              <h1 className="text-2xl font-bold">Chat</h1>
-              <p className="text-muted-foreground">
-                Start a conversation or practice your language skills
-              </p>
-            </div>
+          {/* Threads Sidebar */}
+          <ThreadSidebar
+            threads={threads}
+            threadId={threadId}
+            onThreadSelect={setThreadId}
+            onNewThread={createThread}
+            isCreating={isCreating}
+          />
 
-            <Card className="border-border/50 shadow-lg">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-emerald-500" />
-                  Chat Interface
-                </CardTitle>
-                <CardDescription>
-                  Your chat interface will appear here
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-xl bg-muted/50 border border-border/50 p-8 text-center">
-                  <MessageSquare className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">
-                    Chat functionality coming soon...
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+          {/* Chat Area */}
+          <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full min-h-0">
+            {!threadId ? (
+              <div className="flex-1 flex items-center justify-center">
+                <Loader size={24} />
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                <ChatMessages messages={messages} isLoading={isThreadLoading} />
+                <ChatInput
+                  onSubmit={handleSubmit}
+                  onSuggestionClick={handleSuggestionClick}
+                  text={text}
+                  onTextChange={setText}
+                  status={status}
+                  isRecording={isRecording}
+                  isTranscribing={isTranscribing}
+                  onVoiceClick={handleVoiceClick}
+                  showSuggestions={messages.length === 0}
+                />
+              </div>
+            )}
           </div>
         </SignedIn>
       </main>
@@ -108,4 +192,3 @@ export default function ChatPage() {
     </div>
   );
 }
-
