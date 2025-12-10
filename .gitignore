@@ -45,3 +45,6 @@ next-env.d.ts
 data_preparation/data/intermediate_outputs
 data_preparation/data/inputs
 **/__pycache__/**
+
+
+data_preparation/**
