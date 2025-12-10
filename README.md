@@ -104,7 +104,34 @@ LLM.txt files:
 BetterAuth https://www.better-auth.com/llms.txt
 BetterAuthUi: https://better-auth-ui.com/llms.txt
 Shadcn: https://ui.shadcn.com/llms.txt
+Vercel AI SDK: https://ai-sdk.dev/llms.txt
 To add these go Cursor->Cursor Settings->Indexing and Docs
+
+You can also add the MCP Servers for Convex, BetterAuth and AI Elements by setting the following for MCP servers in the Cursor settings 
+```
+{
+  "mcpServers": {
+    "convex": {
+      "command": "npx -y convex@latest mcp start",
+      "env": {},
+      "args": []
+    },
+    "Better Auth": {
+      "url": "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp",
+      "headers": {}
+    }, 
+    "ai-elements": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://registry.ai-sdk.dev/api/mcp"
+      ]
+    }
+  }
+}
+```
+
 
 ^
 ---
