@@ -23,7 +23,7 @@
 # Install dependencies
 pnpm install
 ```
-
+- [ ] done
 
 
 
@@ -34,11 +34,13 @@ Make sure Docker is running and run:
 ```bash 
 docker compose up
 ```
+- [ ] done
 
 Then run the following: 
 ```bash 
 docker compose exec backend ./generate_admin_key.sh
 ```
+- [ ] done
 
 Create a `.env.local` file in the root directory with and set the admin key and other variables: 
 
@@ -50,8 +52,9 @@ NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211
 # BETTER_AUTH_SECRET=your-secret-here # has to be the same as the one set in the convex dashboard
 SITE_URL=http://localhost:3000
 ```
+- [ ] done
 You also have to set SITE_URL and BETTER_AUTH_SECRET in the convex dashboard. 
-
+- [ ] done
 #### Develop Against Convex Dev/Prod Environment 
 
 For developing against the cloud instance, you can take the URLS and keys from the convex dashboard. 
@@ -66,7 +69,7 @@ NEXT_PUBLIC_CONVEX_SITE_URL=XXX
 # BETTER_AUTH_SECRET=your-secret-here # has to be the same as the one set in the convex dashboard
 SITE_URL=http://localhost:3000
 ```
-
+- [ ] done
 ### Development
 
 ```bash
@@ -77,6 +80,7 @@ pnpm dev
 pnpm dev:frontend  # Next.js on http://localhost:3000
 pnpm dev:backend   # Convex dev server
 ```
+- [ ] done
 
 ### Other Commands
 
@@ -105,7 +109,7 @@ BetterAuth https://www.better-auth.com/llms.txt
 BetterAuthUi: https://better-auth-ui.com/llms.txt
 Shadcn: https://ui.shadcn.com/llms.txt
 To add these go Cursor->Cursor Settings->Indexing and Docs
-
+- [ ] done
 ^
 ---
 # More things that are not setup related
@@ -145,7 +149,7 @@ Install the **Tailwind CSS IntelliSense** extension for:
 - Linting for class conflicts
 
 [Install Tailwind CSS IntelliSense](https://marketplace.visualstudio.com/items?itemName=bradlc.vscode-tailwindcss)
-
+- [ ] done
 ---
 
 ## shadcn/ui
@@ -161,7 +165,7 @@ npx shadcn@latest add button
 # Add multiple components
 npx shadcn@latest add card dialog tabs
 ```
-
+- [ ] done
 ### Configuration
 
 The shadcn config is in `components.json`:
@@ -182,7 +186,7 @@ Components are installed to `components/ui/` and can be freely modified.
 - Email/password authentication
 - Social providers (Google, GitHub, etc.)
 - Session management
-
+- [ ] done
 ### Client Usage
 
 ```tsx
@@ -200,7 +204,7 @@ await authClient.signOut();
 // Get session (React hook)
 const { data: session, isPending } = authClient.useSession();
 ```
-
+- [ ] done
 ### UI Components
 
 The project includes pre-built auth UI from `@daveyplate/better-auth-ui`:
@@ -227,7 +231,7 @@ import { SignedIn, SignedOut, UserButton } from "@daveyplate/better-auth-ui";
 - **Queries**: Real-time reactive queries
 - **Mutations**: Transactional writes
 - **Actions**: Server-side functions for external APIs
-
+- [ ] done
 ### Writing Functions
 
 ```typescript
