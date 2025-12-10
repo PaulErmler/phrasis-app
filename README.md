@@ -23,7 +23,7 @@
 # Install dependencies
 pnpm install
 ```
-- [ ] done
+- [x] done
 
 
 
@@ -34,13 +34,13 @@ Make sure Docker is running and run:
 ```bash 
 docker compose up
 ```
-- [ ] done
+- [x] done
 
 Then run the following: 
 ```bash 
 docker compose exec backend ./generate_admin_key.sh
 ```
-- [ ] done
+- [x] done
 
 Create a `.env.local` file in the root directory with and set the admin key and other variables: 
 
@@ -52,7 +52,7 @@ NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211
 # BETTER_AUTH_SECRET=your-secret-here # has to be the same as the one set in the convex dashboard
 SITE_URL=http://localhost:3000
 ```
-- [ ] done
+- [x] done
 You also have to set SITE_URL and BETTER_AUTH_SECRET in the convex dashboard. 
 - [ ] done
 #### Develop Against Convex Dev/Prod Environment 
