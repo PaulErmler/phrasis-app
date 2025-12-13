@@ -7,6 +7,7 @@ import { listUIMessages, syncStreams } from "@convex-dev/agent";
 import { components } from "../_generated/api";
 import { authComponent } from "../auth";
 import { agent } from "./agent";
+import { GoogleGenerativeAIProviderOptions } from "@ai-sdk/google";
 
 export type ListMessagesStreamArgs = {
   kind: "list";
@@ -128,8 +129,19 @@ export const generateResponse = internalAction({
         { threadId: args.threadId },
         {
           promptMessageId: args.promptMessageId,
+          // providerOptions: {
+          //   google: {
+          //     thinkingConfig: {
+          //       thinkingBudget: 8192,
+          //       includeThoughts: true,
+          //     },
+          //   } satisfies GoogleGenerativeAIProviderOptions,
+          // }
         },
-        { saveStreamDeltas: true }
+        { 
+          saveStreamDeltas: true,
+          
+        }
       );
     } catch (error) {
       console.error("Failed to generate AI response:", error);

@@ -30,7 +30,10 @@ export function useChatMessages({
   const messageResult = useUIMessages(
     listMessagesQuery,
     threadId ? { threadId } : "skip",
-    { initialNumItems: 100 }
+    { 
+      initialNumItems: 100,
+      stream: true
+    }
   );
 
   const messages: ExtendedUIMessage[] = messageResult?.results ?? [];

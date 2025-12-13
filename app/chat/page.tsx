@@ -21,6 +21,7 @@ import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
 import { ChatMessages } from "@/components/chat/ChatMessages";
 import { ChatInput } from "@/components/chat/ChatInput";
+import { FlashcardSidebar } from "@/components/chat/FlashcardSidebar";
 
 // Constants
 import { ERROR_MESSAGES, SUCCESS_MESSAGES, CHAT_STATUS } from "@/lib/constants/chat";
@@ -164,7 +165,7 @@ export default function ChatPage() {
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <ChatMessages messages={messages} isLoading={isThreadLoading} />
+                <ChatMessages messages={messages} isLoading={isThreadLoading} threadId={threadId} />
                 <ChatInput
                   onSubmit={handleSubmit}
                   onSuggestionClick={handleSuggestionClick}
@@ -179,6 +180,9 @@ export default function ChatPage() {
               </div>
             )}
           </div>
+
+          {/* Flashcard Sidebar */}
+          <FlashcardSidebar />
         </SignedIn>
       </main>
 
