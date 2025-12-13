@@ -12,6 +12,7 @@
     "lint": "eslint . --ignore-pattern \"convex/_generated/**\""
   },
   "dependencies": {
+    "@ai-sdk/google": "^2.0.45",
     "@ai-sdk/openai": "^2.0.80",
     "@convex-dev/agent": "^0.3.2",
     "@convex-dev/better-auth": "^0.9.7",
