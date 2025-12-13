@@ -44,4 +44,13 @@ next-env.d.ts
 # data preparation 
 data_preparation/data/intermediate_outputs
 data_preparation/data/inputs
+data_preparation/data_filtering
+data_preparation/sentence_processor
+data_preparation/language_intelligence/output
+data_preparation/language_intelligence/utils/output
+data_preparation/pipeline.py
 **/__pycache__/**
+
+
+
+convex/_generated
