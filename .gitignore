@@ -44,7 +44,10 @@ next-env.d.ts
 # data preparation 
 data_preparation/data/intermediate_outputs
 data_preparation/data/inputs
+data_preparation/data/ARCHIVE
 data_preparation/data_filtering
+data_preparation/data/output/dataset_statistics
+data_preparation/data/output/sentences_by_difficulty
 data_preparation/sentence_processor
 data_preparation/language_intelligence/output
 data_preparation/language_intelligence/utils/output

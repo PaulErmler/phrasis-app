@@ -1,0 +1,914 @@
+id,text,difficulty,topics,llm_usefulness,usefulness
+8997470,Learn Hungarian!,A1,language learning,10.0,7.0
+7149232,Sami is very happy.,A1,emotions,10.0,9.0
+9156223,How did you learn Toki Pona?,A1,language learning,9.0,7.0
+1864475,It was my first job.,A1,work,8.0,9.0
+719437,John isn't here.,A1,negation,8.0,7.0
+11768985,I cannot pay.,A1,"money,negation",8.0,8.0
+2667594,I read your book.,A1,"books,free time",8.0,6.0
+3913152,Let me stay.,A1,requests,8.0,5.0
+12726116,Which team will play?,A1,sports,8.0,8.0
+254915,I wanted to get a lot of money.,A1,"money,goals",8.0,7.0
+10497145,Cheese is my favorite food.,A1,food,8.0,7.0
+370724,How many books did you read?,A1,"books,numbers",8.0,6.0
+2890962,Are you up there?,A1,"time,emotions",8.0,6.0
+22462,Could I have the check?,A1,requests,8.0,8.0
+5187117,What is there to eat?,A1,food,8.0,7.0
+2954211,Why do you want to go to Boston?,A1,"travel,goals",8.0,8.0
+10189358,Three years is a really long time.,A1,time,8.0,6.0
+9953590,Yanni worked late.,A1,"work,time",8.0,6.0
+11713699,Martino and Melissa always got along well.,A1,emotions,8.0,6.0
+3171042,We must get help.,A1,"requests,negation",8.0,6.0
+5737545,Why would I feel different?,A1,emotions,8.0,5.0
+309990,She is human.,A1,emotions,8.0,9.0
+9805616,Where do you see yourself in 5 years?,A1,"goals,future plans",8.0,7.0
+11369510,I was popular at school.,A1,"school,emotions",8.0,6.0
+299020,He went to Boston by car.,A1,travel,8.0,8.0
+7438861,They said they didn't know where to go.,A1,"negation,travel",8.0,7.0
+6890544,Did anyone hear you?,A1,negation,8.0,7.0
+2011975,We want you to be happy.,A1,emotions,8.0,6.0
+7444705,They told me they were uninsured.,A1,money,7.0,5.0
+3908429,We need to tell her what to do.,A1,"requests,work",7.0,8.0
+9149398,"If there is a problem, please let me know.",A1,requests,7.0,8.0
+9823891,Would you sell this to me?,A1,"money,requests",7.0,7.0
+7976178,Learning French was hard.,A1,language learning,7.0,5.0
+2541427,I'll tell you when you get here.,A1,"time,future plans",7.0,7.0
+1898382,Everything's ready.,A1,"free time,goals",7.0,9.0
+8959062,We got someone else to do that.,A1,negation,7.0,7.0
+9949151,Where do you want to put this?,A1,requests,7.0,7.0
+4133564,Did you get everything you asked for?,A1,"requests,negation",7.0,7.0
+4784234,My hands are full.,A1,"emotions,requests",7.0,6.0
+8808813,He's got to go there.,A1,"emotions,future plans",7.0,8.0
+12343048,I have to be there tomorrow morning.,A1,"time,future plans",7.0,7.0
+1519349,I believe in Buddha.,A1,religion,7.0,7.0
+8480575,He began to read.,A1,"books,free time",7.0,7.0
+4016213,What else do we need to do?,A1,requests,7.0,9.0
+6297432,It was late August.,A1,"time,weather",7.0,6.0
+2064712,We should build something.,A1,"requests,future plans",7.0,8.0
+11820141,Fyodor moved into his new house.,A1,"free time,travel",7.0,7.0
+8222946,I believe you should leave.,A1,"requests,emotions",7.0,6.0
+3915388,I have to go help him.,A1,"requests,emotions,future plans",7.0,8.0
+1493784,How are you doing for money?,A1,money,7.0,7.0
+7260033,Sami held the phone.,A1,free time,7.0,8.0
+457547,This is her house.,A1,school,7.0,8.0
+7156331,Sami was really funny.,A1,emotions,7.0,7.0
+11936731,I have to keep my cool.,A1,"emotions,negation",7.0,8.0
+2546145,I wasn't here last year.,A1,"time,negation",7.0,8.0
+3919445,"You don't believe her, do you?",A1,negation,7.0,6.0
+679870,They are all of my friends.,A1,"people,relationships",7.0,8.0
+3906626,Maybe I should go talk to her.,A1,"emotions,requests,free time",7.0,7.0
+10999894,Phone him tonight.,A1,"time,requests",7.0,7.0
+2325976,I feel all right.,A1,emotions,7.0,8.0
+5835895,Fadil would like to see you.,A1,requests,7.0,7.0
+9719832,Did they write to her?,A1,"negation,requests",7.0,5.0
+8516629,Our time is coming.,A1,"time,future plans,emotions",7.0,7.0
+10857016,Tell him I sent you.,A1,requests,7.0,7.0
+298904,He is free to go there.,A1,"free time,travel,emotions",7.0,7.0
+3726068,"I know what you were thinking, because I was thinking it, too.",A1,"emotions,language learning",7.0,5.0
+6221430,Tom may not be at home today.,A1,"time,negation",7.0,6.0
+11657109,Paul told Rima to stop.,A1,"requests,emotions",7.0,7.0
+3831429,Your mother has always loved you.,A1,emotions,7.0,8.0
+12498632,Did you tell the children a story?,A1,"books,negation,requests",7.0,7.0
+753366,Let me drive your new Toyota.,A1,requests,7.0,8.0
+7205448,Sami had class on Tuesdays and Fridays.,A1,"school,time",7.0,8.0
+6709623,Sami was there for a reason.,A1,emotions,7.0,7.0
+7450503,Why did she agree?,A1,"emotions,requests",7.0,7.0
+7397465,She said she knew how I felt.,A1,emotions,7.0,8.0
+2243331,They started running.,A1,"sports,emotions",7.0,9.0
+8835796,I have a beach house.,A1,travel,7.0,7.0
+312501,She has never seen it before.,A1,negation,7.0,8.0
+7736539,We started doing that a week ago.,A1,"time,future plans",7.0,6.0
+7213102,I told Tom what I had done.,A1,"language learning,emotions",7.0,8.0
+8515758,She did everything she could to help him.,A1,"emotions,negation",7.0,8.0
+4220036,Have a good week!,A1,"time,emotions",7.0,8.0
+6362528,I saw a beautiful house.,A1,free time,7.0,7.0
+10107940,Yanni is really good.,A1,"people,emotions",7.0,7.0
+40586,Doubtless you have heard the news.,A1,news,7.0,5.0
+8103152,The man is very old.,A1,emotions,7.0,5.0
+7398875,She said she had a difficult day.,A1,emotions,7.0,7.0
+3418621,Did you enjoy your Sunday?,A1,"time,emotions,free time",7.0,8.0
+6254598,They'll come with their children.,A1,"future plans,family",7.0,6.0
+10715874,I practice every day.,A1,"hobbies,free time",7.0,8.0
+8520351,She asked if anyone knew anything about him.,A1,"negation,requests",7.0,7.0
+64108,"May I use your car, Dad?",A1,"requests,free time",7.0,7.0
+8037477,Telling lies is wrong.,A1,negation,7.0,6.0
+6369787,"Whoa, wait a second there.",A1,"negation,requests",7.0,5.0
+292101,He is a man of great ability.,A1,work,7.0,4.0
+7294399,Sami and Layla got along a lot.,A1,emotions,7.0,8.0
+8520221,He knows nothing about her.,A1,negation,7.0,6.0
+3909967,Why do you want to see me?,A1,requests,7.0,8.0
+13405468,This is the best school in town.,A1,school,7.0,8.0
+12300710,Did you run all the way home?,A1,"time,emotions,future plans",7.0,7.0
+9705496,It would be nice if I had a car.,A1,"requests,future plans",7.0,7.0
+7733502,We should get there soon.,A1,"time,travel",6.0,7.0
+9039611,We had to work together.,A1,work,6.0,6.0
+5207752,I watch TV all the time.,A1,"free time,time",6.0,8.0
+3917175,Did you buy these for us?,A1,requests,6.0,7.0
+8348622,"You're the best, Lisa!",A1,emotions,6.0,8.0
+4498104,I did everything.,A1,"work,goals",6.0,7.0
+4502606,Think about your goals.,A1,goals,6.0,7.0
+6529788,These are nice. How much are they?,A1,money,6.0,7.0
+12694731,Did you enjoy school?,A1,school,6.0,7.0
+3915792,I just got her off to school.,A1,school,6.0,8.0
+3201306,Tell us about what you're doing.,A1,"free time,hobbies,work",6.0,7.0
+11250757,They know everyone.,A1,"emotions,negation",6.0,6.0
+7407182,They played with their children.,A1,"free time,emotions",6.0,8.0
+8243932,Will they come today?,A1,"time,future plans,negation",6.0,7.0
+12955456,He has got a point here.,A1,"emotions,requests",6.0,7.0
+6273677,How safe is this car?,A1,free time,6.0,8.0
+939883,Has she come or what?,A1,"time,future plans,requests",6.0,6.0
+7203186,Sami was talking about something else.,A1,"free time,emotions",6.0,8.0
+8071436,I wanted a big family.,A1,"emotions,future plans",6.0,5.0
+7202527,Sami has been to college before.,A1,school,6.0,7.0
+9479734,"Did you watch the video? ""Some of it.""",A1,"movies,free time",6.0,6.0
+1886155,Did you get it?,A1,requests,6.0,8.0
+7486360,Where did she buy them?,A1,travel,6.0,8.0
+802385,They could not get there quickly.,A1,"time,negation,travel",6.0,8.0
+12274999,How long were you alone?,A1,"time,emotions",6.0,7.0
+2245345,Don't go away.,A1,"requests,negation",6.0,7.0
+11677686,Alberto told Isabella to wait there.,A1,"requests,emotions",6.0,7.0
+9510252,Your phone was off.,A1,"time,emotions,negation",6.0,7.0
+3439512,You should look into it.,A1,requests,6.0,7.0
+10598413,How often do you work out?,A1,"free time,sports",6.0,8.0
+2568338,She's with her parents.,A1,"emotions,work",5.0,6.0
+1879864,This is not my first time.,A1,negation,5.0,7.0
+3625415,I did everything to become your friend.,A1,"emotions,goals",5.0,5.0
+3200480,Did you tell them anything?,A1,"questions,negation",5.0,9.0
+8543346,Help your friends.,A1,requests,5.0,7.0
+6803329,I asked Tom about his work.,A1,work,5.0,7.0
+4494486,Sooner would be better.,A1,time,5.0,5.0
+10020101,Yanni is coming on Wednesday.,A1,time,5.0,7.0
+2013571,"I want to be there, you know.",A1,goals,5.0,7.0
+3916001,We should give them some space.,A1,requests,5.0,7.0
+7404884,He does the best he can.,A1,work,5.0,7.0
+8513451,He'll be here before her.,A1,time,5.0,6.0
+9557103,You need to find her.,A1,requests,5.0,7.0
+5990238,We never left the house.,A1,negation,5.0,7.0
+11686159,What else was down there?,A1,free time,5.0,7.0
+1879485,Where did you wear them?,A1,"clothes,questions",4.0,7.0
+2250003,Stay and watch.,A1,free time,4.0,6.0
+9289019,Who's behind all this?,A1,"questions,emotions",4.0,7.0
+3200064,What haven't you told me?,A1,negation,4.0,6.0
+8999575,I was in Hamburg.,A1,travel,4.0,7.0
+11803829,We did not leave anything.,A1,negation,4.0,7.0
+11557256,I work in town.,A1,work,4.0,7.0
+11887140,Eat some candy.,A1,food,4.0,7.0
+2930573,You had played.,A1,past time,4.0,5.0
+2535041,You're thinking too much.,A1,"emotions,negation",4.0,6.0
+274644,Where are all the others?,A1,negation,3.0,7.0
+11829211,Ivan was late to the party.,A1,"time,free time",3.0,7.0
+773552,I hear you.,A1,emotions,3.0,9.0
+73939,"Yes, all right, says Mrs. Lee.",A1,,3.0,6.0
+1078147,I am young.,A1,emotions,3.0,7.0
+3393160,We should wait.,A1,free time,3.0,8.0
+8790325,Skura and Nuja were late.,A1,time,3.0,6.0
+3917172,Did you buy this for me?,A1,"requests,emotions",3.0,7.0
+10518512,Why do you have more than one Facebook account?,A1,"social media,personal information",3.0,7.0
+5879580,Why are you coming from that side?,A1,time,3.0,6.0
+2405886,I said not now.,A1,"negation,time",3.0,8.0
+11544402,Why didn't she go?,A1,negation,3.0,8.0
+1151432,See you.,A1,"time,free time",3.0,7.0
+11776160,Antonio and Rima both started talking.,A1,school,3.0,8.0
+11793569,Santiago welcomed Rima.,A1,emotions,3.0,7.0
+11216358,Where did you see these at?,A1,travel,3.0,7.0
+10743045,Tell me what you think of my car.,A1,"free time,hobbies",3.0,8.0
+11439085,I am alone.,A1,emotions,3.0,7.0
+6767537,I miss the dog.,A1,"animals,emotions",3.0,6.0
+11735287,"OK, let's get started.",A1,goals,3.0,7.0
+2685770,My eyes have a problem.,A1,emotions,3.0,6.0
+11439504,Rima and Skura were not right.,A1,negation,3.0,4.0
+8931935,I did this alone.,A1,negation,3.0,7.0
+6810176,Sami was short.,A1,emotions,3.0,3.0
+13189643,Where is your dad?,A1,animals,3.0,7.0
+11414852,Rima looked different.,A1,"emotions,people",3.0,5.0
+11693074,Damiano said it again.,A1,negation,3.0,7.0
+5573320,We do what we want to do.,A1,"emotions,free time,goals,negation",3.0,6.0
+3138423,I am on the Internet.,A1,,2.0,7.0
+12721053,Seven?,A1,time,2.0,3.0
+3904941,I understand them.,A1,emotions,2.0,8.0
+3727199,We can all do this.,A1,goals,2.0,8.0
+62522,Ken's turn came.,A1,time,2.0,7.0
+11118474,Do both match?,A1,negation,2.0,6.0
+12304642,Each in turn.,A1,time,2.0,8.0
+886966,She asked him questions.,A1,requests,2.0,8.0
+5296357,This is not my key.,A1,negation,2.0,9.0
+2549167,Could you help us?,A1,requests,2.0,8.0
+12296677,Add some oil.,A1,"food,requests",2.0,6.0
+252916,I don't know you.,A1,negation,2.0,6.0
+12093242,She does not want to know them.,A1,negation,2.0,6.0
+3168075,Which one is your car?,A1,negation,1.0,7.0
+2646012,Start at the beginning.,A1,time,1.0,5.0
+12487998,That would be no problem.,A1,negation,1.0,7.0
+6267809,I shouldn't need any help.,A2,negation,10.0,7.0
+3544611,Do you want to figure out your purpose in life? Live your passion!,A2,"goals,free time",9.0,6.0
+1197303,Please turn off the radio.,A2,"requests,free time,hobbies,music",8.0,8.0
+7521176,I believe I can handle that.,A2,"emotions,goals",8.0,7.0
+8053427,He's so smart and funny.,A2,emotions,8.0,7.0
+2728895,He majored in literature at the university.,A2,"school,books",8.0,7.0
+8850433,I'd never have done that if you hadn't been there.,A2,"negation,emotions",8.0,7.0
+13180978,Your words totally changed my life.,A2,emotions,8.0,7.0
+1837977,I'll teach you everything you need to know.,A2,"language learning,goals,future plans",8.0,8.0
+2483174,This really isn't a good time.,A2,"time,emotions,negation",8.0,7.0
+54296,I'll make every possible effort to meet your request.,A2,"emotions,requests,future plans",8.0,8.0
+11371808,Ziri looked around.,A2,emotions,8.0,6.0
+72437,I'd like to reserve a table for four at six.,A2,"requests,time",8.0,9.0
+2795088,I need help!,A2,requests,8.0,9.0
+2436255,There was no internet back then.,A2,"time,negation",8.0,6.0
+9649540,Please come back in thirty minutes to get it.,A2,"time,requests,future plans",8.0,7.0
+265042,I would like to address two questions.,A2,requests,8.0,6.0
+1476745,"I can speak Chinese, but I can't read Chinese.",A2,language learning,8.0,7.0
+6456944,Are you willing to learn Kadazan language?,A2,language learning,8.0,4.0
+6419484,"Mary is sick, so she can't help us today.",A2,"emotions,negation",8.0,7.0
+9733540,Yanni bought his daughter a swing set.,A2,"free time,hobbies,family",8.0,7.0
+5729554,Finally we're getting somewhere.,A2,"emotions,future plans",8.0,7.0
+8479798,He wasn't quiet.,A2,negation,8.0,7.0
+4475046,It's been a pleasure doing business with you.,A2,"work,emotions",8.0,8.0
+6899091,Thanks for helping us do that.,A2,emotions,8.0,7.0
+5502219,That's a fantastic idea.,A2,emotions,8.0,7.0
+1679736,This is the first time I've ever needed help.,A2,"time,goals",8.0,6.0
+1779284,Are there people whose mother tongue is Esperanto?,A2,language learning,8.0,6.0
+6048809,Do you mind if I go home early?,A2,"requests,free time",8.0,7.0
+405341,What will you do when you grow up?,A2,"future plans,school",8.0,6.0
+3908730,I should tell them to try it.,A2,"time,future plans",8.0,8.0
+10843866,The mouse tried to get away from the cat.,A2,"animals,food",8.0,6.0
+3918893,I called him from the hospital.,A2,"requests,time,emotions",7.0,6.0
+3903722,I like living with her.,A2,"emotions,free time",7.0,7.0
+1526448,Do I need to explain the reason to him?,A2,"requests,negation",7.0,7.0
+3680842,He's interested in math.,A2,school,7.0,7.0
+8526664,"He's still up, isn't he?",A2,"emotions,negation",7.0,6.0
+13015011,I wish you could join me here.,A2,"emotions,requests",7.0,7.0
+9931157,Yanni didn't think anything of it.,A2,"emotions,negation",7.0,7.0
+2060390,"If you were in my shoes, what would you do?",A2,"emotions,requests",7.0,6.0
+13064631,Friendship is a support in difficult times.,A2,emotions,7.0,8.0
+2264302,I'm ahead in my work.,A2,"work,goals",7.0,8.0
+11631269,Gunter was a very spiritual man.,A2,emotions,7.0,6.0
+394278,The question is whether he'll read the letter or not.,A2,"books,future plans,negation",7.0,7.0
+10231744,This is exactly what Ziri needs right now.,A2,"emotions,requests",7.0,6.0
+12421037,I don't really want to go out today.,A2,"emotions,negation,free time",7.0,6.0
+3129193,I must convince her.,A2,"emotions,goals,future plans,requests",7.0,8.0
+2542610,I was on the road last summer.,A2,"time,travel",7.0,6.0
+12911332,I quickly got up.,A2,emotions,7.0,7.0
+253901,"Though I had never met Jim, I could pick him out right away.",A2,emotions,7.0,7.0
+5744432,They stuck to their plan.,A2,"future plans,negation",7.0,7.0
+39221,Could you please turn your television down?,A2,requests,7.0,8.0
+5859686,I've fixed everything.,A2,negation,7.0,6.0
+3311042,We're all together right now.,A2,"time,emotions",7.0,8.0
+2537283,Your boyfriend's really lucky to have someone like you.,A2,emotions,7.0,6.0
+708099,I didn't know she was ill.,A2,"negation,emotions",7.0,7.0
+9149689,"Are you going on this bus? ""No, it's too full.""",A2,"travel,negation",7.0,7.0
+3722906,I'll let you know when it's time.,A2,"time,future plans",7.0,6.0
+6482286,You'll find this lesson easy.,A2,language learning,7.0,6.0
+36178,Nancy is afraid of dogs.,A2,"animals,emotions",7.0,7.0
+3908107,Tell them I'll be there by 2:30.,A2,"time,future plans",7.0,7.0
+1459981,"Meow, said the cat, and it looked at me.",A2,animals,7.0,7.0
+11490700,Did they think that I wouldn't notice?,A2,"emotions,negation",7.0,7.0
+12647784,Ziri missed his best friend.,A2,emotions,7.0,7.0
+33806,Please write with a pen.,A2,requests,7.0,6.0
+6236841,"You didn't think you should do that, did you?",A2,"negation,emotions",7.0,5.0
+24445,Hundreds of people work in this factory.,A2,work,7.0,7.0
+6043994,The ball is in Layla's court.,A2,sports,7.0,6.0
+9449006,Don't press that button.,A2,"negation,requests",7.0,6.0
+7440473,They said they could handle it.,A2,"work,emotions,future plans",7.0,7.0
+6403319,It's Saturday so I don't have to get up for work tomorrow.,A2,"time,work,free time,negation",7.0,6.0
+6818720,Sami's daughter is so cute.,A2,emotions,7.0,8.0
+2953221,Maybe it just isn't funny.,A2,"emotions,negation",7.0,5.0
+7139831,I liked Tom right off.,A2,emotions,7.0,6.0
+3178614,It's probably hard.,A2,emotions,7.0,6.0
+253725,I don't know this neighborhood too well.,A2,"travel,negation",7.0,6.0
+11111190,I wouldn't do something like that.,A2,negation,7.0,6.0
+6202983,Are your children already grown up?,A2,"animals,emotions",7.0,7.0
+1815264,"Cyprus is called ""Kıbrıs"" in Turkish.",A2,language learning,7.0,9.0
+11446114,I showed Linda that.,A2,free time,7.0,5.0
+2713310,I had a very strange dream.,A2,"emotions,free time",7.0,7.0
+7174194,I thought that I told you never to go there alone.,A2,"negation,requests,emotions",7.0,7.0
+9796051,Yanni and Skura are married and expecting their first child together.,A2,"emotions,future plans",7.0,6.0
+2362784,You're capable.,A2,emotions,7.0,9.0
+9995242,Yanni ran to the bathroom.,A2,free time,7.0,6.0
+3726087,I forgot who I was talking to.,A2,language learning,7.0,5.0
+7217725,I'm afraid that we're out of time.,A2,time,7.0,5.0
+2372792,I just might get to like this place.,A2,"emotions,future plans",7.0,7.0
+1890730,I'll call you when I get there.,A2,"future plans,travel",7.0,8.0
+11992914,No life without water.,A2,"time,goals",7.0,7.0
+5938741,You seem very determined.,A2,free time,7.0,7.0
+10787909,He's the kindest person I've ever met.,A2,emotions,7.0,6.0
+6418420,Mary says she finished writing the report.,A2,"work,language learning",7.0,7.0
+1159277,"At first, we weren't familiar at all. Over time we got to know each other.",A2,"emotions,time,language learning",6.0,9.0
+11416370,She loves it.,A2,emotions,6.0,8.0
+2326567,I forgot to do something.,A2,"negation,requests,future plans",6.0,6.0
+8249340,That's just my imagination.,A2,emotions,6.0,6.0
+2540044,I'm trying to move on with my life.,A2,"goals,emotions",6.0,7.0
+6810389,I wanted to say that I was sorry.,A2,emotions,6.0,7.0
+4706552,I spent that Saturday afternoon watching TV.,A2,free time,6.0,9.0
+3273755,Do you think it's normal to talk like that?,A2,school,6.0,7.0
+5836181,I've worked here for many years.,A2,work,6.0,7.0
+8890593,I asked somebody to help me.,A2,requests,6.0,7.0
+2249807,Please sign these.,A2,requests,6.0,5.0
+6311518,We split the pay in half.,A2,money,6.0,7.0
+7400642,She told me she plans on going.,A2,future plans,6.0,8.0
+456575,Our visit has been very pleasant.,A2,travel,6.0,8.0
+2359235,I've been sitting here for three hours.,A2,time,6.0,7.0
+3018962,Please make some tea.,A2,food,6.0,6.0
+11709750,The resort was shut down a long time ago.,A2,time,6.0,6.0
+10646970,Can you let me off at the next light?,A2,travel,6.0,7.0
+302852,He did not like her manner of speech.,A2,"negation,emotions",6.0,6.0
+3819034,We could take turns.,A2,"requests,free time",6.0,7.0
+2374024,I just want it the way it was.,A2,"requests,negation",6.0,6.0
+10641715,I don't like singing in public.,A2,"negation,music,emotions",6.0,7.0
+405520,You shouldn't wait here.,A2,negation,6.0,8.0
+6439288,How much milk did you drink?,A2,"food,negation",6.0,8.0
+7395739,He said that he wouldn't help me.,A2,"negation,emotions",6.0,6.0
+6229852,I don't feel like taking my dog for a walk this morning.,A2,"animals,emotions,negation",6.0,7.0
+6265239,Do your children drink milk?,A2,"animals,food,negation,requests",6.0,7.0
+11889117,"You didn't dress up as Yuri, did you?",A2,"negation,school",6.0,5.0
+4710415,I need to get a little sleep.,A2,time,6.0,6.0
+6218795,Let's rewind for a moment; what was it that you said to him exactly?,A2,language learning,6.0,6.0
+6272268,When will you do that?,A2,future plans,6.0,5.0
+24639,"Whatever may happen, I am prepared for it.",A2,future plans,6.0,7.0
+1447897,Is there space for one more person?,A2,requests,6.0,7.0
+285154,Let him use the telephone.,A2,requests,6.0,8.0
+3122318,I know you're disappointed in me.,A2,emotions,6.0,7.0
+12099380,This went on for months.,A2,"time,free time",6.0,7.0
+5066391,Isn't it better like this?,A2,requests,6.0,7.0
+8849867,Yanni removed the hard drive and replaced it with a new one.,A2,work,6.0,6.0
+13015301,What is the last thing you do before you go to sleep?,A2,time,6.0,8.0
+6425670,Mary can do what she wants to do.,A2,free time,6.0,7.0
+10278613,Make sure you arrive on time.,A2,requests,6.0,8.0
+3045771,I'll square things with you later.,A2,requests,6.0,6.0
+8380046,He was friendly to her.,A2,emotions,6.0,7.0
+10166001,I thought you didn't know about it.,A2,negation,6.0,8.0
+10778489,You'd better close the door.,A2,requests,5.0,8.0
+8282301,I think that we're in this together.,A2,emotions,5.0,8.0
+8052448,I need to declutter my home.,A2,free time,5.0,7.0
+1160258,"Mr. Holmes, you are very interesting to me.",A2,emotions,5.0,7.0
+4141206,I'm sure you've seen everything you need to.,A2,emotions,5.0,6.0
+7504027,Did you know that you are stronger than you think you are?,A2,emotions,5.0,6.0
+6270389,I wouldn't do that here.,A2,negation,5.0,6.0
+4015305,Are you moving back home?,A2,travel,5.0,8.0
+3732013,What are you going to tell me now?,A2,requests,5.0,6.0
+8532460,She asked him what his last name was.,A2,language learning,5.0,6.0
+355633,The only person who is tired of waiting for Miss Cobb.,A2,emotions,5.0,4.0
+7245180,Sami bought Layla hair products.,A2,food,5.0,8.0
+7493899,Where did Tom take these pictures?,A2,free time,5.0,7.0
+285414,I'm looking forward to his present.,A2,free time,5.0,7.0
+6807113,Sami had to do that online.,A2,work,5.0,6.0
+3735415,"Sooner or later, someone has to speak up.",A2,requests,5.0,6.0
+10906774,I wish I had that talent.,A2,emotions,5.0,8.0
+12785404,You guys eat fruit.,A2,food,5.0,7.0
+8195613,I often listen to your videos.,A2,music,5.0,8.0
+5915423,I have some more questions for you.,A2,requests,5.0,7.0
+906842,What's your favorite piece of furniture?,A2,food,5.0,7.0
+11075237,I don't know why anymore.,A2,negation,5.0,7.0
+5744557,That's how I feel anyway.,A2,emotions,5.0,7.0
+7212768,I still wish that you'd do that.,A2,emotions,5.0,6.0
+7280071,Sami felt immediately nervous.,A2,emotions,5.0,6.0
+7392709,He says he doesn't have to do that.,A2,negation,5.0,7.0
+8893803,In the early morning the sun dazzles drivers.,A2,weather,5.0,7.0
+12909554,He was home yesterday.,A2,free time,5.0,5.0
+8243195,"Yes, the cat is big.",A2,animals,5.0,7.0
+1096403,It wasn't much of a view.,A2,"negation,free time",5.0,6.0
+8218356,I don't think I'd rule that out.,A2,negation,5.0,7.0
+371435,He went to the shop.,A2,travel,5.0,8.0
+10021839,I have many published books.,A2,books,5.0,6.0
+12876208,We went to the only place we could think of.,A2,free time,5.0,6.0
+1182667,"By this time tomorrow, we will have already arrived.",A2,emotions,5.0,7.0
+6698617,I kept silent because I didn't know what to say.,A2,free time,5.0,7.0
+317527,She is very good at changing the subject.,A2,language learning,5.0,7.0
+1877499,Tom is the person who helped Mary.,A2,work,5.0,7.0
+8521897,She knows that we trust him.,A2,"emotions,school",4.0,8.0
+8481651,She's shorter than him.,A2,free time,4.0,6.0
+12946733,He doesn't like those pictures.,A2,negation,4.0,7.0
+8478101,He tickled her.,A2,emotions,4.0,5.0
+3910735,I don't think it's her.,A2,negation,4.0,8.0
+70988,Whatever you say.,A2,language learning,4.0,7.0
+11251673,It's not my idea.,A2,negation,4.0,9.0
+3739786,Please do whatever seems best to you.,A2,"free time,hobbies",3.0,7.0
+2013869,Do you want this or don't you?,A2,"negation,requests",3.0,6.0
+65040,What do you recommend?,A2,requests,3.0,8.0
+5360480,The sky darkened.,A2,weather,3.0,7.0
+8336211,It's not a new technique.,A2,negation,3.0,7.0
+2243698,They're useless now.,A2,negation,3.0,7.0
+6660789,You don't look much like your father.,A2,negation,3.0,5.0
+1635376,Where did you leave your shoes?,A2,"free time,hobbies",3.0,8.0
+11807954,Is it possible to believe?,A2,emotions,3.0,6.0
+309499,Her voice sounds very beautiful.,A2,music,3.0,8.0
+4529449,The teacher's name is Mr. Jackson.,A2,school,2.0,7.0
+73835,"Who is it? ""It's me.""",A2,language learning,2.0,7.0
+9220395,Did you jump?,A2,"animals,emotions",2.0,5.0
+3170522,Where's your black suit?,A2,negation,2.0,5.0
+10637366,How were they formed?,A2,time,2.0,6.0
+6352403,I know who agreed to do that.,A2,negation,2.0,6.0
+8045295,I want to know who lost.,A2,negation,2.0,6.0
+8336379,Who are your role models?,A2,people,1.0,7.0
+1190264,Steak and caviar are my favorite foods.,B1,food,9.0,8.0
+9709473,How many sentences have you added?,B1,language learning,8.0,4.0
+1660633,"Look, my house is cleaner than yours.",B1,negation,8.0,5.0
+9464919,We're going for a wander round town.,B1,"travel,free time",8.0,7.0
+10387366,Marcus wants to be a translator.,B1,"work,goals,language learning",8.0,7.0
+69715,It is necessary that you take a good rest.,B1,"emotions,requests,free time",8.0,8.0
+5262984,The capybara is the world's largest rodent.,B1,animals,8.0,5.0
+7796700,The drainage systems are not able to handle the water pressure.,B1,"weather,work",8.0,5.0
+880015,How wonderful that we have met with a paradox. Now we have some hope of making progress.,B1,emotions,8.0,4.0
+13147810,A life of moderation is a life without danger.,B1,emotions,8.0,6.0
+12221016,Have you seen this movie? It's one of my favorites.,B1,"movies,emotions",8.0,8.0
+12768017,I sometimes go hiking in the mountains.,B1,"hobbies,free time,travel",8.0,7.0
+10314648,"I can't play chess, but I'd like to learn how.",B1,"language learning,free time,sports,negation",8.0,8.0
+397956,The teacher and her partner took the people attending the wedding to a park.,B1,"school,work,free time",8.0,7.0
+10064020,My train is delayed.,B1,"time,travel",8.0,8.0
+299547,He is in fourth grade of elementary school.,B1,school,8.0,6.0
+3719537,Everywhere were fruits and sweet and delightful flowers.,B1,"food,plants",8.0,7.0
+7008420,I did a week's worth of work in an afternoon.,B1,"work,time",8.0,6.0
+325257,Many trees were blown down by the storm.,B1,"plants,weather",8.0,7.0
+330545,What we've already achieved gives us hope for what we can and must achieve tomorrow.,B1,"future plans,goals,emotions",8.0,9.0
+262361,"I can ride a horse, too.",B1,"animals,hobbies",8.0,8.0
+12595127,What a marvelous sentence!,B1,emotions,8.0,7.0
+3892729,Will you stop answering my questions with a question?,B1,"requests,negation",8.0,7.0
+3822679,"Anytime you need a favor, call me.",B1,"requests,emotions,future plans",8.0,7.0
+5858786,I like spaghetti.,B1,food,8.0,9.0
+10117459,It's time to stock up on provisions.,B1,"time,food",8.0,6.0
+21496,The street to school was flooded so we had to go around.,B1,"school,weather,travel",8.0,7.0
+5751918,I'm glad I watched it.,B1,"movies,emotions",8.0,7.0
+6256772,I'd be glad to teach you French.,B1,"language learning,requests",8.0,7.0
+11744025,I appreciate the mutual respect that Carlos and I have as colleagues.,B1,"work,emotions",8.0,8.0
+11785998,Santiago competed in track competitions.,B1,sports,8.0,7.0
+3390702,Please hand me my cane.,B1,requests,8.0,6.0
+72735,I received your Model 345 in good condition.,B1,free time,7.0,5.0
+5826151,I need permission from your parents or guardian.,B1,requests,7.0,7.0
+10170378,His dogs are barking.,B1,animals,7.0,7.0
+11472777,I need to scour the city.,B1,travel,7.0,5.0
+12937663,He put the groceries on the counter.,B1,food,7.0,8.0
+12175989,He's never moving to the countryside again.,B1,"animals,plants,weather,future plans,negation",7.0,6.0
+12317072,Thoughts disturb meditation.,B1,"emotions,free time",7.0,5.0
+2360998,I hope you'll reconsider.,B1,"requests,emotions,future plans",7.0,8.0
+278127,The eldest son succeeded to all the property.,B1,"work,money",7.0,7.0
+12946816,He doesn't need the money anyways.,B1,"money,negation",7.0,6.0
+2362295,Try to slice the meat with a different knife.,B1,food,7.0,6.0
+12698387,"Wait, hold up a second! ""What's wrong?"" ""I got some sand in my shoes.""",B1,"emotions,free time",7.0,7.0
+29347,Robert enjoyed talking with his girlfriend.,B1,emotions,7.0,8.0
+284323,I will get through with my homework before he comes.,B1,"school,future plans,time",7.0,7.0
+10555467,I've got no idea why he's scared of violins.,B1,"animals,emotions,music,negation",7.0,7.0
+254607,I named the kitten Tama.,B1,animals,7.0,7.0
+13025397,I didn't go to the library yesterday.,B1,"school,time,negation",7.0,7.0
+8990670,I hope you're ready for today's quiz.,B1,"school,time",7.0,7.0
+6048321,There was a pyramid of empty beer cans on the table.,B1,"food,free time",7.0,6.0
+45407,The boy observed the birds all day.,B1,"animals,time",7.0,7.0
+13247251,My truck doesn't fit in the garage.,B1,negation,7.0,7.0
+5725858,We're still looking for donations.,B1,"money,requests",7.0,7.0
+12946757,He decided to try skating again.,B1,"hobbies,free time",7.0,7.0
+9182174,I hope it doesn't impede my online classes.,B1,"school,negation,future plans",7.0,6.0
+9360750,Do you have a razor?,B1,requests,7.0,7.0
+11832997,Ivan has to move out of the house because he can’t afford it anymore.,B1,"work,money,emotions",7.0,7.0
+2546063,I'll make a reservation.,B1,future plans,7.0,7.0
+3179724,I have decided to weigh myself every day starting today.,B1,goals,7.0,7.0
+5377813,She's done wonders in the scientific field.,B1,work,7.0,7.0
+6347623,Who do you usually go skiing with?,B1,"sports,free time",7.0,7.0
+11592171,Michael revealed that his mom owned that restaurant.,B1,"work,food",7.0,8.0
+5042076,I have trouble talking about my feelings.,B1,emotions,7.0,6.0
+11810206,I hated taking tests.,B1,"school,emotions",7.0,5.0
+527651,Kate stays in Izu on weekends.,B1,"free time,travel",7.0,8.0
+11541588,Fungi are closer to animals than to plants.,B1,"animals,plants",7.0,8.0
+7271410,Sami wanted to go to the prom dance.,B1,"school,emotions,future plans",7.0,7.0
+7250280,Sami wanted to handle the situation without getting anybody in trouble.,B1,"emotions,school,work,future plans,negation",7.0,7.0
+12768412,Beauty is about embracing who you are.,B1,emotions,7.0,7.0
+6898763,"You're very observant, aren't you?",B1,emotions,7.0,7.0
+6011137,Do you want to go jogging?,B1,"sports,free time,requests",7.0,7.0
+8523212,"You aren't the only one who likes chess. He likes it, too.",B1,"free time,hobbies,negation",7.0,8.0
+52733,John employs 200 workers.,B1,work,7.0,6.0
+7174340,I thought that I'd be able to do that without any help.,B1,"emotions,future plans,negation",7.0,8.0
+2205451,My son does not like fried egg.,B1,"food,negation",7.0,5.0
+7541898,Tom tried not to sound too enthusiastic.,B1,"emotions,negation",7.0,7.0
+10851101,Explore all the possibilities.,B1,"free time,goals,future plans",7.0,8.0
+9725049,"Although he is totally different from me, I really respect him.",B1,"emotions,negation",7.0,8.0
+12975771,When was the last time you gave someone a compliment?,B1,"emotions,time,requests",7.0,8.0
+2113453,He came with two pals.,B1,"people,relationships",7.0,7.0
+12638525,Is there anywhere round here where I can hire a motorbike?,B1,"travel,requests",7.0,6.0
+11576123,He ran as fast as a hare.,B1,animals,7.0,7.0
+12872745,She's falling asleep.,B1,emotions,7.0,7.0
+11195451,Do you serve halal food?,B1,"food,negation",7.0,7.0
+7114441,I'm a pitcher.,B1,sports,7.0,7.0
+13373288,The bird flew into the sky.,B1,"animals,weather",7.0,7.0
+5075118,"First and foremost, you need to figure out why you're here.",B1,"goals,requests",7.0,8.0
+3672954,External air conditioners are quite cheap.,B1,money,7.0,6.0
+1923231,He couldn't resist.,B1,"emotions,negation",7.0,6.0
+8373787,I've been speaking to your director and he agreed.,B1,"work,requests,future plans",7.0,7.0
+9027037,Skura owns a comic book store.,B1,"books,work",7.0,8.0
+6271334,Tom hates teaching French.,B1,"school,language learning,emotions,negation",7.0,5.0
+3820871,I like this striped shirt.,B1,"free time,hobbies",7.0,8.0
+9975203,Yanni is delivering a speech.,B1,work,7.0,7.0
+6570573,I'm sometimes lonely on weekends.,B1,"free time,emotions",7.0,6.0
+5248495,There are some flowers around the castle.,B1,plants,7.0,6.0
+8533406,He's fixing his car.,B1,work,7.0,7.0
+7494227,Where did he put my passport?,B1,requests,7.0,7.0
+4529258,I just added some potatoes to the stew.,B1,food,7.0,7.0
+2406654,I still have to fix the washing machine.,B1,"work,hobbies,future plans,requests",7.0,7.0
+1618,It is already eleven.,B1,time,7.0,6.0
+697783,In the attic is my grandfather's old first-aid kit from World War II.,B1,"books,history",7.0,2.0
+7141230,Sami had some cabbage in the fridge.,B1,food,7.0,8.0
+65666,The waiter helped the lady with the chair.,B1,work,7.0,7.0
+8007062,I have relatives who live in Boston.,B1,travel,7.0,5.0
+12950581,He cleaned the mess up.,B1,"emotions,free time",7.0,7.0
+5254825,They could afford to eat in the restaurant.,B1,"food,money",7.0,8.0
+5942214,Solar power is getting cheaper all the time.,B1,"money,future plans",7.0,7.0
+11495886,Daniel walked into the tattoo parlor.,B1,"free time,hobbies",7.0,6.0
+303994,He put on an air of innocence.,B1,emotions,7.0,7.0
+11513765,John kept changing his appearance everyday.,B1,"emotions,free time,hobbies",7.0,7.0
+2546663,I'll return in a jiffy.,B1,"time,requests,future plans",7.0,7.0
+11631413,Gunter drove off the grass and back onto the road.,B1,travel,7.0,7.0
+7558126,I like to eat seasonal fruit.,B1,food,7.0,7.0
+12503384,Now there is a glimmer of hope.,B1,emotions,7.0,7.0
+7073172,"Mary is in the bathroom, fixing her hair.",B1,free time,7.0,7.0
+12496417,This time I'm inviting you.,B1,"requests,future plans",7.0,7.0
+10797702,Tom basted the turkey.,B1,food,7.0,7.0
+2820985,"Pass me the pepper, please.",B1,"food,requests",7.0,8.0
+40419,"Whoever comes, I'll welcome him warmly.",B1,"emotions,future plans",7.0,8.0
+9350508,Let's drink this wine.,B1,food,6.0,7.0
+12036045,Kalman's building was nestled in a suburban area.,B1,travel,6.0,7.0
+7406150,They've hired themselves good lawyers.,B1,"work,negation",6.0,6.0
+4902474,I'll tell you why we haven't answered your letters.,B1,"language learning,future plans,school,work",6.0,7.0
+10915151,The two computers were otherwise identical.,B1,school,6.0,6.0
+7442339,They were so busy they skipped lunch.,B1,"food,emotions,work",6.0,6.0
+9510372,I'm switching off the light.,B1,"free time,time,requests",6.0,7.0
+3150725,I was thinking of going out and buying a whole new wardrobe.,B1,"free time,work",6.0,7.0
+7381147,"Mary is exhausted, isn't she?",B1,emotions,6.0,7.0
+44562,The cat slowly approached the mouse.,B1,animals,6.0,7.0
+11645291,Leon's masterpiece is ready.,B1,work,6.0,7.0
+6150367,My mother-in-law lives in a retirement community.,B1,work,6.0,7.0
+10726484,He is a very clever boy.,B1,"emotions,school",6.0,7.0
+3022667,Are there any poisonous snakes around here?,B1,animals,6.0,6.0
+7397664,He looked like he was reluctant.,B1,emotions,6.0,6.0
+10317676,What classes are you taking this semester?,B1,school,6.0,8.0
+11475354,This is a bilingual channel.,B1,language learning,6.0,7.0
+2973332,It was raining hard in New York.,B1,weather,6.0,7.0
+13211640,Her reaction is completely impossible to predict.,B1,emotions,6.0,5.0
+11677726,Alberto heard the wind outside.,B1,weather,6.0,7.0
+11639037,Karl was never affiliated with Rima’s company.,B1,negation,6.0,7.0
+55416,This is worth one million yen.,B1,money,6.0,5.0
+3839250,The carpet was worn out and had to be replaced.,B1,negation,6.0,6.0
+35176,There were no visible dangers.,B1,negation,6.0,6.0
+9472055,I want a sculpture.,B1,requests,6.0,7.0
+467993,My older brother finished his homework very quickly.,B1,"school,time,emotions",6.0,8.0
+5583081,I don't swim well.,B1,"sports,negation",6.0,7.0
+1722817,Have you ever mopped your house?,B1,"free time,hobbies,requests",6.0,6.0
+12769235,"The stars blinked down, ancient and wise.",B1,"time,emotions",6.0,6.0
+1871840,"I can't sleep. ""Me neither.""",B1,"emotions,negation",6.0,7.0
+11142549,The woman eats fish and drinks wine.,B1,food,6.0,8.0
+10555427,Have you already taken out the rubbish?,B1,"negation,requests",6.0,7.0
+5682264,A notice came in the mail.,B1,"school,requests",6.0,6.0
+12821924,Do you prefer traveling alone or with others?,B1,"travel,emotions",6.0,7.0
+5933224,Lectures take place frequently.,B1,"school,time",6.0,7.0
+1556962,Today I have to drop by the supermarket.,B1,"food,time,requests",6.0,8.0
+12822405,He limps.,B1,"animals,emotions",5.0,6.0
+10865750,Can you read these sentences?,B1,"requests,language learning",5.0,8.0
+10022054,It's just makeshift; it's not meant to stay that way for ever.,B1,goals,5.0,5.0
+8520313,She couldn't help worrying about him.,B1,emotions,5.0,7.0
+50342,The gesture fetched a laugh from the audience.,B1,emotions,5.0,7.0
+10209844,Ziri is a librarian.,B1,work,5.0,6.0
+7402262,She looks like she's troubled.,B1,emotions,5.0,6.0
+11205362,It's freezing at home.,B1,weather,5.0,7.0
+10573610,The cat purred as he lay towards the sun.,B1,animals,5.0,7.0
+315223,She has a lively interest in everything around us.,B1,emotions,5.0,8.0
+3726114,A noise aroused me from my sleep.,B1,time,5.0,6.0
+12748525,I slept well: deep and soundly.,B1,time,5.0,7.0
+11730179,Adriano told Rima everything that transpired.,B1,work,5.0,7.0
+315987,I'm afraid she can't answer.,B1,emotions,5.0,7.0
+261222,I got her a wrist watch.,B1,"free time,hobbies,time",5.0,8.0
+1008899,Dinosaurs once ruled the earth.,B1,animals,4.0,5.0
+71364,Listen to those whom you think to be honest.,B1,language learning,4.0,5.0
+11994461,Are you on any medication at the moment?,B1,"time,food",4.0,7.0
+10843765,Don't take this lightly.,B1,negation,4.0,6.0
+9916167,"We cried, too.",B1,emotions,4.0,6.0
+10449934,The customs here are pretty different.,B1,culture,4.0,7.0
+11051464,The problem resurfaced.,B1,negation,4.0,6.0
+10765490,The road is very dusty.,B1,weather,3.0,7.0
+6412514,"Mary wasn't thirsty, so she didn't drink anything.",B1,"food,negation",3.0,7.0
+11243154,My feet are itchy.,B1,emotions,3.0,6.0
+6049301,What's in your pockets?,B1,questions,3.0,7.0
+8964549,It isn't urgent.,B1,negation,3.0,7.0
+12086209,You washed your feet.,B1,food,3.0,7.0
+11926954,Whose notepad is this?,B1,questions,3.0,7.0
+8915660,I see a tractor.,B1,animals,3.0,7.0
+11446270,He confessed to that.,B1,"emotions,future plans",3.0,6.0
+12573316,I seldom go to the village.,B1,"negation,travel",3.0,7.0
+11849763,Oleg is a researcher.,B1,work,3.0,7.0
+848746,This is a simple declarative sentence.,B1,"language learning,requests",3.0,7.0
+8505541,It's soft and fuzzy.,B1,"animals,plants",3.0,8.0
+7773804,I feel extremely regretful.,B1,emotions,3.0,6.0
+6263512,Are you permitted to do that?,B1,"negation,requests",3.0,5.0
+328542,"The present password is ""eosdigital"".",B1,work,2.0,7.0
+11166117,Join the two cables.,B1,requests,2.0,6.0
+3825717,There's water in the classroom.,B1,"school,weather",2.0,6.0
+12303001,Do you have a grandson?,B1,"negation,family",1.0,7.0
+10658778,Cats meow.,B1,animals,1.0,9.0
+12284735,Are you talking about whales?,B1,animals,1.0,7.0
+887011,"She bought him a car, but he didn't have a driver's license so he couldn't drive it anywhere.",B2,"money,negation,future plans",9.0,5.0
+12217352,"Food has never tasted any better to me, especially since I've been away from it for such a long time.",B2,"food,time,emotions",9.0,7.0
+11137900,It was only when the ticket inspector asked me for my ticket that I realised I didn't have one.,B2,"time,travel,emotions,negation",8.0,6.0
+12708721,"Pursuing a higher education in languages learning brought me one step closer to my dream job, which is professional translator.",B2,"school,language learning,work,goals",8.0,8.0
+1495460,"This city may be a little run-down, but the people living here are all kind, and will welcome anyone with open arms.",B2,"emotions,travel",8.0,5.0
+8110548,More than 200 music-related businesses occupied late-19th century homes and small-scale commercial buildings on Nashville's Music Row.,B2,"music,time,work",8.0,7.0
+5309948,The tourists drove past blooming fruit trees.,B2,"travel,plants,food",8.0,7.0
+2732261,He loves to climb mountains.,B2,"hobbies,sport,free time",8.0,6.0
+8824592,They were so young at the time of their father's remarriage that they always thought of her as their own mother.,B2,"time,emotions,family",8.0,7.0
+3902581,"Please let me know if I can provide you with any further information, or if you would like to contact me with any questions.",B2,requests,8.0,9.0
+327348,List data can easily be totalled using the automatic sum function.,B2,"work,school",8.0,7.0
+8472743,The girl wore a cute hat.,B2,"free time,hobbies",8.0,7.0
+3448577,Can you recommend a romance novel for me?,B2,"books,free time,hobbies",8.0,7.0
+8977287,I have orange and grey tabby-cats in my menagerie.,B2,animals,8.0,7.0
+287282,His daily behavior is not consistent with his principles.,B2,"emotions,work,negation",8.0,7.0
+9777956,You cannot take a sentence in one language and translate it into another word for word. Languages don't work like that.,B2,"language learning,negation",8.0,7.0
+51511,Mrs. Smith is actively engaged in volunteer work.,B2,work,8.0,8.0
+391757,Life is like riding a bicycle. To keep your balance you must keep moving.,B2,"emotions,hobbies,goals",8.0,7.0
+10357643,Everyone has the right to receive equal pay for equal work without any form of discrimination.,B2,work,8.0,8.0
+12604921,My concern isn't so much about earning degrees but rather gaining practical knowledge.,B2,"goals,work",8.0,7.0
+12588362,I'm still in the learning phase of Kabyle composition.,B2,language learning,8.0,6.0
+12080695,Kalman saw lights moving in the woods.,B2,"free time,hobbies",7.0,4.0
+54810,Prizes will be awarded at the end of the contest.,B2,"free time,goals,future plans",7.0,8.0
+11239305,Ziri visited an old mining town that had been abandoned in the 1940s.,B2,travel,7.0,6.0
+10913254,The flashing light means my mouse needs a new battery.,B2,"time,hobbies,work",7.0,7.0
+10495885,"As time passes, your perspective widens.",B2,"time,emotions,goals",7.0,8.0
+13030927,Individuals interpret situations differently.,B2,emotions,7.0,7.0
+11078466,The lorry was stuck in sand.,B2,travel,7.0,8.0
+3496055,Can we humans digest grass and obtain nourishment from it?,B2,"food,plants",7.0,5.0
+12776890,They conduct interviews with experts.,B2,work,7.0,8.0
+1527991,I've kept a blog before. I didn't really have a set theme; I just blogged about whatever happened that day.,B2,"free time,hobbies,past plans",7.0,7.0
+11739844,He reminds her to take breaks and relax.,B2,"emotions,requests",7.0,8.0
+7350110,"“Come on, pay attention, don’t let me get it wrong.” “I am more prepared to listen than you to recite.”",B2,"requests,emotions,language learning",7.0,7.0
+11892574,"Don't leave the DVDs lying around, they might get damaged.",B2,negation,7.0,7.0
+300631,He intended to have visited the temple last week.,B2,"time,future plans,travel",7.0,6.0
+8985201,"With an associate's degree, you can be admitted automatically into some universities.",B2,school,7.0,8.0
+12973231,He always faces risky situations with such a composed demeanour.,B2,"emotions,work,goals",7.0,7.0
+6693857,Sami planned every detail in advance.,B2,"free time,goals",7.0,4.0
+9271119,He determined to quit smoking.,B2,"goals,emotions",7.0,7.0
+369830,"I was surprised to come across vending machines that sell cans of coffee, where you can even choose between hot and cold ones.",B2,"food,time,free time,hobbies",7.0,8.0
+13112264,Areqi and Lila walked slowly along the path that led to the old ash tree.,B2,"animals,plants",7.0,6.0
+2258204,Don't smoke on an empty stomach.,B2,"negation,food",7.0,6.0
+12139639,"The famed Taj Mahal has long inspired copies made from such materials as matchsticks, plastic blocks, or sand.",B2,"travel,free time,hobbies",7.0,7.0
+12380277,"Finally, he spots a whale and points it out over the loudspeaker to those in the group that may have missed it.",B2,animals,7.0,5.0
+11090843,I'll have bread and butter and tea with sugar.,B2,food,7.0,8.0
+318346,I just got a great job because of an introduction from a friend. Sometimes things happen when you least expect it.,B2,"work,emotions,free time,future plans",7.0,7.0
+12115927,A clear countertop makes meal preparation much more pleasant.,B2,"food,emotions",7.0,7.0
+11607392,What's the difference between clog dancing and tap dancing?,B2,"free time,hobbies,sports",7.0,6.0
+10545956,"Our home internet connections these days allow high-definition videos, shows, and content to reach our screens almost instantaneously.",B2,"free time,movies,hobbies",7.0,7.0
+51946,I've sat on my heels for so long my legs have fallen asleep.,B2,"emotions,free time,hobbies",7.0,6.0
+5825088,I'll take Anne with me and Mrs. Spencer will probably make arrangements to send her back to Nova Scotia at once.,B2,"travel,future plans,emotions",7.0,6.0
+2387,You can't get lost in big cities; there are maps everywhere!,B2,"travel,negation",7.0,7.0
+2266589,I like singing loud and out of tune.,B2,"music,hobbies,emotions",7.0,7.0
+5085459,Limit the consumption of white sugar and salt.,B2,food,7.0,7.0
+291565,Diana's singing impressed him so much that he asked her to sing on the radio.,B2,"music,work",7.0,8.0
+6431139,It's going to take longer to tell you how to do it than to just go ahead and do it myself.,B2,"work,time",7.0,5.0
+8874641,"Our rent is too expensive, so we're looking for another apartment.",B2,"money,work",7.0,7.0
+12146772,"I'm sorry for coming to see you at such a late hour. ""It's fine! I was kind of expecting your visit.""",B2,"time,emotions",7.0,8.0
+11121294,"To select, one presses down on the touchpad instead of a physical button.",B2,language learning,7.0,7.0
+18669,"Before saying goodbye to their neighbors, the Smiths had to tie up some loose ends inside the house.",B2,"family,home,free time",6.0,6.0
+11858984,Leonid walked a mile or so into the woods.,B2,"animals,plants",6.0,5.0
+11083135,"Self-healing plastic could be used in a number of ways, White said. For example, it could be used as a protective coating on metal.",B2,work,6.0,7.0
+245051,I anticipated a quiet vacation in the mountains.,B2,"travel,emotions",6.0,6.0
+11770849,"If I had known, I would have acted differently.",B2,emotions,6.0,6.0
+11629042,The roads are quietest after 8pm.,B2,time,6.0,8.0
+320537,A mother rabbit keeps her babies warm with her own body.,B2,animals,6.0,6.0
+8194325,I can't believe she's sharing her couscous recipe with us.,B2,"food,language learning",6.0,7.0
+624050,She belted out tune after tune at the karaoke bar.,B2,music,6.0,7.0
+58177,This ticket holds good only for two days after purchase.,B2,"time,money",6.0,7.0
+3965931,Are there composers who can't play even one musical instrument?,B2,music,5.0,7.0
+11215797,Trying to get your message across is better than attempting to say everything exactly as a native speaker would.,B2,language learning,5.0,6.0
+324686,"Since unexpected incidents occurred one after another, the exhibition was called off.",B2,"work,negation",5.0,5.0
+12272467,The Portuguese man o' war belongs to the class of Hydrozoa.,B2,animals,5.0,7.0
+9281150,Yanni wore a tight shirt.,B2,work,5.0,6.0
+5713313,"The character depends on personality, not on talent.",B2,emotions,5.0,5.0
+33785,Pens and pencils are examples of writing tools.,B2,"school,work",5.0,9.0
+24263,If you take your shoes off before coming into the house you won't bring in any dirt from your shoes.,B2,school,5.0,5.0
+13029000,Opinions can vary widely among individuals.,B2,"emotions,language learning",5.0,5.0
+2649802,This suit fits you perfectly.,B2,work,5.0,7.0
+3955695,"Jupiter emits twice as much heat as it absorbs from the Sun, which indicates it has its own internal heat source.",B2,"weather,time",5.0,7.0
+11624852,Felix was dressed in tattered clothing.,B2,work,5.0,7.0
+275348,Seldom does a loan come home laughing.,B2,"negation,money",5.0,7.0
+287444,It is estimated that his debts will amount to a considerable sum.,B2,money,4.0,6.0
+6890250,The bird fluttered its wings.,B2,animals,4.0,7.0
+6719376,A kidult isn't a kid who acts like an adult; it's an adult who acts like a kid.,B2,emotions,4.0,7.0
+6694903,She puts cheese on slices of bread.,B2,food,4.0,8.0
+2267012,I have to wash my hands and brush my teeth.,B2,personal hygiene,3.0,9.0
+12117520,Make a schedule for regular oven cleaning to ensure it doesn't become too dirty.,B2,"work,food",3.0,7.0
+11590439,Matthew sat on the roof and Linda sat beside him.,B2,free time,3.0,7.0
+4064207,My index finger was suddenly itchy.,B2,emotions,2.0,7.0
+5785989,An unexpected error has occurred.,B2,"free time,emotions",2.0,7.0
+2790501,"I hate and I love. Why would I do this, maybe you're asking? I don't know, but I feel it happening and am tortured.",C1,emotions,9.0,7.0
+29570,Lucy was beside herself with excitement.,C1,emotions,9.0,5.0
+10647884,Being able to apologize is a big virtue.,C1,"emotions,language learning",9.0,8.0
+5393303,"I know a lot of French words, but it's difficult for me to combine them into sentences.",C1,language learning,9.0,9.0
+1426765,"Where programmers use semi-colons every day, the majority of people only use them in emoticons.",C1,language learning,8.0,7.0
+11506031,James sneaked into Amanda's mansion's gates and brought her some cakes.,C1,"food,travel,money",8.0,6.0
+530567,"He described to his neighbour, who has never gone abroad, the tourist attractions.",C1,travel,8.0,7.0
+2271338,Don't spill the soup.,C1,"food,negation",8.0,7.0
+10072866,Pioneering space observatories like Webb only come to fruition when dedicated individuals work together to surmount the challenge of building something that has never been done before.,C1,"work,goals",8.0,8.0
+2367584,She felt much safer once she’d put her helmet on.,C1,"emotions,sports",8.0,7.0
+252408,I am forbidden to stay out after 10 o'clock.,C1,time,8.0,6.0
+72298,"Bases loaded, two outs in the ninth inning.",C1,"sports,time",8.0,7.0
+8569189,His hobby was collecting ancient coins.,C1,hobbies,8.0,8.0
+10180261,The walls of her room are covered with posters of her idol.,C1,"music,free time",8.0,7.0
+2788038,"In 2003, Niue became the first ""Wi-fi"" nation in the world.",C1,"money,work",8.0,8.0
+13350330,What's the difference between a quadrangle and a quadrilateral?,C1,school,8.0,7.0
+12767860,Resilience is the fuel of perseverance.,C1,"goals,emotions",8.0,8.0
+11766678,Gabriel waved his hand to call the waiter for the bill.,C1,"requests,food",8.0,7.0
+7752714,Their cheeks had touched and were withdrawn from each other.,C1,emotions,8.0,6.0
+12777266,He collects vinyl records from the '70s.,C1,"music,hobbies",8.0,8.0
+9735386,"Rescue dogs are usually trained to respond to hand signals, since in noisy situations, dogs may not be able to hear verbal commands.",C1,"animals,work,language learning",8.0,9.0
+73705,"Do you mind my borrowing your microscope? ""No, not at all.""",C1,"requests,language learning",8.0,8.0
+3097215,"After Tom finished watering the plants, he sat down on the porch to enjoy the sunset.",C1,"plants,free time,time",8.0,7.0
+9471792,"Despite the unlikely chance of finding a meteorite, the Geminid shower should be a beautiful sight, particularly after midnight in the first hours of Monday morning.",C1,"weather,time,space",8.0,8.0
+11708946,The fireworks lit up the whole neighborhood and Lorenzo loved it.,C1,"free time,emotions",8.0,6.0
+11431635,Ziri is an avid hiker.,C1,"hobbies,free time",8.0,7.0
+727526,Use a dictionary to find the meanings of the phrases below.,C1,language learning,8.0,7.0
+8811195,Learn to care for your health and how to prepare your system to resist fatigue.,C1,"health,emotions",7.0,5.0
+11027908,His occupation entails a lot of travelling.,C1,"work,travel",7.0,7.0
+11524572,"For several months during winter, the sun doesn't make it over the horizon in the polar regions.",C1,"weather,time",7.0,5.0
+9732153,"The initial costs of moving to solar, including installing solar panels, have decreased by 90% over the past decade.",C1,"money,work",7.0,6.0
+10742821,I love homemade biscuits with butter and honey.,C1,food,7.0,8.0
+10641796,Your luggage must not weigh more than 8 kg.,C1,"travel,work",7.0,7.0
+4102416,My neighbor served the most delicious crab dip at her party last night.,C1,food,7.0,8.0
+11886983,Can you find the manufacturer of the faucet for warranty?,C1,"work,requests",7.0,7.0
+11605818,The flight attendant smiled at William and kindly directed him to his seat.,C1,"travel,emotions",7.0,9.0
+11891875,Can you repair the faucet or should we call a plumber?,C1,"work,requests",7.0,8.0
+12106705,Brioche buns add sweetness.,C1,food,7.0,7.0
+12487631,I'm hugging my stuffy.,C1,emotions,7.0,6.0
+3433969,He travels to meet other travelers.,C1,travel,7.0,7.0
+12888636,Are your cats still spoiled rotten?,C1,animals,7.0,6.0
+8992942,The old woman dried the salmon.,C1,"food,animals",7.0,6.0
+264687,"Some people are good at remembering their dreams, others forget theirs.",C1,language learning,7.0,7.0
+12887277,We rolled out the red carpet for the princess.,C1,"travel,requests",7.0,7.0
+11780746,"She discovered a foul odor coming from her kitchen sink, indicating a problem.",C1,food,7.0,6.0
+10042808,I often dunk crispbread into my tea.,C1,food,7.0,8.0
+11060433,Two carriages need to be decoupled.,C1,work,7.0,7.0
+10244466,"When she dies or her productivity declines, worker bees raise a new queen.",C1,animals,7.0,7.0
+12775898,The queen’s crown was adorned with rubies and pearls.,C1,food,7.0,6.0
+12396019,The scent of freshly baked bread filled the air.,C1,food,7.0,8.0
+7759378,"I asked him if he could do me a favor. He said he couldn't right now, but would get back to me later on today.",C1,"requests,work,future plans",7.0,7.0
+273270,War bankrupted the nation's resources and manpower.,C1,"money,work,travel",7.0,6.0
+22149,Voyages of exploration were the earliest in the history of studying the ocean.,C1,"travel,work",7.0,7.0
+9988122,Can we use Scientific calculators on the analytical chemistry test?,C1,"school,time,work",7.0,6.0
+11744210,Carlos is a talented dancer who understands the intricacies of different styles and techniques.,C1,"music,hobbies,emotions",7.0,7.0
+1612568,"Ants, termites and bees are social animals.",C1,animals,7.0,8.0
+6474832,"When Sami was sixteen, his parents divorced.",C1,"emotions,school",7.0,7.0
+9096756,The small seaside fishing village is very picturesque.,C1,"animals,food",7.0,8.0
+9516731,"It's not raining as such, but it is spitting.",C1,weather,7.0,7.0
+11599443,Robert stopped mid-sentence because everyone was staring at him in surprise.,C1,emotions,7.0,7.0
+8855669,The loss of the harvest made the farmer sad.,C1,"emotions,food",7.0,6.0
+326284,The lovers engraved the oak tree with their initials.,C1,"food,money",7.0,7.0
+6564699,"Archaeologists discovered the ruins of an old city with a circumference of twelve square kilometers and a wide range of bronze, jade and gold objects.",C1,"money,work",7.0,7.0
+8272473,It's better to feed wild ducks grain than bread.,C1,"food,animals",7.0,7.0
+8273830,The garbage truck tends to come around at four in the morning.,C1,"time,work",7.0,6.0
+11845578,"The current people in charge of Reddit had nothing to do with making it what it is today, but they have the ability to destroy it for everyone.",C1,work,7.0,5.0
+9246384,South Georgia island is home to huge colonies of penguins and seals.,C1,animals,7.0,7.0
+8202289,Would it be OK if I borrowed your ladder?,C1,"requests,free time",7.0,7.0
+11751195,Diego rides the subway to work every day.,C1,"work,time",7.0,7.0
+6251947,Tom advised Mary not to waste her time trying to persuade John to do that.,C1,"negation,time,goals",7.0,5.0
+71434,I'll sweep the floor while you wash the dishes.,C1,"future plans,free time",7.0,8.0
+4334396,I don't worry about my spelling - I rather go for speed typing.,C1,"language learning,negation,goals",7.0,6.0
+6293882,Gravity doesn't just exist on Earth. It also affects objects in space.,C1,science,7.0,8.0
+6480639,"It would be good that we scan the old books, whose copyright has expired, to upload them to the Internet. That way, these books will not be forgotten.",C1,"books,work,goals",7.0,5.0
+12070318,"She was so beside herself with joy that she started to dance around the room, whooping loudly.",C1,emotions,7.0,6.0
+28094,The doctors wore white masks over their mouths and noses.,C1,"clothes,work,health",7.0,7.0
+11739015,Benedito shooed his billy goat away from a field of crops and back onto the path.,C1,"animals,plants",7.0,6.0
+6877331,What are some of the main tourist attractions in your country?,C1,travel,7.0,9.0
+8680801,Ben sauntered into the room whistling a chirpy tune.,C1,"music,free time",7.0,5.0
+13270162,Love has the power to heal emotional wounds.,C1,emotions,6.0,6.0
+2719573,We will harvest our wheat in July.,C1,"plants,time",6.0,7.0
+6582598,"Green, yellow, and red peppers are all the same species. The color of the pepper depends on how long it is allowed to grow on the plant.",C1,"plants,food",6.0,8.0
+2890570,The neighbors' son won the spelling bee at school.,C1,school,6.0,8.0
+26845,"Whether it rains or not, Fujita is planning to have a picnic.",C1,"weather,free time",6.0,7.0
+253706,I got this vacuum cleaner for nothing.,C1,money,6.0,7.0
+8697364,"“It's also fun because they don't eat my cake and don't make a mess around my house,” Emma said with the practicality of an adult.",C1,"animals,food",6.0,7.0
+5790542,"It's a private cabin, but you share an external washroom with the other cabins.",C1,travel,6.0,6.0
+11739624,He kisses her goodbye every morning.,C1,"emotions,time",6.0,7.0
+2952046,I drank three cups of coffee this morning.,C1,"food,time",6.0,6.0
+9975638,Yanni never uses cheap resin to fix cracks in his windshield.,C1,"work,negation",6.0,6.0
+10923610,"I don't gamble much, but I do enjoy roulette.",C1,"free time,sports,gambling",6.0,6.0
+11732054,I like to add roasted sweet potatoes to Benedito's salad for some extra sweetness.,C1,food,6.0,6.0
+416878,Nice flowers don't yield good fruits.,C1,"plants,food",6.0,5.0
+6403787,The washing machine is a great invention.,C1,work,6.0,8.0
+278207,The birds flew south in search of warmth.,C1,"animals,weather,travel",6.0,7.0
+36140,This dish is terrific.,C1,"food,emotions",6.0,7.0
+22654,We danced in the subdued lighting.,C1,"music,emotions",6.0,6.0
+13266923,I relish the diversity of flavors.,C1,"food,emotions",6.0,7.0
+12302608,"The old man tasted the balsam with his tongue, and found it good.",C1,"food,emotions",6.0,7.0
+2724528,"Pinocchio ran to look at himself in a bowl of water, and he felt so happy that he said proudly: ""Now I look like a gentleman.""",C1,"emotions,books",6.0,6.0
+1682381,I cannot fold this big carpet by myself.,C1,"negation,work",6.0,7.0
+245499,A stimulating new book attracts attention.,C1,"books,work",6.0,6.0
+10026854,Yanni is gonna get baptized tomorrow.,C1,"time,future plans",6.0,6.0
+58815,This increase in unemployment is a consequence of the recession.,C1,work,6.0,8.0
+11240060,"Don't dawdle about, make haste!",C1,requests,6.0,7.0
+9718339,We cried when he freed her.,C1,emotions,6.0,6.0
+254532,I recalled a newspaper story about those twins.,C1,books,6.0,7.0
+1682830,The tallest and smallest men in the world both joined the circus.,C1,"work,free time",6.0,6.0
+12121400,Why do nettles sting?,C1,plants,6.0,7.0
+2214194,Gazpacho is a cold tomato and vegetable soup from Spain.,C1,food,6.0,8.0
+13270160,The warmth of love comforts us in moments of sorrow.,C1,"emotions,free time",6.0,7.0
+681973,Will you rub my shoulders?,C1,requests,6.0,6.0
+11116364,I live in my newly restored mansion.,C1,"free time,hobbies",6.0,7.0
+8257760,It's not through inventions but through improvements that fortunes are made.,C1,"money,work",6.0,7.0
+33747,"When Hawking graduated from college in 1962, he began studying for a Ph.D. in physics.",C1,"school,work",6.0,8.0
+12945529,Have you had tandoori tofu?,C1,food,6.0,7.0
+2518537,The two squirrels chased each other around the trunk of a large tree.,C1,"animals,plants",6.0,7.0
+326376,The corridor was so crowded that we couldn't walk.,C1,"travel,emotions",6.0,7.0
+13241497,I tend to get jittery before presentations.,C1,"emotions,school",6.0,7.0
+665825,"When it lightly rains like that, I wish to go for a walk in a park.",C1,"weather,free time",6.0,7.0
+12926664,He raced around the city in a limousine.,C1,"travel,money",6.0,8.0
+11617629,Elias slipped inside the barn.,C1,"animals,work",6.0,3.0
+11602841,"William sat down, sipped his beer and casually watched the show.",C1,"food,free time",6.0,8.0
+12847517,She harvested oranges from that tree.,C1,"plants,food",5.0,8.0
+1242436,"If the first chapter is any indication, this book has the makings of a best seller.",C1,books,5.0,8.0
+3579613,The coin toss decides who will kick off the match.,C1,sports,5.0,7.0
+11815858,There are species of dung beetles that are only active at night.,C1,animals,5.0,6.0
+11596410,No good deed goes unnoticed.,C1,negation,5.0,7.0
+11654968,"I poured some milk into a glass, and I drank it.",C1,food,5.0,8.0
+11521227,Chickpeas are so versatile.,C1,food,5.0,6.0
+12244896,"There were potatoes, sausage, and cheese.",C1,food,5.0,7.0
+53700,Jet planes fly much faster than propeller planes.,C1,travel,5.0,7.0
+8529747,This towel feels sticky.,C1,feelings,5.0,6.0
+896208,Add the sugar and vanilla to the cream and beat vigorously until the cream thickens.,C1,food,5.0,7.0
+8987963,The sea urchin was too pointy to pick up.,C1,"animals,food",5.0,7.0
+12699384,"When making gravy, be careful with your coriander.",C1,"food,plants",5.0,6.0
+12228388,I'm a little absent-minded.,C1,emotions,5.0,7.0
+8859046,Greta downed the beer in one swig.,C1,"food,emotions",5.0,7.0
+9762590,Skura and Nuja unclenched their fists.,C1,"emotions,sports",5.0,6.0
+45625,The twins were so alike that it was difficult to tell them apart.,C1,"school,emotions",5.0,7.0
+275047,The sun soon emerged from behind the clouds.,C1,"weather,time",5.0,7.0
+1769362,Was the soup tasty?,C1,"food,emotions",5.0,7.0
+4529131,The picnic area is easily accessible by road.,C1,"travel,school",5.0,7.0
+8982096,The patient complains of frequent headaches.,C1,"emotions,health",5.0,6.0
+8770931,"A boa is very dangerous, and an elephant is very bulky.",C1,"animals,danger",5.0,5.0
+13112362,She owns a flock of sheep.,C1,"animals,work",5.0,7.0
+11798011,Boris's cabin was really isolated.,C1,"home,travel",5.0,7.0
+10581024,The observatory was released at an altitude of approximately 75 miles (120 kilometers).,C1,"travel,free time",5.0,5.0
+2268126,The firemen localized the fire.,C1,work,5.0,7.0
+7741323,"She smiled at his tales, for she knew all about the bottom of the sea much better than any one else.",C1,emotions,5.0,4.0
+327834,"If it's badly insulated, it won't warm up regardless of how much heating you use.",C1,plants,5.0,6.0
+3826315,Tom framed the photograph and hung it over the bed.,C1,free time,5.0,8.0
+7246786,Layla has been to nail salons before.,C1,free time,5.0,7.0
+268048,The boy was engrossed in constructing a model plane.,C1,"hobbies,free time",5.0,7.0
+8379175,Is this costume a rental?,C1,money,5.0,6.0
+4415175,"I used to consider this piece rather mediocre, but it's grown on me since then, and now I find it quite enjoyable to listen to.",C1,"music,free time",5.0,6.0
+304639,He acquitted himself admirably at the track meet.,C1,sports,5.0,7.0
+317087,She practiced typing every day.,C1,"hobbies,time",5.0,7.0
+4761269,"Last month, we collected five liters of rainwater.",C1,weather,5.0,8.0
+10836315,"Tortoise goes slowly, but he arrives at the barrel while Roe Deer is sleeping.",C1,animals,5.0,6.0
+10125438,The early fig grows under the leaf.,C1,plants,5.0,7.0
+2610853,I like soups with lots of vegetables.,C1,food,5.0,7.0
+12879839,We partnered with other bakeries.,C1,"food,work",5.0,7.0
+10703263,My patience is exhausted.,C1,emotions,5.0,6.0
+11159206,You need to put a stamp on the envelope.,C1,work,5.0,8.0
+8808817,Mum is stirring the soup with a wooden spoon.,C1,food,5.0,8.0
+13356024,She blocked a bunch of spam bots on Twitter.,C1,work,5.0,7.0
+10726394,The backpack is being weighed down by the physics books.,C1,school,5.0,7.0
+7407065,They brushed the snow off their coats.,C1,weather,5.0,7.0
+11031368,Some complications have arisen.,C1,health,5.0,6.0
+3378240,You eat potato chips.,C1,food,4.0,7.0
+7394859,He lied about how much he weighed.,C1,negation,4.0,6.0
+12862456,The flower emitted a foul odor.,C1,plants,4.0,5.0
+9237784,Yanni glanced around the cafe like he was looking for someone.,C1,free time,4.0,8.0
+2163119,Airplanes land at airports.,C1,travel,4.0,8.0
+11590131,Matthew and his son spent the night in a tent in the backyard as part of their camping practice.,C1,free time,4.0,7.0
+297802,He gave me a blank stare.,C1,emotions,4.0,6.0
+7209275,Sami slept on the pull-out couch.,C1,free time,4.0,7.0
+7386172,She sorted her laundry.,C1,"work,hobbies",4.0,7.0
+11639512,Leon fiercely banged on the door.,C1,emotions,4.0,6.0
+10027133,The sailors are swabbing the deck.,C1,work,4.0,7.0
+698871,This fact proves her innocence.,C1,work,4.0,6.0
+10749417,The lanterns hung on the temple roof's edges.,C1,plants,4.0,7.0
+10021584,The altar was covered with a luxurious fabric.,C1,food,4.0,7.0
+6100193,"Believing everything is weakness, and believing nothing is foolishness.",C1,negation,4.0,6.0
+6474568,Sami was upstairs praying.,C1,free time,4.0,6.0
+52278,I readily grasped at his proposal.,C1,work,4.0,7.0
+11138046,The most logical place to keep your spare tyre is in the boot of your car.,C1,"work,travel",4.0,6.0
+5663631,Can virtue exist without sin?,C1,emotions,4.0,5.0
+10102068,The gentleman enters the mansion through the door.,C1,free time,3.0,7.0
+11542202,A rumour circulated around the city.,C1,free time,3.0,6.0
+12084189,Dry the trousers on the radiator.,C1,free time,3.0,7.0
+10630639,I got under the sheets smiling and happy.,C1,emotions,3.0,7.0
+324922,The dancers were beautifully got up.,C1,free time,3.0,6.0
+11586410,I'm going to prescribe some antibiotics.,C1,work,3.0,6.0
+2280414,The candle smells nice.,C1,plants,3.0,7.0
+8920725,"I love big, fluffy towels.",C1,free time,3.0,7.0
+1124681,The image projected onto the retina is inverted.,C1,"movies,work",3.0,7.0
+9258009,Yanni shone his flashlight all around the tent.,C1,free time,3.0,7.0
+11165205,"There were no galaxies or even stars, only diffuse gas.",C1,movies,2.0,7.0
+8546904,Giraffes prefer the dense woodlands of the savanna.,C2,"animals,plants,nature",8.0,8.0
+11764967,"The renowned Russian circus tradition combines acrobatics, daring performances, and a unique blend of humor, showcasing extraordinary talent and entertainment.",C2,"hobbies,music,movies",8.0,7.0
+3137861,A large asteroid was responsible for the extinction of the dinosaurs.,C2,"animals,science",7.0,6.0
+6213341,"Here and there were lofty vines, thickly laden with clusters and climbing up the pear and apple trees, whose own fruit ripened beside the black grapes.",C2,"plants,food",7.0,4.0
+11590258,"Matthew threw pine cones into the campfire, which crackled and popped.",C2,"free time,home,food",7.0,8.0
+13329109,Each spike on the barley plant contained dozens of tiny grains ready for harvest.,C2,"plants,food,school",7.0,6.0
+2881978,Mary made a cute snowman out of styrofoam balls and an old sock.,C2,"food,hobbies",6.0,7.0
+5396383,"The eagle is a raptor, like the falcon and vulture.",C2,animals,6.0,6.0
+9192950,He took the hot dog out of its package and put a small frying pan onto the stove's gas burner.,C2,"food,home",6.0,8.0
+3975128,"He continued to walk past currants, gooseberries, fruit trees and hedges.",C2,plants,5.0,7.0
+11880061,I craved a sesame seed bun.,C2,food,5.0,6.0
+11879310,They admired the cake's intricate lace design.,C2,"food,movies",5.0,7.0
+11842844,"If you care about people and not about countries or political alliances, the Ukraine situation becomes much clearer, with a clear aggressor.",C2,"emotions,politics",3.0,6.0
+12122297,The twinkling lights and festive decorations create a magical ambiance that I adore during Christmas.,C2,,0.0,7.0
+8713591,"In this picture, NASA astronaut Chris Cassidy holds a Parmigiana di Melanzane meal packet given to him by European Space Agency (ESA) astronaut Luca Parmitano.",C2,,0.0,5.0
+12732889,A wart is a generally benign and slightly contagious infection.,C2,,0.0,5.0
+10599191,"Time slows down at high speed, and space bends in the presence of gravitational fields.",C2,,0.0,8.0
+10324495,"A trillion kilometres is easy to say, but it's a distance that's barely imaginable. Even light takes 100,000 years to cover it.",C2,,0.0,5.0
+8832476,"In the quaint gazebo in the rose garden, Henry wept all afternoon.",C2,,0.0,6.0
+10652987,The airy castle looked like a feudal fortress.,C2,,0.0,6.0
+12117515,Clean up spills inside the oven as soon as they happen to avoid stubborn stains.,C2,,0.0,6.0
+9780553,"The female ladybug lays eggs on the leaves of plants, which molt to nymphs and then to adults.",C2,,0.0,8.0
