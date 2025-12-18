@@ -218,6 +218,8 @@ import { SignedIn, SignedOut, UserButton } from "@daveyplate/better-auth-ui";
 ```
 
 ---
+## Eden API
+The eden api key has to be added to the convex envrionment via `npx convex env set EDENAI_API_KEY <key>`.
 
 ## Convex
 

@@ -2,45 +2,51 @@
 
 import { v } from "convex/values";
 import { action } from "./_generated/server";
-import axios from "axios";
+const axios = require("axios").default;
+
 
 // Translate text using Eden AI
 export const translateText = action({
   args: {
     text: v.string(),
-    sourceLang: v.string(),
-    targetLang: v.string(),
+    sourceLang: v.string(), // e.g., "zh"
+    targetLang: v.string(), // e.g., "en"
   },
-  returns: v.string(),
+  returns: v.object({
+    translatedText: v.string(),
+  }),
   handler: async (_ctx, args) => {
-    const apiKey = process.env.EDENAI_API_KEY;
-    if (!apiKey) throw new Error("EDENAI_API_KEY not set");
-
-    const response = await fetch("https://api.edenai.run/v2/translation/automatic_translation", {
+    const options = {
       method: "POST",
+      url: "https://api.edenai.run/v2/translation/automatic_translation",
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+        authorization: `Bearer ${process.env.EDENAI_API_KEY}`,
       },
-      body: JSON.stringify({
+      data: {
         providers: "google",
         text: args.text,
         source_language: args.sourceLang,
         target_language: args.targetLang,
-      }),
-    });
+      },
+    };
+    
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Eden AI Translation API error: ${errorText}`);
+    try {
+      const response = await axios.request(options);
+
+      const translatedText = response.data?.google?.text;
+      if (!translatedText) throw new Error("No translation returned from Eden AI");
+
+      return { translatedText };
+    } catch (err: any) {
+      console.error("Translation error:", err.response?.data || err.message);
+      throw new Error(`Translation failed: ${err.message}`);
     }
-
-    const data = await response.json();
-    return data.google?.text ?? "";
   },
 });
 
-// Generate TTS audio using Eden AI
+
+// Generate TTS audio using Eden AI (axios.request style)
 export const generateSpeech = action({
   args: {
     text: v.string(),
@@ -48,30 +54,29 @@ export const generateSpeech = action({
   },
   returns: v.string(),
   handler: async (_ctx, args) => {
+    console.log("EDENAI_API_KEY:", process.env.EDENAI_API_KEY);
     const apiKey = process.env.EDENAI_API_KEY;
-    if (!apiKey) throw new Error("EDENAI_API_KEY not set");
+    //const apiKey ="jafkjahglj"
+    //if (!apiKey) throw new Error("EDENAI_API_KEY not set");
+
+    const options = {
+      method: "POST",
+      url: "https://api.edenai.run/v2/audio/text_to_speech",
+      headers: {
+        Authorization: `Bearer ${apiKey}`
+      },
+      data: {
+        providers: "google",
+        text: args.text,
+        language: args.language,
+        option: "FEMALE",
+      },
+    };
 
     try {
-      const response = await axios.post(
-        "https://api.edenai.run/v2/audio/text_to_speech",
-        {
-          providers: "google",
-          text: args.text,
-          language: args.language,
-          option: "FEMALE",
-          model: "chirp-3",
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
+      const response = await axios.request(options);
       const audioData = response.data?.google?.audio;
       if (!audioData) throw new Error("No audio returned from Eden AI");
-
       return `data:audio/mp3;base64,${audioData}`;
     } catch (err: any) {
       console.error("TTS error:", err.response?.data || err.message);
