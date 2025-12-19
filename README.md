@@ -92,6 +92,12 @@ pnpm lint
 ```
 
 ---
+# Setting up git lfs 
+
+```
+https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage
+```
+---
 # Working with LLMs
 Here are relevant tutorials for making LLMs in cursor more accuracte with the tech stack we are using: 
 

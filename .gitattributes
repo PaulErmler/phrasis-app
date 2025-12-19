@@ -1,0 +1,11 @@
+data_preparation/data/output/sentences.csv filter=lfs diff=lfs merge=lfs -text
+data_preparation/data/output/sentences_by_difficulty/ filter=lfs diff=lfs merge=lfs -text
+data_preparation/data/output/sentences_by_difficulty/A1.csv filter=lfs diff=lfs merge=lfs -text
+data_preparation/data/output/sentences_by_difficulty/A2.csv filter=lfs diff=lfs merge=lfs -text
+data_preparation/data/output/sentences_by_difficulty/Essential.csv filter=lfs diff=lfs merge=lfs -text
+data_preparation/data/output/sentences_by_difficulty/B1.csv filter=lfs diff=lfs merge=lfs -text
+data_preparation/data/output/sentences_by_difficulty/B2.csv filter=lfs diff=lfs merge=lfs -text
+data_preparation/data/output/sentences_by_difficulty/C1.csv filter=lfs diff=lfs merge=lfs -text
+data_preparation/data/output/sentences_by_difficulty/C2.csv filter=lfs diff=lfs merge=lfs -text
+data_preparation/data/output/sentences_cleaned.csv filter=lfs diff=lfs merge=lfs -text
+data_preparation/data/inputs/sentences.csv filter=lfs diff=lfs merge=lfs -text
