@@ -129,5 +129,58 @@
     "AVATAR_INSTRUCTIONS": "An avatar is optional but strongly recommended.",
     "EMAIL_DESCRIPTION": "Enter the email address you want to use to log in.",
     "EMAIL_INSTRUCTIONS": "Please enter a valid email address."
+  },
+  "AppPage": {
+    "views": {
+      "home": "Home",
+      "content": "Content",
+      "library": "Library",
+      "settings": "Settings"
+    },
+    "welcome": "Welcome{viewer, select, undefined {} other {, {viewer}}}!",
+    "loading": "Loading...",
+    "notifications": {
+      "title": "Notifications",
+      "description": {
+        "unsupported": "Notifications are not supported in this browser",
+        "granted": "Send yourself a test notification",
+        "default": "Enable notifications to get practice reminders"
+      },
+      "notAvailable": "Notifications not available",
+      "blocked": "Notifications are blocked. Please enable them in your browser settings.",
+      "requesting": "Requesting permission...",
+      "sendTest": "Send Test Notification",
+      "enable": "Enable Notifications",
+      "enabled": "Notifications enabled"
+    },
+    "flashcards": {
+      "title": "Flashcard Practice",
+      "description": "Practice with flashcards and translations",
+      "goToFlashcard": "Go to Flashcard",
+      "goToAudioFlashcard": "Go to Audio Flashcard"
+    },
+    "randomNumber": {
+      "title": "Random Number Generator",
+      "description": "Click the button to generate and store a random number",
+      "generate": "+ Generate Random Number",
+      "recent": "Recent Numbers",
+      "empty": "No numbers yet — click the button!"
+    },
+    "contentSoon": "Content coming soon",
+    "librarySoon": "Library coming soon",
+    "settings": {
+      "account": "Account",
+      "language": "Language"
+    }
+  },
+  "Theme": {
+    "title": "Theme",
+    "toggle": "Toggle theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "Language": {
+    "title": "Language"
   }
 }

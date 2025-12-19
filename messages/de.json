@@ -129,5 +129,58 @@
     "AVATAR_INSTRUCTIONS": "Ein Avatar ist optional, aber empfohlen.",
     "EMAIL_DESCRIPTION": "Gib die E-Mail-Adresse ein, mit der du dich anmelden möchtest.",
     "EMAIL_INSTRUCTIONS": "Bitte gib eine gültige E-Mail-Adresse ein."
+  },
+  "AppPage": {
+    "views": {
+      "home": "Start",
+      "content": "Inhalt",
+      "library": "Bibliothek",
+      "settings": "Einstellungen"
+    },
+    "welcome": "Willkommen{viewer, select, undefined {} other {, {viewer}}}!",
+    "loading": "Wird geladen...",
+    "notifications": {
+      "title": "Benachrichtigungen",
+      "description": {
+        "unsupported": "Benachrichtigungen werden in diesem Browser nicht unterstützt",
+        "granted": "Sende dir eine Test-Benachrichtigung",
+        "default": "Aktiviere Benachrichtigungen für Übungserinnerungen"
+      },
+      "notAvailable": "Benachrichtigungen nicht verfügbar",
+      "blocked": "Benachrichtigungen sind blockiert. Bitte aktiviere sie in deinen Browser-Einstellungen.",
+      "requesting": "Berechtigung wird angefragt...",
+      "sendTest": "Test-Benachrichtigung senden",
+      "enable": "Benachrichtigungen aktivieren",
+      "enabled": "Benachrichtigungen aktiviert"
+    },
+    "flashcards": {
+      "title": "Flashcard-Übung",
+      "description": "Übe mit Flashcards und Übersetzungen",
+      "goToFlashcard": "Zu den Flashcards",
+      "goToAudioFlashcard": "Zu den Audio-Flashcards"
+    },
+    "randomNumber": {
+      "title": "Zufallszahlengenerator",
+      "description": "Klicke auf die Schaltfläche, um eine Zufallszahl zu generieren und zu speichern",
+      "generate": "+ Zufallszahl generieren",
+      "recent": "Letzte Zahlen",
+      "empty": "Noch keine Zahlen — klicke auf die Schaltfläche!"
+    },
+    "contentSoon": "Inhalt folgt in Kürze",
+    "librarySoon": "Bibliothek folgt in Kürze",
+    "settings": {
+      "account": "Konto",
+      "language": "Sprache"
+    }
+  },
+  "Theme": {
+    "title": "Design",
+    "toggle": "Design umschalten",
+    "light": "Hell",
+    "dark": "Dunkel",
+    "system": "System"
+  },
+  "Language": {
+    "title": "Sprache"
   }
 }
