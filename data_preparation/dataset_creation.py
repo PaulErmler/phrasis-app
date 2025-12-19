@@ -19,22 +19,22 @@ SAMPLING_CONFIG = {
         'max_sentences_per_level': 3000
     },
     'A1': {
-        'min_max_rank': 0,
+        'min_max_rank': 185,
         'max_max_rank': 500,
         'samples_per_max_rank': 3,
         'max_sentences_per_level': 1000
     },
     'A2': {
-        'min_max_rank': 0,
+        'min_max_rank': 200,
         'max_max_rank': 2000,
         'samples_per_max_rank': 3,
-        'max_sentences_per_level': 2000
+        'max_sentences_per_level': 1500
     },
     'B1': {
         'min_max_rank': 300,
         'max_max_rank': 5000,
         'samples_per_max_rank': 3,
-        'max_sentences_per_level': 3000
+        'max_sentences_per_level': 2500
     }, 
     'B2': {
         'min_max_rank': 500,
@@ -46,13 +46,19 @@ SAMPLING_CONFIG = {
         'min_max_rank': 5000,
         'max_max_rank': 10000,
         'samples_per_max_rank': 3,
-        'max_sentences_per_level': 3000
+        'max_sentences_per_level': 5000
     },
     'C2': {
         'min_max_rank': 8000,
-        'max_max_rank': 10000,
+        'max_max_rank': 20000,
         'samples_per_max_rank': 3,
-        'max_sentences_per_level': 3000
+        'max_sentences_per_level': 5000
+    },
+    'Essential': {
+        'min_max_rank': 0,
+        'max_max_rank': 30000,
+        'samples_per_max_rank': 1000,
+        'max_sentences_per_level': 1000
     }
 }
 
@@ -103,7 +109,7 @@ def main():
     classifier = SentenceClassifier()
     
     # 3a. Process Essential Sentences
-    print("   - Processing Essential Sentences (A1 + A2)")
+    print("   - Processing Essential Sentences (Essential + A2)")
     a1_essentials_file = base_dir / "data" / "inputs" / "A1_essential_sentences.csv"
     a2_essentials_file = base_dir / "data" / "inputs" / "A2_essential_sentences.csv"
     
@@ -129,14 +135,15 @@ def main():
                 'text': text,
                 'difficulty': target_difficulty,
                 'max_rank': max_rank,
+                'topics': '',
                 'is_essential': True
             })
             current_id += 1
         return processed
 
-    a1_essentials = process_essentials(a1_essentials_file, 'A1')
+    a1_essentials = process_essentials(a1_essentials_file, 'Essential')
     a2_essentials = process_essentials(a2_essentials_file, 'A2')
-    print(f"     ✓ Processed {len(a1_essentials)} A1 and {len(a2_essentials)} A2 essential sentences")
+    print(f"     ✓ Processed {len(a1_essentials)} Essential and {len(a2_essentials)} A2 essential sentences")
 
     # 3b. Process Main Dataset
     processed_data = []
@@ -155,6 +162,7 @@ def main():
                 'text': text,
                 'difficulty': difficulty,
                 'max_rank': max_rank,
+                'topics': '',
                 'is_essential': False
             })
         except Exception as e:
@@ -174,6 +182,10 @@ def main():
     print(f"\n[4/4] Sampling sentences with difficulty-specific constraints")
     
     unique_levels = sorted(df_processed['difficulty'].unique())
+    # Add 'Essential' level if we have Essential sentences
+    if len(a1_essentials) > 0 and 'Essential' not in unique_levels:
+        unique_levels.append('Essential')
+        unique_levels = sorted(unique_levels)
     all_sampled_dfs = []
     
     for level in unique_levels:
@@ -217,56 +229,41 @@ def main():
                 else:
                     df_sampled_main = df_level_main.copy()
 
-        # Combine logic specific to A1/A2
-        if level == 'A1':
-            # Prepend A1 essentials
-            df_sampled = pd.concat([df_sampled_ess, df_sampled_main], ignore_index=True)
-            print(f"   A1: Prepended {len(df_sampled_ess)} essential sentences.")
+        # Combine logic specific to A2 and Essential
+        if level == 'Essential':
+            # Essential level only contains essential sentences, no main sentences
+            df_sampled = df_sampled_ess.copy()
+            print(f"   Essential: {len(df_sampled_ess)} essential sentences.")
         elif level == 'A2':
-            # Mix A2 essentials into first 300
-            if len(df_sampled_main) > 300:
-                first_part = df_sampled_main.iloc[:300]
-                second_part = df_sampled_main.iloc[300:]
+            # Mix A2 essentials into first 2000
+            if len(df_sampled_main) > 2000:
+                first_part = df_sampled_main.iloc[:2000]
+                second_part = df_sampled_main.iloc[2000:]
                 
-                # Combine essentials with first 300 and shuffle them together
+                # Combine essentials with first 2000 and shuffle them together
                 mixed_first = pd.concat([df_sampled_ess, first_part], ignore_index=True)
                 mixed_first = mixed_first.sample(frac=1, random_state=42).reset_index(drop=True)
                 
                 df_sampled = pd.concat([mixed_first, second_part], ignore_index=True)
-                print(f"   A2: Mixed {len(df_sampled_ess)} essential sentences into the first 300 sentences.")
+                print(f"   A2: Mixed {len(df_sampled_ess)} essential sentences into the first 2000 sentences.")
             else:
                 # Just shuffle everything if main pool is small
                 df_sampled = pd.concat([df_sampled_ess, df_sampled_main], ignore_index=True)
                 df_sampled = df_sampled.sample(frac=1, random_state=42).reset_index(drop=True)
-                print(f"   A2: Mixed {len(df_sampled_ess)} essential sentences into the full dataset (size < 300).")
+                print(f"   A2: Mixed {len(df_sampled_ess)} essential sentences into the full dataset (size < 2000).")
         else:
             # For other levels, just combine
             df_sampled = pd.concat([df_sampled_ess, df_sampled_main], ignore_index=True)
 
         # D. Apply local jitter (±15 positions) and add final order rank
-        # Only jitter non-essential parts if you want to keep A1 essentials at the start?
-        # User said "make the a1 sentences the start", so jitter should probably preserve them.
         if not df_sampled.empty:
-            if level == 'A1':
-                # Jitter ONLY the non-essential part
-                ess_part = df_sampled[df_sampled['is_essential']]
-                main_part = df_sampled[~df_sampled['is_essential']].copy()
-                
-                if not main_part.empty:
-                    base_indices = np.arange(len(main_part))
-                    jitter = np.random.randint(-15, 16, size=len(main_part))
-                    main_part['_jitter_idx'] = base_indices + jitter
-                    main_part = main_part.sort_values('_jitter_idx').drop(columns=['_jitter_idx'])
-                
-                df_sampled = pd.concat([ess_part, main_part], ignore_index=True)
-            else:
-                # Normal jitter for others
-                base_indices = np.arange(len(df_sampled))
-                jitter = np.random.randint(-15, 16, size=len(df_sampled))
-                df_sampled = df_sampled.copy()
-                df_sampled['_jitter_idx'] = base_indices + jitter
-                df_sampled = df_sampled.sort_values('_jitter_idx').reset_index(drop=True)
-                df_sampled = df_sampled.drop(columns=['_jitter_idx'])
+            # Normal jitter for all levels
+            base_indices = np.arange(len(df_sampled))
+            jitter = np.random.randint(-15, 16, size=len(df_sampled))
+            df_sampled = df_sampled.copy()
+            df_sampled['_jitter_idx'] = base_indices + jitter
+            df_sampled = df_sampled.sort_values('_jitter_idx').reset_index(drop=True)
+            df_sampled = df_sampled.drop(columns=['_jitter_idx'])
             
             # Add the 'rank' column which represents the final order in the file
             df_sampled['rank'] = df_sampled.index + 1
@@ -276,7 +273,7 @@ def main():
         
         # Save per-level CSV - Include the new rank column and remove helper is_essential
         level_output = difficulty_dir / f"{level}.csv"
-        cols_to_save = ['id', 'text', 'difficulty', 'max_rank', 'rank']
+        cols_to_save = ['id', 'text', 'difficulty', 'max_rank', 'rank', 'topics']
         df_sampled[cols_to_save].to_csv(level_output, index=False)
     
     if all_sampled_dfs:
@@ -284,7 +281,7 @@ def main():
         
         # Save combined output
         print(f"\n   Saving combined results to {final_output}")
-        cols_to_save = ['id', 'text', 'difficulty', 'max_rank', 'rank']
+        cols_to_save = ['id', 'text', 'difficulty', 'max_rank', 'rank', 'topics']
         df_final[cols_to_save].to_csv(final_output, index=False)
         print(f"   ✓ Total sampled across all levels: {len(df_final)}")
     else:

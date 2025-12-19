@@ -46,7 +46,7 @@ DEFAULT_DIFFICULTY_CONFIG = {
         'level_limits': {
             'A1': -1,
             'A2': -1,   
-            'B1': 1,    
+            'B1': 0,    
             'B2': 0,
             'C1': 0,
             'C2': 0
