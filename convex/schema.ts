@@ -12,9 +12,19 @@ export default defineSchema({
   
   // Sentences table - stores the original sentences
   sentences: defineTable({
+    datasetSentenceId: v.number(), // Unique ID from the dataset
     text: v.string(),
     language: v.string(), // e.g., "en" for English
-  }).index("by_text", ["text"]),
+    deck: v.string(), // Difficulty level: A1, A2, B1, B2, C1, C2
+    deckRank: v.number(), // Rank within the deck
+    difficulty: v.string(), // Difficulty as a string (e.g., "A1")
+    topic1: v.optional(v.string()), // Primary topic
+    topic2: v.optional(v.string()), // Secondary topic
+  })
+    .index("by_text", ["text"])
+    .index("by_datasetSentenceId", ["datasetSentenceId"])
+    .index("by_deck", ["deck", "deckRank"])
+    .index("by_difficulty", ["difficulty"]),
   
   // Translations table - stores translations of sentences
   translations: defineTable({

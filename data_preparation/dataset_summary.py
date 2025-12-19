@@ -1,6 +1,8 @@
 import pandas as pd
 from pathlib import Path
 from collections import Counter
+import spacy
+from wordfreq import top_n_list
 
 def main():
     # Define paths
@@ -22,6 +24,34 @@ def main():
     
     # Ensure topics is a string and handle empty/placeholder values
     df['topics'] = df['topics'].fillna('').astype(str).replace('none', '')
+    
+    # --- Word Frequency and 20k Common Words Statistics ---
+    print("Analyzing word frequencies...")
+    nlp = spacy.load("en_core_web_sm", disable=["parser", "ner", "lemmatizer"])
+    
+    word_counts = Counter()
+    for text in df['text']:
+        doc = nlp(str(text).lower())
+        for token in doc:
+            if token.is_alpha:
+                word_counts[token.text] += 1
+    
+    print("Getting 20k most common words...")
+    top_20k = top_n_list('en', 20000)
+    
+    # How often each of the top 20k appears
+    top_20k_stats = []
+    missing_words = []
+    
+    for word in top_20k:
+        count = word_counts.get(word, 0)
+        if count > 0:
+            top_20k_stats.append((word, count))
+        else:
+            missing_words.append(word)
+    
+    # Sort top_20k_stats by frequency (descending)
+    top_20k_stats.sort(key=lambda x: x[1], reverse=True)
     
     # 1. Number of cards per difficulty
     difficulty_counts = df['difficulty'].value_counts().sort_index()
@@ -71,6 +101,24 @@ def main():
         f.write(f"Total Characters: {int(total_characters):,}\n")
         f.write(f"Avg Characters per Sentence: {avg_characters:.2f}\n\n")
         
+        f.write("TOP 20K COMMON WORDS COVERAGE\n")
+        f.write("-" * 30 + "\n")
+        f.write(f"Words from top 20k present: {len(top_20k_stats):,} / 20,000 ({len(top_20k_stats)/20000*100:.1f}%)\n")
+        f.write(f"Words from top 20k missing: {len(missing_words):,} / 20,000 ({len(missing_words)/20000*100:.1f}%)\n\n")
+        
+        f.write("TOP 20K WORDS FREQUENCY (All present words from top 20k)\n")
+        f.write("-" * 30 + "\n")
+        # List all words from the 20k list that are present, sorted by frequency
+        for i, (word, count) in enumerate(top_20k_stats):
+            f.write(f"{i+1:>5}. {word:<20}: {count:,}\n")
+        f.write("\n")
+        
+        f.write("MISSING WORDS FROM TOP 20K (All missing words)\n")
+        f.write("-" * 30 + "\n")
+        for word in missing_words:
+            f.write(f"{word}\n")
+        f.write("\n")
+
         f.write("CARDS PER DIFFICULTY\n")
         f.write("-" * 30 + "\n")
         for diff, count in difficulty_counts.items():
