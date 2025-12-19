@@ -214,10 +214,31 @@ def evaluate_classifier(data_dir: Path, max_sentences: int = None):
     print(f"Filtered out {long_sentence_count} sentences with 30+ words")
     print(f"Remaining sentences: {len(all_sentences)} ({len(all_sentences)/original_count*100:.1f}% of original)")
     
-    # Limit if requested
+    # Limit to at most 200 sentences per difficulty level
+    import random
+    random.seed(42)
+    print("\nLimiting to at most 200 sentences per difficulty level...")
+    sentences_by_difficulty = defaultdict(list)
+    for sentence_data in all_sentences:
+        # Group by cefr1 (first rating)
+        sentences_by_difficulty[sentence_data['cefr1']].append(sentence_data)
+    
+    limited_sentences = []
+    for level in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']:
+        level_sentences = sentences_by_difficulty[level]
+        if len(level_sentences) > 200:
+            sampled = random.sample(level_sentences, 200)
+            limited_sentences.extend(sampled)
+            print(f"  {level}: {len(level_sentences)} → 200 (sampled)")
+        else:
+            limited_sentences.extend(level_sentences)
+            print(f"  {level}: {len(level_sentences)} (all used)")
+    
+    all_sentences = limited_sentences
+    print(f"Total sentences after limiting: {len(all_sentences)}")
+    
+    # Limit if requested (this now applies after per-level limiting)
     if max_sentences and max_sentences < len(all_sentences):
-        import random
-        random.seed(42)
         all_sentences = random.sample(all_sentences, max_sentences)
         print(f"Randomly sampled {max_sentences} sentences for evaluation")
     
@@ -280,6 +301,7 @@ def evaluate_classifier(data_dir: Path, max_sentences: int = None):
     print(f"  Average rate: {len(results)/total_time:.1f} sentences/second")
     
     # Calculate statistics from results
+    levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2']
     exact_match_rating1 = 0
     exact_match_rating2 = 0
     match_either = 0
@@ -295,6 +317,7 @@ def evaluate_classifier(data_dir: Path, max_sentences: int = None):
     # Track distance distributions
     distance_distribution = defaultdict(int)
     avg_distance_distribution = defaultdict(int)
+    signed_distance_distribution = defaultdict(int)
     
     # Aggregate statistics
     for result in results:
@@ -322,9 +345,19 @@ def evaluate_classifier(data_dir: Path, max_sentences: int = None):
         # Round to nearest 0.5
         bucketed_distance = round(result['avg_distance'] * 2) / 2
         avg_distance_distribution[bucketed_distance] += 1
+        
+        # Track signed distance (Positive = too high, Negative = too low)
+        avg_rating = (result['rating1_idx'] + result['rating2_idx']) / 2.0
+        pred_idx = levels.index(result['predicted'])
+        signed_diff = pred_idx - avg_rating
+        bucketed_signed = round(signed_diff * 2) / 2
+        signed_distance_distribution[bucketed_signed] += 1
     
     # Calculate overall statistics
-    total = len(all_sentences)
+    total = len(results)
+    if total == 0:
+        print("Error: No results to analyze.")
+        return
     
     print("\n" + "="*80)
     print("EVALUATION RESULTS")
@@ -357,6 +390,15 @@ def evaluate_classifier(data_dir: Path, max_sentences: int = None):
         percentage = count / total * 100
         bar = '█' * int(percentage / 2)
         print(f"Distance {distance:>4.1f}: {count:5d} ({percentage:5.1f}%) {bar}")
+    
+    print("\n--- Signed Distance Distribution (Predicted - Actual) ---")
+    print("(Positive = Predicted too high, Negative = Predicted too low)")
+    for distance in sorted(signed_distance_distribution.keys()):
+        count = signed_distance_distribution[distance]
+        percentage = count / total * 100
+        bar = '█' * int(percentage / 2)
+        sign = "+" if distance > 0 else ""
+        print(f"Distance {sign}{distance:>4.1f}: {count:5d} ({percentage:5.1f}%) {bar}")
     
     # Within 1 level accuracy
     within_1 = sum(avg_distance_distribution[d] for d in avg_distance_distribution.keys() if d <= 1.0)
@@ -595,10 +637,10 @@ def evaluate_classifier(data_dir: Path, max_sentences: int = None):
     buckets_order = ['1-5', '6-10', '11-15', '16-20', '21-25', '26+']
     for bucket in buckets_order:
         if word_count_accuracy[bucket]['total'] > 0:
-            correct = word_count_accuracy[bucket]['correct']
-            total = word_count_accuracy[bucket]['total']
-            accuracy = correct / total * 100
-            print(f"{bucket:<15} {correct:<10} {total:<10} {accuracy:>10.1f}%")
+            correct_count = word_count_accuracy[bucket]['correct']
+            bucket_total = word_count_accuracy[bucket]['total']
+            accuracy = correct_count / bucket_total * 100
+            print(f"{bucket:<15} {correct_count:<10} {bucket_total:<10} {accuracy:>10.1f}%")
     
     # Most common misclassification patterns
     print("\n" + "="*80)
@@ -681,10 +723,10 @@ def evaluate_classifier(data_dir: Path, max_sentences: int = None):
     print("-" * 55)
     for level in levels:
         if level_accuracy[level]['total'] > 0:
-            match_either = level_accuracy[level]['match_either']
-            total = level_accuracy[level]['total']
-            accuracy = match_either / total * 100
-            print(f"{level:<10} {match_either:<15} {total:<15} {accuracy:>10.1f}%")
+            match_either_count = level_accuracy[level]['match_either']
+            level_total = level_accuracy[level]['total']
+            accuracy = match_either_count / level_total * 100
+            print(f"{level:<10} {match_either_count:<15} {level_total:<15} {accuracy:>10.1f}%")
     
     # Recommendations for tuning
     print("\n" + "="*80)
@@ -810,6 +852,14 @@ def evaluate_classifier(data_dir: Path, max_sentences: int = None):
             count = avg_distance_distribution[distance]
             percentage = count / total * 100
             f.write(f"Distance {distance:>4.1f}: {count:5d} ({percentage:5.1f}%)\n")
+        
+        f.write("\n--- Signed Distance Distribution (Predicted - Actual) ---\n")
+        f.write("(Positive = Predicted too high, Negative = Predicted too low)\n")
+        for distance in sorted(signed_distance_distribution.keys()):
+            count = signed_distance_distribution[distance]
+            percentage = count / total * 100
+            sign = "+" if distance > 0 else ""
+            f.write(f"Distance {sign}{distance:>4.1f}: {count:5d} ({percentage:5.1f}%)\n")
         
         f.write(f"\nWithin 1 level of average rating: {within_1:5d} ({within_1/total*100:5.1f}%)\n")
         
@@ -940,10 +990,10 @@ def evaluate_classifier(data_dir: Path, max_sentences: int = None):
         f.write("-" * 50 + "\n")
         for bucket in buckets_order:
             if word_count_accuracy[bucket]['total'] > 0:
-                correct = word_count_accuracy[bucket]['correct']
-                total = word_count_accuracy[bucket]['total']
-                accuracy = correct / total * 100
-                f.write(f"{bucket:<15} {correct:<10} {total:<10} {accuracy:>10.1f}%\n")
+                bucket_correct = word_count_accuracy[bucket]['correct']
+                bucket_total = word_count_accuracy[bucket]['total']
+                bucket_accuracy = bucket_correct / bucket_total * 100
+                f.write(f"{bucket:<15} {bucket_correct:<10} {bucket_total:<10} {bucket_accuracy:>10.1f}%\n")
         
         f.write("\n" + "="*80 + "\n")
         f.write("MOST COMMON MISCLASSIFICATION PATTERNS\n")
@@ -985,10 +1035,10 @@ def evaluate_classifier(data_dir: Path, max_sentences: int = None):
         f.write("-" * 55 + "\n")
         for level in levels:
             if level_accuracy[level]['total'] > 0:
-                match_either = level_accuracy[level]['match_either']
-                total_labels = level_accuracy[level]['total']
-                accuracy = match_either / total_labels * 100
-                f.write(f"{level:<10} {match_either:<15} {total_labels:<15} {accuracy:>10.1f}%\n")
+                level_match_either = level_accuracy[level]['match_either']
+                level_total_labels = level_accuracy[level]['total']
+                level_accuracy_pct = level_match_either / level_total_labels * 100
+                f.write(f"{level:<10} {level_match_either:<15} {level_total_labels:<15} {level_accuracy_pct:>10.1f}%\n")
         
         f.write("\n" + "="*80 + "\n")
         f.write("RECOMMENDATIONS FOR TUNING THE CLASSIFIER\n")

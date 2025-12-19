@@ -22,7 +22,7 @@ OUTPUT_PRICE_PER_MILLION = 0.40  # $0.4 per million output tokens
 
 # Moderation Settings
 MODERATION_BATCH_SIZE = 40  # Number of sentences to check per API call
-MODERATION_DELAY = 0.8  # Delay between moderation API calls (seconds)
+MODERATION_DELAY = 2  # Delay between moderation API calls (seconds)
 
 # Filtering Settings
 MAX_WORDS = 30

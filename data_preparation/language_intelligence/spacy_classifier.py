@@ -1,4 +1,8 @@
 
+import os 
+import sys
+
+
 
 import spacy
 import pandas as pd
@@ -16,7 +20,7 @@ HARDCODED_CEFR_LEVELS = {
     "'m": "A2",      # "am" contraction
     "'ll": "A2",     # "will" contraction
     "'re": "A2",     # "are" contraction
-    "'d": "B1",      # "would/had" contraction
+    "'d": "A2",      # "would/had" contraction
     "a.m.": "B1",
     "p.m.": "B1",
     "-": "B1",
@@ -24,6 +28,81 @@ HARDCODED_CEFR_LEVELS = {
 
 # Default configuration for sentence difficulty classification
 DEFAULT_DIFFICULTY_CONFIG = {
+    'A1': {
+        'max_words_with_stops': 11,
+        'max_words_without_stops': 9,
+        'level_limits': {
+            'A1': -1,    
+            'A2': 0,    
+            'B1': 0,    
+            'B2': 0,
+            'C1': 0,
+            'C2': 0
+        }
+    },
+    'A2': {
+        'max_words_with_stops': 16,
+        'max_words_without_stops': 13,
+        'level_limits': {
+            'A1': -1,
+            'A2': -1,   
+            'B1': 1,    
+            'B2': 0,
+            'C1': 0,
+            'C2': 0
+        }
+    },
+    'B1': {
+        'max_words_with_stops': 20,
+        'max_words_without_stops': 15,
+        'level_limits': {
+            'A1': -1,
+            'A2': -1,
+            'B1': -1,    
+            'B2': 0,     
+            'C1': 0,    
+            'C2': 0
+        }
+    },
+    'B2': {
+        'max_words_with_stops': 25,
+        'max_words_without_stops': 20,
+        'level_limits': {
+            'A1': -1,
+            'A2': -1,
+            'B1': -1,
+            'B2': -1,   
+            'C1': 0,   
+            'C2': 0,      
+        }
+    },
+    'C1': {
+        'max_words_with_stops': 30,
+        'max_words_without_stops': 25,
+        'level_limits': {
+            'A1': -1,
+            'A2': -1,
+            'B1': -1,
+            'B2': -1,
+            'C1': -1,    
+            'C2': 0     
+        }
+    },
+    'C2': {
+        'max_words_with_stops': -1,  
+        'max_words_without_stops': -1,
+        'level_limits': {
+            'A1': -1,
+            'A2': -1,
+            'B1': -1,
+            'B2': -1,
+            'C1': -1,
+            'C2': -1     
+        }
+    }
+}
+
+APPROX_CEFR_LEVEL_CONFIG = {
     'A1': {
         'max_words_with_stops': 12,
         'max_words_without_stops': 10,
@@ -97,8 +176,6 @@ DEFAULT_DIFFICULTY_CONFIG = {
         }
     }
 }
-
-
 class SentenceClassifier:
     def __init__(self, spacy_model: str = "en_core_web_sm", language: str = "en"):
         self.nlp = spacy.load(spacy_model)
@@ -150,38 +227,39 @@ class SentenceClassifier:
     
     def get_word_rank(self, word: str, lemma: Optional[str] = None) -> Optional[int]:
         top_words = self._get_top_20k_words()
-        try:
-            return top_words.index(word) + 1
-        except ValueError:
-            if lemma and lemma.lower() != word.lower():
-                try:
-                    return top_words.index(lemma.lower()) + 1
-                except ValueError:
-                    pass
-            return None
+        
+        # Create a dictionary for O(1) lookup if it doesn't exist
+        if not hasattr(self, '_word_rank_dict'):
+            self._word_rank_dict = {w: i + 1 for i, w in enumerate(top_words)}
+            
+        word_lower = word.lower()
+        
+        # 1. Regular lookup
+        if word_lower in self._word_rank_dict:
+            return self._word_rank_dict[word_lower]
+            
+        # 2. Lemma fallback
+        if lemma:
+            lemma_lower = lemma.lower()
+            if lemma_lower in self._word_rank_dict:
+                return self._word_rank_dict[lemma_lower]
+                
+        return None
     
     def get_lemma_rank(self, lemma: str) -> Optional[int]:
         top_words = self._get_top_20k_words()
-        try:
-            return top_words.index(lemma.lower()) + 1
-        except ValueError:
-            pass
-        return None
+        if not hasattr(self, '_word_rank_dict'):
+            self._word_rank_dict = {w: i + 1 for i, w in enumerate(top_words)}
+            
+        lemma_lower = lemma.lower()
+        return self._word_rank_dict.get(lemma_lower)
     
     def get_min_rank(self, word: str, lemma: str) -> Optional[int]:
-        top_words = self._get_top_20k_words()
         ranks = []
         
-        try:
-            ranks.append(top_words.index(word.lower()) + 1)
-        except ValueError:
-            pass
-        
-        if lemma.lower() != word.lower():
-            try:
-                ranks.append(top_words.index(lemma.lower()) + 1)
-            except ValueError:
-                pass
+        r1 = self.get_word_rank(word, lemma)
+        if r1 is not None:
+            ranks.append(r1)
         
         return min(ranks) if ranks else None
     
@@ -198,12 +276,14 @@ class SentenceClassifier:
     def get_cefr_from_rank(self, rank: Optional[int]) -> Optional[str]:
         if rank is None:
             return None
-        if rank <= 700:
+        if rank <= 500:
             return 'A1'
-        elif rank <= 1300:
+        elif rank <= 1000:
             return 'A2'
         elif rank <= 2000:
             return 'B1'
+        elif rank <= 3000:
+            return 'B2'
         elif rank <= 5000:
             return 'B2'
         elif rank <= 10000:
@@ -243,18 +323,98 @@ class SentenceClassifier:
         Returns:
             CEFR level: 'A1' for single digit, 'A2' for two digits, 'B1' for more
         """
-        # Count the number of 'd' characters in the shape
-        digit_count = shape.count('d')
-        
-        if digit_count == 1:
-            return 'A1'
-        elif digit_count == 2:
-            return 'A2'
-        elif digit_count > 2:
-            return 'B1'
-        
-        return None
+        rank = self.get_digit_rank(shape)
+        return self.get_cefr_from_rank(rank)
     
+    def get_digit_rank(self, shape: str) -> Optional[int]:
+        """
+        Get equivalent word rank for numbers based on their digit count.
+        """
+        digit_count = shape.count('d')
+        if digit_count == 1:
+            return 500  # A1 threshold
+        elif digit_count == 2:
+            return 1000 # A2 threshold
+        elif digit_count > 2:
+            return 2000 # B1 threshold
+        return None
+
+    def get_max_word_rank(self) -> int:
+        """
+        Calculate the maximum word rank in the sentence.
+        Ignores names, named entities, proper nouns, and hardcoded contractions.
+        For numbers, uses digit-based rank mapping.
+        """
+        ranks = self._get_sentence_ranks()
+        return max(ranks) if ranks else 0
+
+    def get_average_word_rank(self) -> float:
+        """
+        Calculate the average word rank in the sentence.
+        Ignores names, named entities, proper nouns, and hardcoded contractions.
+        For numbers, uses digit-based rank mapping.
+        """
+        ranks = self._get_sentence_ranks()
+        if not ranks:
+            return 0.0
+        return sum(ranks) / len(ranks)
+
+    def _get_sentence_ranks(self) -> List[int]:
+        """Helper to get a list of ranks for all valid tokens in the sentence."""
+        if not self.doc:
+            return []
+            
+        ranks = []
+        for token in self.doc:
+            # Handle names and named entities
+            is_name = self.is_common_name(token.text)
+            is_entity = token.ent_type_ != ''
+            
+            if is_name:
+                ranks.append(300)
+                continue
+            
+            if is_entity or token.pos_ == 'PROPN':
+                # For named entities that are not common names, try to find their actual rank
+                actual_rank = self.get_word_rank(token.text, token.lemma_)
+                if actual_rank is not None:
+                    # Apply the minimum rank of 300 to ensure they aren't treated as "too common"
+                    ranks.append(max(actual_rank, 20001))
+                else:
+                    # Fallback for entities not in the top 20k
+                    ranks.append(20001)
+                continue
+                
+            # Ignore hardcoded contractions and symbols
+            if token.text.lower() in HARDCODED_CEFR_LEVELS:
+                continue
+
+            # Ignore punctuation, symbols, spaces
+            if token.pos_ in ['PUNCT', 'SYM', 'SPACE']:
+                continue
+                
+            if token.pos_ == 'NUM':
+                digit_rank = self.get_digit_rank(token.shape_)
+                if digit_rank:
+                    ranks.append(digit_rank)
+                else:
+                    # For written-out numbers (e.g., "Three"), use the threshold rank
+                    # associated with their difficulty level to be consistent with digits
+                    word_rank = self.get_word_rank(token.text, token.lemma_)
+                    cefr = self.get_cefr_from_rank(word_rank)
+                    thresholds = {'A1': 500, 'A2': 1000, 'B1': 2000, 'B2': 5000, 'C1': 10000}
+                    ranks.append(thresholds.get(cefr, 20001))
+                continue
+                
+            rank = self.get_word_rank(token.text, token.lemma_)
+            if rank is not None:
+                ranks.append(rank)
+            else:
+                # Word not in top 20k
+                ranks.append(20001)
+                
+        return ranks
+
     def sentence(self, text: str):
         # Replace curly apostrophes with normal apostrophes before processing
         text = text.replace('’', "'").replace('´', "'")

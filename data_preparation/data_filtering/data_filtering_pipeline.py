@@ -43,20 +43,20 @@ def main():
     # )
     # print()
 
-    print("Step 2c & 3: Moderate and classify in parallel...")
-    processor = SentenceProcessor()
-    processor.moderate_and_classify(
-        input_file=output_path / "name_filtered_sentences.csv",
-        moderated_output_file=output_path / "moderation_filtered_sentences.csv",
-        classified_output_file=output_path / "classified_sentences.csv",
-        filtered_output_file=output_path / "filtered_out_sentences.csv",
-        data_dir=str(data_dir),
-        max_classify=15000,
-    )
-    print()
+    # print("Step 2c & 3: Moderate and classify in parallel...")
+    # processor = SentenceProcessor()
+    # processor.moderate_and_classify(
+    #     input_file=output_path / "name_filtered_sentences.csv",
+    #     moderated_output_file=output_path / "moderation_filtered_sentences.csv",
+    #     classified_output_file=output_path / "classified_sentences.csv",
+    #     filtered_output_file=output_path / "filtered_out_sentences.csv",
+    #     data_dir=str(data_dir),
+    #     max_classify=200000,
+    # )
+    # print()
 
-    # # Step 2c: Filter by moderation
-    # # print("Step 2c: Filtering by moderation...")
+    # Step 2c: Filter by moderation
+    # print("Step 2c: Filtering by moderation...")
     # filter_by_moderation(
     #     input_file=output_path / "name_filtered_sentences.csv",
     #     output_file=output_path / "moderation_filtered_sentences.csv",
@@ -67,15 +67,15 @@ def main():
     
 
     # # Step 4: Filter sentences using Gemini 2.5 Flash Lite 
-    # print("Step 3: Classifying sentences with LLM...")
-    # processor = SentenceProcessor()
-    # processor.classify(
-    #     input_file=output_path / "moderation_filtered_sentences.csv",
-    #     output_file=output_path / "classified_sentences.csv",
-    #     data_dir=str(data_dir),
-    #     max_sentences=10000,
-    # )
-    # print()
+    print("Step 3: Classifying sentences with LLM...")
+    processor = SentenceProcessor()
+    processor.classify(
+        input_file=output_path / "moderation_filtered_sentences.csv",
+        output_file=output_path / "classified_sentences.csv",
+        data_dir=str(data_dir),
+        max_sentences=100000,
+    )
+    print()
     
     print("Pipeline completed!")
 

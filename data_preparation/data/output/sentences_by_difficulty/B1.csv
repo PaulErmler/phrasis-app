@@ -1,0 +1,1477 @@
+id,text,difficulty,max_rank,rank,topics
+5066380,At least that part's true.,B1,393,1,negation
+6492622,Tom and Mary didn't know they didn't have enough time to do what had to be done.,B1,300,2,negation
+8466299,"I'm not so sure that I could do that, at least not as well as you.",B1,348,3,
+7299098,Sami was working part-time.,B1,342,4,
+282944,"I cannot tell when he will come, but when he comes, he will do his best.",B1,432,5,
+2042863,I'd think that the last thing you'd want to do right now is go home.,B1,300,6,
+2047859,"I've made up my mind what I'm going to do; and no ifs, ands, or buts about it.",B1,378,7,
+6407101,Mary said she'd like to know why you didn't do what you said you'd do.,B1,300,8,negation
+1342200,"I don't feel like doing anything, and I'm not getting up to turn on the fan.",B1,484,9,negation
+6656802,"Even though it wasn't easy, I was able to do that.",B1,511,10,
+4305168,It doesn't matter that you don't want to do it; the fact is that you have to.,B1,415,11,negation
+12600548,"No matter if you have money or not, live a life that's just right for you.",B1,415,12,
+6231801,I didn't know whether I'd be able to do that or not.,B1,485,13,negation
+6874142,"We're good friends now, but there was a time when we didn't like each other.",B1,355,14,likes & dislikes
+1885997,Don't you think it's still a little too early to talk to Tom about this?,B1,368,15,
+12098547,Here's a list of things you could try. You don't need to try them all.,B1,531,16,negation
+2506095,Are you now working part-time or full-time?,B1,342,17,
+12268114,"You're working part-time, right?",B1,342,18,
+6408542,"Even though Mary said she could do that, she wasn't able to.",B1,352,19,negation
+10089435,"There were a lot of things that we wanted to do, but we didn't have enough time.",B1,439,20,negation
+6655432,"I don't know when it'll happen, but I'm pretty sure that it'll happen.",B1,654,21,
+11713590,Martino was on the main level of the house.,B1,574,22,directions & locations
+6227610,I wouldn't have asked you to do that if I didn't think you could do it.,B1,499,23,negation
+1103024,How far is it to the next town?,B1,580,24,directions & locations
+2520226,When can we watch the next part?,B1,461,25,
+10064128,"How are you? ""I'm fine. You?"" ""I'm fine too.""",B1,586,26,greetings & introductions
+12194787,"Just because you've never heard of it, it doesn't mean that there's no such thing.",B1,542,27,negation
+7294684,Sami was in a long-term relationship.,B1,740,28,family & relationships
+8872252,"He takes care of her, and she takes care of him. They take care of each other.",B1,683,29,family & relationships
+10989128,"I know you don't really need my help, but I thought doing this together might be fun.",B1,502,30,asking for help
+12198251,Our relationship got to a next level.,B1,740,31,family & relationships
+8505592,This is a non-issue.,B1,589,32,
+7501011,I knew Tom would show Mary how to do that even though he said that he wouldn't.,B1,635,33,negation
+71143,"I am ready to do anything that I can for you, because I owe you a great deal.",B1,532,34,
+8055836,"I'm no longer quite sure what the question is, but I do know that the answer is yes.",B1,713,35,
+6227505,"I was about to do that, but something came up and I didn't have a chance to.",B1,548,36,
+7535763,We should stop at the next rest stop.,B1,594,37,
+954393,There were many things that I thought were important at that time that I no longer believe are important.,B1,713,38,
+11743733,Carlos is looking forward to the new school year and all the new friends he will make.,B1,785,39,future plans & goals
+11291137,Their love has gone to the next level.,B1,693,40,family & relationships
+11839091,"We thought it was a short cut, but it turned out to be a long way round.",B1,859,41,
+241305,What is the total amount?,B1,760,42,shopping & prices
+1893850,"We have a lot more to do, so we don't have time to take a break.",B1,670,43,
+10765272,I'm still not certain whether I'll be able to be there.,B1,707,44,
+1341378,Anything worth doing is worth doing well.,B1,726,45,
+10627681,I tried to give you a sense of my state of mind.,B1,724,46,
+8398149,He didn't want a serious relationship.,B1,836,47,negation
+6338872,I wouldn't have even tried to do that if you hadn't been there to help me.,B1,724,48,asking for help
+12510942,Why don't you stay for a bit after everyone has gone so that we can talk?,B1,693,49,polite requests & manners
+5604565,Mary has not written since she left.,B1,861,50,
+3251330,Buy a self-help book for relationship issues.,B1,740,51,
+2268190,The house is on the most level part of the ground.,B1,735,52,
+1025061,Tom is currently working on that problem.,B1,868,53,
+6867833,I sometimes do stuff like that.,B1,757,54,
+10123764,Trust in your friends and they'll have reason to trust you.,B1,780,55,
+8307822,The situation is far more serious than we thought.,B1,857,56,family & relationships
+7294433,Sami is currently in a relationship.,B1,868,57,negation
+10068681,That isn't part of the official plan.,B1,749,58,negation
+290564,He took part in the race.,B1,882,59,
+12054370,"Since you paid last time, let me pay this time.",B1,792,60,
+6406800,"I don't know what else Mary told you, but I do know she doesn't always tell the truth.",B1,960,61,negation
+3113285,This is a serious issue.,B1,836,62,
+8017644,I think that's the last thing you need and I don't want to add to that.,B1,840,63,"negation,likes & dislikes"
+10765257,"If you don't mind it being me, I'll listen to however much you have to say.",B1,929,64,polite requests & manners
+8523200,You say you want to visit him? Why in the world would you want to do that?,B1,980,65,
+241082,It's your decision whether you go or stay.,B1,847,66,
+33615,Do you feel pain in any other part of your body?,B1,996,67,
+13030433,"Because her poor father couldn't support her, she paid for her own education by working.",B1,855,68,
+8838666,Did you part on good terms?,B1,838,69,
+11932863,Are you in a serious relationship?,B1,836,70,family & relationships
+3618418,Shall we rest a bit?,B1,1003,71,polite requests & manners
+6225473,"Even though it was difficult, I was able to do that.",B1,903,72,"basic verbs & actions,emotions"
+258180,I was at a loss what to do next.,B1,907,73,"emotions,basic verbs & actions"
+13131165,Building trust in our relationship is my goal.,B1,925,74,"future plans & goals,family & relationships"
+6581062,It's a beautiful house that you have there. Did you buy it or build it yourself?,B1,963,75,"possession (my, your, his),basic verbs & actions"
+2798076,The wall is white on the outside and green on the inside.,B1,981,76,colors & shapes
+5012677,It wasn't a total loss.,B1,907,77,"negation,emotions"
+6445337,"I still think that deep inside you, you're probably a kind man.",B1,945,78,negation
+11717603,Pietro didn't speak though.,B1,1004,79,negation
+312432,Was she able to write a report?,B1,1008,80,colors & shapes
+1538660,The wall is white on the inside and green on the outside.,B1,981,81,language learning
+2677139,"Don't forget to write after you've left. ""All right, I'll write you once every four days.""",B1,1008,82,"negation,basic verbs & actions,numbers & counting"
+1687441,It's better if you put all that in a box so that you don't lose anything.,B1,962,83,"basic verbs & actions,negation"
+6499054,I'm pretty sure that Tom and Mary are the only ones who don't know how to do that.,B1,909,84,negation
+11524056,I didn't get involved with him out of respect for you.,B1,999,85,"basic verbs & actions,family & relationships,possession (my, your, his)"
+8297974,I respect the decision that you made.,B1,999,86,"basic verbs & actions,family & relationships"
+314547,She was at a loss what to say next.,B1,907,87,"emotions,basic verbs & actions"
+4884193,"If you respect yourself, others will respect you.",B1,999,88,"basic verbs & actions,family & relationships"
+8034210,It's very cold outside.,B1,1013,89,basic verbs & actions
+11163494,"Outside it's cold, dark and windy.",B1,1013,90,basic verbs & actions
+255205,I sometimes write to my mother.,B1,1008,91,family & relationships
+3962165,"Sometimes, a small change can have a big effect.",B1,1015,92,
+9387642,"In most cases, any decision is better than no decision.",B1,965,93,
+4226910,Speak about others as you would want them to speak about you!,B1,1004,94,"basic verbs & actions,family & relationships"
+824486,"Small cause, great effect.",B1,1015,95,
+2026584,I want to speak to the person in charge.,B1,1012,96,"basic verbs & actions,asking for help"
+273547,Players were limited in what they could and could not do to get and keep the ball.,B1,1021,97,"sports,basic verbs & actions"
+12846599,She spent time in other parts of the house.,B1,1029,98,"basic verbs & actions,telling time"
+1148331,I'm able to speak.,B1,1004,99,basic verbs & actions
+2119597,I buy a lot of stuff at that store.,B1,1030,100,shopping & prices
+7407148,They spent all their time working.,B1,1029,101,"basic verbs & actions,telling time"
+2978006,It's pretty cold outside.,B1,1013,102,likes & dislikes
+9183376,He sent the student to the main office.,B1,1031,103,likes & dislikes
+8228424,I think this album is amazing.,B1,1010,104,
+319467,He's in charge of the department.,B1,1012,105,basic verbs & actions
+6120724,I haven't been able to find time to do that recently.,B1,1026,106,"basic verbs & actions,telling time,negation"
+11757206,Gabriel led the charge.,B1,1012,107,basic verbs & actions
+17860,It makes no difference whether you go or not.,B1,1048,108,negation
+11094119,Are you watching his new TV series?,B1,1035,109,sports
+9408531,Everything has a cause and effect.,B1,1015,110,
+2253203,He's a former student of mine.,B1,1031,111,directions & locations
+12911328,I went back inside the store.,B1,1030,112,"directions & locations,basic verbs & actions"
+7386173,He spent all his time working.,B1,1029,113,"basic verbs & actions,telling time"
+11651631,Sometimes the best things happen when you don't expect them.,B1,1050,114,in the classroom
+6101345,Sami was a model student.,B1,1031,115,future plans & goals
+271137,The population of the world will double before long.,B1,1056,116,"future plans & goals,basic verbs & actions"
+12773599,No one knew what to expect next.,B1,1050,117,"negation,emotions"
+10114082,Is it worth watching?,B1,1035,118,sports
+5060698,Recently I lost weight.,B1,1036,119,"basic verbs & actions,negation"
+10786336,This movie is more than well worth watching.,B1,1035,120,"basic verbs & actions,negation"
+6257561,I didn't expect to win the race.,B1,1050,121,future plans & goals
+45873,The baby's growth is normal for his age.,B1,1054,122,future plans & goals
+10890918,I'll ask him whether he plans to come.,B1,1055,123,negation
+10879162,Your blood pressure is normal.,B1,1058,124,"language learning,negation"
+1798498,I cannot write this text by hand.,B1,1062,125,basic verbs & actions
+9992805,Yanni is getting too far ahead.,B1,1038,126,"basic verbs & actions,future plans & goals"
+1022846,The beginning is the most important part of the work.,B1,1066,127,
+28279,The committee are all present.,B1,1046,128,"family & relationships,basic verbs & actions"
+6234433,This area has changed a lot since we moved here.,B1,1053,129,"basic verbs & actions,directions & locations"
+6261652,Your stuff needs to be moved.,B1,1053,130,"possession (my, your, his),basic verbs & actions"
+9453755,I haven't been able to lose weight.,B1,1036,131,"basic verbs & actions,negation"
+3962166,"Sometimes, a small change can make a big difference.",B1,1048,132,basic verbs & actions
+2546481,I'm watching my weight.,B1,1036,133,"basic verbs & actions,telling time"
+3258456,She is already beginning to read and write.,B1,1066,134,language learning
+5803491,We must find time to stop and thank the people who make a difference in our lives.,B1,1048,135,"basic verbs & actions,directions & locations,asking for help"
+6555306,I have to get off at the next station.,B1,1061,136,"basic verbs & actions,directions & locations"
+3733325,The station isn't far from here.,B1,1061,137,directions & locations
+5835978,"My blood pressure probably went down, but I'm fine now.",B1,1058,138,"possession (my, your, his),shopping & prices"
+12837073,But the water is ice cold!,B1,1081,139,basic verbs & actions
+10838289,I like working under pressure.,B1,1058,140,likes & dislikes
+3905137,I don't completely trust him.,B1,1070,141,negation
+7329391,Sami kept thinking about it his entire class period.,B1,1086,142,directions & locations
+10791540,The station's not far from here.,B1,1061,143,directions & locations
+1858812,"Have you paid your bill yet? ""We most certainly have.""",B1,1069,144,"negation,basic verbs & actions"
+55801,Is this the street leading to the station?,B1,1087,145,directions & locations
+50781,And then everything that was written was completely clear.,B1,1070,146,basic verbs & actions
+9323756,Give credit where credit's due.,B1,1072,147,
+6736430,I see cold ice.,B1,1081,148,"colors & shapes,basic verbs & actions"
+11858714,There is no one around for miles and miles.,B1,1090,149,negation
+7202991,Sami said that was completely fine.,B1,1070,150,
+9989952,What's the main message of this book?,B1,1089,151,language learning
+12767364,We have to give credit where credit is due.,B1,1072,152,
+11684765,It'll be interesting to see whether or not you're right.,B1,1083,153,"future plans & goals,negation"
+5386154,We need to cross the river.,B1,1073,154,basic verbs & actions
+10597149,People do sometimes ask interesting questions.,B1,1083,155,language learning
+10624943,Our son has the same character as you; he certainly didn't take after me in that respect.,B1,1069,156,"family & relationships,personal pronouns"
+9974526,There must be a way to cross the river.,B1,1073,157,basic verbs & actions
+4410037,Despite being small you are of great value.,B1,1075,158,personal pronouns
+10852568,Can we cross the river?,B1,1073,159,basic verbs & actions
+11511330,James sent the text message.,B1,1089,160,basic verbs & actions
+619759,Is it possible to travel at such a high speed?,B1,1100,161,family & relationships
+12673169,They loved one another from the beginning.,B1,1088,162,family & relationships
+2996369,We speak quickly.,B1,1094,163,basic verbs & actions
+8433273,The water level rose very quickly.,B1,1094,164,negation
+10046808,We do not consider specific cases.,B1,1101,165,negation
+9870423,"Where did you go? ""I went to the station to say hi to a friend from out of town.""",B1,1079,166,"directions & locations,greetings & introductions,basic verbs & actions"
+7268093,Sami received this text message.,B1,1089,167,basic verbs & actions
+9963953,The snow kept us inside.,B1,1086,168,basic verbs & actions
+7268215,Sami made eye contact with me.,B1,1102,169,basic verbs & actions
+2254284,I got over my cold quickly.,B1,1094,170,basic verbs & actions
+7114099,I kept working hard.,B1,1086,171,basic verbs & actions
+6813235,"Think positive, and positive things will happen.",B1,1109,172,future plans & goals
+242394,Drop in and see us when you're next in Kobe.,B1,1103,173,"greetings & introductions,basic verbs & actions"
+11893344,I'm watching an interesting movie.,B1,1083,174,basic verbs & actions
+11714998,Pietro could finally join the woman that he loved.,B1,1088,175,"family & relationships,basic verbs & actions"
+8105187,Tom tried not to make eye contact with anyone.,B1,1102,176,basic verbs & actions
+11692988,"Damiano and Isabella made eye contact, but she looked away.",B1,1102,177,basic verbs & actions
+1469304,This article is more interesting than the previous one.,B1,1093,178,language learning
+7189484,Sami called the police department and reported that.,B1,1096,179,basic verbs & actions
+10260584,"When I was a kid, I was one of the few boys in our street who didn't like football.",B1,1107,180,likes & dislikes
+9665263,I usually get up earlier than the rest of my family.,B1,1118,181,greetings & introductions
+2798347,You're welcome to write to me.,B1,1113,182,polite requests & manners
+12608456,This section of the road is level.,B1,1097,183,
+13283919,I really loved this book as a kid.,B1,1107,184,likes & dislikes
+5346441,I've been doing this since I was a kid.,B1,1107,185,basic verbs & actions
+2326848,She met a boy at the county fair.,B1,1104,186,basic verbs & actions
+11047524,The working conditions weren't very good.,B1,1117,187,"negation,basic verbs & actions"
+6434074,I'm absolutely positive that I can do that.,B1,1114,188,future plans & goals
+3728052,I've got cold feet.,B1,1105,189,polite requests & manners
+8920093,I'm sorry I couldn't write to you earlier.,B1,1118,190,basic verbs & actions
+11498646,Daniel spent a lot of money on this tour.,B1,1112,191,shopping & prices
+21240,How much was the additional charge?,B1,1115,192,shopping & prices
+6243356,I hope we get paid extra for doing that.,B1,1119,193,future plans & goals
+3010060,A thinking person doesn't give the same answer to the same question throughout his whole life.,B1,1111,194,language learning
+2031999,Are you absolutely positive you want to do this?,B1,1114,195,polite requests & manners
+9505412,"Please come earlier tomorrow, as we will have a lot of work to do.",B1,1118,196,likes & dislikes
+7070287,Sami absolutely loved his dog.,B1,1114,197,polite requests & manners
+2835593,You're welcome to join us if you want.,B1,1113,198,polite requests & manners
+50765,Please write to me about conditions at your school.,B1,1117,199,language learning
+41040,A lot of students do part-time jobs.,B1,1122,200,basic verbs & actions
+3309210,There is no significant difference.,B1,1129,201,negation
+11488682,Donald immediately looked at Jessica once he was inside the room.,B1,1121,202,negation
+9824797,"If you don't want to sell this, we can sell something else.",B1,1128,203,numbers & counting
+316798,She phoned her husband to come immediately.,B1,1121,204,numbers & counting
+8629687,The numbers add up pretty quickly.,B1,1126,205,"numbers & counting,basic verbs & actions"
+10913491,The law went into effect immediately.,B1,1121,206,basic verbs & actions
+8392436,I had various jobs while I was in college.,B1,1122,207,basic verbs & actions
+12755590,You should consider leaving early.,B1,1123,208,future plans & goals
+1795962,The floor must be kept clean.,B1,1135,209,basic verbs & actions
+12090539,I like being in contact with nature.,B1,1125,210,plants
+11817357,"Nature doesn't need people, but people need nature.",B1,1125,211,plants
+68460,They sell live fish at the fish store.,B1,1128,212,animals
+306947,They won by force of numbers.,B1,1126,213,numbers & counting
+8664905,He must be very happy after winning the race.,B1,1132,214,emotions
+7406002,They have to travel a lot for their jobs.,B1,1122,215,basic verbs & actions
+12983001,She had a quick look inside.,B1,1127,216,basic verbs & actions
+12839277,He's a computer science major.,B1,1136,217,basic verbs & actions
+7389250,He's still working on his computer.,B1,1136,218,basic verbs & actions
+12983006,Have a quick look inside.,B1,1127,219,basic verbs & actions
+4757666,The others are leaving. What do you say we wait for them to go away and talk for a while?,B1,1123,220,basic verbs & actions
+2154849,The photo doesn't do us justice.,B1,1145,221,basic verbs & actions
+6272454,I'm the store manager.,B1,1143,222,basic verbs & actions
+414971,Don't forget to turn off the gas before leaving the house.,B1,1123,223,negation
+3821608,This is my favorite part.,B1,1139,224,"possession (my, your, his)"
+1798960,I agree to write the report.,B1,1133,225,"basic verbs & actions,future plans & goals"
+6456843,Sami wanted to sell the rest of his books.,B1,1128,226,"basic verbs & actions,possession,shopping & prices"
+7388413,She has sold the rest of her books.,B1,1150,227,"possession (my, your, his)"
+4486530,This photo is my favorite.,B1,1145,228,"possession (my, your, his)"
+3728723,That's my favorite part.,B1,1139,229,"possession (my, your, his),likes & dislikes"
+9811885,We haven't been able to spend much time together recently.,B1,1152,230,"negation,basic verbs & actions,family & relationships"
+12258516,It sounds serious.,B1,1151,231,emotions
+9064214,That sounds like double talk to me.,B1,1151,232,negation
+11630131,I'm asking you to trust me on this.,B1,1158,233,polite requests & manners
+11830004,Ivan was working on a computer.,B1,1136,234,basic verbs & actions
+11516245,"Even if I don't agree with your choice, I respect it.",B1,1133,235,likes & dislikes
+906976,What's your favorite TV series?,B1,1139,236,likes & dislikes
+6143164,"For what it's worth, I completely agree with you.",B1,1133,237,"basic verbs & actions,personal pronouns"
+45769,The river was not so clean.,B1,1135,238,emotions
+6039881,I want to spend the rest of my life with you. I love you.,B1,1152,239,"likes & dislikes,emotions"
+6877358,How much time do you spend watching TV every day?,B1,1152,240,"telling time,basic verbs & actions,likes & dislikes"
+7259186,Sami went to the property manager.,B1,1143,241,"basic verbs & actions,directions & locations"
+6258833,I need to speak to the manager.,B1,1143,242,shopping & prices
+5848142,Tom sounds like an amazing kid.,B1,1151,243,shopping & prices
+10083229,That's not worth the price that they're asking for it.,B1,1158,244,"negation,shopping & prices"
+9337572,Even a coach needs a coach.,B1,1160,245,basic verbs & actions
+11449306,"He continued to speak, but she paid no attention.",B1,1162,246,basic verbs & actions
+2450043,They just announced that on the radio.,B1,1157,247,greetings & introductions
+7113050,Who shall I say is calling?,B1,1159,248,asking for help
+12941919,He continued to write.,B1,1162,249,basic verbs & actions
+3846159,I cross-posted the message to another website.,B1,1146,250,greetings & introductions
+879675,"Thanks for asking, she is fine.",B1,1158,251,basic verbs & actions
+3961557,I want to find out what happens next!,B1,1169,252,greetings & introductions
+7215119,Sami is calling his manager.,B1,1159,253,greetings & introductions
+8509639,Nothing interesting ever happens around here.,B1,1169,254,"negation,emotions"
+323853,The point at issue is not her ability but her character.,B1,1156,255,likes & dislikes
+11858682,My daughter's favorite subject at school is art.,B1,1175,256,"family & relationships,likes & dislikes"
+10643815,The group continued working.,B1,1162,257,basic verbs & actions
+304969,The train had already left when they got to the station.,B1,1176,258,"basic verbs & actions,directions & locations"
+7475503,They definitely know their stuff.,B1,1164,259,basic verbs & actions
+2380098,The eye has the natural ability to see.,B1,1156,260,basic verbs & actions
+10193156,I don't feel like watching the entire movie just to find out what happens.,B1,1169,261,likes & dislikes
+3214115,We sell a wide range of products.,B1,1177,262,shopping & prices
+13131365,It was a funny story to share with his dad later.,B1,1182,263,family & relationships
+2142618,I'm sorry I never got round to calling you back.,B1,1159,264,polite requests & manners
+9814651,"I don't know who the author is, but I loved what I read.",B1,1179,265,"negation,basic verbs & actions"
+7185736,Sami was in a particularly deep sleep.,B1,1173,266,emotions
+2307541,"Let me off at the train station, please.",B1,1176,267,polite requests & manners
+12134200,It would definitely be worth it.,B1,1164,268,basic verbs & actions
+266470,The house costs double what it did before.,B1,1163,269,shopping & prices
+12775009,He developed technology for space travel.,B1,1183,270,basic verbs & actions
+5422560,And why is that an interesting subject?,B1,1175,271,"likes & dislikes,basic verbs & actions"
+2635096,For this it's definitely worth coming.,B1,1164,272,basic verbs & actions
+9637445,Write down your goals on a piece of paper.,B1,1189,273,future plans & goals
+13073489,My friend's dad is a friend of my dad.,B1,1182,274,"family & relationships,possession (my, your, his)"
+681313,I have no knowledge about their plans.,B1,1172,275,"negation,possession,future plans & goals"
+6917545,What was your favorite subject in school?,B1,1175,276,in the classroom
+12273213,"Do you know who the best dad in the world is? ""Me?"" ""No, Tom's dad!""",B1,1182,277,family & relationships
+289279,He has various knowledge.,B1,1172,278,"possession,basic verbs & actions"
+12270410,"For Tony, only knowledge and ability are important.",B1,1172,279,"possession,basic verbs & actions"
+6918575,There is nothing to fear except fear itself.,B1,1184,280,negation
+12516029,The bed is too wide to fit through the door.,B1,1185,281,future plans & goals
+9012251,Write down your goals.,B1,1189,282,future plans & goals
+3734933,I wasn't particularly interested in what was going on.,B1,1192,283,"negation,emotions,likes & dislikes"
+326213,The train was clear of the station.,B1,1176,284,directions & locations
+7136659,I think you're going to fit in just fine.,B1,1185,285,"basic verbs & actions,family & relationships"
+4064026,Is it normal if I don't like to step on lines?,B1,1197,286,"future plans & goals,likes & dislikes"
+11579704,You need to work on your ability to set yourself goals.,B1,1189,287,future plans & goals
+9955143,This is the most complete collection of the author's works.,B1,1179,288,basic verbs & actions
+2470637,That hotel is very close to the train station.,B1,1191,289,directions & locations
+4500328,What kept you interested?,B1,1192,290,"likes & dislikes,basic verbs & actions"
+7819418,There is a position available for a secretary.,B1,1206,291,basic verbs & actions
+4279412,There is nobody inside.,B1,1200,292,negation
+12370702,My sister is a secretary at a bank.,B1,1207,293,"family & relationships,possession (my, your, his)"
+7198861,The park's not far from the hotel.,B1,1191,294,directions & locations
+322046,I haven't enough material to write a book yet.,B1,1198,295,negation
+8866563,Nobody knows why this happens.,B1,1200,296,negation
+12689207,I want to be the leader of the game next time!,B1,1195,297,future plans & goals
+10275281,That product is sold out.,B1,1204,298,shopping & prices
+7981996,Sami's stories are interesting.,B1,1208,299,"possession (my, your, his)"
+6574928,Sami went straight home after leaving the hotel.,B1,1191,300,directions & locations
+5009421,I'm not particularly interested in that event.,B1,1192,301,likes & dislikes
+64946,An old lady moved into the place next door.,B1,1194,302,directions & locations
+9251480,Write me a letter.,B1,1196,303,basic verbs & actions
+12315803,I went back and finished my degree.,B1,1220,304,basic verbs & actions
+9323415,They were asking to speak to someone named Carol.,B1,1199,305,"asking for help,basic verbs & actions"
+3823649,I hope nobody gets hurt.,B1,1224,306,negation
+261608,I've written a lot of stories.,B1,1208,307,language learning
+2160812,I wrote him a letter asking him to come home soon.,B1,1196,308,basic verbs & actions
+2617174,I am writing you a long letter because I don't have time to write you a short one.,B1,1196,309,basic verbs & actions
+37825,It was such a cold day that there was nobody on the street.,B1,1200,310,negation
+1813911,Why doesn't she write me anymore?,B1,1212,311,basic verbs & actions
+3910908,We weren't able to reach her.,B1,1233,312,negation
+3360450,You should seriously consider majoring in music.,B1,1235,313,"future plans & goals,basic verbs & actions"
+13149074,The sister of your husband is your sister-in-law.,B1,1207,314,family & relationships
+10044975,This product is already sold out.,B1,1204,315,shopping & prices
+40142,I've just finished writing a letter.,B1,1220,316,basic verbs & actions
+8666046,"This is my sister. ""Your sister?"" ""Yes."" ""She's beautiful!""",B1,1207,317,"family & relationships,possession (my, your, his)"
+302951,He had to part with his secretary when she got married.,B1,1206,318,"family & relationships,possession (my, your, his)"
+3273560,He's just finished his studies. He's looking for a job.,B1,1220,319,"basic verbs & actions,future plans & goals"
+10879237,Good friends know all our stories. Best friends are part of them.,B1,1208,320,family & relationships
+3024112,It doesn't make any difference anymore.,B1,1212,321,negation
+12514981,I'm not interested in that anymore.,B1,1212,322,likes & dislikes
+3273010,It would be good if you started working seriously.,B1,1235,323,"basic verbs & actions,future plans & goals"
+250536,My house is within easy reach of the station.,B1,1233,324,"directions & locations,possession (my, your, his)"
+9824547,"To have a successful store, you have to sell people what they want.",B1,1238,325,shopping & prices
+4013957,Is that your professional opinion?,B1,1230,326,"possession (my, your, his)"
+11201083,Your opinion is interesting.,B1,1230,327,"possession (my, your, his)"
+3002093,Shall we dance a bit?,B1,1246,328,basic verbs & actions
+8791880,I think you meant to send that message to someone else.,B1,1228,329,in the classroom
+275240,Is physical education a required course?,B1,1231,330,in the classroom
+6558727,I knew immediately what she meant.,B1,1228,331,basic verbs & actions
+252813,I agree with your opinion.,B1,1230,332,basic verbs & actions
+303090,He's in charge of administration at the hospital.,B1,1240,333,"basic verbs & actions,possession"
+11590767,It's good that nobody got hurt.,B1,1224,334,negation
+11256048,"I had meant to visit him, but I didn't get round to it.",B1,1228,335,"basic verbs & actions,negation"
+6261067,I don't want to dance anymore.,B1,1246,336,"likes & dislikes,negation"
+5725645,It's been an eye-opening experience.,B1,1229,337,"basic verbs & actions,emotions"
+5350404,What is your favorite sports team?,B1,1236,338,"sports,likes & dislikes,possession (my, your, his)"
+55347,So far we have been quite successful.,B1,1238,339,negation
+4378444,I wonder whether you could do it alone as well.,B1,1258,340,negation
+12252273,I don't understand the reasons behind his decision.,B1,1252,341,negation
+276589,None have finished the work.,B1,1251,342,negation
+11690795,I don't have a great sense of direction.,B1,1248,343,"directions & locations,negation"
+7815374,We saw another ship far away.,B1,1254,344,animals
+6656814,You don't seem particularly interested in sports.,B1,1236,345,"sports,negation,likes & dislikes"
+7409282,They said they wanted to join our band.,B1,1262,346,basic verbs & actions
+1676647,She's active and fit.,B1,1239,347,
+7772861,Her brother seriously studies.,B1,1235,348,"personal pronouns,basic verbs & actions"
+6526632,"I didn't have enough cash, so I paid by credit card.",B1,1264,349,"shopping & prices,negation"
+9741115,Are you on any sports teams?,B1,1236,350,sports
+10218271,The ship was not able to pass under it.,B1,1254,351,negation
+8353337,You need to speak more clearly.,B1,1265,352,language learning
+68481,That student is very active.,B1,1239,353,
+266873,Please speak as clearly as you can.,B1,1265,354,polite requests & manners
+241891,So far everything has been successful.,B1,1238,355,
+6352478,I wonder what made Tom think Mary will be able to do that.,B1,1258,356,
+5792055,I don't dance anymore.,B1,1246,357,negation
+4959599,A computer is often compared to a human brain.,B1,1267,358,
+322028,We had our photo taken on the beach.,B1,1263,359,
+7347671,Can you point me in the direction of the central station?,B1,1248,360,directions & locations
+7272239,Make more effort to understand this text.,B1,1268,361,language learning
+10181684,I've spent a lot of time on the beach.,B1,1263,362,
+6576240,What is your favorite band?,B1,1262,363,likes & dislikes
+7733513,Tom gets paid in cash.,B1,1264,364,
+6337142,I wonder whether this is really worth the price they're asking.,B1,1258,365,shopping & prices
+11698970,Have you seen the latest episode of that TV show?,B1,1275,366,
+3625030,I like to travel by ship.,B1,1254,367,animals
+4496526,The band is now doing a sound check.,B1,1262,368,basic verbs & actions
+4331976,There is no lack of effort.,B1,1274,369,negation
+11587355,The train finally passed that station.,B1,1281,370,
+9052891,"I don't have any cash, but I have a credit card.",B1,1264,371,"shopping & prices,negation"
+11147285,You should speak as clearly as possible.,B1,1265,372,language learning
+54557,The computer has made a great impact on modern life.,B1,1273,373,
+1470237,She's about the same age as my older sister.,B1,1278,374,family & relationships
+12877036,It's worth the effort.,B1,1268,375,
+8316665,He studies on the beach.,B1,1263,376,
+7407113,They have to protect their families.,B1,1283,377,family & relationships
+12923711,Do you think reading this book is worth the effort?,B1,1268,378,language learning
+5069709,It's not a secret anymore.,B1,1284,379,negation
+6378344,Sami ended the relationship.,B1,1269,380,family & relationships
+1918450,The time has passed very quickly.,B1,1281,381,telling time
+70627,What's your older sister doing now?,B1,1278,382,family & relationships
+8562981,I sprang to my feet.,B1,1286,383,basic verbs & actions
+4355190,What is her older sister's name?,B1,1278,384,family & relationships
+12108140,You're welcome to take pictures.,B1,1282,385,polite requests & manners
+256607,I gave an opening address.,B1,1291,386,basic verbs & actions
+11119838,The lack of sleep is beginning to tell.,B1,1274,387,
+1788191,We didn't add pictures to our album.,B1,1282,388,negation
+9370601,Some time has passed since then.,B1,1281,389,
+10606991,I wear what I want to wear.,B1,1289,390,basic verbs & actions
+9671030,I bought this at the store next to the house.,B1,1294,391,"shopping & prices,directions & locations"
+12481087,Further analysis is required.,B1,1292,392,language learning
+10718989,Is there anything interesting on at the pictures?,B1,1282,393,basic verbs & actions
+7796804,We left without telling anyone we were leaving.,B1,1288,394,basic verbs & actions
+3164394,Why have you kept it a secret?,B1,1284,395,negation
+6740409,Do you have a favorite color?,B1,1298,396,likes & dislikes
+2544823,I'll text you the address.,B1,1291,397,future plans & goals
+2852093,Wear whatever you want to wear.,B1,1289,398,basic verbs & actions
+8856513,Choose a product.,B1,1296,399,shopping & prices
+236720,"Write your name and address, please.",B1,1291,400,polite requests & manners
+2258912,"In addition to his regular job, he has a lot of other activities.",B1,1290,401,
+11116495,We bought a new hotel.,B1,1294,402,basic verbs & actions
+264173,There is no telling what may happen next.,B1,1288,403,
+6963047,I'm going to come home a little early. There isn't much work at the office anyway.,B1,1293,404,"basic verbs & actions,future plans & goals,negation"
+9344931,I had to choose whether to go with him or to stay here alone.,B1,1296,405,basic verbs & actions
+8160888,He wasn't interested in telling it to them.,B1,1288,406,"basic verbs & actions,negation"
+680695,Can you direct me to the train station?,B1,1302,407,directions & locations
+11744398,Carlos was easily able to run away.,B1,1304,408,"basic verbs & actions,animals"
+3170506,"Your favorite color is red, right?",B1,1298,409,likes & dislikes
+8340605,I don't really have a favorite color.,B1,1298,410,"likes & dislikes,negation"
+11808260,Nobody wanted to wear it.,B1,1289,411,"negation,basic verbs & actions"
+2834300,"Anyway, I've definitely got to see her again.",B1,1293,412,negation
+2952176,I have to finish writing the book I'm working on.,B1,1305,413,basic verbs & actions
+4870464,Tom provided no further details.,B1,1301,414,"basic verbs & actions,future plans & goals"
+6251498,I should be able to do that easily.,B1,1304,415,"basic verbs & actions,negation"
+7142836,"I didn't have enough money to buy the car I wanted, so I bought a different car.",B1,1294,416,"shopping & prices,negation"
+2564704,It never made much sense to me anyway.,B1,1293,417,basic verbs & actions
+680700,Which direction will he choose?,B1,1296,418,directions & locations
+9736681,Tom was the last person to cross the finish line.,B1,1305,419,sports
+264344,Better luck next time.,B1,1312,420,future plans & goals
+251934,My dream has come true at last by working hard.,B1,1303,421,future plans & goals
+11555085,I don't consider that necessary.,B1,1315,422,negation
+6871245,I'm not interested in the details.,B1,1301,423,negation
+3355079,You should be able to do that easily.,B1,1304,424,"future plans & goals,basic verbs & actions"
+11530768,John had to focus completely on the competition.,B1,1300,425,sports
+34586,"Bill won the match, not so much by good luck as by real ability.",B1,1312,426,sports
+12382132,I wonder if my dream will come true.,B1,1303,427,future plans & goals
+8981387,Don't give up your dream! Live your dream!,B1,1303,428,"future plans & goals,basic verbs & actions"
+6115817,Allow me to finish what I'm saying.,B1,1305,429,polite requests & manners
+3393717,What's your favorite skin care product?,B1,1319,430,"personal pronouns,likes & dislikes,possession (my, your, his),shopping & prices"
+7197015,It isn't necessary for us to make a decision now.,B1,1315,431,negation
+2966814,I didn't know why I wasn't supposed to visit that part of the city.,B1,1321,432,"negation,personal pronouns,directions & locations"
+2758453,He has fair skin and hair.,B1,1319,433,"personal pronouns,colors & shapes"
+238716,Marriage is a serious matter.,B1,1313,434,family & relationships
+12464157,I was caught between a rock and a hard place.,B1,1326,435,basic verbs & actions
+4850024,There was no reported damage.,B1,1329,436,negation
+10498060,It seems I've caught a cold.,B1,1326,437,"basic verbs & actions,emotions"
+10685353,The charge was increased.,B1,1308,438,basic verbs & actions
+12797763,"So, time to get started. Good luck working!",B1,1312,439,"basic verbs & actions,future plans & goals,greetings & introductions"
+69715,It is necessary that you take a good rest.,B1,1315,440,basic verbs & actions
+5187492,I have a lot of patients who are older than me.,B1,1316,441,"personal pronouns,family & relationships"
+42895,"You mustn't touch it, because it'll break easily.",B1,1324,442,negation
+703243,I'm speaking with my student.,B1,1320,443,personal pronouns
+6664646,What am I supposed to do next?,B1,1321,444,"asking for help,basic verbs & actions"
+11053892,That store may have already closed.,B1,1327,445,"negation,basic verbs & actions,telling time"
+1349015,"Seriously, stay in touch.",B1,1324,446,"future plans & goals,basic verbs & actions"
+295152,He is without doubt the most successful movie director in the world.,B1,1333,447,personal pronouns
+30656,"If I knew his address, I would get in touch with him right away.",B1,1324,448,"basic verbs & actions,future plans & goals"
+6233035,I thought you weren't supposed to do that anymore.,B1,1321,449,"negation,personal pronouns,basic verbs & actions"
+3737926,"Could you get me a cold drink, please?",B1,1334,450,polite requests & manners
+4081365,"Keep speaking, because you speak well.",B1,1320,451,language learning
+6348091,I doubt you'll be able to do that.,B1,1333,452,"negation,personal pronouns,basic verbs & actions"
+6244860,I doubt that you'll be able to do that.,B1,1333,453,"negation,personal pronouns,basic verbs & actions"
+11833016,Ivan closed the radio.,B1,1327,454,basic verbs & actions
+6659551,I'm able to do that with my eyes closed.,B1,1327,455,"personal pronouns,basic verbs & actions"
+906725,What's your favorite cold drink?,B1,1334,456,likes & dislikes
+1827270,It is necessary that she see a doctor.,B1,1332,457,basic verbs & actions
+319754,I've gone and caught a cold.,B1,1326,458,family & relationships
+6202950,Are you a doctor? My father is also a doctor.,B1,1332,459,"personal pronouns,family & relationships,basic verbs & actions"
+680622,There was damage to the computer.,B1,1329,460,basic verbs & actions
+300986,He established his son in trade.,B1,1336,461,"family & relationships,basic verbs & actions"
+8340204,Let's go inside and get something to drink.,B1,1334,462,basic verbs & actions
+11922323,Where can I find a cash machine?,B1,1346,463,directions & locations
+12050247,Something feels funny.,B1,1338,464,emotions
+11511607,James was glad Amanda was safe and sound.,B1,1342,465,emotions
+37534,Every student passed the driving test.,B1,1335,466,"basic verbs & actions,in the classroom"
+10859825,Ivy began to grow back very quickly.,B1,1344,467,"plants,basic verbs & actions"
+13320598,That lady is a doctor.,B1,1332,468,basic verbs & actions
+8442803,I wonder who'll be driving.,B1,1335,469,"personal pronouns,basic verbs & actions"
+953758,I wonder what it feels like to be rich.,B1,1338,470,emotions
+1890979,I'm glad we agree.,B1,1342,471,emotions
+2486701,Did you grow up near a beach?,B1,1344,472,likes & dislikes
+6949931,What are some of your favorite TV programs?,B1,1351,473,future plans & goals
+5831998,I think I'd like to be a doctor when I grow up.,B1,1344,474,emotions
+5734438,I feel like you've been a good friend to me and I'm glad to know you.,B1,1342,475,emotions
+9931039,Yanni passed his driving test.,B1,1335,476,negation
+12891082,They didn't notice the difference.,B1,1347,477,negation
+5726739,We just don't notice it anymore.,B1,1347,478,"negation,basic verbs & actions"
+40305,Will you play some dance records?,B1,1352,479,"sports,basic verbs & actions"
+2198540,That feels amazing.,B1,1338,480,negation
+11490697,No one would notice the difference.,B1,1347,481,"negation,basic verbs & actions"
+305623,They have run this small hotel since it was established.,B1,1336,482,likes & dislikes
+7189416,What are some of your favorite programs?,B1,1351,483,"personal pronouns,likes & dislikes"
+12212242,You need to watch out for cars when you cross the street.,B1,1361,484,"basic verbs & actions,directions & locations"
+12203380,I had a pretty amazing trip.,B1,1356,485,future plans & goals
+8557533,This is pretty basic stuff.,B1,1358,486,"basic verbs & actions,in the classroom"
+1349178,Every ship needs a captain.,B1,1359,487,"basic verbs & actions,animals"
+10345152,Where shall we sit?,B1,1355,488,"basic verbs & actions,directions & locations"
+291043,He paid the money on the spot.,B1,1377,489,"basic verbs & actions,shopping & prices"
+9181967,I hope that nobody is going to sit in front of us.,B1,1355,490,"negation,basic verbs & actions"
+12258072,Did you go on a social studies field trip? How was it?,B1,1356,491,"basic verbs & actions,in the classroom"
+2487691,Are there any TV or radio programs in your language?,B1,1351,492,"language learning,basic verbs & actions"
+8780249,My husband is a professor.,B1,1350,493,family & relationships
+407580,May I speak to the professor?,B1,1350,494,"basic verbs & actions,family & relationships"
+3223045,Where are we supposed to sit?,B1,1355,495,
+1701549,"Of course, I welcome advice taken from your experience!",B1,1382,496,
+322756,My dream is to take a round-the-world trip.,B1,1356,497,
+789748,You're holding my hand in the photo.,B1,1368,498,
+7806965,It's difficult to explain in a message.,B1,1365,499,
+12777567,What is the nature of reality?,B1,1375,500,
+247550,Let's see if our cars have enough gas.,B1,1361,501,
+5614949,Could you explain your previous statement?,B1,1365,502,
+1820665,How many cars does this train have?,B1,1361,503,
+10608626,Allow me to explain everything from the beginning.,B1,1365,504,
+1898314,My cold is getting worse.,B1,1381,505,
+4976781,I wonder what caused that.,B1,1388,506,
+287578,His dream has become a reality.,B1,1375,507,
+316763,She helped her husband with his work.,B1,1395,508,
+13359369,The river is really wide in this spot.,B1,1377,509,
+4496158,What laws were broken?,B1,1387,510,
+12604706,She couldn't believe her name was called for the service award.,B1,1385,511,
+10533866,The pain got worse.,B1,1381,512,
+5854411,My radio is broken.,B1,1387,513,
+6338949,I think Tom will be able to do that eventually.,B1,1394,514,
+2380201,I love beach parties.,B1,1373,515,
+5239258,I fully agree with this.,B1,1366,516,
+1852315,Send us lots of pictures!,B1,1399,517,
+7317375,Sami lived his life as he saw fit.,B1,1398,518,
+52147,"You had better go to bed right away, or your cold will get worse.",B1,1381,519,
+9504677,I'm glad we could come to an agreement.,B1,1383,520,
+30863,"But for his advice, I could not finish it.",B1,1382,521,
+12241271,I helped make that decision.,B1,1395,522,
+505774,And nobody helped you?,B1,1395,523,
+10707034,The boy did not even consider following his father's advice.,B1,1382,524,
+7320300,Sami lived in the central part of the state.,B1,1398,525,
+9714774,Yanni lived in a nice part of town.,B1,1398,526,
+11160410,What do you sell in your shop?,B1,1408,527,
+2259092,Prices are very high in this store.,B1,1403,528,
+2092,You're sick. You have to rest.,B1,1410,529,
+8901875,I eventually got used to the cold.,B1,1394,530,
+12778864,The challenge is to address a need.,B1,1389,531,
+5658175,I need a new challenge to challenge myself.,B1,1389,532,
+2538517,I'm still waiting for the prices to drop.,B1,1403,533,
+12181066,He plans to open his own shop.,B1,1408,534,
+7218972,Sami had lots of friends with cars.,B1,1399,535,
+12212243,I helped lots of people.,B1,1399,536,
+9931234,Yanni's driving teacher is so fun.,B1,1411,537,
+303131,I wonder if he's really sick.,B1,1410,538,
+5068283,They bought the same camera as you.,B1,1417,539,"possession (my, your, his)"
+6913001,Who do you think is the most interesting teacher at this school?,B1,1411,540,
+10718975,I live next door to a shop.,B1,1408,541,directions & locations
+5419839,The human eye is like a camera.,B1,1417,542,
+9004018,Mary still uses a top-up card to put credit on her phone.,B1,1413,543,
+6898051,"You aren't the only one who uses this computer, are you?",B1,1413,544,negation
+4415338,We will ask at a travel agency.,B1,1415,545,
+242472,Cars are now available in a wide range of prices.,B1,1403,546,shopping & prices
+11624676,"We have a car park, but nobody really uses it.",B1,1413,547,
+1064416,His plans always sound great in theory but they don't work in practice.,B1,1412,548,
+316703,She went in search of a doctor for her sick baby.,B1,1410,549,family & relationships
+45784,The teacher turned out to be sick.,B1,1411,550,
+7733711,I hurt my right foot.,B1,1426,551,
+4012837,That's an interesting theory.,B1,1412,552,
+283212,Do you know where he bought his camera?,B1,1417,553,"possession (my, your, his)"
+7535111,I don't know much about politics. I'm not interested in it.,B1,1434,554,"likes & dislikes,negation"
+3218326,Don't forget to charge your cell phone.,B1,1419,555,
+8412817,I hope I don't catch a cold.,B1,1418,556,emotions
+576656,Nobody goes outside in this kind of weather.,B1,1443,557,
+9627328,"If you take this drug, side effects may result.",B1,1422,558,
+10982297,Keep an eye on the weather.,B1,1443,559,
+252351,I truly loved her.,B1,1442,560,emotions
+251411,My favorite music is pop music.,B1,1435,561,likes & dislikes
+8531541,He ran to catch up with her.,B1,1437,562,basic verbs & actions
+2166113,Focus on your mission!,B1,1430,563,
+3093925,We don't yet know the side effects of the drug.,B1,1422,564,negation
+7227877,I don't think that we're going to be able to catch the train you want to catch.,B1,1418,565,negation
+7987584,Sami moved his foot to the side.,B1,1426,566,
+26105,Do you know how far it is from the station to city hall?,B1,1427,567,directions & locations
+4134976,What are some of the side effects of this drug?,B1,1422,568,
+9171422,There's no cell service here.,B1,1419,569,negation
+7227878,I don't think that we're going to be able to catch the train that you want to catch.,B1,1418,570,negation
+10891018,Do you know how far the station is from the town hall?,B1,1427,571,directions & locations
+2377285,I led that mission.,B1,1430,572,
+2259104,Rest your foot on that step.,B1,1426,573,
+7395183,She claims she hasn't yet been paid.,B1,1447,574,
+7580510,You should really drink less coffee.,B1,1448,575,
+10342281,"Technology isn't the same as science. Technology is the application of science. Of course, technology isn't perfect.",B1,1446,576,negation
+11469229,I try not to have coffee in the evening.,B1,1452,577,
+906727,What's your favorite cold weather food?,B1,1443,578,"days, months & seasons,likes & dislikes"
+11425488,He quickly ran.,B1,1437,579,basic verbs & actions
+8536379,He helped himself to a cup of coffee.,B1,1448,580,
+16613,Can you make out the meaning easily?,B1,1429,581,
+10136101,Do you have time to sit down and have some coffee?,B1,1448,582,
+9188731,This kind of heat isn't normal.,B1,1456,583,"days, months & seasons"
+62078,How far is it to the library from here?,B1,1459,584,directions & locations
+906685,What's your favorite activity?,B1,1444,585,likes & dislikes
+9086962,"This part doesn't work. It's in good condition, but it's not the right size.",B1,1450,586,
+50950,We ran out of gas on the way there.,B1,1437,587,
+12877662,"Francis claims he hasn't got a watch. ""He has got one, he just doesn't wear it.""",B1,1447,588,"possession (my, your, his),negation"
+10791025,We spent the whole evening talking to him.,B1,1452,589,personal pronouns
+10304868,"I sent my application, and I had an interview.",B1,1458,590,
+12436815,It's a very complex issue.,B1,1449,591,
+10025386,"You were offered a chance to join, but you didn't.",B1,1464,592,negation
+301162,He is putting on weight.,B1,1465,593,
+10287800,My sister showed me her new watch.,B1,1468,594,"possession (my, your, his)"
+10000001,Tom was on his way to the library when I ran into him.,B1,1459,595,
+9021177,I live next to a library.,B1,1459,596,directions & locations
+3733827,It was an amazing evening.,B1,1452,597,
+6708049,Sami was standing outside a gas station.,B1,1470,598,
+6542751,The parents are standing outside of the school waiting for the children.,B1,1470,599,family & relationships
+7288652,Sami was sitting directly behind us.,B1,1469,600,
+8246505,This interview question is open-ended!,B1,1458,601,
+10636379,"He's free to take it or leave it, and I respect his freedom.",B1,1454,602,
+3524868,"To turn cold water hot, one needs to heat it.",B1,1456,603,
+1435864,"Since there wasn't any more room at the table, I had to eat standing up.",B1,1470,604,
+42219,Is it a direct flight?,B1,1453,605,
+4979660,Are you able to keep walking?,B1,1472,606,
+11628109,Felix kept his location private.,B1,1461,607,"possession (my, your, his)"
+7767729,His phone's camera broke.,B1,1477,608,"possession (my, your, his)"
+5786313,We accept your challenge.,B1,1473,609,
+7408076,They were offered their jobs back.,B1,1464,610,
+314133,She showed me her album.,B1,1468,611,
+8514491,She showed me the letter from him.,B1,1468,612,
+1432906,I accept the challenge!,B1,1473,613,
+45395,"The boy is sick, though he doesn't appear so.",B1,1475,614,
+704754,It's been a long time since you broke up.,B1,1477,615,directions & locations
+7736820,It's walking distance from here.,B1,1479,616,
+25794,We were glad when we saw a light in the distance.,B1,1479,617,
+11369128,They were sitting on that beach.,B1,1469,618,
+7760906,"I accept your challenge, time, and place of meeting.",B1,1473,619,
+3689054,"Even though I'm sitting here in the sun, I still feel cold.",B1,1469,620,
+278398,"Walking along the street, I met the lady.",B1,1472,621,
+1671775,He's a foreign exchange student.,B1,1481,622,family & relationships
+294770,"While walking down a street, he ran into an old friend of his.",B1,1472,623,
+12484529,I immediately changed the channel.,B1,1478,624,
+874872,The glass got broken.,B1,1485,625,
+5811836,Finding time to write a book is not easy.,B1,1484,626,
+10645130,Then let's exchange phone numbers.,B1,1481,627,
+7252401,Sami ended up finding his dog.,B1,1484,628,
+7001493,I say there's nothing better than a cold glass of water on a hot day!,B1,1485,629,
+6341618,"After we finished eating, we went for a walk.",B1,1480,630,
+11506270,James has been watching Amanda's channel.,B1,1478,631,"possession (my, your, his)"
+11795946,I've already taken pictures with my mobile phone.,B1,1488,632,"possession (my, your, his)"
+7399390,She told me she's losing weight.,B1,1487,633,
+9961843,This is the main thing I have learned.,B1,1486,634,"possession (my, your, his)"
+9721255,My computer broke.,B1,1477,635,"possession (my, your, his)"
+2537976,I'm only interested in finding out the truth.,B1,1484,636,likes & dislikes
+4026530,They spent some time together and eventually fell in love with each other.,B1,1483,637,
+8429880,You haven't finished eating?,B1,1480,638,negation
+12951968,He easily opened the box.,B1,1490,639,basic verbs & actions
+25846,I heard someone calling me from a distance.,B1,1479,640,
+299773,"As soon as he finished eating, he began to walk again.",B1,1480,641,
+4380768,"I tried to keep up with them, but eventually I fell behind.",B1,1483,642,
+2797394,My mobile phone is broken.,B1,1488,643,"possession (my, your, his)"
+6244542,I'm glad that I learned how to do that.,B1,1486,644,"emotions,language learning"
+6567130,Sami quickly learned the truth.,B1,1486,645,
+7390277,She opened her eyes wide.,B1,1490,646,basic verbs & actions
+2985677,I don't like to sit too close to the screen.,B1,1501,647,likes & dislikes
+464594,What is the exchange rate?,B1,1481,648,shopping & prices
+9623412,He wants a present that he'll never receive.,B1,1496,649,
+7391327,He took a drink from his glass.,B1,1485,650,basic verbs & actions
+11004801,I've opened the door wide.,B1,1490,651,basic verbs & actions
+9192773,He reached an agreement with her.,B1,1495,652,
+11943202,My mobile phone isn't working.,B1,1488,653,"possession (my, your, his),negation"
+12263857,Did you receive the application?,B1,1496,654,
+2032277,This letter is not signed.,B1,1503,655,negation
+251119,My letter should have reached him about this time.,B1,1495,656,"possession (my, your, his)"
+284883,He didn't have enough money to ride home on the train.,B1,1498,657,negation
+11632912,Do you know if they serve food on this train?,B1,1502,658,at the restaurant
+8384085,The link is shown on the screen.,B1,1501,659,
+11498837,Daniel tried to catch a ride out of the city.,B1,1498,660,
+290584,He must have reached the station.,B1,1495,661,
+7120329,This will serve the purpose.,B1,1502,662,
+2387611,I need to finish writing my speech.,B1,1506,663,
+9131659,Slow down or you will get a fine.,B1,1504,664,negation
+7734572,I didn't expect to be asked to give a speech.,B1,1506,665,
+5657451,You can expect to receive a little something from us soon.,B1,1496,666,
+12307500,There was no one to serve me in the shop.,B1,1502,667,
+5942227,Plant a tree there.,B1,1508,668,plants
+12274309,Did you get caught in traffic?,B1,1507,669,
+13140283,I was just walking out the door when my brother asked me for a ride to school.,B1,1498,670,
+6046774,Why is the computer so slow?,B1,1504,671,
+323585,Let's take a little rest under the tree.,B1,1508,672,plants
+2258657,He's wearing himself out working so much.,B1,1511,673,
+11174129,The letter is not signed.,B1,1503,674,negation
+6888219,You absolutely have to go see this film. It's wonderful.,B1,1514,675,
+9729521,I have not yet met anyone with whom I should like to spend the rest of my life.,B1,1513,676,
+3188423,A computer is a wonderful thing.,B1,1514,677,
+11605190,"From a distance, the water appears green.",B1,1518,678,colors & shapes
+7258837,Sami ran all the way across that airport.,B1,1516,679,
+283893,I doubt that he can make a speech in public.,B1,1506,680,
+9199707,The weather is wonderful.,B1,1514,681,
+12106717,That store has rock-bottom prices.,B1,1521,682,shopping & prices
+299813,He is a man whom we can trust.,B1,1513,683,
+954477,We made good time since the traffic was light.,B1,1507,684,
+12887927,We played in different cities across several states.,B1,1522,685,
+9997602,When did you begin working here?,B1,1519,686,
+13412356,That appears to be completely by design.,B1,1518,687,
+8373787,I've been speaking to your director and he agreed.,B1,1515,688,
+11487299,Donald immediately agreed to it.,B1,1515,689,
+3014154,What heavy traffic!,B1,1507,690,
+6126234,I'll race you to the tree over there.,B1,1508,691,sports
+3889362,This car has a huge engine.,B1,1524,692,
+906870,What's your favorite search engine?,B1,1524,693,
+11710563,Lorenzo appears in a post-credit scene.,B1,1518,694,
+7265354,Sami loved animals.,B1,1517,695,animals
+423853,When will we reach the airport?,B1,1516,696,
+9626932,She has some funny ideas about how to run a company.,B1,1527,697,
+57602,This road will lead you to the airport.,B1,1516,698,directions & locations
+48497,We all agreed that the plan made sense.,B1,1515,699,
+316012,She kept on writing stories about animals.,B1,1517,700,animals
+8808835,There are lots of animals to see here.,B1,1517,701,animals
+251921,My sister is famous.,B1,1526,702,family & relationships
+10085492,Don't just sit there. Start taking notes.,B1,1531,703,in the classroom
+34477,Bill has a lot of original ideas.,B1,1527,704,
+38004,Which shall I begin with?,B1,1519,705,
+11618022,William and his partner have a dog named Max.,B1,1532,706,"family & relationships,animals"
+9306462,He's keeping it secret.,B1,1529,707,
+8394534,This is a website of pictures of famous people.,B1,1526,708,
+4597075,You should begin with books you can easily understand.,B1,1519,709,
+9673087,Nearly everybody got here on time.,B1,1525,710,
+10107605,This search engine is really slow.,B1,1524,711,
+10735820,This product is not in demand.,B1,1523,712,negation
+293880,He is far from telling a lie.,B1,1530,713,
+8155102,Get everybody involved.,B1,1525,714,
+2987677,They passed notes during class.,B1,1531,715,in the classroom
+12796004,"We looked so happy. ""Pictures lie.""",B1,1530,716,emotions
+317754,I wear a sad look.,B1,1536,717,emotions
+12142575,Have you written lots of songs?,B1,1538,718,
+6912101,"Everybody agreed with you, didn't they?",B1,1525,719,
+4552569,This station plays good music.,B1,1533,720,
+3549751,Tom quickly became very famous.,B1,1526,721,
+11517869,He's always coming up with winning ideas.,B1,1527,722,
+293582,He plays little part in the decision-making.,B1,1533,723,
+9140698,Yanni is keeping an eye on the kids.,B1,1529,724,
+5725990,It's hard to find a dance partner.,B1,1532,725,
+11454338,I'm keeping track of everything.,B1,1529,726,emotions
+311286,"When she was reading the letter, she looked sad.",B1,1536,727,emotions
+293879,He is above telling a lie.,B1,1530,728,
+5744512,The engine never stopped.,B1,1542,729,
+7137963,Sami won fair and square.,B1,1541,730,
+2264278,I hope my partner can come to an agreement with you.,B1,1532,731,
+931376,The wind died down by the evening.,B1,1547,732,
+11826379,The rain completely stopped.,B1,1542,733,in the classroom
+1482495,That student raised his hand to ask a question.,B1,1534,734,in the classroom
+12871052,The author often plays with words.,B1,1533,735,
+1860383,Don't worry. I have insurance.,B1,1548,736,
+5066175,I think they must be at least twice as long.,B1,1546,737,numbers & counting
+1315825,How long does it take for the airport bus to get to the airport?,B1,1554,738,"directions & locations,basic verbs & actions"
+19073,A student raised his hand when the teacher finished the reading.,B1,1534,739,"in the classroom,possession (my, your, his),basic verbs & actions"
+5754367,That's the sad part.,B1,1536,740,emotions
+12002098,The shop has raised all its prices.,B1,1534,741,shopping & prices
+8438243,Let's get off the bus at the next stop.,B1,1554,742,"directions & locations,basic verbs & actions"
+13004946,I quickly stopped what I was doing and looked around to see who was there.,B1,1542,743,basic verbs & actions
+12142578,Have you written any other songs?,B1,1538,744,language learning
+328157,"If I'm to become a regular, I have to work twice as hard as the rest.",B1,1546,745,future plans & goals
+11688272,That's why I write songs.,B1,1538,746,language learning
+10451205,The structure of the economy has changed.,B1,1543,747,
+4497076,Does their opinion count?,B1,1557,748,
+9189183,This lake provided water to our city.,B1,1564,749,
+11797879,All appeared to be back to normal.,B1,1551,750,
+11173907,The weather is a bit fresh.,B1,1563,751,negation
+1559772,The structure isn't strong enough to support so much weight.,B1,1543,752,
+11677726,Alberto heard the wind outside.,B1,1547,753,
+7393302,She never mentioned she had a sister.,B1,1566,754,negation
+7835005,I don't think you need to worry so much; you'll be fine.,B1,1548,755,
+22961,We can count on him for financial help.,B1,1557,756,negation
+3098938,I guess you don't have to worry about that anymore.,B1,1548,757,"emotions,negation"
+8378366,I'm glad that money wasn't mentioned.,B1,1566,758,
+10630773,With a cup of coffee your head becomes clear.,B1,1552,759,
+11530515,A brand new computer was waiting for John in the room.,B1,1553,760,
+59358,How deep is this lake?,B1,1564,761,
+11729369,Adriano ran against the wind.,B1,1547,762,
+9081370,We need fresh ideas.,B1,1563,763,
+4934531,The deep snow covered everything.,B1,1558,764,
+239363,"The ground was covered with snow, as far as the eye could see.",B1,1558,765,
+12776000,They bring fresh ideas to the table.,B1,1563,766,
+12831669,"You can count on me, I'll look into it as soon as I get back home.",B1,1557,767,
+45578,The damage was covered by insurance.,B1,1558,768,telling time
+264290,What time does the airport bus leave?,B1,1554,769,telling time
+11743647,Carlos's friends took lots of photos at the party.,B1,1571,770,family & relationships
+2679191,You missed the best part.,B1,1567,771,directions & locations
+5346996,The owner lives above the store.,B1,1570,772,
+12256761,You sound pretty smart.,B1,1578,773,
+293480,He was forced to go back because of the bad weather.,B1,1561,774,
+8051006,He's the new owner of the hotel.,B1,1570,775,
+7390046,She missed her train.,B1,1567,776,likes & dislikes
+5832836,I absolutely fell in love with those photos.,B1,1571,777,"in the classroom,basic verbs & actions"
+9865259,I missed the school bus.,B1,1567,778,
+7408485,They mostly kept to themselves.,B1,1568,779,
+11769178,She hadn't opened her mouth.,B1,1569,780,negation
+5686494,I didn't realize what that meant.,B1,1573,781,
+12142956,This is a deep lake.,B1,1564,782,
+51087,"Now that you've mentioned it, I remember coming here with my parents when I was a child.",B1,1566,783,family & relationships
+11889713,Take care of your physical and mental health.,B1,1565,784,"basic verbs & actions,possession"
+5564404,She showed little interest in the photos.,B1,1571,785,"emotions,likes & dislikes"
+10264080,How many goals did you score?,B1,1576,786,"numbers & counting,sports"
+2646442,Tom covered his mouth.,B1,1569,787,basic verbs & actions
+326214,Would you tell me what time the train starts?,B1,1579,788,"telling time,polite requests & manners"
+4422389,I realize that this is a difficult decision for you.,B1,1573,789,emotions
+2298136,He opened his mouth.,B1,1569,790,basic verbs & actions
+7002685,It was totally worth it.,B1,1583,791,emotions
+55408,This is important enough for separate treatment.,B1,1577,792,
+9725049,"Although he is totally different from me, I really respect him.",B1,1583,793,"likes & dislikes,emotions"
+7504200,I realize that I'm not very likely to be able to do that.,B1,1573,794,"negation,future plans & goals,basic verbs & actions"
+8053427,He's so smart and funny.,B1,1578,795,emotions
+5101386,Let the wedding begin.,B1,1586,796,basic verbs & actions
+12624077,She fell into my arms.,B1,1591,797,basic verbs & actions
+9049891,I would've failed without your advice.,B1,1596,798,"basic verbs & actions,asking for help"
+8172603,I have a long list of stuff that I want to throw away.,B1,1581,799,likes & dislikes
+12625414,He fell into your arms.,B1,1591,800,"possession (my, your, his)"
+13011057,What actions can I take to make a difference?,B1,1589,801,asking for help
+9330056,That sounds like a smart idea.,B1,1578,802,basic verbs & actions
+6247559,Would you like to be a fashion model?,B1,1598,803,polite requests & manners
+1461899,Click here to create an account.,B1,1594,804,basic verbs & actions
+8812871,Yanni was acting like everything was normal.,B1,1588,805,emotions
+1012262,Don't throw away a good opportunity.,B1,1581,806,negation
+11317254,Things that used to mean something to him now left him totally cold.,B1,1583,807,"emotions,likes & dislikes"
+273184,Don't throw a stone into the river.,B1,1581,808,"negation,basic verbs & actions"
+11596672,"Sometimes, Robert failed.",B1,1596,809,basic verbs & actions
+6033849,"I respect him, even if I don't agree with some of his views.",B1,1585,810,emotions
+6383696,He took me in his arms and told me that he loved me.,B1,1591,811,emotions
+19855,The hill was all covered with snow.,B1,1603,812,"directions & locations,basic verbs & actions"
+10470828,I think my hearing is getting worse.,B1,1602,813,"basic verbs & actions,emotions"
+309088,Her acting is on the level of a professional.,B1,1588,814,
+3308346,"You took pictures at the wedding, didn't you?",B1,1586,815,"basic verbs & actions,family & relationships"
+2890516,We'll be glad to see you at our wedding.,B1,1586,816,"emotions,family & relationships"
+9245200,Tom is acting like everything is normal.,B1,1588,817,basic verbs & actions
+8983014,Sometimes we judge others based on their actions.,B1,1589,818,basic verbs & actions
+6373938,Do not push your luck.,B1,1612,819,negation
+6660633,I don't listen to heavy metal anymore.,B1,1607,820,"likes & dislikes,emotions"
+7252328,Sami was interested in hearing that story.,B1,1602,821,polite requests & manners
+10290411,Click a photo of mine please.,B1,1594,822,"possession,basic verbs & actions"
+831932,Many a student has failed the test.,B1,1596,823,basic verbs & actions
+2474650,She's interested in fashion.,B1,1598,824,likes & dislikes
+6982140,He had lots of words and few actions.,B1,1589,825,basic verbs & actions
+11587051,Matthew seemed like a pretty normal guy.,B1,1616,826,
+908704,Who's your favorite fashion model?,B1,1598,827,family & relationships
+7259570,Sami was interested in hearing the story.,B1,1602,828,"likes & dislikes,emotions"
+27154,Don't pull it. Push it open.,B1,1612,829,basic verbs & actions
+9460545,A boy on the bus gets up to offer his seat to an old woman.,B1,1615,830,polite requests & manners
+11543302,The study was very limited in budget.,B1,1593,831,shopping & prices
+2013887,I didn't want to push my luck.,B1,1612,832,negation
+11826270,Igor reached the top of the hill.,B1,1603,833,"directions & locations,basic verbs & actions"
+505628,Sandra offered me her seat in the train.,B1,1615,834,polite requests & manners
+13134980,I'm not a secret agent.,B1,1622,835,negation
+8688770,My agent was in charge of travel.,B1,1622,836,"possession,basic verbs & actions"
+304832,He offered his seat to an old woman.,B1,1615,837,polite requests & manners
+11685895,Claudio got to the bottom of the hill.,B1,1603,838,"directions & locations,basic verbs & actions"
+8532084,She seemed to get along fine with him.,B1,1616,839,basic verbs & actions
+5747349,No calls were returned.,B1,1613,840,negation
+7279158,Sami is a huge animal person.,B1,1623,841,animals
+45887,Once there lived an old man in a village.,B1,1621,842,"family & relationships,directions & locations"
+4663639,"Next time, you should buy a larger size.",B1,1605,843,"future plans & goals,directions & locations"
+12707251,He never thought about his sister living in the village.,B1,1621,844,"family & relationships,negation,basic verbs & actions"
+7388396,He's returned from his trip.,B1,1613,845,basic verbs & actions
+284798,He has got both authority and ability.,B1,1625,846,possession
+13064295,"Having returned home, he wrote a letter to his brother.",B1,1613,847,"basic verbs & actions,family & relationships"
+48793,The rule doesn't apply in this case.,B1,1624,848,negation
+11581176,Matthew was becoming the person he was meant to be.,B1,1627,849,"basic verbs & actions,future plans & goals"
+2583054,I am subject to his authority.,B1,1625,850,"possession,basic verbs & actions"
+249750,I have a friend whose father is an animal doctor.,B1,1623,851,animals
+7840308,My animal makes the sound of another animal.,B1,1623,852,family & relationships
+3716729,People often enter into a relationship thinking that they can change the other person.,B1,1632,853,emotions
+10219682,It was cold and it seemed like I had caught a cold.,B1,1616,854,"emotions,basic verbs & actions"
+312359,She is making an effort at becoming a model.,B1,1627,855,"basic verbs & actions,future plans & goals"
+293632,He is bent on becoming a doctor.,B1,1627,856,"basic verbs & actions,future plans & goals"
+60699,"If you take this bus, you will get to the village.",B1,1621,857,"directions & locations,basic verbs & actions"
+284034,I saw him enter the store.,B1,1632,858,basic verbs & actions
+11554647,Certain conditions may apply.,B1,1624,859,
+2207313,He follows the rules to the letter.,B1,1634,860,basic verbs & actions
+7986918,"Enter the room, find the letter, and come back out.",B1,1632,861,"basic verbs & actions,directions & locations"
+1589561,No pain no gain.,B1,1636,862,language learning
+10543533,I want to learn how to draw pictures.,B1,1629,863,"language learning,basic verbs & actions"
+6266916,Can you draw pictures well?,B1,1629,864,basic verbs & actions
+1665375,Everything starts from a basis.,B1,1626,865,negation
+10794709,This rule doesn't always apply.,B1,1624,866,negation
+10579724,"I do not trust my memory, so I write everything down.",B1,1641,867,"negation,basic verbs & actions"
+8353015,This is beyond my authority.,B1,1625,868,"possession (my, your, his),asking for help"
+7391390,She took off her wedding ring.,B1,1644,869,shopping & prices
+238645,"In the long run, prices will rise.",B1,1645,870,negation
+9956327,Yanni doesn't have his memory fully back.,B1,1641,871,"negation,personal pronouns"
+287755,Their claims were as follows.,B1,1634,872,
+18370,"No pain, no gain.",B1,1636,873,negation
+20212,It is still fresh in my memory.,B1,1641,874,"possession (my, your, his)"
+7989487,Let's draw lots.,B1,1629,875,shopping & prices
+11471306,Prices are likely to rise again.,B1,1645,876,future plans & goals
+12888655,He spread the news throughout the entire village.,B1,1650,877,basic verbs & actions
+9204793,I'm trying to gain weight.,B1,1636,878,basic verbs & actions
+7771113,"Your time is limited, so don't waste it living someone else's life.",B1,1652,879,"possession (my, your, his),telling time"
+9199481,I like silver cars.,B1,1648,880,colors & shapes
+12770763,We rise with each new challenge.,B1,1645,881,basic verbs & actions
+8813938,I had a very weird dream.,B1,1653,882,emotions
+314147,She served me coffee.,B1,1647,883,basic verbs & actions
+68254,The young girl wanted to be a star of the silver screen.,B1,1648,884,future plans & goals
+255123,I look on watching TV as a waste of time.,B1,1652,885,likes & dislikes
+12911346,I quickly spread the news.,B1,1650,886,basic verbs & actions
+13068424,Why does he ring you? What's his purpose?,B1,1644,887,asking for help
+11933551,Don't waste the gas.,B1,1652,888,negation
+304987,The news of their marriage spread throughout the village.,B1,1650,889,basic verbs & actions
+59066,I bought this ring at a certain place.,B1,1644,890,basic verbs & actions
+9668898,That artist is in high demand.,B1,1656,891,
+12498529,It's normal to be weird.,B1,1653,892,
+12768020,I try to stay active and healthy.,B1,1662,893,basic verbs & actions
+11566520,He reasons like an adult.,B1,1654,894,basic verbs & actions
+6265896,It's a method worth trying.,B1,1664,895,"basic verbs & actions,possession (my, your, his)"
+238440,An artist must have an eye for color.,B1,1656,896,colors & shapes
+8369889,Tom is obviously interested.,B1,1668,897,future plans & goals
+3503912,"Then our chairman came up with a good idea, which we have made into a great plan.",B1,1657,898,
+1199415,I may take some smaller trip before then.,B1,1674,899,future plans & goals
+55510,This is by far the best method.,B1,1664,900,basic verbs & actions
+11748887,Diego immediately knew what was happening.,B1,1661,901,basic verbs & actions
+50451,He is apparently responsible for it.,B1,1655,902,basic verbs & actions
+10593567,You don't have to worry about this happening again.,B1,1661,903,negation
+1935074,He's obviously in pain.,B1,1668,904,emotions
+270104,Not everybody wants to be an artist.,B1,1656,905,negation
+2871799,It's about time somebody showed up.,B1,1675,906,"basic verbs & actions,telling time"
+8838743,They've apparently got on the wrong train.,B1,1655,907,basic verbs & actions
+681637,The chairman opened the meeting.,B1,1657,908,basic verbs & actions
+6048841,Can you imagine that happening?,B1,1661,909,
+1935076,He was obviously in pain.,B1,1668,910,emotions
+9279515,This edition is limited.,B1,1658,911,basic verbs & actions
+837815,Apparently the bus was late.,B1,1655,912,"numbers & counting,possession (my, your, his)"
+10240321,Will this count towards my grade?,B1,1660,913,basic verbs & actions
+8816318,I don't have the physical strength to do that.,B1,1677,914,negation
+9448962,Some people keep wild animals at home.,B1,1679,915,animals
+11577285,Mark was eating healthy food.,B1,1662,916,"basic verbs & actions,possession (my, your, his)"
+71488,This letter arrived while you were out.,B1,1682,917,basic verbs & actions
+1495319,My sister is smaller than you.,B1,1674,918,"basic verbs & actions,family & relationships,possession (my, your, his)"
+2943365,We had to count on our strength only.,B1,1677,919,"numbers & counting,basic verbs & actions"
+294990,He appears to be strong and healthy.,B1,1662,920,basic verbs & actions
+4495608,The winner hasn't yet been announced.,B1,1681,921,"negation,basic verbs & actions"
+11892246,"Look, there's a rainbow outside your window!",B1,1680,922,colors & shapes
+10712897,What shall we bet?,B1,1684,923,
+8418473,I want somebody to close the window.,B1,1680,924,basic verbs & actions
+13239569,"There’s strength in being independent, but I miss family.",B1,1677,925,family & relationships
+57146,This method is of wide application.,B1,1664,926,
+8561927,I've opened the window.,B1,1680,927,basic verbs & actions
+10834221,Consider this as an option.,B1,1669,928,basic verbs & actions
+8724547,What is your wildest dream?,B1,1679,929,future plans & goals
+3821091,I knew there was somebody in the next room.,B1,1675,930,"asking for help,basic verbs & actions,directions & locations"
+11031557,"It's small enough to fit in a bag, so it's easy to carry.",B1,1683,931,basic verbs & actions
+6524457,I wonder whether or not it's safe to camp here.,B1,1685,932,"basic verbs & actions,possession (my, your, his)"
+11891775,Remember to look out for wild animals.,B1,1679,933,animals
+3403144,Tom is clearly the winner.,B1,1681,934,basic verbs & actions
+9989419,"Bet you didn't expect me to be into that, did you?",B1,1684,935,"basic verbs & actions,asking for help"
+275478,I want to be somebody when I grow up.,B1,1675,936,future plans & goals
+5123845,Your letter has just arrived.,B1,1682,937,"possession (my, your, his)"
+11693449,Damiano returned to camp.,B1,1685,938,basic verbs & actions
+5351369,The student gave the correct answer.,B1,1689,939,in the classroom
+11490895,It appears you were correct.,B1,1689,940,
+294092,He arrived at the station.,B1,1682,941,
+11590833,"Outside, it was extremely dark.",B1,1692,942,
+9004348,The weather is extremely hot.,B1,1692,943,
+266049,Let me help you. Your bag looks very heavy.,B1,1683,944,
+11634874,Jonas failed to contact the camp.,B1,1685,945,
+60666,You should be able to carry that bag on.,B1,1683,946,
+241736,We haven't been able to handle this so far.,B1,1695,947,
+9613716,We all thought that was extremely funny.,B1,1692,948,
+11595935,What do you think would be the most effective way to handle this situation?,B1,1695,949,
+11033793,Have you seen any new movies recently?,B1,1699,950,
+6524461,I wonder whether or not it's dangerous to do that here.,B1,1690,951,
+12169004,I'll do all I can to prevent that from happening.,B1,1701,952,
+10145294,Give the correct answer immediately.,B1,1689,953,
+6567146,Sami has just opened his law firm.,B1,1693,954,
+13187514,The color of the leaves is beautiful.,B1,1698,955,
+5993895,Nothing provides more peace of mind than a firm decision.,B1,1693,956,
+7009569,The square of a real number cannot be negative.,B1,1700,957,
+13348485,It seems like the weather is going to improve.,B1,1696,958,
+24588,Can you please tell me what time the train leaves?,B1,1698,959,
+9023846,She has a color television.,B1,1705,960,
+4889975,How do we prevent this from happening again?,B1,1701,961,
+9409488,Yanni and his friends reported the account till it was taken down.,B1,1706,962,
+10699358,Let's not let the lack of money prevent us from doing that.,B1,1701,963,
+11831532,I love my job because I get to help people feel better and improve their quality of life.,B1,1696,964,
+2638468,The sea can be a very dangerous place sometimes.,B1,1690,965,
+1214428,They are considered the greatest rock band in history.,B1,1694,966,
+10860483,This ivy has wide leaves.,B1,1698,967,
+12784549,What do you think is your greatest strength?,B1,1694,968,
+881430,We shall hold on till the end.,B1,1706,969,
+5187058,I watch lots of movies.,B1,1699,970,
+3785140,The greatest thing you'll ever learn is just to love and be loved in return.,B1,1694,971,
+1075509,I had no trouble finding his office.,B1,1707,972,
+6382800,Sami is having trouble speaking.,B1,1707,973,
+1887779,I think we should spend some time apart from each other.,B1,1711,974,
+4512616,She couldn't handle it anymore.,B1,1695,975,
+257370,I took advantage of an opportunity.,B1,1710,976,
+2925232,I'm sorry to have caused you all this trouble.,B1,1707,977,
+7289261,Sami's videos are funny.,B1,1709,978,
+5269828,I often went to the movies with dad.,B1,1699,979,
+6095203,The television stopped working.,B1,1705,980,
+11454372,She had a negative impact on you.,B1,1700,981,
+2452027,Take it apart if necessary.,B1,1711,982,
+9023840,I have a color television.,B1,1705,983,
+7286609,Sami is watching music videos.,B1,1709,984,
+6759956,I wasn't aware that we were supposed to do that.,B1,1712,985,
+6900629,I was watching videos.,B1,1709,986,
+2833293,It's you who will decide whether to accept it or not.,B1,1715,987,
+13100196,My cat lost weight.,B1,1713,988,
+268704,Let's walk on the beach after dinner.,B1,1716,989,basic verbs & actions
+238977,It is not till we lose our health that we realize its true value.,B1,1706,990,
+307304,They study about the function of the brain.,B1,1720,991,
+1396342,It's up to you to decide whether we'll go there or not.,B1,1715,992,
+6228274,You didn't seem to be aware that I wasn't supposed to do that.,B1,1712,993,negation
+12417880,Have you bought a gift?,B1,1721,994,
+1153022,You should take advantage of this opportunity.,B1,1710,995,
+7770324,We are finding it difficult to decide which one to buy.,B1,1715,996,
+6260519,I'm aware of what's happening.,B1,1712,997,
+11188162,The cat came in through the window.,B1,1713,998,animals
+11775914,The ring was a gift Antonio’s father left him.,B1,1721,999,
+1716419,Thank you for helping me to cross the road.,B1,1722,1000,polite requests & manners
+8981944,You were taking the engine apart.,B1,1711,1001,
+48831,The function of the machine is to save work.,B1,1720,1002,
+7999657,There is a word with that specific function.,B1,1720,1003,
+6396742,Sami has a little cat he calls Farid.,B1,1713,1004,animals
+11205389,"As there were no customers, we closed the shop early.",B1,1714,1005,
+7762834,I've already finished dinner.,B1,1716,1006,
+1467249,"There were no customers, so we closed the shop early.",B1,1714,1007,
+3204197,What have you been telling your customers?,B1,1714,1008,
+8525963,She told him she wasn't interested in helping him do anything.,B1,1722,1009,negation
+10212319,These items are not for sale.,B1,1726,1010,"shopping & prices,negation"
+1450800,It's impossible to live on that island.,B1,1724,1011,
+9981397,I'm proud to count her among my friends.,B1,1735,1012,family & relationships
+8536328,"She bought one for herself, too.",B1,1723,1013,
+12233692,I helped make dinner.,B1,1716,1014,basic verbs & actions
+880188,How much time per week do you spend reading materials of your own choice?,B1,1731,1015,language learning
+4502003,This seemed impossible.,B1,1724,1016,
+2542419,I'm interested in helping Tom.,B1,1722,1017,
+2965735,Consider it a gift.,B1,1721,1018,
+6336435,I wonder whether Tom thinks we have to do that.,B1,1741,1019,
+7190467,Sami tells stories from his life.,B1,1740,1020,
+8373830,This van is not for sale.,B1,1742,1021,"shopping & prices,negation"
+3288375,I should've kept my mouth shut.,B1,1738,1022,
+8535944,She has a very high opinion of herself.,B1,1723,1023,
+246073,Children will produce beautiful works when they grow up.,B1,1733,1024,
+5186856,Absolutely impossible.,B1,1724,1025,
+11558808,My partner was present at the birth of our baby.,B1,1745,1026,family & relationships
+7217840,He sounds almost proud of that.,B1,1735,1027,
+7383368,She doesn't clean up after herself.,B1,1723,1028,
+6345237,Tom said he thinks I'd be able to win.,B1,1741,1029,
+7381276,Mary shut down her computer.,B1,1738,1030,
+13226729,My sister gave birth to a baby.,B1,1745,1031,family & relationships
+56455,This story tells us an interesting fact.,B1,1740,1032,
+70428,Write the date of your birth.,B1,1745,1033,
+39136,TV programs have a bad influence on children.,B1,1725,1034,
+10875739,The train is now going over a bridge.,B1,1746,1035,
+11971498,"Sometimes, the heart tells you what's right.",B1,1740,1036,
+8316676,He studies in his van.,B1,1742,1037,
+42058,Is it made of wood or metal?,B1,1743,1038,
+8947468,I'm more than proud to be part of this team.,B1,1735,1039,emotions
+48663,The bridge is still under construction.,B1,1746,1040,
+291160,He thinks he is fit for the position.,B1,1741,1041,
+9452255,His students loved his classes.,B1,1749,1042,
+2311247,He carried her bag.,B1,1747,1043,basic verbs & actions
+7132028,Does your band need a van?,B1,1742,1044,
+13039399,It's very cold. Should I shut the window?,B1,1738,1045,polite requests & manners
+267883,The little girl was carried back home in her father's arms.,B1,1747,1046,
+953719,I will send you a copy of my plans as soon as I can.,B1,1752,1047,future plans & goals
+3238960,Is it safe to cross this bridge?,B1,1746,1048,
+12879605,We wanted to take dance classes.,B1,1749,1049,language learning
+998984,Is this made out of wood or metal?,B1,1743,1050,
+10254509,I really dream of such a tree in my garden.,B1,1757,1051,"likes & dislikes,plants"
+12664239,I completed the writing of the text.,B1,1750,1052,
+11729359,The wind carried the sound of music.,B1,1747,1053,
+12930808,He wasn't able to find housing.,B1,1759,1054,negation
+7376317,Mary said that her efforts paid off.,B1,1756,1055,
+11745614,"This is a copy, not the original.",B1,1752,1056,negation
+11213755,I'll copy this quickly.,B1,1752,1057,
+11503496,David kept missing classes.,B1,1749,1058,
+9849578,What is the highest level of school you completed?,B1,1750,1059,
+265555,The car labored up the hill.,B1,1763,1060,
+11720978,I went to a public garden to rest.,B1,1757,1061,"plants,basic verbs & actions"
+5452699,We were extremely lucky.,B1,1766,1062,emotions
+12282960,Our efforts have paid off.,B1,1756,1063,basic verbs & actions
+9649885,All dogs are good dogs.,B1,1754,1064,animals
+8555819,You're a very patient teacher.,B1,1769,1065,in the classroom
+278465,I see your cat in the garden.,B1,1757,1066,"animals,plants"
+1010152,You can see the sun setting from the window.,B1,1773,1067,"basic verbs & actions,telling time"
+7070525,Sami was walking his dogs.,B1,1754,1068,animals
+906763,What's your favorite free software application?,B1,1775,1069,likes & dislikes
+8856936,"Despite our best efforts, we couldn't find a solution to the problem.",B1,1756,1070,basic verbs & actions
+6687840,I'm lucky that they still allow me to do that.,B1,1766,1071,emotions
+239171,"As for dogs, customers may not bring them into this store.",B1,1754,1072,animals
+7514163,I don't think we'll be able to prove that.,B1,1771,1073,negation
+8826685,The patient looked healthy.,B1,1769,1074,"emotions,basic verbs & actions"
+11066326,You have the skills required.,B1,1774,1075,"personal pronouns,basic verbs & actions"
+8551858,This is a rare opportunity.,B1,1772,1076,
+12303554,I've been patient so far.,B1,1769,1077,emotions
+61428,My father will possibly come on the next train.,B1,1770,1078,family & relationships
+3731620,Can this possibly be the right address?,B1,1770,1079,"asking for help,directions & locations"
+29632,The apple fell from the tree.,B1,1781,1080,plants
+10817296,We need to cut down this apple tree.,B1,1781,1081,plants
+11606802,It can be very difficult to prove a negative.,B1,1771,1082,negation
+13284967,You never forget to send a birthday present to your mother.,B1,1783,1083,family & relationships
+681330,The team captain led the players onto the field.,B1,1768,1084,sports
+11768751,Gustavo uses a paid software to do that.,B1,1775,1085,basic verbs & actions
+4394321,You were lucky that you didn't get caught in the rain.,B1,1766,1086,emotions
+11606786,Coming up with a solution may prove difficult.,B1,1771,1087,basic verbs & actions
+8789020,Peace be onto you.,B1,1768,1088,greetings & introductions
+7294657,Sami was working there with no boss.,B1,1785,1089,basic verbs & actions
+12389462,I got my sister to make the dress.,B1,1789,1090,"possessive adjectives,family & relationships,basic verbs & actions"
+7271384,Sami's memory cards weren't working.,B1,1786,1091,"negation,possession (my, your, his)"
+2358750,I have a lot of credit cards.,B1,1786,1092,"possession (my, your, his),basic verbs & actions"
+5377788,"She's sad, but, very much alive.",B1,1780,1093,emotions
+3620346,It's a rare opportunity.,B1,1772,1094,
+12083265,Why does Sarah keep changing her hair color?,B1,1787,1095,"personal pronouns,colors & shapes,basic verbs & actions"
+9433792,We have a deep connection.,B1,1788,1096,"family & relationships,basic verbs & actions"
+632492,You should begin with easier questions.,B1,1790,1097,basic verbs & actions
+59988,This connection is too slow for me to watch movies.,B1,1788,1098,"personal pronouns,basic verbs & actions"
+11886978,You should keep your computer's software up to date.,B1,1775,1099,"personal pronouns,basic verbs & actions"
+11803992,My sister is wearing a red dress.,B1,1789,1100,colors & shapes
+9811390,Is it really OK to spend that much money on a gift for your boss?,B1,1785,1101,"basic verbs & actions,shopping & prices,possession (my, your, his)"
+12626151,Nature is alive.,B1,1780,1102,basic verbs & actions
+6309952,You should check the speed of your Internet connection.,B1,1788,1103,basic verbs & actions
+1708915,We accept credit cards.,B1,1786,1104,"basic verbs & actions,shopping & prices"
+954432,This is the best birthday dinner ever.,B1,1783,1105,basic verbs & actions
+24750,"Not knowing what to do, I asked for his advice.",B1,1794,1106,"negation,asking for help,basic verbs & actions"
+11028503,My parents gave me a cell phone for my birthday.,B1,1783,1107,family & relationships
+10315061,Melanie's eating an apple.,B1,1781,1108,"basic verbs & actions,plants"
+3002008,I'm not the only one interested in knowing where Tom was.,B1,1794,1109,negation
+2042802,"If you want more details than that, you'll have to ask my boss.",B1,1785,1110,"asking for help,possession (my, your, his)"
+317527,She is very good at changing the subject.,B1,1787,1111,basic verbs & actions
+11574150,The cat liked it.,B1,1795,1112,"animals,likes & dislikes"
+277235,Let's spread the map on the table and talk it over.,B1,1798,1113,basic verbs & actions
+36044,He managed to run the machine.,B1,1797,1114,basic verbs & actions
+10900332,It's much easier to understand a foreign language than to speak it.,B1,1790,1115,language learning
+10088668,I have a request from the head of department.,B1,1801,1116,basic verbs & actions
+6029338,"The horse is old, but healthy.",B1,1793,1117,animals
+825029,Let's write in turns.,B1,1804,1118,basic verbs & actions
+274253,Did you request a seat by the window?,B1,1801,1119,polite requests & manners
+10047080,She bought herself a dress.,B1,1789,1120,"basic verbs & actions,possession (my, your, his)"
+11295059,"I don't feel like myself, knowing there's a cat in my house.",B1,1794,1121,animals
+6199697,It's easier once the ice has broken.,B1,1790,1122,basic verbs & actions
+262361,"I can ride a horse, too.",B1,1793,1123,animals
+647613,One does not look a gift horse in the mouth.,B1,1793,1124,animals
+11679838,I'm just having my wake-up coffee.,B1,1807,1125,basic verbs & actions
+36040,I managed to get to the station on time.,B1,1797,1126,"basic verbs & actions,telling time"
+3732525,I think I need a hearing aid.,B1,1808,1127,basic verbs & actions
+5116583,I wish everybody liked me.,B1,1795,1128,likes & dislikes
+11940082,I liked that part best.,B1,1795,1129,likes & dislikes
+19236,It is hard to wake up without a strong cup of coffee.,B1,1807,1130,basic verbs & actions
+296650,"When he is in trouble, he always turns to his sister for help.",B1,1804,1131,"family & relationships,asking for help"
+2536020,Maybe you could draw me a map?,B1,1798,1132,directions & locations
+2756751,But nobody believed her.,B1,1810,1133,negation
+2045901,We carried a map with us in case we got lost.,B1,1798,1134,directions & locations
+3131051,This is where the magic happens.,B1,1796,1135,basic verbs & actions
+54296,I'll make every possible effort to meet your request.,B1,1801,1136,polite requests & manners
+38412,I managed to make the teacher understand my idea.,B1,1797,1137,basic verbs & actions
+22998,We took turns driving the car.,B1,1804,1138,basic verbs & actions
+4624413,She needed financial aid.,B1,1808,1139,basic verbs & actions
+2561672,I wonder if you are as busy as we are.,B1,1812,1140,basic verbs & actions
+7474066,They sold everything that they owned.,B1,1800,1141,basic verbs & actions
+70973,Your sister has a sense of beauty.,B1,1809,1142,"family & relationships,possession (my, your, his)"
+9662761,Leave the door half-open so I don't have to wake you up when I get back.,B1,1807,1143,basic verbs & actions
+25212,"Before buying anything, you had better ask yourself whether you cannot do without it.",B1,1813,1144,"negation,basic verbs & actions"
+5693970,There's a television in the corner of the room.,B1,1817,1145,"directions & locations,basic verbs & actions"
+6665654,Tom seemed very concerned.,B1,1815,1146,emotions
+2997107,Nobody really believed it.,B1,1810,1147,negation
+12033625,Janos was driving down the road in a work vehicle.,B1,1805,1148,"basic verbs & actions,directions & locations"
+250074,"So far as I am concerned, I am not against his plan.",B1,1815,1149,"emotions,basic verbs & actions,future plans & goals"
+21357,Students should develop their reading skills.,B1,1820,1150,language learning
+7317872,Sami seemed really concerned.,B1,1815,1151,emotions
+290639,He went round the corner at top speed.,B1,1817,1152,
+7742013,It feels good to come to the aid of somebody.,B1,1808,1153,
+9297821,Almost no one believed it was possible to grow a garden in these places.,B1,1810,1154,negation
+12022879,Could we finish our conversation?,B1,1816,1155,polite requests & manners
+13231887,"Hi, you busy?",B1,1812,1156,greetings & introductions
+6469354,Beauty is only skin-deep.,B1,1809,1157,
+11744505,Carlos asked the driver to take him to the airport.,B1,1821,1158,
+53691,Jennifer has a good eye for beauty.,B1,1809,1159,
+22338,"When you enter a conversation, you should have something to say.",B1,1816,1160,
+6089343,Where the night ends a new day starts.,B1,1822,1161,
+12182572,I'd be interested in buying one of those.,B1,1813,1162,
+8438313,"The driver stopped and opened the door, but no one got on or off the bus.",B1,1821,1163,
+10036452,The building is managed by a local cultural foundation.,B1,1819,1164,
+6101682,Sami owned a horse farm.,B1,1824,1165,"possession (my, your, his)"
+8528153,"He's extremely busy, isn't he?",B1,1812,1166,
+6370008,"Is this a private conversation, or can anyone join in?",B1,1816,1167,
+11615649,You can support me by buying from my shop.,B1,1813,1168,
+28183,How do I fix the seat?,B1,1826,1169,asking for help
+9265009,"People need to understand that there's no easy fix for everything, and that some things take time and effort.",B1,1826,1170,
+10856761,Please open the window to let this fly out.,B1,1827,1171,polite requests & manners
+11833181,Ivan carried out an investigation on the property.,B1,1831,1172,
+7474925,They continued their investigation.,B1,1831,1173,
+1194204,There is a fly in the coffee.,B1,1827,1174,animals
+8155003,Ask the driver to stop at the next bus stop.,B1,1821,1175,
+11507048,Is the patient still in the operating room?,B1,1833,1176,
+306899,They worked hard in order to develop a new machine.,B1,1820,1177,
+10601543,"At the next corner, turn right.",B1,1817,1178,directions & locations
+8253293,A guide dog really makes a difference in your life.,B1,1829,1179,animals
+6259411,I didn't expect to get a raise.,B1,1836,1180,negation
+5936612,I've spent a lot of time trying to fix this.,B1,1826,1181,
+8185341,We’re operating at a loss right now.,B1,1833,1182,
+10856762,Please open the window to let the fly out.,B1,1827,1183,polite requests & manners
+1027086,Tom asked his boss for a pay raise.,B1,1836,1184,
+2245233,Copy this file.,B1,1825,1185,
+3824756,What animals do you have on your farm?,B1,1824,1186,animals
+5834495,How far away is your farm?,B1,1824,1187,animals
+2093377,We demand a raise!,B1,1836,1188,
+3502887,I bent over slightly to choose a coffee and get the change.,B1,1839,1189,"shopping & prices,basic verbs & actions"
+267614,A check is a method of paying money to somebody.,B1,1834,1190,
+6046902,I am not aware of any evidence to suggest that that is true.,B1,1840,1191,negation
+11151715,I'm ready to take responsibility for my actions.,B1,1837,1192,
+11695799,The door moved slightly.,B1,1839,1193,
+13347719,Let's rock and roll!,B1,1838,1194,
+1422699,I'm glad that I'm not paying.,B1,1834,1195,emotions
+280617,Reading will guide us to the rich world of wonder.,B1,1829,1196,language learning
+63796,The guide will lead us to the famous park.,B1,1829,1197,
+5725283,Let's see what the investigation turns up.,B1,1831,1198,
+8180436,Do you think that you could handle that kind of responsibility?,B1,1837,1199,polite requests & manners
+13029005,Each person may have a unique take on issues.,B1,1845,1200,
+6388749,Sami's doctor didn't suggest any special treatment.,B1,1840,1201,negation
+8409384,He has a rock and roll band.,B1,1838,1202,
+43758,I have my own thoughts on that subject.,B1,1843,1203,"possession (my, your, his)"
+10017565,Yanni finished paying them.,B1,1834,1204,shopping & prices
+6532246,I like rock and roll.,B1,1838,1205,likes & dislikes
+11407313,I'm interested in a variety of things in life.,B1,1846,1206,likes & dislikes
+5997636,I receive information from a variety of sources.,B1,1846,1207,
+9823934,"This is mine to sell, not yours.",B1,1849,1208,"possession (my, your, his)"
+3730214,It's a huge responsibility.,B1,1837,1209,
+8392427,I don't trust people with weapons.,B1,1848,1210,negation
+7917463,I was just trying to write out some of my thoughts.,B1,1843,1211,
+3531645,Sometimes you surprise me.,B1,1841,1212,
+1199457,It wouldn't surprise me if we had the same bag!,B1,1841,1213,
+9351645,There are many stars that are bigger than our sun.,B1,1853,1214,
+40443,I wonder who discovered it.,B1,1855,1215,
+6870646,"If we had children, we would have bought a bigger house.",B1,1853,1216,
+3597778,Is this my seat or yours?,B1,1849,1217,"possession (my, your, his)"
+250879,My thoughts are in agreement with them.,B1,1843,1218,"possession (my, your, his)"
+6351435,I suggest you do that quickly.,B1,1840,1219,
+2697578,A look of surprise ran across Maria's face.,B1,1841,1220,emotions
+7286402,Sami went to the youth part of the church.,B1,1850,1221,
+11180645,I like this apple variety.,B1,1846,1222,likes & dislikes
+8936298,They said that it is a unique opportunity.,B1,1845,1223,
+27146,We appreciate your continued support.,B1,1852,1224,polite requests & manners
+13027772,The main thing is to appreciate each other.,B1,1852,1225,
+12606766,Your brain is unique.,B1,1845,1226,
+1153994,They were extremely excited.,B1,1860,1227,emotions
+7388565,He helps his dad out on the farm.,B1,1863,1228,
+250435,My opinion is different from yours.,B1,1849,1229,"possession (my, your, his)"
+1933622,I appreciate the effort.,B1,1852,1230,
+6577341,I just discovered a new band.,B1,1855,1231,
+4498369,Everybody is excited.,B1,1860,1232,emotions
+12104918,You sound like you had a lovely evening.,B1,1867,1233,
+8792494,Yanni helps customers.,B1,1863,1234,basic verbs & actions
+262750,"Forever we will change, forever we will learn.",B1,1861,1235,language learning
+4927446,I look bigger on television than I do in real life.,B1,1853,1236,
+10685153,Thanks for the lovely present!,B1,1867,1237,polite requests & manners
+4189026,I hope the weather is going to be dry.,B1,1857,1238,
+10663138,He showed me a magazine.,B1,1869,1239,
+290262,He gets mad very easily.,B1,1868,1240,emotions
+9773564,My skin gets dry easily.,B1,1857,1241,
+273128,The other day I discovered a book written by my father.,B1,1855,1242,family & relationships
+13190754,The plant looks very dry. Please water it.,B1,1857,1243,plants
+13372091,Then people learned to make iron products.,B1,1866,1244,
+263153,We put up at a small hotel on the edge of the town.,B1,1858,1245,
+6687283,Sami seemed to have the edge on his older brother.,B1,1858,1246,
+9809423,I hope to be able to do this forever.,B1,1861,1247,future plans & goals
+3361491,I'm not mad at you anymore.,B1,1868,1248,"emotions,negation"
+5917170,You don't sound very excited.,B1,1860,1249,emotions
+5736290,We have the funds available.,B1,1862,1250,
+12194824,Let's go somewhere we can talk in peace.,B1,1879,1251,
+10570067,I've been doing it since forever now.,B1,1861,1252,
+10552739,I need to know ahead of time so that we can be prepared.,B1,1875,1253,
+277231,A map helps us to know where we are.,B1,1863,1254,directions & locations
+7399900,She said she wasn't mad anymore.,B1,1868,1255,"emotions,negation"
+6376213,Sami prepared a surprise party.,B1,1875,1256,
+10768134,This is the magazine I was telling you about.,B1,1869,1257,
+6265773,Our strategy isn't working.,B1,1881,1258,
+6709549,Sami ordered coffee.,B1,1873,1259,at the restaurant
+6568980,The weather was lovely.,B1,1867,1260,
+7172335,I thought that the captain ordered you not to do that.,B1,1873,1261,
+9096737,Have you read this magazine's latest issue?,B1,1869,1262,
+7264245,Sami ordered his drink.,B1,1873,1263,at the restaurant
+6474558,Sami wasn't interested in religion.,B1,1877,1264,
+52482,Could I have a glass of white wine?,B1,1884,1265,"polite requests & manners,at the restaurant"
+2878257,We need a completely new strategy.,B1,1881,1266,
+11071433,It's too early to tell whether the strategy will pay off.,B1,1881,1267,
+38239,We have to draw a line somewhere.,B1,1879,1268,
+1359134,The web goes slow when there are far too many people online.,B1,1883,1269,
+10183392,"Somewhere deep inside me, I'm still a kid.",B1,1879,1270,
+260146,I saw him walking with a book under his arm.,B1,1887,1271,
+10115694,"They were caught by surprise, as they weren't prepared at all.",B1,1875,1272,
+33705,You look like you're having a lot of trouble setting up that web page. Want some help?,B1,1883,1273,asking for help
+11188144,The audience didn't look interested.,B1,1888,1274,emotions
+9953817,Why don't we sit closer to the front?,B1,1891,1275,
+8572566,We're getting closer and closer to your stop.,B1,1891,1276,
+3662952,I like red wine better than white wine.,B1,1884,1277,"likes & dislikes,at the restaurant"
+11647149,Lukas just dropped the subject.,B1,1895,1278,
+236884,He wrote a fine description of what happened there.,B1,1894,1279,
+7406147,"They aren't teachers anymore, are they?",B1,1882,1280,negation
+11681094,Bruno dropped the bag of food on the floor.,B1,1895,1281,
+8105197,Make eye contact with the audience during your talk.,B1,1888,1282,
+305331,They walk arm in arm with each other.,B1,1887,1283,
+11095564,"As far as I know, that word doesn't exist.",B1,1897,1284,
+7965433,That company doesn't exist anymore.,B1,1897,1285,negation
+7374469,"Mary is an excellent driver, isn't she?",B1,1896,1286,
+258018,I had to finish the job by the stated date.,B1,1880,1287,
+4487357,I think it's not a good idea to let children drink wine.,B1,1884,1288,"negation,at the restaurant"
+312599,"She is a good teacher, as teachers go.",B1,1882,1289,
+6717701,Sami just dropped by to say hi.,B1,1895,1290,greetings & introductions
+3958878,She was an excellent student.,B1,1896,1291,
+7388151,She has a growth on her arm.,B1,1887,1292,
+6267330,This is an excellent wine.,B1,1896,1293,
+8901456,How many jobs can teachers do?,B1,1882,1294,
+12166930,Have you seen the latest figures?,B1,1898,1295,
+8105196,Make eye contact with the audience.,B1,1888,1296,
+12991033,Education can take many forms beyond a degree.,B1,1899,1297,
+8572114,That's part of the job description.,B1,1894,1298,
+6902940,Please give me your honest opinion.,B1,1901,1299,polite requests & manners
+11675780,Alberto was just a security guard.,B1,1900,1300,
+7321095,Sami was a security guard.,B1,1900,1301,
+7299592,Sami was sitting at the edge of the mountain.,B1,1910,1302,
+9622835,Let's move this table closer to the window.,B1,1891,1303,
+802194,They believed he was honest.,B1,1901,1304,
+12925517,Where do I find the necessary forms?,B1,1899,1305,asking for help
+530149,He likes to listen to the radio.,B1,1907,1306,likes & dislikes
+4927077,He likes to go to the beach sometimes.,B1,1907,1307,likes & dislikes
+65885,No one has been able to reach the top of the mountain.,B1,1910,1308,negation
+71364,Listen to those whom you think to be honest.,B1,1901,1309,
+6448350,Sami went to get the medicine quickly.,B1,1908,1310,
+9189135,Thomas and Maria took turns standing guard.,B1,1900,1311,"basic verbs & actions, animals"
+12319743,Our orders were quite specific.,B1,1912,1312,"basic verbs & actions, polite requests & manners"
+269550,What forms do we need to file?,B1,1899,1313,asking for help
+12944606,She's getting off at the next port.,B1,1913,1314,"basic verbs & actions, directions & locations"
+56623,This medicine has no side effects.,B1,1908,1315,"negation, basic verbs & actions"
+12883686,"It's not that I want to take sides, but I agree with your opinion.",B1,1918,1316,likes & dislikes
+325625,Read both sides and then decide for yourself.,B1,1918,1317,basic verbs & actions
+3696764,Ice is water in solid form.,B1,1919,1318,likes & dislikes
+8665070,He likes watching TV in the evening.,B1,1907,1319,"likes & dislikes, basic verbs & actions, telling time"
+12140961,The ship is about to leave port.,B1,1913,1320,numbers & counting
+4665154,We need to reduce labor costs.,B1,1916,1321,numbers & counting
+10082479,I always used to count the steps while going up.,B1,1922,1322,"numbers & counting, basic verbs & actions"
+10326365,I've lost my sense of taste.,B1,1924,1323,"emotions, basic verbs & actions"
+43557,Does the medicine act quickly?,B1,1908,1324,basic verbs & actions
+13072974,"At length, the ship arrived at its home port.",B1,1913,1325,"directions & locations, basic verbs & actions"
+4664802,The captain's orders were clear.,B1,1912,1326,negation
+1615236,"What I want isn't tea, but coffee.",B1,1925,1327,"likes & dislikes, negation"
+2510740,She ordered him not to give orders.,B1,1912,1328,"negation, basic verbs & actions"
+13270129,"As far as I'm concerned, the August is a victory.",B1,1926,1329,sports
+57383,This room has fine view of the mountain.,B1,1910,1330,sports
+30268,"In order to lose weight, it is best to take up some sport.",B1,1921,1331,sports
+462778,The man and the woman drink tea.,B1,1925,1332,"sports,likes & dislikes"
+3598244,Which sport do you most enjoy watching?,B1,1921,1333,likes & dislikes
+10502471,It's too sweet for my taste.,B1,1924,1334,likes & dislikes
+2731067,"Which do you like, green tea or black tea?",B1,1925,1335,"likes & dislikes, colors & shapes"
+265964,We should take the necessary steps before it's too late.,B1,1922,1336,basic verbs & actions
+1699402,It's popular among senior citizens.,B1,1930,1337,in the classroom
+11173256,Your presence is required.,B1,1914,1338,"personal pronouns, polite requests & manners"
+12769472,We find peace in each other's presence.,B1,1914,1339,"emotions, personal pronouns"
+277579,I have rather a busy afternoon in front of me.,B1,1927,1340,sports
+9806281,What's your favorite sport to watch on TV?,B1,1921,1341,"sports, likes & dislikes"
+11592245,Michael didn't even notice Linda's presence.,B1,1914,1342,"negation, emotions"
+2540583,I'll be working as your assistant.,B1,1928,1343,likes & dislikes
+11685133,She didn't use to buy clothes that she really liked.,B1,1932,1344,"negation, basic verbs & actions, shopping & prices, likes & dislikes"
+9045392,Don't sit on the steps.,B1,1922,1345,"negation, basic verbs & actions"
+9164549,I was busy most of the afternoon.,B1,1927,1346,"emotions, basic verbs & actions, telling time"
+11634842,Jonas entered the station.,B1,1936,1347,"directions & locations, basic verbs & actions"
+4638965,"Victory may seem impossible, but actually it is not.",B1,1926,1348,"negation, basic verbs & actions"
+8353943,The fish doesn't taste fresh.,B1,1924,1349,"negation, basic verbs & actions"
+37912,It's entirely up to you which one you choose.,B1,1937,1350,"personal pronouns, basic verbs & actions"
+12999319,You often make quick decisions.,B1,1933,1351,"personal pronouns, basic verbs & actions"
+24980,I am entirely at your service.,B1,1937,1352,basic verbs & actions
+3211370,Victory seemed within easy reach.,B1,1926,1353,"personal pronouns, basic verbs & actions"
+2275272,Don't make any quick decisions.,B1,1933,1354,"negation, basic verbs & actions"
+7164817,Sami was working with the assistant manager.,B1,1928,1355,"family & relationships, basic verbs & actions"
+287772,His theory is based on many facts.,B1,1938,1356,basic verbs & actions
+6658412,I'm going to be busy most of the afternoon.,B1,1927,1357,"emotions, basic verbs & actions, telling time"
+11931451,I'm interested only in the facts.,B1,1938,1358,basic verbs & actions
+13003307,What’s your best advice on how to deal with failure?,B1,1939,1359,"asking for help, basic verbs & actions"
+8423131,I opened the door and entered.,B1,1936,1360,"basic verbs & actions, directions & locations"
+10700690,We ran out of fuel.,B1,1942,1361,basic verbs & actions
+2810695,Do you only sell clothes?,B1,1932,1362,shopping & prices
+10639646,To travel is to change the clothes of the soul.,B1,1932,1363,basic verbs & actions
+314023,She works as an assistant to the manager.,B1,1928,1364,"basic verbs & actions, family & relationships"
+3114021,What's the nature of your emergency?,B1,1935,1365,basic verbs & actions
+5482839,He is a man of quick decisions.,B1,1933,1366,"asking for help, basic verbs & actions"
+286803,He was entirely free of his worry.,B1,1937,1367,basic verbs & actions
+8027979,Say hello to the nice doctor.,B1,1944,1368,greetings & introductions
+10621717,The houses were sold.,B1,1945,1369,"emotions, basic verbs & actions"
+12898569,I just moved in a few houses away.,B1,1945,1370,"basic verbs & actions, directions & locations"
+10258708,She turned round and went into the flat.,B1,1941,1371,"directions & locations, basic verbs & actions"
+1862546,The joke fell completely flat.,B1,1941,1372,"basic verbs & actions, directions & locations"
+2245220,Consider the facts.,B1,1938,1373,"basic verbs & actions, directions & locations"
+9166370,"After paying the electric bill, the phone bill and the gas bill, I was broke.",B1,1934,1374,"shopping & prices, basic verbs & actions"
+12356265,He's got to clean the flat.,B1,1941,1375,"basic verbs & actions, directions & locations"
+306499,They entered into conversation.,B1,1936,1376,basic verbs & actions
+315122,She was ill with heart disease.,B1,1946,1377,greetings & introductions
+8519342,She introduced herself to him.,B1,1948,1378,"personal pronouns,greetings & introductions,basic verbs & actions"
+711283,"Today I shall go visit my friend, who is ill and has to stay home.",B1,1946,1379,"greetings & introductions,family & relationships"
+245559,Say hello to your sister for me.,B1,1944,1380,"greetings & introductions,polite requests & manners,family & relationships"
+286547,There seem to be several reasons for his failure.,B1,1939,1381,
+9264975,There's a festival in the village.,B1,1940,1382,
+23400,The reasons for our failure are as follows.,B1,1939,1383,
+2764256,Can you e-mail it?,B1,1952,1384,"asking for help,basic verbs & actions"
+306479,They brought solid fuel with them.,B1,1942,1385,negation
+12566927,They didn't get involved in other matters.,B1,1954,1386,greetings & introductions
+5228687,"Hello, this is room service.",B1,1944,1387,greetings & introductions
+4500918,That might make matters worse.,B1,1954,1388,
+2894523,She introduced his sister to me.,B1,1948,1389,"family & relationships,greetings & introductions,possession (my, your, his)"
+1203682,I just sent you a present in the mail.,B1,1952,1390,"basic verbs & actions,possession (my, your, his)"
+12609238,He lived in a massive house.,B1,1953,1391,"basic verbs & actions,colors & shapes"
+6699473,Sami fell ill.,B1,1946,1392,"basic verbs & actions,emotions"
+1211994,"Tom likes Mary, but Mary likes John. To make matters even more interesting, John likes Alice, but Alice likes Tom.",B1,1954,1393,likes & dislikes
+4519858,She introduced herself to them.,B1,1948,1394,"greetings & introductions,personal pronouns"
+10963440,The big houses on the hill are blue.,B1,1945,1395,colors & shapes
+3860069,The prince wants a white horse.,B1,1960,1396,animals
+3728722,I think you're plenty smart.,B1,1959,1397,"personal pronouns,emotions"
+11694516,The plane reached the target location.,B1,1958,1398,"basic verbs & actions,directions & locations"
+1487892,He likes to kick back with some music on.,B1,1950,1399,likes & dislikes
+20461,Are there movies on the plane?,B1,1958,1400,"asking for help,directions & locations"
+3524792,I can see the stars in the sky.,B1,1968,1401,"basic verbs & actions,directions & locations"
+42655,It fell to pieces.,B1,1957,1402,in the classroom
+6433740,Mary's husband picked her up at the station.,B1,1956,1403,family & relationships
+7905801,"Everyone, pair up with a person next to you.",B1,1955,1404,in the classroom
+6215802,Do you like to send it by air mail or by surface mail?,B1,1952,1405,basic verbs & actions
+3726219,Somebody must've picked it up.,B1,1956,1406,negation
+2667384,"This book isn't just interesting, but also useful.",B1,1973,1407,
+7992140,Sami had plenty of photos online.,B1,1959,1408,"basic verbs & actions,numbers & counting"
+8160040,Just a dream can shape the future.,B1,1967,1409,future plans & goals
+8520536,He moved toward her.,B1,1970,1410,"basic verbs & actions,personal pronouns"
+308301,"Given her interest in children, I am sure teaching is the right career for her.",B1,1969,1411,"personal pronouns,future plans & goals,basic verbs & actions"
+282635,The shape of a box is usually square.,B1,1967,1412,colors & shapes
+11581113,Matthew picked Linda up at the airport.,B1,1956,1413,"basic verbs & actions,directions & locations"
+11818906,The sky looked amazing.,B1,1968,1414,"basic verbs & actions,directions & locations"
+12256569,"When I arrived at the airport, I saw the plane taking off.",B1,1958,1415,"basic verbs & actions,directions & locations"
+3054455,The website you told me about was very interesting and also useful.,B1,1973,1416,basic verbs & actions
+11624714,There were some pieces of wood around.,B1,1957,1417,"basic verbs & actions,directions & locations"
+8219066,Tom tried to force the pieces to fit together.,B1,1957,1418,directions & locations
+2267577,Move this table toward the corner.,B1,1970,1419,"basic verbs & actions,directions & locations"
+18349,"Seen from the sky, the island was very beautiful.",B1,1968,1420,"basic verbs & actions,politerequests & manners"
+34624,Possibly he knows who broke the windows.,B1,1977,1421,"personal pronouns,basic verbs & actions"
+282392,The horse is a useful animal.,B1,1973,1422,animals
+12593806,May I suggest an alternative plan?,B1,1981,1423,polite requests & manners
+5752005,I just loved teaching.,B1,1969,1424,"basic verbs & actions,directions & locations"
+11708739,Lorenzo was standing near one of the windows.,B1,1977,1425,"basic verbs & actions,politerequests & manners"
+12166944,Are your windows shut?,B1,1977,1426,basic verbs & actions
+13108698,Would they be able to come up with an alternative?,B1,1981,1427,"asking for help,basic verbs & actions"
+7829865,The teacher is teaching.,B1,1969,1428,"basic verbs & actions,in the classroom"
+290917,Did he mention the accident?,B1,1979,1429,basic verbs & actions
+6927396,Have you ever had a traffic accident?,B1,1979,1430,basic verbs & actions
+276090,A river runs down through the valley.,B1,1974,1431,"basic verbs & actions,directions & locations"
+9338700,Yanni watched a lot of music videos.,B1,1975,1432,"basic verbs & actions,numbers & counting,likes & dislikes"
+10553713,Consider the alternative.,B1,1981,1433,"basic verbs & actions,directions & locations"
+3045845,"From the hill, we saw the whole valley spread out below us.",B1,1974,1434,"basic verbs & actions,likes & dislikes,politerequests & manners"
+11631916,Gunter continued to drink some wine as he watched one of his favorite movies.,B1,1975,1435,"basic verbs & actions,likes & dislikes"
+2258481,He took out accident insurance.,B1,1979,1436,"basic verbs & actions,directions & locations"
+12913986,I reached the valley floor.,B1,1974,1437,basic verbs & actions
+7276145,Sami watched those videos.,B1,1975,1438,"basic verbs & actions,directions & locations"
+9772330,We joined in the discussion.,B1,1992,1439,basic verbs & actions
+12773281,To know is to bear responsibility.,B1,1985,1440,"basic verbs & actions,politerequests & manners"
+8849828,Yanni couldn't find his clothes anywhere.,B1,1982,1441,"negation,possession (my, your, his)"
+4753259,"Where should I sit? ""Anywhere is OK.""",B1,1982,1442,directions & locations
+11070725,I am drinking hot wine.,B1,1993,1443,basic verbs & actions
+1867375,They see another boat going into the port.,B1,1986,1444,basic verbs & actions
+12904941,He advanced in the competition.,B1,1980,1445,basic verbs & actions
+1079072,They took turns on duty.,B1,1994,1446,basic verbs & actions
+10592882,That dress looks fantastic on you.,B1,1995,1447,likes & dislikes
+4413135,He's drinking red wine.,B1,1993,1448,"colors & shapes,basic verbs & actions"
+9936073,You bear the responsibility for what you do.,B1,1985,1449,basic verbs & actions
+12958927,He owned a small boat.,B1,1986,1450,"possession (my, your, his)"
+680525,What's your favorite climate?,B1,1990,1451,likes & dislikes
+10739336,The cars are cheap.,B1,1989,1452,shopping & prices
+11181122,This house was sold cheap.,B1,1989,1453,shopping & prices
+248289,We'll cross the river in a boat.,B1,1986,1454,basic verbs & actions
+12790014,"If you could travel anywhere in the world right now, where would you go?",B1,1982,1455,directions & locations
+245067,Have you ever seen a bear in the mountain?,B1,1985,1456,animals
+8972856,There is a fantastic view from the top of that tree.,B1,1995,1457,plants
+9342783,This computer was cheap.,B1,1989,1458,shopping & prices
+8161303,You’ll quickly get used to the cold climate.,B1,1990,1459,"basic verbs & actions,politerequests & manners"
+11484041,My feelings toward him have changed over time.,B1,1996,1460,emotions
+10918369,The plane is flying south.,B1,1997,1461,directions & locations
+5042076,I have trouble talking about my feelings.,B1,1996,1462,emotions
+667897,"Climate is what we expect, weather is what we get.",B1,1990,1463,"basic verbs & actions,politerequests & manners"
+5939647,I led the discussion.,B1,1992,1464,basic verbs & actions
+7073454,My doctor told me that I wasn't drinking enough water.,B1,1993,1465,"basic verbs & actions,politerequests & manners"
+9955712,The bus arrived at exactly 2:30.,B1,2000,1466,telling time
+2761666,That plane is flying too low.,B1,1997,1467,directions & locations
+10135436,The plane was flying east.,B1,1997,1468,directions & locations
+12121151,Keep the discussion on track.,B1,1992,1469,"basic verbs & actions,politerequests & manners"
+539157,He went above and beyond the call of duty.,B1,1994,1470,"basic verbs & actions,politerequests & manners"
+1673345,It starts around 8:30.,B1,2000,1471,telling time
+277027,The governor's speech was published in the magazine.,B1,1998,1472,"basic verbs & actions,politerequests & manners"
+11711517,Martino came for guard duty.,B1,1994,1473,
+286134,His words hurt her feelings.,B1,1996,1474,emotions
+5736708,It was absolutely fantastic.,B1,1995,1475,emotions
+10869818,Expect me around 2:30.,B1,2000,1476,telling time
