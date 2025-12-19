@@ -81,7 +81,7 @@ function parseTopics(topicsString) {
 }
 
 async function uploadSentences() {
-  const csvPath = path.join(__dirname, "../data_preparation/data/output/sentences_cleaned.csv");
+  const csvPath = path.join(__dirname, "../data_preparation/data/output/sentences.csv");
   console.log(`Reading CSV file from: ${csvPath}`);
 
   if (!fs.existsSync(csvPath)) {
