@@ -30,6 +30,49 @@
       "createAccount": "Create your account and begin mastering new languages"
     }
   },
+  "AppPage": {
+    "views": {
+      "home": "Home",
+      "content": "Content",
+      "library": "Library",
+      "settings": "Settings"
+    },
+    "loading": "Loading...",
+    "welcome": "Welcome back, {viewer}!",
+    "notifications": {
+      "title": "Notifications",
+      "description": {
+        "default": "Get reminders to practice your phrases.",
+        "granted": "Notifications are enabled! You'll receive practice reminders.",
+        "unsupported": "Notifications are not supported by your browser."
+      },
+      "notAvailable": "Notifications not available",
+      "blocked": "Notifications are blocked. Please enable them in your browser settings to receive reminders.",
+      "requesting": "Requesting...",
+      "sendTest": "Send Test Notification",
+      "enable": "Enable Notifications",
+      "enabled": "Notifications enabled"
+    },
+    "flashcards": {
+      "title": "Flashcards",
+      "description": "Practice your phrases with interactive flashcards.",
+      "goToFlashcard": "Go to Flashcards",
+      "goToAudioFlashcard": "Go to Audio Flashcards"
+    },
+    "randomNumber": {
+      "title": "Random Numbers",
+      "description": "A simple Convex demo showing real-time updates.",
+      "generate": "Generate Random Number",
+      "recent": "Recent numbers:",
+      "empty": "No numbers generated yet."
+    },
+    "contentSoon": "Coming Soon: Discover new phrases and content tailored for you.",
+    "librarySoon": "Coming Soon: Manage and organize your saved phrases.",
+    "settings": {
+      "account": "Account",
+      "language": "App Language"
+    }
+  },
   "Footer": {
     "copyright": "© {year} Phrasis. All rights reserved.",
     "theme": "Theme:",

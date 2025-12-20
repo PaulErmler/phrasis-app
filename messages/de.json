@@ -30,6 +30,49 @@
       "createAccount": "Erstelle dein Konto und beginne, neue Sprachen zu meistern"
     }
   },
+  "AppPage": {
+    "views": {
+      "home": "Start",
+      "content": "Inhalte",
+      "library": "Bibliothek",
+      "settings": "Einstellungen"
+    },
+    "loading": "Lädt...",
+    "welcome": "Willkommen zurück, {viewer}!",
+    "notifications": {
+      "title": "Benachrichtigungen",
+      "description": {
+        "default": "Erhalte Erinnerungen, um deine Phrasen zu üben.",
+        "granted": "Benachrichtigungen sind aktiviert! Du erhältst Übungserinnerungen.",
+        "unsupported": "Benachrichtigungen werden von deinem Browser nicht unterstützt."
+      },
+      "notAvailable": "Benachrichtigungen nicht verfügbar",
+      "blocked": "Benachrichtigungen sind blockiert. Bitte aktiviere sie in deinen Browsereinstellungen, um Erinnerungen zu erhalten.",
+      "requesting": "Wird angefordert...",
+      "sendTest": "Test-Benachrichtigung senden",
+      "enable": "Benachrichtigungen aktivieren",
+      "enabled": "Benachrichtigungen aktiviert"
+    },
+    "flashcards": {
+      "title": "Lernkarten",
+      "description": "Übe deine Phrasen mit interaktiven Lernkarten.",
+      "goToFlashcard": "Zu den Lernkarten",
+      "goToAudioFlashcard": "Zu den Audio-Lernkarten"
+    },
+    "randomNumber": {
+      "title": "Zufallszahlen",
+      "description": "Eine einfache Convex-Demo mit Echtzeit-Updates.",
+      "generate": "Zufallszahl generieren",
+      "recent": "Letzte Zahlen:",
+      "empty": "Noch keine Zahlen generiert."
+    },
+    "contentSoon": "Demnächst: Entdecke neue Phrasen und auf dich zugeschnittene Inhalte.",
+    "librarySoon": "Demnächst: Verwalte und organisiere deine gespeicherten Phrasen.",
+    "settings": {
+      "account": "Konto",
+      "language": "App-Sprache"
+    }
+  },
   "Footer": {
     "copyright": "© {year} Phrasis. Alle Rechte vorbehalten.",
     "theme": "Design:",
