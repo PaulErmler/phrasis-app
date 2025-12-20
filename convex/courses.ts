@@ -42,31 +42,6 @@ export const getUserSettings = query({
   },
 });
 
-/**
- * Quick check if user has completed onboarding
- */
-export const hasCompletedOnboarding = query({
-  args: {},
-  returns: v.union(v.boolean(), v.null()),
-  handler: async (ctx) => {
-    try {
-      const user = await authComponent.getAuthUser(ctx);
-      if (!user) {
-        return null;
-      }
-
-      const userId = user._id;
-      const settings = await ctx.db
-        .query("userSettings")
-        .withIndex("by_userId", (q) => q.eq("userId", userId))
-        .first();
-
-      return settings?.hasCompletedOnboarding ?? false;
-    } catch {
-      return null;
-    }
-  },
-});
 
 /**
  * Get all courses for the authenticated user
