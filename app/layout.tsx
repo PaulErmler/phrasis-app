@@ -6,6 +6,7 @@ import { Providers } from "./providers";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { getUserLocale } from "@/i18n/locale";
 import { getMessages, getTimeZone } from "next-intl/server";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,6 +64,7 @@ export default async function RootLayout({
         <ConvexClientProvider>
           <Providers locale={locale} messages={messages} timeZone={timeZone}>
             {children}
+            <Toaster position="top-center" />
           </Providers>
         </ConvexClientProvider>
       </body>
