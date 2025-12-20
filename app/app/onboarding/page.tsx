@@ -25,17 +25,25 @@ export default function OnboardingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const userSettings = useQuery(api.courses.getUserSettings);
+  const onboardingProgress = useQuery(api.courses.getOnboardingProgress);
   const saveProgress = useMutation(api.courses.saveOnboardingProgress);
   const completeOnboarding = useMutation(api.courses.completeOnboarding);
 
-  const [data, setData] = useState<OnboardingData>({
+  // Initialize data from onboarding progress or use defaults
+  const initialData: OnboardingData = onboardingProgress ? {
+    learningStyle: onboardingProgress.learningStyle || null,
+    targetLanguages: onboardingProgress.targetLanguages || [],
+    currentLevel: onboardingProgress.currentLevel || null,
+    baseLanguages: onboardingProgress.baseLanguages || [],
+  } : {
     learningStyle: null,
     targetLanguages: [],
     currentLevel: null,
     baseLanguages: [],
-  });
+  };
 
-  const [step, setStep] = useState(1);
+  const [data, setData] = useState<OnboardingData>(initialData);
+  const [step, setStep] = useState(onboardingProgress?.step || 1);
 
   const totalSteps = 6;
   const progress = (step / totalSteps) * 100;
@@ -111,8 +119,8 @@ export default function OnboardingPage() {
     }
   };
 
-  // Show loading state while query is loading (undefined) or if redirecting to /app
-  if (userSettings === undefined || userSettings?.hasCompletedOnboarding) {
+  // Show loading state while queries are loading (undefined) or if redirecting to /app
+  if (userSettings === undefined || onboardingProgress === undefined || userSettings?.hasCompletedOnboarding) {
     return (
       <>
         <RedirectToSignIn />

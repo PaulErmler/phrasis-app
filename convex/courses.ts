@@ -19,9 +19,6 @@ export const getUserSettings = query({
       hasCompletedOnboarding: v.boolean(),
       learningStyle: v.optional(learningStyleValidator),
       currentLevel: v.optional(currentLevelValidator),
-      onboardingStep: v.optional(v.number()),
-      targetLanguages: v.optional(v.array(v.string())),
-      baseLanguages: v.optional(v.array(v.string())),
     }),
     v.null()
   ),
@@ -107,6 +104,44 @@ export const getUserCourses = query({
 });
 
 /**
+ * Get the current user's onboarding progress
+ */
+export const getOnboardingProgress = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      _id: v.id("onboardingProgress"),
+      _creationTime: v.number(),
+      userId: v.string(),
+      step: v.number(),
+      learningStyle: v.optional(learningStyleValidator),
+      currentLevel: v.optional(currentLevelValidator),
+      targetLanguages: v.optional(v.array(v.string())),
+      baseLanguages: v.optional(v.array(v.string())),
+    }),
+    v.null()
+  ),
+  handler: async (ctx) => {
+    try {
+      const user = await authComponent.getAuthUser(ctx);
+      if (!user) {
+        return null;
+      }
+
+      const userId = user._id;
+      const progress = await ctx.db
+        .query("onboardingProgress")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .first();
+
+      return progress ?? null;
+    } catch {
+      return null;
+    }
+  },
+});
+
+/**
  * Save onboarding progress
  */
 export const saveOnboardingProgress = mutation({
@@ -118,13 +153,12 @@ export const saveOnboardingProgress = mutation({
     baseLanguages: v.optional(v.array(v.string())),
   },
   returns: v.object({
-    _id: v.id("userSettings"),
+    _id: v.id("onboardingProgress"),
     _creationTime: v.number(),
     userId: v.string(),
-    hasCompletedOnboarding: v.boolean(),
+    step: v.number(),
     learningStyle: v.optional(learningStyleValidator),
     currentLevel: v.optional(currentLevelValidator),
-    onboardingStep: v.optional(v.number()),
     targetLanguages: v.optional(v.array(v.string())),
     baseLanguages: v.optional(v.array(v.string())),
   }),
@@ -136,35 +170,49 @@ export const saveOnboardingProgress = mutation({
 
     const userId = user._id;
 
-    // Check if settings already exist
+    // Check if progress already exists
+    const existingProgress = await ctx.db
+      .query("onboardingProgress")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+
+    let progressId;
+    if (existingProgress) {
+      await ctx.db.patch(existingProgress._id, args);
+      progressId = existingProgress._id;
+    } else {
+      progressId = await ctx.db.insert("onboardingProgress", {
+        userId,
+        ...args,
+      });
+    }
+
+    // Ensure userSettings exists
     const existingSettings = await ctx.db
       .query("userSettings")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .first();
 
-    const { step, ...otherFields } = args;
-    const updateData = {
-    ...otherFields,
-    onboardingStep: step,
-    hasCompletedOnboarding: false,
-    };
-
-    let settingsId;
-    if (existingSettings) {
-    await ctx.db.patch(existingSettings._id, updateData);
-    settingsId = existingSettings._id;
-    } else {
-    settingsId = await ctx.db.insert("userSettings", {
+    if (!existingSettings) {
+      await ctx.db.insert("userSettings", {
         userId,
-        ...updateData,
-    });
+        hasCompletedOnboarding: false,
+        learningStyle: args.learningStyle,
+        currentLevel: args.currentLevel,
+      });
+    } else {
+      // Update userSettings with learning preferences
+      await ctx.db.patch(existingSettings._id, {
+        learningStyle: args.learningStyle,
+        currentLevel: args.currentLevel,
+      });
     }
 
-    const settings = await ctx.db.get(settingsId);
-    if (!settings) {
-    throw new Error("Failed to retrieve user settings");
+    const progress = await ctx.db.get(progressId);
+    if (!progress) {
+      throw new Error("Failed to retrieve onboarding progress");
     }
-    return settings;
+    return progress;
   },
 });
 
@@ -226,26 +274,44 @@ export const completeOnboarding = mutation({
 
     const userId = user._id;
 
-    // Get existing settings
+    // Get onboarding progress
+    const progress = await ctx.db
+      .query("onboardingProgress")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+
+    if (!progress) {
+      throw new Error("Onboarding progress not found");
+    }
+
+    // Get or create user settings
     const existingSettings = await ctx.db
       .query("userSettings")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .first();
 
+    let settingsId;
     if (!existingSettings) {
-      throw new Error("User settings not found");
+      settingsId = await ctx.db.insert("userSettings", {
+        userId,
+        hasCompletedOnboarding: true,
+        learningStyle: progress.learningStyle,
+        currentLevel: progress.currentLevel,
+      });
+    } else {
+      // Mark onboarding as complete
+      await ctx.db.patch(existingSettings._id, {
+        hasCompletedOnboarding: true,
+        learningStyle: progress.learningStyle,
+        currentLevel: progress.currentLevel,
+      });
+      settingsId = existingSettings._id;
     }
 
-    // Mark onboarding as complete
-    await ctx.db.patch(existingSettings._id, {
-      hasCompletedOnboarding: true,
-      onboardingStep: undefined,
-    });
-
-    // Create the course
+    // Create the course with data from onboarding progress
     const courseId = await ctx.db.insert("courses", {
-      baseLanguages: existingSettings.baseLanguages || [],
-      targetLanguages: existingSettings.targetLanguages || [],
+      baseLanguages: progress.baseLanguages || [],
+      targetLanguages: progress.targetLanguages || [],
       userId,
     });
 
@@ -259,6 +325,9 @@ export const completeOnboarding = mutation({
       courseSettingsId,
     });
 
-    return { settingsId: existingSettings._id, courseId };
+    // Delete the onboarding progress now that it's been transferred
+    await ctx.db.delete(progress._id);
+
+    return { settingsId, courseId };
   },
 });

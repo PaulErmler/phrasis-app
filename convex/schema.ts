@@ -51,7 +51,14 @@ export default defineSchema({
     hasCompletedOnboarding: v.boolean(),
     learningStyle: v.optional(learningStyleValidator),
     currentLevel: v.optional(currentLevelValidator),
-    onboardingStep: v.optional(v.number()), // Current step in onboarding (1-6)
+  }).index("by_userId", ["userId"]),
+
+  // Onboarding progress table - stores temporary onboarding data until completion
+  onboardingProgress: defineTable({
+    userId: v.string(), // Links to auth user
+    step: v.number(), // Current step in onboarding (1-6)
+    learningStyle: v.optional(learningStyleValidator),
+    currentLevel: v.optional(currentLevelValidator),
     targetLanguages: v.optional(v.array(v.string())),
     baseLanguages: v.optional(v.array(v.string())),
   }).index("by_userId", ["userId"]),
