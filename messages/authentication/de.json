@@ -1,10 +1,12 @@
 {
   "Auth": {
+    "SIGN_IN_DESCRIPTION": "", 
+    "SIGN_UP_DESCRIPTION": "",
+    "OR_CONTINUE_WITH": "oder nutze Email und Passwort", 
     "SIGN_IN": "Anmelden",
     "SIGN_UP": "Registrieren",
     "SIGN_OUT": "Abmelden",
-    "SIGN_IN_DESCRIPTION": "Gib deine Anmeldedaten ein, um dich anzumelden",
-    "SIGN_UP_DESCRIPTION": "Erstelle ein Konto, um loszulegen",
+
     "EMAIL": "E-Mail",
     "EMAIL_PLACEHOLDER": "du@beispiel.de",
     "EMAIL_REQUIRED": "E-Mail-Adresse ist erforderlich",
@@ -34,7 +36,6 @@
     "NEW_PASSWORD_PLACEHOLDER": "Gib dein neues Passwort ein",
     "ALREADY_HAVE_AN_ACCOUNT": "Bereits ein Konto?",
     "DONT_HAVE_AN_ACCOUNT": "Noch kein Konto?",
-    "OR_CONTINUE_WITH": "oder weiter mit",
     "INVALID_EMAIL_OR_PASSWORD": "Ungültige E-Mail oder Passwort",
     "INVALID_PASSWORD": "Ungültiges Passwort",
     "INVALID_EMAIL": "Bitte gib eine gültige E-Mail-Adresse ein",

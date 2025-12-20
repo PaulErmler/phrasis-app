@@ -15,8 +15,8 @@ export default async function Home() {
       <section className="flex-1 flex flex-col items-center justify-center px-4 py-20 md:py-32">
         <div className="w-full max-w-4xl mx-auto text-center space-y-8">
           {/* Logo */}
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-linear-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
-            <span className="text-4xl font-bold text-white">P</span>
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-foreground shadow-lg shadow-foreground/5">
+            <span className="text-4xl font-bold text-background">P</span>
           </div>
 
           {/* Heading */}
@@ -50,8 +50,8 @@ export default async function Home() {
               </div>
               <div className="space-y-3 pt-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 mt-0.5">
-                    <div className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
+                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-2 h-2 rounded-full bg-foreground" />
                   </div>
                   <div>
                     <p className="font-medium text-foreground">{t("features.learnAtPace.title")}</p>
@@ -59,8 +59,8 @@ export default async function Home() {
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 mt-0.5">
-                    <div className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
+                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-2 h-2 rounded-full bg-foreground" />
                   </div>
                   <div>
                     <p className="font-medium text-foreground">{t("features.trackProgress.title")}</p>
@@ -68,8 +68,8 @@ export default async function Home() {
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0 mt-0.5">
-                    <div className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
+                  <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-2 h-2 rounded-full bg-foreground" />
                   </div>
                   <div>
                     <p className="font-medium text-foreground">{t("features.multipleLanguages.title")}</p>
@@ -94,8 +94,8 @@ export default async function Home() {
 
       {/* Subtle Background Pattern */}
       <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-linear-to-br from-emerald-100/40 to-teal-100/40 dark:from-emerald-900/20 dark:to-teal-900/20 blur-3xl" />
-        <div className="absolute -bottom-1/2 -left-1/2 w-[600px] h-[600px] rounded-full bg-linear-to-tr from-slate-100/40 to-zinc-100/40 dark:from-slate-900/20 dark:to-zinc-900/20 blur-3xl" />
+        <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
+        <div className="absolute -bottom-1/2 -left-1/2 w-[600px] h-[600px] rounded-full bg-muted/10 blur-3xl" />
       </div>
     </main>
   );

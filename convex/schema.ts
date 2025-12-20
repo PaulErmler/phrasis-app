@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { learningStyleValidator, currentLevelValidator } from "./types";
 
 // The schema is entirely optional.
 // You can delete this file (schema.ts) and the
@@ -43,4 +44,29 @@ export default defineSchema({
     audioUrl: v.string(), // Data URL for playing
   })
     .index("by_sentence_language_accent", ["sentenceId", "language", "accent"]),
+
+  // User settings table - stores user preferences and onboarding status
+  userSettings: defineTable({
+    userId: v.string(), // Links to auth user
+    hasCompletedOnboarding: v.boolean(),
+    learningStyle: v.optional(learningStyleValidator),
+    currentLevel: v.optional(currentLevelValidator),
+    onboardingStep: v.optional(v.number()), // Current step in onboarding (1-6)
+    targetLanguages: v.optional(v.array(v.string())),
+    baseLanguages: v.optional(v.array(v.string())),
+  }).index("by_userId", ["userId"]),
+
+
+  // Courses table - stores user language learning courses
+  courses: defineTable({
+    userId: v.string(), // Links to auth user
+    baseLanguages: v.array(v.string()), // ISO codes (e.g., ["en"])
+    targetLanguages: v.array(v.string()), // ISO codes (e.g., ["es", "fr"])
+    courseSettingsId: v.optional(v.id("courseSettings")),
+  }).index("by_userId", ["userId"]),
+
+  // Course settings table - stores course-specific settings
+  courseSettings: defineTable({
+    courseId: v.id("courses"),
+  }).index("by_courseId", ["courseId"]),
 });

@@ -18,7 +18,7 @@ export function CTAButtons({ isAuthenticated }: CTAButtonsProps) {
         <Button
           onClick={() => router.push("/app")}
           size="lg"
-          className="w-full sm:w-auto min-w-[200px] text-base h-12 bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25"
+          className="w-full sm:w-auto min-w-[200px] text-base h-12 shadow-xl shadow-black/5"
         >
           {t("goToApp")}
         </Button>
@@ -39,7 +39,7 @@ export function CTAButtons({ isAuthenticated }: CTAButtonsProps) {
       <Button
         onClick={() => router.push("/auth/sign-up")}
         size="lg"
-        className="w-full sm:w-auto min-w-[160px] text-base h-12 bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25"
+        className="w-full sm:w-auto min-w-[160px] text-base h-12 shadow-xl shadow-black/5"
       >
         {t("getStarted")}
       </Button>

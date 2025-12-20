@@ -1,23 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { SignedIn, RedirectToSignIn } from "@daveyplate/better-auth-ui";
+import { RedirectToSignIn } from "@daveyplate/better-auth-ui";
+import { Authenticated, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { HomeView } from "@/components/app/HomeView";
 import { ContentView } from "@/components/app/ContentView";
 import { LibraryView } from "@/components/app/LibraryView";
 import { SettingsView } from "@/components/app/SettingsView";
 import { BottomNav, View } from "@/components/app/BottomNav";
+import { Loader2 } from "lucide-react";
 
 export default function AppPage() {
+  const router = useRouter();
   const [currentView, setCurrentView] = useState<View>("home");
   const t = useTranslations("AppPage");
+  const hasCompletedOnboarding = useQuery(api.courses.hasCompletedOnboarding);
+
+  useEffect(() => {
+    if (hasCompletedOnboarding === false) {
+      router.push("/app/onboarding");
+    }
+  }, [hasCompletedOnboarding, router]);
+
+  // Show loading state while checking onboarding status or if redirecting
+  if (hasCompletedOnboarding === undefined || hasCompletedOnboarding === false) {
+    return (
+      <>
+        <RedirectToSignIn />
+        <Authenticated>
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+              <p className="text-muted-foreground">{t("loading")}</p>
+            </div>
+          </div>
+        </Authenticated>
+      </>
+    );
+  }
 
   return (
     <>
       <RedirectToSignIn />
-      <SignedIn>
+      <Authenticated>
         <div className="min-h-screen flex flex-col">
           {/* Header */}
           <header className="sticky top-0 z-10 border-b">
@@ -25,7 +54,7 @@ export default function AppPage() {
               <h1 className="font-semibold text-lg capitalize">
                 {t(`views.${currentView}`)}
               </h1>
-              <ThemeSwitcher minimal />
+              <ThemeSwitcher />
             </div>
           </header>
 
@@ -45,7 +74,7 @@ export default function AppPage() {
             <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
           </div>
         </div>
-      </SignedIn>
+      </Authenticated>
     </>
   );
 }
