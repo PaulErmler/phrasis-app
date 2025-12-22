@@ -79,7 +79,30 @@
       "noCourses": "Noch keine Kurse. Erstelle deinen ersten Kurs, um zu beginnen.",
       "active": "Aktiv",
       "learning": "{language} lernen",
-      "currentCourse": "Aktueller Kurs"
+      "currentCourse": "Aktueller Kurs",
+      "from": "von {language}",
+      "createDialog": {
+        "title": "Neuen Kurs erstellen",
+        "step1": {
+          "title": "Welche Sprache möchtest du lernen?",
+          "subtitle": "Wähle deine Zielsprache"
+        },
+        "step2": {
+          "title": "Von welcher Sprache möchtest du lernen?",
+          "subtitle": "Wähle deine Basissprache"
+        },
+        "step3": {
+          "title": "Was ist dein aktuelles Level?",
+          "subtitle": "Wähle dein Sprachniveau"
+        },
+        "creating": "Kurs wird erstellt...",
+        "success": "Kurs erfolgreich erstellt!",
+        "error": "Kurs konnte nicht erstellt werden",
+        "cancel": "Abbrechen",
+        "back": "Zurück",
+        "next": "Weiter",
+        "create": "Kurs erstellen"
+      }
     },
     "changeCourse": "Kurs wechseln"
   },

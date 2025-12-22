@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { useTranslations } from "next-intl";
 import { api } from "@/convex/_generated/api";
@@ -11,10 +12,10 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Check, Plus, X } from "lucide-react";
 import { getLanguagesByCodes } from "@/lib/languages";
 import { cn } from "@/lib/utils";
+import { CreateCourseDialog } from "@/components/course/CreateCourseDialog";
 
 interface CourseMenuProps {
   open: boolean;
@@ -26,6 +27,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
   const courses = useQuery(api.courses.getUserCourses);
   const activeCourse = useQuery(api.courses.getActiveCourse);
   const setActiveCourse = useMutation(api.courses.setActiveCourse);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const handleSelectCourse = async (courseId: Id<"courses">) => {
     try {
@@ -40,6 +42,12 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
     const targetLanguageObjects = getLanguagesByCodes(targetLanguages);
     const targetNames = targetLanguageObjects.map((l) => l.name).join(", ");
     return targetNames;
+  };
+
+  const formatBaseLanguageName = (baseLanguages: string[]) => {
+    const baseLanguageObjects = getLanguagesByCodes(baseLanguages);
+    const baseNames = baseLanguageObjects.map((l) => l.name).join(", ");
+    return baseNames;
   };
 
   return (
@@ -67,24 +75,21 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
           {/* Create New Course Button */}
           <Button
             variant="outline"
-            className="w-full mb-4 gap-2"
-            onClick={() => {
-              // Functionality to be implemented
-              console.log("Create new course");
-            }}
+            className="w-full mb-3 gap-2 h-9"
+            onClick={() => setCreateDialogOpen(true)}
           >
             <Plus className="h-4 w-4" />
             {t("courses.createNew")}
           </Button>
 
           {/* Courses List */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
             {courses === undefined ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="h-24 rounded-lg bg-muted animate-pulse"
+                    className="h-14 rounded-lg bg-muted animate-pulse"
                   />
                 ))}
               </div>
@@ -98,39 +103,46 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
               courses.map((course) => {
                 const isActive = activeCourse?._id === course._id;
                 const targetLanguageName = formatCourseName(course.targetLanguages);
+                const baseLanguageName = formatBaseLanguageName(course.baseLanguages);
 
                 return (
-                  <Card
+                  <Button
                     key={course._id}
-                    className={cn(
-                      "cursor-pointer transition-all hover:shadow-md",
-                      isActive && "ring-2 ring-primary border-primary"
-                    )}
+                    variant="ghost"
                     onClick={() => handleSelectCourse(course._id)}
+                    className={cn(
+                      "w-full h-auto flex items-center justify-between gap-3 p-3 rounded-lg border transition-all text-left whitespace-normal",
+                      isActive
+                        ? "border-primary bg-primary/5 shadow-sm hover:bg-primary/5"
+                        : "border-muted hover:border-muted-foreground/30 hover:bg-muted/50"
+                    )}
                   >
-                    <CardContent className="p-4 flex items-center justify-between">
-                      <div className="flex flex-col gap-1">
-                        <h3 className="font-semibold text-base">
-                          {targetLanguageName}
-                        </h3>
-                        {/* <p className="text-sm text-muted-foreground">
-                          {t("courses.learning", { language: targetLanguageName })}
-                        </p> */}
+                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                      <h3 className="font-semibold text-base leading-tight">
+                        {targetLanguageName}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {t("courses.from", { language: baseLanguageName })}
+                      </p>
+                    </div>
+                    {isActive && (
+                      <div className="flex items-center gap-1.5 text-primary shrink-0">
+                        <span className="text-xs font-medium">{t("courses.active")}</span>
+                        <Check className="h-4 w-4" />
                       </div>
-                      {isActive && (
-                        <div className="flex items-center gap-2 text-primary">
-                          <span className="text-sm font-medium">{t("courses.active")}</span>
-                          <Check className="h-5 w-5" />
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                    )}
+                  </Button>
                 );
               })
             )}
           </div>
         </div>
       </SheetContent>
+      
+      <CreateCourseDialog 
+        open={createDialogOpen} 
+        onOpenChange={setCreateDialogOpen}
+      />
     </Sheet>
   );
 }

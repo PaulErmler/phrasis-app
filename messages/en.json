@@ -79,7 +79,30 @@
       "noCourses": "No courses yet. Create your first course to get started.",
       "active": "Active",
       "learning": "Learning {language}",
-      "currentCourse": "Current Course"
+      "currentCourse": "Current Course",
+      "from": "from {language}",
+      "createDialog": {
+        "title": "Create New Course",
+        "step1": {
+          "title": "What language do you want to learn?",
+          "subtitle": "Select your target language"
+        },
+        "step2": {
+          "title": "What language will you learn from?",
+          "subtitle": "Select your base language"
+        },
+        "step3": {
+          "title": "What's your current level?",
+          "subtitle": "Select your proficiency level"
+        },
+        "creating": "Creating course...",
+        "success": "Course created successfully!",
+        "error": "Failed to create course",
+        "cancel": "Cancel",
+        "back": "Back",
+        "next": "Next",
+        "create": "Create Course"
+      }
     },
     "changeCourse": "Change Course"
   },
