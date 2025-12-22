@@ -45,7 +45,7 @@ export function BaseLanguagesStep({
                 }
               }}
               className={cn(
-                buttonVariants({ variant: "outline" }),
+                buttonVariants({ variant: "ghost" }),
                 "h-auto flex items-center justify-start gap-3 p-3 rounded-xl border-2 transition-all text-left cursor-pointer",
                 isSelected
                   ? "border-primary bg-primary/5 shadow-sm hover:bg-primary/5"

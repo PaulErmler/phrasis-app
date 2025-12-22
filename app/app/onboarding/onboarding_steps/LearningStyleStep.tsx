@@ -2,6 +2,7 @@ import { useTranslations } from "next-intl";
 import { Coffee, Target, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LearningStyle } from "../types";
+import { cn } from "@/lib/utils";
 
 interface LearningStyleStepProps {
   selectedStyle: LearningStyle | null;
@@ -49,15 +50,16 @@ export function LearningStyleStep({ selectedStyle, onSelectStyle }: LearningStyl
           return (
             <Button
               key={style.id}
-              variant="outline"
+              variant="ghost"
               onClick={() => onSelectStyle(style.id)}
-              className={`w-full h-auto flex items-center justify-start gap-4 p-4 rounded-xl border-2 transition-all text-left whitespace-normal ${
+              className={cn(
+                "w-full h-auto flex items-center justify-start gap-4 p-4 rounded-xl border-2 transition-all text-left whitespace-normal",
                 isSelected
                   ? "border-primary bg-primary/5 shadow-sm hover:bg-primary/5"
                   : "border-muted hover:border-muted-foreground/30 hover:bg-muted/50"
-              }`}
+              )}
             >
-              <div className={`p-2.5 rounded-lg ${style.color} shrink-0`}>
+              <div className={cn("p-2.5 rounded-lg shrink-0", style.color)}>
                 <Icon className="h-5 w-5" />
               </div>
               <div className="flex-1 min-w-0">

@@ -2,6 +2,7 @@ import { useTranslations } from "next-intl";
 import { GraduationCap, BookOpen, MessageSquare, Globe, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CurrentLevel } from "../types";
+import { cn } from "@/lib/utils";
 
 interface CurrentLevelStepProps {
   selectedLevel: CurrentLevel | null;
@@ -64,15 +65,16 @@ export function CurrentLevelStep({ selectedLevel, onSelectLevel, targetLanguageN
           return (
             <Button
               key={level.id}
-              variant="outline"
+              variant="ghost"
               onClick={() => onSelectLevel(level.id)}
-              className={`w-full h-auto flex items-center justify-start gap-4 p-4 rounded-xl border-2 transition-all text-left whitespace-normal ${
+              className={cn(
+                "w-full h-auto flex items-center justify-start gap-4 p-4 rounded-xl border-2 transition-all text-left whitespace-normal",
                 isSelected
                   ? "border-primary bg-primary/5 shadow-sm hover:bg-primary/5"
                   : "border-muted hover:border-muted-foreground/30 hover:bg-muted/50"
-              }`}
+              )}
             >
-              <div className={`p-2.5 rounded-lg ${level.color} shrink-0`}>
+              <div className={cn("p-2.5 rounded-lg shrink-0", level.color)}>
                 <Icon className="h-5 w-5" />
               </div>
               <div className="flex-1 min-w-0">
