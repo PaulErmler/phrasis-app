@@ -7,7 +7,6 @@ import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistratio
 import { getUserLocale } from "@/i18n/locale";
 import { getMessages, getTimeZone } from "next-intl/server";
 import { Toaster } from "@/components/ui/sonner";
-import { getToken } from "@/lib/auth-server";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,7 +45,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const token = await getToken();
+
+
   const locale = await getUserLocale();
   const messages = await getMessages();
   const timeZone = await getTimeZone();
@@ -63,7 +63,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ServiceWorkerRegistration />
-        <ConvexClientProvider initialToken={token}>
+        <ConvexClientProvider>
           <Providers locale={locale} messages={messages} timeZone={timeZone}>
             {children}
             <Toaster position="top-center" />

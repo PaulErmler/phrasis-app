@@ -125,11 +125,6 @@ export default function OnboardingPage() {
     return (
       <>
         <RedirectToSignIn />
-        <SignedIn>
-          <div className="min-h-screen flex items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        </SignedIn>
       </>
     );
   }
@@ -138,7 +133,7 @@ export default function OnboardingPage() {
     <>
       <RedirectToSignIn />
       <SignedIn>
-        <div className="h-screen flex flex-col overflow-hidden">
+        <div className="h-screen flex flex-col overflow-hidden ">
           {/* Fixed Progress Bar */}
           {step < totalSteps && (
             <div className="bg-background border-b shrink-0">
