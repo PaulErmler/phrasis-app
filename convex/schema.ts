@@ -50,7 +50,6 @@ export default defineSchema({
     userId: v.string(), // Links to auth user
     hasCompletedOnboarding: v.boolean(),
     learningStyle: v.optional(learningStyleValidator),
-    currentLevel: v.optional(currentLevelValidator),
     activeCourseId: v.optional(v.id("courses")), // Active course for the user
   }).index("by_userId", ["userId"]),
 
@@ -70,11 +69,6 @@ export default defineSchema({
     userId: v.string(), // Links to auth user
     baseLanguages: v.array(v.string()), // ISO codes (e.g., ["en"])
     targetLanguages: v.array(v.string()), // ISO codes (e.g., ["es", "fr"])
-    courseSettingsId: v.optional(v.id("courseSettings")),
+    currentLevel: v.optional(currentLevelValidator), // User's current level in this course
   }).index("by_userId", ["userId"]),
-
-  // Course settings table - stores course-specific settings
-  courseSettings: defineTable({
-    courseId: v.id("courses"),
-  }).index("by_courseId", ["courseId"]),
 });

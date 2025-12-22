@@ -18,7 +18,6 @@ export const getUserSettings = query({
       userId: v.string(),
       hasCompletedOnboarding: v.boolean(),
       learningStyle: v.optional(learningStyleValidator),
-      currentLevel: v.optional(currentLevelValidator),
       activeCourseId: v.optional(v.id("courses")),
     }),
     v.null()
@@ -56,7 +55,7 @@ export const getUserCourses = query({
       userId: v.string(),
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
-      courseSettingsId: v.optional(v.id("courseSettings")),
+      currentLevel: v.optional(currentLevelValidator),
     })
   ),
   handler: async (ctx) => {
@@ -91,7 +90,7 @@ export const getActiveCourse = query({
       userId: v.string(),
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
-      courseSettingsId: v.optional(v.id("courseSettings")),
+      currentLevel: v.optional(currentLevelValidator),
     }),
     v.null()
   ),
@@ -271,13 +270,11 @@ export const saveOnboardingProgress = mutation({
         userId,
         hasCompletedOnboarding: false,
         learningStyle: args.learningStyle,
-        currentLevel: args.currentLevel,
       });
     } else {
       // Update userSettings with learning preferences
       await ctx.db.patch(existingSettings._id, {
         learningStyle: args.learningStyle,
-        currentLevel: args.currentLevel,
       });
     }
 
@@ -290,16 +287,16 @@ export const saveOnboardingProgress = mutation({
 });
 
 /**
- * Create a new course with associated settings
+ * Create a new course
  */
 export const createCourse = mutation({
   args: {
     baseLanguages: v.array(v.string()),
     targetLanguages: v.array(v.string()),
+    currentLevel: v.optional(currentLevelValidator),
   },
   returns: v.object({
     courseId: v.id("courses"),
-    courseSettingsId: v.id("courseSettings"),
   }),
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
@@ -309,24 +306,15 @@ export const createCourse = mutation({
 
     const userId = user._id;
 
-    // Create the course first without courseSettingsId
+    // Create the course with currentLevel
     const courseId = await ctx.db.insert("courses", {
       baseLanguages: args.baseLanguages,
       targetLanguages: args.targetLanguages,
+      currentLevel: args.currentLevel,
       userId,
     });
 
-    // Create the course settings with the courseId
-    const courseSettingsId = await ctx.db.insert("courseSettings", {
-      courseId,
-    });
-
-    // Update course with courseSettingsId
-    await ctx.db.patch(courseId, {
-      courseSettingsId,
-    });
-
-    return { courseId, courseSettingsId };
+    return { courseId };
   },
 });
 
@@ -367,17 +355,8 @@ export const completeOnboarding = mutation({
     const courseId = await ctx.db.insert("courses", {
       baseLanguages: progress.baseLanguages || [],
       targetLanguages: progress.targetLanguages || [],
+      currentLevel: progress.currentLevel,
       userId,
-    });
-
-    // Create course settings
-    const courseSettingsId = await ctx.db.insert("courseSettings", {
-      courseId,
-    });
-
-    // Update course with courseSettingsId
-    await ctx.db.patch(courseId, {
-      courseSettingsId,
     });
 
     let settingsId;
@@ -386,7 +365,6 @@ export const completeOnboarding = mutation({
         userId,
         hasCompletedOnboarding: true,
         learningStyle: progress.learningStyle,
-        currentLevel: progress.currentLevel,
         activeCourseId: courseId,
       });
     } else {
@@ -394,7 +372,6 @@ export const completeOnboarding = mutation({
       await ctx.db.patch(existingSettings._id, {
         hasCompletedOnboarding: true,
         learningStyle: progress.learningStyle,
-        currentLevel: progress.currentLevel,
         activeCourseId: courseId,
       });
       settingsId = existingSettings._id;
