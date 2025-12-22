@@ -5,12 +5,11 @@ import { useTranslations, useLocale } from "next-intl";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ChevronLeft, X } from "lucide-react";
@@ -96,7 +95,6 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
       // Set the newly created course as active
       await setActiveCourse({ courseId: result.courseId });
 
-      toast.success(t("success"));
       handleClose(false);
       resetForm();
     } catch (error) {
@@ -152,26 +150,29 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
   ];
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="w-screen h-screen max-w-none flex flex-col p-0 rounded-none">
-        <DialogHeader className="px-6 pt-6 pb-4 relative">
-          <DialogTitle>{t("title")}</DialogTitle>
-          <DialogDescription className="sr-only">
-            {t("title")}
-          </DialogDescription>
+    <Sheet open={open} onOpenChange={handleClose}>
+      <SheetContent side="left" className="w-full sm:max-w-md flex flex-col p-0 gap-0">
+        <SheetTitle className="sr-only">{t("title")}</SheetTitle>
+        <SheetDescription className="sr-only">
+          {t("title")}
+        </SheetDescription>
+        
+        {/* Header */}
+        <div className="sticky top-0 z-10 border-b bg-background px-4 h-14 flex items-center justify-between">
+          <h2 className="font-semibold text-lg">{t("title")}</h2>
           <Button
             variant="ghost"
             size="icon"
-            className="absolute right-6 top-6"
             onClick={() => handleClose(false)}
             disabled={isSubmitting}
+            className="-mr-2"
           >
             <X className="h-5 w-5" />
           </Button>
-        </DialogHeader>
+        </div>
 
         {/* Progress Bar */}
-        <div className="px-6 pb-4">
+        <div className="px-4 py-4 border-b">
           <Progress value={progress} className="h-2" />
           <p className="text-sm text-muted-foreground mt-2 text-center">
             Step {step} of {totalSteps}
@@ -179,7 +180,7 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
+        <div className="flex-1 overflow-hidden px-6">
           {step === 1 && (
             <LanguageSelector
               title={t("step1.title")}
@@ -213,7 +214,7 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
         </div>
 
         {/* Footer Navigation */}
-        <div className="border-t bg-background px-6 py-4">
+        <div className="sticky bottom-0 border-t bg-background px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             {step > 1 ? (
               <Button
@@ -241,8 +242,8 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
 

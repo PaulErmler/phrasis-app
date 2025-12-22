@@ -14,7 +14,7 @@ interface LevelOption {
 }
 
 interface DifficultySelectorProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   selectedLevel: DifficultyLevel | null;
   onSelectLevel: (level: DifficultyLevel) => void;
@@ -29,15 +29,17 @@ export function DifficultySelector({
   levelOptions,
 }: DifficultySelectorProps) {
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        {subtitle && (
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
-        )}
-      </div>
+    <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {title && (
+        <div className="text-center space-y-2 py-4">
+          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+          {subtitle && (
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
+          )}
+        </div>
+      )}
       
-      <div className="space-y-3 max-w-md mx-auto">
+      <div className="flex-1 flex flex-col gap-3 overflow-y-auto py-4 pr-3">
         {levelOptions.map((level) => {
           const Icon = level.icon;
           const isSelected = selectedLevel === level.id;

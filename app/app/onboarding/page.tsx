@@ -138,10 +138,10 @@ export default function OnboardingPage() {
     <>
       <RedirectToSignIn />
       <SignedIn>
-        <div className="min-h-screen flex flex-col">
+        <div className="h-screen flex flex-col overflow-hidden">
           {/* Fixed Progress Bar */}
           {step < totalSteps && (
-            <div className="sticky top-0 z-10 bg-background border-b">
+            <div className="bg-background border-b shrink-0">
               <div className="container mx-auto px-4 py-4">
                 <Progress value={progress} className="h-2" />
                 <p className="text-sm text-muted-foreground mt-2 text-center">
@@ -151,9 +151,9 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Scrollable Content */}
-          <main className={`flex-1 overflow-y-auto ${step < totalSteps ? "pb-24" : ""}`}>
-            <div className="container mx-auto px-4 py-8 max-w-4xl">
+          {/* Scrollable Content Area */}
+          <main className="flex-1 overflow-hidden">
+            <div className="container mx-auto px-4 max-w-4xl h-full flex flex-col overflow-hidden">
               {step === 1 && <WelcomeStep />}
 
               {step === 2 && (
@@ -194,9 +194,9 @@ export default function OnboardingPage() {
             </div>
           </main>
 
-          {/* Fixed Bottom Navigation */}
+          {/* Bottom Navigation */}
           {step < totalSteps && (
-            <div className="fixed bottom-0 left-0 right-0 border-t bg-background">
+            <div className="border-t bg-background shrink-0">
               <div className="container mx-auto px-4 py-4">
                 <div className="flex items-center justify-between gap-4">
                   {step > 1 && step < 6 ? (

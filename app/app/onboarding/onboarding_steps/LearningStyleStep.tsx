@@ -37,12 +37,12 @@ export function LearningStyleStep({ selectedStyle, onSelectStyle }: LearningStyl
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center space-y-2">
+    <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="text-center space-y-2 mb-6 py-3">
         <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
       </div>
       
-      <div className="space-y-3 max-w-md mx-auto">
+      <div className="flex-1 flex flex-col gap-3 overflow-y-auto py-3 pr-3">
         {styles.map((style) => {
           const Icon = style.icon;
           const isSelected = selectedStyle === style.id;

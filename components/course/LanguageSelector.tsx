@@ -7,7 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface LanguageSelectorProps {
-  title: string;
+  title?: string;
   subtitle?: string;
   selectedLanguages: string[];
   excludeLanguages?: string[];
@@ -31,15 +31,17 @@ export function LanguageSelector({
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="text-center space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-        {subtitle && (
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
-        )}
-      </div>
+    <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {title && (
+        <div className="text-center space-y-2 py-4">
+          <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+          {subtitle && (
+            <p className="text-sm text-muted-foreground">{subtitle}</p>
+          )}
+        </div>
+      )}
       
-      <div className="grid grid-cols-2 gap-3 max-w-2xl mx-auto">
+      <div className="flex-1 flex flex-col gap-3 overflow-y-auto py-3 pr-3">
         {availableLanguages.map((language) => {
           const isSelected = selectedLanguages.includes(language.code);
           return (
@@ -64,10 +66,10 @@ export function LanguageSelector({
             >
               <span className="text-2xl shrink-0">{language.flag}</span>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm leading-none truncate">
+                <p className="font-semibold text-sm leading-tight break-words">
                   {getLocalizedLanguageNameByCode(language.code, locale)}
                 </p>
-                <p className="text-xs text-muted-foreground truncate">
+                <p className="text-xs text-muted-foreground break-words">
                   {language.nativeName}
                 </p>
               </div>
