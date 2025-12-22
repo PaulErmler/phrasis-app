@@ -71,7 +71,17 @@
     "settings": {
       "account": "Konto",
       "language": "App-Sprache"
-    }
+    },
+    "courses": {
+      "title": "Deine Kurse",
+      "description": "Wähle einen Kurs zum Wechseln oder erstelle einen neuen",
+      "createNew": "Neuen Kurs erstellen",
+      "noCourses": "Noch keine Kurse. Erstelle deinen ersten Kurs, um zu beginnen.",
+      "active": "Aktiv",
+      "learning": "{language} lernen",
+      "currentCourse": "Aktueller Kurs"
+    },
+    "changeCourse": "Kurs wechseln"
   },
   "Footer": {
     "copyright": "© {year} Phrasis. Alle Rechte vorbehalten.",

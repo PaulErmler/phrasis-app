@@ -71,7 +71,17 @@
     "settings": {
       "account": "Account",
       "language": "App Language"
-    }
+    },
+    "courses": {
+      "title": "Your Courses",
+      "description": "Select a course to switch to or create a new one",
+      "createNew": "Create New Course",
+      "noCourses": "No courses yet. Create your first course to get started.",
+      "active": "Active",
+      "learning": "Learning {language}",
+      "currentCourse": "Current Course"
+    },
+    "changeCourse": "Change Course"
   },
   "Footer": {
     "copyright": "© {year} Phrasis. All rights reserved.",

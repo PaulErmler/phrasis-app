@@ -51,6 +51,7 @@ export default defineSchema({
     hasCompletedOnboarding: v.boolean(),
     learningStyle: v.optional(learningStyleValidator),
     currentLevel: v.optional(currentLevelValidator),
+    activeCourseId: v.optional(v.id("courses")), // Active course for the user
   }).index("by_userId", ["userId"]),
 
   // Onboarding progress table - stores temporary onboarding data until completion

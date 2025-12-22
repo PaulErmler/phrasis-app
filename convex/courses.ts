@@ -19,6 +19,7 @@ export const getUserSettings = query({
       hasCompletedOnboarding: v.boolean(),
       learningStyle: v.optional(learningStyleValidator),
       currentLevel: v.optional(currentLevelValidator),
+      activeCourseId: v.optional(v.id("courses")),
     }),
     v.null()
   ),
@@ -69,12 +70,109 @@ export const getUserCourses = query({
       const courses = await ctx.db
         .query("courses")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
-        .collect();
+        .take(50);
 
       return courses;
     } catch {
       return [];
     }
+  },
+});
+
+/**
+ * Get the currently active course for the authenticated user
+ */
+export const getActiveCourse = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      _id: v.id("courses"),
+      _creationTime: v.number(),
+      userId: v.string(),
+      baseLanguages: v.array(v.string()),
+      targetLanguages: v.array(v.string()),
+      courseSettingsId: v.optional(v.id("courseSettings")),
+    }),
+    v.null()
+  ),
+  handler: async (ctx) => {
+    try {
+      const user = await authComponent.getAuthUser(ctx);
+      if (!user) {
+        return null;
+      }
+
+      const userId = user._id;
+      
+      // Get user settings to find active course ID
+      const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .first();
+
+      if (!settings?.activeCourseId) {
+        // If no active course is set, return the first course
+        const firstCourse = await ctx.db
+          .query("courses")
+          .withIndex("by_userId", (q) => q.eq("userId", userId))
+          .first();
+        
+        return firstCourse;
+      }
+
+      // Get the active course
+      const activeCourse = await ctx.db.get(settings.activeCourseId);
+      return activeCourse;
+    } catch {
+      return null;
+    }
+  },
+});
+
+/**
+ * Set the active course for the authenticated user
+ */
+export const setActiveCourse = mutation({
+  args: {
+    courseId: v.id("courses"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("User must be authenticated");
+    }
+
+    const userId = user._id;
+
+    // Verify the course belongs to the user
+    const course = await ctx.db.get(args.courseId);
+    if (!course) {
+      throw new Error("Course not found");
+    }
+    if (course.userId !== userId) {
+      throw new Error("Course does not belong to user");
+    }
+
+    // Get or create user settings
+    const existingSettings = await ctx.db
+      .query("userSettings")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+
+    if (existingSettings) {
+      await ctx.db.patch(existingSettings._id, {
+        activeCourseId: args.courseId,
+      });
+    } else {
+      await ctx.db.insert("userSettings", {
+        userId,
+        hasCompletedOnboarding: true,
+        activeCourseId: args.courseId,
+      });
+    }
+
+    return null;
   },
 });
 
@@ -265,24 +363,6 @@ export const completeOnboarding = mutation({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .first();
 
-    let settingsId;
-    if (!existingSettings) {
-      settingsId = await ctx.db.insert("userSettings", {
-        userId,
-        hasCompletedOnboarding: true,
-        learningStyle: progress.learningStyle,
-        currentLevel: progress.currentLevel,
-      });
-    } else {
-      // Mark onboarding as complete
-      await ctx.db.patch(existingSettings._id, {
-        hasCompletedOnboarding: true,
-        learningStyle: progress.learningStyle,
-        currentLevel: progress.currentLevel,
-      });
-      settingsId = existingSettings._id;
-    }
-
     // Create the course with data from onboarding progress
     const courseId = await ctx.db.insert("courses", {
       baseLanguages: progress.baseLanguages || [],
@@ -299,6 +379,26 @@ export const completeOnboarding = mutation({
     await ctx.db.patch(courseId, {
       courseSettingsId,
     });
+
+    let settingsId;
+    if (!existingSettings) {
+      settingsId = await ctx.db.insert("userSettings", {
+        userId,
+        hasCompletedOnboarding: true,
+        learningStyle: progress.learningStyle,
+        currentLevel: progress.currentLevel,
+        activeCourseId: courseId,
+      });
+    } else {
+      // Mark onboarding as complete and set active course
+      await ctx.db.patch(existingSettings._id, {
+        hasCompletedOnboarding: true,
+        learningStyle: progress.learningStyle,
+        currentLevel: progress.currentLevel,
+        activeCourseId: courseId,
+      });
+      settingsId = existingSettings._id;
+    }
 
     // Delete the onboarding progress now that it's been transferred
     await ctx.db.delete(progress._id);
