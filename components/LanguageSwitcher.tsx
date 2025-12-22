@@ -31,7 +31,7 @@ export function LanguageSwitcher() {
   if (!mounted) {
     return (
       <Select value={locale} disabled>
-        <SelectTrigger className="w-[140px]">
+        <SelectTrigger className="w-full">
           <SelectValue placeholder={t("title")} />
         </SelectTrigger>
       </Select>
@@ -40,7 +40,7 @@ export function LanguageSwitcher() {
 
   return (
     <Select value={locale} onValueChange={handleLocaleChange} disabled={isPending}>
-      <SelectTrigger className="w-[140px]">
+      <SelectTrigger className="w-full">
         <SelectValue placeholder={t("title")} />
       </SelectTrigger>
       <SelectContent>
