@@ -1,7 +1,8 @@
 "use client";
 
+import { useLocale } from "next-intl";
 import { Checkbox } from "@/components/ui/checkbox";
-import { SUPPORTED_LANGUAGES } from "@/lib/languages";
+import { SUPPORTED_LANGUAGES, getLocalizedLanguageNameByCode } from "@/lib/languages";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,8 @@ export function LanguageSelector({
   onToggleLanguage,
   multiSelect = false,
 }: LanguageSelectorProps) {
+  const locale = useLocale();
+  
   // Filter out excluded languages
   const availableLanguages = SUPPORTED_LANGUAGES.filter(
     (lang) => !excludeLanguages.includes(lang.code)
@@ -62,7 +65,7 @@ export function LanguageSelector({
               <span className="text-2xl shrink-0">{language.flag}</span>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm leading-none truncate">
-                  {language.name}
+                  {getLocalizedLanguageNameByCode(language.code, locale)}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
                   {language.nativeName}

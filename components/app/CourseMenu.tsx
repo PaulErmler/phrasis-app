@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Check, Plus, X } from "lucide-react";
-import { getLanguagesByCodes } from "@/lib/languages";
+import { getLocalizedLanguageNameByCode } from "@/lib/languages";
 import { cn } from "@/lib/utils";
 import { CreateCourseDialog } from "@/components/course/CreateCourseDialog";
 
@@ -24,6 +24,7 @@ interface CourseMenuProps {
 
 export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
   const t = useTranslations("AppPage");
+  const locale = useLocale();
   const courses = useQuery(api.courses.getUserCourses);
   const activeCourse = useQuery(api.courses.getActiveCourse);
   const setActiveCourse = useMutation(api.courses.setActiveCourse);
@@ -31,22 +32,25 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
 
   const handleSelectCourse = async (courseId: Id<"courses">) => {
     try {
-      await setActiveCourse({ courseId });
-      onOpenChange(false);
+        onOpenChange(false);
+        await setActiveCourse({ courseId });
+      
     } catch (error) {
       console.error("Error setting active course:", error);
     }
   };
 
   const formatCourseName = (targetLanguages: string[]) => {
-    const targetLanguageObjects = getLanguagesByCodes(targetLanguages);
-    const targetNames = targetLanguageObjects.map((l) => l.name).join(", ");
+    const targetNames = targetLanguages
+      .map((code) => getLocalizedLanguageNameByCode(code, locale))
+      .join(", ");
     return targetNames;
   };
 
   const formatBaseLanguageName = (baseLanguages: string[]) => {
-    const baseLanguageObjects = getLanguagesByCodes(baseLanguages);
-    const baseNames = baseLanguageObjects.map((l) => l.name).join(", ");
+    const baseNames = baseLanguages
+      .map((code) => getLocalizedLanguageNameByCode(code, locale))
+      .join(", ");
     return baseNames;
   };
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { SignedIn, RedirectToSignIn } from "@daveyplate/better-auth-ui";
@@ -16,12 +16,13 @@ import { TargetLanguagesStep } from "./onboarding_steps/TargetLanguagesStep";
 import { CurrentLevelStep } from "./onboarding_steps/CurrentLevelStep";
 import { BaseLanguagesStep } from "./onboarding_steps/BaseLanguagesStep";
 import { LoadingStep } from "./onboarding_steps/LoadingStep";
-import { getLanguageByCode } from "@/lib/languages";
+import { getLocalizedLanguageNameByCode } from "@/lib/languages";
 import { OnboardingData } from "./types";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const t = useTranslations("Onboarding");
+  const locale = useLocale();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const userSettings = useQuery(api.courses.getUserSettings);
@@ -174,7 +175,7 @@ export default function OnboardingPage() {
                   selectedLevel={data.currentLevel}
                   targetLanguageName={
                     data.targetLanguages[0]
-                      ? getLanguageByCode(data.targetLanguages[0])?.name
+                      ? getLocalizedLanguageNameByCode(data.targetLanguages[0], locale)
                       : undefined
                   }
                   onSelectLevel={(level) => setData({ ...data, currentLevel: level })}
