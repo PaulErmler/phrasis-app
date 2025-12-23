@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, BellOff, BellRing } from "lucide-react";
 import { getLanguagesByCodes } from "@/lib/languages";
+import { SearchBar } from "@/components/search/SearchBar";
 
 export function HomeView() {
   const router = useRouter();
@@ -85,6 +86,11 @@ export function HomeView() {
           <h2 className="text-2xl font-bold mt-1">{courseName}</h2>
         </div>
       )}
+
+      {/* Search Bar */}
+      <SearchBar 
+        showSuggestions={false}
+      />
 
       {/* Notification Card */}
       <Card>
@@ -164,23 +170,6 @@ export function HomeView() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{"Chat"}</CardTitle>
-        <CardDescription>
-          {"Prototype for the AI Chat"}
-        </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            onClick={() => router.push("/chat")}
-            className="w-full"
-          >
-            {"Go to Chat"}
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }
-

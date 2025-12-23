@@ -82,102 +82,108 @@ export function ChatMessages({ messages, isLoading, threadId }: ChatMessagesProp
   }
 
   return (
-    <Conversation className="flex-1 min-h-0 overflow-y-auto">
-      <ConversationContent>
-        {messages && messages.length > 0 ? (
-          messages.map((message: ExtendedUIMessage) => {
-            const messageText = message.content ?? message.text ?? "";
-            const isAssistantStreaming =
-              message.role === "assistant" &&
-              (message.status === "streaming" || message.status === "pending");
+    <Conversation className="relative flex-1 h-full w-full overflow-hidden flex flex-col">
+      
 
-            return (
-              <MessageBranch key={message.id} defaultBranch={0}>
-                <MessageBranchContent>
-                  <Message from={message.role}>
-                    <MessageContent>
-                      {isAssistantStreaming && !messageText && !message.parts?.length ? (
-                        <Shimmer>Thinking...</Shimmer>
-                      ) : message.parts && message.parts.length > 0 ? (
-                        // Render parts in order: text parts, tool calls, and confirmations
-                        <>
-                          {message.parts.map((part, idx: number) => {
-                            // Render text parts (skip empty ones)
-                            if (part.type === "text") {
-                              const textPart = part as { type: "text"; text: string };
-                              if (!textPart.text || textPart.text.trim() === "") {
-                                return null;
-                              }
-                              return (
-                                <MessageResponse key={`${message.id}-text-${idx}`}>
-                                  {textPart.text}
-                                </MessageResponse>
-                              );
-                            }
-                            
-                            // Render tool calls (excluding createFlashcard)
-                            if (part.type.startsWith("tool-")) {
-                              const toolPart = part as ToolUIPart;
-                              const toolName = toolPart.type.replace("tool-", "");
-                              
-                              // Render createFlashcard as confirmation
-                              if (toolName === "createFlashcard" && threadId) {
+      <ConversationContent className="flex-1 overflow-y-auto px-4">
+        {messages && messages.length > 0 ? (
+          <>
+            {messages.map((message: ExtendedUIMessage) => {
+              const messageText = message.content ?? message.text ?? "";
+              const isAssistantStreaming =
+                message.role === "assistant" &&
+                (message.status === "streaming" || message.status === "pending");
+
+              return (
+                <MessageBranch key={message.id} defaultBranch={0}>
+                  <MessageBranchContent>
+                    <Message from={message.role}>
+                      <MessageContent>
+                        {isAssistantStreaming && !messageText && !message.parts?.length ? (
+                          <Shimmer>Thinking...</Shimmer>
+                        ) : message.parts && message.parts.length > 0 ? (
+                          // Render parts in order: text parts, tool calls, and confirmations
+                          <>
+                            {message.parts.map((part, idx: number) => {
+                              // Render text parts (skip empty ones)
+                              if (part.type === "text") {
+                                const textPart = part as { type: "text"; text: string };
+                                if (!textPart.text || textPart.text.trim() === "") {
+                                  return null;
+                                }
                                 return (
-                                  <FlashcardConfirmation
-                                    key={`${message.id}-flashcard-${idx}`}
-                                    threadId={threadId}
-                                    messageId={message.id}
-                                    toolPart={toolPart}
-                                    onApprove={handleApprove}
-                                    onReject={handleReject}
-                                    processingApprovals={processingApprovals}
-                                  />
+                                  <MessageResponse key={`${message.id}-text-${idx}`}>
+                                    {textPart.text}
+                                  </MessageResponse>
                                 );
                               }
                               
-                              // Render other tools normally
-                              return (
-                                <div key={`${message.id}-tool-${idx}`} className="mt-2">
-                                  <Tool>
-                                    <ToolHeader 
-                                      title={toolName}
-                                      type={toolPart.type}
-                                      state={toolPart.state}
+                              // Render tool calls (excluding createFlashcard)
+                              if (part.type.startsWith("tool-")) {
+                                const toolPart = part as ToolUIPart;
+                                const toolName = toolPart.type.replace("tool-", "");
+                                
+                                // Render createFlashcard as confirmation
+                                if (toolName === "createFlashcard" && threadId) {
+                                  return (
+                                    <FlashcardConfirmation
+                                      key={`${message.id}-flashcard-${idx}`}
+                                      threadId={threadId}
+                                      messageId={message.id}
+                                      toolPart={toolPart}
+                                      onApprove={handleApprove}
+                                      onReject={handleReject}
+                                      processingApprovals={processingApprovals}
                                     />
-                                    <ToolContent>
-                                      <ToolInput input={toolPart.input} />
-                                      <ToolOutput output={toolPart.output} errorText={toolPart.errorText} />
-                                    </ToolContent>
-                                  </Tool>
-                                </div>
-                              );
-                            }
-                            
-                            return null;
-                          })}
-                          {isAssistantStreaming && (
-                            <div className="mt-2">
-                              <Shimmer duration={1}>Thinking...</Shimmer>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        // Fallback to message content if no parts
-                        <>
-                          <MessageResponse>{messageText}</MessageResponse>
-                          {isAssistantStreaming && messageText && (
-                            <div className="mt-2">
-                              <Shimmer duration={1}>Thinking...</Shimmer>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </MessageContent>
-                  </Message>
-                </MessageBranchContent>
-              </MessageBranch>
-            );
-          })
+                                  );
+                                }
+                                
+                                // Render other tools normally
+                                return (
+                                  <div key={`${message.id}-tool-${idx}`} className="mt-2">
+                                    <Tool>
+                                      <ToolHeader 
+                                        title={toolName}
+                                        type={toolPart.type}
+                                        state={toolPart.state}
+                                      />
+                                      <ToolContent>
+                                        <ToolInput input={toolPart.input} />
+                                        <ToolOutput output={toolPart.output} errorText={toolPart.errorText} />
+                                      </ToolContent>
+                                    </Tool>
+                                  </div>
+                                );
+                              }
+                              
+                              return null;
+                            })}
+                            {isAssistantStreaming && (
+                              <div className="mt-2">
+                                <Shimmer duration={1}>Thinking...</Shimmer>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          // Fallback to message content if no parts
+                          <>
+                            <MessageResponse>{messageText}</MessageResponse>
+                            {isAssistantStreaming && messageText && (
+                              <div className="mt-2">
+                                <Shimmer duration={1}>Thinking...</Shimmer>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </MessageContent>
+                    </Message>
+                  </MessageBranchContent>
+                </MessageBranch>
+              );
+            })}
+            
+
+          </>
         ) : (
           <ConversationEmptyState
             title="No messages yet"
@@ -185,7 +191,18 @@ export function ChatMessages({ messages, isLoading, threadId }: ChatMessagesProp
           />
         )}
       </ConversationContent>
-      <ConversationScrollButton />
+
+      {/* 4. The Scroll Button:
+         Placed outside ConversationContent but inside Conversation (relative).
+         Ensure your UI library supports the 'sticky' or 'absolute' positioning here.
+      */}
+      <div className="absolute bottom-4 right-4 z-20">
+        <ConversationScrollButton 
+          className="static! rounded-lg bg-background dark:bg-background" 
+          size="default"
+        />
+      </div>
+
     </Conversation>
   );
 }

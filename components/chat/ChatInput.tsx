@@ -45,9 +45,12 @@ export function ChatInput({
   onVoiceClick,
   showSuggestions = false,
 }: ChatInputProps) {
+
+
+
   return (
-    <div className="shrink-0 border-t border-border bg-background">
-      <div className="grid gap-4 pt-4">
+    <div>
+      <div>
         {showSuggestions && (
           <Suggestions className="px-4">
             {DEFAULT_SUGGESTIONS.map((suggestion) => (
@@ -59,14 +62,15 @@ export function ChatInput({
             ))}
           </Suggestions>
         )}
-        <div className="w-full px-4 pb-4">
-          <PromptInput globalDrop multiple onSubmit={onSubmit}>
-            <PromptInputHeader>
+        <div>
+          <PromptInput globalDrop multiple onSubmit={onSubmit} className="container mx-auto" >
+            <PromptInputHeader >
               <PromptInputAttachments>
                 {(attachment) => <PromptInputAttachment data={attachment} />}
               </PromptInputAttachments>
             </PromptInputHeader>
-            <PromptInputBody>
+            
+            <PromptInputBody  >
               <PromptInputTextarea
                 onChange={(event) => onTextChange(event.target.value)}
                 value={text}

@@ -81,4 +81,3 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
     </nav>
   );
 }
-

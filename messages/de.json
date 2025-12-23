@@ -34,6 +34,7 @@
   "AppPage": {
     "views": {
       "home": "Start",
+      "chat": "Chat",
       "content": "Inhalte",
       "library": "Bibliothek",
       "settings": "Einstellungen"
