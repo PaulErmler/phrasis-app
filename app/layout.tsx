@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import ConvexClientProvider from "@/components/ConvexClientProvider";
+import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 import { Providers } from "./providers";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { getUserLocale } from "@/i18n/locale";
 import { getMessages, getTimeZone } from "next-intl/server";
+import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,6 +45,8 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
+
   const locale = await getUserLocale();
   const messages = await getMessages();
   const timeZone = await getTimeZone();
@@ -63,6 +66,7 @@ export default async function RootLayout({
         <ConvexClientProvider>
           <Providers locale={locale} messages={messages} timeZone={timeZone}>
             {children}
+            <Toaster position="top-center" />
           </Providers>
         </ConvexClientProvider>
       </body>
