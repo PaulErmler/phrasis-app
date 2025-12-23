@@ -27,6 +27,7 @@ import type { Id } from "@/convex/_generated/dataModel";
 import { useState, useEffect } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface ChatMessagesProps {
   messages: ExtendedUIMessage[];
@@ -80,19 +81,11 @@ export function ChatMessages({ messages, isLoading, threadId }: ChatMessagesProp
     );
   }
 
-  // Deduplicate messages by ID to prevent showing the same message twice
-  const uniqueMessages = messages.reduce((acc: ExtendedUIMessage[], message: ExtendedUIMessage) => {
-    if (!acc.find(m => m.id === message.id)) {
-      acc.push(message);
-    }
-    return acc;
-  }, []);
-
   return (
     <Conversation className="flex-1 min-h-0 overflow-y-auto">
       <ConversationContent>
-        {uniqueMessages && uniqueMessages.length > 0 ? (
-          uniqueMessages.map((message: ExtendedUIMessage) => {
+        {messages && messages.length > 0 ? (
+          messages.map((message: ExtendedUIMessage) => {
             const messageText = message.content ?? message.text ?? "";
             const isAssistantStreaming =
               message.role === "assistant" &&
@@ -217,18 +210,24 @@ function FlashcardConfirmation({
   onReject,
   processingApprovals,
 }: FlashcardConfirmationProps) {
+  const t = useTranslations("Chat.flashcardConfirmation");
   const [approvalId, setApprovalId] = useState<Id<"flashcardApprovals"> | null>(null);
   const [approvalState, setApprovalState] = useState<"pending" | "approved" | "rejected">("pending");
   const createApprovalRequest = useMutation(api.chat.flashcardApprovals.createApprovalRequest);
   
-  // Create approval request on mount
+  // Extract stable values from toolPart
+  const input = toolPart.input as Record<string, unknown>;
+  const text = (input?.text as string) || "";
+  const note = (input?.note as string) || "";
+  
+  // Extract toolCallId value (stable across renders)
+  const toolCallId = (toolPart as Record<string, unknown>).toolCallId as string;
+  
+
+  
+  // Create approval request on mount (only once per unique toolCallId)
   useEffect(() => {
     if (!approvalId) {
-      const input = toolPart.input as Record<string, unknown>;
-      const text = (input?.text as string) || "";
-      const note = (input?.note as string) || "";
-      const toolCallId = (toolPart as Record<string, unknown>).toolCallId as string || `tool-${Date.now()}`;
-      
       createApprovalRequest({
         threadId,
         messageId,
@@ -243,7 +242,7 @@ function FlashcardConfirmation({
           console.error("Failed to create approval request:", error);
         });
     }
-  }, [approvalId, createApprovalRequest, threadId, messageId, toolPart]);
+  }, [approvalId, createApprovalRequest, threadId, messageId, toolCallId, text, note]);
   
   const handleApprovalClick = async () => {
     if (!approvalId) return;
@@ -257,16 +256,13 @@ function FlashcardConfirmation({
     setApprovalState("rejected");
   };
   
-  const input = toolPart.input as Record<string, unknown>;
-  const text = (input?.text as string) || "";
-  const note = (input?.note as string) || "";
   const isProcessing = approvalId ? processingApprovals.has(approvalId) : false;
   
   if (approvalState === "approved") {
     return (
       <Alert className="my-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
         <AlertDescription className="text-green-700 dark:text-green-300">
-          ✓ Flashcard created successfully!
+          ✓ {t("approved")}
         </AlertDescription>
       </Alert>
     );
@@ -276,7 +272,7 @@ function FlashcardConfirmation({
     return (
       <Alert className="my-3 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
         <AlertDescription className="text-red-700 dark:text-red-300">
-          Flashcard creation cancelled
+          {t("rejected")}
         </AlertDescription>
       </Alert>
     );
@@ -286,8 +282,8 @@ function FlashcardConfirmation({
     <Alert className="my-3 flex flex-col gap-3">
       <AlertDescription>
         <div className="space-y-2 text-sm">
-          <p><strong>Text:</strong> {text}</p>
-          <p><strong>Note:</strong> {note}</p>
+          <p><strong>{t("textLabel")}:</strong> {text}</p>
+          <p><strong>{t("noteLabel")}:</strong> {note}</p>
         </div>
       </AlertDescription>
       <div className="flex items-center justify-end gap-2">
@@ -298,7 +294,7 @@ function FlashcardConfirmation({
           size="sm"
           className="h-8 px-3 text-sm"
         >
-          Reject
+          {t("rejectButton")}
         </Button>
         <Button
           onClick={handleApprovalClick}
@@ -306,7 +302,7 @@ function FlashcardConfirmation({
           size="sm"
           className="h-8 px-3 text-sm"
         >
-          Create Flashcard
+          {t("approveButton")}
         </Button>
       </div>
     </Alert>

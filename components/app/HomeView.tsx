@@ -163,6 +163,23 @@ export function HomeView() {
           </Button>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">{"Chat"}</CardTitle>
+        <CardDescription>
+          {"Prototype for the AI Chat"}
+        </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={() => router.push("/chat")}
+            className="w-full"
+          >
+            {"Go to Chat"}
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }

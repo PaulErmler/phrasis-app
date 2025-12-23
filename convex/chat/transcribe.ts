@@ -7,7 +7,7 @@ import { openai } from "@ai-sdk/openai";
 import { authComponent } from "../auth";
 
 /**
- * Transcribe audio using OpenAI Whisper
+ * Transcribe audio using OpenAI Transcription API
  */
 export const transcribeAudio = action({
   args: {
@@ -23,7 +23,7 @@ export const transcribeAudio = action({
 
     try {
       const transcript = await transcribe({
-        model: openai.transcription("whisper-1"),
+        model: openai.transcription("gpt-4o-mini-transcribe"),
         audio: args.audio,
       });
 

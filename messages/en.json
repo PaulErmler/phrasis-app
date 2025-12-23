@@ -122,6 +122,16 @@
   "Language": {
     "title": "Language"
   },
+  "Chat": {
+    "flashcardConfirmation": {
+      "textLabel": "Text",
+      "noteLabel": "Note",
+      "approveButton": "Create Flashcard",
+      "rejectButton": "Reject",
+      "approved": "Flashcard created successfully!",
+      "rejected": "Flashcard creation cancelled"
+    }
+  },
   "Onboarding": {
     "welcome": {
       "title": "Welcome to Phrasis!",

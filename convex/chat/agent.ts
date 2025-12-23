@@ -2,7 +2,7 @@ import { Agent, createTool } from "@convex-dev/agent";
 import { components } from "../_generated/api";
 import { stepCountIs } from "ai";
 import { gateway } from "ai";
-import { z } from "zod";
+import { z } from 'zod/v3';
 
 // Define the createFlashcard tool - creates approval request, doesn't immediately create
 export const createFlashcardTool = createTool({

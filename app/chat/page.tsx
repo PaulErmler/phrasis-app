@@ -31,6 +31,13 @@ export default function ChatPage() {
   const { data: session, isPending } = authClient.useSession();
   const [text, setText] = useState<string>("");
 
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!session && !isPending) {
+      router.push("/");
+    }
+  }, [session, isPending, router]);
+
   // Thread management
   const {
     threadId,
@@ -54,12 +61,7 @@ export default function ChatPage() {
   // Mutations
   const sendMessage = useMutation(api.chat.messages.sendMessage);
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!session && !isPending) {
-      router.push("/");
-    }
-  }, [session, isPending, router]);
+
 
   // Handle message submission
   const handleSubmit = useCallback(
@@ -189,10 +191,7 @@ export default function ChatPage() {
       {/* Footer */}
       <Footer />
 
-      {/* Background Pattern */}
-      <div className="fixed inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-linear-to-br from-emerald-100/30 to-teal-100/30 dark:from-emerald-900/10 dark:to-teal-900/10 blur-3xl" />
-      </div>
+
     </div>
   );
 }
