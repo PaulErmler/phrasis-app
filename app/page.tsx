@@ -15,8 +15,14 @@ export default async function Home() {
       <section className="flex-1 flex flex-col items-center justify-center px-4 py-20 md:py-32">
         <div className="w-full max-w-4xl mx-auto text-center space-y-8">
           {/* Logo */}
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-foreground shadow-lg shadow-foreground/5">
-            <span className="text-4xl font-bold text-background">P</span>
+          <div className="inline-flex items-center justify-center w-48 h-48 rounded-2xl ">
+            <img
+              src="/icons/icon.svg"
+              alt="Phrasis Logo"
+              className="w-full h-full"
+              width={48}
+              height={48}
+            />
           </div>
 
           {/* Heading */}
