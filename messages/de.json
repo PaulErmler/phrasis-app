@@ -130,7 +130,9 @@
       "approveButton": "Lernkarte erstellen",
       "rejectButton": "Ablehnen",
       "approved": "Lernkarte erfolgreich erstellt!",
-      "rejected": "Lernkarten-Erstellung abgebrochen"
+      "rejected": "Lernkarten-Erstellung abgebrochen",
+      "loading": "Lädt...",
+      "creatingApproval": "Genehmigungsanfrage wird erstellt..."
     }
   },
   "Onboarding": {

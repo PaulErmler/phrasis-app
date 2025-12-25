@@ -3,19 +3,18 @@
 import { useState, useCallback } from "react";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 import { toast } from "sonner";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
 
 // Hooks
 import { useVoiceRecording } from "@/hooks/use-voice-recording";
 import { useChatMessages } from "@/hooks/use-chat-messages";
+import { useSendMessage } from "@/hooks/use-send-message";
 
 // Components
 import { ChatMessages } from "@/components/chat/ChatMessages";
 import { ChatInput } from "@/components/chat/ChatInput";
 
 // Constants
-import { ERROR_MESSAGES, SUCCESS_MESSAGES, CHAT_STATUS } from "@/lib/constants/chat";
+import { SUCCESS_MESSAGES } from "@/lib/constants/chat";
 
 interface SimplifiedChatViewProps {
   threadId: string; // Always provided, never null
@@ -38,8 +37,11 @@ export function SimplifiedChatView({ threadId }: SimplifiedChatViewProps) {
     }
   );
 
-  // Mutations
-  const sendMessage = useMutation(api.chat.messages.sendMessage);
+
+  const { sendMessage } = useSendMessage({
+    threadId,
+    setStatus,
+  });
 
   // Handle message submission
   const handleSubmit = useCallback(
@@ -51,47 +53,26 @@ export function SimplifiedChatView({ threadId }: SimplifiedChatViewProps) {
         return;
       }
 
-      setStatus(CHAT_STATUS.SUBMITTED);
-
       if (message.files?.length) {
         toast.success(SUCCESS_MESSAGES.FILES_ATTACHED, {
           description: `${message.files.length} file(s) attached to message`,
         });
       }
 
-      try {
-        await sendMessage({
-          threadId,
-          prompt: message.text || "Sent with attachments",
-        });
-        setText("");
-      } catch (error) {
-        console.error("Failed to send message:", error);
-        toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
-        setStatus(CHAT_STATUS.ERROR);
-        setTimeout(() => setStatus(CHAT_STATUS.READY), 2000);
-      }
+      await sendMessage({
+        prompt: message.text || "Sent with attachments",
+        clearInput: () => setText(""),
+      });
     },
-    [threadId, sendMessage, setStatus]
+    [sendMessage]
   );
 
-  // Handle suggestion click
+  // Handle suggestion click 
   const handleSuggestionClick = useCallback(
-    async (suggestion: string) => {
-      setStatus(CHAT_STATUS.SUBMITTED);
-      try {
-        await sendMessage({
-          threadId,
-          prompt: suggestion,
-        });
-      } catch (error) {
-        console.error("Failed to send message:", error);
-        toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
-        setStatus(CHAT_STATUS.ERROR);
-        setTimeout(() => setStatus(CHAT_STATUS.READY), 2000);
-      }
+    (suggestion: string) => {
+      setText(suggestion);
     },
-    [threadId, sendMessage, setStatus]
+    []
   );
 
   return (

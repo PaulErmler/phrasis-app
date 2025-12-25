@@ -16,23 +16,27 @@ import { useVoiceRecording } from "@/hooks/use-voice-recording";
 import { ERROR_MESSAGES, CHAT_STATUS } from "@/lib/constants/chat";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 
-interface SearchBarProps {
+interface NewChatInputProps {
   placeholder?: string;
   className?: string;
   showSuggestions?: boolean;
 }
 
 /**
- * Self-contained SearchBar component that handles:
+ * Component for initiating new chat conversations
+ * 
+ * Handles the complete flow of starting a new chat:
  * - User input (text + voice + files)
  * - Thread creation
  * - Initial message sending
- * - Routing to chat page
+ * - Navigation to chat page
+ * 
+ * This component is typically used on the home page to start new conversations.
  */
-export function SearchBar({
+export function NewChatInput({
   className,
   showSuggestions = true,
-}: SearchBarProps) {
+}: NewChatInputProps) {
   const router = useRouter();
   const [text, setText] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -46,9 +50,9 @@ export function SearchBar({
 
   // Mutations
   const createThread = useMutation(api.chat.threads.createThread);
-  const sendMessage = useMutation(api.chat.messages.sendMessage);
+  const sendMessageMutation = useMutation(api.chat.messages.sendMessage);
 
-  // Handle search submission - create thread, send message, route to chat
+  // Handle chat initiation - create thread, send message, route to chat
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
       if (!message.text?.trim()) return;
@@ -60,7 +64,7 @@ export function SearchBar({
         const threadId = await createThread({});
 
         // 2. Send initial message
-        await sendMessage({
+        await sendMessageMutation({
           threadId,
           prompt: message.text,
         });
@@ -77,16 +81,15 @@ export function SearchBar({
       }
       // Note: Don't set isProcessing to false on success - we're navigating away
     },
-    [createThread, sendMessage, router]
+    [createThread, sendMessageMutation, router]
   );
 
-  // Handle suggestion click
+  // Handle suggestion click - populate input instead of sending
   const handleSuggestionClick = useCallback(
-    async (suggestion: string) => {
+    (suggestion: string) => {
       setText(suggestion);
-      await handleSubmit({ text: suggestion, files: [] });
     },
-    [handleSubmit]
+    []
   );
 
   return (

@@ -1,8 +1,10 @@
 import { Agent, createTool } from "@convex-dev/agent";
 import { components } from "../_generated/api";
+import { internal } from "../_generated/api";
 import { stepCountIs } from "ai";
 import { gateway } from "ai";
 import { z } from 'zod/v3';
+import type { ToolCallOptions } from "ai";
 
 // Define the createFlashcard tool - creates approval request, doesn't immediately create
 export const createFlashcardTool = createTool({
@@ -11,10 +13,42 @@ export const createFlashcardTool = createTool({
     text: z.string().describe("The flashcard content (always a phrase)"),
     note: z.string().describe("Additional note or explanation about the flashcard"),
   }),
-  handler: async (_ctx, _args): Promise<string> => {
-    // Return a simple acknowledgment
-    // The UI will handle displaying the confirmation
-    return "I've prepared a flashcard for you to review.";
+  handler: async (ctx, args, options): Promise<string> => {
+    // Access context provided by the agent framework
+    const threadId = ctx.threadId;
+    const userId = ctx.userId;
+    const messageId = ctx.messageId || "pending";
+    
+    if (!threadId || !userId) {
+      return "Missing context for creating flashcard approval.";
+    }
+    
+    // Access toolCallId from options (third parameter)
+    // The ToolCallOptions type has additional properties at runtime including toolCallId
+    const optionsWithId = options as ToolCallOptions & { toolCallId?: string };
+    const toolCallId = optionsWithId?.toolCallId;
+    
+    if (!toolCallId) {
+      console.error("No toolCallId provided by framework");
+      return "Error: Unable to create flashcard approval without toolCallId.";
+    }
+    
+    // Create the approval request (idempotent based on content)
+    try {
+      await ctx.runMutation(internal.chat.flashcardApprovals.createApprovalRequestInternal, {
+        threadId,
+        messageId,
+        toolCallId,
+        text: args.text,
+        note: args.note,
+        userId,
+      });
+      
+      return "I've prepared a flashcard for you to review and approve.";
+    } catch (error) {
+      console.error("Failed to create approval request:", error);
+      return "Sorry, I couldn't create the flashcard approval. Please try again.";
+    }
   },
 });
 

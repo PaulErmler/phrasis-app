@@ -21,7 +21,7 @@ import { DEFAULT_SUGGESTIONS, CHAT_STATUS } from "@/lib/constants/chat";
 
 interface ChatInputProps {
   onSubmit: (message: PromptInputMessage) => Promise<void>;
-  onSuggestionClick: (suggestion: string) => Promise<void>;
+  onSuggestionClick: (suggestion: string) => void | Promise<void>;
   text: string;
   onTextChange: (text: string) => void;
   status: ChatStatus;

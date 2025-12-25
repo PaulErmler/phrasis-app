@@ -130,7 +130,9 @@
       "approveButton": "Create Flashcard",
       "rejectButton": "Reject",
       "approved": "Flashcard created successfully!",
-      "rejected": "Flashcard creation cancelled"
+      "rejected": "Flashcard creation cancelled",
+      "loading": "Loading...",
+      "creatingApproval": "Creating approval request..."
     }
   },
   "Onboarding": {

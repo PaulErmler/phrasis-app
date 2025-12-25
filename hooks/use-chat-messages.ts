@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useRef } from "react";
 import { useUIMessages } from "@convex-dev/agent/react";
 import type { UIMessagesQuery } from "@convex-dev/agent/react";
 import { api } from "@/convex/_generated/api";
@@ -15,6 +15,53 @@ interface UseChatMessagesReturn {
   setStatus: (status: ChatStatus) => void;
 }
 
+// State for the reducer
+interface ChatMessagesState {
+  status: ChatStatus;
+  hasStreamingMessages: boolean;
+}
+
+// Actions for the reducer
+type ChatMessagesAction =
+  | { type: "SET_STATUS"; status: ChatStatus }
+  | { type: "UPDATE_STREAMING"; hasStreamingMessages: boolean }
+  | { type: "RESET_THREAD" };
+
+/**
+ * Reducer for managing chat status with predictable state transitions
+ */
+function chatMessagesReducer(
+  state: ChatMessagesState,
+  action: ChatMessagesAction
+): ChatMessagesState {
+  switch (action.type) {
+    case "SET_STATUS":
+      return { ...state, status: action.status };
+
+    case "UPDATE_STREAMING":
+      // Automatically transition status based on streaming state
+      if (action.hasStreamingMessages) {
+        // If messages are streaming and we're not already in streaming state
+        if (state.status !== CHAT_STATUS.STREAMING) {
+          return { ...state, status: CHAT_STATUS.STREAMING, hasStreamingMessages: true };
+        }
+        return { ...state, hasStreamingMessages: true };
+      } else {
+        // No streaming messages - return to ready if we were streaming/submitted
+        if (state.status === CHAT_STATUS.STREAMING || state.status === CHAT_STATUS.SUBMITTED) {
+          return { ...state, status: CHAT_STATUS.READY, hasStreamingMessages: false };
+        }
+        return { ...state, hasStreamingMessages: false };
+      }
+
+    case "RESET_THREAD":
+      return { status: CHAT_STATUS.READY, hasStreamingMessages: false };
+
+    default:
+      return state;
+  }
+}
+
 /**
  * Custom hook for managing chat messages and streaming status
  * Handles message retrieval and status updates based on streaming state
@@ -22,7 +69,13 @@ interface UseChatMessagesReturn {
 export function useChatMessages({
   threadId,
 }: UseChatMessagesProps): UseChatMessagesReturn {
-  const [status, setStatus] = useState<ChatStatus>(CHAT_STATUS.READY);
+  const [state, dispatch] = useReducer(chatMessagesReducer, {
+    status: CHAT_STATUS.READY,
+    hasStreamingMessages: false,
+  });
+
+  // Track previous streaming state to avoid unnecessary dispatches
+  const prevStreamingRef = useRef<boolean | null>(null);
 
   const listMessagesQuery: UIMessagesQuery<{ threadId: string }, AgentUIMessage> =
     api.chat.messages.listMessages as UIMessagesQuery<{ threadId: string }, AgentUIMessage>;
@@ -49,30 +102,29 @@ export function useChatMessages({
         (message.status === "streaming" || message.status === "pending")
     );
 
-    if (hasStreamingMessages) {
-      // If we have streaming messages and status is not already streaming, set it
-      if (status !== CHAT_STATUS.STREAMING) {
-        setTimeout(() => setStatus(CHAT_STATUS.STREAMING), 0);
-      }
-    } else if (
-      status === CHAT_STATUS.STREAMING ||
-      status === CHAT_STATUS.SUBMITTED
-    ) {
-      // If no streaming messages and we were in streaming/submitted state, return to ready
-      setTimeout(() => setStatus(CHAT_STATUS.READY), 0);
+    // Only dispatch if the streaming state actually changed
+    if (prevStreamingRef.current !== hasStreamingMessages) {
+      prevStreamingRef.current = hasStreamingMessages;
+      dispatch({ type: "UPDATE_STREAMING", hasStreamingMessages });
     }
-  }, [messageResult?.results, status]);
+  }, [messageResult?.results]);
 
   // Reset state when thread changes
   useEffect(() => {
     if (threadId) {
-      setTimeout(() => setStatus(CHAT_STATUS.READY), 0);
+      prevStreamingRef.current = null;
+      dispatch({ type: "RESET_THREAD" });
     }
   }, [threadId]);
 
+  // Wrapper to allow external status updates
+  const setStatus = (status: ChatStatus) => {
+    dispatch({ type: "SET_STATUS", status });
+  };
+
   return {
     messages,
-    status,
+    status: state.status,
     setStatus,
   };
 }

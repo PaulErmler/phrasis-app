@@ -29,7 +29,9 @@ export default defineSchema({
     processedAt: v.optional(v.number()), // When it was approved/rejected
   })
     .index("by_message", ["messageId"])
-    .index("by_user_and_status", ["userId", "status"]),
+    .index("by_user_and_status", ["userId", "status"])
+    .index("by_toolCallId", ["toolCallId"])
+    .index("by_thread_and_user", ["threadId", "userId"]),
   
   // Sentences table - stores the original sentences
   sentences: defineTable({

@@ -103,28 +103,12 @@ export default function ChatPage() {
     [threadId, sendMessage, setStatus]
   );
 
-  // Handle suggestion click
+  // Handle suggestion click - populate input instead of sending
   const handleSuggestionClick = useCallback(
-    async (suggestion: string) => {
-      if (!threadId) {
-        toast.error(ERROR_MESSAGES.CHAT_NOT_INITIALIZED);
-        return;
-      }
-
-      setStatus(CHAT_STATUS.SUBMITTED);
-      try {
-        await sendMessage({
-          threadId,
-          prompt: suggestion,
-        });
-      } catch (error) {
-        console.error("Failed to send message:", error);
-        toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
-        setStatus(CHAT_STATUS.ERROR);
-        setTimeout(() => setStatus(CHAT_STATUS.READY), 2000);
-      }
+    (suggestion: string) => {
+      setText(suggestion);
     },
-    [threadId, sendMessage, setStatus]
+    []
   );
 
   // Loading state

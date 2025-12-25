@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, BellOff, BellRing } from "lucide-react";
 import { getLanguagesByCodes } from "@/lib/languages";
-import { SearchBar } from "@/components/search/SearchBar";
+import { NewChatInput } from "@/components/chat/NewChatInput";
 
 export function HomeView() {
   const router = useRouter();
@@ -87,8 +87,8 @@ export function HomeView() {
         </div>
       )}
 
-      {/* Search Bar */}
-      <SearchBar 
+      {/* New Chat Input */}
+      <NewChatInput 
         showSuggestions={false}
       />
 
