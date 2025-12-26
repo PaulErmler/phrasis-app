@@ -5,7 +5,7 @@ lastUpdated: "2025-12-26"
 
 # Präambel
 
-Mit der folgenden Datenschutzerklärung möchten wir Sie darüber aufklären, welche Arten Ihrer personenbezogenen Daten (nachfolgend auch kurz als "Daten" bezeichnet) wir zu welchen Zwecken und in welchem Umfang verarbeiten. Die Datenschutzerklärung gilt für alle von uns durchgeführten Verarbeitungen personenbezogener Daten, sowohl im Rahmen der Erbringung unserer Leistungen als auch insbesondere auf unseren Webseiten, in mobilen Applikationen sowie innerhalb externer Onlinepräsenzen, wie z. B. unserer Social-Media-Profile (nachfolgend zusammenfassend bezeichnet als "Onlineangebot").
+Mit der folgenden Datenschutzerklärung möchten wir Sie darüber aufklären, welche Arten Ihrer personenbezogenen Daten (nachfolgend auch kurz als "Daten" bezeichnet) wir zu welchen Zwecken und in welchem Umfang verarbeiten. Die Datenschutzerklärung gilt für alle von uns durchgeführten Verarbeitungen personenbezogener Daten, sowohl im Rahmen der Erbringung unserer Leistungen als auch insbesondere auf unseren Webseiten, in mobilen Applikationen sowie innerhalb externer Onlinepräsenzen (nachfolgend zusammenfassend bezeichnet als "Onlineangebot").
 
 Die verwendeten Begriffe sind nicht geschlechtsspezifisch.
 
@@ -14,8 +14,8 @@ Stand: 26. Dezember 2025
 ## Verantwortlicher
 
 Paul Ermler & Franziska Hradilak  
-Friedrich-Ebert Straße 62  
-14467 Potsdam
+Friedrich-Ebert-Straße 62  
+14469 Potsdam
 
 Vertretungsberechtigte Personen: Paul Ermler
 
@@ -38,11 +38,11 @@ Die nachfolgende Übersicht fasst die Arten der verarbeiteten Daten und die Zwec
 
 ### Kategorien betroffener Personen
 
-- Leistungsempfänger und Auftraggeber.
-- Interessenten.
-- Kommunikationspartner.
-- Nutzer.
-- Geschäfts- und Vertragspartner.
+- Leistungsempfänger:innen
+- Interessent:innen.
+- Kommunikationspartner:innen.
+- Nutzer:innen.
+- Geschäfts- und Vertragspartner:innen.
 
 ### Zwecke der Verarbeitung
 
@@ -287,7 +287,8 @@ Hinweise zu Rechtsgrundlagen: Sofern wir die Nutzer um ihre Einwilligung in den 
 
 **Weitere Hinweise zu Verarbeitungsprozessen, Verfahren und Diensten:**
 
-**Einbindung von Drittsoftware, Skripten oder Frameworks (z. B. jQuery):** Wir binden in unser Onlineangebot Software ein, die wir von Servern anderer Anbieter abrufen (z. B. Funktions-Bibliotheken, die wir zwecks Darstellung oder Nutzerfreundlichkeit unseres Onlineangebotes verwenden). Hierbei erheben die jeweiligen Anbieter die IP-Adresse der Nutzer und können diese zu Zwecken der Übermittlung der Software an den Browser der Nutzer sowie zu Zwecken der Sicherheit, als auch zur Auswertung und Optimierung ihres Angebotes verarbeiten. - Wir binden in unser Onlineangebot Software ein, die wir von Servern anderer Anbieter abrufen (z. B. Funktions-Bibliotheken, die wir zwecks Darstellung oder Nutzerfreundlichkeit unseres Onlineangebotes verwenden). Hierbei erheben die jeweiligen Anbieter die IP-Adresse der Nutzer und können diese zu Zwecken der Übermittlung der Software an den Browser der Nutzer sowie zu Zwecken der Sicherheit, als auch zur Auswertung und Optimierung ihres Angebotes verarbeiten; Rechtsgrundlagen: Berechtigte Interessen (Art. 6 Abs. 1 S. 1 lit. f) DSGVO).
+**Einbindung von Drittsoftware, Skripten oder Frameworks:** 
+Wir binden in unser Onlineangebot Software ein, die wir von Servern anderer Anbieter abrufen (z. B. Funktions-Bibliotheken, die wir zwecks Darstellung oder Nutzerfreundlichkeit unseres Onlineangebotes verwenden). Hierbei erheben die jeweiligen Anbieter die IP-Adresse der Nutzer und können diese zu Zwecken der Übermittlung der Software an den Browser der Nutzer sowie zu Zwecken der Sicherheit, als auch zur Auswertung und Optimierung ihres Angebotes verarbeiten. Rechtsgrundlagen: Berechtigte Interessen (Art. 6 Abs. 1 S. 1 lit. f) DSGVO).
 
 ## Änderung und Aktualisierung
 
@@ -321,4 +322,4 @@ In diesem Abschnitt erhalten Sie eine Übersicht über die in dieser Datenschutz
 
 **Zahlungsdaten:** Zahlungsdaten umfassen sämtliche Informationen, die zur Abwicklung von Zahlungstransaktionen zwischen Käufern und Verkäufern benötigt werden. Diese Daten sind von entscheidender Bedeutung für den elektronischen Handel, das Online-Banking und jede andere Form der finanziellen Transaktion. Sie beinhalten Details wie Kreditkartennummern, Bankverbindungen, Zahlungsbeträge, Transaktionsdaten, Verifizierungsnummern und Rechnungsinformationen. Zahlungsdaten können auch Informationen über den Zahlungsstatus, Rückbuchungen, Autorisierungen und Gebühren enthalten.
 
-Erstellt mit kostenlosem Datenschutz-Generator.de von Dr. Thomas Schwenke
+Erstellt mit Unterstützung durch Datenschutz-Generator.de von Dr. Thomas Schwenke
