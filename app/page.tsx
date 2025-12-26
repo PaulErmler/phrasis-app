@@ -1,4 +1,5 @@
 import { getTranslations } from "next-intl/server";
+import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { CTAButtons } from "@/components/home/cta-buttons";
 import { GoToAppButton } from "@/components/home/go-to-app-button";
@@ -10,7 +11,9 @@ export default async function Home() {
   const isAuthenticated = !!token;
 
   return (
-    <main className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col">
+      <Header />
+      <main className="flex-1 flex flex-col">
       {/* Hero Section */}
       <section className="flex-1 flex flex-col items-center justify-center px-4 py-20 md:py-32">
         <div className="w-full max-w-4xl mx-auto text-center space-y-8">
@@ -93,16 +96,13 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Footer */}
-      <div className="mt-auto">
-        <Footer />
-      </div>
-
       {/* Subtle Background Pattern */}
       <div className="fixed inset-0 -z-10 overflow-hidden">
         <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
         <div className="absolute -bottom-1/2 -left-1/2 w-[600px] h-[600px] rounded-full bg-muted/10 blur-3xl" />
       </div>
     </main>
+    <Footer />
+    </div>
   );
 }

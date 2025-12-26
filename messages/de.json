@@ -111,7 +111,13 @@
   "Footer": {
     "copyright": "© {year} Phrasis. Alle Rechte vorbehalten.",
     "theme": "Design:",
-    "language": "Sprache:"
+    "language": "Sprache:",
+    "madeInGermany": "Hergestellt in Deutschland",
+    "legal": {
+      "impressum": "Impressum",
+      "agb": "AGB",
+      "privacy": "Datenschutz"
+    }
   },
   "Theme": {
     "title": "Design",
