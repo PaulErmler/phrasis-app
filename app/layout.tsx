@@ -7,6 +7,7 @@ import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistratio
 import { getUserLocale } from "@/i18n/locale";
 import { getMessages, getTimeZone } from "next-intl/server";
 import { Toaster } from "@/components/ui/sonner";
+import { ConsentManager } from "./consent-manager";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -52,24 +53,28 @@ export default async function RootLayout({
   const timeZone = await getTimeZone();
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Phrasis" />
-      </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-        <ServiceWorkerRegistration />
-        <ConvexClientProvider>
-          <Providers locale={locale} messages={messages} timeZone={timeZone}>
-            {children}
-            <Toaster position="top-center" />
-          </Providers>
-        </ConvexClientProvider>
-      </body>
-    </html>
-  );
+        <html lang={locale} suppressHydrationWarning>
+          <head>
+            <link rel="manifest" href="/manifest.json" />
+            <meta name="mobile-web-app-capable" content="yes" />
+            <meta name="apple-mobile-web-app-capable" content="yes" />
+            <meta name="apple-mobile-web-app-title" content="Phrasis" />
+          </head>
+          <body
+            className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+          >
+    		<ConsentManager>
+    			
+            <ServiceWorkerRegistration />
+            <ConvexClientProvider>
+              <Providers locale={locale} messages={messages} timeZone={timeZone}>
+                {children}
+                <Toaster position="top-center" />
+              </Providers>
+            </ConvexClientProvider>
+          
+    		</ConsentManager>
+    	</body>
+        </html>
+      )
 }

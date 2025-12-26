@@ -126,3 +126,8 @@ body {
   @apply bg-background text-foreground;
 }
 }
+
+/* Hide C15T branding footer in consent manager dialog */
+[data-c15t-dialog-footer] {
+  display: none !important;
+}
