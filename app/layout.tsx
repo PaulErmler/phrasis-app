@@ -4,6 +4,7 @@ import "./globals.css";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 import { Providers } from "./providers";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { PWAInstallGlobal } from "@/components/PWAInstallGlobal";
 import { getUserLocale } from "@/i18n/locale";
 import { getMessages, getTimeZone } from "next-intl/server";
 import { Toaster } from "@/components/ui/sonner";
@@ -66,6 +67,7 @@ export default async function RootLayout({
     		<ConsentManager>
     			
             <ServiceWorkerRegistration />
+            <PWAInstallGlobal />
             <ConvexClientProvider>
               <Providers locale={locale} messages={messages} timeZone={timeZone}>
                 {children}

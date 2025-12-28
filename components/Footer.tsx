@@ -2,6 +2,8 @@
 
 import { useTranslations } from "next-intl";
 import Link from "next/link";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 export function Footer() {
   const t = useTranslations("Footer");
@@ -38,6 +40,16 @@ export function Footer() {
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span>🇩🇪</span>
               <span>{t("madeInGermany")}</span>
+            </div>
+          </div>
+
+          {/* Bottom Row - Language and Theme Selectors */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2 border-t border-border/50">
+            <div className="flex items-center gap-4">
+              <div className="w-[140px]">
+                <LanguageSwitcher />
+              </div>
+              <ThemeSwitcher />
             </div>
           </div>
         </div>

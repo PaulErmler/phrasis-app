@@ -65,6 +65,7 @@
 --accent: oklch(0.97 0 0);
 --accent-foreground: oklch(0.205 0 0);
 --destructive: oklch(0.58 0.22 27);
+--accent-orange: #oklch(0.8179 0.1705 77.95);
 --border: oklch(0.922 0 0);
 --input: oklch(0.922 0 0);
 --ring: oklch(0.708 0 0);
@@ -99,6 +100,7 @@
 --muted-foreground: oklch(0.708 0 0);
 --accent: oklch(0.371 0 0);
 --accent-foreground: oklch(0.985 0 0);
+--accent-orange: #oklch(0.8179 0.1705 77.95);
 --destructive: oklch(0.704 0.191 22.216);
 --border: oklch(1 0 0 / 10%);
 --input: oklch(1 0 0 / 15%);
@@ -122,6 +124,9 @@
 * {
   @apply border-border outline-ring/50;
 }
+html {
+  scroll-behavior: smooth;
+}
 body {
   @apply bg-background text-foreground;
 }
@@ -131,3 +136,251 @@ body {
 [data-c15t-dialog-footer] {
   display: none !important;
 }
+
+/* Landing Page Animations */
+@keyframes sound-wave {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.5);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-10px) rotate(1deg);
+  }
+  75% {
+    transform: translateY(5px) rotate(-1deg);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px oklch(0.61 0.11 222 / 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px oklch(0.61 0.11 222 / 0.5);
+  }
+}
+
+@keyframes pulse-glow-orange {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 179, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(255, 179, 0, 0.5);
+  }
+}
+
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease-out forwards;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.6s ease-out forwards;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
+
+.animate-pulse-glow-orange {
+  animation: pulse-glow-orange 3s ease-in-out infinite;
+}
+
+.animate-gradient-shift {
+  animation: gradient-shift 8s ease infinite;
+  background-size: 200% 200%;
+}
+
+/* Glassmorphism */
+.glass {
+  background: oklch(1 0 0 / 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid oklch(1 0 0 / 0.2);
+}
+
+.dark .glass {
+  background: oklch(0.2 0 0 / 0.7);
+  border: 1px solid oklch(1 0 0 / 0.1);
+}
+
+/* Noise texture overlay */
+.noise-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Section divider */
+.section-divider {
+  position: relative;
+}
+
+.section-divider::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, oklch(0.61 0.11 222), transparent);
+}
+
+/* Staggered animations */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }
+.stagger-6 { animation-delay: 0.6s; }
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, oklch(0.61 0.11 222), oklch(0.80 0.13 212));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Hero gradient background */
+.hero-gradient {
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.61 0.11 222 / 0.15), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 60%, oklch(0.80 0.13 212 / 0.1), transparent),
+    radial-gradient(ellipse 50% 30% at 20% 80%, oklch(0.71 0.13 215 / 0.08), transparent);
+}
+
+.dark .hero-gradient {
+  background: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.61 0.11 222 / 0.25), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 60%, oklch(0.80 0.13 212 / 0.15), transparent),
+    radial-gradient(ellipse 50% 30% at 20% 80%, oklch(0.71 0.13 215 / 0.1), transparent);
+}
+
+/* Newsletter gradient background */
+.newsletter-gradient {
+  background: 
+    radial-gradient(ellipse 70% 50% at 50% 120%, oklch(0.61 0.11 222 / 0.12), transparent),
+    radial-gradient(ellipse 50% 40% at 20% 40%, oklch(0.80 0.13 212 / 0.08), transparent),
+    radial-gradient(ellipse 60% 35% at 80% 30%, oklch(0.71 0.13 215 / 0.06), transparent);
+}
+
+.dark .newsletter-gradient {
+  background: 
+    radial-gradient(ellipse 70% 50% at 50% 120%, oklch(0.61 0.11 222 / 0.2), transparent),
+    radial-gradient(ellipse 50% 40% at 20% 40%, oklch(0.80 0.13 212 / 0.12), transparent),
+    radial-gradient(ellipse 60% 35% at 80% 30%, oklch(0.71 0.13 215 / 0.1), transparent);
+}
+
+/* Section with faded background - no hard edges */
+.section-fade-bg {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    oklch(0.97 0 0 / 0.5) 10%,
+    oklch(0.97 0 0 / 0.5) 90%,
+    transparent 100%
+  );
+}
+
+.dark .section-fade-bg {
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    oklch(0.2 0 0 / 0.5) 10%,
+    oklch(0.2 0 0 / 0.5) 90%,
+    transparent 100%
+  );
+}
+
+/* Pricing card hover effect */
+.pricing-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.pricing-card:hover {
+  transform: translateY(-8px);
+}
+
+/* Feature card */
+.feature-card {
+  transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px oklch(0 0 0 / 0.15);
+}
+
+.dark .feature-card:hover {
+  box-shadow: 0 20px 40px -12px oklch(0 0 0 / 0.4);
+}
+
+/* Pricing carousel - hide scrollbar but keep functionality */
+.pricing-carousel {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.pricing-carousel::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* FAQ details/summary styling */
+.faq-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.faq-details[open] summary {
+  border-bottom: none;
+}
+
+
