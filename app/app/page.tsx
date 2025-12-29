@@ -215,6 +215,12 @@ function Content() {
           >
             Go to Audio Flashcard
           </Button>
+          <Button
+            onClick={() => router.push("/audio-learning")}
+            className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
+          >
+            Go to Audio Learning
+          </Button>
         </CardContent>
       </Card>
 
