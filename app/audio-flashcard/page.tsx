@@ -21,8 +21,8 @@ export default function AudioFlashcardPage() {
   const englishAudioRef = useRef<HTMLAudioElement>(new Audio());
   const spanishAudioRef = useRef<HTMLAudioElement>(new Audio());
 
-  const translateText = useAction(api.textToSpeech.translateText);
-  const generateSpeech = useAction(api.textToSpeech.generateSpeech);
+  const translateText = useAction(api.translationFunctions.getOrTranslate);
+  const generateSpeech = useAction(api.audioFunctions.getOrRecordAudio);
 
   // Stop all audio
   const stopAudio = () => {
@@ -67,8 +67,12 @@ export default function AudioFlashcardPage() {
     stopAudio();
     setLoading(true);
   
+    let audioUrl: string | null = null;
     try {
-      const audioUrl = await generateSpeech({ text, language: lang });
+      const result = await generateSpeech({ text, language: lang });
+      audioUrl = result.audioUrl;
+      console.log("while playing", audioUrl);
+      console.log("Text:", text, "Language:", lang);
       setUrl(audioUrl);
   
       ref.current.src = audioUrl;
@@ -78,7 +82,9 @@ export default function AudioFlashcardPage() {
       setPlaying(true);
     } catch (error) {
       console.error("Audio error:", error);
-      alert("Failed to play audio");
+      console.log("Audio error:", error);
+      console.log("AUDIO URL:", audioUrl);
+      alert(`Failed to play audio ${error}`);
     } finally {
       setLoading(false);
     }

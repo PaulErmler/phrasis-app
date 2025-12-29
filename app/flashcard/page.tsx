@@ -14,7 +14,7 @@ export default function FlashcardPage() {
   const router = useRouter();
   const [translation, setTranslation] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const translateText = useAction(api.translation.translateText);
+  const translateText = useAction(api.translationFunctions.getOrTranslate);
 
   const handleCardClick = async () => {
     if (translation) {

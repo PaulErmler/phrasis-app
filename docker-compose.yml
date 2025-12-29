@@ -40,6 +40,7 @@ services:
       - DISABLE_BEACON
       - DOCUMENT_RETENTION_DELAY=${DOCUMENT_RETENTION_DELAY:-172800} # Lower default document retention to 2 days
       - DO_NOT_REQUIRE_SSL=1
+      - EDENAI_API_KEY=${EDENAI_API_KEY}
       - INSTANCE_NAME
       - INSTANCE_SECRET
       - REDACT_LOGS_TO_CLIENT
@@ -69,6 +70,8 @@ services:
       - "${DASHBOARD_PORT:-6791}:6791"
     environment:
       - NEXT_PUBLIC_DEPLOYMENT_URL=${NEXT_PUBLIC_DEPLOYMENT_URL:-http://127.0.0.1:${PORT:-3210}}
+      - CONVEX_INTERNAL_URL=http://host.docker.internal:3210
+      - USE_PROXY=true
     depends_on:
       backend:
         condition: service_healthy
