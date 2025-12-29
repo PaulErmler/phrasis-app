@@ -29,14 +29,14 @@ export default function AudioLearningPage() {
   const [autoplayDelayEnglishToSpanish, setAutoplayDelayEnglishToSpanish] = useState(2000);
   const [autoplayDelaySpanishToNext, setAutoplayDelaySpanishToNext] = useState(3000);
   const [showSettings, setShowSettings] = useState(false);
-
   const englishAudioRef = useRef<HTMLAudioElement>(new Audio());
   const spanishAudioRef = useRef<HTMLAudioElement>(new Audio());
   const autoplayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isAutoplayActiveRef = useRef(false);
   const autoplayEnabledRef = useRef(true);
   const currentSentenceIndexRef = useRef(0);
-
+  const translationCacheRef = useRef<Record<string, string>>({});
+  const audioCacheRef = useRef<Record<string, string>>({});
   const translateText = useAction(api.translationFunctions.getOrTranslate);
   const generateSpeech = useAction(api.audioFunctions.getOrRecordAudio);
 
@@ -112,6 +112,28 @@ export default function AudioLearningPage() {
 
   // Play audio
   const playAudio = async (text: string, lang: string, ref: React.MutableRefObject<HTMLAudioElement>, setUrl: React.Dispatch<React.SetStateAction<string | null>>, setPlaying: React.Dispatch<React.SetStateAction<boolean>>, setLoading: React.Dispatch<React.SetStateAction<boolean>>, isEnglish: boolean) => {
+    // If playing English, start fetching translation in background
+    if (isEnglish && !showTranslation) {
+      const translationCacheKey = `${text}_en_es`;
+      if (translationCacheRef.current[translationCacheKey]) {
+        // Translation is already cached
+        setIsLoadingSpanish(false);
+      } else {
+        setIsLoadingSpanish(true);
+        translateText({
+          text: text,
+          sourceLang: "en",
+          targetLang: "es",
+        }).then(() => {
+          translationCacheRef.current[translationCacheKey] = "cached";
+          setIsLoadingSpanish(false);
+        }).catch((error) => {
+          console.error("Translation error:", error);
+          setIsLoadingSpanish(false);
+        });
+      }
+    }
+
     // Stop any current playback without stopping autoplay
     englishAudioRef.current.pause();
     englishAudioRef.current.currentTime = 0;
@@ -128,8 +150,20 @@ export default function AudioLearningPage() {
     setLoading(true);
 
     try {
-      const result = await generateSpeech({ text, language: lang });
-      const audioUrl = result.audioUrl;
+      // Check cache first
+      const audioCacheKey = `${text}_${lang}`;
+      let audioUrl: string;
+      
+      if (audioCacheRef.current[audioCacheKey]) {
+        console.log('Using cached audio for:', text);
+        audioUrl = audioCacheRef.current[audioCacheKey];
+      } else {
+        console.log('Fetching new audio for:', text);
+        const result = await generateSpeech({ text, language: lang });
+        audioUrl = result.audioUrl;
+        audioCacheRef.current[audioCacheKey] = audioUrl;
+      }
+      
       setUrl(audioUrl);
 
       ref.current.src = '';
@@ -152,7 +186,7 @@ export default function AudioLearningPage() {
         } else if (!isEnglish && autoplayEnabledRef.current && isAutoplayActiveRef.current) {
             console.log('Scheduling next card');
             autoplayTimeoutRef.current = setTimeout(() => {
-            goToNext(true);
+              goToNext(true);
             }, autoplayDelaySpanishToNext);
         }
     };
