@@ -1,18 +1,24 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useAction } from "convex/react";
+import { useAction, useQuery, useConvexAuth } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, Play, Pause, Settings } from "lucide-react";
 
-const SENTENCES = [
-  { english: "I like cookies.", spanish: "Me gustan las galletas." },
-  { english: "I am eating cookies.", spanish: "Estoy comiendo galletas." },
-];
-
 export default function AudioLearningPage() {
+  const { isLoading: authLoading, isAuthenticated } = useConvexAuth();
+  const currentUser = useQuery(api.auth.getCurrentUser, isAuthenticated ? {} : "skip");
+  const userId = currentUser?._id;
+  
+  // Fetch due cards from FSRS
+  const cardsQuery = useQuery(
+    api.cardActions.getCardsDueForReview,
+    userId ? { userId, limit: 100 } : "skip"
+  );
+  
+  const [cards, setCards] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showTranslation, setShowTranslation] = useState(false);
   const [englishAudioUrl, setEnglishAudioUrl] = useState<string | null>(null);
@@ -40,6 +46,15 @@ export default function AudioLearningPage() {
   const translateText = useAction(api.translationFunctions.getOrTranslate);
   const generateSpeech = useAction(api.audioFunctions.getOrRecordAudio);
 
+  // Load cards when query completes
+  useEffect(() => {
+    if (cardsQuery && cardsQuery.length > 0) {
+      setCards(cardsQuery);
+      setCurrentIndex(0);
+      setShowTranslation(false);
+    }
+  }, [cardsQuery]);
+
   // Keep refs updated with current state
   useEffect(() => {
     isAutoplayActiveRef.current = isAutoplayActive;
@@ -53,7 +68,7 @@ export default function AudioLearningPage() {
     currentSentenceIndexRef.current = currentIndex;
   }, [currentIndex]);
 
-  const currentSentence = SENTENCES[currentIndex];
+  const currentSentence = cards && cards.length > 0 ? cards[currentIndex] : null;
 
   // Stop all audio and clear timeouts
   const stopAudio = () => {
@@ -178,11 +193,13 @@ export default function AudioLearningPage() {
           setShowTranslation(true);
           // Use the sentence index that was playing when English audio started
           const sentenceIndexThatJustPlayed = currentSentenceIndexRef.current;
-          const spanishText = SENTENCES[sentenceIndexThatJustPlayed].spanish;
-          autoplayTimeoutRef.current = setTimeout(() => {
-            console.log('Playing Spanish audio:', spanishText);
-            playAudio(spanishText, "es", spanishAudioRef, setSpanishAudioUrl, setIsPlayingSpanish, setIsLoadingSpanishAudio, false);
-          }, autoplayDelayEnglishToSpanish);
+          const spanishText = cards[sentenceIndexThatJustPlayed]?.spanish;
+          if (spanishText) {
+            autoplayTimeoutRef.current = setTimeout(() => {
+              console.log('Playing Spanish audio:', spanishText);
+              playAudio(spanishText, "es", spanishAudioRef, setSpanishAudioUrl, setIsPlayingSpanish, setIsLoadingSpanishAudio, false);
+            }, autoplayDelayEnglishToSpanish);
+          }
         } else if (!isEnglish && autoplayEnabledRef.current && isAutoplayActiveRef.current) {
             console.log('Scheduling next card');
             autoplayTimeoutRef.current = setTimeout(() => {
@@ -215,7 +232,7 @@ export default function AudioLearningPage() {
   };
 
   const goToNext = (autoPlay = false) => {
-    const newIndex = (currentIndex + 1) % SENTENCES.length;
+    const newIndex = (currentIndex + 1) % cards.length;
     setCurrentIndex(newIndex);
     setShowTranslation(false);
     if (!autoPlay) {
@@ -223,14 +240,14 @@ export default function AudioLearningPage() {
     }
     if (autoPlay && autoplayEnabled) {
       setTimeout(() => {
-        const sentence = SENTENCES[newIndex];
+        const sentence = cards[newIndex];
         playAudio(sentence.english, "en", englishAudioRef, setEnglishAudioUrl, setIsPlayingEnglish, setIsLoadingEnglish, true);
       }, 0);
     }
   };
 
   const goToPrev = () => {
-    setCurrentIndex((prev) => (prev - 1 + SENTENCES.length) % SENTENCES.length);
+    setCurrentIndex((prev) => (prev - 1 + cards.length) % cards.length);
     setShowTranslation(false);
     stopAudio();
   };
@@ -244,27 +261,67 @@ export default function AudioLearningPage() {
   const remainingTime = duration - currentTime;
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // Loading state
+  if (authLoading) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-4 py-20 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950">
+        <Card className="p-8">Loading...</Card>
+      </main>
+    );
+  }
+
+  // Auth state
+  if (!isAuthenticated) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-4 py-20 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950">
+        <Card className="p-8 max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-4">Audio Learning</h1>
+          <p className="text-gray-600">Please sign in to access learning mode.</p>
+        </Card>
+      </main>
+    );
+  }
+
+  // No cards state
+  if (!cards || cards.length === 0) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-4 py-20 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950">
+        <Card className="p-8 max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-4">No Cards Available</h1>
+          <p className="text-gray-600">Add cards to start practicing!</p>
+        </Card>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-20 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950 dark:to-teal-950">
       <div className="w-full max-w-2xl space-y-6">
+        {/* Practice Mode Badge */}
+        <div className="text-center">
+          <span className="inline-block px-3 py-1 text-xs font-semibold text-emerald-700 bg-emerald-200 rounded-full">
+            Practice Mode - Zero FSRS Impact
+          </span>
+        </div>
+
         {/* Navigation */}
         <div className="flex items-center justify-between">
           <Button
             onClick={goToPrev}
             variant="outline"
             size="icon"
-            disabled={SENTENCES.length <= 1}
+            disabled={cards.length <= 1}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <div className="text-sm text-muted-foreground">
-            {currentIndex + 1} / {SENTENCES.length}
+            {currentIndex + 1} / {cards.length}
           </div>
           <Button
             onClick={() => goToNext()}
             variant="outline"
             size="icon"
-            disabled={SENTENCES.length <= 1}
+            disabled={cards.length <= 1}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>

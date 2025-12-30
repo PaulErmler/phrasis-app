@@ -10,12 +10,16 @@
 
 import type * as audioFunctions from "../audioFunctions.js";
 import type * as auth from "../auth.js";
+import type * as cardActions from "../cardActions.js";
+import type * as essentialSentences from "../essentialSentences.js";
+import type * as fsrs from "../fsrs.js";
 import type * as http from "../http.js";
-import type * as internalQueries from "../internalQueries.js";
 import type * as myFunctions from "../myFunctions.js";
+import type * as seedCards from "../seedCards.js";
 import type * as textToSpeech from "../textToSpeech.js";
 import type * as translation from "../translation.js";
 import type * as translationFunctions from "../translationFunctions.js";
+import type * as userPreferences from "../userPreferences.js";
 
 import type {
   ApiFromModules,
@@ -26,12 +30,16 @@ import type {
 declare const fullApi: ApiFromModules<{
   audioFunctions: typeof audioFunctions;
   auth: typeof auth;
+  cardActions: typeof cardActions;
+  essentialSentences: typeof essentialSentences;
+  fsrs: typeof fsrs;
   http: typeof http;
-  internalQueries: typeof internalQueries;
   myFunctions: typeof myFunctions;
+  seedCards: typeof seedCards;
   textToSpeech: typeof textToSpeech;
   translation: typeof translation;
   translationFunctions: typeof translationFunctions;
+  userPreferences: typeof userPreferences;
 }>;
 
 /**

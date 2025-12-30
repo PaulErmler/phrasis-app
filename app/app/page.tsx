@@ -114,6 +114,32 @@ function Content() {
     }
   }, [notificationPermission, requestNotificationPermission]);
 
+  // Show loading while checking authentication
+  if (currentUser === undefined) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
+          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+          <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+          <p className="ml-2 text-muted-foreground">Verifying authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message while redirecting
+  if (currentUser === null) {
+    return (
+      <div className="min-h-[400px] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <p className="text-lg text-muted-foreground">Authentication required</p>
+          <p className="text-sm text-muted-foreground">Redirecting to login page...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (viewer === undefined || numbers === undefined) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -249,7 +275,7 @@ function Content() {
               disabled={isAddingCards}
               className="w-full bg-linear-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-lg shadow-purple-500/25"
             >
-              {isAddingCards ? "Adding cards..." : "✨ Add 5 Basic Cards to Start"}
+              {isAddingCards ? "Adding cards..." : "✨ Add Essential Sentences to Start"}
             </Button>
           )}
         </CardContent>
