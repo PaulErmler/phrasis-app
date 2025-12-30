@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { SignedIn, SignedOut, UserButton, RedirectToSignIn } from "@daveyplate/better-auth-ui";
 import { Button } from "@/components/ui/button";
@@ -56,9 +56,14 @@ function Content() {
   const router = useRouter();
   const { viewer, numbers } = useQuery(api.myFunctions.listNumbers, { count: 10 }) ?? {};
   const addNumber = useMutation(api.myFunctions.addNumber);
+  const currentUser = useQuery(api.auth.getCurrentUser);
+  const userId = currentUser?._id;
+  const cardStats = useQuery(api.cardActions.getCardStats, userId ? { userId } : "skip");
+  const addBasicCards = useAction(api.seedCards.addBasicCards);
   
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [isLoading, setIsLoading] = useState(false);
+  const [isAddingCards, setIsAddingCards] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -195,6 +200,61 @@ function Content() {
         </CardContent>
       </Card>
 
+      {/* Learning Deck Stats */}
+      <Card className="border-border/50 shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-lg">📚 Your Learning Deck</CardTitle>
+          <CardDescription>
+            Track your progress and manage your cards
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {cardStats ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3 text-center">
+                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{cardStats.totalCards}</p>
+                <p className="text-xs text-muted-foreground">Total Cards</p>
+              </div>
+              <div className="rounded-lg bg-orange-50 dark:bg-orange-950/30 p-3 text-center">
+                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{cardStats.dueCount}</p>
+                <p className="text-xs text-muted-foreground">Due Now</p>
+              </div>
+              <div className="rounded-lg bg-green-50 dark:bg-green-950/30 p-3 text-center">
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{cardStats.reviewsToday}</p>
+                <p className="text-xs text-muted-foreground">Reviewed Today</p>
+              </div>
+              <div className="rounded-lg bg-purple-50 dark:bg-purple-950/30 p-3 text-center">
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{cardStats.newCount}</p>
+                <p className="text-xs text-muted-foreground">New Cards</p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-muted-foreground py-4">
+              Loading stats...
+            </div>
+          )}
+          {cardStats && cardStats.totalCards === 0 && (
+            <Button
+              onClick={async () => {
+                if (!userId) return;
+                try {
+                  setIsAddingCards(true);
+                  await addBasicCards({ userId });
+                } catch (error) {
+                  console.error("Error adding cards:", error);
+                } finally {
+                  setIsAddingCards(false);
+                }
+              }}
+              disabled={isAddingCards}
+              className="w-full bg-linear-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-lg shadow-purple-500/25"
+            >
+              {isAddingCards ? "Adding cards..." : "✨ Add 5 Basic Cards to Start"}
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="border-border/50 shadow-lg">
         <CardHeader>
           <CardTitle className="text-lg">Flashcard Practice</CardTitle>
@@ -220,6 +280,12 @@ function Content() {
             className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
           >
             Go to Audio Learning
+          </Button>
+          <Button
+            onClick={() => router.push("/audio-spaced")}
+            className="w-full bg-linear-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 transition-all duration-200"
+          >
+            Go to Spaced Repetition
           </Button>
         </CardContent>
       </Card>

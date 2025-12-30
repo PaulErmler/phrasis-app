@@ -28,4 +28,54 @@ export default defineSchema({
     storageId: v.id("_storage"),
     createdAt: v.number(), // timestamp
   }).index("by_sentence_language", ["sentenceId", "language"]),// "accent"]),
+
+  // User authentication & preferences
+  users: defineTable({
+    email: v.string(),
+    createdAt: v.number(),
+  }).index("by_email", ["email"]),
+
+  user_preferences: defineTable({
+    userId: v.string(), // better-auth userId
+    autoplayDelayEnglishToSpanish: v.number(), // milliseconds
+    autoplayDelaySpanishToNext: v.number(), // milliseconds
+    updatedAt: v.number(),
+  }).index("by_userId", ["userId"]),
+
+  // User's learning cards (FSRS)
+  cards: defineTable({
+    userId: v.string(),
+    sentenceId: v.id("sentences"),
+    // FSRS state
+    state: v.string(), // "new" | "learning" | "review" | "relearning"
+    difficulty: v.number(), // 0-1, difficulty factor
+    stability: v.number(), // 0+, in days
+    elapsedDays: v.number(), // days since last review
+    scheduledDays: v.number(), // days until next review
+    reps: v.number(), // total reviews
+    lapses: v.number(), // times forgotten
+    lastReview: v.optional(v.number()), // timestamp
+    nextReview: v.optional(v.number()), // timestamp (due date)
+    createdAt: v.number(),
+  }).index("by_userId", ["userId"])
+    .index("by_userId_nextReview", ["userId", "nextReview"]),
+
+  card_reviews: defineTable({
+    userId: v.string(),
+    cardId: v.id("cards"),
+    sentenceId: v.id("sentences"),
+    rating: v.string(), // "again" | "hard" | "good" | "easy"
+    elapsedSeconds: v.number(), // time spent on card
+    reviewedAt: v.number(),
+  }).index("by_userId", ["userId"])
+    .index("by_cardId", ["cardId"]),
+
+  // Custom sentences created by users
+  user_sentences: defineTable({
+    userId: v.string(),
+    english: v.string(),
+    spanish: v.string(),
+    difficulty: v.optional(v.number()), // 0-1, optional difficulty rating
+    createdAt: v.number(),
+  }).index("by_userId", ["userId"]),
 });
