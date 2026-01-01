@@ -2,7 +2,7 @@ import { Heart, ExternalLink } from "lucide-react";
 
 export function DonationSection() {
   return (
-    <section className="relative py-12 md:py-16 px-4">
+    <section id="donate" className="relative py-12 md:py-16 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-accent-orange/5 to-primary/5 p-8 md:p-12 text-center shadow-lg">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-accent-orange/10 mb-6 animate-pulse-glow-orange">

@@ -70,7 +70,7 @@ export function TestimonialsSection() {
   }, [api, isHovered]);
 
   return (
-    <section className="relative py-16 md:py-20 px-4 bg-muted/30 overflow-hidden">
+    <section id="testimonials" className="relative py-16 md:py-20 px-4 bg-muted/30 overflow-hidden">
       <div className="relative z-10 max-w-7xl mx-auto">
         {/* Section header */}
         <div className="text-center mb-12">

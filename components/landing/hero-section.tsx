@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play } from "lucide-react";
-import { FloatingSpeechBubble } from "./sound-wave";
+import { FloatingSpeechBubble } from "./speech-bubble";
+import { LandingHeader } from "./landing-header";
 
 interface HeroSectionProps {
   isAuthenticated: boolean;
@@ -10,6 +11,9 @@ interface HeroSectionProps {
 export function HeroSection({ isAuthenticated }: HeroSectionProps) {
   return (
     <section className="relative min-h-[90vh] flex flex-col items-center justify-center px-4 py-20 md:py-32 overflow-hidden hero-gradient noise-bg">
+      {/* Header */}
+      <LandingHeader isAuthenticated={isAuthenticated} />
+
       {/* Floating speech bubbles - language examples */}
       <FloatingSpeechBubble className="hidden md:block top-[15%] left-[8%]" delay={0}>
         <span className="text-primary">Hola</span> 

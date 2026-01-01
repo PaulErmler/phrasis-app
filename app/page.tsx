@@ -1,3 +1,4 @@
+import "./landing-page.css";
 import { Footer } from "@/components/Footer";
 import { HeroSection } from "@/components/landing/hero-section";
 import { FeaturesSection } from "@/components/landing/features-section";

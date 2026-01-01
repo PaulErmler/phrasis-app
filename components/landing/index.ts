@@ -5,5 +5,5 @@ export { TestimonialsSection } from "./testimonials-section";
 export { NewsletterSection } from "./newsletter-section";
 export { FAQSection } from "./faq-section";
 export { DonationSection } from "./donation-section";
-export { FloatingSpeechBubble } from "./sound-wave";
+export { FloatingSpeechBubble } from "./speech-bubble";
 
