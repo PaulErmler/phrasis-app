@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState, useTransition } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { setUserLocale } from "@/i18n/locale";
@@ -12,6 +12,7 @@ const locales = [
 
 export function LanguageSwitcher() {
   const locale = useLocale();
+  const t = useTranslations("Language");
   const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -29,9 +30,9 @@ export function LanguageSwitcher() {
 
   if (!mounted) {
     return (
-      <Select disabled>
-        <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Language" />
+      <Select value={locale} disabled>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder={t("title")} />
         </SelectTrigger>
       </Select>
     );
@@ -39,8 +40,8 @@ export function LanguageSwitcher() {
 
   return (
     <Select value={locale} onValueChange={handleLocaleChange} disabled={isPending}>
-      <SelectTrigger className="w-[140px]">
-        <SelectValue placeholder="Language" />
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder={t("title")} />
       </SelectTrigger>
       <SelectContent>
         {locales.map((loc) => (
