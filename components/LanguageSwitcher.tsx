@@ -32,9 +32,7 @@ export function LanguageSwitcher({ compact = false, className }: LanguageSwitche
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    setTimeout(() => {
-      setMounted(true);
-    }, 0);
+    setMounted(true);
   }, []);
 
   const handleLocaleChange = (newLocale: string) => {
@@ -47,18 +45,15 @@ export function LanguageSwitcher({ compact = false, className }: LanguageSwitche
 
   // Compact mode - use DropdownMenu like ThemeSwitcher
   if (compact) {
-    if (!mounted) {
-      return (
-        <Button variant="ghost" size="icon" className="size-9" disabled>
-          <span className="text-base opacity-50">{currentLocale?.flag}</span>
-        </Button>
-      );
-    }
-
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className={cn("size-9", className)} disabled={isPending}>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className={cn("size-9", className)} 
+            disabled={isPending || !mounted}
+          >
             <span className="text-base">{currentLocale?.flag}</span>
             <span className="sr-only">{t("title")}</span>
           </Button>
@@ -80,18 +75,8 @@ export function LanguageSwitcher({ compact = false, className }: LanguageSwitche
   }
 
   // Full mode - use Select
-  if (!mounted) {
-    return (
-      <Select value={locale} disabled>
-        <SelectTrigger className={cn("w-full", className)}>
-          <SelectValue placeholder={t("title")} />
-        </SelectTrigger>
-      </Select>
-    );
-  }
-
   return (
-    <Select value={locale} onValueChange={handleLocaleChange} disabled={isPending}>
+    <Select value={locale} onValueChange={handleLocaleChange} disabled={isPending || !mounted}>
       <SelectTrigger className={cn("w-full", className)}>
         <SelectValue placeholder={t("title")} />
       </SelectTrigger>
