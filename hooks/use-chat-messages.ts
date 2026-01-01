@@ -85,7 +85,6 @@ export function useChatMessages({
     threadId ? { threadId } : "skip",
     { 
       initialNumItems: 100,
-      stream: true
     }
   );
 

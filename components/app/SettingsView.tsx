@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { LogOut, Mail } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { PricingTable } from "autumn-js/react";
 
 export function SettingsView() {
   const t = useTranslations("AppPage");
@@ -33,6 +34,7 @@ export function SettingsView() {
           )}
 
           <Separator />
+
 
           {/* Language Section */}
           <div className="space-y-2">
@@ -63,6 +65,8 @@ export function SettingsView() {
           </div>
         </CardContent>
       </Card>
+
+      <PricingTable/>
     </div>
   );
 }

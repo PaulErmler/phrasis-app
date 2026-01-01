@@ -6,6 +6,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import type { ReactNode } from "react"
 import { NextIntlClientProvider } from "next-intl"
+import { AutumnProvider } from "autumn-js/react";
+import { api } from "../convex/_generated/api";
+import { useConvex } from "convex/react";
+
 
 import { authClient } from "@/lib/auth-client"
 
@@ -16,6 +20,18 @@ type Props = {
     locale: string
     messages: Record<string, unknown>
     timeZone: string
+}
+
+
+
+export function AutumnWrapper({ children }: { children: React.ReactNode }) {
+  const convex = useConvex();
+
+  return (
+    <AutumnProvider convex={convex} convexApi={(api as any).autumn}>
+      {children}
+    </AutumnProvider>
+  );
 }
 
 export function Providers({ children, locale, messages, timeZone }: Props) {
@@ -52,3 +68,4 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
         </NextIntlClientProvider>
     )
 }
+
