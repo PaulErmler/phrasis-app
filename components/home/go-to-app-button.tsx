@@ -28,7 +28,10 @@ export function GoToAppButton({ isAuthenticated }: GoToAppButtonProps) {
         </CardHeader>
         <CardContent>
           <Button
-            onClick={() => router.push("/app")}
+            onClick={() => {
+              router.refresh();
+              router.push("/app");
+            }}
             className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
             size="lg"
           >
