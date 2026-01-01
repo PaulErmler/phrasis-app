@@ -1,6 +1,8 @@
 import { Heart, ExternalLink } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export function DonationSection() {
+  const t = useTranslations('LandingPage.donation');
   return (
     <section id="donate" className="relative py-12 md:py-16 px-4">
       <div className="max-w-4xl mx-auto">
@@ -10,19 +12,18 @@ export function DonationSection() {
           </div>
           
           <h2 className="text-2xl md:text-3xl font-bold mb-4">
-            Learning that <span className="gradient-text">Gives Back</span>
+            {t('title')} <span className="gradient-text">{t('titleHighlight')}</span>
           </h2>
           
           <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
-            When you subscribe to Phrasis, you're not just investing in yourself. 
-            We donate <span className="font-semibold text-foreground">10% of our earnings</span> to highly effective charities recommended by {" "}
+            {t('description')} <span className="font-semibold text-foreground">{t('percentage')}</span> {t('description2')} {" "}
             <a
               href="https://www.givewell.org"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline inline-flex items-center gap-1 font-medium"
             >
-              GiveWell
+              {t('givewellLink')}
               <ExternalLink className="w-4 h-4" />
             </a>. 
           </p>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Menu, X, Download, Sun, Moon, Monitor } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -12,14 +13,15 @@ interface LandingHeaderProps {
   isAuthenticated: boolean;
 }
 
-const navLinks = [
-  { href: "#features", label: "Features" },
-  { href: "#pricing", label: "Pricing" },
-  { href: "#testimonials", label: "Reviews" },
-  { href: "#faq", label: "FAQ" },
-];
-
 export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
+  const t = useTranslations('LandingPage.header');
+  
+  const navLinks = [
+    { href: "#features", label: t('nav.features') },
+    { href: "#pricing", label: t('nav.pricing') },
+    { href: "#testimonials", label: t('nav.reviews') },
+    { href: "#faq", label: t('nav.faq') },
+  ];
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -61,8 +63,8 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                 width={40}
                 height={40}
               />
-              <span className="text-xl md:text-2xl font-bold gradient-text hidden sm:inline">
-                Phrasis
+              <span className="text-xl md:text-2xl font-bold hidden sm:inline text-primary">
+                Phrasis<sup className="text-sm text-muted-foreground">alpha</sup>
               </span>
             </Link>
 
@@ -87,13 +89,13 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                 className="hidden lg:flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground transition-all duration-300 hover:bg-primary/10"
               >
                 <Download className="h-4 w-4" />
-                Install
+                {t('install')}
               </button>
 
               {/* Auth buttons */}
               {isAuthenticated ? (
                 <Button asChild size="sm" className="hidden sm:inline-flex">
-                  <Link href="/app">Go to App</Link>
+                  <Link href="/app">{t('goToApp')}</Link>
                 </Button>
               ) : (
                 <>
@@ -101,10 +103,10 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                     href="/auth/sign-in"
                     className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2"
                   >
-                    Sign in
+                    {t('signIn')}
                   </Link>
                   <Button asChild size="sm" className="shadow-lg shadow-primary/20">
-                    <Link href="/auth/sign-up">Sign up</Link>
+                    <Link href="/auth/sign-up">{t('signUp')}</Link>
                   </Button>
                 </>
               )}
@@ -162,11 +164,11 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                 onClick={handleInstallClick}
                 className="px-4 py-3 rounded-xl text-base font-medium text-foreground hover:bg-primary/10 transition-all w-full text-left"
               >
-                Install App
+                {t('installApp')}
               </button>
 
               <div className="px-4 py-2">
-                <span className="text-sm text-muted-foreground">Theme</span>
+                <span className="text-sm text-muted-foreground">{t('theme')}</span>
                 <div className="flex gap-1 mt-2">
                   {themeOptions.map((option) => {
                     const isActive = mounted && theme === option.value;

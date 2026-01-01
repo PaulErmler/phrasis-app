@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play } from "lucide-react";
 import { FloatingSpeechBubble } from "./speech-bubble";
@@ -9,6 +10,7 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ isAuthenticated }: HeroSectionProps) {
+  const t = useTranslations('LandingPage.hero');
   return (
     <section className="relative min-h-[90vh] flex flex-col items-center justify-center px-4 py-20 md:py-32 overflow-hidden hero-gradient noise-bg">
       {/* Header */}
@@ -40,16 +42,13 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
 
         {/* Main Headline */}
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-foreground  leading-[1.1]">
-        <span className="gradient-text">Phrasis</span>
-            {" "} - Master Languages{" "}
-          <span className="gradient-text">While Living</span>{" "}
-          Your Life
+          <span className="gradient-text">Phrasis</span>
+          {" "} - {t('tagline')}
         </h1>
 
         {/* Subheadline */}
         <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto  stagger-1 leading-relaxed">
-          Audio flashcards that adapt to your level, AI that answers your questions instantly, 
-          and spaced repetition that makes you remember up to 10x more — all while you commute, exercise, or cook.
+          {t('subtitle')}
         </p>
 
         {/* CTA Buttons */}
@@ -61,7 +60,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
               className="w-full sm:w-auto min-w-[220px] text-lg h-14 shadow-xl shadow-primary/20"
             >
               <Link href="/app">
-                Go to App
+                {t('cta.goToApp')}
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
@@ -73,7 +72,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
                 className="w-full sm:w-auto min-w-[220px] text-lg h-14 shadow-xl shadow-primary/20"
               >
                 <Link href="/auth/sign-up">
-                  Start Learning Free
+                  {t('cta.start')}
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
@@ -85,7 +84,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
               >
                 <a href="#features">
                   <Play className="mr-2 h-5 w-5" />
-                  See How It Works
+                  {t('cta.howItWorks')}
                 </a>
               </Button>
             </>

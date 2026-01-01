@@ -2,6 +2,7 @@
 
 import { Quote } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import {
   Carousel,
   CarouselContent,
@@ -9,40 +10,15 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 
-const testimonials = [
-  {
-    quote: "Phrasis completely changed how I learn languages. I can finally make progress during my daily commute!",
-    author: "Sarah M.",
-    role: "Learning Spanish",
-  },
-  {
-    quote: "The AI answers my grammar questions instantly. It's like having a personal tutor available 24/7. Whenever I have a question, I can ask and Phrasis automatically creates a flashcard for me so that I dont forget the answer.",
-    author: "Michael T.",
-    role: "Learning French",
-  },
-  {
-    quote: "I love that I can add my own phrases from books I'm reading. Finally, a language app that adapts to me!",
-    author: "Anna K.",
-    role: "Learning German",
-  },
-  {
-    quote: "The spaced repetition actually works. I'm remembering vocabulary so much better than with other apps.",
-    author: "David L.",
-    role: "Learning Japanese",
-  },
-  {
-    quote: "Being able to learn hands-free while cooking or exercising is a game-changer for me!",
-    author: "Emma R.",
-    role: "Learning Italian",
-  },
-  {
-    quote: "Instead of having to sit at my desk for hours to learn Portuguese, I go on walks and can spend time outside while learning.",
-    author: "Lisa P.",
-    role: "Learning Portuguese",
-  },
-];
-
 export function TestimonialsSection() {
+  const t = useTranslations('LandingPage.testimonials');
+  
+  // Get testimonials from translations
+  const testimonials = Array.from({ length: 6 }, (_, i) => ({
+    quote: t(`items.${i}.quote`),
+    author: t(`items.${i}.author`),
+    role: t(`items.${i}.role`),
+  }));
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
@@ -75,7 +51,7 @@ export function TestimonialsSection() {
         {/* Section header */}
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold">
-            Loved by <span className="gradient-text">Language Learners</span>
+            {t('title')} <span className="gradient-text">{t('titleHighlight')}</span>
           </h2>
         </div>
 

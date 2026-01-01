@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, ArrowRight, Check, Loader2 } from "lucide-react";
+import { ArrowRight, Check, Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export function NewsletterSection() {
+  const t = useTranslations('LandingPage.newsletter');
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
 
@@ -34,11 +36,10 @@ export function NewsletterSection() {
             {/* Left side - Content */}
             <div className="flex-1 text-center lg:text-left">
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
-                Get Language Tips & Updates
+                {t('title')}
               </h2>
               <p className="text-muted-foreground text-lg">
-                Join our newsletter for exclusive learning strategies, new feature announcements, 
-                and tips from polyglots. Unsubscribe anytime.
+                {t('subtitle')}
               </p>
             </div>
 
@@ -48,7 +49,7 @@ export function NewsletterSection() {
                 <div className="relative">
                   <Input
                     type="email"
-                    placeholder="Enter your email"
+                    placeholder={t('placeholder')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={status === "loading" || status === "success"}
@@ -71,24 +72,24 @@ export function NewsletterSection() {
                     ) : status === "success" ? (
                       <>
                         <Check className="w-4 h-4" />
-                        Done
+                        {t('done')}
                       </>
                     ) : (
                       <>
-                        Subscribe
+                        {t('cta')}
                         <ArrowRight className="w-4 h-4 ml-1" />
                       </>
                     )}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground text-center lg:text-left">
-                  We respect your privacy. No spam, ever.
+                  {t('privacy')}
                 </p>
               </form>
 
               {status === "success" && (
                 <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-sm text-center">
-                  You're subscribed! Check your inbox for a welcome email.
+                  {t('success')}
                 </div>
               )}
             </div>
