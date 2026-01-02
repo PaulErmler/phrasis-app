@@ -76,15 +76,6 @@ export const generateSpeech = action({
   },
 });
 
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes;
-}
-
 export const deleteAllAudioRecordings = mutation({
   handler: async (ctx) => {
     const rows = await ctx.db
@@ -112,13 +103,6 @@ export const getOrRecordAudio = action({
     ctx,
     { text, language }
   ): Promise<{ audioUrl: string }> => {
-    // Toggle whether the Convex action should return a same-origin proxy path
-    // or a direct Convex storage URL. Set USE_PROXY in env to 'true'|'false'.
-    const USE_PROXY = (() => {
-      const v = process.env.USE_PROXY;
-      if (v !== undefined) return v === "1" || v.toLowerCase() === "true";
-      return process.env.NODE_ENV !== "production";
-    })();
     console.log(`[getOrRecordAudio] Checking for existing audio for text: "${text}", language: "${language}"`);
     const sentence: { _id: Id<"sentences"> } | null =
       await ctx.runQuery(
@@ -142,12 +126,6 @@ export const getOrRecordAudio = action({
       );
     if (audio) {
       console.log(`[getOrRecordAudio] Audio found in database for text: "${text}", language: "${language}"`);
-      if (USE_PROXY) {
-        const proxyPath = `/api/convex-storage/${String(audio.storageId)}`;
-        console.log(`[getOrRecordAudio] Returning proxy path: ${proxyPath}`);
-        return { audioUrl: proxyPath };
-      }
-
       const url: string | null = await ctx.storage.getUrl(audio.storageId);
       if (!url) throw new Error("Failed to load audio");
       console.log(`[getOrRecordAudio] Returning direct Convex storage URL: ${url}`);
@@ -177,15 +155,6 @@ export const getOrRecordAudio = action({
     });
 
     console.log(`[getOrRecordAudio] Audio stored successfully in database for text: "${text}", language: "${language}"`);
-
-    // Return either a same-origin proxy path or the direct Convex storage URL
-    // depending on `USE_PROXY`.
-    if (USE_PROXY) {
-      const proxyPath = `/api/convex-storage/${String(storageId)}`;
-      console.log(`[getOrRecordAudio] Returning proxy path: ${proxyPath}`);
-      return { audioUrl: proxyPath };
-    }
-
     const finalUrl: string | null = await ctx.storage.getUrl(storageId);
     if (!finalUrl) throw new Error("Failed to load audio");
     console.log(`[getOrRecordAudio] Returning direct Convex storage URL: ${finalUrl}`);
