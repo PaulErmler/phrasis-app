@@ -9,11 +9,11 @@ import { essentialSentences } from "./essentialSentences";
  * Adds the NEXT N sentences that the user doesn't already have cards for
  */
 export const addBasicCards: any = action({
-  args: { userId: v.string(), count: v.optional(v.number()) },
-  handler: async (ctx, { userId, count = 10 }): Promise<{ message: string; cardIds: any[] }> => {
+  args: { userId: v.string(), count: v.optional(v.number()), sourceLanguage: v.optional(v.string()), targetLanguage: v.optional(v.string()) },
+  handler: async (ctx, { userId, count = 10, sourceLanguage = "en", targetLanguage = "es" }): Promise<{ message: string; cardIds: any[] }> => {
     // 1. Get all existing sentence texts that user already has cards for
     const existingCards = await ctx.runQuery(api.cardActions.getAllCardsForPractice, { userId, limit: 1000 });
-    const existingSentenceTexts = new Set(existingCards.map((card: any) => card.english));
+    const existingSentenceTexts = new Set(existingCards.map((card: any) => card.sourceText || card.english));
 
     // 2. Find the next N sentences the user doesn't have yet
     const sentencesToAdd: string[] = [];
@@ -32,43 +32,45 @@ export const addBasicCards: any = action({
     }
 
     // 3. Translate ALL sentences in parallel first
-    const translationPromises = sentencesToAdd.map((english) =>
+    const translationPromises = sentencesToAdd.map((sourceText) =>
       ctx.runAction(api.translation.translateText, {
-        text: english,
-        sourceLang: "en",
-        targetLang: "es",
+        text: sourceText,
+        sourceLang: sourceLanguage,
+        targetLang: targetLanguage,
       }).catch((error) => {
-        console.error(`Failed to translate "${english}":`, error);
-        return { translatedText: english }; // fallback
+        console.error(`Failed to translate "${sourceText}":`, error);
+        return { translatedText: sourceText }; // fallback
       })
     );
 
     const translations = await Promise.all(translationPromises);
 
     // 4. Create all cards in the database SEQUENTIALLY to avoid conflicts
-    const results: Array<{ cardId: any; english: string }> = [];
+    const results: Array<{ cardId: any; sourceText: string }> = [];
     for (let i = 0; i < sentencesToAdd.length; i++) {
-      const english = sentencesToAdd[i];
-      const spanish = translations[i].translatedText;
+      const sourceText = sentencesToAdd[i];
+      const targetText = translations[i].translatedText;
       
       const cardId = await ctx.runMutation(api.seedCards.createCardWithTranslation, {
         userId,
-        english,
-        spanish,
+        sourceText,
+        targetText,
+        sourceLanguage,
+        targetLanguage,
       });
       
       if (cardId) {
-        results.push({ cardId, english });
+        results.push({ cardId, sourceText });
       }
     }
 
     // 5. Pre-generate audio for ALL cards in parallel
-    const audioPromises = sentencesToAdd.map((english) =>
+    const audioPromises = sentencesToAdd.map((sourceText) =>
       ctx.runAction(api.audioFunctions.getOrRecordAudio, {
-        text: english,
-        language: "en",
+        text: sourceText,
+        language: sourceLanguage,
       }).catch((error) => {
-        console.error(`Error pre-generating audio for "${english}":`, error);
+        console.error(`Error pre-generating audio for "${sourceText}":`, error);
       })
     );
 
@@ -87,21 +89,23 @@ export const addBasicCards: any = action({
 export const createCardWithTranslation = mutation({
   args: {
     userId: v.string(),
-    english: v.string(),
-    spanish: v.string(),
+    sourceText: v.string(),
+    targetText: v.string(),
+    sourceLanguage: v.optional(v.string()),
+    targetLanguage: v.optional(v.string()), // Default to 'es' for backward compatibility
   },
-  handler: async (ctx, { userId, english, spanish }) => {
-    // 1. Check if English sentence already exists
+  handler: async (ctx, { userId, sourceText, targetText, sourceLanguage = "en", targetLanguage = "es" }) => {
+    // 1. Check if source sentence already exists
     let sentenceRecord = await ctx.db
       .query("sentences")
-      .withIndex("by_text", (q) => q.eq("text", english))
+      .withIndex("by_text", (q) => q.eq("text", sourceText))
       .first();
 
     // 2. If not, insert it
     if (!sentenceRecord) {
       const sentenceId = await ctx.db.insert("sentences", {
-        text: english,
-        language: "en",
+        text: sourceText,
+        language: sourceLanguage,
         createdAt: Date.now(),
       });
       sentenceRecord = await ctx.db.get(sentenceId);
@@ -109,11 +113,11 @@ export const createCardWithTranslation = mutation({
 
     if (!sentenceRecord) return null;
 
-    // 3. Check if Spanish translation exists
+    // 3. Check if target translation exists
     let translation = await ctx.db
       .query("translations")
       .withIndex("by_sentence_and_language", (q) =>
-        q.eq("sentenceId", sentenceRecord._id).eq("targetLanguage", "es")
+        q.eq("sentenceId", sentenceRecord._id).eq("targetLanguage", targetLanguage)
       )
       .first();
 
@@ -121,8 +125,8 @@ export const createCardWithTranslation = mutation({
     if (!translation) {
       await ctx.db.insert("translations", {
         sentenceId: sentenceRecord._id,
-        targetLanguage: "es",
-        translatedText: spanish,
+        targetLanguage: targetLanguage,
+        translatedText: targetText,
         createdAt: Date.now(),
       });
     }
@@ -133,7 +137,8 @@ export const createCardWithTranslation = mutation({
       .filter((q) =>
         q.and(
           q.eq(q.field("userId"), userId),
-          q.eq(q.field("sentenceId"), sentenceRecord._id)
+          q.eq(q.field("sentenceId"), sentenceRecord._id),
+          q.eq(q.field("targetLanguage"), targetLanguage)
         )
       )
       .first();
@@ -146,6 +151,7 @@ export const createCardWithTranslation = mutation({
     const cardId = await ctx.db.insert("cards", {
       userId,
       sentenceId: sentenceRecord._id,
+      targetLanguage, // Add target language to card
       // FSRS initial state for new card
       state: "new",
       difficulty: 0,

@@ -21,6 +21,13 @@ export default function AudioSpacedRepetitionPage() {
   const currentUser = useQuery(api.auth.getCurrentUser, isAuthenticated ? {} : "skip");
   const userId = currentUser?._id;
   
+  // Fetch user preferences first
+  const userPreferences = useQuery(
+    api.userPreferences.getUserPreferences,
+    userId ? { userId } : "skip"
+  );
+ 
+ 
   // Fetch cards due for review
   const cardsQuery = useQuery(
     api.cardActions.getCardsDueForReview,
@@ -32,25 +39,17 @@ export default function AudioSpacedRepetitionPage() {
     api.cardActions.getCardStats,
     userId ? { userId } : "skip"
   );
-  
-  // Fetch user preferences
-  const userPreferences = useQuery(
-    api.userPreferences.getUserPreferences,
-    userId ? { userId } : "skip"
-  );
 
   const [currentCard, setCurrentCard] = useState<any>(null);
-  const [showSpanish, setShowSpanish] = useState(false);
+  const [showTarget, setShowTarget] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [autoplayEnabled, setAutoplayEnabled] = useState(false);
-  const [autoplayDelayEnglishToSpanish, setAutoplayDelayEnglishToSpanish] = useState(2000);
-  const [autoplayDelaySpanishToNext, setAutoplayDelaySpanishToNext] = useState(3000);
+  const [autoplayDelaySourceToTarget, setAutoplayDelaySourceToTarget] = useState(2000);
+  const [autoplayDelayTargetToNext, setAutoplayDelayTargetToNext] = useState(3000);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedAudioType, setSelectedAudioType] = useState<'english' | 'spanish'>('english');
   const [manualPlayMode, setManualPlayMode] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -68,8 +67,8 @@ export default function AudioSpacedRepetitionPage() {
   // Load settings from user preferences
   useEffect(() => {
     if (userPreferences) {
-      setAutoplayDelayEnglishToSpanish(userPreferences.autoplayDelayEnglishToSpanish ?? 2000);
-      setAutoplayDelaySpanishToNext(userPreferences.autoplayDelaySpanishToNext ?? 3000);
+      setAutoplayDelaySourceToTarget(userPreferences.autoplayDelaySourceToTarget ?? 2000);
+      setAutoplayDelayTargetToNext(userPreferences.autoplayDelayTargetToNext ?? 3000);
     }
   }, [userPreferences]);
 
@@ -81,7 +80,7 @@ export default function AudioSpacedRepetitionPage() {
   const generateSpeech = useAction(api.audioFunctions.getOrRecordAudio);
 
   // Get audio URL via Convex action (uses text + language)
-  const getAudioUrl = async (text: string, language: "en" | "es") => {
+  const getAudioUrl = async (text: string, language: string) => {
     try {
       const result = await generateSpeech({ text, language });
       return result.audioUrl;
@@ -105,7 +104,7 @@ export default function AudioSpacedRepetitionPage() {
   };
 
   // Play audio with proper cleanup
-  const playAudio = async (url: string, isEnglish: boolean = false) => {
+  const playAudio = async (url: string) => {
     if (!url) return;
     if (audioRef.current) {
       // Stop current playback and cleanup
@@ -142,13 +141,13 @@ export default function AudioSpacedRepetitionPage() {
       if (currentCard && !manualPlayMode && autoplayEnabledRef.current) {
         const isInitialLearning = currentCard.isInInitialLearning;
         
-        if (!showSpanish) {
-          // English just finished, schedule Spanish reveal
+        if (!showTarget) {
+          // Source language just finished, schedule target reveal
           autoplayTimeoutRef.current = setTimeout(() => {
-            setShowSpanish(true);
-          }, autoplayDelayEnglishToSpanish);
+            setShowTarget(true);
+          }, autoplayDelaySourceToTarget);
         } else {
-          // Spanish just finished - auto-advance
+          // Target language just finished - auto-advance
           autoplayTimeoutRef.current = setTimeout(() => {
             if (isInitialLearning) {
               // Initial learning: just mark as seen
@@ -157,7 +156,7 @@ export default function AudioSpacedRepetitionPage() {
               // FSRS: auto-rate as "good"
               handleRate("good");
             }
-          }, autoplayDelaySpanishToNext);
+          }, autoplayDelayTargetToNext);
         }
       }
     };
@@ -171,7 +170,7 @@ export default function AudioSpacedRepetitionPage() {
       audioRef.current?.removeEventListener('loadedmetadata', updateProgress);
       audioRef.current?.removeEventListener('ended', handleAudioEnded);
     };
-  }, [autoplayDelayEnglishToSpanish, autoplayDelaySpanishToNext, currentCard, showSpanish]);
+  }, [autoplayDelaySourceToTarget, autoplayDelayTargetToNext, currentCard, showTarget]);
 
   if (authLoading) {
     return (
@@ -198,8 +197,7 @@ export default function AudioSpacedRepetitionPage() {
   useEffect(() => {
     if (cardsQuery && cardsQuery.length > 0) {
       setCurrentCard(cardsQuery[0]);
-      setShowSpanish(false);
-      setElapsedSeconds(0);
+      setShowTarget(false);
       setManualPlayMode(false);
       reviewStartTimeRef.current = Date.now();
       
@@ -209,35 +207,36 @@ export default function AudioSpacedRepetitionPage() {
         autoplayTimeoutRef.current = null;
       }
       
-      // Play English audio
+      // Play source language audio
       (async () => {
-        const url = await getAudioUrl(cardsQuery[0].english, "en");
+        const sourceText = cardsQuery[0].sourceText || cardsQuery[0].english;
+        const sourceLang = cardsQuery[0].sourceLanguage || "en";
+        const url = await getAudioUrl(sourceText, sourceLang);
         if (url) {
           currentAudioUrlRef.current = url;
-          await playAudio(url, true);
+          await playAudio(url);
         }
       })();
     }
   }, [cardsQuery]);
 
-  // Update elapsed time when showing Spanish
+  // Update elapsed time when showing target translation
   useEffect(() => {
-    if (showSpanish) {
-      const elapsed = Math.round((Date.now() - startTimeRef.current) / 1000);
-      setElapsedSeconds(elapsed);
-      
-      // Play Spanish audio automatically
+    if (showTarget) {
+      // Play target language audio automatically
       (async () => {
         if (currentCard) {
-          const url = await getAudioUrl(currentCard.spanish, "es");
+          const targetText = currentCard.targetText || currentCard.spanish;
+          const targetLang = currentCard.targetLanguage || "es";
+          const url = await getAudioUrl(targetText, targetLang);
           if (url) {
             currentAudioUrlRef.current = url;
-            await playAudio(url, false);
+            await playAudio(url);
           }
         }
       })();
     }
-  }, [showSpanish, currentCard]);
+  }, [showTarget, currentCard]);
 
   // Handle rating or marking as seen
   const handleRate = async (rating?: ReviewRating) => {
@@ -275,12 +274,13 @@ export default function AudioSpacedRepetitionPage() {
         const nextCards = await nextCardsResponse.json();
         if (nextCards.length > 0) {
           setCurrentCard(nextCards[0]);
-          setShowSpanish(false);
-          setElapsedSeconds(0);
+          setShowTarget(false);
           reviewStartTimeRef.current = Date.now();
           
-          // Play English audio for next card
-          const url = await getAudioUrl(nextCards[0].english, "en");
+          // Play source language audio for next card
+          const sourceText = nextCards[0].sourceText || nextCards[0].english;
+          const sourceLang = nextCards[0].sourceLanguage || "en";
+          const url = await getAudioUrl(sourceText, sourceLang);
           if (url) {
             currentAudioUrlRef.current = url;
             await playAudio(url);
@@ -466,15 +466,15 @@ export default function AudioSpacedRepetitionPage() {
                 <div className="space-y-3">
                   <div>
                     <label className="text-sm font-medium text-gray-700">
-                      English to Spanish Delay
+                      Source to Target Delay
                     </label>
                     <div className="flex items-center gap-3 mt-2">
                       <Button
                         onClick={async () => {
-                          const newValue = Math.max(0, autoplayDelayEnglishToSpanish - 500);
-                          setAutoplayDelayEnglishToSpanish(newValue);
+                          const newValue = Math.max(0, autoplayDelaySourceToTarget - 500);
+                          setAutoplayDelaySourceToTarget(newValue);
                           if (userId) {
-                            await updatePreferencesMutation({ userId, autoplayDelayEnglishToSpanish: newValue });
+                            await updatePreferencesMutation({ userId, autoplayDelaySourceToTarget: newValue });
                           }
                         }}
                         variant="outline"
@@ -484,14 +484,14 @@ export default function AudioSpacedRepetitionPage() {
                         -
                       </Button>
                       <span className="text-lg font-semibold w-16 text-center">
-                        {(autoplayDelayEnglishToSpanish / 1000).toFixed(1)}s
+                        {(autoplayDelaySourceToTarget / 1000).toFixed(1)}s
                       </span>
                       <Button
                         onClick={async () => {
-                          const newValue = Math.min(10000, autoplayDelayEnglishToSpanish + 500);
-                          setAutoplayDelayEnglishToSpanish(newValue);
+                          const newValue = Math.min(10000, autoplayDelaySourceToTarget + 500);
+                          setAutoplayDelaySourceToTarget(newValue);
                           if (userId) {
-                            await updatePreferencesMutation({ userId, autoplayDelayEnglishToSpanish: newValue });
+                            await updatePreferencesMutation({ userId, autoplayDelaySourceToTarget: newValue });
                           }
                         }}
                         variant="outline"
@@ -501,20 +501,20 @@ export default function AudioSpacedRepetitionPage() {
                         +
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">Wait time after English audio before showing Spanish</p>
+                    <p className="text-xs text-muted-foreground mt-1">Wait time after source audio before showing translation</p>
                   </div>
                   
                   <div>
                     <label className="text-sm font-medium text-gray-700">
-                      Spanish to Next Card Delay
+                      Target to Next Card Delay
                     </label>
                     <div className="flex items-center gap-3 mt-2">
                       <Button
                         onClick={async () => {
-                          const newValue = Math.max(0, autoplayDelaySpanishToNext - 500);
-                          setAutoplayDelaySpanishToNext(newValue);
+                          const newValue = Math.max(0, autoplayDelayTargetToNext - 500);
+                          setAutoplayDelayTargetToNext(newValue);
                           if (userId) {
-                            await updatePreferencesMutation({ userId, autoplayDelaySpanishToNext: newValue });
+                            await updatePreferencesMutation({ userId, autoplayDelayTargetToNext: newValue });
                           }
                         }}
                         variant="outline"
@@ -524,14 +524,14 @@ export default function AudioSpacedRepetitionPage() {
                         -
                       </Button>
                       <span className="text-lg font-semibold w-16 text-center">
-                        {(autoplayDelaySpanishToNext / 1000).toFixed(1)}s
+                        {(autoplayDelayTargetToNext / 1000).toFixed(1)}s
                       </span>
                       <Button
                         onClick={async () => {
-                          const newValue = Math.min(10000, autoplayDelaySpanishToNext + 500);
-                          setAutoplayDelaySpanishToNext(newValue);
+                          const newValue = Math.min(10000, autoplayDelayTargetToNext + 500);
+                          setAutoplayDelayTargetToNext(newValue);
                           if (userId) {
-                            await updatePreferencesMutation({ userId, autoplayDelaySpanishToNext: newValue });
+                            await updatePreferencesMutation({ userId, autoplayDelayTargetToNext: newValue });
                           }
                         }}
                         variant="outline"
@@ -541,7 +541,7 @@ export default function AudioSpacedRepetitionPage() {
                         +
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">Wait time after Spanish audio before auto-advancing</p>
+                    <p className="text-xs text-muted-foreground mt-1">Wait time after target audio before auto-advancing</p>
                   </div>
                 </div>
               </div>
@@ -553,54 +553,56 @@ export default function AudioSpacedRepetitionPage() {
         <Card
           className="p-8 shadow-lg cursor-pointer hover:shadow-xl transition-shadow bg-white/90 border border-border/70"
           onClick={() => {
-            if (!showSpanish) {
+            if (!showTarget) {
               startTimeRef.current = Date.now();
-              setShowSpanish(true);
+              setShowTarget(true);
             }
           }}
         >
           <div className="space-y-6">
-            {/* English Sentence with Audio Progress */}
+            {/* Source Language Sentence with Audio Progress */}
             <div className="space-y-4">
               <div className="space-y-2">
                 <p 
                   className="text-3xl md:text-4xl font-medium text-gray-900 leading-snug cursor-pointer hover:text-emerald-600 transition-colors"
                   onClick={async (e) => {
                     e.stopPropagation();
-                    if (!showSpanish) {
+                    if (!showTarget) {
                       startTimeRef.current = Date.now();
-                      setShowSpanish(true);
+                      setShowTarget(true);
                     } else {
-                      setSelectedAudioType('english');
                       setManualPlayMode(true);
-                      const url = await getAudioUrl(currentCard.english, 'en');
+                      const sourceText = currentCard.sourceText || currentCard.english;
+                      const sourceLang = currentCard.sourceLanguage || (userPreferences?.sourceLanguage ?? "en");
+                      const url = await getAudioUrl(sourceText, sourceLang);
                       if (url) {
                         currentAudioUrlRef.current = url;
-                        await playAudio(url, true);
+                        await playAudio(url);
                       }
                     }
                   }}
                 >
-                  {currentCard.english}
+                  {currentCard.sourceText || currentCard.english}
                 </p>
               </div>
 
-              {/* Spanish Translation (below English) */}
-              {showSpanish && (
+              {/* Target Translation (below Source) */}
+              {showTarget && (
                 <p 
                   className="text-2xl md:text-3xl text-muted-foreground leading-snug cursor-pointer hover:text-teal-600 transition-colors"
                   onClick={async (e) => {
                     e.stopPropagation();
-                    setSelectedAudioType('spanish');
                     setManualPlayMode(true);
-                    const url = await getAudioUrl(currentCard.spanish, 'es');
+                    const targetText = currentCard.targetText || currentCard.spanish;
+                    const targetLang = currentCard.targetLanguage || (userPreferences?.targetLanguage ?? "es");
+                    const url = await getAudioUrl(targetText, targetLang);
                     if (url) {
                       currentAudioUrlRef.current = url;
-                      await playAudio(url, false);
+                      await playAudio(url);
                     }
                   }}
                 >
-                  {currentCard.spanish}
+                  {currentCard.targetText || currentCard.spanish}
                 </p>
               )}
 
@@ -640,22 +642,22 @@ export default function AudioSpacedRepetitionPage() {
             </div>
 
             {/* Instructions */}
-            {!showSpanish && (
+            {!showTarget && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="w-2 h-2 rounded-full bg-amber-400" />
                 <p>Tap anywhere on the card to reveal the translation.</p>
               </div>
             )}
             
-            {showSpanish && (
+            {showTarget && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span className="w-2 h-2 rounded-full bg-blue-400" />
-                <p>Click on English or Spanish text to hear it. Use the center button to pause/play.</p>
+                <p>Click on any text to hear it. Use the center button to pause/play.</p>
               </div>
             )}
 
-            {/* Rating Buttons (only after Spanish is revealed) */}
-            {showSpanish && (
+            {/* Rating Buttons (only after target is revealed) */}
+            {showTarget && (
               <div className="pt-4 border-t border-border/70 space-y-3">
                 {currentCard.isInInitialLearning ? (
                   <>

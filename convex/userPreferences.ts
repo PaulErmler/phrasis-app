@@ -16,8 +16,10 @@ export const getUserPreferences = query({
       // Return defaults
       return {
         userId,
-        autoplayDelayEnglishToSpanish: 2000,
-        autoplayDelaySpanishToNext: 3000,
+        sourceLanguage: "en", // Default: English
+        targetLanguage: "es", // Default: Spanish
+        autoplayDelaySourceToTarget: 2000,
+        autoplayDelayTargetToNext: 3000,
         maxInitialLearningCards: 10,
         initialLearningReviewsRequired: 4,
         initialLearningPriorityCoefficientReviewCount: 1.0,
@@ -37,8 +39,10 @@ export const getUserPreferences = query({
 export const updateUserPreferences = mutation({
   args: {
     userId: v.string(),
-    autoplayDelayEnglishToSpanish: v.optional(v.number()),
-    autoplayDelaySpanishToNext: v.optional(v.number()),
+    sourceLanguage: v.optional(v.string()),
+    targetLanguage: v.optional(v.string()),
+    autoplayDelaySourceToTarget: v.optional(v.number()),
+    autoplayDelayTargetToNext: v.optional(v.number()),
     maxInitialLearningCards: v.optional(v.number()),
     initialLearningReviewsRequired: v.optional(v.number()),
     initialLearningPriorityCoefficientReviewCount: v.optional(v.number()),
@@ -49,8 +53,10 @@ export const updateUserPreferences = mutation({
     ctx,
     {
       userId,
-      autoplayDelayEnglishToSpanish,
-      autoplayDelaySpanishToNext,
+      sourceLanguage,
+      targetLanguage,
+      autoplayDelaySourceToTarget,
+      autoplayDelayTargetToNext,
       maxInitialLearningCards,
       initialLearningReviewsRequired,
       initialLearningPriorityCoefficientReviewCount,
@@ -66,10 +72,12 @@ export const updateUserPreferences = mutation({
     const updates = {
       userId,
       updatedAt: Date.now(),
-      ...(autoplayDelayEnglishToSpanish !== undefined && {
-        autoplayDelayEnglishToSpanish,
+      ...(sourceLanguage !== undefined && { sourceLanguage }),
+      ...(targetLanguage !== undefined && { targetLanguage }),
+      ...(autoplayDelaySourceToTarget !== undefined && {
+        autoplayDelaySourceToTarget,
       }),
-      ...(autoplayDelaySpanishToNext !== undefined && { autoplayDelaySpanishToNext }),
+      ...(autoplayDelayTargetToNext !== undefined && { autoplayDelayTargetToNext }),
       ...(maxInitialLearningCards !== undefined && { maxInitialLearningCards }),
       ...(initialLearningReviewsRequired !== undefined && {
         initialLearningReviewsRequired,
@@ -90,8 +98,10 @@ export const updateUserPreferences = mutation({
       // Create with defaults
       const id = await ctx.db.insert("user_preferences", {
         userId,
-        autoplayDelayEnglishToSpanish: autoplayDelayEnglishToSpanish ?? 2000,
-        autoplayDelaySpanishToNext: autoplayDelaySpanishToNext ?? 3000,
+        sourceLanguage: sourceLanguage ?? "en",
+        targetLanguage: targetLanguage ?? "es",
+        autoplayDelaySourceToTarget: autoplayDelaySourceToTarget ?? 2000,
+        autoplayDelayTargetToNext: autoplayDelayTargetToNext ?? 3000,
         maxInitialLearningCards: maxInitialLearningCards ?? 10,
         initialLearningReviewsRequired: initialLearningReviewsRequired ?? 4,
         initialLearningPriorityCoefficientReviewCount:
@@ -105,8 +115,10 @@ export const updateUserPreferences = mutation({
       return {
         _id: id,
         userId,
-        autoplayDelayEnglishToSpanish: autoplayDelayEnglishToSpanish ?? 2000,
-        autoplayDelaySpanishToNext: autoplayDelaySpanishToNext ?? 3000,
+        sourceLanguage: sourceLanguage ?? "en",
+        targetLanguage: targetLanguage ?? "es",
+        autoplayDelaySourceToTarget: autoplayDelaySourceToTarget ?? 2000,
+        autoplayDelayTargetToNext: autoplayDelayTargetToNext ?? 3000,
         maxInitialLearningCards: maxInitialLearningCards ?? 10,
         initialLearningReviewsRequired: initialLearningReviewsRequired ?? 4,
         initialLearningPriorityCoefficientReviewCount:

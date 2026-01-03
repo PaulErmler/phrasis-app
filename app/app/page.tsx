@@ -54,11 +54,11 @@ export default function AppPage() {
 
 function Content() {
   const router = useRouter();
-  const { viewer, numbers } = useQuery(api.myFunctions.listNumbers, { count: 10 }) ?? {};
-  const addNumber = useMutation(api.myFunctions.addNumber);
   const currentUser = useQuery(api.auth.getCurrentUser);
   const userId = currentUser?._id;
+  const userPreferences = useQuery(api.userPreferences.getUserPreferences, userId ? { userId } : "skip");
   const cardStats = useQuery(api.cardActions.getCardStats, userId ? { userId } : "skip");
+  const updatePreferencesMutation = useMutation(api.userPreferences.updateUserPreferences);
   const addBasicCards = useAction(api.seedCards.addBasicCards);
   
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
@@ -141,24 +141,11 @@ function Content() {
     );
   }
 
-  if (viewer === undefined || numbers === undefined) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-          <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
-          <p className="ml-2 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-xl mx-auto space-y-6">
-      <div className="text-center space-y-2">
+      <div className="text-center space-y-3">
         <h1 className="text-2xl font-bold">
-          Welcome{viewer ? `, ${viewer}` : ""}!
+          Welcome!
         </h1>
         <p className="text-muted-foreground">
           You&apos;re signed in to Phrasis
@@ -320,7 +307,10 @@ function Content() {
               if (!userId) return;
               try {
                 setIsAddingCards(true);
-                await addBasicCards({ userId, count: cardImportCount });
+                await addBasicCards({ 
+                  userId, 
+                  count: cardImportCount
+                });
               } catch (error) {
                 console.error("Error adding cards:", error);
               } finally {

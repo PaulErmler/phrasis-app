@@ -30,26 +30,27 @@ function calculateInitialLearningPriority(
  * Initial learning cards are shown FIRST and ONLY - FSRS blocked until all initial learning complete
  */
 export const getCardsDueForReview = query({
-  args: { userId: v.string(), limit: v.optional(v.number()) },
-  handler: async (ctx, { userId, limit = 20 }) => {
+  args: { userId: v.string(), limit: v.optional(v.number()), targetLanguage: v.optional(v.string()) },
+  handler: async (ctx, { userId, limit = 20, targetLanguage: paramTargetLanguage }) => {
     const now = Date.now();
 
-    // Get user preferences for initial learning config
+    // Get user preferences for initial learning config and target language
     const prefs = await ctx.db
       .query("user_preferences")
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .first();
 
+    // Use parameter if provided, otherwise fall back to user preferences
+    const targetLanguage = paramTargetLanguage ?? prefs?.targetLanguage ?? "es";
     const reviewsRequired = prefs?.initialLearningReviewsRequired ?? 4;
     const reviewCountCoeff = prefs?.initialLearningPriorityCoefficientReviewCount ?? 1.0;
     const minutesCoeff = prefs?.initialLearningPriorityCoefficientMinutes ?? 0.1;
 
-    // Get initial learning cards and filter out those that already meet the requirement
-    // (they should have been graduated but haven't been yet - will be graduated on next review)
+    // Get initial learning cards for the current target language
     const initialLearningCards = await ctx.db
       .query("cards")
-      .withIndex("by_userId_initialLearning", (q) =>
-        q.eq("userId", userId).eq("initialLearningPhase", true)
+      .withIndex("by_userId_targetLanguage_initialLearning", (q) =>
+        q.eq("userId", userId).eq("targetLanguage", targetLanguage).eq("initialLearningPhase", true)
       )
       .collect();
 
@@ -79,16 +80,16 @@ export const getCardsDueForReview = query({
       return priorityB - priorityA; // Higher priority first
     });
 
-    // If ANY initial learning cards exist, ONLY show those (block FSRS until initial learning complete)
+    // If ANY initial learning cards exist for this language, ONLY show those
     let allCards;
     if (sortedInitialLearning.length > 0) {
       allCards = sortedInitialLearning.slice(0, limit);
     } else {
-      // No initial learning cards - get FSRS cards due for review
+      // No initial learning cards - get FSRS cards due for review in target language
       const fsrsCards = await ctx.db
         .query("cards")
-        .withIndex("by_userId_nextReview", (q) =>
-          q.eq("userId", userId).lte("nextReview", now)
+        .withIndex("by_userId_targetLanguage_nextReview", (q) =>
+          q.eq("userId", userId).eq("targetLanguage", targetLanguage).lte("nextReview", now)
         )
         .filter((q) => q.eq(q.field("initialLearningPhase"), false))
         .order("asc")
@@ -103,14 +104,16 @@ export const getCardsDueForReview = query({
         const translation = await ctx.db
           .query("translations")
           .withIndex("by_sentence_and_language", (q) =>
-            q.eq("sentenceId", card.sentenceId).eq("targetLanguage", "es")
+            q.eq("sentenceId", card.sentenceId).eq("targetLanguage", prefs?.targetLanguage ?? "es")
           )
           .first();
 
         return {
           ...card,
-          english: sentence?.text || "",
-          spanish: translation?.translatedText || "",
+          sourceText: sentence?.text || "",
+          targetText: translation?.translatedText || "",
+          sourceLanguage: sentence?.language || prefs?.sourceLanguage || "en",
+          targetLanguage: prefs?.targetLanguage ?? "es",
           isInInitialLearning: card.initialLearningPhase,
         };
       })
@@ -126,9 +129,18 @@ export const getCardsDueForReview = query({
 export const getAllCardsForPractice = query({
   args: { userId: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, { userId, limit = 20 }) => {
+    const prefs = await ctx.db
+      .query("user_preferences")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+
+    const targetLanguage = prefs?.targetLanguage ?? "es";
+
     const cards = await ctx.db
       .query("cards")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .withIndex("by_userId_targetLanguage", (q) => 
+        q.eq("userId", userId).eq("targetLanguage", targetLanguage)
+      )
       .order("desc")
       .take(limit);
 
@@ -139,14 +151,17 @@ export const getAllCardsForPractice = query({
         const translation = await ctx.db
           .query("translations")
           .withIndex("by_sentence_and_language", (q) =>
-            q.eq("sentenceId", card.sentenceId).eq("targetLanguage", "es")
+            q.eq("sentenceId", card.sentenceId).eq("targetLanguage", prefs?.targetLanguage ?? "es")
           )
           .first();
 
         return {
           ...card,
-          english: sentence?.text || "",
-          spanish: translation?.translatedText || "",
+          sourceText: sentence?.text || "",
+          targetText: translation?.translatedText || "",
+          sourceLanguage: sentence?.language || prefs?.sourceLanguage || "en",
+          targetLanguage: prefs?.targetLanguage ?? "es",
+          isInInitialLearning: card.initialLearningPhase,
         };
       })
     );
@@ -159,11 +174,22 @@ export const getAllCardsForPractice = query({
  * Get card stats for user dashboard
  */
 export const getCardStats = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
+  args: { userId: v.string(), targetLanguage: v.optional(v.string()) },
+  handler: async (ctx, { userId, targetLanguage: paramTargetLanguage }) => {
+    // Get user preferences for target language
+    const prefs = await ctx.db
+      .query("user_preferences")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+
+    // Use parameter if provided, otherwise fall back to user preferences
+    const targetLanguage = paramTargetLanguage ?? prefs?.targetLanguage ?? "es";
+
     const cards = await ctx.db
       .query("cards")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .withIndex("by_userId_targetLanguage", (q) => 
+        q.eq("userId", userId).eq("targetLanguage", targetLanguage)
+      )
       .collect();
 
     const now = Date.now();
@@ -210,13 +236,18 @@ export const createCard = mutation({
   args: {
     userId: v.string(),
     sentenceId: v.id("sentences"),
+    targetLanguage: v.string(), // Language being learned
   },
-  handler: async (ctx, { userId, sentenceId }) => {
-    // Check if card already exists
+  handler: async (ctx, { userId, sentenceId, targetLanguage }) => {
+    // Check if card already exists for this user, sentence, and target language
     const existing = await ctx.db
       .query("cards")
       .filter((q) =>
-        q.and(q.eq(q.field("userId"), userId), q.eq(q.field("sentenceId"), sentenceId))
+        q.and(
+          q.eq(q.field("userId"), userId), 
+          q.eq(q.field("sentenceId"), sentenceId),
+          q.eq(q.field("targetLanguage"), targetLanguage)
+        )
       )
       .first();
 
@@ -228,6 +259,7 @@ export const createCard = mutation({
     const cardId = await ctx.db.insert("cards", {
       userId,
       sentenceId,
+      targetLanguage,
       ...fsrsData,
       nextReview: Date.now(), // New cards are due immediately
       createdAt: Date.now(),
@@ -246,12 +278,14 @@ export const createCardFromUserSentence = mutation({
   args: {
     userId: v.string(),
     userSentenceId: v.id("user_sentences"),
+    targetLanguage: v.string(),
   },
-  handler: async (ctx, { userId, userSentenceId }) => {
+  handler: async (ctx, { userId, userSentenceId, targetLanguage }) => {
     const fsrsData = initializeCard();
     const cardId = await ctx.db.insert("cards", {
       userId,
-      sentenceId: userSentenceId as any, // Temporarily store user sentence ID
+      sentenceId: userSentenceId as any,
+      targetLanguage,
       ...fsrsData,
       nextReview: Date.now(),
       createdAt: Date.now(),
