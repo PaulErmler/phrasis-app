@@ -262,7 +262,6 @@ export const createCard = mutation({
       targetLanguage,
       ...fsrsData,
       nextReview: Date.now(), // New cards are due immediately
-      createdAt: Date.now(),
       initialLearningPhase: true,
       initialReviewCount: 0,
     });
@@ -288,7 +287,7 @@ export const createCardFromUserSentence = mutation({
       targetLanguage,
       ...fsrsData,
       nextReview: Date.now(),
-      createdAt: Date.now(),
+
       initialLearningPhase: true,
       initialReviewCount: 0,
     });

@@ -106,7 +106,6 @@ export const createCardWithTranslation = mutation({
       const sentenceId = await ctx.db.insert("sentences", {
         text: sourceText,
         language: sourceLanguage,
-        createdAt: Date.now(),
       });
       sentenceRecord = await ctx.db.get(sentenceId);
     }
@@ -127,7 +126,6 @@ export const createCardWithTranslation = mutation({
         sentenceId: sentenceRecord._id,
         targetLanguage: targetLanguage,
         translatedText: targetText,
-        createdAt: Date.now(),
       });
     }
 
@@ -163,7 +161,6 @@ export const createCardWithTranslation = mutation({
       nextReview: Date.now(), // Due immediately
       initialLearningPhase: true,
       initialReviewCount: 0,
-      createdAt: Date.now(),
     });
 
     return cardId;

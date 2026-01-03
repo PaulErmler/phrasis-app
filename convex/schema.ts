@@ -9,14 +9,12 @@ export default defineSchema({
   sentences: defineTable({
     text: v.string(),
     language: v.string(), // e.g., "en"
-    createdAt: v.number(), // timestamp
   }).index("by_text", ["text"]),
   
   translations: defineTable({
     sentenceId: v.id("sentences"),
     targetLanguage: v.string(), // e.g., "es"
     translatedText: v.string(),
-    createdAt: v.number(), // timestamp
   }).index("by_sentence_and_language", ["sentenceId", "targetLanguage"]),
   
   audio_recordings: defineTable({
@@ -25,13 +23,11 @@ export default defineSchema({
     //accent: v.optional(v.string()), // e.g., "us", "uk"
     voice: v.optional(v.string()), // e.g., "FEMALE"
     storageId: v.id("_storage"),
-    createdAt: v.number(), // timestamp
   }).index("by_sentence_language", ["sentenceId", "language"]),// "accent"]),
 
   // User authentication & preferences
   users: defineTable({
     email: v.string(),
-    createdAt: v.number(),
   }).index("by_email", ["email"]),
 
   user_preferences: defineTable({
@@ -70,7 +66,6 @@ export default defineSchema({
     initialLearningPhase: v.boolean(), // true = in initial learning, false = FSRS active
     initialReviewCount: v.number(), // 0-4, times seen in initial phase
     lastInitialReviewTime: v.optional(v.number()), // timestamp of last initial review
-    createdAt: v.number(),
   }).index("by_userId", ["userId"])
     .index("by_userId_targetLanguage", ["userId", "targetLanguage"])
     .index("by_userId_nextReview", ["userId", "nextReview"])
@@ -94,6 +89,5 @@ export default defineSchema({
     english: v.string(),
     spanish: v.string(),
     difficulty: v.optional(v.number()), // 0-1, optional difficulty rating
-    createdAt: v.number(),
   }).index("by_userId", ["userId"]),
 });
