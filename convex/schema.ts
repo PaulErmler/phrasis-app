@@ -24,7 +24,6 @@ export default defineSchema({
     language: v.string(), // e.g., "en-US"
     //accent: v.optional(v.string()), // e.g., "us", "uk"
     voice: v.optional(v.string()), // e.g., "FEMALE"
-    //audioData: v.optional(v.string()), // base64
     storageId: v.id("_storage"),
     createdAt: v.number(), // timestamp
   }).index("by_sentence_language", ["sentenceId", "language"]),// "accent"]),
@@ -37,8 +36,12 @@ export default defineSchema({
 
   user_preferences: defineTable({
     userId: v.string(), // better-auth userId
-    autoplayDelayEnglishToSpanish: v.number(), // milliseconds
-    autoplayDelaySpanishToNext: v.number(), // milliseconds
+    // Language settings
+    sourceLanguage: v.string(), // e.g., "en" for English (learning from)
+    targetLanguage: v.string(), // e.g., "es" for Spanish (translating to)
+    // Autoplay delays (language-agnostic)
+    autoplayDelaySourceToTarget: v.number(), // milliseconds (delay after source language audio)
+    autoplayDelayTargetToNext: v.number(), // milliseconds (delay after target language audio)
     // Initial learning phase preferences
     maxInitialLearningCards: v.number(), // max cards in initial phase at once (default 10)
     initialLearningReviewsRequired: v.number(), // times to review before FSRS (default 4)
@@ -52,6 +55,7 @@ export default defineSchema({
   cards: defineTable({
     userId: v.string(),
     sentenceId: v.id("sentences"),
+    targetLanguage: v.string(), // e.g., "es" for Spanish - the language being learned
     // FSRS state
     state: v.string(), // "new" | "learning" | "review" | "relearning"
     difficulty: v.number(), // 0-1, difficulty factor
@@ -68,8 +72,11 @@ export default defineSchema({
     lastInitialReviewTime: v.optional(v.number()), // timestamp of last initial review
     createdAt: v.number(),
   }).index("by_userId", ["userId"])
+    .index("by_userId_targetLanguage", ["userId", "targetLanguage"])
     .index("by_userId_nextReview", ["userId", "nextReview"])
-    .index("by_userId_initialLearning", ["userId", "initialLearningPhase"]),
+    .index("by_userId_initialLearning", ["userId", "initialLearningPhase"])
+    .index("by_userId_targetLanguage_nextReview", ["userId", "targetLanguage", "nextReview"])
+    .index("by_userId_targetLanguage_initialLearning", ["userId", "targetLanguage", "initialLearningPhase"]),
 
   card_reviews: defineTable({
     userId: v.string(),
