@@ -39,6 +39,12 @@ export default defineSchema({
     userId: v.string(), // better-auth userId
     autoplayDelayEnglishToSpanish: v.number(), // milliseconds
     autoplayDelaySpanishToNext: v.number(), // milliseconds
+    // Initial learning phase preferences
+    maxInitialLearningCards: v.number(), // max cards in initial phase at once (default 10)
+    initialLearningReviewsRequired: v.number(), // times to review before FSRS (default 4)
+    initialLearningPriorityCoefficientReviewCount: v.number(), // weight for (required - current) (default 1.0)
+    initialLearningPriorityCoefficientMinutes: v.number(), // weight for minutes since last review (default 0.1)
+    initialLearningAutoplay: v.boolean(), // enable autoplay during initial learning (default false)
     updatedAt: v.number(),
   }).index("by_userId", ["userId"]),
 
@@ -56,9 +62,14 @@ export default defineSchema({
     lapses: v.number(), // times forgotten
     lastReview: v.optional(v.number()), // timestamp
     nextReview: v.optional(v.number()), // timestamp (due date)
+    // Initial learning phase (before FSRS)
+    initialLearningPhase: v.boolean(), // true = in initial learning, false = FSRS active
+    initialReviewCount: v.number(), // 0-4, times seen in initial phase
+    lastInitialReviewTime: v.optional(v.number()), // timestamp of last initial review
     createdAt: v.number(),
   }).index("by_userId", ["userId"])
-    .index("by_userId_nextReview", ["userId", "nextReview"]),
+    .index("by_userId_nextReview", ["userId", "nextReview"])
+    .index("by_userId_initialLearning", ["userId", "initialLearningPhase"]),
 
   card_reviews: defineTable({
     userId: v.string(),

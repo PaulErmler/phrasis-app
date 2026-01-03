@@ -6,23 +6,99 @@ import { api } from "./_generated/api";
 type CardState = "new" | "learning" | "review" | "relearning";
 
 /**
- * Get all cards due for review for the current user, sorted by due date
+ * Calculate priority score for initial learning cards
+ * Higher score = should be reviewed sooner
+ * Score = (reviewsRequired - currentCount) * reviewCountWeight + (minutesSinceLast) * minutesWeight
+ */
+function calculateInitialLearningPriority(
+  initialReviewCount: number,
+  lastInitialReviewTime: number | undefined,
+  reviewsRequired: number,
+  reviewCountCoeff: number,
+  minutesCoeff: number,
+  now: number
+): number {
+  const reviewsRemaining = Math.max(0, reviewsRequired - initialReviewCount);
+  const minutesSinceLast = lastInitialReviewTime
+    ? (now - lastInitialReviewTime) / (1000 * 60)
+    : 0;
+  return reviewsRemaining * reviewCountCoeff + minutesSinceLast * minutesCoeff;
+}
+
+/**
+ * Get all cards due for review (both initial learning and FSRS)
+ * Initial learning cards are shown FIRST and ONLY - FSRS blocked until all initial learning complete
  */
 export const getCardsDueForReview = query({
   args: { userId: v.string(), limit: v.optional(v.number()) },
   handler: async (ctx, { userId, limit = 20 }) => {
     const now = Date.now();
-    const cards = await ctx.db
+
+    // Get user preferences for initial learning config
+    const prefs = await ctx.db
+      .query("user_preferences")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+
+    const reviewsRequired = prefs?.initialLearningReviewsRequired ?? 4;
+    const reviewCountCoeff = prefs?.initialLearningPriorityCoefficientReviewCount ?? 1.0;
+    const minutesCoeff = prefs?.initialLearningPriorityCoefficientMinutes ?? 0.1;
+
+    // Get initial learning cards and filter out those that already meet the requirement
+    // (they should have been graduated but haven't been yet - will be graduated on next review)
+    const initialLearningCards = await ctx.db
       .query("cards")
-      .withIndex("by_userId_nextReview", (q) =>
-        q.eq("userId", userId).lte("nextReview", now)
+      .withIndex("by_userId_initialLearning", (q) =>
+        q.eq("userId", userId).eq("initialLearningPhase", true)
       )
-      .order("asc")
-      .take(limit);
+      .collect();
+
+    // Filter out cards that already meet the graduation requirement
+    const activeInitialLearningCards = initialLearningCards.filter(
+      (card) => card.initialReviewCount < reviewsRequired
+    );
+
+    // Sort initial learning cards by priority
+    const sortedInitialLearning = activeInitialLearningCards.sort((a, b) => {
+      const priorityA = calculateInitialLearningPriority(
+        a.initialReviewCount,
+        a.lastInitialReviewTime,
+        reviewsRequired,
+        reviewCountCoeff,
+        minutesCoeff,
+        now
+      );
+      const priorityB = calculateInitialLearningPriority(
+        b.initialReviewCount,
+        b.lastInitialReviewTime,
+        reviewsRequired,
+        reviewCountCoeff,
+        minutesCoeff,
+        now
+      );
+      return priorityB - priorityA; // Higher priority first
+    });
+
+    // If ANY initial learning cards exist, ONLY show those (block FSRS until initial learning complete)
+    let allCards;
+    if (sortedInitialLearning.length > 0) {
+      allCards = sortedInitialLearning.slice(0, limit);
+    } else {
+      // No initial learning cards - get FSRS cards due for review
+      const fsrsCards = await ctx.db
+        .query("cards")
+        .withIndex("by_userId_nextReview", (q) =>
+          q.eq("userId", userId).lte("nextReview", now)
+        )
+        .filter((q) => q.eq(q.field("initialLearningPhase"), false))
+        .order("asc")
+        .collect();
+      allCards = fsrsCards.slice(0, limit);
+    }
 
     // Enrich with sentence data
     const enriched = await Promise.all(
-      cards.map(async (card) => {
+      allCards.map(async (card) => {
         const sentence = await ctx.db.get(card.sentenceId);
         const translation = await ctx.db
           .query("translations")
@@ -35,6 +111,7 @@ export const getCardsDueForReview = query({
           ...card,
           english: sentence?.text || "",
           spanish: translation?.translatedText || "",
+          isInInitialLearning: card.initialLearningPhase,
         };
       })
     );
@@ -90,10 +167,18 @@ export const getCardStats = query({
       .collect();
 
     const now = Date.now();
-    const dueCount = cards.filter((c) => (c.nextReview ?? 0) <= now).length;
-    const newCount = cards.filter((c) => c.state === "new").length;
-    const reviewCount = cards.filter((c) => c.state === "review").length;
-    const learningCount = cards.filter((c) => c.state === "learning").length;
+    const initialLearningCards = cards.filter((c) => c.initialLearningPhase);
+    const fsrsCards = cards.filter((c) => !c.initialLearningPhase);
+
+    // Initial learning stats
+    const initialLearningDueNow = initialLearningCards.length; // All initial learning cards are "due"
+    const initialLearningCount = initialLearningCards.length;
+
+    // FSRS stats
+    const dueCount = fsrsCards.filter((c) => (c.nextReview ?? 0) <= now).length;
+    const newCount = fsrsCards.filter((c) => c.state === "new").length;
+    const reviewCount = fsrsCards.filter((c) => c.state === "review").length;
+    const learningCount = fsrsCards.filter((c) => c.state === "learning").length;
 
     const reviews = await ctx.db
       .query("card_reviews")
@@ -112,6 +197,8 @@ export const getCardStats = query({
       learningCount,
       reviewsToday,
       totalReviews: reviews.length,
+      initialLearningCount,
+      initialLearningDueNow,
     };
   },
 });
@@ -144,6 +231,8 @@ export const createCard = mutation({
       ...fsrsData,
       nextReview: Date.now(), // New cards are due immediately
       createdAt: Date.now(),
+      initialLearningPhase: true,
+      initialReviewCount: 0,
     });
 
     return { _id: cardId, ...fsrsData };
@@ -166,9 +255,106 @@ export const createCardFromUserSentence = mutation({
       ...fsrsData,
       nextReview: Date.now(),
       createdAt: Date.now(),
+      initialLearningPhase: true,
+      initialReviewCount: 0,
     });
 
     return { _id: cardId, ...fsrsData };
+  },
+});
+
+/**
+ * Mark a card as seen in initial learning phase
+ * Increments review count; when reaching required count, initializes FSRS and moves to FSRS phase
+ */
+export const markCardAsSeenInInitialLearning = mutation({
+  args: {
+    userId: v.string(),
+    cardId: v.id("cards"),
+  },
+  handler: async (ctx, { userId, cardId }) => {
+    const card = await ctx.db.get(cardId);
+    if (!card || card.userId !== userId) {
+      throw new Error("Card not found or unauthorized");
+    }
+
+    if (!card.initialLearningPhase) {
+      throw new Error("Card is not in initial learning phase");
+    }
+
+    // Get user preferences to know when to graduate
+    const prefs = await ctx.db
+      .query("user_preferences")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .first();
+
+    const reviewsRequired = prefs?.initialLearningReviewsRequired ?? 4;
+    
+    // Check if card already meets graduation requirement (e.g., requirement was lowered)
+    if (card.initialReviewCount >= reviewsRequired) {
+      // Graduate immediately without incrementing
+      const fsrsData = initializeCard();
+      await ctx.db.patch(cardId, {
+        initialLearningPhase: false,
+        lastInitialReviewTime: Date.now(),
+        ...fsrsData,
+        nextReview: Date.now(), // FSRS cards start due immediately
+      });
+      return { success: true, graduated: true };
+    }
+    
+    const newReviewCount = card.initialReviewCount + 1;
+
+    if (newReviewCount >= reviewsRequired) {
+      // Graduate to FSRS
+      const fsrsData = initializeCard();
+      await ctx.db.patch(cardId, {
+        initialLearningPhase: false,
+        initialReviewCount: newReviewCount,
+        lastInitialReviewTime: Date.now(),
+        ...fsrsData,
+        nextReview: Date.now(), // FSRS cards start due immediately
+      });
+    } else {
+      // Stay in initial learning, just increment count
+      await ctx.db.patch(cardId, {
+        initialReviewCount: newReviewCount,
+        lastInitialReviewTime: Date.now(),
+      });
+    }
+
+    return { success: true, graduated: newReviewCount >= reviewsRequired };
+  },
+});
+
+/**
+ * Skip initial learning phase - graduate all initial learning cards to FSRS immediately
+ */
+export const skipInitialLearningPhase = mutation({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const initialLearningCards = await ctx.db
+      .query("cards")
+      .withIndex("by_userId_initialLearning", (q) =>
+        q.eq("userId", userId).eq("initialLearningPhase", true)
+      )
+      .collect();
+
+    const now = Date.now();
+    let graduatedCount = 0;
+
+    for (const card of initialLearningCards) {
+      const fsrsData = initializeCard();
+      await ctx.db.patch(card._id, {
+        initialLearningPhase: false,
+        lastInitialReviewTime: now,
+        ...fsrsData,
+        nextReview: now, // Due immediately for FSRS
+      });
+      graduatedCount++;
+    }
+
+    return { success: true, graduatedCount };
   },
 });
 

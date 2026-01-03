@@ -5,13 +5,34 @@ import { api } from "./_generated/api";
 import { essentialSentences } from "./essentialSentences";
 
 /**
- * Add all essential sentence cards from Essential.csv for a user with pre-generated audio
+ * Add essential sentence cards from Essential.csv for a user with pre-generated audio
+ * Adds the NEXT N sentences that the user doesn't already have cards for
  */
 export const addBasicCards: any = action({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }): Promise<{ message: string; cardIds: any[] }> => {
-    // 1. Translate ALL sentences in parallel first
-    const translationPromises = essentialSentences.map((english) =>
+  args: { userId: v.string(), count: v.optional(v.number()) },
+  handler: async (ctx, { userId, count = 10 }): Promise<{ message: string; cardIds: any[] }> => {
+    // 1. Get all existing sentence texts that user already has cards for
+    const existingCards = await ctx.runQuery(api.cardActions.getAllCardsForPractice, { userId, limit: 1000 });
+    const existingSentenceTexts = new Set(existingCards.map((card: any) => card.english));
+
+    // 2. Find the next N sentences the user doesn't have yet
+    const sentencesToAdd: string[] = [];
+    for (const sentence of essentialSentences) {
+      if (!existingSentenceTexts.has(sentence)) {
+        sentencesToAdd.push(sentence);
+        if (sentencesToAdd.length >= count) break;
+      }
+    }
+
+    if (sentencesToAdd.length === 0) {
+      return {
+        message: "You already have all available essential sentences!",
+        cardIds: [],
+      };
+    }
+
+    // 3. Translate ALL sentences in parallel first
+    const translationPromises = sentencesToAdd.map((english) =>
       ctx.runAction(api.translation.translateText, {
         text: english,
         sourceLang: "en",
@@ -24,25 +45,25 @@ export const addBasicCards: any = action({
 
     const translations = await Promise.all(translationPromises);
 
-    // 2. Create all cards in the database
+    // 4. Create all cards in the database SEQUENTIALLY to avoid conflicts
     const results: Array<{ cardId: any; english: string }> = [];
-    const cardPromises = essentialSentences.map((english, index) =>
-      ctx.runMutation(api.seedCards.createCardWithTranslation, {
+    for (let i = 0; i < sentencesToAdd.length; i++) {
+      const english = sentencesToAdd[i];
+      const spanish = translations[i].translatedText;
+      
+      const cardId = await ctx.runMutation(api.seedCards.createCardWithTranslation, {
         userId,
         english,
-        spanish: translations[index].translatedText,
-      }).then((cardId) => {
-        if (cardId) {
-          results.push({ cardId, english });
-        }
-        return cardId;
-      })
-    );
+        spanish,
+      });
+      
+      if (cardId) {
+        results.push({ cardId, english });
+      }
+    }
 
-    await Promise.all(cardPromises);
-
-    // 3. Pre-generate audio for ALL cards in parallel
-    const audioPromises = essentialSentences.map((english) =>
+    // 5. Pre-generate audio for ALL cards in parallel
+    const audioPromises = sentencesToAdd.map((english) =>
       ctx.runAction(api.audioFunctions.getOrRecordAudio, {
         text: english,
         language: "en",
@@ -134,6 +155,8 @@ export const createCardWithTranslation = mutation({
       reps: 0,
       lapses: 0,
       nextReview: Date.now(), // Due immediately
+      initialLearningPhase: true,
+      initialReviewCount: 0,
       createdAt: Date.now(),
     });
 

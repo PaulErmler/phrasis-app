@@ -64,6 +64,7 @@ function Content() {
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingCards, setIsAddingCards] = useState(false);
+  const [cardImportCount, setCardImportCount] = useState(10);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -236,109 +237,101 @@ function Content() {
         </CardHeader>
         <CardContent className="space-y-4">
           {cardStats ? (
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3 text-center">
-                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{cardStats.totalCards}</p>
-                <p className="text-xs text-muted-foreground">Total Cards</p>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3 text-center">
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{cardStats.totalCards}</p>
+                  <p className="text-xs text-muted-foreground">Total Cards</p>
+                </div>
+                <div className="rounded-lg bg-orange-50 dark:bg-orange-950/30 p-3 text-center">
+                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                    {(cardStats.initialLearningDueNow || 0) + (cardStats.dueCount || 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Due Now</p>
+                </div>
+                <div className="rounded-lg bg-green-50 dark:bg-green-950/30 p-3 text-center">
+                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">{cardStats.reviewsToday}</p>
+                  <p className="text-xs text-muted-foreground">Reviewed Today</p>
+                </div>
+                <div className="rounded-lg bg-purple-50 dark:bg-purple-950/30 p-3 text-center">
+                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                    {cardStats.initialLearningCount > 0 ? cardStats.initialLearningCount : cardStats.newCount}
+                  </p>
+                  <p className="text-xs text-muted-foreground">New Cards</p>
+                </div>
               </div>
-              <div className="rounded-lg bg-orange-50 dark:bg-orange-950/30 p-3 text-center">
-                <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{cardStats.dueCount}</p>
-                <p className="text-xs text-muted-foreground">Due Now</p>
-              </div>
-              <div className="rounded-lg bg-green-50 dark:bg-green-950/30 p-3 text-center">
-                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{cardStats.reviewsToday}</p>
-                <p className="text-xs text-muted-foreground">Reviewed Today</p>
-              </div>
-              <div className="rounded-lg bg-purple-50 dark:bg-purple-950/30 p-3 text-center">
-                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{cardStats.newCount}</p>
-                <p className="text-xs text-muted-foreground">New Cards</p>
-              </div>
+              
+              {/* Initial Learning Progress or Continue Learning Button */}
+              {cardStats.initialLearningCount > 0 && (
+                <div className="rounded-lg bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-200 dark:border-cyan-800 p-4">
+                  <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100 mb-2">
+                    📚 Learning Phase: {cardStats.initialLearningCount} cards
+                  </p>
+                  <p className="text-xs text-cyan-700 dark:text-cyan-300 mb-3">
+                    Complete the initial learning phase before FSRS review starts.
+                  </p>
+                </div>
+              )}
+              
+              {/* Continue/Start Learning Button */}
+              {cardStats.totalCards > 0 && (cardStats.initialLearningDueNow > 0 || cardStats.dueCount > 0) && (
+                <Button
+                  onClick={() => router.push("/audio-spaced")}
+                  className="w-full bg-linear-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 transition-all duration-200"
+                >
+                  {cardStats.initialLearningCount > 0 ? "Continue Learning" : "Start Learning"} ({(cardStats.initialLearningDueNow || 0) + (cardStats.dueCount || 0)} due)
+                </Button>
+              )}
             </div>
           ) : (
             <div className="text-center text-muted-foreground py-4">
               Loading stats...
             </div>
           )}
-          {cardStats && cardStats.totalCards === 0 && (
-            <Button
-              onClick={async () => {
-                if (!userId) return;
-                try {
-                  setIsAddingCards(true);
-                  await addBasicCards({ userId });
-                } catch (error) {
-                  console.error("Error adding cards:", error);
-                } finally {
-                  setIsAddingCards(false);
-                }
-              }}
-              disabled={isAddingCards}
-              className="w-full bg-linear-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-lg shadow-purple-500/25"
-            >
-              {isAddingCards ? "Adding cards..." : "✨ Add Essential Sentences to Start"}
-            </Button>
-          )}
+          
         </CardContent>
       </Card>
 
+      {/* Add Cards Section - Always Visible */}
       <Card className="border-border/50 shadow-lg">
         <CardHeader>
-          <CardTitle className="text-lg">Flashcard Practice</CardTitle>
+          <CardTitle className="text-lg">➕ Add More Cards</CardTitle>
           <CardDescription>
-            Practice with flashcards and translations
+            Import essential sentences to expand your learning deck
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <Button
-            onClick={() => router.push("/flashcard")}
-            className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
-          >
-            Go to Flashcard
-          </Button>
-          <Button
-            onClick={() => router.push("/audio-flashcard")}
-            className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
-          >
-            Go to Audio Flashcard
-          </Button>
-          <Button
-            onClick={() => router.push("/audio-learning")}
-            className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
-          >
-            Go to Audio Learning
-          </Button>
-          <Button
-            onClick={() => router.push("/audio-spaced")}
-            className="w-full bg-linear-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white shadow-lg shadow-blue-500/25 transition-all duration-200"
-          >
-            Go to Spaced Repetition
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="border-border/50 shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-lg">Random Number Generator</CardTitle>
-          <CardDescription>
-            Click the button to generate and store a random number
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button
-            onClick={() => addNumber({ value: Math.floor(Math.random() * 100) })}
-            className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
-          >
-            + Generate Random Number
-          </Button>
-
-          <div className="rounded-xl bg-muted/50 border border-border/50 p-4">
-            <p className="text-sm font-medium text-muted-foreground mb-2">Recent Numbers</p>
-            <p className="font-mono text-lg">
-              {numbers?.length === 0
-                ? "No numbers yet — click the button!"
-                : numbers?.join(", ") ?? "..."}
-            </p>
+          <div>
+            <label htmlFor="cardCount" className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
+              Number of cards to import:
+            </label>
+            <input
+              id="cardCount"
+              type="number"
+              min="1"
+              max="100"
+              value={cardImportCount}
+              onChange={(e) => setCardImportCount(Math.max(1, parseInt(e.target.value) || 10))}
+              className="w-full px-3 py-2 border border-border rounded-md bg-white dark:bg-slate-950 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
           </div>
+          <Button
+            onClick={async () => {
+              if (!userId) return;
+              try {
+                setIsAddingCards(true);
+                await addBasicCards({ userId, count: cardImportCount });
+              } catch (error) {
+                console.error("Error adding cards:", error);
+              } finally {
+                setIsAddingCards(false);
+              }
+            }}
+            disabled={isAddingCards}
+            className="w-full bg-linear-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-lg shadow-purple-500/25"
+          >
+            {isAddingCards ? "Adding cards..." : (cardStats?.totalCards === 0 ? `🚀 Start Learning with ${cardImportCount} Sentences` : `✨ Add ${cardImportCount} Essential Sentences`)}
+          </Button>
         </CardContent>
       </Card>
     </div>
