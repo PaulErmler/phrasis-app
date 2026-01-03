@@ -37,7 +37,6 @@ export const insertAudioRecording = mutation({
   handler: async (ctx, args) => {
     return ctx.db.insert("audio_recordings", {
       ...args,
-      createdAt: Date.now(),
     });
   },
 });

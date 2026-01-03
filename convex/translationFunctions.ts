@@ -23,7 +23,6 @@ export const insertSentence = mutation({
     return await ctx.db.insert("sentences",{
       text,
       language,
-      createdAt: Date.now(),
     });
   },
 });
@@ -55,7 +54,6 @@ export const insertTranslation = mutation({
       sentenceId,
       targetLanguage,
       translatedText,
-      createdAt: Date.now(),
     });
   },
 });

@@ -2,9 +2,6 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  numbers: defineTable({
-    value: v.number(),
-  }),
   
   sentences: defineTable({
     text: v.string(),
@@ -23,7 +20,28 @@ export default defineSchema({
     //accent: v.optional(v.string()), // e.g., "us", "uk"
     voice: v.optional(v.string()), // e.g., "FEMALE"
     storageId: v.id("_storage"),
-  }).index("by_sentence_language", ["sentenceId", "language"]),// "accent"]),
+  }).index("by_sentence_language", ["sentenceId", "language"]),
+
+  // Audio generation requests (capture user intent, schedule action)
+  audio_requests: defineTable({
+    userId: v.string(),
+    text: v.string(),
+    language: v.string(),
+    status: v.string(), // "pending" | "completed" | "failed"
+    audioRecordingId: v.optional(v.id("audio_recordings")),
+  }).index("by_userId_status", ["userId", "status"])
+    .index("by_text_language", ["text", "language"]),
+
+  // Translation requests (capture user intent, schedule action)
+  translation_requests: defineTable({
+    userId: v.string(),
+    sourceText: v.string(),
+    sourceLanguage: v.string(),
+    targetLanguage: v.string(),
+    status: v.string(), // "pending" | "completed" | "failed"
+    translatedText: v.optional(v.string()),
+  }).index("by_userId_status", ["userId", "status"])
+    .index("by_sourceText_languages", ["sourceText", "sourceLanguage", "targetLanguage"]),
 
   // User authentication & preferences
   users: defineTable({

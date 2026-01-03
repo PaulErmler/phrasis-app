@@ -77,17 +77,43 @@ export default function AudioSpacedRepetitionPage() {
   const markCardAsSeenMutation = useMutation(api.cardActions.markCardAsSeenInInitialLearning);
   const skipInitialLearningMutation = useMutation(api.cardActions.skipInitialLearningPhase);
   const updatePreferencesMutation = useMutation(api.userPreferences.updateUserPreferences);
-  const generateSpeech = useAction(api.audioFunctions.getOrRecordAudio);
+  const requestAudioMutation = useMutation(api.audioRequests.requestAudio);
+  const requestTranslationMutation = useMutation(api.translationRequests.requestTranslation);
 
-  // Get audio URL via Convex action (uses text + language)
-  const getAudioUrl = async (text: string, language: string) => {
+  // Helper to get audio URL from request
+  const getAudioUrlFromRequest = async (requestId: string) => {
+    // This would ideally be a query, but we'll fetch via the existing pattern
+    // In production, you'd query the request and return the URL when ready
     try {
-      const result = await generateSpeech({ text, language });
-      return result.audioUrl;
+      const response = await fetch(`/api/audio-request?id=${requestId}`);
+      if (response.ok) {
+        const data = await response.json();
+        return data.audioUrl;
+      }
     } catch (error) {
-      console.error("Audio fetch error:", error);
-      return null;
+      console.error("Error fetching audio request:", error);
     }
+    return null;
+  };
+
+  // Request audio (non-blocking, returns immediately)
+  const requestAudio = async (text: string, language: string) => {
+    const requestId = await requestAudioMutation({ text, language });
+    return requestId;
+  };
+
+  // Request translation (non-blocking, returns immediately)
+  const requestTranslation = async (
+    sourceText: string,
+    sourceLanguage: string,
+    targetLanguage: string
+  ) => {
+    const requestId = await requestTranslationMutation({
+      sourceText,
+      sourceLanguage,
+      targetLanguage,
+    });
+    return requestId;
   };
 
   // Toggle audio play/pause
@@ -207,14 +233,25 @@ export default function AudioSpacedRepetitionPage() {
         autoplayTimeoutRef.current = null;
       }
       
-      // Play source language audio
+      // Request source language audio (non-blocking)
       (async () => {
-        const sourceText = cardsQuery[0].sourceText || cardsQuery[0].english;
+        const sourceText = cardsQuery[0].sourceText;
         const sourceLang = cardsQuery[0].sourceLanguage || "en";
-        const url = await getAudioUrl(sourceText, sourceLang);
-        if (url) {
-          currentAudioUrlRef.current = url;
-          await playAudio(url);
+        const requestId = await requestAudio(sourceText, sourceLang);
+        
+        // For now, we still need the URL immediately to play
+        // TODO: Implement lazy audio loading with request polling
+        try {
+          const result = await fetch(`/api/audio?text=${encodeURIComponent(sourceText)}&language=${sourceLang}`);
+          if (result.ok) {
+            const data = await result.json();
+            if (data.audioUrl) {
+              currentAudioUrlRef.current = data.audioUrl;
+              await playAudio(data.audioUrl);
+            }
+          }
+        } catch (error) {
+          console.error("Error loading audio:", error);
         }
       })();
     }
@@ -223,15 +260,25 @@ export default function AudioSpacedRepetitionPage() {
   // Update elapsed time when showing target translation
   useEffect(() => {
     if (showTarget) {
-      // Play target language audio automatically
+      // Request target language audio (non-blocking)
       (async () => {
         if (currentCard) {
-          const targetText = currentCard.targetText || currentCard.spanish;
+          const targetText = currentCard.targetText;
           const targetLang = currentCard.targetLanguage || "es";
-          const url = await getAudioUrl(targetText, targetLang);
-          if (url) {
-            currentAudioUrlRef.current = url;
-            await playAudio(url);
+          const requestId = await requestAudio(targetText, targetLang);
+          
+          // For now, fetch the audio URL immediately (TODO: implement lazy loading)
+          try {
+            const result = await fetch(`/api/audio?text=${encodeURIComponent(targetText)}&language=${targetLang}`);
+            if (result.ok) {
+              const data = await result.json();
+              if (data.audioUrl) {
+                currentAudioUrlRef.current = data.audioUrl;
+                await playAudio(data.audioUrl);
+              }
+            }
+          } catch (error) {
+            console.error("Error loading audio:", error);
           }
         }
       })();
@@ -278,12 +325,22 @@ export default function AudioSpacedRepetitionPage() {
           reviewStartTimeRef.current = Date.now();
           
           // Play source language audio for next card
-          const sourceText = nextCards[0].sourceText || nextCards[0].english;
+          const sourceText = nextCards[0].sourceText;
           const sourceLang = nextCards[0].sourceLanguage || "en";
-          const url = await getAudioUrl(sourceText, sourceLang);
-          if (url) {
-            currentAudioUrlRef.current = url;
-            await playAudio(url);
+          const requestId = await requestAudio(sourceText, sourceLang);
+          
+          // Fetch audio URL immediately (TODO: implement lazy loading)
+          try {
+            const audioResult = await fetch(`/api/audio?text=${encodeURIComponent(sourceText)}&language=${sourceLang}`);
+            if (audioResult.ok) {
+              const audioData = await audioResult.json();
+              if (audioData.audioUrl) {
+                currentAudioUrlRef.current = audioData.audioUrl;
+                await playAudio(audioData.audioUrl);
+              }
+            }
+          } catch (error) {
+            console.error("Error loading audio:", error);
           }
         } else {
           setCurrentCard(null);
@@ -572,17 +629,27 @@ export default function AudioSpacedRepetitionPage() {
                       setShowTarget(true);
                     } else {
                       setManualPlayMode(true);
-                      const sourceText = currentCard.sourceText || currentCard.english;
+                      const sourceText = currentCard.sourceText;
                       const sourceLang = currentCard.sourceLanguage || (userPreferences?.sourceLanguage ?? "en");
-                      const url = await getAudioUrl(sourceText, sourceLang);
-                      if (url) {
-                        currentAudioUrlRef.current = url;
-                        await playAudio(url);
+                      const requestId = await requestAudio(sourceText, sourceLang);
+                      
+                      // Fetch audio URL for manual playback
+                      try {
+                        const result = await fetch(`/api/audio?text=${encodeURIComponent(sourceText)}&language=${sourceLang}`);
+                        if (result.ok) {
+                          const data = await result.json();
+                          if (data.audioUrl) {
+                            currentAudioUrlRef.current = data.audioUrl;
+                            await playAudio(data.audioUrl);
+                          }
+                        }
+                      } catch (error) {
+                        console.error("Error loading audio:", error);
                       }
                     }
                   }}
                 >
-                  {currentCard.sourceText || currentCard.english}
+                  {currentCard.sourceText}
                 </p>
               </div>
 
@@ -593,16 +660,26 @@ export default function AudioSpacedRepetitionPage() {
                   onClick={async (e) => {
                     e.stopPropagation();
                     setManualPlayMode(true);
-                    const targetText = currentCard.targetText || currentCard.spanish;
+                    const targetText = currentCard.targetText;
                     const targetLang = currentCard.targetLanguage || (userPreferences?.targetLanguage ?? "es");
-                    const url = await getAudioUrl(targetText, targetLang);
-                    if (url) {
-                      currentAudioUrlRef.current = url;
-                      await playAudio(url);
+                    const requestId = await requestAudio(targetText, targetLang);
+                    
+                    // Fetch audio URL for manual playback
+                    try {
+                      const result = await fetch(`/api/audio?text=${encodeURIComponent(targetText)}&language=${targetLang}`);
+                      if (result.ok) {
+                        const data = await result.json();
+                        if (data.audioUrl) {
+                          currentAudioUrlRef.current = data.audioUrl;
+                          await playAudio(data.audioUrl);
+                        }
+                      }
+                    } catch (error) {
+                      console.error("Error loading audio:", error);
                     }
                   }}
                 >
-                  {currentCard.targetText || currentCard.spanish}
+                  {currentCard.targetText}
                 </p>
               )}
 
