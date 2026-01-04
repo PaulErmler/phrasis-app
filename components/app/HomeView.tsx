@@ -3,13 +3,14 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useQuery } from "convex/react";
+import { Authenticated, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, BellOff, BellRing } from "lucide-react";
 import { getLanguagesByCodes } from "@/lib/languages";
 import { NewChatInput } from "@/components/chat/NewChatInput";
+import { FeatureUsageCard } from "@/components/app/FeatureUsageCard";
 
 export function HomeView() {
   const router = useRouter();
@@ -169,6 +170,11 @@ export function HomeView() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Feature Usage Card */}
+      <Authenticated>
+      <FeatureUsageCard />
+      </Authenticated>
 
     </div>
   );

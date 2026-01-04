@@ -93,4 +93,12 @@ export default defineSchema({
     targetLanguages: v.array(v.string()), // ISO codes (e.g., ["es", "fr"])
     currentLevel: v.optional(currentLevelValidator), // User's current level in this course
   }).index("by_userId", ["userId"]),
+
+  // User features table - caches Autumn feature quotas for local access checks
+  userFeatures: defineTable({
+    userId: v.string(), // Links to auth user
+    // Using v.any() for features since Autumn returns many fields that may change
+    features: v.any(),
+    lastSyncedAt: v.number(), // Timestamp for cache freshness
+  }).index("by_userId", ["userId"]),
 });
