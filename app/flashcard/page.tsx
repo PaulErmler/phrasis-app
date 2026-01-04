@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useAction } from "convex/react";
+import { useState, useEffect } from "react";
+import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,14 @@ export default function FlashcardPage() {
   const router = useRouter();
   const [translation, setTranslation] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const translateText = useAction(api.translationFunctions.getOrTranslate);
+  const [translationRequestId, setTranslationRequestId] = useState<string | null>(null);
+  const requestTranslation = useMutation(api.translationRequests.requestTranslation);
+  
+  // Subscribe to translation request status
+  const translationRequest = useQuery(
+    api.translationRequests.getRequest,
+    translationRequestId ? { requestId: translationRequestId as any } : "skip"
+  );
 
   const handleCardClick = async () => {
     if (translation) {
@@ -22,22 +29,32 @@ export default function FlashcardPage() {
       return;
     }
 
-    // Fetch translation
+    // Request translation via mutation (captures intent, runs in background)
     setIsLoading(true);
     try {
-      const result = await translateText({
-        text: ENGLISH_SENTENCE,
-        sourceLang: "en",
-        targetLang: "es", // Translate to Spanish
+      const requestId = await requestTranslation({
+        sourceText: ENGLISH_SENTENCE,
+        sourceLanguage: "en",
+        targetLanguage: "es", // Translate to Spanish
       });
-      setTranslation(result.translatedText);
+      setTranslationRequestId(requestId);
     } catch (error) {
       console.error("Translation error:", error);
       setTranslation("Translation failed. Please try again.");
-    } finally {
       setIsLoading(false);
     }
   };
+
+  // Handle translation completion via subscription
+  useEffect(() => {
+    if (translationRequest?.status === "completed") {
+      setTranslation(translationRequest.translatedText || null);
+      setIsLoading(false);
+    } else if (translationRequest?.status === "failed") {
+      setTranslation("Translation failed. Please try again.");
+      setIsLoading(false);
+    }
+  }, [translationRequest?.status, translationRequest?.translatedText]);
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4 py-20">

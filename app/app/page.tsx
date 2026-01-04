@@ -58,8 +58,9 @@ function Content() {
   const userId = currentUser?._id;
   const userPreferences = useQuery(api.userPreferences.getUserPreferences, userId ? { userId } : "skip");
   const cardStats = useQuery(api.cardActions.getCardStats, userId ? { userId } : "skip");
+  const latestImportRequest = useQuery(api.cardImportRequests.getLatestRequest, userId ? { userId } : "skip");
   const updatePreferencesMutation = useMutation(api.userPreferences.updateUserPreferences);
-  const addBasicCards = useAction(api.seedCards.addBasicCards);
+  const requestCardImport = useMutation(api.cardImportRequests.requestCardImport);
   
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [isLoading, setIsLoading] = useState(false);
@@ -307,12 +308,14 @@ function Content() {
               if (!userId) return;
               try {
                 setIsAddingCards(true);
-                await addBasicCards({ 
+                await requestCardImport({ 
                   userId, 
-                  count: cardImportCount
+                  count: cardImportCount,
+                  sourceLanguage: "en",
+                  targetLanguage: userPreferences?.targetLanguage || "es",
                 });
               } catch (error) {
-                console.error("Error adding cards:", error);
+                console.error("Error requesting card import:", error);
               } finally {
                 setIsAddingCards(false);
               }
@@ -320,8 +323,23 @@ function Content() {
             disabled={isAddingCards}
             className="w-full bg-linear-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-lg shadow-purple-500/25"
           >
-            {isAddingCards ? "Adding cards..." : (cardStats?.totalCards === 0 ? `🚀 Start Learning with ${cardImportCount} Sentences` : `✨ Add ${cardImportCount} Essential Sentences`)}
+            {isAddingCards ? "Requesting import..." : (cardStats?.totalCards === 0 ? `🚀 Start Learning with ${cardImportCount} Sentences` : `✨ Add ${cardImportCount} Essential Sentences`)}
           </Button>
+          {latestImportRequest && latestImportRequest.status === "completed" && (
+            <p className="text-xs text-green-600 dark:text-green-400 text-center">
+              ✓ Cards imported successfully
+            </p>
+          )}
+          {latestImportRequest && latestImportRequest.status === "failed" && (
+            <p className="text-xs text-red-600 dark:text-red-400 text-center">
+              ✗ Import failed: {latestImportRequest.error}
+            </p>
+          )}
+          {latestImportRequest && latestImportRequest.status === "pending" && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+              ⏳ Import in progress...
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

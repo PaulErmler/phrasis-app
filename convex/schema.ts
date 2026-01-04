@@ -29,6 +29,7 @@ export default defineSchema({
     language: v.string(),
     status: v.string(), // "pending" | "completed" | "failed"
     audioRecordingId: v.optional(v.id("audio_recordings")),
+    audioUrl: v.optional(v.string()), // Convex storage URL when completed
   }).index("by_userId_status", ["userId", "status"])
     .index("by_text_language", ["text", "language"]),
 
@@ -108,4 +109,14 @@ export default defineSchema({
     spanish: v.string(),
     difficulty: v.optional(v.number()), // 0-1, optional difficulty rating
   }).index("by_userId", ["userId"]),
+
+  // Card import requests (track background imports)
+  card_import_requests: defineTable({
+    userId: v.string(),
+    count: v.number(),
+    sourceLanguage: v.optional(v.string()),
+    targetLanguage: v.optional(v.string()),
+    status: v.string(), // "pending" | "completed" | "failed"
+    error: v.optional(v.string()),
+  }).index("by_userId_status", ["userId", "status"]),
 });
