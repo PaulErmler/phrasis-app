@@ -11,8 +11,9 @@ export const requestCardImport = mutation({
     count: v.number(),
     sourceLanguage: v.optional(v.string()),
     targetLanguage: v.optional(v.string()),
+    dataset: v.optional(v.string()),
   },
-  handler: async (ctx, { userId, count, sourceLanguage = "en", targetLanguage = "es" }) => {
+  handler: async (ctx, { userId, count, sourceLanguage = "en", targetLanguage = "es", dataset = "Essential" }) => {
     const requestId = await ctx.db.insert("card_import_requests", {
       userId,
       count,
@@ -28,6 +29,7 @@ export const requestCardImport = mutation({
       count,
       sourceLanguage,
       targetLanguage,
+      dataset,
     });
 
     return requestId;
@@ -42,17 +44,19 @@ export const performImport = action({
     requestId: v.id("card_import_requests"),
     userId: v.string(),
     count: v.number(),
-    sourceLanguage: v.optional(v.string()),
-    targetLanguage: v.optional(v.string()),
+    sourceLanguage: v.string(),
+    targetLanguage: v.string(),
+    dataset: v.string(),
   },
-  handler: async (ctx, { requestId, userId, count, sourceLanguage = "en", targetLanguage = "es" }) => {
+  handler: async (ctx, { requestId, userId, count, sourceLanguage = "en", targetLanguage = "es", dataset }) => {
     try {
       // Call the actual card import action
-      await ctx.runAction(api.seedCards.addBasicCards, {
+      await ctx.runAction(api.cardImporter.importCardsFromDataset, {
         userId,
         count,
         sourceLanguage,
         targetLanguage,
+        dataset,
       });
 
       // Update request status
@@ -110,5 +114,24 @@ export const getLatestRequest = query({
       .take(1);
 
     return requests[0] || null;
+  },
+});
+
+/**
+ * Get all available CSV datasets
+ */
+export const getAvailableDatasets = query({
+  args: {},
+  handler: async (ctx) => {
+    const csvFiles = await ctx.db
+      .query("csv_files")
+      .order("desc")
+      .collect();
+
+    return csvFiles.map((file) => ({
+      id: file._id,
+      name: file.name,
+      uploadedAt: file.uploadedAt,
+    }));
   },
 });
