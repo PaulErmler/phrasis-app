@@ -17,12 +17,18 @@ export const findSentenceByText = query({
   });
 
 export const insertSentence = mutation({
-  args: { text: v.string(), language: v.string() },
+  args: { text: v.string(), language: v.string(), difficulty: v.string(), datasetSentenceId: v.number(), deck: v.string(), deckRank: v.number(), topic1: v.optional(v.string()), topic2: v.optional(v.string()) },
   returns: v.id("sentences"),
-  handler: async (ctx, { text, language }) => {
+  handler: async (ctx, { text, language, difficulty, datasetSentenceId, deck, deckRank, topic1, topic2 }) => {
     return await ctx.db.insert("sentences",{
       text,
       language,
+      difficulty: difficulty,
+      datasetSentenceId: datasetSentenceId,
+      deck: deck,
+      deckRank: deckRank,
+      topic1: topic1,
+      topic2: topic2,
     });
   },
 });

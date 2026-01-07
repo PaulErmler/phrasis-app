@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,9 +15,31 @@ export function HomeView() {
   const router = useRouter();
   const t = useTranslations("AppPage");
   const activeCourse = useQuery(api.courses.getActiveCourse);
+  const currentUser = useQuery(api.auth.getCurrentUser);
+  const userId = currentUser?._id;
+  const userPreferences = useQuery(api.userPreferences.getUserPreferences, userId ? { userId } : "skip");
+  const cardStats = useQuery(api.cardActions.getCardStats, userId ? { userId } : "skip");
+  const latestImportRequest = useQuery(api.cardImportRequests.getLatestRequest, userId ? { userId } : "skip");
+  const availableDatasets = useQuery(api.cardImportRequests.getAvailableDatasets);
+  const csvFile = useQuery(api.fileUpload.getCSVFile, { name: "Essential" });
+  const requestCardImport = useMutation(api.cardImportRequests.requestCardImport);
   
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [isLoading, setIsLoading] = useState(false);
+  const [isAddingCards, setIsAddingCards] = useState(false);
+  const [cardImportCount, setCardImportCount] = useState(10);
+  const [selectedDataset, setSelectedDataset] = useState<string | undefined>(undefined);
+  const [datasets, setDatasets] = useState<Array<{id: string; name: string}>>([]);
+
+  // Update datasets and selectedDataset when availableDatasets loads
+  useEffect(() => {
+    if (availableDatasets && Array.isArray(availableDatasets) && availableDatasets.length > 0) {
+      setDatasets(availableDatasets);
+      if (!selectedDataset) {
+        setSelectedDataset(availableDatasets[0].name);
+      }
+    }
+  }, [availableDatasets, selectedDataset]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -161,12 +183,103 @@ export function HomeView() {
             {t("flashcards.goToFlashcard")}
           </Button>
           <Button
-            onClick={() => router.push("/audio-flashcard")}
+            onClick={() => router.push("/audio-spaced")}
             className="w-full"
             variant="outline"
           >
             {t("flashcards.goToAudioFlashcard")}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Add Cards Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">➕ Add More Cards</CardTitle>
+          <CardDescription>
+            Import sentences to expand your learning deck
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <label htmlFor="dataset" className="text-sm font-medium block mb-2">
+              Select dataset:
+            </label>
+            {datasets.length > 0 ? (
+              <select
+                id="dataset"
+                value={selectedDataset || ""}
+                onChange={(e) => setSelectedDataset(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                {datasets.map((dataset) => (
+                  <option key={dataset.id} value={dataset.name}>
+                    {dataset.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="w-full px-3 py-2 border border-border rounded-md bg-background text-muted-foreground">
+                Loading datasets...
+              </div>
+            )}
+          </div>
+          <div>
+            <label htmlFor="cardCount" className="text-sm font-medium block mb-2">
+              Number of cards to import:
+            </label>
+            <input
+              id="cardCount"
+              type="number"
+              min="1"
+              max="100"
+              value={cardImportCount}
+              onChange={(e) => setCardImportCount(Math.max(1, parseInt(e.target.value) || 10))}
+              className="w-full px-3 py-2 border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+          <Button
+            onClick={async () => {
+              if (!userId) return;
+              try {
+                setIsAddingCards(true);
+                await requestCardImport({ 
+                  userId, 
+                  count: cardImportCount,
+                  sourceLanguage: "en",
+                  targetLanguage: userPreferences?.targetLanguage || "es",
+                  dataset: selectedDataset,
+                });
+              } catch (error) {
+                console.error("Error requesting card import:", error);
+              } finally {
+                setIsAddingCards(false);
+              }
+            }}
+            disabled={isAddingCards}
+            className="w-full"
+          >
+            {isAddingCards 
+              ? "Requesting import..." 
+              : (cardStats?.totalCards === 0 
+                ? `🚀 Start Learning with ${cardImportCount} Sentences` 
+                : `✨ Add ${cardImportCount} Sentences`)}
+          </Button>
+          {latestImportRequest && latestImportRequest.status === "completed" && (
+            <p className="text-xs text-green-600 dark:text-green-400 text-center">
+              ✓ Cards imported successfully
+            </p>
+          )}
+          {latestImportRequest && latestImportRequest.status === "failed" && (
+            <p className="text-xs text-red-600 dark:text-red-400 text-center">
+              ✗ Import failed: {latestImportRequest.error}
+            </p>
+          )}
+          {latestImportRequest && latestImportRequest.status === "pending" && (
+            <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
+              ⏳ Import in progress...
+            </p>
+          )}
         </CardContent>
       </Card>
 

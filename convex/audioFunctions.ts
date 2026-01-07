@@ -93,6 +93,12 @@ export const getOrRecordAudio = action({
   args: {
     text: v.string(),
     language: v.string(),
+    difficulty: v.optional(v.string()),
+    datasetSentenceId: v.optional(v.number()),
+    deck: v.optional(v.string()),
+    deckRank: v.optional(v.number()),
+    topic1: v.optional(v.string()),
+    topic2: v.optional(v.string()),
   },
   returns: v.object({
     audioUrl: v.string(),
@@ -100,7 +106,7 @@ export const getOrRecordAudio = action({
   
   handler: async (
     ctx,
-    { text, language }
+    { text, language, difficulty, datasetSentenceId, deck, deckRank, topic1, topic2 }
   ): Promise<{ audioUrl: string }> => {
     console.log(`[getOrRecordAudio] Checking for existing audio for text: "${text}", language: "${language}"`);
     const sentence: { _id: Id<"sentences"> } | null =
@@ -115,7 +121,16 @@ export const getOrRecordAudio = action({
     } else {
       sentenceId = await ctx.runMutation(
         api.translationFunctions.insertSentence,
-        { text, language }
+        {
+          datasetSentenceId: datasetSentenceId || 0,
+          text: text,
+          language: language,
+          deck: deck || "unknown",
+          deckRank: deckRank || 0,
+          difficulty: difficulty || "Essential",
+          topic1: topic1,
+          topic2: topic2
+        }
       );
     }
     const audio: { storageId: Id<"_storage"> } | null =

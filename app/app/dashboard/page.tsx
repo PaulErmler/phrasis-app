@@ -59,6 +59,7 @@ function Content() {
   const userPreferences = useQuery(api.userPreferences.getUserPreferences, userId ? { userId } : "skip");
   const cardStats = useQuery(api.cardActions.getCardStats, userId ? { userId } : "skip");
   const latestImportRequest = useQuery(api.cardImportRequests.getLatestRequest, userId ? { userId } : "skip");
+  const availableDatasets = useQuery(api.cardImportRequests.getAvailableDatasets);
   const updatePreferencesMutation = useMutation(api.userPreferences.updateUserPreferences);
   const requestCardImport = useMutation(api.cardImportRequests.requestCardImport);
   
@@ -66,6 +67,18 @@ function Content() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAddingCards, setIsAddingCards] = useState(false);
   const [cardImportCount, setCardImportCount] = useState(10);
+  const [selectedDataset, setSelectedDataset] = useState<string | null>(null);
+  const [datasets, setDatasets] = useState<Array<{id: string; name: string}>>([]);
+
+  // Update datasets and selectedDataset when availableDatasets loads
+  useEffect(() => {
+    if (availableDatasets && Array.isArray(availableDatasets) && availableDatasets.length > 0) {
+      setDatasets(availableDatasets);
+      if (!selectedDataset) {
+        setSelectedDataset(availableDatasets[0].name);
+      }
+    }
+  }, [availableDatasets]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -285,10 +298,33 @@ function Content() {
         <CardHeader>
           <CardTitle className="text-lg">➕ Add More Cards</CardTitle>
           <CardDescription>
-            Import essential sentences to expand your learning deck
+            Import sentences to expand your learning deck
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div>
+            <label htmlFor="dataset" className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
+              Select dataset:
+            </label>
+            {datasets.length > 0 ? (
+              <select
+                id="dataset"
+                value={selectedDataset || ""}
+                onChange={(e) => setSelectedDataset(e.target.value)}
+                className="w-full px-3 py-2 border border-border rounded-md bg-white dark:bg-slate-950 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                {datasets.map((dataset) => (
+                  <option key={dataset.id} value={dataset.name}>
+                    {dataset.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="w-full px-3 py-2 border border-border rounded-md bg-white dark:bg-slate-950 text-gray-500">
+                Loading datasets...
+              </div>
+            )}
+          </div>
           <div>
             <label htmlFor="cardCount" className="text-sm font-medium text-gray-700 dark:text-gray-300 block mb-2">
               Number of cards to import:
@@ -313,6 +349,7 @@ function Content() {
                   count: cardImportCount,
                   sourceLanguage: "en",
                   targetLanguage: userPreferences?.targetLanguage || "es",
+                  dataset: selectedDataset,
                 });
               } catch (error) {
                 console.error("Error requesting card import:", error);
@@ -323,13 +360,8 @@ function Content() {
             disabled={isAddingCards}
             className="w-full bg-linear-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white shadow-lg shadow-purple-500/25"
           >
-            {isAddingCards ? "Requesting import..." : (cardStats?.totalCards === 0 ? `🚀 Start Learning with ${cardImportCount} Sentences` : `✨ Add ${cardImportCount} Essential Sentences`)}
+            {isAddingCards ? "Requesting import..." : (cardStats?.totalCards === 0 ? `Start Learning with ${cardImportCount} Sentence(s)` : `Add ${cardImportCount} Sentences`)}
           </Button>
-          {latestImportRequest && latestImportRequest.status === "completed" && (
-            <p className="text-xs text-green-600 dark:text-green-400 text-center">
-              ✓ Cards imported successfully
-            </p>
-          )}
           {latestImportRequest && latestImportRequest.status === "failed" && (
             <p className="text-xs text-red-600 dark:text-red-400 text-center">
               ✗ Import failed: {latestImportRequest.error}

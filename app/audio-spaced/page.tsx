@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useConvexAuth, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { Play, Pause } from "lucide-react";
+import { BottomNav } from "@/components/app/BottomNav";
 
 type ReviewRating = "again" | "hard" | "good" | "easy";
 
@@ -87,11 +89,18 @@ export default function AudioSpacedRepetitionPage() {
     }
   }, [userPreferences]);
 
+  // Sync autoplay enabled state to ref for use in event handlers
+  useEffect(() => {
+    autoplayEnabledRef.current = autoplayEnabled;
+  }, [autoplayEnabled]);
+
   // Helper to request audio via mutation (captures intent, generates in background)
   const requestAudio = async (text: string, language: string) => {
     try {
-      // Request audio via mutation
-      const requestId = await requestAudioMutation({ text, language });
+      const requestId = await requestAudioMutation({
+        text,
+        language,
+      });
       setAudioRequestId(requestId);
       
       // Wait for completion via useQuery subscription (returns immediately)
@@ -154,8 +163,7 @@ export default function AudioSpacedRepetitionPage() {
       // Request source language audio
       (async () => {
         const sourceText = cardsQuery[0].sourceText;
-        const sourceLang = cardsQuery[0].sourceLanguage || "en";
-        
+        const sourceLang = cardsQuery[0].sourceLanguage || "en"     
         // Fetch the audio URL
         try {
           const audioUrl = await requestAudio(sourceText, sourceLang);
@@ -167,6 +175,9 @@ export default function AudioSpacedRepetitionPage() {
           console.error("Error loading audio:", error);
         }
       })();
+    } else if (cardsQuery && cardsQuery.length === 0) {
+      // No more cards due
+      setCurrentCard(null);
     }
   }, [cardsQuery]);
 
@@ -313,56 +324,85 @@ export default function AudioSpacedRepetitionPage() {
 
   if (!currentCard) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Card className="p-8 max-w-md text-center">
-          <h1 className="text-2xl font-bold mb-4">No Cards Due</h1>
-          <p className="text-gray-600">
-            Great job! No cards are due for review right now.
-          </p>
-        </Card>
+      <div className="min-h-screen bg-background pb-20">
+        <div className="max-w-3xl mx-auto p-4 py-8 space-y-4">
+          {/* Back Button */}
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => window.history.back()}
+              variant="outline"
+              size="sm"
+            >
+              ← Back
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground uppercase tracking-wide">Audio Practice</p>
+            <h1 className="text-3xl font-bold">Spaced Repetition</h1>
+          </div>
+
+          {/* All Done Card */}
+          <div className="flex justify-center pt-8">
+            <Card className="max-w-md w-full">
+              <CardHeader className="text-center">
+                <div className="text-6xl mb-4">🎉</div>
+                <CardTitle>Great Job!</CardTitle>
+                <CardDescription>
+                  No cards are due for review right now. Come back later to continue learning!
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  onClick={() => window.history.back()}
+                  className="w-full"
+                  variant="outline"
+                >
+                  ← Go Back Home
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Bottom Navigation */}
+        <BottomNav currentView="home" onViewChange={() => {}} hidePlayButton={true} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-100 p-4">
-      <div className="max-w-3xl mx-auto py-8 space-y-4">
+    <div className="min-h-screen bg-background pb-20">
+      <div className="max-w-3xl mx-auto p-4 py-8 space-y-4">
         {/* Back Button */}
         <div className="flex items-center gap-2">
           <Button
             onClick={() => window.history.back()}
             variant="outline"
             size="sm"
-            className="bg-white/80 hover:bg-white"
           >
             ← Back
           </Button>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-emerald-600 font-semibold">Spaced Repetition</p>
-            <h1 className="text-3xl font-bold text-gray-900">Audio Spaced Repetition</h1>
-            <p className="text-sm text-muted-foreground">Tap to reveal, listen, then rate your recall.</p>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground bg-white/70 border border-border/60 px-3 py-2 rounded-lg shadow-sm">
-            <span className={`w-2 h-2 rounded-full ${currentCard?.isInInitialLearning ? 'bg-blue-500' : 'bg-emerald-500'}`} />
-            <span>{currentCard?.isInInitialLearning ? 'Learning Phase' : 'FSRS Review'}</span>
-          </div>
+        <div className="space-y-2">
+          <p className="text-sm text-muted-foreground uppercase tracking-wide">Audio Practice</p>
+          <h1 className="text-3xl font-bold">Spaced Repetition</h1>
         </div>
 
         {/* Cards Remaining Counter */}
         {cardStats && (
           <div className="flex justify-center">
-            <div className="inline-flex items-center gap-2 bg-white/80 border border-border/50 px-4 py-2 rounded-lg shadow-sm">
-              <span className="text-sm font-medium text-gray-700">
+            <div className="inline-flex items-center gap-3 bg-muted/50 border border-border px-4 py-2 rounded-lg text-sm">
+              <span className={`w-2 h-2 rounded-full ${currentCard?.isInInitialLearning ? 'bg-cyan-500' : 'bg-orange-500'}`} />
+              <span>
                 {currentCard?.isInInitialLearning ? (
                   <>
-                    📚 Learning: <span className="font-bold text-cyan-600">{cardStats.initialLearningDueNow}</span> cards remaining
+                    📚 Learning: <span className="font-semibold">{cardStats.initialLearningDueNow}</span> remaining
                   </>
                 ) : (
                   <>
-                    🔁 Review: <span className="font-bold text-orange-600">{cardStats.dueCount}</span> cards due
+                    🔁 Review: <span className="font-semibold">{cardStats.dueCount}</span> due
                   </>
                 )}
               </span>
@@ -374,11 +414,10 @@ export default function AudioSpacedRepetitionPage() {
         <div className="flex justify-center gap-3">
           <Button
             onClick={() => setAutoplayEnabled(!autoplayEnabled)}
-            variant="outline"
+            variant={autoplayEnabled ? "default" : "outline"}
             size="sm"
-            className={autoplayEnabled ? "bg-emerald-100 border-emerald-300" : ""}
           >
-            Autoplay: {autoplayEnabled ? "On" : "Off"}
+            {autoplayEnabled ? "▶ Autoplay: On" : "⏸ Autoplay: Off"}
           </Button>
           <Button
             onClick={() => setShowSettings(!showSettings)}
@@ -391,10 +430,11 @@ export default function AudioSpacedRepetitionPage() {
 
         {/* Settings Panel */}
         {showSettings && (
-          <Card className="border-border/50 shadow-lg bg-white/95">
-            <div className="p-4 space-y-4">
-              <h3 className="font-semibold text-base mb-3">Settings</h3>
-              
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               {/* Initial Learning Reviews Required */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700">
@@ -547,23 +587,23 @@ export default function AudioSpacedRepetitionPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </CardContent>
           </Card>
         )}
 
         {/* Main Card */}
-        <Card
-          className="p-8 shadow-lg cursor-pointer hover:shadow-xl transition-shadow bg-white/90 border border-border/70"
-          onClick={() => {
-            if (!showTarget) {
-              startTimeRef.current = Date.now();
-              setShowTarget(true);
-            }
-          }}
-        >
-          <div className="space-y-6">
+        <Card>
+          <CardContent className="p-8">
             {/* Source Language Sentence with Audio Progress */}
-            <div className="space-y-4">
+            <div
+              className="space-y-4 cursor-pointer"
+              onClick={() => {
+                if (!showTarget) {
+                  startTimeRef.current = Date.now();
+                  setShowTarget(true);
+                }
+              }}
+            >
               <div className="space-y-2">
                 <p 
                   className="text-3xl md:text-4xl font-medium text-gray-900 leading-snug cursor-pointer hover:text-emerald-600 transition-colors"
@@ -647,20 +687,29 @@ export default function AudioSpacedRepetitionPage() {
 
             {/* Play/Pause Button */}
             <div className="flex justify-center">
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleAudioPlayPause();
-                }}
-                size="lg"
-                className="rounded-full w-16 h-16 bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg flex items-center justify-center"
-              >
-                {isPlayingAudio ? (
-                  <span className="text-2xl">⏸️</span>
-                ) : (
-                  <span className="text-2xl">▶️</span>
-                )}
-              </Button>
+              {!isPlayingAudio ? (
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleAudioPlayPause();
+                  }}
+                  size="icon"
+                  className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
+                >
+                  <Play className="h-6 w-6 fill-current text-primary-foreground" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleAudioPlayPause();
+                  }}
+                  size="icon"
+                  className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
+                >
+                  <Pause className="h-6 w-6 fill-current text-primary-foreground" />
+                </Button>
+              )}
             </div>
 
             {/* Instructions */}
@@ -746,9 +795,12 @@ export default function AudioSpacedRepetitionPage() {
               onEnded={() => setIsPlayingAudio(false)}
               className="hidden"
             />
-          </div>
+          </CardContent>
         </Card>
       </div>
+
+      {/* Bottom Navigation */}
+      <BottomNav currentView="home" onViewChange={() => {}} hidePlayButton={true} />
     </div>
   );
 }

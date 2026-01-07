@@ -10,8 +10,14 @@ export const requestAudio = mutation({
   args: {
     text: v.string(),
     language: v.string(),
+    difficulty: v.optional(v.string()),
+    datasetSentenceId: v.optional(v.number()),
+    deck: v.optional(v.string()),
+    deckRank: v.optional(v.number()),
+    topic1: v.optional(v.string()),
+    topic2: v.optional(v.string()),
   },
-  handler: async (ctx, { text, language }) => {
+  handler: async (ctx, { text, language, difficulty, datasetSentenceId, deck, deckRank, topic1, topic2 }) => {
     // Check if we already have this audio recording
     // We can fetch it from the audio_recordings table by looking up the sentence
     
@@ -29,6 +35,12 @@ export const requestAudio = mutation({
       requestId,
       text,
       language,
+      difficulty: difficulty,
+      datasetSentenceId: datasetSentenceId,
+      deck: deck,
+      deckRank: deckRank,
+      topic1: topic1,
+      topic2: topic2
     });
 
     return requestId;
@@ -56,13 +68,25 @@ export const generateAudio = action({
     requestId: v.id("audio_requests"),
     text: v.string(),
     language: v.string(),
+    difficulty: v.optional(v.string()),
+    datasetSentenceId: v.optional(v.number()),
+    deck: v.optional(v.string()),
+    deckRank: v.optional(v.number()),
+    topic1: v.optional(v.string()),
+    topic2: v.optional(v.string()),
   },
-  handler: async (ctx, { requestId, text, language }) => {
+  handler: async (ctx, { requestId, text, language, difficulty, datasetSentenceId, deck, deckRank, topic1, topic2 }) => {
     try {
       // Call the audio generation action
       const result = await ctx.runAction(api.audioFunctions.getOrRecordAudio, {
         text,
         language,
+        difficulty: difficulty || "Essential",
+        datasetSentenceId: datasetSentenceId || 0,
+        deck: deck || "unknown",
+        deckRank: deckRank || 0,
+        topic1: topic1,
+        topic2: topic2,
       });
 
       if (result?.audioUrl) {

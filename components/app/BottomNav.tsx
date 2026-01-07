@@ -10,9 +10,10 @@ export type View = "home" | "content" | "library" | "settings";
 interface BottomNavProps {
   currentView: View;
   onViewChange: (view: View) => void;
+  hidePlayButton?: boolean;
 }
 
-export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
+export function BottomNav({ currentView, onViewChange, hidePlayButton = false }: BottomNavProps) {
   const router = useRouter();
   const t = useTranslations("AppPage");
 
@@ -45,13 +46,15 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
           {/* Central Play Button */}
           <div className="flex justify-center relative h-full">
             <div className="absolute top-0 -translate-y-1/2">
-              <Button
-                size="icon"
-                className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
-                onClick={() => router.push("/flashcard")}
-              >
-                <Play className="h-6 w-6 fill-current text-primary-foreground" />
-              </Button>
+              {!hidePlayButton && (
+                <Button
+                  size="icon"
+                  className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
+                  onClick={() => router.push("/audio-spaced")}
+                >
+                  <Play className="h-6 w-6 fill-current text-primary-foreground" />
+                </Button>
+              )}
             </div>
           </div>
 
