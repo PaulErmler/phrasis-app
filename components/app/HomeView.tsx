@@ -192,6 +192,70 @@ export function HomeView() {
         </CardContent>
       </Card>
 
+      {/* Learning Deck Stats */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">📚 Your Learning Deck</CardTitle>
+          <CardDescription>
+            Track your progress and manage your cards
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {cardStats ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                  <p className="text-2xl font-bold text-foreground">{cardStats.totalCards}</p>
+                  <p className="text-xs text-muted-foreground">Total Cards</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                  <p className="text-2xl font-bold text-foreground">
+                    {(cardStats.initialLearningDueNow || 0) + (cardStats.dueCount || 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Due Now</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                  <p className="text-2xl font-bold text-foreground">{cardStats.reviewsToday}</p>
+                  <p className="text-xs text-muted-foreground">Reviewed Today</p>
+                </div>
+                <div className="rounded-lg border border-border bg-muted/30 p-3 text-center">
+                  <p className="text-2xl font-bold text-foreground">
+                    {cardStats.initialLearningCount > 0 ? cardStats.initialLearningCount : cardStats.newCount}
+                  </p>
+                  <p className="text-xs text-muted-foreground">New Cards</p>
+                </div>
+              </div>
+              
+              {/* Initial Learning Progress or Continue Learning Button */}
+              {cardStats.initialLearningCount > 0 && (
+                <div className="rounded-lg bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-200 dark:border-cyan-800 p-4">
+                  <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100 mb-2">
+                    Learning Phase: {cardStats.initialLearningCount} cards
+                  </p>
+                  <p className="text-xs text-cyan-700 dark:text-cyan-300 mb-3">
+                    Complete the initial learning phase before FSRS review starts.
+                  </p>
+                </div>
+              )}
+              
+              {/* Continue/Start Learning Button */}
+              {cardStats.totalCards > 0 && (cardStats.initialLearningDueNow > 0 || cardStats.dueCount > 0) && (
+                <Button
+                  onClick={() => router.push("/audio-spaced")}
+                  className="w-full"
+                >
+                  {cardStats.initialLearningCount > 0 ? "Continue Learning" : "Start Learning"} ({(cardStats.initialLearningDueNow || 0) + (cardStats.dueCount || 0)} due)
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="text-center text-muted-foreground py-4">
+              Loading stats...
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Add Cards Section */}
       <Card>
         <CardHeader>
