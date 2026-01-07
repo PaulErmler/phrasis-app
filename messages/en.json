@@ -5,6 +5,7 @@
     "signIn": "Sign In",
     "getStarted": "Get Started",
     "goToApp": "Go to App",
+    "installApp": "Install App",
     "welcomeBack": "Welcome back",
     "continueToApp": "Continue where you left off",
     "journeySection": {
@@ -30,104 +31,192 @@
       "createAccount": "Create your account and begin mastering new languages"
     }
   },
+  "AppPage": {
+    "views": {
+      "home": "Home",
+      "chat": "Chat",
+      "content": "Content",
+      "library": "Library",
+      "settings": "Settings"
+    },
+    "loading": "Loading...",
+    "welcome": "Welcome back, {viewer}!",
+    "notifications": {
+      "title": "Notifications",
+      "description": {
+        "default": "Get reminders to practice your phrases.",
+        "granted": "Notifications are enabled! You'll receive practice reminders.",
+        "unsupported": "Notifications are not supported by your browser."
+      },
+      "notAvailable": "Notifications not available",
+      "blocked": "Notifications are blocked. Please enable them in your browser settings to receive reminders.",
+      "requesting": "Requesting...",
+      "sendTest": "Send Test Notification",
+      "enable": "Enable Notifications",
+      "enabled": "Notifications enabled"
+    },
+    "flashcards": {
+      "title": "Flashcards",
+      "description": "Practice your phrases with interactive flashcards.",
+      "goToFlashcard": "Go to Flashcards",
+      "goToAudioFlashcard": "Go to Audio Flashcards"
+    },
+    "randomNumber": {
+      "title": "Random Numbers",
+      "description": "A simple Convex demo showing real-time updates.",
+      "generate": "Generate Random Number",
+      "recent": "Recent numbers:",
+      "empty": "No numbers generated yet."
+    },
+    "contentSoon": "Coming Soon: Discover new phrases and content tailored for you.",
+    "librarySoon": "Coming Soon: Manage and organize your saved phrases.",
+    "settings": {
+      "account": "Account",
+      "language": "App Language"
+    },
+    "courses": {
+      "title": "Your Courses",
+      "description": "Select a course to switch to or create a new one",
+      "createNew": "Create New Course",
+      "noCourses": "No courses yet. Create your first course to get started.",
+      "active": "Active",
+      "learning": "Learning {language}",
+      "currentCourse": "Current Course",
+      "from": "from {language}",
+      "createDialog": {
+        "title": "Create New Course",
+        "step1": {
+          "title": "What language do you want to learn?",
+          "subtitle": "Select your target language"
+        },
+        "step2": {
+          "title": "What language will you learn from?",
+          "subtitle": "Select your base language"
+        },
+        "step3": {
+          "title": "What's your current level?",
+          "subtitle": "Select your proficiency level"
+        },
+        "creating": "Creating course...",
+        "success": "Course created successfully!",
+        "error": "Failed to create course",
+        "cancel": "Cancel",
+        "back": "Back",
+        "next": "Next",
+        "create": "Create Course"
+      }
+    },
+    "changeCourse": "Change Course"
+  },
   "Footer": {
     "copyright": "© {year} Phrasis. All rights reserved.",
     "theme": "Theme:",
-    "language": "Language:"
+    "language": "Language:",
+    "madeInGermany": "Made in Germany",
+    "legal": {
+      "impressum": "Imprint",
+      "agb": "Terms & Conditions",
+      "privacy": "Privacy Policy"
+    }
   },
-  "Auth": {
-    "SIGN_IN": "Sign In",
-    "SIGN_UP": "Sign Up",
-    "SIGN_OUT": "Sign Out",
-    "SIGN_IN_DESCRIPTION": "Enter your credentials to sign in to your account",
-    "SIGN_UP_DESCRIPTION": "Create an account to get started",
-    "EMAIL": "Email",
-    "EMAIL_PLACEHOLDER": "you@example.com",
-    "EMAIL_REQUIRED": "Email address is required",
-    "PASSWORD": "Password",
-    "PASSWORD_PLACEHOLDER": "Enter your password",
-    "PASSWORD_REQUIRED": "Password is required",
-    "PASSWORD_TOO_SHORT": "Password must be at least 8 characters",
-    "PASSWORD_TOO_LONG": "Password is too long",
-    "NAME": "Name",
-    "NAME_PLACEHOLDER": "John Doe",
-    "NAME_REQUIRED": "Name is required",
-    "NAME_DESCRIPTION": "Please enter your full name, or a display name.",
-    "CONFIRM_PASSWORD": "Confirm Password",
-    "CONFIRM_PASSWORD_PLACEHOLDER": "Confirm your password",
-    "CONFIRM_PASSWORD_REQUIRED": "Please confirm your password",
-    "PASSWORDS_DO_NOT_MATCH": "Passwords do not match",
-    "FORGOT_PASSWORD": "Forgot Password",
-    "FORGOT_PASSWORD_LINK": "Forgot your password?",
-    "FORGOT_PASSWORD_DESCRIPTION": "Enter your email to reset your password",
-    "FORGOT_PASSWORD_ACTION": "Send reset link",
-    "FORGOT_PASSWORD_EMAIL": "Check your email for the password reset link.",
-    "RESET_PASSWORD": "Reset Password",
-    "RESET_PASSWORD_DESCRIPTION": "Enter your new password",
-    "RESET_PASSWORD_ACTION": "Reset Password",
-    "RESET_PASSWORD_SUCCESS": "Your password has been reset successfully",
-    "NEW_PASSWORD": "New Password",
-    "NEW_PASSWORD_PLACEHOLDER": "Enter your new password",
-    "ALREADY_HAVE_AN_ACCOUNT": "Already have an account?",
-    "DONT_HAVE_AN_ACCOUNT": "Don't have an account?",
-    "OR_CONTINUE_WITH": "or continue with",
-    "INVALID_EMAIL_OR_PASSWORD": "Invalid email or password",
-    "INVALID_PASSWORD": "Invalid password",
-    "INVALID_EMAIL": "Please enter a valid email address",
-    "USER_NOT_FOUND": "User not found",
-    "USER_ALREADY_EXISTS": "User already exists",
-    "EMAIL_NOT_VERIFIED": "Please verify your email address",
-    "EMAIL_VERIFICATION": "Please check your email for the verification link.",
-    "UNEXPECTED_ERROR": "An unexpected error occurred. Please try again.",
-    "TOO_MANY_ATTEMPTS": "Too many attempts. Please try again later.",
-    "MAGIC_LINK": "Magic Link",
-    "MAGIC_LINK_DESCRIPTION": "Enter your email to receive a magic link",
-    "MAGIC_LINK_ACTION": "Send magic link",
-    "MAGIC_LINK_EMAIL": "Check your email for the magic link",
-    "EMAIL_OTP": "Email Code",
-    "EMAIL_OTP_DESCRIPTION": "Enter your email to receive a code",
-    "EMAIL_OTP_SEND_ACTION": "Send code",
-    "EMAIL_OTP_VERIFY_ACTION": "Verify code",
-    "EMAIL_OTP_VERIFICATION_SENT": "Please check your email for the verification code.",
-    "CANCEL": "Cancel",
-    "CONTINUE": "Continue",
-    "SUBMIT": "Submit",
-    "SAVE": "Save",
-    "DELETE": "Delete",
-    "SETTINGS": "Settings",
-    "ACCOUNT": "Account",
-    "SECURITY": "Security",
-    "CHANGE_PASSWORD": "Change Password",
-    "CHANGE_PASSWORD_DESCRIPTION": "Enter your current password and a new password.",
-    "CHANGE_PASSWORD_INSTRUCTIONS": "Please use 8 characters at minimum.",
-    "CHANGE_PASSWORD_SUCCESS": "Your password has been changed.",
-    "CURRENT_PASSWORD": "Current Password",
-    "CURRENT_PASSWORD_PLACEHOLDER": "Enter your current password",
-    "TWO_FACTOR": "Two-Factor Authentication",
-    "TWO_FACTOR_DESCRIPTION": "Add an extra layer of security to your account",
-    "ENABLE_TWO_FACTOR": "Enable Two-Factor",
-    "DISABLE_TWO_FACTOR": "Disable Two-Factor",
-    "BACKUP_CODES": "Backup Codes",
-    "BACKUP_CODES_DESCRIPTION": "Save these backup codes in a secure place. You can use them to access your account if you lose your two-factor authentication method.",
-    "PASSKEYS": "Passkeys",
-    "PASSKEYS_DESCRIPTION": "Passkeys are a secure and convenient way to sign in without passwords.",
-    "ADD_PASSKEY": "Add Passkey",
-    "SESSIONS": "Sessions",
-    "SESSIONS_DESCRIPTION": "Manage your active sessions across devices.",
-    "CURRENT_SESSION": "Current Session",
-    "REVOKE_SESSION": "Revoke Session",
-    "REVOKE_ALL_SESSIONS": "Revoke All Sessions",
-    "DELETE_ACCOUNT": "Delete Account",
-    "DELETE_ACCOUNT_DESCRIPTION": "Permanently remove your account and all of its contents. This action is not reversible, so please continue with caution.",
-    "DELETE_ACCOUNT_INSTRUCTIONS": "Please confirm the deletion of your account. This action is not reversible, so please continue with caution.",
-    "PROVIDERS": "Connected Accounts",
-    "PROVIDERS_DESCRIPTION": "Manage your connected social accounts.",
-    "LINK": "Link",
-    "UNLINK": "Unlink",
-    "AVATAR": "Avatar",
-    "AVATAR_DESCRIPTION": "Click on the avatar to upload a custom one from your files.",
-    "AVATAR_INSTRUCTIONS": "An avatar is optional but strongly recommended.",
-    "EMAIL_DESCRIPTION": "Enter the email address you want to use to log in.",
-    "EMAIL_INSTRUCTIONS": "Please enter a valid email address."
+  "Theme": {
+    "title": "Theme",
+    "toggle": "Toggle theme",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System"
+  },
+  "Language": {
+    "title": "Language"
+  },
+  "Chat": {
+    "flashcardConfirmation": {
+      "textLabel": "Text",
+      "noteLabel": "Note",
+      "approveButton": "Create Flashcard",
+      "rejectButton": "Reject",
+      "approved": "Flashcard created successfully!",
+      "rejected": "Flashcard creation cancelled",
+      "loading": "Loading...",
+      "creatingApproval": "Creating approval request..."
+    }
+  },
+  "Onboarding": {
+    "welcome": {
+      "title": "Welcome to Phrasis!",
+      "subtitle": "Let's customize your learning experience in just a few steps",
+      "description": "This will only take a minute, and you can always change these settings later.",
+      "feature1": {
+        "title": "Personalized Content",
+        "description": "Get learning materials tailored to your level and goals"
+      },
+      "feature2": {
+        "title": "Your Pace",
+        "description": "Learn at a speed that works for you"
+      },
+      "feature3": {
+        "title": "Multiple Languages",
+        "description": "Choose from 8 popular languages to learn"
+      }
+    },
+    "step1": {
+      "title": "What kind of language learner are you?",
+      "casual": {
+        "title": "Casual",
+        "description": "I want a simple learning experience"
+      },
+      "focused": {
+        "title": "Intermediate",
+        "description": "I like to customize my content and settings"
+      },
+      "advanced": {
+        "title": "Advanced",
+        "description": "I want to cutomize everything"
+      }
+    },
+    "step2": {
+      "title": "What language do you want to learn?",
+      "subtitle": "Select a language"
+    },
+    "step3": {
+      "title": "What language will you learn from?",
+      "subtitle": "Select your base language"
+    },
+    "step4": {
+      "title": "What's your current level?",
+      "beginner": {
+        "title": "Beginner",
+        "description": "I'm new to {language}"
+      },
+      "elementary": {
+        "title": "Elementary",
+        "description": "I know some common words"
+      },
+      "intermediate": {
+        "title": "Intermediate",
+        "description": "I can have basic conversations"
+      },
+      "upper_intermediate": {
+        "title": "Upper Intermediate",
+        "description": "I can talk about various topics"
+      },
+      "advanced": {
+        "title": "Advanced",
+        "description": "I can discuss most topics in detail"
+      }
+    },
+    "continue": "Continue",
+    "back": "Back",
+    "getStarted": "Get Started",
+    "finish": "Finish",
+    "loading": {
+      "title": "Customizing Your Learning Journey",
+      "subtitle": "We're preparing everything just for you..."
+    },
+    "finished": {
+      "title": "You're all set!",
+      "subtitle": "Your personalized learning experience is ready.",
+      "button": "Start Learning"
+    }
   }
 }

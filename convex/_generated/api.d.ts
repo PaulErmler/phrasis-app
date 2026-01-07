@@ -9,17 +9,23 @@
  */
 
 import type * as audioFunctions from "../audioFunctions.js";
+import type * as audioRequests from "../audioRequests.js";
 import type * as auth from "../auth.js";
+import type * as backupData from "../backupData.js";
 import type * as cardActions from "../cardActions.js";
+import type * as cardImportRequests from "../cardImportRequests.js";
+import type * as checkCardsInDb from "../checkCardsInDb.js";
+import type * as debugTargetLanguage from "../debugTargetLanguage.js";
 import type * as essentialSentences from "../essentialSentences.js";
 import type * as fsrs from "../fsrs.js";
 import type * as http from "../http.js";
-import type * as myFunctions from "../myFunctions.js";
+import type * as migrations from "../migrations.js";
 import type * as seedCards from "../seedCards.js";
-import type * as textToSpeech from "../textToSpeech.js";
 import type * as translation from "../translation.js";
 import type * as translationFunctions from "../translationFunctions.js";
+import type * as translationRequests from "../translationRequests.js";
 import type * as userPreferences from "../userPreferences.js";
+import type * as verifyData from "../verifyData.js";
 
 import type {
   ApiFromModules,
@@ -29,17 +35,23 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   audioFunctions: typeof audioFunctions;
+  audioRequests: typeof audioRequests;
   auth: typeof auth;
+  backupData: typeof backupData;
   cardActions: typeof cardActions;
+  cardImportRequests: typeof cardImportRequests;
+  checkCardsInDb: typeof checkCardsInDb;
+  debugTargetLanguage: typeof debugTargetLanguage;
   essentialSentences: typeof essentialSentences;
   fsrs: typeof fsrs;
   http: typeof http;
-  myFunctions: typeof myFunctions;
+  migrations: typeof migrations;
   seedCards: typeof seedCards;
-  textToSpeech: typeof textToSpeech;
   translation: typeof translation;
   translationFunctions: typeof translationFunctions;
+  translationRequests: typeof translationRequests;
   userPreferences: typeof userPreferences;
+  verifyData: typeof verifyData;
 }>;
 
 /**

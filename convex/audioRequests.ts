@@ -98,10 +98,10 @@ export const updateRequest = mutation({
     audioUrl: v.optional(v.string()),
   },
   handler: async (ctx, { requestId, status, audioUrl }) => {
-    await ctx.db.patch(requestId, {
-      status,
-      // Store audio URL in metadata if needed
-      ...(audioUrl && { audioUrl: audioUrl as any }),
-    });
+    const updateData: Record<string, string> = { status };
+    if (audioUrl) {
+      updateData.audioUrl = audioUrl;
+    }
+    await ctx.db.patch(requestId, updateData);
   },
 });
