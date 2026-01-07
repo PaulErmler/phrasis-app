@@ -1,5 +1,5 @@
 /** */
-import { mutation, action } from "./_generated/server";
+import { mutation, action, query } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { parseCSVFromStorage, getNewSentences as filterNewSentences } from "./csvParser";
@@ -17,7 +17,7 @@ export const importCardsFromDataset = action({
     
     // 1. Get all existing sentence texts that user already has cards for
     const existingCards = await ctx.runQuery(api.cardActions.getAllCardsForPractice, { userId, limit: 1000 });
-    const existingSentenceTexts = new Set(existingCards.map((card: any) => card.sourceText || card.english));
+    const existingSentenceTexts = new Set<string>(existingCards.map((card: any) => card.sourceText || card.english));
 
     // 2. Parse CSV from Convex storage and get new sentences
     const allSentences = await parseCSVFromStorage(ctx, dataset);
@@ -38,232 +38,117 @@ export const importCardsFromDataset = action({
       };
     }
 
-    // 3. Request translations via mutation pattern (action → mutation → background action)
-    const translationPromises: Promise<{ translatedText: string }>[] = [];
-    
-    for (let index = 0; index < sentencesToAdd.length; index++) {
-      const sourceText = sentencesToAdd[index].text;
-      
-      // Create a promise that polls for completion
-      const translationPromise = new Promise<{ translatedText: string }>(async (resolve) => {
-        try {
-          // Add delay to respect API rate limits (200ms between requests)
-          await new Promise(r => setTimeout(r, index * 200));
-          
-          // Request translation via mutation (captures intent, schedules background action)
-          const requestId = await ctx.runMutation(api.translationRequests.requestTranslation, {
-            sourceText,
-            sourceLanguage,
-            targetLanguage: finalTargetLanguage,
-          });
-          
-          // Poll for completion (max 30 seconds)
-          let attempts = 0;
-          const maxAttempts = 300;
-          while (attempts < maxAttempts) {
-            const request = await ctx.runQuery(api.translationRequests.getRequest, {
-              requestId,
-            });
-            
-            if (request?.status === "completed") {
-              resolve({ translatedText: request.translatedText || sourceText });
-              return;
-            } else if (request?.status === "failed") {
-              console.error(`Translation failed for "${sourceText}"`);
-              resolve({ translatedText: sourceText }); // fallback
-              return;
-            }
-            
-            // Wait 100ms before polling again
-            await new Promise(r => setTimeout(r, 100));
-            attempts++;
-          }
-          
-          // Timeout - use original text
-          console.error(`Translation timeout for "${sourceText}"`);
-          resolve({ translatedText: sourceText });
-        } catch (error: any) {
-          console.error(`Failed to request translation for "${sourceText}":`, error);
-          resolve({ translatedText: sourceText }); // fallback
-        }
-      });
-      
-      translationPromises.push(translationPromise);
-    }
-
-    const translations = await Promise.all(translationPromises);
-
-    // 4. Create all cards in the database SEQUENTIALLY to avoid conflicts
+    // 3. Create sentences and cards immediately (non-blocking)
+    // Schedule translation and audio requests in background
     const results: Array<{ cardId: any; sourceText: string }> = [];
-    for (let i = 0; i < sentencesToAdd.length; i++) {
-      const sentence = sentencesToAdd[i];
-      const targetText = translations[i].translatedText;
-      
-      const cardId = await ctx.runMutation(api.cardImporter.createCardWithTranslation, {
+    
+    for (const sentence of sentencesToAdd) {
+      // Check if sentence already exists
+      let sentenceRecord = await ctx.runQuery(api.cardImporter.getSentenceByText, { text: sentence.text });
+
+      // Create sentence if it doesn't exist
+      if (!sentenceRecord) {
+        const sentenceId = await ctx.runMutation(api.sentences.createSentence, {
+          datasetSentenceId: sentence.datasetSentenceId,
+          text: sentence.text,
+          language: sourceLanguage,
+          deck: sentence.deck,
+          deckRank: sentence.deckRank,
+          difficulty: sentence.difficulty,
+          topic1: sentence.topic1,
+          topic2: sentence.topic2,
+        });
+        sentenceRecord = await ctx.runQuery(api.sentences.getSentenceById, { sentenceId });
+      }
+
+      if (!sentenceRecord) {
+        continue;
+      }
+
+      // Create card immediately
+      const cardId = await ctx.runMutation(api.cardImporter.createCardForSentence, {
         userId,
+        sentenceId: sentenceRecord._id,
+        targetLanguage: finalTargetLanguage,
+      });
+
+      if (cardId) {
+        results.push({ cardId, sourceText: sentence.text });
+      }
+
+      // Schedule translation request in background (don't wait)
+      ctx.scheduler.runAfter(0, api.translationRequests.translateInBackground, {
+        requestId: "temp", // Not used, just for schedule
         sourceText: sentence.text,
-        targetText,
         sourceLanguage,
         targetLanguage: finalTargetLanguage,
-        datasetSentenceId: sentence.datasetSentenceId,
+      });
+
+      // Schedule audio request in background (don't wait)
+      ctx.scheduler.runAfter(0, api.audioRequests.generateAudio, {
+        requestId: "temp", // Not used, just for schedule
+        text: sentence.text,
+        language: sourceLanguage,
         difficulty: sentence.difficulty,
+        datasetSentenceId: sentence.datasetSentenceId,
         deck: sentence.deck,
         deckRank: sentence.deckRank,
         topic1: sentence.topic1,
         topic2: sentence.topic2,
       });
-      
-      if (cardId) {
-        results.push({ cardId, sourceText: sentence.text });
-      }
     }
-
-    // 5. Request audio generation for all sentences via mutation pattern
-    // (action → mutation → background action, runs in background without waiting)
-    const audioPromises: Promise<any>[] = [];
-    
-    for (let index = 0; index < sentencesToAdd.length; index++) {
-      const sentence = sentencesToAdd[index];
-      
-      // Create a promise that polls for audio completion
-      const audioPromise = new Promise(async (resolve) => {
-        try {
-          // Add delay to respect API rate limits
-          await new Promise(r => setTimeout(r, index * 100));
-          
-          // Request audio via mutation (captures intent, schedules background action)
-          const requestId = await ctx.runMutation(api.audioRequests.requestAudio, {
-            text: sentence.text,
-            language: sourceLanguage,
-            difficulty: sentence.difficulty,
-            datasetSentenceId: sentence.datasetSentenceId,
-            deck: sentence.deck,
-            deckRank: sentence.deckRank,
-            topic1: sentence.topic1,
-            topic2: sentence.topic2,
-          });
-          
-          // Poll for completion (max 30 seconds)
-          let attempts = 0;
-          const maxAttempts = 300;
-          while (attempts < maxAttempts) {
-            const request = await ctx.runQuery(api.audioRequests.getRequest, {
-              requestId,
-            });
-            
-            if (request?.status === "completed" || request?.status === "failed") {
-              resolve(null); // Either success or failure, we continue
-              return;
-            }
-            
-            // Wait 100ms before polling again
-            await new Promise(r => setTimeout(r, 100));
-            attempts++;
-          }
-          
-          resolve(null); // Timeout
-        } catch (error: any) {
-          console.error(`Error requesting audio for "${sentence.text}":`, error);
-          resolve(null); // Continue regardless
-        }
-      });
-      
-      audioPromises.push(audioPromise);
-    }
-
-    // Wait for all audio requests to complete or timeout
-    await Promise.all(audioPromises);
 
     return {
-      message: `Added ${results.length} new cards with audio`,
+      message: `Added ${results.length} new cards. Translations and audio are generating in the background.`,
       cardIds: results.map((r) => r.cardId),
     };
   },
 });
 
 /**
- * Helper mutation to create a card with translation
+ * Get a sentence by its text
  */
-export const createCardWithTranslation = mutation({
+export const getSentenceByText = query({
+  args: { text: v.string() },
+  handler: async (ctx, { text }) => {
+    return await ctx.db
+      .query("sentences")
+      .filter((q) => q.eq(q.field("text"), text))
+      .first();
+  },
+});
+
+/**
+ * Create a card for a sentence (simple, non-blocking)
+ */
+export const createCardForSentence = mutation({
   args: {
     userId: v.string(),
-    sourceText: v.string(),
-    targetText: v.string(),
-    sourceLanguage: v.optional(v.string()),
-    targetLanguage: v.optional(v.string()), // Default to 'es' for backward compatibility
-    datasetSentenceId: v.optional(v.number()),
-    deck: v.optional(v.string()),
-    deckRank: v.optional(v.number()),
-    difficulty: v.optional(v.string()),
-    topic1: v.optional(v.string()),
-    topic2: v.optional(v.string()),
+    sentenceId: v.id("sentences"),
+    targetLanguage: v.string(),
   },
-  handler: async (ctx, { userId, sourceText, targetText, sourceLanguage = "en", targetLanguage, datasetSentenceId = 0, deck = "Essential", deckRank = 1, difficulty = "Essential", topic1, topic2 }) => {
-    // Use provided targetLanguage or default to "es"
-    const finalTargetLanguage = targetLanguage || "es";
-    // 1. Check if source sentence already exists
-    let sentenceRecord = await ctx.db
-      .query("sentences")
-      .withIndex("by_text", (q) => q.eq("text", sourceText))
-      .first();
-
-    // 2. If not, insert it
-    if (!sentenceRecord) {
-      const sentenceId = await ctx.db.insert("sentences", {
-        datasetSentenceId: datasetSentenceId || 0,
-        text: sourceText,
-        language: sourceLanguage,
-        deck: deck,
-        deckRank: deckRank,
-        difficulty: difficulty,
-        topic1: topic1 || undefined,
-        topic2: topic2 || undefined,
-        
-      });
-      sentenceRecord = await ctx.db.get(sentenceId);
-    }
-
-    if (!sentenceRecord) return null;
-
-    // 3. Check if target translation exists
-    let translation = await ctx.db
-      .query("translations")
-      .withIndex("by_sentence_and_language", (q) =>
-        q.eq("sentenceId", sentenceRecord._id).eq("targetLanguage", finalTargetLanguage)
-      )
-      .first();
-
-    // 4. If not, insert translation
-    if (!translation) {
-      await ctx.db.insert("translations", {
-        sentenceId: sentenceRecord._id,
-        targetLanguage: finalTargetLanguage,
-        translatedText: targetText,
-      });
-    }
-
-    // 5. Create a card for the user (if it doesn't already exist)
-    const existingCard = await ctx.db
+  handler: async (ctx, { userId, sentenceId, targetLanguage }) => {
+    // Check if card already exists
+    const existing = await ctx.db
       .query("cards")
       .filter((q) =>
         q.and(
           q.eq(q.field("userId"), userId),
-          q.eq(q.field("sentenceId"), sentenceRecord._id),
-          q.eq(q.field("targetLanguage"), finalTargetLanguage)
+          q.eq(q.field("sentenceId"), sentenceId),
+          q.eq(q.field("targetLanguage"), targetLanguage)
         )
       )
       .first();
 
-    if (existingCard) {
-      return existingCard._id;
+    if (existing) {
+      return existing._id;
     }
 
-    // Create the card
-    const cardId = await ctx.db.insert("cards", {
+    // Create new card
+    return await ctx.db.insert("cards", {
       userId,
-      sentenceId: sentenceRecord._id,
-      targetLanguage: finalTargetLanguage, // Add target language to card
-      // FSRS initial state for new card
+      sentenceId,
+      targetLanguage,
       state: "new",
       difficulty: 0,
       stability: 0,
@@ -271,11 +156,9 @@ export const createCardWithTranslation = mutation({
       scheduledDays: 0,
       reps: 0,
       lapses: 0,
-      nextReview: Date.now(), // Due immediately
+      nextReview: Date.now(),
       initialLearningPhase: true,
       initialReviewCount: 0,
     });
-
-    return cardId;
   },
 });

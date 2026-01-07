@@ -19,7 +19,6 @@ export function HomeView() {
   const userId = currentUser?._id;
   const userPreferences = useQuery(api.userPreferences.getUserPreferences, userId ? { userId } : "skip");
   const cardStats = useQuery(api.cardActions.getCardStats, userId ? { userId } : "skip");
-  const latestImportRequest = useQuery(api.cardImportRequests.getLatestRequest, userId ? { userId } : "skip");
   const availableDatasets = useQuery(api.cardImportRequests.getAvailableDatasets);
   const csvFile = useQuery(api.fileUpload.getCSVFile, { name: "Essential" });
   const requestCardImport = useMutation(api.cardImportRequests.requestCardImport);
@@ -329,21 +328,8 @@ export function HomeView() {
                 ? `🚀 Start Learning with ${cardImportCount} Sentences` 
                 : `✨ Add ${cardImportCount} Sentences`)}
           </Button>
-          {latestImportRequest && latestImportRequest.status === "completed" && (
-            <p className="text-xs text-green-600 dark:text-green-400 text-center">
-              ✓ Cards imported successfully
-            </p>
-          )}
-          {latestImportRequest && latestImportRequest.status === "failed" && (
-            <p className="text-xs text-red-600 dark:text-red-400 text-center">
-              ✗ Import failed: {latestImportRequest.error}
-            </p>
-          )}
-          {latestImportRequest && latestImportRequest.status === "pending" && (
-            <p className="text-xs text-amber-600 dark:text-amber-400 text-center">
-              ⏳ Import in progress...
-            </p>
-          )}
+          
+         
         </CardContent>
       </Card>
 
