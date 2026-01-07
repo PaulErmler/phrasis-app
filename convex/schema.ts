@@ -156,16 +156,6 @@ export default defineSchema({
 
   /////////// Request Tables ///////////
 
-  // Card import requests (track background imports)
-  card_import_requests: defineTable({
-    userId: v.string(),
-    count: v.number(),
-    sourceLanguage: v.optional(v.string()),
-    targetLanguage: v.optional(v.string()),
-    status: v.string(), // "pending" | "completed" | "failed"
-    error: v.optional(v.string()),
-  }).index("by_userId_status", ["userId", "status"]),
-
   // Audio generation requests (capture user intent, schedule action)
   audio_requests: defineTable({
     userId: v.string(),
