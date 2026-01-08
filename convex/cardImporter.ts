@@ -48,7 +48,7 @@ export const importCardsFromDataset = action({
 
       // Create sentence if it doesn't exist
       if (!sentenceRecord) {
-        const sentenceId = await ctx.runMutation(api.sentences.createSentence, {
+        const sentenceId = await ctx.runMutation(api.translationFunctions.insertSentence, {
           datasetSentenceId: sentence.datasetSentenceId,
           text: sentence.text,
           language: sourceLanguage,
@@ -58,7 +58,7 @@ export const importCardsFromDataset = action({
           topic1: sentence.topic1,
           topic2: sentence.topic2,
         });
-        sentenceRecord = await ctx.runQuery(api.sentences.getSentenceById, { sentenceId });
+        sentenceRecord = await ctx.runQuery(api.cardImporter.getSentenceByText, { text: sentence.text });
       }
 
       if (!sentenceRecord) {
@@ -77,16 +77,14 @@ export const importCardsFromDataset = action({
       }
 
       // Schedule translation request in background (don't wait)
-      ctx.scheduler.runAfter(0, api.translationRequests.translateInBackground, {
-        requestId: "temp", // Not used, just for schedule
+      const translationRequestId = await ctx.runMutation(api.translationRequests.requestTranslation, {
         sourceText: sentence.text,
         sourceLanguage,
         targetLanguage: finalTargetLanguage,
       });
 
       // Schedule audio request in background (don't wait)
-      ctx.scheduler.runAfter(0, api.audioRequests.generateAudio, {
-        requestId: "temp", // Not used, just for schedule
+      const audioRequestId = await ctx.runMutation(api.audioRequests.requestAudio, {
         text: sentence.text,
         language: sourceLanguage,
         difficulty: sentence.difficulty,
