@@ -1,0 +1,236 @@
+{
+  "header": {
+    "nav": {
+      "features": "Features",
+      "pricing": "Pricing",
+      "reviews": "Reviews",
+      "faq": "FAQ"
+    },
+    "install": "Install",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "goToApp": "Go to App",
+    "installApp": "Install App",
+    "theme": "Theme"
+  },
+  "hero": {
+    "tagline": "Master Languages While Living Your Life",
+    "subtitle": "Audio flashcards that adapt to your level, AI that answers your questions instantly, and spaced repetition that makes you remember up to 10x more — all while you commute, exercise, or cook.",
+    "cta": {
+      "start": "Start Learning Free",
+      "howItWorks": "See How It Works",
+      "goToApp": "Go to App"
+    }
+  },
+  "features": {
+    "title": "Everything You Need to",
+    "titleHighlight": "Learn Faster",
+    "subtitle": "Phrasis combines the best of audio learning, AI tutoring, and memory science into one seamless experience that fits your busy life.",
+    "items": {
+      "audioBased": {
+        "title": "Audio Based",
+        "description": "Learn while commuting, exercising, or cooking. No screen required — just listen, repeat, and absorb."
+      },
+      "selfDriven": {
+        "title": "Self Driven",
+        "description": "Add your own phrases from images or files. Ask Phrasis to create sentences for you. Or use our smart defaults tailored to your level."
+      },
+      "instantFeedback": {
+        "title": "Instant Feedback",
+        "description": "Ask any vocabulary or grammar question anytime. Our AI tutor explains nuances, alternatives, and usage and creates flashcards and notes for you."
+      },
+      "allInOne": {
+        "title": "All-in-One",
+        "description": "No more switching between dictionaries, ChatGPT, and flashcard apps. Instead spend your time learning. Everything you need in one place."
+      },
+      "spacedRepetition": {
+        "title": "Spaced Repetition",
+        "description": "Remember up to 10x more with scientifically-proven algorithms that show you cards exactly when you need them."
+      },
+      "languageIntelligence": {
+        "title": "Language Intelligence",
+        "description": "Learn the most commonly used words and phrases first, or focus on vocabulary for your specific goals and interests."
+      }
+    }
+  },
+  "pricing": {
+    "title": "Simple, Transparent",
+    "titleHighlight": "Pricing",
+    "comparison": {
+      "comparedWith": "Compared with:",
+      "traditionalCourses": "Traditional Courses",
+      "price": "€299 - €599",
+      "period": "/8 weeks",
+      "whatYouGet": "What you get:",
+      "issues": {
+        "limitedHours": "Limited hours per course",
+        "fixedSchedule": "Fixed schedule and location",
+        "noIndividualized": "No individualised content",
+        "noReview": "No long-term review strategy"
+      }
+    },
+    "plans": {
+      "free": {
+        "name": "Free",
+        "description": "Perfect for getting started",
+        "price": "€0",
+        "period": "forever",
+        "cta": "Get Started",
+        "features": {
+          "reviews": "200 reviews per month",
+          "flashcards": "10 custom flashcards per month",
+          "languages": "1 language",
+          "aiQuestions": "5 AI Questions per month"
+        }
+      },
+      "basic": {
+        "name": "Basic",
+        "description": "For dedicated learners",
+        "price": "€9",
+        "period": "per month",
+        "cta": "Start Free Trial",
+        "features": {
+          "reviews": "2000 reviews per month",
+          "flashcards": "50 custom flashcards per month",
+          "languages": "Up to 2 languages",
+          "aiQuestions": "100 AI Questions per month"
+        }
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "Maximum learning power",
+        "price": "€19",
+        "period": "per month",
+        "cta": "Start Free Trial",
+        "features": {
+          "reviews": "Unlimited reviews per month",
+          "flashcards": "500 custom flashcards per month",
+          "languages": "Unlimited languages",
+          "aiQuestions": "500 AI Questions per month",
+          "priority": "Priority Access to new features"
+        }
+      }
+    }
+  },
+  "testimonials": {
+    "title": "Loved by",
+    "titleHighlight": "Language Learners",
+    "items": [
+      {
+        "quote": "Phrasis completely changed how I learn languages. I can finally make progress during my daily commute!",
+        "author": "Sarah M.",
+        "role": "Learning Spanish"
+      },
+      {
+        "quote": "The AI answers my grammar questions instantly. It's like having a personal tutor available 24/7. Whenever I have a question, I can ask and Phrasis automatically creates a flashcard for me so that I dont forget the answer.",
+        "author": "Michael T.",
+        "role": "Learning French"
+      },
+      {
+        "quote": "I love that I can add my own phrases from books I'm reading. Finally, a language app that adapts to me!",
+        "author": "Anna K.",
+        "role": "Learning German"
+      },
+      {
+        "quote": "The spaced repetition actually works. I'm remembering vocabulary so much better than with other apps.",
+        "author": "David L.",
+        "role": "Learning Japanese"
+      },
+      {
+        "quote": "Being able to learn hands-free while cooking or exercising is a game-changer for me!",
+        "author": "Emma R.",
+        "role": "Learning Italian"
+      },
+      {
+        "quote": "Instead of having to sit at my desk for hours to learn Portuguese, I go on walks and can spend time outside while learning.",
+        "author": "Lisa P.",
+        "role": "Learning Portuguese"
+      }
+    ]
+  },
+  "donation": {
+    "title": "Learning that",
+    "titleHighlight": "Gives Back",
+    "description": "When you subscribe to Phrasis, you're not just investing in yourself. We donate",
+    "percentage": "10% of our earnings",
+    "description2": "to highly effective charities recommended by",
+    "givewellLink": "GiveWell"
+  },
+  "faq": {
+    "title": "Frequently Asked",
+    "titleHighlight": "Questions",
+    "subtitle": "Everything you need to know about Phrasis",
+    "items": [
+      {
+        "question": "What is Phrasis?",
+        "answer": [
+          "Phrasis is an audio-first language learning app. Unlike traditional apps, you can learn hands-free while commuting, exercising, or doing chores. It reads out sentences in one language and then you have some time to come up with the translation before the app tells you the correct answer and moves on to the next sentence.",
+          "If you don't understand something, you can ask a state of the art language model to explain it to you. You can also let it create new flashcards for you."
+        ]
+      },
+      {
+        "question": "Is Phrasis free?",
+        "answer": [
+          "Phrasis offers a free tier such that you can try it. Unfortunately, we cannot offer it completely free as we have to cover our running costs. If you need higher limits you can upgrade to our Basic or Pro plans."
+        ]
+      },
+      {
+        "question": "How does Phrasis work?",
+        "answer": [
+          "Phrasis uses audio flashcards that play phrases in your target language, followed by the translation. You can rate how well you knew each phrase, and our spaced repetition algorithm shows the card again when you are likely about to forget it.",
+          "If you dont understand a phrase you can ask the AI tutor questions anytime — like 'How can I say this more politely?' or 'Give me 3 more examples with this verb in a different tense.' We generate natural-sounding audio using state of the art text-to-speech technology."
+        ]
+      },
+      {
+        "question": "Can I add my own phrases?",
+        "answer": [
+          "Absolutely! You can either upload images, PDF, CSV or text files and Phrasis will automatically create flashcards for you. You can also add your own flashcards manually.",
+          "Are we missing a method that you would like to use? Let us know and we will try to add it."
+        ]
+      },
+      {
+        "question": "How long does it take to get fluent?",
+        "answer": [
+          "Fluency depends on many factors: the language, your native language, daily practice time, and learning methods.",
+          "The goal of Phrasis is to give you all the tools you need to learn it as fast as possible. For instance Phrasis teaches you new words in the order they appear most commonly. This way you can become fluent faster in more contexts because you learn the most frequent words first."
+        ]
+      },
+      {
+        "question": "What languages does Phrasis support?",
+        "answer": [
+          "Currently, Phrasis supports learning Spanish, French, German, Italian, Portuguese, and Japanese, with more languages being added regularly.",
+          "Is your langauge not supported? Let us know and we will try to prioritize it."
+        ]
+      },
+      {
+        "question": "Why is Phrasis a subscription?",
+        "answer": [
+          "Running AI models for voice generation and intelligent tutoring has ongoing costs. You can try it for free and see if it works for you.",
+          "Phrasis can save you a lot of time e.g. because you can learn while on the go and it makes learning new sentences and vocabulary way easier."
+        ]
+      },
+      {
+        "question": "Can I download Phrasis as an app?",
+        "answer": [
+          "You can install Phrasis as a Web App right now! This gives you an app-like experience and home screen access. We're also working on native iOS and Android apps that will be available in the app stores soon."
+        ],
+        "hasInstallButton": true
+      }
+    ],
+    "contact": {
+      "title": "Still have questions?",
+      "description": "Reach out to us at",
+      "email": "support@phrasis.app"
+    }
+  },
+  "newsletter": {
+    "title": "Get Language Tips & Updates",
+    "subtitle": "Join our newsletter for exclusive learning strategies, new feature announcements, and tips. Unsubscribe anytime.",
+    "placeholder": "Enter your email",
+    "cta": "Subscribe",
+    "privacy": "We respect your privacy. No spam, ever.",
+    "success": "You're subscribed! Check your inbox for a welcome email.",
+    "done": "Done"
+  }
+}
+
