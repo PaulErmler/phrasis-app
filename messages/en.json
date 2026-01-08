@@ -61,6 +61,17 @@
       "goToFlashcard": "Go to Flashcards",
       "goToAudioFlashcard": "Go to Audio Flashcards"
     },
+    "addCards": {
+      "title": "Add More Cards",
+      "description": "Import essential sentences to expand your learning deck",
+      "numberOfCards": "Number of cards to import:",
+      "requesting": "Requesting import...",
+      "startLearning": "Start Learning with {count} Sentences",
+      "addSentences": "Add {count} Essential Sentences",
+      "importSuccess": "Cards imported successfully",
+      "importFailed": "Import failed",
+      "importInProgress": "Import in progress..."
+    },
     "randomNumber": {
       "title": "Random Numbers",
       "description": "A simple Convex demo showing real-time updates.",
