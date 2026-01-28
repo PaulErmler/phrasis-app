@@ -9,4 +9,38 @@ export default defineSchema({
   numbers: defineTable({
     value: v.number(),
   }),
+  
+  // Sentences table - stores the original sentences
+  sentences: defineTable({
+    datasetSentenceId: v.number(), // Unique ID from the dataset
+    text: v.string(),
+    language: v.string(), // e.g., "en" for English
+    deck: v.string(), // Difficulty level: A1, A2, B1, B2, C1, C2
+    deckRank: v.number(), // Rank within the deck
+    difficulty: v.string(), // Difficulty as a string (e.g., "A1")
+    topic1: v.optional(v.string()), // Primary topic
+    topic2: v.optional(v.string()), // Secondary topic
+  })
+    .index("by_text", ["text"])
+    .index("by_datasetSentenceId", ["datasetSentenceId"])
+    .index("by_deck", ["deck", "deckRank"])
+    .index("by_difficulty", ["difficulty"]),
+  
+  // Translations table - stores translations of sentences
+  translations: defineTable({
+    sentenceId: v.id("sentences"),
+    targetLanguage: v.string(), // e.g., "es" for Spanish
+    translatedText: v.string(),
+  })
+    .index("by_sentence_and_language", ["sentenceId", "targetLanguage"]),
+  
+  // Audio recordings table - stores audio data for sentences
+  audio_recordings: defineTable({
+    sentenceId: v.id("sentences"),
+    language: v.string(), // e.g., "en-US" or "es-ES"
+    accent: v.optional(v.string()), // e.g., "us", "uk", "mx"
+    audioData: v.string(), // Base64 encoded audio
+    audioUrl: v.string(), // Data URL for playing
+  })
+    .index("by_sentence_language_accent", ["sentenceId", "language", "accent"]),
 });
