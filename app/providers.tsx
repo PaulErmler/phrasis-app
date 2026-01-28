@@ -40,6 +40,9 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
                         // Clear router cache (protected routes)
                         router.refresh()
                     }}
+                    social={{
+                        providers: ["google"],
+                    }}
                     Link={Link}
                     localization={authLocalization}
                 >
