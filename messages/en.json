@@ -5,6 +5,7 @@
     "signIn": "Sign In",
     "getStarted": "Get Started",
     "goToApp": "Go to App",
+    "installApp": "Install App",
     "welcomeBack": "Welcome back",
     "continueToApp": "Continue where you left off",
     "journeySection": {
@@ -33,6 +34,7 @@
   "AppPage": {
     "views": {
       "home": "Home",
+      "chat": "Chat",
       "content": "Content",
       "library": "Library",
       "settings": "Settings"
@@ -71,12 +73,51 @@
     "settings": {
       "account": "Account",
       "language": "App Language"
-    }
+    },
+    "courses": {
+      "title": "Your Courses",
+      "description": "Select a course to switch to or create a new one",
+      "createNew": "Create New Course",
+      "noCourses": "No courses yet. Create your first course to get started.",
+      "active": "Active",
+      "learning": "Learning {language}",
+      "currentCourse": "Current Course",
+      "from": "from {language}",
+      "createDialog": {
+        "title": "Create New Course",
+        "step1": {
+          "title": "What language do you want to learn?",
+          "subtitle": "Select your target language"
+        },
+        "step2": {
+          "title": "What language will you learn from?",
+          "subtitle": "Select your base language"
+        },
+        "step3": {
+          "title": "What's your current level?",
+          "subtitle": "Select your proficiency level"
+        },
+        "creating": "Creating course...",
+        "success": "Course created successfully!",
+        "error": "Failed to create course",
+        "cancel": "Cancel",
+        "back": "Back",
+        "next": "Next",
+        "create": "Create Course"
+      }
+    },
+    "changeCourse": "Change Course"
   },
   "Footer": {
     "copyright": "© {year} Phrasis. All rights reserved.",
     "theme": "Theme:",
-    "language": "Language:"
+    "language": "Language:",
+    "madeInGermany": "Made in Germany",
+    "legal": {
+      "impressum": "Imprint",
+      "agb": "Terms & Conditions",
+      "privacy": "Privacy Policy"
+    }
   },
   "Theme": {
     "title": "Theme",
@@ -87,5 +128,95 @@
   },
   "Language": {
     "title": "Language"
+  },
+  "Chat": {
+    "flashcardConfirmation": {
+      "textLabel": "Text",
+      "noteLabel": "Note",
+      "approveButton": "Create Flashcard",
+      "rejectButton": "Reject",
+      "approved": "Flashcard created successfully!",
+      "rejected": "Flashcard creation cancelled",
+      "loading": "Loading...",
+      "creatingApproval": "Creating approval request..."
+    }
+  },
+  "Onboarding": {
+    "welcome": {
+      "title": "Welcome to Phrasis!",
+      "subtitle": "Let's customize your learning experience in just a few steps",
+      "description": "This will only take a minute, and you can always change these settings later.",
+      "feature1": {
+        "title": "Personalized Content",
+        "description": "Get learning materials tailored to your level and goals"
+      },
+      "feature2": {
+        "title": "Your Pace",
+        "description": "Learn at a speed that works for you"
+      },
+      "feature3": {
+        "title": "Multiple Languages",
+        "description": "Choose from 8 popular languages to learn"
+      }
+    },
+    "step1": {
+      "title": "What kind of language learner are you?",
+      "casual": {
+        "title": "Casual",
+        "description": "I want a simple learning experience"
+      },
+      "focused": {
+        "title": "Intermediate",
+        "description": "I like to customize my content and settings"
+      },
+      "advanced": {
+        "title": "Advanced",
+        "description": "I want to cutomize everything"
+      }
+    },
+    "step2": {
+      "title": "What language do you want to learn?",
+      "subtitle": "Select a language"
+    },
+    "step3": {
+      "title": "What language will you learn from?",
+      "subtitle": "Select your base language"
+    },
+    "step4": {
+      "title": "What's your current level?",
+      "beginner": {
+        "title": "Beginner",
+        "description": "I'm new to {language}"
+      },
+      "elementary": {
+        "title": "Elementary",
+        "description": "I know some common words"
+      },
+      "intermediate": {
+        "title": "Intermediate",
+        "description": "I can have basic conversations"
+      },
+      "upper_intermediate": {
+        "title": "Upper Intermediate",
+        "description": "I can talk about various topics"
+      },
+      "advanced": {
+        "title": "Advanced",
+        "description": "I can discuss most topics in detail"
+      }
+    },
+    "continue": "Continue",
+    "back": "Back",
+    "getStarted": "Get Started",
+    "finish": "Finish",
+    "loading": {
+      "title": "Customizing Your Learning Journey",
+      "subtitle": "We're preparing everything just for you..."
+    },
+    "finished": {
+      "title": "You're all set!",
+      "subtitle": "Your personalized learning experience is ready.",
+      "button": "Start Learning"
+    }
   }
 }

@@ -32,7 +32,7 @@ export function GoToAppButton({ isAuthenticated }: GoToAppButtonProps) {
               router.refresh();
               router.push("/app");
             }}
-            className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
+            className="w-full shadow-xl shadow-black/5 transition-all duration-200"
             size="lg"
           >
             {t("goToApp")}
@@ -57,7 +57,7 @@ export function GoToAppButton({ isAuthenticated }: GoToAppButtonProps) {
       <CardContent className="space-y-3">
         <Button
           onClick={() => router.push("/auth/sign-up")}
-          className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
+          className="w-full shadow-xl shadow-black/5 transition-all duration-200"
           size="lg"
         >
           {t("getStarted")}

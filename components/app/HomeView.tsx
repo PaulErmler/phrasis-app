@@ -2,18 +2,19 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
+import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, BellOff, BellRing } from "lucide-react";
+import { getLanguagesByCodes } from "@/lib/languages";
+import { NewChatInput } from "@/components/chat/NewChatInput";
 
 export function HomeView() {
   const router = useRouter();
   const t = useTranslations("AppPage");
-  const { viewer, numbers } = useQuery(api.myFunctions.listNumbers, { count: 10 }) ?? {};
-  const addNumber = useMutation(api.myFunctions.addNumber);
+  const activeCourse = useQuery(api.courses.getActiveCourse);
   
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [isLoading, setIsLoading] = useState(false);
@@ -67,26 +68,29 @@ export function HomeView() {
     }
   }, [notificationPermission, requestNotificationPermission]);
 
-  if (viewer === undefined || numbers === undefined) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-          <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
-          <p className="ml-2 text-muted-foreground">{t("loading")}</p>
-        </div>
-      </div>
-    );
-  }
+  const formatCourseName = () => {
+    if (!activeCourse) return null;
+    const targetLanguageObjects = getLanguagesByCodes(activeCourse.targetLanguages);
+    const targetNames = targetLanguageObjects.map((l) => l.name).join(", ");
+    return targetNames;
+  };
+
+  const courseName = formatCourseName();
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
-      <div className="text-center space-y-2 mb-6">
-        <p className="text-muted-foreground">
-          {t("welcome", { viewer: viewer || "undefined" })}
-        </p>
-      </div>
+      {/* Current Course Display */}
+      {courseName && (
+        <div className="text-center py-2">
+          <p className="text-sm text-muted-foreground">{t("courses.currentCourse")}</p>
+          <h2 className="text-2xl font-bold mt-1">{courseName}</h2>
+        </div>
+      )}
+
+      {/* New Chat Input */}
+      <NewChatInput 
+        showSuggestions={false}
+      />
 
       {/* Notification Card */}
       <Card>
@@ -166,32 +170,6 @@ export function HomeView() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{t("randomNumber.title")}</CardTitle>
-          <CardDescription>
-            {t("randomNumber.description")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Button
-            onClick={() => addNumber({ value: Math.floor(Math.random() * 100) })}
-            className="w-full"
-          >
-            {t("randomNumber.generate")}
-          </Button>
-
-          <div className="rounded-lg bg-muted p-4">
-            <p className="text-sm font-medium text-muted-foreground mb-2">{t("randomNumber.recent")}</p>
-            <p className="font-mono text-lg">
-              {numbers?.length === 0
-                ? t("randomNumber.empty")
-                : numbers?.join(", ") ?? "..."}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
-

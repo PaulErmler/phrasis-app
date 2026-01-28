@@ -5,6 +5,7 @@
     "signIn": "Anmelden",
     "getStarted": "Jetzt starten",
     "goToApp": "Zur App",
+    "installApp": "App installieren",
     "welcomeBack": "Willkommen zurück",
     "continueToApp": "Mach weiter, wo du aufgehört hast",
     "journeySection": {
@@ -33,6 +34,7 @@
   "AppPage": {
     "views": {
       "home": "Start",
+      "chat": "Chat",
       "content": "Inhalte",
       "library": "Bibliothek",
       "settings": "Einstellungen"
@@ -71,12 +73,51 @@
     "settings": {
       "account": "Konto",
       "language": "App-Sprache"
-    }
+    },
+    "courses": {
+      "title": "Deine Kurse",
+      "description": "Wähle einen Kurs zum Wechseln oder erstelle einen neuen",
+      "createNew": "Neuen Kurs erstellen",
+      "noCourses": "Noch keine Kurse. Erstelle deinen ersten Kurs, um zu beginnen.",
+      "active": "Aktiv",
+      "learning": "{language} lernen",
+      "currentCourse": "Aktueller Kurs",
+      "from": "von {language}",
+      "createDialog": {
+        "title": "Neuen Kurs erstellen",
+        "step1": {
+          "title": "Welche Sprache möchtest du lernen?",
+          "subtitle": "Wähle deine Zielsprache"
+        },
+        "step2": {
+          "title": "Von welcher Sprache möchtest du lernen?",
+          "subtitle": "Wähle deine Basissprache"
+        },
+        "step3": {
+          "title": "Was ist dein aktuelles Level?",
+          "subtitle": "Wähle dein Sprachniveau"
+        },
+        "creating": "Kurs wird erstellt...",
+        "success": "Kurs erfolgreich erstellt!",
+        "error": "Kurs konnte nicht erstellt werden",
+        "cancel": "Abbrechen",
+        "back": "Zurück",
+        "next": "Weiter",
+        "create": "Kurs erstellen"
+      }
+    },
+    "changeCourse": "Kurs wechseln"
   },
   "Footer": {
     "copyright": "© {year} Phrasis. Alle Rechte vorbehalten.",
     "theme": "Design:",
-    "language": "Sprache:"
+    "language": "Sprache:",
+    "madeInGermany": "Hergestellt in Deutschland",
+    "legal": {
+      "impressum": "Impressum",
+      "agb": "AGB",
+      "privacy": "Datenschutz"
+    }
   },
   "Theme": {
     "title": "Design",
@@ -87,5 +128,95 @@
   },
   "Language": {
     "title": "Sprache"
+  },
+  "Chat": {
+    "flashcardConfirmation": {
+      "textLabel": "Text",
+      "noteLabel": "Notiz",
+      "approveButton": "Lernkarte erstellen",
+      "rejectButton": "Ablehnen",
+      "approved": "Lernkarte erfolgreich erstellt!",
+      "rejected": "Lernkarten-Erstellung abgebrochen",
+      "loading": "Lädt...",
+      "creatingApproval": "Genehmigungsanfrage wird erstellt..."
+    }
+  },
+  "Onboarding": {
+    "welcome": {
+      "title": "Willkommen bei Phrasis!",
+      "subtitle": "Lass uns deine Lernerfahrung in nur wenigen Schritten anpassen",
+      "description": "Das dauert nur eine Minute, und du kannst diese Einstellungen jederzeit später ändern.",
+      "feature1": {
+        "title": "Personalisierte Inhalte",
+        "description": "Erhalte Lernmaterialien, die auf dein Niveau und deine Ziele zugeschnitten sind"
+      },
+      "feature2": {
+        "title": "Dein Tempo",
+        "description": "Lerne in einem Tempo, das für dich funktioniert"
+      },
+      "feature3": {
+        "title": "Mehrere Sprachen",
+        "description": "Wähle aus 8 beliebten Sprachen zum Lernen"
+      }
+    },
+    "step1": {
+      "title": "Was für ein Sprachlerner bist du?",
+      "casual": {
+        "title": "Einfach",
+        "description": "Ich halte es gerne einfach"
+      },
+      "focused": {
+        "title": "Fortgeschritten",
+        "description": "Ich passe gerne einzelne Inhalte und Einstellungen auf mich an"
+      },
+      "advanced": {
+        "title": "Experte",
+        "description": "Ich möchte meine Inhalte und Einstellung auf mich anpassen"
+      }
+    },
+    "step2": {
+      "title": "Welche Sprache möchtest du lernen?",
+      "subtitle": "Wähle eine Sprache"
+    },
+    "step3": {
+      "title": "Von welcher Sprache aus möchtest du lernen?",
+      "subtitle": "Wähle deine Ausgangssprache"
+    },
+    "step4": {
+      "title": "Was ist dein aktuelles Niveau?",
+      "beginner": {
+        "title": "Anfänger",
+        "description": "Ich fange gerade erst mit {language} an"
+      },
+      "elementary": {
+        "title": "Grundkenntnisse",
+        "description": "Ich kenne einige gebräuchliche Wörter"
+      },
+      "intermediate": {
+        "title": "Mittelstufe",
+        "description": "Ich kann einfache Gespräche führen"
+      },
+      "upper_intermediate": {
+        "title": "Obere Mittelstufe",
+        "description": "Ich kann über verschiedene Themen sprechen"
+      },
+      "advanced": {
+        "title": "Fortgeschritten",
+        "description": "Ich kann die meisten Themen ausführlich diskutieren"
+      }
+    },
+    "continue": "Weiter",
+    "back": "Zurück",
+    "getStarted": "Jetzt starten",
+    "finish": "Abschließen",
+    "loading": {
+      "title": "Wir passen deine Lernreise an",
+      "subtitle": "Wir bereiten alles speziell für dich vor..."
+    },
+    "finished": {
+      "title": "Du bist bereit!",
+      "subtitle": "Deine personalisierte Lernerfahrung ist nun vorbereitet.",
+      "button": "Zur App"
+    }
   }
 }

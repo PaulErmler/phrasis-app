@@ -3,8 +3,9 @@
  */
 
 export interface Language {
-    code: string; // ISO 639-1 language code
-    name: string; // English name
+    code: string; // ISO 639-1 language code (for internal use and database storage)
+    displayCode: string; // BCP 47 language tag for display (e.g., "es-MX", "zh-CN")
+    name: string; // English name (fallback)
     nativeName: string; // Name in the language itself
     flag: string; // Flag emoji
     learnerCount?: string; // e.g. "24.2M"
@@ -13,6 +14,7 @@ export interface Language {
   export const SUPPORTED_LANGUAGES: Language[] = [
     {
       code: "en",
+      displayCode: "en",
       name: "English",
       nativeName: "English",
       flag: "🇬🇧",
@@ -20,6 +22,7 @@ export interface Language {
     },
     {
       code: "es",
+      displayCode: "es",
       name: "Spanish",
       nativeName: "Español",
       flag: "🇪🇸",
@@ -27,6 +30,7 @@ export interface Language {
     },
     {
       code: "fr",
+      displayCode: "fr",
       name: "French",
       nativeName: "Français",
       flag: "🇫🇷",
@@ -34,6 +38,7 @@ export interface Language {
     },
     {
       code: "de",
+      displayCode: "de",
       name: "German",
       nativeName: "Deutsch",
       flag: "🇩🇪",
@@ -41,6 +46,7 @@ export interface Language {
     },
     {
       code: "it",
+      displayCode: "it",
       name: "Italian",
       nativeName: "Italiano",
       flag: "🇮🇹",
@@ -48,20 +54,23 @@ export interface Language {
     },
     {
       code: "pt",
+      displayCode: "pt",
       name: "Portuguese",
       nativeName: "Português",
-      flag: "🇵🇹",
+      flag: "🇧🇷",
       learnerCount: "3.8M",
     },
     {
       code: "zh",
-      name: "Chinese",
-      nativeName: "中文",
+      displayCode: "zh-CN",
+      name: "Chinese (Simplified)",
+      nativeName: "中文（简体）",
       flag: "🇨🇳",
       learnerCount: "12.5M",
     },
     {
       code: "ja",
+      displayCode: "ja",
       name: "Japanese",
       nativeName: "日本語",
       flag: "🇯🇵",
@@ -85,18 +94,49 @@ export interface Language {
       .filter((lang): lang is Language => lang !== undefined);
   }
   
-  /**
-   * Generate a course name from base and target language codes
-   */
-  export function generateCourseName(
-    baseLanguageCodes: string[],
-    targetLanguageCodes: string[]
-  ): string {
-    const baseLanguages = getLanguagesByCodes(baseLanguageCodes);
-    const targetLanguages = getLanguagesByCodes(targetLanguageCodes);
-  
-    const baseName = baseLanguages.map((l) => l.name).join(", ");
-    const targetName = targetLanguages.map((l) => l.name).join(", ");
-  
-    return `${baseName} → ${targetName}`;
+/**
+ * Generate a course name from base and target language codes
+ */
+export function generateCourseName(
+  baseLanguageCodes: string[],
+  targetLanguageCodes: string[]
+): string {
+  const baseLanguages = getLanguagesByCodes(baseLanguageCodes);
+  const targetLanguages = getLanguagesByCodes(targetLanguageCodes);
+
+  const baseName = baseLanguages.map((l) => l.name).join(", ");
+  const targetName = targetLanguages.map((l) => l.name).join(", ");
+
+  return `${baseName} → ${targetName}`;
+}
+
+/**
+ * Get a localized language name using the Intl.DisplayNames API
+ * @param displayCode - BCP 47 language tag (e.g., "es-MX", "zh-CN")
+ * @param locale - The locale to display the name in (e.g., "en", "de")
+ * @returns The localized language name (e.g., "Spanish (Mexico)" in English, "Spanisch (Mexiko)" in German)
+ */
+export function getLocalizedLanguageName(displayCode: string, locale: string): string {
+  try {
+    const displayNames = new Intl.DisplayNames([locale], { type: 'language' });
+    return displayNames.of(displayCode) || displayCode;
+  } catch (error) {
+    // Fallback to the display code if DisplayNames fails
+    console.warn(`Failed to get localized name for language "${displayCode}" in locale "${locale}":`, error);
+    return displayCode;
   }
+}
+
+/**
+ * Get a localized language name by internal language code
+ * @param code - Internal language code (e.g., "es", "zh")
+ * @param locale - The locale to display the name in (e.g., "en", "de")
+ * @returns The localized language name or the language's English name as fallback
+ */
+export function getLocalizedLanguageNameByCode(code: string, locale: string): string {
+  const language = getLanguageByCode(code);
+  if (!language) {
+    return code;
+  }
+  return getLocalizedLanguageName(language.displayCode, locale);
+}

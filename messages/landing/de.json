@@ -1,0 +1,236 @@
+{
+  "header": {
+    "nav": {
+      "features": "Funktionen",
+      "pricing": "Preise",
+      "reviews": "Bewertungen",
+      "faq": "FAQ"
+    },
+    "install": "Installieren",
+    "signIn": "Anmelden",
+    "signUp": "Registrieren",
+    "goToApp": "Zur App",
+    "installApp": "App installieren",
+    "theme": "Design"
+  },
+  "hero": {
+    "tagline": "Meistere Sprachen ganz nebenbei",
+    "subtitle": "Audio-Lernkarten, die sich deinem Niveau anpassen. KI, die deine Fragen sofort beantwortet. Spaced Repetition, die dich bis zu 10x mehr behalten lässt. Alles während du pendelst, trainierst oder kochst.",
+    "cta": {
+      "start": "Kostenlos starten",
+      "howItWorks": "So funktioniert's",
+      "goToApp": "Zur App"
+    }
+  },
+  "features": {
+    "title": "Alles was du brauchst, um",
+    "titleHighlight": "schneller zu lernen",
+    "subtitle": "Phrasis kombiniert audio-basiertes Lernen, KI-Tutoring und Gedächtnisforschung, damit du dich aufs Lernen konzentrieren kannst.",
+    "items": {
+      "audioBased": {
+        "title": "Audio-basiert",
+        "description": "Lerne während du pendelst, trainierst oder kochst. Kein Bildschirm nötig — einfach zuhören, wiederholen und lernen."
+      },
+      "selfDriven": {
+        "title": "Selbstbestimmt",
+        "description": "Füge eigene Phrasen aus Bildern oder Dateien hinzu. Bitte Phrasis, Sätze für dich zu erstellen. Oder nutze unsere vorgefertigten Sätze, die auf dein Niveau zugeschnitten werden."
+      },
+      "instantFeedback": {
+        "title": "Sofortiges Feedback",
+        "description": "Stelle jederzeit Fragen zu Vokabeln oder Grammatik. Unser KI-Tutor erklärt Nuancen, Alternativen und Verwendung und erstellt Lernkarten und Notizen für dich."
+      },
+      "allInOne": {
+        "title": "Alles-in-Einem",
+        "description": "Kein Wechseln mehr zwischen Wörterbüchern, ChatGPT und Lernkarten-Apps. Stattdessen verbringe deine Zeit mit Lernen. Alles was du brauchst an einem Ort."
+      },
+      "spacedRepetition": {
+        "title": "Spaced Repetition",
+        "description": "Behalte bis zu 10x mehr mit wissenschaftlich bewährten Algorithmen, die dir Karten genau dann zeigen, wenn du sie brauchst."
+      },
+      "languageIntelligence": {
+        "title": "Sprachintelligenz",
+        "description": "Lerne zuerst die am häufigsten verwendeten Wörter und Phrasen oder konzentriere dich auf Vokabular für deine spezifischen Ziele und Interessen."
+      }
+    }
+  },
+  "pricing": {
+    "title": "Einfache, transparente",
+    "titleHighlight": "Preise",
+    "comparison": {
+      "comparedWith": "Im Vergleich zu:",
+      "traditionalCourses": "Traditionelle Kurse",
+      "price": "299€ - 599€",
+      "period": "/8 Wochen",
+      "whatYouGet": "Was du bekommst:",
+      "issues": {
+        "limitedHours": "Begrenzte Stunden pro Kurs",
+        "fixedSchedule": "Fester Zeitplan und Ort",
+        "noIndividualized": "Keine individuellen Inhalte",
+        "noReview": "Keine langfristige Wiederholungsstrategie"
+      }
+    },
+    "plans": {
+      "free": {
+        "name": "Kostenlos",
+        "description": "Perfekt zum Ausprobieren",
+        "price": "0€",
+        "period": "für immer",
+        "cta": "Jetzt starten",
+        "features": {
+          "reviews": "200 Wiederholungen pro Monat",
+          "flashcards": "10 eigene Lernkarten pro Monat",
+          "languages": "1 Sprache",
+          "aiQuestions": "5 KI-Fragen pro Monat"
+        }
+      },
+      "basic": {
+        "name": "Basic",
+        "description": "Für engagierte Lernende",
+        "price": "9€",
+        "period": "pro Monat",
+        "cta": "Kostenlos testen",
+        "features": {
+          "reviews": "2000 Wiederholungen pro Monat",
+          "flashcards": "50 eigene Lernkarten pro Monat",
+          "languages": "Bis zu 2 Sprachen",
+          "aiQuestions": "100 KI-Fragen pro Monat"
+        }
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "Maximale Lernpower",
+        "price": "19€",
+        "period": "pro Monat",
+        "cta": "Kostenlos testen",
+        "features": {
+          "reviews": "Unbegrenzte Wiederholungen pro Monat",
+          "flashcards": "500 eigene Lernkarten pro Monat",
+          "languages": "Unbegrenzte Sprachen",
+          "aiQuestions": "500 KI-Fragen pro Monat",
+          "priority": "Prioritäts-Zugang zu neuen Funktionen"
+        }
+      }
+    }
+  },
+  "testimonials": {
+    "title": "Geliebt von",
+    "titleHighlight": "Sprachlernenden",
+    "items": [
+      {
+        "quote": "Phrasis hat komplett verändert, wie ich Sprachen lerne. Ich kann endlich während meines täglichen Pendelns Fortschritte machen!",
+        "author": "Sarah M.",
+        "role": "Lernt Spanisch"
+      },
+      {
+        "quote": "Die KI beantwortet meine Grammatikfragen sofort. Es ist, als hätte ich einen persönlichen Tutor, der 24/7 verfügbar ist. Immer wenn ich eine Frage habe, kann ich sie stellen und Phrasis erstellt automatisch eine Lernkarte für mich, damit ich die Antwort nicht vergesse.",
+        "author": "Michael T.",
+        "role": "Lernt Französisch"
+      },
+      {
+        "quote": "Ich liebe es, dass ich meine eigenen Phrasen aus Büchern hinzufügen kann, die ich lese. Endlich eine Sprach-App, die sich mir anpasst!",
+        "author": "Anna K.",
+        "role": "Lernt Deutsch"
+      },
+      {
+        "quote": "Die Spaced Repetition funktioniert wirklich. Ich merke mir Vokabeln so viel besser als mit anderen Apps.",
+        "author": "David L.",
+        "role": "Lernt Japanisch"
+      },
+      {
+        "quote": "Freihändig lernen zu können, während ich koche oder trainiere, ist ein Gamechanger für mich!",
+        "author": "Emma R.",
+        "role": "Lernt Italienisch"
+      },
+      {
+        "quote": "Anstatt stundenlang am Schreibtisch zu sitzen, um Portugiesisch zu lernen, gehe ich spazieren und kann Zeit draußen verbringen, während ich lerne.",
+        "author": "Lisa P.",
+        "role": "Lernt Portugiesisch"
+      }
+    ]
+  },
+  "donation": {
+    "title": "Lerne, das",
+    "titleHighlight": "Gutes tut",
+    "description": "Wenn du Phrasis abonnierst, investierst du nicht nur in dich selbst. Wir spenden",
+    "percentage": "10% unserer Einnahmen",
+    "description2": "an hochwirksame Wohltätigkeitsorganisationen, kuriert von",
+    "givewellLink": "GiveWell"
+  },
+  "faq": {
+    "title": "Häufig gestellte",
+    "titleHighlight": "Fragen",
+    "subtitle": "Alles was du über Phrasis wissen musst",
+    "items": [
+      {
+        "question": "Was ist Phrasis?",
+        "answer": [
+          "Phrasis ist eine audio-basierte Sprachlern-App. Anders als traditionelle Apps kannst du freihändig lernen, während du pendelst, trainierst oder Hausarbeit erledigst. Die App liest Sätze in einer Sprache vor und du hast dann etwas Zeit, um die Übersetzung zu finden, bevor die App dir die richtige Antwort sagt und zum nächsten Satz übergeht.",
+          "Wenn du etwas nicht verstehst, kannst du ein hochmodernes Sprachmodell bitten, es dir zu erklären. Du kannst es auch neue Lernkarten für dich erstellen lassen."
+        ]
+      },
+      {
+        "question": "Ist Phrasis kostenlos?",
+        "answer": [
+          "Phrasis bietet eine kostenlose Version, damit du es ausprobieren kannst. Leider können wir es nicht komplett kostenlos anbieten, da wir unsere laufenden Kosten decken müssen. Wenn du höhere Limits benötigst, kannst du auf unsere Basic- oder Pro-Pläne upgraden."
+        ]
+      },
+      {
+        "question": "Wie funktioniert Phrasis?",
+        "answer": [
+          "Phrasis verwendet Audio-Lernkarten, die Phrasen in deiner Zielsprache abspielen, gefolgt von der Übersetzung. Du kannst bewerten, wie gut du jede Phrase kanntest, und unser Spaced-Repetition-Algorithmus zeigt dir die Karte wieder, wenn du sie wahrscheinlich gerade vergessen wirst.",
+          "Wenn du eine Phrase nicht verstehst, kannst du dem KI-Tutor jederzeit Fragen stellen — wie 'Wie kann ich das höflicher sagen?' oder 'Gib mir 3 weitere Beispiele mit diesem Verb in einer anderen Zeitform.' Wir generieren natürlich klingendes Audio mit modernster Text-zu-Sprache-Technologie."
+        ]
+      },
+      {
+        "question": "Kann ich meine eigenen Phrasen hinzufügen?",
+        "answer": [
+          "Absolut! Du kannst entweder Bilder, PDF-, CSV- oder Textdateien hochladen und Phrasis erstellt automatisch Lernkarten für dich. Du kannst auch deine eigenen Lernkarten manuell hinzufügen.",
+          "Fehlt uns eine Methode, die du verwenden möchtest? Lass es uns wissen und wir versuchen, sie hinzuzufügen."
+        ]
+      },
+      {
+        "question": "Wie lange dauert es, bis ich fließend spreche?",
+        "answer": [
+          "Fließend sprechen zu können, hängt von vielen Faktoren ab: der Sprache, deiner Muttersprache, der täglichen Übungszeit und den Lernmethoden.",
+          "Das Ziel von Phrasis ist es, dir alle Werkzeuge zu geben, die du brauchst, um es so schnell wie möglich zu lernen. Zum Beispiel bringt dir Phrasis neue Wörter in der Reihenfolge bei, in der sie am häufigsten vorkommen. So kannst du in mehr Kontexten schneller fließend sprechen, weil du die häufigsten Wörter zuerst lernst."
+        ]
+      },
+      {
+        "question": "Welche Sprachen unterstützt Phrasis?",
+        "answer": [
+          "Derzeit unterstützt Phrasis das Lernen von Spanisch, Französisch, Deutsch, Italienisch, Portugiesisch und Japanisch, wobei regelmäßig weitere Sprachen hinzugefügt werden.",
+          "Wird deine Sprache nicht unterstützt? Lass es uns wissen und wir werden versuchen, sie zu priorisieren."
+        ]
+      },
+      {
+        "question": "Warum ist Phrasis ein Abonnement?",
+        "answer": [
+          "Das Betreiben von KI-Modellen für Spracherzeugung und intelligentes Tutoring verursacht laufende Kosten. Du kannst es kostenlos ausprobieren und sehen, ob es für dich funktioniert.",
+          "Phrasis kann dir viel Zeit sparen, z.B. weil du unterwegs lernen kannst und es das Lernen neuer Sätze und Vokabeln viel einfacher macht."
+        ]
+      },
+      {
+        "question": "Kann ich Phrasis als App herunterladen?",
+        "answer": [
+          "Du kannst Phrasis jetzt als Web-App installieren! Das gibt dir ein app-ähnliches Erlebnis und Zugriff über deinen Startbildschirm. Wir arbeiten auch an nativen iOS- und Android-Apps, die bald in den App-Stores verfügbar sein werden."
+        ],
+        "hasInstallButton": true
+      }
+    ],
+    "contact": {
+      "title": "Hast du noch Fragen?",
+      "description": "Kontaktiere uns unter",
+      "email": "support@phrasis.app"
+    }
+  },
+  "newsletter": {
+    "title": "Erhalte Sprachtipps & Updates",
+    "subtitle": "Abonniere unseren Newsletter für exklusive Lernstrategien, neue Feature-Ankündigungen und Tipps. Jederzeit abbestellbar.",
+    "placeholder": "Gib deine E-Mail ein",
+    "cta": "Abonnieren",
+    "privacy": "Wir respektieren deine Privatsphäre. Kein Spam, niemals.",
+    "success": "Du bist angemeldet! Schau in deinem Posteingang nach einer Willkommens-E-Mail.",
+    "done": "Fertig"
+  }
+}
+

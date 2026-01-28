@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { learningStyleValidator, currentLevelValidator } from "./types";
 
 // The schema is entirely optional.
 // You can delete this file (schema.ts) and the
@@ -9,6 +10,28 @@ export default defineSchema({
   numbers: defineTable({
     value: v.number(),
   }),
+  testFlashcards: defineTable({
+    text: v.string(),           // Flashcard content
+    note: v.string(),           // Additional note
+    date: v.number(),           // Timestamp
+    randomNumber: v.number(),   // Random number
+    userId: v.string(),         // User who owns the flashcard
+  }),
+  flashcardApprovals: defineTable({
+    threadId: v.string(),       // Thread where approval was requested
+    messageId: v.string(),      // Message containing the tool call
+    toolCallId: v.string(),     // ID of the tool call
+    text: v.string(),           // Proposed flashcard text
+    note: v.string(),           // Proposed flashcard note
+    userId: v.string(),         // User who needs to approve
+    status: v.string(),         // "pending", "approved", "rejected"
+    createdAt: v.number(),      // When the approval was requested
+    processedAt: v.optional(v.number()), // When it was approved/rejected
+  })
+    .index("by_message", ["messageId"])
+    .index("by_user_and_status", ["userId", "status"])
+    .index("by_toolCallId", ["toolCallId"])
+    .index("by_thread_and_user", ["threadId", "userId"]),
   
   // Sentences table - stores the original sentences
   sentences: defineTable({
@@ -43,4 +66,31 @@ export default defineSchema({
     audioUrl: v.string(), // Data URL for playing
   })
     .index("by_sentence_language_accent", ["sentenceId", "language", "accent"]),
+
+  // User settings table - stores user preferences and onboarding status
+  userSettings: defineTable({
+    userId: v.string(), // Links to auth user
+    hasCompletedOnboarding: v.boolean(),
+    learningStyle: v.optional(learningStyleValidator),
+    activeCourseId: v.optional(v.id("courses")), // Active course for the user
+  }).index("by_userId", ["userId"]),
+
+  // Onboarding progress table - stores temporary onboarding data until completion
+  onboardingProgress: defineTable({
+    userId: v.string(), // Links to auth user
+    step: v.number(), // Current step in onboarding (1-6)
+    learningStyle: v.optional(learningStyleValidator),
+    currentLevel: v.optional(currentLevelValidator),
+    targetLanguages: v.optional(v.array(v.string())),
+    baseLanguages: v.optional(v.array(v.string())),
+  }).index("by_userId", ["userId"]),
+
+
+  // Courses table - stores user language learning courses
+  courses: defineTable({
+    userId: v.string(), // Links to auth user
+    baseLanguages: v.array(v.string()), // ISO codes (e.g., ["en"])
+    targetLanguages: v.array(v.string()), // ISO codes (e.g., ["es", "fr"])
+    currentLevel: v.optional(currentLevelValidator), // User's current level in this course
+  }).index("by_userId", ["userId"]),
 });

@@ -19,7 +19,7 @@ export default async function AuthPage({ params }: { params: Promise<{ path: str
                 <AuthView 
                     path={path} 
                     localization={authLocalization} 
-                    redirectTo="/app"
+                    redirectTo="/app/onboarding"
                     classNames={{
                         // Keep the base as is, don't reverse the whole card
                         base: "w-full",
