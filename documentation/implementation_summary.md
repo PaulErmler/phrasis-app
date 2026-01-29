@@ -20,8 +20,8 @@
 ### Upload Script (`scripts/uploadTexts.mjs`)
 - Reads CSVs from `data_preparation/data/output/sentences_by_difficulty/`
 - Creates collections per CEFR level (Essential, A1-C2)
-- Batch uploads via `npx convex run`
-- Run: `npm run seed-texts`
+- Batch uploads via `npx convex run [batch uploading function]`
+- Run: `pnpm run seed-texts`
 
 ### UI (`components/app/CollectionsPreview.tsx`)
 - Accordion displaying collections with first 5 texts each
