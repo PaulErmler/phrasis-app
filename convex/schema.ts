@@ -17,6 +17,7 @@ export default defineSchema({
     randomNumber: v.number(),   // Random number
     userId: v.string(),         // User who owns the flashcard
   }),
+  
   flashcardApprovals: defineTable({
     threadId: v.string(),       // Thread where approval was requested
     messageId: v.string(),      // Message containing the tool call
@@ -33,39 +34,43 @@ export default defineSchema({
     .index("by_toolCallId", ["toolCallId"])
     .index("by_thread_and_user", ["threadId", "userId"]),
   
-  // Sentences table - stores the original sentences
-  sentences: defineTable({
-    datasetSentenceId: v.number(), // Unique ID from the dataset
+  // Collections table - groups texts by difficulty level
+  collections: defineTable({
+    name: v.string(), // e.g., "A1", "B2", "Essential"
+    textCount: v.number(), // Number of texts in this collection
+  })
+    .index("by_name", ["name"]),
+
+  // Texts table - stores the original texts/sentences
+  texts: defineTable({
+    datasetSentenceId: v.optional(v.number()), // Unique ID from the dataset (optional for user-created)
     text: v.string(),
     language: v.string(), // e.g., "en" for English
-    deck: v.string(), // Difficulty level: A1, A2, B1, B2, C1, C2
-    deckRank: v.number(), // Rank within the deck
-    difficulty: v.string(), // Difficulty as a string (e.g., "A1")
-    topic1: v.optional(v.string()), // Primary topic
-    topic2: v.optional(v.string()), // Secondary topic
+    userCreated: v.boolean(), // false for uploaded data, true for user-created
+    userId: v.optional(v.string()), // User who created (for user-created texts)
+    collectionId: v.optional(v.id("collections")), // Reference to collection
+    collectionRank: v.optional(v.number()), // Rank within the collection
   })
     .index("by_text", ["text"])
     .index("by_datasetSentenceId", ["datasetSentenceId"])
-    .index("by_deck", ["deck", "deckRank"])
-    .index("by_difficulty", ["difficulty"]),
+    .index("by_collection_and_rank", ["collectionId", "collectionRank"]),
   
-  // Translations table - stores translations of sentences
+  // Translations table - stores translations of texts
   translations: defineTable({
-    sentenceId: v.id("sentences"),
+    textId: v.id("texts"),
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
   })
-    .index("by_sentence_and_language", ["sentenceId", "targetLanguage"]),
+    .index("by_text_and_language", ["textId", "targetLanguage"]),
   
-  // Audio recordings table - stores audio data for sentences
-  audio_recordings: defineTable({
-    sentenceId: v.id("sentences"),
+  // Audio recordings table - stores audio files for texts
+  audioRecordings: defineTable({
+    textId: v.id("texts"),
     language: v.string(), // e.g., "en-US" or "es-ES"
-    accent: v.optional(v.string()), // e.g., "us", "uk", "mx"
-    audioData: v.string(), // Base64 encoded audio
-    audioUrl: v.string(), // Data URL for playing
+    storageId: v.id("_storage"), // Convex file storage reference
+    url: v.string(), // URL to the audio file
   })
-    .index("by_sentence_language_accent", ["sentenceId", "language", "accent"]),
+    .index("by_text_and_language", ["textId", "language"]),
 
   // User settings table - stores user preferences and onboarding status
   userSettings: defineTable({

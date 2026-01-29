@@ -4,7 +4,7 @@ import { internalQuery } from "./_generated/server";
 // Internal query to get translation from database
 export const getTranslation = internalQuery({
   args: {
-    sentenceId: v.id("sentences"),
+    textId: v.id("texts"),
     targetLanguage: v.string(),
   },
   returns: v.union(
@@ -17,8 +17,8 @@ export const getTranslation = internalQuery({
   handler: async (ctx, args) => {
     const translation = await ctx.db
       .query("translations")
-      .withIndex("by_sentence_and_language", (q) => 
-        q.eq("sentenceId", args.sentenceId).eq("targetLanguage", args.targetLanguage)
+      .withIndex("by_text_and_language", (q) => 
+        q.eq("textId", args.textId).eq("targetLanguage", args.targetLanguage)
       )
       .first();
     
@@ -36,26 +36,24 @@ export const getTranslation = internalQuery({
 // Internal query to get audio recording from database
 export const getAudioRecording = internalQuery({
   args: {
-    sentenceId: v.id("sentences"),
+    textId: v.id("texts"),
     language: v.string(),
-    accent: v.optional(v.string()),
   },
   returns: v.union(
     v.object({
-      _id: v.id("audio_recordings"),
-      audioUrl: v.string(),
-      audioData: v.string(),
+      _id: v.id("audioRecordings"),
+      url: v.string(),
+      storageId: v.id("_storage"),
     }),
     v.null()
   ),
   handler: async (ctx, args) => {
     const recording = await ctx.db
-      .query("audio_recordings")
-      .withIndex("by_sentence_language_accent", (q) => 
+      .query("audioRecordings")
+      .withIndex("by_text_and_language", (q) => 
         q
-          .eq("sentenceId", args.sentenceId)
+          .eq("textId", args.textId)
           .eq("language", args.language)
-          .eq("accent", args.accent ?? undefined)
       )
       .first();
     
@@ -65,9 +63,8 @@ export const getAudioRecording = internalQuery({
     
     return {
       _id: recording._id,
-      audioUrl: recording.audioUrl,
-      audioData: recording.audioData,
+      url: recording.url,
+      storageId: recording.storageId,
     };
   },
 });
-

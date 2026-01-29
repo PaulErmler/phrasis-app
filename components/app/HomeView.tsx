@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Bell, BellOff, BellRing } from "lucide-react";
 import { getLanguagesByCodes } from "@/lib/languages";
 import { NewChatInput } from "@/components/chat/NewChatInput";
+import { CollectionsPreview } from "@/components/app/CollectionsPreview";
 
 export function HomeView() {
   const router = useRouter();
@@ -169,6 +170,9 @@ export function HomeView() {
           </Button>
         </CardContent>
       </Card>
+
+      {/* Collections Preview */}
+      <CollectionsPreview />
 
     </div>
   );
