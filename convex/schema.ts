@@ -98,4 +98,19 @@ export default defineSchema({
     targetLanguages: v.array(v.string()), // ISO codes (e.g., ["es", "fr"])
     currentLevel: v.optional(currentLevelValidator), // User's current level in this course
   }).index("by_userId", ["userId"]),
+
+  // Translation requests table - async translation processing
+  translationRequests: defineTable({
+    userId: v.string(), // User who requested the translation
+    text: v.string(), // Original text to translate
+    sourceLang: v.string(), // Source language code
+    targetLang: v.string(), // Target language code
+    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+    result: v.optional(v.string()), // Translated text (when completed)
+    error: v.optional(v.string()), // Error message (when failed)
+    createdAt: v.number(),
+    completedAt: v.optional(v.number()),
+  })
+    .index("by_userId", ["userId"])
+    .index("by_userId_and_status", ["userId", "status"]),
 });

@@ -2,81 +2,98 @@
  * Language definitions and utilities for the Phrasis app
  */
 
+/**
+ * Voice configuration for text-to-speech
+ */
+export interface Voice {
+  name: string; // Internal identifier
+  displayName: string; // Human-readable name, e.g., "English (US) - Female"
+  apiCode: string; // e.g. Google TTS voice code
+}
+
 export interface Language {
-    code: string; // ISO 639-1 language code (for internal use and database storage)
-    displayCode: string; // BCP 47 language tag for display (e.g., "es-MX", "zh-CN")
-    name: string; // English name (fallback)
-    nativeName: string; // Name in the language itself
-    flag: string; // Flag emoji
-    learnerCount?: string; // e.g. "24.2M"
-  }
-  
-  export const SUPPORTED_LANGUAGES: Language[] = [
-    {
-      code: "en",
-      displayCode: "en",
-      name: "English",
-      nativeName: "English",
-      flag: "🇬🇧",
-      learnerCount: "1.5B",
-    },
-    {
-      code: "es",
-      displayCode: "es",
-      name: "Spanish",
-      nativeName: "Español",
-      flag: "🇪🇸",
-      learnerCount: "24.2M",
-    },
-    {
-      code: "fr",
-      displayCode: "fr",
-      name: "French",
-      nativeName: "Français",
-      flag: "🇫🇷",
-      learnerCount: "15.4M",
-    },
-    {
-      code: "de",
-      displayCode: "de",
-      name: "German",
-      nativeName: "Deutsch",
-      flag: "🇩🇪",
-      learnerCount: "9.2M",
-    },
-    {
-      code: "it",
-      displayCode: "it",
-      name: "Italian",
-      nativeName: "Italiano",
-      flag: "🇮🇹",
-      learnerCount: "5.1M",
-    },
-    {
-      code: "pt",
-      displayCode: "pt",
-      name: "Portuguese",
-      nativeName: "Português",
-      flag: "🇧🇷",
-      learnerCount: "3.8M",
-    },
-    {
-      code: "zh",
-      displayCode: "zh-CN",
-      name: "Chinese (Simplified)",
-      nativeName: "中文（简体）",
-      flag: "🇨🇳",
-      learnerCount: "12.5M",
-    },
-    {
-      code: "ja",
-      displayCode: "ja",
-      name: "Japanese",
-      nativeName: "日本語",
-      flag: "🇯🇵",
-      learnerCount: "8.4M",
-    },
-  ];
+  code: string; // ISO 639-1 language code (for internal use and database storage)
+  displayCode: string; // BCP 47 language tag for display (e.g., "es-MX", "zh-CN")
+  name: string; // English name (fallback)
+  nativeName: string; // Name in the language itself
+  flag: string; // Flag emoji
+  voices: Voice[]; // Available TTS voices for this language
+}
+
+export const SUPPORTED_LANGUAGES: Language[] = [
+  {
+    code: "en",
+    displayCode: "en",
+    name: "English",
+    nativeName: "English",
+    flag: "🇬🇧",
+    voices: [],
+  },
+  {
+    code: "es",
+    displayCode: "es",
+    name: "Spanish",
+    nativeName: "Español",
+    flag: "🇪🇸",
+    voices: [],
+  },
+  {
+    code: "fr",
+    displayCode: "fr",
+    name: "French",
+    nativeName: "Français",
+    flag: "🇫🇷",
+    voices: [],
+  },
+  {
+    code: "de",
+    displayCode: "de",
+    name: "German",
+    nativeName: "Deutsch",
+    flag: "🇩🇪",
+    voices: [],
+  },
+  {
+    code: "it",
+    displayCode: "it",
+    name: "Italian",
+    nativeName: "Italiano",
+    flag: "🇮🇹",
+    voices: [],
+  },
+  {
+    code: "pt",
+    displayCode: "pt",
+    name: "Portuguese",
+    nativeName: "Português",
+    flag: "🇧🇷",
+    voices: [],
+  },
+  {
+    code: "zh",
+    displayCode: "zh-CN",
+    name: "Chinese (Simplified)",
+    nativeName: "中文（简体）",
+    flag: "🇨🇳",
+    voices: [],
+  },
+  {
+    code: "ja",
+    displayCode: "ja",
+    name: "Japanese",
+    nativeName: "日本語",
+    flag: "🇯🇵",
+    voices: [],
+  },
+  {
+    code: "sv",
+    displayCode: "sv",
+    name: "Swedish",
+    nativeName: "Svenska",
+    flag: "🇸🇪",
+    voices: [],
+  },
+];
   
   /**
    * Get a language by its ISO 639-1 code
@@ -85,14 +102,22 @@ export interface Language {
     return SUPPORTED_LANGUAGES.find((lang) => lang.code === code);
   }
   
-  /**
-   * Get multiple languages by their codes
-   */
-  export function getLanguagesByCodes(codes: string[]): Language[] {
-    return codes
-      .map((code) => getLanguageByCode(code))
-      .filter((lang): lang is Language => lang !== undefined);
-  }
+/**
+ * Get multiple languages by their codes
+ */
+export function getLanguagesByCodes(codes: string[]): Language[] {
+  return codes
+    .map((code) => getLanguageByCode(code))
+    .filter((lang): lang is Language => lang !== undefined);
+}
+
+/**
+ * Get all voices for a specific language by its code
+ */
+export function getVoicesByLanguageCode(code: string): Voice[] {
+  const language = getLanguageByCode(code);
+  return language?.voices ?? [];
+}
   
 /**
  * Generate a course name from base and target language codes
