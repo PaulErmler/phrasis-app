@@ -27,3 +27,37 @@
 - Accordion displaying collections with first 5 texts each
 - Shows text count per collection
 - Located in HomeView
+
+## Translation System
+
+### Backend (`convex/translation.ts`)
+- `requestTranslation` - mutation creates pending request, schedules async processing
+- `getTranslationRequest` - query returns request status and result
+- `processTranslation` - internal action calls Google Cloud Translation API
+
+### Constants (`lib/constants/translation.ts`)
+- `MAX_TRANSLATION_LENGTH` - shared between frontend and backend
+
+### UI (`components/testing/TranslationTest.tsx`)
+- Test component with source/target language selection
+- Reactive result display when translation completes
+
+## Text-to-Speech System
+
+### Backend (`convex/tts.ts`)
+- `requestTTS` - mutation creates pending request, schedules async processing
+- `getTTSRequest` - query returns request status, generates `audioUrl` dynamically from `storageId`
+- `processTTS` - internal action calls Google Cloud TTS API (Chirp3 HD voices), stores MP3 in Convex storage
+
+### Constants (`lib/constants/tts.ts`)
+- Shared constants: `MAX_TTS_LENGTH`, `MIN_TTS_SPEED`, `MAX_TTS_SPEED`, `TTS_SPEED_OPTIONS`
+- Used by both frontend and backend
+
+### Voice Configuration (`lib/languages.ts`)
+- `SUPPORTED_LANGUAGES` with Chirp3 HD voices (1 female, 1 male per accent)
+- Helper functions: `getVoicesByLanguageCode`, `getLocalesByLanguageCode`, `getLocaleFromApiCode`
+
+### UI (`components/testing/TTSTest.tsx`)
+- Test component for TTS with language/accent/voice selection
+- Speed control (0.5x - 1.0x)
+- Reactive audio playback when generation completes

@@ -4,6 +4,7 @@ import { RedirectToSignIn } from "@daveyplate/better-auth-ui";
 import { Authenticated } from "convex/react";
 import { FlaskConical } from "lucide-react";
 import { TranslationTest } from "@/components/testing/TranslationTest";
+import { TTSTest } from "@/components/testing/TTSTest";
 import { NotificationTest } from "@/components/testing/NotificationTest";
 import { CollectionsPreview } from "@/components/app/CollectionsPreview";
 
@@ -29,6 +30,11 @@ export default function TestingPage() {
             {/* Translation Test Card */}
             <div className="md:col-span-2 lg:col-span-1">
               <TranslationTest />
+            </div>
+
+            {/* TTS Test Card */}
+            <div className="md:col-span-2 lg:col-span-1">
+              <TTSTest />
             </div>
 
             {/* Notification Card */}
