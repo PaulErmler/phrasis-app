@@ -180,6 +180,21 @@ export function getVoicesByLanguageCode(code: string): Voice[] {
   return language?.voices ?? [];
 }
 
+
+/**
+ * Get a random voice for a language
+ * Returns the full apiCode (e.g., "en-US-Chirp3-HD-Leda")
+ * @throws Error if language code is not supported
+ */
+export function getRandomVoiceForLanguage(code: string): string {
+  const voices = getVoicesByLanguageCode(code);
+  if (voices.length === 0) {
+    throw new Error(`No voices available for language code: "${code}". Add it to SUPPORTED_LANGUAGES.`);
+  }
+  const randomIndex = Math.floor(Math.random() * voices.length);
+  return voices[randomIndex].apiCode;
+}
+
 /**
  * Extract locale from voice apiCode (e.g., "en-US-Chirp3-HD-Leda" -> "en-US")
  */

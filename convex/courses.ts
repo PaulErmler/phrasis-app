@@ -297,6 +297,7 @@ export const createCourse = mutation({
   },
   returns: v.object({
     courseId: v.id("courses"),
+    deckId: v.id("decks"),
   }),
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
@@ -314,7 +315,15 @@ export const createCourse = mutation({
       userId,
     });
 
-    return { courseId };
+    // Auto-create a deck for this course
+    const deckName = `Learning ${args.targetLanguages.join(", ")}`;
+    const deckId = await ctx.db.insert("decks", {
+      courseId,
+      name: deckName,
+      cardCount: 0,
+    });
+
+    return { courseId, deckId };
   },
 });
 
@@ -326,6 +335,7 @@ export const completeOnboarding = mutation({
   returns: v.object({
     settingsId: v.id("userSettings"),
     courseId: v.id("courses"),
+    deckId: v.id("decks"),
   }),
   handler: async (ctx) => {
     const user = await authComponent.getAuthUser(ctx);
@@ -351,12 +361,22 @@ export const completeOnboarding = mutation({
       .withIndex("by_userId", (q) => q.eq("userId", userId))
       .first();
 
+    const targetLanguages = progress.targetLanguages || [];
+    
     // Create the course with data from onboarding progress
     const courseId = await ctx.db.insert("courses", {
       baseLanguages: progress.baseLanguages || [],
-      targetLanguages: progress.targetLanguages || [],
+      targetLanguages,
       currentLevel: progress.currentLevel,
       userId,
+    });
+
+    // Auto-create a deck for this course
+    const deckName = `Learning ${targetLanguages.join(", ")}`;
+    const deckId = await ctx.db.insert("decks", {
+      courseId,
+      name: deckName,
+      cardCount: 0,
     });
 
     let settingsId;
@@ -380,6 +400,6 @@ export const completeOnboarding = mutation({
     // Delete the onboarding progress now that it's been transferred
     await ctx.db.delete(progress._id);
 
-    return { settingsId, courseId };
+    return { settingsId, courseId, deckId };
   },
 });

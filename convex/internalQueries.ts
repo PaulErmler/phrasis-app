@@ -37,12 +37,12 @@ export const getTranslation = internalQuery({
 export const getAudioRecording = internalQuery({
   args: {
     textId: v.id("texts"),
-    language: v.string(),
+    language: v.string(), // Base language code (e.g., "en", "de")
   },
   returns: v.union(
     v.object({
       _id: v.id("audioRecordings"),
-      url: v.string(),
+      voiceName: v.string(),
       storageId: v.id("_storage"),
     }),
     v.null()
@@ -63,7 +63,7 @@ export const getAudioRecording = internalQuery({
     
     return {
       _id: recording._id,
-      url: recording.url,
+      voiceName: recording.voiceName,
       storageId: recording.storageId,
     };
   },

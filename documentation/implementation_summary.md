@@ -1,12 +1,28 @@
 # Implementation Summary
 
+## Data Model Overview
+
+```mermaid
+erDiagram
+    users ||--o{ courses : has
+    courses ||--|| decks : has
+    decks ||--o{ cards : contains
+    collections ||--o{ texts : groups
+    texts ||--o{ translations : has
+    texts ||--o{ audioRecordings : has
+    cards }o--|| texts : references
+    cards }o--|| collections : "sourced from"
+    collectionProgress }o--|| courses : tracks
+    collectionProgress }o--|| collections : tracks
+```
+
 ## Texts & Collections System
 
 ### Schema (`convex/schema.ts`)
 - `collections` - groups texts by CEFR level with `name` and `textCount`
 - `texts` - stores sentences with `datasetSentenceId`, `text`, `language`, `userCreated`, `collectionId`, `collectionRank`
-- `translations` - stores translations linked to `textId`
-- `audioRecordings` - stores audio files using Convex file storage, linked to `textId`
+- `translations` - stores translations linked to `textId` and `targetLanguage`
+- `audioRecordings` - stores audio files using Convex file storage, linked to `textId`, `language`, and `voiceName`
 
 ### Data Seeding (`convex/data_uploading/data_management.ts`)
 - `upsertCollection` - internal mutation to create/get collection by name
@@ -23,12 +39,110 @@
 - Batch uploads via `npx convex run [batch uploading function]`
 - Run: `pnpm run seed-texts`
 
-### UI (`components/app/CollectionsPreview.tsx`)
-- Accordion displaying collections with first 5 texts each
-- Shows text count per collection
-- Located in HomeView
+## Courses, Decks & Cards System
 
-## Translation System
+### Schema
+- `courses` - stores user's language configuration (`baseLanguages`, `targetLanguages`, `currentLevel`)
+- `decks` - one deck per course, auto-created with `cardCount` for efficient queries
+- `cards` - links texts to decks with `dueDate`, `isMastered`, `isHidden` for spaced repetition
+- `collectionProgress` - tracks per-user, per-course progress through collections using `lastRankProcessed` for efficient pagination
+
+### How Cards Are Added
+
+```mermaid
+sequenceDiagram
+    participant UI as CollectionSelector
+    participant Mutation as addCardsFromCollection
+    participant DB as Database
+    participant Scheduler as ctx.scheduler
+    participant Prep as prepareCardContent
+
+    UI->>Mutation: collectionId, batchSize
+    Mutation->>DB: Get user's active course
+    Mutation->>DB: Get/create deck for course
+    Mutation->>DB: Get collectionProgress (lastRankProcessed)
+    Mutation->>DB: Query texts using by_collection_and_rank index
+    Note over Mutation: Uses lastRankProcessed for efficient pagination
+    loop For each text
+        Mutation->>DB: Check if card exists (by_deckId_and_textId)
+        Mutation->>DB: Insert card if new
+    end
+    Mutation->>DB: Update deck.cardCount
+    Mutation->>DB: Update collectionProgress.lastRankProcessed
+    loop For each new card
+        Mutation->>Scheduler: Schedule prepareCardContent
+    end
+    Scheduler->>Prep: textId, baseLanguages, targetLanguages
+```
+
+### Backend Functions (`convex/decks.ts`)
+
+**Public Mutations:**
+- `addCardsFromCollection` - adds cards from a collection to user's deck, tracks progress via `collectionProgress`
+
+**Public Queries:**
+- `getDeckForCourse` - returns the deck for user's active course
+- `getDeckCards` - returns cards with translations and audio (paginated, default 20)
+- `getCollectionProgress` - returns progress for all collections in active course
+
+**Internal Functions:**
+- `getOrCreateDeck` - ensures deck exists for a course
+- `prepareCardContent` - schedules translation and TTS for a text's required languages
+
+### UI Components
+- `CollectionSelector` - displays collections with progress bars, batch size selector, "Add Cards" button
+- `DeckCardsView` - displays cards with translations and audio playback
+
+## Content Generation System
+
+When cards are added, translations and audio are generated asynchronously for all course languages (both base and target).
+
+### Content Generation Flow
+
+```mermaid
+flowchart TD
+    A[addCardsFromCollection] -->|schedules| B[prepareCardContent]
+    B -->|calls| C{scheduleMissingContent}
+    C -->|for each language| D{Language = Source?}
+    D -->|Yes| E{Audio exists?}
+    E -->|No| F[Schedule processTTSForCard]
+    D -->|No| G{Translation exists?}
+    G -->|No| H[Schedule processTranslationForCard]
+    G -->|Yes| I{Audio exists?}
+    I -->|No| F
+    H -->|calls Google Translate| J[storeTranslationAndScheduleTTS]
+    J -->|stores translation| K[(translations table)]
+    J -->|schedules| F
+    F -->|calls Google TTS| L[storeAudioRecording]
+    L -->|stores audio| M[(audioRecordings table)]
+    L -->|stores file| N[(Convex Storage)]
+```
+
+### Key Implementation Details
+
+1. **Texts are stored in English** - translations are created for user's base AND target languages
+2. **Random voice selection** - `getRandomVoiceForLanguage()` picks a random Chirp3 HD voice
+3. **Batch loading optimization** - queries only needed languages using `by_text_and_language` index
+4. **On-demand regeneration** - `ensureCardContent` mutation checks and schedules missing content when cards are displayed
+
+### Backend Functions (`convex/decks.ts`)
+
+**Helper Function:**
+- `scheduleMissingContent()` - shared logic for checking and scheduling missing translations/audio
+
+**Internal Mutations:**
+- `prepareCardContent` - entry point for new card content generation
+- `storeTranslationAndScheduleTTS` - stores translation and schedules TTS in one transaction
+- `storeAudioRecording` - stores audio file reference
+
+**Internal Actions (call external APIs):**
+- `processTranslationForCard` - calls Google Cloud Translation API
+- `processTTSForCard` - calls Google Cloud TTS API, stores MP3 in Convex storage
+
+**Public Mutation:**
+- `ensureCardContent` - regenerates missing content for a specific card (called from UI when `hasMissingContent: true`)
+
+## Translation System (Standalone)
 
 ### Backend (`convex/translation.ts`)
 - `requestTranslation` - mutation creates pending request, schedules async processing
@@ -42,7 +156,7 @@
 - Test component with source/target language selection
 - Reactive result display when translation completes
 
-## Text-to-Speech System
+## Text-to-Speech System (Standalone)
 
 ### Backend (`convex/tts.ts`)
 - `requestTTS` - mutation creates pending request, schedules async processing
@@ -55,9 +169,17 @@
 
 ### Voice Configuration (`lib/languages.ts`)
 - `SUPPORTED_LANGUAGES` with Chirp3 HD voices (1 female, 1 male per accent)
-- Helper functions: `getVoicesByLanguageCode`, `getLocalesByLanguageCode`, `getLocaleFromApiCode`
+- Helper functions: `getVoicesByLanguageCode`, `getLocalesByLanguageCode`, `getLocaleFromApiCode`, `getRandomVoiceForLanguage`
 
 ### UI (`components/testing/TTSTest.tsx`)
 - Test component for TTS with language/accent/voice selection
 - Speed control (0.5x - 1.0x)
 - Reactive audio playback when generation completes
+
+## Performance Optimizations
+
+1. **Efficient pagination** - uses `lastRankProcessed` in `collectionProgress` instead of offset/skip
+2. **Denormalized counts** - `deck.cardCount` and `collection.textCount` avoid expensive `.collect()` calls
+3. **Targeted queries** - queries only needed languages using compound indexes
+4. **Batch scheduling** - single mutation schedules all content generation, avoiding action→mutation round trips
+5. **On-the-fly URL generation** - `audioRecordings` stores `storageId`, URL generated via `ctx.storage.getUrl()`

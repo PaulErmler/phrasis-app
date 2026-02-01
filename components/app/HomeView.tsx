@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLanguagesByCodes } from "@/lib/languages";
 import { NewChatInput } from "@/components/chat/NewChatInput";
+import { CollectionSelector } from "@/components/app/CollectionSelector";
+import { DeckCardsView } from "@/components/app/DeckCardsView";
 
 export function HomeView() {
   const router = useRouter();
@@ -37,6 +39,12 @@ export function HomeView() {
       <NewChatInput 
         showSuggestions={false}
       />
+
+      {/* Collection Selector - Add Cards to Deck */}
+      <CollectionSelector />
+
+      {/* Deck Cards View - Display all cards in deck */}
+      <DeckCardsView />
 
       {/* Flashcards Card */}
       <Card>
