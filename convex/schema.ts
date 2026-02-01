@@ -101,6 +101,12 @@ export default defineSchema({
     currentLevel: v.optional(currentLevelValidator), // User's current level in this course
   }).index("by_userId", ["userId"]),
 
+  // Course settings table - stores configurable settings per course
+  courseSettings: defineTable({
+    courseId: v.id("courses"), // Reference to the course
+    initialReviewsTarget: v.number(), // Number of initial reviews before graduating to FSRS
+  }).index("by_courseId", ["courseId"]),
+
   // Decks table - one deck per course, auto-created
   decks: defineTable({
     courseId: v.id("courses"), // Reference to the course
@@ -108,18 +114,30 @@ export default defineSchema({
     cardCount: v.number(), // Denormalized count of cards in this deck
   }).index("by_courseId", ["courseId"]),
 
-  // Cards table - links texts to decks with review metadata
+  // Cards table - links texts to decks with review metadata and FSRS scheduling
   cards: defineTable({
     deckId: v.id("decks"), // Reference to the deck
     textId: v.id("texts"), // Reference to the text/sentence
     collectionId: v.id("collections"), // Reference to the source collection
-    dueDate: v.number(), // Timestamp for spaced repetition scheduling
+    // FSRS scheduling fields
+    dueDate: v.number(), // Timestamp for next review
+    stability: v.number(), // Memory strength (FSRS)
+    difficulty: v.number(), // Card difficulty 1-10 (FSRS)
+    scheduledDays: v.number(), // Scheduled interval in days
+    reps: v.number(), // Total number of reviews
+    lapses: v.number(), // Number of times forgotten (rated Again)
+    state: v.number(), // 0=New, 1=Learning, 2=Review, 3=Relearning
+    lastReview: v.optional(v.number()), // Timestamp of last review
+    initialReviewCount: v.number(), // Reviews completed in initial learning phase
+    // Flags
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
   })
     .index("by_deckId", ["deckId"])
     .index("by_deckId_and_dueDate", ["deckId", "dueDate"])
-    .index("by_deckId_and_textId", ["deckId", "textId"]),
+    .index("by_deckId_and_textId", ["deckId", "textId"])
+    .index("by_deckId_and_state", ["deckId", "state"])
+    .index("by_deckId_and_state_and_dueDate", ["deckId", "state", "dueDate"]),
 
   // Collection progress table - tracks cards added per collection/course
   collectionProgress: defineTable({

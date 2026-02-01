@@ -5,6 +5,7 @@ import {
   learningStyleValidator, 
   currentLevelValidator
 } from "./types";
+import { DEFAULT_INITIAL_REVIEWS_TARGET } from "../lib/scheduling";
 
 /**
  * Get the current user's settings
@@ -104,24 +105,87 @@ export const getActiveCourse = query({
       const userId = user._id;
       
       // Get user settings to find active course ID
-      const settings = await ctx.db
+      const userSettings = await ctx.db
         .query("userSettings")
         .withIndex("by_userId", (q) => q.eq("userId", userId))
         .first();
 
-      if (!settings?.activeCourseId) {
+      let course;
+      if (!userSettings?.activeCourseId) {
         // If no active course is set, return the first course
-        const firstCourse = await ctx.db
+        course = await ctx.db
           .query("courses")
           .withIndex("by_userId", (q) => q.eq("userId", userId))
           .first();
-        
-        return firstCourse;
+      } else {
+        // Get the active course
+        course = await ctx.db.get(userSettings.activeCourseId);
       }
 
-      // Get the active course
-      const activeCourse = await ctx.db.get(settings.activeCourseId);
-      return activeCourse;
+      return course ?? null;
+    } catch {
+      return null;
+    }
+  },
+});
+
+/**
+ * Get the settings for the currently active course
+ */
+export const getActiveCourseSettings = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      _id: v.id("courseSettings"),
+      _creationTime: v.number(),
+      courseId: v.id("courses"),
+      initialReviewsTarget: v.number(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx) => {
+    try {
+      const user = await authComponent.getAuthUser(ctx);
+      if (!user) {
+        return null;
+      }
+
+      const userId = user._id;
+      
+      // Get user settings to find active course ID
+      const userSettings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .first();
+
+      let courseId;
+      if (!userSettings?.activeCourseId) {
+        // If no active course is set, get the first course
+        const course = await ctx.db
+          .query("courses")
+          .withIndex("by_userId", (q) => q.eq("userId", userId))
+          .first();
+        courseId = course?._id;
+      } else {
+        courseId = userSettings.activeCourseId;
+      }
+
+      if (!courseId) {
+        return null;
+      }
+
+      // Get course settings
+      const courseSettings = await ctx.db
+        .query("courseSettings")
+        .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+        .first();
+
+      if (!courseSettings) {
+        // Return default settings if none exist
+        return null;
+      }
+
+      return courseSettings;
     } catch {
       return null;
     }
@@ -307,12 +371,18 @@ export const createCourse = mutation({
 
     const userId = user._id;
 
-    // Create the course with currentLevel
+    // Create the course
     const courseId = await ctx.db.insert("courses", {
       baseLanguages: args.baseLanguages,
       targetLanguages: args.targetLanguages,
       currentLevel: args.currentLevel,
       userId,
+    });
+
+    // Create course settings with default values
+    await ctx.db.insert("courseSettings", {
+      courseId,
+      initialReviewsTarget: DEFAULT_INITIAL_REVIEWS_TARGET,
     });
 
     // Auto-create a deck for this course
@@ -369,6 +439,12 @@ export const completeOnboarding = mutation({
       targetLanguages,
       currentLevel: progress.currentLevel,
       userId,
+    });
+
+    // Create course settings with default values
+    await ctx.db.insert("courseSettings", {
+      courseId,
+      initialReviewsTarget: DEFAULT_INITIAL_REVIEWS_TARGET,
     });
 
     // Auto-create a deck for this course

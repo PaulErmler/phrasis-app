@@ -176,10 +176,94 @@ flowchart TD
 - Speed control (0.5x - 1.0x)
 - Reactive audio playback when generation completes
 
-## Performance Optimizations
+## Card Scheduling System
 
-1. **Efficient pagination** - uses `lastRankProcessed` in `collectionProgress` instead of offset/skip
-2. **Denormalized counts** - `deck.cardCount` and `collection.textCount` avoid expensive `.collect()` calls
-3. **Targeted queries** - queries only needed languages using compound indexes
-4. **Batch scheduling** - single mutation schedules all content generation, avoiding action→mutation round trips
-5. **On-the-fly URL generation** - `audioRecordings` stores `storageId`, URL generated via `ctx.storage.getUrl()`
+Cards use a two-phase spaced repetition algorithm: an initial learning phase with fixed intervals, followed by the FSRS algorithm for long-term retention.
+
+### Scheduling Flow
+
+```mermaid
+flowchart TD
+    A[New Card] --> B{Initial Phase?}
+    B -->|Yes| C[Fixed Intervals]
+    C --> D{Rating?}
+    D -->|Again| E[Reset to review 0]
+    D -->|Hard/Good| F[Progress to next interval]
+    D -->|Easy| G[Graduate immediately]
+    F --> H{Target reached?}
+    H -->|No| C
+    H -->|Yes| I[Graduate to FSRS]
+    G --> I
+    B -->|No| J[FSRS Algorithm]
+    J --> K[Calculate next interval based on stability/difficulty]
+```
+
+### Initial Learning Phase
+
+Cards are shown at increasing intervals until `initialReviewsTarget` reviews are completed:
+
+| Review # | Interval |
+|----------|----------|
+| 1 | 1 minute |
+| 2 | 3 minutes |
+| 3 | 5 minutes |
+| 4 | 10 minutes |
+| 5 | 15 minutes |
+| 6+ | +60 minutes each |
+| Graduation | 1 day |
+
+**Rating behavior during initial phase:**
+- **Again** - Reset to review 0, increment lapses
+- **Hard/Good** - Progress to next interval
+- **Easy** - Instant graduation to 1-day interval
+
+### Schema
+
+**`courseSettings` table:**
+- `courseId` - Reference to course
+- `initialReviewsTarget` - Reviews before graduating to FSRS (default: 5)
+
+**`cards` table scheduling fields:**
+- `dueDate` - Timestamp for next review
+- `stability` - FSRS memory strength
+- `difficulty` - FSRS card difficulty (1-10)
+- `scheduledDays` - Current interval in days
+- `reps` - Total reviews completed
+- `lapses` - Times rated "Again"
+- `state` - 0=New, 1=Learning, 2=Review, 3=Relearning
+- `lastReview` - Timestamp of last review
+- `initialReviewCount` - Reviews in initial phase
+
+### Shared Scheduling Logic (`lib/scheduling.ts`)
+
+Pure functions shared between frontend and backend:
+
+| Function | Purpose |
+|----------|---------|
+| `createInitialCardState()` | Initialize new card scheduling state |
+| `calculateNextReview()` | Full state calculation after review |
+| `previewNextDueDate()` | Lightweight preview for UI |
+| `getAllRatingPreviews()` | Previews for all rating buttons |
+| `isInInitialPhase()` | Check if card is in initial learning |
+| `getPhaseDescription()` | Human-readable phase description |
+| `cardToSchedulingState()` | Convert card document to scheduling state |
+
+### Backend Functions (`convex/decks.ts`)
+
+**Public Mutation:**
+- `reviewCard` - Updates card with new scheduling state based on rating
+
+**Public Queries:**
+- `getCardsForReview` - Returns due cards with scheduling info
+- `getDeckCards` - Returns all cards with full scheduling state
+
+**Settings:**
+- `updateInitialReviewsTarget` - Updates `initialReviewsTarget` in `courseSettings`
+
+### Frontend Integration
+
+The `SchedulerTest` component (`components/testing/SchedulerTest.tsx`) provides:
+- Simulated card with time-shift controls for testing
+- Rating buttons showing next due date previews
+- Real card review with backend integration
+- `initialReviewsTarget` slider with debounced updates

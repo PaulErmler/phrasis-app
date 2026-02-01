@@ -277,7 +277,7 @@ export function DeckCardsView() {
                           </Badge>
                         )}
                         <span className="text-xs text-muted-foreground">
-                          Due: {new Date(card.dueDate).toLocaleDateString()}
+                          Due: {new Date(card.scheduling.dueDate).toLocaleDateString()}
                         </span>
                       </div>
                     </div>

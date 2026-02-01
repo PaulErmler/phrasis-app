@@ -7,6 +7,20 @@ import {
   getRandomVoiceForLanguage,
   getLocaleFromApiCode,
 } from "../lib/languages";
+import { 
+  ratingValidator,
+  schedulingValidator,
+  cardTranslationValidator,
+  cardAudioRecordingValidator,
+} from "./types";
+import {
+  createInitialCardState,
+  calculateNextReview,
+  cardToSchedulingState,
+  Rating,
+  DEFAULT_INITIAL_REVIEWS_TARGET,
+  type CardSchedulingState,
+} from "../lib/scheduling";
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -308,11 +322,24 @@ export const addCardsFromCollection = mutation({
         .first();
 
       if (!existingCard) {
+        // Create initial FSRS scheduling state
+        const initialState = createInitialCardState();
+        
         await ctx.db.insert("cards", {
           deckId: deck._id,
           textId: text._id,
           collectionId: args.collectionId,
-          dueDate: now, // Due immediately for new cards
+          // FSRS scheduling fields
+          dueDate: initialState.dueDate,
+          stability: initialState.stability,
+          difficulty: initialState.difficulty,
+          scheduledDays: initialState.scheduledDays,
+          reps: initialState.reps,
+          lapses: initialState.lapses,
+          state: initialState.state,
+          lastReview: initialState.lastReview ?? undefined,
+          initialReviewCount: initialState.initialReviewCount,
+          // Flags
           isMastered: false,
           isHidden: false,
         });
@@ -643,28 +670,15 @@ export const getDeckCards = query({
       _id: v.id("cards"),
       _creationTime: v.number(),
       textId: v.id("texts"),
-      sourceText: v.string(), // Original text (e.g., English)
-      sourceLanguage: v.string(), // Original language (e.g., "en")
-      // Translations for ALL course languages (base + target)
-      translations: v.array(
-        v.object({
-          language: v.string(),
-          text: v.string(),
-          isBaseLanguage: v.boolean(), // true if this is user's base language
-          isTargetLanguage: v.boolean(), // true if this is user's target language
-        })
-      ),
-      audioRecordings: v.array(
-        v.object({
-          language: v.string(), // Base language code (e.g., "en", "de")
-          voiceName: v.union(v.string(), v.null()), // Full voice name used
-          url: v.union(v.string(), v.null()), // Generated from storageId
-        })
-      ),
-      dueDate: v.number(),
+      sourceText: v.string(),
+      sourceLanguage: v.string(),
+      translations: v.array(cardTranslationValidator),
+      audioRecordings: v.array(cardAudioRecordingValidator),
+      scheduling: schedulingValidator,
+      initialReviewsTarget: v.number(),
       isMastered: v.boolean(),
       isHidden: v.boolean(),
-      hasMissingContent: v.boolean(), // true if translations or audio are missing
+      hasMissingContent: v.boolean(),
     })
   ),
   handler: async (ctx, args) => {
@@ -688,6 +702,13 @@ export const getDeckCards = query({
     if (!course) {
       return [];
     }
+
+    // Get course settings
+    const courseSettings = await ctx.db
+      .query("courseSettings")
+      .withIndex("by_courseId", (q) => q.eq("courseId", settings.activeCourseId!))
+      .first();
+    const initialReviewsTarget = courseSettings?.initialReviewsTarget ?? DEFAULT_INITIAL_REVIEWS_TARGET;
 
     // Get deck for this course
     const deck = await ctx.db
@@ -786,7 +807,18 @@ export const getDeckCards = query({
           sourceLanguage,
           translations,
           audioRecordings,
-          dueDate: card.dueDate,
+          scheduling: {
+            dueDate: card.dueDate,
+            stability: card.stability,
+            difficulty: card.difficulty,
+            scheduledDays: card.scheduledDays,
+            reps: card.reps,
+            lapses: card.lapses,
+            state: card.state,
+            lastReview: card.lastReview ?? null,
+            initialReviewCount: card.initialReviewCount,
+          },
+          initialReviewsTarget,
           isMastered: card.isMastered,
           isHidden: card.isHidden,
           hasMissingContent,
@@ -917,6 +949,311 @@ export const ensureCardContent = mutation({
       course.baseLanguages,
       course.targetLanguages
     );
+  },
+});
+
+// ============================================================================
+// CARD REVIEW / SCHEDULING FUNCTIONS
+// ============================================================================
+
+
+/**
+ * Review a card with the selected rating.
+ * Calculates the new scheduling state and updates the card.
+ */
+export const reviewCard = mutation({
+  args: {
+    cardId: v.id("cards"),
+    rating: ratingValidator, // 1=Again, 2=Hard, 3=Good, 4=Easy
+  },
+  returns: v.object({
+    nextDueDate: v.number(),
+    newState: v.number(),
+    isGraduated: v.boolean(),
+    intervalMinutes: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Unauthenticated");
+    }
+
+    // Get the card
+    const card = await ctx.db.get(args.cardId);
+    if (!card) {
+      throw new Error("Card not found");
+    }
+
+    // Get the deck to verify ownership
+    const deck = await ctx.db.get(card.deckId);
+    if (!deck) {
+      throw new Error("Deck not found");
+    }
+
+    // Get the course to check ownership
+    const course = await ctx.db.get(deck.courseId);
+    if (!course) {
+      throw new Error("Course not found");
+    }
+
+    // Verify the user owns this course
+    if (course.userId !== user._id) {
+      throw new Error("Unauthorized");
+    }
+
+    // Get course settings for initialReviewsTarget
+    const courseSettings = await ctx.db
+      .query("courseSettings")
+      .withIndex("by_courseId", (q) => q.eq("courseId", deck.courseId))
+      .first();
+    if (!courseSettings) {
+      throw new Error("Course settings not found");
+    }
+
+    // Convert card to scheduling state
+    const currentState = cardToSchedulingState(card);
+
+    // Calculate new state using shared scheduling logic
+    const result = calculateNextReview(
+      currentState,
+      args.rating as Rating,
+      courseSettings.initialReviewsTarget,
+      new Date()
+    );
+
+    // Update the card with new scheduling data
+    await ctx.db.patch(args.cardId, {
+      dueDate: result.nextState.dueDate,
+      stability: result.nextState.stability,
+      difficulty: result.nextState.difficulty,
+      scheduledDays: result.nextState.scheduledDays,
+      reps: result.nextState.reps,
+      lapses: result.nextState.lapses,
+      state: result.nextState.state,
+      lastReview: result.nextState.lastReview ?? undefined,
+      initialReviewCount: result.nextState.initialReviewCount,
+    });
+
+    return {
+      nextDueDate: result.nextState.dueDate,
+      newState: result.nextState.state,
+      isGraduated: result.isGraduated,
+      intervalMinutes: result.intervalMinutes,
+    };
+  },
+});
+
+/**
+ * Get cards that are due for review in the user's active deck.
+ * Uses efficient index-based filtering.
+ */
+export const getCardsForReview = query({
+  args: {
+    limit: v.optional(v.number()), // Max cards to return (default 20)
+  },
+  returns: v.object({
+    cards: v.array(
+      v.object({
+        _id: v.id("cards"),
+        textId: v.id("texts"),
+        sourceText: v.string(),
+        sourceLanguage: v.string(),
+        translations: v.array(cardTranslationValidator),
+        audioRecordings: v.array(cardAudioRecordingValidator),
+        scheduling: schedulingValidator,
+      })
+    ),
+    initialReviewsTarget: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    try {
+      const user = await authComponent.getAuthUser(ctx);
+      const defaultReturn = { cards: [], initialReviewsTarget: DEFAULT_INITIAL_REVIEWS_TARGET };
+      if (!user) {
+        return defaultReturn;
+      }
+
+      // Get user's active course
+      const settings = await ctx.db
+        .query("userSettings")
+        .withIndex("by_userId", (q) => q.eq("userId", user._id))
+        .first();
+
+      if (!settings?.activeCourseId) {
+        return defaultReturn;
+      }
+
+      // Get the course
+      const course = await ctx.db.get(settings.activeCourseId);
+      if (!course) {
+        return defaultReturn;
+      }
+
+      // Get course settings
+      const courseSettings = await ctx.db
+        .query("courseSettings")
+        .withIndex("by_courseId", (q) => q.eq("courseId", settings.activeCourseId!))
+        .first();
+      const initialReviewsTarget = courseSettings?.initialReviewsTarget ?? DEFAULT_INITIAL_REVIEWS_TARGET;
+
+      // Get deck for this course
+      const deck = await ctx.db
+        .query("decks")
+        .withIndex("by_courseId", (q) => q.eq("courseId", settings.activeCourseId!))
+        .first();
+
+      if (!deck) {
+        return defaultReturn;
+      }
+
+      const now = Date.now();
+      const maxCards = args.limit ?? 20;
+
+    // Get due cards using the index, ordered by due date
+    const dueCards = await ctx.db
+      .query("cards")
+      .withIndex("by_deckId_and_dueDate", (q) => q.eq("deckId", deck._id).lte("dueDate", now))
+      .order("asc")
+      .take(maxCards);
+
+    // All languages we need content for
+    const allLanguages = [...new Set([...course.baseLanguages, ...course.targetLanguages])];
+
+    // Build full card objects
+    const result = await Promise.all(
+      dueCards.map(async (card) => {
+        const text = await ctx.db.get(card.textId);
+        if (!text) {
+          return null;
+        }
+
+        const sourceLanguage = text.language;
+
+        // Get translations
+        const translations = await Promise.all(
+          allLanguages.map(async (lang) => {
+            let translatedText = "";
+
+            if (lang === sourceLanguage) {
+              translatedText = text.text;
+            } else {
+              const translation = await ctx.db
+                .query("translations")
+                .withIndex("by_text_and_language", (q) =>
+                  q.eq("textId", card.textId).eq("targetLanguage", lang)
+                )
+                .first();
+              translatedText = translation?.translatedText || "";
+            }
+
+            return {
+              language: lang,
+              text: translatedText,
+              isBaseLanguage: course.baseLanguages.includes(lang),
+              isTargetLanguage: course.targetLanguages.includes(lang),
+            };
+          })
+        );
+
+        // Get audio
+        const audioRecordings = await Promise.all(
+          allLanguages.map(async (lang) => {
+            const audio = await ctx.db
+              .query("audioRecordings")
+              .withIndex("by_text_and_language", (q) =>
+                q.eq("textId", card.textId).eq("language", lang)
+              )
+              .first();
+
+            const url = audio?.storageId
+              ? await ctx.storage.getUrl(audio.storageId)
+              : null;
+
+            return {
+              language: lang,
+              voiceName: audio?.voiceName ?? null,
+              url,
+            };
+          })
+        );
+
+        return {
+          _id: card._id,
+          textId: card.textId,
+          sourceText: text.text,
+          sourceLanguage,
+          translations,
+          audioRecordings,
+          scheduling: {
+            dueDate: card.dueDate,
+            stability: card.stability,
+            difficulty: card.difficulty,
+            scheduledDays: card.scheduledDays,
+            reps: card.reps,
+            lapses: card.lapses,
+            state: card.state,
+            lastReview: card.lastReview ?? null,
+            initialReviewCount: card.initialReviewCount,
+          },
+        };
+      })
+    );
+
+      return {
+        cards: result.filter((card): card is NonNullable<typeof card> => card !== null),
+        initialReviewsTarget,
+      };
+    } catch {
+      // Return empty results if unauthenticated
+      return { cards: [], initialReviewsTarget: DEFAULT_INITIAL_REVIEWS_TARGET };
+    }
+  },
+});
+
+/**
+ * Update the initial reviews target for a course.
+ */
+export const updateInitialReviewsTarget = mutation({
+  args: {
+    target: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await authComponent.getAuthUser(ctx);
+    if (!user) {
+      throw new Error("Unauthenticated");
+    }
+
+    // Get user's active course
+    const userSettings = await ctx.db
+      .query("userSettings")
+      .withIndex("by_userId", (q) => q.eq("userId", user._id))
+      .first();
+
+    if (!userSettings?.activeCourseId) {
+      throw new Error("No active course");
+    }
+
+    // Validate the target
+    if (args.target < 1 || args.target > 20) {
+      throw new Error("Initial reviews target must be between 1 and 20");
+    }
+
+    // Get course settings
+    const courseSettings = await ctx.db
+      .query("courseSettings")
+      .withIndex("by_courseId", (q) => q.eq("courseId", userSettings.activeCourseId!))
+      .first();
+
+    if (!courseSettings) {
+      throw new Error("Course settings not found");
+    }
+
+    await ctx.db.patch(courseSettings._id, {
+      initialReviewsTarget: args.target,
+    });
+
+    return null;
   },
 });
 

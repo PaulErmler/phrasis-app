@@ -3,6 +3,7 @@
 import { RedirectToSignIn } from "@daveyplate/better-auth-ui";
 import { Authenticated } from "convex/react";
 import { FlaskConical } from "lucide-react";
+import { SchedulerTest } from "@/components/testing/SchedulerTest";
 import { TranslationTest } from "@/components/testing/TranslationTest";
 import { TTSTest } from "@/components/testing/TTSTest";
 import { NotificationTest } from "@/components/testing/NotificationTest";
@@ -27,6 +28,11 @@ export default function TestingPage() {
 
           {/* Responsive Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Scheduler Test Card */}
+            <div className="md:col-span-2 lg:col-span-1">
+              <SchedulerTest />
+            </div>
+
             {/* Translation Test Card */}
             <div className="md:col-span-2 lg:col-span-1">
               <TranslationTest />
