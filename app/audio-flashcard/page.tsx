@@ -105,7 +105,6 @@ export default function AudioFlashcardPage() {
           </CardContent>
         </Card>
 
-        {/* English Audio Button */}
         <Button
           onClick={() =>
             playAudio(
@@ -126,7 +125,6 @@ export default function AudioFlashcardPage() {
             : "Play English"}
         </Button>
 
-        {/* Spanish Audio Button */}
         <Button
           onClick={() => {
             if (!translation) return alert("Click the card first to get translation");

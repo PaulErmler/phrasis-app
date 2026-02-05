@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { authComponent } from "../auth";
@@ -68,20 +68,20 @@ export const approveFlashcard = mutation({
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("Not authenticated");
+      throw new ConvexError("Not authenticated");
     }
 
     const approval = await ctx.db.get(args.approvalId);
     if (!approval) {
-      throw new Error("Approval not found");
+      throw new ConvexError("Approval not found");
     }
 
     if (approval.userId !== user._id) {
-      throw new Error("Not authorized");
+      throw new ConvexError("Not authorized");
     }
 
     if (approval.status !== "pending") {
-      throw new Error("Approval already processed");
+      throw new ConvexError("Approval already processed");
     }
 
     // Create the flashcard
@@ -115,20 +115,20 @@ export const rejectFlashcard = mutation({
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("Not authenticated");
+      throw new ConvexError("Not authenticated");
     }
 
     const approval = await ctx.db.get(args.approvalId);
     if (!approval) {
-      throw new Error("Approval not found");
+      throw new ConvexError("Approval not found");
     }
 
     if (approval.userId !== user._id) {
-      throw new Error("Not authorized");
+      throw new ConvexError("Not authorized");
     }
 
     if (approval.status !== "pending") {
-      throw new Error("Approval already processed");
+      throw new ConvexError("Approval already processed");
     }
 
     // Update approval status

@@ -1,0 +1,5 @@
+# Code Style Rules
+
+- **Never use JSX section label comments** like `{/* Header */}`, `{/* Main Content */}` that just comment the name of the following component. You can comment, if it is otherwise unclear what the code below does.  
+- **Always use `ConvexError` for user-facing errors** in queries, mutations, and actions
+- Import: `import { ConvexError } from "convex/values";`

@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { query } from "./_generated/server";
 import { authComponent } from "./auth";
 
@@ -16,7 +16,7 @@ export const getCollections = query({
   handler: async (ctx) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      return [];
+      throw new ConvexError("Unauthorized");
     }
 
     const collections = await ctx.db.query("collections").collect();
