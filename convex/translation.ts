@@ -2,7 +2,13 @@ import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation, internalAction, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { MAX_TRANSLATION_LENGTH } from "../lib/constants/translation";
+import { SUPPORTED_LANGUAGES } from "../lib/languages";
 import { authComponent } from "./auth";
+
+/** Set of all valid language codes from SUPPORTED_LANGUAGES */
+const VALID_LANGUAGE_CODES = new Set(
+  SUPPORTED_LANGUAGES.map((lang) => lang.code)
+);
 
 /** Google Translation API response type */
 interface GoogleTranslateResponse {
@@ -29,7 +35,6 @@ export const requestTranslation = mutation({
       throw new ConvexError("Unauthenticated");
     }
 
-    // Validate text
     const text = args.text.trim();
     if (!text) {
       throw new ConvexError("Text cannot be empty");
@@ -38,11 +43,17 @@ export const requestTranslation = mutation({
       throw new ConvexError(`Text exceeds maximum length of ${MAX_TRANSLATION_LENGTH} characters`);
     }
 
+    if (!VALID_LANGUAGE_CODES.has(args.sourceLang)) {
+      throw new ConvexError("Invalid source language. Must be a supported language.");
+    }
+    if (!VALID_LANGUAGE_CODES.has(args.targetLang)) {
+      throw new ConvexError("Invalid target language. Must be a supported language.");
+    }
+
     if (args.sourceLang === args.targetLang) {
       throw new ConvexError("Source and target languages cannot be the same");
     }
 
-    // Create pending request
     const requestId = await ctx.db.insert("translationRequests", {
       userId: user._id,
       text,
@@ -52,7 +63,6 @@ export const requestTranslation = mutation({
       createdAt: Date.now(),
     });
 
-    // Schedule the translation processing
     await ctx.scheduler.runAfter(0, internal.translation.processTranslation, {
       requestId,
     });
@@ -108,7 +118,6 @@ export const processTranslation = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Load the request
     const request = await ctx.runQuery(internal.translation.getRequestInternal, {
       requestId: args.requestId,
     });
@@ -128,7 +137,6 @@ export const processTranslation = internalAction({
     }
 
     try {
-      // Call Google Cloud Translation REST API v2
       const response = await fetch(
         `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
         {

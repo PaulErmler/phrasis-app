@@ -27,20 +27,16 @@ export default function TestingPage() {
 
           {/* Responsive Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Translation Test Card */}
             <div className="md:col-span-2 lg:col-span-1">
               <TranslationTest />
             </div>
 
-            {/* TTS Test Card */}
             <div className="md:col-span-2 lg:col-span-1">
               <TTSTest />
             </div>
 
-            {/* Notification Card */}
             <NotificationTest />
 
-            {/* Collections Preview */}
             <div className="md:col-span-2 lg:col-span-1">
               <CollectionsPreview />
             </div>

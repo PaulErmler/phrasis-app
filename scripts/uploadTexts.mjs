@@ -9,7 +9,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuration
-const BATCH_SIZE = 500; // Max texts per batch
+const BATCH_SIZE = 500;
+const MAX_BUFFER_BYTES = 50 * 1024 * 1024; // 50 MB
 const DIFFICULTY_LEVELS = ["Essential", "A1", "A2", "B1", "B2", "C1", "C2"];
 
 /**
@@ -21,8 +22,8 @@ function runConvexMutation(functionPath, args) {
   const result = spawnSync("npx", ["convex", "run", functionPath, argsJson], {
     cwd: path.join(__dirname, ".."),
     encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-    maxBuffer: 50 * 1024 * 1024, 
+    stdio: "pipe",
+    maxBuffer: MAX_BUFFER_BYTES,
   });
 
   if (result.status !== 0) {
