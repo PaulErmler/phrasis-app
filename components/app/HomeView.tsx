@@ -25,7 +25,6 @@ export function HomeView() {
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
-      {/* Current Course Display */}
       {courseName && (
         <div className="text-center py-2">
           <p className="text-sm text-muted-foreground">{t("courses.currentCourse")}</p>
@@ -33,7 +32,6 @@ export function HomeView() {
         </div>
       )}
 
-      {/* New Chat Input */}
       <NewChatInput 
         showSuggestions={false}
       />

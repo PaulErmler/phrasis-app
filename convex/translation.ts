@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation, internalAction, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { MAX_TRANSLATION_LENGTH } from "../lib/constants/translation";
@@ -26,20 +26,20 @@ export const requestTranslation = mutation({
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("Unauthenticated");
+      throw new ConvexError("Unauthenticated");
     }
 
     // Validate text
     const text = args.text.trim();
     if (!text) {
-      throw new Error("Text cannot be empty");
+      throw new ConvexError("Text cannot be empty");
     }
     if (text.length > MAX_TRANSLATION_LENGTH) {
-      throw new Error(`Text exceeds maximum length of ${MAX_TRANSLATION_LENGTH} characters`);
+      throw new ConvexError(`Text exceeds maximum length of ${MAX_TRANSLATION_LENGTH} characters`);
     }
 
     if (args.sourceLang === args.targetLang) {
-      throw new Error("Source and target languages cannot be the same");
+      throw new ConvexError("Source and target languages cannot be the same");
     }
 
     // Create pending request
@@ -147,14 +147,14 @@ export const processTranslation = internalAction({
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Google API error: ${response.status} - ${errorText}`);
+        throw new ConvexError(`Google API error: ${response.status} - ${errorText}`);
       }
 
       const data = (await response.json()) as GoogleTranslateResponse;
       const translation = data.data?.translations?.[0]?.translatedText;
 
       if (!translation) {
-        throw new Error("No translation returned from Google API");
+        throw new ConvexError("No translation returned from Google API");
       }
 
       await ctx.runMutation(internal.translation.updateRequestResult, {

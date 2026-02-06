@@ -53,7 +53,8 @@
       "requesting": "Wird angefordert...",
       "sendTest": "Test-Benachrichtigung senden",
       "enable": "Benachrichtigungen aktivieren",
-      "enabled": "Benachrichtigungen aktiviert"
+      "enabled": "Benachrichtigungen aktiviert",
+      "testMessage": "Zeit, deine Phrasen zu üben! 🌟"
     },
     "flashcards": {
       "title": "Lernkarten",

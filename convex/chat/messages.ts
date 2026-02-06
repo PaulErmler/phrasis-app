@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { internalAction, mutation, query } from "../_generated/server";
 import { paginationOptsValidator } from "convex/server";
 import { internal } from "../_generated/api";
@@ -30,7 +30,7 @@ export const sendMessage = mutation({
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("Not authenticated");
+      throw new ConvexError("Not authenticated");
     }
 
     // Verify thread ownership
@@ -39,7 +39,7 @@ export const sendMessage = mutation({
     });
 
     if (!thread || thread.userId !== user._id) {
-      throw new Error("Thread not found or access denied");
+      throw new ConvexError("Thread not found or access denied");
     }
 
     // Save the user message
