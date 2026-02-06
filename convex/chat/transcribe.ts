@@ -1,7 +1,7 @@
 "use node";
 
 import { action } from "../_generated/server";
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { experimental_transcribe as transcribe } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { authComponent } from "../auth";
@@ -18,7 +18,7 @@ export const transcribeAudio = action({
 
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("User not authenticated");
+      throw new ConvexError("User not authenticated");
     }
 
     try {
@@ -30,7 +30,7 @@ export const transcribeAudio = action({
       return transcript.text;
     } catch (error) {
       console.error("Transcription error:", error);
-      throw new Error(
+      throw new ConvexError(
         error instanceof Error ? error.message : "Failed to transcribe audio"
       );
     }

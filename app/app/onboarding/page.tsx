@@ -134,7 +134,6 @@ export default function OnboardingPage() {
       <RedirectToSignIn />
       <SignedIn>
         <div className="h-screen flex flex-col overflow-hidden ">
-          {/* Fixed Progress Bar */}
           {step < totalSteps && (
             <div className="bg-background border-b shrink-0">
               <div className="container mx-auto px-4 py-4">
@@ -146,7 +145,6 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Scrollable Content Area */}
           <main className="flex-1 overflow-hidden">
             <div className="container mx-auto px-4 max-w-4xl h-full flex flex-col overflow-hidden">
               {step === 1 && <WelcomeStep />}
@@ -189,7 +187,6 @@ export default function OnboardingPage() {
             </div>
           </main>
 
-          {/* Bottom Navigation */}
           {step < totalSteps && (
             <div className="border-t bg-background shrink-0">
               <div className="container mx-auto px-4 py-4">
@@ -230,7 +227,6 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* Background Pattern */}
           <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
             <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
             <div className="absolute -bottom-1/2 -left-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />

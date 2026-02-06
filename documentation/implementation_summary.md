@@ -3,7 +3,7 @@
 ## Texts & Collections System
 
 ### Schema (`convex/schema.ts`)
-- `collections` - groups texts by CEFR level with `name` and `textCount`
+- `collections` - groups texts by CEFR level with `name` and `textCount` and other topics/groupings are possible in the future 
 - `texts` - stores sentences with `datasetSentenceId`, `text`, `language`, `userCreated`, `collectionId`, `collectionRank`
 - `translations` - stores translations linked to `textId`
 - `audioRecordings` - stores audio files using Convex file storage, linked to `textId`

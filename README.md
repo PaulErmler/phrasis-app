@@ -76,6 +76,9 @@ pnpm dev
 # Or run them separately:
 pnpm dev:frontend  # Next.js on http://localhost:3000
 pnpm dev:backend   # Convex dev server
+
+# seeding the texts 
+pnpm seed-texts
 ```
 
 ### Other Commands

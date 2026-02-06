@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation } from "../_generated/server";
 import { authComponent } from "../auth";
 
@@ -43,7 +43,7 @@ export const createFlashcard = mutation({
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("Not authenticated");
+      throw new ConvexError("Not authenticated");
     }
 
     // Generate date and random number

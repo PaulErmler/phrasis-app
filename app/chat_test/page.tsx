@@ -122,10 +122,8 @@ export default function ChatPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      {/* Header */}
       <ChatHeader onBack={() => router.push("/app")} />
 
-      {/* Main Content */}
       <main className="flex-1 flex flex-row overflow-hidden min-h-0">
         <SignedOut>
           <div className="flex-1 flex items-center justify-center">
@@ -134,7 +132,6 @@ export default function ChatPage() {
         </SignedOut>
 
         <SignedIn>
-          {/* Threads Sidebar */}
           <ThreadSidebar
             threads={threads}
             threadId={threadId}
@@ -167,12 +164,10 @@ export default function ChatPage() {
             )}
           </div>
 
-          {/* Flashcard Sidebar */}
           <FlashcardSidebar />
         </SignedIn>
       </main>
 
-      {/* Footer */}
       <Footer />
 
 

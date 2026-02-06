@@ -1,6 +1,22 @@
 import { v } from "convex/values";
-import { internalMutation } from "../_generated/server";
+import { internalMutation, MutationCtx } from "../_generated/server";
 import { Id } from "../_generated/dataModel";
+
+/**
+ * Adjust a collection's textCount by a delta (positive or negative).
+ */
+export async function adjustCollectionTextCount(
+  ctx: MutationCtx,
+  collectionId: Id<"collections">,
+  delta: number
+) {
+  if (delta === 0) return;
+  const collection = await ctx.db.get(collectionId);
+  if (!collection) return;
+  await ctx.db.patch(collectionId, {
+    textCount: Math.max(0, collection.textCount + delta),
+  });
+}
 
 // Upsert a collection into the database (internal - for seeding only)
 export const upsertCollection = internalMutation({
@@ -18,7 +34,7 @@ export const upsertCollection = internalMutation({
     if (existing) {
       return existing._id;
     } else {
-      // Insert new collection with textCount initialized to 0
+      // Insert new collection 
       const id: Id<"collections"> = await ctx.db.insert("collections", {
         name: args.name,
         textCount: 0,
@@ -51,9 +67,6 @@ export const batchUpsertTexts = internalMutation({
     let inserted = 0;
     let updated = 0;
 
-    // Group texts by collectionId to batch update textCount
-    const collectionCounts: Map<Id<"collections">, number> = new Map();
-
     for (const textData of args.texts) {
       // Try to find existing text by datasetSentenceId
       const existing = await ctx.db
@@ -64,6 +77,12 @@ export const batchUpsertTexts = internalMutation({
         .unique();
 
       if (existing) {
+        // If text is moving to a different collection, adjust both counts
+        if (existing.collectionId && existing.collectionId !== textData.collectionId) {
+          await adjustCollectionTextCount(ctx, existing.collectionId, -1);
+          await adjustCollectionTextCount(ctx, textData.collectionId, +1);
+        }
+
         // Update existing text
         await ctx.db.patch(existing._id, {
           text: textData.text,
@@ -82,21 +101,8 @@ export const batchUpsertTexts = internalMutation({
           collectionId: textData.collectionId,
           collectionRank: textData.collectionRank,
         });
+        await adjustCollectionTextCount(ctx, textData.collectionId, +1);
         inserted++;
-
-        // Track count for this collection
-        const currentCount = collectionCounts.get(textData.collectionId) || 0;
-        collectionCounts.set(textData.collectionId, currentCount + 1);
-      }
-    }
-
-    // Update textCount for each collection that had new inserts
-    for (const [collectionId, count] of collectionCounts) {
-      const collection = await ctx.db.get(collectionId);
-      if (collection) {
-        await ctx.db.patch(collectionId, {
-          textCount: collection.textCount + count,
-        });
       }
     }
 
