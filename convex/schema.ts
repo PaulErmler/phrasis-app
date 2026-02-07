@@ -1,32 +1,9 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { learningStyleValidator, currentLevelValidator } from "./types";
+import { testingTables } from "./testing/schema";
 
 export default defineSchema({
-  testFlashcards: defineTable({
-    text: v.string(),           // Flashcard content
-    note: v.string(),           // Additional note
-    date: v.number(),           // Timestamp
-    randomNumber: v.number(),   // Random number
-    userId: v.string(),         // User who owns the flashcard
-  }),
-  
-  flashcardApprovals: defineTable({
-    threadId: v.string(),       // Thread where approval was requested
-    messageId: v.string(),      // Message containing the tool call
-    toolCallId: v.string(),     // ID of the tool call
-    text: v.string(),           // Proposed flashcard text
-    note: v.string(),           // Proposed flashcard note
-    userId: v.string(),         // User who needs to approve
-    status: v.string(),         // "pending", "approved", "rejected"
-    createdAt: v.number(),      // When the approval was requested
-    processedAt: v.optional(v.number()), // When it was approved/rejected
-  })
-    .index("by_message", ["messageId"])
-    .index("by_user_and_status", ["userId", "status"])
-    .index("by_toolCallId", ["toolCallId"])
-    .index("by_thread_and_user", ["threadId", "userId"]),
-  
   // Collections table - groups texts by difficulty level or potentially other topics 
   collections: defineTable({
     name: v.string(), // e.g., "A1", "B2", "Essential"
@@ -125,34 +102,6 @@ export default defineSchema({
     .index("by_userId_and_courseId", ["userId", "courseId"])
     .index("by_userId_and_courseId_and_collectionId", ["userId", "courseId", "collectionId"]),
 
-  // Translation requests table - async translation processing
-  translationRequests: defineTable({
-    userId: v.string(), // User who requested the translation
-    text: v.string(), // Original text to translate
-    sourceLang: v.string(), // Source language code
-    targetLang: v.string(), // Target language code
-    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
-    result: v.optional(v.string()), // Translated text (when completed)
-    error: v.optional(v.string()), // Error message (when failed)
-    createdAt: v.number(),
-    completedAt: v.optional(v.number()),
-  })
-    .index("by_userId", ["userId"])
-    .index("by_userId_and_status", ["userId", "status"]),
-
-
-  // TTS requests table - async TTS audio generation
-  ttsRequests: defineTable({
-    userId: v.string(),
-    text: v.string(),
-    voiceName: v.string(), // e.g., "en-US-Chirp3-HD-Leda" (contains languageCode)
-    speed: v.number(), // speaking_rate (0.5 to 1.0)
-    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
-    storageId: v.optional(v.id("_storage")),
-    error: v.optional(v.string()),
-    createdAt: v.number(),
-    completedAt: v.optional(v.number()),
-  })
-    .index("by_userId", ["userId"])
-    .index("by_userId_and_status", ["userId", "status"]),
+  // Testing-only tables (testFlashcards, flashcardApprovals, translationRequests, ttsRequests)
+  ...testingTables,
 });

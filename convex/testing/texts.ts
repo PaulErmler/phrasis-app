@@ -3,7 +3,7 @@ import { query } from "../_generated/server";
 import { getAuthUser } from "../db/users";
 
 // ============================================================================
-// QUERIES
+// QUERIES (testing page — CollectionsPreview)
 // ============================================================================
 
 /**
