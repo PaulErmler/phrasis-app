@@ -1,9 +1,15 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation, internalAction, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { MAX_TTS_LENGTH, MIN_TTS_SPEED, MAX_TTS_SPEED } from "../lib/constants/tts";
+import { SUPPORTED_LANGUAGES } from "../lib/languages";
 import { authComponent } from "./auth";
 import { Id } from "./_generated/dataModel";
+
+/** Set of all valid voice API codes from SUPPORTED_LANGUAGES */
+const VALID_VOICE_CODES = new Set(
+  SUPPORTED_LANGUAGES.flatMap((lang) => lang.voices.map((v) => v.apiCode))
+);
 
 /** Google TTS API response type */
 interface GoogleTTSResponse {
@@ -30,23 +36,25 @@ export const requestTTS = mutation({
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("Unauthenticated");
+      throw new ConvexError("Unauthenticated");
     }
 
-    // Validate text
     const text = args.text.trim();
     if (!text) {
-      throw new Error("Text cannot be empty");
+      throw new ConvexError("Text cannot be empty");
     }
     if (text.length > MAX_TTS_LENGTH) {
-      throw new Error(`Text exceeds maximum length of ${MAX_TTS_LENGTH} characters`);
+      throw new ConvexError(`Text exceeds maximum length of ${MAX_TTS_LENGTH} characters`);
     }
 
     if (args.speed < MIN_TTS_SPEED || args.speed > MAX_TTS_SPEED) {
-      throw new Error(`Invalid speed. Must be between ${MIN_TTS_SPEED} and ${MAX_TTS_SPEED}`);
+      throw new ConvexError(`Invalid speed. Must be between ${MIN_TTS_SPEED} and ${MAX_TTS_SPEED}`);
     }
 
-    // Create pending request
+    if (!VALID_VOICE_CODES.has(args.voiceName)) {
+      throw new ConvexError("Invalid voice name. Must be a supported voice.");
+    }
+
     const requestId = await ctx.db.insert("ttsRequests", {
       userId: user._id,
       text,
@@ -56,7 +64,6 @@ export const requestTTS = mutation({
       createdAt: Date.now(),
     });
 
-    // Schedule the TTS processing
     await ctx.scheduler.runAfter(0, internal.tts.processTTS, {
       requestId,
     });
@@ -100,7 +107,6 @@ export const getTTSRequest = query({
       return null;
     }
 
-    // Generate audioUrl dynamically from storageId
     const audioUrl = request.storageId 
       ? await ctx.storage.getUrl(request.storageId) 
       : undefined;
@@ -170,7 +176,6 @@ export const processTTS = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Load the request
     const request = await ctx.runQuery(internal.tts.getRequestInternal, {
       requestId: args.requestId,
     });
@@ -190,10 +195,8 @@ export const processTTS = internalAction({
     }
 
     try {
-      // Extract languageCode from voiceName
       const languageCode = extractLanguageCode(request.voiceName);
 
-      // Build the request body for Google TTS API
       const requestBody = {
         input: {
           text: request.text,
@@ -208,7 +211,6 @@ export const processTTS = internalAction({
         },
       };
 
-      // Call Google Cloud TTS REST API
       const response = await fetch(
         `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
         {
@@ -222,22 +224,19 @@ export const processTTS = internalAction({
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`Google TTS API error: ${response.status} - ${errorText}`);
+        throw new ConvexError(`Google TTS API error: ${response.status} - ${errorText}`);
       }
 
       const data = (await response.json()) as GoogleTTSResponse;
       const audioContent = data.audioContent;
 
       if (!audioContent) {
-        throw new Error("No audio content returned from Google TTS API");
+        throw new ConvexError("No audio content returned from Google TTS API");
       }
 
-      // Decode base64 to binary and store in Convex storage
       const blob = new Blob([Uint8Array.from(atob(audioContent), c => c.charCodeAt(0))], {
         type: 'audio/mp3',
       });
-      
-      // Store in Convex storage
       const storageId: Id<"_storage"> = await ctx.storage.store(blob);
 
       await ctx.runMutation(internal.tts.updateRequestResult, {

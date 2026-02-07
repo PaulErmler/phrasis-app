@@ -39,7 +39,6 @@ export function AppPageClient({
       <RedirectToSignIn />
       <Authenticated>
         <div className="min-h-screen flex flex-col">
-          {/* Header */}
           <header className="sticky top-0 z-10 border-b bg-background">
             <div className="container mx-auto px-4 h-14 flex items-center justify-between">
               {currentView === "home" ? (
@@ -60,10 +59,8 @@ export function AppPageClient({
             </div>
           </header>
 
-          {/* Course Menu */}
           <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
-          {/* Main Content */}
           <main className="flex-1 container mx-auto px-4 py-8 pb-20">
             {currentView === "home" && <HomeView />}
             {currentView === "content" && <ContentView />}
@@ -71,10 +68,8 @@ export function AppPageClient({
             {currentView === "settings" && <SettingsView />}
           </main>
 
-          {/* Bottom Navigation */}
           <BottomNav currentView={currentView} onViewChange={setCurrentView} />
 
-          {/* Background Pattern */}
           <div className="fixed inset-0 -z-10 overflow-hidden">
             <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
           </div>

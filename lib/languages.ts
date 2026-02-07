@@ -115,7 +115,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: "pt",
     name: "Portuguese",
     nativeName: "Português",
-    flag: "🇧🇷",
+    flag: "🇵🇹",
     voices: [
       createChirp3Voice("Leda", "female", "pt-BR", "Brazil"),
       createChirp3Voice("Charon", "male", "pt-BR", "Brazil"),

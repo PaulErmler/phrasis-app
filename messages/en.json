@@ -53,7 +53,8 @@
       "requesting": "Requesting...",
       "sendTest": "Send Test Notification",
       "enable": "Enable Notifications",
-      "enabled": "Notifications enabled"
+      "enabled": "Notifications enabled",
+      "testMessage": "Time to practice your phrases! 🌟"
     },
     "flashcards": {
       "title": "Flashcards",

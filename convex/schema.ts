@@ -34,7 +34,7 @@ export default defineSchema({
     .index("by_toolCallId", ["toolCallId"])
     .index("by_thread_and_user", ["threadId", "userId"]),
   
-  // Collections table - groups texts by difficulty level
+  // Collections table - groups texts by difficulty level or potentially other topics 
   collections: defineTable({
     name: v.string(), // e.g., "A1", "B2", "Essential"
     textCount: v.number(), // Number of texts in this collection

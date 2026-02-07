@@ -21,7 +21,6 @@ export function Header() {
             <span className="text-xl font-bold text-foreground">Phrasis</span>
           </Link>
 
-          {/* Right side - Language & Theme */}
           <div className="flex items-center gap-4">
             <LanguageSwitcher />
             <ThemeSwitcher />
