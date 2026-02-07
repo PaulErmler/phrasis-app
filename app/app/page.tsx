@@ -6,7 +6,7 @@ import { AppPageClient } from "./AppPageClient";
 export default async function AppPage() {
   const token = await getToken();
   const preloadedSettings = await preloadQuery(
-    api.courses.getUserSettings,
+    api.features.courses.getUserSettings,
     {},
     { token: token ?? undefined }
   );

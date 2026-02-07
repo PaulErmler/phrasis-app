@@ -35,11 +35,11 @@ export function TTSTest() {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const requestTTS = useMutation(api.tts.requestTTS);
+  const requestTTS = useMutation(api.features.tts.requestTTS);
 
   // Query the TTS request - reactively updates when the result is ready
   const ttsRequest = useQuery(
-    api.tts.getTTSRequest,
+    api.features.tts.getTTSRequest,
     requestId ? { requestId } : "skip"
   );
 

@@ -18,14 +18,15 @@ export async function adjustCollectionTextCount(
   });
 }
 
-// Upsert a collection into the database (internal - for seeding only)
+/**
+ * Upsert a collection into the database (internal — for seeding only).
+ */
 export const upsertCollection = internalMutation({
   args: {
     name: v.string(),
   },
   returns: v.id("collections"),
   handler: async (ctx, args) => {
-    // Try to find existing collection by name
     const existing = await ctx.db
       .query("collections")
       .withIndex("by_name", (q) => q.eq("name", args.name))
@@ -33,20 +34,20 @@ export const upsertCollection = internalMutation({
 
     if (existing) {
       return existing._id;
-    } else {
-      // Insert new collection 
-      const id: Id<"collections"> = await ctx.db.insert("collections", {
-        name: args.name,
-        textCount: 0,
-      });
-      return id;
     }
+
+    const id: Id<"collections"> = await ctx.db.insert("collections", {
+      name: args.name,
+      textCount: 0,
+    });
+    return id;
   },
 });
 
-
-// Batch upsert texts into the database (internal - for seeding only)
-// More efficient for bulk uploads - processes up to 500 texts at once
+/**
+ * Batch upsert texts into the database (internal — for seeding only).
+ * Processes up to 500 texts at once.
+ */
 export const batchUpsertTexts = internalMutation({
   args: {
     texts: v.array(
@@ -68,7 +69,6 @@ export const batchUpsertTexts = internalMutation({
     let updated = 0;
 
     for (const textData of args.texts) {
-      // Try to find existing text by datasetSentenceId
       const existing = await ctx.db
         .query("texts")
         .withIndex("by_datasetSentenceId", (q) =>
@@ -83,7 +83,6 @@ export const batchUpsertTexts = internalMutation({
           await adjustCollectionTextCount(ctx, textData.collectionId, +1);
         }
 
-        // Update existing text
         await ctx.db.patch(existing._id, {
           text: textData.text,
           language: textData.language,
@@ -92,7 +91,6 @@ export const batchUpsertTexts = internalMutation({
         });
         updated++;
       } else {
-        // Insert new text
         await ctx.db.insert("texts", {
           datasetSentenceId: textData.datasetSentenceId,
           text: textData.text,
@@ -109,3 +107,4 @@ export const batchUpsertTexts = internalMutation({
     return { inserted, updated };
   },
 });
+

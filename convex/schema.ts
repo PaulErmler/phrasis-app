@@ -2,14 +2,7 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import { learningStyleValidator, currentLevelValidator } from "./types";
 
-// The schema is entirely optional.
-// You can delete this file (schema.ts) and the
-// app will continue to work.
-// The schema provides more precise TypeScript types.
 export default defineSchema({
-  numbers: defineTable({
-    value: v.number(),
-  }),
   testFlashcards: defineTable({
     text: v.string(),           // Flashcard content
     note: v.string(),           // Additional note
