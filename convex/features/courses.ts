@@ -2,7 +2,9 @@ import { v, ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { learningStyleValidator, currentLevelValidator } from "../types";
 import { getAuthUser, getUserSettings as dbGetUserSettings, getOnboardingProgress as dbGetOnboardingProgress } from "../db/users";
-import { getCoursesForUser } from "../db/courses";
+import { getCoursesForUser, getActiveCourseForUser } from "../db/courses";
+import { getCourseSettings as dbGetCourseSettings, upsertCourseSettings } from "../db/courseSettings";
+import { DEFAULT_INITIAL_REVIEW_COUNT } from "../../lib/scheduling";
 
 // ============================================================================
 // QUERIES
@@ -226,6 +228,7 @@ export const createCourse = mutation({
     baseLanguages: v.array(v.string()),
     targetLanguages: v.array(v.string()),
     currentLevel: v.optional(currentLevelValidator),
+    initialReviewCount: v.optional(v.number()),
   },
   returns: v.object({
     courseId: v.id("courses"),
@@ -240,6 +243,11 @@ export const createCourse = mutation({
       targetLanguages: args.targetLanguages,
       currentLevel: args.currentLevel,
       userId: user._id,
+    });
+
+    // Create course settings in a separate table
+    await upsertCourseSettings(ctx, courseId, {
+      initialReviewCount: args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
     });
 
     const deckName = `Learning ${args.targetLanguages.join(", ")}`;
@@ -283,6 +291,11 @@ export const completeOnboarding = mutation({
       userId,
     });
 
+    // Create course settings in a separate table
+    await upsertCourseSettings(ctx, courseId, {
+      initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+    });
+
     // Auto-create a deck
     const deckName = `Learning ${targetLanguages.join(", ")}`;
     const deckId = await ctx.db.insert("decks", {
@@ -312,6 +325,64 @@ export const completeOnboarding = mutation({
     await ctx.db.delete(progress._id);
 
     return { settingsId, courseId, deckId };
+  },
+});
+
+// ============================================================================
+// COURSE SETTINGS
+// ============================================================================
+
+/**
+ * Get the settings for the active course.
+ */
+export const getActiveCourseSettings = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      _id: v.id("courseSettings"),
+      _creationTime: v.number(),
+      courseId: v.id("courses"),
+      initialReviewCount: v.number(),
+    }),
+    v.null()
+  ),
+  handler: async (ctx) => {
+    try {
+      const user = await getAuthUser(ctx);
+      if (!user) return null;
+
+      const active = await getActiveCourseForUser(ctx, user._id);
+      if (!active) return null;
+
+      return dbGetCourseSettings(ctx, active.course._id);
+    } catch {
+      return null;
+    }
+  },
+});
+
+/**
+ * Update the initialReviewCount for the user's active course.
+ */
+export const updateCourseSettings = mutation({
+  args: {
+    courseId: v.id("courses"),
+    initialReviewCount: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await getAuthUser(ctx);
+    if (!user) throw new ConvexError("User must be authenticated");
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new ConvexError("Course not found");
+    if (course.userId !== user._id) throw new ConvexError("Course does not belong to user");
+
+    await upsertCourseSettings(ctx, args.courseId, {
+      initialReviewCount: args.initialReviewCount,
+    });
+
+    return null;
   },
 });
 

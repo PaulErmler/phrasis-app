@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { learningStyleValidator, currentLevelValidator } from "./types";
+import { learningStyleValidator, currentLevelValidator, fsrsStateValidator } from "./types";
 import { testingTables } from "./testing/schema";
 
 export default defineSchema({
@@ -71,6 +71,12 @@ export default defineSchema({
     currentLevel: v.optional(currentLevelValidator), // User's current level in this course
   }).index("by_userId", ["userId"]),
 
+  // Course settings table — separated so changes don't trigger course re-fetches
+  courseSettings: defineTable({
+    courseId: v.id("courses"),
+    initialReviewCount: v.number(), // How many times a card is shown before FSRS scheduling
+  }).index("by_courseId", ["courseId"]),
+
   // Decks table - one deck per course, auto-created
   decks: defineTable({
     courseId: v.id("courses"), // Reference to the course
@@ -78,18 +84,22 @@ export default defineSchema({
     cardCount: v.number(), // Denormalized count of cards in this deck
   }).index("by_courseId", ["courseId"]),
 
-  // Cards table - links texts to decks with review metadata
+  // Cards table - links texts to decks with review metadata and scheduling state
   cards: defineTable({
     deckId: v.id("decks"), // Reference to the deck
     textId: v.id("texts"), // Reference to the text/sentence
     collectionId: v.id("collections"), // Reference to the source collection
-    dueDate: v.number(), // Timestamp for spaced repetition scheduling
+    dueDate: v.number(), // Timestamp for spaced repetition scheduling (driven by scheduler)
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
+    schedulingPhase: v.string(), // "preReview" | "review"
+    preReviewCount: v.number(), // How many pre-review rounds completed
+    fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
   })
     .index("by_deckId", ["deckId"])
     .index("by_deckId_and_dueDate", ["deckId", "dueDate"])
-    .index("by_deckId_and_textId", ["deckId", "textId"]),
+    .index("by_deckId_and_textId", ["deckId", "textId"])
+    .index("by_deckId_and_isHidden_and_isMastered_and_dueDate", ["deckId", "isHidden", "isMastered", "dueDate"]),
 
   // Collection progress table - tracks cards added per collection/course
   collectionProgress: defineTable({

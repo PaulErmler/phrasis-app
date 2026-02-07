@@ -8,6 +8,7 @@ import { getActiveCourseForUser } from "../db/courses";
 import { getDeckByCourseId } from "../db/decks";
 import { translateText } from "./translation";
 import { synthesizeSpeech } from "./tts";
+import { translationValidator, audioRecordingValidator } from "../types";
 
 // ============================================================================
 // HELPERS
@@ -133,21 +134,8 @@ export const getDeckCards = query({
       textId: v.id("texts"),
       sourceText: v.string(),
       sourceLanguage: v.string(),
-      translations: v.array(
-        v.object({
-          language: v.string(),
-          text: v.string(),
-          isBaseLanguage: v.boolean(),
-          isTargetLanguage: v.boolean(),
-        })
-      ),
-      audioRecordings: v.array(
-        v.object({
-          language: v.string(),
-          voiceName: v.union(v.string(), v.null()),
-          url: v.union(v.string(), v.null()),
-        })
-      ),
+      translations: v.array(translationValidator),
+      audioRecordings: v.array(audioRecordingValidator),
       dueDate: v.number(),
       isMastered: v.boolean(),
       isHidden: v.boolean(),
@@ -396,6 +384,8 @@ export const addCardsFromCollection = mutation({
           dueDate: now,
           isMastered: false,
           isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
         });
         cardsInserted++;
       }
