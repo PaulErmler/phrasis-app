@@ -7,7 +7,8 @@ import { TranslationTest } from "@/components/testing/TranslationTest";
 import { TTSTest } from "@/components/testing/TTSTest";
 import { NotificationTest } from "@/components/testing/NotificationTest";
 import { SchedulingTest } from "@/components/testing/SchedulingTest";
-import { CollectionsPreview } from "@/components/app/CollectionsPreview";
+import { CollectionsPreview } from "@/components/testing/CollectionsPreview";
+import { CollectionCarouselTest } from "@/components/testing/CollectionCarouselTest";
 
 export default function TestingPage() {
   return (
@@ -45,6 +46,11 @@ export default function TestingPage() {
 
             <div className="md:col-span-2 lg:col-span-1">
               <CollectionsPreview />
+            </div>
+
+            {/* Collection Carousel UI Test */}
+            <div className="md:col-span-2">
+              <CollectionCarouselTest />
             </div>
           </div>
         </div>

@@ -75,6 +75,49 @@
       "account": "Konto",
       "language": "App-Sprache"
     },
+    "collections": {
+      "carousel": {
+        "sectionTitle": "Schwierigkeitsauswahl",
+        "title": "Sammlungen",
+        "select": "Auswählen",
+        "selected": "Ausgewählt",
+        "done": "Fertig",
+        "cards": "{count} Karten",
+        "notStarted": "Nicht begonnen",
+        "addCards": "{count} Karten zum Deck hinzufügen",
+        "adding": "Wird hinzugefügt...",
+        "complete": "Fertig",
+        "collectionComplete": "{name} abgeschlossen!",
+        "allCardsAdded": "Alle Karten dieser Sammlung wurden deinem Deck hinzugefügt.",
+        "noMoreCards": "Keine weiteren Karten aus {name} hinzuzufügen",
+        "nextCards": "Nächste {count} Karten aus {name}",
+        "progress": "{added} / {total}",
+        "failedToSelect": "Sammlung konnte nicht ausgewählt werden",
+        "failedToAdd": "Karten konnten nicht hinzugefügt werden",
+        "cardsAdded": "{count} Karten zu deinem Deck hinzugefügt",
+        "noCardsToAdd": "Keine weiteren Karten aus dieser Sammlung hinzuzufügen",
+        "descriptions": {
+          "Essential": "Die wichtigsten Sätze am Anfang",
+          "A1": "Sätze mit Vokabular auf CEFR A1-Niveau",
+          "A2": "Sätze mit Vokabular auf CEFR A2-Niveau",
+          "B1": "Sätze mit Vokabular auf CEFR B1-Niveau",
+          "B2": "Sätze mit Vokabular auf CEFR B2-Niveau",
+          "C1": "Sätze mit Vokabular auf CEFR C1-Niveau",
+          "C2": "Sätze mit Vokabular auf CEFR C2-Niveau"
+        },
+        "detail": {
+          "totalCards": "{count} Karten",
+          "progress": "Fortschritt",
+          "select": "Auswählen",
+          "done": "Fertig",
+          "allCardsAdded": "Alle Karten dieser Sammlung wurden deinem Deck hinzugefügt.",
+          "nextSentences": "Nächste Sätze",
+          "adding": "Wird hinzugefügt...",
+          "addN": "{count} hinzufügen",
+          "noMoreCards": "Keine weiteren Karten hinzuzufügen"
+        }
+      }
+    },
     "courses": {
       "title": "Deine Kurse",
       "description": "Wähle einen Kurs zum Wechseln oder erstelle einen neuen",

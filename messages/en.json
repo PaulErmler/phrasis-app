@@ -75,6 +75,49 @@
       "account": "Account",
       "language": "App Language"
     },
+    "collections": {
+      "carousel": {
+        "sectionTitle": "Difficulty Selection",
+        "title": "Collections",
+        "select": "Select",
+        "selected": "Selected",
+        "done": "Done",
+        "cards": "{count} cards",
+        "notStarted": "Not started",
+        "addCards": "Add {count} cards to deck",
+        "adding": "Adding...",
+        "complete": "Done",
+        "collectionComplete": "{name} complete!",
+        "allCardsAdded": "All cards from this collection have been added to your deck.",
+        "noMoreCards": "No more cards to add from {name}",
+        "nextCards": "Next {count} cards from {name}",
+        "progress": "{added} / {total}",
+        "failedToSelect": "Failed to select collection",
+        "failedToAdd": "Failed to add cards",
+        "cardsAdded": "Added {count} cards to your deck",
+        "noCardsToAdd": "No more cards to add from this collection",
+        "descriptions": {
+          "Essential": "The most essential survival sentences",
+          "A1": "Sentences with vocabulary at CEFR A1 Level",
+          "A2": "Sentences with vocabulary at CEFR A2 Level",
+          "B1": "Sentences with vocabulary at CEFR B1 Level",
+          "B2": "Sentences with vocabulary at CEFR B2 Level",
+          "C1": "Sentences with vocabulary at CEFR C1 Level",
+          "C2": "Sentences with vocabulary at CEFR C2 Level"
+        },
+        "detail": {
+          "totalCards": "{count} cards",
+          "progress": "Progress",
+          "select": "Select",
+          "done": "Done",
+          "allCardsAdded": "All cards from this collection have been added to your deck.",
+          "nextSentences": "Next Sentences",
+          "adding": "Adding...",
+          "addN": "Add {count}",
+          "noMoreCards": "No more cards to add"
+        }
+      }
+    },
     "courses": {
       "title": "Your Courses",
       "description": "Select a course to switch to or create a new one",

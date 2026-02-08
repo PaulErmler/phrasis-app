@@ -6,9 +6,11 @@ import { getRandomVoiceForLanguage } from "../../lib/languages";
 import { getAuthUser, getUserSettings } from "../db/users";
 import { getActiveCourseForUser } from "../db/courses";
 import { getDeckByCourseId } from "../db/decks";
+import { getCourseSettings, setActiveCollectionOnSettings } from "../db/courseSettings";
 import { translateText } from "./translation";
 import { synthesizeSpeech } from "./tts";
 import { translationValidator, audioRecordingValidator } from "../types";
+import { LEVEL_ORDER, getNextCollectionName } from "../lib/collections";
 
 // ============================================================================
 // HELPERS
@@ -274,7 +276,7 @@ export const getCollectionProgress = query({
       })
     );
 
-    const levelOrder = ["Essential", "A1", "A2", "B1", "B2", "C1", "C2"];
+    const levelOrder: readonly string[] = LEVEL_ORDER;
     result.sort((a, b) => {
       const aIndex = levelOrder.indexOf(a.collectionName);
       const bIndex = levelOrder.indexOf(b.collectionName);
@@ -288,9 +290,98 @@ export const getCollectionProgress = query({
   },
 });
 
+/**
+ * Get the next N texts from a collection that haven't been added to the deck yet.
+ * Uses collectionProgress.lastRankProcessed for efficient pagination.
+ */
+export const getNextTextsFromCollection = query({
+  args: {
+    collectionId: v.id("collections"),
+    limit: v.optional(v.number()),
+  },
+  returns: v.array(
+    v.object({
+      _id: v.id("texts"),
+      text: v.string(),
+      collectionRank: v.optional(v.number()),
+    })
+  ),
+  handler: async (ctx, args) => {
+    const user = await getAuthUser(ctx);
+    if (!user) return [];
+
+    const settings = await getUserSettings(ctx, user._id);
+    if (!settings?.activeCourseId) return [];
+
+    const courseId = settings.activeCourseId;
+    const maxTexts = Math.min(args.limit ?? 5, 20);
+
+    // Get current progress for this collection
+    const progress = await ctx.db
+      .query("collectionProgress")
+      .withIndex("by_userId_and_courseId_and_collectionId", (q) =>
+        q.eq("userId", user._id).eq("courseId", courseId).eq("collectionId", args.collectionId)
+      )
+      .first();
+
+    const lastRankProcessed = progress?.lastRankProcessed ?? 0;
+
+    const texts = await ctx.db
+      .query("texts")
+      .withIndex("by_collection_and_rank", (q) =>
+        q.eq("collectionId", args.collectionId).gt("collectionRank", lastRankProcessed)
+      )
+      .order("asc")
+      .take(maxTexts);
+
+    return texts.map((t) => ({
+      _id: t._id,
+      text: t.text,
+      collectionRank: t.collectionRank,
+    }));
+  },
+});
+
 // ============================================================================
 // MUTATIONS
 // ============================================================================
+
+/**
+ * Set the active collection for the user's current course.
+ */
+export const setActiveCollection = mutation({
+  args: {
+    collectionId: v.id("collections"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const user = await getAuthUser(ctx);
+    if (!user) throw new ConvexError("Unauthenticated");
+
+    const active = await getActiveCourseForUser(ctx, user._id);
+    if (!active) throw new ConvexError("No active course");
+    const courseId = active.settings.activeCourseId!;
+
+    // Validate collection exists
+    const collection = await ctx.db.get(args.collectionId);
+    if (!collection) throw new ConvexError("Collection not found");
+
+    // Check if collection is already fully completed
+    const progress = await ctx.db
+      .query("collectionProgress")
+      .withIndex("by_userId_and_courseId_and_collectionId", (q) =>
+        q.eq("userId", user._id).eq("courseId", courseId).eq("collectionId", args.collectionId)
+      )
+      .first();
+
+    if (progress && progress.cardsAdded >= collection.textCount) {
+      throw new ConvexError("This collection is already complete");
+    }
+
+    await setActiveCollectionOnSettings(ctx, courseId, args.collectionId);
+    return null;
+  },
+});
 
 /**
  * Add cards from a collection to the user's deck.
@@ -334,33 +425,22 @@ export const addCardsFromCollection = mutation({
       .first();
 
     const cardsAlreadyAdded = progress?.cardsAdded ?? 0;
-    const lastRankProcessed = progress?.lastRankProcessed;
+    const lastRankProcessed = progress?.lastRankProcessed ?? 0;
 
     // Get texts from collection (efficient index range pagination)
-    let textsToAdd;
-    if (lastRankProcessed !== undefined) {
-      textsToAdd = await ctx.db
-        .query("texts")
-        .withIndex("by_collection_and_rank", (q) =>
-          q.eq("collectionId", args.collectionId).gt("collectionRank", lastRankProcessed)
-        )
-        .order("asc")
-        .take(args.batchSize);
-    } else {
-      textsToAdd = await ctx.db
-        .query("texts")
-        .withIndex("by_collection_and_rank", (q) =>
-          q.eq("collectionId", args.collectionId)
-        )
-        .order("asc")
-        .take(args.batchSize);
-    }
+    const textsToAdd = await ctx.db
+      .query("texts")
+      .withIndex("by_collection_and_rank", (q) =>
+        q.eq("collectionId", args.collectionId).gt("collectionRank", lastRankProcessed)
+      )
+      .order("asc")
+      .take(args.batchSize);
 
     if (textsToAdd.length === 0) {
       return { cardsAdded: 0, totalCardsInDeck: deck.cardCount };
     }
 
-    let newLastRank = lastRankProcessed ?? -1;
+    let newLastRank = lastRankProcessed;
     const now = Date.now();
     let cardsInserted = 0;
 
@@ -418,6 +498,44 @@ export const addCardsFromCollection = mutation({
         baseLanguages: course.baseLanguages,
         targetLanguages: course.targetLanguages,
       });
+    }
+
+    // Auto-advance: if the collection is now complete and is the active one,
+    // move to the next incomplete collection (or clear if last).
+    const collection = await ctx.db.get(args.collectionId);
+    if (collection && newCardsAdded >= collection.textCount) {
+      const courseSettings = await getCourseSettings(ctx, courseId);
+      if (courseSettings?.activeCollectionId?.toString() === args.collectionId.toString()) {
+        // Find next incomplete collection in LEVEL_ORDER
+        let nextCollectionId: Id<"collections"> | undefined;
+        const nextName = getNextCollectionName(collection.name);
+
+        if (nextName) {
+          // Walk forward through LEVEL_ORDER to find the first incomplete collection
+          const allCollections = await ctx.db.query("collections").collect();
+          const orderedNames: readonly string[] = LEVEL_ORDER;
+          const startIdx = orderedNames.indexOf(nextName);
+
+          for (let i = startIdx; i < orderedNames.length; i++) {
+            const coll = allCollections.find((c) => c.name === orderedNames[i]);
+            if (!coll) continue;
+
+            const prog = await ctx.db
+              .query("collectionProgress")
+              .withIndex("by_userId_and_courseId_and_collectionId", (q) =>
+                q.eq("userId", user._id).eq("courseId", courseId).eq("collectionId", coll._id)
+              )
+              .first();
+
+            if (!prog || prog.cardsAdded < coll.textCount) {
+              nextCollectionId = coll._id;
+              break;
+            }
+          }
+        }
+
+        await setActiveCollectionOnSettings(ctx, courseId, nextCollectionId);
+      }
     }
 
     return {

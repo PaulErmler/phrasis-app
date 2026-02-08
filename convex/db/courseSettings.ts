@@ -35,7 +35,10 @@ export async function getInitialReviewCount(
 export async function upsertCourseSettings(
   ctx: MutationCtx,
   courseId: Id<"courses">,
-  values: { initialReviewCount: number },
+  values: {
+    initialReviewCount: number;
+    activeCollectionId?: Id<"collections">;
+  },
 ): Promise<Id<"courseSettings">> {
   const existing = await ctx.db
     .query("courseSettings")
@@ -51,5 +54,29 @@ export async function upsertCourseSettings(
     courseId,
     ...values,
   });
+}
+
+/**
+ * Update just the activeCollectionId on course settings.
+ */
+export async function setActiveCollectionOnSettings(
+  ctx: MutationCtx,
+  courseId: Id<"courses">,
+  activeCollectionId: Id<"collections"> | undefined,
+): Promise<void> {
+  const existing = await ctx.db
+    .query("courseSettings")
+    .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+    .first();
+
+  if (existing) {
+    await ctx.db.patch(existing._id, { activeCollectionId });
+  } else {
+    await ctx.db.insert("courseSettings", {
+      courseId,
+      initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+      activeCollectionId,
+    });
+  }
 }
 

@@ -75,6 +75,7 @@ export default defineSchema({
   courseSettings: defineTable({
     courseId: v.id("courses"),
     initialReviewCount: v.number(), // How many times a card is shown before FSRS scheduling
+    activeCollectionId: v.optional(v.id("collections")), 
   }).index("by_courseId", ["courseId"]),
 
   // Decks table - one deck per course, auto-created

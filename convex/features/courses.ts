@@ -5,6 +5,7 @@ import { getAuthUser, getUserSettings as dbGetUserSettings, getOnboardingProgres
 import { getCoursesForUser, getActiveCourseForUser } from "../db/courses";
 import { getCourseSettings as dbGetCourseSettings, upsertCourseSettings } from "../db/courseSettings";
 import { DEFAULT_INITIAL_REVIEW_COUNT } from "../../lib/scheduling";
+import { LEVEL_TO_COLLECTION } from "../lib/collections";
 
 // ============================================================================
 // QUERIES
@@ -291,9 +292,17 @@ export const completeOnboarding = mutation({
       userId,
     });
 
-    // Create course settings in a separate table
+    // Map the user's level to a starting collection
+    const collectionName = LEVEL_TO_COLLECTION[progress.currentLevel ?? "beginner"] ?? "A1";
+    const collection = await ctx.db
+      .query("collections")
+      .withIndex("by_name", (q) => q.eq("name", collectionName))
+      .first();
+
+    // Create course settings in a separate table (with preselected collection)
     await upsertCourseSettings(ctx, courseId, {
       initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+      activeCollectionId: collection?._id,
     });
 
     // Auto-create a deck
@@ -343,6 +352,7 @@ export const getActiveCourseSettings = query({
       _creationTime: v.number(),
       courseId: v.id("courses"),
       initialReviewCount: v.number(),
+      activeCollectionId: v.optional(v.id("collections")),
     }),
     v.null()
   ),
