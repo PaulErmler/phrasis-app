@@ -48,7 +48,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
               <Button
                 size="icon"
                 className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
-                onClick={() => router.push("/flashcard")}
+                onClick={() => router.push("/app/learn")}
               >
                 <Play className="h-6 w-6 fill-current text-primary-foreground" />
               </Button>

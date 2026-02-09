@@ -54,7 +54,7 @@ const FSRS_PARAMS: Partial<FSRSParameters> = {
   maximum_interval: 36500,
   enable_fuzz: false,
   enable_short_term: true,
-  learning_steps: ["10m", "10m"] as const, // 2 steps → 2 Good reviews to graduate
+  learning_steps: ["1m", "10m"] as const, // 2 steps → 2 Good reviews to graduate
   relearning_steps: ["10m"] as const,
 };
 

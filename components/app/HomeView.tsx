@@ -10,6 +10,7 @@ import { getLanguagesByCodes } from "@/lib/languages";
 import { NewChatInput } from "@/components/chat/NewChatInput";
 import { CollectionCarousel } from "@/components/app/CollectionCarousel";
 import { DeckCardsView } from "@/components/app/DeckCardsView";
+import { Play } from "lucide-react";
 
 export function HomeView() {
   const router = useRouter();
@@ -33,6 +34,16 @@ export function HomeView() {
           <h2 className="text-2xl font-bold mt-1">{courseName}</h2>
         </div>
       )}
+
+      {/* Start Learning Button */}
+      <Button
+        size="lg"
+        className="w-full gap-2"
+        onClick={() => router.push("/app/learn")}
+      >
+        <Play className="h-5 w-5 fill-current" />
+        {t("startLearning")}
+      </Button>
 
       <NewChatInput 
         showSuggestions={false}

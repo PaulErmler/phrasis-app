@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -11,7 +11,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -21,77 +20,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Layers, Volume2, VolumeX, Loader2, Languages } from "lucide-react";
-
-interface AudioPlayerProps {
-  url: string | null;
-  language: string;
-}
-
-function AudioPlayer({ url, language }: AudioPlayerProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const handlePlay = async () => {
-    if (!url) return;
-
-    if (isPlaying && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      if (!audioRef.current || audioRef.current.src !== url) {
-        audioRef.current = new Audio(url);
-        audioRef.current.onended = () => setIsPlaying(false);
-        audioRef.current.onerror = () => {
-          setIsPlaying(false);
-          setIsLoading(false);
-        };
-      }
-
-      await audioRef.current.play();
-      setIsPlaying(true);
-    } catch (error) {
-      console.error("Error playing audio:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Audio is still being generated
-  if (!url) {
-    return (
-      <Button variant="ghost" size="sm" disabled className="gap-1 text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        <span className="text-xs">Generating {language}...</span>
-      </Button>
-    );
-  }
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={handlePlay}
-      disabled={isLoading}
-      className="gap-1"
-    >
-      {isLoading ? (
-        <Loader2 className="h-3 w-3 animate-spin" />
-      ) : isPlaying ? (
-        <VolumeX className="h-3 w-3" />
-      ) : (
-        <Volume2 className="h-3 w-3" />
-      )}
-      <span className="text-xs">{language}</span>
-    </Button>
-  );
-}
+import { Layers, Languages } from "lucide-react";
+import { AudioButton } from "@/components/app/learning/AudioButton";
 
 export function DeckCardsView() {
   const deckCards = useQuery(api.features.decks.getDeckCards, {});
@@ -235,9 +165,10 @@ export function DeckCardsView() {
                           <p className="text-sm text-muted-foreground italic">Translating...</p>
                         )}
                         <div className="flex gap-2">
-                          <AudioPlayer
+                          <AudioButton
                             url={baseAudio?.url ?? null}
                             language={(baseTranslation?.language || card.sourceLanguage).toUpperCase()}
+                            showLabel
                           />
                         </div>
                       </div>
@@ -257,9 +188,10 @@ export function DeckCardsView() {
                           <p className="text-sm text-muted-foreground italic">Translating...</p>
                         )}
                         <div className="flex gap-2">
-                          <AudioPlayer
+                          <AudioButton
                             url={targetAudio?.url ?? null}
                             language={targetTranslation?.language.toUpperCase() || ""}
+                            showLabel
                           />
                         </div>
                       </div>
@@ -291,4 +223,3 @@ export function DeckCardsView() {
     </Card>
   );
 }
-

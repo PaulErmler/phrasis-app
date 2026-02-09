@@ -150,7 +150,59 @@
         "create": "Create Course"
       }
     },
-    "changeCourse": "Change Course"
+    "changeCourse": "Change Course",
+    "startLearning": "Start Learning"
+  },
+  "LearningMode": {
+    "title": "Learning",
+    "back": "Back",
+    "settings": "Settings",
+    "loading": "Loading...",
+    "baseLanguage": "Base Language",
+    "targetLanguage": "Target Language",
+    "phase": {
+      "preReview": "Pre-review",
+      "review": "Review"
+    },
+    "reviewCount": "{count} reviews",
+    "nextReview": "Next review in {time}",
+    "nextReviewNow": "Due now",
+    "ratings": {
+      "stillLearning": "Still learning",
+      "understood": "Understood",
+      "again": "Again",
+      "hard": "Hard",
+      "good": "Good",
+      "easy": "Easy"
+    },
+    "actions": {
+      "master": "Master",
+      "hide": "Hide",
+      "next": "Next",
+      "pause": "Pause",
+      "play": "Play"
+    },
+    "empty": {
+      "noCardsDue": "No cards due for review",
+      "addCards": "Add {count} cards",
+      "adding": "Adding...",
+      "noCollection": "No collection selected",
+      "goHome": "Go to Home",
+      "allDone": "All caught up! Add more cards to continue learning.",
+      "noCardsInDeck": "No cards in your deck yet. Add cards from a collection to start learning."
+    },
+    "settingsPanel": {
+      "title": "Learning Settings",
+      "iconLegend": "Card Icons",
+      "iconMaster": "Mark card as mastered (won't appear again)",
+      "iconHide": "Hide card from review",
+      "cardsPerBatch": "Cards per batch",
+      "cardsPerBatchDescription": "Number of cards to add at once",
+      "autoAddCards": "Auto-add cards",
+      "autoAddCardsDescription": "Automatically add new cards when none are due",
+      "initialReviews": "Initial reviews",
+      "initialReviewsDescription": "Number of pre-reviews before spaced repetition"
+    }
   },
   "Footer": {
     "copyright": "© {year} Phrasis. All rights reserved.",

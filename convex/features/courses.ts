@@ -353,6 +353,8 @@ export const getActiveCourseSettings = query({
       courseId: v.id("courses"),
       initialReviewCount: v.number(),
       activeCollectionId: v.optional(v.id("collections")),
+      cardsToAddBatchSize: v.optional(v.number()),
+      autoAddCards: v.optional(v.boolean()),
     }),
     v.null()
   ),
@@ -377,7 +379,9 @@ export const getActiveCourseSettings = query({
 export const updateCourseSettings = mutation({
   args: {
     courseId: v.id("courses"),
-    initialReviewCount: v.number(),
+    initialReviewCount: v.optional(v.number()),
+    cardsToAddBatchSize: v.optional(v.number()),
+    autoAddCards: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -388,9 +392,23 @@ export const updateCourseSettings = mutation({
     if (!course) throw new ConvexError("Course not found");
     if (course.userId !== user._id) throw new ConvexError("Course does not belong to user");
 
-    await upsertCourseSettings(ctx, args.courseId, {
-      initialReviewCount: args.initialReviewCount,
-    });
+    // Build patch object with only provided fields
+    const existing = await dbGetCourseSettings(ctx, args.courseId);
+    const patch: Record<string, unknown> = {};
+    if (args.initialReviewCount !== undefined) patch.initialReviewCount = args.initialReviewCount;
+    if (args.cardsToAddBatchSize !== undefined) patch.cardsToAddBatchSize = args.cardsToAddBatchSize;
+    if (args.autoAddCards !== undefined) patch.autoAddCards = args.autoAddCards;
+
+    if (existing) {
+      await ctx.db.patch(existing._id, patch);
+    } else {
+      await ctx.db.insert("courseSettings", {
+        courseId: args.courseId,
+        initialReviewCount: args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
+        cardsToAddBatchSize: args.cardsToAddBatchSize,
+        autoAddCards: args.autoAddCards,
+      });
+    }
 
     return null;
   },

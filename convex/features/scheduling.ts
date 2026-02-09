@@ -1,5 +1,6 @@
 import { v, ConvexError } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { mutation, query, MutationCtx } from "../_generated/server";
+import { Id, Doc } from "../_generated/dataModel";
 import { getAuthUser } from "../db/users";
 import { getActiveCourseForUser } from "../db/courses";
 import { getInitialReviewCount } from "../db/courseSettings";
@@ -10,6 +11,29 @@ import {
   type CardSchedulingState,
 } from "../../lib/scheduling";
 import { fsrsStateValidator, translationValidator, audioRecordingValidator } from "../types";
+
+/**
+ * Authenticate the user and verify ownership of a card via deck → course.
+ * Throws ConvexError on failure.
+ */
+async function authorizeCardAccess(
+  ctx: MutationCtx,
+  cardId: Id<"cards">,
+) {
+  const user = await getAuthUser(ctx);
+  if (!user) throw new ConvexError("Unauthenticated");
+
+  const card = await ctx.db.get(cardId);
+  if (!card) throw new ConvexError("Card not found");
+
+  const deck = await ctx.db.get(card.deckId);
+  if (!deck) throw new ConvexError("Deck not found");
+
+  const course = await ctx.db.get(deck.courseId);
+  if (!course || course.userId !== user._id) throw new ConvexError("Unauthorized");
+
+  return { user, card, deck, course };
+}
 
 // ============================================================================
 // QUERIES
@@ -163,16 +187,9 @@ export const reviewCard = mutation({
     fsrsState: v.union(fsrsStateValidator, v.null()),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
-
-    const card = await ctx.db.get(args.cardId);
-    if (!card) throw new ConvexError("Card not found");
+    const { card, deck } = await authorizeCardAccess(ctx, args.cardId);
 
     // Load initialReviewCount from courseSettings (not course)
-    const deck = await ctx.db.get(card.deckId);
-    if (!deck) throw new ConvexError("Deck not found");
-
     const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
 
     // Build current scheduling state
@@ -205,6 +222,36 @@ export const reviewCard = mutation({
       phaseTransitioned: result.phaseTransitioned,
       fsrsState: result.fsrsState,
     };
+  },
+});
+
+/**
+ * Master a card — marks `isMastered: true` so it no longer appears for review.
+ */
+export const masterCard = mutation({
+  args: {
+    cardId: v.id("cards"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await authorizeCardAccess(ctx, args.cardId);
+    await ctx.db.patch(args.cardId, { isMastered: true });
+    return null;
+  },
+});
+
+/**
+ * Hide a card — marks `isHidden: true` so it no longer appears for review.
+ */
+export const hideCard = mutation({
+  args: {
+    cardId: v.id("cards"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await authorizeCardAccess(ctx, args.cardId);
+    await ctx.db.patch(args.cardId, { isHidden: true });
+    return null;
   },
 });
 

@@ -17,6 +17,22 @@ import { LEVEL_ORDER, getNextCollectionName } from "../lib/collections";
 // ============================================================================
 
 /**
+ * Authenticate the user and resolve the active course.
+ * Throws ConvexError on failure.
+ */
+async function requireAuthWithActiveCourse(ctx: MutationCtx) {
+  const user = await getAuthUser(ctx);
+  if (!user) throw new ConvexError("Unauthenticated");
+
+  const active = await getActiveCourseForUser(ctx, user._id);
+  if (!active) throw new ConvexError("No active course. Please complete onboarding first.");
+  const { settings, course } = active;
+  const courseId = settings.activeCourseId!;
+
+  return { user, settings, course, courseId };
+}
+
+/**
  * Schedule missing translations and audio for a text.
  *
  * Used by both `prepareCardContent` (for new cards) and
@@ -355,12 +371,7 @@ export const setActiveCollection = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
-
-    const active = await getActiveCourseForUser(ctx, user._id);
-    if (!active) throw new ConvexError("No active course");
-    const courseId = active.settings.activeCourseId!;
+    const { user, courseId } = await requireAuthWithActiveCourse(ctx);
 
     // Validate collection exists
     const collection = await ctx.db.get(args.collectionId);
@@ -396,13 +407,7 @@ export const addCardsFromCollection = mutation({
     totalCardsInDeck: v.number(),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
-
-    const active = await getActiveCourseForUser(ctx, user._id);
-    if (!active) throw new ConvexError("No active course. Please complete onboarding first.");
-    const { settings, course } = active;
-    const courseId = settings.activeCourseId!;
+    const { user, course, courseId } = await requireAuthWithActiveCourse(ctx);
 
     // Get or create deck
     let deck = await getDeckByCourseId(ctx, courseId);
@@ -558,11 +563,7 @@ export const ensureCardContent = mutation({
     audioScheduled: v.number(),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
-
-    const active = await getActiveCourseForUser(ctx, user._id);
-    if (!active) return { translationsScheduled: 0, audioScheduled: 0 };
+    const { course } = await requireAuthWithActiveCourse(ctx);
 
     const text = await ctx.db.get(args.textId);
     if (!text) return { translationsScheduled: 0, audioScheduled: 0 };
@@ -571,8 +572,8 @@ export const ensureCardContent = mutation({
       ctx,
       args.textId,
       text,
-      active.course.baseLanguages,
-      active.course.targetLanguages
+      course.baseLanguages,
+      course.targetLanguages
     );
   },
 });

@@ -150,7 +150,59 @@
         "create": "Kurs erstellen"
       }
     },
-    "changeCourse": "Kurs wechseln"
+    "changeCourse": "Kurs wechseln",
+    "startLearning": "Lernen starten"
+  },
+  "LearningMode": {
+    "title": "Lernen",
+    "back": "Zurück",
+    "settings": "Einstellungen",
+    "loading": "Lädt...",
+    "baseLanguage": "Ausgangssprache",
+    "targetLanguage": "Zielsprache",
+    "phase": {
+      "preReview": "Vorwiederholung",
+      "review": "Wiederholung"
+    },
+    "reviewCount": "{count} Wiederholungen",
+    "nextReview": "Nächste Wiederholung in {time}",
+    "nextReviewNow": "Jetzt fällig",
+    "ratings": {
+      "stillLearning": "Lerne noch",
+      "understood": "Verstanden",
+      "again": "Nochmal",
+      "hard": "Schwer",
+      "good": "Gut",
+      "easy": "Leicht"
+    },
+    "actions": {
+      "master": "Gemeistert",
+      "hide": "Ausblenden",
+      "next": "Weiter",
+      "pause": "Pause",
+      "play": "Abspielen"
+    },
+    "empty": {
+      "noCardsDue": "Keine Karten zur Wiederholung fällig",
+      "addCards": "{count} Karten hinzufügen",
+      "adding": "Wird hinzugefügt...",
+      "noCollection": "Keine Sammlung ausgewählt",
+      "goHome": "Zur Startseite",
+      "allDone": "Alles erledigt! Füge weitere Karten hinzu, um weiterzulernen.",
+      "noCardsInDeck": "Noch keine Karten in deinem Deck. Füge Karten aus einer Sammlung hinzu, um mit dem Lernen zu beginnen."
+    },
+    "settingsPanel": {
+      "title": "Lerneinstellungen",
+      "iconLegend": "Karten-Symbole",
+      "iconMaster": "Karte als gemeistert markieren (erscheint nicht mehr)",
+      "iconHide": "Karte aus der Wiederholung ausblenden",
+      "cardsPerBatch": "Karten pro Stapel",
+      "cardsPerBatchDescription": "Anzahl der Karten, die auf einmal hinzugefügt werden",
+      "autoAddCards": "Karten automatisch hinzufügen",
+      "autoAddCardsDescription": "Automatisch neue Karten hinzufügen, wenn keine mehr fällig sind",
+      "initialReviews": "Anfängliche Wiederholungen",
+      "initialReviewsDescription": "Anzahl der Vorwiederholungen vor der Abstandswiederholung"
+    }
   },
   "Footer": {
     "copyright": "© {year} Phrasis. Alle Rechte vorbehalten.",

@@ -235,6 +235,9 @@ All scheduling logic lives in a single pure TypeScript module with no Convex/Rea
 **Course Settings** (separate `courseSettings` table — avoids course re-fetches):
 - `courseId` — reference to the course
 - `initialReviewCount` — the X value controlling pre-review threshold
+- `cardsToAddBatchSize` — optional, how many cards to add per batch (default 5)
+- `autoAddCards` — optional, auto-add cards when none are due (default false)
+- `activeCollectionId` — optional, currently selected collection
 
 ### Backend Functions (`convex/features/scheduling.ts`)
 
@@ -249,6 +252,61 @@ All scheduling logic lives in a single pure TypeScript module with no Convex/Rea
 - `SchedulingTest` (`components/testing/SchedulingTest.tsx`) — developer test component with two tabs:
   - **Virtual Simulation** — interactive step-by-step scheduling with adjustable `initialReviewCount`, quick preview table, FSRS state display
   - **Real Cards** — reviews actual cards from the user's deck with the real `reviewCard` mutation
+
+## Learning Mode
+
+An immersive full-screen learning session at `/app/learn` for reviewing flashcards using the spaced repetition system.
+
+### Architecture
+
+- **Separate page** at `app/app/learn/page.tsx` (no bottom nav, own header with back + settings)
+- **Entry points:** "Start Learning" button on HomeView, central Play button in BottomNav
+- **Data flow:** Uses `getCardForReview` query → displays flashcard → `reviewCard` mutation on rating
+
+### Card Display States
+
+| State | UI |
+|---|---|
+| Card due (preReview) | Flashcard + "Still learning" / "Understood" buttons |
+| Card due (review) | Flashcard + "Again" / "Hard" / "Good" / "Easy" buttons |
+| No cards due, collection selected | "Add X more cards" button (+ auto-add logic) |
+| No collection selected | Message + "Go to Home" button |
+| Loading | Skeleton |
+
+### Flashcard Layout (top to bottom)
+
+1. **Header** — back button, title, settings icon
+2. **Card content** — base language texts with audio icons, separator, target language texts with audio icons
+3. **Card metadata** — phase badge, review count, next review time
+4. **Master / Hide action buttons**
+5. **Rating buttons row** — phase-dependent (pre-review vs FSRS ratings)
+6. **Play / Next button row**
+
+### Schema Extensions
+
+`courseSettings` table gained two new optional fields:
+- `cardsToAddBatchSize` (number, default 5) — how many cards to add at once
+- `autoAddCards` (boolean, default false) — auto-add cards when none are due
+
+### Backend Functions
+
+**New mutations in `convex/features/scheduling.ts`:**
+- `masterCard({ cardId })` — sets `isMastered: true` on the card
+- `hideCard({ cardId })` — sets `isHidden: true` on the card
+
+**Updated mutation in `convex/features/courses.ts`:**
+- `updateCourseSettings` — now accepts optional `cardsToAddBatchSize` and `autoAddCards` fields
+
+### Frontend Components
+
+- `LearningMode` (`components/app/LearningMode.tsx`) — main learning session component with flashcard display, rating buttons, master/hide actions, audio playback, auto-add logic
+- `LearningModeSettings` (`components/app/LearningModeSettings.tsx`) — Sheet panel with cards-per-batch, initial reviews, and auto-add toggle
+
+### Internationalization
+
+All UI text is internationalized under the `LearningMode` namespace in `messages/en.json` and `messages/de.json`, covering:
+- Header, phase labels, rating buttons, card actions
+- Empty state messages, settings panel labels
 
 ## Performance Optimizations
 

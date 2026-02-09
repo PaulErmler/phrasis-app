@@ -1,8 +1,24 @@
 import { v, ConvexError } from "convex/values";
-import { mutation, query, internalMutation } from "../../_generated/server";
+import { mutation, query, internalMutation, MutationCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
 import { getAuthUser } from "../../db/users";
 import { Id } from "../../_generated/dataModel";
+
+/**
+ * Authenticate the user and verify ownership of a pending approval.
+ * Throws ConvexError on failure.
+ */
+async function authorizePendingApproval(ctx: MutationCtx, approvalId: Id<"flashcardApprovals">) {
+  const user = await getAuthUser(ctx);
+  if (!user) throw new ConvexError("Not authenticated");
+
+  const approval = await ctx.db.get(approvalId);
+  if (!approval) throw new ConvexError("Approval not found");
+  if (approval.userId !== user._id) throw new ConvexError("Not authorized");
+  if (approval.status !== "pending") throw new ConvexError("Approval already processed");
+
+  return { user, approval };
+}
 
 /**
  * Internal mutation to create approval request from tool handler.
@@ -61,13 +77,7 @@ export const approveFlashcard = mutation({
     flashcardId: v.optional(v.id("testFlashcards")),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Not authenticated");
-
-    const approval = await ctx.db.get(args.approvalId);
-    if (!approval) throw new ConvexError("Approval not found");
-    if (approval.userId !== user._id) throw new ConvexError("Not authorized");
-    if (approval.status !== "pending") throw new ConvexError("Approval already processed");
+    const { approval } = await authorizePendingApproval(ctx, args.approvalId);
 
     const flashcardId: Id<"testFlashcards"> = await ctx.runMutation(
       internal.features.chat.flashcards.createFlashcardInternal,
@@ -96,13 +106,7 @@ export const rejectFlashcard = mutation({
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Not authenticated");
-
-    const approval = await ctx.db.get(args.approvalId);
-    if (!approval) throw new ConvexError("Approval not found");
-    if (approval.userId !== user._id) throw new ConvexError("Not authorized");
-    if (approval.status !== "pending") throw new ConvexError("Approval already processed");
+    await authorizePendingApproval(ctx, args.approvalId);
 
     await ctx.db.patch(args.approvalId, {
       status: "rejected",

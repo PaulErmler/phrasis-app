@@ -75,7 +75,9 @@ export default defineSchema({
   courseSettings: defineTable({
     courseId: v.id("courses"),
     initialReviewCount: v.number(), // How many times a card is shown before FSRS scheduling
-    activeCollectionId: v.optional(v.id("collections")), 
+    activeCollectionId: v.optional(v.id("collections")),
+    cardsToAddBatchSize: v.optional(v.number()), // How many cards to add at once
+    autoAddCards: v.optional(v.boolean()), // Auto-add cards when none are due 
   }).index("by_courseId", ["courseId"]),
 
   // Decks table - one deck per course, auto-created

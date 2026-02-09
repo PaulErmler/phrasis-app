@@ -9,6 +9,7 @@ import { NotificationTest } from "@/components/testing/NotificationTest";
 import { SchedulingTest } from "@/components/testing/SchedulingTest";
 import { CollectionsPreview } from "@/components/testing/CollectionsPreview";
 import { CollectionCarouselTest } from "@/components/testing/CollectionCarouselTest";
+import { FlashcardUITest } from "@/components/testing/FlashcardUITest";
 
 export default function TestingPage() {
   return (
@@ -51,6 +52,11 @@ export default function TestingPage() {
             {/* Collection Carousel UI Test */}
             <div className="md:col-span-2">
               <CollectionCarouselTest />
+            </div>
+
+            {/* Flashcard UI States Test */}
+            <div className="md:col-span-2">
+              <FlashcardUITest />
             </div>
           </div>
         </div>

@@ -55,7 +55,7 @@ export function AppPageClient({
                   {t(`views.${currentView}`)}
                 </h1>
               )}
-              <ThemeSwitcher />
+              <ThemeSwitcher className="-mr-2" />
             </div>
           </header>
 
