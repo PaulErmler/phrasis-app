@@ -386,7 +386,9 @@ export const updateCourseSettings = mutation({
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
 
-    validateInitialReviewCount(args.initialReviewCount);
+    if (args.initialReviewCount !== undefined) {
+      validateInitialReviewCount(args.initialReviewCount);
+    }
 
     const course = await ctx.db.get(args.courseId);
     if (!course) throw new ConvexError("Course not found");
