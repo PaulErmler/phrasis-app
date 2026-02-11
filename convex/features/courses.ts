@@ -4,7 +4,7 @@ import { learningStyleValidator, currentLevelValidator } from "../types";
 import { getAuthUser, requireAuthUser, getUserSettings as dbGetUserSettings, getOnboardingProgress as dbGetOnboardingProgress } from "../db/users";
 import { getCoursesForUser, getActiveCourseForUser } from "../db/courses";
 import { getCourseSettings as dbGetCourseSettings, upsertCourseSettings } from "../db/courseSettings";
-import { DEFAULT_INITIAL_REVIEW_COUNT } from "../../lib/scheduling";
+import { DEFAULT_INITIAL_REVIEW_COUNT, validateInitialReviewCount } from "../../lib/scheduling";
 
 // ============================================================================
 // QUERIES
@@ -235,6 +235,9 @@ export const createCourse = mutation({
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
 
+    const initialReviewCount = args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
+    validateInitialReviewCount(initialReviewCount);
+
     const courseId = await ctx.db.insert("courses", {
       baseLanguages: args.baseLanguages,
       targetLanguages: args.targetLanguages,
@@ -244,7 +247,7 @@ export const createCourse = mutation({
 
     // Create course settings in a separate table
     await upsertCourseSettings(ctx, courseId, {
-      initialReviewCount: args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
+      initialReviewCount,
     });
 
     const deckName = `Learning ${args.targetLanguages.join(", ")}`;
@@ -368,6 +371,8 @@ export const updateCourseSettings = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
+
+    validateInitialReviewCount(args.initialReviewCount);
 
     const course = await ctx.db.get(args.courseId);
     if (!course) throw new ConvexError("Course not found");
