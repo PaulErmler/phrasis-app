@@ -1,6 +1,6 @@
 import { v, ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
-import { getAuthUser } from "../db/users";
+import { getAuthUser, requireAuthUser } from "../db/users";
 import { getActiveCourseForUser } from "../db/courses";
 import { getInitialReviewCount } from "../db/courseSettings";
 import { getDeckByCourseId } from "../db/decks";
@@ -171,8 +171,7 @@ export const reviewCard = mutation({
     fsrsState: v.union(fsrsStateValidator, v.null()),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
+    const user = await requireAuthUser(ctx);
 
     const card = await ctx.db.get(args.cardId);
     if (!card) throw new ConvexError("Card not found");

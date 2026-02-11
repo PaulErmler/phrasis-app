@@ -1,7 +1,7 @@
 import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import { getAuthUser } from "../../db/users";
+import { getAuthUser, requireAuthUser } from "../../db/users";
 import { Id } from "../../_generated/dataModel";
 
 /**
@@ -61,8 +61,7 @@ export const approveFlashcard = mutation({
     flashcardId: v.optional(v.id("testFlashcards")),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Not authenticated");
+    const user = await requireAuthUser(ctx);
 
     const approval = await ctx.db.get(args.approvalId);
     if (!approval) throw new ConvexError("Approval not found");
@@ -96,8 +95,7 @@ export const rejectFlashcard = mutation({
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Not authenticated");
+    const user = await requireAuthUser(ctx);
 
     const approval = await ctx.db.get(args.approvalId);
     if (!approval) throw new ConvexError("Approval not found");

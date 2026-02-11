@@ -5,7 +5,7 @@ import { internal } from "../../_generated/api";
 import { saveMessage } from "@convex-dev/agent";
 import { listUIMessages, syncStreams } from "@convex-dev/agent";
 import { components } from "../../_generated/api";
-import { getAuthUser } from "../../db/users";
+import { getAuthUser, requireAuthUser } from "../../db/users";
 import { agent } from "./agent";
 
 export type ListMessagesStreamArgs = {
@@ -25,8 +25,7 @@ export const sendMessage = mutation({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Not authenticated");
+    const user = await requireAuthUser(ctx);
 
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {
       threadId: args.threadId,

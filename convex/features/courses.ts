@@ -1,7 +1,7 @@
 import { v, ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { learningStyleValidator, currentLevelValidator } from "../types";
-import { getAuthUser, getUserSettings as dbGetUserSettings, getOnboardingProgress as dbGetOnboardingProgress } from "../db/users";
+import { getAuthUser, requireAuthUser, getUserSettings as dbGetUserSettings, getOnboardingProgress as dbGetOnboardingProgress } from "../db/users";
 import { getCoursesForUser, getActiveCourseForUser } from "../db/courses";
 import { getCourseSettings as dbGetCourseSettings, upsertCourseSettings } from "../db/courseSettings";
 import { DEFAULT_INITIAL_REVIEW_COUNT } from "../../lib/scheduling";
@@ -143,8 +143,7 @@ export const setActiveCourse = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("User must be authenticated");
+    const user = await requireAuthUser(ctx);
 
     const course = await ctx.db.get(args.courseId);
     if (!course) throw new ConvexError("Course not found");
@@ -187,8 +186,7 @@ export const saveOnboardingProgress = mutation({
     baseLanguages: v.optional(v.array(v.string())),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("User must be authenticated");
+    const user = await requireAuthUser(ctx);
 
     const userId = user._id;
 
@@ -235,8 +233,7 @@ export const createCourse = mutation({
     deckId: v.id("decks"),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("User must be authenticated to create a course");
+    const user = await requireAuthUser(ctx);
 
     const courseId = await ctx.db.insert("courses", {
       baseLanguages: args.baseLanguages,
@@ -272,8 +269,7 @@ export const completeOnboarding = mutation({
     deckId: v.id("decks"),
   }),
   handler: async (ctx) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("User must be authenticated");
+    const user = await requireAuthUser(ctx);
 
     const userId = user._id;
 
@@ -371,8 +367,7 @@ export const updateCourseSettings = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("User must be authenticated");
+    const user = await requireAuthUser(ctx);
 
     const course = await ctx.db.get(args.courseId);
     if (!course) throw new ConvexError("Course not found");

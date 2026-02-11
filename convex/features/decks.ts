@@ -3,9 +3,9 @@ import { mutation, query, internalMutation, internalAction, MutationCtx } from "
 import { internal } from "../_generated/api";
 import { Id, Doc } from "../_generated/dataModel";
 import { getRandomVoiceForLanguage } from "../../lib/languages";
-import { getAuthUser, getUserSettings } from "../db/users";
-import { getActiveCourseForUser } from "../db/courses";
-import { getDeckByCourseId } from "../db/decks";
+import { getAuthUser, requireAuthUser, getUserSettings } from "../db/users";
+import { getActiveCourseForUser, requireActiveCourse } from "../db/courses";
+import { getDeckByCourseId, getCardByDeckAndText } from "../db/decks";
 import { translateText } from "./translation";
 import { synthesizeSpeech } from "./tts";
 import { translationValidator, audioRecordingValidator } from "../types";
@@ -364,12 +364,7 @@ export const addCardsFromCollection = mutation({
     totalCardsInDeck: v.number(),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
-
-    const active = await getActiveCourseForUser(ctx, user._id);
-    if (!active) throw new ConvexError("No active course. Please complete onboarding first.");
-    const { settings, course } = active;
+    const { user, settings, course } = await requireActiveCourse(ctx);
     const courseId = settings.activeCourseId!;
 
     // Get or create deck
@@ -428,12 +423,7 @@ export const addCardsFromCollection = mutation({
         newLastRank = text.collectionRank;
       }
 
-      const existingCard = await ctx.db
-        .query("cards")
-        .withIndex("by_deckId_and_textId", (q) =>
-          q.eq("deckId", deck._id).eq("textId", text._id)
-        )
-        .first();
+      const existingCard = await getCardByDeckAndText(ctx, deck._id, text._id);
 
       if (!existingCard) {
         await ctx.db.insert("cards", {
@@ -499,11 +489,17 @@ export const ensureCardContent = mutation({
     audioScheduled: v.number(),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
+    const user = await requireAuthUser(ctx);
 
     const active = await getActiveCourseForUser(ctx, user._id);
     if (!active) return { translationsScheduled: 0, audioScheduled: 0 };
+
+    const deck = await getDeckByCourseId(ctx, active.course._id);
+    if (!deck) return { translationsScheduled: 0, audioScheduled: 0 };
+
+    // Verify the user actually has a card for this text in their deck
+    const card = await getCardByDeckAndText(ctx, deck._id, args.textId);
+    if (!card) return { translationsScheduled: 0, audioScheduled: 0 };
 
     const text = await ctx.db.get(args.textId);
     if (!text) return { translationsScheduled: 0, audioScheduled: 0 };

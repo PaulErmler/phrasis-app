@@ -3,7 +3,7 @@ import { mutation, query, internalMutation, internalAction, internalQuery } from
 import { internal } from "../_generated/api";
 import { MAX_TRANSLATION_LENGTH } from "../../lib/constants/translation";
 import { SUPPORTED_LANGUAGES } from "../../lib/languages";
-import { getAuthUser } from "../db/users";
+import { getAuthUser, requireAuthUser } from "../db/users";
 import { translateText } from "../features/translation";
 
 /** Set of all valid language codes from SUPPORTED_LANGUAGES */
@@ -26,8 +26,7 @@ export const requestTranslation = mutation({
   },
   returns: v.id("translationRequests"),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
+    const user = await requireAuthUser(ctx);
 
     const text = args.text.trim();
     if (!text) throw new ConvexError("Text cannot be empty");
