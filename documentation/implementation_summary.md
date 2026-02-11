@@ -24,13 +24,12 @@ erDiagram
 - `translations` - stores translations linked to `textId` and `targetLanguage`
 - `audioRecordings` - stores audio files using Convex file storage, linked to `textId`, `language`, and `voiceName`
 
-### Data Seeding (`convex/data_uploading/data_management.ts`)
+### Data Seeding (`convex/db/seed.ts`)
 - `upsertCollection` - internal mutation to create/get collection by name
 - `batchUpsertTexts` - internal mutation for bulk inserting up to 500 texts
+- `adjustCollectionTextCount` - helper to update collection text counts
 
-### Queries (`convex/texts.ts`)
-- `getCollections` - returns all collections (authenticated)
-- `getTextsByCollection` - returns texts for a collection with limit (authenticated)
+### Queries (`convex/testing/texts.ts`)
 - `getCollectionsWithTexts` - returns collections with preview texts and count (authenticated)
 
 ### Upload Script (`scripts/uploadTexts.mjs`)
@@ -76,18 +75,17 @@ sequenceDiagram
     Scheduler->>Prep: textId, baseLanguages, targetLanguages
 ```
 
-### Backend Functions (`convex/decks.ts`)
+### Backend Functions (`convex/features/decks.ts`)
 
 **Public Mutations:**
 - `addCardsFromCollection` - adds cards from a collection to user's deck, tracks progress via `collectionProgress`
+- `ensureCardContent` - regenerates missing content for a specific card (called from UI when `hasMissingContent: true`)
 
 **Public Queries:**
-- `getDeckForCourse` - returns the deck for user's active course
 - `getDeckCards` - returns cards with translations and audio (paginated, default 20)
 - `getCollectionProgress` - returns progress for all collections in active course
 
 **Internal Functions:**
-- `getOrCreateDeck` - ensures deck exists for a course
 - `prepareCardContent` - schedules translation and TTS for a text's required languages
 
 ### UI Components
@@ -126,7 +124,7 @@ flowchart TD
 3. **Batch loading optimization** - queries only needed languages using `by_text_and_language` index
 4. **On-demand regeneration** - `ensureCardContent` mutation checks and schedules missing content when cards are displayed
 
-### Backend Functions (`convex/decks.ts`)
+### Backend Functions (`convex/features/decks.ts`)
 
 **Helper Function:**
 - `scheduleMissingContent()` - shared logic for checking and scheduling missing translations/audio
@@ -140,12 +138,13 @@ flowchart TD
 - `processTranslationForCard` - calls Google Cloud Translation API
 - `processTTSForCard` - calls Google Cloud TTS API, stores MP3 in Convex storage
 
-**Public Mutation:**
-- `ensureCardContent` - regenerates missing content for a specific card (called from UI when `hasMissingContent: true`)
+**Shared Helpers:**
+- `convex/features/translation.ts` - `translateText()` plain async helper wrapping Google Cloud Translation API
+- `convex/features/tts.ts` - `synthesizeSpeech()` plain async helper wrapping Google Cloud TTS API
 
-## Translation System (Standalone)
+## Translation System (Standalone Testing)
 
-### Backend (`convex/translation.ts`)
+### Backend (`convex/testing/translation.ts`)
 - `requestTranslation` - mutation creates pending request, schedules async processing
 - `getTranslationRequest` - query returns request status and result
 - `processTranslation` - internal action calls Google Cloud Translation API
@@ -157,9 +156,9 @@ flowchart TD
 - Test component with source/target language selection
 - Reactive result display when translation completes
 
-## Text-to-Speech System (Standalone)
+## Text-to-Speech System (Standalone Testing)
 
-### Backend (`convex/tts.ts`)
+### Backend (`convex/testing/tts.ts`)
 - `requestTTS` - mutation creates pending request, schedules async processing
 - `getTTSRequest` - query returns request status, generates `audioUrl` dynamically from `storageId`
 - `processTTS` - internal action calls Google Cloud TTS API (Chirp3 HD voices), stores MP3 in Convex storage
