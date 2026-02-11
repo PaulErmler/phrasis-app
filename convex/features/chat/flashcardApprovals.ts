@@ -1,7 +1,7 @@
 import { v, ConvexError } from "convex/values";
 import { mutation, query, internalMutation, MutationCtx } from "../../_generated/server";
 import { internal } from "../../_generated/api";
-import { getAuthUser } from "../../db/users";
+import { getAuthUser, requireAuthUser } from "../../db/users";
 import { Id } from "../../_generated/dataModel";
 
 /**
@@ -77,7 +77,13 @@ export const approveFlashcard = mutation({
     flashcardId: v.optional(v.id("testFlashcards")),
   }),
   handler: async (ctx, args) => {
-    const { approval } = await authorizePendingApproval(ctx, args.approvalId);
+    const user = await getAuthUser(ctx);
+    if (!user) throw new ConvexError("Not authenticated");
+
+    const approval = await ctx.db.get(args.approvalId);
+    if (!approval) throw new ConvexError("Approval not found");
+    if (approval.userId !== user._id) throw new ConvexError("Not authorized");
+    if (approval.status !== "pending") throw new ConvexError("Approval already processed");
 
     const flashcardId: Id<"testFlashcards"> = await ctx.runMutation(
       internal.features.chat.flashcards.createFlashcardInternal,
@@ -106,7 +112,13 @@ export const rejectFlashcard = mutation({
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
-    await authorizePendingApproval(ctx, args.approvalId);
+    const user = await getAuthUser(ctx);
+    if (!user) throw new ConvexError("Not authenticated");
+
+    const approval = await ctx.db.get(args.approvalId);
+    if (!approval) throw new ConvexError("Approval not found");
+    if (approval.userId !== user._id) throw new ConvexError("Not authorized");
+    if (approval.status !== "pending") throw new ConvexError("Approval already processed");
 
     await ctx.db.patch(args.approvalId, {
       status: "rejected",

@@ -1,3 +1,4 @@
+import { ConvexError } from "convex/values";
 import { QueryCtx, MutationCtx, ActionCtx } from "../_generated/server";
 import { authComponent } from "../auth";
 import { Doc } from "../_generated/dataModel";
@@ -9,6 +10,16 @@ import { Doc } from "../_generated/dataModel";
  */
 export async function getAuthUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
   return authComponent.getAuthUser(ctx);
+}
+
+/**
+ * Require an authenticated user, throwing if not logged in.
+ * Use in mutations and actions that should never run unauthenticated.
+ */
+export async function requireAuthUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
+  const user = await getAuthUser(ctx);
+  if (!user) throw new ConvexError("Unauthenticated");
+  return user;
 }
 
 /**

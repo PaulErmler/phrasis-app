@@ -3,7 +3,7 @@ import { mutation, query, internalMutation, internalAction, internalQuery } from
 import { internal } from "../_generated/api";
 import { MAX_TTS_LENGTH, MIN_TTS_SPEED, MAX_TTS_SPEED } from "../../lib/constants/tts";
 import { SUPPORTED_LANGUAGES } from "../../lib/languages";
-import { getAuthUser } from "../db/users";
+import { getAuthUser, requireAuthUser } from "../db/users";
 import { Id } from "../_generated/dataModel";
 import { synthesizeSpeech } from "../features/tts";
 
@@ -27,8 +27,7 @@ export const requestTTS = mutation({
   },
   returns: v.id("ttsRequests"),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
+    const user = await requireAuthUser(ctx);
 
     const text = args.text.trim();
     if (!text) throw new ConvexError("Text cannot be empty");

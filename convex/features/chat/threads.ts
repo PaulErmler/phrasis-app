@@ -2,7 +2,7 @@ import { v, ConvexError } from "convex/values";
 import { mutation, query } from "../../_generated/server";
 import { createThread as createAgentThread } from "@convex-dev/agent";
 import { components } from "../../_generated/api";
-import { getAuthUser } from "../../db/users";
+import { getAuthUser, requireAuthUser } from "../../db/users";
 
 const agentComponent = components.agent;
 
@@ -15,8 +15,7 @@ export const createThread = mutation({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Not authenticated");
+    const user = await requireAuthUser(ctx);
 
     const threadId = await createAgentThread(ctx, agentComponent, {
       userId: user._id,
