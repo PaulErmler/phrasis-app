@@ -5,12 +5,43 @@ import pluginReact from 'eslint-plugin-react';
 import { defineConfig } from 'eslint/config';
 
 export default defineConfig([
+  // Global ignores - separate block
+  {
+    ignores: [
+      'node_modules/**',
+      'convex/_generated/**',
+      '.next/**',
+      '.convex/**',
+      'dist/**',
+      'build/**',
+      'out/**',
+      'public/**',
+      '*.min.js',
+      'coverage/**',
+    ],
+  },
+
   {
     files: ['**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    ignores: ['node_modules/**', 'convex/_generated/**', '.next/**'],
     plugins: { js },
     extends: ['js/recommended'],
-    languageOptions: { globals: globals.browser },
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        React: 'readonly',
+      },
+    },
+  },
+
+  // Backend files (Convex)
+  {
+    files: ['convex/**/*.{js,ts}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        process: 'readonly',
+      },
+    },
   },
 
   tseslint.configs.recommended,
@@ -18,8 +49,14 @@ export default defineConfig([
   {
     plugins: { react: pluginReact },
     rules: {
-      ...pluginReact.configs.flat.recommended.rules,
+      'react/jsx-uses-react': 'error',
+      'react/jsx-uses-vars': 'error',
       'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
+      'react-hooks/purity': 'off',
+      'import/no-anonymous-default-export': 'off',
+      // Add indentation rules
+      indent: ['error', 2], // 2-space indentation for all files
     },
     settings: {
       react: {

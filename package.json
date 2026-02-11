@@ -11,6 +11,7 @@
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "lint:all": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs --fix",
     "prepare": "husky install"
   },
   "dependencies": {
@@ -76,8 +77,10 @@
     "eslint": "^9.39.1",
     "eslint-config-next": "16.0.7",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-prettier": "^5.5.5",
     "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^17.3.0",
     "husky": "^8.0.0",
     "lint-staged": "^16.2.7",
@@ -96,7 +99,13 @@
     ]
   },
   "lint-staged": {
-    "{app,components,lib,hooks,i18n,convex}/**/*.{js,jsx,ts,tsx}": ["eslint --fix", "prettier --write"],
-    "*.{mjs,ts,tsx}": ["eslint --fix", "prettier --write"]
+    "{app,components,lib,hooks,i18n,convex}/**/*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{mjs,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }
