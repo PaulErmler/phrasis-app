@@ -64,6 +64,17 @@ async function scheduleMissingContent(
     allRequiredLanguages.map((lang, i) => [lang, existingAudio[i]])
   );
 
+  // Validate storage files — delete stale rows where the file was removed
+  for (const [lang, audio] of audioMap) {
+    if (audio?.storageId) {
+      const url = await ctx.storage.getUrl(audio.storageId);
+      if (url === null) {
+        await ctx.db.delete(audio._id);
+        audioMap.set(lang, null);
+      }
+    }
+  }
+
   let translationsScheduled = 0;
   let audioScheduled = 0;
 
