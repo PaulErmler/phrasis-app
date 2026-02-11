@@ -414,12 +414,8 @@ export const setActiveCollection = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
-
-    const active = await getActiveCourseForUser(ctx, user._id);
-    if (!active) throw new ConvexError("No active course");
-    const courseId = active.settings.activeCourseId!;
+    const { user, course } = await requireActiveCourse(ctx);
+    const courseId = course._id;
 
     // Validate collection exists
     const collection = await ctx.db.get(args.collectionId);
