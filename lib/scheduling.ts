@@ -32,6 +32,24 @@ import {
 /** Default number of initial reviews before FSRS scheduling begins. */
 export const DEFAULT_INITIAL_REVIEW_COUNT = 5;
 
+/** Minimum allowed initialReviewCount (need ≥2 FSRS learning steps to graduate). */
+export const MIN_INITIAL_REVIEW_COUNT = 2;
+
+/** Maximum allowed initialReviewCount. */
+export const MAX_INITIAL_REVIEW_COUNT = 10;
+
+/**
+ * Validate that an initialReviewCount is an integer within the allowed range.
+ * Throws a ConvexError if invalid.
+ */
+export function validateInitialReviewCount(value: number): void {
+  if (!Number.isInteger(value) || value < MIN_INITIAL_REVIEW_COUNT || value > MAX_INITIAL_REVIEW_COUNT) {
+    throw new Error(
+      `initialReviewCount must be an integer between ${MIN_INITIAL_REVIEW_COUNT} and ${MAX_INITIAL_REVIEW_COUNT}`,
+    );
+  }
+}
+
 /** Default desired retention used by the backend. */
 export const DEFAULT_REQUEST_RETENTION = 0.95;
 

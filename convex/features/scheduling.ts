@@ -1,11 +1,12 @@
 import { v, ConvexError } from "convex/values";
 import { mutation, query } from "../_generated/server";
-import { getAuthUser } from "../db/users";
+import { getAuthUser, requireAuthUser } from "../db/users";
 import { getActiveCourseForUser } from "../db/courses";
 import { getInitialReviewCount } from "../db/courseSettings";
 import { getDeckByCourseId } from "../db/decks";
 import {
   scheduleCard,
+  getValidRatings,
   type ReviewRating,
   type CardSchedulingState,
 } from "../../lib/scheduling";
@@ -153,7 +154,14 @@ export const getCardForReview = query({
 export const reviewCard = mutation({
   args: {
     cardId: v.id("cards"),
-    rating: v.string(), // ReviewRating: "stillLearning" | "understood" | "again" | "hard" | "good" | "easy"
+    rating: v.union(
+      v.literal("stillLearning"),
+      v.literal("understood"),
+      v.literal("again"),
+      v.literal("hard"),
+      v.literal("good"),
+      v.literal("easy"),
+    ),
   },
   returns: v.object({
     schedulingPhase: v.string(),
@@ -163,8 +171,7 @@ export const reviewCard = mutation({
     fsrsState: v.union(fsrsStateValidator, v.null()),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Unauthenticated");
+    const user = await requireAuthUser(ctx);
 
     const card = await ctx.db.get(args.cardId);
     if (!card) throw new ConvexError("Card not found");
@@ -175,9 +182,18 @@ export const reviewCard = mutation({
 
     const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
 
+    // Validate rating is appropriate for the card's current phase
+    const phase = card.schedulingPhase as "preReview" | "review";
+    const validRatings = getValidRatings(phase);
+    if (!validRatings.includes(args.rating)) {
+      throw new ConvexError(
+        `Invalid rating "${args.rating}" for ${phase} phase. Valid ratings: ${validRatings.join(", ")}`,
+      );
+    }
+
     // Build current scheduling state
     const cardState: CardSchedulingState = {
-      schedulingPhase: card.schedulingPhase as "preReview" | "review",
+      schedulingPhase: phase,
       preReviewCount: card.preReviewCount,
       dueDate: card.dueDate,
       fsrsState: card.fsrsState ?? null,
@@ -186,7 +202,7 @@ export const reviewCard = mutation({
     // Run the shared scheduling algorithm
     const result = scheduleCard(
       cardState,
-      args.rating as ReviewRating,
+      args.rating,
       initialReviewCount,
     );
 
