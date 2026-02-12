@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs",
     "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs --fix",
-    "lint:all": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs --fix",
+    "lint:staged": "lint-staged",
     "prepare": "husky install"
   },
   "dependencies": {
