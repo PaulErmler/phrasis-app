@@ -9,8 +9,8 @@
     "predev": "convex dev --until-success",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs",
+    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs --fix",
     "lint:all": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs --fix",
     "prepare": "husky install"
   },
@@ -99,13 +99,9 @@
     ]
   },
   "lint-staged": {
-    "{app,components,lib,hooks,i18n,convex}/**/*.{js,jsx,ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{mjs,ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
+    "*.{js,jsx,ts,tsx,mjs}": [
+      "prettier --write",
+      "eslint --fix"
     ]
   }
 }
