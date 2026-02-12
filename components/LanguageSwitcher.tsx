@@ -1,13 +1,19 @@
-"use client";
+'use client';
 
-import { useLocale } from "next-intl";
-import { useEffect, useState, useTransition } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { setUserLocale } from "@/i18n/locale";
+import { useLocale } from 'next-intl';
+import { useEffect, useState, useTransition } from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { setUserLocale } from '@/i18n/locale';
 
 const locales = [
-  { code: "en", label: "English", flag: "🇬🇧" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
 ] as const;
 
 export function LanguageSwitcher() {
@@ -23,7 +29,7 @@ export function LanguageSwitcher() {
 
   const handleLocaleChange = (newLocale: string) => {
     startTransition(() => {
-      setUserLocale(newLocale as "en" | "de");
+      setUserLocale(newLocale as 'en' | 'de');
     });
   };
 
@@ -38,7 +44,11 @@ export function LanguageSwitcher() {
   }
 
   return (
-    <Select value={locale} onValueChange={handleLocaleChange} disabled={isPending}>
+    <Select
+      value={locale}
+      onValueChange={handleLocaleChange}
+      disabled={isPending}
+    >
       <SelectTrigger className="w-[140px]">
         <SelectValue placeholder="Language" />
       </SelectTrigger>
@@ -55,4 +65,3 @@ export function LanguageSwitcher() {
     </Select>
   );
 }
-

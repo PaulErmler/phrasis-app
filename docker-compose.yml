@@ -7,11 +7,11 @@ services:
       POSTGRES_DB: convex_self_hosted
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d convex_self_hosted || exit 1"]
+      test: ['CMD-SHELL', 'pg_isready -U app -d convex_self_hosted || exit 1']
       interval: 5s
       retries: 12
   backend:
@@ -20,8 +20,8 @@ services:
     stop_grace_period: 10s
     stop_signal: SIGINT
     ports:
-      - "${PORT:-3210}:3210"
-      - "${SITE_PROXY_PORT:-3211}:3211"
+      - '${PORT:-3210}:3210'
+      - '${SITE_PROXY_PORT:-3211}:3211'
     volumes:
       - data:/convex/data
     environment:
@@ -66,7 +66,7 @@ services:
     stop_grace_period: 10s
     stop_signal: SIGINT
     ports:
-      - "${DASHBOARD_PORT:-6791}:6791"
+      - '${DASHBOARD_PORT:-6791}:6791'
     environment:
       - NEXT_PUBLIC_DEPLOYMENT_URL=${NEXT_PUBLIC_DEPLOYMENT_URL:-http://127.0.0.1:${PORT:-3210}}
     depends_on:
