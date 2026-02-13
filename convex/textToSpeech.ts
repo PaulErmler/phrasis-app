@@ -1,6 +1,6 @@
 "use node";
 
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { action } from "./_generated/server";
 import axios from "axios";
 
@@ -14,7 +14,7 @@ export const translateText = action({
   returns: v.string(),
   handler: async (_ctx, args) => {
     const apiKey = process.env.EDENAI_API_KEY;
-    if (!apiKey) throw new Error("EDENAI_API_KEY not set");
+    if (!apiKey) throw new ConvexError("EDENAI_API_KEY not set");
 
     const response = await fetch("https://api.edenai.run/v2/translation/automatic_translation", {
       method: "POST",
@@ -32,7 +32,7 @@ export const translateText = action({
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Eden AI Translation API error: ${errorText}`);
+      throw new ConvexError(`Eden AI Translation API error: ${errorText}`);
     }
 
     const data = await response.json();
@@ -49,7 +49,7 @@ export const generateSpeech = action({
   returns: v.string(),
   handler: async (_ctx, args) => {
     const apiKey = process.env.EDENAI_API_KEY;
-    if (!apiKey) throw new Error("EDENAI_API_KEY not set");
+    if (!apiKey) throw new ConvexError("EDENAI_API_KEY not set");
 
     try {
       const response = await axios.post(
@@ -70,12 +70,12 @@ export const generateSpeech = action({
       );
 
       const audioData = response.data?.google?.audio;
-      if (!audioData) throw new Error("No audio returned from Eden AI");
+      if (!audioData) throw new ConvexError("No audio returned from Eden AI");
 
       return `data:audio/mp3;base64,${audioData}`;
     } catch (err: any) {
       console.error("TTS error:", err.response?.data || err.message);
-      throw new Error(`Failed to generate audio: ${err.message}`);
+      throw new ConvexError(`Failed to generate audio: ${err.message}`);
     }
   },
 });

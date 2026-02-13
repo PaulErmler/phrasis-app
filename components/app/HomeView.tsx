@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Bell, BellOff, BellRing } from "lucide-react";
 import { getLanguagesByCodes } from "@/lib/languages";
 import { NewChatInput } from "@/components/chat/NewChatInput";
+import { CollectionsPreview } from "@/components/app/CollectionsPreview";
 
 export function HomeView() {
   const router = useRouter();
@@ -48,25 +49,25 @@ export function HomeView() {
       return;
     }
 
-    // Try to use service worker notification first (works when app is in background)
+    const notificationBody = t("notifications.testMessage");
+
     if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
       const registration = await navigator.serviceWorker.ready;
       await registration.showNotification("Phrasis", {
-        body: "Time to practice your phrases! 🌟",
+        body: notificationBody,
         icon: "/icons/icon-192x192.png",
         badge: "/icons/icon-96x96.png",
         tag: "phrasis-reminder",
         data: { url: "/app" },
       });
     } else {
-      // Fallback to regular notification
       new Notification("Phrasis", {
-        body: "Time to practice your phrases! 🌟",
+        body: notificationBody,
         icon: "/icons/icon-192x192.png",
         tag: "phrasis-reminder",
       });
     }
-  }, [notificationPermission, requestNotificationPermission]);
+  }, [notificationPermission, requestNotificationPermission, t]);
 
   const formatCourseName = () => {
     if (!activeCourse) return null;
@@ -79,7 +80,6 @@ export function HomeView() {
 
   return (
     <div className="max-w-xl mx-auto space-y-6">
-      {/* Current Course Display */}
       {courseName && (
         <div className="text-center py-2">
           <p className="text-sm text-muted-foreground">{t("courses.currentCourse")}</p>
@@ -87,12 +87,10 @@ export function HomeView() {
         </div>
       )}
 
-      {/* New Chat Input */}
       <NewChatInput 
         showSuggestions={false}
       />
 
-      {/* Notification Card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -169,6 +167,8 @@ export function HomeView() {
           </Button>
         </CardContent>
       </Card>
+
+      <CollectionsPreview />
 
     </div>
   );

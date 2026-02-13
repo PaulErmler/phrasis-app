@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { authComponent } from "./auth";
 import { 
@@ -139,7 +139,7 @@ export const setActiveCourse = mutation({
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("User must be authenticated");
+      throw new ConvexError("User must be authenticated");
     }
 
     const userId = user._id;
@@ -147,10 +147,10 @@ export const setActiveCourse = mutation({
     // Verify the course belongs to the user
     const course = await ctx.db.get(args.courseId);
     if (!course) {
-      throw new Error("Course not found");
+      throw new ConvexError("Course not found");
     }
     if (course.userId !== userId) {
-      throw new Error("Course does not belong to user");
+      throw new ConvexError("Course does not belong to user");
     }
 
     // Get or create user settings
@@ -237,7 +237,7 @@ export const saveOnboardingProgress = mutation({
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("User must be authenticated");
+      throw new ConvexError("User must be authenticated");
     }
 
     const userId = user._id;
@@ -280,7 +280,7 @@ export const saveOnboardingProgress = mutation({
 
     const progress = await ctx.db.get(progressId);
     if (!progress) {
-      throw new Error("Failed to retrieve onboarding progress");
+      throw new ConvexError("Failed to retrieve onboarding progress");
     }
     return progress;
   },
@@ -301,7 +301,7 @@ export const createCourse = mutation({
   handler: async (ctx, args) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("User must be authenticated to create a course");
+      throw new ConvexError("User must be authenticated to create a course");
     }
 
     const userId = user._id;
@@ -330,7 +330,7 @@ export const completeOnboarding = mutation({
   handler: async (ctx) => {
     const user = await authComponent.getAuthUser(ctx);
     if (!user) {
-      throw new Error("User must be authenticated");
+      throw new ConvexError("User must be authenticated");
     }
 
     const userId = user._id;
@@ -342,7 +342,7 @@ export const completeOnboarding = mutation({
       .first();
 
     if (!progress) {
-      throw new Error("Onboarding progress not found");
+      throw new ConvexError("Onboarding progress not found");
     }
 
     // Get or create user settings

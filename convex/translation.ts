@@ -1,6 +1,6 @@
 "use node";
 
-import { v } from "convex/values";
+import { v, ConvexError } from "convex/values";
 import { action } from "./_generated/server";
 import axios from "axios";
 
@@ -16,7 +16,7 @@ export const translateText = action({
   handler: async (_ctx, args) => {
     const apiKey = process.env.EDENAI_API_KEY;
     if (!apiKey) {
-      throw new Error("EDENAI_API_KEY environment variable is not set");
+      throw new ConvexError("EDENAI_API_KEY environment variable is not set");
     }
 
     try {
@@ -37,12 +37,12 @@ export const translateText = action({
       );
 
       const translatedText = response.data?.google?.text;
-      if (!translatedText) throw new Error("No translation returned from Eden AI");
+      if (!translatedText) throw new ConvexError("No translation returned from Eden AI");
 
       return { translatedText };
     } catch (err: any) {
       console.error("Translation error:", err.response?.data || err.message);
-      throw new Error(`Translation failed: ${err.message}`);
+      throw new ConvexError(`Translation failed: ${err.message}`);
     }
   },
 });
