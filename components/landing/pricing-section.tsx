@@ -72,7 +72,7 @@ export function PricingSection() {
                   {/* Plan header */}
                   <div className="mb-6">
                     <h3 className="text-xl font-semibold mb-2">{t(`plans.${plan.key}.name`)}</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-muted-sm">
                       {t(`plans.${plan.key}.description`)}
                     </p>
                   </div>

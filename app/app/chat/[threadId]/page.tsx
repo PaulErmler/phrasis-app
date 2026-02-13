@@ -22,8 +22,8 @@ export default function ChatPage({
       <RedirectToSignIn />
       <Authenticated>
       <div className="flex flex-col h-screen overflow-hidden">
-          <header className="border-b bg-background">
-            <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+          <header className="sticky-header">
+            <div className="header-bar">
               <Link href="/app">
                 <Button variant="ghost" className="gap-2 -ml-2">
                   <ChevronLeft className="h-4 w-4" />

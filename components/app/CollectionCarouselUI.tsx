@@ -101,7 +101,7 @@ export function CollectionCarouselUI({
           {[1, 2].map((i) => (
             <Skeleton
               key={i}
-              className="h-48 min-w-[85%] sm:min-w-[48%] md:min-w-[32%] rounded-2xl"
+              className="h-48 min-w-[85%] sm:min-w-[48%] md:min-w-[32%] rounded-xl"
             />
           ))}
         </div>
@@ -149,7 +149,7 @@ export function CollectionCarouselUI({
                     }
                   }}
                   className={cn(
-                    "w-full text-left rounded-2xl border p-5 transition-all cursor-pointer h-[200px] flex flex-col",
+                    "w-full text-left rounded-xl border p-5 transition-all cursor-pointer h-[200px] flex flex-col",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     "hover:shadow-md",
                     isActive && !isComplete && "border-2 border-current",
@@ -158,7 +158,7 @@ export function CollectionCarouselUI({
                 >
                   {/* Header: title + select button */}
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <h3 className="text-xl font-bold">{collection.collectionName}</h3>
+                    <h3 className="heading-section">{collection.collectionName}</h3>
                     {!isComplete && (
                       <Button
                         size="sm"
@@ -176,7 +176,7 @@ export function CollectionCarouselUI({
                       </Button>
                     )}
                     {isComplete && (
-                      <div className="flex items-center gap-1 text-xs text-green-600 font-medium shrink-0">
+                      <div className="flex items-center gap-1 text-xs text-success font-medium shrink-0">
                         <Check className="h-4 w-4" />
                         {t("done")}
                       </div>
@@ -184,7 +184,7 @@ export function CollectionCarouselUI({
                   </div>
 
                   {/* Description */}
-                  <p className="text-sm text-muted-foreground leading-relaxed mb-4 line-clamp-2 flex-shrink-0">
+                  <p className="text-muted-sm leading-relaxed mb-4 line-clamp-2 flex-shrink-0">
                     {getCollectionDescription(
                       collection.collectionName,
                       (key) => t(`descriptions.${key}`)
@@ -210,7 +210,7 @@ export function CollectionCarouselUI({
                         <Progress value={progress} className="h-2" />
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">{t("notStarted")}</p>
+                      <p className="text-muted-sm">{t("notStarted")}</p>
                     )}
                   </div>
                 </div>

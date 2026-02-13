@@ -64,7 +64,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                 height={40}
               />
               <span className="text-xl md:text-2xl font-bold hidden sm:inline text-primary">
-                Phrasis<sup className="text-sm text-muted-foreground">alpha</sup>
+                Phrasis<sup className="text-muted-sm">alpha</sup>
               </span>
             </Link>
 
@@ -168,7 +168,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
               </button>
 
               <div className="px-4 py-2">
-                <span className="text-sm text-muted-foreground">{t('theme')}</span>
+                <span className="text-muted-sm">{t('theme')}</span>
                 <div className="flex gap-1 mt-2">
                   {themeOptions.map((option) => {
                     const isActive = mounted && theme === option.value;

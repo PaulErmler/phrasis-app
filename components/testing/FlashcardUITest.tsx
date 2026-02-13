@@ -123,7 +123,7 @@ function FlashcardPreview({
     <div className="flex flex-col border rounded-lg overflow-hidden bg-background">
       {/* Card area */}
       <div className="p-4">
-        <div className="rounded-xl border bg-card shadow-sm">
+        <div className="card-surface">
           {/* Card top bar */}
           <div className="flex items-center justify-between px-4 pt-4 pb-2">
             <div className="flex items-center gap-2">
@@ -140,7 +140,7 @@ function FlashcardPreview({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30"
+                      className="h-8 w-8 text-muted-foreground hover:text-success hover:bg-green-50 dark:hover:bg-green-950/30"
                       onClick={() => alert("Master clicked")}
                     >
                       <CircleCheck className="h-4 w-4" />
@@ -153,7 +153,7 @@ function FlashcardPreview({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30"
+                      className="h-8 w-8 text-muted-foreground hover:text-warning hover:bg-orange-50 dark:hover:bg-orange-950/30"
                       onClick={() => alert("Hide clicked")}
                     >
                       <EyeOff className="h-4 w-4" />
@@ -169,7 +169,7 @@ function FlashcardPreview({
             <div className="space-y-2">
               {baseTexts.map((item) => (
                 <div key={item.language} className="flex items-start gap-2">
-                  <p className="flex-1 text-lg font-medium leading-relaxed">
+                  <p className="flex-1 body-large font-medium">
                     {item.text}
                   </p>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -184,7 +184,7 @@ function FlashcardPreview({
             <div className="space-y-2">
               {targetTexts.map((item) => (
                 <div key={item.language} className="flex items-start gap-2">
-                  <p className="flex-1 text-lg leading-relaxed">{item.text}</p>
+                  <p className="flex-1 body-large">{item.text}</p>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
                     <Volume2 className="h-4 w-4" />
                   </Button>
@@ -259,8 +259,8 @@ function NoCardsDuePreview() {
   return (
     <div className="flex flex-col items-center justify-center gap-6 py-16 border rounded-lg bg-background">
       <div className="text-center space-y-2">
-        <p className="text-lg font-medium">No cards due for review</p>
-        <p className="text-sm text-muted-foreground">
+        <p className="body-large font-medium">No cards due for review</p>
+        <p className="text-muted-sm">
           All caught up! Add more cards to continue learning.
         </p>
       </div>
@@ -274,7 +274,7 @@ function NoCardsDuePreview() {
 function NoCollectionPreview() {
   return (
     <div className="flex flex-col items-center justify-center gap-4 py-16 border rounded-lg bg-background">
-      <p className="text-muted-foreground text-center">No collection selected</p>
+      <p className="text-muted-sm text-center">No collection selected</p>
       <Button onClick={() => alert("Go home clicked")}>Go to Home</Button>
     </div>
   );

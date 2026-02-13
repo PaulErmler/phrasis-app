@@ -15,8 +15,8 @@ function StatItem({
   return (
     <div className="text-center">
       <Icon className="mx-auto h-5 w-5 text-muted-foreground mb-1" />
-      <p className="text-lg font-semibold">{value}</p>
-      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="stat-value">{value}</p>
+      <p className="text-muted-xs">{label}</p>
     </div>
   );
 }
@@ -25,7 +25,7 @@ export function ProgressStatsCard() {
   const t = useTranslations("AppPage");
 
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="card-surface p-4">
       <div className="grid grid-cols-4 gap-3">
         <StatItem icon={Flame} label={t("stats.streak")} value="0" />
         <StatItem icon={RotateCcw} label={t("stats.reps")} value="127" />

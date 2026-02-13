@@ -62,8 +62,8 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
           {t("courses.description")}
         </SheetDescription>
         {/* Header */}
-        <div className="sticky top-0 z-10 border-b bg-background px-4 h-14 flex items-center justify-between">
-          <h2 className="font-semibold text-lg">{t("courses.title")}</h2>
+        <div className="sheet-header">
+          <h2 className="heading-section">{t("courses.title")}</h2>
           <Button
             variant="ghost"
             size="icon"
@@ -75,7 +75,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="sheet-body">
           {/* Create New Course Button */}
           <Button
             variant="outline"
@@ -93,13 +93,13 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
                 {[1, 2, 3].map((i) => (
                   <div
                     key={i}
-                    className="h-14 rounded-lg bg-muted animate-pulse"
+                    className="h-14 rounded-xl bg-muted animate-pulse"
                   />
                 ))}
               </div>
             ) : courses.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-sm">
                   {t("courses.noCourses")}
                 </p>
               </div>
@@ -115,7 +115,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
                     variant="ghost"
                     onClick={() => handleSelectCourse(course._id)}
                     className={cn(
-                      "w-full h-auto flex items-center justify-between gap-3 p-3 rounded-lg border transition-all text-left whitespace-normal",
+                      "w-full h-auto flex items-center justify-between gap-3 p-3 rounded-xl border transition-all text-left whitespace-normal",
                       isActive
                         ? "border-primary bg-primary/5 shadow-sm hover:bg-primary/5"
                         : "border-muted hover:border-muted-foreground/30 hover:bg-muted/50"
@@ -125,7 +125,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
                       <h3 className="font-semibold text-base leading-tight">
                         {targetLanguageName}
                       </h3>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-muted-xs">
                         {t("courses.from", { language: baseLanguageName })}
                       </p>
                     </div>

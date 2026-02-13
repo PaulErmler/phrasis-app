@@ -22,7 +22,7 @@ export function ThreadSidebar({
   return (
     <aside className="w-64 border-r border-border bg-background/50 flex flex-col">
       <div className="p-4 border-b border-border">
-        <h2 className="font-semibold text-lg">Conversations</h2>
+        <h2 className="heading-section">Conversations</h2>
       </div>
       <div className="flex-1 overflow-y-auto">
         {threads && threads.length > 0 ? (
@@ -49,7 +49,7 @@ export function ThreadSidebar({
             ))}
           </div>
         ) : (
-          <div className="p-4 text-center text-sm text-muted-foreground">
+          <div className="p-4 text-center text-muted-sm">
             No conversations yet
           </div>
         )}

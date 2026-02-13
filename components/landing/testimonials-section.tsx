@@ -88,7 +88,7 @@ export function TestimonialsSection() {
                     {/* Author */}
                     <div>
                       <p className="font-semibold text-foreground">{testimonial.author}</p>
-                      <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                      <p className="text-muted-sm">{testimonial.role}</p>
                     </div>
                   </div>
                 </CarouselItem>

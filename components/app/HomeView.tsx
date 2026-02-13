@@ -13,7 +13,7 @@ export function HomeView() {
   const t = useTranslations("AppPage");
 
   return (
-    <div className="max-w-xl mx-auto space-y-6">
+    <div className="app-view">
       {/* Start Learning Button */}
       <Button
         size="lg"
@@ -28,7 +28,7 @@ export function HomeView() {
 
       {/* Collection Carousel - Select difficulty and add cards */}
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold">{t("collections.carousel.sectionTitle")}</h2>
+        <h2 className="heading-section">{t("collections.carousel.sectionTitle")}</h2>
         <CollectionCarousel />
       </div>
 

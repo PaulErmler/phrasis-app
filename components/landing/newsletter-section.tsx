@@ -82,13 +82,13 @@ export function NewsletterSection() {
                     )}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground text-center lg:text-left">
+                <p className="text-muted-xs text-center lg:text-left">
                   {t('privacy')}
                 </p>
               </form>
 
               {status === "success" && (
-                <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-600 dark:text-green-400 text-sm text-center">
+                <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-success dark:text-green-400 text-sm text-center">
                   {t('success')}
                 </div>
               )}

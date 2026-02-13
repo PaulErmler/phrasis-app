@@ -158,8 +158,8 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
         </SheetDescription>
         
         {/* Header */}
-        <div className="sticky top-0 z-10 border-b bg-background px-4 h-14 flex items-center justify-between">
-          <h2 className="font-semibold text-lg">{t("title")}</h2>
+        <div className="sheet-header">
+          <h2 className="heading-section">{t("title")}</h2>
           <Button
             variant="ghost"
             size="icon"
@@ -174,7 +174,7 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
         {/* Progress Bar */}
         <div className="px-4 py-4 border-b">
           <Progress value={progress} className="h-2" />
-          <p className="text-sm text-muted-foreground mt-2 text-center">
+          <p className="text-muted-sm mt-2 text-center">
             Step {step} of {totalSteps}
           </p>
         </div>
@@ -214,7 +214,7 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
         </div>
 
         {/* Footer Navigation */}
-        <div className="sticky bottom-0 border-t bg-background px-4 py-4">
+        <div className="sheet-footer">
           <div className="flex items-center justify-between gap-4">
             {step > 1 ? (
               <Button

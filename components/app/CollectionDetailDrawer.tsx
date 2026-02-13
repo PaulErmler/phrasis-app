@@ -63,13 +63,13 @@ export function CollectionDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold">
+          <DialogTitle className="heading-dialog">
             {collectionName}
           </DialogTitle>
           <DialogDescription className="text-sm leading-relaxed">
             {description}
           </DialogDescription>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-sm">
             {t("totalCards", { count: totalTexts.toLocaleString() })}
           </p>
         </DialogHeader>
@@ -79,9 +79,9 @@ export function CollectionDetailDialog({
 
           {/* Progress + Select row */}
           <div className="flex items-center gap-3">
-            <div className="flex-1 rounded-xl border p-3 space-y-2">
+            <div className="flex-1 content-box space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">{t("progress")}</span>
+                <span className="text-muted-sm">{t("progress")}</span>
                 <span className="text-sm font-bold">
                   {cardsAdded} / {totalTexts}
                 </span>
@@ -99,7 +99,7 @@ export function CollectionDetailDialog({
                 {t("select")}
               </Button>
             ) : (
-              <div className="flex items-center gap-1.5 text-sm text-green-600 font-medium shrink-0 px-3">
+              <div className="flex items-center gap-1.5 text-sm text-success font-medium shrink-0 px-3">
                 <CheckCircle2 className="h-5 w-5" />
                 {t("done")}
               </div>
@@ -111,7 +111,7 @@ export function CollectionDetailDialog({
           {/* Next sentences section */}
           {isComplete ? (
             <div className="text-center py-6 space-y-2">
-              <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto" />
+              <CheckCircle2 className="h-10 w-10 text-success mx-auto" />
               <p className="text-sm font-medium">
                 {t("allCardsAdded")}
               </p>
@@ -120,7 +120,7 @@ export function CollectionDetailDialog({
             <>
               {/* Header */}
               <div className="flex items-center justify-between">
-                <h4 className="text-base font-bold">{t("nextSentences")}</h4>
+                <h4 className="text-base font-semibold">{t("nextSentences")}</h4>
                 {texts.length > 0 && (
                   <Button
                     size="sm"
@@ -154,7 +154,7 @@ export function CollectionDetailDialog({
                 </div>
               ) : texts.length === 0 ? (
                 <div className="text-center py-6 space-y-2">
-                  <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto" />
+                  <CheckCircle2 className="h-10 w-10 text-success mx-auto" />
                   <p className="text-sm font-medium">
                     {t("noMoreCards")}
                   </p>
@@ -164,7 +164,7 @@ export function CollectionDetailDialog({
                   {texts.map((text) => (
                     <div
                       key={text._id}
-                      className="rounded-xl border p-4 text-sm leading-relaxed"
+                      className="content-box p-4 text-sm leading-relaxed"
                     >
                       {text.text}
                     </div>

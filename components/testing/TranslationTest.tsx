@@ -170,7 +170,7 @@ export function TranslationTest() {
         {/* Translation Result */}
         {displayedResult && (
           <div className={`rounded-lg p-3 ${displayedResult.startsWith("Error:") ? "bg-destructive/10" : "bg-muted"}`}>
-            <p className="text-xs text-muted-foreground mb-1">
+            <p className="text-muted-xs mb-1">
               {displayedResult.startsWith("Error:") ? "Error:" : "Translation:"}
             </p>
             <p className={`text-sm ${displayedResult.startsWith("Error:") ? "text-destructive" : ""}`}>

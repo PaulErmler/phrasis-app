@@ -40,7 +40,7 @@ export function LearningCardContent({
   return (
     <main className="flex-1 overflow-y-auto">
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
-        <div className="rounded-xl border bg-card shadow-sm">
+        <div className="card-surface">
           {/* Card top bar: metadata left, actions right */}
           <div className="flex items-center justify-between px-4 pt-4 pb-2">
             <div className="flex items-center gap-2">
@@ -58,7 +58,7 @@ export function LearningCardContent({
                     variant="ghost"
                     size="icon"
                     onClick={onMaster}
-                    className="h-8 w-8 text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950/30"
+                    className="h-8 w-8 text-muted-foreground hover:text-success hover:bg-green-50 dark:hover:bg-green-950/30"
                   >
                     <CircleCheck className="h-4 w-4" />
                   </Button>
@@ -73,7 +73,7 @@ export function LearningCardContent({
                     variant="ghost"
                     size="icon"
                     onClick={onHide}
-                    className="h-8 w-8 text-muted-foreground hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30"
+                    className="h-8 w-8 text-muted-foreground hover:text-warning hover:bg-orange-50 dark:hover:bg-orange-950/30"
                   >
                     <EyeOff className="h-4 w-4" />
                   </Button>
@@ -95,7 +95,7 @@ export function LearningCardContent({
                 );
                 return (
                   <div key={translation.language} className="flex items-start gap-2">
-                    <p className="flex-1 text-lg font-medium leading-relaxed">
+                    <p className="flex-1 body-large font-medium">
                       {translation.text || "..."}
                     </p>
                     <AudioButton
@@ -106,7 +106,7 @@ export function LearningCardContent({
                 );
               })}
               {baseTranslations.length === 0 && (
-                <p className="text-lg font-medium">{sourceText}</p>
+                <p className="body-large font-medium">{sourceText}</p>
               )}
             </div>
 
@@ -120,7 +120,7 @@ export function LearningCardContent({
                 );
                 return (
                   <div key={translation.language} className="flex items-start gap-2">
-                    <p className="flex-1 text-lg leading-relaxed">
+                    <p className="flex-1 body-large">
                       {translation.text || "..."}
                     </p>
                     <AudioButton

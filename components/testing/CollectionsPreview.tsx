@@ -81,7 +81,7 @@ export function CollectionsPreview() {
                   <Badge variant="outline" className="font-mono">
                     {collection.name}
                   </Badge>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-muted-sm">
                     {collection.textCount} texts
                   </span>
                 </div>
@@ -100,7 +100,7 @@ export function CollectionsPreview() {
                     </li>
                   ))}
                   {collection.textCount > 5 && (
-                    <li className="text-sm text-muted-foreground pl-6">
+                    <li className="text-muted-sm pl-6">
                       ... and {collection.textCount - 5} more
                     </li>
                   )}

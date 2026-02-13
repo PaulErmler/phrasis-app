@@ -168,7 +168,7 @@ export function CollectionSelector() {
                         </Badge>
                       )}
                     </div>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-muted-sm">
                       {collection.cardsAdded} / {collection.totalTexts} cards
                     </span>
                   </div>
@@ -182,7 +182,7 @@ export function CollectionSelector() {
         {/* Batch Size and Add Button */}
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
-            <Label htmlFor="batch-size" className="text-sm text-muted-foreground mb-2 block">
+            <Label htmlFor="batch-size" className="text-muted-sm mb-2 block">
               Cards to add
             </Label>
             <Select value={batchSize} onValueChange={setBatchSize}>
@@ -221,7 +221,7 @@ export function CollectionSelector() {
         </div>
 
         {selectedCollectionId && remainingCards > 0 && (
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-sm">
             {remainingCards} cards remaining in this collection
           </p>
         )}

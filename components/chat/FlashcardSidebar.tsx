@@ -18,8 +18,8 @@ export function FlashcardSidebar() {
     return (
       <aside className="hidden lg:flex w-80 border-l flex-col">
         <div className="p-4 border-b">
-          <h2 className="font-semibold text-lg">My Flashcards</h2>
-          <p className="text-sm text-muted-foreground">Your saved learning cards</p>
+          <h2 className="heading-section">My Flashcards</h2>
+          <p className="text-muted-sm">Your saved learning cards</p>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <Loader size={24} />
@@ -31,8 +31,8 @@ export function FlashcardSidebar() {
   return (
     <aside className="hidden lg:flex w-80 border-l flex-col">
       <div className="p-4 border-b">
-        <h2 className="font-semibold text-lg">My Flashcards</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="heading-section">My Flashcards</h2>
+        <p className="text-muted-sm">
           {flashcards.length} {flashcards.length === 1 ? "card" : "cards"}
         </p>
       </div>
@@ -41,10 +41,10 @@ export function FlashcardSidebar() {
         <div className="p-4 space-y-3">
           {flashcards.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground text-sm">
+              <p className="text-muted-sm">
                 No flashcards yet
               </p>
-              <p className="text-muted-foreground text-xs mt-1">
+              <p className="text-muted-xs mt-1">
                 Ask your teacher to create some!
               </p>
             </div>
@@ -65,7 +65,7 @@ export function FlashcardSidebar() {
                   <CardDescription className="text-xs mb-2">
                     {flashcard.note}
                   </CardDescription>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-muted-xs">
                     {format(new Date(flashcard.date), "MMM d, yyyy")}
                   </p>
                 </CardContent>

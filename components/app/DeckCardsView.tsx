@@ -142,7 +142,7 @@ export function DeckCardsView() {
                           </p>
                           {/* Show target language text (what user is learning) */}
                           {targetTranslation?.text && (
-                            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                            <p className="text-muted-sm mt-1 leading-relaxed">
                               {targetTranslation.text}
                             </p>
                           )}
@@ -162,7 +162,7 @@ export function DeckCardsView() {
                         </div>
                         <p className="text-sm">{baseTranslation?.text || card.sourceText}</p>
                         {!baseTranslation?.text && baseTranslation === undefined && (
-                          <p className="text-sm text-muted-foreground italic">Translating...</p>
+                          <p className="text-muted-sm italic">Translating...</p>
                         )}
                         <div className="flex gap-2">
                           <AudioButton
@@ -185,7 +185,7 @@ export function DeckCardsView() {
                         {targetTranslation?.text ? (
                           <p className="text-sm">{targetTranslation.text}</p>
                         ) : (
-                          <p className="text-sm text-muted-foreground italic">Translating...</p>
+                          <p className="text-muted-sm italic">Translating...</p>
                         )}
                         <div className="flex gap-2">
                           <AudioButton
@@ -208,7 +208,7 @@ export function DeckCardsView() {
                             Hidden
                           </Badge>
                         )}
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-muted-xs">
                           Due: {new Date(card.dueDate).toLocaleDateString()}
                         </span>
                       </div>

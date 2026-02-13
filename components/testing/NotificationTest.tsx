@@ -103,7 +103,7 @@ export function NotificationTest() {
         )}
 
         {notificationPermission === "granted" && (
-          <p className="text-xs text-muted-foreground text-center">
+          <p className="text-muted-xs text-center">
             ✓ Notifications enabled
           </p>
         )}

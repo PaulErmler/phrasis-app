@@ -105,7 +105,7 @@ function VirtualSimulation() {
           <label className="text-sm font-medium">
             Initial Review Count (X)
           </label>
-          <span className="text-sm text-muted-foreground font-mono">
+          <span className="text-muted-sm font-mono">
             {initialReviewCount}
           </span>
         </div>
@@ -119,7 +119,7 @@ function VirtualSimulation() {
           max={10}
           step={1}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-xs">
           Pre-review threshold: {Math.max(initialReviewCount - 2, 0)} reviews
           before FSRS starts
         </p>
@@ -129,7 +129,7 @@ function VirtualSimulation() {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium">Desired Retention</label>
-          <span className="text-sm text-muted-foreground font-mono">
+          <span className="text-muted-sm font-mono">
             {(requestRetention * 100).toFixed(0)}%
           </span>
         </div>
@@ -143,7 +143,7 @@ function VirtualSimulation() {
           max={99}
           step={1}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-xs">
           Higher retention → shorter intervals. Backend uses{" "}
           {(DEFAULT_REQUEST_RETENTION * 100).toFixed(0)}%.
         </p>
@@ -317,7 +317,7 @@ function RealCardReview() {
 
   if (cardForReview === undefined) {
     return (
-      <div className="text-sm text-muted-foreground py-8 text-center">
+      <div className="text-muted-sm py-8 text-center">
         Loading...
       </div>
     );
@@ -325,7 +325,7 @@ function RealCardReview() {
 
   if (cardForReview === null) {
     return (
-      <div className="text-sm text-muted-foreground py-8 text-center space-y-2">
+      <div className="text-muted-sm py-8 text-center space-y-2">
         <p>No cards due for review.</p>
         <p className="text-xs">
           Add cards from a collection first, or wait until a card is due.
@@ -345,7 +345,7 @@ function RealCardReview() {
         <p className="text-sm font-medium">{cardForReview.sourceText}</p>
         {cardForReview.translations.map((t) =>
           t.language !== cardForReview.sourceLanguage ? (
-            <p key={t.language} className="text-sm text-muted-foreground">
+            <p key={t.language} className="text-muted-sm">
               {t.text || "(translation pending)"}
             </p>
           ) : null,

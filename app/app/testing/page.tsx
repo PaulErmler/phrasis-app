@@ -23,7 +23,7 @@ export default function TestingPage() {
               <FlaskConical className="h-6 w-6" />
               <h1 className="text-2xl font-bold">Testing</h1>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-sm">
               Test various app features and integrations
             </p>
           </div>

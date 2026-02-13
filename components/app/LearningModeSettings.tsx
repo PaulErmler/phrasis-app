@@ -63,9 +63,9 @@ export function LearningModeSettings({
         <SheetDescription className="sr-only">{t("title")}</SheetDescription>
 
         {/* Header matching LearningMode header style */}
-        <div className="border-b">
+        <div className="sticky-header">
           <div className="px-4 h-14 flex items-center relative">
-            <SheetTitle className="font-semibold text-lg absolute inset-0 flex items-center justify-center pointer-events-none">
+            <SheetTitle className="heading-section absolute inset-0 flex items-center justify-center pointer-events-none">
               {t("title")}
             </SheetTitle>
             <Button
@@ -87,11 +87,11 @@ export function LearningModeSettings({
             </p>
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 text-xs">
-                <CircleCheck className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                <CircleCheck className="h-3.5 w-3.5 text-success shrink-0" />
                 <span>{t("iconMaster")}</span>
               </div>
               <div className="flex items-center gap-2 text-xs">
-                <EyeOff className="h-3.5 w-3.5 text-orange-600 shrink-0" />
+                <EyeOff className="h-3.5 w-3.5 text-warning shrink-0" />
                 <span>{t("iconHide")}</span>
               </div>
             </div>
@@ -102,7 +102,7 @@ export function LearningModeSettings({
             <Label htmlFor="batchSize" className="text-sm font-medium">
               {t("cardsPerBatch")}
             </Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-xs">
               {t("cardsPerBatchDescription")}
             </p>
             <Input
@@ -121,7 +121,7 @@ export function LearningModeSettings({
             <Label htmlFor="initialReviews" className="text-sm font-medium">
               {t("initialReviews")}
             </Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-xs">
               {t("initialReviewsDescription")}
             </p>
             <Input
@@ -141,7 +141,7 @@ export function LearningModeSettings({
               <Label htmlFor="autoAdd" className="text-sm font-medium">
                 {t("autoAddCards")}
               </Label>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-muted-xs">
                 {t("autoAddCardsDescription")}
               </p>
             </div>

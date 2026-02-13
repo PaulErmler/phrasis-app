@@ -36,7 +36,7 @@ export function CollectionCardPreviewUI({
         <p className="text-sm font-medium">
           {collectionName} complete!
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-xs">
           All cards from this collection have been added to your deck.
         </p>
       </div>

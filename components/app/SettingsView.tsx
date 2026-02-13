@@ -15,18 +15,18 @@ export function SettingsView() {
   const userEmail = session?.user?.email;
 
   return (
-    <div className="max-w-xl mx-auto px-4 py-6">
+    <div className="app-view">
       <Card>
 
         <CardContent className="space-y-6">
           {/* User Email Section */}
           {userEmail && (
             <div className="space-y-2">
-              <label className="text-sm font-medium text-muted-foreground">
+              <label className="label-form">
                 {t("settings.account") || "Account"}
               </label>
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50">
-                <Mail className="size-4 text-muted-foreground" />
+              <div className="flex items-center gap-2 p-3 surface-muted">
+                <Mail className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">{userEmail}</span>
               </div>
             </div>
@@ -36,7 +36,7 @@ export function SettingsView() {
 
           {/* Language Section */}
           <div className="space-y-2">
-            <label className="text-sm font-medium text-muted-foreground">
+            <label className="label-form">
               {t("settings.language") || "Language"}
             </label>
             <LanguageSwitcher />
@@ -57,7 +57,7 @@ export function SettingsView() {
                 }
               })}
             >
-              <LogOut className="size-4 mr-2" />
+              <LogOut className="h-4 w-4 mr-2" />
               {tAuth("SIGN_OUT")}
             </Button>
           </div>

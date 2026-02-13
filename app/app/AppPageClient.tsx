@@ -49,8 +49,8 @@ export function AppPageClient({
       <RedirectToSignIn />
       <Authenticated>
         <div className="min-h-screen flex flex-col">
-          <header className="sticky top-0 z-10 border-b bg-background">
-            <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+          <header className="sticky-header">
+            <div className="header-bar">
               {currentView === "home" ? (
                 <Button
                   variant="ghost"
@@ -61,7 +61,7 @@ export function AppPageClient({
                   {courseButtonLabel}
                 </Button>
               ) : (
-                <h1 className="font-semibold text-lg capitalize">
+                <h1 className="heading-section capitalize">
                   {t(`views.${currentView}`)}
                 </h1>
               )}

@@ -138,6 +138,77 @@ body {
 }
 }
 
+/* ── Reusable component classes (Style Guide) ── */
+
+@layer components {
+  /* Layout */
+  .sticky-header {
+    @apply sticky top-0 z-10 border-b bg-background;
+  }
+  .header-bar {
+    @apply container mx-auto px-4 h-14 flex items-center justify-between;
+  }
+  .app-view {
+    @apply max-w-xl mx-auto space-y-6;
+  }
+
+  /* Sheet / panel layout */
+  .sheet-header {
+    @apply sticky top-0 z-10 border-b bg-background px-4 h-14 flex items-center justify-between;
+  }
+  .sheet-body {
+    @apply flex-1 overflow-y-auto px-4 py-6;
+  }
+  .sheet-footer {
+    @apply sticky bottom-0 border-t bg-background px-4 py-4;
+  }
+
+  /* Typography */
+  .heading-section {
+    @apply text-lg font-semibold;
+  }
+  .heading-dialog {
+    @apply text-xl font-bold;
+  }
+  .body-large {
+    @apply text-lg leading-relaxed;
+  }
+  .stat-value {
+    @apply text-lg font-semibold;
+  }
+  .label-form {
+    @apply text-sm font-medium text-muted-foreground;
+  }
+  .text-muted-sm {
+    @apply text-sm text-muted-foreground;
+  }
+  .text-muted-xs {
+    @apply text-xs text-muted-foreground;
+  }
+
+  /* Cards & surfaces */
+  .card-surface {
+    @apply rounded-xl border bg-card shadow-sm;
+  }
+  .content-box {
+    @apply rounded-xl border p-3;
+  }
+  .surface-muted {
+    @apply rounded-lg bg-muted/50;
+  }
+  .state-active {
+    @apply border-primary bg-primary/5 shadow-sm;
+  }
+
+  /* Semantic colors */
+  .text-success {
+    @apply text-green-600;
+  }
+  .text-warning {
+    @apply text-orange-600;
+  }
+}
+
 /* Hide C15T branding footer in consent manager dialog */
 [data-c15t-dialog-footer] {
   display: none !important;

@@ -138,7 +138,7 @@ export default function OnboardingPage() {
             <div className="bg-background border-b shrink-0">
               <div className="container mx-auto px-4 py-4">
                 <Progress value={progress} className="h-2" />
-                <p className="text-sm text-muted-foreground mt-2 text-center">
+                <p className="text-muted-sm mt-2 text-center">
                   Step {step} of {totalSteps}
                 </p>
               </div>
