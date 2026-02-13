@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Volume2, VolumeX, Loader2 } from "lucide-react";
 
@@ -9,12 +9,27 @@ export interface AudioButtonProps {
   language: string;
   /** Show a text label next to the icon (used in DeckCardsView). Default: false */
   showLabel?: boolean;
+  /** If true, immediately stop current playback and prevent new playback. */
+  stopPlayback?: boolean;
 }
 
-export function AudioButton({ url, language, showLabel = false }: AudioButtonProps) {
+export function AudioButton({
+  url,
+  language,
+  showLabel = false,
+  stopPlayback = false,
+}: AudioButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (!stopPlayback || !audioRef.current) return;
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+    setIsPlaying(false);
+    setIsLoading(false);
+  }, [stopPlayback]);
 
   const handlePlay = async () => {
     if (!url) return;
@@ -60,7 +75,7 @@ export function AudioButton({ url, language, showLabel = false }: AudioButtonPro
         variant="ghost"
         size="icon"
         onClick={handlePlay}
-        disabled={isLoading}
+        disabled={isLoading || stopPlayback}
         className="h-8 w-8"
       >
         {isLoading ? (
@@ -89,7 +104,7 @@ export function AudioButton({ url, language, showLabel = false }: AudioButtonPro
       variant="ghost"
       size="sm"
       onClick={handlePlay}
-      disabled={isLoading}
+      disabled={isLoading || stopPlayback}
       className="gap-1"
     >
       {isLoading ? (

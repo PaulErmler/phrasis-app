@@ -44,6 +44,8 @@ export function LearningMode() {
           open={state.settingsOpen}
           onOpenChange={state.setSettingsOpen}
           courseSettings={state.courseSettings}
+          baseLanguages={state.baseLanguages}
+          targetLanguages={state.targetLanguages}
         />
       </div>
     );
@@ -63,6 +65,8 @@ export function LearningMode() {
           open={state.settingsOpen}
           onOpenChange={state.setSettingsOpen}
           courseSettings={state.courseSettings}
+          baseLanguages={state.baseLanguages}
+          targetLanguages={state.targetLanguages}
         />
       </div>
     );
@@ -79,6 +83,7 @@ export function LearningMode() {
         sourceText={state.sourceText}
         translations={state.translations}
         audioRecordings={state.audioRecordings}
+        stopAudioPlayback={state.settingsOpen}
         onMaster={state.handleMaster}
         onHide={state.handleHide}
       />
@@ -89,6 +94,7 @@ export function LearningMode() {
         ratingIntervals={state.ratingIntervals}
         onSelectRating={state.setSelectedRating}
         onAutoPlay={state.handleAutoPlay}
+        onStopAutoPlay={state.handleStopAutoPlay}
         isAutoPlaying={state.isAutoPlaying}
         onNext={state.handleNext}
         isReviewing={state.isReviewing}
@@ -98,6 +104,8 @@ export function LearningMode() {
         open={state.settingsOpen}
         onOpenChange={state.setSettingsOpen}
         courseSettings={state.courseSettings}
+        baseLanguages={state.baseLanguages}
+        targetLanguages={state.targetLanguages}
       />
     </div>
   );

@@ -354,6 +354,17 @@ export const getActiveCourseSettings = query({
       activeCollectionId: v.optional(v.id("collections")),
       cardsToAddBatchSize: v.optional(v.number()),
       autoAddCards: v.optional(v.boolean()),
+      // Audio playback settings
+      autoPlayAudio: v.optional(v.boolean()),
+      autoAdvance: v.optional(v.boolean()),
+      languageRepetitions: v.optional(v.record(v.string(), v.number())),
+      languageRepetitionPauses: v.optional(v.record(v.string(), v.number())),
+      pauseBaseToBase: v.optional(v.number()),
+      pauseBaseToTarget: v.optional(v.number()),
+      pauseTargetToTarget: v.optional(v.number()),
+      pauseBeforeAutoAdvance: v.optional(v.number()),
+      baseLanguageOrder: v.optional(v.array(v.string())),
+      targetLanguageOrder: v.optional(v.array(v.string())),
     }),
     v.null()
   ),
@@ -381,6 +392,17 @@ export const updateCourseSettings = mutation({
     initialReviewCount: v.optional(v.number()),
     cardsToAddBatchSize: v.optional(v.number()),
     autoAddCards: v.optional(v.boolean()),
+    // Audio playback settings
+    autoPlayAudio: v.optional(v.boolean()),
+    autoAdvance: v.optional(v.boolean()),
+    languageRepetitions: v.optional(v.record(v.string(), v.number())),
+    languageRepetitionPauses: v.optional(v.record(v.string(), v.number())),
+    pauseBaseToBase: v.optional(v.number()),
+    pauseBaseToTarget: v.optional(v.number()),
+    pauseTargetToTarget: v.optional(v.number()),
+    pauseBeforeAutoAdvance: v.optional(v.number()),
+    baseLanguageOrder: v.optional(v.array(v.string())),
+    targetLanguageOrder: v.optional(v.array(v.string())),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -395,11 +417,28 @@ export const updateCourseSettings = mutation({
     if (course.userId !== user._id) throw new ConvexError("Course does not belong to user");
 
     // Build patch object with only provided fields
+    const PATCHABLE_KEYS = [
+      "initialReviewCount",
+      "cardsToAddBatchSize",
+      "autoAddCards",
+      "autoPlayAudio",
+      "autoAdvance",
+      "languageRepetitions",
+      "languageRepetitionPauses",
+      "pauseBaseToBase",
+      "pauseBaseToTarget",
+      "pauseTargetToTarget",
+      "pauseBeforeAutoAdvance",
+      "baseLanguageOrder",
+      "targetLanguageOrder",
+    ] as const;
+
     const existing = await dbGetCourseSettings(ctx, args.courseId);
     const patch: Record<string, unknown> = {};
-    if (args.initialReviewCount !== undefined) patch.initialReviewCount = args.initialReviewCount;
-    if (args.cardsToAddBatchSize !== undefined) patch.cardsToAddBatchSize = args.cardsToAddBatchSize;
-    if (args.autoAddCards !== undefined) patch.autoAddCards = args.autoAddCards;
+    for (const key of PATCHABLE_KEYS) {
+      const value = args[key];
+      if (value !== undefined) patch[key] = value;
+    }
 
     if (existing) {
       await ctx.db.patch(existing._id, patch);
@@ -409,6 +448,16 @@ export const updateCourseSettings = mutation({
         initialReviewCount: args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
         cardsToAddBatchSize: args.cardsToAddBatchSize,
         autoAddCards: args.autoAddCards,
+        autoPlayAudio: args.autoPlayAudio,
+        autoAdvance: args.autoAdvance,
+        languageRepetitions: args.languageRepetitions,
+        languageRepetitionPauses: args.languageRepetitionPauses,
+        pauseBaseToBase: args.pauseBaseToBase,
+        pauseBaseToTarget: args.pauseBaseToTarget,
+        pauseTargetToTarget: args.pauseTargetToTarget,
+        pauseBeforeAutoAdvance: args.pauseBeforeAutoAdvance,
+        baseLanguageOrder: args.baseLanguageOrder,
+        targetLanguageOrder: args.targetLanguageOrder,
       });
     }
 

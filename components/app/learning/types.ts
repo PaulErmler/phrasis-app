@@ -31,5 +31,17 @@ export interface CourseSettings {
   activeCollectionId?: Id<"collections">;
   cardsToAddBatchSize?: number;
   autoAddCards?: boolean;
+  // Audio playback settings
+  autoPlayAudio?: boolean;
+  autoAdvance?: boolean;
+  languageRepetitions?: Record<string, number>;
+  languageRepetitionPauses?: Record<string, number>;
+  pauseBaseToBase?: number;
+  pauseBaseToTarget?: number;
+  pauseTargetToTarget?: number;
+  pauseBeforeAutoAdvance?: number;
+  // Language order overrides
+  baseLanguageOrder?: string[];
+  targetLanguageOrder?: string[];
 }
 

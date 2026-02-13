@@ -11,6 +11,7 @@ interface LearningControlsProps {
   ratingIntervals: Record<string, string>;
   onSelectRating: (rating: ReviewRating) => void;
   onAutoPlay: () => void;
+  onStopAutoPlay: () => void;
   isAutoPlaying: boolean;
   onNext: () => void;
   isReviewing: boolean;
@@ -22,6 +23,7 @@ export function LearningControls({
   ratingIntervals,
   onSelectRating,
   onAutoPlay,
+  onStopAutoPlay,
   isAutoPlaying,
   onNext,
   isReviewing,
@@ -59,8 +61,7 @@ export function LearningControls({
           <Button
             variant="outline"
             size="sm"
-            onClick={onAutoPlay}
-            disabled={isAutoPlaying}
+            onClick={isAutoPlaying ? onStopAutoPlay : onAutoPlay}
             className="flex-[2] gap-2"
           >
             {isAutoPlaying ? (

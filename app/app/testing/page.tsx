@@ -2,7 +2,8 @@
 
 import { RedirectToSignIn } from "@daveyplate/better-auth-ui";
 import { Authenticated } from "convex/react";
-import { FlaskConical } from "lucide-react";
+import { FlaskConical, Settings } from "lucide-react";
+import Link from "next/link";
 import { TranslationTest } from "@/components/testing/TranslationTest";
 import { TTSTest } from "@/components/testing/TTSTest";
 import { NotificationTest } from "@/components/testing/NotificationTest";
@@ -57,6 +58,22 @@ export default function TestingPage() {
             {/* Flashcard UI States Test */}
             <div className="md:col-span-2">
               <FlashcardUITest />
+            </div>
+
+            {/* Settings UI Prototypes */}
+            <div className="md:col-span-2">
+              <Link
+                href="/app/testing/settings"
+                className="block rounded-xl border p-4 hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Settings className="h-5 w-5" />
+                  <span className="font-medium">Settings UI Prototypes</span>
+                </div>
+                <p className="text-muted-sm text-sm">
+                  4 different approaches for audio playback settings
+                </p>
+              </Link>
             </div>
           </div>
         </div>

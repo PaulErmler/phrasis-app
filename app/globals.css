@@ -42,6 +42,10 @@
 --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 --color-sidebar-border: var(--sidebar-border);
 --color-sidebar-ring: var(--sidebar-ring);
+--color-timeline-base: var(--timeline-base);
+--color-timeline-base-border: var(--timeline-base-border);
+--color-timeline-target: var(--timeline-target);
+--color-timeline-target-border: var(--timeline-target-border);
 --radius-sm: calc(var(--radius) - 4px);
 --radius-md: calc(var(--radius) - 2px);
 --radius-lg: var(--radius);
@@ -69,7 +73,7 @@
 --destructive: oklch(0.58 0.22 27);
 --warning: oklch(0.75 0.15 70);
 --warning-foreground: oklch(0.20 0.05 70);
---accent-orange: #oklch(0.8179 0.1705 77.95);
+--accent-orange: oklch(0.82 0.17 78);
 --border: oklch(0.922 0 0);
 --input: oklch(0.922 0 0);
 --ring: oklch(0.708 0 0);
@@ -79,6 +83,11 @@
 --chart-4: oklch(0.61 0.11 222);
 --chart-5: oklch(0.52 0.09 223);
 --radius: 0.625rem;
+/* Timeline colors — base (blue, derived from primary) and target (warm orange) */
+--timeline-base: oklch(0.93 0.04 222);
+--timeline-base-border: oklch(0.80 0.07 222);
+--timeline-target: oklch(0.93 0.05 70);
+--timeline-target-border: oklch(0.80 0.11 70);
 --sidebar: oklch(0.985 0 0);
 --sidebar-foreground: oklch(0.145 0 0);
 --sidebar-primary: oklch(0.61 0.11 222);
@@ -104,7 +113,7 @@
 --muted-foreground: oklch(0.708 0 0);
 --accent: oklch(0.371 0 0);
 --accent-foreground: oklch(0.985 0 0);
---accent-orange: #oklch(0.8179 0.1705 77.95);
+--accent-orange: oklch(0.82 0.17 78);
 --destructive: oklch(0.704 0.191 22.216);
 --warning: oklch(0.80 0.15 70);
 --warning-foreground: oklch(0.20 0.05 70);
@@ -116,6 +125,11 @@
 --chart-3: oklch(0.71 0.13 215);
 --chart-4: oklch(0.61 0.11 222);
 --chart-5: oklch(0.52 0.09 223);
+/* Timeline colors — dark mode */
+--timeline-base: oklch(0.25 0.04 222);
+--timeline-base-border: oklch(0.42 0.07 222);
+--timeline-target: oklch(0.25 0.05 70);
+--timeline-target-border: oklch(0.42 0.09 70);
 --sidebar: oklch(0.205 0 0);
 --sidebar-foreground: oklch(0.985 0 0);
 --sidebar-primary: oklch(0.80 0.13 212);

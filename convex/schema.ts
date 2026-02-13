@@ -77,7 +77,20 @@ export default defineSchema({
     initialReviewCount: v.number(), // How many times a card is shown before FSRS scheduling
     activeCollectionId: v.optional(v.id("collections")),
     cardsToAddBatchSize: v.optional(v.number()), // How many cards to add at once
-    autoAddCards: v.optional(v.boolean()), // Auto-add cards when none are due 
+    autoAddCards: v.optional(v.boolean()), // Auto-add cards when none are due
+
+    // Audio playback settings
+    autoPlayAudio: v.optional(v.boolean()), // Auto-play audio when card is shown
+    autoAdvance: v.optional(v.boolean()), // Auto-advance after audio finishes
+    languageRepetitions: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 2, "es": 2 }
+    languageRepetitionPauses: v.optional(v.record(v.string(), v.number())), // per-language pause between repeats (seconds)
+    pauseBaseToBase: v.optional(v.number()), // seconds between different base languages
+    pauseBaseToTarget: v.optional(v.number()), // seconds between base and target sections
+    pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages
+    pauseBeforeAutoAdvance: v.optional(v.number()), // seconds to wait before auto-advancing to next card
+    // Language order overrides
+    baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
+    targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
   }).index("by_courseId", ["courseId"]),
 
   // Decks table - one deck per course, auto-created
