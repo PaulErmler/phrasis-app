@@ -125,7 +125,7 @@
       "noCourses": "No courses yet. Create your first course to get started.",
       "active": "Active",
       "learning": "Learning {language}",
-      "currentCourse": "Current Course",
+      "currentCourse": "Course",
       "from": "from {language}",
       "createDialog": {
         "title": "Create New Course",
@@ -151,7 +151,14 @@
       }
     },
     "changeCourse": "Change Course",
-    "startLearning": "Start Learning"
+    "currentCourseWithLanguages": "Current Course: {targetLanguages}",
+    "startLearning": "Start Learning",
+    "stats": {
+      "streak": "Streak",
+      "reps": "Reps",
+      "sentences": "Sentences",
+      "time": "Time"
+    }
   },
   "LearningMode": {
     "title": "Learning",

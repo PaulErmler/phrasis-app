@@ -151,7 +151,14 @@
       }
     },
     "changeCourse": "Kurs wechseln",
-    "startLearning": "Lernen starten"
+    "currentCourseWithLanguages": "Kurs: {targetLanguages}",
+    "startLearning": "Lernen starten",
+    "stats": {
+      "streak": "Serie",
+      "reps": "Wiederholungen",
+      "sentences": "Sätze",
+      "time": "Zeit"
+    }
   },
   "LearningMode": {
     "title": "Lernen",

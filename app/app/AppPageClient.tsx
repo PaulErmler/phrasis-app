@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { RedirectToSignIn } from "@daveyplate/better-auth-ui";
-import { Authenticated, usePreloadedQuery, Preloaded } from "convex/react";
+import { Authenticated, usePreloadedQuery, useQuery, Preloaded } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { HomeView } from "@/components/app/HomeView";
@@ -15,6 +15,7 @@ import { BottomNav, View } from "@/components/app/BottomNav";
 import { CourseMenu } from "@/components/app/CourseMenu";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
+import { getLanguagesByCodes } from "@/lib/languages";
 
 export function AppPageClient({
   preloadedSettings,
@@ -26,6 +27,15 @@ export function AppPageClient({
   const [courseMenuOpen, setCourseMenuOpen] = useState(false);
   const t = useTranslations("AppPage");
   const settings = usePreloadedQuery(preloadedSettings);
+  const activeCourse = useQuery(api.features.courses.getActiveCourse);
+
+  const courseButtonLabel = activeCourse
+    ? t("currentCourseWithLanguages", {
+        targetLanguages: getLanguagesByCodes(activeCourse.targetLanguages)
+          .map((l) => l.name)
+          .join(", "),
+      })
+    : t("changeCourse");
   const hasCompletedOnboarding = settings?.hasCompletedOnboarding ?? true;
 
   useEffect(() => {
@@ -48,7 +58,7 @@ export function AppPageClient({
                   className="gap-2 -ml-2"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  {t("changeCourse")}
+                  {courseButtonLabel}
                 </Button>
               ) : (
                 <h1 className="font-semibold text-lg capitalize">
