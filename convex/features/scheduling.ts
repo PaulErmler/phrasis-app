@@ -196,7 +196,6 @@ export const reviewCard = mutation({
   handler: async (ctx, args) => {
     const { card, deck } = await authorizeCardAccess(ctx, args.cardId);
 
-    // Load initialReviewCount from courseSettings (not course)
     const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
 
     // Validate rating is appropriate for the card's current phase
