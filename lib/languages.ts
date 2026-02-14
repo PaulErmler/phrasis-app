@@ -4,11 +4,13 @@
 
 /**
  * Voice configuration for text-to-speech
+ * The apiCode contains all info needed: locale-Chirp3-HD-VoiceName
  */
 export interface Voice {
-  name: string; // Internal identifier
-  displayName: string; // Human-readable name, e.g., "English (US) - Female"
-  apiCode: string; // e.g. Google TTS voice code
+  name: string; // Voice name (e.g., "Leda")
+  displayName: string; // Human-readable name, e.g., "Leda (Female) - US"
+  apiCode: string; // Full Google TTS voice code, e.g., "en-US-Chirp3-HD-Leda"
+  gender: "female" | "male";
 }
 
 export interface Language {
@@ -20,6 +22,23 @@ export interface Language {
   voices: Voice[]; // Available TTS voices for this language
 }
 
+/**
+ * Helper to create Chirp3 HD voice entries
+ */
+function createChirp3Voice(
+  name: string,
+  gender: "female" | "male",
+  locale: string,
+  accentLabel: string
+): Voice {
+  return {
+    name,
+    displayName: `${name} (${gender === "female" ? "Female" : "Male"}) - ${accentLabel}`,
+    apiCode: `${locale}-Chirp3-HD-${name}`,
+    gender,
+  };
+}
+
 export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: "en",
@@ -27,7 +46,17 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: "English",
     nativeName: "English",
     flag: "🇬🇧",
-    voices: [],
+    voices: [
+      // US English
+      createChirp3Voice("Leda", "female", "en-US", "US"),
+      createChirp3Voice("Charon", "male", "en-US", "US"),
+      // UK English
+      createChirp3Voice("Aoede", "female", "en-GB", "UK"),
+      createChirp3Voice("Orus", "male", "en-GB", "UK"),
+      // Australian English
+      createChirp3Voice("Achernar", "female", "en-AU", "AU"),
+      createChirp3Voice("Achird", "male", "en-AU", "AU"),
+    ],
   },
   {
     code: "es",
@@ -35,7 +64,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: "Spanish",
     nativeName: "Español",
     flag: "🇪🇸",
-    voices: [],
+    voices: [
+      // Spain Spanish
+      createChirp3Voice("Leda", "female", "es-ES", "Spain"),
+      createChirp3Voice("Charon", "male", "es-ES", "Spain"),
+      // US Spanish
+      createChirp3Voice("Aoede", "female", "es-US", "US"),
+      createChirp3Voice("Orus", "male", "es-US", "US"),
+    ],
   },
   {
     code: "fr",
@@ -43,7 +79,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: "French",
     nativeName: "Français",
     flag: "🇫🇷",
-    voices: [],
+    voices: [
+      // France French
+      createChirp3Voice("Leda", "female", "fr-FR", "France"),
+      createChirp3Voice("Charon", "male", "fr-FR", "France"),
+      // Canadian French
+      createChirp3Voice("Aoede", "female", "fr-CA", "Canada"),
+      createChirp3Voice("Orus", "male", "fr-CA", "Canada"),
+    ],
   },
   {
     code: "de",
@@ -51,7 +94,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: "German",
     nativeName: "Deutsch",
     flag: "🇩🇪",
-    voices: [],
+    voices: [
+      createChirp3Voice("Leda", "female", "de-DE", "Germany"),
+      createChirp3Voice("Charon", "male", "de-DE", "Germany"),
+    ],
   },
   {
     code: "it",
@@ -59,15 +105,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: "Italian",
     nativeName: "Italiano",
     flag: "🇮🇹",
-    voices: [],
+    voices: [
+      createChirp3Voice("Leda", "female", "it-IT", "Italy"),
+      createChirp3Voice("Charon", "male", "it-IT", "Italy"),
+    ],
   },
   {
     code: "pt",
     displayCode: "pt",
     name: "Portuguese",
     nativeName: "Português",
-    flag: "🇧🇷",
-    voices: [],
+    flag: "🇵🇹",
+    voices: [
+      createChirp3Voice("Leda", "female", "pt-BR", "Brazil"),
+      createChirp3Voice("Charon", "male", "pt-BR", "Brazil"),
+    ],
   },
   {
     code: "zh",
@@ -75,7 +127,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: "Chinese (Simplified)",
     nativeName: "中文（简体）",
     flag: "🇨🇳",
-    voices: [],
+    voices: [
+      createChirp3Voice("Leda", "female", "cmn-CN", "Mandarin"),
+      createChirp3Voice("Charon", "male", "cmn-CN", "Mandarin"),
+    ],
   },
   {
     code: "ja",
@@ -83,7 +138,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: "Japanese",
     nativeName: "日本語",
     flag: "🇯🇵",
-    voices: [],
+    voices: [
+      createChirp3Voice("Leda", "female", "ja-JP", "Japan"),
+      createChirp3Voice("Charon", "male", "ja-JP", "Japan"),
+    ],
   },
   {
     code: "sv",
@@ -91,17 +149,20 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: "Swedish",
     nativeName: "Svenska",
     flag: "🇸🇪",
-    voices: [],
+    voices: [
+      createChirp3Voice("Leda", "female", "sv-SE", "Sweden"),
+      createChirp3Voice("Charon", "male", "sv-SE", "Sweden"),
+    ],
   },
 ];
-  
-  /**
-   * Get a language by its ISO 639-1 code
-   */
-  export function getLanguageByCode(code: string): Language | undefined {
-    return SUPPORTED_LANGUAGES.find((lang) => lang.code === code);
-  }
-  
+
+/**
+ * Get a language by its ISO 639-1 code
+ */
+export function getLanguageByCode(code: string): Language | undefined {
+  return SUPPORTED_LANGUAGES.find((lang) => lang.code === code);
+}
+
 /**
  * Get multiple languages by their codes
  */
@@ -118,7 +179,29 @@ export function getVoicesByLanguageCode(code: string): Voice[] {
   const language = getLanguageByCode(code);
   return language?.voices ?? [];
 }
-  
+
+/**
+ * Extract locale from voice apiCode (e.g., "en-US-Chirp3-HD-Leda" -> "en-US")
+ */
+export function getLocaleFromApiCode(apiCode: string): string {
+  // Format: locale-Chirp3-HD-VoiceName
+  // locale can be like "en-US", "cmn-CN", etc.
+  const parts = apiCode.split("-Chirp3-HD-");
+  return parts[0] || apiCode;
+}
+
+/**
+ * Get all unique locales for a language by extracting from apiCodes
+ */
+export function getLocalesByLanguageCode(code: string): string[] {
+  const voices = getVoicesByLanguageCode(code);
+  const locales = voices.map((v) => getLocaleFromApiCode(v.apiCode));
+  return [...new Set(locales)];
+}
+
+
+
+
 /**
  * Generate a course name from base and target language codes
  */
