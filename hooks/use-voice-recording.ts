@@ -1,8 +1,8 @@
-import { useState, useCallback, useRef } from "react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { toast } from "sonner";
-import { ERROR_MESSAGES, SUCCESS_MESSAGES } from "@/lib/constants/chat";
+import { useState, useCallback, useRef } from 'react';
+import { useAction } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { toast } from 'sonner';
+import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants/chat';
 
 interface UseVoiceRecordingReturn {
   isRecording: boolean;
@@ -17,14 +17,16 @@ interface UseVoiceRecordingReturn {
  * Handles MediaRecorder setup, audio capture, and transcription
  */
 export function useVoiceRecording(
-  onTranscript: (transcript: string) => void
+  onTranscript: (transcript: string) => void,
 ): UseVoiceRecordingReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const transcribeAudio = useAction(api.features.chat.transcribe.transcribeAudio);
+  const transcribeAudio = useAction(
+    api.features.chat.transcribe.transcribeAudio,
+  );
 
   const startRecording = useCallback(async () => {
     try {
@@ -46,7 +48,7 @@ export function useVoiceRecording(
           setIsTranscribing(true);
           try {
             const audioBlob = new Blob(audioChunksRef.current, {
-              type: "audio/webm",
+              type: 'audio/webm',
             });
             const arrayBuffer = await audioBlob.arrayBuffer();
 
@@ -57,7 +59,7 @@ export function useVoiceRecording(
             onTranscript(transcript);
             toast.success(SUCCESS_MESSAGES.VOICE_TRANSCRIBED);
           } catch (error) {
-            console.error("Transcription error:", error);
+            console.error('Transcription error:', error);
             toast.error(ERROR_MESSAGES.FAILED_TO_TRANSCRIBE);
           } finally {
             setIsTranscribing(false);
@@ -68,7 +70,7 @@ export function useVoiceRecording(
       mediaRecorder.start();
       setIsRecording(true);
     } catch (error) {
-      console.error("Error starting recording:", error);
+      console.error('Error starting recording:', error);
       toast.error(ERROR_MESSAGES.MICROPHONE_ACCESS);
     }
   }, [transcribeAudio, onTranscript]);
@@ -96,7 +98,3 @@ export function useVoiceRecording(
     handleVoiceClick,
   };
 }
-
-
-
-

@@ -1,29 +1,28 @@
-"use client";
+'use client';
 
-import { useTranslations } from "next-intl";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { Button } from "@/components/ui/button";
-import { authClient } from "@/lib/auth-client";
-import { LogOut, Mail } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
+import { useTranslations } from 'next-intl';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { Button } from '@/components/ui/button';
+import { authClient } from '@/lib/auth-client';
+import { LogOut, Mail } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 export function SettingsView() {
-  const t = useTranslations("AppPage");
-  const tAuth = useTranslations("Auth");
+  const t = useTranslations('AppPage');
+  const tAuth = useTranslations('Auth');
   const { data: session } = authClient.useSession();
   const userEmail = session?.user?.email;
 
   return (
     <div className="app-view">
       <Card>
-
         <CardContent className="space-y-6">
           {/* User Email Section */}
           {userEmail && (
             <div className="space-y-2">
               <label className="label-form">
-                {t("settings.account") || "Account"}
+                {t('settings.account') || 'Account'}
               </label>
               <div className="flex items-center gap-2 p-3 surface-muted">
                 <Mail className="h-4 w-4 text-muted-foreground" />
@@ -37,7 +36,7 @@ export function SettingsView() {
           {/* Language Section */}
           <div className="space-y-2">
             <label className="label-form">
-              {t("settings.language") || "Language"}
+              {t('settings.language') || 'Language'}
             </label>
             <LanguageSwitcher />
           </div>
@@ -46,19 +45,21 @@ export function SettingsView() {
 
           {/* Sign Out Section */}
           <div className="space-y-2">
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               className="w-full"
-              onClick={() => authClient.signOut({
-                fetchOptions: {
-                  onSuccess: () => {
-                    window.location.href = "/";
-                  }
-                }
-              })}
+              onClick={() =>
+                authClient.signOut({
+                  fetchOptions: {
+                    onSuccess: () => {
+                      window.location.href = '/';
+                    },
+                  },
+                })
+              }
             >
               <LogOut className="h-4 w-4 mr-2" />
-              {tAuth("SIGN_OUT")}
+              {tAuth('SIGN_OUT')}
             </Button>
           </div>
         </CardContent>
@@ -66,4 +67,3 @@ export function SettingsView() {
     </div>
   );
 }
-

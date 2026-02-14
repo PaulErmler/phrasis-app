@@ -1,36 +1,38 @@
-import { v, ConvexError } from "convex/values";
-import { mutation, query, MutationCtx } from "../_generated/server";
-import { Id } from "../_generated/dataModel";
-import { getAuthUser, requireAuthUser } from "../db/users";
-import { getActiveCourseForUser } from "../db/courses";
-import { getInitialReviewCount } from "../db/courseSettings";
-import { getDeckByCourseId } from "../db/decks";
+import { v, ConvexError } from 'convex/values';
+import { mutation, query, MutationCtx } from '../_generated/server';
+import { Id } from '../_generated/dataModel';
+import { getAuthUser, requireAuthUser } from '../db/users';
+import { getActiveCourseForUser } from '../db/courses';
+import { getInitialReviewCount } from '../db/courseSettings';
+import { getDeckByCourseId } from '../db/decks';
 import {
   scheduleCard,
   getValidRatings,
   type ReviewRating,
   type CardSchedulingState,
-} from "../../lib/scheduling";
-import { fsrsStateValidator, translationValidator, audioRecordingValidator } from "../types";
+} from '../../lib/scheduling';
+import {
+  fsrsStateValidator,
+  translationValidator,
+  audioRecordingValidator,
+} from '../types';
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
  * Throws ConvexError on failure.
  */
-async function authorizeCardAccess(
-  ctx: MutationCtx,
-  cardId: Id<"cards">,
-) {
+async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<'cards'>) {
   const user = await requireAuthUser(ctx);
 
   const card = await ctx.db.get(cardId);
-  if (!card) throw new ConvexError("Card not found");
+  if (!card) throw new ConvexError('Card not found');
 
   const deck = await ctx.db.get(card.deckId);
-  if (!deck) throw new ConvexError("Deck not found");
+  if (!deck) throw new ConvexError('Deck not found');
 
   const course = await ctx.db.get(deck.courseId);
-  if (!course || course.userId !== user._id) throw new ConvexError("Unauthorized");
+  if (!course || course.userId !== user._id)
+    throw new ConvexError('Unauthorized');
 
   return { user, card, deck, course };
 }
@@ -49,9 +51,9 @@ export const getCardForReview = query({
   args: {},
   returns: v.union(
     v.object({
-      _id: v.id("cards"),
+      _id: v.id('cards'),
       _creationTime: v.number(),
-      textId: v.id("texts"),
+      textId: v.id('texts'),
       sourceText: v.string(),
       sourceLanguage: v.string(),
       translations: v.array(translationValidator),
@@ -64,7 +66,7 @@ export const getCardForReview = query({
       initialReviewCount: v.number(),
       fsrsState: v.union(fsrsStateValidator, v.null()),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx) => {
     const user = await getAuthUser(ctx);
@@ -84,11 +86,15 @@ export const getCardForReview = query({
 
     // Get the card with the earliest due date that is neither hidden nor mastered.
     const card = await ctx.db
-      .query("cards")
-      .withIndex("by_deckId_and_isHidden_and_isMastered_and_dueDate", (q) =>
-        q.eq("deckId", deck._id).eq("isHidden", false).eq("isMastered", false).lte("dueDate", now)
+      .query('cards')
+      .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
+        q
+          .eq('deckId', deck._id)
+          .eq('isHidden', false)
+          .eq('isMastered', false)
+          .lte('dueDate', now),
       )
-      .order("asc")
+      .order('asc')
       .first();
     if (!card) return null;
 
@@ -104,17 +110,17 @@ export const getCardForReview = query({
     // Load translations
     const translations = await Promise.all(
       allLanguages.map(async (lang) => {
-        let translatedText = "";
+        let translatedText = '';
         if (lang === sourceLanguage) {
           translatedText = text.text;
         } else {
           const translation = await ctx.db
-            .query("translations")
-            .withIndex("by_text_and_language", (q) =>
-              q.eq("textId", card.textId).eq("targetLanguage", lang)
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', card.textId).eq('targetLanguage', lang),
             )
             .first();
-          translatedText = translation?.translatedText || "";
+          translatedText = translation?.translatedText || '';
         }
         return {
           language: lang,
@@ -122,16 +128,16 @@ export const getCardForReview = query({
           isBaseLanguage: course.baseLanguages.includes(lang),
           isTargetLanguage: course.targetLanguages.includes(lang),
         };
-      })
+      }),
     );
 
     // Load audio
     const audioRecordings = await Promise.all(
       allLanguages.map(async (lang) => {
         const audio = await ctx.db
-          .query("audioRecordings")
-          .withIndex("by_text_and_language", (q) =>
-            q.eq("textId", card.textId).eq("language", lang)
+          .query('audioRecordings')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', card.textId).eq('language', lang),
           )
           .first();
         const url = audio?.storageId
@@ -142,7 +148,7 @@ export const getCardForReview = query({
           voiceName: audio?.voiceName ?? null,
           url,
         };
-      })
+      }),
     );
 
     return {
@@ -176,14 +182,14 @@ export const getCardForReview = query({
  */
 export const reviewCard = mutation({
   args: {
-    cardId: v.id("cards"),
+    cardId: v.id('cards'),
     rating: v.union(
-      v.literal("stillLearning"),
-      v.literal("understood"),
-      v.literal("again"),
-      v.literal("hard"),
-      v.literal("good"),
-      v.literal("easy"),
+      v.literal('stillLearning'),
+      v.literal('understood'),
+      v.literal('again'),
+      v.literal('hard'),
+      v.literal('good'),
+      v.literal('easy'),
     ),
   },
   returns: v.object({
@@ -199,11 +205,11 @@ export const reviewCard = mutation({
     const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
 
     // Validate rating is appropriate for the card's current phase
-    const phase = card.schedulingPhase as "preReview" | "review";
+    const phase = card.schedulingPhase as 'preReview' | 'review';
     const validRatings = getValidRatings(phase);
     if (!validRatings.includes(args.rating)) {
       throw new ConvexError(
-        `Invalid rating "${args.rating}" for ${phase} phase. Valid ratings: ${validRatings.join(", ")}`,
+        `Invalid rating "${args.rating}" for ${phase} phase. Valid ratings: ${validRatings.join(', ')}`,
       );
     }
 
@@ -216,11 +222,7 @@ export const reviewCard = mutation({
     };
 
     // Run the shared scheduling algorithm
-    const result = scheduleCard(
-      cardState,
-      args.rating,
-      initialReviewCount,
-    );
+    const result = scheduleCard(cardState, args.rating, initialReviewCount);
 
     // Patch the card
     await ctx.db.patch(args.cardId, {
@@ -245,7 +247,7 @@ export const reviewCard = mutation({
  */
 export const masterCard = mutation({
   args: {
-    cardId: v.id("cards"),
+    cardId: v.id('cards'),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -260,7 +262,7 @@ export const masterCard = mutation({
  */
 export const hideCard = mutation({
   args: {
-    cardId: v.id("cards"),
+    cardId: v.id('cards'),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -269,4 +271,3 @@ export const hideCard = mutation({
     return null;
   },
 });
-

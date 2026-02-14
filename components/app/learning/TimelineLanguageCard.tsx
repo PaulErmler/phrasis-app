@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp, Minus, Plus } from "lucide-react";
-import { getLanguageByCode } from "@/lib/languages";
-import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
+import { useState, useEffect } from 'react';
+import { ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react';
+import { getLanguageByCode } from '@/lib/languages';
+import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 
 interface TimelineLanguageCardProps {
   code: string;
-  type: "base" | "target";
+  type: 'base' | 'target';
   plays: number;
   repPause: number;
   onPlaysChange: (value: number) => void;
@@ -47,10 +47,10 @@ export function TimelineLanguageCard({
     <div className="w-full max-w-[300px]">
       <div
         className={`rounded-lg border-2 px-3 py-2.5 space-y-2.5 transition-opacity ${
-          type === "base"
-            ? "border-timeline-base-border bg-timeline-base"
-            : "border-timeline-target-border bg-timeline-target"
-        } ${isDisabled ? "opacity-50" : ""}`}
+          type === 'base'
+            ? 'border-timeline-base-border bg-timeline-base'
+            : 'border-timeline-target-border bg-timeline-target'
+        } ${isDisabled ? 'opacity-50' : ''}`}
       >
         <div className="flex items-center gap-2">
           <div className="flex flex-col -my-1">
@@ -83,7 +83,9 @@ export function TimelineLanguageCard({
             >
               <Minus className="h-3 w-3" />
             </Button>
-            <span className="tabular-nums text-sm font-medium w-5 text-center">{plays}x</span>
+            <span className="tabular-nums text-sm font-medium w-5 text-center">
+              {plays}x
+            </span>
             <Button
               variant="outline"
               size="icon"
@@ -99,8 +101,12 @@ export function TimelineLanguageCard({
         {plays > 1 && (
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">{repPauseLabel}</span>
-              <span className="text-xs font-medium tabular-nums">{localRepPause}s</span>
+              <span className="text-xs text-muted-foreground">
+                {repPauseLabel}
+              </span>
+              <span className="text-xs font-medium tabular-nums">
+                {localRepPause}s
+              </span>
             </div>
             <Slider
               min={0}

@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useTranslations } from "next-intl";
-import { Flame, RotateCcw, MessageSquare, Clock } from "lucide-react";
+import { useTranslations } from 'next-intl';
+import { Flame, RotateCcw, MessageSquare, Clock } from 'lucide-react';
 
 function StatItem({
   icon: Icon,
@@ -22,15 +22,19 @@ function StatItem({
 }
 
 export function ProgressStatsCard() {
-  const t = useTranslations("AppPage");
+  const t = useTranslations('AppPage');
 
   return (
     <div className="card-surface p-4">
       <div className="grid grid-cols-4 gap-3">
-        <StatItem icon={Flame} label={t("stats.streak")} value="0" />
-        <StatItem icon={RotateCcw} label={t("stats.reps")} value="127" />
-        <StatItem icon={MessageSquare} label={t("stats.sentences")} value="42" />
-        <StatItem icon={Clock} label={t("stats.time")} value="23m" />
+        <StatItem icon={Flame} label={t('stats.streak')} value="0" />
+        <StatItem icon={RotateCcw} label={t('stats.reps')} value="127" />
+        <StatItem
+          icon={MessageSquare}
+          label={t('stats.sentences')}
+          value="42"
+        />
+        <StatItem icon={Clock} label={t('stats.time')} value="23m" />
       </div>
     </div>
   );

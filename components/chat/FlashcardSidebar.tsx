@@ -1,12 +1,18 @@
-"use client";
+'use client';
 
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader } from "@/components/ai-elements/loader";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader } from '@/components/ai-elements/loader';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
 
 /**
  * Sidebar component to display user's flashcards
@@ -33,17 +39,15 @@ export function FlashcardSidebar() {
       <div className="p-4 border-b">
         <h2 className="heading-section">My Flashcards</h2>
         <p className="text-muted-sm">
-          {flashcards.length} {flashcards.length === 1 ? "card" : "cards"}
+          {flashcards.length} {flashcards.length === 1 ? 'card' : 'cards'}
         </p>
       </div>
-      
+
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-3">
           {flashcards.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-sm">
-                No flashcards yet
-              </p>
+              <p className="text-muted-sm">No flashcards yet</p>
               <p className="text-muted-xs mt-1">
                 Ask your teacher to create some!
               </p>
@@ -66,7 +70,7 @@ export function FlashcardSidebar() {
                     {flashcard.note}
                   </CardDescription>
                   <p className="text-muted-xs">
-                    {format(new Date(flashcard.date), "MMM d, yyyy")}
+                    {format(new Date(flashcard.date), 'MMM d, yyyy')}
                   </p>
                 </CardContent>
               </Card>
@@ -77,6 +81,3 @@ export function FlashcardSidebar() {
     </aside>
   );
 }
-
-
-

@@ -1,7 +1,7 @@
-import { ConvexError } from "convex/values";
-import { QueryCtx, MutationCtx, ActionCtx } from "../_generated/server";
-import { authComponent } from "../auth";
-import { Doc } from "../_generated/dataModel";
+import { ConvexError } from 'convex/values';
+import { QueryCtx, MutationCtx, ActionCtx } from '../_generated/server';
+import { authComponent } from '../auth';
+import { Doc } from '../_generated/dataModel';
 
 /**
  * Get the authenticated user from the auth component.
@@ -18,7 +18,7 @@ export async function getAuthUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
  */
 export async function requireAuthUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
   const user = await getAuthUser(ctx);
-  if (!user) throw new ConvexError("Unauthenticated");
+  if (!user) throw new ConvexError('Unauthenticated');
   return user;
 }
 
@@ -27,11 +27,11 @@ export async function requireAuthUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
  */
 export async function getUserSettings(
   ctx: QueryCtx,
-  userId: string
-): Promise<Doc<"userSettings"> | null> {
+  userId: string,
+): Promise<Doc<'userSettings'> | null> {
   return ctx.db
-    .query("userSettings")
-    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .query('userSettings')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first();
 }
 
@@ -41,12 +41,14 @@ export async function getUserSettings(
 export async function getOrCreateUserSettings(
   ctx: MutationCtx,
   userId: string,
-  defaults: Partial<Omit<Doc<"userSettings">, "_id" | "_creationTime" | "userId">>
+  defaults: Partial<
+    Omit<Doc<'userSettings'>, '_id' | '_creationTime' | 'userId'>
+  >,
 ) {
   const existing = await getUserSettings(ctx, userId);
   if (existing) return existing;
 
-  const id = await ctx.db.insert("userSettings", {
+  const id = await ctx.db.insert('userSettings', {
     userId,
     hasCompletedOnboarding: defaults.hasCompletedOnboarding ?? false,
     learningStyle: defaults.learningStyle,
@@ -60,11 +62,10 @@ export async function getOrCreateUserSettings(
  */
 export async function getOnboardingProgress(
   ctx: QueryCtx,
-  userId: string
-): Promise<Doc<"onboardingProgress"> | null> {
+  userId: string,
+): Promise<Doc<'onboardingProgress'> | null> {
   return ctx.db
-    .query("onboardingProgress")
-    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .query('onboardingProgress')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first();
 }
-

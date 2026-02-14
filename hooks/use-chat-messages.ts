@@ -1,9 +1,13 @@
-import { useEffect, useReducer, useRef } from "react";
-import { useUIMessages } from "@convex-dev/agent/react";
-import type { UIMessagesQuery } from "@convex-dev/agent/react";
-import { api } from "@/convex/_generated/api";
-import type { ChatStatus, AgentUIMessage, ExtendedUIMessage } from "@/lib/types/chat";
-import { CHAT_STATUS } from "@/lib/constants/chat";
+import { useEffect, useReducer, useRef } from 'react';
+import { useUIMessages } from '@convex-dev/agent/react';
+import type { UIMessagesQuery } from '@convex-dev/agent/react';
+import { api } from '@/convex/_generated/api';
+import type {
+  ChatStatus,
+  AgentUIMessage,
+  ExtendedUIMessage,
+} from '@/lib/types/chat';
+import { CHAT_STATUS } from '@/lib/constants/chat';
 
 interface UseChatMessagesProps {
   threadId: string | null;
@@ -23,42 +27,53 @@ interface ChatMessagesState {
 
 // Actions for the reducer
 type ChatMessagesAction =
-  | { type: "SET_STATUS"; status: ChatStatus }
-  | { type: "UPDATE_STREAMING"; hasStreamingMessages: boolean }
-  | { type: "RESET_THREAD" };
+  | { type: 'SET_STATUS'; status: ChatStatus }
+  | { type: 'UPDATE_STREAMING'; hasStreamingMessages: boolean }
+  | { type: 'RESET_THREAD' };
 
 /**
  * Reducer for managing chat status with predictable state transitions
  */
 function chatMessagesReducer(
   state: ChatMessagesState,
-  action: ChatMessagesAction
+  action: ChatMessagesAction,
 ): ChatMessagesState {
   switch (action.type) {
-    case "SET_STATUS":
-      return { ...state, status: action.status };
+  case 'SET_STATUS':
+    return { ...state, status: action.status };
 
-    case "UPDATE_STREAMING":
-      // Automatically transition status based on streaming state
-      if (action.hasStreamingMessages) {
-        // If messages are streaming and we're not already in streaming state
-        if (state.status !== CHAT_STATUS.STREAMING) {
-          return { ...state, status: CHAT_STATUS.STREAMING, hasStreamingMessages: true };
-        }
-        return { ...state, hasStreamingMessages: true };
-      } else {
-        // No streaming messages - return to ready if we were streaming/submitted
-        if (state.status === CHAT_STATUS.STREAMING || state.status === CHAT_STATUS.SUBMITTED) {
-          return { ...state, status: CHAT_STATUS.READY, hasStreamingMessages: false };
-        }
-        return { ...state, hasStreamingMessages: false };
+  case 'UPDATE_STREAMING':
+    // Automatically transition status based on streaming state
+    if (action.hasStreamingMessages) {
+      // If messages are streaming and we're not already in streaming state
+      if (state.status !== CHAT_STATUS.STREAMING) {
+        return {
+          ...state,
+          status: CHAT_STATUS.STREAMING,
+          hasStreamingMessages: true,
+        };
       }
+      return { ...state, hasStreamingMessages: true };
+    } else {
+      // No streaming messages - return to ready if we were streaming/submitted
+      if (
+        state.status === CHAT_STATUS.STREAMING ||
+          state.status === CHAT_STATUS.SUBMITTED
+      ) {
+        return {
+          ...state,
+          status: CHAT_STATUS.READY,
+          hasStreamingMessages: false,
+        };
+      }
+      return { ...state, hasStreamingMessages: false };
+    }
 
-    case "RESET_THREAD":
-      return { status: CHAT_STATUS.READY, hasStreamingMessages: false };
+  case 'RESET_THREAD':
+    return { status: CHAT_STATUS.READY, hasStreamingMessages: false };
 
-    default:
-      return state;
+  default:
+    return state;
   }
 }
 
@@ -77,16 +92,21 @@ export function useChatMessages({
   // Track previous streaming state to avoid unnecessary dispatches
   const prevStreamingRef = useRef<boolean | null>(null);
 
-  const listMessagesQuery: UIMessagesQuery<{ threadId: string }, AgentUIMessage> =
-    api.features.chat.messages.listMessages as UIMessagesQuery<{ threadId: string }, AgentUIMessage>;
+  const listMessagesQuery: UIMessagesQuery<
+    { threadId: string },
+    AgentUIMessage
+  > = api.features.chat.messages.listMessages as UIMessagesQuery<
+    { threadId: string },
+    AgentUIMessage
+  >;
 
   const messageResult = useUIMessages(
     listMessagesQuery,
-    threadId ? { threadId } : "skip",
-    { 
+    threadId ? { threadId } : 'skip',
+    {
       initialNumItems: 100,
-      stream: true
-    }
+      stream: true,
+    },
   );
 
   const messages: ExtendedUIMessage[] = messageResult?.results ?? [];
@@ -98,14 +118,14 @@ export function useChatMessages({
     // Check if there are any messages currently streaming or pending
     const hasStreamingMessages = messageResult.results.some(
       (message) =>
-        message.role === "assistant" &&
-        (message.status === "streaming" || message.status === "pending")
+        message.role === 'assistant' &&
+        (message.status === 'streaming' || message.status === 'pending'),
     );
 
     // Only dispatch if the streaming state actually changed
     if (prevStreamingRef.current !== hasStreamingMessages) {
       prevStreamingRef.current = hasStreamingMessages;
-      dispatch({ type: "UPDATE_STREAMING", hasStreamingMessages });
+      dispatch({ type: 'UPDATE_STREAMING', hasStreamingMessages });
     }
   }, [messageResult?.results]);
 
@@ -113,13 +133,13 @@ export function useChatMessages({
   useEffect(() => {
     if (threadId) {
       prevStreamingRef.current = null;
-      dispatch({ type: "RESET_THREAD" });
+      dispatch({ type: 'RESET_THREAD' });
     }
   }, [threadId]);
 
   // Wrapper to allow external status updates
   const setStatus = (status: ChatStatus) => {
-    dispatch({ type: "SET_STATUS", status });
+    dispatch({ type: 'SET_STATUS', status });
   };
 
   return {
@@ -128,4 +148,3 @@ export function useChatMessages({
     setStatus,
   };
 }
-

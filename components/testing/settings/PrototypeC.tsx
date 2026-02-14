@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Prototype C: Tabbed Approach
@@ -9,14 +9,14 @@
  *      per-language repetition pauses and global pauses.
  */
 
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { getLanguageByCode } from "@/lib/languages";
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { getLanguageByCode } from '@/lib/languages';
 import {
   DEFAULT_AUTO_PLAY,
   DEFAULT_AUTO_ADVANCE,
@@ -25,7 +25,7 @@ import {
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
   DEFAULT_PAUSE_BASE_TO_TARGET,
-} from "@/lib/constants/audioPlayback";
+} from '@/lib/constants/audioPlayback';
 
 interface LanguageSettings {
   plays: number;
@@ -37,21 +37,38 @@ interface PrototypeCProps {
   targetLanguages: string[];
 }
 
-export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) {
+export function PrototypeC({
+  baseLanguages,
+  targetLanguages,
+}: PrototypeCProps) {
   const [autoPlay, setAutoPlay] = useState(DEFAULT_AUTO_PLAY);
   const [autoAdvance, setAutoAdvance] = useState(DEFAULT_AUTO_ADVANCE);
-  const [pauseBaseToBase, setPauseBaseToBase] = useState(DEFAULT_PAUSE_BETWEEN_LANGUAGES);
-  const [pauseBaseToTarget, setPauseBaseToTarget] = useState(DEFAULT_PAUSE_BASE_TO_TARGET);
-  const [pauseTargetToTarget, setPauseTargetToTarget] = useState(DEFAULT_PAUSE_BETWEEN_LANGUAGES);
+  const [pauseBaseToBase, setPauseBaseToBase] = useState(
+    DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+  );
+  const [pauseBaseToTarget, setPauseBaseToTarget] = useState(
+    DEFAULT_PAUSE_BASE_TO_TARGET,
+  );
+  const [pauseTargetToTarget, setPauseTargetToTarget] = useState(
+    DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+  );
 
-  const [langSettings, setLangSettings] = useState<Record<string, LanguageSettings>>({});
+  const [langSettings, setLangSettings] = useState<
+    Record<string, LanguageSettings>
+  >({});
 
   const getDefaultsFor = (code: string): LanguageSettings => ({
-    plays: baseLanguages.includes(code) ? DEFAULT_REPETITIONS_BASE : DEFAULT_REPETITIONS_TARGET,
+    plays: baseLanguages.includes(code)
+      ? DEFAULT_REPETITIONS_BASE
+      : DEFAULT_REPETITIONS_TARGET,
     repPause: DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   });
 
-  const updateLang = (code: string, key: keyof LanguageSettings, value: number) => {
+  const updateLang = (
+    code: string,
+    key: keyof LanguageSettings,
+    value: number,
+  ) => {
     setLangSettings((prev) => ({
       ...prev,
       [code]: { ...(prev[code] ?? getDefaultsFor(code)), [key]: value },
@@ -85,14 +102,19 @@ export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) 
       {/* Tabbed content */}
       <Tabs defaultValue="playback" className="w-full">
         <TabsList className="w-full">
-          <TabsTrigger value="playback" className="flex-1">Playback</TabsTrigger>
-          <TabsTrigger value="timing" className="flex-1">Timing</TabsTrigger>
+          <TabsTrigger value="playback" className="flex-1">
+            Playback
+          </TabsTrigger>
+          <TabsTrigger value="timing" className="flex-1">
+            Timing
+          </TabsTrigger>
         </TabsList>
 
         {/* ---- Playback tab ---- */}
         <TabsContent value="playback" className="space-y-4 pt-2">
           <p className="text-muted-xs">
-            Choose how many times each language&apos;s audio is played. Set to 0 to skip.
+            Choose how many times each language&apos;s audio is played. Set to 0
+            to skip.
           </p>
 
           {/* Compact table */}
@@ -101,8 +123,12 @@ export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) 
               <thead>
                 <tr className="bg-muted/40 text-muted-foreground text-xs">
                   <th className="text-left py-2 px-3 font-medium">Language</th>
-                  <th className="text-center py-2 px-3 font-medium w-16">Type</th>
-                  <th className="text-center py-2 px-3 font-medium w-20">Plays</th>
+                  <th className="text-center py-2 px-3 font-medium w-16">
+                    Type
+                  </th>
+                  <th className="text-center py-2 px-3 font-medium w-20">
+                    Plays
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -113,20 +139,24 @@ export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) 
                   return (
                     <tr
                       key={code}
-                      className={idx < allLanguages.length - 1 ? "border-b" : ""}
+                      className={
+                        idx < allLanguages.length - 1 ? 'border-b' : ''
+                      }
                     >
                       <td className="py-2.5 px-3">
                         <div className="flex items-center gap-2">
                           <span>{lang?.flag}</span>
-                          <span className="font-medium">{lang?.name ?? code}</span>
+                          <span className="font-medium">
+                            {lang?.name ?? code}
+                          </span>
                         </div>
                       </td>
                       <td className="py-2.5 px-3 text-center">
                         <Badge
-                          variant={isBase ? "secondary" : "outline"}
+                          variant={isBase ? 'secondary' : 'outline'}
                           className="text-[10px]"
                         >
-                          {isBase ? "Base" : "Target"}
+                          {isBase ? 'Base' : 'Target'}
                         </Badge>
                       </td>
                       <td className="py-2.5 px-3">
@@ -136,9 +166,18 @@ export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) 
                             min={0}
                             max={10}
                             step={1}
-                            value={settings?.plays ?? (isBase ? DEFAULT_REPETITIONS_BASE : DEFAULT_REPETITIONS_TARGET)}
+                            value={
+                              settings?.plays ??
+                              (isBase
+                                ? DEFAULT_REPETITIONS_BASE
+                                : DEFAULT_REPETITIONS_TARGET)
+                            }
                             onChange={(e) =>
-                              updateLang(code, "plays", parseInt(e.target.value) || 0)
+                              updateLang(
+                                code,
+                                'plays',
+                                parseInt(e.target.value) || 0,
+                              )
                             }
                             className="w-14 h-7 text-center text-sm"
                           />
@@ -160,7 +199,9 @@ export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) 
 
           {/* Per-language repetition pauses */}
           <div className="space-y-2">
-            <p className="text-xs font-medium">Between repetitions of the same language</p>
+            <p className="text-xs font-medium">
+              Between repetitions of the same language
+            </p>
             <p className="text-muted-xs">
               Only applies when a language plays more than once.
             </p>
@@ -170,20 +211,28 @@ export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) 
                 const lang = getLanguageByCode(code);
                 const isBase = baseLanguages.includes(code);
                 const settings = langSettings[code] ?? getDefaultsFor(code);
-                const plays = settings?.plays ?? (isBase ? DEFAULT_REPETITIONS_BASE : DEFAULT_REPETITIONS_TARGET);
+                const plays =
+                  settings?.plays ??
+                  (isBase
+                    ? DEFAULT_REPETITIONS_BASE
+                    : DEFAULT_REPETITIONS_TARGET);
 
                 return (
                   <div
                     key={code}
                     className={`flex items-center justify-between gap-3 ${
-                      plays <= 1 ? "opacity-40" : ""
+                      plays <= 1 ? 'opacity-40' : ''
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <span className="text-sm">{lang?.flag}</span>
-                      <span className="text-sm truncate">{lang?.name ?? code}</span>
+                      <span className="text-sm truncate">
+                        {lang?.name ?? code}
+                      </span>
                       {plays <= 1 && (
-                        <span className="text-[10px] text-muted-foreground">(single play)</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          (single play)
+                        </span>
                       )}
                     </div>
                     <div className="flex items-center gap-1">
@@ -192,9 +241,16 @@ export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) 
                         min={0}
                         max={30}
                         step={1}
-                        value={settings?.repPause ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS}
+                        value={
+                          settings?.repPause ??
+                          DEFAULT_PAUSE_BETWEEN_REPETITIONS
+                        }
                         onChange={(e) =>
-                          updateLang(code, "repPause", parseInt(e.target.value) || 0)
+                          updateLang(
+                            code,
+                            'repPause',
+                            parseInt(e.target.value) || 0,
+                          )
                         }
                         className="w-14 h-7 text-center text-sm"
                         disabled={plays <= 1}
@@ -217,7 +273,9 @@ export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) 
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5">
                   <span className="text-sm">Base → Base</span>
-                  <p className="text-muted-xs">Gap between different base languages</p>
+                  <p className="text-muted-xs">
+                    Gap between different base languages
+                  </p>
                 </div>
                 <div className="flex items-center gap-1">
                   <Input
@@ -238,7 +296,9 @@ export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) 
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5">
                   <span className="text-sm">Base → Target</span>
-                  <p className="text-muted-xs">Gap between the last base and first target audio</p>
+                  <p className="text-muted-xs">
+                    Gap between the last base and first target audio
+                  </p>
                 </div>
                 <div className="flex items-center gap-1">
                   <Input
@@ -259,7 +319,9 @@ export function PrototypeC({ baseLanguages, targetLanguages }: PrototypeCProps) 
               <div className="flex items-center justify-between gap-4">
                 <div className="space-y-0.5">
                   <span className="text-sm">Target → Target</span>
-                  <p className="text-muted-xs">Gap between different target languages</p>
+                  <p className="text-muted-xs">
+                    Gap between different target languages
+                  </p>
                 </div>
                 <div className="flex items-center gap-1">
                   <Input

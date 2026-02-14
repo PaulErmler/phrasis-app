@@ -1,37 +1,40 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useTranslations, useLocale } from "next-intl";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useState } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetTitle,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, X } from "lucide-react";
-import { toast } from "sonner";
-import { LanguageSelector } from "./LanguageSelector";
-import { DifficultySelector, LEVEL_ICONS } from "./DifficultySelector";
-import { CurrentLevel } from "./types";
-import { getLocalizedLanguageNameByCode } from "@/lib/languages";
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { ChevronLeft, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { LanguageSelector } from './LanguageSelector';
+import { DifficultySelector, LEVEL_ICONS } from './DifficultySelector';
+import { CurrentLevel } from './types';
+import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 
 interface CreateCourseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogProps) {
-  const t = useTranslations("AppPage.courses.createDialog");
-  const tLevels = useTranslations("Onboarding.step4");
+export function CreateCourseDialog({
+  open,
+  onOpenChange,
+}: CreateCourseDialogProps) {
+  const t = useTranslations('AppPage.courses.createDialog');
+  const tLevels = useTranslations('Onboarding.step4');
   const locale = useLocale();
-  
+
   const [step, setStep] = useState(1);
-  const [targetLanguage, setTargetLanguage] = useState<string>("");
-  const [baseLanguage, setBaseLanguage] = useState<string>("");
+  const [targetLanguage, setTargetLanguage] = useState<string>('');
+  const [baseLanguage, setBaseLanguage] = useState<string>('');
   const [difficulty, setDifficulty] = useState<CurrentLevel | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -43,8 +46,8 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
 
   const resetForm = () => {
     setStep(1);
-    setTargetLanguage("");
-    setBaseLanguage("");
+    setTargetLanguage('');
+    setBaseLanguage('');
     setDifficulty(null);
     setIsSubmitting(false);
   };
@@ -58,10 +61,14 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
 
   const canContinue = () => {
     switch (step) {
-      case 1: return targetLanguage !== "";
-      case 2: return baseLanguage !== "";
-      case 3: return difficulty !== null;
-      default: return false;
+    case 1:
+      return targetLanguage !== '';
+    case 2:
+      return baseLanguage !== '';
+    case 3:
+      return difficulty !== null;
+    default:
+      return false;
     }
   };
 
@@ -98,8 +105,8 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
       handleClose(false);
       resetForm();
     } catch (error) {
-      console.error("Error creating course:", error);
-      toast.error(t("error"));
+      console.error('Error creating course:', error);
+      toast.error(t('error'));
       setIsSubmitting(false);
     }
   };
@@ -112,54 +119,57 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
     setBaseLanguage(code);
   };
 
-  const targetLanguageName = targetLanguage 
+  const targetLanguageName = targetLanguage
     ? getLocalizedLanguageNameByCode(targetLanguage, locale)
     : undefined;
 
   const levelOptions = [
     {
-      id: "beginner" as const,
+      id: 'beginner' as const,
       icon: LEVEL_ICONS.beginner,
-      title: tLevels("beginner.title"),
-      description: tLevels("beginner.description", { language: targetLanguageName || "the language" }),
+      title: tLevels('beginner.title'),
+      description: tLevels('beginner.description', {
+        language: targetLanguageName || 'the language',
+      }),
     },
     {
-      id: "elementary" as const,
+      id: 'elementary' as const,
       icon: LEVEL_ICONS.elementary,
-      title: tLevels("elementary.title"),
-      description: tLevels("elementary.description"),
+      title: tLevels('elementary.title'),
+      description: tLevels('elementary.description'),
     },
     {
-      id: "intermediate" as const,
+      id: 'intermediate' as const,
       icon: LEVEL_ICONS.intermediate,
-      title: tLevels("intermediate.title"),
-      description: tLevels("intermediate.description"),
+      title: tLevels('intermediate.title'),
+      description: tLevels('intermediate.description'),
     },
     {
-      id: "upper_intermediate" as const,
+      id: 'upper_intermediate' as const,
       icon: LEVEL_ICONS.upper_intermediate,
-      title: tLevels("upper_intermediate.title"),
-      description: tLevels("upper_intermediate.description"),
+      title: tLevels('upper_intermediate.title'),
+      description: tLevels('upper_intermediate.description'),
     },
     {
-      id: "advanced" as const,
+      id: 'advanced' as const,
       icon: LEVEL_ICONS.advanced,
-      title: tLevels("advanced.title"),
-      description: tLevels("advanced.description"),
+      title: tLevels('advanced.title'),
+      description: tLevels('advanced.description'),
     },
   ];
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
-      <SheetContent side="left" className="w-full sm:max-w-md flex flex-col p-0 gap-0">
-        <SheetTitle className="sr-only">{t("title")}</SheetTitle>
-        <SheetDescription className="sr-only">
-          {t("title")}
-        </SheetDescription>
-        
+      <SheetContent
+        side="left"
+        className="w-full sm:max-w-md flex flex-col p-0 gap-0"
+      >
+        <SheetTitle className="sr-only">{t('title')}</SheetTitle>
+        <SheetDescription className="sr-only">{t('title')}</SheetDescription>
+
         {/* Header */}
         <div className="sheet-header">
-          <h2 className="heading-section">{t("title")}</h2>
+          <h2 className="heading-section">{t('title')}</h2>
           <Button
             variant="ghost"
             size="icon"
@@ -183,8 +193,8 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
         <div className="flex-1 overflow-hidden px-6">
           {step === 1 && (
             <LanguageSelector
-              title={t("step1.title")}
-              subtitle={t("step1.subtitle")}
+              title={t('step1.title')}
+              subtitle={t('step1.subtitle')}
               selectedLanguages={targetLanguage ? [targetLanguage] : []}
               onToggleLanguage={handleTargetLanguageToggle}
               multiSelect={false}
@@ -193,8 +203,8 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
 
           {step === 2 && (
             <LanguageSelector
-              title={t("step2.title")}
-              subtitle={t("step2.subtitle")}
+              title={t('step2.title')}
+              subtitle={t('step2.subtitle')}
               selectedLanguages={baseLanguage ? [baseLanguage] : []}
               excludeLanguages={targetLanguage ? [targetLanguage] : []}
               onToggleLanguage={handleBaseLanguageToggle}
@@ -204,8 +214,8 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
 
           {step === 3 && (
             <DifficultySelector
-              title={t("step3.title")}
-              subtitle={t("step3.subtitle")}
+              title={t('step3.title')}
+              subtitle={t('step3.subtitle')}
               selectedLevel={difficulty}
               onSelectLevel={setDifficulty}
               levelOptions={levelOptions}
@@ -224,7 +234,7 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
                 className="gap-2"
               >
                 <ChevronLeft className="h-4 w-4" />
-                {t("back")}
+                {t('back')}
               </Button>
             ) : (
               <div />
@@ -234,11 +244,7 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
               disabled={!canContinue() || isSubmitting}
               className="min-w-[120px]"
             >
-              {step === totalSteps ? (
-                t("create")
-              ) : (
-                t("next")
-              )}
+              {step === totalSteps ? t('create') : t('next')}
             </Button>
           </div>
         </div>
@@ -246,4 +252,3 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
     </Sheet>
   );
 }
-

@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
-import { useTranslations } from "next-intl";
-import { Menu, X, Download, Sun, Moon, Monitor } from "lucide-react";
-import { useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { Menu, X, Download, Sun, Moon, Monitor } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Button } from '@/components/ui/button';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 
 interface LandingHeaderProps {
   isAuthenticated: boolean;
@@ -15,12 +15,12 @@ interface LandingHeaderProps {
 
 export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
   const t = useTranslations('LandingPage.header');
-  
+
   const navLinks = [
-    { href: "#features", label: t('nav.features') },
-    { href: "#pricing", label: t('nav.pricing') },
-    { href: "#testimonials", label: t('nav.reviews') },
-    { href: "#faq", label: t('nav.faq') },
+    { href: '#features', label: t('nav.features') },
+    { href: '#pricing', label: t('nav.pricing') },
+    { href: '#testimonials', label: t('nav.reviews') },
+    { href: '#faq', label: t('nav.faq') },
   ];
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -31,9 +31,11 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
   }, []);
 
   const handleInstallClick = () => {
-    const pwaInstallElement = document.querySelector("pwa-install") as HTMLElement & {
-      showDialog: () => void;
-    } | null;
+    const pwaInstallElement = document.querySelector('pwa-install') as
+      | (HTMLElement & {
+          showDialog: () => void;
+        })
+      | null;
 
     if (pwaInstallElement) {
       pwaInstallElement.showDialog();
@@ -44,9 +46,9 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
   const themeOptions = [
-    { value: "light", label: "Light", icon: Sun },
-    { value: "dark", label: "Dark", icon: Moon },
-    { value: "system", label: "System", icon: Monitor },
+    { value: 'light', label: 'Light', icon: Sun },
+    { value: 'dark', label: 'Dark', icon: Moon },
+    { value: 'system', label: 'System', icon: Monitor },
   ];
 
   return (
@@ -105,7 +107,11 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                   >
                     {t('signIn')}
                   </Link>
-                  <Button asChild size="sm" className="shadow-lg shadow-primary/20">
+                  <Button
+                    asChild
+                    size="sm"
+                    className="shadow-lg shadow-primary/20"
+                  >
                     <Link href="/auth/sign-up">{t('signUp')}</Link>
                   </Button>
                 </>
@@ -141,8 +147,8 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
         <div
           className={`absolute top-full left-0 right-0 lg:hidden transition-all duration-300 ease-out overflow-hidden ${
             mobileMenuOpen
-              ? "opacity-100 max-h-[500px]"
-              : "opacity-0 max-h-0 pointer-events-none"
+              ? 'opacity-100 max-h-[500px]'
+              : 'opacity-0 max-h-0 pointer-events-none'
           }`}
         >
           <div className="mx-4 mt-2 p-2 rounded-2xl bg-background border border-border">
@@ -157,9 +163,9 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                   {link.label}
                 </a>
               ))}
-              
+
               <div className="h-px bg-border my-1 mx-2" />
-              
+
               <button
                 onClick={handleInstallClick}
                 className="px-4 py-3 rounded-xl text-base font-medium text-foreground hover:bg-primary/10 transition-all w-full text-left"
@@ -178,8 +184,8 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                         onClick={() => setTheme(option.value)}
                         className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                           isActive
-                            ? "bg-primary/15 text-primary"
-                            : "text-muted-foreground hover:bg-primary/10 hover:text-foreground"
+                            ? 'bg-primary/15 text-primary'
+                            : 'text-muted-foreground hover:bg-primary/10 hover:text-foreground'
                         }`}
                       >
                         <option.icon className="h-4 w-4" />
@@ -208,4 +214,3 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
     </>
   );
 }
-

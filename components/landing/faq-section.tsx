@@ -1,16 +1,33 @@
-import { ChevronDown } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { PWAInstallButton } from "./pwa-install-button";
+import { ChevronDown } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { PWAInstallButton } from './pwa-install-button';
 
 export function FAQSection() {
   const t = useTranslations('LandingPage.faq');
-  
+
   // Get FAQs from translations
   const faqs = Array.from({ length: 8 }, (_, i) => {
-    const answerCount = i === 0 ? 2 : i === 1 ? 1 : i === 2 ? 2 : i === 3 ? 2 : i === 4 ? 2 : i === 5 ? 2 : i === 6 ? 2 : 1;
+    const answerCount =
+      i === 0
+        ? 2
+        : i === 1
+          ? 1
+          : i === 2
+            ? 2
+            : i === 3
+              ? 2
+              : i === 4
+                ? 2
+                : i === 5
+                  ? 2
+                  : i === 6
+                    ? 2
+                    : 1;
     return {
       question: t(`items.${i}.question`),
-      answer: Array.from({ length: answerCount }, (_, j) => t(`items.${i}.answer.${j}`)),
+      answer: Array.from({ length: answerCount }, (_, j) =>
+        t(`items.${i}.answer.${j}`),
+      ),
       hasInstallButton: i === 7,
     };
   });
@@ -20,7 +37,7 @@ export function FAQSection() {
         {/* Section header */}
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">
-            {t('title')}{" "}
+            {t('title')}{' '}
             <span className="gradient-text">{t('titleHighlight')}</span>
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground">
@@ -59,8 +76,8 @@ export function FAQSection() {
         <div className="text-center mt-12 p-8 rounded-2xl bg-muted/50 border border-border/30">
           <p className="text-lg font-medium mb-2">{t('contact.title')}</p>
           <p className="text-muted-foreground">
-            {t('contact.description')}{" "}
-            <a 
+            {t('contact.description')}{' '}
+            <a
               href={`mailto:${t('contact.email')}`}
               className="text-primary hover:underline"
             >

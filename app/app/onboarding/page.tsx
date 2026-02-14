@@ -1,47 +1,53 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useTranslations, useLocale } from "next-intl";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { SignedIn, RedirectToSignIn } from "@daveyplate/better-auth-ui";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { WelcomeStep } from "./onboarding_steps/WelcomeStep";
-import { LearningStyleStep } from "./onboarding_steps/LearningStyleStep";
-import { TargetLanguagesStep } from "./onboarding_steps/TargetLanguagesStep";
-import { CurrentLevelStep } from "./onboarding_steps/CurrentLevelStep";
-import { BaseLanguagesStep } from "./onboarding_steps/BaseLanguagesStep";
-import { LoadingStep } from "./onboarding_steps/LoadingStep";
-import { getLocalizedLanguageNameByCode } from "@/lib/languages";
-import { OnboardingData } from "./types";
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useTranslations, useLocale } from 'next-intl';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { SignedIn, RedirectToSignIn } from '@daveyplate/better-auth-ui';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+import { ChevronLeft, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { WelcomeStep } from './onboarding_steps/WelcomeStep';
+import { LearningStyleStep } from './onboarding_steps/LearningStyleStep';
+import { TargetLanguagesStep } from './onboarding_steps/TargetLanguagesStep';
+import { CurrentLevelStep } from './onboarding_steps/CurrentLevelStep';
+import { BaseLanguagesStep } from './onboarding_steps/BaseLanguagesStep';
+import { LoadingStep } from './onboarding_steps/LoadingStep';
+import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import { OnboardingData } from './types';
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const t = useTranslations("Onboarding");
+  const t = useTranslations('Onboarding');
   const locale = useLocale();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const userSettings = useQuery(api.features.courses.getUserSettings);
-  const onboardingProgress = useQuery(api.features.courses.getOnboardingProgress);
+  const onboardingProgress = useQuery(
+    api.features.courses.getOnboardingProgress,
+  );
   const saveProgress = useMutation(api.features.courses.saveOnboardingProgress);
-  const completeOnboarding = useMutation(api.features.courses.completeOnboarding);
+  const completeOnboarding = useMutation(
+    api.features.courses.completeOnboarding,
+  );
 
   // Initialize data from onboarding progress or use defaults
-  const initialData: OnboardingData = onboardingProgress ? {
-    learningStyle: onboardingProgress.learningStyle || null,
-    targetLanguages: onboardingProgress.targetLanguages || [],
-    currentLevel: onboardingProgress.currentLevel || null,
-    baseLanguages: onboardingProgress.baseLanguages || [],
-  } : {
-    learningStyle: null,
-    targetLanguages: [],
-    currentLevel: null,
-    baseLanguages: [],
-  };
+  const initialData: OnboardingData = onboardingProgress
+    ? {
+      learningStyle: onboardingProgress.learningStyle || null,
+      targetLanguages: onboardingProgress.targetLanguages || [],
+      currentLevel: onboardingProgress.currentLevel || null,
+      baseLanguages: onboardingProgress.baseLanguages || [],
+    }
+    : {
+      learningStyle: null,
+      targetLanguages: [],
+      currentLevel: null,
+      baseLanguages: [],
+    };
 
   const [data, setData] = useState<OnboardingData>(initialData);
   const [step, setStep] = useState(onboardingProgress?.step || 1);
@@ -52,19 +58,26 @@ export default function OnboardingPage() {
   // Redirect to /app if onboarding is already completed
   useEffect(() => {
     if (userSettings?.hasCompletedOnboarding) {
-      router.push("/app");
+      router.push('/app');
     }
   }, [userSettings, router]);
 
   const canContinue = () => {
     switch (step) {
-      case 1: return true;
-      case 2: return data.learningStyle !== null;
-      case 3: return data.targetLanguages.length > 0;
-      case 4: return data.currentLevel !== null;
-      case 5: return data.baseLanguages.length > 0;
-      case 6: return true;
-      default: return false;
+    case 1:
+      return true;
+    case 2:
+      return data.learningStyle !== null;
+    case 3:
+      return data.targetLanguages.length > 0;
+    case 4:
+      return data.currentLevel !== null;
+    case 5:
+      return data.baseLanguages.length > 0;
+    case 6:
+      return true;
+    default:
+      return false;
     }
   };
 
@@ -72,11 +85,11 @@ export default function OnboardingPage() {
     setIsSubmitting(true);
     try {
       await completeOnboarding();
-      router.push("/app");
+      router.push('/app');
     } catch (error) {
-      console.error("Error completing onboarding:", error);
-      toast.error("Failed to complete onboarding", {
-        description: "Please try again.",
+      console.error('Error completing onboarding:', error);
+      toast.error('Failed to complete onboarding', {
+        description: 'Please try again.',
       });
       setIsSubmitting(false);
     }
@@ -90,12 +103,14 @@ export default function OnboardingPage() {
         await saveProgress({
           step: nextStep,
           learningStyle: data.learningStyle || undefined,
-          targetLanguages: data.targetLanguages.length > 0 ? data.targetLanguages : undefined,
+          targetLanguages:
+            data.targetLanguages.length > 0 ? data.targetLanguages : undefined,
           currentLevel: data.currentLevel || undefined,
-          baseLanguages: data.baseLanguages.length > 0 ? data.baseLanguages : undefined,
+          baseLanguages:
+            data.baseLanguages.length > 0 ? data.baseLanguages : undefined,
         });
       } catch (error) {
-        console.error("Error saving progress:", error);
+        console.error('Error saving progress:', error);
       }
     } else {
       await handleComplete();
@@ -110,18 +125,24 @@ export default function OnboardingPage() {
         await saveProgress({
           step: prevStep,
           learningStyle: data.learningStyle || undefined,
-          targetLanguages: data.targetLanguages.length > 0 ? data.targetLanguages : undefined,
+          targetLanguages:
+            data.targetLanguages.length > 0 ? data.targetLanguages : undefined,
           currentLevel: data.currentLevel || undefined,
-          baseLanguages: data.baseLanguages.length > 0 ? data.baseLanguages : undefined,
+          baseLanguages:
+            data.baseLanguages.length > 0 ? data.baseLanguages : undefined,
         });
       } catch (error) {
-        console.error("Error saving progress:", error);
+        console.error('Error saving progress:', error);
       }
     }
   };
 
   // Show loading state while queries are loading (undefined) or if redirecting to /app
-  if (userSettings === undefined || onboardingProgress === undefined || userSettings?.hasCompletedOnboarding) {
+  if (
+    userSettings === undefined ||
+    onboardingProgress === undefined ||
+    userSettings?.hasCompletedOnboarding
+  ) {
     return (
       <>
         <RedirectToSignIn />
@@ -152,14 +173,18 @@ export default function OnboardingPage() {
               {step === 2 && (
                 <LearningStyleStep
                   selectedStyle={data.learningStyle}
-                  onSelectStyle={(style) => setData({ ...data, learningStyle: style })}
+                  onSelectStyle={(style) =>
+                    setData({ ...data, learningStyle: style })
+                  }
                 />
               )}
 
               {step === 3 && (
                 <TargetLanguagesStep
                   selectedLanguages={data.targetLanguages}
-                  onToggleLanguage={(code) => setData({ ...data, targetLanguages: [code] })}
+                  onToggleLanguage={(code) =>
+                    setData({ ...data, targetLanguages: [code] })
+                  }
                 />
               )}
 
@@ -168,10 +193,15 @@ export default function OnboardingPage() {
                   selectedLevel={data.currentLevel}
                   targetLanguageName={
                     data.targetLanguages[0]
-                      ? getLocalizedLanguageNameByCode(data.targetLanguages[0], locale)
+                      ? getLocalizedLanguageNameByCode(
+                        data.targetLanguages[0],
+                        locale,
+                      )
                       : undefined
                   }
-                  onSelectLevel={(level) => setData({ ...data, currentLevel: level })}
+                  onSelectLevel={(level) =>
+                    setData({ ...data, currentLevel: level })
+                  }
                 />
               )}
 
@@ -179,7 +209,9 @@ export default function OnboardingPage() {
                 <BaseLanguagesStep
                   selectedLanguages={data.baseLanguages}
                   excludeLanguages={data.targetLanguages}
-                  onToggleLanguage={(code) => setData({ ...data, baseLanguages: [code] })}
+                  onToggleLanguage={(code) =>
+                    setData({ ...data, baseLanguages: [code] })
+                  }
                 />
               )}
 
@@ -199,7 +231,7 @@ export default function OnboardingPage() {
                       className="gap-2"
                     >
                       <ChevronLeft className="h-4 w-4" />
-                      {t("back")}
+                      {t('back')}
                     </Button>
                   ) : (
                     <div />
@@ -215,11 +247,11 @@ export default function OnboardingPage() {
                         Loading...
                       </>
                     ) : step === 1 ? (
-                      t("getStarted")
+                      t('getStarted')
                     ) : step === totalSteps ? (
-                      t("finish")
+                      t('finish')
                     ) : (
-                      t("continue")
+                      t('continue')
                     )}
                   </Button>
                 </div>

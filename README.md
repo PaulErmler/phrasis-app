@@ -78,7 +78,7 @@ pnpm dev
 pnpm dev:frontend  # Next.js on http://localhost:3000
 pnpm dev:backend   # Convex dev server
 
-# seeding the texts 
+# seeding the texts
 pnpm seed-texts
 ```
 
@@ -96,14 +96,18 @@ pnpm lint
 ```
 
 ---
-# Setting up git lfs 
+
+# Setting up git lfs
 
 ```
 https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage
 ```
+
 ---
+
 # Working with LLMs
-Here are relevant tutorials for making LLMs in cursor more accuracte with the tech stack we are using: 
+
+Here are relevant tutorials for making LLMs in cursor more accuracte with the tech stack we are using:
 
 # Working with LLMs
 
@@ -121,7 +125,8 @@ Shadcn: https://ui.shadcn.com/llms.txt
 Vercel AI SDK: https://ai-sdk.dev/llms.txt
 To add these go Cursor->Cursor Settings->Indexing and Docs
 
-You can also add the MCP Servers for Convex, BetterAuth and AI Elements by setting the following for MCP servers in the Cursor settings 
+You can also add the MCP Servers for Convex, BetterAuth and AI Elements by setting the following for MCP servers in the Cursor settings
+
 ```
 {
   "mcpServers": {
@@ -133,7 +138,7 @@ You can also add the MCP Servers for Convex, BetterAuth and AI Elements by setti
     "Better Auth": {
       "url": "https://mcp.chonkie.ai/better-auth/better-auth-builder/mcp",
       "headers": {}
-    }, 
+    },
     "ai-elements": {
       "command": "npx",
       "args": [

@@ -1,6 +1,11 @@
-export type LearningStyle = "casual" | "focused" | "advanced";
+export type LearningStyle = 'casual' | 'focused' | 'advanced';
 
-export type CurrentLevel = "beginner" | "elementary" | "intermediate" | "upper_intermediate" | "advanced";
+export type CurrentLevel =
+  | 'beginner'
+  | 'elementary'
+  | 'intermediate'
+  | 'upper_intermediate'
+  | 'advanced';
 
 export interface OnboardingData {
   learningStyle: LearningStyle | null;
@@ -8,6 +13,3 @@ export interface OnboardingData {
   currentLevel: CurrentLevel | null;
   baseLanguages: string[];
 }
-
-
-

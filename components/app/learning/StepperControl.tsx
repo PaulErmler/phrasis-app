@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { Minus, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Minus, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface StepperControlProps {
   value: number;
@@ -30,7 +30,9 @@ export function StepperControl({
       >
         <Minus className="h-3 w-3" />
       </Button>
-      <span className="tabular-nums text-sm font-medium w-8 text-center">{value}</span>
+      <span className="tabular-nums text-sm font-medium w-8 text-center">
+        {value}
+      </span>
       <Button
         variant="outline"
         size="icon"

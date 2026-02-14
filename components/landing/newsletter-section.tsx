@@ -1,31 +1,33 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { ArrowRight, Check, Loader2 } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { ArrowRight, Check, Loader2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 export function NewsletterSection() {
   const t = useTranslations('LandingPage.newsletter');
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<
+    'idle' | 'loading' | 'success' | 'error'
+  >('idle');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
 
-    setStatus("loading");
-    
+    setStatus('loading');
+
     // Simulate API call - replace with actual newsletter signup
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    
-    setStatus("success");
-    setEmail("");
-    
+
+    setStatus('success');
+    setEmail('');
+
     // Reset after 3 seconds
-    setTimeout(() => setStatus("idle"), 3000);
+    setTimeout(() => setStatus('idle'), 3000);
   };
 
   return (
@@ -38,9 +40,7 @@ export function NewsletterSection() {
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold tracking-tight mb-4">
                 {t('title')}
               </h2>
-              <p className="text-muted-foreground text-lg">
-                {t('subtitle')}
-              </p>
+              <p className="text-muted-foreground text-lg">{t('subtitle')}</p>
             </div>
 
             {/* Right side - Form */}
@@ -52,24 +52,26 @@ export function NewsletterSection() {
                     placeholder={t('placeholder')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    disabled={status === "loading" || status === "success"}
+                    disabled={status === 'loading' || status === 'success'}
                     className={cn(
-                      "h-14 px-5 text-base pr-[140px]",
-                      status === "success" && "border-green-500"
+                      'h-14 px-5 text-base pr-[140px]',
+                      status === 'success' && 'border-green-500',
                     )}
                     required
                   />
                   <Button
                     type="submit"
-                    disabled={status === "loading" || status === "success" || !email}
+                    disabled={
+                      status === 'loading' || status === 'success' || !email
+                    }
                     className={cn(
-                      "absolute right-2 top-1/2 -translate-y-1/2 h-10",
-                      status === "success" && "bg-green-500 hover:bg-green-500"
+                      'absolute right-2 top-1/2 -translate-y-1/2 h-10',
+                      status === 'success' && 'bg-green-500 hover:bg-green-500',
                     )}
                   >
-                    {status === "loading" ? (
+                    {status === 'loading' ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : status === "success" ? (
+                    ) : status === 'success' ? (
                       <>
                         <Check className="w-4 h-4" />
                         {t('done')}
@@ -87,7 +89,7 @@ export function NewsletterSection() {
                 </p>
               </form>
 
-              {status === "success" && (
+              {status === 'success' && (
                 <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-success dark:text-green-400 text-sm text-center">
                   {t('success')}
                 </div>
@@ -99,4 +101,3 @@ export function NewsletterSection() {
     </section>
   );
 }
-

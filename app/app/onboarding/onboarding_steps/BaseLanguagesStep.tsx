@@ -1,5 +1,5 @@
-import { useTranslations } from "next-intl";
-import { LanguageSelector } from "@/components/course/LanguageSelector";
+import { useTranslations } from 'next-intl';
+import { LanguageSelector } from '@/components/course/LanguageSelector';
 
 interface BaseLanguagesStepProps {
   selectedLanguages: string[];
@@ -12,12 +12,12 @@ export function BaseLanguagesStep({
   excludeLanguages,
   onToggleLanguage,
 }: BaseLanguagesStepProps) {
-  const t = useTranslations("Onboarding.step3");
+  const t = useTranslations('Onboarding.step3');
 
   return (
     <LanguageSelector
-      title={t("title")}
-      subtitle={t("subtitle")}
+      title={t('title')}
+      subtitle={t('subtitle')}
       selectedLanguages={selectedLanguages}
       excludeLanguages={excludeLanguages}
       onToggleLanguage={onToggleLanguage}

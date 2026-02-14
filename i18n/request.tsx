@@ -4,7 +4,6 @@ import { getUserLocale } from './locale';
 export default getRequestConfig(async () => {
   const locale = await getUserLocale();
 
-
   const [mainMessages, authMessages, landingMessages] = await Promise.all([
     import(`../messages/${locale}.json`).then((m) => m.default),
     import(`../messages/authentication/${locale}.json`)
@@ -22,6 +21,6 @@ export default getRequestConfig(async () => {
       ...authMessages,
       LandingPage: landingMessages,
     },
-    timeZone: "UTC",
+    timeZone: 'UTC',
   };
 });

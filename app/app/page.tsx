@@ -1,6 +1,6 @@
-import { api } from "@/convex/_generated/api";
-import { preloadAuthQuery } from "@/lib/auth-server";
-import { AppPageClient } from "./AppPageClient";
+import { api } from '@/convex/_generated/api';
+import { preloadAuthQuery } from '@/lib/auth-server';
+import { AppPageClient } from './AppPageClient';
 
 export default async function AppPage() {
   const [

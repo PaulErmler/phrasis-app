@@ -1,22 +1,25 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { LayoutGrid } from "lucide-react";
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { LayoutGrid } from 'lucide-react';
 import {
   CollectionCarouselUI,
   type CollectionProgressItem,
-} from "@/components/app/CollectionCarouselUI";
-import { CollectionDetailDialog, type PreviewText } from "@/components/app/CollectionDetailDialog";
+} from '@/components/app/CollectionCarouselUI';
+import {
+  CollectionDetailDialog,
+  type PreviewText,
+} from '@/components/app/CollectionDetailDialog';
 
 // ============================================================================
 // MOCK DATA
@@ -27,21 +30,64 @@ function makeId(name: string): string {
 }
 
 const ALL_COLLECTIONS: CollectionProgressItem[] = [
-  { collectionId: makeId("Essential"), collectionName: "Essential", cardsAdded: 0, totalTexts: 1000 },
-  { collectionId: makeId("A1"), collectionName: "A1", cardsAdded: 0, totalTexts: 800 },
-  { collectionId: makeId("A2"), collectionName: "A2", cardsAdded: 0, totalTexts: 1200 },
-  { collectionId: makeId("B1"), collectionName: "B1", cardsAdded: 0, totalTexts: 2000 },
-  { collectionId: makeId("B2"), collectionName: "B2", cardsAdded: 0, totalTexts: 2500 },
-  { collectionId: makeId("C1"), collectionName: "C1", cardsAdded: 0, totalTexts: 3000 },
-  { collectionId: makeId("C2"), collectionName: "C2", cardsAdded: 0, totalTexts: 3000 },
+  {
+    collectionId: makeId('Essential'),
+    collectionName: 'Essential',
+    cardsAdded: 0,
+    totalTexts: 1000,
+  },
+  {
+    collectionId: makeId('A1'),
+    collectionName: 'A1',
+    cardsAdded: 0,
+    totalTexts: 800,
+  },
+  {
+    collectionId: makeId('A2'),
+    collectionName: 'A2',
+    cardsAdded: 0,
+    totalTexts: 1200,
+  },
+  {
+    collectionId: makeId('B1'),
+    collectionName: 'B1',
+    cardsAdded: 0,
+    totalTexts: 2000,
+  },
+  {
+    collectionId: makeId('B2'),
+    collectionName: 'B2',
+    cardsAdded: 0,
+    totalTexts: 2500,
+  },
+  {
+    collectionId: makeId('C1'),
+    collectionName: 'C1',
+    cardsAdded: 0,
+    totalTexts: 3000,
+  },
+  {
+    collectionId: makeId('C2'),
+    collectionName: 'C2',
+    cardsAdded: 0,
+    totalTexts: 3000,
+  },
 ];
 
 const SAMPLE_TEXTS: PreviewText[] = [
-  { _id: "t1", text: "I know I can't take Tom's place.", collectionRank: 1 },
-  { _id: "t2", text: "That's what I like about Tom.", collectionRank: 2 },
-  { _id: "t3", text: "I don't like it in the town in winter.", collectionRank: 3 },
-  { _id: "t4", text: "That's not something that you forget.", collectionRank: 4 },
-  { _id: "t5", text: "I don't have any time to waste.", collectionRank: 5 },
+  { _id: 't1', text: "I know I can't take Tom's place.", collectionRank: 1 },
+  { _id: 't2', text: "That's what I like about Tom.", collectionRank: 2 },
+  {
+    _id: 't3',
+    text: "I don't like it in the town in winter.",
+    collectionRank: 3,
+  },
+  {
+    _id: 't4',
+    text: "That's not something that you forget.",
+    collectionRank: 4,
+  },
+  { _id: 't5', text: "I don't have any time to waste.", collectionRank: 5 },
 ];
 
 // ============================================================================
@@ -65,7 +111,7 @@ function ScenarioWrapper({
 
 /** 1. Fresh onboarding — A2 preselected, nothing done */
 function FreshOnboardingScenario() {
-  const [active, setActive] = useState<string | null>(makeId("A2"));
+  const [active, setActive] = useState<string | null>(makeId('A2'));
   const [openId, setOpenId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
@@ -88,7 +134,9 @@ function FreshOnboardingScenario() {
       />
       <CollectionDetailDialog
         open={openId !== null}
-        onOpenChange={(o) => { if (!o) setOpenId(null); }}
+        onOpenChange={(o) => {
+          if (!o) setOpenId(null);
+        }}
         collectionName={opened?.collectionName ?? null}
         totalTexts={opened?.totalTexts ?? 0}
         cardsAdded={opened?.cardsAdded ?? 0}
@@ -97,7 +145,9 @@ function FreshOnboardingScenario() {
         texts={SAMPLE_TEXTS}
         isLoadingTexts={false}
         isAdding={isAdding}
-        onSelect={() => { if (openId) setActive(openId); }}
+        onSelect={() => {
+          if (openId) setActive(openId);
+        }}
         onAddCards={handleAdd}
       />
     </ScenarioWrapper>
@@ -106,18 +156,22 @@ function FreshOnboardingScenario() {
 
 /** 2. Mid-progress — Essential+A1 done, A2 at 40% */
 function MidProgressScenario() {
-  const [active, setActive] = useState<string | null>(makeId("A2"));
+  const [active, setActive] = useState<string | null>(makeId('A2'));
   const [openId, setOpenId] = useState<string | null>(null);
 
   const collections: CollectionProgressItem[] = ALL_COLLECTIONS.map((c) => {
-    if (c.collectionName === "Essential") return { ...c, cardsAdded: c.totalTexts };
-    if (c.collectionName === "A1") return { ...c, cardsAdded: c.totalTexts };
-    if (c.collectionName === "A2") return { ...c, cardsAdded: Math.round(c.totalTexts * 0.4) };
+    if (c.collectionName === 'Essential')
+      return { ...c, cardsAdded: c.totalTexts };
+    if (c.collectionName === 'A1') return { ...c, cardsAdded: c.totalTexts };
+    if (c.collectionName === 'A2')
+      return { ...c, cardsAdded: Math.round(c.totalTexts * 0.4) };
     return { ...c };
   });
 
   const opened = collections.find((c) => c.collectionId === openId);
-  const isOpenedComplete = opened ? opened.cardsAdded >= opened.totalTexts && opened.totalTexts > 0 : false;
+  const isOpenedComplete = opened
+    ? opened.cardsAdded >= opened.totalTexts && opened.totalTexts > 0
+    : false;
 
   return (
     <ScenarioWrapper label="Essential + A1 done, A2 at 40%">
@@ -129,7 +183,9 @@ function MidProgressScenario() {
       />
       <CollectionDetailDialog
         open={openId !== null}
-        onOpenChange={(o) => { if (!o) setOpenId(null); }}
+        onOpenChange={(o) => {
+          if (!o) setOpenId(null);
+        }}
         collectionName={opened?.collectionName ?? null}
         totalTexts={opened?.totalTexts ?? 0}
         cardsAdded={opened?.cardsAdded ?? 0}
@@ -138,7 +194,9 @@ function MidProgressScenario() {
         texts={isOpenedComplete ? [] : SAMPLE_TEXTS}
         isLoadingTexts={false}
         isAdding={false}
-        onSelect={() => { if (openId) setActive(openId); }}
+        onSelect={() => {
+          if (openId) setActive(openId);
+        }}
         onAddCards={() => {}}
       />
     </ScenarioWrapper>
@@ -148,13 +206,14 @@ function MidProgressScenario() {
 /** 3. Auto-advance simulation */
 function AutoAdvanceScenario() {
   const [completedA2, setCompletedA2] = useState(false);
-  const active = completedA2 ? makeId("B1") : makeId("A2");
+  const active = completedA2 ? makeId('B1') : makeId('A2');
   const [openId, setOpenId] = useState<string | null>(null);
 
   const collections: CollectionProgressItem[] = ALL_COLLECTIONS.map((c) => {
-    if (c.collectionName === "Essential") return { ...c, cardsAdded: c.totalTexts };
-    if (c.collectionName === "A1") return { ...c, cardsAdded: c.totalTexts };
-    if (c.collectionName === "A2") {
+    if (c.collectionName === 'Essential')
+      return { ...c, cardsAdded: c.totalTexts };
+    if (c.collectionName === 'A1') return { ...c, cardsAdded: c.totalTexts };
+    if (c.collectionName === 'A2') {
       return completedA2
         ? { ...c, cardsAdded: c.totalTexts }
         : { ...c, cardsAdded: c.totalTexts - 5 };
@@ -163,17 +222,25 @@ function AutoAdvanceScenario() {
   });
 
   const opened = collections.find((c) => c.collectionId === openId);
-  const isOpenedComplete = opened ? opened.cardsAdded >= opened.totalTexts && opened.totalTexts > 0 : false;
+  const isOpenedComplete = opened
+    ? opened.cardsAdded >= opened.totalTexts && opened.totalTexts > 0
+    : false;
 
   return (
-    <ScenarioWrapper label={completedA2 ? "A2 completed → auto-advanced to B1" : "A2 nearly done (5 remaining)"}>
+    <ScenarioWrapper
+      label={
+        completedA2
+          ? 'A2 completed → auto-advanced to B1'
+          : 'A2 nearly done (5 remaining)'
+      }
+    >
       <div className="flex gap-3 items-center">
         <Button
           size="sm"
-          variant={completedA2 ? "outline" : "default"}
+          variant={completedA2 ? 'outline' : 'default'}
           onClick={() => setCompletedA2(!completedA2)}
         >
-          {completedA2 ? "Reset" : "Complete A2"}
+          {completedA2 ? 'Reset' : 'Complete A2'}
         </Button>
       </div>
       <CollectionCarouselUI
@@ -184,7 +251,9 @@ function AutoAdvanceScenario() {
       />
       <CollectionDetailDialog
         open={openId !== null}
-        onOpenChange={(o) => { if (!o) setOpenId(null); }}
+        onOpenChange={(o) => {
+          if (!o) setOpenId(null);
+        }}
         collectionName={opened?.collectionName ?? null}
         totalTexts={opened?.totalTexts ?? 0}
         cardsAdded={opened?.cardsAdded ?? 0}
@@ -221,7 +290,9 @@ function AllCompleteScenario() {
       />
       <CollectionDetailDialog
         open={openId !== null}
-        onOpenChange={(o) => { if (!o) setOpenId(null); }}
+        onOpenChange={(o) => {
+          if (!o) setOpenId(null);
+        }}
         collectionName={opened?.collectionName ?? null}
         totalTexts={opened?.totalTexts ?? 0}
         cardsAdded={opened?.cardsAdded ?? 0}
@@ -242,28 +313,33 @@ function LastCollectionScenario() {
   const [openId, setOpenId] = useState<string | null>(null);
 
   const collections: CollectionProgressItem[] = ALL_COLLECTIONS.map((c) => {
-    if (c.collectionName === "C2") return { ...c, cardsAdded: Math.round(c.totalTexts * 0.1) };
+    if (c.collectionName === 'C2')
+      return { ...c, cardsAdded: Math.round(c.totalTexts * 0.1) };
     return { ...c, cardsAdded: c.totalTexts };
   });
 
   const opened = collections.find((c) => c.collectionId === openId);
-  const isOpenedComplete = opened ? opened.cardsAdded >= opened.totalTexts && opened.totalTexts > 0 : false;
+  const isOpenedComplete = opened
+    ? opened.cardsAdded >= opened.totalTexts && opened.totalTexts > 0
+    : false;
 
   return (
     <ScenarioWrapper label="Only C2 remaining (10% progress)">
       <CollectionCarouselUI
         collections={collections}
-        activeCollectionId={makeId("C2")}
+        activeCollectionId={makeId('C2')}
         onSelectCollection={() => {}}
         onOpenCollection={setOpenId}
       />
       <CollectionDetailDialog
         open={openId !== null}
-        onOpenChange={(o) => { if (!o) setOpenId(null); }}
+        onOpenChange={(o) => {
+          if (!o) setOpenId(null);
+        }}
         collectionName={opened?.collectionName ?? null}
         totalTexts={opened?.totalTexts ?? 0}
         cardsAdded={opened?.cardsAdded ?? 0}
-        isActive={makeId("C2") === openId}
+        isActive={makeId('C2') === openId}
         isComplete={isOpenedComplete}
         texts={isOpenedComplete ? [] : SAMPLE_TEXTS}
         isLoadingTexts={false}
@@ -303,7 +379,8 @@ export function CollectionCarouselTest() {
           Collection Carousel UI States
         </CardTitle>
         <CardDescription>
-          All possible states rendered with mock data (no backend). Click a card to open the detail dialog.
+          All possible states rendered with mock data (no backend). Click a card
+          to open the detail dialog.
         </CardDescription>
       </CardHeader>
       <CardContent>

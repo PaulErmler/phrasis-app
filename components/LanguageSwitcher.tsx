@@ -1,17 +1,23 @@
 'use client';
 
-import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useState, useTransition } from "react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useLocale, useTranslations } from 'next-intl';
+import { useEffect, useState, useTransition } from 'react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { setUserLocale } from "@/i18n/locale";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
+import { setUserLocale } from '@/i18n/locale';
+import { cn } from '@/lib/utils';
 
 const locales = [
   { code: 'en', label: 'English', flag: '🇬🇧' },
@@ -25,9 +31,12 @@ interface LanguageSwitcherProps {
   className?: string;
 }
 
-export function LanguageSwitcher({ compact = false, className }: LanguageSwitcherProps) {
+export function LanguageSwitcher({
+  compact = false,
+  className,
+}: LanguageSwitcherProps) {
   const locale = useLocale();
-  const t = useTranslations("Language");
+  const t = useTranslations('Language');
   const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
 
@@ -48,14 +57,14 @@ export function LanguageSwitcher({ compact = false, className }: LanguageSwitche
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className={cn("size-9", className)} 
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn('size-9', className)}
             disabled={isPending || !mounted}
           >
             <span className="text-base">{currentLocale?.flag}</span>
-            <span className="sr-only">{t("title")}</span>
+            <span className="sr-only">{t('title')}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
@@ -63,7 +72,7 @@ export function LanguageSwitcher({ compact = false, className }: LanguageSwitche
             <DropdownMenuItem
               key={loc.code}
               onClick={() => handleLocaleChange(loc.code)}
-              className={cn(locale === loc.code && "bg-accent")}
+              className={cn(locale === loc.code && 'bg-accent')}
             >
               <span className="mr-2">{loc.flag}</span>
               {loc.label}
@@ -76,9 +85,13 @@ export function LanguageSwitcher({ compact = false, className }: LanguageSwitche
 
   // Full mode - use Select
   return (
-    <Select value={locale} onValueChange={handleLocaleChange} disabled={isPending || !mounted}>
-      <SelectTrigger className={cn("w-full", className)}>
-        <SelectValue placeholder={t("title")} />
+    <Select
+      value={locale}
+      onValueChange={handleLocaleChange}
+      disabled={isPending || !mounted}
+    >
+      <SelectTrigger className={cn('w-full', className)}>
+        <SelectValue placeholder={t('title')} />
       </SelectTrigger>
       <SelectContent>
         {locales.map((loc) => (

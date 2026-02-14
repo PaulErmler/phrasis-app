@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Settings prototype comparison UI.
@@ -7,26 +7,35 @@
  * languages to see how each prototype handles different configurations.
  */
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { getLanguageByCode, SUPPORTED_LANGUAGES } from "@/lib/languages";
-import { Plus, X } from "lucide-react";
-import { PrototypeA } from "./PrototypeA";
-import { PrototypeB } from "./PrototypeB";
-import { PrototypeC } from "./PrototypeC";
-import { PrototypeD } from "./PrototypeD";
+import { useState } from 'react';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { getLanguageByCode, SUPPORTED_LANGUAGES } from '@/lib/languages';
+import { Plus, X } from 'lucide-react';
+import { PrototypeA } from './PrototypeA';
+import { PrototypeB } from './PrototypeB';
+import { PrototypeC } from './PrototypeC';
+import { PrototypeD } from './PrototypeD';
 
 const ALL_CODES = SUPPORTED_LANGUAGES.map((l) => l.code);
 
 export function SettingsTest() {
-  const [baseLanguages, setBaseLanguages] = useState<string[]>(["en"]);
-  const [targetLanguages, setTargetLanguages] = useState<string[]>(["es", "fr"]);
+  const [baseLanguages, setBaseLanguages] = useState<string[]>(['en']);
+  const [targetLanguages, setTargetLanguages] = useState<string[]>([
+    'es',
+    'fr',
+  ]);
 
   const usedCodes = new Set([...baseLanguages, ...targetLanguages]);
   const availableCodes = ALL_CODES.filter((c) => !usedCodes.has(c));
-  const languageSignature = `${baseLanguages.join(",")}__${targetLanguages.join(",")}`;
+  const languageSignature = `${baseLanguages.join(',')}__${targetLanguages.join(',')}`;
 
   const addBase = () => {
     if (availableCodes.length > 0) {
@@ -83,7 +92,12 @@ export function SettingsTest() {
                 );
               })}
               {availableCodes.length > 0 && (
-                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={addBase}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  onClick={addBase}
+                >
                   <Plus className="h-3 w-3" />
                   Add
                 </Button>
@@ -112,7 +126,12 @@ export function SettingsTest() {
                 );
               })}
               {availableCodes.length > 0 && (
-                <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={addTarget}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 gap-1 text-xs"
+                  onClick={addTarget}
+                >
                   <Plus className="h-3 w-3" />
                   Add
                 </Button>
@@ -128,13 +147,16 @@ export function SettingsTest() {
             <CardHeader>
               <CardTitle>A: Visual Timeline</CardTitle>
               <CardDescription>
-                Shows the actual playback sequence as a visual flow.
-                Pause durations are editable inline on the timeline.
-                Gives users an intuitive preview of what will happen.
+                Shows the actual playback sequence as a visual flow. Pause
+                durations are editable inline on the timeline. Gives users an
+                intuitive preview of what will happen.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <PrototypeA baseLanguages={baseLanguages} targetLanguages={targetLanguages} />
+              <PrototypeA
+                baseLanguages={baseLanguages}
+                targetLanguages={targetLanguages}
+              />
             </CardContent>
           </Card>
 
@@ -143,13 +165,16 @@ export function SettingsTest() {
             <CardHeader>
               <CardTitle>B: Language Cards + Sliders</CardTitle>
               <CardDescription>
-                Each language is a bordered card with slider controls.
-                Global pauses shown as labeled dividers between groups.
+                Each language is a bordered card with slider controls. Global
+                pauses shown as labeled dividers between groups.
                 Mobile-friendly, tactile slider interaction.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <PrototypeB baseLanguages={baseLanguages} targetLanguages={targetLanguages} />
+              <PrototypeB
+                baseLanguages={baseLanguages}
+                targetLanguages={targetLanguages}
+              />
             </CardContent>
           </Card>
 
@@ -158,13 +183,16 @@ export function SettingsTest() {
             <CardHeader>
               <CardTitle>C: Tabbed Separation</CardTitle>
               <CardDescription>
-                Splits &quot;what plays&quot; and &quot;timing&quot; into two tabs.
-                Playback tab shows a compact table. Timing tab shows
-                all pauses. Reduces clutter for each concern.
+                Splits &quot;what plays&quot; and &quot;timing&quot; into two
+                tabs. Playback tab shows a compact table. Timing tab shows all
+                pauses. Reduces clutter for each concern.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <PrototypeC baseLanguages={baseLanguages} targetLanguages={targetLanguages} />
+              <PrototypeC
+                baseLanguages={baseLanguages}
+                targetLanguages={targetLanguages}
+              />
             </CardContent>
           </Card>
 
@@ -173,9 +201,9 @@ export function SettingsTest() {
             <CardHeader>
               <CardTitle>D: Timeline + Cards Combined</CardTitle>
               <CardDescription>
-                Combines A and B: each language is an interactive card
-                embedded directly in the timeline. Sliders for plays
-                and repetition pauses, +/&minus; steppers for pauses between groups.
+                Combines A and B: each language is an interactive card embedded
+                directly in the timeline. Sliders for plays and repetition
+                pauses, +/&minus; steppers for pauses between groups.
               </CardDescription>
             </CardHeader>
             <CardContent>

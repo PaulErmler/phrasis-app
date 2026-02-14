@@ -1,16 +1,16 @@
-import { QueryCtx } from "../_generated/server";
-import { Id, Doc } from "../_generated/dataModel";
+import { QueryCtx } from '../_generated/server';
+import { Id, Doc } from '../_generated/dataModel';
 
 /**
  * Get the deck for a given course.
  */
 export async function getDeckByCourseId(
   ctx: QueryCtx,
-  courseId: Id<"courses">
-): Promise<Doc<"decks"> | null> {
+  courseId: Id<'courses'>,
+): Promise<Doc<'decks'> | null> {
   return ctx.db
-    .query("decks")
-    .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+    .query('decks')
+    .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
     .first();
 }
 
@@ -20,13 +20,13 @@ export async function getDeckByCourseId(
  */
 export async function getCardByDeckAndText(
   ctx: QueryCtx,
-  deckId: Id<"decks">,
-  textId: Id<"texts">
-): Promise<Doc<"cards"> | null> {
+  deckId: Id<'decks'>,
+  textId: Id<'texts'>,
+): Promise<Doc<'cards'> | null> {
   return ctx.db
-    .query("cards")
-    .withIndex("by_deckId_and_textId", (q) =>
-      q.eq("deckId", deckId).eq("textId", textId)
+    .query('cards')
+    .withIndex('by_deckId_and_textId', (q) =>
+      q.eq('deckId', deckId).eq('textId', textId),
     )
     .first();
 }

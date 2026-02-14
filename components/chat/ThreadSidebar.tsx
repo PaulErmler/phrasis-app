@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
-import type { Thread } from "@/lib/types/chat";
+import { Button } from '@/components/ui/button';
+import type { Thread } from '@/lib/types/chat';
 
 interface ThreadSidebarProps {
   threads: Thread[] | undefined;
@@ -33,12 +33,12 @@ export function ThreadSidebar({
                 onClick={() => onThreadSelect(thread._id)}
                 className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
                   threadId === thread._id
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-accent"
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-accent'
                 }`}
               >
                 <div className="font-medium truncate">
-                  {thread.title || "New Chat"}
+                  {thread.title || 'New Chat'}
                 </div>
                 {thread.summary && (
                   <div className="text-xs opacity-70 truncate mt-1">
@@ -61,13 +61,9 @@ export function ThreadSidebar({
           variant="outline"
           disabled={isCreating}
         >
-          {isCreating ? "Creating..." : "New Chat"}
+          {isCreating ? 'Creating...' : 'New Chat'}
         </Button>
       </div>
     </aside>
   );
 }
-
-
-
-

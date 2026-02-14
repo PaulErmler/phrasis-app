@@ -1,11 +1,22 @@
-import { v, ConvexError } from "convex/values";
-import { mutation, query } from "../_generated/server";
-import { learningStyleValidator, currentLevelValidator } from "../types";
-import { getAuthUser, requireAuthUser, getUserSettings as dbGetUserSettings, getOnboardingProgress as dbGetOnboardingProgress } from "../db/users";
-import { getCoursesForUser, getActiveCourseForUser } from "../db/courses";
-import { getCourseSettings as dbGetCourseSettings, upsertCourseSettings } from "../db/courseSettings";
-import { DEFAULT_INITIAL_REVIEW_COUNT, validateInitialReviewCount } from "../../lib/scheduling";
-import { LEVEL_TO_COLLECTION } from "../lib/collections";
+import { v, ConvexError } from 'convex/values';
+import { mutation, query } from '../_generated/server';
+import { learningStyleValidator, currentLevelValidator } from '../types';
+import {
+  getAuthUser,
+  requireAuthUser,
+  getUserSettings as dbGetUserSettings,
+  getOnboardingProgress as dbGetOnboardingProgress,
+} from '../db/users';
+import { getCoursesForUser, getActiveCourseForUser } from '../db/courses';
+import {
+  getCourseSettings as dbGetCourseSettings,
+  upsertCourseSettings,
+} from '../db/courseSettings';
+import {
+  DEFAULT_INITIAL_REVIEW_COUNT,
+  validateInitialReviewCount,
+} from '../../lib/scheduling';
+import { LEVEL_TO_COLLECTION } from '../lib/collections';
 
 // ============================================================================
 // QUERIES
@@ -18,14 +29,14 @@ export const getUserSettings = query({
   args: {},
   returns: v.union(
     v.object({
-      _id: v.id("userSettings"),
+      _id: v.id('userSettings'),
       _creationTime: v.number(),
       userId: v.string(),
       hasCompletedOnboarding: v.boolean(),
       learningStyle: v.optional(learningStyleValidator),
-      activeCourseId: v.optional(v.id("courses")),
+      activeCourseId: v.optional(v.id('courses')),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx) => {
     try {
@@ -45,13 +56,13 @@ export const getUserCourses = query({
   args: {},
   returns: v.array(
     v.object({
-      _id: v.id("courses"),
+      _id: v.id('courses'),
       _creationTime: v.number(),
       userId: v.string(),
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
       currentLevel: v.optional(currentLevelValidator),
-    })
+    }),
   ),
   handler: async (ctx) => {
     try {
@@ -71,14 +82,14 @@ export const getActiveCourse = query({
   args: {},
   returns: v.union(
     v.object({
-      _id: v.id("courses"),
+      _id: v.id('courses'),
       _creationTime: v.number(),
       userId: v.string(),
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
       currentLevel: v.optional(currentLevelValidator),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx) => {
     try {
@@ -89,8 +100,8 @@ export const getActiveCourse = query({
       if (!settings?.activeCourseId) {
         // If no active course is set, return the first course
         const firstCourse = await ctx.db
-          .query("courses")
-          .withIndex("by_userId", (q) => q.eq("userId", user._id))
+          .query('courses')
+          .withIndex('by_userId', (q) => q.eq('userId', user._id))
           .first();
         return firstCourse;
       }
@@ -109,7 +120,7 @@ export const getOnboardingProgress = query({
   args: {},
   returns: v.union(
     v.object({
-      _id: v.id("onboardingProgress"),
+      _id: v.id('onboardingProgress'),
       _creationTime: v.number(),
       userId: v.string(),
       step: v.number(),
@@ -118,7 +129,7 @@ export const getOnboardingProgress = query({
       targetLanguages: v.optional(v.array(v.string())),
       baseLanguages: v.optional(v.array(v.string())),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx) => {
     try {
@@ -140,21 +151,24 @@ export const getOnboardingProgress = query({
  */
 export const setActiveCourse = mutation({
   args: {
-    courseId: v.id("courses"),
+    courseId: v.id('courses'),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError("Course not found");
-    if (course.userId !== user._id) throw new ConvexError("Course does not belong to user");
+    if (!course) throw new ConvexError('Course not found');
+    if (course.userId !== user._id)
+      throw new ConvexError('Course does not belong to user');
 
     const existingSettings = await dbGetUserSettings(ctx, user._id);
     if (existingSettings) {
-      await ctx.db.patch(existingSettings._id, { activeCourseId: args.courseId });
+      await ctx.db.patch(existingSettings._id, {
+        activeCourseId: args.courseId,
+      });
     } else {
-      await ctx.db.insert("userSettings", {
+      await ctx.db.insert('userSettings', {
         userId: user._id,
         hasCompletedOnboarding: true,
         activeCourseId: args.courseId,
@@ -177,7 +191,7 @@ export const saveOnboardingProgress = mutation({
     baseLanguages: v.optional(v.array(v.string())),
   },
   returns: v.object({
-    _id: v.id("onboardingProgress"),
+    _id: v.id('onboardingProgress'),
     _creationTime: v.number(),
     userId: v.string(),
     step: v.number(),
@@ -198,23 +212,29 @@ export const saveOnboardingProgress = mutation({
       await ctx.db.patch(existingProgress._id, args);
       progressId = existingProgress._id;
     } else {
-      progressId = await ctx.db.insert("onboardingProgress", { userId, ...args });
+      progressId = await ctx.db.insert('onboardingProgress', {
+        userId,
+        ...args,
+      });
     }
 
     // Ensure userSettings exists
     const existingSettings = await dbGetUserSettings(ctx, userId);
     if (!existingSettings) {
-      await ctx.db.insert("userSettings", {
+      await ctx.db.insert('userSettings', {
         userId,
         hasCompletedOnboarding: false,
         learningStyle: args.learningStyle,
       });
     } else {
-      await ctx.db.patch(existingSettings._id, { learningStyle: args.learningStyle });
+      await ctx.db.patch(existingSettings._id, {
+        learningStyle: args.learningStyle,
+      });
     }
 
     const progress = await ctx.db.get(progressId);
-    if (!progress) throw new ConvexError("Failed to retrieve onboarding progress");
+    if (!progress)
+      throw new ConvexError('Failed to retrieve onboarding progress');
     return progress;
   },
 });
@@ -230,16 +250,17 @@ export const createCourse = mutation({
     initialReviewCount: v.optional(v.number()),
   },
   returns: v.object({
-    courseId: v.id("courses"),
-    deckId: v.id("decks"),
+    courseId: v.id('courses'),
+    deckId: v.id('decks'),
   }),
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
 
-    const initialReviewCount = args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
+    const initialReviewCount =
+      args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
     validateInitialReviewCount(initialReviewCount);
 
-    const courseId = await ctx.db.insert("courses", {
+    const courseId = await ctx.db.insert('courses', {
       baseLanguages: args.baseLanguages,
       targetLanguages: args.targetLanguages,
       currentLevel: args.currentLevel,
@@ -251,8 +272,8 @@ export const createCourse = mutation({
       initialReviewCount,
     });
 
-    const deckName = `Learning ${args.targetLanguages.join(", ")}`;
-    const deckId = await ctx.db.insert("decks", {
+    const deckName = `Learning ${args.targetLanguages.join(', ')}`;
+    const deckId = await ctx.db.insert('decks', {
       courseId,
       name: deckName,
       cardCount: 0,
@@ -268,9 +289,9 @@ export const createCourse = mutation({
 export const completeOnboarding = mutation({
   args: {},
   returns: v.object({
-    settingsId: v.id("userSettings"),
-    courseId: v.id("courses"),
-    deckId: v.id("decks"),
+    settingsId: v.id('userSettings'),
+    courseId: v.id('courses'),
+    deckId: v.id('decks'),
   }),
   handler: async (ctx) => {
     const user = await requireAuthUser(ctx);
@@ -278,13 +299,13 @@ export const completeOnboarding = mutation({
     const userId = user._id;
 
     const progress = await dbGetOnboardingProgress(ctx, userId);
-    if (!progress) throw new ConvexError("Onboarding progress not found");
+    if (!progress) throw new ConvexError('Onboarding progress not found');
 
     const existingSettings = await dbGetUserSettings(ctx, userId);
     const targetLanguages = progress.targetLanguages || [];
 
     // Create the course
-    const courseId = await ctx.db.insert("courses", {
+    const courseId = await ctx.db.insert('courses', {
       baseLanguages: progress.baseLanguages || [],
       targetLanguages,
       currentLevel: progress.currentLevel,
@@ -292,10 +313,11 @@ export const completeOnboarding = mutation({
     });
 
     // Map the user's level to a starting collection
-    const collectionName = LEVEL_TO_COLLECTION[progress.currentLevel ?? "beginner"] ?? "A1";
+    const collectionName =
+      LEVEL_TO_COLLECTION[progress.currentLevel ?? 'beginner'] ?? 'A1';
     const collection = await ctx.db
-      .query("collections")
-      .withIndex("by_name", (q) => q.eq("name", collectionName))
+      .query('collections')
+      .withIndex('by_name', (q) => q.eq('name', collectionName))
       .first();
 
     // Create course settings in a separate table (with preselected collection)
@@ -305,8 +327,8 @@ export const completeOnboarding = mutation({
     });
 
     // Auto-create a deck
-    const deckName = `Learning ${targetLanguages.join(", ")}`;
-    const deckId = await ctx.db.insert("decks", {
+    const deckName = `Learning ${targetLanguages.join(', ')}`;
+    const deckId = await ctx.db.insert('decks', {
       courseId,
       name: deckName,
       cardCount: 0,
@@ -314,7 +336,7 @@ export const completeOnboarding = mutation({
 
     let settingsId;
     if (!existingSettings) {
-      settingsId = await ctx.db.insert("userSettings", {
+      settingsId = await ctx.db.insert('userSettings', {
         userId,
         hasCompletedOnboarding: true,
         learningStyle: progress.learningStyle,
@@ -347,11 +369,11 @@ export const getActiveCourseSettings = query({
   args: {},
   returns: v.union(
     v.object({
-      _id: v.id("courseSettings"),
+      _id: v.id('courseSettings'),
       _creationTime: v.number(),
-      courseId: v.id("courses"),
+      courseId: v.id('courses'),
       initialReviewCount: v.number(),
-      activeCollectionId: v.optional(v.id("collections")),
+      activeCollectionId: v.optional(v.id('collections')),
       cardsToAddBatchSize: v.optional(v.number()),
       autoAddCards: v.optional(v.boolean()),
       // Audio playback settings
@@ -366,7 +388,7 @@ export const getActiveCourseSettings = query({
       baseLanguageOrder: v.optional(v.array(v.string())),
       targetLanguageOrder: v.optional(v.array(v.string())),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx) => {
     try {
@@ -388,7 +410,7 @@ export const getActiveCourseSettings = query({
  */
 export const updateCourseSettings = mutation({
   args: {
-    courseId: v.id("courses"),
+    courseId: v.id('courses'),
     initialReviewCount: v.optional(v.number()),
     cardsToAddBatchSize: v.optional(v.number()),
     autoAddCards: v.optional(v.boolean()),
@@ -413,24 +435,25 @@ export const updateCourseSettings = mutation({
     }
 
     const course = await ctx.db.get(args.courseId);
-    if (!course) throw new ConvexError("Course not found");
-    if (course.userId !== user._id) throw new ConvexError("Course does not belong to user");
+    if (!course) throw new ConvexError('Course not found');
+    if (course.userId !== user._id)
+      throw new ConvexError('Course does not belong to user');
 
     // Build patch object with only provided fields
     const PATCHABLE_KEYS = [
-      "initialReviewCount",
-      "cardsToAddBatchSize",
-      "autoAddCards",
-      "autoPlayAudio",
-      "autoAdvance",
-      "languageRepetitions",
-      "languageRepetitionPauses",
-      "pauseBaseToBase",
-      "pauseBaseToTarget",
-      "pauseTargetToTarget",
-      "pauseBeforeAutoAdvance",
-      "baseLanguageOrder",
-      "targetLanguageOrder",
+      'initialReviewCount',
+      'cardsToAddBatchSize',
+      'autoAddCards',
+      'autoPlayAudio',
+      'autoAdvance',
+      'languageRepetitions',
+      'languageRepetitionPauses',
+      'pauseBaseToBase',
+      'pauseBaseToTarget',
+      'pauseTargetToTarget',
+      'pauseBeforeAutoAdvance',
+      'baseLanguageOrder',
+      'targetLanguageOrder',
     ] as const;
 
     const existing = await dbGetCourseSettings(ctx, args.courseId);
@@ -443,9 +466,10 @@ export const updateCourseSettings = mutation({
     if (existing) {
       await ctx.db.patch(existing._id, patch);
     } else {
-      await ctx.db.insert("courseSettings", {
+      await ctx.db.insert('courseSettings', {
         courseId: args.courseId,
-        initialReviewCount: args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
+        initialReviewCount:
+          args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
         cardsToAddBatchSize: args.cardsToAddBatchSize,
         autoAddCards: args.autoAddCards,
         autoPlayAudio: args.autoPlayAudio,
@@ -464,4 +488,3 @@ export const updateCourseSettings = mutation({
     return null;
   },
 });
-

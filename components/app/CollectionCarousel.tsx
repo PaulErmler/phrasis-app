@@ -1,13 +1,24 @@
-"use client";
+'use client';
 
-import { useState, useCallback } from "react";
-import { usePreloadedQuery, useQuery, useMutation, Preloaded } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
-import { useTranslations } from "next-intl";
-import { toast } from "sonner";
-import { CollectionCarouselUI, type CollectionProgressItem } from "./CollectionCarouselUI";
-import { CollectionDetailDialog, type PreviewText } from "./CollectionDetailDialog";
+import { useState, useCallback } from 'react';
+import {
+  usePreloadedQuery,
+  useQuery,
+  useMutation,
+  Preloaded,
+} from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
+import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
+import {
+  CollectionCarouselUI,
+  type CollectionProgressItem,
+} from './CollectionCarouselUI';
+import {
+  CollectionDetailDialog,
+  type PreviewText,
+} from './CollectionDetailDialog';
 
 const PREVIEW_COUNT = 5;
 
@@ -15,41 +26,58 @@ export function CollectionCarousel({
   preloadedCollectionProgress,
   preloadedCourseSettings,
 }: {
-  preloadedCollectionProgress: Preloaded<typeof api.features.decks.getCollectionProgress>;
-  preloadedCourseSettings: Preloaded<typeof api.features.courses.getActiveCourseSettings>;
+  preloadedCollectionProgress: Preloaded<
+    typeof api.features.decks.getCollectionProgress
+  >;
+  preloadedCourseSettings: Preloaded<
+    typeof api.features.courses.getActiveCourseSettings
+  >;
 }) {
-  const t = useTranslations("AppPage.collections.carousel");
+  const t = useTranslations('AppPage.collections.carousel');
   const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
-  const [optimisticActiveId, setOptimisticActiveId] = useState<string | null>(null);
+  const [optimisticActiveId, setOptimisticActiveId] = useState<string | null>(
+    null,
+  );
 
   const collectionProgress = usePreloadedQuery(preloadedCollectionProgress);
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
-  const setActiveCollection = useMutation(api.features.decks.setActiveCollection);
-  const addCardsFromCollection = useMutation(api.features.decks.addCardsFromCollection);
+  const setActiveCollection = useMutation(
+    api.features.decks.setActiveCollection,
+  );
+  const addCardsFromCollection = useMutation(
+    api.features.decks.addCardsFromCollection,
+  );
 
-  const activeCollectionId = optimisticActiveId ?? courseSettings?.activeCollectionId ?? null;
+  const activeCollectionId =
+    optimisticActiveId ?? courseSettings?.activeCollectionId ?? null;
 
   // Find opened collection progress
   const openedCollection = collectionProgress?.find(
-    (c) => c.collectionId === openCollectionId
+    (c) => c.collectionId === openCollectionId,
   );
   const isOpenedComplete = openedCollection
-    ? openedCollection.cardsAdded >= openedCollection.totalTexts && openedCollection.totalTexts > 0
+    ? openedCollection.cardsAdded >= openedCollection.totalTexts &&
+      openedCollection.totalTexts > 0
     : false;
 
   // Query next texts for the opened collection (skip if complete or not opened)
   const nextTexts = useQuery(
     api.features.decks.getNextTextsFromCollection,
     openCollectionId && !isOpenedComplete
-      ? { collectionId: openCollectionId as Id<"collections">, limit: PREVIEW_COUNT }
-      : "skip"
+      ? {
+        collectionId: openCollectionId as Id<'collections'>,
+        limit: PREVIEW_COUNT,
+      }
+      : 'skip',
   );
 
   // Compute initial scroll index (active collection position)
   const initialScrollIndex =
     collectionProgress && activeCollectionId
-      ? collectionProgress.findIndex((c) => c.collectionId === activeCollectionId)
+      ? collectionProgress.findIndex(
+        (c) => c.collectionId === activeCollectionId,
+      )
       : undefined;
 
   const handleSelectCollection = useCallback(
@@ -57,18 +85,18 @@ export function CollectionCarousel({
       setOptimisticActiveId(collectionId);
       try {
         await setActiveCollection({
-          collectionId: collectionId as Id<"collections">,
+          collectionId: collectionId as Id<'collections'>,
         });
       } catch (error) {
-        console.error("Error setting active collection:", error);
+        console.error('Error setting active collection:', error);
         toast.error(
-          error instanceof Error ? error.message : t("failedToSelect")
+          error instanceof Error ? error.message : t('failedToSelect'),
         );
       } finally {
         setOptimisticActiveId(null);
       }
     },
-    [setActiveCollection, t]
+    [setActiveCollection, t],
   );
 
   const handleAddCards = useCallback(async () => {
@@ -77,18 +105,18 @@ export function CollectionCarousel({
     setIsAdding(true);
     try {
       const result = await addCardsFromCollection({
-        collectionId: openCollectionId as Id<"collections">,
+        collectionId: openCollectionId as Id<'collections'>,
         batchSize: PREVIEW_COUNT,
       });
 
       if (result.cardsAdded === 0) {
-        toast.info(t("noCardsToAdd"));
+        toast.info(t('noCardsToAdd'));
       } else {
-        toast.success(t("cardsAdded", { count: result.cardsAdded }));
+        toast.success(t('cardsAdded', { count: result.cardsAdded }));
       }
     } catch (error) {
-      console.error("Error adding cards:", error);
-      toast.error(t("failedToAdd"));
+      console.error('Error adding cards:', error);
+      toast.error(t('failedToAdd'));
     } finally {
       setIsAdding(false);
     }
@@ -131,7 +159,11 @@ export function CollectionCarousel({
         onSelectCollection={handleSelectCollection}
         onOpenCollection={setOpenCollectionId}
         isLoading={false}
-        initialScrollIndex={initialScrollIndex !== undefined && initialScrollIndex >= 0 ? initialScrollIndex : undefined}
+        initialScrollIndex={
+          initialScrollIndex !== undefined && initialScrollIndex >= 0
+            ? initialScrollIndex
+            : undefined
+        }
       />
 
       <CollectionDetailDialog

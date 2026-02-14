@@ -19,20 +19,24 @@ erDiagram
 ## Texts & Collections System
 
 ### Schema (`convex/schema.ts`)
-- `collections` - groups texts by CEFR level with `name` and `textCount` and other topics/groupings are possible in the future 
+
+- `collections` - groups texts by CEFR level with `name` and `textCount` and other topics/groupings are possible in the future
 - `texts` - stores sentences with `datasetSentenceId`, `text`, `language`, `userCreated`, `collectionId`, `collectionRank`
 - `translations` - stores translations linked to `textId` and `targetLanguage`
 - `audioRecordings` - stores audio files using Convex file storage, linked to `textId`, `language`, and `voiceName`
 
 ### Data Seeding (`convex/db/seed.ts`)
+
 - `upsertCollection` - internal mutation to create/get collection by name
 - `batchUpsertTexts` - internal mutation for bulk inserting up to 500 texts
 - `adjustCollectionTextCount` - helper to update collection text counts
 
 ### Queries (`convex/testing/texts.ts`)
+
 - `getCollectionsWithTexts` - returns collections with preview texts and count (authenticated)
 
 ### Upload Script (`scripts/uploadTexts.mjs`)
+
 - Reads CSVs from `data_preparation/data/output/sentences_by_difficulty/`
 - Creates collections per CEFR level (Essential, A1-C2)
 - Batch uploads via `npx convex run [batch uploading function]`
@@ -41,6 +45,7 @@ erDiagram
 ## Courses, Decks & Cards System
 
 ### Schema
+
 - `courses` - stores user's language configuration (`baseLanguages`, `targetLanguages`, `currentLevel`)
 - `courseSettings` - stores course-specific settings (`initialReviewCount`) in a separate table to avoid course re-fetches when settings change
 - `decks` - one deck per course, auto-created with `cardCount` for efficient queries
@@ -78,17 +83,21 @@ sequenceDiagram
 ### Backend Functions (`convex/features/decks.ts`)
 
 **Public Mutations:**
+
 - `addCardsFromCollection` - adds cards from a collection to user's deck, tracks progress via `collectionProgress`
 - `ensureCardContent` - regenerates missing content for a specific card (called from UI when `hasMissingContent: true`)
 
 **Public Queries:**
+
 - `getDeckCards` - returns cards with translations and audio (paginated, default 20)
 - `getCollectionProgress` - returns progress for all collections in active course
 
 **Internal Functions:**
+
 - `prepareCardContent` - schedules translation and TTS for a text's required languages
 
 ### UI Components
+
 - `CollectionSelector` - displays collections with progress bars, batch size selector, "Add Cards" button
 - `DeckCardsView` - displays cards with translations and audio playback
 
@@ -127,51 +136,62 @@ flowchart TD
 ### Backend Functions (`convex/features/decks.ts`)
 
 **Helper Function:**
+
 - `scheduleMissingContent()` - shared logic for checking and scheduling missing translations/audio
 
 **Internal Mutations:**
+
 - `prepareCardContent` - entry point for new card content generation
 - `storeTranslationAndScheduleTTS` - stores translation and schedules TTS in one transaction
 - `storeAudioRecording` - stores audio file reference
 
 **Internal Actions (call external APIs):**
+
 - `processTranslationForCard` - calls Google Cloud Translation API
 - `processTTSForCard` - calls Google Cloud TTS API, stores MP3 in Convex storage
 
 **Shared Helpers:**
+
 - `convex/features/translation.ts` - `translateText()` plain async helper wrapping Google Cloud Translation API
 - `convex/features/tts.ts` - `synthesizeSpeech()` plain async helper wrapping Google Cloud TTS API
 
 ## Translation System (Standalone Testing)
 
 ### Backend (`convex/testing/translation.ts`)
+
 - `requestTranslation` - mutation creates pending request, schedules async processing
 - `getTranslationRequest` - query returns request status and result
 - `processTranslation` - internal action calls Google Cloud Translation API
 
 ### Constants (`lib/constants/translation.ts`)
+
 - `MAX_TRANSLATION_LENGTH` - shared between frontend and backend
 
 ### UI (`components/testing/TranslationTest.tsx`)
+
 - Test component with source/target language selection
 - Reactive result display when translation completes
 
 ## Text-to-Speech System (Standalone Testing)
 
 ### Backend (`convex/testing/tts.ts`)
+
 - `requestTTS` - mutation creates pending request, schedules async processing
 - `getTTSRequest` - query returns request status, generates `audioUrl` dynamically from `storageId`
 - `processTTS` - internal action calls Google Cloud TTS API (Chirp3 HD voices), stores MP3 in Convex storage
 
 ### Constants (`lib/constants/tts.ts`)
+
 - Shared constants: `MAX_TTS_LENGTH`, `MIN_TTS_SPEED`, `MAX_TTS_SPEED`, `TTS_SPEED_OPTIONS`
 - Used by both frontend and backend
 
 ### Voice Configuration (`lib/languages.ts`)
+
 - `SUPPORTED_LANGUAGES` with Chirp3 HD voices (1 female, 1 male per accent)
 - Helper functions: `getVoicesByLanguageCode`, `getLocalesByLanguageCode`, `getLocaleFromApiCode`, `getRandomVoiceForLanguage`
 
 ### UI (`components/testing/TTSTest.tsx`)
+
 - Test component for TTS with language/accent/voice selection
 - Speed control (0.5x - 1.0x)
 - Reactive audio playback when generation completes
@@ -192,11 +212,13 @@ stateDiagram-v2
 ```
 
 **Phase 1 — Pre-review:**
+
 - `preReviewCount` starts at 0, card shown with fixed intervals: 1 min, 3 min, 5 min, then every 10 min
 - Options: "Still learning" (default) / "Understood"
 - Transitions to FSRS when user selects "Understood" OR `preReviewCount` reaches `initialReviewCount - 2`
 
 **Phase 2 — FSRS review:**
+
 - Uses FSRS algorithm with `desired_retention: 0.95` and two learning steps `["10m", "10m"]`
 - Options: Again / Hard / Good (default) / Easy
 - Produces review intervals of approximately 1, 3, 9, 18 days
@@ -215,23 +237,25 @@ All scheduling logic lives in a single pure TypeScript module with no Convex/Rea
 
 ### FSRS Configuration
 
-| Parameter | Value |
-|-----------|-------|
-| `request_retention` | 0.95 |
-| `maximum_interval` | 36500 days |
-| `enable_fuzz` | false |
-| `enable_short_term` | true |
-| `learning_steps` | `["10m", "10m"]` |
-| `relearning_steps` | `["10m"]` |
+| Parameter           | Value            |
+| ------------------- | ---------------- |
+| `request_retention` | 0.95             |
+| `maximum_interval`  | 36500 days       |
+| `enable_fuzz`       | false            |
+| `enable_short_term` | true             |
+| `learning_steps`    | `["10m", "10m"]` |
+| `relearning_steps`  | `["10m"]`        |
 
 ### Schema Fields
 
 **Cards** (new fields alongside existing `dueDate`, `isMastered`, `isHidden`):
+
 - `schedulingPhase` — `"preReview"` or `"review"`
 - `preReviewCount` — number of pre-review rounds completed
 - `fsrsState` — optional serialised FSRS card state (stability, difficulty, reps, lapses, state, etc.)
 
 **Course Settings** (separate `courseSettings` table — avoids course re-fetches):
+
 - `courseId` — reference to the course
 - `initialReviewCount` — the X value controlling pre-review threshold
 - `cardsToAddBatchSize` — optional, how many cards to add per batch (default 5)
@@ -241,9 +265,11 @@ All scheduling logic lives in a single pure TypeScript module with no Convex/Rea
 ### Backend Functions (`convex/features/scheduling.ts`)
 
 **Public Query:**
+
 - `getCardForReview` — returns the next due card (earliest `dueDate <= now`, not hidden) with text, translations, and audio
 
 **Public Mutation:**
+
 - `reviewCard` — takes `cardId` + `rating`, delegates to shared `scheduleCard()`, patches card document
 
 ### UI Components
@@ -264,13 +290,13 @@ An immersive full-screen learning session at `/app/learn` for reviewing flashcar
 
 ### Card Display States
 
-| State | UI |
-|---|---|
-| Card due (preReview) | Flashcard + "Still learning" / "Understood" buttons |
-| Card due (review) | Flashcard + "Again" / "Hard" / "Good" / "Easy" buttons |
-| No cards due, collection selected | "Add X more cards" button (+ auto-add logic) |
-| No collection selected | Message + "Go to Home" button |
-| Loading | Skeleton |
+| State                             | UI                                                     |
+| --------------------------------- | ------------------------------------------------------ |
+| Card due (preReview)              | Flashcard + "Still learning" / "Understood" buttons    |
+| Card due (review)                 | Flashcard + "Again" / "Hard" / "Good" / "Easy" buttons |
+| No cards due, collection selected | "Add X more cards" button (+ auto-add logic)           |
+| No collection selected            | Message + "Go to Home" button                          |
+| Loading                           | Skeleton                                               |
 
 ### Flashcard Layout (top to bottom)
 
@@ -284,16 +310,19 @@ An immersive full-screen learning session at `/app/learn` for reviewing flashcar
 ### Schema Extensions
 
 `courseSettings` table gained two new optional fields:
+
 - `cardsToAddBatchSize` (number, default 5) — how many cards to add at once
 - `autoAddCards` (boolean, default false) — auto-add cards when none are due
 
 ### Backend Functions
 
 **New mutations in `convex/features/scheduling.ts`:**
+
 - `masterCard({ cardId })` — sets `isMastered: true` on the card
 - `hideCard({ cardId })` — sets `isHidden: true` on the card
 
 **Updated mutation in `convex/features/courses.ts`:**
+
 - `updateCourseSettings` — now accepts optional `cardsToAddBatchSize` and `autoAddCards` fields
 
 ### Frontend Components
@@ -304,6 +333,7 @@ An immersive full-screen learning session at `/app/learn` for reviewing flashcar
 ### Internationalization
 
 All UI text is internationalized under the `LearningMode` namespace in `messages/en.json` and `messages/de.json`, covering:
+
 - Header, phase labels, rating buttons, card actions
 - Empty state messages, settings panel labels
 

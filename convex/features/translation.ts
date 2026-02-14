@@ -19,23 +19,23 @@ interface GoogleTranslateResponse {
 export async function translateText(
   text: string,
   sourceLang: string,
-  targetLang: string
+  targetLang: string,
 ): Promise<string> {
   const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY;
-  if (!apiKey) throw new Error("Translation service not configured");
+  if (!apiKey) throw new Error('Translation service not configured');
 
   const response = await fetch(
     `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
     {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         q: text,
         source: sourceLang,
         target: targetLang,
-        format: "text",
+        format: 'text',
       }),
-    }
+    },
   );
 
   if (!response.ok) {
@@ -45,7 +45,7 @@ export async function translateText(
 
   const data = (await response.json()) as GoogleTranslateResponse;
   const translation = data.data?.translations?.[0]?.translatedText;
-  if (!translation) throw new Error("No translation returned from Google API");
+  if (!translation) throw new Error('No translation returned from Google API');
 
   return translation;
 }

@@ -36,7 +36,7 @@ export function GoToAppButton({ isAuthenticated }: GoToAppButtonProps) {
           <Button
             onClick={() => {
               router.refresh();
-              router.push("/app");
+              router.push('/app');
             }}
             className="w-full shadow-xl shadow-black/5 transition-all duration-200"
             size="lg"
@@ -62,7 +62,7 @@ export function GoToAppButton({ isAuthenticated }: GoToAppButtonProps) {
       </CardHeader>
       <CardContent className="space-y-3">
         <Button
-          onClick={() => router.push("/auth/sign-up")}
+          onClick={() => router.push('/auth/sign-up')}
           className="w-full shadow-xl shadow-black/5 transition-all duration-200"
           size="lg"
         >

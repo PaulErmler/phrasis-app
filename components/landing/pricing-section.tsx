@@ -1,35 +1,41 @@
-import Link from "next/link";
-import { useTranslations } from "next-intl";
-import { Check, X } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { Check, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 export function PricingSection() {
   const t = useTranslations('LandingPage.pricing');
-  
+
   const pricingPlans = [
     {
-      key: "free" as const,
+      key: 'free' as const,
       highlighted: false,
-      features: ["reviews", "flashcards", "languages", "aiQuestions"],
+      features: ['reviews', 'flashcards', 'languages', 'aiQuestions'],
     },
     {
-      key: "basic" as const,
+      key: 'basic' as const,
       highlighted: true,
-      features: ["reviews", "flashcards", "languages", "aiQuestions"],
+      features: ['reviews', 'flashcards', 'languages', 'aiQuestions'],
     },
     {
-      key: "pro" as const,
+      key: 'pro' as const,
       highlighted: false,
-      features: ["reviews", "flashcards", "languages", "aiQuestions", "priority"],
+      features: [
+        'reviews',
+        'flashcards',
+        'languages',
+        'aiQuestions',
+        'priority',
+      ],
     },
   ];
 
   const traditionalIssues = [
-    "limitedHours",
-    "fixedSchedule",
-    "noIndividualized",
-    "noReview",
+    'limitedHours',
+    'fixedSchedule',
+    'noIndividualized',
+    'noReview',
   ] as const;
   return (
     <section id="pricing" className="relative py-20 md:py-24 px-4">
@@ -42,10 +48,9 @@ export function PricingSection() {
         {/* Section header */}
         <div className="text-center max-w-3xl mx-auto mb-12">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">
-            {t('title')}{" "}
+            {t('title')}{' '}
             <span className="gradient-text">{t('titleHighlight')}</span>
           </h2>
-
         </div>
 
         {/* Pricing cards - CSS scroll-snap carousel */}
@@ -59,19 +64,21 @@ export function PricingSection() {
                 {/* Main Card Container */}
                 <div
                   className={cn(
-                    "pricing-card group relative flex flex-col p-8 rounded-2xl h-full isolation-isolate",
-                    "opacity-0 animate-fade-in-up",
-                    "bg-card border",
-                    plan.highlighted ? "border-primary/50" : "border-border/50"
+                    'pricing-card group relative flex flex-col p-8 rounded-2xl h-full isolation-isolate',
+                    'opacity-0 animate-fade-in-up',
+                    'bg-card border',
+                    plan.highlighted ? 'border-primary/50' : 'border-border/50',
                   )}
                   style={{
                     animationDelay: `${index * 0.1}s`,
-                    animationFillMode: "forwards",
+                    animationFillMode: 'forwards',
                   }}
                 >
                   {/* Plan header */}
                   <div className="mb-6">
-                    <h3 className="text-xl font-semibold mb-2">{t(`plans.${plan.key}.name`)}</h3>
+                    <h3 className="text-xl font-semibold mb-2">
+                      {t(`plans.${plan.key}.name`)}
+                    </h3>
                     <p className="text-muted-sm">
                       {t(`plans.${plan.key}.description`)}
                     </p>
@@ -83,7 +90,9 @@ export function PricingSection() {
                       <span className="text-4xl md:text-5xl font-bold">
                         {t(`plans.${plan.key}.price`)}
                       </span>
-                      <span className="text-muted-foreground">/{t(`plans.${plan.key}.period`)}</span>
+                      <span className="text-muted-foreground">
+                        /{t(`plans.${plan.key}.period`)}
+                      </span>
                     </div>
                   </div>
 
@@ -93,18 +102,22 @@ export function PricingSection() {
                       <li key={featureKey} className="flex items-start gap-3">
                         <div
                           className={cn(
-                            "flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5",
-                            plan.highlighted ? "bg-primary/20" : "bg-muted"
+                            'flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5',
+                            plan.highlighted ? 'bg-primary/20' : 'bg-muted',
                           )}
                         >
                           <Check
                             className={cn(
-                              "w-3 h-3",
-                              plan.highlighted ? "text-primary" : "text-foreground"
+                              'w-3 h-3',
+                              plan.highlighted
+                                ? 'text-primary'
+                                : 'text-foreground',
                             )}
                           />
                         </div>
-                        <span className="text-sm">{t(`plans.${plan.key}.features.${featureKey}`)}</span>
+                        <span className="text-sm">
+                          {t(`plans.${plan.key}.features.${featureKey}`)}
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -112,12 +125,9 @@ export function PricingSection() {
                   {/* CTA button */}
                   <Button
                     asChild
-                    variant={plan.highlighted ? "default" : "outline"}
+                    variant={plan.highlighted ? 'default' : 'outline'}
                     size="lg"
-                    className={cn(
-                      "w-full",
-                      plan.highlighted && "shadow-none" 
-                    )}
+                    className={cn('w-full', plan.highlighted && 'shadow-none')}
                   >
                     <Link href="/auth/sign-up">
                       {t(`plans.${plan.key}.cta`)}
@@ -141,11 +151,11 @@ export function PricingSection() {
                   </h2>
                 </div>
                 <div className="flex flex-col md:flex-row items-center md:items-center gap-2 md:gap-3">
-                 <h3 className="text-2xl md:text-2xl lg:text-3xl font-bold text-muted-foreground">
+                  <h3 className="text-2xl md:text-2xl lg:text-3xl font-bold text-muted-foreground">
                     {t('comparison.traditionalCourses')}
                   </h3>
                 </div>
-                
+
                 <div className="pt-2 md:pt-4">
                   <div className="flex flex-col md:flex-row items-center md:items-baseline gap-1 md:gap-2">
                     <span className="text-3xl md:text-3xl lg:text-4xl font-bold text-muted-foreground">
@@ -163,7 +173,7 @@ export function PricingSection() {
                 <h4 className="text-lg md:text-xl font-semibold text-muted-foreground text-center md:text-left">
                   {t('comparison.whatYouGet')}
                 </h4>
-                
+
                 <div className="space-y-3 md:space-y-3.5">
                   {traditionalIssues.map((issueKey) => (
                     <div
@@ -183,7 +193,6 @@ export function PricingSection() {
             </div>
           </div>
         </div>
-        
       </div>
     </section>
   );

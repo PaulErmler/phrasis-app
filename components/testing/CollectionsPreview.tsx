@@ -1,23 +1,23 @@
-"use client";
+'use client';
 
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Skeleton } from "@/components/ui/skeleton";
-import { BookOpen } from "lucide-react";
+} from '@/components/ui/accordion';
+import { Skeleton } from '@/components/ui/skeleton';
+import { BookOpen } from 'lucide-react';
 
 export function CollectionsPreview() {
   const collections = useQuery(api.testing.texts.getCollectionsWithTexts, {
@@ -113,4 +113,3 @@ export function CollectionsPreview() {
     </Card>
   );
 }
-

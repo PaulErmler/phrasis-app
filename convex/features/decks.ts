@@ -1,16 +1,25 @@
-import { v, ConvexError } from "convex/values";
-import { mutation, query, internalMutation, internalAction, MutationCtx } from "../_generated/server";
-import { internal } from "../_generated/api";
-import { Id, Doc } from "../_generated/dataModel";
-import { getRandomVoiceForLanguage } from "../../lib/languages";
-import { getCourseSettings, setActiveCollectionOnSettings } from "../db/courseSettings";
-import { getAuthUser, requireAuthUser, getUserSettings } from "../db/users";
-import { getActiveCourseForUser, requireActiveCourse } from "../db/courses";
-import { getDeckByCourseId, getCardByDeckAndText } from "../db/decks";
-import { translateText } from "./translation";
-import { synthesizeSpeech } from "./tts";
-import { translationValidator, audioRecordingValidator } from "../types";
-import { LEVEL_ORDER, getNextCollectionName } from "../lib/collections";
+import { v, ConvexError } from 'convex/values';
+import {
+  mutation,
+  query,
+  internalMutation,
+  internalAction,
+  MutationCtx,
+} from '../_generated/server';
+import { internal } from '../_generated/api';
+import { Id, Doc } from '../_generated/dataModel';
+import { getRandomVoiceForLanguage } from '../../lib/languages';
+import {
+  getCourseSettings,
+  setActiveCollectionOnSettings,
+} from '../db/courseSettings';
+import { getAuthUser, requireAuthUser, getUserSettings } from '../db/users';
+import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
+import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
+import { translateText } from './translation';
+import { synthesizeSpeech } from './tts';
+import { translationValidator, audioRecordingValidator } from '../types';
+import { LEVEL_ORDER, getNextCollectionName } from '../lib/collections';
 
 // ============================================================================
 // HELPERS
@@ -24,47 +33,51 @@ import { LEVEL_ORDER, getNextCollectionName } from "../lib/collections";
  */
 async function scheduleMissingContent(
   ctx: MutationCtx,
-  textId: Id<"texts">,
-  text: Doc<"texts">,
+  textId: Id<'texts'>,
+  text: Doc<'texts'>,
   baseLanguages: string[],
-  targetLanguages: string[]
+  targetLanguages: string[],
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sourceLanguage = text.language;
-  const allRequiredLanguages = [...new Set([...baseLanguages, ...targetLanguages])];
+  const allRequiredLanguages = [
+    ...new Set([...baseLanguages, ...targetLanguages]),
+  ];
 
   // Languages that need translation (all except source)
-  const langsNeedingTranslation = allRequiredLanguages.filter((l) => l !== sourceLanguage);
+  const langsNeedingTranslation = allRequiredLanguages.filter(
+    (l) => l !== sourceLanguage,
+  );
 
   // Batch load existing translations and audio for only the needed languages
   const [existingTranslations, existingAudio] = await Promise.all([
     Promise.all(
       langsNeedingTranslation.map((lang) =>
         ctx.db
-          .query("translations")
-          .withIndex("by_text_and_language", (q) =>
-            q.eq("textId", textId).eq("targetLanguage", lang)
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('targetLanguage', lang),
           )
-          .first()
-      )
+          .first(),
+      ),
     ),
     Promise.all(
       allRequiredLanguages.map((lang) =>
         ctx.db
-          .query("audioRecordings")
-          .withIndex("by_text_and_language", (q) =>
-            q.eq("textId", textId).eq("language", lang)
+          .query('audioRecordings')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('language', lang),
           )
-          .first()
-      )
+          .first(),
+      ),
     ),
   ]);
 
   // Build lookup maps
   const translationMap = new Map(
-    langsNeedingTranslation.map((lang, i) => [lang, existingTranslations[i]])
+    langsNeedingTranslation.map((lang, i) => [lang, existingTranslations[i]]),
   );
   const audioMap = new Map(
-    allRequiredLanguages.map((lang, i) => [lang, existingAudio[i]])
+    allRequiredLanguages.map((lang, i) => [lang, existingAudio[i]]),
   );
 
   // Validate storage files — delete stale rows where the file was removed
@@ -89,12 +102,16 @@ async function scheduleMissingContent(
       // Source language — no translation needed, maybe TTS
       if (!hasAudio) {
         const voiceName = getRandomVoiceForLanguage(lang);
-        await ctx.scheduler.runAfter(0, internal.features.decks.processTTSForCard, {
-          textId,
-          text: text.text,
-          language: lang,
-          voiceName,
-        });
+        await ctx.scheduler.runAfter(
+          0,
+          internal.features.decks.processTTSForCard,
+          {
+            textId,
+            text: text.text,
+            language: lang,
+            voiceName,
+          },
+        );
         audioScheduled++;
       }
     } else {
@@ -102,22 +119,30 @@ async function scheduleMissingContent(
       const translation = translationMap.get(lang);
       if (!translation) {
         // Schedule translation (which also triggers TTS after completion)
-        await ctx.scheduler.runAfter(0, internal.features.decks.processTranslationForCard, {
-          textId,
-          sourceLanguage,
-          targetLanguage: lang,
-          text: text.text,
-        });
+        await ctx.scheduler.runAfter(
+          0,
+          internal.features.decks.processTranslationForCard,
+          {
+            textId,
+            sourceLanguage,
+            targetLanguage: lang,
+            text: text.text,
+          },
+        );
         translationsScheduled++;
       } else if (!hasAudio) {
         // Translation exists but TTS is missing
         const voiceName = getRandomVoiceForLanguage(lang);
-        await ctx.scheduler.runAfter(0, internal.features.decks.processTTSForCard, {
-          textId,
-          text: translation.translatedText,
-          language: lang,
-          voiceName,
-        });
+        await ctx.scheduler.runAfter(
+          0,
+          internal.features.decks.processTTSForCard,
+          {
+            textId,
+            text: translation.translatedText,
+            language: lang,
+            voiceName,
+          },
+        );
         audioScheduled++;
       }
     }
@@ -142,9 +167,9 @@ export const getDeckCards = query({
   },
   returns: v.array(
     v.object({
-      _id: v.id("cards"),
+      _id: v.id('cards'),
       _creationTime: v.number(),
-      textId: v.id("texts"),
+      textId: v.id('texts'),
       sourceText: v.string(),
       sourceLanguage: v.string(),
       translations: v.array(translationValidator),
@@ -153,7 +178,7 @@ export const getDeckCards = query({
       isMastered: v.boolean(),
       isHidden: v.boolean(),
       hasMissingContent: v.boolean(),
-    })
+    }),
   ),
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
@@ -168,20 +193,22 @@ export const getDeckCards = query({
 
     const maxCards = args.limit ?? 20;
     const cards = await ctx.db
-      .query("cards")
-      .withIndex("by_deckId", (q) => q.eq("deckId", deck._id))
+      .query('cards')
+      .withIndex('by_deckId', (q) => q.eq('deckId', deck._id))
       .take(maxCards);
 
-    const allLanguages = [...new Set([...course.baseLanguages, ...course.targetLanguages])];
+    const allLanguages = [
+      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
+    ];
 
     // 1. Fetch all texts in parallel
     const texts = await Promise.all(cards.map((c) => ctx.db.get(c.textId)));
 
     // 2. Build flat lists of all translation + audio fetches across all cards
     const translationFetches: Array<{ cardIdx: number; lang: string }> = [];
-    const translationPromises: Array<Promise<Doc<"translations"> | null>> = [];
+    const translationPromises: Array<Promise<Doc<'translations'> | null>> = [];
     const audioFetches: Array<{ cardIdx: number; lang: string }> = [];
-    const audioPromises: Array<Promise<Doc<"audioRecordings"> | null>> = [];
+    const audioPromises: Array<Promise<Doc<'audioRecordings'> | null>> = [];
 
     cards.forEach((card, i) => {
       const text = texts[i];
@@ -191,21 +218,21 @@ export const getDeckCards = query({
           translationFetches.push({ cardIdx: i, lang });
           translationPromises.push(
             ctx.db
-              .query("translations")
-              .withIndex("by_text_and_language", (q) =>
-                q.eq("textId", card.textId).eq("targetLanguage", lang)
+              .query('translations')
+              .withIndex('by_text_and_language', (q) =>
+                q.eq('textId', card.textId).eq('targetLanguage', lang),
               )
-              .first()
+              .first(),
           );
         }
         audioFetches.push({ cardIdx: i, lang });
         audioPromises.push(
           ctx.db
-            .query("audioRecordings")
-            .withIndex("by_text_and_language", (q) =>
-              q.eq("textId", card.textId).eq("language", lang)
+            .query('audioRecordings')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', card.textId).eq('language', lang),
             )
-            .first()
+            .first(),
         );
       }
     });
@@ -217,21 +244,27 @@ export const getDeckCards = query({
     ]);
 
     // 4. Build lookup maps keyed by "cardIdx:lang"
-    const translationMap = new Map<string, Doc<"translations"> | null>();
+    const translationMap = new Map<string, Doc<'translations'> | null>();
     translationFetches.forEach((t, i) => {
       translationMap.set(`${t.cardIdx}:${t.lang}`, translationResults[i]);
     });
-    const audioMap = new Map<string, Doc<"audioRecordings"> | null>();
+    const audioMap = new Map<string, Doc<'audioRecordings'> | null>();
     audioFetches.forEach((a, i) => {
       audioMap.set(`${a.cardIdx}:${a.lang}`, audioResults[i]);
     });
 
     // 5. Fetch storage URLs only for audio that has a storageId
     const audioWithStorage = audioFetches
-      .map((a, i) => ({ key: `${a.cardIdx}:${a.lang}`, audio: audioResults[i] }))
-      .filter((a): a is { key: string; audio: Doc<"audioRecordings"> } => a.audio?.storageId != null);
+      .map((a, i) => ({
+        key: `${a.cardIdx}:${a.lang}`,
+        audio: audioResults[i],
+      }))
+      .filter(
+        (a): a is { key: string; audio: Doc<'audioRecordings'> } =>
+          a.audio?.storageId != null,
+      );
     const storageUrls = await Promise.all(
-      audioWithStorage.map((a) => ctx.storage.getUrl(a.audio.storageId))
+      audioWithStorage.map((a) => ctx.storage.getUrl(a.audio.storageId)),
     );
     const urlMap = new Map<string, string | null>();
     audioWithStorage.forEach((a, i) => {
@@ -246,11 +279,12 @@ export const getDeckCards = query({
       const sourceLanguage = text.language;
 
       const translations = allLanguages.map((lang) => {
-        let translatedText = "";
+        let translatedText = '';
         if (lang === sourceLanguage) {
           translatedText = text.text;
         } else {
-          translatedText = translationMap.get(`${i}:${lang}`)?.translatedText || "";
+          translatedText =
+            translationMap.get(`${i}:${lang}`)?.translatedText || '';
         }
         return {
           language: lang,
@@ -271,7 +305,7 @@ export const getDeckCards = query({
       });
 
       const hasMissingTranslation = translations.some(
-        (t) => t.language !== sourceLanguage && !t.text
+        (t) => t.language !== sourceLanguage && !t.text,
       );
       const hasMissingAudio = audioRecordings.some((a) => !a.url);
 
@@ -290,7 +324,9 @@ export const getDeckCards = query({
       };
     });
 
-    return result.filter((card): card is NonNullable<typeof card> => card !== null);
+    return result.filter(
+      (card): card is NonNullable<typeof card> => card !== null,
+    );
   },
 });
 
@@ -301,11 +337,11 @@ export const getCollectionProgress = query({
   args: {},
   returns: v.array(
     v.object({
-      collectionId: v.id("collections"),
+      collectionId: v.id('collections'),
       collectionName: v.string(),
       cardsAdded: v.number(),
       totalTexts: v.number(),
-    })
+    }),
   ),
   handler: async (ctx) => {
     const user = await getAuthUser(ctx);
@@ -315,14 +351,17 @@ export const getCollectionProgress = query({
     if (!settings?.activeCourseId) return [];
 
     const courseId = settings.activeCourseId;
-    const collections = await ctx.db.query("collections").collect();
+    const collections = await ctx.db.query('collections').collect();
 
     const result = await Promise.all(
       collections.map(async (collection) => {
         const progress = await ctx.db
-          .query("collectionProgress")
-          .withIndex("by_userId_and_courseId_and_collectionId", (q) =>
-            q.eq("userId", user._id).eq("courseId", courseId).eq("collectionId", collection._id)
+          .query('collectionProgress')
+          .withIndex('by_userId_and_courseId_and_collectionId', (q) =>
+            q
+              .eq('userId', user._id)
+              .eq('courseId', courseId)
+              .eq('collectionId', collection._id),
           )
           .first();
 
@@ -332,14 +371,15 @@ export const getCollectionProgress = query({
           cardsAdded: progress?.cardsAdded ?? 0,
           totalTexts: collection.textCount,
         };
-      })
+      }),
     );
 
     const levelOrder: readonly string[] = LEVEL_ORDER;
     result.sort((a, b) => {
       const aIndex = levelOrder.indexOf(a.collectionName);
       const bIndex = levelOrder.indexOf(b.collectionName);
-      if (aIndex === -1 && bIndex === -1) return a.collectionName.localeCompare(b.collectionName);
+      if (aIndex === -1 && bIndex === -1)
+        return a.collectionName.localeCompare(b.collectionName);
       if (aIndex === -1) return 1;
       if (bIndex === -1) return -1;
       return aIndex - bIndex;
@@ -355,15 +395,15 @@ export const getCollectionProgress = query({
  */
 export const getNextTextsFromCollection = query({
   args: {
-    collectionId: v.id("collections"),
+    collectionId: v.id('collections'),
     limit: v.optional(v.number()),
   },
   returns: v.array(
     v.object({
-      _id: v.id("texts"),
+      _id: v.id('texts'),
       text: v.string(),
       collectionRank: v.optional(v.number()),
-    })
+    }),
   ),
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
@@ -377,20 +417,25 @@ export const getNextTextsFromCollection = query({
 
     // Get current progress for this collection
     const progress = await ctx.db
-      .query("collectionProgress")
-      .withIndex("by_userId_and_courseId_and_collectionId", (q) =>
-        q.eq("userId", user._id).eq("courseId", courseId).eq("collectionId", args.collectionId)
+      .query('collectionProgress')
+      .withIndex('by_userId_and_courseId_and_collectionId', (q) =>
+        q
+          .eq('userId', user._id)
+          .eq('courseId', courseId)
+          .eq('collectionId', args.collectionId),
       )
       .first();
 
     const lastRankProcessed = progress?.lastRankProcessed ?? 0;
 
     const texts = await ctx.db
-      .query("texts")
-      .withIndex("by_collection_and_rank", (q) =>
-        q.eq("collectionId", args.collectionId).gt("collectionRank", lastRankProcessed)
+      .query('texts')
+      .withIndex('by_collection_and_rank', (q) =>
+        q
+          .eq('collectionId', args.collectionId)
+          .gt('collectionRank', lastRankProcessed),
       )
-      .order("asc")
+      .order('asc')
       .take(maxTexts);
 
     return texts.map((t) => ({
@@ -410,7 +455,7 @@ export const getNextTextsFromCollection = query({
  */
 export const setActiveCollection = mutation({
   args: {
-    collectionId: v.id("collections"),
+    collectionId: v.id('collections'),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -419,18 +464,21 @@ export const setActiveCollection = mutation({
 
     // Validate collection exists
     const collection = await ctx.db.get(args.collectionId);
-    if (!collection) throw new ConvexError("Collection not found");
+    if (!collection) throw new ConvexError('Collection not found');
 
     // Check if collection is already fully completed
     const progress = await ctx.db
-      .query("collectionProgress")
-      .withIndex("by_userId_and_courseId_and_collectionId", (q) =>
-        q.eq("userId", user._id).eq("courseId", courseId).eq("collectionId", args.collectionId)
+      .query('collectionProgress')
+      .withIndex('by_userId_and_courseId_and_collectionId', (q) =>
+        q
+          .eq('userId', user._id)
+          .eq('courseId', courseId)
+          .eq('collectionId', args.collectionId),
       )
       .first();
 
     if (progress && progress.cardsAdded >= collection.textCount) {
-      throw new ConvexError("This collection is already complete");
+      throw new ConvexError('This collection is already complete');
     }
 
     await setActiveCollectionOnSettings(ctx, courseId, args.collectionId);
@@ -443,7 +491,7 @@ export const setActiveCollection = mutation({
  */
 export const addCardsFromCollection = mutation({
   args: {
-    collectionId: v.id("collections"),
+    collectionId: v.id('collections'),
     batchSize: v.number(),
   },
   returns: v.object({
@@ -457,20 +505,23 @@ export const addCardsFromCollection = mutation({
     // Get or create deck
     let deck = await getDeckByCourseId(ctx, courseId);
     if (!deck) {
-      const deckId = await ctx.db.insert("decks", {
+      const deckId = await ctx.db.insert('decks', {
         courseId,
-        name: `Learning ${course.targetLanguages.join(", ")}`,
+        name: `Learning ${course.targetLanguages.join(', ')}`,
         cardCount: 0,
       });
       deck = await ctx.db.get(deckId);
-      if (!deck) throw new ConvexError("Failed to create deck");
+      if (!deck) throw new ConvexError('Failed to create deck');
     }
 
     // Get current progress
     const progress = await ctx.db
-      .query("collectionProgress")
-      .withIndex("by_userId_and_courseId_and_collectionId", (q) =>
-        q.eq("userId", user._id).eq("courseId", courseId).eq("collectionId", args.collectionId)
+      .query('collectionProgress')
+      .withIndex('by_userId_and_courseId_and_collectionId', (q) =>
+        q
+          .eq('userId', user._id)
+          .eq('courseId', courseId)
+          .eq('collectionId', args.collectionId),
       )
       .first();
 
@@ -479,11 +530,13 @@ export const addCardsFromCollection = mutation({
 
     // Get texts from collection (efficient index range pagination)
     const textsToAdd = await ctx.db
-      .query("texts")
-      .withIndex("by_collection_and_rank", (q) =>
-        q.eq("collectionId", args.collectionId).gt("collectionRank", lastRankProcessed)
+      .query('texts')
+      .withIndex('by_collection_and_rank', (q) =>
+        q
+          .eq('collectionId', args.collectionId)
+          .gt('collectionRank', lastRankProcessed),
       )
-      .order("asc")
+      .order('asc')
       .take(args.batchSize);
 
     if (textsToAdd.length === 0) {
@@ -495,21 +548,24 @@ export const addCardsFromCollection = mutation({
     let cardsInserted = 0;
 
     for (const text of textsToAdd) {
-      if (text.collectionRank !== undefined && text.collectionRank > newLastRank) {
+      if (
+        text.collectionRank !== undefined &&
+        text.collectionRank > newLastRank
+      ) {
         newLastRank = text.collectionRank;
       }
 
       const existingCard = await getCardByDeckAndText(ctx, deck._id, text._id);
 
       if (!existingCard) {
-        await ctx.db.insert("cards", {
+        await ctx.db.insert('cards', {
           deckId: deck._id,
           textId: text._id,
           collectionId: args.collectionId,
           dueDate: now,
           isMastered: false,
           isHidden: false,
-          schedulingPhase: "preReview",
+          schedulingPhase: 'preReview',
           preReviewCount: 0,
         });
         cardsInserted++;
@@ -527,7 +583,7 @@ export const addCardsFromCollection = mutation({
         lastRankProcessed: newLastRank,
       });
     } else {
-      await ctx.db.insert("collectionProgress", {
+      await ctx.db.insert('collectionProgress', {
         userId: user._id,
         courseId,
         collectionId: args.collectionId,
@@ -538,11 +594,15 @@ export const addCardsFromCollection = mutation({
 
     // Schedule content processing for each card
     for (const text of textsToAdd) {
-      await ctx.scheduler.runAfter(0, internal.features.decks.prepareCardContent, {
-        textId: text._id,
-        baseLanguages: course.baseLanguages,
-        targetLanguages: course.targetLanguages,
-      });
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.decks.prepareCardContent,
+        {
+          textId: text._id,
+          baseLanguages: course.baseLanguages,
+          targetLanguages: course.targetLanguages,
+        },
+      );
     }
 
     // Auto-advance: if the collection is now complete and is the active one,
@@ -550,14 +610,17 @@ export const addCardsFromCollection = mutation({
     const collection = await ctx.db.get(args.collectionId);
     if (collection && newCardsAdded >= collection.textCount) {
       const courseSettings = await getCourseSettings(ctx, courseId);
-      if (courseSettings?.activeCollectionId?.toString() === args.collectionId.toString()) {
+      if (
+        courseSettings?.activeCollectionId?.toString() ===
+        args.collectionId.toString()
+      ) {
         // Find next incomplete collection in LEVEL_ORDER
-        let nextCollectionId: Id<"collections"> | undefined;
+        let nextCollectionId: Id<'collections'> | undefined;
         const nextName = getNextCollectionName(collection.name);
 
         if (nextName) {
           // Walk forward through LEVEL_ORDER to find the first incomplete collection
-          const allCollections = await ctx.db.query("collections").collect();
+          const allCollections = await ctx.db.query('collections').collect();
           const orderedNames: readonly string[] = LEVEL_ORDER;
           const startIdx = orderedNames.indexOf(nextName);
 
@@ -566,9 +629,12 @@ export const addCardsFromCollection = mutation({
             if (!coll) continue;
 
             const prog = await ctx.db
-              .query("collectionProgress")
-              .withIndex("by_userId_and_courseId_and_collectionId", (q) =>
-                q.eq("userId", user._id).eq("courseId", courseId).eq("collectionId", coll._id)
+              .query('collectionProgress')
+              .withIndex('by_userId_and_courseId_and_collectionId', (q) =>
+                q
+                  .eq('userId', user._id)
+                  .eq('courseId', courseId)
+                  .eq('collectionId', coll._id),
               )
               .first();
 
@@ -596,7 +662,7 @@ export const addCardsFromCollection = mutation({
  */
 export const ensureCardContent = mutation({
   args: {
-    textId: v.id("texts"),
+    textId: v.id('texts'),
   },
   returns: v.object({
     translationsScheduled: v.number(),
@@ -623,7 +689,7 @@ export const ensureCardContent = mutation({
       args.textId,
       text,
       active.course.baseLanguages,
-      active.course.targetLanguages
+      active.course.targetLanguages,
     );
   },
 });
@@ -637,7 +703,7 @@ export const ensureCardContent = mutation({
  */
 export const prepareCardContent = internalMutation({
   args: {
-    textId: v.id("texts"),
+    textId: v.id('texts'),
     baseLanguages: v.array(v.string()),
     targetLanguages: v.array(v.string()),
   },
@@ -645,11 +711,17 @@ export const prepareCardContent = internalMutation({
   handler: async (ctx, args) => {
     const text = await ctx.db.get(args.textId);
     if (!text) {
-      console.error("Text not found:", args.textId);
+      console.error('Text not found:', args.textId);
       return null;
     }
 
-    await scheduleMissingContent(ctx, args.textId, text, args.baseLanguages, args.targetLanguages);
+    await scheduleMissingContent(
+      ctx,
+      args.textId,
+      text,
+      args.baseLanguages,
+      args.targetLanguages,
+    );
     return null;
   },
 });
@@ -659,7 +731,7 @@ export const prepareCardContent = internalMutation({
  */
 export const processTranslationForCard = internalAction({
   args: {
-    textId: v.id("texts"),
+    textId: v.id('texts'),
     sourceLanguage: v.string(),
     targetLanguage: v.string(),
     text: v.string(),
@@ -667,17 +739,24 @@ export const processTranslationForCard = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      const translation = await translateText(args.text, args.sourceLanguage, args.targetLanguage);
+      const translation = await translateText(
+        args.text,
+        args.sourceLanguage,
+        args.targetLanguage,
+      );
       const voiceName = getRandomVoiceForLanguage(args.targetLanguage);
 
-      await ctx.runMutation(internal.features.decks.storeTranslationAndScheduleTTS, {
-        textId: args.textId,
-        targetLanguage: args.targetLanguage,
-        translatedText: translation,
-        voiceName,
-      });
+      await ctx.runMutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId: args.textId,
+          targetLanguage: args.targetLanguage,
+          translatedText: translation,
+          voiceName,
+        },
+      );
     } catch (err) {
-      console.error("Translation error:", err);
+      console.error('Translation error:', err);
     }
 
     return null;
@@ -689,7 +768,7 @@ export const processTranslationForCard = internalAction({
  */
 export const storeTranslationAndScheduleTTS = internalMutation({
   args: {
-    textId: v.id("texts"),
+    textId: v.id('texts'),
     targetLanguage: v.string(),
     translatedText: v.string(),
     voiceName: v.string(),
@@ -697,14 +776,14 @@ export const storeTranslationAndScheduleTTS = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const existing = await ctx.db
-      .query("translations")
-      .withIndex("by_text_and_language", (q) =>
-        q.eq("textId", args.textId).eq("targetLanguage", args.targetLanguage)
+      .query('translations')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
       )
       .first();
 
     if (!existing) {
-      await ctx.db.insert("translations", {
+      await ctx.db.insert('translations', {
         textId: args.textId,
         targetLanguage: args.targetLanguage,
         translatedText: args.translatedText,
@@ -727,7 +806,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
  */
 export const processTTSForCard = internalAction({
   args: {
-    textId: v.id("texts"),
+    textId: v.id('texts'),
     text: v.string(),
     language: v.string(),
     voiceName: v.string(),
@@ -736,7 +815,7 @@ export const processTTSForCard = internalAction({
   handler: async (ctx, args) => {
     try {
       const blob = await synthesizeSpeech(args.text, args.voiceName, 0.9);
-      const storageId: Id<"_storage"> = await ctx.storage.store(blob);
+      const storageId: Id<'_storage'> = await ctx.storage.store(blob);
 
       await ctx.runMutation(internal.features.decks.storeAudioRecording, {
         textId: args.textId,
@@ -745,7 +824,7 @@ export const processTTSForCard = internalAction({
         storageId,
       });
     } catch (err) {
-      console.error("TTS error:", err);
+      console.error('TTS error:', err);
     }
 
     return null;
@@ -757,22 +836,22 @@ export const processTTSForCard = internalAction({
  */
 export const storeAudioRecording = internalMutation({
   args: {
-    textId: v.id("texts"),
+    textId: v.id('texts'),
     language: v.string(),
     voiceName: v.string(),
-    storageId: v.id("_storage"),
+    storageId: v.id('_storage'),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const existing = await ctx.db
-      .query("audioRecordings")
-      .withIndex("by_text_and_language", (q) =>
-        q.eq("textId", args.textId).eq("language", args.language)
+      .query('audioRecordings')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('language', args.language),
       )
       .first();
 
     if (!existing) {
-      await ctx.db.insert("audioRecordings", {
+      await ctx.db.insert('audioRecordings', {
         textId: args.textId,
         language: args.language,
         voiceName: args.voiceName,
@@ -782,4 +861,3 @@ export const storeAudioRecording = internalMutation({
     return null;
   },
 });
-

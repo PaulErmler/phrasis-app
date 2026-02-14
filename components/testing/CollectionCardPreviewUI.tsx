@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Loader2, CheckCircle2 } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Plus, Loader2, CheckCircle2 } from 'lucide-react';
 
 export interface PreviewText {
   _id: string;
@@ -33,9 +33,7 @@ export function CollectionCardPreviewUI({
     return (
       <div className="rounded-xl border border-border bg-muted/30 p-4 text-center space-y-2">
         <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto" />
-        <p className="text-sm font-medium">
-          {collectionName} complete!
-        </p>
+        <p className="text-sm font-medium">{collectionName} complete!</p>
         <p className="text-muted-xs">
           All cards from this collection have been added to your deck.
         </p>
@@ -74,10 +72,7 @@ export function CollectionCardPreviewUI({
 
       <ul className="space-y-2">
         {texts.map((text, idx) => (
-          <li
-            key={text._id}
-            className="flex items-start gap-2 text-sm"
-          >
+          <li key={text._id} className="flex items-start gap-2 text-sm">
             <span className="text-muted-foreground font-mono text-xs min-w-[1.5rem] mt-0.5">
               {idx + 1}.
             </span>
@@ -107,4 +102,3 @@ export function CollectionCardPreviewUI({
     </div>
   );
 }
-

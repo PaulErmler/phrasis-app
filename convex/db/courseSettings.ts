@@ -1,6 +1,6 @@
-import { QueryCtx, MutationCtx } from "../_generated/server";
-import { Id, Doc } from "../_generated/dataModel";
-import { DEFAULT_INITIAL_REVIEW_COUNT } from "../../lib/scheduling";
+import { QueryCtx, MutationCtx } from '../_generated/server';
+import { Id, Doc } from '../_generated/dataModel';
+import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 
 /**
  * Get the course settings for a given course.
@@ -8,11 +8,11 @@ import { DEFAULT_INITIAL_REVIEW_COUNT } from "../../lib/scheduling";
  */
 export async function getCourseSettings(
   ctx: QueryCtx,
-  courseId: Id<"courses">,
-): Promise<Doc<"courseSettings"> | null> {
+  courseId: Id<'courses'>,
+): Promise<Doc<'courseSettings'> | null> {
   return ctx.db
-    .query("courseSettings")
-    .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+    .query('courseSettings')
+    .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
     .first();
 }
 
@@ -21,12 +21,11 @@ export async function getCourseSettings(
  */
 export async function getInitialReviewCount(
   ctx: QueryCtx,
-  courseId: Id<"courses">,
+  courseId: Id<'courses'>,
 ): Promise<number> {
   const settings = await getCourseSettings(ctx, courseId);
   if (!settings) return DEFAULT_INITIAL_REVIEW_COUNT;
-  return settings.initialReviewCount
-    ?? DEFAULT_INITIAL_REVIEW_COUNT;
+  return settings.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
 }
 
 /**
@@ -34,15 +33,15 @@ export async function getInitialReviewCount(
  */
 export async function upsertCourseSettings(
   ctx: MutationCtx,
-  courseId: Id<"courses">,
+  courseId: Id<'courses'>,
   values: {
     initialReviewCount: number;
-    activeCollectionId?: Id<"collections">;
+    activeCollectionId?: Id<'collections'>;
   },
-): Promise<Id<"courseSettings">> {
+): Promise<Id<'courseSettings'>> {
   const existing = await ctx.db
-    .query("courseSettings")
-    .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+    .query('courseSettings')
+    .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
     .first();
 
   if (existing) {
@@ -50,7 +49,7 @@ export async function upsertCourseSettings(
     return existing._id;
   }
 
-  return ctx.db.insert("courseSettings", {
+  return ctx.db.insert('courseSettings', {
     courseId,
     ...values,
   });
@@ -61,22 +60,21 @@ export async function upsertCourseSettings(
  */
 export async function setActiveCollectionOnSettings(
   ctx: MutationCtx,
-  courseId: Id<"courses">,
-  activeCollectionId: Id<"collections"> | undefined,
+  courseId: Id<'courses'>,
+  activeCollectionId: Id<'collections'> | undefined,
 ): Promise<void> {
   const existing = await ctx.db
-    .query("courseSettings")
-    .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+    .query('courseSettings')
+    .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
     .first();
 
   if (existing) {
     await ctx.db.patch(existing._id, { activeCollectionId });
   } else {
-    await ctx.db.insert("courseSettings", {
+    await ctx.db.insert('courseSettings', {
       courseId,
       initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
       activeCollectionId,
     });
   }
 }
-

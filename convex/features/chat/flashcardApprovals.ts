@@ -1,21 +1,30 @@
-import { v, ConvexError } from "convex/values";
-import { mutation, query, internalMutation, MutationCtx } from "../../_generated/server";
-import { internal } from "../../_generated/api";
-import { getAuthUser, requireAuthUser } from "../../db/users";
-import { Id } from "../../_generated/dataModel";
+import { v, ConvexError } from 'convex/values';
+import {
+  mutation,
+  query,
+  internalMutation,
+  MutationCtx,
+} from '../../_generated/server';
+import { internal } from '../../_generated/api';
+import { getAuthUser, requireAuthUser } from '../../db/users';
+import { Id } from '../../_generated/dataModel';
 
 /**
  * Authenticate the user and verify ownership of a pending approval.
  * Throws ConvexError on failure.
  */
-async function authorizePendingApproval(ctx: MutationCtx, approvalId: Id<"flashcardApprovals">) {
+async function authorizePendingApproval(
+  ctx: MutationCtx,
+  approvalId: Id<'flashcardApprovals'>,
+) {
   const user = await getAuthUser(ctx);
-  if (!user) throw new ConvexError("Not authenticated");
+  if (!user) throw new ConvexError('Not authenticated');
 
   const approval = await ctx.db.get(approvalId);
-  if (!approval) throw new ConvexError("Approval not found");
-  if (approval.userId !== user._id) throw new ConvexError("Not authorized");
-  if (approval.status !== "pending") throw new ConvexError("Approval already processed");
+  if (!approval) throw new ConvexError('Approval not found');
+  if (approval.userId !== user._id) throw new ConvexError('Not authorized');
+  if (approval.status !== 'pending')
+    throw new ConvexError('Approval already processed');
 
   return { user, approval };
 }
@@ -32,32 +41,32 @@ export const createApprovalRequestInternal = internalMutation({
     note: v.string(),
     userId: v.string(),
   },
-  returns: v.id("flashcardApprovals"),
+  returns: v.id('flashcardApprovals'),
   handler: async (ctx, args) => {
     // Idempotency check by content within same thread/user
     const existing = await ctx.db
-      .query("flashcardApprovals")
-      .withIndex("by_thread_and_user", (q) =>
-        q.eq("threadId", args.threadId).eq("userId", args.userId)
+      .query('flashcardApprovals')
+      .withIndex('by_thread_and_user', (q) =>
+        q.eq('threadId', args.threadId).eq('userId', args.userId),
       )
       .filter((q) =>
         q.and(
-          q.eq(q.field("text"), args.text),
-          q.eq(q.field("note"), args.note)
-        )
+          q.eq(q.field('text'), args.text),
+          q.eq(q.field('note'), args.note),
+        ),
       )
       .first();
 
     if (existing) return existing._id;
 
-    const approvalId = await ctx.db.insert("flashcardApprovals", {
+    const approvalId = await ctx.db.insert('flashcardApprovals', {
       threadId: args.threadId,
       messageId: args.messageId,
       toolCallId: args.toolCallId,
       text: args.text,
       note: args.note,
       userId: args.userId,
-      status: "pending",
+      status: 'pending',
       createdAt: Date.now(),
     });
 
@@ -70,32 +79,33 @@ export const createApprovalRequestInternal = internalMutation({
  */
 export const approveFlashcard = mutation({
   args: {
-    approvalId: v.id("flashcardApprovals"),
+    approvalId: v.id('flashcardApprovals'),
   },
   returns: v.object({
     success: v.boolean(),
-    flashcardId: v.optional(v.id("testFlashcards")),
+    flashcardId: v.optional(v.id('testFlashcards')),
   }),
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Not authenticated");
+    if (!user) throw new ConvexError('Not authenticated');
 
     const approval = await ctx.db.get(args.approvalId);
-    if (!approval) throw new ConvexError("Approval not found");
-    if (approval.userId !== user._id) throw new ConvexError("Not authorized");
-    if (approval.status !== "pending") throw new ConvexError("Approval already processed");
+    if (!approval) throw new ConvexError('Approval not found');
+    if (approval.userId !== user._id) throw new ConvexError('Not authorized');
+    if (approval.status !== 'pending')
+      throw new ConvexError('Approval already processed');
 
-    const flashcardId: Id<"testFlashcards"> = await ctx.runMutation(
+    const flashcardId: Id<'testFlashcards'> = await ctx.runMutation(
       internal.features.chat.flashcards.createFlashcardInternal,
       {
         text: approval.text,
         note: approval.note,
         userId: approval.userId,
-      }
+      },
     );
 
     await ctx.db.patch(args.approvalId, {
-      status: "approved",
+      status: 'approved',
       processedAt: Date.now(),
     });
 
@@ -108,20 +118,21 @@ export const approveFlashcard = mutation({
  */
 export const rejectFlashcard = mutation({
   args: {
-    approvalId: v.id("flashcardApprovals"),
+    approvalId: v.id('flashcardApprovals'),
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError("Not authenticated");
+    if (!user) throw new ConvexError('Not authenticated');
 
     const approval = await ctx.db.get(args.approvalId);
-    if (!approval) throw new ConvexError("Approval not found");
-    if (approval.userId !== user._id) throw new ConvexError("Not authorized");
-    if (approval.status !== "pending") throw new ConvexError("Approval already processed");
+    if (!approval) throw new ConvexError('Approval not found');
+    if (approval.userId !== user._id) throw new ConvexError('Not authorized');
+    if (approval.status !== 'pending')
+      throw new ConvexError('Approval already processed');
 
     await ctx.db.patch(args.approvalId, {
-      status: "rejected",
+      status: 'rejected',
       processedAt: Date.now(),
     });
 
@@ -138,21 +149,21 @@ export const getApprovalsByThread = query({
   },
   returns: v.array(
     v.object({
-      _id: v.id("flashcardApprovals"),
+      _id: v.id('flashcardApprovals'),
       toolCallId: v.string(),
       text: v.string(),
       note: v.string(),
       status: v.string(),
-    })
+    }),
   ),
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
     if (!user) return [];
 
     const approvals = await ctx.db
-      .query("flashcardApprovals")
-      .withIndex("by_thread_and_user", (q) =>
-        q.eq("threadId", args.threadId).eq("userId", user._id)
+      .query('flashcardApprovals')
+      .withIndex('by_thread_and_user', (q) =>
+        q.eq('threadId', args.threadId).eq('userId', user._id),
       )
       .collect();
 
@@ -165,4 +176,3 @@ export const getApprovalsByThread = query({
     }));
   },
 });
-

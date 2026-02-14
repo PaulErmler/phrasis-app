@@ -1,6 +1,6 @@
-"use client";
+'use client';
 
-import "@khmyznikov/pwa-install";
+import '@khmyznikov/pwa-install';
 
 /**
  * Global PWA Install element that should be rendered once at the root level.
@@ -15,4 +15,3 @@ export function PWAInstallGlobal() {
     ></pwa-install>
   );
 }
-

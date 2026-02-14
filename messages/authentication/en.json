@@ -1,10 +1,8 @@
 {
   "Auth": {
     "SIGN_OUT": "Sign Out",
-    "SIGN_IN_DESCRIPTION": "", 
+    "SIGN_IN_DESCRIPTION": "",
     "SIGN_UP_DESCRIPTION": "",
     "OR_CONTINUE_WITH": "or enter an email and password"
   }
 }
-
-

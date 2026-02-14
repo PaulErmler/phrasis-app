@@ -4,7 +4,15 @@
  */
 
 /** CEFR-based collection order from easiest to hardest. */
-export const LEVEL_ORDER = ["Essential", "A1", "A2", "B1", "B2", "C1", "C2"] as const;
+export const LEVEL_ORDER = [
+  'Essential',
+  'A1',
+  'A2',
+  'B1',
+  'B2',
+  'C1',
+  'C2',
+] as const;
 
 /**
  * Maps the onboarding `currentLevel` value to the collection name that should
@@ -19,11 +27,11 @@ export const LEVEL_ORDER = ["Essential", "A1", "A2", "B1", "B2", "C1", "C2"] as 
  * | advanced           | C1         |
  */
 export const LEVEL_TO_COLLECTION: Record<string, string> = {
-  beginner: "Essential",
-  elementary: "A2",
-  intermediate: "B1",
-  upper_intermediate: "B2",
-  advanced: "C1",
+  beginner: 'Essential',
+  elementary: 'A2',
+  intermediate: 'B1',
+  upper_intermediate: 'B2',
+  advanced: 'C1',
 };
 
 /**
@@ -31,8 +39,7 @@ export const LEVEL_TO_COLLECTION: Record<string, string> = {
  * `LEVEL_ORDER`, or `null` if the given name is the last (or unknown).
  */
 export function getNextCollectionName(currentName: string): string | null {
-  const idx = LEVEL_ORDER.indexOf(currentName as typeof LEVEL_ORDER[number]);
+  const idx = LEVEL_ORDER.indexOf(currentName as (typeof LEVEL_ORDER)[number]);
   if (idx === -1 || idx >= LEVEL_ORDER.length - 1) return null;
   return LEVEL_ORDER[idx + 1];
 }
-

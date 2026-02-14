@@ -1,5 +1,5 @@
-import { defineTable } from "convex/server";
-import { v } from "convex/values";
+import { defineTable } from 'convex/server';
+import { v } from 'convex/values';
 
 /**
  * Tables used only by testing / experimental chat features.
@@ -27,10 +27,10 @@ export const testingTables = {
     createdAt: v.number(),
     processedAt: v.optional(v.number()),
   })
-    .index("by_message", ["messageId"])
-    .index("by_user_and_status", ["userId", "status"])
-    .index("by_toolCallId", ["toolCallId"])
-    .index("by_thread_and_user", ["threadId", "userId"]),
+    .index('by_message', ['messageId'])
+    .index('by_user_and_status', ['userId', 'status'])
+    .index('by_toolCallId', ['toolCallId'])
+    .index('by_thread_and_user', ['threadId', 'userId']),
 
   // Translation requests table — async translation processing (testing UI)
   translationRequests: defineTable({
@@ -38,14 +38,18 @@ export const testingTables = {
     text: v.string(),
     sourceLang: v.string(),
     targetLang: v.string(),
-    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+    status: v.union(
+      v.literal('pending'),
+      v.literal('completed'),
+      v.literal('failed'),
+    ),
     result: v.optional(v.string()),
     error: v.optional(v.string()),
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
   })
-    .index("by_userId", ["userId"])
-    .index("by_userId_and_status", ["userId", "status"]),
+    .index('by_userId', ['userId'])
+    .index('by_userId_and_status', ['userId', 'status']),
 
   // TTS requests table — async TTS audio generation (testing UI)
   ttsRequests: defineTable({
@@ -53,13 +57,16 @@ export const testingTables = {
     text: v.string(),
     voiceName: v.string(),
     speed: v.number(),
-    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
-    storageId: v.optional(v.id("_storage")),
+    status: v.union(
+      v.literal('pending'),
+      v.literal('completed'),
+      v.literal('failed'),
+    ),
+    storageId: v.optional(v.id('_storage')),
     error: v.optional(v.string()),
     createdAt: v.number(),
     completedAt: v.optional(v.number()),
   })
-    .index("by_userId", ["userId"])
-    .index("by_userId_and_status", ["userId", "status"]),
+    .index('by_userId', ['userId'])
+    .index('by_userId_and_status', ['userId', 'status']),
 };
-

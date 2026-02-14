@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Volume2, VolumeX, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Volume2, VolumeX, Loader2 } from 'lucide-react';
 
 export interface AudioButtonProps {
   url: string | null;
@@ -54,7 +54,7 @@ export function AudioButton({
       await audioRef.current.play();
       setIsPlaying(true);
     } catch (error) {
-      console.error("Error playing audio:", error);
+      console.error('Error playing audio:', error);
     } finally {
       setIsLoading(false);
     }
@@ -64,7 +64,12 @@ export function AudioButton({
   if (!showLabel) {
     if (!url) {
       return (
-        <Button variant="ghost" size="icon" disabled className="h-8 w-8 text-muted-foreground">
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled
+          className="h-8 w-8 text-muted-foreground"
+        >
           <Loader2 className="h-4 w-4 animate-spin" />
         </Button>
       );
@@ -92,7 +97,12 @@ export function AudioButton({
   // Labeled variant (deck cards view)
   if (!url) {
     return (
-      <Button variant="ghost" size="sm" disabled className="gap-1 text-muted-foreground">
+      <Button
+        variant="ghost"
+        size="sm"
+        disabled
+        className="gap-1 text-muted-foreground"
+      >
         <Loader2 className="h-3 w-3 animate-spin" />
         <span className="text-xs">Generating {language}...</span>
       </Button>

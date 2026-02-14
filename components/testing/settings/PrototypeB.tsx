@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Prototype B: Per-language cards with slider controls
@@ -8,13 +8,13 @@
  * target→target) shown as labeled divider rows between groups.
  */
 
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { Slider } from "@/components/ui/slider";
-import { getLanguageByCode } from "@/lib/languages";
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { getLanguageByCode } from '@/lib/languages';
 import {
   DEFAULT_AUTO_PLAY,
   DEFAULT_AUTO_ADVANCE,
@@ -23,7 +23,7 @@ import {
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
   DEFAULT_PAUSE_BASE_TO_TARGET,
-} from "@/lib/constants/audioPlayback";
+} from '@/lib/constants/audioPlayback';
 
 interface LanguageSettings {
   plays: number;
@@ -35,21 +35,38 @@ interface PrototypeBProps {
   targetLanguages: string[];
 }
 
-export function PrototypeB({ baseLanguages, targetLanguages }: PrototypeBProps) {
+export function PrototypeB({
+  baseLanguages,
+  targetLanguages,
+}: PrototypeBProps) {
   const [autoPlay, setAutoPlay] = useState(DEFAULT_AUTO_PLAY);
   const [autoAdvance, setAutoAdvance] = useState(DEFAULT_AUTO_ADVANCE);
-  const [pauseBaseToBase, setPauseBaseToBase] = useState(DEFAULT_PAUSE_BETWEEN_LANGUAGES);
-  const [pauseBaseToTarget, setPauseBaseToTarget] = useState(DEFAULT_PAUSE_BASE_TO_TARGET);
-  const [pauseTargetToTarget, setPauseTargetToTarget] = useState(DEFAULT_PAUSE_BETWEEN_LANGUAGES);
+  const [pauseBaseToBase, setPauseBaseToBase] = useState(
+    DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+  );
+  const [pauseBaseToTarget, setPauseBaseToTarget] = useState(
+    DEFAULT_PAUSE_BASE_TO_TARGET,
+  );
+  const [pauseTargetToTarget, setPauseTargetToTarget] = useState(
+    DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+  );
 
-  const [langSettings, setLangSettings] = useState<Record<string, LanguageSettings>>({});
+  const [langSettings, setLangSettings] = useState<
+    Record<string, LanguageSettings>
+  >({});
 
   const getDefaultsFor = (code: string): LanguageSettings => ({
-    plays: baseLanguages.includes(code) ? DEFAULT_REPETITIONS_BASE : DEFAULT_REPETITIONS_TARGET,
+    plays: baseLanguages.includes(code)
+      ? DEFAULT_REPETITIONS_BASE
+      : DEFAULT_REPETITIONS_TARGET,
     repPause: DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   });
 
-  const updateLang = (code: string, key: keyof LanguageSettings, value: number) => {
+  const updateLang = (
+    code: string,
+    key: keyof LanguageSettings,
+    value: number,
+  ) => {
     setLangSettings((prev) => ({
       ...prev,
       [code]: { ...(prev[code] ?? getDefaultsFor(code)), [key]: value },
@@ -152,7 +169,7 @@ function LanguageCard({
   onChange,
 }: {
   code: string;
-  type: "base" | "target";
+  type: 'base' | 'target';
   settings: LanguageSettings;
   onChange: (key: keyof LanguageSettings, value: number) => void;
 }) {
@@ -164,7 +181,7 @@ function LanguageCard({
   return (
     <div
       className={`rounded-xl border p-3 space-y-3 transition-opacity ${
-        isDisabled ? "opacity-50" : ""
+        isDisabled ? 'opacity-50' : ''
       }`}
     >
       {/* Header */}
@@ -172,10 +189,10 @@ function LanguageCard({
         <span className="text-lg">{lang?.flag}</span>
         <span className="text-sm font-medium">{lang?.name ?? code}</span>
         <Badge
-          variant={type === "base" ? "secondary" : "outline"}
+          variant={type === 'base' ? 'secondary' : 'outline'}
           className="text-[10px] shrink-0"
         >
-          {type === "base" ? "Base" : "Target"}
+          {type === 'base' ? 'Base' : 'Target'}
         </Badge>
       </div>
 
@@ -192,7 +209,7 @@ function LanguageCard({
           max={10}
           step={1}
           value={[plays]}
-          onValueChange={([v]) => onChange("plays", v)}
+          onValueChange={([v]) => onChange('plays', v)}
         />
       </div>
 
@@ -212,7 +229,7 @@ function LanguageCard({
             max={30}
             step={1}
             value={[repPause]}
-            onValueChange={([v]) => onChange("repPause", v)}
+            onValueChange={([v]) => onChange('repPause', v)}
           />
         </div>
       )}
@@ -236,15 +253,19 @@ function PauseDivider({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center gap-3">
-        <div className={`flex-1 h-px ${accent ? "bg-primary/40" : "bg-border"}`} />
+        <div
+          className={`flex-1 h-px ${accent ? 'bg-primary/40' : 'bg-border'}`}
+        />
         <span
           className={`text-xs whitespace-nowrap ${
-            accent ? "text-primary font-medium" : "text-muted-foreground"
+            accent ? 'text-primary font-medium' : 'text-muted-foreground'
           }`}
         >
           {label}
         </span>
-        <div className={`flex-1 h-px ${accent ? "bg-primary/40" : "bg-border"}`} />
+        <div
+          className={`flex-1 h-px ${accent ? 'bg-primary/40' : 'bg-border'}`}
+        />
       </div>
       <div className="flex items-center justify-center">
         <div className="flex items-center gap-1.5">

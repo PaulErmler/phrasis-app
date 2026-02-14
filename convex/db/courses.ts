@@ -1,15 +1,15 @@
-import { ConvexError } from "convex/values";
-import { QueryCtx } from "../_generated/server";
-import { Id, Doc } from "../_generated/dataModel";
-import { getUserSettings, requireAuthUser } from "./users";
+import { ConvexError } from 'convex/values';
+import { QueryCtx } from '../_generated/server';
+import { Id, Doc } from '../_generated/dataModel';
+import { getUserSettings, requireAuthUser } from './users';
 
 /**
  * Get a course by its ID.
  */
 export async function getCourseById(
   ctx: QueryCtx,
-  courseId: Id<"courses">
-): Promise<Doc<"courses"> | null> {
+  courseId: Id<'courses'>,
+): Promise<Doc<'courses'> | null> {
   return ctx.db.get(courseId);
 }
 
@@ -19,8 +19,8 @@ export async function getCourseById(
  */
 export async function getActiveCourseForUser(
   ctx: QueryCtx,
-  userId: string
-): Promise<{ settings: Doc<"userSettings">; course: Doc<"courses"> } | null> {
+  userId: string,
+): Promise<{ settings: Doc<'userSettings'>; course: Doc<'courses'> } | null> {
   const settings = await getUserSettings(ctx, userId);
   if (!settings?.activeCourseId) return null;
 
@@ -38,7 +38,7 @@ export async function getActiveCourseForUser(
 export async function requireActiveCourse(ctx: QueryCtx) {
   const user = await requireAuthUser(ctx);
   const result = await getActiveCourseForUser(ctx, user._id);
-  if (!result) throw new ConvexError("No active course found");
+  if (!result) throw new ConvexError('No active course found');
   return { user, ...result };
 }
 
@@ -47,11 +47,10 @@ export async function requireActiveCourse(ctx: QueryCtx) {
  */
 export async function getCoursesForUser(
   ctx: QueryCtx,
-  userId: string
-): Promise<Doc<"courses">[]> {
+  userId: string,
+): Promise<Doc<'courses'>[]> {
   return ctx.db
-    .query("courses")
-    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .query('courses')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
     .take(50);
 }
-

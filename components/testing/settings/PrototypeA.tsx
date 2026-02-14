@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Prototype A: Visual Timeline / Sequence
@@ -8,13 +8,13 @@
  * and can edit repetitions and pauses inline.
  */
 
-import { useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { Switch } from "@/components/ui/switch";
-import { getLanguageByCode } from "@/lib/languages";
+import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { getLanguageByCode } from '@/lib/languages';
 import {
   DEFAULT_AUTO_PLAY,
   DEFAULT_AUTO_ADVANCE,
@@ -23,7 +23,7 @@ import {
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
   DEFAULT_PAUSE_BASE_TO_TARGET,
-} from "@/lib/constants/audioPlayback";
+} from '@/lib/constants/audioPlayback';
 
 interface LanguageSettings {
   plays: number;
@@ -35,21 +35,38 @@ interface PrototypeAProps {
   targetLanguages: string[];
 }
 
-export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) {
+export function PrototypeA({
+  baseLanguages,
+  targetLanguages,
+}: PrototypeAProps) {
   const [autoPlay, setAutoPlay] = useState(DEFAULT_AUTO_PLAY);
   const [autoAdvance, setAutoAdvance] = useState(DEFAULT_AUTO_ADVANCE);
-  const [pauseBaseToBase, setPauseBaseToBase] = useState(DEFAULT_PAUSE_BETWEEN_LANGUAGES);
-  const [pauseBaseToTarget, setPauseBaseToTarget] = useState(DEFAULT_PAUSE_BASE_TO_TARGET);
-  const [pauseTargetToTarget, setPauseTargetToTarget] = useState(DEFAULT_PAUSE_BETWEEN_LANGUAGES);
+  const [pauseBaseToBase, setPauseBaseToBase] = useState(
+    DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+  );
+  const [pauseBaseToTarget, setPauseBaseToTarget] = useState(
+    DEFAULT_PAUSE_BASE_TO_TARGET,
+  );
+  const [pauseTargetToTarget, setPauseTargetToTarget] = useState(
+    DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+  );
 
-  const [langSettings, setLangSettings] = useState<Record<string, LanguageSettings>>({});
+  const [langSettings, setLangSettings] = useState<
+    Record<string, LanguageSettings>
+  >({});
 
   const getDefaultsFor = (code: string): LanguageSettings => ({
-    plays: baseLanguages.includes(code) ? DEFAULT_REPETITIONS_BASE : DEFAULT_REPETITIONS_TARGET,
+    plays: baseLanguages.includes(code)
+      ? DEFAULT_REPETITIONS_BASE
+      : DEFAULT_REPETITIONS_TARGET,
     repPause: DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   });
 
-  const updateLang = (code: string, key: keyof LanguageSettings, value: number) => {
+  const updateLang = (
+    code: string,
+    key: keyof LanguageSettings,
+    value: number,
+  ) => {
     setLangSettings((prev) => ({
       ...prev,
       [code]: { ...(prev[code] ?? getDefaultsFor(code)), [key]: value },
@@ -61,8 +78,12 @@ export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) 
   // Build the timeline sequence
   const timelineItems: React.ReactNode[] = [];
 
-  const activeBase = baseLanguages.filter((c) => (langSettings[c]?.plays ?? DEFAULT_REPETITIONS_BASE) > 0);
-  const activeTarget = targetLanguages.filter((c) => (langSettings[c]?.plays ?? DEFAULT_REPETITIONS_TARGET) > 0);
+  const activeBase = baseLanguages.filter(
+    (c) => (langSettings[c]?.plays ?? DEFAULT_REPETITIONS_BASE) > 0,
+  );
+  const activeTarget = targetLanguages.filter(
+    (c) => (langSettings[c]?.plays ?? DEFAULT_REPETITIONS_TARGET) > 0,
+  );
 
   // Base languages
   activeBase.forEach((code, idx) => {
@@ -74,12 +95,12 @@ export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) 
     timelineItems.push(
       <TimelineAudioBlock
         key={`base-${code}`}
-        flag={lang?.flag ?? ""}
+        flag={lang?.flag ?? ''}
         name={lang?.name ?? code}
         type="base"
         plays={plays}
         repPause={repPause}
-      />
+      />,
     );
 
     if (idx < activeBase.length - 1) {
@@ -89,7 +110,7 @@ export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) 
           label="Base → Base"
           seconds={pauseBaseToBase}
           onChange={setPauseBaseToBase}
-        />
+        />,
       );
     }
   });
@@ -103,7 +124,7 @@ export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) 
         seconds={pauseBaseToTarget}
         onChange={setPauseBaseToTarget}
         accent
-      />
+      />,
     );
   }
 
@@ -117,12 +138,12 @@ export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) 
     timelineItems.push(
       <TimelineAudioBlock
         key={`target-${code}`}
-        flag={lang?.flag ?? ""}
+        flag={lang?.flag ?? ''}
         name={lang?.name ?? code}
         type="target"
         plays={plays}
         repPause={repPause}
-      />
+      />,
     );
 
     if (idx < activeTarget.length - 1) {
@@ -132,7 +153,7 @@ export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) 
           label="Target → Target"
           seconds={pauseTargetToTarget}
           onChange={setPauseTargetToTarget}
-        />
+        />,
       );
     }
   });
@@ -168,8 +189,12 @@ export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) 
         {/* Column headers */}
         <div className="flex items-center gap-3">
           <div className="flex-1" />
-          <span className="w-14 text-center text-[11px] text-muted-foreground">Plays</span>
-          <span className="w-14 text-center text-[11px] text-muted-foreground">Pause</span>
+          <span className="w-14 text-center text-[11px] text-muted-foreground">
+            Plays
+          </span>
+          <span className="w-14 text-center text-[11px] text-muted-foreground">
+            Pause
+          </span>
         </div>
 
         <div className="space-y-2">
@@ -182,8 +207,11 @@ export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) 
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="text-sm">{lang?.flag}</span>
                   <span className="text-sm truncate">{lang?.name ?? code}</span>
-                  <Badge variant={isBase ? "secondary" : "outline"} className="text-[10px] shrink-0">
-                    {isBase ? "Base" : "Target"}
+                  <Badge
+                    variant={isBase ? 'secondary' : 'outline'}
+                    className="text-[10px] shrink-0"
+                  >
+                    {isBase ? 'Base' : 'Target'}
                   </Badge>
                 </div>
                 <Input
@@ -191,8 +219,15 @@ export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) 
                   min={0}
                   max={10}
                   step={1}
-                  value={settings?.plays ?? (isBase ? DEFAULT_REPETITIONS_BASE : DEFAULT_REPETITIONS_TARGET)}
-                  onChange={(e) => updateLang(code, "plays", parseInt(e.target.value) || 0)}
+                  value={
+                    settings?.plays ??
+                    (isBase
+                      ? DEFAULT_REPETITIONS_BASE
+                      : DEFAULT_REPETITIONS_TARGET)
+                  }
+                  onChange={(e) =>
+                    updateLang(code, 'plays', parseInt(e.target.value) || 0)
+                  }
                   className="w-14 h-8 text-center text-sm"
                 />
                 <Input
@@ -200,8 +235,12 @@ export function PrototypeA({ baseLanguages, targetLanguages }: PrototypeAProps) 
                   min={0}
                   max={30}
                   step={1}
-                  value={settings?.repPause ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS}
-                  onChange={(e) => updateLang(code, "repPause", parseInt(e.target.value) || 0)}
+                  value={
+                    settings?.repPause ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS
+                  }
+                  onChange={(e) =>
+                    updateLang(code, 'repPause', parseInt(e.target.value) || 0)
+                  }
                   className="w-14 h-8 text-center text-sm"
                 />
               </div>
@@ -252,7 +291,7 @@ function TimelineAudioBlock({
 }: {
   flag: string;
   name: string;
-  type: "base" | "target";
+  type: 'base' | 'target';
   plays: number;
   repPause: number;
 }) {
@@ -260,9 +299,9 @@ function TimelineAudioBlock({
     <div className="w-full max-w-[280px]">
       <div
         className={`rounded-lg border-2 px-3 py-2 text-center ${
-          type === "base"
-            ? "border-timeline-base-border bg-timeline-base"
-            : "border-timeline-target-border bg-timeline-target"
+          type === 'base'
+            ? 'border-timeline-base-border bg-timeline-base'
+            : 'border-timeline-target-border bg-timeline-target'
         }`}
       >
         <div className="flex items-center justify-center gap-1.5">
@@ -270,7 +309,7 @@ function TimelineAudioBlock({
           <span className="text-sm font-medium">{name}</span>
         </div>
         <div className="text-muted-xs mt-0.5">
-          {plays}x {plays > 1 && repPause > 0 ? `(${repPause}s between)` : ""}
+          {plays}x {plays > 1 && repPause > 0 ? `(${repPause}s between)` : ''}
         </div>
       </div>
     </div>
@@ -291,14 +330,14 @@ function TimelinePause({
   return (
     <div className="flex flex-col items-center py-0.5">
       {/* Vertical connector line */}
-      <div className={`w-px h-2.5 ${accent ? "bg-primary" : "bg-border"}`} />
+      <div className={`w-px h-2.5 ${accent ? 'bg-primary' : 'bg-border'}`} />
 
       {/* Editable pause bubble */}
       <div
         className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs ${
           accent
-            ? "bg-primary/10 text-primary border border-primary/30"
-            : "bg-muted text-muted-foreground"
+            ? 'bg-primary/10 text-primary border border-primary/30'
+            : 'bg-muted text-muted-foreground'
         }`}
       >
         <span className="whitespace-nowrap">{label}</span>
@@ -315,7 +354,7 @@ function TimelinePause({
       </div>
 
       {/* Vertical connector line */}
-      <div className={`w-px h-2.5 ${accent ? "bg-primary" : "bg-border"}`} />
+      <div className={`w-px h-2.5 ${accent ? 'bg-primary' : 'bg-border'}`} />
     </div>
   );
 }

@@ -1,13 +1,13 @@
-import "./landing-page.css";
-import { Footer } from "@/components/Footer";
-import { HeroSection } from "@/components/landing/hero-section";
-import { FeaturesSection } from "@/components/landing/features-section";
-import { PricingSection } from "@/components/landing/pricing-section";
-import { TestimonialsSection } from "@/components/landing/testimonials-section";
-import { NewsletterSection } from "@/components/landing/newsletter-section";
-import { FAQSection } from "@/components/landing/faq-section";
-import { DonationSection } from "@/components/landing/donation-section";
-import { getToken } from "@/lib/auth-server";
+import './landing-page.css';
+import { Footer } from '@/components/Footer';
+import { HeroSection } from '@/components/landing/hero-section';
+import { FeaturesSection } from '@/components/landing/features-section';
+import { PricingSection } from '@/components/landing/pricing-section';
+import { TestimonialsSection } from '@/components/landing/testimonials-section';
+import { NewsletterSection } from '@/components/landing/newsletter-section';
+import { FAQSection } from '@/components/landing/faq-section';
+import { DonationSection } from '@/components/landing/donation-section';
+import { getToken } from '@/lib/auth-server';
 
 export default async function Home() {
   const token = await getToken();
@@ -24,7 +24,6 @@ export default async function Home() {
         <FAQSection />
         <DonationSection />
         <NewsletterSection />
-        
       </main>
       <Footer />
     </div>

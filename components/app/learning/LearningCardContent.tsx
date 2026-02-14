@@ -1,18 +1,18 @@
-"use client";
+'use client';
 
-import { useTranslations } from "next-intl";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { CircleCheck, EyeOff } from "lucide-react";
+import { useTranslations } from 'next-intl';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { CircleCheck, EyeOff } from 'lucide-react';
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
-} from "@/components/ui/tooltip";
-import { AudioButton } from "./AudioButton";
-import type { SchedulingPhase } from "@/lib/scheduling";
-import type { CardTranslation, CardAudioRecording } from "./types";
+} from '@/components/ui/tooltip';
+import { AudioButton } from './AudioButton';
+import type { SchedulingPhase } from '@/lib/scheduling';
+import type { CardTranslation, CardAudioRecording } from './types';
 
 interface LearningCardContentProps {
   phase: SchedulingPhase;
@@ -35,7 +35,7 @@ export function LearningCardContent({
   onMaster,
   onHide,
 }: LearningCardContentProps) {
-  const t = useTranslations("LearningMode");
+  const t = useTranslations('LearningMode');
   const baseTranslations = translations.filter((tr) => tr.isBaseLanguage);
   const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
 
@@ -50,7 +50,7 @@ export function LearningCardContent({
                 {t(`phase.${phase}`)}
               </Badge>
               <Badge variant="secondary" className="text-xs">
-                {t("reviewCount", { count: preReviewCount })}
+                {t('reviewCount', { count: preReviewCount })}
               </Badge>
             </div>
             <div className="flex items-center gap-1">
@@ -66,7 +66,7 @@ export function LearningCardContent({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  {t("actions.master")}
+                  {t('actions.master')}
                 </TooltipContent>
               </Tooltip>
               <Tooltip>
@@ -81,7 +81,7 @@ export function LearningCardContent({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  {t("actions.hide")}
+                  {t('actions.hide')}
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -93,12 +93,15 @@ export function LearningCardContent({
             <div className="space-y-2">
               {baseTranslations.map((translation) => {
                 const audio = audioRecordings.find(
-                  (a) => a.language === translation.language
+                  (a) => a.language === translation.language,
                 );
                 return (
-                  <div key={translation.language} className="flex items-start gap-2">
+                  <div
+                    key={translation.language}
+                    className="flex items-start gap-2"
+                  >
                     <p className="flex-1 body-large font-medium">
-                      {translation.text || "..."}
+                      {translation.text || '...'}
                     </p>
                     <AudioButton
                       url={audio?.url ?? null}
@@ -119,12 +122,15 @@ export function LearningCardContent({
             <div className="space-y-2">
               {targetTranslations.map((translation) => {
                 const audio = audioRecordings.find(
-                  (a) => a.language === translation.language
+                  (a) => a.language === translation.language,
                 );
                 return (
-                  <div key={translation.language} className="flex items-start gap-2">
+                  <div
+                    key={translation.language}
+                    className="flex items-start gap-2"
+                  >
                     <p className="flex-1 body-large">
-                      {translation.text || "..."}
+                      {translation.text || '...'}
                     </p>
                     <AudioButton
                       url={audio?.url ?? null}

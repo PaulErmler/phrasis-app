@@ -1,37 +1,47 @@
-"use client";
+'use client';
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Volume2, Loader2, Play, Pause, AlertCircle } from "lucide-react";
-import { 
-  SUPPORTED_LANGUAGES, 
-  getVoicesByLanguageCode, 
-  getLocalesByLanguageCode, 
+} from '@/components/ui/select';
+import { Volume2, Loader2, Play, Pause, AlertCircle } from 'lucide-react';
+import {
+  SUPPORTED_LANGUAGES,
+  getVoicesByLanguageCode,
+  getLocalesByLanguageCode,
   getLocaleFromApiCode,
-  Voice 
-} from "@/lib/languages";
-import { MAX_TTS_LENGTH, TTS_SPEED_OPTIONS, DEFAULT_TTS_SPEED } from "@/lib/constants/tts";
+  Voice,
+} from '@/lib/languages';
+import {
+  MAX_TTS_LENGTH,
+  TTS_SPEED_OPTIONS,
+  DEFAULT_TTS_SPEED,
+} from '@/lib/constants/tts';
 
 export function TTSTest() {
-  const [text, setText] = useState("");
-  const [selectedLanguage, setSelectedLanguage] = useState("en");
-  const [selectedLocale, setSelectedLocale] = useState("en-US");
+  const [text, setText] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [selectedLocale, setSelectedLocale] = useState('en-US');
   const [selectedVoice, setSelectedVoice] = useState<Voice | null>(null);
   const [speed, setSpeed] = useState<number>(DEFAULT_TTS_SPEED);
-  const [requestId, setRequestId] = useState<Id<"ttsRequests"> | null>(null);
+  const [requestId, setRequestId] = useState<Id<'ttsRequests'> | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -40,7 +50,7 @@ export function TTSTest() {
   // Query the TTS request - reactively updates when the result is ready
   const ttsRequest = useQuery(
     api.testing.tts.getTTSRequest,
-    requestId ? { requestId } : "skip"
+    requestId ? { requestId } : 'skip',
   );
 
   // Get available locales for the selected language
@@ -51,13 +61,15 @@ export function TTSTest() {
   // Get available voices for the selected locale
   const availableVoices = useMemo(() => {
     const voices = getVoicesByLanguageCode(selectedLanguage);
-    return voices.filter((v) => getLocaleFromApiCode(v.apiCode) === selectedLocale);
+    return voices.filter(
+      (v) => getLocaleFromApiCode(v.apiCode) === selectedLocale,
+    );
   }, [selectedLanguage, selectedLocale]);
 
   // Group voices by gender
   const voicesByGender = useMemo(() => {
-    const female = availableVoices.filter((v) => v.gender === "female");
-    const male = availableVoices.filter((v) => v.gender === "male");
+    const female = availableVoices.filter((v) => v.gender === 'female');
+    const male = availableVoices.filter((v) => v.gender === 'male');
     return { female, male };
   }, [availableVoices]);
 
@@ -80,7 +92,9 @@ export function TTSTest() {
         setSelectedVoice(sameVoice);
       } else {
         // Default to first female voice
-        const defaultVoice = availableVoices.find((v) => v.gender === "female") || availableVoices[0];
+        const defaultVoice =
+          availableVoices.find((v) => v.gender === 'female') ||
+          availableVoices[0];
         setSelectedVoice(defaultVoice);
       }
     }
@@ -88,7 +102,7 @@ export function TTSTest() {
 
   // Handle audio playback when request completes
   useEffect(() => {
-    if (ttsRequest?.status === "completed" && ttsRequest.audioUrl) {
+    if (ttsRequest?.status === 'completed' && ttsRequest.audioUrl) {
       // Create audio element and play
       if (audioRef.current) {
         audioRef.current.src = ttsRequest.audioUrl;
@@ -107,14 +121,14 @@ export function TTSTest() {
     const handlePause = () => setIsPlaying(false);
     const handlePlay = () => setIsPlaying(true);
 
-    audio.addEventListener("ended", handleEnded);
-    audio.addEventListener("pause", handlePause);
-    audio.addEventListener("play", handlePlay);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('play', handlePlay);
 
     return () => {
-      audio.removeEventListener("ended", handleEnded);
-      audio.removeEventListener("pause", handlePause);
-      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('play', handlePlay);
     };
   }, []);
 
@@ -142,7 +156,7 @@ export function TTSTest() {
       });
       setRequestId(newRequestId);
     } catch (error) {
-      console.error("TTS request failed:", error);
+      console.error('TTS request failed:', error);
     }
   }, [text, selectedVoice, speed, requestTTS]);
 
@@ -156,15 +170,15 @@ export function TTSTest() {
     }
   };
 
-  const isGenerating = requestId !== null && ttsRequest?.status === "pending";
-  const hasError = ttsRequest?.status === "failed";
-  const hasAudio = ttsRequest?.status === "completed" && ttsRequest.audioUrl;
+  const isGenerating = requestId !== null && ttsRequest?.status === 'pending';
+  const hasError = ttsRequest?.status === 'failed';
+  const hasAudio = ttsRequest?.status === 'completed' && ttsRequest.audioUrl;
   const isOverLimit = text.length > MAX_TTS_LENGTH;
   const charCountColor = isOverLimit
-    ? "text-destructive"
+    ? 'text-destructive'
     : text.length > MAX_TTS_LENGTH * 0.9
-      ? "text-warning"
-      : "text-muted-foreground";
+      ? 'text-warning'
+      : 'text-muted-foreground';
 
   return (
     <Card>
@@ -185,7 +199,10 @@ export function TTSTest() {
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1.5">
             <Label className="text-xs">Language</Label>
-            <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+            <Select
+              value={selectedLanguage}
+              onValueChange={setSelectedLanguage}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Language" />
               </SelectTrigger>
@@ -220,7 +237,7 @@ export function TTSTest() {
         <div className="space-y-1.5">
           <Label className="text-xs">Voice</Label>
           <Select
-            value={selectedVoice?.apiCode || ""}
+            value={selectedVoice?.apiCode || ''}
             onValueChange={(apiCode) => {
               const voice = availableVoices.find((v) => v.apiCode === apiCode);
               if (voice) setSelectedVoice(voice);
@@ -232,7 +249,11 @@ export function TTSTest() {
             <SelectContent>
               {voicesByGender.female.length > 0 && (
                 <>
-                  <SelectItem value="_female_header" disabled className="font-semibold text-xs opacity-60">
+                  <SelectItem
+                    value="_female_header"
+                    disabled
+                    className="font-semibold text-xs opacity-60"
+                  >
                     Female Voices
                   </SelectItem>
                   {voicesByGender.female.map((voice) => (
@@ -244,7 +265,11 @@ export function TTSTest() {
               )}
               {voicesByGender.male.length > 0 && (
                 <>
-                  <SelectItem value="_male_header" disabled className="font-semibold text-xs opacity-60">
+                  <SelectItem
+                    value="_male_header"
+                    disabled
+                    className="font-semibold text-xs opacity-60"
+                  >
                     Male Voices
                   </SelectItem>
                   {voicesByGender.male.map((voice) => (
@@ -261,7 +286,10 @@ export function TTSTest() {
         {/* Speed Selection */}
         <div className="space-y-1.5">
           <Label className="text-xs">Speed</Label>
-          <Select value={String(speed)} onValueChange={(v) => setSpeed(Number(v))}>
+          <Select
+            value={String(speed)}
+            onValueChange={(v) => setSpeed(Number(v))}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Speed" />
             </SelectTrigger>
@@ -293,7 +321,9 @@ export function TTSTest() {
         {/* Generate Button */}
         <Button
           onClick={handleGenerate}
-          disabled={isGenerating || !text.trim() || !selectedVoice || isOverLimit}
+          disabled={
+            isGenerating || !text.trim() || !selectedVoice || isOverLimit
+          }
           className="w-full"
         >
           {isGenerating ? (
@@ -314,7 +344,7 @@ export function TTSTest() {
           <div className="rounded-lg p-3 bg-destructive/10 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-destructive" />
             <p className="text-sm text-destructive">
-              {ttsRequest?.error || "TTS generation failed"}
+              {ttsRequest?.error || 'TTS generation failed'}
             </p>
           </div>
         )}

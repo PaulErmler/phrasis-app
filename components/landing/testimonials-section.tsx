@@ -1,18 +1,18 @@
-"use client";
+'use client';
 
-import { Quote } from "lucide-react";
-import { useState, useEffect } from "react";
-import { useTranslations } from "next-intl";
+import { Quote } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   type CarouselApi,
-} from "@/components/ui/carousel";
+} from '@/components/ui/carousel';
 
 export function TestimonialsSection() {
   const t = useTranslations('LandingPage.testimonials');
-  
+
   // Get testimonials from translations
   const testimonials = Array.from({ length: 6 }, (_, i) => ({
     quote: t(`items.${i}.quote`),
@@ -29,7 +29,7 @@ export function TestimonialsSection() {
 
     setCurrent(api.selectedScrollSnap());
 
-    api.on("select", () => {
+    api.on('select', () => {
       setCurrent(api.selectedScrollSnap());
     });
   }, [api]);
@@ -46,12 +46,16 @@ export function TestimonialsSection() {
   }, [api, isHovered]);
 
   return (
-    <section id="testimonials" className="relative py-16 md:py-20 px-4 bg-muted/30 overflow-hidden">
+    <section
+      id="testimonials"
+      className="relative py-16 md:py-20 px-4 bg-muted/30 overflow-hidden"
+    >
       <div className="relative z-10 max-w-7xl mx-auto">
         {/* Section header */}
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold">
-            {t('title')} <span className="gradient-text">{t('titleHighlight')}</span>
+            {t('title')}{' '}
+            <span className="gradient-text">{t('titleHighlight')}</span>
           </h2>
         </div>
 
@@ -63,7 +67,7 @@ export function TestimonialsSection() {
           <Carousel
             setApi={setApi}
             opts={{
-              align: "start",
+              align: 'start',
               loop: true,
             }}
             className="w-full"
@@ -87,7 +91,9 @@ export function TestimonialsSection() {
 
                     {/* Author */}
                     <div>
-                      <p className="font-semibold text-foreground">{testimonial.author}</p>
+                      <p className="font-semibold text-foreground">
+                        {testimonial.author}
+                      </p>
                       <p className="text-muted-sm">{testimonial.role}</p>
                     </div>
                   </div>
@@ -105,8 +111,8 @@ export function TestimonialsSection() {
               onClick={() => api?.scrollTo(index)}
               className={`w-2 h-2 rounded-full transition-all duration-300 ${
                 index === current
-                  ? "bg-primary w-8"
-                  : "bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                  ? 'bg-primary w-8'
+                  : 'bg-muted-foreground/30 hover:bg-muted-foreground/50'
               }`}
               aria-label={`Go to testimonial ${index + 1}`}
             />

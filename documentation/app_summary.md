@@ -1,1 +1,1 @@
-A summary of what our app does and what the main features are 
+A summary of what our app does and what the main features are

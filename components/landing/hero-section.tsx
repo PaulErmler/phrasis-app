@@ -1,9 +1,9 @@
-import Link from "next/link";
-import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
-import { ArrowRight, Play } from "lucide-react";
-import { FloatingSpeechBubble } from "./speech-bubble";
-import { LandingHeader } from "./landing-header";
+import Link from 'next/link';
+import { useTranslations } from 'next-intl';
+import { Button } from '@/components/ui/button';
+import { ArrowRight, Play } from 'lucide-react';
+import { FloatingSpeechBubble } from './speech-bubble';
+import { LandingHeader } from './landing-header';
 
 interface HeroSectionProps {
   isAuthenticated: boolean;
@@ -17,16 +17,24 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
       <LandingHeader isAuthenticated={isAuthenticated} />
 
       {/* Floating speech bubbles - language examples */}
-      <FloatingSpeechBubble className="hidden md:block top-[15%] left-[8%]" delay={0}>
-        <span className="text-primary">Hola</span> 
+      <FloatingSpeechBubble
+        className="hidden md:block top-[15%] left-[8%]"
+        delay={0}
+      >
+        <span className="text-primary">Hola</span>
       </FloatingSpeechBubble>
-      <FloatingSpeechBubble className="hidden md:block top-[25%] right-[10%]" delay={1.5}>
-        <span className="text-primary">Bonjour</span> 
+      <FloatingSpeechBubble
+        className="hidden md:block top-[25%] right-[10%]"
+        delay={1.5}
+      >
+        <span className="text-primary">Bonjour</span>
       </FloatingSpeechBubble>
-      <FloatingSpeechBubble className="hidden lg:block bottom-[25%] right-[8%]" delay={2}>
-        <span className="text-primary">こんにちは</span> 
+      <FloatingSpeechBubble
+        className="hidden lg:block bottom-[25%] right-[8%]"
+        delay={2}
+      >
+        <span className="text-primary">こんにちは</span>
       </FloatingSpeechBubble>
-
 
       <div className="relative z-10 w-full max-w-5xl mx-auto text-center space-y-8 animate-fade-in-up">
         {/* Logo */}
@@ -42,8 +50,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
 
         {/* Main Headline */}
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-foreground  leading-[1.1]">
-          <span className="gradient-text">Phrasis</span>
-          {" "} - {t('tagline')}
+          <span className="gradient-text">Phrasis</span> - {t('tagline')}
         </h1>
 
         {/* Subheadline */}
@@ -90,7 +97,6 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
             </>
           )}
         </div>
-
       </div>
     </section>
   );

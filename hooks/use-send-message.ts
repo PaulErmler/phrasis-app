@@ -1,9 +1,9 @@
-import { useCallback } from "react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { toast } from "sonner";
-import { ERROR_MESSAGES, CHAT_STATUS } from "@/lib/constants/chat";
-import type { ChatStatus } from "@/lib/types/chat";
+import { useCallback } from 'react';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { toast } from 'sonner';
+import { ERROR_MESSAGES, CHAT_STATUS } from '@/lib/constants/chat';
+import type { ChatStatus } from '@/lib/types/chat';
 
 interface UseSendMessageProps {
   threadId: string;
@@ -27,7 +27,9 @@ export function useSendMessage({
   onSuccess,
   onError,
 }: UseSendMessageProps) {
-  const sendMessageMutation = useMutation(api.features.chat.messages.sendMessage);
+  const sendMessageMutation = useMutation(
+    api.features.chat.messages.sendMessage,
+  );
 
   const sendMessage = useCallback(
     async ({ prompt, clearInput }: SendMessageOptions) => {
@@ -56,7 +58,7 @@ export function useSendMessage({
           onSuccess();
         }
       } catch (error) {
-        console.error("Failed to send message:", error);
+        console.error('Failed to send message:', error);
         toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
 
         // Reset status on error if setStatus is provided
@@ -73,9 +75,8 @@ export function useSendMessage({
         throw error;
       }
     },
-    [threadId, sendMessageMutation, setStatus, onSuccess, onError]
+    [threadId, sendMessageMutation, setStatus, onSuccess, onError],
   );
 
   return { sendMessage };
 }
-

@@ -1,40 +1,44 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { SignedIn, SignedOut } from "@daveyplate/better-auth-ui";
-import { authClient } from "@/lib/auth-client";
-import { Footer } from "@/components/Footer";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
-import { toast } from "sonner";
-import { Loader } from "@/components/ai-elements/loader";
+import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { SignedIn, SignedOut } from '@daveyplate/better-auth-ui';
+import { authClient } from '@/lib/auth-client';
+import { Footer } from '@/components/Footer';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
+import { toast } from 'sonner';
+import { Loader } from '@/components/ai-elements/loader';
 
 // Hooks
-import { useThreadManagement } from "@/hooks/use-thread-management";
-import { useVoiceRecording } from "@/hooks/use-voice-recording";
-import { useChatMessages } from "@/hooks/use-chat-messages";
+import { useThreadManagement } from '@/hooks/use-thread-management';
+import { useVoiceRecording } from '@/hooks/use-voice-recording';
+import { useChatMessages } from '@/hooks/use-chat-messages';
 
 // Components
-import { ChatHeader } from "@/components/chat/ChatHeader";
-import { ThreadSidebar } from "@/components/chat/ThreadSidebar";
-import { ChatMessages } from "@/components/chat/ChatMessages";
-import { ChatInput } from "@/components/chat/ChatInput";
-import { FlashcardSidebar } from "@/components/chat/FlashcardSidebar";
+import { ChatHeader } from '@/components/chat/ChatHeader';
+import { ThreadSidebar } from '@/components/chat/ThreadSidebar';
+import { ChatMessages } from '@/components/chat/ChatMessages';
+import { ChatInput } from '@/components/chat/ChatInput';
+import { FlashcardSidebar } from '@/components/chat/FlashcardSidebar';
 
 // Constants
-import { ERROR_MESSAGES, SUCCESS_MESSAGES, CHAT_STATUS } from "@/lib/constants/chat";
+import {
+  ERROR_MESSAGES,
+  SUCCESS_MESSAGES,
+  CHAT_STATUS,
+} from '@/lib/constants/chat';
 
 export default function ChatPage() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
-  const [text, setText] = useState<string>("");
+  const [text, setText] = useState<string>('');
 
   // Redirect if not authenticated
   useEffect(() => {
     if (!session && !isPending) {
-      router.push("/");
+      router.push('/');
     }
   }, [session, isPending, router]);
 
@@ -55,13 +59,11 @@ export default function ChatPage() {
   const { isRecording, isTranscribing, handleVoiceClick } = useVoiceRecording(
     (transcript) => {
       setText((prev) => (prev ? `${prev} ${transcript}` : transcript));
-    }
+    },
   );
 
   // Mutations
   const sendMessage = useMutation(api.features.chat.messages.sendMessage);
-
-
 
   // Handle message submission
   const handleSubmit = useCallback(
@@ -89,27 +91,24 @@ export default function ChatPage() {
       try {
         await sendMessage({
           threadId,
-          prompt: message.text || "Sent with attachments",
+          prompt: message.text || 'Sent with attachments',
         });
-        setText("");
+        setText('');
         setStatus(CHAT_STATUS.SUBMITTED);
       } catch (error) {
-        console.error("Failed to send message:", error);
+        console.error('Failed to send message:', error);
         toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
         setStatus(CHAT_STATUS.ERROR);
         setTimeout(() => setStatus(CHAT_STATUS.READY), 2000);
       }
     },
-    [threadId, sendMessage, setStatus]
+    [threadId, sendMessage, setStatus],
   );
 
   // Handle suggestion click - populate input instead of sending
-  const handleSuggestionClick = useCallback(
-    (suggestion: string) => {
-      setText(suggestion);
-    },
-    []
-  );
+  const handleSuggestionClick = useCallback((suggestion: string) => {
+    setText(suggestion);
+  }, []);
 
   // Loading state
   if (isPending) {
@@ -122,7 +121,7 @@ export default function ChatPage() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden">
-      <ChatHeader onBack={() => router.push("/app")} />
+      <ChatHeader onBack={() => router.push('/app')} />
 
       <main className="flex-1 flex flex-row overflow-hidden min-h-0">
         <SignedOut>
@@ -148,7 +147,11 @@ export default function ChatPage() {
               </div>
             ) : (
               <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <ChatMessages messages={messages} isLoading={isThreadLoading} threadId={threadId} />
+                <ChatMessages
+                  messages={messages}
+                  isLoading={isThreadLoading}
+                  threadId={threadId}
+                />
                 <ChatInput
                   onSubmit={handleSubmit}
                   onSuggestionClick={handleSuggestionClick}
@@ -169,8 +172,6 @@ export default function ChatPage() {
       </main>
 
       <Footer />
-
-
     </div>
   );
 }

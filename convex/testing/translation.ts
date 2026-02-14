@@ -1,14 +1,20 @@
-import { v, ConvexError } from "convex/values";
-import { mutation, query, internalMutation, internalAction, internalQuery } from "../_generated/server";
-import { internal } from "../_generated/api";
-import { MAX_TRANSLATION_LENGTH } from "../../lib/constants/translation";
-import { SUPPORTED_LANGUAGES } from "../../lib/languages";
-import { getAuthUser, requireAuthUser } from "../db/users";
-import { translateText } from "../features/translation";
+import { v, ConvexError } from 'convex/values';
+import {
+  mutation,
+  query,
+  internalMutation,
+  internalAction,
+  internalQuery,
+} from '../_generated/server';
+import { internal } from '../_generated/api';
+import { MAX_TRANSLATION_LENGTH } from '../../lib/constants/translation';
+import { SUPPORTED_LANGUAGES } from '../../lib/languages';
+import { getAuthUser, requireAuthUser } from '../db/users';
+import { translateText } from '../features/translation';
 
 /** Set of all valid language codes from SUPPORTED_LANGUAGES */
 const VALID_LANGUAGE_CODES = new Set(
-  SUPPORTED_LANGUAGES.map((lang) => lang.code)
+  SUPPORTED_LANGUAGES.map((lang) => lang.code),
 );
 
 // ============================================================================
@@ -24,37 +30,47 @@ export const requestTranslation = mutation({
     sourceLang: v.string(),
     targetLang: v.string(),
   },
-  returns: v.id("translationRequests"),
+  returns: v.id('translationRequests'),
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
 
     const text = args.text.trim();
-    if (!text) throw new ConvexError("Text cannot be empty");
+    if (!text) throw new ConvexError('Text cannot be empty');
     if (text.length > MAX_TRANSLATION_LENGTH) {
-      throw new ConvexError(`Text exceeds maximum length of ${MAX_TRANSLATION_LENGTH} characters`);
+      throw new ConvexError(
+        `Text exceeds maximum length of ${MAX_TRANSLATION_LENGTH} characters`,
+      );
     }
     if (!VALID_LANGUAGE_CODES.has(args.sourceLang)) {
-      throw new ConvexError("Invalid source language. Must be a supported language.");
+      throw new ConvexError(
+        'Invalid source language. Must be a supported language.',
+      );
     }
     if (!VALID_LANGUAGE_CODES.has(args.targetLang)) {
-      throw new ConvexError("Invalid target language. Must be a supported language.");
+      throw new ConvexError(
+        'Invalid target language. Must be a supported language.',
+      );
     }
     if (args.sourceLang === args.targetLang) {
-      throw new ConvexError("Source and target languages cannot be the same");
+      throw new ConvexError('Source and target languages cannot be the same');
     }
 
-    const requestId = await ctx.db.insert("translationRequests", {
+    const requestId = await ctx.db.insert('translationRequests', {
       userId: user._id,
       text,
       sourceLang: args.sourceLang,
       targetLang: args.targetLang,
-      status: "pending",
+      status: 'pending',
       createdAt: Date.now(),
     });
 
-    await ctx.scheduler.runAfter(0, internal.testing.translation.processTranslation, {
-      requestId,
-    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.testing.translation.processTranslation,
+      {
+        requestId,
+      },
+    );
 
     return requestId;
   },
@@ -65,23 +81,27 @@ export const requestTranslation = mutation({
  */
 export const getTranslationRequest = query({
   args: {
-    requestId: v.id("translationRequests"),
+    requestId: v.id('translationRequests'),
   },
   returns: v.union(
     v.object({
-      _id: v.id("translationRequests"),
+      _id: v.id('translationRequests'),
       _creationTime: v.number(),
       userId: v.string(),
       text: v.string(),
       sourceLang: v.string(),
       targetLang: v.string(),
-      status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+      status: v.union(
+        v.literal('pending'),
+        v.literal('completed'),
+        v.literal('failed'),
+      ),
       result: v.optional(v.string()),
       error: v.optional(v.string()),
       createdAt: v.number(),
       completedAt: v.optional(v.number()),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
@@ -103,16 +123,20 @@ export const getTranslationRequest = query({
  */
 export const getRequestInternal = internalQuery({
   args: {
-    requestId: v.id("translationRequests"),
+    requestId: v.id('translationRequests'),
   },
   returns: v.union(
     v.object({
       text: v.string(),
       sourceLang: v.string(),
       targetLang: v.string(),
-      status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+      status: v.union(
+        v.literal('pending'),
+        v.literal('completed'),
+        v.literal('failed'),
+      ),
     }),
-    v.null()
+    v.null(),
   ),
   handler: async (ctx, args) => {
     const request = await ctx.db.get(args.requestId);
@@ -131,8 +155,8 @@ export const getRequestInternal = internalQuery({
  */
 export const updateRequestResult = internalMutation({
   args: {
-    requestId: v.id("translationRequests"),
-    status: v.union(v.literal("completed"), v.literal("failed")),
+    requestId: v.id('translationRequests'),
+    status: v.union(v.literal('completed'), v.literal('failed')),
     result: v.optional(v.string()),
     error: v.optional(v.string()),
   },
@@ -152,36 +176,42 @@ export const updateRequestResult = internalMutation({
  */
 export const processTranslation = internalAction({
   args: {
-    requestId: v.id("translationRequests"),
+    requestId: v.id('translationRequests'),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const request = await ctx.runQuery(internal.testing.translation.getRequestInternal, {
-      requestId: args.requestId,
-    });
+    const request = await ctx.runQuery(
+      internal.testing.translation.getRequestInternal,
+      {
+        requestId: args.requestId,
+      },
+    );
 
-    if (!request || request.status !== "pending") return null;
+    if (!request || request.status !== 'pending') return null;
 
     try {
-      const translation = await translateText(request.text, request.sourceLang, request.targetLang);
+      const translation = await translateText(
+        request.text,
+        request.sourceLang,
+        request.targetLang,
+      );
 
       await ctx.runMutation(internal.testing.translation.updateRequestResult, {
         requestId: args.requestId,
-        status: "completed",
+        status: 'completed',
         result: translation,
       });
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      console.error("Translation error:", errorMessage);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      console.error('Translation error:', errorMessage);
 
       await ctx.runMutation(internal.testing.translation.updateRequestResult, {
         requestId: args.requestId,
-        status: "failed",
-        error: "Translation failed. Please try again.",
+        status: 'failed',
+        error: 'Translation failed. Please try again.',
       });
     }
 
     return null;
   },
 });
-

@@ -1,16 +1,16 @@
-import { v, ConvexError } from "convex/values";
-import { internalAction, mutation, query } from "../../_generated/server";
-import { paginationOptsValidator } from "convex/server";
-import { internal } from "../../_generated/api";
-import { saveMessage } from "@convex-dev/agent";
-import { listUIMessages, syncStreams } from "@convex-dev/agent";
-import { components } from "../../_generated/api";
-import { getAuthUser, requireAuthUser } from "../../db/users";
-import { agent } from "./agent";
+import { v, ConvexError } from 'convex/values';
+import { internalAction, mutation, query } from '../../_generated/server';
+import { paginationOptsValidator } from 'convex/server';
+import { internal } from '../../_generated/api';
+import { saveMessage } from '@convex-dev/agent';
+import { listUIMessages, syncStreams } from '@convex-dev/agent';
+import { components } from '../../_generated/api';
+import { getAuthUser, requireAuthUser } from '../../db/users';
+import { agent } from './agent';
 
 export type ListMessagesStreamArgs = {
-  kind: "list";
-  includeStatuses?: ("streaming" | "finished" | "aborted")[];
+  kind: 'list';
+  includeStatuses?: ('streaming' | 'finished' | 'aborted')[];
 };
 
 const agentComponent = components.agent;
@@ -32,7 +32,7 @@ export const sendMessage = mutation({
     });
 
     if (!thread || thread.userId !== user._id) {
-      throw new ConvexError("Thread not found or access denied");
+      throw new ConvexError('Thread not found or access denied');
     }
 
     const { messageId } = await saveMessage(ctx, agentComponent, {
@@ -40,10 +40,14 @@ export const sendMessage = mutation({
       prompt: args.prompt,
     });
 
-    await ctx.scheduler.runAfter(0, internal.features.chat.messages.generateResponse, {
-      threadId: args.threadId,
-      promptMessageId: messageId,
-    });
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.chat.messages.generateResponse,
+      {
+        threadId: args.threadId,
+        promptMessageId: messageId,
+      },
+    );
 
     return messageId;
   },
@@ -67,7 +71,7 @@ export const listMessages = query({
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
     if (!user) {
-      return { page: [], isDone: true, continueCursor: "" };
+      return { page: [], isDone: true, continueCursor: '' };
     }
 
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {
@@ -75,7 +79,7 @@ export const listMessages = query({
     });
 
     if (!thread || thread.userId !== user._id) {
-      return { page: [], isDone: true, continueCursor: "" };
+      return { page: [], isDone: true, continueCursor: '' };
     }
 
     const messages = await listUIMessages(ctx, agentComponent, {
@@ -110,10 +114,9 @@ export const generateResponse = internalAction({
         { saveStreamDeltas: true },
       );
     } catch (error) {
-      console.error("Failed to generate AI response:", error);
+      console.error('Failed to generate AI response:', error);
     }
 
     return null;
   },
 });
-

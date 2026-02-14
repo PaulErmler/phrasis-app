@@ -17,21 +17,21 @@ export default async function AuthPage({
   const messages = await getMessages();
   const authLocalization = (messages.Auth as Record<string, string>) || {};
 
-    return (
-        <main className="min-h-screen flex items-center justify-center p-4">
-            <div className="w-full max-w-md mx-auto flex justify-center">
-                <AuthView 
-                    path={path} 
-                    localization={authLocalization} 
-                    redirectTo="/app/onboarding"
-                    classNames={{
-                        // Keep the base as is, don't reverse the whole card
-                        base: "w-full",
-                        // Target the content area specifically (may need adjustment based on actual DOM structure)
-                        content: "flex flex-col-reverse"
-                    }}
-                />
-            </div>
-        </main>
-    )
+  return (
+    <main className="min-h-screen flex items-center justify-center p-4">
+      <div className="w-full max-w-md mx-auto flex justify-center">
+        <AuthView
+          path={path}
+          localization={authLocalization}
+          redirectTo="/app/onboarding"
+          classNames={{
+            // Keep the base as is, don't reverse the whole card
+            base: 'w-full',
+            // Target the content area specifically (may need adjustment based on actual DOM structure)
+            content: 'flex flex-col-reverse',
+          }}
+        />
+      </div>
+    </main>
+  );
 }

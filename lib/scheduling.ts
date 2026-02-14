@@ -23,7 +23,7 @@ import {
   type Grade,
   type FSRSParameters,
   type RecordLogItem,
-} from "ts-fsrs";
+} from 'ts-fsrs';
 
 // ============================================================================
 // CONSTANTS
@@ -43,7 +43,11 @@ export const MAX_INITIAL_REVIEW_COUNT = 10;
  * Throws a ConvexError if invalid.
  */
 export function validateInitialReviewCount(value: number): void {
-  if (!Number.isInteger(value) || value < MIN_INITIAL_REVIEW_COUNT || value > MAX_INITIAL_REVIEW_COUNT) {
+  if (
+    !Number.isInteger(value) ||
+    value < MIN_INITIAL_REVIEW_COUNT ||
+    value > MAX_INITIAL_REVIEW_COUNT
+  ) {
     throw new Error(
       `initialReviewCount must be an integer between ${MIN_INITIAL_REVIEW_COUNT} and ${MAX_INITIAL_REVIEW_COUNT}`,
     );
@@ -72,8 +76,8 @@ const FSRS_PARAMS: Partial<FSRSParameters> = {
   maximum_interval: 36500,
   enable_fuzz: false,
   enable_short_term: true,
-  learning_steps: ["1m", "10m"] as const, // 2 steps → 2 Good reviews to graduate
-  relearning_steps: ["10m"] as const,
+  learning_steps: ['1m', '10m'] as const, // 2 steps → 2 Good reviews to graduate
+  relearning_steps: ['10m'] as const,
 };
 
 function getFsrsInstance(requestRetention?: number) {
@@ -88,11 +92,11 @@ function getFsrsInstance(requestRetention?: number) {
 // TYPES
 // ============================================================================
 
-export type SchedulingPhase = "preReview" | "review";
+export type SchedulingPhase = 'preReview' | 'review';
 
-export type PreReviewRating = "stillLearning" | "understood";
+export type PreReviewRating = 'stillLearning' | 'understood';
 
-export type FSRSRating = "again" | "hard" | "good" | "easy";
+export type FSRSRating = 'again' | 'hard' | 'good' | 'easy';
 
 export type ReviewRating = PreReviewRating | FSRSRating;
 
@@ -177,14 +181,14 @@ function deserializeFsrsCard(s: FsrsCardState): Card {
 
 function ratingToGrade(rating: FSRSRating): Grade {
   switch (rating) {
-    case "again":
-      return Rating.Again;
-    case "hard":
-      return Rating.Hard;
-    case "good":
-      return Rating.Good;
-    case "easy":
-      return Rating.Easy;
+  case 'again':
+    return Rating.Again;
+  case 'hard':
+    return Rating.Hard;
+  case 'good':
+    return Rating.Good;
+  case 'easy':
+    return Rating.Easy;
   }
 }
 
@@ -225,10 +229,21 @@ export function scheduleCard(
   now: number = Date.now(),
   requestRetention?: number,
 ): ScheduleResult {
-  if (cardState.schedulingPhase === "preReview") {
-    return schedulePreReview(cardState, rating, initialReviewCount, now, requestRetention);
+  if (cardState.schedulingPhase === 'preReview') {
+    return schedulePreReview(
+      cardState,
+      rating,
+      initialReviewCount,
+      now,
+      requestRetention,
+    );
   }
-  return scheduleFsrsReview(cardState, rating as FSRSRating, now, requestRetention);
+  return scheduleFsrsReview(
+    cardState,
+    rating as FSRSRating,
+    now,
+    requestRetention,
+  );
 }
 
 // ============================================================================
@@ -247,7 +262,7 @@ function schedulePreReview(
 
   // Transition to FSRS if "understood" is selected or threshold reached.
   const shouldTransition =
-    rating === "understood" || newPreReviewCount >= threshold;
+    rating === 'understood' || newPreReviewCount >= threshold;
 
   if (shouldTransition) {
     // Still honor the pre-review interval before the first FSRS review.
@@ -259,7 +274,7 @@ function schedulePreReview(
   // Stay in pre-review: compute next due date from the interval table.
   const interval = getPreReviewInterval(cardState.preReviewCount);
   return {
-    schedulingPhase: "preReview",
+    schedulingPhase: 'preReview',
     preReviewCount: newPreReviewCount,
     dueDate: now + interval,
     fsrsState: null,
@@ -272,15 +287,12 @@ function schedulePreReview(
  * Creates a fresh FSRS card in New state, due immediately.
  * The next user review will be the first real FSRS review.
  */
-function transitionToFsrs(
-  preReviewCount: number,
-  now: number,
-): ScheduleResult {
+function transitionToFsrs(preReviewCount: number, now: number): ScheduleResult {
   const emptyCard = createEmptyCard(new Date(now));
   const newFsrsState = serializeFsrsCard(emptyCard);
 
   return {
-    schedulingPhase: "review",
+    schedulingPhase: 'review',
     preReviewCount,
     dueDate: now, // due immediately — next user interaction is the first FSRS review
     fsrsState: newFsrsState,
@@ -299,7 +311,7 @@ function scheduleFsrsReview(
   requestRetention?: number,
 ): ScheduleResult {
   if (!cardState.fsrsState) {
-    throw new Error("Cannot perform FSRS review: no FSRS state on card");
+    throw new Error('Cannot perform FSRS review: no FSRS state on card');
   }
 
   const f = getFsrsInstance(requestRetention);
@@ -310,7 +322,7 @@ function scheduleFsrsReview(
   const newFsrsState = serializeFsrsCard(result.card);
 
   return {
-    schedulingPhase: "review",
+    schedulingPhase: 'review',
     preReviewCount: cardState.preReviewCount,
     dueDate: result.card.due.getTime(),
     fsrsState: newFsrsState,
@@ -319,7 +331,7 @@ function scheduleFsrsReview(
 }
 
 // ============================================================================
-// UTILITY 
+// UTILITY
 // ============================================================================
 
 /** Create initial scheduling state for a brand-new card. */
@@ -327,7 +339,7 @@ export function createInitialCardState(
   now: number = Date.now(),
 ): CardSchedulingState {
   return {
-    schedulingPhase: "preReview",
+    schedulingPhase: 'preReview',
     preReviewCount: 0,
     dueDate: now,
     fsrsState: null,
@@ -336,18 +348,18 @@ export function createInitialCardState(
 
 /** Return the valid ratings for the current scheduling phase. */
 export function getValidRatings(phase: SchedulingPhase): ReviewRating[] {
-  if (phase === "preReview") {
-    return ["stillLearning", "understood"];
+  if (phase === 'preReview') {
+    return ['stillLearning', 'understood'];
   }
-  return ["again", "hard", "good", "easy"];
+  return ['again', 'hard', 'good', 'easy'];
 }
 
 /** Return the default (pre-selected) rating for the current phase. */
 export function getDefaultRating(phase: SchedulingPhase): ReviewRating {
-  if (phase === "preReview") {
-    return "stillLearning";
+  if (phase === 'preReview') {
+    return 'stillLearning';
   }
-  return "good";
+  return 'good';
 }
 
 // ============================================================================
@@ -387,7 +399,13 @@ export function simulateReviews(
 
   for (let i = 0; i < ratings.length; i++) {
     const rating = ratings[i];
-    const result = scheduleCard(state, rating, initialReviewCount, currentTime, requestRetention);
+    const result = scheduleCard(
+      state,
+      rating,
+      initialReviewCount,
+      currentTime,
+      requestRetention,
+    );
 
     const interval = result.dueDate - currentTime;
     steps.push({

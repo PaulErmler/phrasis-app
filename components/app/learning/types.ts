@@ -1,4 +1,4 @@
-import { Id } from "@/convex/_generated/dataModel";
+import { Id } from '@/convex/_generated/dataModel';
 
 // ============================================================================
 // Shared constants
@@ -24,11 +24,11 @@ export interface CardAudioRecording {
 }
 
 export interface CourseSettings {
-  _id: Id<"courseSettings">;
+  _id: Id<'courseSettings'>;
   _creationTime: number;
-  courseId: Id<"courses">;
+  courseId: Id<'courses'>;
   initialReviewCount: number;
-  activeCollectionId?: Id<"collections">;
+  activeCollectionId?: Id<'collections'>;
   cardsToAddBatchSize?: number;
   autoAddCards?: boolean;
   // Audio playback settings
@@ -44,4 +44,3 @@ export interface CourseSettings {
   baseLanguageOrder?: string[];
   targetLanguageOrder?: string[];
 }
-

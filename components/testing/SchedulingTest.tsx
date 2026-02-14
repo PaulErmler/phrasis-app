@@ -1,19 +1,19 @@
-"use client";
+'use client';
 
-import { useState, useMemo, useCallback } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Button } from "@/components/ui/button";
+import { useState, useMemo, useCallback } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Button } from '@/components/ui/button';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Slider } from "@/components/ui/slider";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarClock, Play, RotateCcw } from "lucide-react";
+} from '@/components/ui/card';
+import { Slider } from '@/components/ui/slider';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CalendarClock, Play, RotateCcw } from 'lucide-react';
 import {
   DEFAULT_INITIAL_REVIEW_COUNT,
   DEFAULT_REQUEST_RETENTION,
@@ -26,7 +26,7 @@ import {
   type ReviewRating,
   type CardSchedulingState,
   type SimulationStep,
-} from "@/lib/scheduling";
+} from '@/lib/scheduling';
 
 // ============================================================================
 // VIRTUAL SIMULATION TAB
@@ -77,7 +77,13 @@ function VirtualSimulation() {
       });
       setSimulationTime(result.dueDate);
     },
-    [cardState, initialReviewCount, simulationTime, steps.length, requestRetention],
+    [
+      cardState,
+      initialReviewCount,
+      simulationTime,
+      steps.length,
+      requestRetention,
+    ],
   );
 
   const handleReset = useCallback(() => {
@@ -91,10 +97,15 @@ function VirtualSimulation() {
   const quickSimulation = useMemo(() => {
     const preReviewCount = Math.max(initialReviewCount - 2, 0);
     const ratings: Array<ReviewRating> = [
-      ...Array<ReviewRating>(preReviewCount).fill("stillLearning"),
-      ...Array<ReviewRating>(8).fill("good"),
+      ...Array<ReviewRating>(preReviewCount).fill('stillLearning'),
+      ...Array<ReviewRating>(8).fill('good'),
     ];
-    return simulateReviews(initialReviewCount, ratings, undefined, requestRetention);
+    return simulateReviews(
+      initialReviewCount,
+      ratings,
+      undefined,
+      requestRetention,
+    );
   }, [initialReviewCount, requestRetention]);
 
   return (
@@ -105,9 +116,7 @@ function VirtualSimulation() {
           <label className="text-sm font-medium">
             Initial Review Count (X)
           </label>
-          <span className="text-muted-sm font-mono">
-            {initialReviewCount}
-          </span>
+          <span className="text-muted-sm font-mono">{initialReviewCount}</span>
         </div>
         <Slider
           value={[initialReviewCount]}
@@ -144,7 +153,7 @@ function VirtualSimulation() {
           step={1}
         />
         <p className="text-muted-xs">
-          Higher retention → shorter intervals. Backend uses{" "}
+          Higher retention → shorter intervals. Backend uses{' '}
           {(DEFAULT_REQUEST_RETENTION * 100).toFixed(0)}%.
         </p>
       </div>
@@ -188,7 +197,7 @@ function VirtualSimulation() {
             <PhaseBadge
               phase={cardState.schedulingPhase}
               isInitialFsrs={
-                cardState.schedulingPhase === "review" &&
+                cardState.schedulingPhase === 'review' &&
                 steps.length < initialReviewCount
               }
             />
@@ -196,8 +205,7 @@ function VirtualSimulation() {
           <div className="flex justify-between">
             <span className="text-muted-foreground">Pre-review count:</span>
             <span className="font-mono">
-              {cardState.preReviewCount} /{" "}
-              {Math.max(initialReviewCount - 2, 0)}
+              {cardState.preReviewCount} / {Math.max(initialReviewCount - 2, 0)}
             </span>
           </div>
           {cardState.fsrsState && (
@@ -221,7 +229,7 @@ function VirtualSimulation() {
               <div className="flex justify-between">
                 <span className="text-muted-foreground">FSRS state:</span>
                 <span className="font-mono">
-                  {["New", "Learning", "Review", "Relearning"][
+                  {['New', 'Learning', 'Review', 'Relearning'][
                     cardState.fsrsState.state
                   ] ?? cardState.fsrsState.state}
                 </span>
@@ -236,7 +244,7 @@ function VirtualSimulation() {
             <Button
               key={rating}
               size="sm"
-              variant={rating === defaultRating ? "default" : "outline"}
+              variant={rating === defaultRating ? 'default' : 'outline'}
               onClick={() => handleReview(rating)}
             >
               {ratingLabel(rating)}
@@ -259,7 +267,7 @@ function VirtualSimulation() {
                 <PhaseBadge
                   phase={step.phase}
                   isInitialFsrs={
-                    step.phase === "review" &&
+                    step.phase === 'review' &&
                     step.reviewNumber <= initialReviewCount
                   }
                 />
@@ -316,11 +324,7 @@ function RealCardReview() {
   );
 
   if (cardForReview === undefined) {
-    return (
-      <div className="text-muted-sm py-8 text-center">
-        Loading...
-      </div>
-    );
+    return <div className="text-muted-sm py-8 text-center">Loading...</div>;
   }
 
   if (cardForReview === null) {
@@ -334,7 +338,7 @@ function RealCardReview() {
     );
   }
 
-  const phase = cardForReview.schedulingPhase as "preReview" | "review";
+  const phase = cardForReview.schedulingPhase as 'preReview' | 'review';
   const validRatings = getValidRatings(phase);
   const defaultRating = getDefaultRating(phase);
 
@@ -346,7 +350,7 @@ function RealCardReview() {
         {cardForReview.translations.map((t) =>
           t.language !== cardForReview.sourceLanguage ? (
             <p key={t.language} className="text-muted-sm">
-              {t.text || "(translation pending)"}
+              {t.text || '(translation pending)'}
             </p>
           ) : null,
         )}
@@ -361,7 +365,7 @@ function RealCardReview() {
         <div className="flex justify-between">
           <span className="text-muted-foreground">Pre-review count:</span>
           <span className="font-mono">
-            {cardForReview.preReviewCount} /{" "}
+            {cardForReview.preReviewCount} /{' '}
             {Math.max(cardForReview.initialReviewCount - 2, 0)}
           </span>
         </div>
@@ -395,7 +399,7 @@ function RealCardReview() {
           <Button
             key={rating}
             size="sm"
-            variant={rating === defaultRating ? "default" : "outline"}
+            variant={rating === defaultRating ? 'default' : 'outline'}
             onClick={() => handleReview(rating)}
             disabled={isReviewing}
           >
@@ -439,17 +443,17 @@ function PhaseBadge({
   phase: string;
   isInitialFsrs?: boolean;
 }) {
-  const isPreReview = phase === "preReview";
+  const isPreReview = phase === 'preReview';
   const colorClass = isPreReview
-    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
     : isInitialFsrs
-      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-      : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
+      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+      : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
   const label = isPreReview
-    ? "Pre-review"
+    ? 'Pre-review'
     : isInitialFsrs
-      ? "Initial FSRS Review"
-      : "FSRS Review";
+      ? 'Initial FSRS Review'
+      : 'FSRS Review';
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${colorClass}`}
@@ -467,7 +471,7 @@ function QuickSimRow({
   initialReviewCount: number;
 }) {
   const isInitialFsrs =
-    step.phase === "review" && step.reviewNumber <= initialReviewCount;
+    step.phase === 'review' && step.reviewNumber <= initialReviewCount;
   return (
     <>
       <span className="font-mono text-muted-foreground">
@@ -487,18 +491,18 @@ function QuickSimRow({
 
 function ratingLabel(rating: ReviewRating): string {
   switch (rating) {
-    case "stillLearning":
-      return "Still learning";
-    case "understood":
-      return "Understood";
-    case "again":
-      return "Again";
-    case "hard":
-      return "Hard";
-    case "good":
-      return "Good";
-    case "easy":
-      return "Easy";
+  case 'stillLearning':
+    return 'Still learning';
+  case 'understood':
+    return 'Understood';
+  case 'again':
+    return 'Again';
+  case 'hard':
+    return 'Hard';
+  case 'good':
+    return 'Good';
+  case 'easy':
+    return 'Easy';
   }
 }
 
@@ -541,4 +545,3 @@ export function SchedulingTest() {
     </Card>
   );
 }
-

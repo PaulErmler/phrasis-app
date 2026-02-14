@@ -1,9 +1,9 @@
-import { useEffect, useState, useCallback } from "react";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { toast } from "sonner";
-import type { Thread } from "@/lib/types/chat";
-import { ERROR_MESSAGES } from "@/lib/constants/chat";
+import { useEffect, useState, useCallback } from 'react';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { toast } from 'sonner';
+import type { Thread } from '@/lib/types/chat';
+import { ERROR_MESSAGES } from '@/lib/constants/chat';
 
 interface UseThreadManagementProps {
   session: { user?: { id?: string } } | null;
@@ -31,12 +31,14 @@ export function useThreadManagement({
   const [isCreating, setIsCreating] = useState(false);
 
   // Mutations and queries
-  const createThreadMutation = useMutation(api.features.chat.threads.createThread);
-  
+  const createThreadMutation = useMutation(
+    api.features.chat.threads.createThread,
+  );
+
   // Skip query until session is ready to prevent auth errors on reload
   const threads = useQuery(
     api.features.chat.threads.listThreads,
-    session && !isPending ? {} : "skip"
+    session && !isPending ? {} : 'skip',
   );
 
   // Initialize thread - use existing threads first, only create if none exist
@@ -53,7 +55,7 @@ export function useThreadManagement({
             setThreadId(id);
           })
           .catch((error) => {
-            console.error("Failed to create thread:", error);
+            console.error('Failed to create thread:', error);
             toast.error(ERROR_MESSAGES.FAILED_TO_INITIALIZE);
           })
           .finally(() => {
@@ -70,7 +72,7 @@ export function useThreadManagement({
       const id = await createThreadMutation({});
       setThreadId(id);
     } catch (error) {
-      console.error("Failed to create thread:", error);
+      console.error('Failed to create thread:', error);
       toast.error(ERROR_MESSAGES.FAILED_TO_CREATE_THREAD);
       throw error;
     } finally {
@@ -78,7 +80,8 @@ export function useThreadManagement({
     }
   }, [createThreadMutation]);
 
-  const isLoading = isPending || (!!session && !threadId && threads === undefined);
+  const isLoading =
+    isPending || (!!session && !threadId && threads === undefined);
 
   return {
     threadId,
@@ -89,4 +92,3 @@ export function useThreadManagement({
     isCreating,
   };
 }
-

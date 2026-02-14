@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import { useTranslations } from "next-intl";
-import { usePreloadedQuery, useMutation, Preloaded } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
+import { usePreloadedQuery, useMutation, Preloaded } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
 import {
   getValidRatings,
   getDefaultRating,
@@ -13,13 +13,13 @@ import {
   type ReviewRating,
   type SchedulingPhase,
   type CardSchedulingState,
-} from "@/lib/scheduling";
+} from '@/lib/scheduling';
 import {
   DEFAULT_BATCH_SIZE,
   type CardTranslation,
   type CardAudioRecording,
   type CourseSettings,
-} from "./types";
+} from './types';
 import {
   DEFAULT_AUTO_PLAY,
   DEFAULT_AUTO_ADVANCE,
@@ -29,8 +29,8 @@ import {
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
-} from "@/lib/constants/audioPlayback";
-import { resolveLanguageOrder } from "@/lib/utils/languageOrder";
+} from '@/lib/constants/audioPlayback';
+import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 
 // ============================================================================
 // Helpers
@@ -42,10 +42,10 @@ function wait(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms);
     signal?.addEventListener(
-      "abort",
+      'abort',
       () => {
         clearTimeout(timer);
-        reject(new DOMException("Aborted", "AbortError"));
+        reject(new DOMException('Aborted', 'AbortError'));
       },
       { once: true },
     );
@@ -56,11 +56,11 @@ function wait(ms: number, signal?: AbortSignal): Promise<void> {
 function preloadAudio(url: string): Promise<HTMLAudioElement> {
   return new Promise((resolve, reject) => {
     const audio = new Audio(url);
-    audio.addEventListener("canplaythrough", () => resolve(audio), {
+    audio.addEventListener('canplaythrough', () => resolve(audio), {
       once: true,
     });
     audio.addEventListener(
-      "error",
+      'error',
       () => reject(new Error(`Failed to load audio: ${url}`)),
       { once: true },
     );
@@ -75,28 +75,28 @@ function playAudio(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
-      reject(new DOMException("Aborted", "AbortError"));
+      reject(new DOMException('Aborted', 'AbortError'));
       return;
     }
 
     const onAbort = () => {
       audio.pause();
       audio.currentTime = 0;
-      reject(new DOMException("Aborted", "AbortError"));
+      reject(new DOMException('Aborted', 'AbortError'));
     };
-    signal?.addEventListener("abort", onAbort, { once: true });
+    signal?.addEventListener('abort', onAbort, { once: true });
 
     audio.onended = () => {
-      signal?.removeEventListener("abort", onAbort);
+      signal?.removeEventListener('abort', onAbort);
       resolve();
     };
     audio.onerror = () => {
-      signal?.removeEventListener("abort", onAbort);
-      reject(new Error("Audio playback error"));
+      signal?.removeEventListener('abort', onAbort);
+      reject(new Error('Audio playback error'));
     };
     audio.currentTime = 0;
     audio.play().catch((err) => {
-      signal?.removeEventListener("abort", onAbort);
+      signal?.removeEventListener('abort', onAbort);
       reject(err);
     });
   });
@@ -112,18 +112,18 @@ interface BaseState {
 }
 
 interface LoadingState extends BaseState {
-  status: "loading";
+  status: 'loading';
 }
 
 interface NoCollectionState extends BaseState {
-  status: "noCollection";
+  status: 'noCollection';
   courseSettings: CourseSettings | null;
   baseLanguages: string[];
   targetLanguages: string[];
 }
 
 interface NoCardsDueState extends BaseState {
-  status: "noCardsDue";
+  status: 'noCardsDue';
   courseSettings: CourseSettings;
   baseLanguages: string[];
   targetLanguages: string[];
@@ -133,12 +133,12 @@ interface NoCardsDueState extends BaseState {
 }
 
 interface ReviewingState extends BaseState {
-  status: "reviewing";
+  status: 'reviewing';
   courseSettings: CourseSettings;
   baseLanguages: string[];
   targetLanguages: string[];
   // Card data
-  cardId: Id<"cards">;
+  cardId: Id<'cards'>;
   phase: SchedulingPhase;
   preReviewCount: number;
   sourceText: string;
@@ -168,7 +168,9 @@ export type LearningState =
 
 export interface PreloadedLearningData {
   card: Preloaded<typeof api.features.scheduling.getCardForReview>;
-  courseSettings: Preloaded<typeof api.features.courses.getActiveCourseSettings>;
+  courseSettings: Preloaded<
+    typeof api.features.courses.getActiveCourseSettings
+  >;
   activeCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
 }
 
@@ -176,8 +178,10 @@ export interface PreloadedLearningData {
 // Hook
 // ============================================================================
 
-export function useLearningMode(preloaded: PreloadedLearningData): LearningState {
-  const t = useTranslations("LearningMode");
+export function useLearningMode(
+  preloaded: PreloadedLearningData,
+): LearningState {
+  const t = useTranslations('LearningMode');
 
   const cardForReview = usePreloadedQuery(preloaded.card);
   const courseSettings = usePreloadedQuery(preloaded.courseSettings);
@@ -186,14 +190,20 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
   const masterCardMutation = useMutation(api.features.scheduling.masterCard);
   const hideCardMutation = useMutation(api.features.scheduling.hideCard);
-  const addCardsMutation = useMutation(api.features.decks.addCardsFromCollection);
-  const ensureContentMutation = useMutation(api.features.decks.ensureCardContent);
+  const addCardsMutation = useMutation(
+    api.features.decks.addCardsFromCollection,
+  );
+  const ensureContentMutation = useMutation(
+    api.features.decks.ensureCardContent,
+  );
 
   const [isReviewing, setIsReviewing] = useState(false);
   const [isAddingCards, setIsAddingCards] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
-  const [selectedRating, setSelectedRating] = useState<ReviewRating | null>(null);
+  const [selectedRating, setSelectedRating] = useState<ReviewRating | null>(
+    null,
+  );
 
   // Track cards we've already ensured content for
   const ensuredCardsRef = useRef<Set<string>>(new Set());
@@ -212,10 +222,15 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
     const autoAdvance = courseSettings?.autoAdvance ?? DEFAULT_AUTO_ADVANCE;
     const reps = courseSettings?.languageRepetitions ?? {};
     const repPauses = courseSettings?.languageRepetitionPauses ?? {};
-    const pauseB2B = courseSettings?.pauseBaseToBase ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
-    const pauseB2T = courseSettings?.pauseBaseToTarget ?? DEFAULT_PAUSE_BASE_TO_TARGET;
-    const pauseT2T = courseSettings?.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
-    const pauseBeforeAdvance = courseSettings?.pauseBeforeAutoAdvance ?? DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE;
+    const pauseB2B =
+      courseSettings?.pauseBaseToBase ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+    const pauseB2T =
+      courseSettings?.pauseBaseToTarget ?? DEFAULT_PAUSE_BASE_TO_TARGET;
+    const pauseT2T =
+      courseSettings?.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+    const pauseBeforeAdvance =
+      courseSettings?.pauseBeforeAutoAdvance ??
+      DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE;
 
     const orderedBase = resolveLanguageOrder(
       courseSettings?.baseLanguageOrder,
@@ -226,7 +241,18 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
       activeCourse?.targetLanguages ?? [],
     );
 
-    return { autoPlay, autoAdvance, reps, repPauses, pauseB2B, pauseB2T, pauseT2T, pauseBeforeAdvance, orderedBase, orderedTarget };
+    return {
+      autoPlay,
+      autoAdvance,
+      reps,
+      repPauses,
+      pauseB2B,
+      pauseB2T,
+      pauseT2T,
+      pauseBeforeAdvance,
+      orderedBase,
+      orderedTarget,
+    };
   }, [courseSettings, activeCourse]);
 
   // --------------------------------------------------------------------------
@@ -240,8 +266,10 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
 
     if (hasMissing && !ensuredCardsRef.current.has(cardForReview.textId)) {
       ensuredCardsRef.current.add(cardForReview.textId);
-      ensureContentMutation({ textId: cardForReview.textId as Id<"texts"> }).catch((err) => {
-        console.error("Failed to ensure card content:", err);
+      ensureContentMutation({
+        textId: cardForReview.textId as Id<'texts'>,
+      }).catch((err) => {
+        console.error('Failed to ensure card content:', err);
         ensuredCardsRef.current.delete(cardForReview.textId);
       });
     }
@@ -259,7 +287,7 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
         batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
       });
     } catch (error) {
-      console.error("Failed to add cards:", error);
+      console.error('Failed to add cards:', error);
     } finally {
       setIsAddingCards(false);
     }
@@ -297,7 +325,7 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
         });
         setSelectedRating(null);
       } catch (error) {
-        console.error("Failed to review card:", error);
+        console.error('Failed to review card:', error);
       } finally {
         setIsReviewing(false);
       }
@@ -310,7 +338,7 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
     try {
       await masterCardMutation({ cardId: cardForReview._id });
     } catch (error) {
-      console.error("Failed to master card:", error);
+      console.error('Failed to master card:', error);
     }
   }, [cardForReview, masterCardMutation]);
 
@@ -319,7 +347,7 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
     try {
       await hideCardMutation({ cardId: cardForReview._id });
     } catch (error) {
-      console.error("Failed to hide card:", error);
+      console.error('Failed to hide card:', error);
     }
   }, [cardForReview, hideCardMutation]);
 
@@ -360,7 +388,8 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
   // Auto-play: build sequence from settings, preload, play with pauses
   // --------------------------------------------------------------------------
   const handleAutoPlay = useCallback(async () => {
-    if (!cardForReview || !activeCourse || isAutoPlaying || settingsOpen) return;
+    if (!cardForReview || !activeCourse || isAutoPlaying || settingsOpen)
+      return;
 
     // Abort any previous playback
     playbackAbortRef.current?.abort();
@@ -370,7 +399,17 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
 
     setIsAutoPlaying(true);
 
-    const { autoAdvance, reps, repPauses, pauseB2B, pauseB2T, pauseT2T, pauseBeforeAdvance, orderedBase, orderedTarget } = resolveSettings();
+    const {
+      autoAdvance,
+      reps,
+      repPauses,
+      pauseB2B,
+      pauseB2T,
+      pauseT2T,
+      pauseBeforeAdvance,
+      orderedBase,
+      orderedTarget,
+    } = resolveSettings();
 
     /** Get the per-language repetition pause, falling back to the global default. */
     const getRepPause = (lang: string) =>
@@ -384,14 +423,20 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
     for (const lang of orderedBase) {
       const repetitions = reps[lang] ?? DEFAULT_REPETITIONS_BASE;
       if (repetitions <= 0) continue; // skip languages with 0 plays
-      const rec = cardForReview.audioRecordings.find((a) => a.language === lang);
-      if (rec?.url) baseEntries.push({ language: lang, url: rec.url, isBase: true });
+      const rec = cardForReview.audioRecordings.find(
+        (a) => a.language === lang,
+      );
+      if (rec?.url)
+        baseEntries.push({ language: lang, url: rec.url, isBase: true });
     }
     for (const lang of orderedTarget) {
       const repetitions = reps[lang] ?? DEFAULT_REPETITIONS_TARGET;
       if (repetitions <= 0) continue; // skip languages with 0 plays
-      const rec = cardForReview.audioRecordings.find((a) => a.language === lang);
-      if (rec?.url) targetEntries.push({ language: lang, url: rec.url, isBase: false });
+      const rec = cardForReview.audioRecordings.find(
+        (a) => a.language === lang,
+      );
+      if (rec?.url)
+        targetEntries.push({ language: lang, url: rec.url, isBase: false });
     }
 
     const allEntries = [...baseEntries, ...targetEntries];
@@ -477,8 +522,8 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
       }
     } catch (err) {
       // AbortError is expected when playback is cancelled
-      if (!(err instanceof DOMException && err.name === "AbortError")) {
-        console.error("Auto-play error:", err);
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        console.error('Auto-play error:', err);
       }
     } finally {
       if (playbackAbortRef.current === controller) {
@@ -486,13 +531,21 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
       }
       setIsAutoPlaying(false);
     }
-  }, [cardForReview, activeCourse, isAutoPlaying, settingsOpen, resolveSettings, handleNext]);
+  }, [
+    cardForReview,
+    activeCourse,
+    isAutoPlaying,
+    settingsOpen,
+    resolveSettings,
+    handleNext,
+  ]);
 
   // --------------------------------------------------------------------------
   // Auto-play on card change (when autoPlay setting is enabled)
   // --------------------------------------------------------------------------
   useEffect(() => {
-    if (!cardForReview || !activeCourse || !courseSettings || settingsOpen) return;
+    if (!cardForReview || !activeCourse || !courseSettings || settingsOpen)
+      return;
 
     const cardId = cardForReview._id;
     const autoPlay = courseSettings.autoPlayAudio ?? DEFAULT_AUTO_PLAY;
@@ -508,7 +561,12 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
       return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardForReview?._id, cardForReview?.audioRecordings, courseSettings?.autoPlayAudio, settingsOpen]);
+  }, [
+    cardForReview?._id,
+    cardForReview?.audioRecordings,
+    courseSettings?.autoPlayAudio,
+    settingsOpen,
+  ]);
 
   // ============================================================================
   // Return discriminated states
@@ -517,8 +575,12 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
   const base = { settingsOpen, setSettingsOpen };
 
   // Loading
-  if (cardForReview === undefined || courseSettings === undefined || activeCourse === undefined) {
-    return { ...base, status: "loading" };
+  if (
+    cardForReview === undefined ||
+    courseSettings === undefined ||
+    activeCourse === undefined
+  ) {
+    return { ...base, status: 'loading' };
   }
 
   const baseLanguages = resolveLanguageOrder(
@@ -532,14 +594,20 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
 
   // No collection selected
   if (!courseSettings?.activeCollectionId) {
-    return { ...base, status: "noCollection", courseSettings, baseLanguages, targetLanguages };
+    return {
+      ...base,
+      status: 'noCollection',
+      courseSettings,
+      baseLanguages,
+      targetLanguages,
+    };
   }
 
   // No cards due
   if (cardForReview === null) {
     return {
       ...base,
-      status: "noCardsDue",
+      status: 'noCardsDue',
       courseSettings,
       baseLanguages,
       targetLanguages,
@@ -566,11 +634,17 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
   const ratingIntervals: Record<string, string> = {};
   for (const rating of validRatings) {
     try {
-      const result = scheduleCard(cardState, rating, cardForReview.initialReviewCount, now);
+      const result = scheduleCard(
+        cardState,
+        rating,
+        cardForReview.initialReviewCount,
+        now,
+      );
       const diff = result.dueDate - now;
-      ratingIntervals[rating] = diff <= 0 ? t("nextReviewNow") : formatInterval(diff);
+      ratingIntervals[rating] =
+        diff <= 0 ? t('nextReviewNow') : formatInterval(diff);
     } catch {
-      ratingIntervals[rating] = "—";
+      ratingIntervals[rating] = '—';
     }
   }
 
@@ -592,7 +666,7 @@ export function useLearningMode(preloaded: PreloadedLearningData): LearningState
 
   return {
     ...base,
-    status: "reviewing",
+    status: 'reviewing',
     courseSettings,
     baseLanguages,
     targetLanguages,

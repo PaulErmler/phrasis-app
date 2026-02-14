@@ -1,17 +1,17 @@
-import { v, Infer } from "convex/values";
+import { v, Infer } from 'convex/values';
 
 export const learningStyleValidator = v.union(
-  v.literal("casual"),
-  v.literal("focused"),
-  v.literal("advanced")
+  v.literal('casual'),
+  v.literal('focused'),
+  v.literal('advanced'),
 );
 
 export const currentLevelValidator = v.union(
-  v.literal("beginner"),
-  v.literal("elementary"),
-  v.literal("intermediate"),
-  v.literal("upper_intermediate"),
-  v.literal("advanced")
+  v.literal('beginner'),
+  v.literal('elementary'),
+  v.literal('intermediate'),
+  v.literal('upper_intermediate'),
+  v.literal('advanced'),
 );
 
 // FSRS scheduling state (inner object, wrap with v.optional / v.union as needed)

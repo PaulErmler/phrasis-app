@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { RedirectToSignIn } from "@daveyplate/better-auth-ui";
-import { Authenticated } from "convex/react";
-import { FlaskConical, Settings } from "lucide-react";
-import Link from "next/link";
-import { TranslationTest } from "@/components/testing/TranslationTest";
-import { TTSTest } from "@/components/testing/TTSTest";
-import { NotificationTest } from "@/components/testing/NotificationTest";
-import { SchedulingTest } from "@/components/testing/SchedulingTest";
-import { CollectionsPreview } from "@/components/testing/CollectionsPreview";
-import { CollectionCarouselTest } from "@/components/testing/CollectionCarouselTest";
-import { FlashcardUITest } from "@/components/testing/FlashcardUITest";
+import { RedirectToSignIn } from '@daveyplate/better-auth-ui';
+import { Authenticated } from 'convex/react';
+import { FlaskConical, Settings } from 'lucide-react';
+import Link from 'next/link';
+import { TranslationTest } from '@/components/testing/TranslationTest';
+import { TTSTest } from '@/components/testing/TTSTest';
+import { NotificationTest } from '@/components/testing/NotificationTest';
+import { SchedulingTest } from '@/components/testing/SchedulingTest';
+import { CollectionsPreview } from '@/components/testing/CollectionsPreview';
+import { CollectionCarouselTest } from '@/components/testing/CollectionCarouselTest';
+import { FlashcardUITest } from '@/components/testing/FlashcardUITest';
 
 export default function TestingPage() {
   return (

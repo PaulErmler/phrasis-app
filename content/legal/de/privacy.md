@@ -1,6 +1,6 @@
 ---
-title: "Datenschutzerklärung"
-lastUpdated: "2025-12-26"
+title: 'Datenschutzerklärung'
+lastUpdated: '2025-12-26'
 ---
 
 # Präambel
@@ -287,7 +287,7 @@ Hinweise zu Rechtsgrundlagen: Sofern wir die Nutzer um ihre Einwilligung in den 
 
 **Weitere Hinweise zu Verarbeitungsprozessen, Verfahren und Diensten:**
 
-**Einbindung von Drittsoftware, Skripten oder Frameworks:** 
+**Einbindung von Drittsoftware, Skripten oder Frameworks:**
 Wir binden in unser Onlineangebot Software ein, die wir von Servern anderer Anbieter abrufen (z. B. Funktions-Bibliotheken, die wir zwecks Darstellung oder Nutzerfreundlichkeit unseres Onlineangebotes verwenden). Hierbei erheben die jeweiligen Anbieter die IP-Adresse der Nutzer und können diese zu Zwecken der Übermittlung der Software an den Browser der Nutzer sowie zu Zwecken der Sicherheit, als auch zur Auswertung und Optimierung ihres Angebotes verarbeiten. Rechtsgrundlagen: Berechtigte Interessen (Art. 6 Abs. 1 S. 1 lit. f) DSGVO).
 
 ## Änderung und Aktualisierung

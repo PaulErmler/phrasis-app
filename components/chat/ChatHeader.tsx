@@ -1,6 +1,6 @@
-import { SignedIn, UserButton } from "@daveyplate/better-auth-ui";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { SignedIn, UserButton } from '@daveyplate/better-auth-ui';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 interface ChatHeaderProps {
   onBack?: () => void;
@@ -38,7 +38,3 @@ export function ChatHeader({ onBack }: ChatHeaderProps) {
     </header>
   );
 }
-
-
-
-

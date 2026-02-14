@@ -1,6 +1,6 @@
-import { v } from "convex/values";
-import { query } from "../_generated/server";
-import { getAuthUser } from "../db/users";
+import { v } from 'convex/values';
+import { query } from '../_generated/server';
+import { getAuthUser } from '../db/users';
 
 // ============================================================================
 // QUERIES (testing page — CollectionsPreview)
@@ -15,33 +15,33 @@ export const getCollectionsWithTexts = query({
   },
   returns: v.array(
     v.object({
-      _id: v.id("collections"),
+      _id: v.id('collections'),
       name: v.string(),
       texts: v.array(
         v.object({
-          _id: v.id("texts"),
+          _id: v.id('texts'),
           text: v.string(),
           collectionRank: v.optional(v.number()),
-        })
+        }),
       ),
       textCount: v.number(),
-    })
+    }),
   ),
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
     if (!user) return [];
 
     const limit = args.textsPerCollection ?? 5;
-    const collections = await ctx.db.query("collections").collect();
+    const collections = await ctx.db.query('collections').collect();
 
     const result = await Promise.all(
       collections.map(async (collection) => {
         const texts = await ctx.db
-          .query("texts")
-          .withIndex("by_collection_and_rank", (q) =>
-            q.eq("collectionId", collection._id)
+          .query('texts')
+          .withIndex('by_collection_and_rank', (q) =>
+            q.eq('collectionId', collection._id),
           )
-          .order("asc")
+          .order('asc')
           .take(limit);
 
         return {
@@ -54,11 +54,11 @@ export const getCollectionsWithTexts = query({
           })),
           textCount: collection.textCount,
         };
-      })
+      }),
     );
 
     // Sort by CEFR level order
-    const levelOrder = ["Essential", "A1", "A2", "B1", "B2", "C1", "C2"];
+    const levelOrder = ['Essential', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
     result.sort((a, b) => {
       const aIndex = levelOrder.indexOf(a.name);
       const bIndex = levelOrder.indexOf(b.name);
@@ -71,4 +71,3 @@ export const getCollectionsWithTexts = query({
     return result;
   },
 });
-

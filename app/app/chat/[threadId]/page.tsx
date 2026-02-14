@@ -1,13 +1,13 @@
-"use client"; // Add this!
+'use client'; // Add this!
 
-import { SimplifiedChatView } from "@/components/app/SimplifiedChatView";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft } from "lucide-react";
-import Link from "next/link";
-import { RedirectToSignIn } from "@daveyplate/better-auth-ui";
-import { Authenticated } from "convex/react";
-import { use } from "react"; // Use 'use' to unwrap params in client components
+import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
+import { Button } from '@/components/ui/button';
+import { ChevronLeft } from 'lucide-react';
+import Link from 'next/link';
+import { RedirectToSignIn } from '@daveyplate/better-auth-ui';
+import { Authenticated } from 'convex/react';
+import { use } from 'react'; // Use 'use' to unwrap params in client components
 
 export default function ChatPage({
   params,
@@ -21,7 +21,7 @@ export default function ChatPage({
     <>
       <RedirectToSignIn />
       <Authenticated>
-      <div className="flex flex-col h-screen overflow-hidden">
+        <div className="flex flex-col h-screen overflow-hidden">
           <header className="sticky-header">
             <div className="header-bar">
               <Link href="/app">
@@ -37,7 +37,6 @@ export default function ChatPage({
           <main className="flex-1 min-h-0 relative">
             <SimplifiedChatView threadId={threadId} />
           </main>
-
         </div>
       </Authenticated>
     </>

@@ -1,6 +1,6 @@
-import { api } from "@/convex/_generated/api";
-import { preloadAuthQuery } from "@/lib/auth-server";
-import { LearnPageClient } from "./LearnPageClient";
+import { api } from '@/convex/_generated/api';
+import { preloadAuthQuery } from '@/lib/auth-server';
+import { LearnPageClient } from './LearnPageClient';
 
 export default async function LearnPage() {
   const [preloadedCard, preloadedCourseSettings, preloadedActiveCourse] =

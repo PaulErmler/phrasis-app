@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { useTranslations } from "next-intl";
-import { Button } from "@/components/ui/button";
-import { Play, Pause, ChevronRight, Loader2 } from "lucide-react";
-import type { ReviewRating } from "@/lib/scheduling";
+import { useTranslations } from 'next-intl';
+import { Button } from '@/components/ui/button';
+import { Play, Pause, ChevronRight, Loader2 } from 'lucide-react';
+import type { ReviewRating } from '@/lib/scheduling';
 
 interface LearningControlsProps {
   validRatings: ReviewRating[];
@@ -28,7 +28,7 @@ export function LearningControls({
   onNext,
   isReviewing,
 }: LearningControlsProps) {
-  const t = useTranslations("LearningMode");
+  const t = useTranslations('LearningMode');
 
   return (
     <div className="border-t bg-background pb-safe">
@@ -36,7 +36,10 @@ export function LearningControls({
         {/* Rating buttons — select only, don't submit */}
         <div className="flex gap-2">
           {validRatings.map((rating) => (
-            <div key={rating} className="flex-1 flex flex-col items-center gap-1">
+            <div
+              key={rating}
+              className="flex-1 flex flex-col items-center gap-1"
+            >
               <span className="text-[11px] text-muted-foreground">
                 {ratingIntervals[rating]}
               </span>
@@ -46,8 +49,8 @@ export function LearningControls({
                 onClick={() => onSelectRating(rating)}
                 className={`w-full ${
                   activeRating === rating
-                    ? "ring-2 ring-primary border-primary bg-primary/5"
-                    : ""
+                    ? 'ring-2 ring-primary border-primary bg-primary/5'
+                    : ''
                 }`}
               >
                 {t(`ratings.${rating}`)}
@@ -69,7 +72,7 @@ export function LearningControls({
             ) : (
               <Play className="h-4 w-4" />
             )}
-            {isAutoPlaying ? t("actions.pause") : t("actions.play")}
+            {isAutoPlaying ? t('actions.pause') : t('actions.play')}
           </Button>
           <Button
             size="sm"
@@ -81,7 +84,7 @@ export function LearningControls({
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <>
-                {t("actions.next")}
+                {t('actions.next')}
                 <ChevronRight className="h-4 w-4" />
               </>
             )}
