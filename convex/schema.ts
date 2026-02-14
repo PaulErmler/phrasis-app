@@ -61,15 +61,17 @@ export default defineSchema({
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
   })
+    .index("by_textId", ["textId"])
     .index("by_text_and_language", ["textId", "targetLanguage"]),
   
   // Audio recordings table - stores audio files for texts
   audioRecordings: defineTable({
     textId: v.id("texts"),
-    language: v.string(), // e.g., "en-US" or "es-ES"
+    language: v.string(), // Base language code (e.g., "en", "es", "de")
+    voiceName: v.string(), // Full voice identifier (e.g., "en-US-Chirp3-HD-Leda")
     storageId: v.id("_storage"), // Convex file storage reference
-    url: v.string(), // URL to the audio file
   })
+    .index("by_textId", ["textId"])
     .index("by_text_and_language", ["textId", "language"]),
 
   // User settings table - stores user preferences and onboarding status
@@ -98,6 +100,37 @@ export default defineSchema({
     targetLanguages: v.array(v.string()), // ISO codes (e.g., ["es", "fr"])
     currentLevel: v.optional(currentLevelValidator), // User's current level in this course
   }).index("by_userId", ["userId"]),
+
+  // Decks table - one deck per course, auto-created
+  decks: defineTable({
+    courseId: v.id("courses"), // Reference to the course
+    name: v.string(), // Deck name (defaults to course target languages)
+    cardCount: v.number(), // Denormalized count of cards in this deck
+  }).index("by_courseId", ["courseId"]),
+
+  // Cards table - links texts to decks with review metadata
+  cards: defineTable({
+    deckId: v.id("decks"), // Reference to the deck
+    textId: v.id("texts"), // Reference to the text/sentence
+    collectionId: v.id("collections"), // Reference to the source collection
+    dueDate: v.number(), // Timestamp for spaced repetition scheduling
+    isMastered: v.boolean(), // Whether the card has been mastered
+    isHidden: v.boolean(), // Whether the card is hidden from review
+  })
+    .index("by_deckId", ["deckId"])
+    .index("by_deckId_and_dueDate", ["deckId", "dueDate"])
+    .index("by_deckId_and_textId", ["deckId", "textId"]),
+
+  // Collection progress table - tracks cards added per collection/course
+  collectionProgress: defineTable({
+    userId: v.string(), // Links to auth user
+    courseId: v.id("courses"), // Reference to the course
+    collectionId: v.id("collections"), // Reference to the collection
+    cardsAdded: v.number(), // Count of cards added from this collection
+    lastRankProcessed: v.optional(v.number()), // Last collectionRank processed (for efficient pagination)
+  })
+    .index("by_userId_and_courseId", ["userId", "courseId"])
+    .index("by_userId_and_courseId_and_collectionId", ["userId", "courseId", "collectionId"]),
 
   // Translation requests table - async translation processing
   translationRequests: defineTable({
