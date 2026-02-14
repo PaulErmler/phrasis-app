@@ -1,17 +1,20 @@
-"use client";
+import { api } from "@/convex/_generated/api";
+import { preloadAuthQuery } from "@/lib/auth-server";
+import { LearnPageClient } from "./LearnPageClient";
 
-import { RedirectToSignIn } from "@daveyplate/better-auth-ui";
-import { Authenticated } from "convex/react";
-import { LearningMode } from "@/components/app/LearningMode";
+export default async function LearnPage() {
+  const [preloadedCard, preloadedCourseSettings, preloadedActiveCourse] =
+    await Promise.all([
+      preloadAuthQuery(api.features.scheduling.getCardForReview, {}),
+      preloadAuthQuery(api.features.courses.getActiveCourseSettings, {}),
+      preloadAuthQuery(api.features.courses.getActiveCourse, {}),
+    ]);
 
-export default function LearnPage() {
   return (
-    <>
-      <RedirectToSignIn />
-      <Authenticated>
-        <LearningMode />
-      </Authenticated>
-    </>
+    <LearnPageClient
+      preloadedCard={preloadedCard}
+      preloadedCourseSettings={preloadedCourseSettings}
+      preloadedActiveCourse={preloadedActiveCourse}
+    />
   );
 }
-

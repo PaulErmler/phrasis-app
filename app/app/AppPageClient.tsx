@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { RedirectToSignIn } from "@daveyplate/better-auth-ui";
-import { Authenticated, usePreloadedQuery, useQuery, Preloaded } from "convex/react";
+import { Authenticated, usePreloadedQuery, Preloaded } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { HomeView } from "@/components/app/HomeView";
@@ -19,15 +19,21 @@ import { getLanguagesByCodes } from "@/lib/languages";
 
 export function AppPageClient({
   preloadedSettings,
+  preloadedActiveCourse,
+  preloadedCollectionProgress,
+  preloadedCourseSettings,
 }: {
   preloadedSettings: Preloaded<typeof api.features.courses.getUserSettings>;
+  preloadedActiveCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
+  preloadedCollectionProgress: Preloaded<typeof api.features.decks.getCollectionProgress>;
+  preloadedCourseSettings: Preloaded<typeof api.features.courses.getActiveCourseSettings>;
 }) {
   const router = useRouter();
   const [currentView, setCurrentView] = useState<View>("home");
   const [courseMenuOpen, setCourseMenuOpen] = useState(false);
   const t = useTranslations("AppPage");
   const settings = usePreloadedQuery(preloadedSettings);
-  const activeCourse = useQuery(api.features.courses.getActiveCourse);
+  const activeCourse = usePreloadedQuery(preloadedActiveCourse);
 
   const courseButtonLabel = activeCourse
     ? t("currentCourseWithLanguages", {
@@ -72,7 +78,12 @@ export function AppPageClient({
           <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
           <main className="flex-1 container mx-auto px-4 py-8 pb-20">
-            {currentView === "home" && <HomeView />}
+            {currentView === "home" && (
+              <HomeView
+                preloadedCollectionProgress={preloadedCollectionProgress}
+                preloadedCourseSettings={preloadedCourseSettings}
+              />
+            )}
             {currentView === "content" && <ContentView />}
             {currentView === "library" && <LibraryView />}
             {currentView === "settings" && <SettingsView />}

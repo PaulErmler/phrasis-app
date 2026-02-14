@@ -1,6 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { Preloaded } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LearningModeSettings } from "@/components/app/LearningModeSettings";
 import {
@@ -11,10 +13,23 @@ import {
   NoCollectionState,
   NoCardsDueState,
 } from "@/components/app/learning";
+import type { PreloadedLearningData } from "@/components/app/learning/useLearningMode";
 
-export function LearningMode() {
+export function LearningMode({
+  preloadedCard,
+  preloadedCourseSettings,
+  preloadedActiveCourse,
+}: {
+  preloadedCard: Preloaded<typeof api.features.scheduling.getCardForReview>;
+  preloadedCourseSettings: Preloaded<typeof api.features.courses.getActiveCourseSettings>;
+  preloadedActiveCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
+}) {
   const router = useRouter();
-  const state = useLearningMode();
+  const state = useLearningMode({
+    card: preloadedCard,
+    courseSettings: preloadedCourseSettings,
+    activeCourse: preloadedActiveCourse,
+  });
 
   const goHome = () => router.push("/app");
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { usePreloadedQuery, useQuery, useMutation, Preloaded } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import { useTranslations } from "next-intl";
@@ -11,14 +11,20 @@ import { CollectionDetailDialog, type PreviewText } from "./CollectionDetailDial
 
 const PREVIEW_COUNT = 5;
 
-export function CollectionCarousel() {
+export function CollectionCarousel({
+  preloadedCollectionProgress,
+  preloadedCourseSettings,
+}: {
+  preloadedCollectionProgress: Preloaded<typeof api.features.decks.getCollectionProgress>;
+  preloadedCourseSettings: Preloaded<typeof api.features.courses.getActiveCourseSettings>;
+}) {
   const t = useTranslations("AppPage.collections.carousel");
   const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [optimisticActiveId, setOptimisticActiveId] = useState<string | null>(null);
 
-  const collectionProgress = useQuery(api.features.decks.getCollectionProgress);
-  const courseSettings = useQuery(api.features.courses.getActiveCourseSettings);
+  const collectionProgress = usePreloadedQuery(preloadedCollectionProgress);
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const setActiveCollection = useMutation(api.features.decks.setActiveCollection);
   const addCardsFromCollection = useMutation(api.features.decks.addCardsFromCollection);
 
@@ -88,7 +94,7 @@ export function CollectionCarousel() {
     }
   }, [openCollectionId, addCardsFromCollection, t]);
 
-  if (collectionProgress === undefined || courseSettings === undefined) {
+  if (!collectionProgress || !courseSettings) {
     return (
       <CollectionCarouselUI
         collections={[]}

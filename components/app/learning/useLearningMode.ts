@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslations } from "next-intl";
-import { useQuery, useMutation } from "convex/react";
+import { usePreloadedQuery, useMutation, Preloaded } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import {
@@ -166,16 +166,22 @@ export type LearningState =
   | NoCardsDueState
   | ReviewingState;
 
+export interface PreloadedLearningData {
+  card: Preloaded<typeof api.features.scheduling.getCardForReview>;
+  courseSettings: Preloaded<typeof api.features.courses.getActiveCourseSettings>;
+  activeCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
+}
+
 // ============================================================================
 // Hook
 // ============================================================================
 
-export function useLearningMode(): LearningState {
+export function useLearningMode(preloaded: PreloadedLearningData): LearningState {
   const t = useTranslations("LearningMode");
 
-  const cardForReview = useQuery(api.features.scheduling.getCardForReview);
-  const courseSettings = useQuery(api.features.courses.getActiveCourseSettings);
-  const activeCourse = useQuery(api.features.courses.getActiveCourse);
+  const cardForReview = usePreloadedQuery(preloaded.card);
+  const courseSettings = usePreloadedQuery(preloaded.courseSettings);
+  const activeCourse = usePreloadedQuery(preloaded.activeCourse);
 
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
   const masterCardMutation = useMutation(api.features.scheduling.masterCard);
