@@ -106,7 +106,7 @@ export function useChatMessages({
     {
       initialNumItems: 100,
       stream: true,
-    },
+    } as any,
   );
 
   const messages: ExtendedUIMessage[] = messageResult?.results ?? [];

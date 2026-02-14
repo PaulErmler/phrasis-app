@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';

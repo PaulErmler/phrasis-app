@@ -49,6 +49,7 @@ export function TranslationTest() {
       translationRequest?.status === 'completed' &&
       translationRequest.result
     ) {
+       
       setDisplayedResult(translationRequest.result);
     } else if (translationRequest?.status === 'failed') {
       setDisplayedResult(

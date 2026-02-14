@@ -279,7 +279,7 @@ export const getDeckCards = query({
       const sourceLanguage = text.language;
 
       const translations = allLanguages.map((lang) => {
-        let translatedText = '';
+        let translatedText;
         if (lang === sourceLanguage) {
           translatedText = text.text;
         } else {

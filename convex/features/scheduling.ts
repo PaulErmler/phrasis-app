@@ -110,7 +110,7 @@ export const getCardForReview = query({
     // Load translations
     const translations = await Promise.all(
       allLanguages.map(async (lang) => {
-        let translatedText = '';
+        let translatedText;
         if (lang === sourceLanguage) {
           translatedText = text.text;
         } else {

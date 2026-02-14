@@ -9,7 +9,7 @@ import convexPlugin from '@convex-dev/eslint-plugin';
 
 export default defineConfig([
   ...nextTypescript,
-  //...nextCoreWebVitals,
+  ...nextCoreWebVitals,
   ...convexPlugin.configs.recommended,
 
   // Global ignores - separate block
@@ -61,7 +61,10 @@ export default defineConfig([
       'react/react-in-jsx-scope': 'off',
       'react/prop-types': 'off',
       'react-hooks/purity': 'off',
+      'react-hooks/set-state-in-effect': 'off',
       'import/no-anonymous-default-export': 'off',
+      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
       // Add indentation rules
       indent: ['error', 2], // 2-space indentation for all files
     },
