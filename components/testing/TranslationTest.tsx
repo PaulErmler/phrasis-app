@@ -25,11 +25,11 @@ export function TranslationTest() {
   const [requestId, setRequestId] = useState<Id<"translationRequests"> | null>(null);
   const [displayedResult, setDisplayedResult] = useState("");
 
-  const requestTranslation = useMutation(api.translation.requestTranslation);
+  const requestTranslation = useMutation(api.testing.translation.requestTranslation);
   
   // Query the translation request - reactively updates when the result is ready
   const translationRequest = useQuery(
-    api.translation.getTranslationRequest,
+    api.testing.translation.getTranslationRequest,
     requestId ? { requestId } : "skip"
   );
 

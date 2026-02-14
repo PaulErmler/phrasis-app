@@ -12,7 +12,7 @@ import { format } from "date-fns";
  * Sidebar component to display user's flashcards
  */
 export function FlashcardSidebar() {
-  const flashcards = useQuery(api.chat.flashcards.listUserFlashcards);
+  const flashcards = useQuery(api.features.chat.flashcards.listUserFlashcards);
 
   if (flashcards === undefined) {
     return (

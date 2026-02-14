@@ -75,6 +75,49 @@
       "account": "Konto",
       "language": "App-Sprache"
     },
+    "collections": {
+      "carousel": {
+        "sectionTitle": "Schwierigkeitsauswahl",
+        "title": "Sammlungen",
+        "select": "Auswählen",
+        "selected": "Ausgewählt",
+        "done": "Fertig",
+        "cards": "{count} Karten",
+        "notStarted": "Nicht begonnen",
+        "addCards": "{count} Karten zum Deck hinzufügen",
+        "adding": "Wird hinzugefügt...",
+        "complete": "Fertig",
+        "collectionComplete": "{name} abgeschlossen!",
+        "allCardsAdded": "Alle Karten dieser Sammlung wurden deinem Deck hinzugefügt.",
+        "noMoreCards": "Keine weiteren Karten aus {name} hinzuzufügen",
+        "nextCards": "Nächste {count} Karten aus {name}",
+        "progress": "{added} / {total}",
+        "failedToSelect": "Sammlung konnte nicht ausgewählt werden",
+        "failedToAdd": "Karten konnten nicht hinzugefügt werden",
+        "cardsAdded": "{count} Karten zu deinem Deck hinzugefügt",
+        "noCardsToAdd": "Keine weiteren Karten aus dieser Sammlung hinzuzufügen",
+        "descriptions": {
+          "Essential": "Die wichtigsten Sätze am Anfang",
+          "A1": "Sätze mit Vokabular auf CEFR A1-Niveau",
+          "A2": "Sätze mit Vokabular auf CEFR A2-Niveau",
+          "B1": "Sätze mit Vokabular auf CEFR B1-Niveau",
+          "B2": "Sätze mit Vokabular auf CEFR B2-Niveau",
+          "C1": "Sätze mit Vokabular auf CEFR C1-Niveau",
+          "C2": "Sätze mit Vokabular auf CEFR C2-Niveau"
+        },
+        "detail": {
+          "totalCards": "{count} Karten",
+          "progress": "Fortschritt",
+          "select": "Auswählen",
+          "done": "Fertig",
+          "allCardsAdded": "Alle Karten dieser Sammlung wurden deinem Deck hinzugefügt.",
+          "nextSentences": "Nächste Sätze",
+          "adding": "Wird hinzugefügt...",
+          "addN": "{count} hinzufügen",
+          "noMoreCards": "Keine weiteren Karten hinzuzufügen"
+        }
+      }
+    },
     "courses": {
       "title": "Deine Kurse",
       "description": "Wähle einen Kurs zum Wechseln oder erstelle einen neuen",
@@ -107,7 +150,66 @@
         "create": "Kurs erstellen"
       }
     },
-    "changeCourse": "Kurs wechseln"
+    "changeCourse": "Kurs wechseln",
+    "currentCourseWithLanguages": "Kurs: {targetLanguages}",
+    "startLearning": "Lernen starten",
+    "stats": {
+      "streak": "Serie",
+      "reps": "Wiederholungen",
+      "sentences": "Sätze",
+      "time": "Zeit"
+    }
+  },
+  "LearningMode": {
+    "title": "Lernen",
+    "back": "Zurück",
+    "settings": "Einstellungen",
+    "loading": "Lädt...",
+    "baseLanguage": "Ausgangssprache",
+    "targetLanguage": "Zielsprache",
+    "phase": {
+      "preReview": "Vorwiederholung",
+      "review": "Wiederholung"
+    },
+    "reviewCount": "{count} Wiederholungen",
+    "nextReview": "Nächste Wiederholung in {time}",
+    "nextReviewNow": "Jetzt fällig",
+    "ratings": {
+      "stillLearning": "Lerne noch",
+      "understood": "Verstanden",
+      "again": "Nochmal",
+      "hard": "Schwer",
+      "good": "Gut",
+      "easy": "Leicht"
+    },
+    "actions": {
+      "master": "Gemeistert",
+      "hide": "Ausblenden",
+      "next": "Weiter",
+      "pause": "Pause",
+      "play": "Abspielen"
+    },
+    "empty": {
+      "noCardsDue": "Keine Karten zur Wiederholung fällig",
+      "addCards": "{count} Karten hinzufügen",
+      "adding": "Wird hinzugefügt...",
+      "noCollection": "Keine Sammlung ausgewählt",
+      "goHome": "Zur Startseite",
+      "allDone": "Alles erledigt! Füge weitere Karten hinzu, um weiterzulernen.",
+      "noCardsInDeck": "Noch keine Karten in deinem Deck. Füge Karten aus einer Sammlung hinzu, um mit dem Lernen zu beginnen."
+    },
+    "settingsPanel": {
+      "title": "Lerneinstellungen",
+      "iconLegend": "Karten-Symbole",
+      "iconMaster": "Karte als gemeistert markieren (erscheint nicht mehr)",
+      "iconHide": "Karte aus der Wiederholung ausblenden",
+      "cardsPerBatch": "Karten pro Stapel",
+      "cardsPerBatchDescription": "Anzahl der Karten, die auf einmal hinzugefügt werden",
+      "autoAddCards": "Karten automatisch hinzufügen",
+      "autoAddCardsDescription": "Automatisch neue Karten hinzufügen, wenn keine mehr fällig sind",
+      "initialReviews": "Anfängliche Wiederholungen",
+      "initialReviewsDescription": "Anzahl der Vorwiederholungen vor der Abstandswiederholung"
+    }
   },
   "Footer": {
     "copyright": "© {year} Phrasis. Alle Rechte vorbehalten.",

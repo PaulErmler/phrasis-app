@@ -25,9 +25,9 @@ interface CourseMenuProps {
 export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
   const t = useTranslations("AppPage");
   const locale = useLocale();
-  const courses = useQuery(api.courses.getUserCourses);
-  const activeCourse = useQuery(api.courses.getActiveCourse);
-  const setActiveCourse = useMutation(api.courses.setActiveCourse);
+  const courses = useQuery(api.features.courses.getUserCourses);
+  const activeCourse = useQuery(api.features.courses.getActiveCourse);
+  const setActiveCourse = useMutation(api.features.courses.setActiveCourse);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const handleSelectCourse = async (courseId: Id<"courses">) => {

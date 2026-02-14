@@ -25,10 +25,10 @@ export default function OnboardingPage() {
   const locale = useLocale();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const userSettings = useQuery(api.courses.getUserSettings);
-  const onboardingProgress = useQuery(api.courses.getOnboardingProgress);
-  const saveProgress = useMutation(api.courses.saveOnboardingProgress);
-  const completeOnboarding = useMutation(api.courses.completeOnboarding);
+  const userSettings = useQuery(api.features.courses.getUserSettings);
+  const onboardingProgress = useQuery(api.features.courses.getOnboardingProgress);
+  const saveProgress = useMutation(api.features.courses.saveOnboardingProgress);
+  const completeOnboarding = useMutation(api.features.courses.completeOnboarding);
 
   // Initialize data from onboarding progress or use defaults
   const initialData: OnboardingData = onboardingProgress ? {
