@@ -15,7 +15,7 @@ export const transcribeAudio = action({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
+    await requireAuthUser(ctx);
 
     try {
       const transcript = await transcribe({
