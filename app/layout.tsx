@@ -11,20 +11,20 @@ import { Toaster } from "@/components/ui/sonner";
 import { ConsentManager } from "./consent-manager";
 
 const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+  variable: '--font-geist-sans',
+  subsets: ['latin'],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+  variable: '--font-geist-mono',
+  subsets: ['latin'],
 });
 
-
 export const metadata: Metadata = {
-  title: "Phrasis",
-  description: "Master languages with Phrasis. Learn, practice pronunciation, and build fluency in any language.",
-  manifest: "/manifest.json",
+  title: 'Phrasis',
+  description:
+    'Master languages with Phrasis. Learn, practice pronunciation, and build fluency in any language.',
+  manifest: '/manifest.json',
   icons: {
     icon: [
       { url: "/favicon.svg", sizes: "32x32", type: "image/png" },
@@ -32,13 +32,13 @@ export const metadata: Metadata = {
       { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
     ],
     apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "Phrasis",
+    statusBarStyle: 'default',
+    title: 'Phrasis',
   },
 };
 

@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState, useTransition } from "react";
@@ -14,8 +14,8 @@ import { setUserLocale } from "@/i18n/locale";
 import { cn } from "@/lib/utils";
 
 const locales = [
-  { code: "en", label: "English", flag: "🇬🇧" },
-  { code: "de", label: "Deutsch", flag: "🇩🇪" },
+  { code: 'en', label: 'English', flag: '🇬🇧' },
+  { code: 'de', label: 'Deutsch', flag: '🇩🇪' },
 ] as const;
 
 interface LanguageSwitcherProps {
@@ -37,7 +37,7 @@ export function LanguageSwitcher({ compact = false, className }: LanguageSwitche
 
   const handleLocaleChange = (newLocale: string) => {
     startTransition(() => {
-      setUserLocale(newLocale as "en" | "de");
+      setUserLocale(newLocale as 'en' | 'de');
     });
   };
 
@@ -93,4 +93,3 @@ export function LanguageSwitcher({ compact = false, className }: LanguageSwitche
     </Select>
   );
 }
-

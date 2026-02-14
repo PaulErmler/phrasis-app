@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -6,7 +6,7 @@ import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 
 export function Footer() {
-  const t = useTranslations("Footer");
+  const t = useTranslations('Footer');
 
   return (
     <footer className="w-full border-t border-border bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
