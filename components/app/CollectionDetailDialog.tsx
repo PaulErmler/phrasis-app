@@ -77,7 +77,7 @@ export function CollectionDetailDialog({
         <div className="space-y-4">
           <Separator />
 
-          {/* Progress + Select row */}
+        
           <div className="flex items-center gap-3">
             <div className="flex-1 rounded-xl border p-3 space-y-2">
               <div className="flex items-center justify-between">

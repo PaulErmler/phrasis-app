@@ -1,5 +1,6 @@
 import { v, ConvexError } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { mutation, query, MutationCtx } from "../_generated/server";
+import { Id } from "../_generated/dataModel";
 import { getAuthUser, requireAuthUser } from "../db/users";
 import { getActiveCourseForUser } from "../db/courses";
 import { getInitialReviewCount } from "../db/courseSettings";
@@ -11,6 +12,21 @@ import {
   type CardSchedulingState,
 } from "../../lib/scheduling";
 import { fsrsStateValidator, translationValidator, audioRecordingValidator } from "../types";
+
+/**
+ * Require auth and verify the card belongs to the current user's course/deck.
+ * Throws ConvexError if not authenticated, card/deck not found, or course not owned by user.
+ */
+async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<"cards">) {
+  const user = await requireAuthUser(ctx);
+  const card = await ctx.db.get(cardId);
+  if (!card) throw new ConvexError("Card not found");
+  const deck = await ctx.db.get(card.deckId);
+  if (!deck) throw new ConvexError("Deck not found");
+  const course = await ctx.db.get(deck.courseId);
+  if (!course || course.userId !== user._id) throw new ConvexError("Unauthorized");
+  return { card, deck };
+}
 
 // ============================================================================
 // QUERIES
@@ -171,14 +187,7 @@ export const reviewCard = mutation({
     fsrsState: v.union(fsrsStateValidator, v.null()),
   }),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
-
-    const card = await ctx.db.get(args.cardId);
-    if (!card) throw new ConvexError("Card not found");
-
-    // Load initialReviewCount from courseSettings (not course)
-    const deck = await ctx.db.get(card.deckId);
-    if (!deck) throw new ConvexError("Deck not found");
+    const { card, deck } = await authorizeCardAccess(ctx, args.cardId);
 
     const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
 
