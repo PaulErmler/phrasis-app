@@ -94,9 +94,9 @@ function AudioPlayer({ url, language }: AudioPlayerProps) {
 }
 
 export function DeckCardsView() {
-  const deckCards = useQuery(api.decks.getDeckCards, {});
-  const activeCourse = useQuery(api.courses.getActiveCourse);
-  const ensureCardContent = useMutation(api.decks.ensureCardContent);
+  const deckCards = useQuery(api.features.decks.getDeckCards, {});
+  const activeCourse = useQuery(api.features.courses.getActiveCourse);
+  const ensureCardContent = useMutation(api.features.decks.ensureCardContent);
   
   // Track which cards we've already triggered regeneration for
   // to avoid calling the mutation repeatedly

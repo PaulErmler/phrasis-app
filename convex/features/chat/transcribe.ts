@@ -1,13 +1,13 @@
 "use node";
 
-import { action } from "../_generated/server";
+import { action } from "../../_generated/server";
 import { v, ConvexError } from "convex/values";
 import { experimental_transcribe as transcribe } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { authComponent } from "../auth";
+import { getAuthUser } from "../../db/users";
 
 /**
- * Transcribe audio using OpenAI Transcription API
+ * Transcribe audio using OpenAI Transcription API.
  */
 export const transcribeAudio = action({
   args: {
@@ -15,11 +15,8 @@ export const transcribeAudio = action({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-
-    const user = await authComponent.getAuthUser(ctx);
-    if (!user) {
-      throw new ConvexError("User not authenticated");
-    }
+    const user = await getAuthUser(ctx);
+    if (!user) throw new ConvexError("User not authenticated");
 
     try {
       const transcript = await transcribe({
@@ -36,5 +33,4 @@ export const transcribeAudio = action({
     }
   },
 });
-
 

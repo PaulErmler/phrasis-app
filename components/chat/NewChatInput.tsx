@@ -49,8 +49,8 @@ export function NewChatInput({
   );
 
   // Mutations
-  const createThread = useMutation(api.chat.threads.createThread);
-  const sendMessageMutation = useMutation(api.chat.messages.sendMessage);
+  const createThread = useMutation(api.features.chat.threads.createThread);
+  const sendMessageMutation = useMutation(api.features.chat.messages.sendMessage);
 
   // Handle chat initiation - create thread, send message, route to chat
   const handleSubmit = useCallback(

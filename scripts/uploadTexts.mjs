@@ -85,7 +85,7 @@ async function uploadTexts() {
     let collectionId;
     try {
       collectionId = runConvexMutation(
-        "data_uploading/data_management:upsertCollection",
+        "db/seed:upsertCollection",
         { name: level }
       );
       console.log(`Collection '${level}' ready (ID: ${collectionId})`);
@@ -141,7 +141,7 @@ async function uploadTexts() {
 
       try {
         const result = runConvexMutation(
-          "data_uploading/data_management:batchUpsertTexts",
+          "db/seed:batchUpsertTexts",
           { texts: batch }
         );
 

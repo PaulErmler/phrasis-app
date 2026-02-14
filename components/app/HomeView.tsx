@@ -14,7 +14,7 @@ import { DeckCardsView } from "@/components/app/DeckCardsView";
 export function HomeView() {
   const router = useRouter();
   const t = useTranslations("AppPage");
-  const activeCourse = useQuery(api.courses.getActiveCourse);
+  const activeCourse = useQuery(api.features.courses.getActiveCourse);
 
   const formatCourseName = () => {
     if (!activeCourse) return null;
