@@ -35,8 +35,8 @@ export function CreateCourseDialog({ open, onOpenChange }: CreateCourseDialogPro
   const [difficulty, setDifficulty] = useState<CurrentLevel | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const createCourse = useMutation(api.courses.createCourse);
-  const setActiveCourse = useMutation(api.courses.setActiveCourse);
+  const createCourse = useMutation(api.features.courses.createCourse);
+  const setActiveCourse = useMutation(api.features.courses.setActiveCourse);
 
   const totalSteps = 3;
   const progress = (step / totalSteps) * 100;

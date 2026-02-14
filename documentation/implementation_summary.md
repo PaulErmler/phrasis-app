@@ -24,13 +24,12 @@ erDiagram
 - `translations` - stores translations linked to `textId` and `targetLanguage`
 - `audioRecordings` - stores audio files using Convex file storage, linked to `textId`, `language`, and `voiceName`
 
-### Data Seeding (`convex/data_uploading/data_management.ts`)
+### Data Seeding (`convex/db/seed.ts`)
 - `upsertCollection` - internal mutation to create/get collection by name
 - `batchUpsertTexts` - internal mutation for bulk inserting up to 500 texts
+- `adjustCollectionTextCount` - helper to update collection text counts
 
-### Queries (`convex/texts.ts`)
-- `getCollections` - returns all collections (authenticated)
-- `getTextsByCollection` - returns texts for a collection with limit (authenticated)
+### Queries (`convex/testing/texts.ts`)
 - `getCollectionsWithTexts` - returns collections with preview texts and count (authenticated)
 
 ### Upload Script (`scripts/uploadTexts.mjs`)
@@ -43,8 +42,9 @@ erDiagram
 
 ### Schema
 - `courses` - stores user's language configuration (`baseLanguages`, `targetLanguages`, `currentLevel`)
+- `courseSettings` - stores course-specific settings (`initialReviewCount`) in a separate table to avoid course re-fetches when settings change
 - `decks` - one deck per course, auto-created with `cardCount` for efficient queries
-- `cards` - links texts to decks with `dueDate`, `isMastered`, `isHidden` for spaced repetition
+- `cards` - links texts to decks with scheduling state: `dueDate`, `isMastered`, `isHidden`, `schedulingPhase`, `preReviewCount`, `fsrsState`
 - `collectionProgress` - tracks per-user, per-course progress through collections using `lastRankProcessed` for efficient pagination
 
 ### How Cards Are Added
@@ -75,18 +75,17 @@ sequenceDiagram
     Scheduler->>Prep: textId, baseLanguages, targetLanguages
 ```
 
-### Backend Functions (`convex/decks.ts`)
+### Backend Functions (`convex/features/decks.ts`)
 
 **Public Mutations:**
 - `addCardsFromCollection` - adds cards from a collection to user's deck, tracks progress via `collectionProgress`
+- `ensureCardContent` - regenerates missing content for a specific card (called from UI when `hasMissingContent: true`)
 
 **Public Queries:**
-- `getDeckForCourse` - returns the deck for user's active course
 - `getDeckCards` - returns cards with translations and audio (paginated, default 20)
 - `getCollectionProgress` - returns progress for all collections in active course
 
 **Internal Functions:**
-- `getOrCreateDeck` - ensures deck exists for a course
 - `prepareCardContent` - schedules translation and TTS for a text's required languages
 
 ### UI Components
@@ -125,7 +124,7 @@ flowchart TD
 3. **Batch loading optimization** - queries only needed languages using `by_text_and_language` index
 4. **On-demand regeneration** - `ensureCardContent` mutation checks and schedules missing content when cards are displayed
 
-### Backend Functions (`convex/decks.ts`)
+### Backend Functions (`convex/features/decks.ts`)
 
 **Helper Function:**
 - `scheduleMissingContent()` - shared logic for checking and scheduling missing translations/audio
@@ -139,12 +138,13 @@ flowchart TD
 - `processTranslationForCard` - calls Google Cloud Translation API
 - `processTTSForCard` - calls Google Cloud TTS API, stores MP3 in Convex storage
 
-**Public Mutation:**
-- `ensureCardContent` - regenerates missing content for a specific card (called from UI when `hasMissingContent: true`)
+**Shared Helpers:**
+- `convex/features/translation.ts` - `translateText()` plain async helper wrapping Google Cloud Translation API
+- `convex/features/tts.ts` - `synthesizeSpeech()` plain async helper wrapping Google Cloud TTS API
 
-## Translation System (Standalone)
+## Translation System (Standalone Testing)
 
-### Backend (`convex/translation.ts`)
+### Backend (`convex/testing/translation.ts`)
 - `requestTranslation` - mutation creates pending request, schedules async processing
 - `getTranslationRequest` - query returns request status and result
 - `processTranslation` - internal action calls Google Cloud Translation API
@@ -156,9 +156,9 @@ flowchart TD
 - Test component with source/target language selection
 - Reactive result display when translation completes
 
-## Text-to-Speech System (Standalone)
+## Text-to-Speech System (Standalone Testing)
 
-### Backend (`convex/tts.ts`)
+### Backend (`convex/testing/tts.ts`)
 - `requestTTS` - mutation creates pending request, schedules async processing
 - `getTTSRequest` - query returns request status, generates `audioUrl` dynamically from `storageId`
 - `processTTS` - internal action calls Google Cloud TTS API (Chirp3 HD voices), stores MP3 in Convex storage
@@ -175,6 +175,79 @@ flowchart TD
 - Test component for TTS with language/accent/voice selection
 - Speed control (0.5x - 1.0x)
 - Reactive audio playback when generation completes
+
+## Card Review & Scheduling System
+
+Cards use a two-phase spaced repetition system powered by the [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs) library.
+
+### Two-Phase Scheduling Model
+
+```mermaid
+stateDiagram-v2
+    [*] --> PreReview: Card created
+    PreReview --> PreReview: "Still learning" preReviewCount++
+    PreReview --> FSRSReview: "Understood" at any time
+    PreReview --> FSRSReview: preReviewCount reaches X-2
+    FSRSReview --> FSRSReview: Again/Hard/Good/Easy
+```
+
+**Phase 1 — Pre-review:**
+- `preReviewCount` starts at 0, card shown with fixed intervals: 1 min, 3 min, 5 min, then every 10 min
+- Options: "Still learning" (default) / "Understood"
+- Transitions to FSRS when user selects "Understood" OR `preReviewCount` reaches `initialReviewCount - 2`
+
+**Phase 2 — FSRS review:**
+- Uses FSRS algorithm with `desired_retention: 0.95` and two learning steps `["10m", "10m"]`
+- Options: Again / Hard / Good (default) / Easy
+- Produces review intervals of approximately 1, 3, 9, 18 days
+- The `-2` threshold ensures total initial exposure = `initialReviewCount` (pre-review + 2 FSRS learning reviews)
+
+### Shared Scheduling Logic (`lib/scheduling.ts`)
+
+All scheduling logic lives in a single pure TypeScript module with no Convex/React dependencies, importable from both backend and frontend:
+
+- `DEFAULT_INITIAL_REVIEW_COUNT = 5` — single source of truth
+- `scheduleCard(cardState, rating, initialReviewCount, now)` — main entry-point for all scheduling
+- `createInitialCardState(now)` — factory for new card scheduling state
+- `getPreReviewInterval(reviewCount)` — returns pre-review interval in ms
+- `simulateReviews(initialReviewCount, ratings[])` — simulates a review sequence for the test UI
+- `getValidRatings(phase)` / `getDefaultRating(phase)` — UI helpers
+
+### FSRS Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| `request_retention` | 0.95 |
+| `maximum_interval` | 36500 days |
+| `enable_fuzz` | false |
+| `enable_short_term` | true |
+| `learning_steps` | `["10m", "10m"]` |
+| `relearning_steps` | `["10m"]` |
+
+### Schema Fields
+
+**Cards** (new fields alongside existing `dueDate`, `isMastered`, `isHidden`):
+- `schedulingPhase` — `"preReview"` or `"review"`
+- `preReviewCount` — number of pre-review rounds completed
+- `fsrsState` — optional serialised FSRS card state (stability, difficulty, reps, lapses, state, etc.)
+
+**Course Settings** (separate `courseSettings` table — avoids course re-fetches):
+- `courseId` — reference to the course
+- `initialReviewCount` — the X value controlling pre-review threshold
+
+### Backend Functions (`convex/features/scheduling.ts`)
+
+**Public Query:**
+- `getCardForReview` — returns the next due card (earliest `dueDate <= now`, not hidden) with text, translations, and audio
+
+**Public Mutation:**
+- `reviewCard` — takes `cardId` + `rating`, delegates to shared `scheduleCard()`, patches card document
+
+### UI Components
+
+- `SchedulingTest` (`components/testing/SchedulingTest.tsx`) — developer test component with two tabs:
+  - **Virtual Simulation** — interactive step-by-step scheduling with adjustable `initialReviewCount`, quick preview table, FSRS state display
+  - **Real Cards** — reviews actual cards from the user's deck with the real `reviewCard` mutation
 
 ## Performance Optimizations
 

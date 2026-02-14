@@ -6,7 +6,9 @@ import { FlaskConical } from "lucide-react";
 import { TranslationTest } from "@/components/testing/TranslationTest";
 import { TTSTest } from "@/components/testing/TTSTest";
 import { NotificationTest } from "@/components/testing/NotificationTest";
-import { CollectionsPreview } from "@/components/app/CollectionsPreview";
+import { SchedulingTest } from "@/components/testing/SchedulingTest";
+import { CollectionsPreview } from "@/components/testing/CollectionsPreview";
+import { CollectionCarouselTest } from "@/components/testing/CollectionCarouselTest";
 
 export default function TestingPage() {
   return (
@@ -27,6 +29,11 @@ export default function TestingPage() {
 
           {/* Responsive Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Scheduling Test Card — spans full width */}
+            <div className="md:col-span-2">
+              <SchedulingTest />
+            </div>
+
             <div className="md:col-span-2 lg:col-span-1">
               <TranslationTest />
             </div>
@@ -39,6 +46,11 @@ export default function TestingPage() {
 
             <div className="md:col-span-2 lg:col-span-1">
               <CollectionsPreview />
+            </div>
+
+            {/* Collection Carousel UI Test */}
+            <div className="md:col-span-2">
+              <CollectionCarouselTest />
             </div>
           </div>
         </div>

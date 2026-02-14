@@ -24,7 +24,7 @@ export function useVoiceRecording(
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const transcribeAudio = useAction(api.chat.transcribe.transcribeAudio);
+  const transcribeAudio = useAction(api.features.chat.transcribe.transcribeAudio);
 
   const startRecording = useCallback(async () => {
     try {

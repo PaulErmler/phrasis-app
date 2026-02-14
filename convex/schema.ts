@@ -1,39 +1,9 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { learningStyleValidator, currentLevelValidator } from "./types";
+import { learningStyleValidator, currentLevelValidator, fsrsStateValidator } from "./types";
+import { testingTables } from "./testing/schema";
 
-// The schema is entirely optional.
-// You can delete this file (schema.ts) and the
-// app will continue to work.
-// The schema provides more precise TypeScript types.
 export default defineSchema({
-  numbers: defineTable({
-    value: v.number(),
-  }),
-  testFlashcards: defineTable({
-    text: v.string(),           // Flashcard content
-    note: v.string(),           // Additional note
-    date: v.number(),           // Timestamp
-    randomNumber: v.number(),   // Random number
-    userId: v.string(),         // User who owns the flashcard
-  }),
-  
-  flashcardApprovals: defineTable({
-    threadId: v.string(),       // Thread where approval was requested
-    messageId: v.string(),      // Message containing the tool call
-    toolCallId: v.string(),     // ID of the tool call
-    text: v.string(),           // Proposed flashcard text
-    note: v.string(),           // Proposed flashcard note
-    userId: v.string(),         // User who needs to approve
-    status: v.string(),         // "pending", "approved", "rejected"
-    createdAt: v.number(),      // When the approval was requested
-    processedAt: v.optional(v.number()), // When it was approved/rejected
-  })
-    .index("by_message", ["messageId"])
-    .index("by_user_and_status", ["userId", "status"])
-    .index("by_toolCallId", ["toolCallId"])
-    .index("by_thread_and_user", ["threadId", "userId"]),
-  
   // Collections table - groups texts by difficulty level or potentially other topics 
   collections: defineTable({
     name: v.string(), // e.g., "A1", "B2", "Essential"
@@ -101,6 +71,13 @@ export default defineSchema({
     currentLevel: v.optional(currentLevelValidator), // User's current level in this course
   }).index("by_userId", ["userId"]),
 
+  // Course settings table — separated so changes don't trigger course re-fetches
+  courseSettings: defineTable({
+    courseId: v.id("courses"),
+    initialReviewCount: v.number(), // How many times a card is shown before FSRS scheduling
+    activeCollectionId: v.optional(v.id("collections")), 
+  }).index("by_courseId", ["courseId"]),
+
   // Decks table - one deck per course, auto-created
   decks: defineTable({
     courseId: v.id("courses"), // Reference to the course
@@ -108,18 +85,22 @@ export default defineSchema({
     cardCount: v.number(), // Denormalized count of cards in this deck
   }).index("by_courseId", ["courseId"]),
 
-  // Cards table - links texts to decks with review metadata
+  // Cards table - links texts to decks with review metadata and scheduling state
   cards: defineTable({
     deckId: v.id("decks"), // Reference to the deck
     textId: v.id("texts"), // Reference to the text/sentence
     collectionId: v.id("collections"), // Reference to the source collection
-    dueDate: v.number(), // Timestamp for spaced repetition scheduling
+    dueDate: v.number(), // Timestamp for spaced repetition scheduling (driven by scheduler)
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
+    schedulingPhase: v.string(), // "preReview" | "review"
+    preReviewCount: v.number(), // How many pre-review rounds completed
+    fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
   })
     .index("by_deckId", ["deckId"])
     .index("by_deckId_and_dueDate", ["deckId", "dueDate"])
-    .index("by_deckId_and_textId", ["deckId", "textId"]),
+    .index("by_deckId_and_textId", ["deckId", "textId"])
+    .index("by_deckId_and_isHidden_and_isMastered_and_dueDate", ["deckId", "isHidden", "isMastered", "dueDate"]),
 
   // Collection progress table - tracks cards added per collection/course
   collectionProgress: defineTable({
@@ -132,34 +113,6 @@ export default defineSchema({
     .index("by_userId_and_courseId", ["userId", "courseId"])
     .index("by_userId_and_courseId_and_collectionId", ["userId", "courseId", "collectionId"]),
 
-  // Translation requests table - async translation processing
-  translationRequests: defineTable({
-    userId: v.string(), // User who requested the translation
-    text: v.string(), // Original text to translate
-    sourceLang: v.string(), // Source language code
-    targetLang: v.string(), // Target language code
-    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
-    result: v.optional(v.string()), // Translated text (when completed)
-    error: v.optional(v.string()), // Error message (when failed)
-    createdAt: v.number(),
-    completedAt: v.optional(v.number()),
-  })
-    .index("by_userId", ["userId"])
-    .index("by_userId_and_status", ["userId", "status"]),
-
-
-  // TTS requests table - async TTS audio generation
-  ttsRequests: defineTable({
-    userId: v.string(),
-    text: v.string(),
-    voiceName: v.string(), // e.g., "en-US-Chirp3-HD-Leda" (contains languageCode)
-    speed: v.number(), // speaking_rate (0.5 to 1.0)
-    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
-    storageId: v.optional(v.id("_storage")),
-    error: v.optional(v.string()),
-    createdAt: v.number(),
-    completedAt: v.optional(v.number()),
-  })
-    .index("by_userId", ["userId"])
-    .index("by_userId_and_status", ["userId", "status"]),
+  // Testing-only tables (testFlashcards, flashcardApprovals, translationRequests, ttsRequests)
+  ...testingTables,
 });

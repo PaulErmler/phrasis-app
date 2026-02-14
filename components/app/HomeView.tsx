@@ -8,13 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLanguagesByCodes } from "@/lib/languages";
 import { NewChatInput } from "@/components/chat/NewChatInput";
-import { CollectionSelector } from "@/components/app/CollectionSelector";
+import { CollectionCarousel } from "@/components/app/CollectionCarousel";
 import { DeckCardsView } from "@/components/app/DeckCardsView";
 
 export function HomeView() {
   const router = useRouter();
   const t = useTranslations("AppPage");
-  const activeCourse = useQuery(api.courses.getActiveCourse);
+  const activeCourse = useQuery(api.features.courses.getActiveCourse);
 
   const formatCourseName = () => {
     if (!activeCourse) return null;
@@ -38,36 +38,15 @@ export function HomeView() {
         showSuggestions={false}
       />
 
-      {/* Collection Selector - Add Cards to Deck */}
-      <CollectionSelector />
+      {/* Collection Carousel - Select difficulty and add cards */}
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold">{t("collections.carousel.sectionTitle")}</h2>
+        <CollectionCarousel />
+      </div>
 
       {/* Deck Cards View - Display all cards in deck */}
       <DeckCardsView />
 
-      {/* Flashcards Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{t("flashcards.title")}</CardTitle>
-          <CardDescription>
-            {t("flashcards.description")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Button
-            onClick={() => router.push("/flashcard")}
-            className="w-full"
-          >
-            {t("flashcards.goToFlashcard")}
-          </Button>
-          <Button
-            onClick={() => router.push("/audio-flashcard")}
-            className="w-full"
-            variant="outline"
-          >
-            {t("flashcards.goToAudioFlashcard")}
-          </Button>
-        </CardContent>
-      </Card>
     </div>
   );
 }

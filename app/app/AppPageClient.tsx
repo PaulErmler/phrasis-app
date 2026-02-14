@@ -19,7 +19,7 @@ import { ChevronLeft } from "lucide-react";
 export function AppPageClient({
   preloadedSettings,
 }: {
-  preloadedSettings: Preloaded<typeof api.courses.getUserSettings>;
+  preloadedSettings: Preloaded<typeof api.features.courses.getUserSettings>;
 }) {
   const router = useRouter();
   const [currentView, setCurrentView] = useState<View>("home");
