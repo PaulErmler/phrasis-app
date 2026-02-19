@@ -1,27 +1,20 @@
 import { v, ConvexError } from "convex/values";
-import { mutation, query, internalMutation, internalAction, internalQuery } from "./_generated/server";
-import { internal } from "./_generated/api";
-import { MAX_TTS_LENGTH, MIN_TTS_SPEED, MAX_TTS_SPEED } from "../lib/constants/tts";
-import { SUPPORTED_LANGUAGES } from "../lib/languages";
-import { authComponent } from "./auth";
-import { Id } from "./_generated/dataModel";
+import { mutation, query, internalMutation, internalAction, internalQuery } from "../_generated/server";
+import { internal } from "../_generated/api";
+import { MAX_TTS_LENGTH, MIN_TTS_SPEED, MAX_TTS_SPEED } from "../../lib/constants/tts";
+import { SUPPORTED_LANGUAGES } from "../../lib/languages";
+import { getAuthUser, requireAuthUser } from "../db/users";
+import { Id } from "../_generated/dataModel";
+import { synthesizeSpeech } from "../features/tts";
 
 /** Set of all valid voice API codes from SUPPORTED_LANGUAGES */
 const VALID_VOICE_CODES = new Set(
   SUPPORTED_LANGUAGES.flatMap((lang) => lang.voices.map((v) => v.apiCode))
 );
 
-/** Google TTS API response type */
-interface GoogleTTSResponse {
-  audioContent: string; // Base64-encoded audio
-}
-
-/**
- * Extract languageCode from voiceName (e.g., "en-US-Chirp3-HD-Leda" -> "en-US")
- */
-function extractLanguageCode(voiceName: string): string {
-  return voiceName.split("-Chirp3-HD-")[0];
-}
+// ============================================================================
+// PUBLIC API (testing page)
+// ============================================================================
 
 /**
  * Request TTS audio generation. Creates a pending request and schedules processing.
@@ -29,28 +22,21 @@ function extractLanguageCode(voiceName: string): string {
 export const requestTTS = mutation({
   args: {
     text: v.string(),
-    voiceName: v.string(), // e.g., "en-US-Chirp3-HD-Leda"
-    speed: v.number(), // speaking_rate: 0.5 to 1.0
+    voiceName: v.string(),
+    speed: v.number(),
   },
   returns: v.id("ttsRequests"),
   handler: async (ctx, args) => {
-    const user = await authComponent.getAuthUser(ctx);
-    if (!user) {
-      throw new ConvexError("Unauthenticated");
-    }
+    const user = await requireAuthUser(ctx);
 
     const text = args.text.trim();
-    if (!text) {
-      throw new ConvexError("Text cannot be empty");
-    }
+    if (!text) throw new ConvexError("Text cannot be empty");
     if (text.length > MAX_TTS_LENGTH) {
       throw new ConvexError(`Text exceeds maximum length of ${MAX_TTS_LENGTH} characters`);
     }
-
     if (args.speed < MIN_TTS_SPEED || args.speed > MAX_TTS_SPEED) {
       throw new ConvexError(`Invalid speed. Must be between ${MIN_TTS_SPEED} and ${MAX_TTS_SPEED}`);
     }
-
     if (!VALID_VOICE_CODES.has(args.voiceName)) {
       throw new ConvexError("Invalid voice name. Must be a supported voice.");
     }
@@ -64,9 +50,7 @@ export const requestTTS = mutation({
       createdAt: Date.now(),
     });
 
-    await ctx.scheduler.runAfter(0, internal.tts.processTTS, {
-      requestId,
-    });
+    await ctx.scheduler.runAfter(0, internal.testing.tts.processTTS, { requestId });
 
     return requestId;
   },
@@ -97,23 +81,23 @@ export const getTTSRequest = query({
     v.null()
   ),
   handler: async (ctx, args) => {
-    const user = await authComponent.getAuthUser(ctx);
-    if (!user) {
-      return null;
-    }
+    const user = await getAuthUser(ctx);
+    if (!user) return null;
 
     const request = await ctx.db.get(args.requestId);
-    if (!request || request.userId !== user._id) {
-      return null;
-    }
+    if (!request || request.userId !== user._id) return null;
 
-    const audioUrl = request.storageId 
-      ? await ctx.storage.getUrl(request.storageId) 
+    const audioUrl = request.storageId
+      ? await ctx.storage.getUrl(request.storageId)
       : undefined;
 
     return { ...request, audioUrl: audioUrl ?? undefined };
   },
 });
+
+// ============================================================================
+// INTERNAL FUNCTIONS
+// ============================================================================
 
 /**
  * Internal query to get a request (used by the action).
@@ -133,9 +117,7 @@ export const getRequestInternal = internalQuery({
   ),
   handler: async (ctx, args) => {
     const request = await ctx.db.get(args.requestId);
-    if (!request) {
-      return null;
-    }
+    if (!request) return null;
     return {
       text: request.text,
       voiceName: request.voiceName,
@@ -168,7 +150,7 @@ export const updateRequestResult = internalMutation({
 });
 
 /**
- * Internal action to process a TTS request using Google Cloud TTS REST API.
+ * Internal action to process a TTS request.
  */
 export const processTTS = internalAction({
   args: {
@@ -176,70 +158,17 @@ export const processTTS = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const request = await ctx.runQuery(internal.tts.getRequestInternal, {
+    const request = await ctx.runQuery(internal.testing.tts.getRequestInternal, {
       requestId: args.requestId,
     });
 
-    if (!request || request.status !== "pending") {
-      return null;
-    }
-
-    const apiKey = process.env.GOOGLE_TTS_API_KEY;
-    if (!apiKey) {
-      await ctx.runMutation(internal.tts.updateRequestResult, {
-        requestId: args.requestId,
-        status: "failed",
-        error: "TTS service not configured. Set GOOGLE_TTS_API_KEY.",
-      });
-      return null;
-    }
+    if (!request || request.status !== "pending") return null;
 
     try {
-      const languageCode = extractLanguageCode(request.voiceName);
-
-      const requestBody = {
-        input: {
-          text: request.text,
-        },
-        voice: {
-          languageCode,
-          name: request.voiceName,
-        },
-        audioConfig: {
-          audioEncoding: "MP3",
-          speakingRate: request.speed,
-        },
-      };
-
-      const response = await fetch(
-        `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new ConvexError(`Google TTS API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = (await response.json()) as GoogleTTSResponse;
-      const audioContent = data.audioContent;
-
-      if (!audioContent) {
-        throw new ConvexError("No audio content returned from Google TTS API");
-      }
-
-      const blob = new Blob([Uint8Array.from(atob(audioContent), c => c.charCodeAt(0))], {
-        type: 'audio/mp3',
-      });
+      const blob = await synthesizeSpeech(request.text, request.voiceName, request.speed);
       const storageId: Id<"_storage"> = await ctx.storage.store(blob);
 
-      await ctx.runMutation(internal.tts.updateRequestResult, {
+      await ctx.runMutation(internal.testing.tts.updateRequestResult, {
         requestId: args.requestId,
         status: "completed",
         storageId,
@@ -248,7 +177,7 @@ export const processTTS = internalAction({
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
       console.error("TTS error:", errorMessage);
 
-      await ctx.runMutation(internal.tts.updateRequestResult, {
+      await ctx.runMutation(internal.testing.tts.updateRequestResult, {
         requestId: args.requestId,
         status: "failed",
         error: "TTS generation failed. Please try again.",
@@ -258,3 +187,4 @@ export const processTTS = internalAction({
     return null;
   },
 });
+

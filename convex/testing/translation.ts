@@ -1,23 +1,19 @@
 import { v, ConvexError } from "convex/values";
-import { mutation, query, internalMutation, internalAction, internalQuery } from "./_generated/server";
-import { internal } from "./_generated/api";
-import { MAX_TRANSLATION_LENGTH } from "../lib/constants/translation";
-import { SUPPORTED_LANGUAGES } from "../lib/languages";
-import { authComponent } from "./auth";
+import { mutation, query, internalMutation, internalAction, internalQuery } from "../_generated/server";
+import { internal } from "../_generated/api";
+import { MAX_TRANSLATION_LENGTH } from "../../lib/constants/translation";
+import { SUPPORTED_LANGUAGES } from "../../lib/languages";
+import { getAuthUser, requireAuthUser } from "../db/users";
+import { translateText } from "../features/translation";
 
 /** Set of all valid language codes from SUPPORTED_LANGUAGES */
 const VALID_LANGUAGE_CODES = new Set(
   SUPPORTED_LANGUAGES.map((lang) => lang.code)
 );
 
-/** Google Translation API response type */
-interface GoogleTranslateResponse {
-  data: {
-    translations: Array<{
-      translatedText: string;
-    }>;
-  };
-}
+// ============================================================================
+// PUBLIC API (testing page)
+// ============================================================================
 
 /**
  * Request a translation. Creates a pending request and schedules processing.
@@ -30,26 +26,19 @@ export const requestTranslation = mutation({
   },
   returns: v.id("translationRequests"),
   handler: async (ctx, args) => {
-    const user = await authComponent.getAuthUser(ctx);
-    if (!user) {
-      throw new ConvexError("Unauthenticated");
-    }
+    const user = await requireAuthUser(ctx);
 
     const text = args.text.trim();
-    if (!text) {
-      throw new ConvexError("Text cannot be empty");
-    }
+    if (!text) throw new ConvexError("Text cannot be empty");
     if (text.length > MAX_TRANSLATION_LENGTH) {
       throw new ConvexError(`Text exceeds maximum length of ${MAX_TRANSLATION_LENGTH} characters`);
     }
-
     if (!VALID_LANGUAGE_CODES.has(args.sourceLang)) {
       throw new ConvexError("Invalid source language. Must be a supported language.");
     }
     if (!VALID_LANGUAGE_CODES.has(args.targetLang)) {
       throw new ConvexError("Invalid target language. Must be a supported language.");
     }
-
     if (args.sourceLang === args.targetLang) {
       throw new ConvexError("Source and target languages cannot be the same");
     }
@@ -63,7 +52,7 @@ export const requestTranslation = mutation({
       createdAt: Date.now(),
     });
 
-    await ctx.scheduler.runAfter(0, internal.translation.processTranslation, {
+    await ctx.scheduler.runAfter(0, internal.testing.translation.processTranslation, {
       requestId,
     });
 
@@ -95,95 +84,19 @@ export const getTranslationRequest = query({
     v.null()
   ),
   handler: async (ctx, args) => {
-    const user = await authComponent.getAuthUser(ctx);
-    if (!user) {
-      return null;
-    }
+    const user = await getAuthUser(ctx);
+    if (!user) return null;
 
     const request = await ctx.db.get(args.requestId);
-    if (!request || request.userId !== user._id) {
-      return null;
-    }
+    if (!request || request.userId !== user._id) return null;
 
     return request;
   },
 });
 
-/**
- * Internal action to process a translation request using Google Cloud Translation REST API.
- */
-export const processTranslation = internalAction({
-  args: {
-    requestId: v.id("translationRequests"),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const request = await ctx.runQuery(internal.translation.getRequestInternal, {
-      requestId: args.requestId,
-    });
-
-    if (!request || request.status !== "pending") {
-      return null;
-    }
-
-    const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY;
-    if (!apiKey) {
-      await ctx.runMutation(internal.translation.updateRequestResult, {
-        requestId: args.requestId,
-        status: "failed",
-        error: "Translation service not configured",
-      });
-      return null;
-    }
-
-    try {
-      const response = await fetch(
-        `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            q: request.text,
-            source: request.sourceLang,
-            target: request.targetLang,
-            format: "text",
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new ConvexError(`Google API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = (await response.json()) as GoogleTranslateResponse;
-      const translation = data.data?.translations?.[0]?.translatedText;
-
-      if (!translation) {
-        throw new ConvexError("No translation returned from Google API");
-      }
-
-      await ctx.runMutation(internal.translation.updateRequestResult, {
-        requestId: args.requestId,
-        status: "completed",
-        result: translation,
-      });
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      console.error("Translation error:", errorMessage);
-
-      await ctx.runMutation(internal.translation.updateRequestResult, {
-        requestId: args.requestId,
-        status: "failed",
-        error: "Translation failed. Please try again.",
-      });
-    }
-
-    return null;
-  },
-});
+// ============================================================================
+// INTERNAL FUNCTIONS
+// ============================================================================
 
 /**
  * Internal query to get a request (used by the action).
@@ -203,9 +116,7 @@ export const getRequestInternal = internalQuery({
   ),
   handler: async (ctx, args) => {
     const request = await ctx.db.get(args.requestId);
-    if (!request) {
-      return null;
-    }
+    if (!request) return null;
     return {
       text: request.text,
       sourceLang: request.sourceLang,
@@ -235,3 +146,42 @@ export const updateRequestResult = internalMutation({
     });
   },
 });
+
+/**
+ * Internal action to process a translation request.
+ */
+export const processTranslation = internalAction({
+  args: {
+    requestId: v.id("translationRequests"),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const request = await ctx.runQuery(internal.testing.translation.getRequestInternal, {
+      requestId: args.requestId,
+    });
+
+    if (!request || request.status !== "pending") return null;
+
+    try {
+      const translation = await translateText(request.text, request.sourceLang, request.targetLang);
+
+      await ctx.runMutation(internal.testing.translation.updateRequestResult, {
+        requestId: args.requestId,
+        status: "completed",
+        result: translation,
+      });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      console.error("Translation error:", errorMessage);
+
+      await ctx.runMutation(internal.testing.translation.updateRequestResult, {
+        requestId: args.requestId,
+        status: "failed",
+        error: "Translation failed. Please try again.",
+      });
+    }
+
+    return null;
+  },
+});
+

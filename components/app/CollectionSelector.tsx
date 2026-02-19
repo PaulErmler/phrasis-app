@@ -39,8 +39,8 @@ export function CollectionSelector() {
   const [batchSize, setBatchSize] = useState("10");
   const [isAdding, setIsAdding] = useState(false);
 
-  const collectionProgress = useQuery(api.decks.getCollectionProgress);
-  const addCardsFromCollection = useMutation(api.decks.addCardsFromCollection);
+  const collectionProgress = useQuery(api.features.decks.getCollectionProgress);
+  const addCardsFromCollection = useMutation(api.features.decks.addCardsFromCollection);
 
   const handleAddCards = async () => {
     if (!selectedCollectionId) {

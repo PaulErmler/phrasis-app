@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BookOpen } from "lucide-react";
 
 export function CollectionsPreview() {
-  const collections = useQuery(api.texts.getCollectionsWithTexts, {
+  const collections = useQuery(api.testing.texts.getCollectionsWithTexts, {
     textsPerCollection: 5,
   });
 

@@ -1,13 +1,13 @@
 import { v, ConvexError } from "convex/values";
-import { mutation, query } from "../_generated/server";
+import { mutation, query } from "../../_generated/server";
 import { createThread as createAgentThread } from "@convex-dev/agent";
-import { components } from "../_generated/api";
-import { authComponent } from "../auth";
+import { components } from "../../_generated/api";
+import { getAuthUser, requireAuthUser } from "../../db/users";
 
 const agentComponent = components.agent;
 
 /**
- * Create a new chat thread for the current user
+ * Create a new chat thread for the current user.
  */
 export const createThread = mutation({
   args: {
@@ -15,10 +15,7 @@ export const createThread = mutation({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const user = await authComponent.getAuthUser(ctx);
-    if (!user) {
-      throw new ConvexError("Not authenticated");
-    }
+    const user = await requireAuthUser(ctx);
 
     const threadId = await createAgentThread(ctx, agentComponent, {
       userId: user._id,
@@ -30,7 +27,7 @@ export const createThread = mutation({
 });
 
 /**
- * List all threads for the current user
+ * List all threads for the current user.
  */
 export const listThreads = query({
   args: {},
@@ -45,28 +42,23 @@ export const listThreads = query({
     })
   ),
   handler: async (ctx) => {
+    const user = await getAuthUser(ctx);
+    if (!user) return [];
 
-      const user = await authComponent.getAuthUser(ctx);
-      if (!user) {
-        return [];
+    const threads = await ctx.runQuery(
+      agentComponent.threads.listThreadsByUserId,
+      {
+        userId: user._id,
+        paginationOpts: { cursor: null, numItems: 100 },
       }
+    );
 
-      // Call internal agent query
-      const threads = await ctx.runQuery(
-        agentComponent.threads.listThreadsByUserId,
-        {
-          userId: user._id,
-          paginationOpts: { cursor: null, numItems: 100 },
-        }
-      );
-
-      return threads.page;
-
+    return threads.page;
   },
 });
 
 /**
- * Get a specific thread by ID
+ * Get a specific thread by ID.
  */
 export const getThread = query({
   args: {
@@ -84,24 +76,15 @@ export const getThread = query({
     v.null()
   ),
   handler: async (ctx, args) => {
-      const user = await authComponent.getAuthUser(ctx);
-      if (!user) {
-        return null;
-      }
+    const user = await getAuthUser(ctx);
+    if (!user) return null;
 
-      // Get thread metadata
-      const thread = await ctx.runQuery(agentComponent.threads.getThread, {
-        threadId: args.threadId,
-      });
+    const thread = await ctx.runQuery(agentComponent.threads.getThread, {
+      threadId: args.threadId,
+    });
 
-      // Verify user owns this thread
-      if (thread?.userId !== user._id) {
-        return null;
-      }
-
-      return thread;
+    if (thread?.userId !== user._id) return null;
+    return thread;
   },
 });
-
-
 
