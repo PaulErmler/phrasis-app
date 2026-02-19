@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 jobs:
-  check.lint-build:
+  check-lint-build:
     runs-on: ubuntu-latest
 
     steps:
