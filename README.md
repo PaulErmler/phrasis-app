@@ -15,7 +15,7 @@
 ### Prerequisites
 
 - Node.js 18+
-- pnpm 
+- pnpm
 
 ### Installation
 
@@ -24,23 +24,23 @@
 pnpm install
 ```
 
+### Setup Environment Variables
 
+#### Local Development
 
+Make sure Docker is running and run:
 
-### Setup Environment Variables 
-#### Local Development 
-
-Make sure Docker is running and run: 
-```bash 
+```bash
 docker compose up
 ```
 
-Then run the following: 
-```bash 
+Then run the following:
+
+```bash
 docker compose exec backend ./generate_admin_key.sh
 ```
 
-Create a `.env.local` file in the root directory with and set the admin key and other variables: 
+Create a `.env.local` file in the root directory with and set the admin key and other variables:
 
 ```
 CONVEX_SELF_HOSTED_URL='http://127.0.0.1:3210'
@@ -50,11 +50,12 @@ NEXT_PUBLIC_CONVEX_SITE_URL=http://127.0.0.1:3211
 # BETTER_AUTH_SECRET=your-secret-here # has to be the same as the one set in the convex dashboard
 SITE_URL=http://localhost:3000
 ```
-You also have to set SITE_URL and BETTER_AUTH_SECRET in the convex dashboard. 
 
-#### Develop Against Convex Dev/Prod Environment 
+You also have to set SITE_URL and BETTER_AUTH_SECRET in the convex dashboard.
 
-For developing against the cloud instance, you can take the URLS and keys from the convex dashboard. 
+#### Develop Against Convex Dev/Prod Environment
+
+For developing against the cloud instance, you can take the URLS and keys from the convex dashboard.
 
 ```env
 # Convex
@@ -92,23 +93,26 @@ pnpm lint
 ```
 
 ---
-# Working with LLMs
-Here are relevant tutorials for making LLMs in cursor more accuracte with the tech stack we are using: 
 
-MCP Servers and rules: 
+# Working with LLMs
+
+Here are relevant tutorials for making LLMs in cursor more accuracte with the tech stack we are using:
+
+MCP Servers and rules:
 Convex: https://docs.convex.dev/ai/using-cursor
 BetterAuth: https://www.better-auth.com/docs/introduction#llmstxt
-Follow the turorials on the websites to add MCP servers and docs 
+Follow the turorials on the websites to add MCP servers and docs
 
-LLM.txt files: 
+LLM.txt files:
 BetterAuth https://www.better-auth.com/llms.txt
 BetterAuthUi: https://better-auth-ui.com/llms.txt
 Shadcn: https://ui.shadcn.com/llms.txt
 To add these go Cursor->Cursor Settings->Indexing and Docs
 
-^
----
+## ^
+
 # More things that are not setup related
+
 ## Project Structure
 
 ```
@@ -132,9 +136,6 @@ phrasis-app/
 ```
 
 ---
-
-
-
 
 ## Recommended VS Code Extensions
 
@@ -186,7 +187,7 @@ Components are installed to `components/ui/` and can be freely modified.
 ### Client Usage
 
 ```tsx
-import { authClient } from "@/lib/auth-client";
+import { authClient } from '@/lib/auth-client';
 
 // Sign in
 await authClient.signIn.email({ email, password });
@@ -257,15 +258,15 @@ export const createItem = mutation({
 ### Client Usage
 
 ```tsx
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../convex/_generated/api";
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '../convex/_generated/api';
 
 // Use query (automatically re-renders when data changes)
 const items = useQuery(api.myFunctions.listItems, { limit: 10 });
 
 // Use mutation
 const createItem = useMutation(api.myFunctions.createItem);
-await createItem({ name: "New Item" });
+await createItem({ name: 'New Item' });
 ```
 
 ### Convex Dashboard

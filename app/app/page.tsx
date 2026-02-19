@@ -1,15 +1,21 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "../../convex/_generated/api";
-import { SignedIn, SignedOut, UserButton } from "@daveyplate/better-auth-ui";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { authClient } from "@/lib/auth-client";
-import { Footer } from "@/components/Footer";
-import { Bell, BellOff, BellRing } from "lucide-react";
+import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useMutation, useQuery } from 'convex/react';
+import { api } from '../../convex/_generated/api';
+import { SignedIn, SignedOut, UserButton } from '@daveyplate/better-auth-ui';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { authClient } from '@/lib/auth-client';
+import { Footer } from '@/components/Footer';
+import { Bell, BellOff, BellRing } from 'lucide-react';
 
 export default function AppPage() {
   const router = useRouter();
@@ -17,7 +23,7 @@ export default function AppPage() {
 
   useEffect(() => {
     if (!session && !isPending) {
-      router.push("/");
+      router.push('/');
     }
   }, [session, isPending, router]);
 
@@ -26,8 +32,14 @@ export default function AppPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-          <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+          <div
+            className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce"
+            style={{ animationDelay: '0.1s' }}
+          />
+          <div
+            className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
+            style={{ animationDelay: '0.2s' }}
+          />
         </div>
       </div>
     );
@@ -46,7 +58,7 @@ export default function AppPage() {
           </div>
           <div className="flex items-center gap-4">
             <SignedIn>
-              <UserButton size="icon"  />
+              <UserButton size="icon" />
             </SignedIn>
           </div>
         </div>
@@ -77,23 +89,26 @@ export default function AppPage() {
 }
 
 function Content() {
-  const { viewer, numbers } = useQuery(api.myFunctions.listNumbers, { count: 10 }) ?? {};
+  const { viewer, numbers } =
+    useQuery(api.myFunctions.listNumbers, { count: 10 }) ?? {};
   const addNumber = useMutation(api.myFunctions.addNumber);
-  
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
+
+  const [notificationPermission, setNotificationPermission] = useState<
+    NotificationPermission | 'unsupported'
+  >('default');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
       setNotificationPermission(Notification.permission);
     } else {
-      setNotificationPermission("unsupported");
+      setNotificationPermission('unsupported');
     }
   }, []);
 
   const requestNotificationPermission = useCallback(async () => {
-    if (!("Notification" in window)) {
-      setNotificationPermission("unsupported");
+    if (!('Notification' in window)) {
+      setNotificationPermission('unsupported');
       return;
     }
 
@@ -107,27 +122,27 @@ function Content() {
   }, []);
 
   const sendTestNotification = useCallback(async () => {
-    if (notificationPermission !== "granted") {
+    if (notificationPermission !== 'granted') {
       await requestNotificationPermission();
       return;
     }
 
     // Try to use service worker notification first (works when app is in background)
-    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       const registration = await navigator.serviceWorker.ready;
-      await registration.showNotification("Phrasis", {
-        body: "Time to practice your phrases! 🌟",
-        icon: "/icons/icon-192x192.png",
-        badge: "/icons/icon-96x96.png",
-        tag: "phrasis-reminder",
-        data: { url: "/app" },
+      await registration.showNotification('Phrasis', {
+        body: 'Time to practice your phrases! 🌟',
+        icon: '/icons/icon-192x192.png',
+        badge: '/icons/icon-96x96.png',
+        tag: 'phrasis-reminder',
+        data: { url: '/app' },
       });
     } else {
       // Fallback to regular notification
-      new Notification("Phrasis", {
-        body: "Time to practice your phrases! 🌟",
-        icon: "/icons/icon-192x192.png",
-        tag: "phrasis-reminder",
+      new Notification('Phrasis', {
+        body: 'Time to practice your phrases! 🌟',
+        icon: '/icons/icon-192x192.png',
+        tag: 'phrasis-reminder',
       });
     }
   }, [notificationPermission, requestNotificationPermission]);
@@ -137,8 +152,14 @@ function Content() {
       <div className="flex items-center justify-center py-12">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" />
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-          <div className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+          <div
+            className="w-2 h-2 bg-emerald-500 rounded-full animate-bounce"
+            style={{ animationDelay: '0.1s' }}
+          />
+          <div
+            className="w-2 h-2 bg-emerald-600 rounded-full animate-bounce"
+            style={{ animationDelay: '0.2s' }}
+          />
           <p className="ml-2 text-muted-foreground">Loading...</p>
         </div>
       </div>
@@ -149,7 +170,7 @@ function Content() {
     <div className="max-w-xl mx-auto space-y-6">
       <div className="text-center space-y-2">
         <h1 className="text-2xl font-bold">
-          Welcome{viewer ? `, ${viewer}` : ""}!
+          Welcome{viewer ? `, ${viewer}` : ''}!
         </h1>
         <p className="text-muted-foreground">
           You&apos;re signed in to Phrasis
@@ -164,39 +185,42 @@ function Content() {
             Notifications
           </CardTitle>
           <CardDescription>
-            {notificationPermission === "unsupported"
-              ? "Notifications are not supported in this browser"
-              : notificationPermission === "granted"
-                ? "Send yourself a test notification"
-                : "Enable notifications to get practice reminders"}
+            {notificationPermission === 'unsupported'
+              ? 'Notifications are not supported in this browser'
+              : notificationPermission === 'granted'
+                ? 'Send yourself a test notification'
+                : 'Enable notifications to get practice reminders'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {notificationPermission === "unsupported" ? (
+          {notificationPermission === 'unsupported' ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <BellOff className="h-4 w-4" />
               <span className="text-sm">Notifications not available</span>
             </div>
-          ) : notificationPermission === "denied" ? (
+          ) : notificationPermission === 'denied' ? (
             <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
               <p className="text-sm text-destructive">
-                Notifications are blocked. Please enable them in your browser settings.
+                Notifications are blocked. Please enable them in your browser
+                settings.
               </p>
             </div>
           ) : (
             <Button
               onClick={sendTestNotification}
               disabled={isLoading}
-              variant={notificationPermission === "granted" ? "default" : "outline"}
+              variant={
+                notificationPermission === 'granted' ? 'default' : 'outline'
+              }
               className={
-                notificationPermission === "granted"
-                  ? "w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
-                  : "w-full"
+                notificationPermission === 'granted'
+                  ? 'w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200'
+                  : 'w-full'
               }
             >
               {isLoading ? (
-                "Requesting permission..."
-              ) : notificationPermission === "granted" ? (
+                'Requesting permission...'
+              ) : notificationPermission === 'granted' ? (
                 <>
                   <Bell className="h-4 w-4 mr-2" />
                   Send Test Notification
@@ -210,7 +234,7 @@ function Content() {
             </Button>
           )}
 
-          {notificationPermission === "granted" && (
+          {notificationPermission === 'granted' && (
             <p className="text-xs text-muted-foreground text-center">
               ✓ Notifications enabled
             </p>
@@ -227,18 +251,22 @@ function Content() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Button
-            onClick={() => addNumber({ value: Math.floor(Math.random() * 100) })}
+            onClick={() =>
+              addNumber({ value: Math.floor(Math.random() * 100) })
+            }
             className="w-full bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-lg shadow-emerald-500/25 transition-all duration-200"
           >
             + Generate Random Number
           </Button>
 
           <div className="rounded-xl bg-muted/50 border border-border/50 p-4">
-            <p className="text-sm font-medium text-muted-foreground mb-2">Recent Numbers</p>
+            <p className="text-sm font-medium text-muted-foreground mb-2">
+              Recent Numbers
+            </p>
             <p className="font-mono text-lg">
               {numbers?.length === 0
-                ? "No numbers yet — click the button!"
-                : numbers?.join(", ") ?? "..."}
+                ? 'No numbers yet — click the button!'
+                : (numbers?.join(', ') ?? '...')}
             </p>
           </div>
         </CardContent>
@@ -246,4 +274,3 @@ function Content() {
     </div>
   );
 }
-

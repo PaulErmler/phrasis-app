@@ -1,11 +1,11 @@
-import { getTranslations } from "next-intl/server";
-import { Footer } from "@/components/Footer";
-import { CTAButtons } from "@/components/home/cta-buttons";
-import { GoToAppButton } from "@/components/home/go-to-app-button";
-import { getToken } from "@/lib/auth-server";
+import { getTranslations } from 'next-intl/server';
+import { Footer } from '@/components/Footer';
+import { CTAButtons } from '@/components/home/cta-buttons';
+import { GoToAppButton } from '@/components/home/go-to-app-button';
+import { getToken } from '@/lib/auth-server';
 
 export default async function Home() {
-  const t = await getTranslations("HomePage");
+  const t = await getTranslations('HomePage');
   const token = await getToken();
   const isAuthenticated = !!token;
 
@@ -22,10 +22,10 @@ export default async function Home() {
           {/* Heading */}
           <div className="space-y-4">
             <h1 className="text-5xl md:text-6xl font-bold tracking-tight text-foreground">
-              {t("title")}
+              {t('title')}
             </h1>
             <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto">
-              {t("subtitle")}
+              {t('subtitle')}
             </p>
           </div>
 
@@ -42,10 +42,10 @@ export default async function Home() {
             <div className="space-y-6">
               <div className="space-y-4">
                 <h2 className="text-3xl md:text-4xl font-bold text-foreground">
-                  {t("journeySection.title")}
+                  {t('journeySection.title')}
                 </h2>
                 <p className="text-lg text-muted-foreground">
-                  {t("journeySection.description")}
+                  {t('journeySection.description')}
                 </p>
               </div>
               <div className="space-y-3 pt-4">
@@ -54,8 +54,12 @@ export default async function Home() {
                     <div className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">{t("features.learnAtPace.title")}</p>
-                    <p className="text-sm text-muted-foreground">{t("features.learnAtPace.description")}</p>
+                    <p className="font-medium text-foreground">
+                      {t('features.learnAtPace.title')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('features.learnAtPace.description')}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -63,8 +67,12 @@ export default async function Home() {
                     <div className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">{t("features.trackProgress.title")}</p>
-                    <p className="text-sm text-muted-foreground">{t("features.trackProgress.description")}</p>
+                    <p className="font-medium text-foreground">
+                      {t('features.trackProgress.title')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('features.trackProgress.description')}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -72,8 +80,12 @@ export default async function Home() {
                     <div className="w-2 h-2 rounded-full bg-emerald-600 dark:bg-emerald-400" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">{t("features.multipleLanguages.title")}</p>
-                    <p className="text-sm text-muted-foreground">{t("features.multipleLanguages.description")}</p>
+                    <p className="font-medium text-foreground">
+                      {t('features.multipleLanguages.title')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {t('features.multipleLanguages.description')}
+                    </p>
                   </div>
                 </div>
               </div>
