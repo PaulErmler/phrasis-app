@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as db_collections from "../db/collections.js";
 import type * as db_courseSettings from "../db/courseSettings.js";
 import type * as db_courseStats from "../db/courseStats.js";
 import type * as db_courses from "../db/courses.js";
@@ -21,12 +22,15 @@ import type * as features_chat_flashcards from "../features/chat/flashcards.js";
 import type * as features_chat_messages from "../features/chat/messages.js";
 import type * as features_chat_threads from "../features/chat/threads.js";
 import type * as features_chat_transcribe from "../features/chat/transcribe.js";
+import type * as features_collections from "../features/collections.js";
 import type * as features_courses from "../features/courses.js";
 import type * as features_decks from "../features/decks.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_translation from "../features/translation.js";
 import type * as features_tts from "../features/tts.js";
 import type * as http from "../http.js";
+import type * as lib_audio from "../lib/audio.js";
+import type * as lib_cardContent from "../lib/cardContent.js";
 import type * as lib_collections from "../lib/collections.js";
 import type * as testing_texts from "../testing/texts.js";
 import type * as testing_translation from "../testing/translation.js";
@@ -41,6 +45,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  "db/collections": typeof db_collections;
   "db/courseSettings": typeof db_courseSettings;
   "db/courseStats": typeof db_courseStats;
   "db/courses": typeof db_courses;
@@ -53,12 +58,15 @@ declare const fullApi: ApiFromModules<{
   "features/chat/messages": typeof features_chat_messages;
   "features/chat/threads": typeof features_chat_threads;
   "features/chat/transcribe": typeof features_chat_transcribe;
+  "features/collections": typeof features_collections;
   "features/courses": typeof features_courses;
   "features/decks": typeof features_decks;
   "features/scheduling": typeof features_scheduling;
   "features/translation": typeof features_translation;
   "features/tts": typeof features_tts;
   http: typeof http;
+  "lib/audio": typeof lib_audio;
+  "lib/cardContent": typeof lib_cardContent;
   "lib/collections": typeof lib_collections;
   "testing/texts": typeof testing_texts;
   "testing/translation": typeof testing_translation;

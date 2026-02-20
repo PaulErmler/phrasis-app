@@ -378,6 +378,70 @@ The learning mode audio flow was refactored from sequential per-clip playback lo
 - Revisit merge gating: current logic requires all `audioRecordings` URLs to be present before merged playback initializes
 - Confirm desired behavior for inline `AudioButton` playback when opening settings, since explicit stop wiring was removed
 
+## Collection Preview System
+
+When a user expands a collection (in either the testing page or the home view), the next `COLLECTION_PREVIEW_SIZE` (5) texts are displayed with translations and audio for all active course languages — matching the flashcard experience.
+
+### How It Works
+
+```mermaid
+sequenceDiagram
+    participant UI as CollectionTexts / CollectionCarousel
+    participant Query as getCollectionTextsWithContent
+    participant Mutation as ensureContentForCollection
+    participant Pipeline as scheduleMissingContent
+
+    UI->>Query: useQuery(collectionId)
+    Query-->>UI: next 5 texts + hasMissingContent
+    alt hasMissingContent is true
+        UI->>Mutation: ensureContentForCollection(collectionId)
+        Mutation->>Mutation: Server resolves next 5 texts from progress
+        Mutation->>Pipeline: Schedule missing translations + audio
+        Note over Query: Convex reactivity updates as content generates
+        Query-->>UI: Updated data with translations + audio URLs
+    end
+```
+
+### Backend Functions (`convex/features/collections.ts`)
+
+**Public Query:**
+
+- `getCollectionTextsWithContent({ collectionId })` — returns the next `COLLECTION_PREVIEW_SIZE` texts based on user's `collectionProgress`, enriched with translations and audio for all active course languages. Includes a top-level `hasMissingContent` flag.
+
+**Public Mutation:**
+
+- `ensureContentForCollection({ collectionId })` — server-side only accepts a `collectionId`; resolves the next preview texts from the user's progress and calls `scheduleMissingContent` for each. The frontend cannot control which texts get generated.
+
+### Pre-generation on Card Addition
+
+When `addCardsFromCollection` (in `convex/features/decks.ts`) adds cards and updates progress, it also pre-generates content for the next `COLLECTION_PREVIEW_SIZE` texts beyond the new progress point. This means preview content is usually ready before the user opens the collection.
+
+### Frontend Deduplication
+
+Both `CollectionTexts` (testing page) and `CollectionCarousel` (home view) use a `useRef<Set<string>>` with composite keys of `"${courseId}:${collectionId}"` to avoid re-triggering `ensureContentForCollection` for the same course+collection combination within a session. The key is deleted when cards are added (so the next preview batch can trigger generation).
+
+### Constants
+
+- `COLLECTION_PREVIEW_SIZE = 5` defined in `convex/lib/collections.ts`, used by the query, mutation, and pre-generation logic.
+
+## Shared Database & Content Helpers
+
+Repeated patterns were extracted into shared helper modules to reduce duplication across `convex/features/collections.ts` and `convex/features/decks.ts`.
+
+### Database Helpers (`convex/db/collections.ts`)
+
+- `getCollectionProgress(ctx, userId, courseId, collectionId)` — queries `collectionProgress` by the `by_userId_and_courseId_and_collectionId` index. Replaces 6+ inline occurrences.
+- `getNextTextsFromRank(ctx, collectionId, afterRank, limit)` — queries `texts` by `by_collection_and_rank` index with rank-based pagination. Replaces 4+ inline occurrences.
+
+### Content Batch Helper (`convex/lib/cardContent.ts`)
+
+- `buildTextContentBatchForLanguages(ctx, inputs, baseLanguages, targetLanguages)` — given an array of `TextContentInput` objects (key, textId, sourceText, sourceLanguage), batch-fetches all translations and audio recordings, resolves storage URLs, and returns a `Map<string, TextContentResult>` with assembled translations, audio, and `hasMissingContent` per text. Used by both `getCollectionTextsWithContent` and `getDeckCards`.
+- `getCourseLanguages(baseLanguages, targetLanguages)` — deduplicates base + target language arrays.
+
+### Audio Helper (`convex/lib/audio.ts`)
+
+- `getAudioForText(ctx, textId, languages)` — fetches audio recordings with resolved storage URLs for a single text across the given languages. Used by `getCardForReview` in `scheduling.ts`.
+
 ## Performance Optimizations
 
 1. **Efficient pagination** - uses `lastRankProcessed` in `collectionProgress` instead of offset/skip
@@ -385,3 +449,4 @@ The learning mode audio flow was refactored from sequential per-clip playback lo
 3. **Targeted queries** - queries only needed languages using compound indexes
 4. **Batch scheduling** - single mutation schedules all content generation, avoiding action→mutation round trips
 5. **On-the-fly URL generation** - `audioRecordings` stores `storageId`, URL generated via `ctx.storage.getUrl()`
+6. **Flat-batch content loading** - `buildTextContentBatchForLanguages` issues all translation + audio DB reads in a single `Promise.all` pass across all texts, then resolves storage URLs in a second parallel pass, avoiding N+1 query patterns

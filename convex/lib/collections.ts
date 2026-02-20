@@ -14,6 +14,9 @@ export const LEVEL_ORDER = [
   'C2',
 ] as const;
 
+/** How many upcoming texts to fetch/pre-generate for collection previews. */
+export const COLLECTION_PREVIEW_SIZE = 5;
+
 /**
  * Maps the onboarding `currentLevel` value to the collection name that should
  * be preselected as the user's starting difficulty.

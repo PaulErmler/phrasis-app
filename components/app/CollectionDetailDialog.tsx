@@ -13,12 +13,28 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Check, Plus, Loader2, CheckCircle2 } from 'lucide-react';
 import { getCollectionDescription } from './CollectionCarouselUI';
+import { AudioButton } from '@/components/app/learning/AudioButton';
 import { useTranslations } from 'next-intl';
+
+interface Translation {
+  language: string;
+  text: string;
+  isBaseLanguage: boolean;
+  isTargetLanguage: boolean;
+}
+
+interface AudioRecording {
+  language: string;
+  voiceName: string | null;
+  url: string | null;
+}
 
 export interface PreviewText {
   _id: string;
   text: string;
-  collectionRank?: number;
+  sourceLanguage: string;
+  translations: Translation[];
+  audioRecordings: AudioRecording[];
 }
 
 interface CollectionDetailDialogProps {
@@ -156,15 +172,75 @@ export function CollectionDetailDialog({
                   <p className="text-sm font-medium">{t('noMoreCards')}</p>
                 </div>
               ) : (
-                <div className="space-y-2.5">
-                  {texts.map((text) => (
-                    <div
-                      key={text._id}
-                      className="content-box p-4 text-sm leading-relaxed"
-                    >
-                      {text.text}
-                    </div>
-                  ))}
+                <div className="space-y-4">
+                  {texts.map((text) => {
+                    const baseTranslations = text.translations.filter(
+                      (tr) => tr.isBaseLanguage,
+                    );
+                    const targetTranslations = text.translations.filter(
+                      (tr) => tr.isTargetLanguage,
+                    );
+
+                    return (
+                      <div
+                        key={text._id}
+                        className="content-box p-4 space-y-2"
+                      >
+                        {/* Base language translations */}
+                        <div className="space-y-1">
+                          {baseTranslations.map((translation) => {
+                            const audio = text.audioRecordings.find(
+                              (a) => a.language === translation.language,
+                            );
+                            return (
+                              <div
+                                key={translation.language}
+                                className="flex items-start gap-2"
+                              >
+                                <p className="flex-1 text-sm font-medium leading-relaxed">
+                                  {translation.text || '...'}
+                                </p>
+                                <AudioButton
+                                  url={audio?.url ?? null}
+                                  language={translation.language.toUpperCase()}
+                                />
+                              </div>
+                            );
+                          })}
+                          {baseTranslations.length === 0 && (
+                            <p className="text-sm font-medium leading-relaxed">
+                              {text.text}
+                            </p>
+                          )}
+                        </div>
+
+                        <Separator />
+
+                        {/* Target language translations */}
+                        <div className="space-y-1">
+                          {targetTranslations.map((translation) => {
+                            const audio = text.audioRecordings.find(
+                              (a) => a.language === translation.language,
+                            );
+                            return (
+                              <div
+                                key={translation.language}
+                                className="flex items-start gap-2"
+                              >
+                                <p className="flex-1 text-sm leading-relaxed">
+                                  {translation.text || '...'}
+                                </p>
+                                <AudioButton
+                                  url={audio?.url ?? null}
+                                  language={translation.language.toUpperCase()}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </>

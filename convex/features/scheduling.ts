@@ -21,6 +21,7 @@ import {
   translationValidator,
   audioRecordingValidator,
 } from '../types';
+import { getAudioForText } from '../lib/audio';
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
@@ -137,25 +138,7 @@ export const getCardForReview = query({
       }),
     );
 
-    // Load audio
-    const audioRecordings = await Promise.all(
-      allLanguages.map(async (lang) => {
-        const audio = await ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('language', lang),
-          )
-          .first();
-        const url = audio?.storageId
-          ? await ctx.storage.getUrl(audio.storageId)
-          : null;
-        return {
-          language: lang,
-          voiceName: audio?.voiceName ?? null,
-          url,
-        };
-      }),
-    );
+    const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
 
     return {
       _id: card._id,

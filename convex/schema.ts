@@ -45,7 +45,12 @@ export default defineSchema({
     storageId: v.id('_storage'), // Convex file storage reference
   })
     .index('by_textId', ['textId'])
-    .index('by_text_and_language', ['textId', 'language']),
+    .index('by_text_and_language', ['textId', 'language'])
+    .index('by_text_and_language_and_voiceName', [
+      'textId',
+      'language',
+      'voiceName',
+    ]),
 
   // User settings table - stores user preferences and onboarding status
   userSettings: defineTable({
