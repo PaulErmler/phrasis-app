@@ -6,6 +6,11 @@ import { getActiveCourseForUser } from '../db/courses';
 import { getInitialReviewCount } from '../db/courseSettings';
 import { getDeckByCourseId } from '../db/decks';
 import {
+  getCourseStatsForMutation,
+  getTodayInTimezone,
+  computeStreakUpdate,
+} from '../db/courseStats';
+import {
   scheduleCard,
   getValidRatings,
   type ReviewRating,
@@ -191,6 +196,8 @@ export const reviewCard = mutation({
       v.literal('good'),
       v.literal('easy'),
     ),
+    timeSpentMs: v.optional(v.number()),
+    timezone: v.string(),
   },
   returns: v.object({
     schedulingPhase: v.string(),
@@ -200,7 +207,7 @@ export const reviewCard = mutation({
     fsrsState: v.union(fsrsStateValidator, v.null()),
   }),
   handler: async (ctx, args) => {
-    const { card, deck } = await authorizeCardAccess(ctx, args.cardId);
+    const { user, card, deck } = await authorizeCardAccess(ctx, args.cardId);
 
     const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
 
@@ -230,6 +237,34 @@ export const reviewCard = mutation({
       preReviewCount: result.preReviewCount,
       dueDate: result.dueDate,
       ...(result.fsrsState && { fsrsState: result.fsrsState }),
+    });
+
+    // Update course stats (reps, time, streak)
+    const MAX_TIME_PER_CARD_MS = 180_000; // 3 minutes
+    const nonNegativeTime = Math.max(args.timeSpentMs ?? 0, 0);
+    const clampedTime = Math.min(nonNegativeTime, MAX_TIME_PER_CARD_MS);
+    const stats = await getCourseStatsForMutation(
+      ctx,
+      user._id,
+      deck.courseId,
+    );
+    if (!stats) {
+      throw new ConvexError('Course stats not found');
+    }
+    const todayDate = getTodayInTimezone(args.timezone);
+    const { newStreak, newLastActivityDate } = computeStreakUpdate(
+      stats.lastActivityDate,
+      todayDate,
+      stats.currentStreak,
+    );
+    const isFirstReview =
+      card.schedulingPhase === 'preReview' && card.preReviewCount === 0;
+    await ctx.db.patch(stats._id, {
+      totalRepetitions: stats.totalRepetitions + 1,
+      totalTimeMs: stats.totalTimeMs + clampedTime,
+      totalCards: stats.totalCards + (isFirstReview ? 1 : 0),
+      currentStreak: newStreak,
+      lastActivityDate: newLastActivityDate,
     });
 
     return {

@@ -13,6 +13,10 @@ import {
   upsertCourseSettings,
 } from '../db/courseSettings';
 import {
+  getCourseStats as dbGetCourseStats,
+  createCourseStats,
+} from '../db/courseStats';
+import {
   DEFAULT_INITIAL_REVIEW_COUNT,
   validateInitialReviewCount,
 } from '../../lib/scheduling';
@@ -136,6 +140,47 @@ export const getOnboardingProgress = query({
       const user = await getAuthUser(ctx);
       if (!user) return null;
       return (await dbGetOnboardingProgress(ctx, user._id)) ?? null;
+    } catch {
+      return null;
+    }
+  },
+});
+
+/**
+ * Get stats for the user's active course.
+ */
+export const getCourseStats = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      totalRepetitions: v.number(),
+      totalTimeMs: v.number(),
+      totalCards: v.number(),
+      currentStreak: v.number(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx) => {
+    try {
+      const user = await getAuthUser(ctx);
+      if (!user) return null;
+
+      const active = await getActiveCourseForUser(ctx, user._id);
+      if (!active) return null;
+
+      const stats = await dbGetCourseStats(
+        ctx,
+        user._id,
+        active.course._id,
+      );
+      if (!stats) return null;
+
+      return {
+        totalRepetitions: stats.totalRepetitions,
+        totalTimeMs: stats.totalTimeMs,
+        totalCards: stats.totalCards,
+        currentStreak: stats.currentStreak,
+      };
     } catch {
       return null;
     }
@@ -266,6 +311,7 @@ export const createCourse = mutation({
       currentLevel: args.currentLevel,
       userId: user._id,
     });
+    await createCourseStats(ctx, user._id, courseId);
 
     // Create course settings in a separate table
     await upsertCourseSettings(ctx, courseId, {
@@ -311,6 +357,7 @@ export const completeOnboarding = mutation({
       currentLevel: progress.currentLevel,
       userId,
     });
+    await createCourseStats(ctx, userId, courseId);
 
     // Map the user's level to a starting collection
     const collectionName =

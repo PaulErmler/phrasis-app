@@ -125,6 +125,17 @@ export default defineSchema({
       'dueDate',
     ]),
 
+  // Course stats table - tracks learning statistics per course
+  courseStats: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    totalRepetitions: v.number(),
+    totalTimeMs: v.number(),
+    totalCards: v.number(),
+    currentStreak: v.number(),
+    lastActivityDate: v.optional(v.string()), // "YYYY-MM-DD" in user's local timezone
+  }).index('by_userId_and_courseId', ['userId', 'courseId']),
+
   // Collection progress table - tracks cards added per collection/course
   collectionProgress: defineTable({
     userId: v.string(), // Links to auth user

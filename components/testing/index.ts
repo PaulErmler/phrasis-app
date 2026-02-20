@@ -8,3 +8,4 @@ export { CollectionSelector } from './CollectionSelector';
 export { CollectionsPreview } from './CollectionsPreview';
 export { CollectionCarouselTest } from './CollectionCarouselTest';
 export { SettingsTest } from './settings/SettingsTest';
+export { StatsPreview } from './StatsPreview';

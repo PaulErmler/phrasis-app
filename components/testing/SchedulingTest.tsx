@@ -28,6 +28,13 @@ import {
   type SimulationStep,
 } from '@/lib/scheduling';
 
+function buildReviewTelemetry(): { timeSpentMs: number; timezone: string } {
+  return {
+    timeSpentMs: 0,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+  };
+}
+
 // ============================================================================
 // VIRTUAL SIMULATION TAB
 // ============================================================================
@@ -310,6 +317,7 @@ function RealCardReview() {
         const result = await reviewCardMutation({
           cardId: cardForReview._id,
           rating,
+          ...buildReviewTelemetry(),
         });
         setLastResult({
           phase: result.schedulingPhase,

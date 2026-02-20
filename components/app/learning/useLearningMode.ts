@@ -127,6 +127,9 @@ export function useLearningMode(
   // Track cards we've already ensured content for
   const ensuredCardsRef = useRef<Set<string>>(new Set());
 
+  // Track when the current card was first shown (for time-spent stats)
+  const cardShownAtRef = useRef<number>(Date.now());
+
   // Cross-tab coordination: only the tab that initiated the review should auto-play
   const reviewInitiatedByThisTabRef = useRef(true); // true initially so first card auto-plays
 
@@ -190,9 +193,10 @@ export function useLearningMode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardForReview, courseSettings?.autoAddCards]);
 
-  // Reset selectedRating when card changes
+  // Reset selectedRating and card timer when card changes
   useEffect(() => {
     setSelectedRating(null);
+    cardShownAtRef.current = Date.now();
   }, [cardForReview?._id]);
 
   // --------------------------------------------------------------------------
@@ -207,6 +211,9 @@ export function useLearningMode(
         await reviewCardMutation({
           cardId: cardForReview._id,
           rating,
+          timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
+          timezone:
+            Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
         });
         setSelectedRating(null);
       } catch (error) {

@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as db_courseSettings from "../db/courseSettings.js";
+import type * as db_courseStats from "../db/courseStats.js";
 import type * as db_courses from "../db/courses.js";
 import type * as db_decks from "../db/decks.js";
 import type * as db_seed from "../db/seed.js";
@@ -41,6 +42,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   "db/courseSettings": typeof db_courseSettings;
+  "db/courseStats": typeof db_courseStats;
   "db/courses": typeof db_courses;
   "db/decks": typeof db_decks;
   "db/seed": typeof db_seed;
