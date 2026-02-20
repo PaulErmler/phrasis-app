@@ -132,6 +132,7 @@ export function LearningMode({
         onSeek={audio.seekTo}
         onNext={state.handleNext}
         isReviewing={state.isReviewing}
+        showProgressBar={state.courseSettings.showProgressBar ?? true}
       />
 
       <LearningModeSettings

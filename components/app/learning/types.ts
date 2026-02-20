@@ -40,6 +40,7 @@ export interface CourseSettings {
   pauseBaseToTarget?: number;
   pauseTargetToTarget?: number;
   pauseBeforeAutoAdvance?: number;
+  showProgressBar?: boolean;
   // Language order overrides
   baseLanguageOrder?: string[];
   targetLanguageOrder?: string[];

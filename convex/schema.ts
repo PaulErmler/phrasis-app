@@ -90,6 +90,7 @@ export default defineSchema({
     pauseBaseToTarget: v.optional(v.number()), // seconds between base and target sections
     pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages
     pauseBeforeAutoAdvance: v.optional(v.number()), // seconds to wait before auto-advancing to next card
+    showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
     // Language order overrides
     baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
     targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages

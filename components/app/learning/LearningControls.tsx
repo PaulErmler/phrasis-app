@@ -20,6 +20,7 @@ interface LearningControlsProps {
   onSeek: (seconds: number) => void;
   onNext: () => void;
   isReviewing: boolean;
+  showProgressBar?: boolean;
 }
 
 export function LearningControls({
@@ -36,6 +37,7 @@ export function LearningControls({
   onSeek,
   onNext,
   isReviewing,
+  showProgressBar = true,
 }: LearningControlsProps) {
   const t = useTranslations('LearningMode');
 
@@ -69,13 +71,15 @@ export function LearningControls({
         </div>
 
         
-        <AudioProgressBar
-          audioRef={audioRef}
-          durationSec={durationSec}
-          isPlaying={isPlaying}
-          onSeek={onSeek}
-          isMerging={isMerging}
-        />
+        {showProgressBar && (
+          <AudioProgressBar
+            audioRef={audioRef}
+            durationSec={durationSec}
+            isPlaying={isPlaying}
+            onSeek={onSeek}
+            isMerging={isMerging}
+          />
+        )}
 
         {/* Restart + Play + Next row */}
         <div className="flex gap-2">

@@ -385,6 +385,7 @@ export const getActiveCourseSettings = query({
       pauseBaseToTarget: v.optional(v.number()),
       pauseTargetToTarget: v.optional(v.number()),
       pauseBeforeAutoAdvance: v.optional(v.number()),
+      showProgressBar: v.optional(v.boolean()),
       baseLanguageOrder: v.optional(v.array(v.string())),
       targetLanguageOrder: v.optional(v.array(v.string())),
     }),
@@ -423,6 +424,7 @@ export const updateCourseSettings = mutation({
     pauseBaseToTarget: v.optional(v.number()),
     pauseTargetToTarget: v.optional(v.number()),
     pauseBeforeAutoAdvance: v.optional(v.number()),
+    showProgressBar: v.optional(v.boolean()),
     baseLanguageOrder: v.optional(v.array(v.string())),
     targetLanguageOrder: v.optional(v.array(v.string())),
   },
@@ -452,6 +454,7 @@ export const updateCourseSettings = mutation({
       'pauseBaseToTarget',
       'pauseTargetToTarget',
       'pauseBeforeAutoAdvance',
+      'showProgressBar',
       'baseLanguageOrder',
       'targetLanguageOrder',
     ] as const;
