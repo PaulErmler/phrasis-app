@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { RedirectToSignIn } from '@daveyplate/better-auth-ui';
 import { Authenticated, usePreloadedQuery, Preloaded } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -15,7 +15,7 @@ import { BottomNav, View } from '@/components/app/BottomNav';
 import { CourseMenu } from '@/components/app/CourseMenu';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
-import { getLanguagesByCodes } from '@/lib/languages';
+import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 
 export function AppPageClient({
   preloadedSettings,
@@ -36,13 +36,14 @@ export function AppPageClient({
   const [currentView, setCurrentView] = useState<View>('home');
   const [courseMenuOpen, setCourseMenuOpen] = useState(false);
   const t = useTranslations('AppPage');
+  const locale = useLocale();
   const settings = usePreloadedQuery(preloadedSettings);
   const activeCourse = usePreloadedQuery(preloadedActiveCourse);
 
   const courseButtonLabel = activeCourse
     ? t('currentCourseWithLanguages', {
-      targetLanguages: getLanguagesByCodes(activeCourse.targetLanguages)
-        .map((l) => l.name)
+      targetLanguages: activeCourse.targetLanguages
+        .map((code) => getLocalizedLanguageNameByCode(code, locale))
         .join(', '),
     })
     : t('changeCourse');
