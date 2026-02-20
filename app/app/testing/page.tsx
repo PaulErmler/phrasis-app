@@ -8,7 +8,6 @@ import { TranslationTest } from '@/components/testing/TranslationTest';
 import { TTSTest } from '@/components/testing/TTSTest';
 import { NotificationTest } from '@/components/testing/NotificationTest';
 import { SchedulingTest } from '@/components/testing/SchedulingTest';
-import { CollectionCarouselTest } from '@/components/testing/CollectionCarouselTest';
 import { FlashcardUITest } from '@/components/testing/FlashcardUITest';
 
 export default function TestingPage() {
@@ -44,11 +43,6 @@ export default function TestingPage() {
             </div>
 
             <NotificationTest />
-
-            {/* Collection Carousel UI Test */}
-            <div className="md:col-span-2">
-              <CollectionCarouselTest />
-            </div>
 
             {/* Flashcard UI States Test */}
             <div className="md:col-span-2">
