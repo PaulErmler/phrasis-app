@@ -62,18 +62,16 @@ export function CollectionDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="heading-dialog">{collectionName}</DialogTitle>
-          <DialogDescription className="text-sm leading-relaxed">
-            {description}
-          </DialogDescription>
-          <p className="text-muted-sm">
-            {t('totalCards', { count: totalTexts.toLocaleString() })}
-          </p>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col gap-0 p-0 overflow-hidden">
+        {/* Static header section */}
+        <div className="flex-shrink-0 p-6 pb-4 space-y-4">
+          <DialogHeader>
+            <DialogTitle className="heading-dialog">{collectionName}</DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed">
+              {description}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4">
           <Separator />
 
           <div className="flex items-center gap-3">
@@ -104,17 +102,9 @@ export function CollectionDetailDialog({
             )}
           </div>
 
-          <Separator />
-
-          {/* Next sentences section */}
-          {isComplete ? (
-            <div className="text-center py-6 space-y-2">
-              <CheckCircle2 className="h-10 w-10 text-success mx-auto" />
-              <p className="text-sm font-medium">{t('allCardsAdded')}</p>
-            </div>
-          ) : (
+          {!isComplete && (
             <>
-              {/* Header */}
+              <Separator />
               <div className="flex items-center justify-between">
                 <h4 className="text-base font-semibold">
                   {t('nextSentences')}
@@ -140,10 +130,20 @@ export function CollectionDetailDialog({
                   </Button>
                 )}
               </div>
+            </>
+          )}
+        </div>
 
-              <Separator />
-
-              {/* Sentence list */}
+        {/* Scrollable sentences section */}
+        <div className="flex-1 overflow-y-auto px-6 pb-6">
+          {isComplete ? (
+            <div className="text-center py-6 space-y-2">
+              <CheckCircle2 className="h-10 w-10 text-success mx-auto" />
+              <p className="text-sm font-medium">{t('allCardsAdded')}</p>
+            </div>
+          ) : (
+            <>
+              <Separator className="mb-4" />
               {isLoadingTexts ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (

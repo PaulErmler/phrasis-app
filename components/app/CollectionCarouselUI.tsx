@@ -149,7 +149,7 @@ export function CollectionCarouselUI({
                     }
                   }}
                   className={cn(
-                    'w-full text-left rounded-xl border p-5 transition-all cursor-pointer h-[200px] flex flex-col',
+                    'w-full text-left rounded-xl border p-4 transition-all cursor-pointer h-[170px] flex flex-col',
                     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     'hover:shadow-md',
                     isActive && !isComplete && 'border-2 border-current',
@@ -157,7 +157,7 @@ export function CollectionCarouselUI({
                   )}
                 >
                   {/* Header: title + select button */}
-                  <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="heading-section">
                       {collection.collectionName}
                     </h3>
@@ -186,7 +186,7 @@ export function CollectionCarouselUI({
                   </div>
 
                   {/* Description */}
-                  <p className="text-muted-sm leading-relaxed mb-4 line-clamp-2 flex-shrink-0">
+                  <p className="text-muted-sm leading-relaxed mb-3 line-clamp-2 flex-shrink-0">
                     {getCollectionDescription(
                       collection.collectionName,
                       (key) => t(`descriptions.${key}`),
@@ -198,23 +198,19 @@ export function CollectionCarouselUI({
 
                   {/* Card count + Progress (pinned to bottom) */}
                   <div>
-                    <p className="text-base mb-1">
-                      {t('cards', {
-                        count: collection.totalTexts.toLocaleString(),
-                      })}
-                    </p>
-
                     {hasStarted ? (
                       <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold">
-                            {collection.cardsAdded} / {collection.totalTexts}
-                          </span>
-                        </div>
+                        <span className="text-sm font-semibold">
+                          {collection.cardsAdded} / {t('cards', { count: collection.totalTexts.toLocaleString() })}
+                        </span>
                         <Progress value={progress} className="h-2" />
                       </div>
                     ) : (
-                      <p className="text-muted-sm">{t('notStarted')}</p>
+                      <p className="text-sm font-semibold">
+                        {t('cards', {
+                          count: collection.totalTexts.toLocaleString(),
+                        })}
+                      </p>
                     )}
                   </div>
                 </div>
