@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
@@ -24,6 +25,7 @@ import { Layers, Languages } from 'lucide-react';
 import { AudioButton } from '@/components/app/learning/AudioButton';
 
 export function DeckCardsView() {
+  const t = useTranslations('AppPage.deckCards');
   const deckCards = useQuery(api.features.decks.getDeckCards, {});
   const activeCourse = useQuery(api.features.courses.getActiveCourse);
   const ensureCardContent = useMutation(api.features.decks.ensureCardContent);
@@ -217,18 +219,23 @@ export function DeckCardsView() {
 
                       {/* Card Status */}
                       <div className="flex items-center gap-2 pt-2 border-t">
+                        {card.isFavorite && (
+                          <Badge variant="secondary" className="text-xs">
+                            {t('statusFavorite')}
+                          </Badge>
+                        )}
                         {card.isMastered && (
                           <Badge variant="default" className="text-xs">
-                            Mastered
+                            {t('statusMastered')}
                           </Badge>
                         )}
                         {card.isHidden && (
                           <Badge variant="outline" className="text-xs">
-                            Hidden
+                            {t('statusHidden')}
                           </Badge>
                         )}
                         <span className="text-muted-xs">
-                          Due: {new Date(card.dueDate).toLocaleDateString()}
+                          {t('due')}: {new Date(card.dueDate).toLocaleDateString()}
                         </span>
                       </div>
                     </div>

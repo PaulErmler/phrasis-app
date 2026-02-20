@@ -75,6 +75,12 @@
       "account": "Account",
       "language": "App Language"
     },
+    "deckCards": {
+      "statusFavorite": "Favorite",
+      "statusMastered": "Mastered",
+      "statusHidden": "Hidden",
+      "due": "Due"
+    },
     "collections": {
       "carousel": {
         "sectionTitle": "Difficulty Selection",
@@ -167,10 +173,6 @@
     "loading": "Loading...",
     "baseLanguage": "Base Language",
     "targetLanguage": "Target Language",
-    "phase": {
-      "preReview": "Pre-review",
-      "review": "Review"
-    },
     "reviewCount": "{count} reviews",
     "nextReview": "Next review in {time}",
     "nextReviewNow": "Due now",
@@ -183,6 +185,7 @@
       "easy": "Easy"
     },
     "actions": {
+      "favorite": "Favorite",
       "master": "Master",
       "hide": "Hide",
       "next": "Next",
@@ -201,8 +204,9 @@
     "settingsPanel": {
       "title": "Learning Settings",
       "iconLegend": "Card Icons",
-      "iconMaster": "Mark card as mastered (won't appear again)",
-      "iconHide": "Hide card from review",
+      "iconFavorite": "Mark card as a favorite",
+      "iconMaster": "Mark card as mastered (won't appear again after next review)",
+      "iconHide": "Hide card from review (won't appear again after next review)",
       "cardsPerBatch": "Cards per batch",
       "cardsPerBatchDescription": "Number of cards to add at once",
       "reviewSettings": "Review Settings",

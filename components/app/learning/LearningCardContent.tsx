@@ -4,34 +4,39 @@ import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { CircleCheck, EyeOff } from 'lucide-react';
+import { CircleCheck, EyeOff, Star } from 'lucide-react';
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip';
 import { AudioButton } from './AudioButton';
-import type { SchedulingPhase } from '@/lib/scheduling';
 import type { CardTranslation, CardAudioRecording } from './types';
 
 interface LearningCardContentProps {
-  phase: SchedulingPhase;
   preReviewCount: number;
   sourceText: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
+  isFavorite: boolean;
+  isPendingMaster: boolean;
+  isPendingHide: boolean;
   onMaster: () => void;
   onHide: () => void;
+  onFavorite: () => void;
 }
 
 export function LearningCardContent({
-  phase,
   preReviewCount,
   sourceText,
   translations,
   audioRecordings,
+  isFavorite,
+  isPendingMaster,
+  isPendingHide,
   onMaster,
   onHide,
+  onFavorite,
 }: LearningCardContentProps) {
   const t = useTranslations('LearningMode');
   const baseTranslations = translations.filter((tr) => tr.isBaseLanguage);
@@ -44,9 +49,6 @@ export function LearningCardContent({
           {/* Card top bar: metadata left, actions right */}
           <div className="flex items-center justify-between px-4 pt-4 pb-2">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs">
-                {t(`phase.${phase}`)}
-              </Badge>
               <Badge variant="secondary" className="text-xs">
                 {t('reviewCount', { count: preReviewCount })}
               </Badge>
@@ -57,8 +59,23 @@ export function LearningCardContent({
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={onFavorite}
+                    className={`h-8 w-8 hover:bg-favorite/10 ${isFavorite ? 'text-favorite hover:text-favorite/80' : 'text-muted-foreground hover:text-favorite'}`}
+                  >
+                    <Star className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {t('actions.favorite')}
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={onMaster}
-                    className="h-8 w-8 text-muted-foreground hover:text-success hover:bg-green-50 dark:hover:bg-green-950/30"
+                    className={`h-8 w-8 hover:bg-success/10 ${isPendingMaster ? 'text-success hover:text-success/80' : 'text-muted-foreground hover:text-success'}`}
                   >
                     <CircleCheck className="h-4 w-4" />
                   </Button>
@@ -73,7 +90,7 @@ export function LearningCardContent({
                     variant="ghost"
                     size="icon"
                     onClick={onHide}
-                    className="h-8 w-8 text-muted-foreground hover:text-warning hover:bg-orange-50 dark:hover:bg-orange-950/30"
+                    className={`h-8 w-8 hover:bg-destructive/10 ${isPendingHide ? 'text-destructive hover:text-destructive/80' : 'text-muted-foreground hover:text-destructive'}`}
                   >
                     <EyeOff className="h-4 w-4" />
                   </Button>

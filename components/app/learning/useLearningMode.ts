@@ -68,9 +68,14 @@ interface ReviewingState extends BaseState {
   validRatings: ReviewRating[];
   activeRating: ReviewRating;
   ratingIntervals: Record<string, string>;
+  // Card flags
+  isFavorite: boolean;
+  isPendingMaster: boolean;
+  isPendingHide: boolean;
   // Handlers
   handleMaster: () => void;
   handleHide: () => void;
+  handleFavorite: () => void;
   handleNext: () => void;
   setSelectedRating: (rating: ReviewRating) => void;
   // Status flags
@@ -108,8 +113,33 @@ export function useLearningMode(
   const activeCourse = usePreloadedQuery(preloaded.activeCourse);
 
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
-  const masterCardMutation = useMutation(api.features.scheduling.masterCard);
-  const hideCardMutation = useMutation(api.features.scheduling.hideCard);
+
+  const masterCardMutation = useMutation(
+    api.features.scheduling.masterCard,
+  ).withOptimisticUpdate((localStore) => {
+    localStore.setQuery(api.features.scheduling.getCardForReview, {}, null);
+  });
+
+  const hideCardMutation = useMutation(
+    api.features.scheduling.hideCard,
+  ).withOptimisticUpdate((localStore) => {
+    localStore.setQuery(api.features.scheduling.getCardForReview, {}, null);
+  });
+
+  const toggleFavoriteCardMutation = useMutation(
+    api.features.scheduling.toggleFavoriteCard,
+  ).withOptimisticUpdate((localStore) => {
+    const current = localStore.getQuery(
+      api.features.scheduling.getCardForReview,
+      {},
+    );
+    if (current != null) {
+      localStore.setQuery(api.features.scheduling.getCardForReview, {}, {
+        ...current,
+        isFavorite: !(current.isFavorite ?? false),
+      });
+    }
+  });
   const addCardsMutation = useMutation(
     api.features.decks.addCardsFromCollection,
   );
@@ -123,6 +153,8 @@ export function useLearningMode(
   const [selectedRating, setSelectedRating] = useState<ReviewRating | null>(
     null,
   );
+  const [isPendingMaster, setIsPendingMaster] = useState(false);
+  const [isPendingHide, setIsPendingHide] = useState(false);
 
   // Track cards we've already ensured content for
   const ensuredCardsRef = useRef<Set<string>>(new Set());
@@ -193,9 +225,11 @@ export function useLearningMode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardForReview, courseSettings?.autoAddCards]);
 
-  // Reset selectedRating and card timer when card changes
+  // Reset selectedRating, pending master/hide state, and card timer when card changes
   useEffect(() => {
     setSelectedRating(null);
+    setIsPendingMaster(false);
+    setIsPendingHide(false);
     cardShownAtRef.current = Date.now();
   }, [cardForReview?._id]);
 
@@ -225,35 +259,56 @@ export function useLearningMode(
     [cardForReview, isReviewing, reviewCardMutation],
   );
 
-  const handleMaster = useCallback(async () => {
-    if (!cardForReview) return;
-    reviewInitiatedByThisTabRef.current = true;
-    try {
-      await masterCardMutation({ cardId: cardForReview._id });
-    } catch (error) {
-      console.error('Failed to master card:', error);
-    }
-  }, [cardForReview, masterCardMutation]);
+  const handleMaster = useCallback(() => {
+    setIsPendingMaster((prev) => !prev);
+    setIsPendingHide(false);
+  }, []);
 
-  const handleHide = useCallback(async () => {
+  const handleHide = useCallback(() => {
+    setIsPendingHide((prev) => !prev);
+    setIsPendingMaster(false);
+  }, []);
+
+  const handleFavorite = useCallback(async () => {
     if (!cardForReview) return;
-    reviewInitiatedByThisTabRef.current = true;
     try {
-      await hideCardMutation({ cardId: cardForReview._id });
+      await toggleFavoriteCardMutation({ cardId: cardForReview._id });
     } catch (error) {
-      console.error('Failed to hide card:', error);
+      console.error('Failed to toggle favorite:', error);
     }
-  }, [cardForReview, hideCardMutation]);
+  }, [cardForReview, toggleFavoriteCardMutation]);
 
   // --------------------------------------------------------------------------
   // Next
   // --------------------------------------------------------------------------
   const handleNext = useCallback(() => {
     if (!cardForReview) return;
+    if (isPendingMaster) {
+      reviewInitiatedByThisTabRef.current = true;
+      masterCardMutation({ cardId: cardForReview._id }).catch((error) => {
+        console.error('Failed to master card:', error);
+      });
+      return;
+    }
+    if (isPendingHide) {
+      reviewInitiatedByThisTabRef.current = true;
+      hideCardMutation({ cardId: cardForReview._id }).catch((error) => {
+        console.error('Failed to hide card:', error);
+      });
+      return;
+    }
     const phase = cardForReview.schedulingPhase as SchedulingPhase;
     const rating = selectedRating ?? getDefaultRating(phase);
     handleReview(rating);
-  }, [cardForReview, selectedRating, handleReview]);
+  }, [
+    cardForReview,
+    isPendingMaster,
+    isPendingHide,
+    selectedRating,
+    handleReview,
+    masterCardMutation,
+    hideCardMutation,
+  ]);
 
   // ============================================================================
   // Return discriminated states
@@ -363,11 +418,15 @@ export function useLearningMode(
     sourceText: cardForReview.sourceText,
     translations: sortedTranslations,
     audioRecordings: cardForReview.audioRecordings,
+    isFavorite: cardForReview.isFavorite ?? false,
+    isPendingMaster,
+    isPendingHide,
     validRatings,
     activeRating,
     ratingIntervals,
     handleMaster,
     handleHide,
+    handleFavorite,
     handleNext,
     setSelectedRating,
     isReviewing,

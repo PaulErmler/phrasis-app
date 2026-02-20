@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { CircleCheck, EyeOff, X } from 'lucide-react';
+import { CircleCheck, EyeOff, Star, X } from 'lucide-react';
 import {
   DEFAULT_BATCH_SIZE,
   type CourseSettings,
@@ -259,11 +259,15 @@ export function LearningModeSettings({
             </p>
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 text-xs">
+                <Star className="h-3.5 w-3.5 text-favorite shrink-0" />
+                <span>{t('iconFavorite')}</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
                 <CircleCheck className="h-3.5 w-3.5 text-success shrink-0" />
                 <span>{t('iconMaster')}</span>
               </div>
               <div className="flex items-center gap-2 text-xs">
-                <EyeOff className="h-3.5 w-3.5 text-warning shrink-0" />
+                <EyeOff className="h-3.5 w-3.5 text-destructive shrink-0" />
                 <span>{t('iconHide')}</span>
               </div>
             </div>

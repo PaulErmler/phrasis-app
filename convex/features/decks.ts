@@ -177,6 +177,7 @@ export const getDeckCards = query({
       dueDate: v.number(),
       isMastered: v.boolean(),
       isHidden: v.boolean(),
+      isFavorite: v.optional(v.boolean()),
       hasMissingContent: v.boolean(),
     }),
   ),
@@ -320,6 +321,7 @@ export const getDeckCards = query({
         dueDate: card.dueDate,
         isMastered: card.isMastered,
         isHidden: card.isHidden,
+        isFavorite: card.isFavorite ?? false,
         hasMissingContent: hasMissingTranslation || hasMissingAudio,
       };
     });
@@ -565,6 +567,7 @@ export const addCardsFromCollection = mutation({
           dueDate: now,
           isMastered: false,
           isHidden: false,
+          isFavorite: false,
           schedulingPhase: 'preReview',
           preReviewCount: 0,
         });

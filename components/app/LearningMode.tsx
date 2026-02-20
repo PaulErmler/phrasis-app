@@ -109,13 +109,16 @@ export function LearningMode({
       />
 
       <LearningCardContent
-        phase={state.phase}
         preReviewCount={state.preReviewCount}
         sourceText={state.sourceText}
         translations={state.translations}
         audioRecordings={state.audioRecordings}
+        isFavorite={state.isFavorite}
+        isPendingMaster={state.isPendingMaster}
+        isPendingHide={state.isPendingHide}
         onMaster={state.handleMaster}
         onHide={state.handleHide}
+        onFavorite={state.handleFavorite}
       />
 
       <LearningControls

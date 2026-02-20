@@ -75,6 +75,12 @@
       "account": "Konto",
       "language": "App-Sprache"
     },
+    "deckCards": {
+      "statusFavorite": "Favorit",
+      "statusMastered": "Gemeistert",
+      "statusHidden": "Ausgeblendet",
+      "due": "Fällig"
+    },
     "collections": {
       "carousel": {
         "sectionTitle": "Schwierigkeitsauswahl",
@@ -167,10 +173,6 @@
     "loading": "Lädt...",
     "baseLanguage": "Ausgangssprache",
     "targetLanguage": "Zielsprache",
-    "phase": {
-      "preReview": "Vorwiederholung",
-      "review": "Wiederholung"
-    },
     "reviewCount": "{count} Wiederholungen",
     "nextReview": "Nächste Wiederholung in {time}",
     "nextReviewNow": "Jetzt fällig",
@@ -183,6 +185,7 @@
       "easy": "Leicht"
     },
     "actions": {
+      "favorite": "Favorit",
       "master": "Gemeistert",
       "hide": "Ausblenden",
       "next": "Weiter",
@@ -201,8 +204,9 @@
     "settingsPanel": {
       "title": "Lerneinstellungen",
       "iconLegend": "Karten-Symbole",
-      "iconMaster": "Karte als gemeistert markieren (erscheint nicht mehr)",
-      "iconHide": "Karte aus der Wiederholung ausblenden",
+      "iconFavorite": "Karte als Favorit markieren",
+      "iconMaster": "Karte als gemeistert markieren (erscheint nach der nächsten Wiederholung nicht mehr)",
+      "iconHide": "Karte aus der Wiederholung ausblenden (erscheint nach der nächsten Wiederholung nicht mehr)",
       "cardsPerBatch": "Karten pro Stapel",
       "cardsPerBatchDescription": "Anzahl der Karten, die auf einmal hinzugefügt werden",
       "reviewSettings": "Wiederholungseinstellungen",

@@ -24,6 +24,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-favorite: var(--favorite);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
@@ -71,6 +73,8 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.58 0.22 27);
+  --success: oklch(0.52 0.16 155);
+  --favorite: oklch(0.83 0.18 95);
   --warning: oklch(0.75 0.15 70);
   --warning-foreground: oklch(0.2 0.05 70);
   --accent-orange: oklch(0.82 0.17 78);
@@ -115,6 +119,8 @@
   --accent-foreground: oklch(0.985 0 0);
   --accent-orange: oklch(0.82 0.17 78);
   --destructive: oklch(0.704 0.191 22.216);
+  --success: oklch(0.65 0.18 155);
+  --favorite: oklch(0.88 0.15 95);
   --warning: oklch(0.8 0.15 70);
   --warning-foreground: oklch(0.2 0.05 70);
   --border: oklch(1 0 0 / 10%);
@@ -215,9 +221,6 @@
   }
 
   /* Semantic colors */
-  .text-success {
-    @apply text-green-600;
-  }
   .text-warning {
     @apply text-orange-600;
   }

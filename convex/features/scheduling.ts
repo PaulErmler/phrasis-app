@@ -66,6 +66,7 @@ export const getCardForReview = query({
       dueDate: v.number(),
       isMastered: v.boolean(),
       isHidden: v.boolean(),
+      isFavorite: v.optional(v.boolean()),
       schedulingPhase: v.string(),
       preReviewCount: v.number(),
       initialReviewCount: v.number(),
@@ -167,6 +168,7 @@ export const getCardForReview = query({
       dueDate: card.dueDate,
       isMastered: card.isMastered,
       isHidden: card.isHidden,
+      isFavorite: card.isFavorite ?? false,
       schedulingPhase: card.schedulingPhase,
       preReviewCount: card.preReviewCount,
       initialReviewCount,
@@ -303,6 +305,25 @@ export const hideCard = mutation({
   handler: async (ctx, args) => {
     await authorizeCardAccess(ctx, args.cardId);
     await ctx.db.patch(args.cardId, { isHidden: true });
+    return null;
+  },
+});
+
+/**
+ * Toggle a card's favorite state — flips `isFavorite` between true and false.
+ */
+export const toggleFavoriteCard = mutation({
+  args: {
+    cardId: v.id('cards'),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await authorizeCardAccess(ctx, args.cardId);
+    const card = await ctx.db.get(args.cardId);
+    if (!card) throw new Error('Card not found');
+    await ctx.db.patch(args.cardId, {
+      isFavorite: !(card.isFavorite ?? false),
+    });
     return null;
   },
 });

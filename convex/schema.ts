@@ -111,6 +111,7 @@ export default defineSchema({
     dueDate: v.number(), // Timestamp for spaced repetition scheduling (driven by scheduler)
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
+    isFavorite: v.optional(v.boolean()), // Whether the card is marked as a favorite
     schedulingPhase: v.string(), // "preReview" | "review"
     preReviewCount: v.number(), // How many pre-review rounds completed
     fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
