@@ -17,7 +17,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   const t = useTranslations('AppPage');
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t border-border/50 z-20">
+    <nav className="shrink-0 w-full bg-background/80 backdrop-blur-md border-t border-border/50">
       <div className="container mx-auto">
         <div className="grid grid-cols-5 items-center h-16 relative">
           <div className="flex justify-center">
