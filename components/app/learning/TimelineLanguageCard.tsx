@@ -1,10 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react';
 import { getLanguageByCode } from '@/lib/languages';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
 
 interface TimelineLanguageCardProps {
   code: string;
@@ -35,13 +33,6 @@ export function TimelineLanguageCard({
 }: TimelineLanguageCardProps) {
   const lang = getLanguageByCode(code);
   const isDisabled = plays === 0;
-
-  // Local state for the slider so dragging updates instantly without
-  // firing a mutation on every intermediate value.
-  const [localRepPause, setLocalRepPause] = useState(repPause);
-  useEffect(() => {
-    setLocalRepPause(repPause);
-  }, [repPause]);
 
   return (
     <div className="w-full max-w-[300px]">
@@ -99,23 +90,33 @@ export function TimelineLanguageCard({
         </div>
 
         {plays > 1 && (
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                {repPauseLabel}
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {repPauseLabel}
+            </span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-6 w-6 rounded-full"
+                onClick={() => onRepPauseChange(Math.max(0, repPause - 1))}
+                disabled={repPause <= 0}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <span className="tabular-nums text-sm font-medium w-5 text-center">
+                {repPause}s
               </span>
-              <span className="text-xs font-medium tabular-nums">
-                {localRepPause}s
-              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-6 w-6 rounded-full"
+                onClick={() => onRepPauseChange(Math.min(30, repPause + 1))}
+                disabled={repPause >= 30}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
             </div>
-            <Slider
-              min={0}
-              max={30}
-              step={1}
-              value={[localRepPause]}
-              onValueChange={([v]) => setLocalRepPause(v)}
-              onValueCommit={([v]) => onRepPauseChange(v)}
-            />
           </div>
         )}
       </div>

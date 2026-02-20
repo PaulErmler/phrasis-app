@@ -220,6 +220,7 @@
       "repetitionsDescription": "How many times each language is played per card",
       "plays": "Plays",
       "pause": "Pause",
+      "pauseBetweenRepetitions": "Pause between repetitions",
       "base": "Base",
       "target": "Target",
       "playbackSequence": "Playback Sequence",

@@ -220,6 +220,7 @@
       "repetitionsDescription": "Wie oft jede Sprache pro Karte abgespielt wird",
       "plays": "Plays",
       "pause": "Pause",
+      "pauseBetweenRepetitions": "Pause zwischen Wiederholungen",
       "base": "Basis",
       "target": "Ziel",
       "playbackSequence": "Wiedergabe-Reihenfolge",

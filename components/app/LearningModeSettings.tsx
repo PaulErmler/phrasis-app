@@ -397,7 +397,7 @@ export function LearningModeSettings({
                     onRepPauseChange={(v) =>
                       handleRepetitionPauseChange(code, v)
                     }
-                    repPauseLabel={t('pause')}
+                    repPauseLabel={t('pauseBetweenRepetitions')}
                     canMoveUp={idx > 0}
                     canMoveDown={idx < baseLanguages.length - 1}
                     onMoveUp={() => moveBaseUp(idx)}
@@ -407,7 +407,7 @@ export function LearningModeSettings({
                   {/* Base → Base Pause connector */}
                   {idx < baseLanguages.length - 1 && (
                     <StepperPauseConnector
-                      label={t('pauseBaseToBase')}
+                      label={t('pause')}
                       seconds={pauseB2B}
                       onChange={handlePauseBaseToBaseChange}
                       lineOnly={plays === 0 || nextPlays === 0}
@@ -420,7 +420,7 @@ export function LearningModeSettings({
             {/* Base → Target Pause connector (always editable) */}
             {baseLanguages.length > 0 && targetLanguages.length > 0 && (
               <StepperPauseConnector
-                label={t('pauseBaseToTarget')}
+                label={t('pause')}
                 seconds={pauseB2T}
                 onChange={handlePauseBaseToTargetChange}
                 accent
@@ -451,7 +451,7 @@ export function LearningModeSettings({
                     onRepPauseChange={(v) =>
                       handleRepetitionPauseChange(code, v)
                     }
-                    repPauseLabel={t('pause')}
+                    repPauseLabel={t('pauseBetweenRepetitions')}
                     canMoveUp={idx > 0}
                     canMoveDown={idx < targetLanguages.length - 1}
                     onMoveUp={() => moveTargetUp(idx)}
@@ -461,7 +461,7 @@ export function LearningModeSettings({
                   {/* Target → Target Pause connector */}
                   {idx < targetLanguages.length - 1 && (
                     <StepperPauseConnector
-                      label={t('pauseTargetToTarget')}
+                      label={t('pause')}
                       seconds={pauseT2T}
                       onChange={handlePauseTargetToTargetChange}
                       lineOnly={plays === 0 || nextPlays === 0}
