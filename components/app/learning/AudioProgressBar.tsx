@@ -15,11 +15,13 @@ export const AudioProgressBar = memo(function AudioProgressBar({
   durationSec,
   isPlaying,
   onSeek,
+  isMerging = false,
 }: {
   audioRef: React.RefObject<HTMLAudioElement | null>;
   durationSec: number;
   isPlaying: boolean;
   onSeek: (seconds: number) => void;
+  isMerging?: boolean;
 }) {
   const [currentTime, setCurrentTime] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -51,25 +53,26 @@ export const AudioProgressBar = memo(function AudioProgressBar({
     };
   }, [isPlaying, audioRef]);
 
-  if (durationSec <= 0) return null;
+  const inactive = durationSec <= 0 || isMerging;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex items-center gap-2 transition-opacity duration-150 ${inactive ? 'opacity-30 pointer-events-none' : ''}`}>
       <span className="text-[11px] text-muted-foreground tabular-nums w-8 text-right">
-        {formatTime(currentTime)}
+        {formatTime(inactive ? 0 : currentTime)}
       </span>
       <Slider
-        value={[currentTime]}
-        max={durationSec}
+        value={[inactive ? 0 : currentTime]}
+        max={inactive ? 1 : durationSec}
         step={0.1}
         onValueChange={([v]) => {
           setCurrentTime(v);
           onSeek(v);
         }}
         className="flex-1"
+        disabled={inactive}
       />
       <span className="text-[11px] text-muted-foreground tabular-nums w-8">
-        {formatTime(durationSec)}
+        {formatTime(inactive ? 0 : durationSec)}
       </span>
     </div>
   );

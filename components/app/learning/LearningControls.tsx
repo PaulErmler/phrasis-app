@@ -74,6 +74,7 @@ export function LearningControls({
           durationSec={durationSec}
           isPlaying={isPlaying}
           onSeek={onSeek}
+          isMerging={isMerging}
         />
 
         {/* Restart + Play + Next row */}
@@ -89,17 +90,16 @@ export function LearningControls({
           </Button>
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={isPlaying ? onPause : onPlay}
             disabled={isMerging || durationSec === 0}
-            className="flex-[2] gap-2"
+            className="h-9 flex-[2] min-w-0"
           >
             {isPlaying ? (
               <Pause className="h-4 w-4" />
             ) : (
               <Play className="h-4 w-4" />
             )}
-            {isPlaying ? t('actions.pause') : t('actions.play')}
           </Button>
           <Button
             size="sm"

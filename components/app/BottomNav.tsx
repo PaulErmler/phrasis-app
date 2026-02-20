@@ -1,9 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { Home, FileText, Play, Library, Settings } from 'lucide-react';
+import { Home, FileText, Play, Library, Settings, Loader2 } from 'lucide-react';
 
 export type View = 'home' | 'content' | 'library' | 'settings';
 
@@ -15,6 +16,12 @@ interface BottomNavProps {
 export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   const router = useRouter();
   const t = useTranslations('AppPage');
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  const handleGoToLearn = () => {
+    setIsNavigating(true);
+    router.push('/app/learn');
+  };
 
   return (
     <nav className="shrink-0 w-full bg-background/80 backdrop-blur-md border-t border-border/50">
@@ -52,9 +59,14 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
               <Button
                 size="icon"
                 className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
-                onClick={() => router.push('/app/learn')}
+                onClick={handleGoToLearn}
+                disabled={isNavigating}
               >
-                <Play className="h-6 w-6 fill-current text-primary-foreground" />
+                {isNavigating ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-primary-foreground" />
+                ) : (
+                  <Play className="h-6 w-6 fill-current text-primary-foreground" />
+                )}
               </Button>
             </div>
           </div>
