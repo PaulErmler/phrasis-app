@@ -1,6 +1,6 @@
-# Phrasis Data Preparation
+# Cacatua Data Preparation
 
-This directory contains the tools and data used to process, filter, and classify the sentence dataset for the Phrasis application.
+This directory contains the tools and data used to process, filter, and classify the sentence dataset for the Cacatua application.
 
 We use two main pipelines:
 
@@ -56,8 +56,8 @@ Located in `language_intelligence/`:
 Create and activate a conda environment using the provided `requirements.txt`:
 
 ```bash
-conda create --name phrasis-prep --file requirements.txt
-conda activate phrasis-prep
+conda create --name cacatua-prep --file requirements.txt
+conda activate cacatua-prep
 ```
 
 ### 2. Environment Variables

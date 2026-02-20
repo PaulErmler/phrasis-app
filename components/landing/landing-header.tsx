@@ -60,13 +60,13 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
             <Link href="/" className="flex items-center gap-2 shrink-0">
               <img
                 src="/icons/icon.svg"
-                alt="Phrasis"
+                alt="Cacatua"
                 className="w-8 h-8 md:w-10 md:h-10"
                 width={40}
                 height={40}
               />
               <span className="text-xl md:text-2xl font-bold hidden sm:inline text-primary">
-                Phrasis<sup className="text-muted-sm">alpha</sup>
+                Cacatua<sup className="text-muted-sm">alpha</sup>
               </span>
             </Link>
 

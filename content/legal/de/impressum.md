@@ -9,8 +9,8 @@ Paul Ermler & Franziska Hradilak
 Friedrich-Ebert Straße 62  
 14467 Potsdam
 
-E-Mail: contact@phrasis.app  
-Website: phrasis.app
+E-Mail: contact@cacatua.app  
+  Website: cacatua.app
 
 Umsatzsteuer-Identifikationsnummer gem. § 27 a Umsatzsteuergesetz: DE 1234567  
 Wirtschaftsidentifikationsnummer gem. § 139 c Abgabenordnung: DE 1234567

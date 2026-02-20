@@ -1,5 +1,5 @@
 /**
- * Text-to-Speech constants for the Phrasis app
+ * Text-to-Speech constants for the Cacatua app
  */
 
 /** Maximum text length for TTS generation */

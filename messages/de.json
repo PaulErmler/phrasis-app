@@ -1,6 +1,6 @@
 {
   "HomePage": {
-    "title": "Sprachen meistern mit Phrasis",
+    "title": "Sprachen meistern mit Cacatua",
     "subtitle": "Lerne Redewendungen, übe die Aussprache und werde fließend in jeder Sprache",
     "signIn": "Anmelden",
     "getStarted": "Jetzt starten",
@@ -237,7 +237,7 @@
     }
   },
   "Footer": {
-    "copyright": "© {year} Phrasis. Alle Rechte vorbehalten.",
+    "copyright": "© {year} Cacatua. Alle Rechte vorbehalten.",
     "theme": "Design:",
     "language": "Sprache:",
     "madeInGermany": "Hergestellt in Deutschland",
@@ -271,7 +271,7 @@
   },
   "Onboarding": {
     "welcome": {
-      "title": "Willkommen bei Phrasis!",
+      "title": "Willkommen bei Cacatua!",
       "subtitle": "Lass uns deine Lernerfahrung in nur wenigen Schritten anpassen",
       "description": "Das dauert nur eine Minute, und du kannst diese Einstellungen jederzeit später ändern.",
       "feature1": {

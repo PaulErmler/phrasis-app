@@ -16,12 +16,12 @@ export function Header() {
           >
             <img
               src="/icons/icon.svg"
-              alt="Phrasis Logo"
+              alt="Cacatua Logo"
               className="w-10 h-10"
               width={40}
               height={40}
             />
-            <span className="heading-dialog text-foreground">Phrasis</span>
+            <span className="heading-dialog text-foreground">Cacatua</span>
           </Link>
 
           <div className="flex items-center gap-4">

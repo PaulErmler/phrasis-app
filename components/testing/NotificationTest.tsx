@@ -48,18 +48,18 @@ export function NotificationTest() {
 
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       const registration = await navigator.serviceWorker.ready;
-      await registration.showNotification('Phrasis', {
+      await registration.showNotification('Cacatua', {
         body: 'Time to practice your phrases! 🌟',
         icon: '/icons/icon-192x192.png',
         badge: '/icons/icon-96x96.png',
-        tag: 'phrasis-reminder',
+        tag: 'cacatua-reminder',
         data: { url: '/app' },
       });
     } else {
-      new Notification('Phrasis', {
+      new Notification('Cacatua', {
         body: 'Time to practice your phrases! 🌟',
         icon: '/icons/icon-192x192.png',
-        tag: 'phrasis-reminder',
+        tag: 'cacatua-reminder',
       });
     }
   }, [notificationPermission, requestNotificationPermission]);

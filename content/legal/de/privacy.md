@@ -19,7 +19,7 @@ Friedrich-Ebert-Straße 62
 
 Vertretungsberechtigte Personen: Paul Ermler
 
-E-Mail-Adresse: [contact@phrasis.app](mailto:contact@phrasis.app)
+E-Mail-Adresse: [contact@cacatua.app](mailto:contact@cacatua.app)
 
 ## Übersicht der Verarbeitungen
 

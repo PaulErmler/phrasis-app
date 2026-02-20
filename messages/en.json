@@ -1,6 +1,6 @@
 {
   "HomePage": {
-    "title": "Master Languages with Phrasis",
+    "title": "Master Languages with Cacatua",
     "subtitle": "Learn phrases, practice pronunciation, and build fluency in any language",
     "signIn": "Sign In",
     "getStarted": "Get Started",
@@ -237,7 +237,7 @@
     }
   },
   "Footer": {
-    "copyright": "© {year} Phrasis. All rights reserved.",
+    "copyright": "© {year} Cacatua. All rights reserved.",
     "theme": "Theme:",
     "language": "Language:",
     "madeInGermany": "Made in Germany",
@@ -271,7 +271,7 @@
   },
   "Onboarding": {
     "welcome": {
-      "title": "Welcome to Phrasis!",
+      "title": "Welcome to Cacatua!",
       "subtitle": "Let's customize your learning experience in just a few steps",
       "description": "This will only take a minute, and you can always change these settings later.",
       "feature1": {

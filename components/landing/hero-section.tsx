@@ -41,7 +41,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
         <div className="inline-flex items-center justify-center w-46 h-46 md:w-46 md:h-46">
           <img
             src="/icons/icon.svg"
-            alt="Phrasis Logo"
+            alt="Cacatua Logo"
             className="w-full h-full"
             width={500}
             height={500}
@@ -50,7 +50,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
 
         {/* Main Headline */}
         <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-foreground  leading-[1.1]">
-          <span className="gradient-text">Phrasis</span> - {t('tagline')}
+          <span className="gradient-text">Cacatua</span> - {t('tagline')}
         </h1>
 
         {/* Subheadline */}

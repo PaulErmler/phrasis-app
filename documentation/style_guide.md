@@ -1,6 +1,6 @@
-# Phrasis App Style Guide
+# Cacatua App Style Guide
 
-This document defines the canonical styling tokens and patterns used across the Phrasis app. All views and components must follow these standards to ensure visual consistency.
+This document defines the canonical styling tokens and patterns used across the Cacatua app. All views and components must follow these standards to ensure visual consistency.
 
 **Stack**: Tailwind CSS v4, shadcn/ui (New York style), Geist + Geist Mono fonts, oklch color tokens.
 

@@ -1,4 +1,4 @@
-# Phrasis
+# Cacatua
 
 ## Tech Stack
 
@@ -156,7 +156,7 @@ You can also add the MCP Servers for Convex, BetterAuth and AI Elements by setti
 ## Project Structure
 
 ```
-phrasis-app/
+cacatua-app/
 ├── app/                    # Next.js app router
 │   ├── page.tsx           # Landing page with auth
 │   ├── app/page.tsx       # Authenticated app page

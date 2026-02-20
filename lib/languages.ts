@@ -1,5 +1,5 @@
 /**
- * Language definitions and utilities for the Phrasis app
+ * Language definitions and utilities for the Cacatua app
  */
 
 /**
