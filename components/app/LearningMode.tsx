@@ -12,6 +12,7 @@ import {
   LearningControls,
   NoCollectionState,
   NoCardsDueState,
+  useLearningAudio,
 } from '@/components/app/learning';
 import type { PreloadedLearningData } from '@/components/app/learning/useLearningMode';
 
@@ -34,6 +35,7 @@ export function LearningMode({
   });
 
   const goHome = () => router.push('/app');
+  const { audio, openSettings } = useLearningAudio(state);
 
   // Loading
   if (state.status === 'loading') {
@@ -41,7 +43,7 @@ export function LearningMode({
       <div className="flex flex-col h-screen">
         <LearningHeader
           onBack={goHome}
-          onSettingsOpen={() => state.setSettingsOpen(true)}
+          onSettingsOpen={openSettings}
         />
         <main className="flex-1 flex items-center justify-center">
           <div className="space-y-4 w-full max-w-md px-4">
@@ -60,7 +62,7 @@ export function LearningMode({
       <div className="flex flex-col h-screen">
         <LearningHeader
           onBack={goHome}
-          onSettingsOpen={() => state.setSettingsOpen(true)}
+          onSettingsOpen={openSettings}
         />
         <NoCollectionState onGoHome={goHome} />
         <LearningModeSettings
@@ -80,7 +82,7 @@ export function LearningMode({
       <div className="flex flex-col h-screen">
         <LearningHeader
           onBack={goHome}
-          onSettingsOpen={() => state.setSettingsOpen(true)}
+          onSettingsOpen={openSettings}
         />
         <NoCardsDueState
           onAddCards={state.handleAddCards}
@@ -103,7 +105,7 @@ export function LearningMode({
     <div className="flex flex-col h-screen">
       <LearningHeader
         onBack={goHome}
-        onSettingsOpen={() => state.setSettingsOpen(true)}
+        onSettingsOpen={openSettings}
       />
 
       <LearningCardContent
@@ -112,7 +114,6 @@ export function LearningMode({
         sourceText={state.sourceText}
         translations={state.translations}
         audioRecordings={state.audioRecordings}
-        stopAudioPlayback={state.settingsOpen}
         onMaster={state.handleMaster}
         onHide={state.handleHide}
       />
@@ -122,9 +123,13 @@ export function LearningMode({
         activeRating={state.activeRating}
         ratingIntervals={state.ratingIntervals}
         onSelectRating={state.setSelectedRating}
-        onAutoPlay={state.handleAutoPlay}
-        onStopAutoPlay={state.handleStopAutoPlay}
-        isAutoPlaying={state.isAutoPlaying}
+        onPlay={audio.play}
+        onPause={audio.pause}
+        audioRef={audio.audioRef}
+        isPlaying={audio.isPlaying}
+        isMerging={audio.isMerging}
+        durationSec={audio.durationSec}
+        onSeek={audio.seekTo}
         onNext={state.handleNext}
         isReviewing={state.isReviewing}
       />

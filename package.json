@@ -57,6 +57,7 @@
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@xyflow/react": "^12.10.0",
     "ai": "^5.0.108",
+    "audiobuffer-to-wav": "^1.0.0",
     "axios": "^1.13.2",
     "better-auth": "1.4.7",
     "class-variance-authority": "^0.7.1",

@@ -337,6 +337,47 @@ All UI text is internationalized under the `LearningMode` namespace in `messages
 - Header, phase labels, rating buttons, card actions
 - Empty state messages, settings panel labels
 
+### Learning Audio Refactor (Current Branch)
+
+The learning mode audio flow was refactored from sequential per-clip playback logic inside `useLearningMode` into a dedicated merged-audio pipeline with its own hook and utilities.
+
+#### What Changed
+
+- `components/app/learning/useLearningAudio.ts` was introduced as an adapter between `useLearningMode` state and the audio player hook
+- `hooks/use-audio-player.ts` was added to manage merge lifecycle, playback controls, seek, media session actions, and cleanup
+- `lib/audio/mergeAudio.ts` was added to:
+  - resolve playback sequence from language order + repetition settings
+  - fetch/decode source clips
+  - render a single timeline with `OfflineAudioContext`
+  - export a playable WAV blob URL
+- `lib/audio/mediaSession.ts` was added to centralize Media Session metadata/action wiring and position updates
+- `components/app/learning/AudioProgressBar.tsx` was added and integrated into `LearningControls` for timeline scrubbing + elapsed/total time display
+- `components/app/LearningMode.tsx` now consumes `useLearningAudio(state)` and passes explicit audio controls to `LearningControls`
+- `components/app/learning/useLearningMode.ts` removed the previous in-hook auto-play orchestration (wait/play loops, abort handling, and auto-advance timing are now handled by merged playback)
+- `components/app/learning/LearningCardContent.tsx` no longer passes `stopPlayback` to per-language `AudioButton`s
+
+#### UI/UX Impact
+
+- Controls changed from `Auto Play / Stop` semantics to direct merged-track controls:
+  - restart
+  - play/pause
+  - seek via progress bar
+  - next card
+- Playback now represents the full configured card sequence as one continuous track (base + target ordering, repetitions, and pauses)
+- Media Session handlers now expose play/pause/next/previous interactions on supported platforms
+
+#### Dependencies
+
+- Added: `audiobuffer-to-wav` (used by `mergeAudio.ts` to encode rendered audio buffer)
+- Added in current diff but likely unrelated to this implementation: `install` (no direct runtime import found in app code)
+
+#### Follow-ups Before Commit
+
+- Add a declaration or typed wrapper for `audiobuffer-to-wav` to resolve current TypeScript lint/type error
+- Confirm whether `install` is intentional; remove if accidental
+- Revisit merge gating: current logic requires all `audioRecordings` URLs to be present before merged playback initializes
+- Confirm desired behavior for inline `AudioButton` playback when opening settings, since explicit stop wiring was removed
+
 ## Performance Optimizations
 
 1. **Efficient pagination** - uses `lastRankProcessed` in `collectionProgress` instead of offset/skip

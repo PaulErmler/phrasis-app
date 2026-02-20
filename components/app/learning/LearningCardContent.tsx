@@ -20,7 +20,6 @@ interface LearningCardContentProps {
   sourceText: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
-  stopAudioPlayback?: boolean;
   onMaster: () => void;
   onHide: () => void;
 }
@@ -31,7 +30,6 @@ export function LearningCardContent({
   sourceText,
   translations,
   audioRecordings,
-  stopAudioPlayback = false,
   onMaster,
   onHide,
 }: LearningCardContentProps) {
@@ -106,7 +104,6 @@ export function LearningCardContent({
                     <AudioButton
                       url={audio?.url ?? null}
                       language={translation.language.toUpperCase()}
-                      stopPlayback={stopAudioPlayback}
                     />
                   </div>
                 );
@@ -135,7 +132,6 @@ export function LearningCardContent({
                     <AudioButton
                       url={audio?.url ?? null}
                       language={translation.language.toUpperCase()}
-                      stopPlayback={stopAudioPlayback}
                     />
                   </div>
                 );
