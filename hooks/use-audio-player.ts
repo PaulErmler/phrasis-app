@@ -5,6 +5,7 @@ import {
   mergeCardAudio,
   type ResolvedAudioSettings,
   type MergeResult,
+  type LanguageCue,
 } from '@/lib/audio/mergeAudio';
 import {
   setupMediaSession,
@@ -37,6 +38,7 @@ export interface AudioPlayerState {
   isPlaying: boolean;
   isMerging: boolean;
   durationSec: number;
+  revealedLanguages: ReadonlySet<string>;
 }
 
 export function useAudioPlayer(
@@ -60,11 +62,13 @@ export function useAudioPlayer(
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const [durationSec, setDurationSec] = useState(0);
+  const [revealedLanguages, setRevealedLanguages] = useState<ReadonlySet<string>>(new Set());
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
   const mergeAbortRef = useRef<AbortController | null>(null);
   const mediaSessionCleanupRef = useRef<(() => void) | null>(null);
+  const languageCuesRef = useRef<LanguageCue[]>([]);
 
   // Stable refs for callbacks to avoid re-triggering effects
   const onScheduleCompleteRef = useRef(onScheduleComplete);
@@ -130,8 +134,10 @@ export function useAudioPlayer(
       blobUrlRef.current = null;
     }
 
+    languageCuesRef.current = [];
     setDurationSec(0);
     setIsPlaying(false);
+    setRevealedLanguages(new Set());
     setMediaSessionPlaybackState('none');
   }, [getAudio]);
 
@@ -163,16 +169,31 @@ export function useAudioPlayer(
       }
     };
 
+    const handleTimeUpdate = () => {
+      const cues = languageCuesRef.current;
+      if (cues.length === 0) return;
+      const currentTime = audio.currentTime;
+      setRevealedLanguages((prev) => {
+        const toReveal = cues.filter((c) => c.startSec <= currentTime && !prev.has(c.language));
+        if (toReveal.length === 0) return prev;
+        const next = new Set(prev);
+        for (const c of toReveal) next.add(c.language);
+        return next;
+      });
+    };
+
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
       audio.removeEventListener('play', handlePlay);
       audio.removeEventListener('pause', handlePause);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [getAudio]);
 
@@ -256,6 +277,7 @@ export function useAudioPlayer(
         }
 
         blobUrlRef.current = result.blobUrl;
+        languageCuesRef.current = result.languageCues;
         audio.src = result.blobUrl;
         setDurationSec(result.durationSec);
         setIsMerging(false);
@@ -347,5 +369,6 @@ export function useAudioPlayer(
     isPlaying,
     isMerging,
     durationSec,
+    revealedLanguages,
   };
 }

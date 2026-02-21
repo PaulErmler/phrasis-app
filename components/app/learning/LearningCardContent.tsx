@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,10 @@ interface LearningCardContentProps {
   onMaster: () => void;
   onHide: () => void;
   onFavorite: () => void;
+  onAudioPlay?: () => void;
+  hideTargetLanguages?: boolean;
+  autoRevealLanguages?: boolean;
+  revealedLanguages?: ReadonlySet<string>;
 }
 
 export function LearningCardContent({
@@ -37,10 +42,32 @@ export function LearningCardContent({
   onMaster,
   onHide,
   onFavorite,
+  onAudioPlay,
+  hideTargetLanguages = false,
+  autoRevealLanguages = false,
+  revealedLanguages,
 }: LearningCardContentProps) {
   const t = useTranslations('LearningMode');
   const baseTranslations = translations.filter((tr) => tr.isBaseLanguage);
   const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
+
+  const [manuallyRevealed, setManuallyRevealed] = useState<Set<string>>(new Set());
+
+  // Reset manual reveals when the card changes
+  const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
+  const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
+  if (translationKey !== prevTranslationKey) {
+    setPrevTranslationKey(translationKey);
+    setManuallyRevealed(new Set());
+  }
+
+  const handleReveal = (language: string) => {
+    setManuallyRevealed((prev) => {
+      const next = new Set(prev);
+      next.add(language);
+      return next;
+    });
+  };
 
   return (
     <main className="flex-1 overflow-y-auto">
@@ -121,6 +148,7 @@ export function LearningCardContent({
                     <AudioButton
                       url={audio?.url ?? null}
                       language={translation.language.toUpperCase()}
+                      onPlay={onAudioPlay}
                     />
                   </div>
                 );
@@ -138,17 +166,23 @@ export function LearningCardContent({
                 const audio = audioRecordings.find(
                   (a) => a.language === translation.language,
                 );
+                const isAudioRevealed = autoRevealLanguages && (revealedLanguages?.has(translation.language) ?? false);
+                const isBlurred = hideTargetLanguages && !isAudioRevealed && !manuallyRevealed.has(translation.language);
                 return (
                   <div
                     key={translation.language}
                     className="flex items-start gap-2"
                   >
-                    <p className="flex-1 body-large">
+                    <p
+                      className={`flex-1 body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                      onClick={isBlurred ? () => handleReveal(translation.language) : undefined}
+                    >
                       {translation.text || '...'}
                     </p>
                     <AudioButton
                       url={audio?.url ?? null}
                       language={translation.language.toUpperCase()}
+                      onPlay={onAudioPlay}
                     />
                   </div>
                 );

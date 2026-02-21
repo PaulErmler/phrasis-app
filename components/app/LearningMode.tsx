@@ -86,6 +86,10 @@ export function LearningMode({ state, audio }: LearningModeProps) {
         onMaster={state.handleMaster}
         onHide={state.handleHide}
         onFavorite={state.handleFavorite}
+        onAudioPlay={audio.stop}
+        hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
+        autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? true}
+        revealedLanguages={audio.revealedLanguages}
       />
 
       <LearningControls

@@ -97,6 +97,8 @@ export default defineSchema({
     pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages
     pauseBeforeAutoAdvance: v.optional(v.number()), // seconds to wait before auto-advancing to next card
     showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
+    hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
+    autoRevealLanguages: v.optional(v.boolean()), // unblur when audio starts playing
     // Language order overrides
     baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
     targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Preloaded } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
@@ -114,7 +114,11 @@ function LearnPageInner({
   preloadedActiveCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
 }) {
   const router = useRouter();
-  const goHome = () => router.push('/app');
+  const [isNavigating, setIsNavigating] = useState(false);
+  const goHome = () => {
+    setIsNavigating(true);
+    router.push('/app');
+  };
 
   const state = useLearningMode({
     card: preloadedCard,
@@ -187,6 +191,7 @@ function LearnPageInner({
     <LearningHeader
       onBack={goHome}
       onSettingsOpen={openSettings}
+      isNavigating={isNavigating}
     />
   );
 

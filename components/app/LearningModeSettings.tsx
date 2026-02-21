@@ -124,6 +124,21 @@ export function LearningModeSettings({
     });
   };
 
+  const handleHideTargetLanguagesChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      hideTargetLanguages: checked,
+      ...(!checked && { autoRevealLanguages: false }),
+    });
+  };
+
+  const handleAutoRevealLanguagesChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      autoRevealLanguages: checked,
+    });
+  };
+
   const handleRepetitionChange = async (language: string, value: number) => {
     if (value < 0 || value > 10) return;
     const current = courseSettings.languageRepetitions ?? {};
@@ -521,6 +536,42 @@ export function LearningModeSettings({
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
             {t('uiSettings')}
           </p>
+
+          {/* Hide target languages + sub-setting */}
+          <div className="space-y-0">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="hideTargetLanguages" className="text-sm font-medium">
+                  {t('hideTargetLanguages')}
+                </Label>
+                <p className="text-muted-xs">{t('hideTargetLanguagesDescription')}</p>
+              </div>
+              <Switch
+                id="hideTargetLanguages"
+                checked={courseSettings.hideTargetLanguages ?? true}
+                onCheckedChange={handleHideTargetLanguagesChange}
+                className="mt-0.5"
+              />
+            </div>
+
+            {/* Auto-reveal — visually indented as a sub-setting */}
+            {(courseSettings.hideTargetLanguages ?? true) && (
+              <div className="ml-4 mt-3 pl-3 border-l-2 border-border flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="autoRevealLanguages" className="text-sm font-medium">
+                    {t('autoRevealLanguages')}
+                  </Label>
+                  <p className="text-muted-xs">{t('autoRevealLanguagesDescription')}</p>
+                </div>
+                <Switch
+                  id="autoRevealLanguages"
+                  checked={courseSettings.autoRevealLanguages ?? false}
+                  onCheckedChange={handleAutoRevealLanguagesChange}
+                  className="mt-0.5"
+                />
+              </div>
+            )}
+          </div>
 
           {/* Show progress bar */}
           <div className="flex items-start justify-between gap-4">

@@ -11,6 +11,8 @@ export interface AudioButtonProps {
   showLabel?: boolean;
   /** If true, immediately stop current playback and prevent new playback. */
   stopPlayback?: boolean;
+  /** Called just before this button starts playing audio (e.g. to stop the main player). */
+  onPlay?: () => void;
 }
 
 export function AudioButton({
@@ -18,6 +20,7 @@ export function AudioButton({
   language,
   showLabel = false,
   stopPlayback = false,
+  onPlay,
 }: AudioButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -42,6 +45,7 @@ export function AudioButton({
     }
 
     setIsLoading(true);
+    onPlay?.();
     try {
       if (!audioRef.current || audioRef.current.src !== url) {
         audioRef.current = new Audio(url);

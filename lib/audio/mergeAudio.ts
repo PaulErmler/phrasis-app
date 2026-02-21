@@ -33,9 +33,15 @@ export function resolveAudioSettings(cs: CourseSettings | null): ResolvedAudioSe
   };
 }
 
+export interface LanguageCue {
+  language: string;
+  startSec: number;
+}
+
 export interface MergeResult {
   blobUrl: string;
   durationSec: number;
+  languageCues: LanguageCue[];
 }
 
 /**
@@ -110,6 +116,7 @@ export async function mergeCardAudio(
 
     type ScheduledClip = { buffer: AudioBuffer; startSec: number };
     const clips: ScheduledClip[] = [];
+    const languageCues: LanguageCue[] = [];
     let cursor = 0; // seconds
 
     const scheduleGroup = (
@@ -120,6 +127,8 @@ export async function mergeCardAudio(
         const entry = entries[i];
         const buffer = decoded.get(entry.url);
         if (!buffer) continue;
+
+        languageCues.push({ language: entry.language, startSec: cursor });
 
         for (let r = 0; r < entry.reps; r++) {
           clips.push({ buffer, startSec: cursor });
@@ -172,7 +181,7 @@ export async function mergeCardAudio(
     const blob = new Blob([toWav(rendered)], { type: 'audio/wav' });
     const blobUrl = URL.createObjectURL(blob);
 
-    return { blobUrl, durationSec: totalDuration };
+    return { blobUrl, durationSec: totalDuration, languageCues };
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') return null;
     throw err;

@@ -41,6 +41,8 @@ export interface CourseSettings {
   pauseTargetToTarget?: number;
   pauseBeforeAutoAdvance?: number;
   showProgressBar?: boolean;
+  hideTargetLanguages?: boolean;
+  autoRevealLanguages?: boolean;
   // Language order overrides
   baseLanguageOrder?: string[];
   targetLanguageOrder?: string[];

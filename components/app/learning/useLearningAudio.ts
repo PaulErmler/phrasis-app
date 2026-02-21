@@ -41,7 +41,7 @@ export function useLearningAudio(state: LearningState) {
     orderedTarget: isReviewing ? state.targetLanguages : [],
     sourceText: isReviewing ? state.sourceText : '',
     languageNames: isReviewing
-      ? state.translations.map((tr) => tr.text).filter(Boolean).join(' / ')
+      ? state.translations.filter((tr) => tr.isTargetLanguage).map((tr) => tr.text).filter(Boolean).join(' / ')
       : '',
     autoPlay,
     getReviewInitiatedByThisTab: isReviewing
