@@ -1,50 +1,33 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Preloaded } from 'convex/react';
-import { api } from '@/convex/_generated/api';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import {
-  useLearningMode,
-  LearningHeader,
   LearningCardContent,
   LearningControls,
   NoCollectionState,
   NoCardsDueState,
-  useLearningAudio,
 } from '@/components/app/learning';
-import type { PreloadedLearningData } from '@/components/app/learning/useLearningMode';
+import type { LearningState } from '@/components/app/learning/useLearningMode';
+import type { AudioPlayerState } from '@/hooks/use-audio-player';
 
-export function LearningMode({
-  preloadedCard,
-  preloadedCourseSettings,
-  preloadedActiveCourse,
-}: {
-  preloadedCard: Preloaded<typeof api.features.scheduling.getCardForReview>;
-  preloadedCourseSettings: Preloaded<
-    typeof api.features.courses.getActiveCourseSettings
-  >;
-  preloadedActiveCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
-}) {
+interface LearningModeProps {
+  state: LearningState;
+  audio: AudioPlayerState;
+}
+
+/**
+ * Learning mode body content (card, controls, settings).
+ * Does NOT render its own header — the parent layout handles that.
+ */
+export function LearningMode({ state, audio }: LearningModeProps) {
   const router = useRouter();
-  const state = useLearningMode({
-    card: preloadedCard,
-    courseSettings: preloadedCourseSettings,
-    activeCourse: preloadedActiveCourse,
-  });
-
   const goHome = () => router.push('/app');
-  const { audio, openSettings } = useLearningAudio(state);
 
-  // Loading
   if (state.status === 'loading') {
     return (
-      <div className="flex flex-col h-screen">
-        <LearningHeader
-          onBack={goHome}
-          onSettingsOpen={openSettings}
-        />
+      <div className="flex flex-col h-full">
         <main className="flex-1 flex items-center justify-center">
           <div className="space-y-4 w-full max-w-md px-4">
             <Skeleton className="h-48 w-full rounded-lg" />
@@ -56,14 +39,9 @@ export function LearningMode({
     );
   }
 
-  // No collection selected
   if (state.status === 'noCollection') {
     return (
-      <div className="flex flex-col h-screen">
-        <LearningHeader
-          onBack={goHome}
-          onSettingsOpen={openSettings}
-        />
+      <div className="flex flex-col h-full">
         <NoCollectionState onGoHome={goHome} />
         <LearningModeSettings
           open={state.settingsOpen}
@@ -76,14 +54,9 @@ export function LearningMode({
     );
   }
 
-  // No cards due
   if (state.status === 'noCardsDue') {
     return (
-      <div className="flex flex-col h-screen">
-        <LearningHeader
-          onBack={goHome}
-          onSettingsOpen={openSettings}
-        />
+      <div className="flex flex-col h-full">
         <NoCardsDueState
           onAddCards={state.handleAddCards}
           isAddingCards={state.isAddingCards}
@@ -100,14 +73,8 @@ export function LearningMode({
     );
   }
 
-  // Reviewing
   return (
-    <div className="flex flex-col h-screen">
-      <LearningHeader
-        onBack={goHome}
-        onSettingsOpen={openSettings}
-      />
-
+    <div className="flex flex-col h-full">
       <LearningCardContent
         preReviewCount={state.preReviewCount}
         sourceText={state.sourceText}

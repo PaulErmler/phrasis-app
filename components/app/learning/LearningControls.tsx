@@ -2,8 +2,9 @@
 
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, ChevronsLeft, ChevronRight } from 'lucide-react';
+import { Play, Pause, ChevronsLeft, ChevronRight, MessageCircle } from 'lucide-react';
 import { AudioProgressBar } from './AudioProgressBar';
+import { useLearningChatToggle } from './LearningChatLayout';
 import type { ReviewRating } from '@/lib/scheduling';
 
 interface LearningControlsProps {
@@ -40,10 +41,25 @@ export function LearningControls({
   showProgressBar = true,
 }: LearningControlsProps) {
   const t = useTranslations('LearningMode');
+  const { openChat } = useLearningChatToggle();
 
   return (
-    <div className="border-t bg-background pb-safe">
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
+    <div className="relative bg-background pb-safe">
+      <div className="hidden lg:block pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] border-t border-border" />
+      {/* Open chat button - above bordered area (mobile only) */}
+      <div className="flex justify-end px-4 pt-4 pb-3 lg:hidden">
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={openChat}
+          className="h-9 w-9 shrink-0"
+          aria-label="Open chat"
+        >
+          <MessageCircle className="h-5 w-5" />
+        </Button>
+      </div>
+
+      <div className="border-t lg:border-t-0 max-w-lg mx-auto px-4 py-4 space-y-3">
         {/* Rating buttons */}
         <div className="flex gap-2">
           {validRatings.map((rating) => (

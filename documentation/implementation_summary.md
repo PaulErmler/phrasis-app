@@ -442,6 +442,101 @@ Repeated patterns were extracted into shared helper modules to reduce duplicatio
 
 - `getAudioForText(ctx, textId, languages)` — fetches audio recordings with resolved storage URLs for a single text across the given languages. Used by `getCardForReview` in `scheduling.ts`.
 
+## Chat System
+
+AI-powered conversational assistant built on the `@convex-dev/agent` framework. Currently used as a standalone chat page and on the home page for starting new conversations.
+
+### Architecture
+
+```mermaid
+sequenceDiagram
+    participant UI as ChatPanel (React)
+    participant Hook as useChat / useChatMessages
+    participant Mut as sendMessage (mutation)
+    participant Agent as @convex-dev/agent
+    participant Act as generateResponse (action)
+    participant LLM as Gemini 2.5 Flash
+
+    UI->>Hook: user types message
+    Hook->>Mut: sendMessage({ threadId, prompt })
+    Mut->>Agent: saveMessage()
+    Mut->>Act: ctx.scheduler.runAfter(0, generateResponse)
+    Act->>LLM: agent.streamText()
+    LLM-->>Agent: streaming tokens
+    Agent-->>Hook: useUIMessages() reactive updates
+    Hook-->>UI: messages[] with streaming status
+```
+
+### File Inventory
+
+**Frontend Components (`components/chat/`):**
+
+- `ChatPanel.tsx` — reusable embeddable chat (messages + input), accepts `toolRenderers` for pluggable tool UI
+- `ChatMessages.tsx` — renders message list with streaming, tool calls, and empty states
+- `ChatInput.tsx` — text input with voice recording and file attachment support
+- `NewChatInput.tsx` — creates a new thread, sends first message, and navigates to chat page
+- `ChatHeader.tsx` — header with logo, back button, and user controls
+- `VoiceRecordButton.tsx` — recording button with visual states
+- `VoiceInputWrapper.tsx` — convenience wrapper combining voice hook + button
+- `FlashcardConfirmation.tsx` — approval/rejection UI for AI-generated flashcards
+- `ThreadSidebar.tsx` — thread list sidebar (currently unused in main flow)
+- `FlashcardSidebar.tsx` — displays user's saved flashcards (currently unused in main flow)
+- `tools/FlashcardToolRenderer.tsx` — extracted flashcard tool rendering with approval logic
+
+**Backend (`convex/features/chat/`):**
+
+- `agent.ts` — Agent configuration: Gemini 2.5 Flash model, language teacher instructions, `createFlashcard` tool
+- `threads.ts` — `createThread`, `listThreads`, `getThread` — thread CRUD via `@convex-dev/agent`
+- `messages.ts` — `sendMessage` (saves + schedules response), `listMessages` (paginated with streaming), `generateResponse` (internal action)
+- `flashcardApprovals.ts` — approval workflow: `createApprovalRequestInternal`, `approveFlashcard`, `rejectFlashcard`, `getApprovalsByThread`
+- `flashcards.ts` — `createFlashcardInternal` (writes to `testFlashcards`), `listUserFlashcards`
+- `transcribe.ts` — `transcribeAudio` action using OpenAI `gpt-4o-mini-transcribe`
+
+**Hooks (`hooks/`):**
+
+- `use-chat.ts` — unified composition hook combining messages, sending, and voice recording
+- `use-chat-messages.ts` — manages message retrieval via `useUIMessages`, tracks streaming status with a reducer
+- `use-send-message.ts` — wraps `sendMessage` mutation with status transitions and error handling
+- `use-voice-recording.ts` — MediaRecorder integration with transcription via Convex action
+- `use-thread.ts` — simple thread lifecycle (auto-create or explicit threadId)
+- `use-flashcard-approvals.ts` — flashcard approval state and handlers for `ChatMessages` tool rendering
+
+**Types & Constants:**
+
+- `lib/types/chat.ts` — `ChatStatus`, `AgentUIMessage`, `ExtendedUIMessage`, `Thread`
+- `lib/types/tool-parts.ts` — `CreateFlashcardToolPart`, type guards `isCreateFlashcardToolPart`, `getToolCallId`
+- `lib/constants/chat.ts` — `DEFAULT_SUGGESTIONS`, `CHAT_STATUS`, error/success messages
+
+### Agent Configuration
+
+| Setting      | Value                                                                                  |
+| ------------ | -------------------------------------------------------------------------------------- |
+| Model        | `gateway('gemini-2.5-flash')` via AI SDK gateway                                       |
+| Instructions | Language teacher focused on grammar/vocabulary, proactively creates Spanish flashcards  |
+| Tools        | `createFlashcard` — creates approval request, user confirms before flashcard is created |
+| Stop         | `stepCountIs(10)`                                                                      |
+
+### Flashcard Approval Flow
+
+1. Agent calls `createFlashcard` tool during response generation
+2. Tool handler writes a `pending` row to `flashcardApprovals` table (idempotent by content)
+3. `ChatMessages` detects `tool-createFlashcard` parts and renders `FlashcardConfirmation`
+4. User clicks approve/reject → mutation updates approval status
+5. On approve → `createFlashcardInternal` writes to `testFlashcards` table
+
+### Streaming Infrastructure
+
+- `@convex-dev/agent` stores messages and streams in its component tables
+- `useUIMessages` hook subscribes to real-time message updates
+- `syncStreams` in `listMessages` query provides delta streaming
+- `useChatMessages` reducer manages status transitions: `ready → submitted → streaming → ready`
+- Status is shared with `ChatInput` to disable submit during streaming
+
+### Schema (Testing Tables)
+
+- `testFlashcards` — `{ text, note, date, randomNumber, userId }` with `by_userId` index
+- `flashcardApprovals` — `{ threadId, messageId, toolCallId, text, note, userId, status, createdAt }` with `by_thread_and_user` index
+
 ## Performance Optimizations
 
 1. **Efficient pagination** - uses `lastRankProcessed` in `collectionProgress` instead of offset/skip

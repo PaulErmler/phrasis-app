@@ -168,6 +168,7 @@
   },
   "LearningMode": {
     "title": "Lernen",
+    "chat": "Chat",
     "back": "Zurück",
     "settings": "Einstellungen",
     "loading": "Lädt...",

@@ -21,99 +21,35 @@ import {
 } from '@/components/ai-elements/tool';
 import type { ExtendedUIMessage } from '@/lib/types/chat';
 import type { ToolUIPart } from 'ai';
-import { useMutation, useQuery } from 'convex/react';
-import { api } from '@/convex/_generated/api';
-import type { Id } from '@/convex/_generated/dataModel';
-import React, { useState } from 'react';
-import { FlashcardConfirmation } from './FlashcardConfirmation';
-import {
-  isCreateFlashcardToolPart,
-  getToolCallId,
-} from '@/lib/types/tool-parts';
+import type { ReactNode } from 'react';
+import { getToolCallId } from '@/lib/types/tool-parts';
+
+export type ToolRenderer = (
+  toolPart: ToolUIPart,
+  messageId: string,
+  idx: number,
+) => ReactNode | null;
 
 interface ChatMessagesProps {
   messages: ExtendedUIMessage[];
   isLoading: boolean;
   threadId: string | null;
+  toolRenderers?: Record<string, ToolRenderer>;
+  contentClassName?: string;
 }
 
 /**
- * Component for displaying chat messages with streaming support
+ * Component for displaying chat messages with streaming support.
+ * Tool rendering is pluggable via `toolRenderers` — a map from
+ * tool name (without "tool-" prefix) to a renderer function.
  */
 export function ChatMessages({
   messages,
   isLoading,
   threadId,
+  toolRenderers,
+  contentClassName,
 }: ChatMessagesProps) {
-  const approveFlashcard = useMutation(
-    api.features.chat.flashcardApprovals.approveFlashcard,
-  );
-  const rejectFlashcard = useMutation(
-    api.features.chat.flashcardApprovals.rejectFlashcard,
-  );
-  const [processingApprovals, setProcessingApprovals] = useState<Set<string>>(
-    new Set(),
-  );
-
-  // Query all approvals for this thread
-  const threadApprovals = useQuery(
-    api.features.chat.flashcardApprovals.getApprovalsByThread,
-    threadId ? { threadId } : 'skip',
-  );
-
-  // Create a map of approvals by toolCallId for O(1) lookup
-  const approvalsByToolCallId = React.useMemo(() => {
-    type ApprovalData = {
-      _id: Id<'flashcardApprovals'>;
-      toolCallId: string;
-      text: string;
-      note: string;
-      status: string;
-    };
-
-    const byToolCallId = new Map<string, ApprovalData>();
-
-    if (!threadApprovals) {
-      return byToolCallId;
-    }
-
-    for (const approval of threadApprovals) {
-      byToolCallId.set(approval.toolCallId, approval);
-    }
-
-    return byToolCallId;
-  }, [threadApprovals]);
-
-  const handleApprove = async (approvalId: Id<'flashcardApprovals'>) => {
-    setProcessingApprovals((prev) => new Set(prev).add(approvalId));
-    try {
-      await approveFlashcard({ approvalId });
-    } catch (error) {
-      console.error('Failed to approve flashcard:', error);
-    } finally {
-      setProcessingApprovals((prev) => {
-        const next = new Set(prev);
-        next.delete(approvalId);
-        return next;
-      });
-    }
-  };
-
-  const handleReject = async (approvalId: Id<'flashcardApprovals'>) => {
-    setProcessingApprovals((prev) => new Set(prev).add(approvalId));
-    try {
-      await rejectFlashcard({ approvalId });
-    } catch (error) {
-      console.error('Failed to reject flashcard:', error);
-    } finally {
-      setProcessingApprovals((prev) => {
-        const next = new Set(prev);
-        next.delete(approvalId);
-        return next;
-      });
-    }
-  };
-
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -124,7 +60,7 @@ export function ChatMessages({
 
   return (
     <Conversation className="relative flex-1 h-full w-full overflow-hidden flex flex-col">
-      <ConversationContent className="flex-1 overflow-y-auto px-4">
+      <ConversationContent className={`flex-1 overflow-y-auto px-4 ${contentClassName ?? ''}`}>
         {messages && messages.length > 0 ? (
           <>
             {messages.map((message: ExtendedUIMessage) => {
@@ -144,14 +80,12 @@ export function ChatMessages({
                         !message.parts?.length ? (
                             <Shimmer>Thinking...</Shimmer>
                           ) : message.parts && message.parts.length > 0 ? (
-                          // Render parts in order: text parts, tool calls, and confirmations
                             (() => {
                               const renderedTextParts = new Set<string>();
                               const renderedToolCalls = new Set<string>();
                               return (
                                 <>
                                   {message.parts.map((part, idx: number) => {
-                                  // Render text parts (skip empty ones and duplicates)
                                     if (part.type === 'text') {
                                       const textPart = part as {
                                       type: 'text';
@@ -174,12 +108,10 @@ export function ChatMessages({
                                       );
                                     }
 
-                                    // Render tool calls (excluding createFlashcard)
                                     if (part.type.startsWith('tool-')) {
                                       const toolPart = part as ToolUIPart;
                                       const toolCallId = getToolCallId(toolPart);
 
-                                      // Deduplicate tool calls by toolCallId if present
                                       if (
                                         toolCallId &&
                                       renderedToolCalls.has(toolCallId)
@@ -195,28 +127,17 @@ export function ChatMessages({
                                         '',
                                       );
 
-                                      // Render createFlashcard as confirmation
-                                      if (
-                                        isCreateFlashcardToolPart(toolPart) &&
-                                      threadId
-                                      ) {
-                                        return (
-                                          <FlashcardConfirmation
-                                            key={`${message.id}-flashcard-${idx}`}
-                                            toolPart={toolPart}
-                                            approvalsByToolCallId={
-                                              approvalsByToolCallId
-                                            }
-                                            onApprove={handleApprove}
-                                            onReject={handleReject}
-                                            processingApprovals={
-                                              processingApprovals
-                                            }
-                                          />
+                                      // Try pluggable renderer first
+                                      if (toolRenderers?.[toolName]) {
+                                        const rendered = toolRenderers[toolName](
+                                          toolPart,
+                                          message.id,
+                                          idx,
                                         );
+                                        if (rendered) return rendered;
                                       }
 
-                                      // Render other tools normally
+                                      // Fallback: generic tool UI
                                       return (
                                         <div
                                           key={`${message.id}-tool-${idx}`}
@@ -251,7 +172,6 @@ export function ChatMessages({
                               );
                             })()
                           ) : (
-                          // Fallback to message content if no parts
                             <>
                               <MessageResponse>{messageText}</MessageResponse>
                               {isAssistantStreaming && messageText && (
@@ -276,10 +196,6 @@ export function ChatMessages({
         )}
       </ConversationContent>
 
-      {/* 4. The Scroll Button:
-         Placed outside ConversationContent but inside Conversation (relative).
-         Ensure your UI library supports the 'sticky' or 'absolute' positioning here.
-      */}
       <div className="absolute bottom-4 right-4 z-20">
         <ConversationScrollButton
           className="static! rounded-lg bg-background dark:bg-background"

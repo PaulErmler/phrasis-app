@@ -2,9 +2,9 @@ import { Agent, createTool } from '@convex-dev/agent';
 import { components } from '../../_generated/api';
 import { internal } from '../../_generated/api';
 import { stepCountIs } from 'ai';
-import { gateway } from 'ai';
 import { z } from 'zod/v3';
 import type { ToolCallOptions } from 'ai';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
 // Define the createFlashcard tool - creates approval request, doesn't immediately create
 export const createFlashcardTool = createTool({
@@ -56,7 +56,9 @@ export const createFlashcardTool = createTool({
 
 export const agent: Agent = new Agent(components.agent, {
   name: 'Language Teacher',
-  languageModel: gateway('gemini-2.5-flash'),
+  languageModel: createOpenRouter({
+    apiKey: process.env.OPENROUTER_API_KEY,
+  })('moonshotai/kimi-k2.5'),
 
   instructions: `
   You are a friendly language teacher assistant. Explain grammar and vocabulary and create spanish flashcards for the user. Do not ask for permission to create flashcards and just create them. 
