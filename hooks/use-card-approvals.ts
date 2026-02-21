@@ -3,40 +3,42 @@ import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 
+import type { CardApprovalStatus } from '@/convex/types';
+
 export type ApprovalData = {
-  _id: Id<'flashcardApprovals'>;
+  _id: Id<'cardApprovals'>;
   toolCallId: string;
-  text: string;
-  note: string;
-  status: string;
+  languages: string[];
+  translations: string[];
+  mainLanguage: string;
+  status: CardApprovalStatus;
 };
 
-interface UseFlashcardApprovalsReturn {
+export interface UseCardApprovalsReturn {
   approvalsByToolCallId: Map<string, ApprovalData>;
   processingApprovals: Set<string>;
-  handleApprove: (approvalId: Id<'flashcardApprovals'>) => Promise<void>;
-  handleReject: (approvalId: Id<'flashcardApprovals'>) => Promise<void>;
+  handleApprove: (approvalId: Id<'cardApprovals'>) => Promise<void>;
+  handleReject: (approvalId: Id<'cardApprovals'>) => Promise<void>;
 }
 
 /**
- * Manages flashcard approval state and mutations for a given thread.
- * Extracted from ChatMessages to enable pluggable tool rendering.
+ * Manages card approval state and mutations for a given thread.
  */
-export function useFlashcardApprovals(
+export function useCardApprovals(
   threadId: string | null,
-): UseFlashcardApprovalsReturn {
-  const approveFlashcard = useMutation(
-    api.features.chat.flashcardApprovals.approveFlashcard,
+): UseCardApprovalsReturn {
+  const approveCard = useMutation(
+    api.features.chat.cardApprovals.approveCard,
   );
-  const rejectFlashcard = useMutation(
-    api.features.chat.flashcardApprovals.rejectFlashcard,
+  const rejectCard = useMutation(
+    api.features.chat.cardApprovals.rejectCard,
   );
   const [processingApprovals, setProcessingApprovals] = useState<Set<string>>(
     new Set(),
   );
 
   const threadApprovals = useQuery(
-    api.features.chat.flashcardApprovals.getApprovalsByThread,
+    api.features.chat.cardApprovals.getApprovalsByThread,
     threadId ? { threadId } : 'skip',
   );
 
@@ -45,17 +47,21 @@ export function useFlashcardApprovals(
     if (!threadApprovals) return byToolCallId;
     for (const approval of threadApprovals) {
       byToolCallId.set(approval.toolCallId, approval);
+      const trimmed = approval.toolCallId.trim();
+      if (trimmed && trimmed !== approval.toolCallId) {
+        byToolCallId.set(trimmed, approval);
+      }
     }
     return byToolCallId;
   }, [threadApprovals]);
 
   const handleApprove = useCallback(
-    async (approvalId: Id<'flashcardApprovals'>) => {
+    async (approvalId: Id<'cardApprovals'>) => {
       setProcessingApprovals((prev) => new Set(prev).add(approvalId));
       try {
-        await approveFlashcard({ approvalId });
+        await approveCard({ approvalId });
       } catch (error) {
-        console.error('Failed to approve flashcard:', error);
+        console.error('Failed to approve card:', error);
       } finally {
         setProcessingApprovals((prev) => {
           const next = new Set(prev);
@@ -64,16 +70,16 @@ export function useFlashcardApprovals(
         });
       }
     },
-    [approveFlashcard],
+    [approveCard],
   );
 
   const handleReject = useCallback(
-    async (approvalId: Id<'flashcardApprovals'>) => {
+    async (approvalId: Id<'cardApprovals'>) => {
       setProcessingApprovals((prev) => new Set(prev).add(approvalId));
       try {
-        await rejectFlashcard({ approvalId });
+        await rejectCard({ approvalId });
       } catch (error) {
-        console.error('Failed to reject flashcard:', error);
+        console.error('Failed to reject card:', error);
       } finally {
         setProcessingApprovals((prev) => {
           const next = new Set(prev);
@@ -82,7 +88,7 @@ export function useFlashcardApprovals(
         });
       }
     },
-    [rejectFlashcard],
+    [rejectCard],
   );
 
   return {

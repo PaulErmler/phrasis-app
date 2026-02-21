@@ -21,7 +21,6 @@ import { ChatHeader } from '@/components/chat/ChatHeader';
 import { ThreadSidebar } from '@/components/chat/ThreadSidebar';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
-import { FlashcardSidebar } from '@/components/chat/FlashcardSidebar';
 
 // Constants
 import {
@@ -167,7 +166,6 @@ export default function ChatPage() {
             )}
           </div>
 
-          <FlashcardSidebar />
         </SignedIn>
       </main>
 

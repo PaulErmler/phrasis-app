@@ -36,6 +36,7 @@ interface LearningChatLayoutProps {
   header: ReactNode;
   children: ReactNode;
   chatPanel: ReactNode;
+  onChatOpen?: () => void;
 }
 
 /**
@@ -48,12 +49,14 @@ export function LearningChatLayout({
   header,
   children,
   chatPanel,
+  onChatOpen,
 }: LearningChatLayoutProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   const openChat = useCallback(() => {
     setIsChatOpen(true);
-  }, []);
+    onChatOpen?.();
+  }, [onChatOpen]);
 
   const closeChat = useCallback(() => {
     setIsChatOpen(false);

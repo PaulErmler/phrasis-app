@@ -1,8 +1,8 @@
 'use client';
 
 import { ChatPanel } from '@/components/chat/ChatPanel';
-import { createFlashcardToolRenderer } from '@/components/chat/tools/FlashcardToolRenderer';
-import { useFlashcardApprovals } from '@/hooks/use-flashcard-approvals';
+import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
+import { useCardApprovals } from '@/hooks/use-card-approvals';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { RedirectToSignIn } from '@daveyplate/better-auth-ui';
 import { Authenticated } from 'convex/react';
 import { use, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 
 export default function ChatPage({
   params,
@@ -29,11 +30,12 @@ export default function ChatPage({
 }
 
 function ChatPageContent({ threadId }: { threadId: string }) {
-  const approvals = useFlashcardApprovals(threadId);
+  const t = useTranslations('Chat');
+  const approvals = useCardApprovals(threadId);
 
   const toolRenderers = useMemo(
     () => ({
-      createFlashcard: createFlashcardToolRenderer(approvals),
+      createCard: createCardToolRenderer(approvals),
     }),
     [approvals],
   );
@@ -45,7 +47,7 @@ function ChatPageContent({ threadId }: { threadId: string }) {
           <Link href="/app">
             <Button variant="ghost" className="gap-2 -ml-2">
               <ChevronLeft className="h-4 w-4" />
-              Back
+              {t('back')}
             </Button>
           </Link>
           <ThemeSwitcher />

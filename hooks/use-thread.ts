@@ -61,6 +61,7 @@ export function useThread({
   }, [autoCreate, explicitThreadId, createThreadMutation]);
 
   const createThread = useCallback(async () => {
+    setThreadId(null);
     setIsLoading(true);
     try {
       const id = await createThreadMutation({});

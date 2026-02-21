@@ -266,15 +266,35 @@
     "title": "Sprache"
   },
   "Chat": {
-    "flashcardConfirmation": {
-      "textLabel": "Text",
-      "noteLabel": "Notiz",
-      "approveButton": "Lernkarte erstellen",
+    "back": "Zurück",
+    "thinking": "Denkt nach...",
+    "emptyTitle": "Noch keine Nachrichten",
+    "emptyDescription": "Starte eine Unterhaltung, um Nachrichten hier zu sehen",
+    "suggestions": {
+      "explain": "Erkläre mir diesen Satz.",
+      "meaning": "Was bedeutet dieses Wort?",
+      "example": "Gib mir ein ähnliches Beispiel.",
+      "conversation": "Wie würde ich das in einem Gespräch verwenden?"
+    },
+    "voice": {
+      "startRecording": "Aufnahme starten",
+      "stopRecording": "Aufnahme stoppen",
+      "recording": "Aufnahme...",
+      "transcribing": "Transkribieren..."
+    },
+    "attachments": {
+      "filesAttached": "Dateien angehängt",
+      "filesAttachedDescription": "{count} Datei(en) an Nachricht angehängt",
+      "sentWithAttachments": "Mit Anhängen gesendet"
+    },
+    "cardApproval": {
+      "approveButton": "Karte hinzufügen",
       "rejectButton": "Ablehnen",
-      "approved": "Lernkarte erfolgreich erstellt!",
-      "rejected": "Lernkarten-Erstellung abgebrochen",
+      "approved": "Karte hinzugefügt!",
+      "rejected": "Kartenerstellung abgebrochen",
       "loading": "Lädt...",
-      "creatingApproval": "Genehmigungsanfrage wird erstellt..."
+      "creatingApproval": "Karte wird erstellt...",
+      "failed": "Kartenerstellung fehlgeschlagen"
     }
   },
   "Onboarding": {

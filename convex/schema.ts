@@ -4,6 +4,7 @@ import {
   learningStyleValidator,
   currentLevelValidator,
   fsrsStateValidator,
+  cardApprovalStatusValidator,
 } from './types';
 import { testingTables } from './testing/schema';
 
@@ -112,7 +113,7 @@ export default defineSchema({
   cards: defineTable({
     deckId: v.id('decks'), // Reference to the deck
     textId: v.id('texts'), // Reference to the text/sentence
-    collectionId: v.id('collections'), // Reference to the source collection
+    collectionId: v.optional(v.id('collections')), // Reference to the source collection (absent for user-created cards)
     dueDate: v.number(), // Timestamp for spaced repetition scheduling (driven by scheduler)
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
@@ -157,6 +158,22 @@ export default defineSchema({
       'collectionId',
     ]),
 
-  // Testing-only tables (testFlashcards, flashcardApprovals, translationRequests, ttsRequests)
+  // Card approval requests from the AI chat
+  cardApprovals: defineTable({
+    threadId: v.string(),
+    messageId: v.string(),
+    toolCallId: v.string(),
+    languages: v.array(v.string()),
+    translations: v.array(v.string()),
+    mainLanguage: v.string(),
+    userId: v.string(),
+    status: cardApprovalStatusValidator,
+    processedAt: v.optional(v.number()),
+    cardId: v.optional(v.id('cards')),
+  })
+    .index('by_toolCallId', ['toolCallId'])
+    .index('by_thread_and_user', ['threadId', 'userId']),
+
+  // Testing-only tables (translationRequests, ttsRequests)
   ...testingTables,
 });

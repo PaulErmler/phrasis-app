@@ -266,15 +266,35 @@
     "title": "Language"
   },
   "Chat": {
-    "flashcardConfirmation": {
-      "textLabel": "Text",
-      "noteLabel": "Note",
-      "approveButton": "Create Flashcard",
+    "back": "Back",
+    "thinking": "Thinking...",
+    "emptyTitle": "No messages yet",
+    "emptyDescription": "Start a conversation to see messages here",
+    "suggestions": {
+      "explain": "Explain this sentence to me.",
+      "meaning": "What does this word mean?",
+      "example": "Give me a similar example.",
+      "conversation": "How would I use this in a conversation?"
+    },
+    "voice": {
+      "startRecording": "Start recording",
+      "stopRecording": "Stop recording",
+      "recording": "Recording...",
+      "transcribing": "Transcribing..."
+    },
+    "attachments": {
+      "filesAttached": "Files attached",
+      "filesAttachedDescription": "{count} file(s) attached to message",
+      "sentWithAttachments": "Sent with attachments"
+    },
+    "cardApproval": {
+      "approveButton": "Add Card",
       "rejectButton": "Reject",
-      "approved": "Flashcard created successfully!",
-      "rejected": "Flashcard creation cancelled",
+      "approved": "Card added!",
+      "rejected": "Card creation cancelled",
       "loading": "Loading...",
-      "creatingApproval": "Creating approval request..."
+      "creatingApproval": "Creating card...",
+      "failed": "Card creation failed"
     }
   },
   "Onboarding": {

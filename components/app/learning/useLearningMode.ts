@@ -62,6 +62,7 @@ interface ReviewingState extends BaseState {
   phase: SchedulingPhase;
   preReviewCount: number;
   sourceText: string;
+  sourceLanguage: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
   // Rating data
@@ -416,6 +417,7 @@ export function useLearningMode(
     phase,
     preReviewCount: cardForReview.preReviewCount,
     sourceText: cardForReview.sourceText,
+    sourceLanguage: cardForReview.sourceLanguage,
     translations: sortedTranslations,
     audioRecordings: cardForReview.audioRecordings,
     isFavorite: cardForReview.isFavorite ?? false,

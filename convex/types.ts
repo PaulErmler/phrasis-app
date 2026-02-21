@@ -42,6 +42,13 @@ export const audioRecordingValidator = v.object({
   url: v.union(v.string(), v.null()),
 });
 
+export const cardApprovalStatusValidator = v.union(
+  v.literal('pending'),
+  v.literal('approved'),
+  v.literal('rejected'),
+);
+
 export type LearningStyle = Infer<typeof learningStyleValidator>;
 export type CurrentLevel = Infer<typeof currentLevelValidator>;
 export type FsrsState = Infer<typeof fsrsStateValidator>;
+export type CardApprovalStatus = Infer<typeof cardApprovalStatusValidator>;

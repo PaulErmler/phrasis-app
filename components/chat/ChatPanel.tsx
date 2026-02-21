@@ -4,15 +4,19 @@ import { useCallback } from 'react';
 import type { ReactNode } from 'react';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
 import { useChat } from '@/hooks/use-chat';
+import type { CardContext } from '@/hooks/use-send-message';
 import { ChatMessages } from '@/components/chat/ChatMessages';
-import type { ToolRenderer } from '@/components/chat/ChatMessages';
+import type { ToolRenderer, MessageFooterRenderer } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
-import { SUCCESS_MESSAGES } from '@/lib/constants/chat';
 
 interface ChatPanelProps {
   threadId: string;
   toolRenderers?: Record<string, ToolRenderer>;
+  messageFooter?: MessageFooterRenderer;
+  cardContext?: CardContext;
+  onMessageSent?: () => void;
   showSuggestions?: boolean;
   suggestions?: readonly string[];
   className?: string;
@@ -30,6 +34,9 @@ interface ChatPanelProps {
 export function ChatPanel({
   threadId,
   toolRenderers,
+  messageFooter,
+  cardContext,
+  onMessageSent,
   showSuggestions,
   suggestions,
   className,
@@ -38,7 +45,8 @@ export function ChatPanel({
   suggestionsAction,
   aboveFooterAction,
 }: ChatPanelProps) {
-  const chat = useChat({ threadId });
+  const chat = useChat({ threadId, cardContext });
+  const t = useTranslations('Chat.attachments');
 
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
@@ -48,14 +56,15 @@ export function ChatPanel({
       if (!(hasText || hasAttachments)) return;
 
       if (message.files?.length) {
-        toast.success(SUCCESS_MESSAGES.FILES_ATTACHED, {
-          description: `${message.files.length} file(s) attached to message`,
+        toast.success(t('filesAttached'), {
+          description: t('filesAttachedDescription', { count: message.files.length }),
         });
       }
 
-      await chat.sendMessage(message.text || 'Sent with attachments');
+      await chat.sendMessage(message.text || t('sentWithAttachments'));
+      onMessageSent?.();
     },
-    [chat],
+    [chat, onMessageSent, t],
   );
 
   const handleSuggestionClick = useCallback(
@@ -75,6 +84,7 @@ export function ChatPanel({
           isLoading={false}
           threadId={threadId}
           toolRenderers={toolRenderers}
+          messageFooter={messageFooter}
           contentClassName={aboveFooterAction ? 'pb-12 lg:pb-0' : undefined}
         />
         {aboveFooterAction && (
