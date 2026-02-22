@@ -154,6 +154,17 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       createChirp3Voice('Charon', 'male', 'sv-SE', 'Sweden'),
     ],
   },
+  {
+    code: 'nl',
+    displayCode: 'nl',
+    name: 'Dutch',
+    nativeName: 'Nederlands',
+    flag: '🇳🇱',
+    voices: [
+      createChirp3Voice('Leda', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Charon', 'male', 'nl-NL', 'Netherlands'),
+    ],
+  },
 ];
 
 /**
