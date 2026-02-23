@@ -103,12 +103,12 @@ export function CollectionDetailDialog({
 
             {!isComplete ? (
               <Button
-                variant={isActive ? 'default' : 'outline'}
-                className="shrink-0 gap-1.5"
+                variant={isActive ? 'secondary' : 'outline'}
+                className="shrink-0 w-28 justify-center"
                 onClick={onSelect}
               >
                 {isActive && <Check className="h-4 w-4" />}
-                {t('select')}
+                {isActive ? t('selected') : t('select')}
               </Button>
             ) : (
               <div className="flex items-center gap-1.5 text-sm text-success font-medium shrink-0 px-3">
@@ -130,19 +130,18 @@ export function CollectionDetailDialog({
                     size="sm"
                     disabled={isAdding}
                     onClick={onAddCards}
-                    className="gap-1.5"
+                    className="justify-center"
                   >
-                    {isAdding ? (
-                      <>
+                    <span className="grid">
+                      <span className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5${isAdding ? '' : ' invisible'}`}>
                         <Loader2 className="h-4 w-4 animate-spin" />
                         {t('adding')}
-                      </>
-                    ) : (
-                      <>
+                      </span>
+                      <span className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5${isAdding ? ' invisible' : ''}`}>
                         <Plus className="h-4 w-4" />
                         {t('addN', { count: texts.length })}
-                      </>
-                    )}
+                      </span>
+                    </span>
                   </Button>
                 )}
               </div>

@@ -261,10 +261,16 @@ export function ChatMessages({
               })}
             </>
           ) : (
-            <ConversationEmptyState
-              title={t('emptyTitle')}
-              description={t('emptyDescription')}
-            />
+            <ConversationEmptyState title={t('emptyTitle')}>
+              <ul className="text-muted-foreground text-sm space-y-1.5 text-left list-none">
+                {(['emptyBullet1', 'emptyBullet2', 'emptyBullet3'] as const).map((key) => (
+                  <li key={key} className="flex items-start gap-2">
+                    <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-muted-foreground/60 shrink-0" />
+                    {t(key)}
+                  </li>
+                ))}
+              </ul>
+            </ConversationEmptyState>
           )}
         </ConversationContent>
       </Conversation>

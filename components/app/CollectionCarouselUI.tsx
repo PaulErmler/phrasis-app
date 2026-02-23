@@ -165,7 +165,7 @@ export function CollectionCarouselUI({
                       <Button
                         size="sm"
                         variant={isActive ? 'default' : 'outline'}
-                        className="shrink-0 text-xs h-8 px-3"
+                        className="shrink-0 text-xs h-8 w-24 justify-center"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (!isActive) {
@@ -173,7 +173,7 @@ export function CollectionCarouselUI({
                           }
                         }}
                       >
-                        {isActive && <Check className="h-3.5 w-3.5 mr-1" />}
+                        {isActive && <Check className="h-3.5 w-3.5" />}
                         {isActive ? t('selected') : t('select')}
                       </Button>
                     )}

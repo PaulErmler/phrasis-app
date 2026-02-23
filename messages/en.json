@@ -115,6 +115,7 @@
           "totalCards": "{count} cards",
           "progress": "Progress",
           "select": "Select",
+          "selected": "Selected",
           "done": "Done",
           "allCardsAdded": "All cards from this collection have been added to your deck.",
           "nextSentences": "Next Sentences",
@@ -272,8 +273,10 @@
   "Chat": {
     "back": "Back",
     "thinking": "Thinking...",
-    "emptyTitle": "No messages yet",
-    "emptyDescription": "Start a conversation to see messages here",
+    "emptyTitle": "Your language tutor",
+    "emptyBullet1": "Ask about vocabulary, grammar, or any sentence.",
+    "emptyBullet2": "The chat knows the card you are currently learning.",
+    "emptyBullet3": "It can create flashcards for you — you just confirm them.",
     "suggestions": {
       "explain": "Explain this sentence to me.",
       "meaning": "What does this word mean?",

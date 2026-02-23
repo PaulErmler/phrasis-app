@@ -115,10 +115,6 @@ function LearnPageInner({
 }) {
   const router = useRouter();
   const [isNavigating, setIsNavigating] = useState(false);
-  const goHome = () => {
-    setIsNavigating(true);
-    router.push('/app');
-  };
 
   const state = useLearningMode({
     card: preloadedCard,
@@ -126,6 +122,12 @@ function LearnPageInner({
     activeCourse: preloadedActiveCourse,
   });
   const { audio, openSettings } = useLearningAudio(state);
+
+  const goHome = () => {
+    audio.stop();
+    setIsNavigating(true);
+    router.push('/app');
+  };
 
   const { threadId, isLoading: isThreadLoading, createThread } = useThread({
     autoCreate: true,

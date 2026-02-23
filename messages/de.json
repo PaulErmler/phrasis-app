@@ -115,6 +115,7 @@
           "totalCards": "{count} Karten",
           "progress": "Fortschritt",
           "select": "Auswählen",
+          "selected": "Ausgewählt",
           "done": "Fertig",
           "allCardsAdded": "Alle Karten dieser Sammlung wurden deinem Deck hinzugefügt.",
           "nextSentences": "Nächste Sätze",
@@ -272,8 +273,10 @@
   "Chat": {
     "back": "Zurück",
     "thinking": "Denkt nach...",
-    "emptyTitle": "Noch keine Nachrichten",
-    "emptyDescription": "Starte eine Unterhaltung, um Nachrichten hier zu sehen",
+    "emptyTitle": "Dein Sprachtutor",
+    "emptyBullet1": "Stelle Fragen zu Vokabeln, Grammatik oder beliebigen Sätzen.",
+    "emptyBullet2": "Der Chat kennt die Karte, die du gerade lernst.",
+    "emptyBullet3": "Er kann Lernkarten für dich erstellen — du bestätigst sie einfach.",
     "suggestions": {
       "explain": "Erkläre mir diesen Satz.",
       "meaning": "Was bedeutet dieses Wort?",

@@ -101,7 +101,7 @@ export const getCardForReview = query({
           .eq('isMastered', false)
           .lte('dueDate', now),
       )
-      .order('asc')
+      .order('desc')
       .first();
     if (!card) return null;
 
@@ -216,11 +216,15 @@ export const reviewCard = mutation({
     // Run the shared scheduling algorithm
     const result = scheduleCard(cardState, args.rating, initialReviewCount);
 
+    // Add a random jitter of 0–60 seconds to spread cards apart in the queue.
+    const jitterMs = Math.random() * 60_000;
+    const dueDateWithJitter = result.dueDate + jitterMs;
+
     // Patch the card
     await ctx.db.patch(args.cardId, {
       schedulingPhase: result.schedulingPhase,
       preReviewCount: result.preReviewCount,
-      dueDate: result.dueDate,
+      dueDate: dueDateWithJitter,
       ...(result.fsrsState && { fsrsState: result.fsrsState }),
     });
 
@@ -255,7 +259,7 @@ export const reviewCard = mutation({
     return {
       schedulingPhase: result.schedulingPhase,
       preReviewCount: result.preReviewCount,
-      dueDate: result.dueDate,
+      dueDate: dueDateWithJitter,
       phaseTransitioned: result.phaseTransitioned,
       fsrsState: result.fsrsState,
     };

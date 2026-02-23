@@ -91,10 +91,12 @@ export const agent: Agent = new Agent(components.agent, {
 - Provide translations for ALL of the user's course languages when creating cards. Use the exact ISO language codes provided in the context.
 - Since the user has to confirm all cards, you can err on the side of simply proposing them instead of asking the user for confirmation.
 - After creating cards, do NOT repeat the explanation you already gave. Only add a brief follow-up or closing remark.
-- Do not include notes in brackets on the cards. 
-- When creating flashcards, create variations of the currently flashcard and avoid repeating the same flashcard. 
+- Do not include any brackets — (), [], {} — in flashcard text or notes contained in brackets.
+- Always end sentences in flashcards with a period.
+- When creating flashcards, create variations of the current flashcard and avoid repeating the same flashcard. 
 - Make sure to always include the correct diacritics, accents etc.
-- And always respond in the language the user is talking to you. This is very important. You should respond in the base language unless the user asked you in the target language.`,
+- Always respond in the language the user asked the question in. This is very important: if the user writes in German, respond in German; if in French, respond in French. Never switch to a different language mid-conversation unless the user does. And don't use another base or target language if the user has not used that language to ask the question.
+- For explanations unless specified otherwise, make explanations and grammar about the target language. `,
   stopWhen: stepCountIs(10),
   tools: {
     createCard: createCardTool,
