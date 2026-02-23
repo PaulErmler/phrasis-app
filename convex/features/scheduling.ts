@@ -101,7 +101,7 @@ export const getCardForReview = query({
           .eq('isMastered', false)
           .lte('dueDate', now),
       )
-      .order('desc')
+      .order('asc')
       .first();
     if (!card) return null;
 
