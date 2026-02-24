@@ -165,7 +165,7 @@ export const generateResponse = internalAction({
           promptMessageId: args.promptMessageId,
           ...(system ? { system } : {}),
         },
-        { saveStreamDeltas: true },
+        { saveStreamDeltas: { chunking: "line", throttleMs: 4000 } },
       );
     } catch (error) {
       console.error('Failed to generate AI response:', error);
