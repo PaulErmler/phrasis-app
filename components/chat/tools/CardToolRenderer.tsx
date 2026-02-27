@@ -12,6 +12,7 @@ interface CardToolRendererProps {
   processingApprovals: Set<string>;
   handleApprove: (approvalId: Id<'cardApprovals'>) => Promise<void>;
   handleReject: (approvalId: Id<'cardApprovals'>) => Promise<void>;
+  targetLanguages: string[];
 }
 
 /**
@@ -24,6 +25,7 @@ export function createCardToolRenderer({
   processingApprovals,
   handleApprove,
   handleReject,
+  targetLanguages,
 }: CardToolRendererProps): (
   toolPart: ToolUIPart,
   messageId: string,
@@ -36,6 +38,7 @@ export function createCardToolRenderer({
       <CardApproval
         key={`${messageId}-card-${idx}`}
         toolPart={toolPart}
+        targetLanguages={targetLanguages}
         approvalsByToolCallId={approvalsByToolCallId}
         onApprove={handleApprove}
         onReject={handleReject}

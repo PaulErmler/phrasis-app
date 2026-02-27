@@ -10,20 +10,10 @@ export const createCardTool = createTool({
   description:
     'Create a flashcard with translations in all course languages. The user will be asked to approve before the card is added to their deck.',
   args: z.object({
-    languages: z
-      .array(z.string())
-      .describe(
-        'Array of ISO language codes, e.g. ["en", "es", "de"]. Must include all course languages.',
-      ),
     translations: z
-      .array(z.string())
+      .array(z.object({ language: z.string(), text: z.string() }))
       .describe(
-        'Array of translated texts, parallel to the languages array. Same length as languages.',
-      ),
-    mainLanguage: z
-      .string()
-      .describe(
-        'ISO language code of the source/original language for this card, e.g. "es"',
+        'Array of {language, text} pairs covering all course languages. The first entry is the card\'s primary (front) language. List base languages first, then target languages in the exact order provided in the context.',
       ),
   }),
   handler: async (ctx, args, options): Promise<string> => {
@@ -42,20 +32,8 @@ export const createCardTool = createTool({
       throw new Error('No toolCallId provided by framework.');
     }
 
-    if (args.languages.length === 0) {
-      throw new Error('languages must not be empty.');
-    }
-
-    if (args.languages.length !== args.translations.length) {
-      throw new Error(
-        `languages (${args.languages.length}) and translations (${args.translations.length}) must have the same length.`,
-      );
-    }
-
-    if (!args.languages.includes(args.mainLanguage)) {
-      throw new Error(
-        `mainLanguage "${args.mainLanguage}" must be one of the provided languages: ${args.languages.join(', ')}.`,
-      );
+    if (args.translations.length === 0) {
+      throw new Error('translations must not be empty.');
     }
 
     await ctx.runMutation(
@@ -64,9 +42,7 @@ export const createCardTool = createTool({
         threadId,
         messageId,
         toolCallId,
-        languages: args.languages,
         translations: args.translations,
-        mainLanguage: args.mainLanguage,
         userId,
       },
     );
@@ -96,7 +72,8 @@ export const agent: Agent = new Agent(components.agent, {
 - When creating flashcards, create variations of the current flashcard and avoid repeating the same flashcard. 
 - Make sure to always include the correct diacritics, accents etc.
 - Always respond in the language the user asked the question in. This is very important: if the user writes in German, respond in German; if in French, respond in French. Never switch to a different language mid-conversation unless the user does. And don't use another base or target language if the user has not used that language to ask the question.
-- For explanations unless specified otherwise, make explanations and grammar about the target language. `,
+- For explanations unless specified otherwise, make explanations and grammar about the target language.
+- When creating cards with the createCard tool, the translations array must be an array of {language, text} objects. List base languages first, then target languages, in the exact order provided in the context.`,
   stopWhen: stepCountIs(10),
   tools: {
     createCard: createCardTool,

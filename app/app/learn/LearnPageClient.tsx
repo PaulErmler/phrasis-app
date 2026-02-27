@@ -27,10 +27,12 @@ function WrappedChatPanel({
   threadId,
   cardContext,
   onMessageSent,
+  targetLanguages,
 }: {
   threadId: string;
   cardContext?: CardContext;
   onMessageSent?: () => void;
+  targetLanguages: string[];
 }) {
   const { closeChat } = useLearningChatToggle();
   const approvals = useCardApprovals(threadId);
@@ -48,9 +50,9 @@ function WrappedChatPanel({
 
   const toolRenderers = useMemo(
     () => ({
-      createCard: createCardToolRenderer(approvals),
+      createCard: createCardToolRenderer({ ...approvals, targetLanguages }),
     }),
-    [approvals],
+    [approvals, targetLanguages],
   );
 
   return (
@@ -124,7 +126,7 @@ function LearnPageInner({
   const { audio, openSettings } = useLearningAudio(state);
 
   const goHome = () => {
-    audio.stop();
+    audio.pause();
     setIsNavigating(true);
     router.push('/app');
   };
@@ -156,8 +158,9 @@ function LearnPageInner({
   }, [currentCardId, createThread]);
 
   const handleMessageSent = useCallback(() => {
+    audio.pause();
     threadHasMessagesRef.current = true;
-  }, []);
+  }, [audio]);
 
   const handleChatOpen = useCallback(() => {
     audio.pause();
@@ -177,11 +180,14 @@ function LearnPageInner({
     };
   }, [state]);
 
+  const targetLanguages = state.status !== 'loading' ? state.targetLanguages : [];
+
   const chatPanel = threadId ? (
     <WrappedChatPanel
       threadId={threadId}
       cardContext={cardContext}
       onMessageSent={handleMessageSent}
+      targetLanguages={targetLanguages}
     />
   ) : isThreadLoading ? (
     <div className="flex-1 flex items-center justify-center">

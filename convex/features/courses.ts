@@ -1,5 +1,6 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query } from '../_generated/server';
+import { Id } from '../_generated/dataModel';
 import { learningStyleValidator, currentLevelValidator } from '../types';
 import {
   getAuthUser,
@@ -313,9 +314,20 @@ export const createCourse = mutation({
     });
     await createCourseStats(ctx, user._id, courseId);
 
-    // Create course settings in a separate table
+    let activeCollectionId: Id<'collections'> | undefined;
+    if (args.currentLevel) {
+      const collectionName =
+        LEVEL_TO_COLLECTION[args.currentLevel] ?? 'A1';
+      const collection = await ctx.db
+        .query('collections')
+        .withIndex('by_name', (q) => q.eq('name', collectionName))
+        .first();
+      activeCollectionId = collection?._id;
+    }
+
     await upsertCourseSettings(ctx, courseId, {
       initialReviewCount,
+      activeCollectionId,
     });
 
     const deckName = `Learning ${args.targetLanguages.join(', ')}`;

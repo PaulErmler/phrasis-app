@@ -115,17 +115,8 @@ export function useLearningMode(
 
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
 
-  const masterCardMutation = useMutation(
-    api.features.scheduling.masterCard,
-  ).withOptimisticUpdate((localStore) => {
-    localStore.setQuery(api.features.scheduling.getCardForReview, {}, null);
-  });
-
-  const hideCardMutation = useMutation(
-    api.features.scheduling.hideCard,
-  ).withOptimisticUpdate((localStore) => {
-    localStore.setQuery(api.features.scheduling.getCardForReview, {}, null);
-  });
+  const masterCardMutation = useMutation(api.features.scheduling.masterCard);
+  const hideCardMutation = useMutation(api.features.scheduling.hideCard);
 
   const toggleFavoriteCardMutation = useMutation(
     api.features.scheduling.toggleFavoriteCard,
@@ -282,20 +273,30 @@ export function useLearningMode(
   // --------------------------------------------------------------------------
   // Next
   // --------------------------------------------------------------------------
-  const handleNext = useCallback(() => {
-    if (!cardForReview) return;
+  const handleNext = useCallback(async () => {
+    if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
       reviewInitiatedByThisTabRef.current = true;
-      masterCardMutation({ cardId: cardForReview._id }).catch((error) => {
+      setIsReviewing(true);
+      try {
+        await masterCardMutation({ cardId: cardForReview._id });
+      } catch (error) {
         console.error('Failed to master card:', error);
-      });
+      } finally {
+        setIsReviewing(false);
+      }
       return;
     }
     if (isPendingHide) {
       reviewInitiatedByThisTabRef.current = true;
-      hideCardMutation({ cardId: cardForReview._id }).catch((error) => {
+      setIsReviewing(true);
+      try {
+        await hideCardMutation({ cardId: cardForReview._id });
+      } catch (error) {
         console.error('Failed to hide card:', error);
-      });
+      } finally {
+        setIsReviewing(false);
+      }
       return;
     }
     const phase = cardForReview.schedulingPhase as SchedulingPhase;
@@ -303,6 +304,7 @@ export function useLearningMode(
     handleReview(rating);
   }, [
     cardForReview,
+    isReviewing,
     isPendingMaster,
     isPendingHide,
     selectedRating,

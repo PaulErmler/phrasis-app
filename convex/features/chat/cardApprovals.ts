@@ -45,24 +45,22 @@ async function processApproval(
   if (!deck) throw new ConvexError('Failed to create deck');
 
 
-  const mainIdx = approval.languages.indexOf(approval.mainLanguage);
-  if (mainIdx === -1) throw new ConvexError('mainLanguage not found in languages array');
-
-  const mainText = approval.translations[mainIdx].slice(0, MAX_MAIN_TEXT_LENGTH);
+  const mainEntry = approval.translations[0];
+  const mainText = mainEntry.text.slice(0, MAX_MAIN_TEXT_LENGTH);
 
   const textId: Id<'texts'> = await ctx.db.insert('texts', {
     text: mainText,
-    language: approval.mainLanguage,
+    language: mainEntry.language,
     userCreated: true,
     userId: user._id,
   });
 
-  for (let i = 0; i < approval.languages.length; i++) {
-    if (approval.languages[i] === approval.mainLanguage) continue;
+  for (let i = 1; i < approval.translations.length; i++) {
+    const entry = approval.translations[i];
     await ctx.db.insert('translations', {
       textId,
-      targetLanguage: approval.languages[i],
-      translatedText: approval.translations[i],
+      targetLanguage: entry.language,
+      translatedText: entry.text,
     });
   }
 
@@ -107,23 +105,13 @@ export const createApprovalRequestInternal = internalMutation({
     threadId: v.string(),
     messageId: v.string(),
     toolCallId: v.string(),
-    languages: v.array(v.string()),
-    translations: v.array(v.string()),
-    mainLanguage: v.string(),
+    translations: v.array(v.object({ language: v.string(), text: v.string() })),
     userId: v.string(),
   },
   returns: v.id('cardApprovals'),
   handler: async (ctx, args) => {
-    if (args.languages.length === 0) {
-      throw new ConvexError('languages must not be empty');
-    }
-    if (args.languages.length !== args.translations.length) {
-      throw new ConvexError(
-        `languages (${args.languages.length}) and translations (${args.translations.length}) must have the same length`,
-      );
-    }
-    if (!args.languages.includes(args.mainLanguage)) {
-      throw new ConvexError('mainLanguage must be present in languages');
+    if (args.translations.length === 0) {
+      throw new ConvexError('translations must not be empty');
     }
 
     const active = await getActiveCourseForUser(ctx, args.userId);
@@ -133,7 +121,8 @@ export const createApprovalRequestInternal = internalMutation({
       ...active.course.baseLanguages,
       ...active.course.targetLanguages,
     ]);
-    const invalidLanguages = args.languages.filter(
+    const providedLanguages = args.translations.map((t) => t.language);
+    const invalidLanguages = providedLanguages.filter(
       (lang) => !courseLanguages.has(lang),
     );
     if (invalidLanguages.length > 0) {
@@ -143,7 +132,7 @@ export const createApprovalRequestInternal = internalMutation({
     }
 
     const missingLanguages = [...courseLanguages].filter(
-      (lang) => !args.languages.includes(lang),
+      (lang) => !providedLanguages.includes(lang),
     );
     if (missingLanguages.length > 0) {
       throw new ConvexError(
@@ -151,21 +140,15 @@ export const createApprovalRequestInternal = internalMutation({
       );
     }
 
-
-    const mainIdx = args.languages.indexOf(args.mainLanguage);
-    const cappedTranslations = [...args.translations];
-    cappedTranslations[mainIdx] = cappedTranslations[mainIdx].slice(
-      0,
-      MAX_MAIN_TEXT_LENGTH,
+    const cappedTranslations = args.translations.map((t, i) =>
+      i === 0 ? { ...t, text: t.text.slice(0, MAX_MAIN_TEXT_LENGTH) } : t,
     );
 
     const approvalId = await ctx.db.insert('cardApprovals', {
       threadId: args.threadId,
       messageId: args.messageId,
       toolCallId: args.toolCallId,
-      languages: args.languages,
       translations: cappedTranslations,
-      mainLanguage: args.mainLanguage,
       userId: args.userId,
       status: 'pending',
     });
@@ -233,9 +216,7 @@ export const getApprovalsByThread = query({
     v.object({
       _id: v.id('cardApprovals'),
       toolCallId: v.string(),
-      languages: v.array(v.string()),
-      translations: v.array(v.string()),
-      mainLanguage: v.string(),
+      translations: v.array(v.object({ language: v.string(), text: v.string() })),
       status: cardApprovalStatusValidator,
     }),
   ),
@@ -253,9 +234,7 @@ export const getApprovalsByThread = query({
     return approvals.map((a) => ({
       _id: a._id,
       toolCallId: a.toolCallId,
-      languages: a.languages,
       translations: a.translations,
-      mainLanguage: a.mainLanguage,
       status: a.status,
     }));
   },

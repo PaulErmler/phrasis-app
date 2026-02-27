@@ -13,14 +13,13 @@ const TOOL_SUCCESS = "I've prepared a card for you to review and approve.";
 
 export interface CardApprovalProps {
   toolPart: CreateCardToolPart;
+  targetLanguages: string[];
   approvalsByToolCallId: Map<
     string,
     {
       _id: Id<'cardApprovals'>;
       toolCallId: string;
-      languages: string[];
-      translations: string[];
-      mainLanguage: string;
+      translations: { language: string; text: string }[];
       status: CardApprovalStatus;
     }
   >;
@@ -40,6 +39,7 @@ function Lang({ code }: { code: string }) {
 
 export function CardApproval({
   toolPart,
+  targetLanguages,
   approvalsByToolCallId,
   onApprove,
   onReject,
@@ -58,9 +58,7 @@ export function CardApproval({
   };
   const { state: toolState, errorText: toolErrorText, output: toolOutput } = tool;
 
-  const languages = toolPart.input?.languages ?? [];
-  const translations = toolPart.input?.translations ?? [];
-  const mainLanguage = toolPart.input?.mainLanguage ?? '';
+  const entries = toolPart.input?.translations ?? [];
   const approval = toolCallId ? approvalsByToolCallId.get(toolCallId) : undefined;
   const approvalId = approval?._id ?? null;
   const approvalState = optimisticState ?? approval?.status ?? 'pending';
@@ -71,10 +69,7 @@ export function CardApproval({
     (isToolComplete &&
       toolOutput !== undefined &&
       toolOutput !== TOOL_SUCCESS);
-  const isWaiting =
-    !approval ||
-    languages.length === 0 ||
-    translations.length === 0;
+  const isWaiting = !approval || entries.length === 0;
   const isProcessing = approvalId ? processingApprovals.has(approvalId) : false;
 
   const handleApprove = async () => {
@@ -128,23 +123,23 @@ export function CardApproval({
     );
   }
 
-  const mainIdx = languages.indexOf(mainLanguage);
-  const mainText = mainIdx >= 0 ? translations[mainIdx] : translations[0];
+  const targetEntries = entries.filter((e) => targetLanguages.includes(e.language));
+  const baseEntries = entries.filter((e) => !targetLanguages.includes(e.language));
 
   return (
     <Alert className="my-3 flex flex-col gap-3">
       <AlertDescription>
         <div className="space-y-1.5 text-sm">
-          <p className="text-base font-medium">
-            <Lang code={mainLanguage} /> {mainText}
-          </p>
-          {languages.map((lang, i) =>
-            lang === mainLanguage ? null : (
-              <p key={lang}>
-                <Lang code={lang} /> {translations[i]}
-              </p>
-            ),
-          )}
+          {baseEntries.map((entry) => (
+            <p key={entry.language} className="text-sm text-muted-foreground">
+              <Lang code={entry.language} /> {entry.text}
+            </p>
+          ))}
+          {targetEntries.map((entry) => (
+            <p key={entry.language} className="text-base font-semibold">
+              <Lang code={entry.language} /> {entry.text}
+            </p>
+          ))}
         </div>
       </AlertDescription>
       <div className="flex items-center justify-end gap-2">

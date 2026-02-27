@@ -4,9 +4,7 @@ import type { ToolUIPart } from 'ai';
  * Input shape for the createCard tool
  */
 export interface CreateCardInput {
-  languages: string[];
-  translations: string[];
-  mainLanguage: string;
+  translations: { language: string; text: string }[];
 }
 
 /**

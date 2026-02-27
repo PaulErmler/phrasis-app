@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Carousel,
   CarouselContent,
@@ -48,7 +48,7 @@ interface CollectionCarouselUIProps {
   onSelectCollection: (collectionId: string) => void;
   onOpenCollection: (collectionId: string) => void;
   isLoading?: boolean;
-  /** Index to scroll to on first render (e.g. active collection index) */
+  /** Index to scroll to whenever it changes (e.g. active collection index after a course switch) */
   initialScrollIndex?: number;
 }
 
@@ -63,7 +63,7 @@ export function CollectionCarouselUI({
   const [api, setApi] = useState<CarouselApi>();
   const [currentSnap, setCurrentSnap] = useState(0);
   const [snapCount, setSnapCount] = useState(0);
-  const [hasScrolledInitial, setHasScrolledInitial] = useState(false);
+  const lastScrolledIndexRef = useRef<number | undefined>(undefined);
   const t = useTranslations('AppPage.collections.carousel');
 
   // Track dot indicator state
@@ -85,14 +85,17 @@ export function CollectionCarouselUI({
     };
   }, [api]);
 
-  // Scroll to initial index once on mount
+  // Scroll to the active collection whenever the index changes (initial mount
+  // or after a course switch). First scroll jumps instantly; subsequent ones
+  // animate so the user can see the transition.
   useEffect(() => {
-    if (!api || hasScrolledInitial || initialScrollIndex === undefined) return;
-    if (initialScrollIndex >= 0) {
-      setTimeout(() => api.scrollTo(initialScrollIndex, true), 50);
-    }
-    setHasScrolledInitial(true);
-  }, [api, initialScrollIndex, hasScrolledInitial]);
+    if (!api || initialScrollIndex === undefined || initialScrollIndex < 0) return;
+    if (lastScrolledIndexRef.current === initialScrollIndex) return;
+
+    const isFirstScroll = lastScrolledIndexRef.current === undefined;
+    lastScrolledIndexRef.current = initialScrollIndex;
+    setTimeout(() => api.scrollTo(initialScrollIndex, isFirstScroll), 50);
+  }, [api, initialScrollIndex]);
 
   if (isLoading) {
     return (

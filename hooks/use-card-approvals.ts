@@ -8,9 +8,7 @@ import type { CardApprovalStatus } from '@/convex/types';
 export type ApprovalData = {
   _id: Id<'cardApprovals'>;
   toolCallId: string;
-  languages: string[];
-  translations: string[];
-  mainLanguage: string;
+  translations: { language: string; text: string }[];
   status: CardApprovalStatus;
 };
 

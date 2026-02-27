@@ -54,7 +54,8 @@ They are currently looking at this card:
   Translations:
 ${translationLines}
 
-When creating cards, you MUST include translations for all of these language codes: ${JSON.stringify(allLangs)}. Use these exact codes.`;
+When creating cards, the translations array MUST contain one {language, text} object for each of these language codes: ${JSON.stringify(allLangs)}. Use these exact codes.
+The translations array must list base languages first, then target languages, in this exact order: ${JSON.stringify(allLangs)}.`;
 }
 
 /**
