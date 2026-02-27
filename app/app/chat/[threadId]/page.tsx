@@ -35,7 +35,7 @@ function ChatPageContent({ threadId }: { threadId: string }) {
 
   const toolRenderers = useMemo(
     () => ({
-      createCard: createCardToolRenderer(approvals),
+      createCard: createCardToolRenderer({ ...approvals, targetLanguages: [] }),
     }),
     [approvals],
   );
