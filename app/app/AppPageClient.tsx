@@ -15,17 +15,33 @@ import { BottomNav, View } from "@/components/app/BottomNav";
 import { CourseMenu } from "@/components/app/CourseMenu";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
+import { getLanguagesByCodes } from "@/lib/languages";
 
 export function AppPageClient({
   preloadedSettings,
+  preloadedActiveCourse,
+  preloadedCollectionProgress,
+  preloadedCourseSettings,
 }: {
-  preloadedSettings: Preloaded<typeof api.courses.getUserSettings>;
+  preloadedSettings: Preloaded<typeof api.features.courses.getUserSettings>;
+  preloadedActiveCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
+  preloadedCollectionProgress: Preloaded<typeof api.features.decks.getCollectionProgress>;
+  preloadedCourseSettings: Preloaded<typeof api.features.courses.getActiveCourseSettings>;
 }) {
   const router = useRouter();
   const [currentView, setCurrentView] = useState<View>("home");
   const [courseMenuOpen, setCourseMenuOpen] = useState(false);
   const t = useTranslations("AppPage");
   const settings = usePreloadedQuery(preloadedSettings);
+  const activeCourse = usePreloadedQuery(preloadedActiveCourse);
+
+  const courseButtonLabel = activeCourse
+    ? t("currentCourseWithLanguages", {
+        targetLanguages: getLanguagesByCodes(activeCourse.targetLanguages)
+          .map((l) => l.name)
+          .join(", "),
+      })
+    : t("changeCourse");
   const hasCompletedOnboarding = settings?.hasCompletedOnboarding ?? true;
 
   useEffect(() => {
@@ -39,8 +55,8 @@ export function AppPageClient({
       <RedirectToSignIn />
       <Authenticated>
         <div className="min-h-screen flex flex-col">
-          <header className="sticky top-0 z-10 border-b bg-background">
-            <div className="container mx-auto px-4 h-14 flex items-center justify-between">
+          <header className="sticky-header">
+            <div className="header-bar">
               {currentView === "home" ? (
                 <Button
                   variant="ghost"
@@ -48,21 +64,26 @@ export function AppPageClient({
                   className="gap-2 -ml-2"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                  {t("changeCourse")}
+                  {courseButtonLabel}
                 </Button>
               ) : (
-                <h1 className="font-semibold text-lg capitalize">
+                <h1 className="heading-section capitalize">
                   {t(`views.${currentView}`)}
                 </h1>
               )}
-              <ThemeSwitcher />
+              <ThemeSwitcher className="-mr-2" />
             </div>
           </header>
 
           <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
           <main className="flex-1 container mx-auto px-4 py-8 pb-20">
-            {currentView === "home" && <HomeView />}
+            {currentView === "home" && (
+              <HomeView
+                preloadedCollectionProgress={preloadedCollectionProgress}
+                preloadedCourseSettings={preloadedCourseSettings}
+              />
+            )}
             {currentView === "content" && <ContentView />}
             {currentView === "library" && <LibraryView />}
             {currentView === "settings" && <SettingsView />}

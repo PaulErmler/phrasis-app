@@ -66,7 +66,7 @@ export function LearningStyleStep({ selectedStyle, onSelectStyle }: LearningStyl
                 <h3 className="font-semibold text-base leading-none mb-1">
                   {style.title}
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-sm">
                   {style.description}
                 </p>
               </div>

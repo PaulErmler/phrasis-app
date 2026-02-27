@@ -25,11 +25,11 @@ export function TranslationTest() {
   const [requestId, setRequestId] = useState<Id<"translationRequests"> | null>(null);
   const [displayedResult, setDisplayedResult] = useState("");
 
-  const requestTranslation = useMutation(api.translation.requestTranslation);
+  const requestTranslation = useMutation(api.testing.translation.requestTranslation);
   
   // Query the translation request - reactively updates when the result is ready
   const translationRequest = useQuery(
-    api.translation.getTranslationRequest,
+    api.testing.translation.getTranslationRequest,
     requestId ? { requestId } : "skip"
   );
 
@@ -170,7 +170,7 @@ export function TranslationTest() {
         {/* Translation Result */}
         {displayedResult && (
           <div className={`rounded-lg p-3 ${displayedResult.startsWith("Error:") ? "bg-destructive/10" : "bg-muted"}`}>
-            <p className="text-xs text-muted-foreground mb-1">
+            <p className="text-muted-xs mb-1">
               {displayedResult.startsWith("Error:") ? "Error:" : "Translation:"}
             </p>
             <p className={`text-sm ${displayedResult.startsWith("Error:") ? "text-destructive" : ""}`}>

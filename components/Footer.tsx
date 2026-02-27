@@ -36,7 +36,7 @@ export function Footer() {
               </Link>
             </div>
             
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-muted-sm">
               <span>🇩🇪</span>
               <span>{t("madeInGermany")}</span>
             </div>

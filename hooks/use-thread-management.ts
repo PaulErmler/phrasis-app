@@ -31,11 +31,11 @@ export function useThreadManagement({
   const [isCreating, setIsCreating] = useState(false);
 
   // Mutations and queries
-  const createThreadMutation = useMutation(api.chat.threads.createThread);
+  const createThreadMutation = useMutation(api.features.chat.threads.createThread);
   
   // Skip query until session is ready to prevent auth errors on reload
   const threads = useQuery(
-    api.chat.threads.listThreads,
+    api.features.chat.threads.listThreads,
     session && !isPending ? {} : "skip"
   );
 
