@@ -1,15 +1,24 @@
-import { useCallback } from "react";
-import { useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { toast } from "sonner";
-import { ERROR_MESSAGES, CHAT_STATUS } from "@/lib/constants/chat";
-import type { ChatStatus } from "@/lib/types/chat";
+import { useCallback } from 'react';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { toast } from 'sonner';
+import { ERROR_MESSAGES, CHAT_STATUS } from '@/lib/constants/chat';
+import type { ChatStatus } from '@/lib/types/chat';
+
+export interface CardContext {
+  sourceText: string;
+  sourceLanguage: string;
+  translations: { language: string; text: string }[];
+  baseLanguages: string[];
+  targetLanguages: string[];
+}
 
 interface UseSendMessageProps {
   threadId: string;
   setStatus?: (status: ChatStatus) => void;
   onSuccess?: () => void;
   onError?: () => void;
+  cardContext?: CardContext;
 }
 
 interface SendMessageOptions {
@@ -26,8 +35,11 @@ export function useSendMessage({
   setStatus,
   onSuccess,
   onError,
+  cardContext,
 }: UseSendMessageProps) {
-  const sendMessageMutation = useMutation(api.chat.messages.sendMessage);
+  const sendMessageMutation = useMutation(
+    api.features.chat.messages.sendMessage,
+  );
 
   const sendMessage = useCallback(
     async ({ prompt, clearInput }: SendMessageOptions) => {
@@ -44,6 +56,7 @@ export function useSendMessage({
         await sendMessageMutation({
           threadId,
           prompt,
+          cardContext,
         });
 
         // Clear input if callback provided
@@ -56,7 +69,7 @@ export function useSendMessage({
           onSuccess();
         }
       } catch (error) {
-        console.error("Failed to send message:", error);
+        console.error('Failed to send message:', error);
         toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
 
         // Reset status on error if setStatus is provided
@@ -73,9 +86,8 @@ export function useSendMessage({
         throw error;
       }
     },
-    [threadId, sendMessageMutation, setStatus, onSuccess, onError]
+    [threadId, sendMessageMutation, setStatus, onSuccess, onError, cardContext],
   );
 
   return { sendMessage };
 }
-

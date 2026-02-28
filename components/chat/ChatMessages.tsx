@@ -1,105 +1,209 @@
+import { useTranslations } from 'next-intl';
 import {
   Conversation,
   ConversationContent,
   ConversationEmptyState,
   ConversationScrollButton,
-} from "@/components/ai-elements/conversation";
+} from '@/components/ai-elements/conversation';
 import {
   MessageBranch,
   MessageBranchContent,
-} from "@/components/ai-elements/message";
-import { Message, MessageContent } from "@/components/ai-elements/message";
-import { MessageResponse } from "@/components/ai-elements/message";
-import { Shimmer } from "@/components/ai-elements/shimmer";
-import { Loader } from "@/components/ai-elements/loader";
+} from '@/components/ai-elements/message';
+import { Message, MessageContent } from '@/components/ai-elements/message';
+import { MessageResponse } from '@/components/ai-elements/message';
+import { Shimmer } from '@/components/ai-elements/shimmer';
+import { Loader } from '@/components/ai-elements/loader';
 import {
   Tool,
   ToolHeader,
   ToolContent,
   ToolInput,
   ToolOutput,
-} from "@/components/ai-elements/tool";
-import type { ExtendedUIMessage } from "@/lib/types/chat";
-import type { ToolUIPart } from "ai";
-import { useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
-import React, { useState } from "react";
-import { FlashcardConfirmation } from "./FlashcardConfirmation";
-import { isCreateFlashcardToolPart, getToolCallId } from "@/lib/types/tool-parts";
+} from '@/components/ai-elements/tool';
+import { useSmoothText } from '@convex-dev/agent/react';
+import type { ExtendedUIMessage } from '@/lib/types/chat';
+import type { ToolUIPart } from 'ai';
+import type { ReactNode } from 'react';
+import { getToolCallId } from '@/lib/types/tool-parts';
+
+// ---------------------------------------------------------------------------
+// Extracted sub-components
+// ---------------------------------------------------------------------------
+
+function SmoothMessageResponse({
+  text,
+  isStreaming,
+}: {
+  text: string;
+  isStreaming: boolean;
+}) {
+  const [smoothText] = useSmoothText(text, { startStreaming: isStreaming });
+  return <MessageResponse>{smoothText}</MessageResponse>;
+}
+
+function DefaultToolDisplay({
+  toolPart,
+  messageId,
+  idx,
+}: {
+  toolPart: ToolUIPart;
+  messageId: string;
+  idx: number;
+}) {
+  const toolName = toolPart.type.replace('tool-', '');
+  return (
+    <div key={`${messageId}-tool-${idx}`} className="mt-2">
+      <Tool>
+        <ToolHeader title={toolName} type={toolPart.type} state={toolPart.state} />
+        <ToolContent>
+          <ToolInput input={toolPart.input} />
+          <ToolOutput output={toolPart.output} errorText={toolPart.errorText} />
+        </ToolContent>
+      </Tool>
+    </div>
+  );
+}
+
+/**
+ * Deduplicates text & tool parts, renders each via the appropriate component,
+ * and appends a streaming indicator when the assistant is still generating.
+ */
+function MessageParts({
+  message,
+  isStreaming,
+  toolRenderers,
+  thinkingLabel,
+}: {
+  message: ExtendedUIMessage;
+  isStreaming: boolean;
+  toolRenderers?: Record<string, ToolRenderer>;
+  thinkingLabel: string;
+}) {
+  const parts = message.parts!;
+  const renderedTextParts = new Set<string>();
+  const renderedToolCalls = new Set<string>();
+  const elements: ReactNode[] = [];
+
+  for (let idx = 0; idx < parts.length; idx++) {
+    const part = parts[idx];
+
+    if (part.type === 'text') {
+      const { text } = part as { type: 'text'; text: string };
+      if (!text || text.trim() === '' || renderedTextParts.has(text)) continue;
+      renderedTextParts.add(text);
+
+      elements.push(
+        isStreaming ? (
+          <SmoothMessageResponse
+            key={`${message.id}-text-${idx}`}
+            text={text}
+            isStreaming
+          />
+        ) : (
+          <MessageResponse key={`${message.id}-text-${idx}`}>
+            {text}
+          </MessageResponse>
+        ),
+      );
+      continue;
+    }
+
+    if (part.type.startsWith('tool-')) {
+      const toolPart = part as ToolUIPart;
+      const toolCallId = getToolCallId(toolPart);
+      if (toolCallId && renderedToolCalls.has(toolCallId)) continue;
+      if (toolCallId) renderedToolCalls.add(toolCallId);
+
+      const toolName = toolPart.type.replace('tool-', '');
+      const custom = toolRenderers?.[toolName]?.(toolPart, message.id, idx);
+      if (custom) {
+        elements.push(custom);
+        continue;
+      }
+
+      elements.push(
+        <DefaultToolDisplay
+          key={`${message.id}-tool-${idx}`}
+          toolPart={toolPart}
+          messageId={message.id}
+          idx={idx}
+        />,
+      );
+    }
+  }
+
+  return (
+    <>
+      {elements}
+      {isStreaming && (
+        <div key={`${message.id}-streaming`} className="mt-2">
+          <Shimmer duration={1}>{thinkingLabel}</Shimmer>
+        </div>
+      )}
+    </>
+  );
+}
+
+function PlainTextContent({
+  messageId,
+  text,
+  isStreaming,
+  thinkingLabel,
+}: {
+  messageId: string;
+  text: string;
+  isStreaming: boolean;
+  thinkingLabel: string;
+}) {
+  return (
+    <>
+      <MessageResponse>{text}</MessageResponse>
+      {isStreaming && text && (
+        <div key={`${messageId}-streaming`} className="mt-2">
+          <Shimmer duration={1}>{thinkingLabel}</Shimmer>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Public types & main component
+// ---------------------------------------------------------------------------
+
+export type ToolRenderer = (
+  toolPart: ToolUIPart,
+  messageId: string,
+  idx: number,
+) => ReactNode | null;
+
+export type MessageFooterRenderer = (
+  message: ExtendedUIMessage,
+) => ReactNode | null;
 
 interface ChatMessagesProps {
   messages: ExtendedUIMessage[];
   isLoading: boolean;
   threadId: string | null;
+  toolRenderers?: Record<string, ToolRenderer>;
+  messageFooter?: MessageFooterRenderer;
+  contentClassName?: string;
 }
 
 /**
- * Component for displaying chat messages with streaming support
+ * Component for displaying chat messages with streaming support.
+ * Tool rendering is pluggable via `toolRenderers` — a map from
+ * tool name (without "tool-" prefix) to a renderer function.
  */
-export function ChatMessages({ messages, isLoading, threadId }: ChatMessagesProps) {
-  const approveFlashcard = useMutation(api.chat.flashcardApprovals.approveFlashcard);
-  const rejectFlashcard = useMutation(api.chat.flashcardApprovals.rejectFlashcard);
-  const [processingApprovals, setProcessingApprovals] = useState<Set<string>>(new Set());
-
-  // Query all approvals for this thread
-  const threadApprovals = useQuery(
-    api.chat.flashcardApprovals.getApprovalsByThread,
-    threadId ? { threadId } : "skip"
-  );
-
-  // Create a map of approvals by toolCallId for O(1) lookup
-  const approvalsByToolCallId = React.useMemo(() => {
-    type ApprovalData = {
-      _id: Id<"flashcardApprovals">;
-      toolCallId: string;
-      text: string;
-      note: string;
-      status: string;
-    };
-    
-    const byToolCallId = new Map<string, ApprovalData>();
-    
-    if (!threadApprovals) {
-      return byToolCallId;
-    }
-    
-    for (const approval of threadApprovals) {
-      byToolCallId.set(approval.toolCallId, approval);
-    }
-    
-    return byToolCallId;
-  }, [threadApprovals]);
-
-  const handleApprove = async (approvalId: Id<"flashcardApprovals">) => {
-    setProcessingApprovals((prev) => new Set(prev).add(approvalId));
-    try {
-      await approveFlashcard({ approvalId });
-    } catch (error) {
-      console.error("Failed to approve flashcard:", error);
-    } finally {
-      setProcessingApprovals((prev) => {
-        const next = new Set(prev);
-        next.delete(approvalId);
-        return next;
-      });
-    }
-  };
-
-  const handleReject = async (approvalId: Id<"flashcardApprovals">) => {
-    setProcessingApprovals((prev) => new Set(prev).add(approvalId));
-    try {
-      await rejectFlashcard({ approvalId });
-    } catch (error) {
-      console.error("Failed to reject flashcard:", error);
-    } finally {
-      setProcessingApprovals((prev) => {
-        const next = new Set(prev);
-        next.delete(approvalId);
-        return next;
-      });
-    }
-  };
+export function ChatMessages({
+  messages,
+  isLoading,
+  threadId,
+  toolRenderers,
+  messageFooter,
+  contentClassName,
+}: ChatMessagesProps) {
+  const t = useTranslations('Chat');
 
   if (isLoading) {
     return (
@@ -110,145 +214,67 @@ export function ChatMessages({ messages, isLoading, threadId }: ChatMessagesProp
   }
 
   return (
-    <Conversation className="relative flex-1 h-full w-full overflow-hidden flex flex-col">
-      
+    <div className="relative flex-1 h-full w-full flex flex-col overflow-hidden">
+      <Conversation className="flex-1 h-full w-full">
+        <ConversationContent className={`px-4 ${contentClassName ?? ''}`}>
+          {messages && messages.length > 0 ? (
+            <>
+              {messages.map((message: ExtendedUIMessage) => {
+                const messageText = message.content ?? message.text ?? '';
+                const isAssistantStreaming =
+                  message.role === 'assistant' &&
+                  (message.status === 'streaming' ||
+                    message.status === 'pending');
 
-      <ConversationContent className="flex-1 overflow-y-auto px-4">
-        {messages && messages.length > 0 ? (
-          <>
-            {messages.map((message: ExtendedUIMessage) => {
-              const messageText = message.content ?? message.text ?? "";
-              const isAssistantStreaming =
-                message.role === "assistant" &&
-                (message.status === "streaming" || message.status === "pending");
+                const hasParts = message.parts && message.parts.length > 0;
 
-              return (
-                <MessageBranch key={message.id} defaultBranch={0}>
-                  <MessageBranchContent>
-                    <Message from={message.role}>
-                      <MessageContent>
-                        {isAssistantStreaming && !messageText && !message.parts?.length ? (
-                          <Shimmer>Thinking...</Shimmer>
-                        ) : message.parts && message.parts.length > 0 ? (
-                          // Render parts in order: text parts, tool calls, and confirmations
-                          (() => {
-                            const renderedTextParts = new Set<string>();
-                            const renderedToolCalls = new Set<string>();
-                            return (
-                              <>
-                                {message.parts.map((part, idx: number) => {
-                                  // Render text parts (skip empty ones and duplicates)
-                                  if (part.type === "text") {
-                                    const textPart = part as { type: "text"; text: string };
-                                    if (!textPart.text || textPart.text.trim() === "" || renderedTextParts.has(textPart.text)) {
-                                      return null;
-                                    }
-                                    renderedTextParts.add(textPart.text);
-                                    return (
-                                      <MessageResponse key={`${message.id}-text-${idx}`}>
-                                        {textPart.text}
-                                      </MessageResponse>
-                                    );
-                                  }
-                                  
-                                  // Render tool calls (excluding createFlashcard)
-                                  if (part.type.startsWith("tool-")) {
-                                    const toolPart = part as ToolUIPart;
-                                    const toolCallId = getToolCallId(toolPart);
-                                    
-                                    // Deduplicate tool calls by toolCallId if present
-                                    if (toolCallId && renderedToolCalls.has(toolCallId)) {
-                                      return null;
-                                    }
-                                    if (toolCallId) {
-                                      renderedToolCalls.add(toolCallId);
-                                    }
+                return (
+                  <MessageBranch key={message.id} defaultBranch={0}>
+                    <MessageBranchContent>
+                      <Message from={message.role}>
+                        <MessageContent>
+                          {isAssistantStreaming && !messageText && !hasParts ? (
+                            <Shimmer>{t('thinking')}</Shimmer>
+                          ) : hasParts ? (
+                            <MessageParts
+                              message={message}
+                              isStreaming={isAssistantStreaming}
+                              toolRenderers={toolRenderers}
+                              thinkingLabel={t('thinking')}
+                            />
+                          ) : (
+                            <PlainTextContent
+                              messageId={message.id}
+                              text={messageText}
+                              isStreaming={isAssistantStreaming}
+                              thinkingLabel={t('thinking')}
+                            />
+                          )}
+                        </MessageContent>
+                      </Message>
+                      {messageFooter &&
+                        message.role === 'assistant' &&
+                        messageFooter(message)}
+                    </MessageBranchContent>
+                  </MessageBranch>
+                );
+              })}
+            </>
+          ) : (
+            <ConversationEmptyState
+              title={t('emptyTitle')}
+              description={t('emptyDescription')}
+            />
+          )}
+        </ConversationContent>
+      </Conversation>
 
-                                    const toolName = toolPart.type.replace("tool-", "");
-                                    
-                                    // Render createFlashcard as confirmation
-                                    if (isCreateFlashcardToolPart(toolPart) && threadId) {
-                                      return (
-                                        <FlashcardConfirmation
-                                          key={`${message.id}-flashcard-${idx}`}
-                                          toolPart={toolPart}
-                                          approvalsByToolCallId={approvalsByToolCallId}
-                                          onApprove={handleApprove}
-                                          onReject={handleReject}
-                                          processingApprovals={processingApprovals}
-                                        />
-                                      );
-                                    }
-                                    
-                                    // Render other tools normally
-                                    return (
-                                      <div key={`${message.id}-tool-${idx}`} className="mt-2">
-                                        <Tool>
-                                          <ToolHeader 
-                                            title={toolName}
-                                            type={toolPart.type}
-                                            state={toolPart.state}
-                                          />
-                                          <ToolContent>
-                                            <ToolInput input={toolPart.input} />
-                                            <ToolOutput output={toolPart.output} errorText={toolPart.errorText} />
-                                          </ToolContent>
-                                        </Tool>
-                                      </div>
-                                    );
-                                  }
-                                  
-                                  return null;
-                                })}
-                                {isAssistantStreaming && (
-                                  <div className="mt-2">
-                                    <Shimmer duration={1}>Thinking...</Shimmer>
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()
-                        ) : (
-                          // Fallback to message content if no parts
-                          <>
-                            <MessageResponse>{messageText}</MessageResponse>
-                            {isAssistantStreaming && messageText && (
-                              <div className="mt-2">
-                                <Shimmer duration={1}>Thinking...</Shimmer>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </MessageContent>
-                    </Message>
-                  </MessageBranchContent>
-                </MessageBranch>
-              );
-            })}
-            
-
-          </>
-        ) : (
-          <ConversationEmptyState
-            title="No messages yet"
-            description="Start a conversation to see messages here"
-          />
-        )}
-      </ConversationContent>
-
-      {/* 4. The Scroll Button:
-         Placed outside ConversationContent but inside Conversation (relative).
-         Ensure your UI library supports the 'sticky' or 'absolute' positioning here.
-      */}
-      <div className="absolute bottom-4 right-4 z-20">
-        <ConversationScrollButton 
-          className="static! rounded-lg bg-background dark:bg-background" 
+      <div className="absolute bottom-4 right-4 z-20 pointer-events-none">
+        <ConversationScrollButton
+          className="pointer-events-auto rounded-lg bg-background dark:bg-background shadow-md"
           size="default"
         />
       </div>
-
-    </Conversation>
+    </div>
   );
 }
-
-

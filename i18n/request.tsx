@@ -1,9 +1,8 @@
-import { getRequestConfig } from "next-intl/server";
-import { getUserLocale } from "./locale";
+import { getRequestConfig } from 'next-intl/server';
+import { getUserLocale } from './locale';
 
 export default getRequestConfig(async () => {
   const locale = await getUserLocale();
-
 
   const [mainMessages, authMessages, landingMessages] = await Promise.all([
     import(`../messages/${locale}.json`).then((m) => m.default),
@@ -22,6 +21,6 @@ export default getRequestConfig(async () => {
       ...authMessages,
       LandingPage: landingMessages,
     },
-    timeZone: "UTC",
+    timeZone: 'UTC',
   };
 });

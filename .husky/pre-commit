@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+#npm test
+pnpm run typecheck
+pnpm exec lint-staged --allow-empty
+
+
+command -v git-lfs >/dev/null 2>&1 || { printf >&2 "\n%s\n\n" "This repository is configured for Git LFS but 'git-lfs' was not found on your path. If you no longer wish to use Git LFS, remove this hook by deleting the 'pre-commit' file in the hooks directory (set by 'core.hookspath'; usually '.git/hooks')."; exit 2; }
+git lfs pre-commit "$@"
+
+CURR_BRANCH=$(git rev-parse --abbrev-ref HEAD | tr '/' '_')
+SNAPSHOT_DIR=".convex-snapshots"
+SNAPSHOT="$SNAPSHOT_DIR/${CURR_BRANCH}.zip"
+
+if [ ! -f "$SNAPSHOT" ]; then
+  printf "\n[convex] No snapshot found for branch '%s'.\n" "$CURR_BRANCH"
+  printf "[convex] Run 'pnpm snapshot' to capture the current data state before committing.\n\n"
+  exit 1
+fi
+
+SNAPSHOT_AGE=$(stat -f "%m" "$SNAPSHOT" 2>/dev/null)
+LAST_COMMIT=$(git log -1 --format="%ct" 2>/dev/null)
+
+if [ -n "$SNAPSHOT_AGE" ] && [ -n "$LAST_COMMIT" ] && [ "$SNAPSHOT_AGE" -lt "$LAST_COMMIT" ]; then
+  printf "\n[convex] Warning: snapshot for '%s' is older than your last commit.\n" "$CURR_BRANCH"
+  printf "[convex] If your data has changed, run 'pnpm snapshot' to update it.\n"
+  printf "[convex] Committing anyway...\n\n"
+fi

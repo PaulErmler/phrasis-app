@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
-import type { Thread } from "@/lib/types/chat";
+import { Button } from '@/components/ui/button';
+import type { Thread } from '@/lib/types/chat';
 
 interface ThreadSidebarProps {
   threads: Thread[] | undefined;
@@ -22,7 +22,7 @@ export function ThreadSidebar({
   return (
     <aside className="w-64 border-r border-border bg-background/50 flex flex-col">
       <div className="p-4 border-b border-border">
-        <h2 className="font-semibold text-lg">Conversations</h2>
+        <h2 className="heading-section">Conversations</h2>
       </div>
       <div className="flex-1 overflow-y-auto">
         {threads && threads.length > 0 ? (
@@ -33,12 +33,12 @@ export function ThreadSidebar({
                 onClick={() => onThreadSelect(thread._id)}
                 className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
                   threadId === thread._id
-                    ? "bg-primary text-primary-foreground"
-                    : "hover:bg-accent"
+                    ? 'bg-primary text-primary-foreground'
+                    : 'hover:bg-accent'
                 }`}
               >
                 <div className="font-medium truncate">
-                  {thread.title || "New Chat"}
+                  {thread.title || 'New Chat'}
                 </div>
                 {thread.summary && (
                   <div className="text-xs opacity-70 truncate mt-1">
@@ -49,7 +49,7 @@ export function ThreadSidebar({
             ))}
           </div>
         ) : (
-          <div className="p-4 text-center text-sm text-muted-foreground">
+          <div className="p-4 text-center text-muted-sm">
             No conversations yet
           </div>
         )}
@@ -61,13 +61,9 @@ export function ThreadSidebar({
           variant="outline"
           disabled={isCreating}
         >
-          {isCreating ? "Creating..." : "New Chat"}
+          {isCreating ? 'Creating...' : 'New Chat'}
         </Button>
       </div>
     </aside>
   );
 }
-
-
-
-

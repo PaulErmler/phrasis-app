@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
 
 /**
  * Button that triggers the global PWA install dialog.
@@ -9,9 +9,11 @@ import { Download } from "lucide-react";
  */
 export function PWAInstallButton() {
   const handleInstallClick = () => {
-    const pwaInstallElement = document.querySelector("pwa-install") as HTMLElement & {
-      showDialog: () => void;
-    } | null;
+    const pwaInstallElement = document.querySelector('pwa-install') as
+      | (HTMLElement & {
+          showDialog: () => void;
+        })
+      | null;
 
     if (pwaInstallElement) {
       pwaInstallElement.showDialog();
@@ -26,8 +28,7 @@ export function PWAInstallButton() {
       className="gap-2"
     >
       <Download className="w-4 h-4" />
-      Install Phrasis
+      Install Cacatua
     </Button>
   );
 }
-

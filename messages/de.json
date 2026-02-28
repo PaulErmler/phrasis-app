@@ -1,6 +1,6 @@
 {
   "HomePage": {
-    "title": "Sprachen meistern mit Phrasis",
+    "title": "Sprachen meistern mit Cacatua",
     "subtitle": "Lerne Redewendungen, übe die Aussprache und werde fließend in jeder Sprache",
     "signIn": "Anmelden",
     "getStarted": "Jetzt starten",
@@ -75,6 +75,55 @@
       "account": "Konto",
       "language": "App-Sprache"
     },
+    "deckCards": {
+      "statusFavorite": "Favorit",
+      "statusMastered": "Gemeistert",
+      "statusHidden": "Ausgeblendet",
+      "due": "Fällig"
+    },
+    "collections": {
+      "carousel": {
+        "sectionTitle": "Schwierigkeitsauswahl",
+        "title": "Sammlungen",
+        "select": "Auswählen",
+        "selected": "Ausgewählt",
+        "done": "Fertig",
+        "cards": "{count} Karten",
+        "notStarted": "Nicht begonnen",
+        "addCards": "{count} Karten zum Deck hinzufügen",
+        "adding": "Wird hinzugefügt...",
+        "complete": "Fertig",
+        "collectionComplete": "{name} abgeschlossen!",
+        "allCardsAdded": "Alle Karten dieser Sammlung wurden deinem Deck hinzugefügt.",
+        "noMoreCards": "Keine weiteren Karten aus {name} hinzuzufügen",
+        "nextCards": "Nächste {count} Karten aus {name}",
+        "progress": "{added} / {total}",
+        "failedToSelect": "Sammlung konnte nicht ausgewählt werden",
+        "failedToAdd": "Karten konnten nicht hinzugefügt werden",
+        "cardsAdded": "{count} Karten zu deinem Deck hinzugefügt",
+        "noCardsToAdd": "Keine weiteren Karten aus dieser Sammlung hinzuzufügen",
+        "descriptions": {
+          "Essential": "Die wichtigsten Sätze am Anfang",
+          "A1": "Sätze mit Vokabular auf CEFR A1-Niveau",
+          "A2": "Sätze mit Vokabular auf CEFR A2-Niveau",
+          "B1": "Sätze mit Vokabular auf CEFR B1-Niveau",
+          "B2": "Sätze mit Vokabular auf CEFR B2-Niveau",
+          "C1": "Sätze mit Vokabular auf CEFR C1-Niveau",
+          "C2": "Sätze mit Vokabular auf CEFR C2-Niveau"
+        },
+        "detail": {
+          "totalCards": "{count} Karten",
+          "progress": "Fortschritt",
+          "select": "Auswählen",
+          "done": "Fertig",
+          "allCardsAdded": "Alle Karten dieser Sammlung wurden deinem Deck hinzugefügt.",
+          "nextSentences": "Nächste Sätze",
+          "adding": "Wird hinzugefügt...",
+          "addN": "{count} hinzufügen",
+          "noMoreCards": "Keine weiteren Karten hinzuzufügen"
+        }
+      }
+    },
     "courses": {
       "title": "Deine Kurse",
       "description": "Wähle einen Kurs zum Wechseln oder erstelle einen neuen",
@@ -107,10 +156,96 @@
         "create": "Kurs erstellen"
       }
     },
-    "changeCourse": "Kurs wechseln"
+    "changeCourse": "Kurs wechseln",
+    "currentCourseWithLanguages": "Kurs: {targetLanguages}",
+    "startLearning": "Lernen starten",
+    "stats": {
+      "streak": "Serie",
+      "reps": "Wiederholungen",
+      "sentences": "Sätze",
+      "time": "Zeit"
+    }
+  },
+  "LearningMode": {
+    "title": "Lernen",
+    "chat": "Chat",
+    "back": "Zurück",
+    "settings": "Einstellungen",
+    "loading": "Lädt...",
+    "baseLanguage": "Ausgangssprache",
+    "targetLanguage": "Zielsprache",
+    "reviewCount": "{count} Wiederholungen",
+    "nextReview": "Nächste Wiederholung in {time}",
+    "nextReviewNow": "Jetzt fällig",
+    "ratings": {
+      "stillLearning": "Lerne noch",
+      "understood": "Verstanden",
+      "again": "Nochmal",
+      "hard": "Schwer",
+      "good": "Gut",
+      "easy": "Leicht"
+    },
+    "actions": {
+      "favorite": "Favorit",
+      "master": "Gemeistert",
+      "hide": "Ausblenden",
+      "next": "Weiter",
+      "pause": "Pause",
+      "play": "Abspielen"
+    },
+    "empty": {
+      "noCardsDue": "Keine Karten zur Wiederholung fällig",
+      "addCards": "{count} Karten hinzufügen",
+      "adding": "Wird hinzugefügt...",
+      "noCollection": "Keine Sammlung ausgewählt",
+      "goHome": "Zur Startseite",
+      "allDone": "Alles erledigt! Füge weitere Karten hinzu, um weiterzulernen.",
+      "noCardsInDeck": "Noch keine Karten in deinem Deck. Füge Karten aus einer Sammlung hinzu, um mit dem Lernen zu beginnen."
+    },
+    "settingsPanel": {
+      "title": "Lerneinstellungen",
+      "iconLegend": "Karten-Symbole",
+      "iconFavorite": "Karte als Favorit markieren",
+      "iconMaster": "Karte als gemeistert markieren (erscheint nach der nächsten Wiederholung nicht mehr)",
+      "iconHide": "Karte aus der Wiederholung ausblenden (erscheint nach der nächsten Wiederholung nicht mehr)",
+      "cardsPerBatch": "Karten pro Stapel",
+      "cardsPerBatchDescription": "Anzahl der Karten, die auf einmal hinzugefügt werden",
+      "reviewSettings": "Wiederholungseinstellungen",
+      "autoAddCards": "Karten automatisch hinzufügen",
+      "autoAddCardsDescription": "Automatisch neue Karten hinzufügen, wenn keine mehr fällig sind",
+      "initialReviews": "Anfängliche Wiederholungen",
+      "initialReviewsDescription": "Anzahl der Vorwiederholungen vor der Abstandswiederholung",
+      "audioPlayback": "Audio-Wiedergabe",
+      "autoPlay": "Audio automatisch abspielen",
+      "autoPlayDescription": "Audio automatisch abspielen, wenn eine Karte angezeigt wird",
+      "uiSettings": "Anzeigeeinstellungen",
+      "showProgressBar": "Fortschrittsbalken",
+      "showProgressBarDescription": "Audio-Fortschrittsbalken und Wiedergabesteuerung anzeigen",
+      "autoAdvance": "Automatisch weiter",
+      "autoAdvanceDescription": "Zur nächsten Karte wechseln, nachdem das Audio fertig ist",
+      "pauseBeforeAutoAdvance": "Vor dem Weitergehen",
+      "repetitions": "Wiederholungen",
+      "repetitionsDescription": "Wie oft jede Sprache pro Karte abgespielt wird",
+      "plays": "Plays",
+      "pause": "Pause",
+      "pauseBetweenRepetitions": "Pause zwischen Wiederholungen",
+      "base": "Basis",
+      "target": "Ziel",
+      "playbackSequence": "Wiedergabe-Reihenfolge",
+      "playbackSequenceDescription": "Vorschau der Audio-Reihenfolge",
+      "pauseBaseToBase": "Basis → Basis Pause",
+      "pauseBaseToTarget": "Basis → Ziel Pause",
+      "pauseTargetToTarget": "Ziel → Ziel Pause",
+      "autoAdvanceIndicator": "Automatisch zur nächsten Karte",
+      "noAutoAdvance": "Manuell weiter (Tippe auf Weiter)",
+      "allSkipped": "Alle Sprachen auf 0 Plays gesetzt",
+      "seconds": "s",
+      "timesPlayed": "{count}x",
+      "pauseBetweenPlays": "{seconds}s dazwischen"
+    }
   },
   "Footer": {
-    "copyright": "© {year} Phrasis. Alle Rechte vorbehalten.",
+    "copyright": "© {year} Cacatua. Alle Rechte vorbehalten.",
     "theme": "Design:",
     "language": "Sprache:",
     "madeInGermany": "Hergestellt in Deutschland",
@@ -131,20 +266,40 @@
     "title": "Sprache"
   },
   "Chat": {
-    "flashcardConfirmation": {
-      "textLabel": "Text",
-      "noteLabel": "Notiz",
-      "approveButton": "Lernkarte erstellen",
+    "back": "Zurück",
+    "thinking": "Denkt nach...",
+    "emptyTitle": "Noch keine Nachrichten",
+    "emptyDescription": "Starte eine Unterhaltung, um Nachrichten hier zu sehen",
+    "suggestions": {
+      "explain": "Erkläre mir diesen Satz.",
+      "meaning": "Was bedeutet dieses Wort?",
+      "example": "Gib mir ein ähnliches Beispiel.",
+      "conversation": "Wie würde ich das in einem Gespräch verwenden?"
+    },
+    "voice": {
+      "startRecording": "Aufnahme starten",
+      "stopRecording": "Aufnahme stoppen",
+      "recording": "Aufnahme...",
+      "transcribing": "Transkribieren..."
+    },
+    "attachments": {
+      "filesAttached": "Dateien angehängt",
+      "filesAttachedDescription": "{count} Datei(en) an Nachricht angehängt",
+      "sentWithAttachments": "Mit Anhängen gesendet"
+    },
+    "cardApproval": {
+      "approveButton": "Karte hinzufügen",
       "rejectButton": "Ablehnen",
-      "approved": "Lernkarte erfolgreich erstellt!",
-      "rejected": "Lernkarten-Erstellung abgebrochen",
+      "approved": "Karte hinzugefügt!",
+      "rejected": "Kartenerstellung abgebrochen",
       "loading": "Lädt...",
-      "creatingApproval": "Genehmigungsanfrage wird erstellt..."
+      "creatingApproval": "Karte wird erstellt...",
+      "failed": "Kartenerstellung fehlgeschlagen"
     }
   },
   "Onboarding": {
     "welcome": {
-      "title": "Willkommen bei Phrasis!",
+      "title": "Willkommen bei Cacatua!",
       "subtitle": "Lass uns deine Lernerfahrung in nur wenigen Schritten anpassen",
       "description": "Das dauert nur eine Minute, und du kannst diese Einstellungen jederzeit später ändern.",
       "feature1": {
