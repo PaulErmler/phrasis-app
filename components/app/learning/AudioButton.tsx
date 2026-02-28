@@ -31,6 +31,19 @@ export function AudioButton({
     setIsLoading(false);
   }, [stopPlayback]);
 
+  useEffect(() => {
+    return () => {
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.onended = null;
+        audio.onerror = null;
+      }
+      audioRef.current = null;
+    };
+  }, []);
+
   const handlePlay = async () => {
     if (!url) return;
 
