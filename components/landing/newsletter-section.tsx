@@ -55,7 +55,7 @@ export function NewsletterSection() {
                     disabled={status === 'loading' || status === 'success'}
                     className={cn(
                       'h-14 px-5 text-base pr-[140px]',
-                      status === 'success' && 'border-green-500',
+                      status === 'success' && 'border-success',
                     )}
                     required
                   />
@@ -66,7 +66,7 @@ export function NewsletterSection() {
                     }
                     className={cn(
                       'absolute right-2 top-1/2 -translate-y-1/2 h-10',
-                      status === 'success' && 'bg-green-500 hover:bg-green-500',
+                      status === 'success' && 'bg-success hover:bg-success',
                     )}
                   >
                     {status === 'loading' ? (
@@ -90,7 +90,7 @@ export function NewsletterSection() {
               </form>
 
               {status === "success" && (
-                <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-success text-sm text-center">
+                <div className="mt-4 p-3 rounded-lg bg-success/10 border border-success/20 text-success text-sm text-center">
                   {t('success')}
                 </div>
               )}

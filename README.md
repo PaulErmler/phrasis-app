@@ -107,13 +107,9 @@ https://docs.github.com/en/repositories/working-with-files/managing-large-files/
 
 # Working with LLMs
 
-Here are relevant tutorials for making LLMs in cursor more accuracte with the tech stack we are using:
+Here are relevant tutorials for making LLMs in cursor more accurate with the tech stack we are using:
 
-# Working with LLMs
-
-Here are relevant tutorials for making LLMs in cursor more accuracte with the tech stack we are using:
-
-MCP Servers and rules:
+## MCP Servers and rules
 Convex: https://docs.convex.dev/ai/using-cursor
 BetterAuth: https://www.better-auth.com/docs/introduction#llmstxt
 Follow the turorials on the websites to add MCP servers and docs
