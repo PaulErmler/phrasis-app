@@ -216,7 +216,7 @@ body {
 
   /* Semantic colors */
   .text-success {
-    @apply text-green-600;
+    @apply text-green-600 dark:text-green-400;
   }
   .text-warning {
     @apply text-orange-600;
