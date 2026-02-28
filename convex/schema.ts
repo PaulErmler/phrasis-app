@@ -5,6 +5,7 @@ import {
   currentLevelValidator,
   fsrsStateValidator,
   cardApprovalStatusValidator,
+  schedulingPhaseValidator
 } from './types';
 import { testingTables } from './testing/schema';
 
@@ -120,7 +121,7 @@ export default defineSchema({
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
     isFavorite: v.optional(v.boolean()), // Whether the card is marked as a favorite
-    schedulingPhase: v.string(), // "preReview" | "review"
+    schedulingPhase: schedulingPhaseValidator,
     preReviewCount: v.number(), // How many pre-review rounds completed
     fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
   })

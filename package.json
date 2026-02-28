@@ -15,7 +15,9 @@
     "lint:fix": "prettier --write . && eslint . --ext .js,.jsx,.ts,.tsx,.mjs --fix",
     "format": "prettier --write .",
     "lint:staged": "lint-staged",
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "snapshot": "mkdir -p .convex-snapshots && convex export --env-file .env.local --path .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip && echo '[convex] Snapshot saved.'",
+    "snapshot:restore": "convex import --replace -y --env-file .env.local .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.45",

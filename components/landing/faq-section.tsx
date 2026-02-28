@@ -6,23 +6,9 @@ export function FAQSection() {
   const t = useTranslations('LandingPage.faq');
 
   // Get FAQs from translations
+  const answerCounts = [2, 1, 2, 2, 2, 2, 2, 1];
   const faqs = Array.from({ length: 8 }, (_, i) => {
-    const answerCount =
-      i === 0
-        ? 2
-        : i === 1
-          ? 1
-          : i === 2
-            ? 2
-            : i === 3
-              ? 2
-              : i === 4
-                ? 2
-                : i === 5
-                  ? 2
-                  : i === 6
-                    ? 2
-                    : 1;
+    const answerCount = answerCounts[i] ?? 1;
     return {
       question: t(`items.${i}.question`),
       answer: Array.from({ length: answerCount }, (_, j) =>

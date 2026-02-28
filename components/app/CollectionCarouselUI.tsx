@@ -153,10 +153,10 @@ export function CollectionCarouselUI({
                   }}
                   className={cn(
                     'w-full text-left rounded-xl border p-4 transition-all cursor-pointer h-[170px] flex flex-col',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    'hover:shadow-md',
-                    isActive && !isComplete && 'border-2 border-current',
-                    isComplete && 'opacity-50',
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "hover:shadow-md",
+                    isActive && !isComplete && "state-active",
+                    isComplete && "opacity-50"
                   )}
                 >
                   {/* Header: title + select button */}
