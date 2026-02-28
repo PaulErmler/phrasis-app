@@ -46,7 +46,7 @@ export function TimelineLanguageCard({
   return (
     <div className="w-full max-w-[300px]">
       <div
-        className={`rounded-lg border-2 px-3 py-2.5 space-y-2.5 transition-opacity ${
+        className={`rounded-xl border-2 px-3 py-2.5 space-y-2.5 transition-opacity ${
           type === "base"
             ? "border-timeline-base-border bg-timeline-base"
             : "border-timeline-target-border bg-timeline-target"

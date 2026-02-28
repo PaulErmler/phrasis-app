@@ -40,7 +40,7 @@ export function LearningMode({
         <LearningHeader onBack={goHome} onSettingsOpen={() => state.setSettingsOpen(true)} />
         <main className="flex-1 flex items-center justify-center">
           <div className="space-y-4 w-full max-w-md px-4">
-            <Skeleton className="h-48 w-full rounded-lg" />
+            <Skeleton className="h-48 w-full rounded-xl" />
             <Skeleton className="h-12 w-full rounded-lg" />
             <Skeleton className="h-12 w-full rounded-lg" />
           </div>
