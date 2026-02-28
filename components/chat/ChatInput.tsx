@@ -13,11 +13,11 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
-} from "@/components/ai-elements/prompt-input";
-import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
-import { VoiceRecordButton } from "./VoiceRecordButton";
-import type { ChatStatus } from "@/lib/types/chat";
-import { DEFAULT_SUGGESTIONS, CHAT_STATUS } from "@/lib/constants/chat";
+} from '@/components/ai-elements/prompt-input';
+import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
+import { VoiceRecordButton } from './VoiceRecordButton';
+import type { ChatStatus } from '@/lib/types/chat';
+import { DEFAULT_SUGGESTIONS, CHAT_STATUS } from '@/lib/constants/chat';
 
 interface ChatInputProps {
   onSubmit: (message: PromptInputMessage) => Promise<void>;
@@ -45,9 +45,6 @@ export function ChatInput({
   onVoiceClick,
   showSuggestions = false,
 }: ChatInputProps) {
-
-
-
   return (
     <div>
       <div>
@@ -63,14 +60,19 @@ export function ChatInput({
           </Suggestions>
         )}
         <div>
-          <PromptInput globalDrop multiple onSubmit={onSubmit} className="container mx-auto" >
-            <PromptInputHeader >
+          <PromptInput
+            globalDrop
+            multiple
+            onSubmit={onSubmit}
+            className="container mx-auto"
+          >
+            <PromptInputHeader>
               <PromptInputAttachments>
                 {(attachment) => <PromptInputAttachment data={attachment} />}
               </PromptInputAttachments>
             </PromptInputHeader>
-            
-            <PromptInputBody  >
+
+            <PromptInputBody>
               <PromptInputTextarea
                 onChange={(event) => onTextChange(event.target.value)}
                 value={text}
@@ -109,7 +111,3 @@ export function ChatInput({
     </div>
   );
 }
-
-
-
-

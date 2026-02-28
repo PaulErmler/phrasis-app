@@ -1,25 +1,31 @@
-"use client";
+'use client';
 
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader } from "@/components/ai-elements/loader";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader } from '@/components/ai-elements/loader';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
 
 /**
  * Sidebar component to display user's flashcards
  */
 export function FlashcardSidebar() {
-  const flashcards = useQuery(api.chat.flashcards.listUserFlashcards);
+  const flashcards = useQuery(api.features.chat.flashcards.listUserFlashcards);
 
   if (flashcards === undefined) {
     return (
       <aside className="hidden lg:flex w-80 border-l flex-col">
         <div className="p-4 border-b">
-          <h2 className="font-semibold text-lg">My Flashcards</h2>
-          <p className="text-sm text-muted-foreground">Your saved learning cards</p>
+          <h2 className="heading-section">My Flashcards</h2>
+          <p className="text-muted-sm">Your saved learning cards</p>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <Loader size={24} />
@@ -31,20 +37,18 @@ export function FlashcardSidebar() {
   return (
     <aside className="hidden lg:flex w-80 border-l flex-col">
       <div className="p-4 border-b">
-        <h2 className="font-semibold text-lg">My Flashcards</h2>
-        <p className="text-sm text-muted-foreground">
-          {flashcards.length} {flashcards.length === 1 ? "card" : "cards"}
+        <h2 className="heading-section">My Flashcards</h2>
+        <p className="text-muted-sm">
+          {flashcards.length} {flashcards.length === 1 ? 'card' : 'cards'}
         </p>
       </div>
-      
+
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-3">
           {flashcards.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground text-sm">
-                No flashcards yet
-              </p>
-              <p className="text-muted-foreground text-xs mt-1">
+              <p className="text-muted-sm">No flashcards yet</p>
+              <p className="text-muted-xs mt-1">
                 Ask your teacher to create some!
               </p>
             </div>
@@ -65,8 +69,8 @@ export function FlashcardSidebar() {
                   <CardDescription className="text-xs mb-2">
                     {flashcard.note}
                   </CardDescription>
-                  <p className="text-xs text-muted-foreground">
-                    {format(new Date(flashcard.date), "MMM d, yyyy")}
+                  <p className="text-muted-xs">
+                    {format(new Date(flashcard.date), 'MMM d, yyyy')}
                   </p>
                 </CardContent>
               </Card>
@@ -77,6 +81,3 @@ export function FlashcardSidebar() {
     </aside>
   );
 }
-
-
-

@@ -1,21 +1,20 @@
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 
-
-export function FloatingSpeechBubble({ 
-  children, 
+export function FloatingSpeechBubble({
+  children,
   className,
-  delay = 0 
-}: { 
-  children: React.ReactNode; 
+  delay = 0,
+}: {
+  children: React.ReactNode;
   className?: string;
   delay?: number;
 }) {
   return (
-    <div 
+    <div
       className={cn(
-        "absolute px-4 py-2 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/50 shadow-lg",
-        "animate-float text-sm font-medium",
-        className
+        'absolute px-4 py-2 rounded-2xl bg-card/80 backdrop-blur-sm border border-border/50 shadow-lg',
+        'animate-float text-sm font-medium',
+        className,
       )}
       style={{ animationDelay: `${delay}s` }}
     >
@@ -24,5 +23,3 @@ export function FloatingSpeechBubble({
     </div>
   );
 }
-
-

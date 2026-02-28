@@ -1,4 +1,4 @@
-import type { ToolUIPart } from "ai";
+import type { ToolUIPart } from 'ai';
 
 /**
  * Input shape for the createFlashcard tool
@@ -14,7 +14,7 @@ export interface CreateFlashcardInput {
  * Note: toolCallId exists at runtime but is not in the base ToolUIPart type
  */
 export interface CreateFlashcardToolPart {
-  type: "tool-createFlashcard";
+  type: 'tool-createFlashcard';
   input?: CreateFlashcardInput;
   toolCallId?: string;
 }
@@ -24,11 +24,11 @@ export interface CreateFlashcardToolPart {
  * Also validates that the input field exists (may not be populated during streaming)
  */
 export function isCreateFlashcardToolPart(
-  toolPart: ToolUIPart
+  toolPart: ToolUIPart,
 ): toolPart is CreateFlashcardToolPart & ToolUIPart {
   return (
-    toolPart.type === "tool-createFlashcard" &&
-    typeof toolPart.input === "object" &&
+    toolPart.type === 'tool-createFlashcard' &&
+    typeof toolPart.input === 'object' &&
     toolPart.input !== null
   );
 }
@@ -37,7 +37,7 @@ export function isCreateFlashcardToolPart(
  * Type guard to check if a tool part has a toolCallId
  */
 export function hasToolCallId(toolPart: ToolUIPart): boolean {
-  return "toolCallId" in toolPart && typeof toolPart.toolCallId === "string";
+  return 'toolCallId' in toolPart && typeof toolPart.toolCallId === 'string';
 }
 
 /**
@@ -49,4 +49,3 @@ export function getToolCallId(toolPart: ToolUIPart): string | undefined {
   }
   return undefined;
 }
-

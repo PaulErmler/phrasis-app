@@ -1,7 +1,7 @@
 {
-  "name": "Phrasis - Language Learning",
-  "short_name": "Phrasis",
-  "description": "Master languages with Phrasis. Learn, practice pronunciation, and build fluency fast.",
+  "name": "Cacatua - Language Learning",
+  "short_name": "Cacatua",
+  "description": "Master languages with Cacatua. Learn, practice pronunciation, and build fluency fast.",
   "start_url": "/app",
   "display": "standalone",
   "background_color": "#0d1117",
