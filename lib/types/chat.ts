@@ -1,14 +1,14 @@
-import type { UIMessage } from "ai";
+import type { UIMessage } from 'ai';
 
 /**
  * Status of the chat submission/streaming process
  */
-export type ChatStatus = "submitted" | "streaming" | "ready" | "error";
+export type ChatStatus = 'submitted' | 'streaming' | 'ready' | 'error';
 
 /**
  * Status of individual UI messages
  */
-export type UIMessageStatus = "streaming" | "pending" | "success" | "failed";
+export type UIMessageStatus = 'streaming' | 'pending' | 'success' | 'failed';
 
 /**
  * Extended UIMessage with agent-specific fields
@@ -49,4 +49,3 @@ export interface Thread {
   status?: string;
   _creationTime: number;
 }
-

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Data filtering pipeline for Phrasis app.
+Data filtering pipeline for Cacatua app.
 """
 
 from pathlib import Path
@@ -16,7 +16,7 @@ def main():
     output_path = data_dir / "intermediate_outputs"
     
     print("=" * 60)
-    print("Phrasis Data Filtering Pipeline")
+    print("Cacatua Data Filtering Pipeline")
     print("=" * 60)
     print()
     

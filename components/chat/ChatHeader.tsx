@@ -1,6 +1,6 @@
-import { SignedIn, UserButton } from "@daveyplate/better-auth-ui";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { SignedIn, UserButton } from '@daveyplate/better-auth-ui';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 interface ChatHeaderProps {
   onBack?: () => void;
@@ -27,7 +27,7 @@ export function ChatHeader({ onBack }: ChatHeaderProps) {
           <div className="w-8 h-8 rounded-lg bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
             <span className="text-sm font-bold text-white">P</span>
           </div>
-          <span className="font-semibold text-lg">Phrasis</span>
+          <span className="heading-section">Cacatua</span>
         </div>
         <div className="flex items-center gap-4">
           <SignedIn>
@@ -38,7 +38,3 @@ export function ChatHeader({ onBack }: ChatHeaderProps) {
     </header>
   );
 }
-
-
-
-

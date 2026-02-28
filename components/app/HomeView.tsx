@@ -1,73 +1,68 @@
-"use client";
+'use client';
 
-import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
-import { useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { getLanguagesByCodes } from "@/lib/languages";
-import { NewChatInput } from "@/components/chat/NewChatInput";
-import { CollectionSelector } from "@/components/app/CollectionSelector";
-import { DeckCardsView } from "@/components/app/DeckCardsView";
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { Preloaded } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Button } from '@/components/ui/button';
+import { NewChatInput } from '@/components/chat/NewChatInput';
+import { CollectionCarousel } from '@/components/app/CollectionCarousel';
+import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
+import { Play, Loader2 } from 'lucide-react';
 
-export function HomeView() {
+export function HomeView({
+  preloadedCollectionProgress,
+  preloadedCourseSettings,
+}: {
+  preloadedCollectionProgress: Preloaded<
+    typeof api.features.decks.getCollectionProgress
+  >;
+  preloadedCourseSettings: Preloaded<
+    typeof api.features.courses.getActiveCourseSettings
+  >;
+}) {
   const router = useRouter();
-  const t = useTranslations("AppPage");
-  const activeCourse = useQuery(api.courses.getActiveCourse);
+  const t = useTranslations('AppPage');
+  const [isNavigating, setIsNavigating] = useState(false);
 
-  const formatCourseName = () => {
-    if (!activeCourse) return null;
-    const targetLanguageObjects = getLanguagesByCodes(activeCourse.targetLanguages);
-    const targetNames = targetLanguageObjects.map((l) => l.name).join(", ");
-    return targetNames;
+  const handleStartLearning = () => {
+    setIsNavigating(true);
+    router.push('/app/learn');
   };
 
-  const courseName = formatCourseName();
-
   return (
-    <div className="max-w-xl mx-auto space-y-6">
-      {courseName && (
-        <div className="text-center py-2">
-          <p className="text-sm text-muted-foreground">{t("courses.currentCourse")}</p>
-          <h2 className="text-2xl font-bold mt-1">{courseName}</h2>
-        </div>
-      )}
+    <div className="app-view">
+      {/* Start Learning Button */}
+      <Button
+        size="lg"
+        className="w-full gap-2"
+        onClick={handleStartLearning}
+        disabled={isNavigating}
+      >
+        {isNavigating ? (
+          <Loader2 className="h-5 w-5 animate-spin" />
+        ) : (
+          <Play className="h-5 w-5 fill-current" />
+        )}
+        {t('startLearning')}
+      </Button>
 
-      <NewChatInput 
-        showSuggestions={false}
-      />
+      <ProgressStatsCard />
 
-      {/* Collection Selector - Add Cards to Deck */}
-      <CollectionSelector />
+      {/* Collection Carousel - Select difficulty and add cards */}
+      <div className="space-y-2">
+        <h2 className="heading-section">
+          {t('collections.carousel.sectionTitle')}
+        </h2>
+        <CollectionCarousel
+          preloadedCollectionProgress={preloadedCollectionProgress}
+          preloadedCourseSettings={preloadedCourseSettings}
+        />
+      </div>
 
-      {/* Deck Cards View - Display all cards in deck */}
-      <DeckCardsView />
-
-      {/* Flashcards Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{t("flashcards.title")}</CardTitle>
-          <CardDescription>
-            {t("flashcards.description")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Button
-            onClick={() => router.push("/flashcard")}
-            className="w-full"
-          >
-            {t("flashcards.goToFlashcard")}
-          </Button>
-          <Button
-            onClick={() => router.push("/audio-flashcard")}
-            className="w-full"
-            variant="outline"
-          >
-            {t("flashcards.goToAudioFlashcard")}
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Chat */}
+      <NewChatInput showSuggestions={false} />
     </div>
   );
 }
