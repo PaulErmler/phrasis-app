@@ -6,6 +6,11 @@ export const learningStyleValidator = v.union(
   v.literal("advanced")
 );
 
+export const schedulingPhaseValidator = v.union(
+  v.literal("preReview"),
+  v.literal("review")
+);
+
 export const currentLevelValidator = v.union(
   v.literal("beginner"),
   v.literal("elementary"),
