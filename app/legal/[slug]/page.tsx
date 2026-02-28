@@ -23,7 +23,7 @@ export default async function LegalPage({
         <div className="max-w-3xl mx-auto py-20 px-6 w-full">
           <header className="mb-10 border-b pb-6">
             <h1 className="text-4xl font-bold mb-2">{data.metadata.title}</h1>
-            <p className="text-muted-foreground text-sm">
+            <p className="text-muted-sm">
               {locale === "de" ? "Zuletzt aktualisiert: " : "Last updated: "}
               {data.metadata.lastUpdated}
             </p>

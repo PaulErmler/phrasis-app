@@ -59,7 +59,7 @@ export default function ChatPage() {
   );
 
   // Mutations
-  const sendMessage = useMutation(api.chat.messages.sendMessage);
+  const sendMessage = useMutation(api.features.chat.messages.sendMessage);
 
 
 

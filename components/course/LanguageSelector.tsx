@@ -36,7 +36,7 @@ export function LanguageSelector({
         <div className="text-center space-y-2 py-4">
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           {subtitle && (
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
+            <p className="text-muted-sm">{subtitle}</p>
           )}
         </div>
       )}
@@ -69,7 +69,7 @@ export function LanguageSelector({
                 <p className="font-semibold text-sm leading-tight break-words">
                   {getLocalizedLanguageNameByCode(language.code, locale)}
                 </p>
-                <p className="text-xs text-muted-foreground break-words">
+                <p className="text-muted-xs break-words">
                   {language.nativeName}
                 </p>
               </div>

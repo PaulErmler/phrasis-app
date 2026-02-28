@@ -40,6 +40,9 @@ yarn-error.log*
 # convex temp directory
 .convex-tmp
 
+# local convex branch snapshots
+.convex-snapshots/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

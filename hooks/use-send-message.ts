@@ -27,7 +27,7 @@ export function useSendMessage({
   onSuccess,
   onError,
 }: UseSendMessageProps) {
-  const sendMessageMutation = useMutation(api.chat.messages.sendMessage);
+  const sendMessageMutation = useMutation(api.features.chat.messages.sendMessage);
 
   const sendMessage = useCallback(
     async ({ prompt, clearInput }: SendMessageOptions) => {
