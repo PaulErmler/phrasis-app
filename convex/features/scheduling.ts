@@ -20,6 +20,7 @@ import {
   fsrsStateValidator,
   translationValidator,
   audioRecordingValidator,
+  schedulingPhaseValidator
 } from '../types';
 import { getAudioForText } from '../lib/audio';
 
@@ -68,7 +69,7 @@ export const getCardForReview = query({
       isMastered: v.boolean(),
       isHidden: v.boolean(),
       isFavorite: v.optional(v.boolean()),
-      schedulingPhase: v.string(),
+      schedulingPhase: schedulingPhaseValidator,
       preReviewCount: v.number(),
       initialReviewCount: v.number(),
       fsrsState: v.union(fsrsStateValidator, v.null()),
@@ -185,7 +186,7 @@ export const reviewCard = mutation({
     timezone: v.string(),
   },
   returns: v.object({
-    schedulingPhase: v.string(),
+    schedulingPhase: schedulingPhaseValidator,
     preReviewCount: v.number(),
     dueDate: v.number(),
     phaseTransitioned: v.boolean(),
@@ -197,7 +198,7 @@ export const reviewCard = mutation({
     const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
 
     // Validate rating is appropriate for the card's current phase
-    const phase = card.schedulingPhase as 'preReview' | 'review';
+    const phase = card.schedulingPhase;
     const validRatings = getValidRatings(phase);
     if (!validRatings.includes(args.rating)) {
       throw new ConvexError(

@@ -89,8 +89,8 @@ export function NewsletterSection() {
                 </p>
               </form>
 
-              {status === 'success' && (
-                <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-success dark:text-green-400 text-sm text-center">
+              {status === "success" && (
+                <div className="mt-4 p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-success text-sm text-center">
                   {t('success')}
                 </div>
               )}

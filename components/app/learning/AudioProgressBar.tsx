@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { updateMediaSessionPosition } from '@/lib/audio/mediaSession';
 
@@ -24,32 +24,30 @@ export const AudioProgressBar = memo(function AudioProgressBar({
   isMerging?: boolean;
 }) {
   const [currentTime, setCurrentTime] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setCurrentTime(0);
   }, [durationSec]);
 
   useEffect(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-
     const audio = audioRef.current;
-    if (audio) setCurrentTime(audio.currentTime);
+    if (!audio) return;
 
-    if (isPlaying) {
-      timerRef.current = setInterval(() => {
-        if (audio && !audio.paused) {
-          setCurrentTime(audio.currentTime);
-          updateMediaSessionPosition(audio.duration || 0, audio.currentTime);
-        }
-      }, 33);
-    }
+    const updatePosition = () => {
+      setCurrentTime(audio.currentTime);
+      updateMediaSessionPosition(audio.duration || 0, audio.currentTime);
+    };
+
+    updatePosition();
+
+    if (!isPlaying) return;
+
+    audio.addEventListener('timeupdate', updatePosition);
+    audio.addEventListener('seeked', updatePosition);
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      audio.removeEventListener('timeupdate', updatePosition);
+      audio.removeEventListener('seeked', updatePosition);
     };
   }, [isPlaying, audioRef]);
 
