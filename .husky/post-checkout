@@ -17,6 +17,7 @@ if [ ! -f "$SNAPSHOT" ]; then
 fi
 
 printf "\n[convex] Restoring snapshot for branch '%s'...\n" "$CURR_BRANCH"
+sleep 5
 if ./node_modules/.bin/convex import --replace -y --env-file .env.local "$SNAPSHOT" 2>/dev/null; then
   printf "[convex] Snapshot restored successfully.\n\n"
 else
