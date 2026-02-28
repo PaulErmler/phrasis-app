@@ -71,6 +71,22 @@
     },
     "contentSoon": "Demnächst: Entdecke neue Phrasen und auf dich zugeschnittene Inhalte.",
     "librarySoon": "Demnächst: Verwalte und organisiere deine gespeicherten Phrasen.",
+    "library": {
+      "title": "Bibliothek",
+      "searchPlaceholder": "Karten suchen...",
+      "filterMastered": "Gemeistert",
+      "filterHidden": "Ausgeblendet",
+      "filterFavorites": "Favoriten",
+      "filtersLabel": "Filter",
+      "emptyTitle": "Noch keine Karten",
+      "emptyDescription": "Füge Karten aus einer Sammlung hinzu, um deine Bibliothek aufzubauen.",
+      "emptySearchTitle": "Keine Ergebnisse",
+      "emptySearchDescription": "Keine Karten entsprechen deiner Suche oder den Filtern.",
+      "unhide": "Einblenden",
+      "hide": "Ausblenden",
+      "master": "Meistern",
+      "unmaster": "Nicht mehr gemeistert"
+    },
     "settings": {
       "account": "Konto",
       "language": "App-Sprache"

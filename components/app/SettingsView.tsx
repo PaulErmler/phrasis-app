@@ -15,6 +15,7 @@ export function SettingsView() {
   const userEmail = session?.user?.email;
 
   return (
+    <div className="flex-1 overflow-y-auto px-4 py-8">
     <div className="app-view">
       <Card>
         <CardContent className="space-y-6">
@@ -64,6 +65,7 @@ export function SettingsView() {
           </div>
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }

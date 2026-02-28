@@ -6,13 +6,15 @@ import { Card, CardContent } from '@/components/ui/card';
 export function ContentView() {
   const t = useTranslations('AppPage');
   return (
-    <div className="app-view">
-      <div className="text-center space-y-2 mb-6" />
-      <Card>
-        <CardContent className="p-12 text-center">
-          <p className="text-muted-foreground">{t('contentSoon')}</p>
-        </CardContent>
-      </Card>
+    <div className="flex-1 overflow-y-auto px-4 py-8">
+      <div className="app-view">
+        <div className="text-center space-y-2 mb-6" />
+        <Card>
+          <CardContent className="p-12 text-center">
+            <p className="text-muted-foreground">{t('contentSoon')}</p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

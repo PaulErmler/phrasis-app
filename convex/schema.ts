@@ -124,16 +124,25 @@ export default defineSchema({
     schedulingPhase: schedulingPhaseValidator,
     preReviewCount: v.number(), // How many pre-review rounds completed
     fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
+    searchableText: v.optional(v.string()), // Denormalized source text + translations for full-text search
+    searchableTextLanguages: v.optional(v.array(v.string())), // Language codes included in searchableText; used to detect staleness when course languages change
+    lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review and FSRS phases)
   })
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_dueDate', ['deckId', 'dueDate'])
     .index('by_deckId_and_textId', ['deckId', 'textId'])
+    .index('by_textId', ['textId'])
     .index('by_deckId_and_isHidden_and_isMastered_and_dueDate', [
       'deckId',
       'isHidden',
       'isMastered',
       'dueDate',
-    ]),
+    ])
+    .index('by_deckId_and_lastReviewedAt', ['deckId', 'lastReviewedAt'])
+    .searchIndex('search_text', {
+      searchField: 'searchableText',
+      filterFields: ['deckId', 'isHidden', 'isMastered', 'isFavorite'],
+    }),
 
   // Course stats table - tracks learning statistics per course
   courseStats: defineTable({

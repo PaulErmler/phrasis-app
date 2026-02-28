@@ -71,6 +71,22 @@
     },
     "contentSoon": "Coming Soon: Discover new phrases and content tailored for you.",
     "librarySoon": "Coming Soon: Manage and organize your saved phrases.",
+    "library": {
+      "title": "Library",
+      "searchPlaceholder": "Search cards...",
+      "filterMastered": "Mastered",
+      "filterHidden": "Hidden",
+      "filterFavorites": "Favorites",
+      "filtersLabel": "Filters",
+      "emptyTitle": "No cards yet",
+      "emptyDescription": "Add cards from a collection to start building your library.",
+      "emptySearchTitle": "No results",
+      "emptySearchDescription": "No cards match your search or filters.",
+      "unhide": "Unhide",
+      "hide": "Hide",
+      "master": "Master",
+      "unmaster": "Unmaster"
+    },
     "settings": {
       "account": "Account",
       "language": "App Language"

@@ -34,6 +34,7 @@ export function HomeView({
   };
 
   return (
+    <div className="flex-1 overflow-y-auto px-4 py-8">
     <div className="app-view">
       <ProgressStatsCard
         preloadedCourseStats={preloadedCourseStats}
@@ -54,6 +55,7 @@ export function HomeView({
 
       {/* Chat */}
       <NewChatInput showSuggestions={false} />
+    </div>
     </div>
   );
 }

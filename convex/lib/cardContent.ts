@@ -142,3 +142,41 @@ export async function buildTextContentBatchForLanguages(
 
   return result;
 }
+
+/**
+ * Builds `searchableText` and `searchableTextLanguages` for a card by querying
+ * the translations table for each course language individually.
+ *
+ * Only languages for which a translation actually exists are included in
+ * `searchableTextLanguages`, so callers can later detect staleness by comparing
+ * this array against the current course language list.
+ */
+export async function buildCardSearchableText(
+  ctx: ContentCtx,
+  textId: Id<'texts'>,
+  sourceText: string,
+  courseLanguages: string[],
+): Promise<{ searchableText: string; searchableTextLanguages: string[] }> {
+  const translationResults = await Promise.all(
+    courseLanguages.map(async (lang) => {
+      const translation = await ctx.db
+        .query('translations')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', textId).eq('targetLanguage', lang),
+        )
+        .unique();
+      return translation ? { lang, text: translation.translatedText } : null;
+    }),
+  );
+
+  const foundTranslations = translationResults.filter(
+    (t): t is NonNullable<typeof t> => t !== null,
+  );
+
+  return {
+    searchableText: [sourceText, ...foundTranslations.map((t) => t.text)]
+      .filter(Boolean)
+      .join(' '),
+    searchableTextLanguages: foundTranslations.map((t) => t.lang),
+  };
+}

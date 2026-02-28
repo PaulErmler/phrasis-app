@@ -23,7 +23,7 @@ import {
 import { translateText } from './translation';
 import { synthesizeSpeech } from './tts';
 import { translationValidator, audioRecordingValidator } from '../types';
-import { buildTextContentBatchForLanguages } from '../lib/cardContent';
+import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
   LEVEL_ORDER,
   COLLECTION_PREVIEW_SIZE,
@@ -462,6 +462,10 @@ export const addCardsFromCollection = mutation({
       const existingCard = await getCardByDeckAndText(ctx, deck._id, text._id);
 
       if (!existingCard) {
+        const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
+        const { searchableText, searchableTextLanguages } =
+          await buildCardSearchableText(ctx, text._id, text.text, courseLanguages);
+
         await ctx.db.insert('cards', {
           deckId: deck._id,
           textId: text._id,
@@ -472,6 +476,8 @@ export const addCardsFromCollection = mutation({
           isFavorite: false,
           schedulingPhase: 'preReview',
           preReviewCount: 0,
+          searchableText,
+          searchableTextLanguages,
         });
         cardsInserted++;
       }

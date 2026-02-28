@@ -65,6 +65,16 @@ async function processApproval(
   }
 
   const now = Date.now();
+  const courseLanguageSet = new Set([...course.baseLanguages, ...course.targetLanguages]);
+  const matchedTranslations = approval.translations.filter((entry) =>
+    courseLanguageSet.has(entry.language),
+  );
+  const searchableText = matchedTranslations
+    .map((entry) => entry.text)
+    .filter(Boolean)
+    .join(' ');
+  const searchableTextLanguages = matchedTranslations.map((entry) => entry.language);
+
   const cardId: Id<'cards'> = await ctx.db.insert('cards', {
     deckId: deck._id,
     textId,
@@ -74,6 +84,8 @@ async function processApproval(
     isFavorite: false,
     schedulingPhase: 'preReview',
     preReviewCount: 0,
+    searchableText,
+    searchableTextLanguages,
   });
 
   await ctx.db.patch(deck._id, { cardCount: deck.cardCount + 1 });

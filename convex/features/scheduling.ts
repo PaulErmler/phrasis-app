@@ -1,5 +1,6 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query, MutationCtx } from '../_generated/server';
+import { buildCardSearchableText } from '../lib/cardContent';
 import { Id } from '../_generated/dataModel';
 import { getAuthUser, requireAuthUser } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -193,7 +194,7 @@ export const reviewCard = mutation({
     fsrsState: v.union(fsrsStateValidator, v.null()),
   }),
   handler: async (ctx, args) => {
-    const { user, card, deck } = await authorizeCardAccess(ctx, args.cardId);
+    const { user, card, deck, course } = await authorizeCardAccess(ctx, args.cardId);
 
     const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
 
@@ -221,11 +222,36 @@ export const reviewCard = mutation({
     const jitterMs = Math.random() * 60_000;
     const dueDateWithJitter = result.dueDate + jitterMs;
 
+    // Rebuild searchableText only when the card's cached languages don't match
+    // the current course languages (new language added, or card predates this field) or translation were generated after card was added.
+    const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
+    const courseLanguageSet = new Set(courseLanguages);
+    const cached = card.searchableTextLanguages;
+    const searchableTextIsStale =
+      cached === undefined ||
+      cached.length !== courseLanguages.length ||
+      cached.some((l) => !courseLanguageSet.has(l));
+
+    let searchableTextPatch: { searchableText: string; searchableTextLanguages: string[] } | undefined;
+    if (searchableTextIsStale) {
+      const text = await ctx.db.get(card.textId);
+      if (text) {
+        searchableTextPatch = await buildCardSearchableText(
+          ctx,
+          card.textId,
+          text.text,
+          courseLanguages,
+        );
+      }
+    }
+
     // Patch the card
     await ctx.db.patch(args.cardId, {
       schedulingPhase: result.schedulingPhase,
       preReviewCount: result.preReviewCount,
       dueDate: dueDateWithJitter,
+      lastReviewedAt: Date.now(),
+      ...searchableTextPatch,
       ...(result.fsrsState && { fsrsState: result.fsrsState }),
     });
 

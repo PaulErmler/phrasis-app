@@ -29,6 +29,7 @@ interface LearningCardContentProps {
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
   revealedLanguages?: ReadonlySet<string>;
+  bare?: boolean;
 }
 
 export function LearningCardContent({
@@ -46,6 +47,7 @@ export function LearningCardContent({
   hideTargetLanguages = false,
   autoRevealLanguages = false,
   revealedLanguages,
+  bare = false,
 }: LearningCardContentProps) {
   const t = useTranslations('LearningMode');
   const baseTranslations = translations.filter((tr) => tr.isBaseLanguage);
@@ -69,9 +71,7 @@ export function LearningCardContent({
     });
   };
 
-  return (
-    <main className="flex-1 overflow-y-auto">
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+  const cardSurface = (
         <div className="card-surface">
           {/* Card top bar: metadata left, actions right */}
           <div className="flex items-center justify-between px-4 pt-4 pb-2">
@@ -190,6 +190,14 @@ export function LearningCardContent({
             </div>
           </div>
         </div>
+  );
+
+  if (bare) return cardSurface;
+
+  return (
+    <main className="flex-1 overflow-y-auto">
+      <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+        {cardSurface}
       </div>
     </main>
   );
