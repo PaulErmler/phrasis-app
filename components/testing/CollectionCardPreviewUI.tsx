@@ -32,8 +32,10 @@ export function CollectionCardPreviewUI({
   if (isCollectionComplete) {
     return (
       <div className="rounded-xl border border-border bg-muted/30 p-4 text-center space-y-2">
-        <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto" />
-        <p className="text-sm font-medium">{collectionName} complete!</p>
+        <CheckCircle2 className="h-8 w-8 text-success mx-auto" />
+        <p className="text-sm font-medium">
+          {collectionName} complete!
+        </p>
         <p className="text-muted-xs">
           All cards from this collection have been added to your deck.
         </p>
@@ -56,7 +58,7 @@ export function CollectionCardPreviewUI({
   if (texts.length === 0) {
     return (
       <div className="rounded-xl border border-border bg-muted/30 p-4 text-center space-y-2">
-        <CheckCircle2 className="h-8 w-8 text-green-500 mx-auto" />
+        <CheckCircle2 className="h-8 w-8 text-success mx-auto" />
         <p className="text-sm font-medium">
           No more cards to add from {collectionName}
         </p>
