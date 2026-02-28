@@ -34,7 +34,7 @@ export function DifficultySelector({
         <div className="text-center space-y-2 py-4">
           <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
           {subtitle && (
-            <p className="text-sm text-muted-foreground">{subtitle}</p>
+            <p className="text-muted-sm">{subtitle}</p>
           )}
         </div>
       )}
@@ -63,7 +63,7 @@ export function DifficultySelector({
                 <h3 className="font-semibold text-base leading-none mb-1">
                   {level.title}
                 </h3>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-sm">
                   {level.description}
                 </p>
               </div>

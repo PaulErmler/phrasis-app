@@ -35,11 +35,11 @@ export function TTSTest() {
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const requestTTS = useMutation(api.tts.requestTTS);
+  const requestTTS = useMutation(api.testing.tts.requestTTS);
 
   // Query the TTS request - reactively updates when the result is ready
   const ttsRequest = useQuery(
-    api.tts.getTTSRequest,
+    api.testing.tts.getTTSRequest,
     requestId ? { requestId } : "skip"
   );
 
@@ -322,7 +322,7 @@ export function TTSTest() {
         {/* Audio Playback Controls */}
         {hasAudio && (
           <div className="rounded-lg p-3 bg-muted space-y-2">
-            <p className="text-xs text-muted-foreground">Generated Audio:</p>
+            <p className="text-muted-xs">Generated Audio:</p>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -342,7 +342,7 @@ export function TTSTest() {
                   </>
                 )}
               </Button>
-              <span className="text-sm text-muted-foreground truncate">
+              <span className="text-muted-sm truncate">
                 {selectedVoice?.displayName}
               </span>
             </div>

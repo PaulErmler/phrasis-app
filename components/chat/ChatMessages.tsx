@@ -38,13 +38,13 @@ interface ChatMessagesProps {
  * Component for displaying chat messages with streaming support
  */
 export function ChatMessages({ messages, isLoading, threadId }: ChatMessagesProps) {
-  const approveFlashcard = useMutation(api.chat.flashcardApprovals.approveFlashcard);
-  const rejectFlashcard = useMutation(api.chat.flashcardApprovals.rejectFlashcard);
+  const approveFlashcard = useMutation(api.features.chat.flashcardApprovals.approveFlashcard);
+  const rejectFlashcard = useMutation(api.features.chat.flashcardApprovals.rejectFlashcard);
   const [processingApprovals, setProcessingApprovals] = useState<Set<string>>(new Set());
 
   // Query all approvals for this thread
   const threadApprovals = useQuery(
-    api.chat.flashcardApprovals.getApprovalsByThread,
+    api.features.chat.flashcardApprovals.getApprovalsByThread,
     threadId ? { threadId } : "skip"
   );
 

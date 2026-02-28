@@ -78,7 +78,7 @@ export function useChatMessages({
   const prevStreamingRef = useRef<boolean | null>(null);
 
   const listMessagesQuery: UIMessagesQuery<{ threadId: string }, AgentUIMessage> =
-    api.chat.messages.listMessages as UIMessagesQuery<{ threadId: string }, AgentUIMessage>;
+    api.features.chat.messages.listMessages as UIMessagesQuery<{ threadId: string }, AgentUIMessage>;
 
   const messageResult = useUIMessages(
     listMessagesQuery,

@@ -18,7 +18,7 @@ export function Header() {
               width={40}
               height={40}
             />
-            <span className="text-xl font-bold text-foreground">Phrasis</span>
+            <span className="heading-dialog text-foreground">Phrasis</span>
           </Link>
 
           <div className="flex items-center gap-4">

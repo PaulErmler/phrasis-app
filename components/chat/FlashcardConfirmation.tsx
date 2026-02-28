@@ -98,7 +98,7 @@ export function FlashcardConfirmation({
   if (approvalState === "approved") {
     return (
       <Alert className="my-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-        <AlertDescription className="text-green-700 dark:text-green-300">
+        <AlertDescription className="text-success">
           ✓ {t("approved")}
         </AlertDescription>
       </Alert>
