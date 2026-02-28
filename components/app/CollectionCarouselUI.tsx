@@ -152,7 +152,7 @@ export function CollectionCarouselUI({
                     "w-full text-left rounded-xl border p-5 transition-all cursor-pointer h-[200px] flex flex-col",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     "hover:shadow-md",
-                    isActive && !isComplete && "border-2 border-current",
+                    isActive && !isComplete && "state-active",
                     isComplete && "opacity-50"
                   )}
                 >

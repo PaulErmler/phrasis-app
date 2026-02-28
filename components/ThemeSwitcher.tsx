@@ -29,7 +29,7 @@ export function ThemeSwitcher({ className }: { className?: string }) {
         <Button 
           variant="ghost" 
           size="icon" 
-          className={cn(className)}
+          className={cn("size-9", className)}
           disabled={!mounted}
         >
           <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />

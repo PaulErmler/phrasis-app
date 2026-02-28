@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { learningStyleValidator, currentLevelValidator, fsrsStateValidator } from "./types";
+import { learningStyleValidator, currentLevelValidator, fsrsStateValidator, schedulingPhaseValidator } from "./types";
 import { testingTables } from "./testing/schema";
 
 export default defineSchema({
@@ -108,7 +108,7 @@ export default defineSchema({
     dueDate: v.number(), // Timestamp for spaced repetition scheduling (driven by scheduler)
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
-    schedulingPhase: v.string(), // "preReview" | "review"
+    schedulingPhase: schedulingPhaseValidator,
     preReviewCount: v.number(), // How many pre-review rounds completed
     fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
   })
