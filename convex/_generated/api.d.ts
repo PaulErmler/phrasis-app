@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as autumn from "../autumn.js";
 import type * as db_collections from "../db/collections.js";
 import type * as db_courseSettings from "../db/courseSettings.js";
 import type * as db_courseStats from "../db/courseStats.js";
@@ -45,6 +46,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  autumn: typeof autumn;
   "db/collections": typeof db_collections;
   "db/courseSettings": typeof db_courseSettings;
   "db/courseStats": typeof db_courseStats;
@@ -4933,4 +4935,5 @@ export declare const components: {
       };
     };
   };
+  autumn: {};
 };
