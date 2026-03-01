@@ -98,6 +98,10 @@
       "due": "Fällig"
     },
     "collections": {
+      "customCarousel": {
+        "sectionTitle": "Eigene Inhalte",
+        "emptyState": "Deine eigenen Inhalte erscheinen hier, sobald du welche erstellst"
+      },
       "carousel": {
         "sectionTitle": "Schwierigkeitsauswahl",
         "title": "Sammlungen",
@@ -125,7 +129,8 @@
           "B1": "Sätze mit Vokabular auf CEFR B1-Niveau",
           "B2": "Sätze mit Vokabular auf CEFR B2-Niveau",
           "C1": "Sätze mit Vokabular auf CEFR C1-Niveau",
-          "C2": "Sätze mit Vokabular auf CEFR C2-Niveau"
+          "C2": "Sätze mit Vokabular auf CEFR C2-Niveau",
+          "Chat": "Phrasen und Vokabular aus dem Chat"
         },
         "detail": {
           "totalCards": "{count} Karten",

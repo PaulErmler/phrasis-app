@@ -50,6 +50,8 @@ interface CollectionDetailDialogProps {
   isAdding: boolean;
   onSelect: () => void;
   onAddCards: () => void;
+  /** When true, hides the "Add N Cards" button and next sentences header */
+  hideAddCards?: boolean;
 }
 
 export function CollectionDetailDialog({
@@ -65,6 +67,7 @@ export function CollectionDetailDialog({
   isAdding,
   onSelect,
   onAddCards,
+  hideAddCards = false,
 }: CollectionDetailDialogProps) {
   const t = useTranslations('AppPage.collections.carousel.detail');
   const tDesc = useTranslations('AppPage.collections.carousel.descriptions');
@@ -101,7 +104,7 @@ export function CollectionDetailDialog({
               <Progress value={progress} className="h-2" />
             </div>
 
-            {!isComplete ? (
+            {!isComplete && (
               <Button
                 variant={isActive ? 'secondary' : 'outline'}
                 className="shrink-0 w-28 justify-center"
@@ -110,7 +113,8 @@ export function CollectionDetailDialog({
                 {isActive && <Check className="h-4 w-4" />}
                 {isActive ? t('selected') : t('select')}
               </Button>
-            ) : (
+            )}
+            {isComplete && (
               <div className="flex items-center gap-1.5 text-sm text-success font-medium shrink-0 px-3">
                 <CheckCircle2 className="h-5 w-5" />
                 {t('done')}
@@ -118,7 +122,7 @@ export function CollectionDetailDialog({
             )}
           </div>
 
-          {!isComplete && (
+          {!isComplete && !hideAddCards && (
             <>
               <Separator />
               <div className="flex items-center justify-between">

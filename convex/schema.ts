@@ -103,6 +103,8 @@ export default defineSchema({
     // Language order overrides
     baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
     targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
+    chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
+    activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
   }).index('by_courseId', ['courseId']),
 
   // Decks table - one deck per course, auto-created
@@ -179,6 +181,7 @@ export default defineSchema({
     userId: v.string(),
     status: cardApprovalStatusValidator,
     processedAt: v.optional(v.number()),
+    textId: v.optional(v.id('texts')),
     cardId: v.optional(v.id('cards')),
   })
     .index('by_toolCallId', ['toolCallId'])

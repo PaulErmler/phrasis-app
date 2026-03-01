@@ -98,6 +98,10 @@
       "due": "Due"
     },
     "collections": {
+      "customCarousel": {
+        "sectionTitle": "Custom Content",
+        "emptyState": "Your custom content will show up here once you create it"
+      },
       "carousel": {
         "sectionTitle": "Difficulty Selection",
         "title": "Collections",
@@ -125,7 +129,8 @@
           "B1": "Sentences with vocabulary at CEFR B1 Level",
           "B2": "Sentences with vocabulary at CEFR B2 Level",
           "C1": "Sentences with vocabulary at CEFR C1 Level",
-          "C2": "Sentences with vocabulary at CEFR C2 Level"
+          "C2": "Sentences with vocabulary at CEFR C2 Level",
+          "Chat": "Phrases and vocabulary from the chat"
         },
         "detail": {
           "totalCards": "{count} cards",

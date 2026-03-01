@@ -44,7 +44,7 @@ export function getCollectionDescription(
 
 interface CollectionCarouselUIProps {
   collections: CollectionProgressItem[];
-  activeCollectionId: string | null;
+  activeCollectionIds: string[];
   onSelectCollection: (collectionId: string) => void;
   onOpenCollection: (collectionId: string) => void;
   isLoading?: boolean;
@@ -54,7 +54,7 @@ interface CollectionCarouselUIProps {
 
 export function CollectionCarouselUI({
   collections,
-  activeCollectionId,
+  activeCollectionIds,
   onSelectCollection,
   onOpenCollection,
   isLoading = false,
@@ -133,7 +133,7 @@ export function CollectionCarouselUI({
             const isComplete =
               collection.cardsAdded >= collection.totalTexts &&
               collection.totalTexts > 0;
-            const isActive = activeCollectionId === collection.collectionId;
+            const isActive = activeCollectionIds.includes(collection.collectionId);
             const hasStarted = collection.cardsAdded > 0;
 
             return (
@@ -171,9 +171,7 @@ export function CollectionCarouselUI({
                         className="shrink-0 text-xs h-8 w-24 justify-center"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!isActive) {
-                            onSelectCollection(collection.collectionId);
-                          }
+                          onSelectCollection(collection.collectionId);
                         }}
                       >
                         {isActive && <Check className="h-3.5 w-3.5" />}

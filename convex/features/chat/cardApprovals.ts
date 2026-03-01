@@ -3,8 +3,12 @@ import { mutation, query, internalMutation } from '../../_generated/server';
 import { internal } from '../../_generated/api';
 import { getAuthUser } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
-import { getDeckByCourseId } from '../../db/decks';
-import { cardApprovalStatusValidator } from '../../types';
+import {
+  getOrCreateChatCollection,
+  getCollectionProgress,
+} from '../../db/collections';
+import { getCourseSettings } from '../../db/courseSettings';
+import { cardApprovalStatusValidator, translationValidator } from '../../types';
 import type { Id, Doc } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
 
@@ -30,29 +34,32 @@ async function getAuthenticatedPendingApproval(
 
 /**
  * Core approval logic for approveCard.
- * Creates text, translations, card, and schedules TTS.
+ * Creates text + translations and adds them to the per-course chat collection.
+ * Cards are created later when the learning system needs new cards.
  */
 async function processApproval(
   ctx: MutationCtx,
   approval: Doc<'cardApprovals'>,
   user: { _id: string },
-) {
+): Promise<Id<'texts'>> {
   const active = await getActiveCourseForUser(ctx, user._id);
   if (!active) throw new ConvexError('No active course found');
   const { course } = active;
 
-  let deck = await getDeckByCourseId(ctx, course._id);
-  if (!deck) throw new ConvexError('Failed to create deck');
-
+  const chatCollection = await getOrCreateChatCollection(ctx, course._id);
 
   const mainEntry = approval.translations[0];
   const mainText = mainEntry.text.slice(0, MAX_MAIN_TEXT_LENGTH);
+
+  const nextRank = chatCollection.textCount + 1;
 
   const textId: Id<'texts'> = await ctx.db.insert('texts', {
     text: mainText,
     language: mainEntry.language,
     userCreated: true,
     userId: user._id,
+    collectionId: chatCollection._id,
+    collectionRank: nextRank,
   });
 
   for (let i = 1; i < approval.translations.length; i++) {
@@ -64,31 +71,9 @@ async function processApproval(
     });
   }
 
-  const now = Date.now();
-  const courseLanguageSet = new Set([...course.baseLanguages, ...course.targetLanguages]);
-  const matchedTranslations = approval.translations.filter((entry) =>
-    courseLanguageSet.has(entry.language),
-  );
-  const searchableText = matchedTranslations
-    .map((entry) => entry.text)
-    .filter(Boolean)
-    .join(' ');
-  const searchableTextLanguages = matchedTranslations.map((entry) => entry.language);
-
-  const cardId: Id<'cards'> = await ctx.db.insert('cards', {
-    deckId: deck._id,
-    textId,
-    dueDate: now,
-    isMastered: false,
-    isHidden: false,
-    isFavorite: false,
-    schedulingPhase: 'preReview',
-    preReviewCount: 0,
-    searchableText,
-    searchableTextLanguages,
+  await ctx.db.patch(chatCollection._id, {
+    textCount: chatCollection.textCount + 1,
   });
-
-  await ctx.db.patch(deck._id, { cardCount: deck.cardCount + 1 });
 
   await ctx.scheduler.runAfter(
     0,
@@ -102,11 +87,11 @@ async function processApproval(
 
   await ctx.db.patch(approval._id, {
     status: 'approved',
-    processedAt: now,
-    cardId,
+    processedAt: Date.now(),
+    textId,
   });
 
-  return cardId;
+  return textId;
 }
 
 /**
@@ -170,7 +155,7 @@ export const createApprovalRequestInternal = internalMutation({
 });
 
 /**
- * Approve a single card and create it in the user's deck.
+ * Approve a card proposal and add the text to the chat collection.
  */
 export const approveCard = mutation({
   args: {
@@ -178,7 +163,7 @@ export const approveCard = mutation({
   },
   returns: v.object({
     success: v.boolean(),
-    cardId: v.optional(v.id('cards')),
+    textId: v.optional(v.id('texts')),
   }),
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
@@ -189,8 +174,8 @@ export const approveCard = mutation({
       args.approvalId,
       user,
     );
-    const cardId = await processApproval(ctx, approval, user);
-    return { success: true, cardId };
+    const textId = await processApproval(ctx, approval, user);
+    return { success: true, textId };
   },
 });
 

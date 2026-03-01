@@ -1,12 +1,7 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import {
-  usePreloadedQuery,
-  useQuery,
-  useMutation,
-  Preloaded,
-} from 'convex/react';
+import { useState, useCallback } from 'react';
+import { usePreloadedQuery, useMutation, Preloaded } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { useTranslations } from 'next-intl';
@@ -16,7 +11,7 @@ import {
   type CollectionProgressItem,
 } from './CollectionCarouselUI';
 import { CollectionDetailDialog } from './CollectionDetailDialog';
-import { COLLECTION_PREVIEW_SIZE } from '@/convex/lib/collections';
+import { useCollectionDetail } from './useCollectionDetail';
 
 export function CollectionCarousel({
   preloadedCollectionProgress,
@@ -30,8 +25,6 @@ export function CollectionCarousel({
   >;
 }) {
   const t = useTranslations('AppPage.collections.carousel');
-  const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
   const [optimisticActiveId, setOptimisticActiveId] = useState<string | null>(
     null,
   );
@@ -41,63 +34,40 @@ export function CollectionCarousel({
   const setActiveCollection = useMutation(
     api.features.decks.setActiveCollection,
   );
-  const addCardsFromCollection = useMutation(
-    api.features.decks.addCardsFromCollection,
-  );
-  const ensureContent = useMutation(
-    api.features.collections.ensureContentForCollection,
-  );
 
   const activeCollectionId =
     optimisticActiveId ?? courseSettings?.activeCollectionId ?? null;
-
-  // Find opened collection progress
-  const openedCollection = collectionProgress?.find(
-    (c) => c.collectionId === openCollectionId,
-  );
-  const isOpenedComplete = openedCollection
-    ? openedCollection.cardsAdded >= openedCollection.totalTexts &&
-      openedCollection.totalTexts > 0
-    : false;
-
-  // Query enriched texts for the opened collection
-  const contentData = useQuery(
-    api.features.collections.getCollectionTextsWithContent,
-    openCollectionId && !isOpenedComplete
-      ? { collectionId: openCollectionId as Id<'collections'> }
-      : 'skip',
-  );
-
-  // Trigger content generation for missing translations/audio.
-  // Keyed by courseId+collectionId so a course switch re-triggers generation.
-  const ensuredRef = useRef<Set<string>>(new Set());
   const activeCourseId = courseSettings?.courseId ?? null;
 
-  useEffect(() => {
-    if (!contentData?.hasMissingContent || !openCollectionId || !activeCourseId)
-      return;
+  const items: CollectionProgressItem[] | undefined = collectionProgress?.map(
+    (c) => ({
+      collectionId: c.collectionId,
+      collectionName: c.collectionName,
+      cardsAdded: c.cardsAdded,
+      totalTexts: c.totalTexts,
+    }),
+  );
 
-    const key = `${activeCourseId}:${openCollectionId}`;
-    if (ensuredRef.current.has(key)) return;
+  const {
+    openCollectionId,
+    setOpenCollectionId,
+    openedCollection,
+    isOpenedComplete,
+    contentData,
+    isAdding,
+    handleAddCards,
+  } = useCollectionDetail({ collections: items, activeCourseId });
 
-    ensuredRef.current.add(key);
-    ensureContent({
-      collectionId: openCollectionId as Id<'collections'>,
-    }).catch(() => {
-      ensuredRef.current.delete(key);
-    });
-  }, [contentData, openCollectionId, activeCourseId, ensureContent]);
-
-  // Compute initial scroll index (active collection position)
   const initialScrollIndex =
     collectionProgress && activeCollectionId
       ? collectionProgress.findIndex(
-        (c) => c.collectionId === activeCollectionId,
-      )
+          (c) => c.collectionId === activeCollectionId,
+        )
       : undefined;
 
   const handleSelectCollection = useCallback(
     async (collectionId: string) => {
+      if (collectionId === activeCollectionId) return;
       setOptimisticActiveId(collectionId);
       try {
         await setActiveCollection({
@@ -112,43 +82,14 @@ export function CollectionCarousel({
         setOptimisticActiveId(null);
       }
     },
-    [setActiveCollection, t],
+    [setActiveCollection, t, activeCollectionId],
   );
-
-  const handleAddCards = useCallback(async () => {
-    if (!openCollectionId) return;
-
-    setIsAdding(true);
-    try {
-      const result = await addCardsFromCollection({
-        collectionId: openCollectionId as Id<'collections'>,
-        batchSize: COLLECTION_PREVIEW_SIZE,
-      });
-
-      // Allow re-triggering ensure for this collection after adding cards,
-      // since progress has shifted to a new set of preview texts.
-      if (activeCourseId) {
-        ensuredRef.current.delete(`${activeCourseId}:${openCollectionId}`);
-      }
-
-      if (result.cardsAdded === 0) {
-        toast.info(t('noCardsToAdd'));
-      } else {
-        toast.success(t('cardsAdded', { count: result.cardsAdded }));
-      }
-    } catch (error) {
-      console.error('Error adding cards:', error);
-      toast.error(t('failedToAdd'));
-    } finally {
-      setIsAdding(false);
-    }
-  }, [openCollectionId, addCardsFromCollection, activeCourseId, t]);
 
   if (!collectionProgress || !courseSettings) {
     return (
       <CollectionCarouselUI
         collections={[]}
-        activeCollectionId={null}
+        activeCollectionIds={[]}
         onSelectCollection={() => {}}
         onOpenCollection={() => {}}
         isLoading={true}
@@ -160,18 +101,11 @@ export function CollectionCarousel({
     return null;
   }
 
-  const items: CollectionProgressItem[] = collectionProgress.map((c) => ({
-    collectionId: c.collectionId,
-    collectionName: c.collectionName,
-    cardsAdded: c.cardsAdded,
-    totalTexts: c.totalTexts,
-  }));
-
   return (
     <>
       <CollectionCarouselUI
-        collections={items}
-        activeCollectionId={activeCollectionId}
+        collections={items!}
+        activeCollectionIds={activeCollectionId ? [activeCollectionId] : []}
         onSelectCollection={handleSelectCollection}
         onOpenCollection={setOpenCollectionId}
         isLoading={false}

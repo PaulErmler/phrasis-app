@@ -449,6 +449,8 @@ export const getActiveCourseSettings = query({
       autoRevealLanguages: v.optional(v.boolean()),
       baseLanguageOrder: v.optional(v.array(v.string())),
       targetLanguageOrder: v.optional(v.array(v.string())),
+      chatCollectionId: v.optional(v.id('collections')),
+      activeCustomCollectionIds: v.optional(v.array(v.id('collections'))),
     }),
     v.null(),
   ),

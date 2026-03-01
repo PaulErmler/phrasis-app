@@ -7,6 +7,7 @@ import { Preloaded } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { NewChatInput } from '@/components/chat/NewChatInput';
 import { CollectionCarousel } from '@/components/app/CollectionCarousel';
+import { CustomCollectionCarousel } from '@/components/app/CustomCollectionCarousel';
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
 
 export function HomeView({
@@ -53,8 +54,11 @@ export function HomeView({
         />
       </div>
 
-      {/* Chat */}
-      <NewChatInput showSuggestions={false} />
+      {/* Custom Collections Carousel */}
+      <CustomCollectionCarousel
+        preloadedCourseSettings={preloadedCourseSettings}
+      />
+
     </div>
     </div>
   );

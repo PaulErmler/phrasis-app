@@ -1,5 +1,7 @@
-import { QueryCtx } from '../_generated/server';
+import { QueryCtx, MutationCtx } from '../_generated/server';
 import { Id, Doc } from '../_generated/dataModel';
+import { getCourseSettings } from './courseSettings';
+import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 
 /**
  * Get the collection progress for a user/course/collection combo.
@@ -37,4 +39,44 @@ export async function getNextTextsFromRank(
     )
     .order('asc')
     .take(limit);
+}
+
+/**
+ * Get or create the per-course chat collection used for AI-approved texts.
+ * Returns the collection doc and whether courseSettings was updated.
+ */
+export async function getOrCreateChatCollection(
+  ctx: MutationCtx,
+  courseId: Id<'courses'>,
+): Promise<Doc<'collections'>> {
+  const settings = await getCourseSettings(ctx, courseId);
+
+  if (settings?.chatCollectionId) {
+    const existing = await ctx.db.get(settings.chatCollectionId);
+    if (existing) return existing;
+  }
+
+  const collectionId = await ctx.db.insert('collections', {
+    name: 'Chat',
+    textCount: 0,
+  });
+
+  if (settings) {
+    const existingCustomIds = settings.activeCustomCollectionIds ?? [];
+    await ctx.db.patch(settings._id, {
+      chatCollectionId: collectionId,
+      activeCustomCollectionIds: [...existingCustomIds, collectionId],
+    });
+  } else {
+    await ctx.db.insert('courseSettings', {
+      courseId,
+      initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+      chatCollectionId: collectionId,
+      activeCustomCollectionIds: [collectionId],
+    });
+  }
+
+  const collection = await ctx.db.get(collectionId);
+  if (!collection) throw new Error('Failed to create chat collection');
+  return collection;
 }

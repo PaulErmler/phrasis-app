@@ -29,6 +29,7 @@ import {
   COLLECTION_PREVIEW_SIZE,
   getNextCollectionName,
 } from '../lib/collections';
+import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 
 // ============================================================================
 // HELPERS
@@ -278,7 +279,13 @@ export const getCollectionProgress = query({
     if (!settings?.activeCourseId) return [];
 
     const courseId = settings.activeCourseId;
-    const collections = await ctx.db.query('collections').collect();
+    const allCollections = await ctx.db.query('collections').collect();
+    const levelOrder: readonly string[] = LEVEL_ORDER;
+
+    // Only include difficulty-level collections in this query
+    const collections = allCollections.filter((c) =>
+      levelOrder.includes(c.name),
+    );
 
     const result = await Promise.all(
       collections.map(async (collection) => {
@@ -298,18 +305,68 @@ export const getCollectionProgress = query({
       }),
     );
 
-    const levelOrder: readonly string[] = LEVEL_ORDER;
     result.sort((a, b) => {
       const aIndex = levelOrder.indexOf(a.collectionName);
       const bIndex = levelOrder.indexOf(b.collectionName);
-      if (aIndex === -1 && bIndex === -1)
-        return a.collectionName.localeCompare(b.collectionName);
-      if (aIndex === -1) return 1;
-      if (bIndex === -1) return -1;
       return aIndex - bIndex;
     });
 
     return result;
+  },
+});
+
+export const getCustomCollectionsProgress = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      collectionId: v.id('collections'),
+      collectionName: v.string(),
+      cardsAdded: v.number(),
+      totalTexts: v.number(),
+    }),
+  ),
+  handler: async (ctx) => {
+    const user = await getAuthUser(ctx);
+    if (!user) return [];
+
+    const settings = await getUserSettings(ctx, user._id);
+    if (!settings?.activeCourseId) return [];
+
+    const courseId = settings.activeCourseId;
+    const courseSettings = await getCourseSettings(ctx, courseId);
+
+    // Collect course-specific custom collection IDs
+    const customCollectionIds: Id<'collections'>[] = [];
+    if (courseSettings?.chatCollectionId) {
+      customCollectionIds.push(courseSettings.chatCollectionId);
+    }
+
+    if (customCollectionIds.length === 0) return [];
+
+    const result = await Promise.all(
+      customCollectionIds.map(async (collectionId) => {
+        const collection = await ctx.db.get(collectionId);
+        if (!collection) return null;
+
+        const progress = await getCollectionProgressHelper(
+          ctx,
+          user._id,
+          courseId,
+          collectionId,
+        );
+
+        return {
+          collectionId: collection._id,
+          collectionName: collection.name,
+          cardsAdded: progress?.cardsAdded ?? 0,
+          totalTexts: collection.textCount,
+        };
+      }),
+    );
+
+    return result.filter(
+      (item): item is NonNullable<typeof item> => item !== null,
+    );
   },
 });
 
@@ -399,7 +456,134 @@ export const setActiveCollection = mutation({
 });
 
 /**
+ * Toggle a custom collection's selection for automatic card inclusion.
+ */
+export const toggleCustomCollection = mutation({
+  args: {
+    collectionId: v.id('collections'),
+  },
+  returns: v.object({
+    selected: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const { course } = await requireActiveCourse(ctx);
+    const courseId = course._id;
+
+    const collection = await ctx.db.get(args.collectionId);
+    if (!collection) throw new ConvexError('Collection not found');
+
+    const courseSettings = await getCourseSettings(ctx, courseId);
+    const currentIds = courseSettings?.activeCustomCollectionIds ?? [];
+    const idStr = args.collectionId.toString();
+    const isCurrentlySelected = currentIds.some((id) => id.toString() === idStr);
+
+    const newIds = isCurrentlySelected
+      ? currentIds.filter((id) => id.toString() !== idStr)
+      : [...currentIds, args.collectionId];
+
+    if (courseSettings) {
+      await ctx.db.patch(courseSettings._id, {
+        activeCustomCollectionIds: newIds,
+      });
+    } else {
+      await ctx.db.insert('courseSettings', {
+        courseId,
+        initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+        activeCustomCollectionIds: newIds,
+      });
+    }
+
+    return { selected: !isCurrentlySelected };
+  },
+});
+
+/**
+ * Creates cards from a list of texts and returns count of new cards inserted.
+ * Shared by both chat-collection and difficulty-collection card creation.
+ */
+async function createCardsFromTexts(
+  ctx: MutationCtx,
+  texts: Doc<'texts'>[],
+  deck: Doc<'decks'>,
+  collectionId: Id<'collections'>,
+  course: Doc<'courses'>,
+): Promise<{ cardsInserted: number; newLastRank: number }> {
+  const now = Date.now();
+  let cardsInserted = 0;
+  let newLastRank = 0;
+
+  for (const text of texts) {
+    if (
+      text.collectionRank !== undefined &&
+      text.collectionRank > newLastRank
+    ) {
+      newLastRank = text.collectionRank;
+    }
+
+    const existingCard = await getCardByDeckAndText(ctx, deck._id, text._id);
+
+    if (!existingCard) {
+      const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
+      const { searchableText, searchableTextLanguages } =
+        await buildCardSearchableText(ctx, text._id, text.text, courseLanguages);
+
+      await ctx.db.insert('cards', {
+        deckId: deck._id,
+        textId: text._id,
+        collectionId,
+        dueDate: now,
+        isMastered: false,
+        isHidden: false,
+        isFavorite: false,
+        schedulingPhase: 'preReview',
+        preReviewCount: 0,
+        searchableText,
+        searchableTextLanguages,
+      });
+      cardsInserted++;
+    }
+  }
+
+  return { cardsInserted, newLastRank };
+}
+
+/**
+ * Updates collection progress after adding cards.
+ */
+async function updateCollectionProgress(
+  ctx: MutationCtx,
+  userId: string,
+  courseId: Id<'courses'>,
+  collectionId: Id<'collections'>,
+  textsProcessed: number,
+  newLastRank: number,
+): Promise<void> {
+  const progress = await getCollectionProgressHelper(
+    ctx,
+    userId,
+    courseId,
+    collectionId,
+  );
+
+  if (progress) {
+    await ctx.db.patch(progress._id, {
+      cardsAdded: progress.cardsAdded + textsProcessed,
+      lastRankProcessed: Math.max(progress.lastRankProcessed ?? 0, newLastRank),
+    });
+  } else {
+    await ctx.db.insert('collectionProgress', {
+      userId,
+      courseId,
+      collectionId,
+      cardsAdded: textsProcessed,
+      lastRankProcessed: newLastRank,
+    });
+  }
+}
+
+/**
  * Add cards from a collection to the user's deck.
+ * Chat-collection texts are prioritized before the difficulty collection.
  */
 export const addCardsFromCollection = mutation({
   args: {
@@ -426,159 +610,208 @@ export const addCardsFromCollection = mutation({
       if (!deck) throw new ConvexError('Failed to create deck');
     }
 
-    const progress = await getCollectionProgressHelper(
-      ctx,
-      user._id,
-      courseId,
-      args.collectionId,
-    );
+    let totalCardsInserted = 0;
+    let totalTextsProcessed = 0;
+    let remainingBatch = args.batchSize;
 
-    const cardsAlreadyAdded = progress?.cardsAdded ?? 0;
-    const lastRankProcessed = progress?.lastRankProcessed ?? 0;
+    // --- Phase 1: Drain pending texts from selected custom collections randomly ---
+    const courseSettings = await getCourseSettings(ctx, courseId);
+    const selectedCustomIds = courseSettings?.activeCustomCollectionIds ?? [];
 
-    const textsToAdd = await getNextTextsFromRank(
-      ctx,
-      args.collectionId,
-      lastRankProcessed,
-      args.batchSize,
-    );
+    if (selectedCustomIds.length > 0 && remainingBatch > 0) {
+      // Load each selected collection and its pending count
+      const collectionsWithPending: {
+        id: Id<'collections'>;
+        collection: Doc<'collections'>;
+        lastRank: number;
+        pendingCount: number;
+      }[] = [];
 
-    if (textsToAdd.length === 0) {
-      return { cardsAdded: 0, totalCardsInDeck: deck.cardCount };
-    }
-
-    let newLastRank = lastRankProcessed;
-    const now = Date.now();
-    let cardsInserted = 0;
-
-    for (const text of textsToAdd) {
-      if (
-        text.collectionRank !== undefined &&
-        text.collectionRank > newLastRank
-      ) {
-        newLastRank = text.collectionRank;
+      for (const collId of selectedCustomIds) {
+        const coll = await ctx.db.get(collId);
+        if (!coll) continue;
+        const prog = await getCollectionProgressHelper(ctx, user._id, courseId, collId);
+        const lastRank = prog?.lastRankProcessed ?? 0;
+        const cardsAdded = prog?.cardsAdded ?? 0;
+        const pending = coll.textCount - cardsAdded;
+        if (pending > 0) {
+          collectionsWithPending.push({
+            id: collId,
+            collection: coll,
+            lastRank,
+            pendingCount: pending,
+          });
+        }
       }
 
-      const existingCard = await getCardByDeckAndText(ctx, deck._id, text._id);
+      // Randomly allocate batch slots across collections with pending texts
+      if (collectionsWithPending.length > 0) {
+        const allocations = new Map<string, number>();
+        const pool = [...collectionsWithPending];
+        let remaining = remainingBatch;
 
-      if (!existingCard) {
-        const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
-        const { searchableText, searchableTextLanguages } =
-          await buildCardSearchableText(ctx, text._id, text.text, courseLanguages);
+        while (remaining > 0 && pool.length > 0) {
+          const idx = Math.floor(Math.random() * pool.length);
+          const entry = pool[idx];
+          const key = entry.id.toString();
+          allocations.set(key, (allocations.get(key) ?? 0) + 1);
+          entry.pendingCount--;
+          if (entry.pendingCount <= 0) pool.splice(idx, 1);
+          remaining--;
+        }
 
-        await ctx.db.insert('cards', {
-          deckId: deck._id,
-          textId: text._id,
-          collectionId: args.collectionId,
-          dueDate: now,
-          isMastered: false,
-          isHidden: false,
-          isFavorite: false,
-          schedulingPhase: 'preReview',
-          preReviewCount: 0,
-          searchableText,
-          searchableTextLanguages,
-        });
-        cardsInserted++;
+        // Fetch sequential texts from each collection and create cards
+        for (const entry of collectionsWithPending) {
+          const count = allocations.get(entry.id.toString()) ?? 0;
+          if (count === 0) continue;
+
+          const texts = await getNextTextsFromRank(ctx, entry.id, entry.lastRank, count);
+          if (texts.length === 0) continue;
+
+          const { cardsInserted, newLastRank } = await createCardsFromTexts(
+            ctx, texts, deck, entry.id, course,
+          );
+
+          totalCardsInserted += cardsInserted;
+          totalTextsProcessed += texts.length;
+          remainingBatch -= texts.length;
+
+          await updateCollectionProgress(
+            ctx, user._id, courseId, entry.id, texts.length, newLastRank,
+          );
+
+          for (const text of texts) {
+            await ctx.scheduler.runAfter(
+              0, internal.features.decks.prepareCardContent,
+              { textId: text._id, baseLanguages: course.baseLanguages, targetLanguages: course.targetLanguages },
+            );
+          }
+        }
+      }
+    }
+
+    // --- Phase 2: Fill remaining batch from the difficulty collection ---
+    if (remainingBatch > 0) {
+      const progress = await getCollectionProgressHelper(
+        ctx,
+        user._id,
+        courseId,
+        args.collectionId,
+      );
+
+      const cardsAlreadyAdded = progress?.cardsAdded ?? 0;
+      const lastRankProcessed = progress?.lastRankProcessed ?? 0;
+
+      const textsToAdd = await getNextTextsFromRank(
+        ctx,
+        args.collectionId,
+        lastRankProcessed,
+        remainingBatch,
+      );
+
+      if (textsToAdd.length > 0) {
+        const { cardsInserted, newLastRank } = await createCardsFromTexts(
+          ctx,
+          textsToAdd,
+          deck,
+          args.collectionId,
+          course,
+        );
+
+        totalCardsInserted += cardsInserted;
+        totalTextsProcessed += textsToAdd.length;
+
+        await updateCollectionProgress(
+          ctx,
+          user._id,
+          courseId,
+          args.collectionId,
+          textsToAdd.length,
+          newLastRank,
+        );
+
+        for (const text of textsToAdd) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.decks.prepareCardContent,
+            {
+              textId: text._id,
+              baseLanguages: course.baseLanguages,
+              targetLanguages: course.targetLanguages,
+            },
+          );
+        }
+
+        const finalLastRank = Math.max(lastRankProcessed, newLastRank);
+        const upcomingTexts = await getNextTextsFromRank(
+          ctx,
+          args.collectionId,
+          finalLastRank,
+          COLLECTION_PREVIEW_SIZE,
+        );
+
+        for (const text of upcomingTexts) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.decks.prepareCardContent,
+            {
+              textId: text._id,
+              baseLanguages: course.baseLanguages,
+              targetLanguages: course.targetLanguages,
+            },
+          );
+        }
+
+        // Auto-advance: if the collection is now complete and is the active one,
+        // move to the next incomplete collection (or clear if last).
+        const newCardsAdded = cardsAlreadyAdded + textsToAdd.length;
+        const collection = await ctx.db.get(args.collectionId);
+        if (collection && newCardsAdded >= collection.textCount) {
+          const latestSettings = await getCourseSettings(ctx, courseId);
+          if (
+            latestSettings?.activeCollectionId?.toString() ===
+            args.collectionId.toString()
+          ) {
+            let nextCollectionId: Id<'collections'> | undefined;
+            const nextName = getNextCollectionName(collection.name);
+
+            if (nextName) {
+              const allCollections = await ctx.db.query('collections').collect();
+              const orderedNames: readonly string[] = LEVEL_ORDER;
+              const startIdx = orderedNames.indexOf(nextName);
+
+              for (let i = startIdx; i < orderedNames.length; i++) {
+                const coll = allCollections.find((c) => c.name === orderedNames[i]);
+                if (!coll) continue;
+
+                const prog = await getCollectionProgressHelper(
+                  ctx,
+                  user._id,
+                  courseId,
+                  coll._id,
+                );
+
+                if (!prog || prog.cardsAdded < coll.textCount) {
+                  nextCollectionId = coll._id;
+                  break;
+                }
+              }
+            }
+
+            await setActiveCollectionOnSettings(ctx, courseId, nextCollectionId);
+          }
+        }
       }
     }
 
     // Update deck card count
-    await ctx.db.patch(deck._id, { cardCount: deck.cardCount + cardsInserted });
-
-    // Update collection progress
-    const newCardsAdded = cardsAlreadyAdded + textsToAdd.length;
-    if (progress) {
-      await ctx.db.patch(progress._id, {
-        cardsAdded: newCardsAdded,
-        lastRankProcessed: newLastRank,
-      });
-    } else {
-      await ctx.db.insert('collectionProgress', {
-        userId: user._id,
-        courseId,
-        collectionId: args.collectionId,
-        cardsAdded: textsToAdd.length,
-        lastRankProcessed: newLastRank,
-      });
-    }
-
-    // Schedule content processing for each card
-    for (const text of textsToAdd) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.features.decks.prepareCardContent,
-        {
-          textId: text._id,
-          baseLanguages: course.baseLanguages,
-          targetLanguages: course.targetLanguages,
-        },
-      );
-    }
-
-    const upcomingTexts = await getNextTextsFromRank(
-      ctx,
-      args.collectionId,
-      newLastRank,
-      COLLECTION_PREVIEW_SIZE,
-    );
-
-    for (const text of upcomingTexts) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.features.decks.prepareCardContent,
-        {
-          textId: text._id,
-          baseLanguages: course.baseLanguages,
-          targetLanguages: course.targetLanguages,
-        },
-      );
-    }
-
-    // Auto-advance: if the collection is now complete and is the active one,
-    // move to the next incomplete collection (or clear if last).
-    const collection = await ctx.db.get(args.collectionId);
-    if (collection && newCardsAdded >= collection.textCount) {
-      const courseSettings = await getCourseSettings(ctx, courseId);
-      if (
-        courseSettings?.activeCollectionId?.toString() ===
-        args.collectionId.toString()
-      ) {
-        // Find next incomplete collection in LEVEL_ORDER
-        let nextCollectionId: Id<'collections'> | undefined;
-        const nextName = getNextCollectionName(collection.name);
-
-        if (nextName) {
-          // Walk forward through LEVEL_ORDER to find the first incomplete collection
-          const allCollections = await ctx.db.query('collections').collect();
-          const orderedNames: readonly string[] = LEVEL_ORDER;
-          const startIdx = orderedNames.indexOf(nextName);
-
-          for (let i = startIdx; i < orderedNames.length; i++) {
-            const coll = allCollections.find((c) => c.name === orderedNames[i]);
-            if (!coll) continue;
-
-            const prog = await getCollectionProgressHelper(
-              ctx,
-              user._id,
-              courseId,
-              coll._id,
-            );
-
-            if (!prog || prog.cardsAdded < coll.textCount) {
-              nextCollectionId = coll._id;
-              break;
-            }
-          }
-        }
-
-        await setActiveCollectionOnSettings(ctx, courseId, nextCollectionId);
-      }
+    if (totalCardsInserted > 0) {
+      await ctx.db.patch(deck._id, { cardCount: deck.cardCount + totalCardsInserted });
     }
 
     return {
-      cardsAdded: textsToAdd.length,
-      totalCardsInDeck: deck.cardCount + cardsInserted,
+      cardsAdded: totalTextsProcessed,
+      totalCardsInDeck: deck.cardCount + totalCardsInserted,
     };
   },
 });
