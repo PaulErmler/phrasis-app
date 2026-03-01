@@ -37,6 +37,11 @@ import type * as testing_texts from "../testing/texts.js";
 import type * as testing_translation from "../testing/translation.js";
 import type * as testing_tts from "../testing/tts.js";
 import type * as types from "../types.js";
+import type * as usage_actions from "../usage/actions.js";
+import type * as usage_helpers from "../usage/helpers.js";
+import type * as usage_queries from "../usage/queries.js";
+import type * as usage_testOperations from "../usage/testOperations.js";
+import type * as usage_tracking from "../usage/tracking.js";
 
 import type {
   ApiFromModules,
@@ -74,6 +79,11 @@ declare const fullApi: ApiFromModules<{
   "testing/translation": typeof testing_translation;
   "testing/tts": typeof testing_tts;
   types: typeof types;
+  "usage/actions": typeof usage_actions;
+  "usage/helpers": typeof usage_helpers;
+  "usage/queries": typeof usage_queries;
+  "usage/testOperations": typeof usage_testOperations;
+  "usage/tracking": typeof usage_tracking;
 }>;
 
 /**
