@@ -14,6 +14,7 @@ export function HomeView({
   preloadedCollectionProgress,
   preloadedCourseSettings,
   preloadedCourseStats,
+  preloadedCustomCollectionsProgress,
 }: {
   preloadedCollectionProgress: Preloaded<
     typeof api.features.decks.getCollectionProgress
@@ -23,6 +24,9 @@ export function HomeView({
   >;
   preloadedCourseStats: Preloaded<
     typeof api.features.courses.getCourseStats
+  >;
+  preloadedCustomCollectionsProgress: Preloaded<
+    typeof api.features.decks.getCustomCollectionsProgress
   >;
 }) {
   const router = useRouter();
@@ -57,6 +61,7 @@ export function HomeView({
       {/* Custom Collections Carousel */}
       <CustomCollectionCarousel
         preloadedCourseSettings={preloadedCourseSettings}
+        preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
       />
 
     </div>

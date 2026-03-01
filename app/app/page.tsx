@@ -9,12 +9,14 @@ export default async function AppPage() {
     preloadedCollectionProgress,
     preloadedCourseSettings,
     preloadedCourseStats,
+    preloadedCustomCollectionsProgress,
   ] = await Promise.all([
     preloadAuthQuery(api.features.courses.getUserSettings),
     preloadAuthQuery(api.features.courses.getActiveCourse),
     preloadAuthQuery(api.features.decks.getCollectionProgress),
     preloadAuthQuery(api.features.courses.getActiveCourseSettings),
     preloadAuthQuery(api.features.courses.getCourseStats),
+    preloadAuthQuery(api.features.decks.getCustomCollectionsProgress),
   ]);
 
   return (
@@ -24,6 +26,7 @@ export default async function AppPage() {
       preloadedCollectionProgress={preloadedCollectionProgress}
       preloadedCourseSettings={preloadedCourseSettings}
       preloadedCourseStats={preloadedCourseStats}
+      preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
     />
   );
 }

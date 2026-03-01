@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
-import { useQuery, useMutation, usePreloadedQuery, Preloaded } from 'convex/react';
+import { useMutation, usePreloadedQuery, Preloaded } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
@@ -16,9 +16,13 @@ import { useCollectionDetail } from './useCollectionDetail';
 
 export function CustomCollectionCarousel({
   preloadedCourseSettings,
+  preloadedCustomCollectionsProgress,
 }: {
   preloadedCourseSettings: Preloaded<
     typeof api.features.courses.getActiveCourseSettings
+  >;
+  preloadedCustomCollectionsProgress: Preloaded<
+    typeof api.features.decks.getCustomCollectionsProgress
   >;
 }) {
   const t = useTranslations('AppPage.collections');
@@ -28,14 +32,12 @@ export function CustomCollectionCarousel({
     (id) => id.toString(),
   );
 
-  const customCollections = useQuery(
-    api.features.decks.getCustomCollectionsProgress,
-  );
+  const customCollections = usePreloadedQuery(preloadedCustomCollectionsProgress);
   const toggleMutation = useMutation(
     api.features.decks.toggleCustomCollection,
   );
 
-  const items: CollectionProgressItem[] | undefined = customCollections?.map(
+  const items: CollectionProgressItem[] = customCollections.map(
     (c) => ({
       collectionId: c.collectionId,
       collectionName: c.collectionName,
@@ -67,8 +69,8 @@ export function CustomCollectionCarousel({
     [toggleMutation, t],
   );
 
-  // Empty state: loaded but no custom collections yet
-  if (customCollections && customCollections.length === 0) {
+  // Empty state: no custom collections yet
+  if (customCollections.length === 0) {
     return (
       <div className="space-y-2">
         <h2 className="heading-section">
@@ -84,16 +86,13 @@ export function CustomCollectionCarousel({
     );
   }
 
-  // Still loading
-  if (!customCollections) return null;
-
   return (
     <div className="space-y-2">
       <h2 className="heading-section">
         {t('customCarousel.sectionTitle')}
       </h2>
       <CollectionCarouselUI
-        collections={items!}
+        collections={items}
         activeCollectionIds={selectedIds}
         onSelectCollection={handleToggleCollection}
         onOpenCollection={setOpenCollectionId}

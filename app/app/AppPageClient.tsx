@@ -23,6 +23,7 @@ export function AppPageClient({
   preloadedCollectionProgress,
   preloadedCourseSettings,
   preloadedCourseStats,
+  preloadedCustomCollectionsProgress,
 }: {
   preloadedSettings: Preloaded<typeof api.features.courses.getUserSettings>;
   preloadedActiveCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
@@ -34,6 +35,9 @@ export function AppPageClient({
   >;
   preloadedCourseStats: Preloaded<
     typeof api.features.courses.getCourseStats
+  >;
+  preloadedCustomCollectionsProgress: Preloaded<
+    typeof api.features.decks.getCustomCollectionsProgress
   >;
 }) {
   const router = useRouter();
@@ -92,6 +96,7 @@ export function AppPageClient({
                 preloadedCollectionProgress={preloadedCollectionProgress}
                 preloadedCourseSettings={preloadedCourseSettings}
                 preloadedCourseStats={preloadedCourseStats}
+                preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
               />
             )}
             {currentView === 'content' && <ContentView />}
