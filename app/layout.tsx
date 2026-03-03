@@ -9,6 +9,7 @@ import { getUserLocale } from '@/i18n/locale';
 import { getMessages, getTimeZone } from 'next-intl/server';
 import { Toaster } from '@/components/ui/sonner';
 import { ConsentManager } from './consent-manager';
+import { getToken } from '@/lib/auth-server';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -50,6 +51,7 @@ export default async function RootLayout({
   const locale = await getUserLocale();
   const messages = await getMessages();
   const timeZone = await getTimeZone();
+  const initialToken = await getToken();
 
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -65,7 +67,7 @@ export default async function RootLayout({
         <ConsentManager>
           <ServiceWorkerRegistration />
           <PWAInstallGlobal />
-          <ConvexClientProvider>
+          <ConvexClientProvider initialToken={initialToken}>
             <Providers locale={locale} messages={messages} timeZone={timeZone}>
               {children}
               <Toaster position="top-center" />

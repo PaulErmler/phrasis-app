@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Preloaded } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
-import { RedirectToSignIn } from '@daveyplate/better-auth-ui';
 import { Authenticated } from 'convex/react';
 import { LearningMode } from '@/components/app/LearningMode';
 import { Button } from '@/components/ui/button';
@@ -92,7 +91,6 @@ export function LearnPageClient({
 }) {
   return (
     <>
-      <RedirectToSignIn />
       <Authenticated>
         <LearnPageInner
           preloadedCard={preloadedCard}

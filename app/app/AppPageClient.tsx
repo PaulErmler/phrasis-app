@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import { RedirectToSignIn } from '@daveyplate/better-auth-ui';
 import { Authenticated, usePreloadedQuery, Preloaded } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
@@ -65,7 +64,6 @@ export function AppPageClient({
 
   return (
     <>
-      <RedirectToSignIn />
       <Authenticated>
         <div className="h-screen flex flex-col overflow-hidden">
           <header className="sticky-header">
