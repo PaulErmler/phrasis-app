@@ -1,6 +1,6 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query } from '../../_generated/server';
-import { createThread as createAgentThread } from '@convex-dev/agent';
+import { createThread as createAgentThread, listMessages } from '@convex-dev/agent';
 import { components } from '../../_generated/api';
 import { getAuthUser, requireAuthUser } from '../../db/users';
 
@@ -54,6 +54,45 @@ export const listThreads = query({
     );
 
     return threads.page;
+  },
+});
+
+/**
+ * Return the user's most recent thread if it has no messages yet,
+ * otherwise create a fresh one.
+ */
+export const getOrCreateEmptyThread = mutation({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => {
+    const user = await requireAuthUser(ctx);
+
+    const threads = await ctx.runQuery(
+      agentComponent.threads.listThreadsByUserId,
+      {
+        userId: user._id,
+        order: 'desc',
+        paginationOpts: { cursor: null, numItems: 1 },
+      },
+    );
+
+    const latest = threads.page[0];
+    if (latest) {
+      const messages = await listMessages(ctx, agentComponent, {
+        threadId: latest._id,
+        paginationOpts: { cursor: null, numItems: 1 },
+      });
+      if (messages.page.length === 0) {
+        return latest._id;
+      }
+    }
+
+    const threadId = await createAgentThread(ctx, agentComponent, {
+      userId: user._id,
+      title: 'New Chat',
+    });
+
+    return threadId;
   },
 });
 
