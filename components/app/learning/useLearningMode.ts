@@ -210,12 +210,13 @@ export function useLearningMode(
       cardForReview === null &&
       courseSettings?.autoAddCards &&
       courseSettings?.activeCollectionId &&
-      !isAddingCards
+      !isAddingCards &&
+      !settingsOpen
     ) {
       handleAddCards();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cardForReview, courseSettings?.autoAddCards]);
+  }, [cardForReview, courseSettings?.autoAddCards, settingsOpen]);
 
   // Reset selectedRating, pending master/hide state, and card timer when card changes
   useEffect(() => {
