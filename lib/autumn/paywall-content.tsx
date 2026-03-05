@@ -1,10 +1,18 @@
 import { type CheckFeaturePreview } from "autumn-js";
 
-export const getPaywallContent = (preview?: CheckFeaturePreview) => {
+export type PaywallTranslateFn = (
+  key: string,
+  params?: Record<string, string | number>
+) => string;
+
+export const getPaywallContent = (
+  preview: CheckFeaturePreview | undefined,
+  t: PaywallTranslateFn
+) => {
   if (!preview) {
     return {
-      title: "Feature Unavailable",
-      message: "This feature is not available for your account.",
+      title: t("featureUnavailable"),
+      message: t("notAvailableForAccount"),
     };
   }
 
@@ -14,14 +22,13 @@ export const getPaywallContent = (preview?: CheckFeaturePreview) => {
     switch (scenario) {
       case "usage_limit":
         return {
-          title: `Feature Unavailable`,
-          message: `You have reached the usage limit for ${feature_name}. Please contact us to increase your limit.`,
+          title: t("featureUnavailable"),
+          message: t("usageLimitNoProducts", { featureName: feature_name }),
         };
       default:
         return {
-          title: "Feature Unavailable",
-          message:
-            "This feature is not available for your account. Please contact us to enable it.",
+          title: t("featureUnavailable"),
+          message: t("notAvailableContactUs"),
         };
     }
   }
@@ -31,33 +38,39 @@ export const getPaywallContent = (preview?: CheckFeaturePreview) => {
   const isAddOn = nextProduct && nextProduct.is_add_on;
 
   const title = nextProduct.free_trial
-    ? `Start trial for ${nextProduct.name}`
+    ? t("startTrial", { productName: nextProduct.name })
     : nextProduct.is_add_on
-    ? `Purchase ${nextProduct.name}`
-    : `Upgrade to ${nextProduct.name}`;
+      ? t("purchaseAddOn", { productName: nextProduct.name })
+      : t("upgradeTo", { productName: nextProduct.name });
 
-  let message = "";
-  if (isAddOn) {
-    message = `Please purchase the ${nextProduct.name} add-on to continue using ${feature_name}.`;
-  } else {
-    message = `Please upgrade to the ${nextProduct.name} plan to continue using ${feature_name}.`;
-  }
+  const detail = isAddOn
+    ? t("addOnDetail", {
+        productName: nextProduct.name,
+        featureName: feature_name,
+      })
+    : t("upgradeDetail", {
+        productName: nextProduct.name,
+        featureName: feature_name,
+      });
 
   switch (scenario) {
     case "usage_limit":
       return {
-        title: title,
-        message: `You have reached the usage limit for ${feature_name}. ${message}`,
+        title,
+        message: t("usageLimitWithDetail", {
+          featureName: feature_name,
+          detail,
+        }),
       };
     case "feature_flag":
       return {
-        title: title,
-        message: `This feature is not available for your account. ${message}`,
+        title,
+        message: t("featureFlagWithDetail", { detail }),
       };
     default:
       return {
-        title: "Feature Unavailable",
-        message: "This feature is not available for your account.",
+        title: t("featureUnavailable"),
+        message: t("notAvailableForAccount"),
       };
   }
 };

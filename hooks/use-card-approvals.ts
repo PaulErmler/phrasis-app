@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useMutation, useQuery } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -17,6 +18,7 @@ export interface UseCardApprovalsReturn {
   processingApprovals: Set<string>;
   handleApprove: (approvalId: Id<'cardApprovals'>) => Promise<void>;
   handleReject: (approvalId: Id<'cardApprovals'>) => Promise<void>;
+  usageLimitHit: boolean;
 }
 
 /**
@@ -34,6 +36,7 @@ export function useCardApprovals(
   const [processingApprovals, setProcessingApprovals] = useState<Set<string>>(
     new Set(),
   );
+  const [usageLimitHit, setUsageLimitHit] = useState(false);
 
   const threadApprovals = useQuery(
     api.features.chat.cardApprovals.getApprovalsByThread,
@@ -58,7 +61,15 @@ export function useCardApprovals(
       setProcessingApprovals((prev) => new Set(prev).add(approvalId));
       try {
         await approveCard({ approvalId });
+        setUsageLimitHit(false);
       } catch (error) {
+        if (
+          error instanceof ConvexError &&
+          (error.data as { code?: string })?.code === 'USAGE_LIMIT'
+        ) {
+          setUsageLimitHit(true);
+          return;
+        }
         console.error('Failed to approve card:', error);
       } finally {
         setProcessingApprovals((prev) => {
@@ -94,5 +105,6 @@ export function useCardApprovals(
     processingApprovals,
     handleApprove,
     handleReject,
+    usageLimitHit,
   };
 }

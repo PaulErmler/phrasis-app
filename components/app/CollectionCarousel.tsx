@@ -12,6 +12,8 @@ import {
 } from './CollectionCarouselUI';
 import { CollectionDetailDialog } from './CollectionDetailDialog';
 import { useCollectionDetail } from './useCollectionDetail';
+import PaywallDialog from '@/components/autumn/paywall-dialog';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
 
 export function CollectionCarousel({
   preloadedCollectionProgress,
@@ -56,7 +58,9 @@ export function CollectionCarousel({
     contentData,
     isAdding,
     handleAddCards,
+    sentencesRemaining,
   } = useCollectionDetail({ collections: items, activeCourseId });
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   const initialScrollIndex =
     collectionProgress && activeCollectionId
@@ -133,7 +137,17 @@ export function CollectionCarousel({
           if (openCollectionId) handleSelectCollection(openCollectionId);
         }}
         onAddCards={handleAddCards}
+        sentencesRemaining={sentencesRemaining}
+        onUpgrade={() => setPaywallOpen(true)}
       />
+
+      {paywallOpen && (
+        <PaywallDialog
+          open={paywallOpen}
+          setOpen={setPaywallOpen}
+          featureId={FEATURE_IDS.SENTENCES}
+        />
+      )}
     </>
   );
 }

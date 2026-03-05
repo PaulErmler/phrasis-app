@@ -3,6 +3,7 @@ import { mutation, action } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { requireAuthUser } from '../db/users';
 import { useQuota, checkQuota } from './helpers';
+import { FEATURE_IDS } from '../features/featureIds';
 
 function catchQuotaError(e: unknown): { allowed: false; balance: 0 } {
   if (e instanceof ConvexError) {
@@ -23,7 +24,7 @@ export const simulateChatMessage = mutation({
   handler: async (ctx) => {
     const user = await requireAuthUser(ctx);
     try {
-      const result = await useQuota(ctx, user._id, 'chat_messages', 1);
+      const result = await useQuota(ctx, user._id, FEATURE_IDS.CHAT_MESSAGES, 1);
       return { allowed: true, balance: result.balance };
     } catch (e) {
       return catchQuotaError(e);
@@ -40,7 +41,7 @@ export const simulateSentence = mutation({
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
     try {
-      const result = await useQuota(ctx, user._id, 'sentences', args.count ?? 1);
+      const result = await useQuota(ctx, user._id, FEATURE_IDS.SENTENCES, args.count ?? 1);
       return { allowed: true, balance: result.balance };
     } catch (e) {
       return catchQuotaError(e);
@@ -57,7 +58,7 @@ export const simulateCustomSentence = mutation({
   handler: async (ctx) => {
     const user = await requireAuthUser(ctx);
     try {
-      const result = await useQuota(ctx, user._id, 'custom_sentences', 1);
+      const result = await useQuota(ctx, user._id, FEATURE_IDS.CUSTOM_SENTENCES, 1);
       return { allowed: true, balance: result.balance };
     } catch (e) {
       return catchQuotaError(e);
@@ -74,7 +75,7 @@ export const simulateCourse = mutation({
   handler: async (ctx) => {
     const user = await requireAuthUser(ctx);
     try {
-      const result = await useQuota(ctx, user._id, 'courses', 1);
+      const result = await useQuota(ctx, user._id, FEATURE_IDS.COURSES, 1);
       return { allowed: true, balance: result.balance };
     } catch (e) {
       return catchQuotaError(e);

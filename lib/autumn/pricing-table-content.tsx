@@ -1,66 +1,71 @@
 import { type Product } from "autumn-js";
 
-export const getPricingTableContent = (product: Product) => {
-  const { scenario, free_trial, properties } = product;
+export type PricingTranslateFn = (key: string) => string;
+
+export const getPricingTableContent = (
+  product: Product,
+  t: PricingTranslateFn
+) => {
+  const { scenario, properties } = product;
   const { is_one_off, updateable, has_trial } = properties;
 
   if (has_trial) {
     return {
-      buttonText: <p>Start Free Trial</p>,
+      buttonText: t("startFreeTrial"),
     };
   }
 
   switch (scenario) {
     case "scheduled":
       return {
-        buttonText: <p>Plan Scheduled</p>,
+        buttonText: t("planScheduled"),
       };
 
     case "active":
       if (updateable) {
         return {
-          buttonText: <p>Update Plan</p>,
+          buttonText: t("updatePlan"),
         };
       }
 
       return {
-        buttonText: <p>Current Plan</p>,
+        buttonText: t("currentPlan"),
       };
 
     case "new":
       if (is_one_off) {
         return {
-          buttonText: <p>Purchase</p>,
+          buttonText: t("purchase"),
         };
       }
 
       return {
-        buttonText: <p>Get started</p>,
+        buttonText: t("getStarted"),
       };
 
     case "renew":
       return {
-        buttonText: <p>Renew</p>,
+        buttonText: t("renew"),
       };
 
     case "upgrade":
       return {
-        buttonText: <p>Upgrade</p>,
+        buttonText: t("upgrade"),
       };
 
     case "downgrade":
       return {
-        buttonText: <p>Downgrade</p>,
+        buttonText: t("downgrade"),
       };
 
     case "cancel":
       return {
-        buttonText: <p>Cancel Plan</p>,
+        buttonText: t("cancelPlan"),
       };
 
     default:
       return {
-        buttonText: <p>Get Started</p>,
+        buttonText: t("getStartedDefault"),
       };
   }
 };

@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { usePaywall } from "autumn-js/react";
 import { getPaywallContent } from "@/lib/autumn/paywall-content";
 import { cn } from "@/lib/utils";
@@ -20,17 +22,32 @@ export interface PaywallDialogProps {
 }
 
 export default function PaywallDialog(params?: PaywallDialogProps) {
+  const t = useTranslations("Paywall");
   const { data: preview } = usePaywall({
     featureId: params?.featureId,
     entityId: params?.entityId,
   });
 
-  if (!params || !preview) {
+  if (!params) {
     return <></>;
   }
 
   const { open, setOpen } = params;
-  const { title, message } = getPaywallContent(preview);
+
+  if (!preview) {
+    return (
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="p-0 pt-4 gap-0 text-foreground overflow-hidden text-sm">
+          <DialogTitle className="sr-only">{t("loading")}</DialogTitle>
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  const { title, message } = getPaywallContent(preview, t);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -47,7 +64,7 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
               setOpen(false);
             }}
           >
-            Confirm
+            {t("confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

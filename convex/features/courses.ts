@@ -17,6 +17,8 @@ import {
   getCourseStats as dbGetCourseStats,
   createCourseStats,
 } from '../db/courseStats';
+import { useQuota, checkQuota } from '../usage/helpers';
+import { FEATURE_IDS } from './featureIds';
 import {
   DEFAULT_INITIAL_REVIEW_COUNT,
   validateInitialReviewCount,
@@ -301,6 +303,7 @@ export const createCourse = mutation({
   }),
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
+    await useQuota(ctx, user._id, FEATURE_IDS.COURSES, 1);
 
     const initialReviewCount =
       args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
@@ -355,6 +358,8 @@ export const completeOnboarding = mutation({
     const user = await requireAuthUser(ctx);
 
     const userId = user._id;
+
+    await useQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
 
     const progress = await dbGetOnboardingProgress(ctx, userId);
     if (!progress) throw new ConvexError('Onboarding progress not found');

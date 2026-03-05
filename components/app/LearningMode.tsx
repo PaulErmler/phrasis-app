@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
@@ -11,6 +12,8 @@ import {
 } from '@/components/app/learning';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
 import type { AudioPlayerState } from '@/hooks/use-audio-player';
+import PaywallDialog from '@/components/autumn/paywall-dialog';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
 
 interface LearningModeProps {
   state: LearningState;
@@ -24,6 +27,7 @@ interface LearningModeProps {
 export function LearningMode({ state, audio }: LearningModeProps) {
   const router = useRouter();
   const goHome = () => router.push('/app');
+  const [paywallOpen, setPaywallOpen] = useState(false);
 
   if (state.status === 'loading') {
     return (
@@ -61,6 +65,8 @@ export function LearningMode({ state, audio }: LearningModeProps) {
           onAddCards={state.handleAddCards}
           isAddingCards={state.isAddingCards}
           batchSize={state.batchSize}
+          sentencesRemaining={state.sentencesRemaining}
+          onUpgrade={() => setPaywallOpen(true)}
         />
         <LearningModeSettings
           open={state.settingsOpen}
@@ -69,6 +75,13 @@ export function LearningMode({ state, audio }: LearningModeProps) {
           baseLanguages={state.baseLanguages}
           targetLanguages={state.targetLanguages}
         />
+        {paywallOpen && (
+          <PaywallDialog
+            open={paywallOpen}
+            setOpen={setPaywallOpen}
+            featureId={FEATURE_IDS.SENTENCES}
+          />
+        )}
       </div>
     );
   }

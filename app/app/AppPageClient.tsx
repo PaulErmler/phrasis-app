@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { RedirectToSignIn } from '@daveyplate/better-auth-ui';
-import { Authenticated, usePreloadedQuery, Preloaded } from 'convex/react';
+import { Authenticated, usePreloadedQuery, useAction, useConvexAuth, Preloaded } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { HomeView } from '@/components/app/HomeView';
@@ -47,6 +47,17 @@ export function AppPageClient({
   const locale = useLocale();
   const settings = usePreloadedQuery(preloadedSettings);
   const activeCourse = usePreloadedQuery(preloadedActiveCourse);
+  const syncQuotas = useAction(api.usage.actions.syncQuotas);
+  const { isAuthenticated } = useConvexAuth();
+  const syncedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || syncedRef.current) return;
+    syncedRef.current = true;
+    syncQuotas().catch((err) => {
+      console.error('Failed to sync quotas on app load:', err);
+    });
+  }, [syncQuotas, isAuthenticated]);
 
   const courseButtonLabel = activeCourse
     ? t('currentCourseWithLanguages', {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import { toast } from 'sonner';
@@ -10,6 +10,10 @@ import type { CardContext } from '@/hooks/use-send-message';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import type { ToolRenderer, MessageFooterRenderer } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
+import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
+import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
+import PaywallDialog from '@/components/autumn/paywall-dialog';
 
 interface ChatPanelProps {
   threadId: string;
@@ -45,7 +49,14 @@ export function ChatPanel({
   suggestionsAction,
   aboveFooterAction,
 }: ChatPanelProps) {
-  const chat = useChat({ threadId, cardContext });
+  const { isAvailable } = useFeatureQuota(FEATURE_IDS.CHAT_MESSAGES);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+
+  const handleUsageLimit = useCallback(() => {
+    setPaywallOpen(true);
+  }, []);
+
+  const chat = useChat({ threadId, cardContext, onUsageLimit: handleUsageLimit });
   const t = useTranslations('Chat.attachments');
 
   const handleSubmit = useCallback(
@@ -54,6 +65,11 @@ export function ChatPanel({
       const hasAttachments = Boolean(message.files?.length);
 
       if (!(hasText || hasAttachments)) return;
+
+      if (!isAvailable) {
+        setPaywallOpen(true);
+        return;
+      }
 
       if (message.files?.length) {
         toast.success(t('filesAttached'), {
@@ -64,7 +80,7 @@ export function ChatPanel({
       await chat.sendMessage(message.text || t('sentWithAttachments'));
       onMessageSent?.();
     },
-    [chat, onMessageSent, t],
+    [chat, onMessageSent, t, isAvailable],
   );
 
   const handleSuggestionClick = useCallback(
@@ -108,10 +124,23 @@ export function ChatPanel({
           showSuggestions={
             showSuggestions ?? chat.messages.length === 0
           }
-          footerAction={footerAction}
+          footerAction={
+            <>
+              {footerAction}
+              <FeatureBadge featureId={FEATURE_IDS.CHAT_MESSAGES} />
+            </>
+          }
           suggestionsAction={suggestionsAction}
         />
       </div>
+
+      {paywallOpen && (
+        <PaywallDialog
+          open={paywallOpen}
+          setOpen={setPaywallOpen}
+          featureId={FEATURE_IDS.CHAT_MESSAGES}
+        />
+      )}
     </div>
   );
 }

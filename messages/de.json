@@ -315,6 +315,9 @@
       "filesAttachedDescription": "{count} Datei(en) an Nachricht angehängt",
       "sentWithAttachments": "Mit Anhängen gesendet"
     },
+    "errors": {
+      "failedToCreateThread": "Neue Unterhaltung konnte nicht erstellt werden"
+    },
     "cardApproval": {
       "approveButton": "Karte hinzufügen",
       "rejectButton": "Ablehnen",
@@ -324,6 +327,41 @@
       "creatingApproval": "Karte wird erstellt...",
       "failed": "Kartenerstellung fehlgeschlagen"
     }
+  },
+  "FeatureTracking": {
+    "unlimited": "Unbegrenzt",
+    "left": "{balance} übrig",
+    "limitReached": "Limit erreicht",
+    "upgrade": "Upgrade",
+    "remaining": "{balance} / {included} übrig"
+  },
+  "Paywall": {
+    "loading": "Laden",
+    "confirm": "Bestätigen",
+    "featureUnavailable": "Funktion nicht verfügbar",
+    "notAvailableForAccount": "Diese Funktion ist für dein Konto nicht verfügbar.",
+    "usageLimitNoProducts": "Du hast das Nutzungslimit für {featureName} erreicht. Bitte kontaktiere uns, um dein Limit zu erhöhen.",
+    "notAvailableContactUs": "Diese Funktion ist für dein Konto nicht verfügbar. Bitte kontaktiere uns, um sie zu aktivieren.",
+    "startTrial": "Testversion für {productName} starten",
+    "purchaseAddOn": "{productName} kaufen",
+    "upgradeTo": "Upgrade auf {productName}",
+    "addOnDetail": "Bitte kaufe das {productName}-Add-on, um {featureName} weiter zu nutzen.",
+    "upgradeDetail": "Bitte upgrade auf den {productName}-Plan, um {featureName} weiter zu nutzen.",
+    "usageLimitWithDetail": "Du hast das Nutzungslimit für {featureName} erreicht. {detail}",
+    "featureFlagWithDetail": "Diese Funktion ist für dein Konto nicht verfügbar. {detail}"
+  },
+  "Pricing": {
+    "startFreeTrial": "Kostenlose Testversion starten",
+    "planScheduled": "Plan geplant",
+    "updatePlan": "Plan aktualisieren",
+    "currentPlan": "Aktueller Plan",
+    "purchase": "Kaufen",
+    "getStarted": "Loslegen",
+    "renew": "Erneuern",
+    "upgrade": "Upgrade",
+    "downgrade": "Downgrade",
+    "cancelPlan": "Plan kündigen",
+    "getStartedDefault": "Loslegen"
   },
   "Onboarding": {
     "welcome": {

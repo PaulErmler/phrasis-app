@@ -1,15 +1,16 @@
 import { feature, item, plan } from 'atmn';
+import { FEATURE_IDS } from './convex/features/featureIds';
 
 // Features
 export const chat_messages = feature({
-	id: 'chat_messages',
+	id: FEATURE_IDS.CHAT_MESSAGES,
 	name: 'Chat Messages',
 	type: 'metered',
 	consumable: true,
 });
 
 export const courses = feature({
-	id: 'courses',
+	id: FEATURE_IDS.COURSES,
 	name: 'Courses',
 	type: 'metered',
 	consumable: false,
@@ -23,14 +24,14 @@ export const reviews = feature({
 });
 
 export const sentences = feature({
-	id: 'sentences',
+	id: FEATURE_IDS.SENTENCES,
 	name: 'Sentences',
 	type: 'metered',
 	consumable: true,
 });
 
 export const custom_sentences = feature({
-	id: 'custom_sentences',
+	id: FEATURE_IDS.CUSTOM_SENTENCES,
 	name: 'Custom Sentences',
 	type: 'metered',
 	consumable: true,
@@ -57,25 +58,25 @@ export const free = plan({
 	autoEnable: true,
 	items: [
 		item({
-			featureId: 'chat_messages',
+			featureId: FEATURE_IDS.CHAT_MESSAGES,
 			included: 5,
 			reset: {
 				interval: 'month',
 			},
 		}),
 		item({
-			featureId: 'courses',
+			featureId: FEATURE_IDS.COURSES,
 			included: 1,
 		}),
 		item({
-			featureId: 'custom_sentences',
+			featureId: FEATURE_IDS.CUSTOM_SENTENCES,
 			included: 10,
 			reset: {
 				interval: 'month',
 			},
 		}),
 		item({
-			featureId: 'sentences',
+			featureId: FEATURE_IDS.SENTENCES,
 			included: 150,
 			reset: {
 				interval: 'month',
@@ -93,25 +94,25 @@ export const basic = plan({
 	},
 	items: [
 		item({
-			featureId: 'chat_messages',
+			featureId: FEATURE_IDS.CHAT_MESSAGES,
 			included: 40,
 			reset: {
 				interval: 'month',
 			},
 		}),
 		item({
-			featureId: 'courses',
+			featureId: FEATURE_IDS.COURSES,
 			included: 2,
 		}),
 		item({
-			featureId: 'custom_sentences',
+			featureId: FEATURE_IDS.CUSTOM_SENTENCES,
 			included: 50,
 			reset: {
 				interval: 'month',
 			},
 		}),
 		item({
-			featureId: 'sentences',
+			featureId: FEATURE_IDS.SENTENCES,
 			included: 300,
 			reset: {
 				interval: 'month',
@@ -129,25 +130,25 @@ export const pro = plan({
 	},
 	items: [
 		item({
-			featureId: 'chat_messages',
+			featureId: FEATURE_IDS.CHAT_MESSAGES,
 			included: 100,
 			reset: {
 				interval: 'month',
 			},
 		}),
 		item({
-			featureId: 'courses',
+			featureId: FEATURE_IDS.COURSES,
 			included: 5,
 		}),
 		item({
-			featureId: 'custom_sentences',
+			featureId: FEATURE_IDS.CUSTOM_SENTENCES,
 			included: 200,
 			reset: {
 				interval: 'month',
 			},
 		}),
 		item({
-			featureId: 'sentences',
+			featureId: FEATURE_IDS.SENTENCES,
 			included: 1000,
 			reset: {
 				interval: 'month',

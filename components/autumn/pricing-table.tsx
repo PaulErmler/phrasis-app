@@ -2,6 +2,7 @@ import React from "react";
 
 import { useCustomer, usePricingTable, ProductDetails } from "autumn-js/react";
 import { createContext, useContext, useState } from "react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -190,6 +191,7 @@ export const PricingCard = ({
   className,
   buttonProps,
 }: PricingCardProps) => {
+  const t = useTranslations("Pricing");
   const { products, showFeatures } = usePricingTableContext("PricingCard");
 
   const product = products.find((p) => p.id === productId);
@@ -200,7 +202,7 @@ export const PricingCard = ({
 
   const { name, display: productDisplay } = product;
 
-  const { buttonText } = getPricingTableContent(product);
+  const { buttonText } = getPricingTableContent(product, t);
 
   const isRecommended = productDisplay?.recommend_text ? true : false;
   const mainPriceDisplay = product.properties?.is_free

@@ -315,6 +315,9 @@
       "filesAttachedDescription": "{count} file(s) attached to message",
       "sentWithAttachments": "Sent with attachments"
     },
+    "errors": {
+      "failedToCreateThread": "Failed to create new conversation"
+    },
     "cardApproval": {
       "approveButton": "Add Card",
       "rejectButton": "Reject",
@@ -324,6 +327,41 @@
       "creatingApproval": "Creating card...",
       "failed": "Card creation failed"
     }
+  },
+  "FeatureTracking": {
+    "unlimited": "Unlimited",
+    "left": "{balance} left",
+    "limitReached": "Limit reached",
+    "upgrade": "Upgrade",
+    "remaining": "{balance} / {included} remaining"
+  },
+  "Paywall": {
+    "loading": "Loading",
+    "confirm": "Confirm",
+    "featureUnavailable": "Feature Unavailable",
+    "notAvailableForAccount": "This feature is not available for your account.",
+    "usageLimitNoProducts": "You have reached the usage limit for {featureName}. Please contact us to increase your limit.",
+    "notAvailableContactUs": "This feature is not available for your account. Please contact us to enable it.",
+    "startTrial": "Start trial for {productName}",
+    "purchaseAddOn": "Purchase {productName}",
+    "upgradeTo": "Upgrade to {productName}",
+    "addOnDetail": "Please purchase the {productName} add-on to continue using {featureName}.",
+    "upgradeDetail": "Please upgrade to the {productName} plan to continue using {featureName}.",
+    "usageLimitWithDetail": "You have reached the usage limit for {featureName}. {detail}",
+    "featureFlagWithDetail": "This feature is not available for your account. {detail}"
+  },
+  "Pricing": {
+    "startFreeTrial": "Start Free Trial",
+    "planScheduled": "Plan Scheduled",
+    "updatePlan": "Update Plan",
+    "currentPlan": "Current Plan",
+    "purchase": "Purchase",
+    "getStarted": "Get started",
+    "renew": "Renew",
+    "upgrade": "Upgrade",
+    "downgrade": "Downgrade",
+    "cancelPlan": "Cancel Plan",
+    "getStartedDefault": "Get Started"
   },
   "Onboarding": {
     "welcome": {

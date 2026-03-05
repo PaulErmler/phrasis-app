@@ -25,6 +25,7 @@ import type * as features_chat_transcribe from "../features/chat/transcribe.js";
 import type * as features_collections from "../features/collections.js";
 import type * as features_courses from "../features/courses.js";
 import type * as features_decks from "../features/decks.js";
+import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_library from "../features/library.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_translation from "../features/translation.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   "features/collections": typeof features_collections;
   "features/courses": typeof features_courses;
   "features/decks": typeof features_decks;
+  "features/featureIds": typeof features_featureIds;
   "features/library": typeof features_library;
   "features/scheduling": typeof features_scheduling;
   "features/translation": typeof features_translation;
