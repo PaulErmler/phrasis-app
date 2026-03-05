@@ -242,7 +242,7 @@
       "initialReviewsDescription": "Number of initial reviews for new cards",
       "audioPlayback": "Audio Playback",
       "autoPlay": "Auto-play audio",
-      "autoPlayDescription": "Automatically play audio when a card is shown",
+      "autoPlayDescription": "Auto-play audio when a card is shown",
       "uiSettings": "UI Settings",
       "showProgressBar": "Progress bar",
       "showProgressBarDescription": "Show the audio progress bar and seek controls",
@@ -274,7 +274,7 @@
       "reviewModeAudio": "Audio",
       "reviewModeFull": "Full Review",
       "fullReviewSettings": "Full Review Settings",
-      "fullReviewTargetAudio": "Automatically play Target Audio",
+      "fullReviewTargetAudio": "Auto-play target audio",
       "fullReviewTargetAudioDescription": "When to play target language audio",
       "fullReviewTargetAudio_always": "After base audio",
       "fullReviewTargetAudio_afterSubmit": "After submitting text"
