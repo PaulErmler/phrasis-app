@@ -55,6 +55,13 @@ export const agent: Agent = new Agent(components.agent, {
   name: 'Language Teacher',
   languageModel: createOpenRouter({
     apiKey: process.env.OPENROUTER_API_KEY,
+    extraBody: {
+      provider: {
+        order: ["inceptron/int4", "fireworks"],
+        allow_fallbacks: true
+      }
+    }
+    
   })('moonshotai/kimi-k2.5'),
 
   instructions: `You are a friendly and knowledgeable language learning assistant.
@@ -71,10 +78,15 @@ export const agent: Agent = new Agent(components.agent, {
 - Always end sentences in flashcards with a period.
 - When creating flashcards, create variations of the current flashcard and avoid repeating the same flashcard. 
 - Make sure to always include the correct diacritics, accents etc.
+- Unless the user explicitly asks for individual words, always create full sentences instead of individual words. 
+- Start the chat with a response to the user and only then create flashcards. 
+- There is no need to repeat the vocabulary already mentioned on the cards in the chat because the user can see the cards that get created. 
 - Always respond in the language the user asked the question in. This is very important: if the user writes in German, respond in German; if in French, respond in French. Never switch to a different language mid-conversation unless the user does. And don't use another base or target language if the user has not used that language to ask the question.
 - For explanations unless specified otherwise, make explanations and grammar about the target language.
-- When creating cards with the createCard tool, the translations array must be an array of {language, text} objects. List base languages first, then target languages, in the exact order provided in the context.`,
-  stopWhen: stepCountIs(10),
+- When creating cards with the createCard tool, the translations array must be an array of {language, text} objects. List base languages first, then target languages, in the exact order provided in the context.
+- And lastly, do not include any reasoning about these rules or the setup with the languages in the response to the user.`,
+
+  stopWhen: stepCountIs(15),
   tools: {
     createCard: createCardTool,
   },
