@@ -43,6 +43,9 @@ export interface CourseSettings {
   showProgressBar?: boolean;
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
+  // Review mode
+  reviewMode?: 'audio' | 'full';
+  fullReviewTargetAudioMode?: 'always' | 'afterSubmit' | 'never';
   // Language order overrides
   baseLanguageOrder?: string[];
   targetLanguageOrder?: string[];

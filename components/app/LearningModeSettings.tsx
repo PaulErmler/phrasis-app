@@ -21,6 +21,7 @@ import {
 import { StepperControl } from '@/components/app/learning/StepperControl';
 import { TimelineLanguageCard } from '@/components/app/learning/TimelineLanguageCard';
 import { StepperPauseConnector } from '@/components/app/learning/StepperPauseConnector';
+import { ReviewModeSwitcher } from '@/components/app/learning/ReviewModeSwitcher';
 import {
   DEFAULT_AUTO_PLAY,
   DEFAULT_AUTO_ADVANCE,
@@ -192,8 +193,28 @@ export function LearningModeSettings({
     });
   };
 
+  // ---- review mode handlers ----
+
+  const handleReviewModeChange = async (mode: 'audio' | 'full') => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      reviewMode: mode,
+    });
+  };
+
+  const handleFullReviewTargetAudioModeChange = async (
+    mode: 'always' | 'afterSubmit' | 'never',
+  ) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      fullReviewTargetAudioMode: mode,
+    });
+  };
+
   // ---- resolved values (with defaults) ----
 
+  const reviewMode = courseSettings.reviewMode ?? 'audio';
+  const fullReviewTargetAudioMode = courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit';
   const reps = courseSettings.languageRepetitions ?? {};
   const repPauses = courseSettings.languageRepetitionPauses ?? {};
   const pauseB2B =
@@ -268,7 +289,18 @@ export function LearningModeSettings({
 
         <div className="px-6 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-3.5rem)]">
           {/* ================================================================
-              REVIEW SETTINGS
+              REVIEW MODE SWITCHER
+              ================================================================ */}
+
+          <ReviewModeSwitcher
+            value={reviewMode}
+            onChange={handleReviewModeChange}
+          />
+
+          <Separator />
+
+          {/* ================================================================
+              REVIEW SETTINGS (common)
               ================================================================ */}
 
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
@@ -293,25 +325,27 @@ export function LearningModeSettings({
             </div>
           </div>
 
-          {/* Initial reviews */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between gap-4">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">
-                  {t('initialReviews')}
-                </Label>
-                <p className="text-muted-xs">
-                  {t('initialReviewsDescription')}
-                </p>
+          {/* Initial reviews — audio mode only */}
+          {reviewMode === 'audio' && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-medium">
+                    {t('initialReviews')}
+                  </Label>
+                  <p className="text-muted-xs">
+                    {t('initialReviewsDescription')}
+                  </p>
+                </div>
+                <StepperControl
+                  value={courseSettings.initialReviewCount}
+                  min={1}
+                  max={20}
+                  onChange={handleInitialReviewsChange}
+                />
               </div>
-              <StepperControl
-                value={courseSettings.initialReviewCount}
-                min={1}
-                max={20}
-                onChange={handleInitialReviewsChange}
-              />
             </div>
-          </div>
+          )}
 
           {/* Auto-add cards */}
           <div className="flex items-start justify-between gap-4">
@@ -329,21 +363,23 @@ export function LearningModeSettings({
             />
           </div>
 
-          {/* Auto-advance */}
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-0.5">
-              <Label htmlFor="autoAdvance" className="text-sm font-medium">
-                {t('autoAdvance')}
-              </Label>
-              <p className="text-muted-xs">{t('autoAdvanceDescription')}</p>
+          {/* Auto-advance — audio mode only */}
+          {reviewMode === 'audio' && (
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-0.5">
+                <Label htmlFor="autoAdvance" className="text-sm font-medium">
+                  {t('autoAdvance')}
+                </Label>
+                <p className="text-muted-xs">{t('autoAdvanceDescription')}</p>
+              </div>
+              <Switch
+                id="autoAdvance"
+                checked={autoAdvance}
+                onCheckedChange={handleAutoAdvanceChange}
+                className="mt-0.5"
+              />
             </div>
-            <Switch
-              id="autoAdvance"
-              checked={autoAdvance}
-              onCheckedChange={handleAutoAdvanceChange}
-              className="mt-0.5"
-            />
-          </div>
+          )}
 
           <Separator />
 
@@ -370,6 +406,60 @@ export function LearningModeSettings({
               className="mt-0.5"
             />
           </div>
+
+          {/* Target language audio — full review mode only */}
+          {reviewMode === 'full' && (
+            <div className="space-y-0">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <Label htmlFor="targetAudioEnabled" className="text-sm font-medium">
+                    {t('fullReviewTargetAudio')}
+                  </Label>
+                  <p className="text-muted-xs">{t('fullReviewTargetAudioDescription')}</p>
+                </div>
+                <Switch
+                  id="targetAudioEnabled"
+                  checked={fullReviewTargetAudioMode !== 'never'}
+                  onCheckedChange={(checked) => {
+                    handleFullReviewTargetAudioModeChange(checked ? 'afterSubmit' : 'never');
+                  }}
+                  className="mt-0.5"
+                />
+              </div>
+
+              {fullReviewTargetAudioMode !== 'never' && (
+                <div className="ml-4 mt-3 pl-3 border-l-2 border-border space-y-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <Label htmlFor="targetAudio_afterSubmit" className="text-sm font-medium">
+                      {t('fullReviewTargetAudio_afterSubmit')}
+                    </Label>
+                    <Switch
+                      id="targetAudio_afterSubmit"
+                      checked={fullReviewTargetAudioMode === 'afterSubmit'}
+                      onCheckedChange={(checked) => {
+                        if (checked) handleFullReviewTargetAudioModeChange('afterSubmit');
+                      }}
+                      className="mt-0.5"
+                    />
+                  </div>
+
+                  <div className="flex items-start justify-between gap-4">
+                    <Label htmlFor="targetAudio_always" className="text-sm font-medium">
+                      {t('fullReviewTargetAudio_always')}
+                    </Label>
+                    <Switch
+                      id="targetAudio_always"
+                      checked={fullReviewTargetAudioMode === 'always'}
+                      onCheckedChange={(checked) => {
+                        if (checked) handleFullReviewTargetAudioModeChange('always');
+                      }}
+                      className="mt-0.5"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <p className="text-muted-xs pt-2">
             {t('playbackSequenceDescription')}
@@ -420,62 +510,67 @@ export function LearningModeSettings({
               );
             })}
 
-            {/* Base → Target Pause connector (always editable) */}
-            {baseLanguages.length > 0 && targetLanguages.length > 0 && (
-              <StepperPauseConnector
-                label={t('pause')}
-                seconds={pauseB2T}
-                onChange={handlePauseBaseToTargetChange}
-                accent
-              />
+            {/* Target languages in timeline — only when they're part of the main audio sequence */}
+            {(reviewMode === 'audio' || fullReviewTargetAudioMode === 'always') && (
+              <>
+                {/* Base → Target Pause connector */}
+                {baseLanguages.length > 0 && targetLanguages.length > 0 && (
+                  <StepperPauseConnector
+                    label={t('pause')}
+                    seconds={pauseB2T}
+                    onChange={handlePauseBaseToTargetChange}
+                    accent
+                  />
+                )}
+
+                {/* Target languages */}
+                {targetLanguages.map((code, idx) => {
+                  const plays = reps[code] ?? DEFAULT_REPETITIONS_TARGET;
+                  const repPause =
+                    repPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
+                  const nextCode = targetLanguages[idx + 1];
+                  const nextPlays = nextCode
+                    ? (reps[nextCode] ?? DEFAULT_REPETITIONS_TARGET)
+                    : 0;
+
+                  return (
+                    <div
+                      key={`target-${code}`}
+                      className="w-full flex flex-col items-center"
+                    >
+                      <TimelineLanguageCard
+                        code={code}
+                        type="target"
+                        plays={plays}
+                        repPause={repPause}
+                        onPlaysChange={(v) => handleRepetitionChange(code, v)}
+                        onRepPauseChange={(v) =>
+                          handleRepetitionPauseChange(code, v)
+                        }
+                        repPauseLabel={t('pauseBetweenRepetitions')}
+                        canMoveUp={idx > 0}
+                        canMoveDown={idx < targetLanguages.length - 1}
+                        onMoveUp={() => moveTargetUp(idx)}
+                        onMoveDown={() => moveTargetDown(idx)}
+                      />
+
+                      {/* Target → Target Pause connector */}
+                      {idx < targetLanguages.length - 1 && (
+                        <StepperPauseConnector
+                          label={t('pause')}
+                          seconds={pauseT2T}
+                          onChange={handlePauseTargetToTargetChange}
+                          lineOnly={plays === 0 || nextPlays === 0}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </>
             )}
 
-            {/* Target languages */}
-            {targetLanguages.map((code, idx) => {
-              const plays = reps[code] ?? DEFAULT_REPETITIONS_TARGET;
-              const repPause =
-                repPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
-              const nextCode = targetLanguages[idx + 1];
-              const nextPlays = nextCode
-                ? (reps[nextCode] ?? DEFAULT_REPETITIONS_TARGET)
-                : 0;
-
-              return (
-                <div
-                  key={`target-${code}`}
-                  className="w-full flex flex-col items-center"
-                >
-                  <TimelineLanguageCard
-                    code={code}
-                    type="target"
-                    plays={plays}
-                    repPause={repPause}
-                    onPlaysChange={(v) => handleRepetitionChange(code, v)}
-                    onRepPauseChange={(v) =>
-                      handleRepetitionPauseChange(code, v)
-                    }
-                    repPauseLabel={t('pauseBetweenRepetitions')}
-                    canMoveUp={idx > 0}
-                    canMoveDown={idx < targetLanguages.length - 1}
-                    onMoveUp={() => moveTargetUp(idx)}
-                    onMoveDown={() => moveTargetDown(idx)}
-                  />
-
-                  {/* Target → Target Pause connector */}
-                  {idx < targetLanguages.length - 1 && (
-                    <StepperPauseConnector
-                      label={t('pause')}
-                      seconds={pauseT2T}
-                      onChange={handlePauseTargetToTargetChange}
-                      lineOnly={plays === 0 || nextPlays === 0}
-                    />
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Pause before auto-advance (only shown when auto-advance is enabled) */}
-            {autoAdvance &&
+            {/* Pause before auto-advance (only shown when auto-advance is enabled, audio mode only) */}
+            {reviewMode === 'audio' && autoAdvance &&
               (baseLanguages.length > 0 || targetLanguages.length > 0) && (
               <StepperPauseConnector
                 label={t('pauseBeforeAutoAdvance')}
@@ -490,7 +585,7 @@ export function LearningModeSettings({
 
             {/* End-of-sequence indicator */}
             <div className="mt-2 flex items-center gap-2 text-muted-xs">
-              {autoAdvance ? (
+              {reviewMode === 'audio' && autoAdvance ? (
                 <>
                   <div className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-t-[6px] border-t-primary" />
                   <span>{t('autoAdvanceIndicator')}</span>
@@ -514,41 +609,43 @@ export function LearningModeSettings({
             {t('uiSettings')}
           </p>
 
-          {/* Hide target languages + sub-setting */}
-          <div className="space-y-0">
-            <div className="flex items-start justify-between gap-4">
-              <div className="space-y-0.5">
-                <Label htmlFor="hideTargetLanguages" className="text-sm font-medium">
-                  {t('hideTargetLanguages')}
-                </Label>
-                <p className="text-muted-xs">{t('hideTargetLanguagesDescription')}</p>
-              </div>
-              <Switch
-                id="hideTargetLanguages"
-                checked={courseSettings.hideTargetLanguages ?? true}
-                onCheckedChange={handleHideTargetLanguagesChange}
-                className="mt-0.5"
-              />
-            </div>
-
-            {/* Auto-reveal — visually indented as a sub-setting */}
-            {(courseSettings.hideTargetLanguages ?? true) && (
-              <div className="ml-4 mt-3 pl-3 border-l-2 border-border flex items-start justify-between gap-4">
+          {/* Hide target languages + sub-setting — audio mode only */}
+          {reviewMode === 'audio' && (
+            <div className="space-y-0">
+              <div className="flex items-start justify-between gap-4">
                 <div className="space-y-0.5">
-                  <Label htmlFor="autoRevealLanguages" className="text-sm font-medium">
-                    {t('autoRevealLanguages')}
+                  <Label htmlFor="hideTargetLanguages" className="text-sm font-medium">
+                    {t('hideTargetLanguages')}
                   </Label>
-                  <p className="text-muted-xs">{t('autoRevealLanguagesDescription')}</p>
+                  <p className="text-muted-xs">{t('hideTargetLanguagesDescription')}</p>
                 </div>
                 <Switch
-                  id="autoRevealLanguages"
-                  checked={courseSettings.autoRevealLanguages ?? false}
-                  onCheckedChange={handleAutoRevealLanguagesChange}
+                  id="hideTargetLanguages"
+                  checked={courseSettings.hideTargetLanguages ?? true}
+                  onCheckedChange={handleHideTargetLanguagesChange}
                   className="mt-0.5"
                 />
               </div>
-            )}
-          </div>
+
+              {/* Auto-reveal — visually indented as a sub-setting */}
+              {(courseSettings.hideTargetLanguages ?? true) && (
+                <div className="ml-4 mt-3 pl-3 border-l-2 border-border flex items-start justify-between gap-4">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="autoRevealLanguages" className="text-sm font-medium">
+                      {t('autoRevealLanguages')}
+                    </Label>
+                    <p className="text-muted-xs">{t('autoRevealLanguagesDescription')}</p>
+                  </div>
+                  <Switch
+                    id="autoRevealLanguages"
+                    checked={courseSettings.autoRevealLanguages ?? false}
+                    onCheckedChange={handleAutoRevealLanguagesChange}
+                    className="mt-0.5"
+                  />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Show progress bar */}
           <div className="flex items-start justify-between gap-4">

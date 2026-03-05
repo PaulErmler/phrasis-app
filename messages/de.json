@@ -215,6 +215,9 @@
       "pause": "Pause",
       "play": "Abspielen"
     },
+    "submitAnswer": "Absenden",
+    "accuracy": "Genauigkeit",
+    "typeTranslation": "Übersetzung eingeben...",
     "empty": {
       "noCardsDue": "Keine Karten zur Wiederholung fällig",
       "addCards": "{count} Karten hinzufügen",
@@ -236,7 +239,7 @@
       "autoAddCards": "Karten automatisch hinzufügen",
       "autoAddCardsDescription": "Automatisch neue Karten hinzufügen, wenn keine mehr fällig sind",
       "initialReviews": "Anfängliche Wiederholungen",
-      "initialReviewsDescription": "Anzahl der Vorwiederholungen vor der Abstandswiederholung",
+      "initialReviewsDescription": "Anzahl der anfänglichen Wiederholungen für neue Karten",
       "audioPlayback": "Audio-Wiedergabe",
       "autoPlay": "Audio automatisch abspielen",
       "autoPlayDescription": "Audio automatisch abspielen, wenn eine Karte angezeigt wird",
@@ -267,7 +270,14 @@
       "allSkipped": "Alle Sprachen auf 0 Plays gesetzt",
       "seconds": "s",
       "timesPlayed": "{count}x",
-      "pauseBetweenPlays": "{seconds}s dazwischen"
+      "pauseBetweenPlays": "{seconds}s dazwischen",
+      "reviewModeAudio": "Audio",
+      "reviewModeFull": "Vollständig",
+      "fullReviewSettings": "Vollständige Wiederholung",
+      "fullReviewTargetAudio": "Zielsprache automatisch abspielen",
+      "fullReviewTargetAudioDescription": "Wann soll das Audio der Zielsprache abgespielt werden",
+      "fullReviewTargetAudio_always": "Nach Basis-Audio",
+      "fullReviewTargetAudio_afterSubmit": "Nach dem Absenden"
     }
   },
   "Footer": {

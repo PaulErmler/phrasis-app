@@ -449,6 +449,11 @@ export const getActiveCourseSettings = query({
       autoRevealLanguages: v.optional(v.boolean()),
       baseLanguageOrder: v.optional(v.array(v.string())),
       targetLanguageOrder: v.optional(v.array(v.string())),
+      // Review mode
+      reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))),
+      fullReviewTargetAudioMode: v.optional(
+        v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
+      ),
       chatCollectionId: v.optional(v.id('collections')),
       activeCustomCollectionIds: v.optional(v.array(v.id('collections'))),
     }),
@@ -492,6 +497,10 @@ export const updateCourseSettings = mutation({
     autoRevealLanguages: v.optional(v.boolean()),
     baseLanguageOrder: v.optional(v.array(v.string())),
     targetLanguageOrder: v.optional(v.array(v.string())),
+    reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))),
+    fullReviewTargetAudioMode: v.optional(
+      v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
+    ),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -524,6 +533,8 @@ export const updateCourseSettings = mutation({
       'autoRevealLanguages',
       'baseLanguageOrder',
       'targetLanguageOrder',
+      'reviewMode',
+      'fullReviewTargetAudioMode',
     ] as const;
 
     const existing = await dbGetCourseSettings(ctx, args.courseId);
@@ -555,6 +566,8 @@ export const updateCourseSettings = mutation({
         autoRevealLanguages: args.autoRevealLanguages,
         baseLanguageOrder: args.baseLanguageOrder,
         targetLanguageOrder: args.targetLanguageOrder,
+        reviewMode: args.reviewMode,
+        fullReviewTargetAudioMode: args.fullReviewTargetAudioMode,
       });
     }
 

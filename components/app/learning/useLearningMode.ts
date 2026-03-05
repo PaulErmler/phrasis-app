@@ -22,6 +22,13 @@ import {
 } from './types';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 
+function effectivePhase(
+  reviewMode: string,
+  rawPhase: SchedulingPhase,
+): SchedulingPhase {
+  return reviewMode === 'full' ? 'review' : rawPhase;
+}
+
 // ============================================================================
 // Discriminated union return type
 // ============================================================================
@@ -230,6 +237,8 @@ export function useLearningMode(
   // --------------------------------------------------------------------------
   // Review / master / hide
   // --------------------------------------------------------------------------
+  const reviewMode = courseSettings?.reviewMode ?? 'audio';
+
   const handleReview = useCallback(
     async (rating: ReviewRating) => {
       if (!cardForReview || isReviewing) return;
@@ -242,6 +251,7 @@ export function useLearningMode(
           timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
           timezone:
             Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          ...(reviewMode === 'full' && { forceReviewPhase: true }),
         });
         setSelectedRating(null);
       } catch (error) {
@@ -250,7 +260,7 @@ export function useLearningMode(
         setIsReviewing(false);
       }
     },
-    [cardForReview, isReviewing, reviewCardMutation],
+    [cardForReview, isReviewing, reviewCardMutation, reviewMode],
   );
 
   const handleMaster = useCallback(() => {
@@ -301,7 +311,7 @@ export function useLearningMode(
       }
       return;
     }
-    const phase = cardForReview.schedulingPhase as SchedulingPhase;
+    const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
     const rating = selectedRating ?? getDefaultRating(phase);
     handleReview(rating);
   }, [
@@ -310,6 +320,7 @@ export function useLearningMode(
     isPendingMaster,
     isPendingHide,
     selectedRating,
+    reviewMode,
     handleReview,
     masterCardMutation,
     hideCardMutation,
@@ -364,8 +375,8 @@ export function useLearningMode(
     };
   }
 
-  // Reviewing
-  const phase = cardForReview.schedulingPhase as SchedulingPhase;
+  // Reviewing — in full review mode, always use FSRS ratings (skip pre-review)
+  const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
   const validRatings = getValidRatings(phase);
   const defaultRating = getDefaultRating(phase);
   const activeRating = selectedRating ?? defaultRating;

@@ -185,6 +185,7 @@ export const reviewCard = mutation({
     ),
     timeSpentMs: v.optional(v.number()),
     timezone: v.string(),
+    forceReviewPhase: v.optional(v.boolean()),
   },
   returns: v.object({
     schedulingPhase: schedulingPhaseValidator,
@@ -198,8 +199,9 @@ export const reviewCard = mutation({
 
     const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
 
-    // Validate rating is appropriate for the card's current phase
-    const phase = card.schedulingPhase;
+    // When forceReviewPhase is true (full review mode), treat the card as
+    // being in the 'review' phase so FSRS ratings are accepted directly.
+    const phase = args.forceReviewPhase ? 'review' as const : card.schedulingPhase;
     const validRatings = getValidRatings(phase);
     if (!validRatings.includes(args.rating)) {
       throw new ConvexError(
@@ -219,7 +221,7 @@ export const reviewCard = mutation({
     const result = scheduleCard(cardState, args.rating, initialReviewCount);
 
     // Add a random jitter of 0–60 seconds to spread cards apart in the queue.
-    const jitterMs = Math.random() * 60_000;
+    const jitterMs = (Math.random()-0.5) * 60_000;
     const dueDateWithJitter = result.dueDate + jitterMs;
 
     // Rebuild searchableText only when the card's cached languages don't match

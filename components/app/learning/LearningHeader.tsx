@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { ChevronLeft, CircleCheck, EyeOff, Info, Loader2, Settings, Star } from 'lucide-react';
 import { useLearningChatToggle } from './LearningChatLayout';
 
@@ -84,6 +85,7 @@ export function LearningHeader({
               </div>
             </PopoverContent>
           </Popover>
+          <ThemeSwitcher className="-mr-1" />
           <Button
             variant="ghost"
             size="icon"

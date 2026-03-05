@@ -103,6 +103,11 @@ export default defineSchema({
     // Language order overrides
     baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
     targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
+    // Review mode
+    reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
+    fullReviewTargetAudioMode: v.optional(
+      v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
+    ), // When to play target audio in full review mode
     chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
     activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
   }).index('by_courseId', ['courseId']),

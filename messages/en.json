@@ -215,6 +215,9 @@
       "pause": "Pause",
       "play": "Play"
     },
+    "submitAnswer": "Submit",
+    "accuracy": "Accuracy",
+    "typeTranslation": "Type the translation...",
     "empty": {
       "noCardsDue": "No cards due for review",
       "addCards": "Add {count} cards",
@@ -236,7 +239,7 @@
       "autoAddCards": "Auto-add cards",
       "autoAddCardsDescription": "Automatically add new cards when none are due",
       "initialReviews": "Initial reviews",
-      "initialReviewsDescription": "Number of pre-reviews before spaced repetition",
+      "initialReviewsDescription": "Number of initial reviews for new cards",
       "audioPlayback": "Audio Playback",
       "autoPlay": "Auto-play audio",
       "autoPlayDescription": "Automatically play audio when a card is shown",
@@ -267,7 +270,14 @@
       "allSkipped": "All languages set to 0 plays",
       "seconds": "s",
       "timesPlayed": "{count}x",
-      "pauseBetweenPlays": "{seconds}s between"
+      "pauseBetweenPlays": "{seconds}s between",
+      "reviewModeAudio": "Audio",
+      "reviewModeFull": "Full Review",
+      "fullReviewSettings": "Full Review Settings",
+      "fullReviewTargetAudio": "Automatically play Target Audio",
+      "fullReviewTargetAudioDescription": "When to play target language audio",
+      "fullReviewTargetAudio_always": "After base audio",
+      "fullReviewTargetAudio_afterSubmit": "After submitting text"
     }
   },
   "Footer": {

@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import {
   LearningCardContent,
+  FullReviewCardContent,
   LearningControls,
   NoCollectionState,
   NoCardsDueState,
@@ -73,26 +74,45 @@ export function LearningMode({ state, audio }: LearningModeProps) {
     );
   }
 
+  const reviewMode = state.courseSettings.reviewMode ?? 'audio';
+
   return (
     <div className="flex flex-col h-full">
-      <LearningCardContent
-        preReviewCount={state.preReviewCount}
-        schedulingPhase={state.phase}
-        fsrsState={state.fsrsState}
-        sourceText={state.sourceText}
-        translations={state.translations}
-        audioRecordings={state.audioRecordings}
-        isFavorite={state.isFavorite}
-        isPendingMaster={state.isPendingMaster}
-        isPendingHide={state.isPendingHide}
-        onMaster={state.handleMaster}
-        onHide={state.handleHide}
-        onFavorite={state.handleFavorite}
-        onAudioPlay={audio.stop}
-        hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
-        autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? false}
-        revealedLanguages={audio.revealedLanguages}
-      />
+      {reviewMode === 'full' ? (
+        <FullReviewCardContent
+          preReviewCount={state.preReviewCount}
+          sourceText={state.sourceText}
+          translations={state.translations}
+          audioRecordings={state.audioRecordings}
+          isFavorite={state.isFavorite}
+          isPendingMaster={state.isPendingMaster}
+          isPendingHide={state.isPendingHide}
+          onMaster={state.handleMaster}
+          onHide={state.handleHide}
+          onFavorite={state.handleFavorite}
+          onAudioPlay={audio.stop}
+          targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
+        />
+      ) : (
+        <LearningCardContent
+          preReviewCount={state.preReviewCount}
+          schedulingPhase={state.phase}
+          fsrsState={state.fsrsState}
+          sourceText={state.sourceText}
+          translations={state.translations}
+          audioRecordings={state.audioRecordings}
+          isFavorite={state.isFavorite}
+          isPendingMaster={state.isPendingMaster}
+          isPendingHide={state.isPendingHide}
+          onMaster={state.handleMaster}
+          onHide={state.handleHide}
+          onFavorite={state.handleFavorite}
+          onAudioPlay={audio.stop}
+          hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
+          autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? false}
+          revealedLanguages={audio.revealedLanguages}
+        />
+      )}
 
       <LearningControls
         validRatings={state.validRatings}

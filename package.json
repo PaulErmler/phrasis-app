@@ -68,6 +68,7 @@
     "convex": "^1.31.2",
     "csv-parse": "^6.1.0",
     "date-fns": "^4.1.0",
+    "diff": "^8.0.3",
     "dotenv": "^17.2.3",
     "embla-carousel-react": "^8.6.0",
     "gray-matter": "^4.0.3",

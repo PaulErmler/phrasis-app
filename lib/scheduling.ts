@@ -310,12 +310,10 @@ function scheduleFsrsReview(
   now: number,
   requestRetention?: number,
 ): ScheduleResult {
-  if (!cardState.fsrsState) {
-    throw new Error('Cannot perform FSRS review: no FSRS state on card');
-  }
-
   const f = getFsrsInstance(requestRetention);
-  const card = deserializeFsrsCard(cardState.fsrsState);
+  const card = cardState.fsrsState
+    ? deserializeFsrsCard(cardState.fsrsState)
+    : createEmptyCard(new Date(now));
   const grade = ratingToGrade(rating);
 
   const result: RecordLogItem = f.next(card, new Date(now), grade);

@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# plans 
+/plans
+
 # convex temp directory
 .convex-tmp
 
