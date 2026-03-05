@@ -5,7 +5,12 @@ import { getAuthUser } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId } from '../db/decks';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
-import { translationValidator, audioRecordingValidator } from '../types';
+import {
+  translationValidator,
+  audioRecordingValidator,
+  fsrsStateValidator,
+  schedulingPhaseValidator,
+} from '../types';
 
 // ============================================================================
 // QUERY
@@ -32,6 +37,8 @@ const libraryCardValidator = v.object({
   isHidden: v.boolean(),
   isFavorite: v.optional(v.boolean()),
   preReviewCount: v.number(),
+  schedulingPhase: schedulingPhaseValidator,
+  fsrsState: v.union(fsrsStateValidator, v.null()),
   lastReviewedAt: v.optional(v.number()),
   hasMissingContent: v.boolean(),
 });
@@ -162,6 +169,8 @@ export const getLibraryCards = query({
           isHidden: card.isHidden,
           isFavorite: card.isFavorite,
           preReviewCount: card.preReviewCount,
+          schedulingPhase: card.schedulingPhase,
+          fsrsState: card.fsrsState ?? null,
           lastReviewedAt: card.lastReviewedAt,
           hasMissingContent: content.hasMissingContent,
         };

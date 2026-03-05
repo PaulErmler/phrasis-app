@@ -209,6 +209,8 @@ export function LibraryView() {
                 key={card._id}
                 bare
                 preReviewCount={card.preReviewCount}
+                schedulingPhase={card.schedulingPhase}
+                fsrsState={card.fsrsState}
                 sourceText={card.sourceText}
                 translations={card.translations}
                 audioRecordings={card.audioRecordings}

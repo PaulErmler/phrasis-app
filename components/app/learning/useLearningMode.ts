@@ -61,6 +61,7 @@ interface ReviewingState extends BaseState {
   cardId: Id<'cards'>;
   phase: SchedulingPhase;
   preReviewCount: number;
+  fsrsState: { reps: number } | null;
   sourceText: string;
   sourceLanguage: string;
   translations: CardTranslation[];
@@ -419,6 +420,7 @@ export function useLearningMode(
     cardId: cardForReview._id,
     phase,
     preReviewCount: cardForReview.preReviewCount,
+    fsrsState: cardForReview.fsrsState,
     sourceText: cardForReview.sourceText,
     sourceLanguage: cardForReview.sourceLanguage,
     translations: sortedTranslations,

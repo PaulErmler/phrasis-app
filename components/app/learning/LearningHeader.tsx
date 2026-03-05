@@ -2,7 +2,12 @@
 
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Loader2, Settings } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { ChevronLeft, CircleCheck, EyeOff, Info, Loader2, Settings, Star } from 'lucide-react';
 import { useLearningChatToggle } from './LearningChatLayout';
 
 interface LearningHeaderProps {
@@ -17,6 +22,7 @@ export function LearningHeader({
   isNavigating = false,
 }: LearningHeaderProps) {
   const t = useTranslations('LearningMode');
+  const tSettings = useTranslations('LearningMode.settingsPanel');
   const { isChatOpen, closeChat } = useLearningChatToggle();
 
   const BackIcon = isNavigating ? Loader2 : ChevronLeft;
@@ -47,6 +53,37 @@ export function LearningHeader({
         </h1>
 
         <div className={`ml-auto flex items-center gap-1 z-10 ${isChatOpen ? 'hidden lg:flex' : 'flex'}`}>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="-mr-1"
+                aria-label={tSettings('iconLegend')}
+              >
+                <Info className="h-5 w-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" side="bottom" className="w-64 p-3">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                {tSettings('iconLegend')}
+              </p>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-xs">
+                  <Star className="h-3.5 w-3.5 text-favorite shrink-0" />
+                  <span>{tSettings('iconFavorite')}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <CircleCheck className="h-3.5 w-3.5 text-success shrink-0" />
+                  <span>{tSettings('iconMaster')}</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs">
+                  <EyeOff className="h-3.5 w-3.5 text-destructive shrink-0" />
+                  <span>{tSettings('iconHide')}</span>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button
             variant="ghost"
             size="icon"

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { CircleCheck, EyeOff, Star, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import {
   DEFAULT_BATCH_SIZE,
   type CourseSettings,
@@ -267,29 +267,6 @@ export function LearningModeSettings({
         </div>
 
         <div className="px-6 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-3.5rem)]">
-          {/* Icon Legend */}
-          <div className="rounded-md border bg-muted/40 px-3 py-2.5 space-y-1.5">
-            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-              {t('iconLegend')}
-            </p>
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2 text-xs">
-                <Star className="h-3.5 w-3.5 text-favorite shrink-0" />
-                <span>{t('iconFavorite')}</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <CircleCheck className="h-3.5 w-3.5 text-success shrink-0" />
-                <span>{t('iconMaster')}</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <EyeOff className="h-3.5 w-3.5 text-destructive shrink-0" />
-                <span>{t('iconHide')}</span>
-              </div>
-            </div>
-          </div>
-
-          <Separator />
-
           {/* ================================================================
               REVIEW SETTINGS
               ================================================================ */}

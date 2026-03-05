@@ -16,6 +16,9 @@ import type { CardTranslation, CardAudioRecording } from './types';
 
 interface LearningCardContentProps {
   preReviewCount: number;
+  /** When in FSRS phase, total reviews = preReviewCount + fsrsState.reps */
+  schedulingPhase?: 'preReview' | 'review';
+  fsrsState?: { reps: number } | null;
   sourceText: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
@@ -34,6 +37,8 @@ interface LearningCardContentProps {
 
 export function LearningCardContent({
   preReviewCount,
+  schedulingPhase,
+  fsrsState,
   sourceText,
   translations,
   audioRecordings,
@@ -50,6 +55,10 @@ export function LearningCardContent({
   bare = false,
 }: LearningCardContentProps) {
   const t = useTranslations('LearningMode');
+  const displayReviewCount =
+    schedulingPhase === 'review' && fsrsState != null
+      ? preReviewCount + fsrsState.reps
+      : preReviewCount;
   const baseTranslations = translations.filter((tr) => tr.isBaseLanguage);
   const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
 
@@ -77,7 +86,7 @@ export function LearningCardContent({
           <div className="flex items-center justify-between px-4 pt-4 pb-2">
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="text-xs">
-                {t('reviewCount', { count: preReviewCount })}
+                {t('reviewCount', { count: displayReviewCount })}
               </Badge>
             </div>
             <div className="flex items-center gap-1">

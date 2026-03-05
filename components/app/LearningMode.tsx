@@ -77,6 +77,8 @@ export function LearningMode({ state, audio }: LearningModeProps) {
     <div className="flex flex-col h-full">
       <LearningCardContent
         preReviewCount={state.preReviewCount}
+        schedulingPhase={state.phase}
+        fsrsState={state.fsrsState}
         sourceText={state.sourceText}
         translations={state.translations}
         audioRecordings={state.audioRecordings}
