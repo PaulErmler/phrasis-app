@@ -70,6 +70,21 @@
       "empty": "Noch keine Zahlen generiert."
     },
     "contentSoon": "Demnächst: Entdecke neue Phrasen und auf dich zugeschnittene Inhalte.",
+    "content": {
+      "chat": {
+        "title": "Chat",
+        "description": "Lass einen Chatbot Lernkarten für dich erstellen"
+      },
+      "fileUpload": {
+        "title": "Datei hochladen",
+        "description": "Lade Dokumente hoch, um Lernkarten aus deinen eigenen Inhalten zu erstellen"
+      },
+      "enterTexts": {
+        "title": "Eigene Texte eingeben",
+        "description": "Tippe oder füge Sätze ein, um eigene Lernkarten zu erstellen"
+      },
+      "comingSoon": "Demnächst"
+    },
     "librarySoon": "Demnächst: Verwalte und organisiere deine gespeicherten Phrasen.",
     "library": {
       "title": "Bibliothek",
@@ -181,6 +196,8 @@
     "changeCourse": "Kurs wechseln",
     "currentCourseWithLanguages": "Kurs: {targetLanguages}",
     "startLearning": "Lernen starten",
+    "fullReview": "Voll-Übung",
+    "audioReview": "Audio-Übung",
     "stats": {
       "streak": "Serie",
       "reps": "Wiederholungen",
@@ -368,6 +385,17 @@
       "advanced": {
         "title": "Experte",
         "description": "Ich möchte meine Inhalte und Einstellung auf mich anpassen"
+      }
+    },
+    "reviewMode": {
+      "title": "Wie möchtest du üben?",
+      "full": {
+        "title": "Voll-Übung",
+        "description": "Übe das Schreiben, indem du Übersetzungen eintippst. Ideal für aktives Üben am Bildschirm."
+      },
+      "audio": {
+        "title": "Audio-Übung",
+        "description": "Übe Hören und Sprechen mit Audio-Wiedergabe. Kein Blick auf den Bildschirm nötig. Ideal für unterwegs — beim Spazieren, Pendeln oder Entspannen."
       }
     },
     "step2": {

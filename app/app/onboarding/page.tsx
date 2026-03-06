@@ -11,6 +11,7 @@ import { ChevronLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { WelcomeStep } from './onboarding_steps/WelcomeStep';
 import { LearningStyleStep } from './onboarding_steps/LearningStyleStep';
+import { ReviewModeStep } from './onboarding_steps/ReviewModeStep';
 import { TargetLanguagesStep } from './onboarding_steps/TargetLanguagesStep';
 import { CurrentLevelStep } from './onboarding_steps/CurrentLevelStep';
 import { BaseLanguagesStep } from './onboarding_steps/BaseLanguagesStep';
@@ -48,16 +49,17 @@ function OnboardingContent() {
     api.features.courses.completeOnboarding,
   );
 
-  // Initialize data from onboarding progress or use defaults
   const initialData: OnboardingData = onboardingProgress
     ? {
       learningStyle: onboardingProgress.learningStyle || null,
+      reviewMode: onboardingProgress.reviewMode || null,
       targetLanguages: onboardingProgress.targetLanguages || [],
       currentLevel: onboardingProgress.currentLevel || null,
       baseLanguages: onboardingProgress.baseLanguages || [],
     }
     : {
       learningStyle: null,
+      reviewMode: null,
       targetLanguages: [],
       currentLevel: null,
       baseLanguages: [],
@@ -66,10 +68,9 @@ function OnboardingContent() {
   const [data, setData] = useState<OnboardingData>(initialData);
   const [step, setStep] = useState(onboardingProgress?.step || 1);
 
-  const totalSteps = 6;
+  const totalSteps = 7;
   const progress = (step / totalSteps) * 100;
 
-  // Redirect to /app if onboarding is already completed
   useEffect(() => {
     if (userSettings?.hasCompletedOnboarding) {
       router.push('/app');
@@ -83,12 +84,14 @@ function OnboardingContent() {
     case 2:
       return data.learningStyle !== null;
     case 3:
-      return data.targetLanguages.length > 0;
+      return data.reviewMode !== null;
     case 4:
-      return data.currentLevel !== null;
+      return data.targetLanguages.length > 0;
     case 5:
-      return data.baseLanguages.length > 0;
+      return data.currentLevel !== null;
     case 6:
+      return data.baseLanguages.length > 0;
+    case 7:
       return true;
     default:
       return false;
@@ -109,23 +112,28 @@ function OnboardingContent() {
     }
   }, [completeOnboarding, router]);
 
+  const saveProgressData = useCallback(async (nextStep: number) => {
+    try {
+      await saveProgress({
+        step: nextStep,
+        learningStyle: data.learningStyle || undefined,
+        reviewMode: data.reviewMode || undefined,
+        targetLanguages:
+          data.targetLanguages.length > 0 ? data.targetLanguages : undefined,
+        currentLevel: data.currentLevel || undefined,
+        baseLanguages:
+          data.baseLanguages.length > 0 ? data.baseLanguages : undefined,
+      });
+    } catch (error) {
+      console.error('Error saving progress:', error);
+    }
+  }, [saveProgress, data]);
+
   const handleContinue = async () => {
     const nextStep = step + 1;
     if (step < totalSteps) {
       setStep(nextStep);
-      try {
-        await saveProgress({
-          step: nextStep,
-          learningStyle: data.learningStyle || undefined,
-          targetLanguages:
-            data.targetLanguages.length > 0 ? data.targetLanguages : undefined,
-          currentLevel: data.currentLevel || undefined,
-          baseLanguages:
-            data.baseLanguages.length > 0 ? data.baseLanguages : undefined,
-        });
-      } catch (error) {
-        console.error('Error saving progress:', error);
-      }
+      await saveProgressData(nextStep);
     } else {
       await handleComplete();
     }
@@ -135,23 +143,10 @@ function OnboardingContent() {
     if (step > 1) {
       const prevStep = step - 1;
       setStep(prevStep);
-      try {
-        await saveProgress({
-          step: prevStep,
-          learningStyle: data.learningStyle || undefined,
-          targetLanguages:
-            data.targetLanguages.length > 0 ? data.targetLanguages : undefined,
-          currentLevel: data.currentLevel || undefined,
-          baseLanguages:
-            data.baseLanguages.length > 0 ? data.baseLanguages : undefined,
-        });
-      } catch (error) {
-        console.error('Error saving progress:', error);
-      }
+      await saveProgressData(prevStep);
     }
   };
 
-  // Show loading state while queries are loading (undefined) or if redirecting to /app
   if (
     userSettings === undefined ||
     onboardingProgress === undefined ||
@@ -191,6 +186,15 @@ function OnboardingContent() {
           )}
 
           {step === 3 && (
+            <ReviewModeStep
+              selectedMode={data.reviewMode}
+              onSelectMode={(mode) =>
+                setData({ ...data, reviewMode: mode })
+              }
+            />
+          )}
+
+          {step === 4 && (
             <TargetLanguagesStep
               selectedLanguages={data.targetLanguages}
               onToggleLanguage={(code) =>
@@ -199,7 +203,7 @@ function OnboardingContent() {
             />
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <CurrentLevelStep
               selectedLevel={data.currentLevel}
               targetLanguageName={
@@ -216,7 +220,7 @@ function OnboardingContent() {
             />
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <BaseLanguagesStep
               selectedLanguages={data.baseLanguages}
               excludeLanguages={data.targetLanguages}
@@ -226,7 +230,7 @@ function OnboardingContent() {
             />
           )}
 
-          {step === 6 && <LoadingStep onComplete={handleComplete} />}
+          {step === 7 && <LoadingStep onComplete={handleComplete} />}
         </div>
       </main>
 
@@ -234,7 +238,7 @@ function OnboardingContent() {
         <div className="border-t bg-background shrink-0">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between gap-4">
-              {step > 1 && step < 6 ? (
+              {step > 1 && step < 7 ? (
                 <Button
                   variant="ghost"
                   onClick={handleBack}

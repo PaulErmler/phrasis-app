@@ -6,7 +6,7 @@ import { useCardApprovals } from '@/hooks/use-card-approvals';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { RedirectToSignIn } from '@daveyplate/better-auth-ui';
 import { Authenticated } from 'convex/react';
 import { use, useMemo } from 'react';
@@ -30,6 +30,7 @@ export default function ChatPage({
 }
 
 function ChatPageContent({ threadId }: { threadId: string }) {
+  const router = useRouter();
   const t = useTranslations('Chat');
   const approvals = useCardApprovals(threadId);
 
@@ -44,12 +45,10 @@ function ChatPageContent({ threadId }: { threadId: string }) {
     <div className="flex flex-col h-screen overflow-hidden">
       <header className="sticky-header">
         <div className="header-bar">
-          <Link href="/app">
-            <Button variant="ghost" className="gap-2 -ml-2">
-              <ChevronLeft className="h-4 w-4" />
-              {t('back')}
-            </Button>
-          </Link>
+          <Button variant="ghost" className="gap-2 -ml-2" onClick={() => router.back()}>
+            <ChevronLeft className="h-4 w-4" />
+            {t('back')}
+          </Button>
           <ThemeSwitcher />
         </div>
       </header>

@@ -1,18 +1,19 @@
 import {
   PromptInput,
-  PromptInputActionAddAttachments,
-  PromptInputActionMenu,
-  PromptInputActionMenuContent,
-  PromptInputActionMenuTrigger,
-  PromptInputAttachment,
-  PromptInputAttachments,
+  // File attachment imports — disabled for now, re-enable when file upload is supported
+  // PromptInputActionAddAttachments,
+  // PromptInputActionMenu,
+  // PromptInputActionMenuContent,
+  // PromptInputActionMenuTrigger,
+  // PromptInputAttachment,
+  // PromptInputAttachments,
   PromptInputBody,
   PromptInputFooter,
-  PromptInputHeader,
+  // PromptInputHeader,
   type PromptInputMessage,
   PromptInputSubmit,
   PromptInputTextarea,
-  PromptInputTools,
+  // PromptInputTools,
 } from '@/components/ai-elements/prompt-input';
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 import { VoiceRecordButton } from './VoiceRecordButton';
@@ -37,7 +38,8 @@ interface ChatInputProps {
 }
 
 /**
- * Chat input component with text input, voice recording, and file attachments
+ * Chat input component with text input and voice recording.
+ * File attachments are disabled for now (see commented-out code below).
  */
 export function ChatInput({
   onSubmit,
@@ -77,16 +79,17 @@ export function ChatInput({
         )}
         <div className="w-full min-w-0">
           <PromptInput
-            globalDrop
-            multiple
+            // File uploads disabled — add globalDrop and multiple back when re-enabling
             onSubmit={onSubmit}
             className="w-full"
           >
+            {/* File attachment header — disabled for now
             <PromptInputHeader>
               <PromptInputAttachments>
                 {(attachment) => <PromptInputAttachment data={attachment} />}
               </PromptInputAttachments>
             </PromptInputHeader>
+            */}
 
             <PromptInputBody>
               <PromptInputTextarea
@@ -97,6 +100,7 @@ export function ChatInput({
             <PromptInputFooter>
               <div className="flex items-center gap-2">
                 {footerAction}
+                {/* File attachment action menu — disabled for now
                 <PromptInputTools>
                   <PromptInputActionMenu>
                     <PromptInputActionMenuTrigger />
@@ -105,6 +109,7 @@ export function ChatInput({
                     </PromptInputActionMenuContent>
                   </PromptInputActionMenu>
                 </PromptInputTools>
+                */}
               </div>
               <div className="flex items-center gap-2">
                 <VoiceRecordButton

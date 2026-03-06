@@ -70,6 +70,21 @@
       "empty": "No numbers generated yet."
     },
     "contentSoon": "Coming Soon: Discover new phrases and content tailored for you.",
+    "content": {
+      "chat": {
+        "title": "Chat",
+        "description": "Let a chatbot create flashcards for you"
+      },
+      "fileUpload": {
+        "title": "File Upload",
+        "description": "Upload documents to generate flashcards from your own content"
+      },
+      "enterTexts": {
+        "title": "Enter Your Own Texts",
+        "description": "Type or paste sentences to create custom flashcards"
+      },
+      "comingSoon": "Coming Soon"
+    },
     "librarySoon": "Coming Soon: Manage and organize your saved phrases.",
     "library": {
       "title": "Library",
@@ -181,6 +196,8 @@
     "changeCourse": "Change Course",
     "currentCourseWithLanguages": "Current Course: {targetLanguages}",
     "startLearning": "Start Learning",
+    "fullReview": "Full Review",
+    "audioReview": "Audio Review",
     "stats": {
       "streak": "Streak",
       "reps": "Reps",
@@ -368,6 +385,17 @@
       "advanced": {
         "title": "Advanced",
         "description": "I want to cutomize everything"
+      }
+    },
+    "reviewMode": {
+      "title": "How do you want to review?",
+      "full": {
+        "title": "Full Review",
+        "description": "Practice writing by typing translations. Best for active practice while looking at the screen."
+      },
+      "audio": {
+        "title": "Audio Review",
+        "description": "Practice listening and speaking with audio playback. There is no need to look at the screen. Ideal for learning on the go — while walking, commuting, or relaxing."
       }
     },
     "step2": {

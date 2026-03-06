@@ -186,7 +186,7 @@ export function CollectionCarouselUI({
                     {!isComplete && (
                       <Button
                         size="sm"
-                        variant={isActive ? 'default' : 'outline'}
+                        variant={isActive ? 'secondary' : 'outline'}
                         className="shrink-0 text-xs h-8 w-24 justify-center"
                         onClick={(e) => {
                           e.stopPropagation();

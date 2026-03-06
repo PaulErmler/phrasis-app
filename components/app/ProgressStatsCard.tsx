@@ -7,6 +7,8 @@ import { Flame, RotateCcw, MessageSquare, Clock } from 'lucide-react';
 import { formatTimeMs } from '@/lib/formatTime';
 import { StartLearningButton } from '@/components/app/StartLearningButton';
 
+type ReviewMode = 'audio' | 'full';
+
 function StatItem({
   icon: Icon,
   label,
@@ -27,12 +29,14 @@ function StatItem({
 
 export function ProgressStatsCard({
   preloadedCourseStats,
-  onStartLearning,
+  onStartReview,
   isNavigating,
+  navigatingMode,
 }: {
   preloadedCourseStats: Preloaded<typeof api.features.courses.getCourseStats>;
-  onStartLearning: () => void;
+  onStartReview: (mode: ReviewMode) => void;
   isNavigating: boolean;
+  navigatingMode: ReviewMode | null;
 }) {
   const t = useTranslations('AppPage');
   const stats = usePreloadedQuery(preloadedCourseStats);
@@ -55,8 +59,9 @@ export function ProgressStatsCard({
         <StatItem icon={Clock} label={t('stats.time')} value={time} />
       </div>
       <StartLearningButton
-        onStartLearning={onStartLearning}
+        onStartReview={onStartReview}
         isNavigating={isNavigating}
+        navigatingMode={navigatingMode}
       />
     </div>
   );

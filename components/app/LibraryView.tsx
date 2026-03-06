@@ -90,10 +90,10 @@ export function LibraryView() {
   const hasActiveFilters = debouncedSearch.length > 0 || activeFilter !== null;
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
+    <div className="flex-1 min-h-0 overflow-y-auto px-4" style={{ scrollbarGutter: 'stable' }}>
       {/* Sticky search + filters card */}
       <div className="sticky top-0 z-10 bg-background">
-        <div className="max-w-xl mx-auto w-full px-4 pt-8">
+        <div className="max-w-xl mx-auto w-full pt-8">
           <div className="card-surface p-3 space-y-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -156,7 +156,7 @@ export function LibraryView() {
       </div>
 
       {/* Card list */}
-      <div className="max-w-xl mx-auto w-full px-4 pt-2.5 pb-4 space-y-2.5">
+      <div className="max-w-xl mx-auto w-full pt-2.5 pb-4 space-y-2.5">
         {isLoading && null}
 
         {!isLoading && !hasResults && (

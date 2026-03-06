@@ -1,7 +1,7 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
-import { learningStyleValidator, currentLevelValidator } from '../types';
+import { learningStyleValidator, currentLevelValidator, reviewModeValidator } from '../types';
 import {
   getAuthUserId,
   requireAuthUserId,
@@ -130,6 +130,7 @@ export const getOnboardingProgress = query({
       userId: v.string(),
       step: v.number(),
       learningStyle: v.optional(learningStyleValidator),
+      reviewMode: v.optional(reviewModeValidator),
       currentLevel: v.optional(currentLevelValidator),
       targetLanguages: v.optional(v.array(v.string())),
       baseLanguages: v.optional(v.array(v.string())),
@@ -232,6 +233,7 @@ export const saveOnboardingProgress = mutation({
   args: {
     step: v.number(),
     learningStyle: v.optional(learningStyleValidator),
+    reviewMode: v.optional(reviewModeValidator),
     targetLanguages: v.optional(v.array(v.string())),
     currentLevel: v.optional(currentLevelValidator),
     baseLanguages: v.optional(v.array(v.string())),
@@ -242,6 +244,7 @@ export const saveOnboardingProgress = mutation({
     userId: v.string(),
     step: v.number(),
     learningStyle: v.optional(learningStyleValidator),
+    reviewMode: v.optional(reviewModeValidator),
     currentLevel: v.optional(currentLevelValidator),
     targetLanguages: v.optional(v.array(v.string())),
     baseLanguages: v.optional(v.array(v.string())),
@@ -375,10 +378,11 @@ export const completeOnboarding = mutation({
       .withIndex('by_name', (q) => q.eq('name', collectionName))
       .first();
 
-    // Create course settings in a separate table (with preselected collection)
+    // Create course settings in a separate table (with preselected collection and review mode)
     await upsertCourseSettings(ctx, courseId, {
       initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
       activeCollectionId: collection?._id,
+      reviewMode: progress.reviewMode,
     });
 
     // Auto-create a deck
