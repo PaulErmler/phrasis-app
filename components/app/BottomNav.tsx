@@ -8,28 +8,38 @@ import { Home, FileText, Play, Library, Settings, Loader2 } from 'lucide-react';
 
 export type View = 'home' | 'content' | 'library' | 'settings';
 
+const VIEW_PATHS: Record<View, string> = {
+  home: '/app',
+  content: '/app/content',
+  library: '/app/library',
+  settings: '/app/settings',
+};
+
 interface BottomNavProps {
   currentView: View;
-  onViewChange: (view: View) => void;
 }
 
-export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
+export function BottomNav({ currentView }: BottomNavProps) {
   const router = useRouter();
   const pathname = usePathname();
   const t = useTranslations('AppPage');
-  const [isNavigating, setIsNavigating] = useState(false);
+  const [isNavigatingToLearn, setIsNavigatingToLearn] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     clearTimeout(timerRef.current);
-    setIsNavigating(false);
+    setIsNavigatingToLearn(false);
   }, [pathname]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
   const handleGoToLearn = useCallback(() => {
     router.push('/app/learn');
-    timerRef.current = setTimeout(() => setIsNavigating(true), 500);
+    timerRef.current = setTimeout(() => setIsNavigatingToLearn(true), 500);
+  }, [router]);
+
+  const navigateTo = useCallback((view: View) => {
+    router.push(VIEW_PATHS[view]);
   }, [router]);
 
   return (
@@ -40,7 +50,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
             <Button
               variant="ghost"
               className={`flex flex-col items-center gap-1 h-auto w-full py-2 hover:bg-transparent ${currentView === 'home' ? 'text-primary' : 'text-muted-foreground'}`}
-              onClick={() => onViewChange('home')}
+              onClick={() => navigateTo('home')}
             >
               <Home className="h-5 w-5" />
               <span className="text-[10px] font-medium leading-none">
@@ -53,7 +63,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
             <Button
               variant="ghost"
               className={`flex flex-col items-center gap-1 h-auto w-full py-2 hover:bg-transparent ${currentView === 'content' ? 'text-primary' : 'text-muted-foreground'}`}
-              onClick={() => onViewChange('content')}
+              onClick={() => navigateTo('content')}
             >
               <FileText className="h-5 w-5" />
               <span className="text-[10px] font-medium leading-none">
@@ -69,9 +79,9 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
                 size="icon"
                 className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95"
                 onClick={handleGoToLearn}
-                disabled={isNavigating}
+                disabled={isNavigatingToLearn}
               >
-                {isNavigating ? (
+                {isNavigatingToLearn ? (
                   <Loader2 className="h-6 w-6 animate-spin text-primary-foreground" />
                 ) : (
                   <Play className="h-6 w-6 fill-current text-primary-foreground" />
@@ -84,7 +94,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
             <Button
               variant="ghost"
               className={`flex flex-col items-center gap-1 h-auto w-full py-2 hover:bg-transparent ${currentView === 'library' ? 'text-primary' : 'text-muted-foreground'}`}
-              onClick={() => onViewChange('library')}
+              onClick={() => navigateTo('library')}
             >
               <Library className="h-5 w-5" />
               <span className="text-[10px] font-medium leading-none">
@@ -97,7 +107,7 @@ export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
             <Button
               variant="ghost"
               className={`flex flex-col items-center gap-1 h-auto w-full py-2 hover:bg-transparent ${currentView === 'settings' ? 'text-primary' : 'text-muted-foreground'}`}
-              onClick={() => onViewChange('settings')}
+              onClick={() => navigateTo('settings')}
             >
               <Settings className="h-5 w-5" />
               <span className="text-[10px] font-medium leading-none">
