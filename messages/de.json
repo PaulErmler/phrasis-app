@@ -273,6 +273,8 @@
       "pauseBetweenPlays": "{seconds}s dazwischen",
       "reviewModeAudio": "Audio",
       "reviewModeFull": "Vollständig",
+      "reviewModeAudioDescription": "Höre dir die Audio-Wiedergabe deiner Phrasen an. Kein Blick auf den Bildschirm nötig, Karten werden automatisch bewertet. Ideal zum Lernen unterwegs — beim Spazieren, Pendeln oder Entspannen.",
+      "reviewModeFullDescription": "Tippe die Übersetzungen ein und sieh einen zeichengenauen Vergleich mit der richtigen Antwort. Ideal für aktives Üben — fördert Erinnerung und Rechtschreibung.",
       "fullReviewSettings": "Vollständige Wiederholung",
       "fullReviewTargetAudio": "Zielsprache automatisch abspielen",
       "fullReviewTargetAudioDescription": "Wann soll das Audio der Zielsprache abgespielt werden",

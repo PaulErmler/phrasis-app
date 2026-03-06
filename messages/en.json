@@ -273,6 +273,8 @@
       "pauseBetweenPlays": "{seconds}s between",
       "reviewModeAudio": "Audio",
       "reviewModeFull": "Full Review",
+      "reviewModeAudioDescription": "Listen to audio playback of your phrases. No need to look at the screen and manually rate the cards. Ideal for learning without looking at the screen — practice on the go while walking, commuting, or relaxing.",
+      "reviewModeFullDescription": "Type the translations and see a character-level comparison with the correct answer. Best for active practice — engages recall and spelling.",
       "fullReviewSettings": "Full Review Settings",
       "fullReviewTargetAudio": "Auto-play target audio",
       "fullReviewTargetAudioDescription": "When to play target language audio",

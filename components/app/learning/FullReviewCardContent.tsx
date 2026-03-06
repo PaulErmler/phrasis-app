@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import { DiffDisplay } from './DiffDisplay';
@@ -283,7 +283,7 @@ function TargetLanguageInput({
           className="h-9 w-9 shrink-0"
           aria-label={submitLabel}
         >
-          <Send className="h-4 w-4" />
+          <Check className="h-4 w-4" />
         </Button>
       </div>
     </div>
