@@ -95,6 +95,9 @@ function LearnViewInner({ onBack }: LearnViewProps) {
   const { preloadedCourseSettings, preloadedActiveCourse } = useAppData();
 
   const [isNavigating, setIsNavigating] = useState(false);
+  const navTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(() => () => clearTimeout(navTimerRef.current), []);
 
   const state = useLearningMode({
     courseSettings: preloadedCourseSettings,
@@ -104,8 +107,8 @@ function LearnViewInner({ onBack }: LearnViewProps) {
 
   const goHome = useCallback(() => {
     audio.pause();
-    setIsNavigating(true);
     onBack();
+    navTimerRef.current = setTimeout(() => setIsNavigating(true), 500);
   }, [audio, onBack]);
 
   const { threadId, isLoading: isThreadLoading, createThread } = useThread({

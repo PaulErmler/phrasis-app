@@ -240,25 +240,27 @@ export function CollectionCarouselUI({
         </CarouselContent>
       </Carousel>
 
-      {/* Dot indicators */}
-      {snapCount > 1 && (
-        <div className="flex justify-center gap-1.5 pt-1">
-          {Array.from({ length: snapCount }).map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              aria-label={`Go to slide ${i + 1}`}
-              onClick={() => api?.scrollTo(i)}
-              className={cn(
-                'rounded-full transition-all',
-                i === currentSnap
-                  ? 'w-6 h-2.5 bg-foreground'
-                  : 'w-2.5 h-2.5 bg-muted-foreground/30',
-              )}
-            />
-          ))}
-        </div>
-      )}
+      {/* Dot indicators – always reserve space to prevent layout shift */}
+      <div className="min-h-[18px] pt-1">
+        {snapCount > 1 && (
+          <div className="flex justify-center gap-1.5">
+            {Array.from({ length: snapCount }).map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                aria-label={`Go to slide ${i + 1}`}
+                onClick={() => api?.scrollTo(i)}
+                className={cn(
+                  'rounded-full transition-all',
+                  i === currentSnap
+                    ? 'w-6 h-2.5 bg-foreground'
+                    : 'w-2.5 h-2.5 bg-muted-foreground/30',
+                )}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
