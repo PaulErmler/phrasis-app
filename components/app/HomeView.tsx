@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Preloaded } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -30,13 +30,22 @@ export function HomeView({
   >;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const t = useTranslations('AppPage');
   const [isNavigating, setIsNavigating] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const handleStartLearning = () => {
-    setIsNavigating(true);
+  useEffect(() => {
+    clearTimeout(timerRef.current);
+    setIsNavigating(false);
+  }, [pathname]);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const handleStartLearning = useCallback(() => {
     router.push('/app/learn');
-  };
+    timerRef.current = setTimeout(() => setIsNavigating(true), 500);
+  }, [router]);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-8">

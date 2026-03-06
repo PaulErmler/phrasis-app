@@ -1,7 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { Skeleton } from '@/components/ui/skeleton';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import {
   LearningCardContent,
@@ -16,26 +14,35 @@ import type { AudioPlayerState } from '@/hooks/use-audio-player';
 interface LearningModeProps {
   state: LearningState;
   audio: AudioPlayerState;
+  onGoHome: () => void;
 }
 
 /**
  * Learning mode body content (card, controls, settings).
  * Does NOT render its own header — the parent layout handles that.
  */
-export function LearningMode({ state, audio }: LearningModeProps) {
-  const router = useRouter();
-  const goHome = () => router.push('/app');
+export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
 
   if (state.status === 'loading') {
     return (
       <div className="flex flex-col h-full">
-        <main className="flex-1 flex items-center justify-center">
-          <div className="space-y-4 w-full max-w-md px-4">
-            <Skeleton className="h-48 w-full rounded-xl" />
-            <Skeleton className="h-12 w-full rounded-lg" />
-            <Skeleton className="h-12 w-full rounded-lg" />
-          </div>
-        </main>
+        <main className="flex-1" />
+        <LearningControls
+          validRatings={[]}
+          activeRating={'good'}
+          ratingIntervals={{}}
+          onSelectRating={() => {}}
+          onPlay={audio.play}
+          onPause={audio.pause}
+          audioRef={audio.audioRef}
+          isPlaying={audio.isPlaying}
+          isMerging={audio.isMerging}
+          durationSec={audio.durationSec}
+          onSeek={audio.seekTo}
+          onNext={() => {}}
+          isReviewing={true}
+          showProgressBar={true}
+        />
       </div>
     );
   }
@@ -43,7 +50,7 @@ export function LearningMode({ state, audio }: LearningModeProps) {
   if (state.status === 'noCollection') {
     return (
       <div className="flex flex-col h-full">
-        <NoCollectionState onGoHome={goHome} />
+        <NoCollectionState onGoHome={onGoHome} />
         <LearningModeSettings
           open={state.settingsOpen}
           onOpenChange={state.setSettingsOpen}

@@ -94,7 +94,8 @@ export function useAudioPlayer(
     const audio = getAudio();
     if (!audio.src || audio.src === '') return;
     audio.play().catch((err) => {
-      if (err.name !== 'AbortError') console.error('Audio play failed:', err);
+      if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
+      console.error('Audio play failed:', err);
     });
   }, [getAudio]);
 
@@ -287,9 +288,8 @@ export function useAudioPlayer(
         if (isCardChange && autoPlay && getReviewInitiatedByThisTab()) {
           onResetReviewFlagRef.current();
           audio.play().catch((err) => {
-            if (err.name !== 'AbortError') {
-              console.error('Auto-play failed:', err);
-            }
+            if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
+            console.error('Auto-play failed:', err);
           });
         }
       } catch (err) {

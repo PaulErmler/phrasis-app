@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useMutation, usePreloadedQuery, Preloaded } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { toast } from 'sonner';
 import { MessageSquarePlus } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   CollectionCarouselUI,
   type CollectionProgressItem,
@@ -26,6 +27,7 @@ export function CustomCollectionCarousel({
   >;
 }) {
   const t = useTranslations('AppPage.collections');
+  const [carouselReady, setCarouselReady] = useState(false);
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const activeCourseId = courseSettings?.courseId ?? null;
   const selectedIds = (courseSettings?.activeCustomCollectionIds ?? []).map(
@@ -87,7 +89,7 @@ export function CustomCollectionCarousel({
   }
 
   return (
-    <div className="space-y-2">
+    <div className={cn('space-y-2', !carouselReady && 'invisible')}>
       <h2 className="heading-section">
         {t('customCarousel.sectionTitle')}
       </h2>
@@ -97,6 +99,7 @@ export function CustomCollectionCarousel({
         onSelectCollection={handleToggleCollection}
         onOpenCollection={setOpenCollectionId}
         isLoading={false}
+        onReady={() => setCarouselReady(true)}
       />
 
       <CollectionDetailDialog

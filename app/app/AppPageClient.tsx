@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import { Authenticated, usePreloadedQuery, Preloaded } from 'convex/react';
-import { api } from '@/convex/_generated/api';
+import { Authenticated, usePreloadedQuery } from 'convex/react';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { HomeView } from '@/components/app/HomeView';
 import { ContentView } from '@/components/app/ContentView';
@@ -12,34 +11,24 @@ import { LibraryView } from '@/components/app/LibraryView';
 import { SettingsView } from '@/components/app/SettingsView';
 import { BottomNav, View } from '@/components/app/BottomNav';
 import { CourseMenu } from '@/components/app/CourseMenu';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 
-export function AppPageClient({
-  preloadedSettings,
-  preloadedActiveCourse,
-  preloadedCollectionProgress,
-  preloadedCourseSettings,
-  preloadedCourseStats,
-  preloadedCustomCollectionsProgress,
-}: {
-  preloadedSettings: Preloaded<typeof api.features.courses.getUserSettings>;
-  preloadedActiveCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
-  preloadedCollectionProgress: Preloaded<
-    typeof api.features.decks.getCollectionProgress
-  >;
-  preloadedCourseSettings: Preloaded<
-    typeof api.features.courses.getActiveCourseSettings
-  >;
-  preloadedCourseStats: Preloaded<
-    typeof api.features.courses.getCourseStats
-  >;
-  preloadedCustomCollectionsProgress: Preloaded<
-    typeof api.features.decks.getCustomCollectionsProgress
-  >;
-}) {
+export function AppPageClient() {
+  const {
+    preloadedSettings,
+    preloadedActiveCourse,
+    preloadedCollectionProgress,
+    preloadedCourseSettings,
+    preloadedCourseStats,
+    preloadedCustomCollectionsProgress,
+  } = useAppData();
+
   const router = useRouter();
+  const pathname = usePathname();
+  const isLearnActive = pathname === '/app/learn';
   const [currentView, setCurrentView] = useState<View>('home');
   const [courseMenuOpen, setCourseMenuOpen] = useState(false);
   const t = useTranslations('AppPage');
@@ -89,17 +78,21 @@ export function AppPageClient({
           <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
           <main className="flex-1 min-h-0 flex flex-col">
-            {currentView === 'home' && (
-              <HomeView
-                preloadedCollectionProgress={preloadedCollectionProgress}
-                preloadedCourseSettings={preloadedCourseSettings}
-                preloadedCourseStats={preloadedCourseStats}
-                preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
-              />
+            {!isLearnActive && (
+              <>
+                {currentView === 'home' && (
+                  <HomeView
+                    preloadedCollectionProgress={preloadedCollectionProgress}
+                    preloadedCourseSettings={preloadedCourseSettings}
+                    preloadedCourseStats={preloadedCourseStats}
+                    preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
+                  />
+                )}
+                {currentView === 'content' && <ContentView />}
+                {currentView === 'library' && <LibraryView />}
+                {currentView === 'settings' && <SettingsView />}
+              </>
             )}
-            {currentView === 'content' && <ContentView />}
-            {currentView === 'library' && <LibraryView />}
-            {currentView === 'settings' && <SettingsView />}
           </main>
 
           <BottomNav currentView={currentView} onViewChange={setCurrentView} />

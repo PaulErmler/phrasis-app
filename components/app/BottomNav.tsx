@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Home, FileText, Play, Library, Settings, Loader2 } from 'lucide-react';
@@ -15,13 +15,22 @@ interface BottomNavProps {
 
 export function BottomNav({ currentView, onViewChange }: BottomNavProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const t = useTranslations('AppPage');
   const [isNavigating, setIsNavigating] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const handleGoToLearn = () => {
-    setIsNavigating(true);
+  useEffect(() => {
+    clearTimeout(timerRef.current);
+    setIsNavigating(false);
+  }, [pathname]);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  const handleGoToLearn = useCallback(() => {
     router.push('/app/learn');
-  };
+    timerRef.current = setTimeout(() => setIsNavigating(true), 500);
+  }, [router]);
 
   return (
     <nav className="shrink-0 w-full bg-background/80 backdrop-blur-md border-t border-border/50">

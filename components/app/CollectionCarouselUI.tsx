@@ -50,6 +50,8 @@ interface CollectionCarouselUIProps {
   isLoading?: boolean;
   /** Index to scroll to whenever it changes (e.g. active collection index after a course switch) */
   initialScrollIndex?: number;
+  /** Called once the carousel is fully initialized and safe to display */
+  onReady?: () => void;
 }
 
 export function CollectionCarouselUI({
@@ -59,12 +61,18 @@ export function CollectionCarouselUI({
   onOpenCollection,
   isLoading = false,
   initialScrollIndex,
+  onReady,
 }: CollectionCarouselUIProps) {
   const [api, setApi] = useState<CarouselApi>();
   const [currentSnap, setCurrentSnap] = useState(0);
   const [snapCount, setSnapCount] = useState(0);
+  const [ready, setReady] = useState(false);
   const lastScrolledIndexRef = useRef<number | undefined>(undefined);
   const t = useTranslations('AppPage.collections.carousel');
+
+  useEffect(() => {
+    if (ready) onReady?.();
+  }, [ready, onReady]);
 
   // Track dot indicator state
   useEffect(() => {
@@ -89,13 +97,24 @@ export function CollectionCarouselUI({
   // or after a course switch). First scroll jumps instantly; subsequent ones
   // animate so the user can see the transition.
   useEffect(() => {
-    if (!api || initialScrollIndex === undefined || initialScrollIndex < 0) return;
+    if (!api || initialScrollIndex === undefined || initialScrollIndex < 0) {
+      if (api && !ready) setReady(true);
+      return;
+    }
     if (lastScrolledIndexRef.current === initialScrollIndex) return;
 
     const isFirstScroll = lastScrolledIndexRef.current === undefined;
     lastScrolledIndexRef.current = initialScrollIndex;
-    setTimeout(() => api.scrollTo(initialScrollIndex, isFirstScroll), 50);
-  }, [api, initialScrollIndex]);
+    api.scrollTo(initialScrollIndex, isFirstScroll);
+    if (!ready) setReady(true);
+  }, [api, initialScrollIndex, ready]);
+
+  // Fallback: mark ready once api is available even without an initialScrollIndex
+  useEffect(() => {
+    if (api && !ready && initialScrollIndex === undefined) {
+      setReady(true);
+    }
+  }, [api, ready, initialScrollIndex]);
 
   if (isLoading) {
     return (
@@ -115,7 +134,7 @@ export function CollectionCarouselUI({
   if (collections.length === 0) return null;
 
   return (
-    <div className="space-y-3">
+    <div className={cn('space-y-3', !ready && 'invisible')}>
       <Carousel
         setApi={setApi}
         opts={{

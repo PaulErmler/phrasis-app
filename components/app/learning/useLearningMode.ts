@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
-import { usePreloadedQuery, useMutation, Preloaded } from 'convex/react';
+import { usePreloadedQuery, useQuery, useMutation, Preloaded } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import {
@@ -101,7 +101,6 @@ export type LearningState =
   | ReviewingState;
 
 export interface PreloadedLearningData {
-  card: Preloaded<typeof api.features.scheduling.getCardForReview>;
   courseSettings: Preloaded<
     typeof api.features.courses.getActiveCourseSettings
   >;
@@ -117,7 +116,7 @@ export function useLearningMode(
 ): LearningState {
   const t = useTranslations('LearningMode');
 
-  const cardForReview = usePreloadedQuery(preloaded.card);
+  const cardForReview = useQuery(api.features.scheduling.getCardForReview, {});
   const courseSettings = usePreloadedQuery(preloaded.courseSettings);
   const activeCourse = usePreloadedQuery(preloaded.activeCourse);
 

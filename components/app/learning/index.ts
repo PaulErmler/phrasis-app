@@ -16,3 +16,5 @@ export type {
   CourseSettings,
 } from './types';
 export { DEFAULT_BATCH_SIZE } from './types';
+export { LearnView } from './LearnView';
+export { LearnOverlay } from './LearnOverlay';
