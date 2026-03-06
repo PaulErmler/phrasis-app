@@ -47,14 +47,18 @@ export function HomeView({
     timerRef.current = setTimeout(() => setIsNavigating(true), 500);
   }, [router]);
 
+  const isLearnOverlayActive = pathname === '/app/learn';
+
   return (
     <div className="flex-1 overflow-y-auto px-4 py-8">
     <div className="app-view">
-      <ProgressStatsCard
-        preloadedCourseStats={preloadedCourseStats}
-        onStartLearning={handleStartLearning}
-        isNavigating={isNavigating}
-      />
+      {!isLearnOverlayActive && (
+        <ProgressStatsCard
+          preloadedCourseStats={preloadedCourseStats}
+          onStartLearning={handleStartLearning}
+          isNavigating={isNavigating}
+        />
+      )}
 
       {/* Collection Carousel - Select difficulty and add cards */}
       <div className="space-y-2">
