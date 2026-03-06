@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation, useQuery, useAction, useConvexAuth } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { SignedIn, RedirectToSignIn } from '@daveyplate/better-auth-ui';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,20 @@ export default function OnboardingPage() {
   const completeOnboarding = useMutation(
     api.features.courses.completeOnboarding,
   );
+  const syncQuotas = useAction(api.usage.actions.syncQuotas);
+  const { isAuthenticated } = useConvexAuth();
+  const syncedRef = useRef(false);
+  const syncPromiseRef = useRef<Promise<void> | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated || syncedRef.current) return;
+    syncedRef.current = true;
+    syncPromiseRef.current = syncQuotas()
+      .catch((err) => {
+        console.error('Failed to sync quotas during onboarding:', err);
+      })
+      .then(() => undefined);
+  }, [syncQuotas, isAuthenticated]);
 
   // Initialize data from onboarding progress or use defaults
   const initialData: OnboardingData = onboardingProgress
@@ -84,6 +98,7 @@ export default function OnboardingPage() {
   const handleComplete = useCallback(async () => {
     setIsSubmitting(true);
     try {
+      if (syncPromiseRef.current) await syncPromiseRef.current;
       await completeOnboarding();
       router.push('/app');
     } catch (error) {

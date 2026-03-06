@@ -16,6 +16,7 @@ import { Check, Plus, X } from 'lucide-react';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 import { CreateCourseDialog } from '@/components/course/CreateCourseDialog';
+import { FeatureGatedButton } from '@/components/feature_tracking/FeatureGatedButton';
 
 interface CourseMenuProps {
   open: boolean;
@@ -79,14 +80,15 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
         {/* Content */}
         <div className="sheet-body">
           {/* Create New Course Button */}
-          <Button
+          <FeatureGatedButton
+            featureId="courses"
             variant="outline"
             className="w-full mb-3 gap-2 h-9"
-            onClick={() => setCreateDialogOpen(true)}
+            onAction={() => setCreateDialogOpen(true)}
           >
             <Plus className="h-4 w-4" />
             {t('courses.createNew')}
-          </Button>
+          </FeatureGatedButton>
 
           {/* Courses List */}
           <div className="flex flex-col gap-2">

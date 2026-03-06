@@ -10,6 +10,7 @@ import { getMessages, getTimeZone } from 'next-intl/server';
 import { Toaster } from '@/components/ui/sonner';
 import { ConsentManager } from './consent-manager';
 import { getToken } from '@/lib/auth-server';
+import { AutumnWrapper } from './providers';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -69,7 +70,9 @@ export default async function RootLayout({
           <PWAInstallGlobal />
           <ConvexClientProvider initialToken={initialToken}>
             <Providers locale={locale} messages={messages} timeZone={timeZone}>
+              <AutumnWrapper>
               {children}
+              </AutumnWrapper>
               <Toaster position="top-center" />
             </Providers>
           </ConvexClientProvider>

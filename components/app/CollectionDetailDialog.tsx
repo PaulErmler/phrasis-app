@@ -11,10 +11,12 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Check, Plus, Loader2, CheckCircle2 } from 'lucide-react';
+import { Check, Plus, Loader2, CheckCircle2, Lock } from 'lucide-react';
 import { getCollectionDescription } from './CollectionCarouselUI';
 import { AudioButton } from '@/components/app/learning/AudioButton';
 import { useTranslations } from 'next-intl';
+import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
 
 interface Translation {
   language: string;
@@ -52,6 +54,10 @@ interface CollectionDetailDialogProps {
   onAddCards: () => void;
   /** When true, hides the "Add N Cards" button and next sentences header */
   hideAddCards?: boolean;
+  /** Remaining sentences quota. null means unlimited. */
+  sentencesRemaining?: number | null;
+  /** Called when the user clicks the upgrade button (limit reached). */
+  onUpgrade?: () => void;
 }
 
 export function CollectionDetailDialog({
@@ -68,6 +74,8 @@ export function CollectionDetailDialog({
   onSelect,
   onAddCards,
   hideAddCards = false,
+  sentencesRemaining,
+  onUpgrade,
 }: CollectionDetailDialogProps) {
   const t = useTranslations('AppPage.collections.carousel.detail');
   const tDesc = useTranslations('AppPage.collections.carousel.descriptions');
@@ -126,27 +134,43 @@ export function CollectionDetailDialog({
             <>
               <Separator />
               <div className="flex items-center justify-between">
-                <h4 className="text-base font-semibold">
-                  {t('nextSentences')}
-                </h4>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-base font-semibold">
+                    {t('nextSentences')}
+                  </h4>
+                  {sentencesRemaining !== undefined && (
+                    <FeatureBadge featureId={FEATURE_IDS.SENTENCES} />
+                  )}
+                </div>
                 {texts.length > 0 && (
-                  <Button
-                    size="sm"
-                    disabled={isAdding}
-                    onClick={onAddCards}
-                    className="justify-center"
-                  >
-                    <span className="grid">
-                      <span className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5${isAdding ? '' : ' invisible'}`}>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t('adding')}
+                  sentencesRemaining === 0 ? (
+                    <Button
+                      size="sm"
+                      onClick={onUpgrade}
+                      className="justify-center gap-1.5"
+                    >
+                      <Lock className="h-4 w-4" />
+                      Upgrade
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      disabled={isAdding}
+                      onClick={onAddCards}
+                      className="justify-center"
+                    >
+                      <span className="grid">
+                        <span className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5${isAdding ? '' : ' invisible'}`}>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {t('adding')}
+                        </span>
+                        <span className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5${isAdding ? ' invisible' : ''}`}>
+                          <Plus className="h-4 w-4" />
+                          {t('addN', { count: sentencesRemaining != null ? Math.min(texts.length, sentencesRemaining) : texts.length })}
+                        </span>
                       </span>
-                      <span className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5${isAdding ? ' invisible' : ''}`}>
-                        <Plus className="h-4 w-4" />
-                        {t('addN', { count: texts.length })}
-                      </span>
-                    </span>
-                  </Button>
+                    </Button>
+                  )
                 )}
               </div>
             </>

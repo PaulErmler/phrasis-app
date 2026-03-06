@@ -6,6 +6,8 @@ import { saveMessage } from '@convex-dev/agent';
 import { listUIMessages, syncStreams } from '@convex-dev/agent';
 import { components } from '../../_generated/api';
 import { getAuthUser, requireAuthUser } from '../../db/users';
+import { useQuota } from '../../usage/helpers';
+import { FEATURE_IDS } from '../featureIds';
 import { agent } from './agent';
 
 export type ListMessagesStreamArgs = {
@@ -70,6 +72,7 @@ export const sendMessage = mutation({
   returns: v.string(),
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
+    await useQuota(ctx, user._id, FEATURE_IDS.CHAT_MESSAGES, 1);
 
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {
       threadId: args.threadId,

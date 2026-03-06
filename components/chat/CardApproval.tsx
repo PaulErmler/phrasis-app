@@ -2,12 +2,16 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { Lock } from 'lucide-react';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { getLanguageByCode } from '@/lib/languages';
 import type { CreateCardToolPart } from '@/lib/types/tool-parts';
 import type { CardApprovalStatus } from '@/convex/types';
+import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
+import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import PaywallDialog from '@/components/autumn/paywall-dialog';
 
 const TOOL_SUCCESS = "I've prepared a card for you to review and approve.";
 
@@ -49,6 +53,8 @@ export function CardApproval({
   const [optimisticState, setOptimisticState] = useState<
     'approved' | 'rejected' | null
   >(null);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const { isAvailable } = useFeatureQuota('custom_sentences');
 
   const toolCallId = toolPart.toolCallId?.trim();
   const tool = toolPart as CreateCardToolPart & {
@@ -74,6 +80,10 @@ export function CardApproval({
 
   const handleApprove = async () => {
     if (!approvalId) return;
+    if (!isAvailable) {
+      setPaywallOpen(true);
+      return;
+    }
     setOptimisticState('approved');
     await onApprove(approvalId);
   };
@@ -143,6 +153,7 @@ export function CardApproval({
         </div>
       </AlertDescription>
       <div className="flex items-center justify-end gap-2">
+        <FeatureBadge featureId="custom_sentences" />
         <Button
           onClick={handleReject}
           disabled={isProcessing || !approvalId}
@@ -152,15 +163,33 @@ export function CardApproval({
         >
           {t('rejectButton')}
         </Button>
-        <Button
-          onClick={handleApprove}
-          disabled={isProcessing || !approvalId}
-          size="sm"
-          className="h-8 px-3 text-sm"
-        >
-          {t('approveButton')}
-        </Button>
+        {!isAvailable ? (
+          <Button
+            onClick={() => setPaywallOpen(true)}
+            size="sm"
+            className="h-8 px-3 text-sm gap-1.5"
+          >
+            <Lock className="h-3.5 w-3.5" />
+            Upgrade
+          </Button>
+        ) : (
+          <Button
+            onClick={handleApprove}
+            disabled={isProcessing || !approvalId}
+            size="sm"
+            className="h-8 px-3 text-sm"
+          >
+            {t('approveButton')}
+          </Button>
+        )}
       </div>
+      {paywallOpen && (
+        <PaywallDialog
+          open={paywallOpen}
+          setOpen={setPaywallOpen}
+          featureId="custom_sentences"
+        />
+      )}
     </Alert>
   );
 }

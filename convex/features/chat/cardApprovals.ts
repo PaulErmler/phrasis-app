@@ -11,6 +11,8 @@ import { getCourseSettings } from '../../db/courseSettings';
 import { cardApprovalStatusValidator, translationValidator } from '../../types';
 import type { Id, Doc } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
+import { useQuota } from '../../usage/helpers';
+import { FEATURE_IDS } from '../featureIds';
 
 /** Maximum length for main text in card approvals. */
 const MAX_MAIN_TEXT_LENGTH = 300;
@@ -168,6 +170,7 @@ export const approveCard = mutation({
   handler: async (ctx, args) => {
     const user = await getAuthUser(ctx);
     if (!user) throw new ConvexError('Not authenticated');
+    await useQuota(ctx, user._id, FEATURE_IDS.CUSTOM_SENTENCES, 1);
 
     const approval = await getAuthenticatedPendingApproval(
       ctx,

@@ -3,17 +3,20 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from 'convex/react';
+import { ConvexError } from 'convex/values';
+import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
 
-// Components
 import { ChatInput } from '@/components/chat/ChatInput';
+import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
+import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
+import PaywallDialog from '@/components/autumn/paywall-dialog';
 
-// Hooks
 import { useVoiceRecording } from '@/hooks/use-voice-recording';
 
-// Constants & Types
-import { ERROR_MESSAGES, CHAT_STATUS } from '@/lib/constants/chat';
+import { CHAT_STATUS } from '@/lib/constants/chat';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 
 interface NewChatInputProps {
@@ -37,9 +40,12 @@ export function NewChatInput({
   className,
   showSuggestions = true,
 }: NewChatInputProps) {
+  const t = useTranslations('Chat.errors');
   const router = useRouter();
   const [text, setText] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const { isAvailable } = useFeatureQuota(FEATURE_IDS.CHAT_MESSAGES);
 
   // Voice recording
   const { isRecording, isTranscribing, handleVoiceClick } = useVoiceRecording(
@@ -59,31 +65,38 @@ export function NewChatInput({
     async (message: PromptInputMessage) => {
       if (!message.text?.trim()) return;
 
+      if (!isAvailable) {
+        setPaywallOpen(true);
+        return;
+      }
+
       setIsProcessing(true);
 
       try {
-        // 1. Create new thread
         const threadId = await createThread({});
 
-        // 2. Send initial message
         await sendMessageMutation({
           threadId,
           prompt: message.text,
         });
 
-        // 3. Clear input
         setText('');
-
-        // 4. Navigate to chat page
         router.push(`/app/chat/${threadId}`);
       } catch (error) {
+        if (
+          error instanceof ConvexError &&
+          (error.data as { code?: string })?.code === 'USAGE_LIMIT'
+        ) {
+          setPaywallOpen(true);
+          setIsProcessing(false);
+          return;
+        }
         console.error('Failed to start chat:', error);
-        toast.error(ERROR_MESSAGES.FAILED_TO_CREATE_THREAD);
+        toast.error(t('failedToCreateThread'));
         setIsProcessing(false);
       }
-      // Note: Don't set isProcessing to false on success - we're navigating away
     },
-    [createThread, sendMessageMutation, router],
+    [createThread, sendMessageMutation, router, isAvailable, t],
   );
 
   // Handle suggestion click - populate input instead of sending
@@ -103,7 +116,15 @@ export function NewChatInput({
         isTranscribing={isTranscribing}
         onVoiceClick={handleVoiceClick}
         showSuggestions={showSuggestions}
+        footerAction={<FeatureBadge featureId={FEATURE_IDS.CHAT_MESSAGES} />}
       />
+      {paywallOpen && (
+        <PaywallDialog
+          open={paywallOpen}
+          setOpen={setPaywallOpen}
+          featureId={FEATURE_IDS.CHAT_MESSAGES}
+        />
+      )}
     </div>
   );
 }

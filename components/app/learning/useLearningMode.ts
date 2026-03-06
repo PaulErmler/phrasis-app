@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
 import { usePreloadedQuery, useQuery, useMutation, Preloaded } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
@@ -21,6 +22,7 @@ import {
   type CourseSettings,
 } from './types';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
+import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 
 function effectivePhase(
   reviewMode: string,
@@ -57,6 +59,7 @@ interface NoCardsDueState extends BaseState {
   handleAddCards: () => void;
   isAddingCards: boolean;
   batchSize: number;
+  sentencesRemaining: number | null;
 }
 
 interface ReviewingState extends BaseState {
@@ -146,6 +149,8 @@ export function useLearningMode(
     api.features.decks.ensureCardContent,
   );
 
+  const sentencesQuota = useFeatureQuota(FEATURE_IDS.SENTENCES);
+
   const [isReviewing, setIsReviewing] = useState(false);
   const [isAddingCards, setIsAddingCards] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -198,18 +203,22 @@ export function useLearningMode(
   // --------------------------------------------------------------------------
   const handleAddCards = useCallback(async () => {
     if (!courseSettings?.activeCollectionId || isAddingCards) return;
+    const configuredBatch = courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE;
+    const effectiveBatch = sentencesQuota.unlimited
+      ? configuredBatch
+      : Math.min(configuredBatch, Math.max(1, sentencesQuota.balance));
     setIsAddingCards(true);
     try {
       await addCardsMutation({
         collectionId: courseSettings.activeCollectionId,
-        batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
+        batchSize: effectiveBatch,
       });
     } catch (error) {
       console.error('Failed to add cards:', error);
     } finally {
       setIsAddingCards(false);
     }
-  }, [courseSettings, isAddingCards, addCardsMutation]);
+  }, [courseSettings, isAddingCards, addCardsMutation, sentencesQuota]);
 
   // Auto-add cards when enabled and no cards due
   useEffect(() => {
@@ -371,6 +380,7 @@ export function useLearningMode(
       handleAddCards,
       isAddingCards,
       batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
+      sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
     };
   }
 

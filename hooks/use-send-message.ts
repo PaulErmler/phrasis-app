@@ -1,8 +1,10 @@
 import { useCallback } from 'react';
 import { useMutation } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
 import { ERROR_MESSAGES, CHAT_STATUS } from '@/lib/constants/chat';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
 import type { ChatStatus } from '@/lib/types/chat';
 
 export interface CardContext {
@@ -18,6 +20,7 @@ interface UseSendMessageProps {
   setStatus?: (status: ChatStatus) => void;
   onSuccess?: () => void;
   onError?: () => void;
+  onUsageLimit?: (featureId: string) => void;
   cardContext?: CardContext;
 }
 
@@ -35,6 +38,7 @@ export function useSendMessage({
   setStatus,
   onSuccess,
   onError,
+  onUsageLimit,
   cardContext,
 }: UseSendMessageProps) {
   const sendMessageMutation = useMutation(
@@ -69,16 +73,29 @@ export function useSendMessage({
           onSuccess();
         }
       } catch (error) {
+        if (
+          error instanceof ConvexError &&
+          (error.data as { code?: string })?.code === 'USAGE_LIMIT'
+        ) {
+          const featureId =
+            (error.data as { featureId?: string })?.featureId ?? FEATURE_IDS.CHAT_MESSAGES;
+          if (onUsageLimit) {
+            onUsageLimit(featureId);
+          }
+          if (setStatus) {
+            setStatus(CHAT_STATUS.READY);
+          }
+          return;
+        }
+
         console.error('Failed to send message:', error);
         toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
 
-        // Reset status on error if setStatus is provided
         if (setStatus) {
           setStatus(CHAT_STATUS.ERROR);
           setTimeout(() => setStatus(CHAT_STATUS.READY), 2000);
         }
 
-        // Call error callback if provided
         if (onError) {
           onError();
         }
@@ -86,7 +103,7 @@ export function useSendMessage({
         throw error;
       }
     },
-    [threadId, sendMessageMutation, setStatus, onSuccess, onError, cardContext],
+    [threadId, sendMessageMutation, setStatus, onSuccess, onError, onUsageLimit, cardContext],
   );
 
   return { sendMessage };

@@ -7,6 +7,7 @@ import type { ChatStatus, ExtendedUIMessage } from '@/lib/types/chat';
 interface UseChatOptions {
   threadId: string;
   cardContext?: CardContext;
+  onUsageLimit?: (featureId: string) => void;
 }
 
 interface UseChatReturn {
@@ -26,7 +27,7 @@ interface UseChatReturn {
  * Unified chat hook that composes message retrieval, sending, and voice recording
  * into a single interface for easy consumption by chat UI components.
  */
-export function useChat({ threadId, cardContext }: UseChatOptions): UseChatReturn {
+export function useChat({ threadId, cardContext, onUsageLimit }: UseChatOptions): UseChatReturn {
   const [text, setText] = useState('');
 
   const { messages, status, setStatus } = useChatMessages({ threadId });
@@ -35,6 +36,7 @@ export function useChat({ threadId, cardContext }: UseChatOptions): UseChatRetur
     threadId,
     setStatus,
     cardContext,
+    onUsageLimit,
   });
 
   const { isRecording, isTranscribing, handleVoiceClick } = useVoiceRecording(

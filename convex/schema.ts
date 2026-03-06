@@ -192,6 +192,23 @@ export default defineSchema({
     .index('by_toolCallId', ['toolCallId'])
     .index('by_thread_and_user', ['threadId', 'userId']),
 
+  // Usage quotas — local cache of Autumn entitlements for synchronous checks.
+  // One document per user; features stored as a record keyed by feature ID.
+  usageQuotas: defineTable({
+    userId: v.string(),
+    features: v.record(
+      v.string(),
+      v.object({
+        balance: v.number(),
+        included: v.number(),
+        used: v.number(),
+        interval: v.optional(v.string()),
+        unlimited: v.optional(v.boolean()),
+      }),
+    ),
+    lastSyncedAt: v.number(),
+  }).index('by_userId', ['userId']),
+
   // Testing-only tables (translationRequests, ttsRequests)
   ...testingTables,
 });

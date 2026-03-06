@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as autumn from "../autumn.js";
 import type * as db_collections from "../db/collections.js";
 import type * as db_courseSettings from "../db/courseSettings.js";
 import type * as db_courseStats from "../db/courseStats.js";
@@ -24,6 +25,7 @@ import type * as features_chat_transcribe from "../features/chat/transcribe.js";
 import type * as features_collections from "../features/collections.js";
 import type * as features_courses from "../features/courses.js";
 import type * as features_decks from "../features/decks.js";
+import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_library from "../features/library.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_translation from "../features/translation.js";
@@ -36,6 +38,11 @@ import type * as testing_texts from "../testing/texts.js";
 import type * as testing_translation from "../testing/translation.js";
 import type * as testing_tts from "../testing/tts.js";
 import type * as types from "../types.js";
+import type * as usage_actions from "../usage/actions.js";
+import type * as usage_helpers from "../usage/helpers.js";
+import type * as usage_queries from "../usage/queries.js";
+import type * as usage_testOperations from "../usage/testOperations.js";
+import type * as usage_tracking from "../usage/tracking.js";
 
 import type {
   ApiFromModules,
@@ -45,6 +52,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  autumn: typeof autumn;
   "db/collections": typeof db_collections;
   "db/courseSettings": typeof db_courseSettings;
   "db/courseStats": typeof db_courseStats;
@@ -60,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   "features/collections": typeof features_collections;
   "features/courses": typeof features_courses;
   "features/decks": typeof features_decks;
+  "features/featureIds": typeof features_featureIds;
   "features/library": typeof features_library;
   "features/scheduling": typeof features_scheduling;
   "features/translation": typeof features_translation;
@@ -72,6 +81,11 @@ declare const fullApi: ApiFromModules<{
   "testing/translation": typeof testing_translation;
   "testing/tts": typeof testing_tts;
   types: typeof types;
+  "usage/actions": typeof usage_actions;
+  "usage/helpers": typeof usage_helpers;
+  "usage/queries": typeof usage_queries;
+  "usage/testOperations": typeof usage_testOperations;
+  "usage/tracking": typeof usage_tracking;
 }>;
 
 /**
@@ -4933,4 +4947,5 @@ export declare const components: {
       };
     };
   };
+  autumn: {};
 };

@@ -30,6 +30,8 @@ import {
   getNextCollectionName,
 } from '../lib/collections';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
+import { useQuota, checkQuota } from '../usage/helpers';
+import { FEATURE_IDS } from './featureIds';
 
 // ============================================================================
 // HELPERS
@@ -598,6 +600,8 @@ export const addCardsFromCollection = mutation({
     const { user, settings, course } = await requireActiveCourse(ctx);
     const courseId = course._id;
 
+    const clampedBatchSize = Math.max(1, Math.min(5, Math.floor(args.batchSize)));
+
     // Get or create deck
     let deck = await getDeckByCourseId(ctx, courseId);
     if (!deck) {
@@ -612,7 +616,7 @@ export const addCardsFromCollection = mutation({
 
     let totalCardsInserted = 0;
     let totalTextsProcessed = 0;
-    let remainingBatch = args.batchSize;
+    let remainingBatch = clampedBatchSize;
 
     // --- Phase 1: Drain pending texts from selected custom collections randomly ---
     const courseSettings = await getCourseSettings(ctx, courseId);
@@ -692,6 +696,24 @@ export const addCardsFromCollection = mutation({
 
     // --- Phase 2: Fill remaining batch from the difficulty collection ---
     if (remainingBatch > 0) {
+      // Deduct sentences quota for difficulty-collection cards
+      const quota = await checkQuota(ctx, user._id, FEATURE_IDS.SENTENCES, remainingBatch);
+      if (quota.synced && !quota.allowed) {
+        // Clamp to whatever balance is left
+        if (quota.balance > 0) {
+          remainingBatch = quota.balance;
+        } else {
+          // No sentences left — skip Phase 2 entirely, return Phase 1 results
+          if (totalCardsInserted > 0) {
+            await ctx.db.patch(deck._id, { cardCount: deck.cardCount + totalCardsInserted });
+          }
+          return {
+            cardsAdded: totalTextsProcessed,
+            totalCardsInDeck: deck.cardCount + totalCardsInserted,
+          };
+        }
+      }
+
       const progress = await getCollectionProgressHelper(
         ctx,
         user._id,
@@ -710,6 +732,8 @@ export const addCardsFromCollection = mutation({
       );
 
       if (textsToAdd.length > 0) {
+        await useQuota(ctx, user._id, FEATURE_IDS.SENTENCES, textsToAdd.length);
+
         const { cardsInserted, newLastRank } = await createCardsFromTexts(
           ctx,
           textsToAdd,

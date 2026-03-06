@@ -2,11 +2,14 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { useTranslations } from 'next-intl';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
 import { toast } from 'sonner';
 import { COLLECTION_PREVIEW_SIZE } from '@/convex/lib/collections';
+import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import type { CollectionProgressItem } from './CollectionCarouselUI';
 
 interface UseCollectionDetailOptions {
@@ -21,7 +24,9 @@ export function useCollectionDetail({
   const t = useTranslations('AppPage.collections.carousel');
   const [openCollectionId, setOpenCollectionId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [usageLimitHit, setUsageLimitHit] = useState(false);
   const ensuredRef = useRef<Set<string>>(new Set());
+  const sentencesQuota = useFeatureQuota(FEATURE_IDS.SENTENCES);
 
   const addCardsFromCollection = useMutation(
     api.features.decks.addCardsFromCollection,
@@ -61,14 +66,19 @@ export function useCollectionDetail({
     });
   }, [contentData, openCollectionId, activeCourseId, ensureContent]);
 
+  const effectiveBatchSize = sentencesQuota.unlimited
+    ? COLLECTION_PREVIEW_SIZE
+    : Math.min(COLLECTION_PREVIEW_SIZE, Math.max(0, sentencesQuota.balance));
+
   const handleAddCards = useCallback(async () => {
     if (!openCollectionId) return;
 
     setIsAdding(true);
+    setUsageLimitHit(false);
     try {
       const result = await addCardsFromCollection({
         collectionId: openCollectionId as Id<'collections'>,
-        batchSize: COLLECTION_PREVIEW_SIZE,
+        batchSize: effectiveBatchSize > 0 ? effectiveBatchSize : COLLECTION_PREVIEW_SIZE,
       });
 
       if (activeCourseId) {
@@ -80,12 +90,19 @@ export function useCollectionDetail({
       } else {
         toast.success(t('cardsAdded', { count: result.cardsAdded }));
       }
-    } catch {
-      toast.error(t('failedToAdd'));
+    } catch (error) {
+      if (
+        error instanceof ConvexError &&
+        (error.data as { code?: string })?.code === 'USAGE_LIMIT'
+      ) {
+        setUsageLimitHit(true);
+      } else {
+        toast.error(t('failedToAdd'));
+      }
     } finally {
       setIsAdding(false);
     }
-  }, [openCollectionId, addCardsFromCollection, activeCourseId, t]);
+  }, [openCollectionId, addCardsFromCollection, activeCourseId, t, effectiveBatchSize]);
 
   return {
     openCollectionId,
@@ -95,5 +112,8 @@ export function useCollectionDetail({
     contentData,
     isAdding,
     handleAddCards,
+    sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
+    sentencesQuota,
+    usageLimitHit,
   };
 }
