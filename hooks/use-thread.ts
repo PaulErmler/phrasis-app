@@ -33,6 +33,9 @@ export function useThread({
   const createThreadMutation = useMutation(
     api.features.chat.threads.createThread,
   );
+  const getOrCreateEmptyThreadMutation = useMutation(
+    api.features.chat.threads.getOrCreateEmptyThread,
+  );
 
   // Sync explicit threadId changes
   useEffect(() => {
@@ -42,12 +45,12 @@ export function useThread({
     }
   }, [explicitThreadId]);
 
-  // Auto-create on mount when requested
+  // Auto-create on mount: reuse the latest empty thread or create a new one
   useEffect(() => {
     if (!autoCreate || explicitThreadId || didAutoCreate.current) return;
     didAutoCreate.current = true;
 
-    createThreadMutation({})
+    getOrCreateEmptyThreadMutation({})
       .then((id) => {
         setThreadId(id);
       })
@@ -58,7 +61,7 @@ export function useThread({
       .finally(() => {
         setIsLoading(false);
       });
-  }, [autoCreate, explicitThreadId, createThreadMutation]);
+  }, [autoCreate, explicitThreadId, getOrCreateEmptyThreadMutation]);
 
   const createThread = useCallback(async () => {
     setThreadId(null);
