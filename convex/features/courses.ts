@@ -417,6 +417,58 @@ export const completeOnboarding = mutation({
   },
 });
 
+/**
+ * Update languages for a course. Languages can only be added, never removed.
+ */
+export const updateCourseLanguages = mutation({
+  args: {
+    courseId: v.id('courses'),
+    baseLanguages: v.array(v.string()),
+    targetLanguages: v.array(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new ConvexError('Course not found');
+    if (course.userId !== userId)
+      throw new ConvexError('Course does not belong to user');
+
+    if (args.baseLanguages.length === 0)
+      throw new ConvexError('At least one base language is required');
+    if (args.targetLanguages.length === 0)
+      throw new ConvexError('At least one target language is required');
+    if (args.baseLanguages.length > 3)
+      throw new ConvexError('Maximum 3 base languages');
+    if (args.targetLanguages.length > 3)
+      throw new ConvexError('Maximum 3 target languages');
+    if (args.baseLanguages.length + args.targetLanguages.length > 5)
+      throw new ConvexError('Maximum 5 languages total');
+
+    const existingCodes = new Set([
+      ...course.baseLanguages,
+      ...course.targetLanguages,
+    ]);
+    const newCodes = new Set([
+      ...args.baseLanguages,
+      ...args.targetLanguages,
+    ]);
+    for (const code of existingCodes) {
+      if (!newCodes.has(code)) {
+        throw new ConvexError(`Cannot remove existing language: ${code}`);
+      }
+    }
+
+    await ctx.db.patch(course._id, {
+      baseLanguages: args.baseLanguages,
+      targetLanguages: args.targetLanguages,
+    });
+
+    return null;
+  },
+});
+
 // ============================================================================
 // COURSE SETTINGS
 // ============================================================================

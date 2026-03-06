@@ -166,7 +166,8 @@
       "description": "Wähle einen Kurs zum Wechseln oder erstelle einen neuen",
       "createNew": "Neuen Kurs erstellen",
       "noCourses": "Noch keine Kurse. Erstelle deinen ersten Kurs, um zu beginnen.",
-      "active": "Aktiv",
+      "select": "Auswählen",
+      "selected": "Ausgewählt",
       "learning": "{language} lernen",
       "currentCourse": "Aktueller Kurs",
       "from": "von {language}",
@@ -191,6 +192,22 @@
         "back": "Zurück",
         "next": "Weiter",
         "create": "Kurs erstellen"
+      },
+      "manage": {
+        "title": "Kurseinstellungen",
+        "targetLanguages": "Zielsprachen",
+        "baseLanguages": "Basissprachen",
+        "addLanguage": "Sprache hinzufügen",
+        "noMoreAvailable": "Keine weiteren Sprachen verfügbar",
+        "infoText": "Ziehe Sprachen per Drag-and-Drop, um sie neu anzuordnen. Einmal gespeichert, können Sprachen nicht entfernt werden. Du kannst bis zu {max} Sprachen insgesamt hinzufügen.",
+        "saveChanges": "Änderungen speichern",
+        "confirmTitle": "Änderungen bestätigen",
+        "confirmAdding": "{languages} hinzufügen. Dies kann nicht rückgängig gemacht werden.",
+        "confirmButton": "Bestätigen",
+        "cancelButton": "Abbrechen",
+        "warningBoth": "Du benötigst mindestens eine Basissprache und eine Zielsprache.",
+        "warningBase": "Du benötigst mindestens eine Basissprache.",
+        "warningTarget": "Du benötigst mindestens eine Zielsprache."
       }
     },
     "changeCourse": "Kurs wechseln",
@@ -400,11 +417,18 @@
     },
     "step2": {
       "title": "Welche Sprache möchtest du lernen?",
-      "subtitle": "Wähle eine Sprache"
+      "titleMulti": "Welche Sprachen möchtest du lernen?",
+      "subtitle": "Wähle eine Sprache",
+      "subtitleMulti": "Wähle bis zu {max} Zielsprachen ({count}/{max})",
+      "addAnother": "Weitere Sprache hinzufügen",
+      "primaryHint": "Die erste Sprache ist deine Hauptlernsprache",
+      "primary": "Primär"
     },
     "step3": {
       "title": "Von welcher Sprache aus möchtest du lernen?",
-      "subtitle": "Wähle deine Ausgangssprache"
+      "titleMulti": "Von welchen Sprachen aus möchtest du lernen?",
+      "subtitle": "Wähle deine Ausgangssprache",
+      "subtitleMulti": "Wähle bis zu {max} Basissprachen ({count}/{max})"
     },
     "step4": {
       "title": "Was ist dein aktuelles Niveau?",
