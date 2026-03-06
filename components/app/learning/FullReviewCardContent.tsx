@@ -200,7 +200,7 @@ function TargetLanguageInput({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !state.submitted && state.userText.trim()) {
+    if (e.key === 'Enter' && !state.submitted) {
       e.preventDefault();
       onSubmit(translation.language);
     }
@@ -236,6 +236,7 @@ function TargetLanguageInput({
         <DiffDisplay
           expected={translation.text}
           actual={state.userText}
+          hideAccuracy={!state.userText.trim()}
         />
       </div>
     );
@@ -279,7 +280,6 @@ function TargetLanguageInput({
           variant="outline"
           size="icon"
           onClick={() => onSubmit(translation.language)}
-          disabled={!state.userText.trim()}
           className="h-9 w-9 shrink-0"
           aria-label={submitLabel}
         >
