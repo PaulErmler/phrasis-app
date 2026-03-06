@@ -1,4 +1,5 @@
-import { SignedIn, UserButton } from '@daveyplate/better-auth-ui';
+import { UserButton } from '@daveyplate/better-auth-ui';
+import { Authenticated } from 'convex/react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 
@@ -30,9 +31,9 @@ export function ChatHeader({ onBack }: ChatHeaderProps) {
           <span className="heading-section">Cacatua</span>
         </div>
         <div className="flex items-center gap-4">
-          <SignedIn>
+          <Authenticated>
             <UserButton size="icon" />
-          </SignedIn>
+          </Authenticated>
         </div>
       </div>
     </header>

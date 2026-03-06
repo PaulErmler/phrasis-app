@@ -3,9 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import { useMutation, useQuery } from 'convex/react';
+import { Authenticated, AuthLoading, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { SignedIn, RedirectToSignIn } from '@daveyplate/better-auth-ui';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ChevronLeft, Loader2 } from 'lucide-react';
@@ -20,6 +19,21 @@ import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { OnboardingData } from './types';
 
 export default function OnboardingPage() {
+  return (
+    <>
+      <AuthLoading>
+        <div className="h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AuthLoading>
+      <Authenticated>
+        <OnboardingContent />
+      </Authenticated>
+    </>
+  );
+}
+
+function OnboardingContent() {
   const router = useRouter();
   const t = useTranslations('Onboarding');
   const locale = useLocale();
@@ -144,127 +158,122 @@ export default function OnboardingPage() {
     userSettings?.hasCompletedOnboarding
   ) {
     return (
-      <>
-        <RedirectToSignIn />
-      </>
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
     );
   }
 
   return (
-    <>
-      <RedirectToSignIn />
-      <SignedIn>
-        <div className="h-screen flex flex-col overflow-hidden ">
-          {step < totalSteps && (
-            <div className="bg-background border-b shrink-0">
-              <div className="container mx-auto px-4 py-4">
-                <Progress value={progress} className="h-2" />
-                <p className="text-muted-sm mt-2 text-center">
-                  Step {step} of {totalSteps}
-                </p>
-              </div>
-            </div>
-          )}
-
-          <main className="flex-1 overflow-hidden">
-            <div className="container mx-auto px-4 max-w-4xl h-full flex flex-col overflow-hidden">
-              {step === 1 && <WelcomeStep />}
-
-              {step === 2 && (
-                <LearningStyleStep
-                  selectedStyle={data.learningStyle}
-                  onSelectStyle={(style) =>
-                    setData({ ...data, learningStyle: style })
-                  }
-                />
-              )}
-
-              {step === 3 && (
-                <TargetLanguagesStep
-                  selectedLanguages={data.targetLanguages}
-                  onToggleLanguage={(code) =>
-                    setData({ ...data, targetLanguages: [code] })
-                  }
-                />
-              )}
-
-              {step === 4 && (
-                <CurrentLevelStep
-                  selectedLevel={data.currentLevel}
-                  targetLanguageName={
-                    data.targetLanguages[0]
-                      ? getLocalizedLanguageNameByCode(
-                        data.targetLanguages[0],
-                        locale,
-                      )
-                      : undefined
-                  }
-                  onSelectLevel={(level) =>
-                    setData({ ...data, currentLevel: level })
-                  }
-                />
-              )}
-
-              {step === 5 && (
-                <BaseLanguagesStep
-                  selectedLanguages={data.baseLanguages}
-                  excludeLanguages={data.targetLanguages}
-                  onToggleLanguage={(code) =>
-                    setData({ ...data, baseLanguages: [code] })
-                  }
-                />
-              )}
-
-              {step === 6 && <LoadingStep onComplete={handleComplete} />}
-            </div>
-          </main>
-
-          {step < totalSteps && (
-            <div className="border-t bg-background shrink-0">
-              <div className="container mx-auto px-4 py-4">
-                <div className="flex items-center justify-between gap-4">
-                  {step > 1 && step < 6 ? (
-                    <Button
-                      variant="ghost"
-                      onClick={handleBack}
-                      disabled={isSubmitting}
-                      className="gap-2"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                      {t('back')}
-                    </Button>
-                  ) : (
-                    <div />
-                  )}
-                  <Button
-                    onClick={handleContinue}
-                    disabled={!canContinue() || isSubmitting}
-                    className="min-w-[120px]"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        Loading...
-                      </>
-                    ) : step === 1 ? (
-                      t('getStarted')
-                    ) : step === totalSteps ? (
-                      t('finish')
-                    ) : (
-                      t('continue')
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-            <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
-            <div className="absolute -bottom-1/2 -left-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
+    <div className="h-screen flex flex-col overflow-hidden ">
+      {step < totalSteps && (
+        <div className="bg-background border-b shrink-0">
+          <div className="container mx-auto px-4 py-4">
+            <Progress value={progress} className="h-2" />
+            <p className="text-muted-sm mt-2 text-center">
+              Step {step} of {totalSteps}
+            </p>
           </div>
         </div>
-      </SignedIn>
-    </>
+      )}
+
+      <main className="flex-1 overflow-hidden">
+        <div className="container mx-auto px-4 max-w-4xl h-full flex flex-col overflow-hidden">
+          {step === 1 && <WelcomeStep />}
+
+          {step === 2 && (
+            <LearningStyleStep
+              selectedStyle={data.learningStyle}
+              onSelectStyle={(style) =>
+                setData({ ...data, learningStyle: style })
+              }
+            />
+          )}
+
+          {step === 3 && (
+            <TargetLanguagesStep
+              selectedLanguages={data.targetLanguages}
+              onToggleLanguage={(code) =>
+                setData({ ...data, targetLanguages: [code] })
+              }
+            />
+          )}
+
+          {step === 4 && (
+            <CurrentLevelStep
+              selectedLevel={data.currentLevel}
+              targetLanguageName={
+                data.targetLanguages[0]
+                  ? getLocalizedLanguageNameByCode(
+                    data.targetLanguages[0],
+                    locale,
+                  )
+                  : undefined
+              }
+              onSelectLevel={(level) =>
+                setData({ ...data, currentLevel: level })
+              }
+            />
+          )}
+
+          {step === 5 && (
+            <BaseLanguagesStep
+              selectedLanguages={data.baseLanguages}
+              excludeLanguages={data.targetLanguages}
+              onToggleLanguage={(code) =>
+                setData({ ...data, baseLanguages: [code] })
+              }
+            />
+          )}
+
+          {step === 6 && <LoadingStep onComplete={handleComplete} />}
+        </div>
+      </main>
+
+      {step < totalSteps && (
+        <div className="border-t bg-background shrink-0">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between gap-4">
+              {step > 1 && step < 6 ? (
+                <Button
+                  variant="ghost"
+                  onClick={handleBack}
+                  disabled={isSubmitting}
+                  className="gap-2"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  {t('back')}
+                </Button>
+              ) : (
+                <div />
+              )}
+              <Button
+                onClick={handleContinue}
+                disabled={!canContinue() || isSubmitting}
+                className="min-w-[120px]"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Loading...
+                  </>
+                ) : step === 1 ? (
+                  t('getStarted')
+                ) : step === totalSteps ? (
+                  t('finish')
+                ) : (
+                  t('continue')
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
+        <div className="absolute -bottom-1/2 -left-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
+      </div>
+    </div>
   );
 }

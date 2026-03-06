@@ -4,7 +4,7 @@ import { action } from '../../_generated/server';
 import { v, ConvexError } from 'convex/values';
 import { experimental_transcribe as transcribe } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { requireAuthUser } from '../../db/users';
+import { requireAuthUserId } from '../../db/users';
 
 /**
  * Transcribe audio using OpenAI Transcription API.
@@ -15,7 +15,7 @@ export const transcribeAudio = action({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    await requireAuthUser(ctx);
+    await requireAuthUserId(ctx);
 
     try {
       const transcript = await transcribe({

@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 import { query } from '../_generated/server';
-import { getAuthUser } from '../db/users';
+import { getAuthUserId } from '../db/users';
 
 // ============================================================================
 // QUERIES (testing page — CollectionsPreview)
@@ -28,8 +28,8 @@ export const getCollectionsWithTexts = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
     const limit = args.textsPerCollection ?? 5;
     const collections = await ctx.db.query('collections').collect();

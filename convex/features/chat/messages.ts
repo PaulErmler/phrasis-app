@@ -5,7 +5,7 @@ import { internal } from '../../_generated/api';
 import { saveMessage } from '@convex-dev/agent';
 import { listUIMessages, syncStreams } from '@convex-dev/agent';
 import { components } from '../../_generated/api';
-import { getAuthUser, requireAuthUser } from '../../db/users';
+import { getAuthUserId, requireAuthUserId } from '../../db/users';
 import { agent } from './agent';
 
 export type ListMessagesStreamArgs = {
@@ -69,13 +69,13 @@ export const sendMessage = mutation({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
+    const userId = await requireAuthUserId(ctx);
 
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {
       threadId: args.threadId,
     });
 
-    if (!thread || thread.userId !== user._id) {
+    if (!thread || thread.userId !== userId) {
       throw new ConvexError('Thread not found or access denied');
     }
 
@@ -116,8 +116,8 @@ export const listMessages = query({
     streams: v.optional(v.any()),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       return { page: [], isDone: true, continueCursor: '' };
     }
 
@@ -125,7 +125,7 @@ export const listMessages = query({
       threadId: args.threadId,
     });
 
-    if (!thread || thread.userId !== user._id) {
+    if (!thread || thread.userId !== userId) {
       return { page: [], isDone: true, continueCursor: '' };
     }
 

@@ -9,7 +9,7 @@ import {
 import { internal } from '../_generated/api';
 import { MAX_TRANSLATION_LENGTH } from '../../lib/constants/translation';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
-import { getAuthUser, requireAuthUser } from '../db/users';
+import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { translateText } from '../features/translation';
 
 /** Set of all valid language codes from SUPPORTED_LANGUAGES */
@@ -32,7 +32,7 @@ export const requestTranslation = mutation({
   },
   returns: v.id('translationRequests'),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
+    const userId = await requireAuthUserId(ctx);
 
     const text = args.text.trim();
     if (!text) throw new ConvexError('Text cannot be empty');
@@ -56,7 +56,7 @@ export const requestTranslation = mutation({
     }
 
     const requestId = await ctx.db.insert('translationRequests', {
-      userId: user._id,
+      userId,
       text,
       sourceLang: args.sourceLang,
       targetLang: args.targetLang,
@@ -104,11 +104,11 @@ export const getTranslationRequest = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return null;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
 
     const request = await ctx.db.get(args.requestId);
-    if (!request || request.userId !== user._id) return null;
+    if (!request || request.userId !== userId) return null;
 
     return request;
   },

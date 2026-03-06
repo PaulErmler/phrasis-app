@@ -1,7 +1,7 @@
 import { ConvexError } from 'convex/values';
 import { QueryCtx } from '../_generated/server';
 import { Id, Doc } from '../_generated/dataModel';
-import { getUserSettings, requireAuthUser } from './users';
+import { getUserSettings, requireAuthUserId } from './users';
 
 /**
  * Get a course by its ID.
@@ -36,10 +36,10 @@ export async function getActiveCourseForUser(
  * Use in mutations that require both auth and an active course.
  */
 export async function requireActiveCourse(ctx: QueryCtx) {
-  const user = await requireAuthUser(ctx);
-  const result = await getActiveCourseForUser(ctx, user._id);
+  const userId = await requireAuthUserId(ctx);
+  const result = await getActiveCourseForUser(ctx, userId);
   if (!result) throw new ConvexError('No active course found');
-  return { user, ...result };
+  return { userId, ...result };
 }
 
 /**

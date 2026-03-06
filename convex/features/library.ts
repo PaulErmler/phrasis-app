@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 import { query, internalMutation, mutation } from '../_generated/server';
 import { Doc } from '../_generated/dataModel';
-import { getAuthUser } from '../db/users';
+import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId } from '../db/decks';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
@@ -62,10 +62,10 @@ export const getLibraryCards = query({
   },
   returns: v.array(libraryCardValidator),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
-    const active = await getActiveCourseForUser(ctx, user._id);
+    const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return [];
     const { course } = active;
 

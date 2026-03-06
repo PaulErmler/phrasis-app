@@ -3,8 +3,8 @@ import { mutation, query } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 import { learningStyleValidator, currentLevelValidator } from '../types';
 import {
-  getAuthUser,
-  requireAuthUser,
+  getAuthUserId,
+  requireAuthUserId,
   getUserSettings as dbGetUserSettings,
   getOnboardingProgress as dbGetOnboardingProgress,
 } from '../db/users';
@@ -45,9 +45,9 @@ export const getUserSettings = query({
   ),
   handler: async (ctx) => {
     try {
-      const user = await getAuthUser(ctx);
-      if (!user) return null;
-      return (await dbGetUserSettings(ctx, user._id)) ?? null;
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return null;
+      return (await dbGetUserSettings(ctx, userId)) ?? null;
     } catch {
       return null;
     }
@@ -71,9 +71,9 @@ export const getUserCourses = query({
   ),
   handler: async (ctx) => {
     try {
-      const user = await getAuthUser(ctx);
-      if (!user) return [];
-      return getCoursesForUser(ctx, user._id);
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return [];
+      return getCoursesForUser(ctx, userId);
     } catch {
       return [];
     }
@@ -98,15 +98,15 @@ export const getActiveCourse = query({
   ),
   handler: async (ctx) => {
     try {
-      const user = await getAuthUser(ctx);
-      if (!user) return null;
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return null;
 
-      const settings = await dbGetUserSettings(ctx, user._id);
+      const settings = await dbGetUserSettings(ctx, userId);
       if (!settings?.activeCourseId) {
         // If no active course is set, return the first course
         const firstCourse = await ctx.db
           .query('courses')
-          .withIndex('by_userId', (q) => q.eq('userId', user._id))
+          .withIndex('by_userId', (q) => q.eq('userId', userId))
           .first();
         return firstCourse;
       }
@@ -138,9 +138,9 @@ export const getOnboardingProgress = query({
   ),
   handler: async (ctx) => {
     try {
-      const user = await getAuthUser(ctx);
-      if (!user) return null;
-      return (await dbGetOnboardingProgress(ctx, user._id)) ?? null;
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return null;
+      return (await dbGetOnboardingProgress(ctx, userId)) ?? null;
     } catch {
       return null;
     }
@@ -163,15 +163,15 @@ export const getCourseStats = query({
   ),
   handler: async (ctx) => {
     try {
-      const user = await getAuthUser(ctx);
-      if (!user) return null;
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return null;
 
-      const active = await getActiveCourseForUser(ctx, user._id);
+      const active = await getActiveCourseForUser(ctx, userId);
       if (!active) return null;
 
       const stats = await dbGetCourseStats(
         ctx,
-        user._id,
+        userId,
         active.course._id,
       );
       if (!stats) return null;
@@ -201,21 +201,21 @@ export const setActiveCourse = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
+    const userId = await requireAuthUserId(ctx);
 
     const course = await ctx.db.get(args.courseId);
     if (!course) throw new ConvexError('Course not found');
-    if (course.userId !== user._id)
+    if (course.userId !== userId)
       throw new ConvexError('Course does not belong to user');
 
-    const existingSettings = await dbGetUserSettings(ctx, user._id);
+    const existingSettings = await dbGetUserSettings(ctx, userId);
     if (existingSettings) {
       await ctx.db.patch(existingSettings._id, {
         activeCourseId: args.courseId,
       });
     } else {
       await ctx.db.insert('userSettings', {
-        userId: user._id,
+        userId,
         hasCompletedOnboarding: true,
         activeCourseId: args.courseId,
       });
@@ -247,9 +247,7 @@ export const saveOnboardingProgress = mutation({
     baseLanguages: v.optional(v.array(v.string())),
   }),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
-
-    const userId = user._id;
+    const userId = await requireAuthUserId(ctx);
 
     // Upsert onboarding progress
     const existingProgress = await dbGetOnboardingProgress(ctx, userId);
@@ -300,7 +298,7 @@ export const createCourse = mutation({
     deckId: v.id('decks'),
   }),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
+    const userId = await requireAuthUserId(ctx);
 
     const initialReviewCount =
       args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
@@ -310,9 +308,9 @@ export const createCourse = mutation({
       baseLanguages: args.baseLanguages,
       targetLanguages: args.targetLanguages,
       currentLevel: args.currentLevel,
-      userId: user._id,
+      userId,
     });
-    await createCourseStats(ctx, user._id, courseId);
+    await createCourseStats(ctx, userId, courseId);
 
     let activeCollectionId: Id<'collections'> | undefined;
     if (args.currentLevel) {
@@ -352,9 +350,7 @@ export const completeOnboarding = mutation({
     deckId: v.id('decks'),
   }),
   handler: async (ctx) => {
-    const user = await requireAuthUser(ctx);
-
-    const userId = user._id;
+    const userId = await requireAuthUserId(ctx);
 
     const progress = await dbGetOnboardingProgress(ctx, userId);
     if (!progress) throw new ConvexError('Onboarding progress not found');
@@ -461,10 +457,10 @@ export const getActiveCourseSettings = query({
   ),
   handler: async (ctx) => {
     try {
-      const user = await getAuthUser(ctx);
-      if (!user) return null;
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return null;
 
-      const active = await getActiveCourseForUser(ctx, user._id);
+      const active = await getActiveCourseForUser(ctx, userId);
       if (!active) return null;
 
       return dbGetCourseSettings(ctx, active.course._id);
@@ -504,7 +500,7 @@ export const updateCourseSettings = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
+    const userId = await requireAuthUserId(ctx);
 
     if (args.initialReviewCount !== undefined) {
       validateInitialReviewCount(args.initialReviewCount);
@@ -512,7 +508,7 @@ export const updateCourseSettings = mutation({
 
     const course = await ctx.db.get(args.courseId);
     if (!course) throw new ConvexError('Course not found');
-    if (course.userId !== user._id)
+    if (course.userId !== userId)
       throw new ConvexError('Course does not belong to user');
 
     // Build patch object with only provided fields
