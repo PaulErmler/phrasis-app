@@ -38,7 +38,7 @@ export function LearningControls({
   onSeek,
   onNext,
   isReviewing,
-  showProgressBar = true,
+  showProgressBar = false,
 }: LearningControlsProps) {
   const t = useTranslations('LearningMode');
   const { openChat } = useLearningChatToggle();

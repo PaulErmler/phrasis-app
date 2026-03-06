@@ -657,7 +657,7 @@ export function LearningModeSettings({
             </div>
             <Switch
               id="showProgressBar"
-              checked={courseSettings.showProgressBar ?? true}
+              checked={courseSettings.showProgressBar ?? false}
               onCheckedChange={handleShowProgressBarChange}
               className="mt-0.5"
             />

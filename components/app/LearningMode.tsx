@@ -41,7 +41,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
           onSeek={audio.seekTo}
           onNext={() => {}}
           isReviewing={true}
-          showProgressBar={true}
+          showProgressBar={false}
         />
       </div>
     );
@@ -135,7 +135,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         onSeek={audio.seekTo}
         onNext={state.handleNext}
         isReviewing={state.isReviewing}
-        showProgressBar={state.courseSettings.showProgressBar ?? true}
+        showProgressBar={state.courseSettings.showProgressBar ?? false}
       />
 
       <LearningModeSettings
