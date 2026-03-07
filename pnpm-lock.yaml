@@ -227,6 +227,12 @@ importers:
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      soundtouch-ts:
+        specifier: ^1.1.1
+        version: 1.1.1
+      soundtouchjs:
+        specifier: ^0.3.0
+        version: 0.3.0
       streamdown:
         specifier: ^1.6.10
         version: 1.6.10(@types/mdast@4.0.4)(micromark-util-types@2.0.2)(micromark@4.0.2)(react@19.2.1)
@@ -5957,6 +5963,12 @@ packages:
 
   sorted-btree@1.8.1:
     resolution: {integrity: sha512-395+XIP+wqNn3USkFSrNz7G3Ss/MXlZEqesxvzCRFwL14h6e8LukDHdLBePn5pwbm5OQ9vGu8mDyz2lLDIqamQ==}
+
+  soundtouch-ts@1.1.1:
+    resolution: {integrity: sha512-w1aJk1lxCtjVsi/RGNOEu67MLosKkOHrQKoBAWAtg1lvJODPfHiFqJRvicNAQpHDxdb4zl5c1kx5NSM5mqEsbA==}
+
+  soundtouchjs@0.3.0:
+    resolution: {integrity: sha512-P/+SwnIE4BLrMbYK8aB8+GfXRfLv3+BV8HFMrEqOuF0F9BsI3sKEN1T+kY/JqiVURcCQgr50BC8D/uVzE/GozQ==}
 
   source-map-js@1.2.1:
     resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
@@ -12888,6 +12900,10 @@ snapshots:
       react-dom: 19.2.1(react@19.2.1)
 
   sorted-btree@1.8.1: {}
+
+  soundtouch-ts@1.1.1: {}
+
+  soundtouchjs@0.3.0: {}
 
   source-map-js@1.2.1: {}
 

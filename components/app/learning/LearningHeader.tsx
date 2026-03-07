@@ -8,26 +8,21 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
-import { ChevronLeft, CircleCheck, EyeOff, Info, Loader2, Settings, Star } from 'lucide-react';
+import { ChevronLeft, CircleCheck, EyeOff, Info, Settings, Star } from 'lucide-react';
 import { useLearningChatToggle } from './LearningChatLayout';
 
 interface LearningHeaderProps {
   onBack: () => void;
   onSettingsOpen: () => void;
-  isNavigating?: boolean;
 }
 
 export function LearningHeader({
   onBack,
   onSettingsOpen,
-  isNavigating = false,
 }: LearningHeaderProps) {
   const t = useTranslations('LearningMode');
   const tSettings = useTranslations('LearningMode.settingsPanel');
   const { isChatOpen, closeChat } = useLearningChatToggle();
-
-  const BackIcon = isNavigating ? Loader2 : ChevronLeft;
-  const backIconClass = isNavigating ? 'h-4 w-4 animate-spin' : 'h-4 w-4';
 
   return (
     <header className="sticky-header">
@@ -36,15 +31,14 @@ export function LearningHeader({
         <Button
           variant="ghost"
           onClick={isChatOpen ? closeChat : onBack}
-          disabled={isNavigating}
           className="gap-2 -ml-2 z-10 lg:hidden"
         >
-          <BackIcon className={backIconClass} />
+          <ChevronLeft className="h-4 w-4" />
           {t('back')}
         </Button>
         {/* Desktop: always show normal back */}
-        <Button variant="ghost" onClick={onBack} disabled={isNavigating} className="gap-2 -ml-2 z-10 hidden lg:inline-flex">
-          <BackIcon className={backIconClass} />
+        <Button variant="ghost" onClick={onBack} className="gap-2 -ml-2 z-10 hidden lg:inline-flex">
+          <ChevronLeft className="h-4 w-4" />
           {t('back')}
         </Button>
 

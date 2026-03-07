@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Preloaded, usePreloadedQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -17,6 +16,7 @@ export function HomeView({
   preloadedCourseSettings,
   preloadedCourseStats,
   preloadedCustomCollectionsProgress,
+  onLearnOpen,
 }: {
   preloadedCollectionProgress: Preloaded<
     typeof api.features.decks.getCollectionProgress
@@ -30,72 +30,58 @@ export function HomeView({
   preloadedCustomCollectionsProgress: Preloaded<
     typeof api.features.decks.getCustomCollectionsProgress
   >;
+  onLearnOpen: () => void;
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const t = useTranslations('AppPage');
-  const [isNavigating, setIsNavigating] = useState(false);
-  const [navigatingMode, setNavigatingMode] = useState<ReviewMode | null>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const updateCourseSettings = useMutation(api.features.courses.updateCourseSettings);
 
-  useEffect(() => {
-    clearTimeout(timerRef.current);
-    setIsNavigating(false);
-    setNavigatingMode(null);
-  }, [pathname]);
+  const handleStartReview = useCallback(
+    async (mode: ReviewMode) => {
+      if (!courseSettings?.courseId) return;
 
-  useEffect(() => () => clearTimeout(timerRef.current), []);
+      const currentMode = courseSettings.reviewMode ?? 'audio';
+      if (currentMode !== mode) {
+        await updateCourseSettings({
+          courseId: courseSettings.courseId,
+          reviewMode: mode,
+        });
+      }
 
-  const handleStartReview = useCallback(async (mode: ReviewMode) => {
-    if (!courseSettings?.courseId) return;
-
-    const currentMode = courseSettings.reviewMode ?? 'audio';
-    if (currentMode !== mode) {
-      await updateCourseSettings({ courseId: courseSettings.courseId, reviewMode: mode });
-    }
-
-    router.push('/app/learn');
-    setNavigatingMode(mode);
-    timerRef.current = setTimeout(() => setIsNavigating(true), 500);
-  }, [router, courseSettings, updateCourseSettings]);
-
-  const isLearnOverlayActive = pathname === '/app/learn';
+      onLearnOpen();
+    },
+    [courseSettings, updateCourseSettings, onLearnOpen],
+  );
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-8">
-    <div className="app-view">
-      {!isLearnOverlayActive && (
+      <div className="app-view">
         <ProgressStatsCard
           preloadedCourseStats={preloadedCourseStats}
           onStartReview={handleStartReview}
-          isNavigating={isNavigating}
-          navigatingMode={navigatingMode}
         />
-      )}
 
-      <NewChatInput showSuggestions={false} className="[&_[data-slot=input-group]]:rounded-xl" />
+        <NewChatInput
+          showSuggestions={false}
+          className="[&_[data-slot=input-group]]:rounded-xl"
+        />
 
-      {/* Collection Carousel - Select difficulty and add cards */}
-      <div className="space-y-2">
-        <h2 className="heading-section">
-          {t('collections.carousel.sectionTitle')}
-        </h2>
-        <CollectionCarousel
-          preloadedCollectionProgress={preloadedCollectionProgress}
+        <div className="space-y-2">
+          <h2 className="heading-section">
+            {t('collections.carousel.sectionTitle')}
+          </h2>
+          <CollectionCarousel
+            preloadedCollectionProgress={preloadedCollectionProgress}
+            preloadedCourseSettings={preloadedCourseSettings}
+          />
+        </div>
+
+        <CustomCollectionCarousel
           preloadedCourseSettings={preloadedCourseSettings}
+          preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
         />
       </div>
-
-      {/* Custom Collections Carousel */}
-      <CustomCollectionCarousel
-        preloadedCourseSettings={preloadedCourseSettings}
-        preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
-      />
-
-    </div>
     </div>
   );
 }

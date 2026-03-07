@@ -1,17 +1,35 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import { Authenticated, usePreloadedQuery } from 'convex/react';
+import {
+  Authenticated,
+  useConvexAuth,
+  usePreloadedQuery,
+  useQuery,
+  useMutation,
+} from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
-import { BottomNav } from '@/components/app/BottomNav';
+import { BottomNav, type View } from '@/components/app/BottomNav';
 import { CourseMenu } from '@/components/app/CourseMenu';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
-import type { View } from '@/components/app/BottomNav';
+import { HomeView } from '@/components/app/HomeView';
+import { ContentView } from '@/components/app/ContentView';
+import { LibraryView } from '@/components/app/LibraryView';
+import { SettingsView } from '@/components/app/SettingsView';
+import { LearnView } from '@/components/app/learning/LearnView';
+
+const VIEW_PATHS: Record<View, string> = {
+  home: '/app',
+  content: '/app/content',
+  library: '/app/library',
+  settings: '/app/settings',
+};
 
 function viewFromPathname(pathname: string): View {
   if (pathname.startsWith('/app/content')) return 'content';
@@ -20,42 +38,115 @@ function viewFromPathname(pathname: string): View {
   return 'home';
 }
 
-export default function MainLayout({ children }: { children: React.ReactNode }) {
+export default function MainLayout({
+  children: _children,
+}: {
+  children: React.ReactNode;
+}) {
   const {
     preloadedSettings,
     preloadedActiveCourse,
+    preloadedCourseSettings,
+    preloadedCollectionProgress,
+    preloadedCourseStats,
+    preloadedCustomCollectionsProgress,
   } = useAppData();
 
   const router = useRouter();
   const pathname = usePathname();
-  const currentView = viewFromPathname(pathname);
-  const [courseMenuOpen, setCourseMenuOpen] = useState(false);
   const t = useTranslations('AppPage');
   const locale = useLocale();
+
   const settings = usePreloadedQuery(preloadedSettings);
   const activeCourse = usePreloadedQuery(preloadedActiveCourse);
 
-  const courseButtonLabel = activeCourse
-    ? t('currentCourseWithLanguages', {
-      targetLanguages: activeCourse.targetLanguages
-        .map((code) => getLocalizedLanguageNameByCode(code, locale))
-        .join(', '),
-    })
-    : t('changeCourse');
-  const hasCompletedOnboarding = settings?.hasCompletedOnboarding ?? true;
+  const { isAuthenticated } = useConvexAuth();
 
+  const [activeView, setActiveView] = useState<View>(() =>
+    viewFromPathname(pathname),
+  );
+  const [isLearnOpen, setIsLearnOpen] = useState(false);
+  const [courseMenuOpen, setCourseMenuOpen] = useState(false);
+
+  // Warm the getCardForReview Convex subscription before learn opens;
+  // skip once learn is open since useLearningMode manages its own subscription
+  useQuery(
+    api.features.scheduling.getCardForReview,
+    isAuthenticated && !isLearnOpen ? {} : 'skip',
+  );
+
+  // Pre-create a chat thread so LearnView can use it immediately
+  const getOrCreateEmptyThread = useMutation(
+    api.features.chat.threads.getOrCreateEmptyThread,
+  );
+  const [prefetchedThreadId, setPrefetchedThreadId] = useState<string | null>(
+    null,
+  );
+  const didPrefetchThread = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated || didPrefetchThread.current) return;
+    didPrefetchThread.current = true;
+    getOrCreateEmptyThread({}).then(setPrefetchedThreadId).catch(() => {});
+  }, [isAuthenticated, getOrCreateEmptyThread]);
+
+  // Onboarding redirect
+  const hasCompletedOnboarding = settings?.hasCompletedOnboarding ?? true;
   useEffect(() => {
     if (hasCompletedOnboarding === false) {
       router.push('/app/onboarding');
     }
   }, [hasCompletedOnboarding, router]);
 
+  // Tab switching — pushState so browser back/forward works between tabs
+  const handleViewChange = useCallback((view: View) => {
+    setActiveView(view);
+    setIsLearnOpen(false);
+    history.pushState(null, '', VIEW_PATHS[view]);
+  }, []);
+
+  // Learn overlay — pushState so the browser back button can close it
+  const handleLearnOpen = useCallback(() => {
+    setIsLearnOpen(true);
+    history.pushState(null, '', '/app/learn');
+  }, []);
+
+  const handleLearnClose = useCallback(() => {
+    setIsLearnOpen(false);
+    history.back();
+    // Re-prefetch a fresh thread for the next learn session
+    getOrCreateEmptyThread({}).then(setPrefetchedThreadId).catch(() => {});
+  }, [getOrCreateEmptyThread]);
+
+  // Sync state when the user navigates with browser back/forward buttons
+  useEffect(() => {
+    const onPopState = () => {
+      const url = window.location.pathname;
+      if (url === '/app/learn') {
+        setIsLearnOpen(true);
+      } else {
+        setIsLearnOpen(false);
+        setActiveView(viewFromPathname(url));
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  const courseButtonLabel = activeCourse
+    ? t('currentCourseWithLanguages', {
+        targetLanguages: activeCourse.targetLanguages
+          .map((code) => getLocalizedLanguageNameByCode(code, locale))
+          .join(', '),
+      })
+    : t('changeCourse');
+
   return (
     <Authenticated>
       <div className="h-screen flex flex-col overflow-hidden">
         <header className="sticky-header">
           <div className="header-bar">
-            {currentView === 'home' ? (
+            {activeView === 'home' ? (
               <Button
                 variant="ghost"
                 onClick={() => setCourseMenuOpen(true)}
@@ -66,7 +157,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </Button>
             ) : (
               <h1 className="heading-section capitalize">
-                {t(`views.${currentView}`)}
+                {t(`views.${activeView}`)}
               </h1>
             )}
             <ThemeSwitcher className="-mr-2" />
@@ -76,10 +167,54 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
         <main className="flex-1 min-h-0 flex flex-col">
-          {children}
+          {!isLearnOpen && activeView === 'home' && (
+            <HomeView
+              preloadedCollectionProgress={preloadedCollectionProgress}
+              preloadedCourseSettings={preloadedCourseSettings}
+              preloadedCourseStats={preloadedCourseStats}
+              preloadedCustomCollectionsProgress={
+                preloadedCustomCollectionsProgress
+              }
+              onLearnOpen={handleLearnOpen}
+            />
+          )}
+          <div
+            style={{
+              display:
+                !isLearnOpen && activeView === 'content'
+                  ? 'contents'
+                  : 'none',
+            }}
+          >
+            <ContentView />
+          </div>
+          {!isLearnOpen && activeView === 'library' && <LibraryView />}
+          <div
+            style={{
+              display:
+                !isLearnOpen && activeView === 'settings'
+                  ? 'contents'
+                  : 'none',
+            }}
+          >
+            <SettingsView />
+          </div>
         </main>
 
-        <BottomNav currentView={currentView} />
+        <BottomNav
+          currentView={activeView}
+          onViewChange={handleViewChange}
+          onLearnOpen={handleLearnOpen}
+        />
+
+        {isLearnOpen && (
+          <div className="fixed inset-0 z-50 bg-background">
+            <LearnView
+              onBack={handleLearnClose}
+              prefetchedThreadId={prefetchedThreadId ?? undefined}
+            />
+          </div>
+        )}
 
         <div className="fixed inset-0 -z-10 overflow-hidden">
           <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />

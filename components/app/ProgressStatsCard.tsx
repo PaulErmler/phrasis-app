@@ -30,13 +30,9 @@ function StatItem({
 export function ProgressStatsCard({
   preloadedCourseStats,
   onStartReview,
-  isNavigating,
-  navigatingMode,
 }: {
   preloadedCourseStats: Preloaded<typeof api.features.courses.getCourseStats>;
   onStartReview: (mode: ReviewMode) => void;
-  isNavigating: boolean;
-  navigatingMode: ReviewMode | null;
 }) {
   const t = useTranslations('AppPage');
   const stats = usePreloadedQuery(preloadedCourseStats);
@@ -58,11 +54,7 @@ export function ProgressStatsCard({
         />
         <StatItem icon={Clock} label={t('stats.time')} value={time} />
       </div>
-      <StartLearningButton
-        onStartReview={onStartReview}
-        isNavigating={isNavigating}
-        navigatingMode={navigatingMode}
-      />
+      <StartLearningButton onStartReview={onStartReview} />
     </div>
   );
 }

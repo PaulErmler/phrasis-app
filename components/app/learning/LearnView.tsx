@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Authenticated } from 'convex/react';
 import { LearningMode } from '@/components/app/LearningMode';
@@ -81,23 +81,19 @@ function WrappedChatPanel({
 
 interface LearnViewProps {
   onBack: () => void;
+  prefetchedThreadId?: string;
 }
 
-export function LearnView({ onBack }: LearnViewProps) {
+export function LearnView({ onBack, prefetchedThreadId }: LearnViewProps) {
   return (
     <Authenticated>
-      <LearnViewInner onBack={onBack} />
+      <LearnViewInner onBack={onBack} prefetchedThreadId={prefetchedThreadId} />
     </Authenticated>
   );
 }
 
-function LearnViewInner({ onBack }: LearnViewProps) {
+function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
   const { preloadedCourseSettings, preloadedActiveCourse } = useAppData();
-
-  const [isNavigating, setIsNavigating] = useState(false);
-  const navTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
-  useEffect(() => () => clearTimeout(navTimerRef.current), []);
 
   const state = useLearningMode({
     courseSettings: preloadedCourseSettings,
@@ -108,11 +104,11 @@ function LearnViewInner({ onBack }: LearnViewProps) {
   const goHome = useCallback(() => {
     audio.pause();
     onBack();
-    navTimerRef.current = setTimeout(() => setIsNavigating(true), 500);
   }, [audio, onBack]);
 
   const { threadId, isLoading: isThreadLoading, createThread } = useThread({
-    autoCreate: true,
+    threadId: prefetchedThreadId,
+    autoCreate: !prefetchedThreadId,
   });
 
   const threadHasMessagesRef = useRef(false);
@@ -180,7 +176,6 @@ function LearnViewInner({ onBack }: LearnViewProps) {
     <LearningHeader
       onBack={goHome}
       onSettingsOpen={openSettings}
-      isNavigating={isNavigating}
     />
   );
 

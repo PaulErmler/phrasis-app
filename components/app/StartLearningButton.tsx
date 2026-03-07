@@ -2,21 +2,15 @@
 
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { BookOpen, Headphones, Loader2 } from 'lucide-react';
+import { BookOpen, Headphones } from 'lucide-react';
 
 type ReviewMode = 'audio' | 'full';
 
 interface StartLearningButtonProps {
   onStartReview: (mode: ReviewMode) => void;
-  isNavigating: boolean;
-  navigatingMode: ReviewMode | null;
 }
 
-export function StartLearningButton({
-  onStartReview,
-  isNavigating,
-  navigatingMode,
-}: StartLearningButtonProps) {
+export function StartLearningButton({ onStartReview }: StartLearningButtonProps) {
   const t = useTranslations('AppPage');
 
   return (
@@ -25,26 +19,16 @@ export function StartLearningButton({
         size="lg"
         className="w-full gap-2"
         onClick={() => onStartReview('full')}
-        disabled={isNavigating}
       >
-        {isNavigating && navigatingMode === 'full' ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
-        ) : (
-          <BookOpen className="h-5 w-5" />
-        )}
+        <BookOpen className="h-5 w-5" />
         {t('fullReview')}
       </Button>
       <Button
         size="lg"
         className="w-full gap-2"
         onClick={() => onStartReview('audio')}
-        disabled={isNavigating}
       >
-        {isNavigating && navigatingMode === 'audio' ? (
-          <Loader2 className="h-5 w-5 animate-spin" />
-        ) : (
-          <Headphones className="h-5 w-5" />
-        )}
+        <Headphones className="h-5 w-5" />
         {t('audioReview')}
       </Button>
     </div>
