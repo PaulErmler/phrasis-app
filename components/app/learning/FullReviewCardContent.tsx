@@ -158,7 +158,7 @@ interface TargetLanguageInputProps {
   placeholder: string;
   showLanguageLabel: boolean;
   locale: string;
-  inputRef?: React.RefObject<HTMLInputElement>;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 function TargetLanguageInput({
