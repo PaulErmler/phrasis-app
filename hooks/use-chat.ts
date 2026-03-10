@@ -1,12 +1,13 @@
 import { useState, useCallback } from 'react';
 import { useChatMessages } from '@/hooks/use-chat-messages';
-import { useSendMessage, type CardContext } from '@/hooks/use-send-message';
+import { useSendMessage } from '@/hooks/use-send-message';
 import { useVoiceRecording } from '@/hooks/use-voice-recording';
 import type { ChatStatus, ExtendedUIMessage } from '@/lib/types/chat';
+import type { Id } from '@/convex/_generated/dataModel';
 
 interface UseChatOptions {
   threadId: string;
-  cardContext?: CardContext;
+  cardId?: Id<'cards'>;
 }
 
 interface UseChatReturn {
@@ -26,7 +27,7 @@ interface UseChatReturn {
  * Unified chat hook that composes message retrieval, sending, and voice recording
  * into a single interface for easy consumption by chat UI components.
  */
-export function useChat({ threadId, cardContext }: UseChatOptions): UseChatReturn {
+export function useChat({ threadId, cardId }: UseChatOptions): UseChatReturn {
   const [text, setText] = useState('');
 
   const { messages, status, setStatus } = useChatMessages({ threadId });
@@ -34,7 +35,7 @@ export function useChat({ threadId, cardContext }: UseChatOptions): UseChatRetur
   const { sendMessage: sendMessageRaw } = useSendMessage({
     threadId,
     setStatus,
-    cardContext,
+    cardId,
   });
 
   const { isRecording, isTranscribing, handleVoiceClick } = useVoiceRecording(

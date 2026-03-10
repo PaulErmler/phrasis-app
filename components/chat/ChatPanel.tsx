@@ -6,16 +6,16 @@ import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/hooks/use-chat';
-import type { CardContext } from '@/hooks/use-send-message';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import type { ToolRenderer, MessageFooterRenderer } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
+import type { Id } from '@/convex/_generated/dataModel';
 
 interface ChatPanelProps {
   threadId: string;
   toolRenderers?: Record<string, ToolRenderer>;
   messageFooter?: MessageFooterRenderer;
-  cardContext?: CardContext;
+  cardId?: Id<'cards'>;
   onMessageSent?: () => void;
   showSuggestions?: boolean;
   suggestions?: readonly string[];
@@ -35,7 +35,7 @@ export function ChatPanel({
   threadId,
   toolRenderers,
   messageFooter,
-  cardContext,
+  cardId,
   onMessageSent,
   showSuggestions,
   suggestions,
@@ -45,7 +45,7 @@ export function ChatPanel({
   suggestionsAction,
   aboveFooterAction,
 }: ChatPanelProps) {
-  const chat = useChat({ threadId, cardContext });
+  const chat = useChat({ threadId, cardId });
   const t = useTranslations('Chat.attachments');
 
   const handleSubmit = useCallback(

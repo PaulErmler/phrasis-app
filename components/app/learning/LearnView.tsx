@@ -18,21 +18,19 @@ import {
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
 import { useCardApprovals } from '@/hooks/use-card-approvals';
-import type { CardContext } from '@/hooks/use-send-message';
 import { useThread } from '@/hooks/use-thread';
 import { Loader } from '@/components/ai-elements/loader';
 import { useAppData } from '@/components/app/AppDataProvider';
+import type { Id } from '@/convex/_generated/dataModel';
 
 function WrappedChatPanel({
   threadId,
-  cardContext,
+  cardId,
   onMessageSent,
-  targetLanguages,
 }: {
   threadId: string;
-  cardContext?: CardContext;
+  cardId?: Id<'cards'>;
   onMessageSent?: () => void;
-  targetLanguages: string[];
 }) {
   const { closeChat } = useLearningChatToggle();
   const approvals = useCardApprovals(threadId);
@@ -50,16 +48,16 @@ function WrappedChatPanel({
 
   const toolRenderers = useMemo(
     () => ({
-      createCard: createCardToolRenderer({ ...approvals, targetLanguages }),
+      createCard: createCardToolRenderer(approvals),
     }),
-    [approvals, targetLanguages],
+    [approvals],
   );
 
   return (
     <ChatPanel
       threadId={threadId}
       toolRenderers={toolRenderers}
-      cardContext={cardContext}
+      cardId={cardId}
       onMessageSent={onMessageSent}
       suggestions={suggestions}
       showSuggestions
@@ -142,29 +140,13 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
     audio.pause();
   }, [audio]);
 
-  const cardContext: CardContext | undefined = useMemo(() => {
-    if (state.status !== 'reviewing') return undefined;
-    return {
-      sourceText: state.sourceText,
-      sourceLanguage: state.sourceLanguage,
-      translations: state.translations.map((t) => ({
-        language: t.language,
-        text: t.text,
-      })),
-      baseLanguages: state.baseLanguages,
-      targetLanguages: state.targetLanguages,
-    };
-  }, [state]);
-
-  const targetLanguages =
-    state.status !== 'loading' ? state.targetLanguages : [];
+  const cardId = state.status === 'reviewing' ? state.cardId : undefined;
 
   const chatPanel = threadId ? (
     <WrappedChatPanel
       threadId={threadId}
-      cardContext={cardContext}
+      cardId={cardId}
       onMessageSent={handleMessageSent}
-      targetLanguages={targetLanguages}
     />
   ) : isThreadLoading ? (
     <div className="flex-1 flex items-center justify-center">

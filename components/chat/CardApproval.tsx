@@ -8,12 +8,12 @@ import { Button } from '@/components/ui/button';
 import { getLanguageByCode } from '@/lib/languages';
 import type { CreateCardToolPart } from '@/lib/types/tool-parts';
 import type { CardApprovalStatus } from '@/convex/types';
+import { useCourseLanguages } from '@/hooks/use-course-languages';
 
 const TOOL_SUCCESS = "Card has been created.";
 
 export interface CardApprovalProps {
   toolPart: CreateCardToolPart;
-  targetLanguages: string[];
   approvalsByToolCallId: Map<
     string,
     {
@@ -39,12 +39,12 @@ function Lang({ code }: { code: string }) {
 
 export function CardApproval({
   toolPart,
-  targetLanguages,
   approvalsByToolCallId,
   onApprove,
   onReject,
   processingApprovals,
 }: CardApprovalProps) {
+  const { targetLanguages } = useCourseLanguages();
   const t = useTranslations('Chat.cardApproval');
   const [optimisticState, setOptimisticState] = useState<
     'approved' | 'rejected' | null
@@ -105,43 +105,45 @@ export function CardApproval({
     );
   }
 
+  const targetEntries = entries.filter((e) => targetLanguages.includes(e.language));
+  const baseEntries = entries.filter((e) => !targetLanguages.includes(e.language));
+
+  const cardContent = (
+    <div className="space-y-1.5 text-sm">
+      {baseEntries.map((entry, i) => (
+        <p key={`base-${i}`} className="text-sm text-muted-foreground">
+          <Lang code={entry.language} /> {entry.text}
+        </p>
+      ))}
+      {targetEntries.map((entry, i) => (
+        <p key={`target-${i}`} className="text-base font-semibold">
+          <Lang code={entry.language} /> {entry.text}
+        </p>
+      ))}
+    </div>
+  );
+
   if (approvalState === 'approved') {
     return (
-      <Alert className="my-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-        <AlertDescription className="text-success">{t('approved')}</AlertDescription>
+      <Alert className="my-3 flex flex-col gap-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+        <AlertDescription>{cardContent}</AlertDescription>
+        <p className="text-xs font-medium text-success">{t('approved')}</p>
       </Alert>
     );
   }
 
   if (approvalState === 'rejected') {
     return (
-      <Alert className="my-3 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-        <AlertDescription className="text-red-700 dark:text-red-300">
-          {t('rejected')}
-        </AlertDescription>
+      <Alert className="my-3 flex flex-col gap-3 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+        <AlertDescription>{cardContent}</AlertDescription>
+        <p className="text-xs font-medium text-red-700 dark:text-red-300">{t('rejected')}</p>
       </Alert>
     );
   }
 
-  const targetEntries = entries.filter((e) => targetLanguages.includes(e.language));
-  const baseEntries = entries.filter((e) => !targetLanguages.includes(e.language));
-
   return (
     <Alert className="my-3 flex flex-col gap-3">
-      <AlertDescription>
-        <div className="space-y-1.5 text-sm">
-          {baseEntries.map((entry, i) => (
-            <p key={`base-${i}`} className="text-sm text-muted-foreground">
-              <Lang code={entry.language} /> {entry.text}
-            </p>
-          ))}
-          {targetEntries.map((entry, i) => (
-            <p key={`target-${i}`} className="text-base font-semibold">
-              <Lang code={entry.language} /> {entry.text}
-            </p>
-          ))}
-        </div>
-      </AlertDescription>
+      <AlertDescription>{cardContent}</AlertDescription>
       <div className="flex items-center justify-end gap-2">
         <Button
           onClick={handleReject}
