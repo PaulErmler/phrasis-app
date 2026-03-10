@@ -9,7 +9,7 @@ import { getLanguageByCode } from '@/lib/languages';
 import type { CreateCardToolPart } from '@/lib/types/tool-parts';
 import type { CardApprovalStatus } from '@/convex/types';
 
-const TOOL_SUCCESS = "I've prepared a card for you to review and approve.";
+const TOOL_SUCCESS = "Card has been created.";
 
 export interface CardApprovalProps {
   toolPart: CreateCardToolPart;
@@ -130,13 +130,13 @@ export function CardApproval({
     <Alert className="my-3 flex flex-col gap-3">
       <AlertDescription>
         <div className="space-y-1.5 text-sm">
-          {baseEntries.map((entry) => (
-            <p key={entry.language} className="text-sm text-muted-foreground">
+          {baseEntries.map((entry, i) => (
+            <p key={`base-${i}`} className="text-sm text-muted-foreground">
               <Lang code={entry.language} /> {entry.text}
             </p>
           ))}
-          {targetEntries.map((entry) => (
-            <p key={entry.language} className="text-base font-semibold">
+          {targetEntries.map((entry, i) => (
+            <p key={`target-${i}`} className="text-base font-semibold">
               <Lang code={entry.language} /> {entry.text}
             </p>
           ))}

@@ -60,6 +60,7 @@ export function FullReviewCardContent({
   );
 
   const autoPlayedRef = useRef<Set<string>>(new Set());
+  const firstInputRef = useRef<HTMLInputElement | null>(null);
 
   const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
   const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
@@ -70,6 +71,10 @@ export function FullReviewCardContent({
     );
     autoPlayedRef.current = new Set();
   }
+
+  useEffect(() => {
+    firstInputRef.current?.focus();
+  }, [translationKey]);
 
   const handleInputChange = useCallback((language: string, text: string) => {
     setInputs((prev) => {
@@ -106,7 +111,7 @@ export function FullReviewCardContent({
     >
       {({ targetTranslations: targets }) => (
         <div className="space-y-4">
-          {targets.map((translation) => {
+          {targets.map((translation, index) => {
             const audio = audioRecordings.find(
               (a) => a.language === translation.language,
             );
@@ -130,6 +135,7 @@ export function FullReviewCardContent({
                 placeholder={t('typeTranslation')}
                 showLanguageLabel={showLanguageLabel}
                 locale={locale}
+                inputRef={index === 0 ? firstInputRef : undefined}
               />
             );
           })}
@@ -152,6 +158,7 @@ interface TargetLanguageInputProps {
   placeholder: string;
   showLanguageLabel: boolean;
   locale: string;
+  inputRef?: React.RefObject<HTMLInputElement>;
 }
 
 function TargetLanguageInput({
@@ -167,6 +174,7 @@ function TargetLanguageInput({
   placeholder,
   showLanguageLabel,
   locale,
+  inputRef,
 }: TargetLanguageInputProps) {
   const autoPlayAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -266,6 +274,7 @@ function TargetLanguageInput({
       )}
       <div className="flex items-center gap-2">
         <Input
+          ref={inputRef}
           value={state.userText}
           onChange={(e) => onInputChange(translation.language, e.target.value)}
           onKeyDown={handleKeyDown}
@@ -273,7 +282,7 @@ function TargetLanguageInput({
           className="flex-1"
           autoComplete="off"
           autoCorrect="off"
-          autoCapitalize="off"
+          autoCapitalize="sentences"
           spellCheck={false}
         />
         <Button

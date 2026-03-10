@@ -29,6 +29,20 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
   const courses = useQuery(api.features.courses.getUserCourses);
   const activeCourse = useQuery(api.features.courses.getActiveCourse);
   const setActiveCourse = useMutation(api.features.courses.setActiveCourse);
+  const setActiveCourseOptimistic = setActiveCourse.withOptimisticUpdate(
+    (store, { courseId }) => {
+      const allCourses = store.getQuery(
+        api.features.courses.getUserCourses,
+        {},
+      );
+      if (!allCourses) return;
+
+      const nextActive =
+        allCourses.find((course) => course._id === courseId) ?? null;
+
+      store.setQuery(api.features.courses.getActiveCourse, {}, nextActive);
+    },
+  );
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editingCourseId, setEditingCourseId] = useState<Id<'courses'> | null>(
     null,
@@ -38,7 +52,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
 
   const handleSelectCourse = async (courseId: Id<'courses'>) => {
     try {
-      await setActiveCourse({ courseId });
+      await setActiveCourseOptimistic({ courseId });
     } catch (error) {
       console.error('Error setting active course:', error);
     }

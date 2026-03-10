@@ -47,7 +47,7 @@ export const createCardTool = createTool({
       },
     );
 
-    return "I've prepared a card for you to review and approve.";
+    return "Card has been created.";
   },
 });
 
@@ -84,7 +84,9 @@ export const agent: Agent = new Agent(components.agent, {
 - Always respond in the language the user asked the question in. This is very important: if the user writes in German, respond in German; if in French, respond in French. Never switch to a different language mid-conversation unless the user does. And don't use another base or target language if the user has not used that language to ask the question.
 - For explanations unless specified otherwise, make explanations and grammar about the target language.
 - When creating cards with the createCard tool, the translations array must be an array of {language, text} objects. List base languages first, then target languages, in the exact order provided in the context.
-- And lastly, do not include any reasoning about these rules or the setup with the languages in the response to the user.`,
+- And lastly, do not include any reasoning about these rules or the setup with the languages in the response to the user.
+- Be sure to always include all languages in the course when creating a card. 
+`,
 
   stopWhen: stepCountIs(15),
   tools: {
