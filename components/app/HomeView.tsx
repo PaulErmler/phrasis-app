@@ -35,7 +35,22 @@ export function HomeView({
   const t = useTranslations('AppPage');
 
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
-  const updateCourseSettings = useMutation(api.features.courses.updateCourseSettings);
+  const updateCourseSettings = useMutation(
+    api.features.courses.updateCourseSettings,
+  ).withOptimisticUpdate((localStore, args) => {
+    const current = localStore.getQuery(
+      api.features.courses.getActiveCourseSettings,
+      {},
+    );
+    if (current !== undefined && current !== null) {
+      const { courseId, ...updates } = args;
+      localStore.setQuery(
+        api.features.courses.getActiveCourseSettings,
+        {},
+        { ...current, ...updates },
+      );
+    }
+  });
 
   const handleStartReview = useCallback(
     async (mode: ReviewMode) => {
@@ -43,9 +58,11 @@ export function HomeView({
 
       const currentMode = courseSettings.reviewMode ?? 'audio';
       if (currentMode !== mode) {
-        await updateCourseSettings({
+        void updateCourseSettings({
           courseId: courseSettings.courseId,
           reviewMode: mode,
+        }).catch((error) => {
+          console.error('Failed to update review mode:', error);
         });
       }
 
