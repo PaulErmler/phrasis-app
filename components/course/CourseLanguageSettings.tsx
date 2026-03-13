@@ -8,6 +8,7 @@ import {
   AlertTriangle,
   Check,
   Info,
+  Lock,
   Loader2,
   X,
 } from 'lucide-react';
@@ -22,6 +23,9 @@ import {
 } from '@/components/ui/sheet';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { DualLanguageEditor } from '@/components/course/DualLanguageEditor';
+import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
+import PaywallDialog from '@/components/autumn/paywall-dialog';
 
 interface CourseData {
   _id: Id<'courses'>;
@@ -43,6 +47,12 @@ export function CourseLanguageSettings({
   const updateCourseLanguages = useMutation(
     api.features.courses.updateCourseLanguages,
   );
+
+  const { isAvailable: hasMultipleLanguages } = useFeatureQuota(FEATURE_IDS.MULTIPLE_LANGUAGES);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+
+  const maxTotal = hasMultipleLanguages ? 5 : 2;
+  const maxPerGroup = hasMultipleLanguages ? 3 : 1;
 
   const [draftBase, setDraftBase] = useState<string[]>([]);
   const [draftTarget, setDraftTarget] = useState<string[]>([]);
@@ -144,19 +154,33 @@ export function CourseLanguageSettings({
             </div>
 
             <div className="sheet-body space-y-4">
-              <div className="rounded-lg bg-muted/50 px-3 py-2.5 flex gap-2">
-                <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  {t('infoText', { max: 5 })}
-                </p>
-              </div>
+              {hasMultipleLanguages && (
+                <div className="rounded-lg bg-muted/50 px-3 py-2.5 flex gap-2">
+                  <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {t('infoText', { max: maxTotal })}
+                  </p>
+                </div>
+              )}
+
+              {!hasMultipleLanguages && (
+                <button
+                  onClick={() => setPaywallOpen(true)}
+                  className="w-full rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5 flex gap-2 text-left hover:bg-primary/10 transition-colors"
+                >
+                  <Lock className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <p className="text-xs text-primary leading-relaxed">
+                    {t('upgradeForMoreLanguages')}
+                  </p>
+                </button>
+              )}
 
               <DualLanguageEditor
                 baseLanguages={draftBase}
                 targetLanguages={draftTarget}
-                maxPerGroup={3}
+                maxPerGroup={maxPerGroup}
                 minPerGroup={1}
-                maxTotal={5}
+                maxTotal={maxTotal}
                 lockedCodes={savedCodes}
                 locale={locale}
                 labels={editorLabels}
@@ -217,6 +241,14 @@ export function CourseLanguageSettings({
           </>
         )}
       </SheetContent>
+
+      {paywallOpen && (
+        <PaywallDialog
+          open={paywallOpen}
+          setOpen={setPaywallOpen}
+          featureId={FEATURE_IDS.MULTIPLE_LANGUAGES}
+        />
+      )}
     </Sheet>
   );
 }

@@ -37,7 +37,7 @@ export function useFeatureQuota(featureId: string): FeatureQuotaInfo {
       included: 0,
       used: 0,
       unlimited: false,
-      isAvailable: true,
+      isAvailable: false,
       isLoading: false,
     };
   }
@@ -49,7 +49,7 @@ export function useFeatureQuota(featureId: string): FeatureQuotaInfo {
       included: 0,
       used: 0,
       unlimited: false,
-      isAvailable: true,
+      isAvailable: false,
       isLoading: false,
     };
   }

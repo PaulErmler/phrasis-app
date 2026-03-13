@@ -199,7 +199,7 @@
         "baseLanguages": "Base Languages",
         "addLanguage": "Add Language",
         "noMoreAvailable": "No more languages available",
-        "infoText": "Drag and drop to reorder languages. Once saved, languages cannot be removed. You can add up to {max} languages total.",
+        "infoText": "Once you have added at least 3 languages, drag and drop to reorder them. Once saved, languages cannot be removed. You can add up to {max} languages total.",
         "saveChanges": "Save Changes",
         "confirmTitle": "Confirm changes",
         "confirmAdding": "Adding {languages}. This cannot be undone.",
@@ -207,7 +207,8 @@
         "cancelButton": "Cancel",
         "warningBoth": "You need at least one base language and one target language.",
         "warningBase": "You need at least one base language.",
-        "warningTarget": "You need at least one target language."
+        "warningTarget": "You need at least one target language.",
+        "upgradeForMoreLanguages": "Upgrade your plan to add more than 2 languages per course."
       }
     },
     "changeCourse": "Change Course",
@@ -381,9 +382,16 @@
     "upgrade": "Upgrade",
     "remaining": "{balance} / {included} remaining"
   },
+  "LowQuota": {
+    "title": "Running Low",
+    "description": "You only have {balance, plural, one {# use} other {# uses}} left. Upgrade your plan to get more.",
+    "dismiss": "Not now",
+    "upgrade": "Upgrade to {productName}"
+  },
   "Paywall": {
     "loading": "Loading",
     "confirm": "Confirm",
+    "dismiss": "Not now",
     "featureUnavailable": "Feature Unavailable",
     "notAvailableForAccount": "This feature is not available for your account.",
     "usageLimitNoProducts": "You have reached the usage limit for {featureName}. Please contact us to increase your limit.",

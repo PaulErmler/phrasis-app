@@ -10,55 +10,37 @@ import {
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { usePaywall, useCustomer } from "autumn-js/react";
-import { getPaywallContent } from "@/lib/autumn/paywall-content";
-import { cn } from "@/lib/utils";
+import { useCustomer, usePricingTable } from "autumn-js/react";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 
-export interface PaywallDialogProps {
+export interface LowQuotaDialogProps {
   open: boolean;
   setOpen: (open: boolean) => void;
+  balance: number;
   featureId: string;
-  entityId?: string;
 }
 
-export default function PaywallDialog(params?: PaywallDialogProps) {
-  const t = useTranslations("Paywall");
-  const { data: preview, isLoading } = usePaywall({
-    featureId: params?.featureId,
-    entityId: params?.entityId,
-  });
+export default function LowQuotaDialog({
+  open,
+  setOpen,
+  balance,
+  featureId,
+}: LowQuotaDialogProps) {
+  const t = useTranslations("LowQuota");
   const { checkout } = useCustomer();
+  const { products } = usePricingTable();
   const [upgrading, setUpgrading] = useState(false);
 
-  if (!params) {
-    return <></>;
-  }
-
-  const { open, setOpen } = params;
-
-  if (isLoading) {
-    return (
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="p-0 pt-4 gap-0 text-foreground overflow-hidden text-sm">
-          <DialogTitle className="sr-only">{t("loading")}</DialogTitle>
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  const { title, message } = getPaywallContent(preview, t);
-  const nextProduct = preview?.products?.[0];
+  const upgradeProduct = products?.find(
+    (p) => p.scenario === "upgrade" || (p.scenario === "new" && !p.properties?.is_free),
+  );
 
   const handleUpgrade = async () => {
-    if (!nextProduct) return;
+    if (!upgradeProduct) return;
     setUpgrading(true);
     try {
       await checkout({
-        productId: nextProduct.id,
+        productId: upgradeProduct.id,
         dialog: CheckoutDialog,
       });
       setOpen(false);
@@ -72,10 +54,13 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="p-0 pt-4 gap-0 text-foreground overflow-hidden text-sm">
-        <DialogTitle className={cn("font-bold text-xl px-6")}>
-          {title}
+        <DialogTitle className="font-bold text-xl px-6">
+          {t("title")}
         </DialogTitle>
-        <div className="px-6 my-2 text-muted-foreground">{message}</div>
+        <p className="px-6 mt-1 mb-2 text-muted-foreground">
+          {t("description", { balance })}
+        </p>
+
         <DialogFooter className="flex flex-col-reverse sm:flex-row justify-between gap-2 py-3 px-6 bg-secondary border-t">
           <Button
             size="sm"
@@ -85,7 +70,7 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
           >
             {t("dismiss")}
           </Button>
-          {nextProduct && (
+          {upgradeProduct && (
             <Button
               size="sm"
               className="font-medium shadow transition min-w-20 gap-1.5"
@@ -96,7 +81,7 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
                 <>
-                  {t("upgradeTo", { productName: nextProduct.name })}
+                  {t("upgrade", { productName: upgradeProduct.name })}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </>
               )}

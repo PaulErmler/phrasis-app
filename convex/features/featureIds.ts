@@ -7,6 +7,7 @@ export const FEATURE_IDS = {
   COURSES: 'courses',
   SENTENCES: 'sentences',
   CUSTOM_SENTENCES: 'custom_sentences',
+  MULTIPLE_LANGUAGES: 'multiple_languages',
 } as const;
 
 export type FeatureId = (typeof FEATURE_IDS)[keyof typeof FEATURE_IDS];

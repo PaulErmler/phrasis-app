@@ -199,7 +199,7 @@
         "baseLanguages": "Basissprachen",
         "addLanguage": "Sprache hinzufügen",
         "noMoreAvailable": "Keine weiteren Sprachen verfügbar",
-        "infoText": "Ziehe Sprachen per Drag-and-Drop, um sie neu anzuordnen. Einmal gespeichert, können Sprachen nicht entfernt werden. Du kannst bis zu {max} Sprachen insgesamt hinzufügen.",
+        "infoText": "Sobald du mindestens 3 Sprachen hinzugefügt hast, kannst du sie per Drag-and-Drop neu anordnen. Einmal gespeichert, können Sprachen nicht entfernt werden. Du kannst bis zu {max} Sprachen insgesamt hinzufügen.",
         "saveChanges": "Änderungen speichern",
         "confirmTitle": "Änderungen bestätigen",
         "confirmAdding": "{languages} hinzufügen. Dies kann nicht rückgängig gemacht werden.",
@@ -207,7 +207,8 @@
         "cancelButton": "Abbrechen",
         "warningBoth": "Du benötigst mindestens eine Basissprache und eine Zielsprache.",
         "warningBase": "Du benötigst mindestens eine Basissprache.",
-        "warningTarget": "Du benötigst mindestens eine Zielsprache."
+        "warningTarget": "Du benötigst mindestens eine Zielsprache.",
+        "upgradeForMoreLanguages": "Upgrade deinen Plan, um mehr als 2 Sprachen pro Kurs hinzuzufügen."
       }
     },
     "changeCourse": "Kurs wechseln",
@@ -381,9 +382,16 @@
     "upgrade": "Upgrade",
     "remaining": "{balance} / {included} übrig"
   },
+  "LowQuota": {
+    "title": "Fast aufgebraucht",
+    "description": "Du hast nur noch {balance, plural, one {# Nutzung} other {# Nutzungen}} übrig. Upgrade deinen Plan für mehr.",
+    "dismiss": "Nicht jetzt",
+    "upgrade": "Upgrade auf {productName}"
+  },
   "Paywall": {
     "loading": "Laden",
     "confirm": "Bestätigen",
+    "dismiss": "Nicht jetzt",
     "featureUnavailable": "Funktion nicht verfügbar",
     "notAvailableForAccount": "Diese Funktion ist für dein Konto nicht verfügbar.",
     "usageLimitNoProducts": "Du hast das Nutzungslimit für {featureName} erreicht. Bitte kontaktiere uns, um dein Limit zu erhöhen.",
