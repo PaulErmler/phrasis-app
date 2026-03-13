@@ -136,6 +136,7 @@ export function FullReviewCardContent({
                 showLanguageLabel={showLanguageLabel}
                 locale={locale}
                 inputRef={index === 0 ? firstInputRef : undefined}
+                autoFocus={index === 0}
               />
             );
           })}
@@ -159,6 +160,7 @@ interface TargetLanguageInputProps {
   showLanguageLabel: boolean;
   locale: string;
   inputRef?: React.RefObject<HTMLInputElement | null>;
+  autoFocus?: boolean;
 }
 
 function TargetLanguageInput({
@@ -175,6 +177,7 @@ function TargetLanguageInput({
   showLanguageLabel,
   locale,
   inputRef,
+  autoFocus,
 }: TargetLanguageInputProps) {
   const autoPlayAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -275,6 +278,7 @@ function TargetLanguageInput({
       <div className="flex items-center gap-2">
         <Input
           ref={inputRef}
+          autoFocus={autoFocus}
           value={state.userText}
           onChange={(e) => onInputChange(translation.language, e.target.value)}
           onKeyDown={handleKeyDown}
