@@ -126,7 +126,7 @@ export const pro = plan({
 	id: 'pro',
 	name: 'Pro',
 	price: {
-		amount: 19,
+		amount: 18,
 		interval: 'month',
 	},
 	items: [

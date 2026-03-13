@@ -23,6 +23,7 @@ import {
 	PopoverTrigger,
 } from "@/components/ui/popover";
 import { useCustomer } from "autumn-js/react";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { getCheckoutContent } from "@/lib/autumn/checkout-content";
 
@@ -36,17 +37,20 @@ export interface CheckoutDialogProps {
 const formatCurrency = ({
 	amount,
 	currency,
+	locale,
 }: {
 	amount: number;
 	currency: string;
+	locale?: string;
 }) => {
-	return new Intl.NumberFormat("en-US", {
+	return new Intl.NumberFormat(locale ?? "en-US", {
 		style: "currency",
 		currency: currency,
 	}).format(amount);
 };
 
 export default function CheckoutDialog(params: CheckoutDialogProps) {
+	const t = useTranslations("Checkout");
 	const { attach } = useCustomer();
 	const [checkoutResult, setCheckoutResult] = useState<
 		CheckoutResult | undefined
@@ -65,7 +69,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
 	}
 
 	const { open, setOpen } = params;
-	const { title, message } = getCheckoutContent(checkoutResult);
+	const { title, message } = getCheckoutContent(checkoutResult, t);
 
 	const isFree = checkoutResult?.product.properties?.is_free;
 	const isPaid = isFree === false;
@@ -112,11 +116,9 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
 						{loading ? (
 							<Loader2 className="w-4 h-4 animate-spin" />
 						) : (
-							<>
-								<span className="whitespace-nowrap flex gap-1">
-									Confirm
-								</span>
-							</>
+							<span className="whitespace-nowrap">
+								{t("confirm")}
+							</span>
 						)}
 					</Button>
 				</DialogFooter>
@@ -150,6 +152,7 @@ function PriceInformation({
 }
 
 function DueAmounts({ checkoutResult }: { checkoutResult: CheckoutResult }) {
+	const t = useTranslations("Checkout");
 	const { next_cycle, product } = checkoutResult;
 	const nextCycleAtStr = next_cycle
 		? new Date(next_cycle.starts_at).toLocaleDateString()
@@ -165,7 +168,7 @@ function DueAmounts({ checkoutResult }: { checkoutResult: CheckoutResult }) {
 		<div className="flex flex-col gap-1">
 			<div className="flex justify-between">
 				<div>
-					<p className="font-medium text-md">Total due today</p>
+					<p className="font-medium text-md">{t("totalDueToday")}</p>
 				</div>
 
 				<p className="font-medium text-md">
@@ -178,14 +181,16 @@ function DueAmounts({ checkoutResult }: { checkoutResult: CheckoutResult }) {
 			{showNextCycle && (
 				<div className="flex justify-between text-muted-foreground">
 					<div>
-						<p className="text-md">Due next cycle ({nextCycleAtStr})</p>
+						<p className="text-md">
+							{t("dueNextCycle", { date: nextCycleAtStr ?? "" })}
+						</p>
 					</div>
 					<p className="text-md">
 						{formatCurrency({
 							amount: next_cycle.total,
 							currency: checkoutResult?.currency,
 						})}
-						{hasUsagePrice && <span> + usage prices</span>}
+						{hasUsagePrice && <span> {t("plusUsagePrices")}</span>}
 					</p>
 				</div>
 			)}
@@ -200,6 +205,8 @@ function ProductItems({
 	checkoutResult: CheckoutResult;
 	setCheckoutResult: (checkoutResult: CheckoutResult) => void;
 }) {
+	const t = useTranslations("Checkout");
+
 	const isUpdateQuantity =
 		checkoutResult?.product.scenario === "active" &&
 		checkoutResult.product.properties.updateable;
@@ -208,11 +215,11 @@ function ProductItems({
 
 	return (
 		<div className="flex flex-col gap-2">
-			<p className="text-sm font-medium">Price</p>
+			<p className="text-sm font-medium">{t("price")}</p>
 			{checkoutResult?.product.items
 				.filter((item) => item.type !== "feature")
 				.map((item, index) => {
-					if (item.usage_model == "prepaid") {
+					if (item.usage_model === "prepaid") {
 						return (
 							<PrepaidItem
 								key={index}
@@ -233,8 +240,8 @@ function ProductItems({
 								{item.feature
 									? item.feature.name
 									: isOneOff
-										? "Price"
-										: "Subscription"}
+										? t("price")
+										: t("subscription")}
 							</p>
 							<p>
 								{item.display?.primary_text} {item.display?.secondary_text}
@@ -247,13 +254,14 @@ function ProductItems({
 }
 
 function CheckoutLines({ checkoutResult }: { checkoutResult: CheckoutResult }) {
+	const t = useTranslations("Checkout");
 	return (
 		<Accordion type="single" collapsible>
 			<AccordionItem value="total" className="border-b-0">
 				<CustomAccordionTrigger className="justify-between w-full my-0 py-0 border-none">
 					<div className="cursor-pointer flex items-center gap-1 w-full justify-end">
 						<p className="font-light text-muted-foreground">
-							View details
+							{t("viewDetails")}
 						</p>
 						<ChevronDown
 							className="text-muted-foreground mt-0.5 rotate-90 transition-transform duration-200 ease-in-out"
@@ -313,6 +321,7 @@ const PrepaidItem = ({
 	checkoutResult: CheckoutResult;
 	setCheckoutResult: (checkoutResult: CheckoutResult) => void;
 }) => {
+	const t = useTranslations("Checkout");
 	const { quantity = 0, billing_units: billingUnits = 1 } = item;
 	const [quantityInput, setQuantityInput] = useState<string>(
 		(quantity / billingUnits).toString(),
@@ -377,7 +386,7 @@ const PrepaidItem = ({
 						)}
 						disabled={disableSelection}
 					>
-						Qty: {quantity}
+						{t("qty", { quantity })}
 						{!disableSelection && <ChevronDown size={12} />}
 					</PopoverTrigger>
 					<PopoverContent
@@ -412,7 +421,7 @@ const PrepaidItem = ({
 								{loading ? (
 									<Loader2 className="text-muted-foreground animate-spin !w-4 !h-4" />
 								) : (
-									"Save"
+									t("save")
 								)}
 							</Button>
 						</div>

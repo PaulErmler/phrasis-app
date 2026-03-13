@@ -5,10 +5,27 @@ export type PaywallTranslateFn = (
   params?: Record<string, string | number>
 ) => string;
 
+/**
+ * Generates title + message for the paywall dialog.
+ * @param preview - Autumn's feature check preview (may be undefined)
+ * @param t - translation function scoped to the "Paywall" namespace
+ * @param featureName - the already-translated feature display name
+ * @param consumable - whether the feature resets periodically (true) or is a permanent cap (false)
+ */
 export const getPaywallContent = (
   preview: CheckFeaturePreview | undefined,
-  t: PaywallTranslateFn
+  t: PaywallTranslateFn,
+  featureName: string,
+  consumable?: boolean
 ) => {
+  const usageLimitKey = consumable === false
+    ? "capReached"
+    : "usageLimitReached";
+
+  const usageLimitWithDetailKey = consumable === false
+    ? "capReachedWithDetail"
+    : "usageLimitWithDetail";
+
   if (!preview) {
     return {
       title: t("featureUnavailable"),
@@ -16,14 +33,17 @@ export const getPaywallContent = (
     };
   }
 
-  const { scenario, products, feature_name } = preview;
+  const { scenario, products } = preview;
 
-  if (products.length == 0) {
+  if (products.length === 0) {
     switch (scenario) {
       case "usage_limit":
         return {
           title: t("featureUnavailable"),
-          message: t("usageLimitNoProducts", { featureName: feature_name }),
+          message: t(
+            consumable === false ? "capReachedNoProducts" : "usageLimitNoProducts",
+            { featureName }
+          ),
         };
       default:
         return {
@@ -34,7 +54,6 @@ export const getPaywallContent = (
   }
 
   const nextProduct = products[0];
-
   const isAddOn = nextProduct && nextProduct.is_add_on;
 
   const title = nextProduct.free_trial
@@ -46,26 +65,29 @@ export const getPaywallContent = (
   const detail = isAddOn
     ? t("addOnDetail", {
         productName: nextProduct.name,
-        featureName: feature_name,
+        featureName,
       })
     : t("upgradeDetail", {
         productName: nextProduct.name,
-        featureName: feature_name,
+        featureName,
       });
 
   switch (scenario) {
     case "usage_limit":
       return {
         title,
-        message: t("usageLimitWithDetail", {
-          featureName: feature_name,
+        message: t(usageLimitWithDetailKey, {
+          featureName,
           detail,
         }),
       };
     case "feature_flag":
       return {
         title,
-        message: t("featureFlagWithDetail", { detail }),
+        message: t("featureFlagWithDetail", {
+          featureName,
+          detail,
+        }),
       };
     default:
       return {

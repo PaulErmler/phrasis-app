@@ -100,7 +100,8 @@
       "unhide": "Unhide",
       "hide": "Hide",
       "master": "Master",
-      "unmaster": "Unmaster"
+      "unmaster": "Unmaster",
+      "loadingCards": "Loading cards..."
     },
     "settings": {
       "account": "Account",
@@ -208,7 +209,8 @@
         "warningBoth": "You need at least one base language and one target language.",
         "warningBase": "You need at least one base language.",
         "warningTarget": "You need at least one target language.",
-        "upgradeForMoreLanguages": "Upgrade your plan to add more than 2 languages per course."
+        "upgradeForMoreLanguages": "Upgrade your plan to add more than 2 languages per course.",
+        "saveFailed": "Failed to save changes. Please try again."
       }
     },
     "changeCourse": "Change Course",
@@ -375,6 +377,33 @@
       "failed": "Card creation failed"
     }
   },
+  "Features": {
+    "chatMessages": {
+      "name": "Chat Messages",
+      "pricingLabel": "{count} chat messages per month",
+      "pricingLabelUnlimited": "Unlimited chat messages"
+    },
+    "courses": {
+      "name": "Courses",
+      "pricingLabel": "{count, plural, one {# course} other {Up to # courses}}",
+      "pricingLabelUnlimited": "Unlimited courses"
+    },
+    "sentences": {
+      "name": "Sentences",
+      "pricingLabel": "{count} sentences per month",
+      "pricingLabelUnlimited": "Unlimited sentences per month"
+    },
+    "customSentences": {
+      "name": "Custom Flashcards",
+      "pricingLabel": "{count} custom flashcards per month",
+      "pricingLabelUnlimited": "Unlimited custom flashcards"
+    },
+    "multipleLanguages": {
+      "name": "Up to 5 languages per course",
+      "pricingLabel": "Up to {count} languages per course",
+      "pricingLabelUnlimited": "Unlimited languages per course"
+    }
+  },
   "FeatureTracking": {
     "unlimited": "Unlimited",
     "left": "{balance} left",
@@ -383,26 +412,36 @@
     "remaining": "{balance} / {included} remaining"
   },
   "LowQuota": {
-    "title": "Running Low",
-    "description": "You only have {balance, plural, one {# use} other {# uses}} left. Upgrade your plan to get more.",
+    "title": "Running Low on {featureName}",
+    "description": "You only have {balance, plural, one {# use} other {# uses}} of {featureName} left. Upgrade your plan to get more.",
+    "descriptionCap": "You can only create {balance, plural, one {# more} other {# more}} {featureName}. Upgrade your plan to create more.",
     "dismiss": "Not now",
-    "upgrade": "Upgrade to {productName}"
+    "upgrade": "Upgrade to {productName}",
+    "noUpgradeAvailable": "You've used most of your {featureName}. Contact us at support@cacatua.app for additional usage.",
+    "noUpgradeAvailableCap": "You've almost reached your maximum number of {featureName}. Contact us at support@cacatua.app for additional capacity.",
+    "contactUs": "Contact Us"
   },
   "Paywall": {
     "loading": "Loading",
     "confirm": "Confirm",
     "dismiss": "Not now",
-    "featureUnavailable": "Feature Unavailable",
-    "notAvailableForAccount": "This feature is not available for your account.",
-    "usageLimitNoProducts": "You have reached the usage limit for {featureName}. Please contact us to increase your limit.",
-    "notAvailableContactUs": "This feature is not available for your account. Please contact us to enable it.",
+    "featureUnavailable": "Limit Reached",
+    "notAvailableForAccount": "This feature is not available on your current plan.",
+    "usageLimitReached": "You've used all your {featureName} for this period.",
+    "capReached": "You've reached your maximum number of {featureName}.",
+    "usageLimitNoProducts": "You've used all your {featureName}. Contact us at support@cacatua.app for additional usage.",
+    "capReachedNoProducts": "You've reached your maximum number of {featureName}. Contact us at support@cacatua.app for additional capacity.",
+    "notAvailableContactUs": "This feature is not available on your current plan. Contact us at support@cacatua.app to enable it.",
     "startTrial": "Start trial for {productName}",
     "purchaseAddOn": "Purchase {productName}",
     "upgradeTo": "Upgrade to {productName}",
-    "addOnDetail": "Please purchase the {productName} add-on to continue using {featureName}.",
-    "upgradeDetail": "Please upgrade to the {productName} plan to continue using {featureName}.",
-    "usageLimitWithDetail": "You have reached the usage limit for {featureName}. {detail}",
-    "featureFlagWithDetail": "This feature is not available for your account. {detail}"
+    "addOnDetail": "Purchase the {productName} add-on to unlock this feature.",
+    "upgradeDetail": "Upgrade to {productName} to unlock this feature.",
+    "usageLimitWithDetail": "You've used all your {featureName} for this period. {detail}",
+    "capReachedWithDetail": "You've reached your maximum number of {featureName}. {detail}",
+    "featureFlagWithDetail": "{featureName} is not available on your current plan. {detail}",
+    "noUpgradeAvailable": "You've reached your limit for {featureName}. Contact us at support@cacatua.app for additional usage.",
+    "contactUs": "Contact Us"
   },
   "Pricing": {
     "startFreeTrial": "Start Free Trial",
@@ -415,7 +454,48 @@
     "upgrade": "Upgrade",
     "downgrade": "Downgrade",
     "cancelPlan": "Cancel Plan",
-    "getStartedDefault": "Get Started"
+    "getStartedDefault": "Get Started",
+    "free": "Free",
+    "forever": "forever",
+    "monthly": "Monthly",
+    "annual": "Annual",
+    "everythingFrom": "Everything from {planName}, plus:",
+    "error": "Something went wrong. Please try again later."
+  },
+  "Checkout": {
+    "confirm": "Confirm",
+    "price": "Price",
+    "subscription": "Subscription",
+    "totalDueToday": "Total due today",
+    "dueNextCycle": "Due next cycle ({date})",
+    "plusUsagePrices": "+ usage prices",
+    "viewDetails": "View details",
+    "save": "Save",
+    "qty": "Qty: {quantity}",
+    "purchaseTitle": "Purchase {productName}",
+    "purchaseMessage": "By clicking confirm, you will purchase {productName} and your card will be charged immediately.",
+    "updatePlanTitle": "Update Plan",
+    "updatePlanMessage": "Update your prepaid quantity. You'll be charged or credited the prorated difference based on your current billing cycle.",
+    "startTrialTitle": "Start trial for {productName}",
+    "startTrialMessage": "By clicking confirm, you will start a free trial of {productName} which ends on {date}.",
+    "scheduledTitle": "{productName} already scheduled",
+    "scheduledMessage": "You are currently on {currentProduct} and are scheduled to start {productName} on {date}.",
+    "alreadyActiveTitle": "Already active",
+    "alreadyActiveMessage": "You are already subscribed to this product.",
+    "enableTitle": "Enable {productName}",
+    "enableMessage": "By clicking confirm, {productName} will be enabled immediately.",
+    "subscribeTitle": "Subscribe to {productName}",
+    "subscribeMessage": "By clicking confirm, you will be subscribed to {productName} and your card will be charged immediately.",
+    "renewTitle": "Renew",
+    "renewMessage": "By clicking confirm, you will renew your subscription to {productName}.",
+    "upgradeTitle": "Upgrade to {productName}",
+    "upgradeMessage": "By clicking confirm, you will upgrade to {productName} and your payment method will be charged immediately.",
+    "downgradeTitle": "Downgrade to {productName}",
+    "downgradeMessage": "By clicking confirm, your current subscription to {currentProduct} will be cancelled and a new subscription to {productName} will begin on {date}.",
+    "cancelTitle": "Cancel",
+    "cancelMessage": "By clicking confirm, your subscription to {currentProduct} will end on {date}.",
+    "changeTitle": "Change Subscription",
+    "changeMessage": "You are about to change your subscription."
   },
   "Onboarding": {
     "welcome": {

@@ -7,6 +7,7 @@ import {
   CarouselItem,
   type CarouselApi,
 } from '@/components/ui/carousel';
+import { CarouselDots } from '@/components/ui/carousel-dots';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -64,8 +65,6 @@ export function CollectionCarouselUI({
   onReady,
 }: CollectionCarouselUIProps) {
   const [api, setApi] = useState<CarouselApi>();
-  const [currentSnap, setCurrentSnap] = useState(0);
-  const [snapCount, setSnapCount] = useState(0);
   const [ready, setReady] = useState(false);
   const lastScrolledIndexRef = useRef<number | undefined>(undefined);
   const t = useTranslations('AppPage.collections.carousel');
@@ -73,25 +72,6 @@ export function CollectionCarouselUI({
   useEffect(() => {
     if (ready) onReady?.();
   }, [ready, onReady]);
-
-  // Track dot indicator state
-  useEffect(() => {
-    if (!api) return;
-
-    const onSelect = () => {
-      setCurrentSnap(api.selectedScrollSnap());
-      setSnapCount(api.scrollSnapList().length);
-    };
-
-    onSelect();
-    api.on('select', onSelect);
-    api.on('reInit', onSelect);
-
-    return () => {
-      api.off('select', onSelect);
-      api.off('reInit', onSelect);
-    };
-  }, [api]);
 
   // Scroll to the active collection whenever the index changes (initial mount
   // or after a course switch). First scroll jumps instantly; subsequent ones
@@ -240,27 +220,7 @@ export function CollectionCarouselUI({
         </CarouselContent>
       </Carousel>
 
-      {/* Dot indicators – always reserve space to prevent layout shift */}
-      <div className="min-h-[18px] pt-1">
-        {snapCount > 1 && (
-          <div className="flex justify-center gap-1.5">
-            {Array.from({ length: snapCount }).map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                aria-label={`Go to slide ${i + 1}`}
-                onClick={() => api?.scrollTo(i)}
-                className={cn(
-                  'rounded-full transition-all',
-                  i === currentSnap
-                    ? 'w-6 h-2.5 bg-foreground'
-                    : 'w-2.5 h-2.5 bg-muted-foreground/30',
-                )}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      <CarouselDots api={api} className="min-h-[18px] pt-1" />
     </div>
   );
 }

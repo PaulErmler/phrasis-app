@@ -192,6 +192,7 @@ function TargetLanguageInput({
     }
 
     autoPlayedRef.current.add(translation.language);
+    onAudioPlay?.();
     const audio = new Audio(audioUrl);
     autoPlayAudioRef.current = audio;
     audio.play().catch((err) => {

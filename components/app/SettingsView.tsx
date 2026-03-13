@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { authClient } from '@/lib/auth-client';
 import { LogOut, Mail } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { PricingTable } from 'autumn-js/react';
+import PricingTable from '@/components/autumn/pricing-table';
 
 export function SettingsView() {
   const t = useTranslations('AppPage');
@@ -45,7 +45,7 @@ export function SettingsView() {
 
           <Separator/> 
 
-          <PricingTable></PricingTable>
+          <PricingTable />
 
           <Separator />
 

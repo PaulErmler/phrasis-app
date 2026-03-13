@@ -8,14 +8,23 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
+import { FEATURE_META, getFeatureI18nKey, getFeatureDisplayCount } from "@/lib/features/feature-meta";
 import type { Product, ProductItem } from "autumn-js";
 import { Loader2 } from "lucide-react";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  type CarouselApi,
+} from "@/components/ui/carousel";
+import { CarouselDots } from "@/components/ui/carousel-dots";
 
 export default function PricingTable({
   productDetails,
 }: {
   productDetails?: ProductDetails[];
 }) {
+  const t = useTranslations("Pricing");
   const { customer, checkout } = useCustomer({ errorOnNotFound: false });
 
   const [isAnnual, setIsAnnual] = useState(false);
@@ -30,7 +39,7 @@ export default function PricingTable({
   }
 
   if (error) {
-    return <div> Something went wrong...</div>;
+    return <div className="text-center text-muted-foreground py-8">{t("error")}</div>;
   }
 
   const intervals = Array.from(
@@ -134,6 +143,8 @@ export const PricingTableContainer = ({
   setIsAnnualToggle: (isAnnual: boolean) => void;
   multiInterval: boolean;
 }) => {
+  const [carouselApi, setCarouselApi] = useState<CarouselApi>();
+
   if (!products) {
     throw new Error("products is required in <PricingTable />");
   }
@@ -150,7 +161,8 @@ export const PricingTableContainer = ({
       <div
         className={cn(
           "flex items-center flex-col",
-          hasRecommended && "!py-10"
+          hasRecommended && "!py-10",
+          className
         )}
       >
         {multiInterval && (
@@ -165,13 +177,21 @@ export const PricingTableContainer = ({
             />
           </div>
         )}
-        <div
-          className={cn(
-            "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(200px,1fr))] w-full gap-2",
-            className
-          )}
-        >
-          {children}
+        <div className="w-full">
+          <Carousel
+            setApi={setCarouselApi}
+            opts={{ align: "start", loop: false }}
+            className="w-full"
+          >
+            <CarouselContent>
+              {React.Children.map(children, (child) => (
+                <CarouselItem className="basis-[85%] sm:basis-[70%] md:basis-[50%]">
+                  {child}
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+          </Carousel>
+          <CarouselDots api={carouselApi} className="mt-3" />
         </div>
       </div>
     </PricingTableContext.Provider>
@@ -192,6 +212,7 @@ export const PricingCard = ({
   buttonProps,
 }: PricingCardProps) => {
   const t = useTranslations("Pricing");
+  const tFeatures = useTranslations("Features");
   const { products, showFeatures } = usePricingTableContext("PricingCard");
 
   const product = products.find((p) => p.id === productId);
@@ -207,7 +228,7 @@ export const PricingCard = ({
   const isRecommended = productDisplay?.recommend_text ? true : false;
   const mainPriceDisplay = product.properties?.is_free
     ? {
-        primary_text: "Free",
+        primary_text: t("free"),
       }
     : product.items[0].display;
 
@@ -265,6 +286,7 @@ export const PricingCard = ({
               <PricingFeatureList
                 items={featureItems}
                 everythingFrom={product.display?.everything_from}
+                tFeatures={tFeatures}
               />
             </div>
           )}
@@ -284,48 +306,64 @@ export const PricingCard = ({
   );
 };
 
-// Pricing Feature List
 export const PricingFeatureList = ({
   items,
   everythingFrom,
   className,
+  tFeatures,
 }: {
   items: ProductItem[];
   everythingFrom?: string;
   className?: string;
+  tFeatures?: ReturnType<typeof useTranslations>;
 }) => {
+  const t = useTranslations("Pricing");
+
+  const getFeatureLabel = (item: ProductItem): string | undefined => {
+    if (tFeatures && item.feature_id && item.feature_id in FEATURE_META) {
+      const i18nKey = getFeatureI18nKey(item.feature_id);
+      const override = getFeatureDisplayCount(item.feature_id);
+      const included = override ?? item.included_usage ?? 0;
+      const isUnlimited = included === Infinity || included === Number.POSITIVE_INFINITY;
+      if (isUnlimited) {
+        return tFeatures(`${i18nKey}.pricingLabelUnlimited`);
+      }
+      return tFeatures(`${i18nKey}.pricingLabel`, { count: Number(included) });
+    }
+    return item.display?.primary_text;
+  };
+
   return (
     <div className={cn("flex-grow", className)}>
       {everythingFrom && (
         <p className="text-sm mb-4">
-          Everything from {everythingFrom}, plus:
+          {t("everythingFrom", { planName: everythingFrom })}
         </p>
       )}
       <div className="space-y-3">
-        {items.map((item, index) => (
-          <div
-            key={index}
-            className="flex items-start gap-2 text-sm"
-          >
-            {/* {showIcon && (
-              <Check className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-            )} */}
-            <div className="flex flex-col">
-              <span>{item.display?.primary_text}</span>
-              {item.display?.secondary_text && (
-                <span className="text-sm text-muted-foreground">
-                  {item.display?.secondary_text}
-                </span>
-              )}
+        {items.map((item, index) => {
+          const label = getFeatureLabel(item);
+          return (
+            <div
+              key={index}
+              className="flex items-start gap-2 text-sm"
+            >
+              <div className="flex flex-col">
+                <span>{label}</span>
+                {item.display?.secondary_text && (
+                  <span className="text-sm text-muted-foreground">
+                    {item.display?.secondary_text}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 };
 
-// Pricing Card Button
 export interface PricingCardButtonProps extends React.ComponentProps<"button"> {
   recommended?: boolean;
   buttonUrl?: string;
@@ -379,7 +417,6 @@ export const PricingCardButton = React.forwardRef<
 });
 PricingCardButton.displayName = "PricingCardButton";
 
-// Annual Switch
 export const AnnualSwitch = ({
   isAnnualToggle,
   setIsAnnualToggle,
@@ -387,15 +424,16 @@ export const AnnualSwitch = ({
   isAnnualToggle: boolean;
   setIsAnnualToggle: (isAnnual: boolean) => void;
 }) => {
+  const t = useTranslations("Pricing");
   return (
     <div className="flex items-center space-x-2 mb-4">
-      <span className="text-sm text-muted-foreground">Monthly</span>
+      <span className="text-sm text-muted-foreground">{t("monthly")}</span>
       <Switch
         id="annual-billing"
         checked={isAnnualToggle}
         onCheckedChange={setIsAnnualToggle}
       />
-      <span className="text-sm text-muted-foreground">Annual</span>
+      <span className="text-sm text-muted-foreground">{t("annual")}</span>
     </div>
   );
 };

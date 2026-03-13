@@ -104,7 +104,7 @@ export function CourseLanguageSettings({
       setSavedCodes([...draftBase, ...draftTarget]);
       setHasChanges(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to save');
+      setError(e instanceof Error ? e.message : t('saveFailed'));
     } finally {
       setSaving(false);
     }

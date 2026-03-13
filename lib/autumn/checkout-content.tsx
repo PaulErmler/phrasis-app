@@ -1,6 +1,14 @@
 import { type CheckoutResult } from "autumn-js";
 
-export const getCheckoutContent = (checkoutResult: CheckoutResult) => {
+export type CheckoutTranslateFn = (
+  key: string,
+  params?: Record<string, string | number>
+) => string;
+
+export const getCheckoutContent = (
+  checkoutResult: CheckoutResult,
+  t: CheckoutTranslateFn
+) => {
   const { product, current_product, next_cycle } = checkoutResult;
   const { is_one_off, is_free, has_trial, updateable } = product.properties;
   const scenario = product.scenario;
@@ -13,130 +21,92 @@ export const getCheckoutContent = (checkoutResult: CheckoutResult) => {
 
   if (is_one_off) {
     return {
-      title: <p>Purchase {productName}</p>,
-      message: (
-        <p>
-          By clicking confirm, you will purchase {productName} and your card
-          will be charged immediately.
-        </p>
-      ),
+      title: t("purchaseTitle", { productName }),
+      message: t("purchaseMessage", { productName }),
     };
   }
 
-  if (scenario == "active" && updateable) {
-    if (updateable) {
-      return {
-        title: <p>Update Plan</p>,
-        message: (
-          <p>
-            Update your prepaid quantity. You&apos;ll be charged or credited the
-            prorated difference based on your current billing cycle.
-          </p>
-        ),
-      };
-    }
+  if (scenario === "active" && updateable) {
+    return {
+      title: t("updatePlanTitle"),
+      message: t("updatePlanMessage"),
+    };
   }
 
   if (has_trial) {
     return {
-      title: <p>Start trial for {productName}</p>,
-      message: (
-        <p>
-          By clicking confirm, you will start a free trial of {productName}{" "}
-          which ends on {nextCycleAtStr}.
-        </p>
-      ),
+      title: t("startTrialTitle", { productName }),
+      message: t("startTrialMessage", {
+        productName,
+        date: nextCycleAtStr ?? "",
+      }),
     };
   }
 
   switch (scenario) {
     case "scheduled":
       return {
-        title: <p>{productName} product already scheduled</p>,
-        message: (
-          <p>
-            You are currently on product {current_product.name} and are
-            scheduled to start {productName} on {nextCycleAtStr}.
-          </p>
-        ),
+        title: t("scheduledTitle", { productName }),
+        message: t("scheduledMessage", {
+          productName,
+          currentProduct: current_product.name,
+          date: nextCycleAtStr ?? "",
+        }),
       };
 
     case "active":
       return {
-        title: <p>Product already active</p>,
-        message: <p>You are already subscribed to this product.</p>,
+        title: t("alreadyActiveTitle"),
+        message: t("alreadyActiveMessage"),
       };
 
     case "new":
       if (is_free) {
         return {
-          title: <p>Enable {productName}</p>,
-          message: (
-            <p>
-              By clicking confirm, {productName} will be enabled immediately.
-            </p>
-          ),
+          title: t("enableTitle", { productName }),
+          message: t("enableMessage", { productName }),
         };
       }
-
       return {
-        title: <p>Subscribe to {productName}</p>,
-        message: (
-          <p>
-            By clicking confirm, you will be subscribed to {productName} and
-            your card will be charged immediately.
-          </p>
-        ),
+        title: t("subscribeTitle", { productName }),
+        message: t("subscribeMessage", { productName }),
       };
+
     case "renew":
       return {
-        title: <p>Renew</p>,
-        message: (
-          <p>
-            By clicking confirm, you will renew your subscription to{" "}
-            {productName}.
-          </p>
-        ),
+        title: t("renewTitle"),
+        message: t("renewMessage", { productName }),
       };
 
     case "upgrade":
       return {
-        title: <p>Upgrade to {productName}</p>,
-        message: (
-          <p>
-            By clicking confirm, you will upgrade to {productName} and your
-            payment method will be charged immediately.
-          </p>
-        ),
+        title: t("upgradeTitle", { productName }),
+        message: t("upgradeMessage", { productName }),
       };
 
     case "downgrade":
       return {
-        title: <p>Downgrade to {productName}</p>,
-        message: (
-          <p>
-            By clicking confirm, your current subscription to{" "}
-            {current_product.name} will be cancelled and a new subscription to{" "}
-            {productName} will begin on {nextCycleAtStr}.
-          </p>
-        ),
+        title: t("downgradeTitle", { productName }),
+        message: t("downgradeMessage", {
+          productName,
+          currentProduct: current_product.name,
+          date: nextCycleAtStr ?? "",
+        }),
       };
 
     case "cancel":
       return {
-        title: <p>Cancel</p>,
-        message: (
-          <p>
-            By clicking confirm, your subscription to {current_product.name}{" "}
-            will end on {nextCycleAtStr}.
-          </p>
-        ),
+        title: t("cancelTitle"),
+        message: t("cancelMessage", {
+          currentProduct: current_product.name,
+          date: nextCycleAtStr ?? "",
+        }),
       };
 
     default:
       return {
-        title: <p>Change Subscription</p>,
-        message: <p>You are about to change your subscription.</p>,
+        title: t("changeTitle"),
+        message: t("changeMessage"),
       };
   }
 };

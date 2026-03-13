@@ -12,7 +12,7 @@ interface FeatureBadgeProps {
   className?: string;
 }
 
-const LOW_BALANCE_THRESHOLD = 3;
+const LOW_BALANCE_THRESHOLD = 5;
 
 /**
  * Displays a small badge showing the remaining quota for a feature.

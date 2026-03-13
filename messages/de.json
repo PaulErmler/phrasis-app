@@ -100,7 +100,8 @@
       "unhide": "Einblenden",
       "hide": "Ausblenden",
       "master": "Meistern",
-      "unmaster": "Nicht mehr gemeistert"
+      "unmaster": "Nicht mehr gemeistert",
+      "loadingCards": "Karten werden geladen..."
     },
     "settings": {
       "account": "Konto",
@@ -208,7 +209,8 @@
         "warningBoth": "Du benötigst mindestens eine Basissprache und eine Zielsprache.",
         "warningBase": "Du benötigst mindestens eine Basissprache.",
         "warningTarget": "Du benötigst mindestens eine Zielsprache.",
-        "upgradeForMoreLanguages": "Upgrade deinen Plan, um mehr als 2 Sprachen pro Kurs hinzuzufügen."
+        "upgradeForMoreLanguages": "Upgrade deinen Plan, um mehr als 2 Sprachen pro Kurs hinzuzufügen.",
+        "saveFailed": "Änderungen konnten nicht gespeichert werden. Bitte versuche es erneut."
       }
     },
     "changeCourse": "Kurs wechseln",
@@ -375,6 +377,33 @@
       "failed": "Kartenerstellung fehlgeschlagen"
     }
   },
+  "Features": {
+    "chatMessages": {
+      "name": "Chat-Nachrichten",
+      "pricingLabel": "{count} Chat-Nachrichten pro Monat",
+      "pricingLabelUnlimited": "Unbegrenzte Chat-Nachrichten"
+    },
+    "courses": {
+      "name": "Kurse",
+      "pricingLabel": "{count, plural, one {# Kurs} other {Bis zu # Kurse}}",
+      "pricingLabelUnlimited": "Unbegrenzte Kurse"
+    },
+    "sentences": {
+      "name": "Sätze",
+      "pricingLabel": "{count} Sätze pro Monat",
+      "pricingLabelUnlimited": "Unbegrenzte Sätze pro Monat"
+    },
+    "customSentences": {
+      "name": "Eigene Lernkarten",
+      "pricingLabel": "{count} eigene Lernkarten pro Monat",
+      "pricingLabelUnlimited": "Unbegrenzte eigene Lernkarten"
+    },
+    "multipleLanguages": {
+      "name": "Bis zu 5 Sprachen pro Kurs",
+      "pricingLabel": "Bis zu {count} Sprachen pro Kurs",
+      "pricingLabelUnlimited": "Unbegrenzte Sprachen pro Kurs"
+    }
+  },
   "FeatureTracking": {
     "unlimited": "Unbegrenzt",
     "left": "{balance} übrig",
@@ -383,26 +412,36 @@
     "remaining": "{balance} / {included} übrig"
   },
   "LowQuota": {
-    "title": "Fast aufgebraucht",
-    "description": "Du hast nur noch {balance, plural, one {# Nutzung} other {# Nutzungen}} übrig. Upgrade deinen Plan für mehr.",
+    "title": "{featureName} fast aufgebraucht",
+    "description": "Du hast nur noch {balance, plural, one {# Nutzung} other {# Nutzungen}} von {featureName} übrig. Upgrade deinen Plan für mehr.",
+    "descriptionCap": "Du kannst nur noch {balance, plural, one {# weiteren} other {# weitere}} {featureName} erstellen. Upgrade deinen Plan, um mehr zu erstellen.",
     "dismiss": "Nicht jetzt",
-    "upgrade": "Upgrade auf {productName}"
+    "upgrade": "Upgrade auf {productName}",
+    "noUpgradeAvailable": "Du hast den Großteil deiner {featureName} aufgebraucht. Kontaktiere uns unter support@cacatua.app für zusätzliche Nutzung.",
+    "noUpgradeAvailableCap": "Du hast fast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@cacatua.app für zusätzliche Kapazität.",
+    "contactUs": "Kontakt"
   },
   "Paywall": {
     "loading": "Laden",
     "confirm": "Bestätigen",
     "dismiss": "Nicht jetzt",
-    "featureUnavailable": "Funktion nicht verfügbar",
-    "notAvailableForAccount": "Diese Funktion ist für dein Konto nicht verfügbar.",
-    "usageLimitNoProducts": "Du hast das Nutzungslimit für {featureName} erreicht. Bitte kontaktiere uns, um dein Limit zu erhöhen.",
-    "notAvailableContactUs": "Diese Funktion ist für dein Konto nicht verfügbar. Bitte kontaktiere uns, um sie zu aktivieren.",
+    "featureUnavailable": "Limit erreicht",
+    "notAvailableForAccount": "Diese Funktion ist in deinem aktuellen Plan nicht verfügbar.",
+    "usageLimitReached": "Du hast alle deine {featureName} für diesen Zeitraum aufgebraucht.",
+    "capReached": "Du hast die maximale Anzahl an {featureName} erreicht.",
+    "usageLimitNoProducts": "Du hast alle deine {featureName} aufgebraucht. Kontaktiere uns unter support@cacatua.app für zusätzliche Nutzung.",
+    "capReachedNoProducts": "Du hast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@cacatua.app für zusätzliche Kapazität.",
+    "notAvailableContactUs": "Diese Funktion ist in deinem aktuellen Plan nicht verfügbar. Kontaktiere uns unter support@cacatua.app, um sie zu aktivieren.",
     "startTrial": "Testversion für {productName} starten",
     "purchaseAddOn": "{productName} kaufen",
     "upgradeTo": "Upgrade auf {productName}",
-    "addOnDetail": "Bitte kaufe das {productName}-Add-on, um {featureName} weiter zu nutzen.",
-    "upgradeDetail": "Bitte upgrade auf den {productName}-Plan, um {featureName} weiter zu nutzen.",
-    "usageLimitWithDetail": "Du hast das Nutzungslimit für {featureName} erreicht. {detail}",
-    "featureFlagWithDetail": "Diese Funktion ist für dein Konto nicht verfügbar. {detail}"
+    "addOnDetail": "Kaufe das {productName}-Add-on, um diese Funktion freizuschalten.",
+    "upgradeDetail": "Upgrade auf {productName}, um diese Funktion freizuschalten.",
+    "usageLimitWithDetail": "Du hast alle deine {featureName} für diesen Zeitraum aufgebraucht. {detail}",
+    "capReachedWithDetail": "Du hast die maximale Anzahl an {featureName} erreicht. {detail}",
+    "featureFlagWithDetail": "{featureName} ist in deinem aktuellen Plan nicht verfügbar. {detail}",
+    "noUpgradeAvailable": "Du hast dein Limit für {featureName} erreicht. Kontaktiere uns unter support@cacatua.app für zusätzliche Nutzung.",
+    "contactUs": "Kontakt"
   },
   "Pricing": {
     "startFreeTrial": "Kostenlose Testversion starten",
@@ -415,7 +454,48 @@
     "upgrade": "Upgrade",
     "downgrade": "Downgrade",
     "cancelPlan": "Plan kündigen",
-    "getStartedDefault": "Loslegen"
+    "getStartedDefault": "Loslegen",
+    "free": "Kostenlos",
+    "forever": "für immer",
+    "monthly": "Monatlich",
+    "annual": "Jährlich",
+    "everythingFrom": "Alles aus {planName}, plus:",
+    "error": "Etwas ist schiefgelaufen. Bitte versuche es später erneut."
+  },
+  "Checkout": {
+    "confirm": "Bestätigen",
+    "price": "Preis",
+    "subscription": "Abonnement",
+    "totalDueToday": "Heute fällig",
+    "dueNextCycle": "Fällig nächster Zyklus ({date})",
+    "plusUsagePrices": "+ Nutzungspreise",
+    "viewDetails": "Details anzeigen",
+    "save": "Speichern",
+    "qty": "Menge: {quantity}",
+    "purchaseTitle": "{productName} kaufen",
+    "purchaseMessage": "Mit Bestätigung kaufst du {productName} und deine Karte wird sofort belastet.",
+    "updatePlanTitle": "Plan aktualisieren",
+    "updatePlanMessage": "Aktualisiere deine Prepaid-Menge. Du erhältst eine anteilige Gutschrift oder Nachbelastung basierend auf deinem aktuellen Abrechnungszyklus.",
+    "startTrialTitle": "Testversion für {productName} starten",
+    "startTrialMessage": "Mit Bestätigung startest du eine kostenlose Testversion von {productName}, die am {date} endet.",
+    "scheduledTitle": "{productName} bereits geplant",
+    "scheduledMessage": "Du nutzt aktuell {currentProduct} und wechselst am {date} zu {productName}.",
+    "alreadyActiveTitle": "Bereits aktiv",
+    "alreadyActiveMessage": "Du hast dieses Produkt bereits abonniert.",
+    "enableTitle": "{productName} aktivieren",
+    "enableMessage": "Mit Bestätigung wird {productName} sofort aktiviert.",
+    "subscribeTitle": "{productName} abonnieren",
+    "subscribeMessage": "Mit Bestätigung abonnierst du {productName} und deine Karte wird sofort belastet.",
+    "renewTitle": "Verlängern",
+    "renewMessage": "Mit Bestätigung verlängerst du dein Abonnement von {productName}.",
+    "upgradeTitle": "Upgrade auf {productName}",
+    "upgradeMessage": "Mit Bestätigung wechselst du zu {productName} und deine Zahlungsmethode wird sofort belastet.",
+    "downgradeTitle": "Downgrade auf {productName}",
+    "downgradeMessage": "Mit Bestätigung wird dein aktuelles Abonnement von {currentProduct} gekündigt und ein neues Abonnement von {productName} beginnt am {date}.",
+    "cancelTitle": "Kündigen",
+    "cancelMessage": "Mit Bestätigung endet dein Abonnement von {currentProduct} am {date}.",
+    "changeTitle": "Abonnement ändern",
+    "changeMessage": "Du bist dabei, dein Abonnement zu ändern."
   },
   "Onboarding": {
     "welcome": {

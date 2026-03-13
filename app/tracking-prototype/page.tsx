@@ -35,7 +35,7 @@ const FEATURE_META: Record<
   chat_messages: {
     label: 'Chat Messages',
     icon: MessageSquare,
-    description: 'AI chat messages per month',
+    description: 'Chat messages per month',
   },
   courses: {
     label: 'Courses',

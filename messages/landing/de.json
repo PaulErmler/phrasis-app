@@ -77,37 +77,37 @@
         "period": "für immer",
         "cta": "Jetzt starten",
         "features": {
-          "reviews": "200 Wiederholungen pro Monat",
-          "flashcards": "10 eigene Lernkarten pro Monat",
-          "languages": "1 Sprache",
-          "aiQuestions": "5 KI-Fragen pro Monat"
+          "sentences": "150 Sätze pro Monat",
+          "customSentences": "10 eigene Lernkarten pro Monat",
+          "courses": "1 Kurs",
+          "chatMessages": "5 Chat-Nachrichten pro Monat"
         }
       },
       "basic": {
         "name": "Basic",
         "description": "Für engagierte Lernende",
-        "price": "9€",
+        "price": "8€",
         "period": "pro Monat",
         "cta": "Kostenlos testen",
         "features": {
-          "reviews": "2000 Wiederholungen pro Monat",
-          "flashcards": "50 eigene Lernkarten pro Monat",
-          "languages": "Bis zu 2 Sprachen",
-          "aiQuestions": "100 KI-Fragen pro Monat"
+          "sentences": "300 Sätze pro Monat",
+          "customSentences": "50 eigene Lernkarten pro Monat",
+          "courses": "Bis zu 2 Kurse",
+          "chatMessages": "40 Chat-Nachrichten pro Monat"
         }
       },
       "pro": {
         "name": "Pro",
         "description": "Maximale Lernpower",
-        "price": "19€",
+        "price": "18€",
         "period": "pro Monat",
         "cta": "Kostenlos testen",
         "features": {
-          "reviews": "Unbegrenzte Wiederholungen pro Monat",
-          "flashcards": "500 eigene Lernkarten pro Monat",
-          "languages": "Unbegrenzte Sprachen",
-          "aiQuestions": "500 KI-Fragen pro Monat",
-          "priority": "Prioritäts-Zugang zu neuen Funktionen"
+          "sentences": "1000 Sätze pro Monat",
+          "customSentences": "200 eigene Lernkarten pro Monat",
+          "courses": "Bis zu 5 Kurse",
+          "chatMessages": "100 Chat-Nachrichten pro Monat",
+          "multipleLanguages": "Mehrere Sprachen pro Kurs"
         }
       }
     }

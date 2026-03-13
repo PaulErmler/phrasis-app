@@ -7,7 +7,7 @@ import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
-import { Search, Star, EyeOff, CircleCheck, X } from 'lucide-react';
+import { Search, Star, EyeOff, CircleCheck, X, Loader2 } from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
 
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
@@ -157,7 +157,16 @@ export function LibraryView() {
 
       {/* Card list */}
       <div className="max-w-xl mx-auto w-full pt-2.5 pb-4 space-y-2.5">
-        {isLoading && null}
+        {isLoading && (
+          <div className="card-surface p-4 flex items-center justify-center h-[180px]">
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-xs font-medium">
+                {t('loadingCards')}
+              </span>
+            </div>
+          </div>
+        )}
 
         {!isLoading && !hasResults && (
           <div className="card-surface p-12 text-center space-y-2">

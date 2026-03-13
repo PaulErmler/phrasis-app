@@ -77,37 +77,37 @@
         "period": "forever",
         "cta": "Get Started",
         "features": {
-          "reviews": "200 reviews per month",
-          "flashcards": "10 custom flashcards per month",
-          "languages": "1 language",
-          "aiQuestions": "5 AI Questions per month"
+          "sentences": "150 sentences per month",
+          "customSentences": "10 custom flashcards per month",
+          "courses": "1 course",
+          "chatMessages": "5 chat messages per month"
         }
       },
       "basic": {
         "name": "Basic",
         "description": "For dedicated learners",
-        "price": "€9",
+        "price": "€8",
         "period": "per month",
         "cta": "Start Free Trial",
         "features": {
-          "reviews": "2000 reviews per month",
-          "flashcards": "50 custom flashcards per month",
-          "languages": "Up to 2 languages",
-          "aiQuestions": "100 AI Questions per month"
+          "sentences": "300 sentences per month",
+          "customSentences": "50 custom flashcards per month",
+          "courses": "Up to 2 courses",
+          "chatMessages": "40 chat messages per month"
         }
       },
       "pro": {
         "name": "Pro",
         "description": "Maximum learning power",
-        "price": "€19",
+        "price": "€18",
         "period": "per month",
         "cta": "Start Free Trial",
         "features": {
-          "reviews": "Unlimited reviews per month",
-          "flashcards": "500 custom flashcards per month",
-          "languages": "Unlimited languages",
-          "aiQuestions": "500 AI Questions per month",
-          "priority": "Priority Access to new features"
+          "sentences": "1000 sentences per month",
+          "customSentences": "200 custom flashcards per month",
+          "courses": "Up to 5 courses",
+          "chatMessages": "100 chat messages per month",
+          "multipleLanguages": "Multiple languages per course"
         }
       }
     }
