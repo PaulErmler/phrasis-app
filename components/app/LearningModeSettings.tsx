@@ -211,6 +211,20 @@ export function LearningModeSettings({
     });
   };
 
+  const handleInstantProceedChange = async (checked: boolean) => {
+    if (reviewMode === 'full') {
+      await updateSettings({
+        courseId: courseSettings.courseId,
+        instantProceedFull: checked,
+      });
+    } else {
+      await updateSettings({
+        courseId: courseSettings.courseId,
+        instantProceedAudio: checked,
+      });
+    }
+  };
+
   // ---- resolved values (with defaults) ----
 
   const reviewMode = courseSettings.reviewMode ?? 'audio';
@@ -224,6 +238,9 @@ export function LearningModeSettings({
   const pauseT2T =
     courseSettings.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
   const autoAdvance = courseSettings.autoAdvance ?? DEFAULT_AUTO_ADVANCE;
+  const instantProceed = reviewMode === 'full'
+    ? (courseSettings.instantProceedFull ?? true)
+    : (courseSettings.instantProceedAudio ?? false);
 
   // ---- reorder helpers (persist to backend) ----
 
@@ -397,6 +414,22 @@ export function LearningModeSettings({
               />
             </div>
           )}
+
+          {/* Instant proceed on rating — both modes */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="instantProceed" className="text-sm font-medium">
+                {t('instantProceed')}
+              </Label>
+              <p className="text-muted-xs">{t('instantProceedDescription')}</p>
+            </div>
+            <Switch
+              id="instantProceed"
+              checked={instantProceed}
+              onCheckedChange={handleInstantProceedChange}
+              className="mt-0.5"
+            />
+          </div>
 
           <Separator />
 

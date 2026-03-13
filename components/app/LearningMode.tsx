@@ -96,6 +96,9 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   }
 
   const reviewMode = state.courseSettings.reviewMode ?? 'audio';
+  const instantProceed = reviewMode === 'full'
+    ? (state.courseSettings.instantProceedFull ?? true)
+    : (state.courseSettings.instantProceedAudio ?? false);
 
   const cardContent =
     reviewMode === 'full' ? (
@@ -168,6 +171,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         onNext={state.handleNext}
         isReviewing={state.isReviewing}
         showProgressBar={state.courseSettings.showProgressBar ?? false}
+        instantProceed={instantProceed}
       />
 
       <LearningModeSettings

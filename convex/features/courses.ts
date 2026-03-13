@@ -554,6 +554,8 @@ export const updateCourseSettings = mutation({
     autoRevealLanguages: v.optional(v.boolean()),
     baseLanguageOrder: v.optional(v.array(v.string())),
     targetLanguageOrder: v.optional(v.array(v.string())),
+    instantProceedAudio: v.optional(v.boolean()),
+    instantProceedFull: v.optional(v.boolean()),
     reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))),
     fullReviewTargetAudioMode: v.optional(
       v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
@@ -590,6 +592,8 @@ export const updateCourseSettings = mutation({
       'autoRevealLanguages',
       'baseLanguageOrder',
       'targetLanguageOrder',
+      'instantProceedAudio',
+      'instantProceedFull',
       'reviewMode',
       'fullReviewTargetAudioMode',
     ] as const;
@@ -623,6 +627,8 @@ export const updateCourseSettings = mutation({
         autoRevealLanguages: args.autoRevealLanguages,
         baseLanguageOrder: args.baseLanguageOrder,
         targetLanguageOrder: args.targetLanguageOrder,
+        instantProceedAudio: args.instantProceedAudio,
+        instantProceedFull: args.instantProceedFull,
         reviewMode: args.reviewMode,
         fullReviewTargetAudioMode: args.fullReviewTargetAudioMode,
       });

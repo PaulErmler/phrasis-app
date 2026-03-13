@@ -254,6 +254,8 @@
     },
     "submitAnswer": "Submit",
     "accuracy": "Accuracy",
+    "showSentence": "Show sentence",
+    "showCorrections": "Show corrections",
     "typeTranslation": "Type the translation...",
     "empty": {
       "noCardsDue": "No cards due for review",
@@ -316,7 +318,9 @@
       "fullReviewTargetAudio": "Auto-play target audio",
       "fullReviewTargetAudioDescription": "When to play target language audio",
       "fullReviewTargetAudio_always": "After base audio",
-      "fullReviewTargetAudio_afterSubmit": "After submitting text"
+      "fullReviewTargetAudio_afterSubmit": "After submitting text",
+      "instantProceed": "Instant proceed on rating",
+      "instantProceedDescription": "Advance to the next card immediately when a rating button is clicked"
     }
   },
   "Footer": {
@@ -348,10 +352,9 @@
     "emptyBullet2": "The chat knows the card you are currently learning.",
     "emptyBullet3": "It can create flashcards for you — you just confirm them.",
     "suggestions": {
-      "explain": "Explain this sentence to me.",
-      "meaning": "What does this word mean?",
-      "example": "Give me a similar example.",
-      "conversation": "How would I use this in a conversation?"
+      "grammar": "Explain me the grammar of this sentence word by word.",
+      "simpler": "How can I say this simpler?",
+      "moreCards": "Create more cards using these verbs."
     },
     "voice": {
       "startRecording": "Start recording",

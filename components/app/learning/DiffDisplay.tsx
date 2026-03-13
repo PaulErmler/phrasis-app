@@ -8,6 +8,7 @@ interface DiffDisplayProps {
   expected: string;
   actual: string;
   hideAccuracy?: boolean;
+  hideErrors?: boolean;
 }
 
 function computeAccuracy(expected: string, actual: string): number {
@@ -29,7 +30,7 @@ function computeAccuracy(expected: string, actual: string): number {
   return Math.round((matchingChars / totalChars) * 100);
 }
 
-export function DiffDisplay({ expected, actual, hideAccuracy = false }: DiffDisplayProps) {
+export function DiffDisplay({ expected, actual, hideAccuracy = false, hideErrors = false }: DiffDisplayProps) {
   const t = useTranslations('LearningMode');
 
   const { changes, accuracy } = useMemo(() => {
@@ -39,10 +40,11 @@ export function DiffDisplay({ expected, actual, hideAccuracy = false }: DiffDisp
   }, [expected, actual]);
 
   return (
-    <div className="space-y-2">
+    <div>
       <p className="leading-relaxed">
         {changes.map((change, i) => {
           if (change.added) {
+            if (hideErrors) return null;
             return (
               <span
                 key={i}
@@ -56,24 +58,22 @@ export function DiffDisplay({ expected, actual, hideAccuracy = false }: DiffDisp
             return (
               <span
                 key={i}
-                className="bg-muted text-muted-foreground rounded-sm px-0.5"
+                className={hideErrors ? 'text-foreground' : 'text-foreground bg-muted rounded-sm px-0.5'}
               >
                 {change.value}
               </span>
             );
           }
           return (
-            <span key={i} className="text-success">
+            <span key={i} className={hideErrors ? 'text-foreground' : 'bg-success/15 text-success rounded-sm px-0.5'}>
               {change.value}
             </span>
           );
         })}
       </p>
-      {!hideAccuracy && (
-        <p className="text-muted-xs">
-          {t('accuracy')}: {accuracy}%
-        </p>
-      )}
+      <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
+        {t('accuracy')}: {accuracy}%
+      </p>
     </div>
   );
 }

@@ -137,7 +137,9 @@ export function CardApproval({
     return (
       <Alert className="my-3 flex flex-col gap-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
         <AlertDescription>{cardContent}</AlertDescription>
-        <p className="text-xs font-medium text-success">{t('approved')}</p>
+        <div className="flex items-center justify-end gap-2 h-8">
+          <p className="text-xs font-medium text-success">{t('approved')}</p>
+        </div>
       </Alert>
     );
   }
@@ -146,7 +148,9 @@ export function CardApproval({
     return (
       <Alert className="my-3 flex flex-col gap-3 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
         <AlertDescription>{cardContent}</AlertDescription>
-        <p className="text-xs font-medium text-red-700 dark:text-red-300">{t('rejected')}</p>
+        <div className="flex items-center justify-end gap-2 h-8">
+          <p className="text-xs font-medium text-red-700 dark:text-red-300">{t('rejected')}</p>
+        </div>
       </Alert>
     );
   }

@@ -4,7 +4,12 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check } from 'lucide-react';
+import { Check, FileText } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from '@/components/ui/tooltip';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import { DiffDisplay } from './DiffDisplay';
@@ -73,7 +78,10 @@ export function FullReviewCardContent({
   }
 
   useEffect(() => {
-    firstInputRef.current?.focus();
+    const raf = requestAnimationFrame(() => {
+      firstInputRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(raf);
   }, [translationKey]);
 
   const handleInputChange = useCallback((language: string, text: string) => {
@@ -179,6 +187,8 @@ function TargetLanguageInput({
   inputRef,
   autoFocus,
 }: TargetLanguageInputProps) {
+  const t = useTranslations('LearningMode');
+  const [showClean, setShowClean] = useState(false);
   const autoPlayAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -222,6 +232,8 @@ function TargetLanguageInput({
     ? getLocalizedLanguageNameByCode(translation.language, locale)
     : null;
 
+  const hasUserText = !!state.userText.trim();
+
   if (state.submitted) {
     return (
       <div className="space-y-1">
@@ -245,11 +257,34 @@ function TargetLanguageInput({
             />
           </div>
         )}
-        <DiffDisplay
-          expected={translation.text}
-          actual={state.userText}
-          hideAccuracy={!state.userText.trim()}
-        />
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <DiffDisplay
+              expected={translation.text}
+              actual={state.userText}
+              hideAccuracy={!hasUserText}
+              hideErrors={showClean}
+            />
+          </div>
+          {hasUserText && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowClean((v) => !v)}
+                  className={`h-9 w-9 shrink-0 ${showClean ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
+                  aria-label={showClean ? t('showCorrections') : t('showSentence')}
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {showClean ? t('showCorrections') : t('showSentence')}
+              </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
       </div>
     );
   }

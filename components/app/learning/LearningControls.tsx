@@ -23,6 +23,7 @@ interface LearningControlsProps {
   onNext: () => void;
   isReviewing: boolean;
   showProgressBar?: boolean;
+  instantProceed?: boolean;
 }
 
 export function LearningControls({
@@ -40,6 +41,7 @@ export function LearningControls({
   onNext,
   isReviewing,
   showProgressBar = false,
+  instantProceed = false,
 }: LearningControlsProps) {
   const t = useTranslations('LearningMode');
   const { openChat } = useLearningChatToggle();
@@ -84,7 +86,10 @@ export function LearningControls({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onSelectRating(rating)}
+                onClick={() => {
+                  onSelectRating(rating);
+                  if (instantProceed) onNext();
+                }}
                 className={`w-full ${
                   activeRating === rating
                     ? 'ring-2 ring-primary border-primary bg-primary/5'

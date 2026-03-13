@@ -43,6 +43,9 @@ export interface CourseSettings {
   showProgressBar?: boolean;
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
+  // Instant proceed on rating
+  instantProceedAudio?: boolean;
+  instantProceedFull?: boolean;
   // Review mode
   reviewMode?: 'audio' | 'full';
   fullReviewTargetAudioMode?: 'always' | 'afterSubmit' | 'never';

@@ -38,10 +38,9 @@ function WrappedChatPanel({
 
   const suggestions = useMemo(
     () => [
-      t('suggestions.explain'),
-      t('suggestions.meaning'),
-      t('suggestions.example'),
-      t('suggestions.conversation'),
+      t('suggestions.grammar'),
+      t('suggestions.simpler'),
+      t('suggestions.moreCards'),
     ],
     [t],
   );

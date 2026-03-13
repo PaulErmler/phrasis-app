@@ -105,6 +105,9 @@ export default defineSchema({
     // Language order overrides
     baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
     targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
+    // Instant proceed on rating (per mode)
+    instantProceedAudio: v.optional(v.boolean()), // auto-advance when rating is clicked (audio mode, default false)
+    instantProceedFull: v.optional(v.boolean()), // auto-advance when rating is clicked (full mode, default true)
     // Review mode
     reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
     fullReviewTargetAudioMode: v.optional(

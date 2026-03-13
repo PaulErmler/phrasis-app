@@ -254,6 +254,8 @@
     },
     "submitAnswer": "Absenden",
     "accuracy": "Genauigkeit",
+    "showSentence": "Satz anzeigen",
+    "showCorrections": "Korrekturen anzeigen",
     "typeTranslation": "Übersetzung eingeben...",
     "empty": {
       "noCardsDue": "Keine Karten zur Wiederholung fällig",
@@ -316,7 +318,9 @@
       "fullReviewTargetAudio": "Zielsprache automatisch abspielen",
       "fullReviewTargetAudioDescription": "Wann soll das Audio der Zielsprache abgespielt werden",
       "fullReviewTargetAudio_always": "Nach Basis-Audio",
-      "fullReviewTargetAudio_afterSubmit": "Nach dem Absenden"
+      "fullReviewTargetAudio_afterSubmit": "Nach dem Absenden",
+      "instantProceed": "Sofort weiter bei Bewertung",
+      "instantProceedDescription": "Zur nächsten Karte wechseln, sobald eine Bewertung angeklickt wird"
     }
   },
   "Footer": {
@@ -348,10 +352,9 @@
     "emptyBullet2": "Der Chat kennt die Karte, die du gerade lernst.",
     "emptyBullet3": "Er kann Lernkarten für dich erstellen — du bestätigst sie einfach.",
     "suggestions": {
-      "explain": "Erkläre mir diesen Satz.",
-      "meaning": "Was bedeutet dieses Wort?",
-      "example": "Gib mir ein ähnliches Beispiel.",
-      "conversation": "Wie würde ich das in einem Gespräch verwenden?"
+      "grammar": "Erkläre mir die Grammatik dieses Satzes Wort für Wort.",
+      "simpler": "Wie kann ich das einfacher sagen?",
+      "moreCards": "Erstelle mehr Karten mit diesen Verben."
     },
     "voice": {
       "startRecording": "Aufnahme starten",
