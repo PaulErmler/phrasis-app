@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Authenticated } from 'convex/react';
 import { LearningMode } from '@/components/app/LearningMode';
@@ -18,21 +18,19 @@ import {
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
 import { useCardApprovals } from '@/hooks/use-card-approvals';
-import type { CardContext } from '@/hooks/use-send-message';
 import { useThread } from '@/hooks/use-thread';
 import { Loader } from '@/components/ai-elements/loader';
 import { useAppData } from '@/components/app/AppDataProvider';
+import type { Id } from '@/convex/_generated/dataModel';
 
 function WrappedChatPanel({
   threadId,
-  cardContext,
+  cardId,
   onMessageSent,
-  targetLanguages,
 }: {
   threadId: string;
-  cardContext?: CardContext;
+  cardId?: Id<'cards'>;
   onMessageSent?: () => void;
-  targetLanguages: string[];
 }) {
   const { closeChat } = useLearningChatToggle();
   const approvals = useCardApprovals(threadId);
@@ -50,16 +48,16 @@ function WrappedChatPanel({
 
   const toolRenderers = useMemo(
     () => ({
-      createCard: createCardToolRenderer({ ...approvals, targetLanguages }),
+      createCard: createCardToolRenderer(approvals),
     }),
-    [approvals, targetLanguages],
+    [approvals],
   );
 
   return (
     <ChatPanel
       threadId={threadId}
       toolRenderers={toolRenderers}
-      cardContext={cardContext}
+      cardId={cardId}
       onMessageSent={onMessageSent}
       suggestions={suggestions}
       showSuggestions
@@ -81,20 +79,19 @@ function WrappedChatPanel({
 
 interface LearnViewProps {
   onBack: () => void;
+  prefetchedThreadId?: string;
 }
 
-export function LearnView({ onBack }: LearnViewProps) {
+export function LearnView({ onBack, prefetchedThreadId }: LearnViewProps) {
   return (
     <Authenticated>
-      <LearnViewInner onBack={onBack} />
+      <LearnViewInner onBack={onBack} prefetchedThreadId={prefetchedThreadId} />
     </Authenticated>
   );
 }
 
-function LearnViewInner({ onBack }: LearnViewProps) {
+function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
   const { preloadedCourseSettings, preloadedActiveCourse } = useAppData();
-
-  const [isNavigating, setIsNavigating] = useState(false);
 
   const state = useLearningMode({
     courseSettings: preloadedCourseSettings,
@@ -104,12 +101,12 @@ function LearnViewInner({ onBack }: LearnViewProps) {
 
   const goHome = useCallback(() => {
     audio.pause();
-    setIsNavigating(true);
     onBack();
   }, [audio, onBack]);
 
   const { threadId, isLoading: isThreadLoading, createThread } = useThread({
-    autoCreate: true,
+    threadId: prefetchedThreadId,
+    autoCreate: !prefetchedThreadId,
   });
 
   const threadHasMessagesRef = useRef(false);
@@ -143,29 +140,13 @@ function LearnViewInner({ onBack }: LearnViewProps) {
     audio.pause();
   }, [audio]);
 
-  const cardContext: CardContext | undefined = useMemo(() => {
-    if (state.status !== 'reviewing') return undefined;
-    return {
-      sourceText: state.sourceText,
-      sourceLanguage: state.sourceLanguage,
-      translations: state.translations.map((t) => ({
-        language: t.language,
-        text: t.text,
-      })),
-      baseLanguages: state.baseLanguages,
-      targetLanguages: state.targetLanguages,
-    };
-  }, [state]);
-
-  const targetLanguages =
-    state.status !== 'loading' ? state.targetLanguages : [];
+  const cardId = state.status === 'reviewing' ? state.cardId : undefined;
 
   const chatPanel = threadId ? (
     <WrappedChatPanel
       threadId={threadId}
-      cardContext={cardContext}
+      cardId={cardId}
       onMessageSent={handleMessageSent}
-      targetLanguages={targetLanguages}
     />
   ) : isThreadLoading ? (
     <div className="flex-1 flex items-center justify-center">
@@ -177,7 +158,6 @@ function LearnViewInner({ onBack }: LearnViewProps) {
     <LearningHeader
       onBack={goHome}
       onSettingsOpen={openSettings}
-      isNavigating={isNavigating}
     />
   );
 

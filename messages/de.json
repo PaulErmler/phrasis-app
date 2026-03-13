@@ -70,6 +70,21 @@
       "empty": "Noch keine Zahlen generiert."
     },
     "contentSoon": "Demnächst: Entdecke neue Phrasen und auf dich zugeschnittene Inhalte.",
+    "content": {
+      "chat": {
+        "title": "Chat",
+        "description": "Lass einen Chatbot Lernkarten für dich erstellen"
+      },
+      "fileUpload": {
+        "title": "Datei hochladen",
+        "description": "Lade Dokumente hoch, um Lernkarten aus deinen eigenen Inhalten zu erstellen"
+      },
+      "enterTexts": {
+        "title": "Eigene Texte eingeben",
+        "description": "Tippe oder füge Sätze ein, um eigene Lernkarten zu erstellen"
+      },
+      "comingSoon": "Demnächst"
+    },
     "librarySoon": "Demnächst: Verwalte und organisiere deine gespeicherten Phrasen.",
     "library": {
       "title": "Bibliothek",
@@ -151,7 +166,8 @@
       "description": "Wähle einen Kurs zum Wechseln oder erstelle einen neuen",
       "createNew": "Neuen Kurs erstellen",
       "noCourses": "Noch keine Kurse. Erstelle deinen ersten Kurs, um zu beginnen.",
-      "active": "Aktiv",
+      "select": "Auswählen",
+      "selected": "Ausgewählt",
       "learning": "{language} lernen",
       "currentCourse": "Aktueller Kurs",
       "from": "von {language}",
@@ -176,11 +192,29 @@
         "back": "Zurück",
         "next": "Weiter",
         "create": "Kurs erstellen"
+      },
+      "manage": {
+        "title": "Kurseinstellungen",
+        "targetLanguages": "Zielsprachen",
+        "baseLanguages": "Basissprachen",
+        "addLanguage": "Sprache hinzufügen",
+        "noMoreAvailable": "Keine weiteren Sprachen verfügbar",
+        "infoText": "Ziehe Sprachen per Drag-and-Drop, um sie neu anzuordnen. Einmal gespeichert, können Sprachen nicht entfernt werden. Du kannst bis zu {max} Sprachen insgesamt hinzufügen.",
+        "saveChanges": "Änderungen speichern",
+        "confirmTitle": "Änderungen bestätigen",
+        "confirmAdding": "{languages} hinzufügen. Dies kann nicht rückgängig gemacht werden.",
+        "confirmButton": "Bestätigen",
+        "cancelButton": "Abbrechen",
+        "warningBoth": "Du benötigst mindestens eine Basissprache und eine Zielsprache.",
+        "warningBase": "Du benötigst mindestens eine Basissprache.",
+        "warningTarget": "Du benötigst mindestens eine Zielsprache."
       }
     },
     "changeCourse": "Kurs wechseln",
     "currentCourseWithLanguages": "Kurs: {targetLanguages}",
     "startLearning": "Lernen starten",
+    "fullReview": "Voll-Übung",
+    "audioReview": "Audio-Übung",
     "stats": {
       "streak": "Serie",
       "reps": "Wiederholungen",
@@ -273,6 +307,8 @@
       "pauseBetweenPlays": "{seconds}s dazwischen",
       "reviewModeAudio": "Audio",
       "reviewModeFull": "Vollständig",
+      "reviewModeAudioDescription": "Höre dir die Audio-Wiedergabe deiner Phrasen an. Kein Blick auf den Bildschirm nötig, Karten werden automatisch bewertet. Ideal zum Lernen unterwegs — beim Spazieren, Pendeln oder Entspannen.",
+      "reviewModeFullDescription": "Tippe die Übersetzungen ein und sieh einen zeichengenauen Vergleich mit der richtigen Antwort. Ideal für aktives Üben — fördert Erinnerung und Rechtschreibung.",
       "fullReviewSettings": "Vollständige Wiederholung",
       "fullReviewTargetAudio": "Zielsprache automatisch abspielen",
       "fullReviewTargetAudioDescription": "Wann soll das Audio der Zielsprache abgespielt werden",
@@ -406,13 +442,31 @@
         "description": "Ich möchte meine Inhalte und Einstellung auf mich anpassen"
       }
     },
+    "reviewMode": {
+      "title": "Wie möchtest du üben?",
+      "full": {
+        "title": "Voll-Übung",
+        "description": "Übe das Schreiben, indem du Übersetzungen eintippst. Ideal für aktives Üben am Bildschirm."
+      },
+      "audio": {
+        "title": "Audio-Übung",
+        "description": "Übe Hören und Sprechen mit Audio-Wiedergabe. Kein Blick auf den Bildschirm nötig. Ideal für unterwegs — beim Spazieren, Pendeln oder Entspannen."
+      }
+    },
     "step2": {
       "title": "Welche Sprache möchtest du lernen?",
-      "subtitle": "Wähle eine Sprache"
+      "titleMulti": "Welche Sprachen möchtest du lernen?",
+      "subtitle": "Wähle eine Sprache",
+      "subtitleMulti": "Wähle bis zu {max} Zielsprachen ({count}/{max})",
+      "addAnother": "Weitere Sprache hinzufügen",
+      "primaryHint": "Die erste Sprache ist deine Hauptlernsprache",
+      "primary": "Primär"
     },
     "step3": {
       "title": "Von welcher Sprache aus möchtest du lernen?",
-      "subtitle": "Wähle deine Ausgangssprache"
+      "titleMulti": "Von welchen Sprachen aus möchtest du lernen?",
+      "subtitle": "Wähle deine Ausgangssprache",
+      "subtitleMulti": "Wähle bis zu {max} Basissprachen ({count}/{max})"
     },
     "step4": {
       "title": "Was ist dein aktuelles Niveau?",

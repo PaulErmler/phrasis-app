@@ -92,6 +92,7 @@ interface ReviewingState extends BaseState {
   setSelectedRating: (rating: ReviewRating) => void;
   // Status flags
   isReviewing: boolean;
+  isExiting: boolean;
   // Cross-tab audio coordination
   getReviewInitiatedByThisTab: () => boolean;
   resetReviewFlag: () => void;
@@ -159,6 +160,7 @@ export function useLearningMode(
   );
   const [isPendingMaster, setIsPendingMaster] = useState(false);
   const [isPendingHide, setIsPendingHide] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
 
   // Track cards we've already ensured content for
   const ensuredCardsRef = useRef<Set<string>>(new Set());
@@ -234,11 +236,12 @@ export function useLearningMode(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cardForReview, courseSettings?.autoAddCards, settingsOpen]);
 
-  // Reset selectedRating, pending master/hide state, and card timer when card changes
+  // Reset selectedRating, pending master/hide state, exit flag, and card timer when card changes
   useEffect(() => {
     setSelectedRating(null);
     setIsPendingMaster(false);
     setIsPendingHide(false);
+    setIsExiting(false);
     cardShownAtRef.current = Date.now();
   }, [cardForReview?._id]);
 
@@ -251,6 +254,7 @@ export function useLearningMode(
     async (rating: ReviewRating) => {
       if (!cardForReview || isReviewing) return;
       reviewInitiatedByThisTabRef.current = true;
+      setIsExiting(true);
       setIsReviewing(true);
       try {
         await reviewCardMutation({
@@ -264,6 +268,7 @@ export function useLearningMode(
         setSelectedRating(null);
       } catch (error) {
         console.error('Failed to review card:', error);
+        setIsExiting(false);
       } finally {
         setIsReviewing(false);
       }
@@ -297,11 +302,13 @@ export function useLearningMode(
     if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
       reviewInitiatedByThisTabRef.current = true;
+      setIsExiting(true);
       setIsReviewing(true);
       try {
         await masterCardMutation({ cardId: cardForReview._id });
       } catch (error) {
         console.error('Failed to master card:', error);
+        setIsExiting(false);
       } finally {
         setIsReviewing(false);
       }
@@ -309,11 +316,13 @@ export function useLearningMode(
     }
     if (isPendingHide) {
       reviewInitiatedByThisTabRef.current = true;
+      setIsExiting(true);
       setIsReviewing(true);
       try {
         await hideCardMutation({ cardId: cardForReview._id });
       } catch (error) {
         console.error('Failed to hide card:', error);
+        setIsExiting(false);
       } finally {
         setIsReviewing(false);
       }
@@ -457,6 +466,7 @@ export function useLearningMode(
     handleNext,
     setSelectedRating,
     isReviewing,
+    isExiting,
     getReviewInitiatedByThisTab,
     resetReviewFlag,
   };

@@ -1,7 +1,7 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query, internalMutation } from '../../_generated/server';
 import { internal } from '../../_generated/api';
-import { getAuthUser } from '../../db/users';
+import { getAuthUserId } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
 import {
   getOrCreateChatCollection,
@@ -24,11 +24,11 @@ const MAX_MAIN_TEXT_LENGTH = 300;
 async function getAuthenticatedPendingApproval(
   ctx: MutationCtx,
   approvalId: Id<'cardApprovals'>,
-  user: { _id: string },
+  userId: string,
 ): Promise<Doc<'cardApprovals'>> {
   const approval = await ctx.db.get(approvalId);
   if (!approval) throw new ConvexError('Approval not found');
-  if (approval.userId !== user._id) throw new ConvexError('Not authorized');
+  if (approval.userId !== userId) throw new ConvexError('Not authorized');
   if (approval.status !== 'pending')
     throw new ConvexError('Approval already processed');
   return approval;
@@ -42,9 +42,9 @@ async function getAuthenticatedPendingApproval(
 async function processApproval(
   ctx: MutationCtx,
   approval: Doc<'cardApprovals'>,
-  user: { _id: string },
+  userId: string,
 ): Promise<Id<'texts'>> {
-  const active = await getActiveCourseForUser(ctx, user._id);
+  const active = await getActiveCourseForUser(ctx, userId);
   if (!active) throw new ConvexError('No active course found');
   const { course } = active;
 
@@ -59,7 +59,7 @@ async function processApproval(
     text: mainText,
     language: mainEntry.language,
     userCreated: true,
-    userId: user._id,
+    userId,
     collectionId: chatCollection._id,
     collectionRank: nextRank,
   });
@@ -168,16 +168,16 @@ export const approveCard = mutation({
     textId: v.optional(v.id('texts')),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError('Not authenticated');
-    await useQuota(ctx, user._id, FEATURE_IDS.CUSTOM_SENTENCES, 1);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError('Not authenticated');
+    await useQuota(ctx, userId, FEATURE_IDS.CUSTOM_SENTENCES, 1);
 
     const approval = await getAuthenticatedPendingApproval(
       ctx,
       args.approvalId,
-      user,
+      userId,
     );
-    const textId = await processApproval(ctx, approval, user);
+    const textId = await processApproval(ctx, approval, userId);
     return { success: true, textId };
   },
 });
@@ -191,10 +191,10 @@ export const rejectCard = mutation({
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) throw new ConvexError('Not authenticated');
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError('Not authenticated');
 
-    await getAuthenticatedPendingApproval(ctx, args.approvalId, user);
+    await getAuthenticatedPendingApproval(ctx, args.approvalId, userId);
 
     await ctx.db.patch(args.approvalId, {
       status: 'rejected',
@@ -221,13 +221,13 @@ export const getApprovalsByThread = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
     const approvals = await ctx.db
       .query('cardApprovals')
       .withIndex('by_thread_and_user', (q) =>
-        q.eq('threadId', args.threadId).eq('userId', user._id),
+        q.eq('threadId', args.threadId).eq('userId', userId),
       )
       .collect();
 

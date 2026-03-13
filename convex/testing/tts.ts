@@ -13,7 +13,7 @@ import {
   MAX_TTS_SPEED,
 } from '../../lib/constants/tts';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
-import { getAuthUser, requireAuthUser } from '../db/users';
+import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { Id } from '../_generated/dataModel';
 import { synthesizeSpeech } from '../features/tts';
 
@@ -37,7 +37,7 @@ export const requestTTS = mutation({
   },
   returns: v.id('ttsRequests'),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
+    const userId = await requireAuthUserId(ctx);
 
     const text = args.text.trim();
     if (!text) throw new ConvexError('Text cannot be empty');
@@ -56,7 +56,7 @@ export const requestTTS = mutation({
     }
 
     const requestId = await ctx.db.insert('ttsRequests', {
-      userId: user._id,
+      userId,
       text,
       voiceName: args.voiceName,
       speed: args.speed,
@@ -101,11 +101,11 @@ export const getTTSRequest = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return null;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
 
     const request = await ctx.db.get(args.requestId);
-    if (!request || request.userId !== user._id) return null;
+    if (!request || request.userId !== userId) return null;
 
     const audioUrl = request.storageId
       ? await ctx.storage.getUrl(request.storageId)

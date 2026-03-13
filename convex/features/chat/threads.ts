@@ -2,7 +2,7 @@ import { v, ConvexError } from 'convex/values';
 import { mutation, query } from '../../_generated/server';
 import { createThread as createAgentThread, listMessages } from '@convex-dev/agent';
 import { components } from '../../_generated/api';
-import { getAuthUser, requireAuthUser } from '../../db/users';
+import { getAuthUserId, requireAuthUserId } from '../../db/users';
 
 const agentComponent = components.agent;
 
@@ -15,10 +15,10 @@ export const createThread = mutation({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
+    const userId = await requireAuthUserId(ctx);
 
     const threadId = await createAgentThread(ctx, agentComponent, {
-      userId: user._id,
+      userId,
       title: args.title || 'New Chat',
     });
 
@@ -42,13 +42,13 @@ export const listThreads = query({
     }),
   ),
   handler: async (ctx) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
     const threads = await ctx.runQuery(
       agentComponent.threads.listThreadsByUserId,
       {
-        userId: user._id,
+        userId,
         paginationOpts: { cursor: null, numItems: 100 },
       },
     );
@@ -65,12 +65,12 @@ export const getOrCreateEmptyThread = mutation({
   args: {},
   returns: v.string(),
   handler: async (ctx) => {
-    const user = await requireAuthUser(ctx);
+    const userId = await requireAuthUserId(ctx);
 
     const threads = await ctx.runQuery(
       agentComponent.threads.listThreadsByUserId,
       {
-        userId: user._id,
+        userId,
         order: 'desc',
         paginationOpts: { cursor: null, numItems: 1 },
       },
@@ -88,7 +88,7 @@ export const getOrCreateEmptyThread = mutation({
     }
 
     const threadId = await createAgentThread(ctx, agentComponent, {
-      userId: user._id,
+      userId,
       title: 'New Chat',
     });
 
@@ -115,14 +115,14 @@ export const getThread = query({
     v.null(),
   ),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return null;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
 
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {
       threadId: args.threadId,
     });
 
-    if (thread?.userId !== user._id) return null;
+    if (thread?.userId !== userId) return null;
     return thread;
   },
 });

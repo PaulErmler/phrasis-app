@@ -205,6 +205,8 @@ export function ChatMessages({
 }: ChatMessagesProps) {
   const t = useTranslations('Chat');
 
+  const visibleMessages = messages?.filter((m) => m.role !== 'system') ?? [];
+
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -217,9 +219,9 @@ export function ChatMessages({
     <div className="relative flex-1 h-full w-full flex flex-col overflow-hidden">
       <Conversation className="flex-1 h-full w-full">
         <ConversationContent className={`px-4 ${contentClassName ?? ''}`}>
-          {messages && messages.length > 0 ? (
+          {visibleMessages.length > 0 ? (
             <>
-              {messages.map((message: ExtendedUIMessage) => {
+              {visibleMessages.map((message: ExtendedUIMessage) => {
                 const messageText = message.content ?? message.text ?? '';
                 const isAssistantStreaming =
                   message.role === 'assistant' &&

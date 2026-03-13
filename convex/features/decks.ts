@@ -13,7 +13,7 @@ import {
   getCourseSettings,
   setActiveCollectionOnSettings,
 } from '../db/courseSettings';
-import { getAuthUser, requireAuthUser, getUserSettings } from '../db/users';
+import { getAuthUserId, requireAuthUserId, getUserSettings } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
@@ -194,10 +194,10 @@ export const getDeckCards = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
-    const active = await getActiveCourseForUser(ctx, user._id);
+    const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return [];
     const { course } = active;
 
@@ -274,10 +274,10 @@ export const getCollectionProgress = query({
     }),
   ),
   handler: async (ctx) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
-    const settings = await getUserSettings(ctx, user._id);
+    const settings = await getUserSettings(ctx, userId);
     if (!settings?.activeCourseId) return [];
 
     const courseId = settings.activeCourseId;
@@ -293,7 +293,7 @@ export const getCollectionProgress = query({
       collections.map(async (collection) => {
         const progress = await getCollectionProgressHelper(
           ctx,
-          user._id,
+          userId,
           courseId,
           collection._id,
         );
@@ -328,10 +328,10 @@ export const getCustomCollectionsProgress = query({
     }),
   ),
   handler: async (ctx) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
-    const settings = await getUserSettings(ctx, user._id);
+    const settings = await getUserSettings(ctx, userId);
     if (!settings?.activeCourseId) return [];
 
     const courseId = settings.activeCourseId;
@@ -352,7 +352,7 @@ export const getCustomCollectionsProgress = query({
 
         const progress = await getCollectionProgressHelper(
           ctx,
-          user._id,
+          userId,
           courseId,
           collectionId,
         );
@@ -389,10 +389,10 @@ export const getNextTextsFromCollection = query({
     }),
   ),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
 
-    const settings = await getUserSettings(ctx, user._id);
+    const settings = await getUserSettings(ctx, userId);
     if (!settings?.activeCourseId) return [];
 
     const courseId = settings.activeCourseId;
@@ -400,7 +400,7 @@ export const getNextTextsFromCollection = query({
 
     const progress = await getCollectionProgressHelper(
       ctx,
-      user._id,
+      userId,
       courseId,
       args.collectionId,
     );
@@ -434,7 +434,7 @@ export const setActiveCollection = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { user, course } = await requireActiveCourse(ctx);
+    const { userId, course } = await requireActiveCourse(ctx);
     const courseId = course._id;
 
     // Validate collection exists
@@ -443,7 +443,7 @@ export const setActiveCollection = mutation({
 
     const progress = await getCollectionProgressHelper(
       ctx,
-      user._id,
+      userId,
       courseId,
       args.collectionId,
     );
@@ -597,7 +597,7 @@ export const addCardsFromCollection = mutation({
     totalCardsInDeck: v.number(),
   }),
   handler: async (ctx, args) => {
-    const { user, settings, course } = await requireActiveCourse(ctx);
+    const { userId, settings, course } = await requireActiveCourse(ctx);
     const courseId = course._id;
 
     const clampedBatchSize = Math.max(1, Math.min(5, Math.floor(args.batchSize)));
@@ -634,7 +634,7 @@ export const addCardsFromCollection = mutation({
       for (const collId of selectedCustomIds) {
         const coll = await ctx.db.get(collId);
         if (!coll) continue;
-        const prog = await getCollectionProgressHelper(ctx, user._id, courseId, collId);
+        const prog = await getCollectionProgressHelper(ctx, userId, courseId, collId);
         const lastRank = prog?.lastRankProcessed ?? 0;
         const cardsAdded = prog?.cardsAdded ?? 0;
         const pending = coll.textCount - cardsAdded;
@@ -681,7 +681,7 @@ export const addCardsFromCollection = mutation({
           remainingBatch -= texts.length;
 
           await updateCollectionProgress(
-            ctx, user._id, courseId, entry.id, texts.length, newLastRank,
+            ctx, userId, courseId, entry.id, texts.length, newLastRank,
           );
 
           for (const text of texts) {
@@ -697,7 +697,7 @@ export const addCardsFromCollection = mutation({
     // --- Phase 2: Fill remaining batch from the difficulty collection ---
     if (remainingBatch > 0) {
       // Deduct sentences quota for difficulty-collection cards
-      const quota = await checkQuota(ctx, user._id, FEATURE_IDS.SENTENCES, remainingBatch);
+      const quota = await checkQuota(ctx, userId, FEATURE_IDS.SENTENCES, remainingBatch);
       if (quota.synced && !quota.allowed) {
         // Clamp to whatever balance is left
         if (quota.balance > 0) {
@@ -716,7 +716,7 @@ export const addCardsFromCollection = mutation({
 
       const progress = await getCollectionProgressHelper(
         ctx,
-        user._id,
+        userId,
         courseId,
         args.collectionId,
       );
@@ -732,7 +732,7 @@ export const addCardsFromCollection = mutation({
       );
 
       if (textsToAdd.length > 0) {
-        await useQuota(ctx, user._id, FEATURE_IDS.SENTENCES, textsToAdd.length);
+        await useQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
 
         const { cardsInserted, newLastRank } = await createCardsFromTexts(
           ctx,
@@ -747,7 +747,7 @@ export const addCardsFromCollection = mutation({
 
         await updateCollectionProgress(
           ctx,
-          user._id,
+          userId,
           courseId,
           args.collectionId,
           textsToAdd.length,
@@ -810,7 +810,7 @@ export const addCardsFromCollection = mutation({
 
                 const prog = await getCollectionProgressHelper(
                   ctx,
-                  user._id,
+                  userId,
                   courseId,
                   coll._id,
                 );
@@ -853,9 +853,9 @@ export const ensureCardContent = mutation({
     audioScheduled: v.number(),
   }),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
+    const userId = await requireAuthUserId(ctx);
 
-    const active = await getActiveCourseForUser(ctx, user._id);
+    const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return { translationsScheduled: 0, audioScheduled: 0 };
 
     const deck = await getDeckByCourseId(ctx, active.course._id);

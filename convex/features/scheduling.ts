@@ -2,7 +2,7 @@ import { v, ConvexError } from 'convex/values';
 import { mutation, query, MutationCtx } from '../_generated/server';
 import { buildCardSearchableText } from '../lib/cardContent';
 import { Id } from '../_generated/dataModel';
-import { getAuthUser, requireAuthUser } from '../db/users';
+import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getInitialReviewCount } from '../db/courseSettings';
 import { getDeckByCourseId } from '../db/decks';
@@ -30,7 +30,7 @@ import { getAudioForText } from '../lib/audio';
  * Throws ConvexError on failure.
  */
 async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<'cards'>) {
-  const user = await requireAuthUser(ctx);
+  const userId = await requireAuthUserId(ctx);
 
   const card = await ctx.db.get(cardId);
   if (!card) throw new ConvexError('Card not found');
@@ -39,10 +39,10 @@ async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<'cards'>) {
   if (!deck) throw new ConvexError('Deck not found');
 
   const course = await ctx.db.get(deck.courseId);
-  if (!course || course.userId !== user._id)
+  if (!course || course.userId !== userId)
     throw new ConvexError('Unauthorized');
 
-  return { user, card, deck, course };
+  return { userId, card, deck, course };
 }
 
 // ============================================================================
@@ -78,10 +78,10 @@ export const getCardForReview = query({
     v.null(),
   ),
   handler: async (ctx) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return null;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
 
-    const active = await getActiveCourseForUser(ctx, user._id);
+    const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return null;
     const { course } = active;
 
@@ -195,7 +195,7 @@ export const reviewCard = mutation({
     fsrsState: v.union(fsrsStateValidator, v.null()),
   }),
   handler: async (ctx, args) => {
-    const { user, card, deck, course } = await authorizeCardAccess(ctx, args.cardId);
+    const { userId, card, deck, course } = await authorizeCardAccess(ctx, args.cardId);
 
     const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
 
@@ -263,7 +263,7 @@ export const reviewCard = mutation({
     const clampedTime = Math.min(nonNegativeTime, MAX_TIME_PER_CARD_MS);
     const stats = await getCourseStatsForMutation(
       ctx,
-      user._id,
+      userId,
       deck.courseId,
     );
     if (!stats) {

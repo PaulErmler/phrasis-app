@@ -5,10 +5,8 @@ import { AppDataProvider } from '@/components/app/AppDataProvider';
 
 export default async function AppLayout({
   children,
-  learn,
 }: {
   children: React.ReactNode;
-  learn: React.ReactNode;
 }) {
   const authed = await isAuthenticated();
   if (!authed) {
@@ -41,7 +39,6 @@ export default async function AppLayout({
       preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
     >
       {children}
-      {learn}
     </AppDataProvider>
   );
 }

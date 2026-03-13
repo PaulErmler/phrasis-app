@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 interface DiffDisplayProps {
   expected: string;
   actual: string;
+  hideAccuracy?: boolean;
 }
 
 function computeAccuracy(expected: string, actual: string): number {
@@ -28,7 +29,7 @@ function computeAccuracy(expected: string, actual: string): number {
   return Math.round((matchingChars / totalChars) * 100);
 }
 
-export function DiffDisplay({ expected, actual }: DiffDisplayProps) {
+export function DiffDisplay({ expected, actual, hideAccuracy = false }: DiffDisplayProps) {
   const t = useTranslations('LearningMode');
 
   const { changes, accuracy } = useMemo(() => {
@@ -68,9 +69,11 @@ export function DiffDisplay({ expected, actual }: DiffDisplayProps) {
           );
         })}
       </p>
-      <p className="text-muted-xs">
-        {t('accuracy')}: {accuracy}%
-      </p>
+      {!hideAccuracy && (
+        <p className="text-muted-xs">
+          {t('accuracy')}: {accuracy}%
+        </p>
+      )}
     </div>
   );
 }

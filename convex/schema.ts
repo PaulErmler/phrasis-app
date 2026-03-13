@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import {
   learningStyleValidator,
   currentLevelValidator,
+  reviewModeValidator,
   fsrsStateValidator,
   cardApprovalStatusValidator,
   schedulingPhaseValidator
@@ -65,8 +66,9 @@ export default defineSchema({
   // Onboarding progress table - stores temporary onboarding data until completion
   onboardingProgress: defineTable({
     userId: v.string(), // Links to auth user
-    step: v.number(), // Current step in onboarding (1-6)
+    step: v.number(), // Current step in onboarding (1-7)
     learningStyle: v.optional(learningStyleValidator),
+    reviewMode: v.optional(reviewModeValidator),
     currentLevel: v.optional(currentLevelValidator),
     targetLanguages: v.optional(v.array(v.string())),
     baseLanguages: v.optional(v.array(v.string())),

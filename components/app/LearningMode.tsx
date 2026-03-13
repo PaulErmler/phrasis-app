@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import {
   LearningCardContent,
@@ -45,7 +46,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
           onSeek={audio.seekTo}
           onNext={() => {}}
           isReviewing={true}
-          showProgressBar={true}
+          showProgressBar={false}
         />
       </div>
     );
@@ -96,43 +97,61 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
 
   const reviewMode = state.courseSettings.reviewMode ?? 'audio';
 
+  const cardContent =
+    reviewMode === 'full' ? (
+      <FullReviewCardContent
+        preReviewCount={state.preReviewCount}
+        sourceText={state.sourceText}
+        translations={state.translations}
+        audioRecordings={state.audioRecordings}
+        isFavorite={state.isFavorite}
+        isPendingMaster={state.isPendingMaster}
+        isPendingHide={state.isPendingHide}
+        onMaster={state.handleMaster}
+        onHide={state.handleHide}
+        onFavorite={state.handleFavorite}
+        onAudioPlay={audio.stop}
+        targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
+      />
+    ) : (
+      <LearningCardContent
+        preReviewCount={state.preReviewCount}
+        schedulingPhase={state.phase}
+        fsrsState={state.fsrsState}
+        sourceText={state.sourceText}
+        translations={state.translations}
+        audioRecordings={state.audioRecordings}
+        isFavorite={state.isFavorite}
+        isPendingMaster={state.isPendingMaster}
+        isPendingHide={state.isPendingHide}
+        onMaster={state.handleMaster}
+        onHide={state.handleHide}
+        onFavorite={state.handleFavorite}
+        onAudioPlay={audio.stop}
+        hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
+        autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? false}
+        revealedLanguages={audio.revealedLanguages}
+      />
+    );
+
   return (
     <div className="flex flex-col h-full">
-      {reviewMode === 'full' ? (
-        <FullReviewCardContent
-          preReviewCount={state.preReviewCount}
-          sourceText={state.sourceText}
-          translations={state.translations}
-          audioRecordings={state.audioRecordings}
-          isFavorite={state.isFavorite}
-          isPendingMaster={state.isPendingMaster}
-          isPendingHide={state.isPendingHide}
-          onMaster={state.handleMaster}
-          onHide={state.handleHide}
-          onFavorite={state.handleFavorite}
-          onAudioPlay={audio.stop}
-          targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
-        />
-      ) : (
-        <LearningCardContent
-          preReviewCount={state.preReviewCount}
-          schedulingPhase={state.phase}
-          fsrsState={state.fsrsState}
-          sourceText={state.sourceText}
-          translations={state.translations}
-          audioRecordings={state.audioRecordings}
-          isFavorite={state.isFavorite}
-          isPendingMaster={state.isPendingMaster}
-          isPendingHide={state.isPendingHide}
-          onMaster={state.handleMaster}
-          onHide={state.handleHide}
-          onFavorite={state.handleFavorite}
-          onAudioPlay={audio.stop}
-          hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
-          autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? false}
-          revealedLanguages={audio.revealedLanguages}
-        />
-      )}
+      <div className="flex-1 min-h-0">
+        <AnimatePresence mode="wait" initial={false}>
+          {!state.isExiting && (
+            <motion.div
+              key={state.cardId}
+              className="h-full flex flex-col"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.15, ease: 'easeInOut' }}
+            >
+              {cardContent}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       <LearningControls
         validRatings={state.validRatings}
@@ -148,7 +167,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         onSeek={audio.seekTo}
         onNext={state.handleNext}
         isReviewing={state.isReviewing}
-        showProgressBar={state.courseSettings.showProgressBar ?? true}
+        showProgressBar={state.courseSettings.showProgressBar ?? false}
       />
 
       <LearningModeSettings

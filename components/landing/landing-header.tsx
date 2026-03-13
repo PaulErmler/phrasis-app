@@ -19,7 +19,6 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
   const navLinks = [
     { href: '#features', label: t('nav.features') },
     { href: '#pricing', label: t('nav.pricing') },
-    { href: '#testimonials', label: t('nav.reviews') },
     { href: '#faq', label: t('nav.faq') },
   ];
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);

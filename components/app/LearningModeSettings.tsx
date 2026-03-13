@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { X } from 'lucide-react';
+import { X, Headphones, PenLine } from 'lucide-react';
 import {
   DEFAULT_BATCH_SIZE,
   type CourseSettings,
@@ -296,6 +296,23 @@ export function LearningModeSettings({
             value={reviewMode}
             onChange={handleReviewModeChange}
           />
+
+          <div className="space-y-2.5 rounded-md border bg-muted/30 p-3">
+            <div className="flex items-start gap-2.5">
+              <Headphones className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs font-medium">{t('reviewModeAudio')}</p>
+                <p className="text-muted-xs">{t('reviewModeAudioDescription')}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <PenLine className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+              <div>
+                <p className="text-xs font-medium">{t('reviewModeFull')}</p>
+                <p className="text-muted-xs">{t('reviewModeFullDescription')}</p>
+              </div>
+            </div>
+          </div>
 
           <Separator />
 
@@ -657,7 +674,7 @@ export function LearningModeSettings({
             </div>
             <Switch
               id="showProgressBar"
-              checked={courseSettings.showProgressBar ?? true}
+              checked={courseSettings.showProgressBar ?? false}
               onCheckedChange={handleShowProgressBarChange}
               className="mt-0.5"
             />

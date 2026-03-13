@@ -70,6 +70,21 @@
       "empty": "No numbers generated yet."
     },
     "contentSoon": "Coming Soon: Discover new phrases and content tailored for you.",
+    "content": {
+      "chat": {
+        "title": "Chat",
+        "description": "Let a chatbot create flashcards for you"
+      },
+      "fileUpload": {
+        "title": "File Upload",
+        "description": "Upload documents to generate flashcards from your own content"
+      },
+      "enterTexts": {
+        "title": "Enter Your Own Texts",
+        "description": "Type or paste sentences to create custom flashcards"
+      },
+      "comingSoon": "Coming Soon"
+    },
     "librarySoon": "Coming Soon: Manage and organize your saved phrases.",
     "library": {
       "title": "Library",
@@ -151,7 +166,8 @@
       "description": "Select a course to switch to or create a new one",
       "createNew": "Create New Course",
       "noCourses": "No courses yet. Create your first course to get started.",
-      "active": "Active",
+      "select": "Select",
+      "selected": "Selected",
       "learning": "Learning {language}",
       "currentCourse": "Course",
       "from": "from {language}",
@@ -176,11 +192,29 @@
         "back": "Back",
         "next": "Next",
         "create": "Create Course"
+      },
+      "manage": {
+        "title": "Course Settings",
+        "targetLanguages": "Target Languages",
+        "baseLanguages": "Base Languages",
+        "addLanguage": "Add Language",
+        "noMoreAvailable": "No more languages available",
+        "infoText": "Drag and drop to reorder languages. Once saved, languages cannot be removed. You can add up to {max} languages total.",
+        "saveChanges": "Save Changes",
+        "confirmTitle": "Confirm changes",
+        "confirmAdding": "Adding {languages}. This cannot be undone.",
+        "confirmButton": "Confirm",
+        "cancelButton": "Cancel",
+        "warningBoth": "You need at least one base language and one target language.",
+        "warningBase": "You need at least one base language.",
+        "warningTarget": "You need at least one target language."
       }
     },
     "changeCourse": "Change Course",
     "currentCourseWithLanguages": "Current Course: {targetLanguages}",
     "startLearning": "Start Learning",
+    "fullReview": "Full Review",
+    "audioReview": "Audio Review",
     "stats": {
       "streak": "Streak",
       "reps": "Reps",
@@ -273,6 +307,8 @@
       "pauseBetweenPlays": "{seconds}s between",
       "reviewModeAudio": "Audio",
       "reviewModeFull": "Full Review",
+      "reviewModeAudioDescription": "Listen to audio playback of your phrases. No need to look at the screen and manually rate the cards. Ideal for learning without looking at the screen — practice on the go while walking, commuting, or relaxing.",
+      "reviewModeFullDescription": "Type the translations and see a character-level comparison with the correct answer. Best for active practice — engages recall and spelling.",
       "fullReviewSettings": "Full Review Settings",
       "fullReviewTargetAudio": "Auto-play target audio",
       "fullReviewTargetAudioDescription": "When to play target language audio",
@@ -406,13 +442,31 @@
         "description": "I want to cutomize everything"
       }
     },
+    "reviewMode": {
+      "title": "How do you want to review?",
+      "full": {
+        "title": "Full Review",
+        "description": "Practice writing by typing translations. Best for active practice while looking at the screen."
+      },
+      "audio": {
+        "title": "Audio Review",
+        "description": "Practice listening and speaking with audio playback. There is no need to look at the screen. Ideal for learning on the go — while walking, commuting, or relaxing."
+      }
+    },
     "step2": {
       "title": "What language do you want to learn?",
-      "subtitle": "Select a language"
+      "titleMulti": "What languages do you want to learn?",
+      "subtitle": "Select a language",
+      "subtitleMulti": "Select up to {max} target languages ({count}/{max})",
+      "addAnother": "Add another language",
+      "primaryHint": "The first language is your primary learning language",
+      "primary": "Primary"
     },
     "step3": {
       "title": "What language will you learn from?",
-      "subtitle": "Select your base language"
+      "titleMulti": "What languages will you learn from?",
+      "subtitle": "Select your base language",
+      "subtitleMulti": "Select up to {max} base languages ({count}/{max})"
     },
     "step4": {
       "title": "What's your current level?",

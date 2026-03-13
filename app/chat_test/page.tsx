@@ -2,10 +2,8 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { SignedIn, SignedOut } from '@daveyplate/better-auth-ui';
-import { authClient } from '@/lib/auth-client';
+import { Authenticated, Unauthenticated, AuthLoading, useConvexAuth, useMutation } from 'convex/react';
 import { Footer } from '@/components/Footer';
-import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import { toast } from 'sonner';
@@ -31,17 +29,48 @@ import {
 
 export default function ChatPage() {
   const router = useRouter();
-  const { data: session, isPending } = authClient.useSession();
+
+  return (
+    <div className="h-screen flex flex-col overflow-hidden">
+      <ChatHeader onBack={() => router.push('/app')} />
+
+      <AuthLoading>
+        <div className="flex-1 flex items-center justify-center">
+          <Loader size={24} />
+        </div>
+      </AuthLoading>
+
+      <Unauthenticated>
+        <UnauthenticatedRedirect />
+      </Unauthenticated>
+
+      <Authenticated>
+        <ChatPageContent />
+      </Authenticated>
+
+      <Footer />
+    </div>
+  );
+}
+
+function UnauthenticatedRedirect() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.push('/');
+  }, [router]);
+
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <p className="text-muted-foreground">Redirecting to sign in...</p>
+    </div>
+  );
+}
+
+function ChatPageContent() {
   const [text, setText] = useState<string>('');
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!session && !isPending) {
-      router.push('/');
-    }
-  }, [session, isPending, router]);
-
-  // Thread management
+  // Thread management (no session/isPending needed — already inside <Authenticated>)
   const {
     threadId,
     threads,
@@ -49,7 +78,7 @@ export default function ChatPage() {
     setThreadId,
     isLoading: isThreadLoading,
     isCreating,
-  } = useThreadManagement({ session, isPending });
+  } = useThreadManagement();
 
   // Message management
   const { messages, status, setStatus } = useChatMessages({ threadId });
@@ -109,67 +138,43 @@ export default function ChatPage() {
     setText(suggestion);
   }, []);
 
-  // Loading state
-  if (isPending) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader size={24} />
-      </div>
-    );
-  }
-
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <ChatHeader onBack={() => router.push('/app')} />
+    <main className="flex-1 flex flex-row overflow-hidden min-h-0">
+      <ThreadSidebar
+        threads={threads}
+        threadId={threadId}
+        onThreadSelect={setThreadId}
+        onNewThread={createThread}
+        isCreating={isCreating}
+      />
 
-      <main className="flex-1 flex flex-row overflow-hidden min-h-0">
-        <SignedOut>
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full min-h-0">
+        {!threadId ? (
           <div className="flex-1 flex items-center justify-center">
-            <p className="text-muted-foreground">Redirecting to sign in...</p>
+            <Loader size={24} />
           </div>
-        </SignedOut>
-
-        <SignedIn>
-          <ThreadSidebar
-            threads={threads}
-            threadId={threadId}
-            onThreadSelect={setThreadId}
-            onNewThread={createThread}
-            isCreating={isCreating}
-          />
-
-          {/* Chat Area */}
-          <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full min-h-0">
-            {!threadId ? (
-              <div className="flex-1 flex items-center justify-center">
-                <Loader size={24} />
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-                <ChatMessages
-                  messages={messages}
-                  isLoading={isThreadLoading}
-                  threadId={threadId}
-                />
-                <ChatInput
-                  onSubmit={handleSubmit}
-                  onSuggestionClick={handleSuggestionClick}
-                  text={text}
-                  onTextChange={setText}
-                  status={status}
-                  isRecording={isRecording}
-                  isTranscribing={isTranscribing}
-                  onVoiceClick={handleVoiceClick}
-                  showSuggestions={messages.length === 0}
-                />
-              </div>
-            )}
+        ) : (
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <ChatMessages
+              messages={messages}
+              isLoading={isThreadLoading}
+              threadId={threadId}
+            />
+            <ChatInput
+              onSubmit={handleSubmit}
+              onSuggestionClick={handleSuggestionClick}
+              text={text}
+              onTextChange={setText}
+              status={status}
+              isRecording={isRecording}
+              isTranscribing={isTranscribing}
+              onVoiceClick={handleVoiceClick}
+              showSuggestions={messages.length === 0}
+            />
           </div>
-
-        </SignedIn>
-      </main>
-
-      <Footer />
-    </div>
+        )}
+      </div>
+    </main>
   );
 }

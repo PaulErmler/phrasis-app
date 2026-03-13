@@ -23,6 +23,31 @@ export async function requireAuthUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
 }
 
 /**
+ * Get the authenticated user ID from the JWT (no session validation).
+ * Use when you only need the user ID for filtering - avoids cross-component DB queries.
+ * Returns null if not authenticated.
+ */
+export async function getAuthUserId(
+  ctx: QueryCtx | MutationCtx | ActionCtx,
+): Promise<string | null> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return null;
+  return identity.subject;
+}
+
+/**
+ * Require an authenticated user ID, throwing if not logged in.
+ * Lightweight alternative to requireAuthUser when you only need the user ID.
+ */
+export async function requireAuthUserId(
+  ctx: QueryCtx | MutationCtx | ActionCtx,
+): Promise<string> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new ConvexError('Unauthenticated');
+  return userId;
+}
+
+/**
  * Get user settings by userId.
  */
 export async function getUserSettings(

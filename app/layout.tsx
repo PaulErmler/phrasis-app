@@ -11,6 +11,7 @@ import { Toaster } from '@/components/ui/sonner';
 import { ConsentManager } from './consent-manager';
 import { getToken } from '@/lib/auth-server';
 import { AutumnWrapper } from './providers';
+import { PWASplashScreen } from '@/components/PWASplashScreen';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -65,6 +66,7 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <PWASplashScreen />
         <ConsentManager>
           <ServiceWorkerRegistration />
           <PWAInstallGlobal />

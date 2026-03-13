@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 import { query, mutation } from '../_generated/server';
-import { getAuthUser } from '../db/users';
+import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import {
   getCollectionProgress,
@@ -36,16 +36,16 @@ export const getCollectionTextsWithContent = query({
     hasMissingContent: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) return { texts: [], hasMissingContent: false };
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { texts: [], hasMissingContent: false };
 
-    const active = await getActiveCourseForUser(ctx, user._id);
+    const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return { texts: [], hasMissingContent: false };
     const { course } = active;
 
     const progress = await getCollectionProgress(
       ctx,
-      user._id,
+      userId,
       course._id,
       args.collectionId,
     );
@@ -111,11 +111,11 @@ export const ensureContentForCollection = mutation({
     totalAudioScheduled: v.number(),
   }),
   handler: async (ctx, args) => {
-    const { user, course } = await requireActiveCourse(ctx);
+    const { userId, course } = await requireActiveCourse(ctx);
 
     const progress = await getCollectionProgress(
       ctx,
-      user._id,
+      userId,
       course._id,
       args.collectionId,
     );

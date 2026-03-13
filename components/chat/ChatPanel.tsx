@@ -6,10 +6,10 @@ import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { useChat } from '@/hooks/use-chat';
-import type { CardContext } from '@/hooks/use-send-message';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import type { ToolRenderer, MessageFooterRenderer } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
+import type { Id } from '@/convex/_generated/dataModel';
 import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
@@ -19,7 +19,7 @@ interface ChatPanelProps {
   threadId: string;
   toolRenderers?: Record<string, ToolRenderer>;
   messageFooter?: MessageFooterRenderer;
-  cardContext?: CardContext;
+  cardId?: Id<'cards'>;
   onMessageSent?: () => void;
   showSuggestions?: boolean;
   suggestions?: readonly string[];
@@ -39,7 +39,7 @@ export function ChatPanel({
   threadId,
   toolRenderers,
   messageFooter,
-  cardContext,
+  cardId,
   onMessageSent,
   showSuggestions,
   suggestions,
@@ -56,7 +56,7 @@ export function ChatPanel({
     setPaywallOpen(true);
   }, []);
 
-  const chat = useChat({ threadId, cardContext, onUsageLimit: handleUsageLimit });
+  const chat = useChat({ threadId, cardId, onUsageLimit: handleUsageLimit });
   const t = useTranslations('Chat.attachments');
 
   const handleSubmit = useCallback(

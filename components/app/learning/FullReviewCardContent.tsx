@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Send } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import { DiffDisplay } from './DiffDisplay';
@@ -60,6 +60,7 @@ export function FullReviewCardContent({
   );
 
   const autoPlayedRef = useRef<Set<string>>(new Set());
+  const firstInputRef = useRef<HTMLInputElement | null>(null);
 
   const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
   const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
@@ -70,6 +71,10 @@ export function FullReviewCardContent({
     );
     autoPlayedRef.current = new Set();
   }
+
+  useEffect(() => {
+    firstInputRef.current?.focus();
+  }, [translationKey]);
 
   const handleInputChange = useCallback((language: string, text: string) => {
     setInputs((prev) => {
@@ -106,7 +111,7 @@ export function FullReviewCardContent({
     >
       {({ targetTranslations: targets }) => (
         <div className="space-y-4">
-          {targets.map((translation) => {
+          {targets.map((translation, index) => {
             const audio = audioRecordings.find(
               (a) => a.language === translation.language,
             );
@@ -130,6 +135,8 @@ export function FullReviewCardContent({
                 placeholder={t('typeTranslation')}
                 showLanguageLabel={showLanguageLabel}
                 locale={locale}
+                inputRef={index === 0 ? firstInputRef : undefined}
+                autoFocus={index === 0}
               />
             );
           })}
@@ -152,6 +159,8 @@ interface TargetLanguageInputProps {
   placeholder: string;
   showLanguageLabel: boolean;
   locale: string;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+  autoFocus?: boolean;
 }
 
 function TargetLanguageInput({
@@ -167,6 +176,8 @@ function TargetLanguageInput({
   placeholder,
   showLanguageLabel,
   locale,
+  inputRef,
+  autoFocus,
 }: TargetLanguageInputProps) {
   const autoPlayAudioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -200,7 +211,7 @@ function TargetLanguageInput({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !state.submitted && state.userText.trim()) {
+    if (e.key === 'Enter' && !state.submitted) {
       e.preventDefault();
       onSubmit(translation.language);
     }
@@ -236,6 +247,7 @@ function TargetLanguageInput({
         <DiffDisplay
           expected={translation.text}
           actual={state.userText}
+          hideAccuracy={!state.userText.trim()}
         />
       </div>
     );
@@ -265,6 +277,8 @@ function TargetLanguageInput({
       )}
       <div className="flex items-center gap-2">
         <Input
+          ref={inputRef}
+          autoFocus={autoFocus}
           value={state.userText}
           onChange={(e) => onInputChange(translation.language, e.target.value)}
           onKeyDown={handleKeyDown}
@@ -272,18 +286,17 @@ function TargetLanguageInput({
           className="flex-1"
           autoComplete="off"
           autoCorrect="off"
-          autoCapitalize="off"
+          autoCapitalize="sentences"
           spellCheck={false}
         />
         <Button
           variant="outline"
           size="icon"
           onClick={() => onSubmit(translation.language)}
-          disabled={!state.userText.trim()}
           className="h-9 w-9 shrink-0"
           aria-label={submitLabel}
         >
-          <Send className="h-4 w-4" />
+          <Check className="h-4 w-4" />
         </Button>
       </div>
     </div>

@@ -15,14 +15,14 @@ export function ReviewModeSwitcher({ value, onChange }: ReviewModeSwitcherProps)
   const t = useTranslations('LearningMode.settingsPanel');
 
   return (
-    <div className="flex w-full rounded-md border bg-muted/40 p-0.5">
+    <div className="flex w-full rounded-lg border bg-muted/50 p-1">
       <button
         type="button"
         onClick={() => onChange('audio')}
         className={cn(
-          'flex-1 inline-flex items-center justify-center gap-2 rounded-sm px-3 py-1.5 text-sm font-medium transition-all',
+          'flex-1 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all',
           value === 'audio'
-            ? 'bg-background text-foreground shadow-sm'
+            ? 'bg-primary text-primary-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground',
         )}
       >
@@ -33,9 +33,9 @@ export function ReviewModeSwitcher({ value, onChange }: ReviewModeSwitcherProps)
         type="button"
         onClick={() => onChange('full')}
         className={cn(
-          'flex-1 inline-flex items-center justify-center gap-2 rounded-sm px-3 py-1.5 text-sm font-medium transition-all',
+          'flex-1 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all',
           value === 'full'
-            ? 'bg-background text-foreground shadow-sm'
+            ? 'bg-primary text-primary-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground',
         )}
       >

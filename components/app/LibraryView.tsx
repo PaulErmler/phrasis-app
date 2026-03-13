@@ -7,7 +7,6 @@ import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Search, Star, EyeOff, CircleCheck, X } from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
 
@@ -20,26 +19,6 @@ function useDebounce<T>(value: T, delay: number): T {
     return () => clearTimeout(t);
   }, [value, delay]);
   return debounced;
-}
-
-function CardSkeleton() {
-  return (
-    <div className="card-surface">
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <Skeleton className="h-5 w-16 rounded-full" />
-        <div className="flex gap-1">
-          <Skeleton className="h-8 w-8 rounded-md" />
-          <Skeleton className="h-8 w-8 rounded-md" />
-          <Skeleton className="h-8 w-8 rounded-md" />
-        </div>
-      </div>
-      <div className="px-6 pb-6 space-y-4">
-        <Skeleton className="h-5 w-3/4" />
-        <Skeleton className="h-px w-full" />
-        <Skeleton className="h-5 w-2/3" />
-      </div>
-    </div>
-  );
 }
 
 export function LibraryView() {
@@ -111,10 +90,10 @@ export function LibraryView() {
   const hasActiveFilters = debouncedSearch.length > 0 || activeFilter !== null;
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto" style={{ scrollbarGutter: 'stable' }}>
+    <div className="flex-1 min-h-0 overflow-y-auto px-4" style={{ scrollbarGutter: 'stable' }}>
       {/* Sticky search + filters card */}
       <div className="sticky top-0 z-10 bg-background">
-        <div className="max-w-xl mx-auto w-full px-4 pt-8">
+        <div className="max-w-xl mx-auto w-full pt-8">
           <div className="card-surface p-3 space-y-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -177,14 +156,8 @@ export function LibraryView() {
       </div>
 
       {/* Card list */}
-      <div className="max-w-xl mx-auto w-full px-4 pt-2.5 pb-4 space-y-2.5">
-        {isLoading && (
-          <>
-            {Array.from({ length: 3 }).map((_, i) => (
-              <CardSkeleton key={i} />
-            ))}
-          </>
-        )}
+      <div className="max-w-xl mx-auto w-full pt-2.5 pb-4 space-y-2.5">
+        {isLoading && null}
 
         {!isLoading && !hasResults && (
           <div className="card-surface p-12 text-center space-y-2">

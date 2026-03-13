@@ -1,8 +1,9 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, ChevronsLeft, ChevronRight, MessageCircle } from 'lucide-react';
+import { Play, Pause, ChevronsLeft, ChevronRight, MessageCircle, Loader2 } from 'lucide-react';
 import { AudioProgressBar } from './AudioProgressBar';
 import { useLearningChatToggle } from './LearningChatLayout';
 import type { ReviewRating } from '@/lib/scheduling';
@@ -38,10 +39,20 @@ export function LearningControls({
   onSeek,
   onNext,
   isReviewing,
-  showProgressBar = true,
+  showProgressBar = false,
 }: LearningControlsProps) {
   const t = useTranslations('LearningMode');
   const { openChat } = useLearningChatToggle();
+
+  const [showSpinner, setShowSpinner] = useState(false);
+  useEffect(() => {
+    if (!isReviewing) {
+      setShowSpinner(false);
+      return;
+    }
+    const id = setTimeout(() => setShowSpinner(true), 300);
+    return () => clearTimeout(id);
+  }, [isReviewing]);
 
   return (
     <div className="relative bg-background pb-safe">
@@ -128,7 +139,11 @@ export function LearningControls({
             className="flex-[1] gap-2"
           >
             {t('actions.next')}
-            <ChevronRight className="h-4 w-4" />
+            {showSpinner ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>

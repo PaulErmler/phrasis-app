@@ -1,14 +1,17 @@
 import { v, ConvexError } from 'convex/values';
-import { internalAction, mutation, query } from '../../_generated/server';
+import { internalAction, internalQuery, mutation, query } from '../../_generated/server';
 import { paginationOptsValidator } from 'convex/server';
 import { internal } from '../../_generated/api';
 import { saveMessage } from '@convex-dev/agent';
 import { listUIMessages, syncStreams } from '@convex-dev/agent';
 import { components } from '../../_generated/api';
-import { getAuthUser, requireAuthUser } from '../../db/users';
+import { requireAuthUserId, getAuthUserId } from '../../db/users';
+import { getActiveCourseForUser } from '../../db/courses';
 import { useQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import { agent } from './agent';
+import type { MutationCtx } from '../../_generated/server';
+import type { Id } from '../../_generated/dataModel';
 
 export type ListMessagesStreamArgs = {
   kind: 'list';
@@ -17,47 +20,109 @@ export type ListMessagesStreamArgs = {
 
 const agentComponent = components.agent;
 
-const cardContextValidator = v.object({
-  sourceText: v.string(),
-  sourceLanguage: v.string(),
-  translations: v.array(
-    v.object({ language: v.string(), text: v.string() }),
+/**
+ * Internal query to get course languages by userId.
+ * Works without auth identity — used by scheduled actions and tool handlers.
+ */
+export const getCourseLanguagesForUser = internalQuery({
+  args: { userId: v.string() },
+  returns: v.union(
+    v.object({
+      baseLanguages: v.array(v.string()),
+      targetLanguages: v.array(v.string()),
+    }),
+    v.null(),
   ),
-  baseLanguages: v.array(v.string()),
-  targetLanguages: v.array(v.string()),
+  handler: async (ctx, args) => {
+    const active = await getActiveCourseForUser(ctx, args.userId);
+    if (!active) return null;
+    return {
+      baseLanguages: active.course.baseLanguages,
+      targetLanguages: active.course.targetLanguages,
+    };
+  },
 });
 
-function buildContextInstructions(cardContext: {
+/**
+ * Look up a card's source text, course-scoped translations, and course
+ * languages via card → deck → course. Only fetches translations whose
+ * targetLanguage is in the course's language set (uses the compound
+ * by_text_and_language index for each language).
+ */
+async function resolveCardContext(
+  ctx: MutationCtx,
+  cardId: Id<'cards'>,
+): Promise<{
   sourceText: string;
   sourceLanguage: string;
   translations: { language: string; text: string }[];
   baseLanguages: string[];
   targetLanguages: string[];
+} | null> {
+  const card = await ctx.db.get(cardId);
+  if (!card) return null;
+
+  const deck = await ctx.db.get(card.deckId);
+  if (!deck) return null;
+
+  const course = await ctx.db.get(deck.courseId);
+  if (!course) return null;
+
+  const text = await ctx.db.get(card.textId);
+  if (!text) return null;
+
+  const courseLangs = new Set([...course.baseLanguages, ...course.targetLanguages]);
+  courseLangs.delete(text.language);
+
+  const translations = (
+    await Promise.all(
+      [...courseLangs].map((lang) =>
+        ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', card.textId).eq('targetLanguage', lang),
+          )
+          .unique(),
+      ),
+    )
+  )
+    .filter((t): t is NonNullable<typeof t> => t !== null)
+    .map((t) => ({ language: t.targetLanguage, text: t.translatedText }));
+
+  return {
+    sourceText: text.text,
+    sourceLanguage: text.language,
+    translations,
+    baseLanguages: course.baseLanguages,
+    targetLanguages: course.targetLanguages,
+  };
+}
+
+function buildCardContextSection(opts: {
+  sourceText: string;
+  sourceLanguage: string;
+  translations: { language: string; text: string }[];
+}): string {
+  const lines = [`Original (${opts.sourceLanguage}): "${opts.sourceText}"`];
+  for (const t of opts.translations) {
+    lines.push(`${t.language}: "${t.text}"`);
+  }
+  return `The user is currently reviewing this card:\n${lines.join('\n')}`;
+}
+
+function buildLanguageSection(courseLanguages: {
+  baseLanguages: string[];
+  targetLanguages: string[];
 }): string {
   const allLangs = [
-    ...new Set([
-      ...cardContext.baseLanguages,
-      ...cardContext.targetLanguages,
-    ]),
+    ...new Set([...courseLanguages.baseLanguages, ...courseLanguages.targetLanguages]),
   ];
 
-  const translationLines = cardContext.translations
-    .map((t) => `    ${t.language}: "${t.text}"`)
-    .join('\n');
-
-  return `
-The user is studying these languages:
-  Base languages: ${cardContext.baseLanguages.join(', ')}
-  Target languages: ${cardContext.targetLanguages.join(', ')}
-  All language codes for cards: ${JSON.stringify(allLangs)}
-
-They are currently looking at this card:
-  Original (${cardContext.sourceLanguage}): "${cardContext.sourceText}"
-  Translations:
-${translationLines}
-
-When creating cards, the translations array MUST contain one {language, text} object for each of these language codes: ${JSON.stringify(allLangs)}. Use these exact codes.
-The translations array must list base languages first, then target languages, in this exact order: ${JSON.stringify(allLangs)}.`;
+  return `Course language configuration:
+Base languages: ${courseLanguages.baseLanguages.join(', ')}
+Target languages: ${courseLanguages.targetLanguages.join(', ')}
+All language codes for cards (in required order): ${JSON.stringify(allLangs)}
+Every createCard call MUST include translations for ALL of these languages: ${JSON.stringify(allLangs)}. No exceptions.`;
 }
 
 /**
@@ -67,18 +132,18 @@ export const sendMessage = mutation({
   args: {
     threadId: v.string(),
     prompt: v.string(),
-    cardContext: v.optional(cardContextValidator),
+    cardId: v.optional(v.id('cards')),
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    const user = await requireAuthUser(ctx);
-    await useQuota(ctx, user._id, FEATURE_IDS.CHAT_MESSAGES, 1);
+    const userId = await requireAuthUserId(ctx);
+    await useQuota(ctx, userId, FEATURE_IDS.CHAT_MESSAGES, 1);
 
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {
       threadId: args.threadId,
     });
 
-    if (!thread || thread.userId !== user._id) {
+    if (!thread || thread.userId !== userId) {
       throw new ConvexError('Thread not found or access denied');
     }
 
@@ -87,15 +152,24 @@ export const sendMessage = mutation({
       prompt: args.prompt,
     });
 
+    let cardContextSection: string | undefined;
+    let languageSection: string | undefined;
+    if (args.cardId) {
+      const cardData = await resolveCardContext(ctx, args.cardId);
+      if (cardData) {
+        cardContextSection = buildCardContextSection(cardData);
+        languageSection = buildLanguageSection(cardData);
+      }
+    }
+
     await ctx.scheduler.runAfter(
       0,
       internal.features.chat.messages.generateResponse,
       {
         threadId: args.threadId,
         promptMessageId: messageId,
-        contextInstructions: args.cardContext
-          ? buildContextInstructions(args.cardContext)
-          : undefined,
+        cardContextSection,
+        languageSection,
       },
     );
 
@@ -119,8 +193,8 @@ export const listMessages = query({
     streams: v.optional(v.any()),
   }),
   handler: async (ctx, args) => {
-    const user = await getAuthUser(ctx);
-    if (!user) {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
       return { page: [], isDone: true, continueCursor: '' };
     }
 
@@ -128,7 +202,7 @@ export const listMessages = query({
       threadId: args.threadId,
     });
 
-    if (!thread || thread.userId !== user._id) {
+    if (!thread || thread.userId !== userId) {
       return { page: [], isDone: true, continueCursor: '' };
     }
 
@@ -153,21 +227,44 @@ export const generateResponse = internalAction({
   args: {
     threadId: v.string(),
     promptMessageId: v.string(),
-    contextInstructions: v.optional(v.string()),
+    cardContextSection: v.optional(v.string()),
+    languageSection: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      const system = args.contextInstructions
-        ? `${agent.options.instructions ?? ''}\n\n${args.contextInstructions}`
-        : undefined;
+      let languageSection = args.languageSection;
+      if (!languageSection) {
+        const thread = await ctx.runQuery(agentComponent.threads.getThread, {
+          threadId: args.threadId,
+        });
+        const courseLanguages = thread?.userId
+          ? await ctx.runQuery(
+              internal.features.chat.messages.getCourseLanguagesForUser,
+              { userId: thread.userId },
+            )
+          : null;
+        if (courseLanguages) {
+          languageSection = buildLanguageSection(courseLanguages);
+        }
+      }
+
+      const parts: string[] = [agent.options.instructions ?? ''];
+      if (languageSection) {
+        parts.push(languageSection);
+      }
+      if (args.cardContextSection) {
+        parts.push(args.cardContextSection);
+      }
+
+      const system = parts.join('\n\n');
 
       await agent.streamText(
         ctx,
         { threadId: args.threadId },
         {
           promptMessageId: args.promptMessageId,
-          ...(system ? { system } : {}),
+          system,
         },
         { saveStreamDeltas: { chunking: "line", throttleMs: 1000 } },
       );

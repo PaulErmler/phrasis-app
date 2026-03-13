@@ -5,11 +5,6 @@ import { toast } from 'sonner';
 import type { Thread } from '@/lib/types/chat';
 import { ERROR_MESSAGES } from '@/lib/constants/chat';
 
-interface UseThreadManagementProps {
-  session: { user?: { id?: string } } | null;
-  isPending: boolean;
-}
-
 interface UseThreadManagementReturn {
   threadId: string | null;
   threads: Thread[] | undefined;
@@ -20,35 +15,25 @@ interface UseThreadManagementReturn {
 }
 
 /**
- * Custom hook for managing chat thread lifecycle
- * Handles thread initialization, creation, and selection
+ * Custom hook for managing chat thread lifecycle.
+ * Must be rendered inside <Authenticated> from convex/react.
  */
-export function useThreadManagement({
-  session,
-  isPending,
-}: UseThreadManagementProps): UseThreadManagementReturn {
+export function useThreadManagement(): UseThreadManagementReturn {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  // Mutations and queries
   const createThreadMutation = useMutation(
     api.features.chat.threads.createThread,
   );
 
-  // Skip query until session is ready to prevent auth errors on reload
-  const threads = useQuery(
-    api.features.chat.threads.listThreads,
-    session && !isPending ? {} : 'skip',
-  );
+  const threads = useQuery(api.features.chat.threads.listThreads);
 
   // Initialize thread - use existing threads first, only create if none exist
   useEffect(() => {
-    if (session && !threadId && threads !== undefined) {
-      // If we have existing threads, use the first one (most recent)
+    if (!threadId && threads !== undefined) {
       if (threads && threads.length > 0) {
         setThreadId(threads[0]._id);
       } else if (threads && threads.length === 0) {
-        // Only create a new thread if there are no existing threads
         setIsCreating(true);
         createThreadMutation({})
           .then((id) => {
@@ -63,9 +48,8 @@ export function useThreadManagement({
           });
       }
     }
-  }, [session, threadId, threads, createThreadMutation]);
+  }, [threadId, threads, createThreadMutation]);
 
-  // Create a new thread manually
   const createThread = useCallback(async () => {
     setIsCreating(true);
     try {
@@ -80,8 +64,7 @@ export function useThreadManagement({
     }
   }, [createThreadMutation]);
 
-  const isLoading =
-    isPending || (!!session && !threadId && threads === undefined);
+  const isLoading = !threadId && threads === undefined;
 
   return {
     threadId,

@@ -13,7 +13,7 @@ export const createCardTool = createTool({
     translations: z
       .array(z.object({ language: z.string(), text: z.string() }))
       .describe(
-        'Array of {language, text} pairs covering all course languages. The first entry is the card\'s primary (front) language. List base languages first, then target languages in the exact order provided in the context.',
+        'Array of {language, text} pairs covering ALL course languages. REQUIRED: include every base and target language exactly once, in exact order as provided in context (base first, then target).',
       ),
   }),
   handler: async (ctx, args, options): Promise<string> => {
@@ -36,6 +36,30 @@ export const createCardTool = createTool({
       throw new Error('translations must not be empty.');
     }
 
+    const courseLanguages = await ctx.runQuery(
+      internal.features.chat.messages.getCourseLanguagesForUser,
+      { userId },
+    );
+    if (!courseLanguages) {
+      throw new Error(
+        'Cannot create card: no active course found for this user.',
+      );
+    }
+
+    const requiredLanguages = [
+      ...new Set([...courseLanguages.baseLanguages, ...courseLanguages.targetLanguages]),
+    ];
+    const providedLanguages = args.translations.map((t) => t.language);
+
+    const missing = requiredLanguages.filter((lang) => !providedLanguages.includes(lang));
+    const extras = providedLanguages.filter((lang) => !requiredLanguages.includes(lang));
+
+    if (missing.length > 0 || extras.length > 0 || new Set(providedLanguages).size !== providedLanguages.length) {
+      throw new Error(
+        `Invalid translations for createCard. Missing: ${JSON.stringify(missing)}. Extra: ${JSON.stringify(extras)}. Please retry with exactly these languages: ${JSON.stringify(requiredLanguages)}.`,
+      );
+    }
+
     await ctx.runMutation(
       internal.features.chat.cardApprovals.createApprovalRequestInternal,
       {
@@ -47,7 +71,7 @@ export const createCardTool = createTool({
       },
     );
 
-    return "I've prepared a card for you to review and approve.";
+    return "Card has been created.";
   },
 });
 
@@ -57,21 +81,25 @@ export const agent: Agent = new Agent(components.agent, {
     apiKey: process.env.OPENROUTER_API_KEY,
     extraBody: {
       provider: {
-        order: ["inceptron/int4", "fireworks"],
+        order: ["fireworks"],
         allow_fallbacks: true
       }
     }
     
-  })('moonshotai/kimi-k2.5'),
+  })('moonshotai/kimi-k2.5:nitro'),
 
-  instructions: `You are a friendly and knowledgeable language learning assistant.
+  instructions: `
+- Every createCard call MUST include a translation for EVERY language in the course. Check the system message for the exact list.
+- Never omit any language. Never add extra languages. Never duplicate a language.
+- Use the exact ISO language codes from the system message.
+
+You are a friendly and knowledgeable language learning assistant.
 - Always respond in the same language the user wrote their message in.
 - You can help with any language-related question in any language.
 - When explaining vocabulary, grammar, or concepts, proactively create multiple flashcards in a single response to help the user remember key words and example sentences. You do not need to ask permission before creating cards. Create 2-4 cards per response when relevant.
 - Call the createCard tool multiple times in one response to propose several cards at once.
 - Cards should contain example sentences, not abstract definitions or concepts. If the user asks about a concept, create example sentences demonstrating it.
 - The text content in flashcards must NOT contain emojis.
-- Provide translations for ALL of the user's course languages when creating cards. Use the exact ISO language codes provided in the context.
 - Since the user has to confirm all cards, you can err on the side of simply proposing them instead of asking the user for confirmation.
 - After creating cards, do NOT repeat the explanation you already gave. Only add a brief follow-up or closing remark.
 - Do not include any brackets — (), [], {} — in flashcard text or notes contained in brackets.
@@ -83,8 +111,8 @@ export const agent: Agent = new Agent(components.agent, {
 - There is no need to repeat the vocabulary already mentioned on the cards in the chat because the user can see the cards that get created. 
 - Always respond in the language the user asked the question in. This is very important: if the user writes in German, respond in German; if in French, respond in French. Never switch to a different language mid-conversation unless the user does. And don't use another base or target language if the user has not used that language to ask the question.
 - For explanations unless specified otherwise, make explanations and grammar about the target language.
-- When creating cards with the createCard tool, the translations array must be an array of {language, text} objects. List base languages first, then target languages, in the exact order provided in the context.
-- And lastly, do not include any reasoning about these rules or the setup with the languages in the response to the user.`,
+- Do not include any reasoning about these rules or the setup with the languages in the response to the user.
+`,
 
   stopWhen: stepCountIs(15),
   tools: {

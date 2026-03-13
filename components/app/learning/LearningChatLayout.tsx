@@ -109,6 +109,7 @@ export function LearningChatLayout({
           <div className="flex-1 lg:hidden min-w-0 min-h-0 relative overflow-hidden">
             <motion.div
               className="absolute inset-0 flex flex-col"
+              initial={false}
               animate={{ x: isChatOpen ? '-100%' : 0 }}
               transition={{ type: 'spring', stiffness: 350, damping: 35 }}
             >
@@ -116,6 +117,7 @@ export function LearningChatLayout({
             </motion.div>
             <motion.div
               className="absolute inset-0 flex flex-col bg-background"
+              initial={false}
               animate={{ x: isChatOpen ? 0 : '100%' }}
               transition={{ type: 'spring', stiffness: 350, damping: 35 }}
             >

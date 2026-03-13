@@ -2,18 +2,11 @@ import { useCallback } from 'react';
 import { useMutation } from 'convex/react';
 import { ConvexError } from 'convex/values';
 import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
 import { toast } from 'sonner';
 import { ERROR_MESSAGES, CHAT_STATUS } from '@/lib/constants/chat';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import type { ChatStatus } from '@/lib/types/chat';
-
-export interface CardContext {
-  sourceText: string;
-  sourceLanguage: string;
-  translations: { language: string; text: string }[];
-  baseLanguages: string[];
-  targetLanguages: string[];
-}
 
 interface UseSendMessageProps {
   threadId: string;
@@ -21,7 +14,7 @@ interface UseSendMessageProps {
   onSuccess?: () => void;
   onError?: () => void;
   onUsageLimit?: (featureId: string) => void;
-  cardContext?: CardContext;
+  cardId?: Id<'cards'>;
 }
 
 interface SendMessageOptions {
@@ -30,8 +23,9 @@ interface SendMessageOptions {
 }
 
 /**
- * Custom hook for sending messages with consistent error handling and status management
- * Consolidates shared logic used across SearchBar and SimplifiedChatView
+ * Custom hook for sending messages with consistent error handling and status management.
+ * Course languages are resolved server-side — an optional cardId provides
+ * per-card review context (the server looks up all card data from the DB).
  */
 export function useSendMessage({
   threadId,
@@ -39,7 +33,7 @@ export function useSendMessage({
   onSuccess,
   onError,
   onUsageLimit,
-  cardContext,
+  cardId,
 }: UseSendMessageProps) {
   const sendMessageMutation = useMutation(
     api.features.chat.messages.sendMessage,
@@ -60,7 +54,7 @@ export function useSendMessage({
         await sendMessageMutation({
           threadId,
           prompt,
-          cardContext,
+          cardId,
         });
 
         // Clear input if callback provided
@@ -103,7 +97,7 @@ export function useSendMessage({
         throw error;
       }
     },
-    [threadId, sendMessageMutation, setStatus, onSuccess, onError, onUsageLimit, cardContext],
+    [threadId, sendMessageMutation, setStatus, onSuccess, onError, onUsageLimit, cardId],
   );
 
   return { sendMessage };
