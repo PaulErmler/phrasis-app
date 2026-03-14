@@ -62,12 +62,22 @@ export const getPaywallContent = (
       ? t("purchaseAddOn", { productName: nextProduct.name })
       : t("upgradeTo", { productName: nextProduct.name });
 
+  const upgradeDetailKey = (() => {
+    switch (scenario) {
+      case "usage_limit":
+        return consumable === false ? "upgradeDetailCap" : "upgradeDetailUsageLimit";
+      case "feature_flag":
+      default:
+        return "upgradeDetail";
+    }
+  })();
+
   const detail = isAddOn
     ? t("addOnDetail", {
         productName: nextProduct.name,
         featureName,
       })
-    : t("upgradeDetail", {
+    : t(upgradeDetailKey, {
         productName: nextProduct.name,
         featureName,
       });

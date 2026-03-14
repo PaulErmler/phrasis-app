@@ -210,6 +210,12 @@
         ]
       },
       {
+        "question": "Woher stammen eure Sätze?",
+        "answer": [
+          "Viele unserer Sätze stammen aus dem umfangreichen Datensatz von Tatoeba, veröffentlicht unter einer CC-BY-Lizenz. Einige der Sätze wurden von uns erstellt."
+        ]
+      },
+      {
         "question": "Kann ich Cacatua als App herunterladen?",
         "answer": [
           "Du kannst Cacatua jetzt als Web-App installieren! Das gibt dir ein app-ähnliches Erlebnis und Zugriff über deinen Startbildschirm. Wir arbeiten auch an nativen iOS- und Android-Apps, die bald in den App-Stores verfügbar sein werden."

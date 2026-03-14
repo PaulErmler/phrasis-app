@@ -6,15 +6,15 @@ export function FAQSection() {
   const t = useTranslations('LandingPage.faq');
 
   // Get FAQs from translations
-  const answerCounts = [2, 1, 2, 2, 2, 2, 2, 1];
-  const faqs = Array.from({ length: 8 }, (_, i) => {
+  const answerCounts = [2, 1, 2, 2, 2, 2, 2, 1, 1];
+  const faqs = Array.from({ length: 9 }, (_, i) => {
     const answerCount = answerCounts[i] ?? 1;
     return {
       question: t(`items.${i}.question`),
       answer: Array.from({ length: answerCount }, (_, j) =>
         t(`items.${i}.answer.${j}`),
       ),
-      hasInstallButton: i === 7,
+      hasInstallButton: i === 8,
     };
   });
   return (

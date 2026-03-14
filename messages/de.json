@@ -105,7 +105,11 @@
     },
     "settings": {
       "account": "Konto",
-      "language": "App-Sprache"
+      "language": "App-Sprache",
+      "attribution": {
+        "label": "Datenquellen",
+        "text": "Viele der Sätze stammen aus dem umfangreichen Datensatz von <tatoeba>Tatoeba</tatoeba>, veröffentlicht unter einer <ccby>CC-BY-Lizenz</ccby>."
+      }
     },
     "deckCards": {
       "statusFavorite": "Favorit",
@@ -441,6 +445,8 @@
     "upgradeTo": "Upgrade auf {productName}",
     "addOnDetail": "Kaufe das {productName}-Add-on, um diese Funktion freizuschalten.",
     "upgradeDetail": "Upgrade auf {productName}, um diese Funktion freizuschalten.",
+    "upgradeDetailUsageLimit": "Upgrade auf {productName} für mehr {featureName}.",
+    "upgradeDetailCap": "Upgrade auf {productName}, um dein {featureName}-Limit zu erhöhen.",
     "usageLimitWithDetail": "Du hast alle deine {featureName} für diesen Zeitraum aufgebraucht. {detail}",
     "capReachedWithDetail": "Du hast die maximale Anzahl an {featureName} erreicht. {detail}",
     "featureFlagWithDetail": "{featureName} ist in deinem aktuellen Plan nicht verfügbar. {detail}",

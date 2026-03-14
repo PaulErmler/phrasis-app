@@ -31,7 +31,16 @@ export function useVoiceRecording(
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+
+      const preferredTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+      ];
+      const mimeType = preferredTypes.find((t) => MediaRecorder.isTypeSupported(t));
+      const options = mimeType ? { mimeType } : undefined;
+
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -43,17 +52,19 @@ export function useVoiceRecording(
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
+        const actualMimeType = mediaRecorder.mimeType || 'audio/webm';
 
         if (audioChunksRef.current.length > 0) {
           setIsTranscribing(true);
           try {
             const audioBlob = new Blob(audioChunksRef.current, {
-              type: 'audio/webm',
+              type: actualMimeType,
             });
             const arrayBuffer = await audioBlob.arrayBuffer();
 
             const transcript = await transcribeAudio({
               audio: arrayBuffer as ArrayBuffer,
+              mimeType: actualMimeType,
             });
 
             onTranscript(transcript);

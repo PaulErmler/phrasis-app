@@ -16,7 +16,7 @@ export function SettingsView() {
   const userEmail = session?.user?.email;
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-8">
+    <div className="flex-1 overflow-y-auto px-4 py-6">
     <div className="app-view">
       <Card>
         <CardContent className="space-y-6">
@@ -46,6 +46,29 @@ export function SettingsView() {
           <Separator/> 
 
           <PricingTable />
+
+          <Separator />
+
+          {/* Attribution Section */}
+          <div className="space-y-2">
+            <label className="label-form">
+              {t('settings.attribution.label')}
+            </label>
+            <p className="text-sm text-muted-foreground">
+              {t.rich('settings.attribution.text', {
+                tatoeba: (chunks) => (
+                  <a href="http://tatoeba.org/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    {chunks}
+                  </a>
+                ),
+                ccby: (chunks) => (
+                  <a href="http://creativecommons.org/licenses/by/2.0/fr/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                    {chunks}
+                  </a>
+                ),
+              })}
+            </p>
+          </div>
 
           <Separator />
 

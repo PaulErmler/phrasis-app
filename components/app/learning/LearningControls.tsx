@@ -56,11 +56,24 @@ export function LearningControls({
     return () => clearTimeout(id);
   }, [isReviewing]);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const idx = parseInt(e.key, 10) - 1;
+      if (idx >= 0 && idx < validRatings.length) {
+        onSelectRating(validRatings[idx]);
+        if (instantProceed) onNext();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [validRatings, onSelectRating, instantProceed, onNext]);
+
   return (
     <div className="relative bg-background pb-safe">
       <div className="hidden lg:block pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] border-t border-border" />
       {/* Open chat button - above bordered area (mobile only) */}
-      <div className="flex justify-end px-4 pt-4 pb-3 lg:hidden">
+      <div className="max-w-lg mx-auto flex justify-end px-4 pt-4 pb-3 lg:hidden">
         <Button
           variant="outline"
           size="icon"
@@ -73,7 +86,8 @@ export function LearningControls({
         </Button>
       </div>
 
-      <div className="border-t lg:border-t-0 max-w-lg mx-auto px-4 py-4 space-y-3">
+      <div className="border-t lg:border-t-0">
+      <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
         {/* Rating buttons */}
         <div className="flex gap-2" data-tutorial="rating-buttons">
           {validRatings.map((rating) => (
@@ -152,6 +166,7 @@ export function LearningControls({
             )}
           </Button>
         </div>
+      </div>
       </div>
     </div>
   );

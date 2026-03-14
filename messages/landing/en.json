@@ -210,6 +210,12 @@
         ]
       },
       {
+        "question": "Where do your sentences come from?",
+        "answer": [
+          "A lot of our sentences are from Tatoeba's massive dataset, released under a CC-BY License. Some of the sentences have been created by us."
+        ]
+      },
+      {
         "question": "Can I download Cacatua as an app?",
         "answer": [
           "You can install Cacatua as a Web App right now! This gives you an app-like experience and home screen access. We're also working on native iOS and Android apps that will be available in the app stores soon."
