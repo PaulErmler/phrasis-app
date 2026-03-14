@@ -97,11 +97,17 @@ pnpm lint
 
 ---
 
-# Setting up git lfs
+# Git LFS
 
-```
-https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage
-```
+[Install Git LFS](https://docs.github.com/en/repositories/working-with-files/managing-large-files/installing-git-large-file-storage) if you haven’t already.
+
+The repo uses **`.lfsconfig`** so the currently largest input files (`data_preparation/data/inputs/sentences.csv`, ~708 MB) is excluded from LFS fetch by default. Other LFS files are still pulled on clone/pull, which keeps deploys (e.g. Coolify) fast and within GitHub LFS quota. 
+
+- **When you need the big file** (e.g. to run the data-prep pipeline):
+  ```bash
+  git lfs pull --include="data_preparation/data/inputs/sentences.csv"
+  ```
+- To skip **all** LFS files on clone/pull, set `GIT_LFS_SKIP_SMUDGE=1` in your environment (e.g. deploy config).
 
 ---
 

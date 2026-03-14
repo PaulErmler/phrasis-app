@@ -1,0 +1,5 @@
+# Exclude the large input CSV from LFS fetch (saves ~708 MB and GitHub LFS quota on clone/pull).
+# Other LFS files (output CSVs, etc.) are still fetched.
+# To fetch this file when needed (e.g. for data preparation): git lfs pull --include="data_preparation/data/inputs/sentences.csv"
+[lfs]
+	fetchexclude = data_preparation/data/inputs/sentences.csv
