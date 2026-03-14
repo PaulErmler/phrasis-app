@@ -13,6 +13,7 @@ const MIME_TO_EXT: Record<string, string> = {
   'audio/wav': 'wav',
   'audio/flac': 'flac',
   'audio/x-m4a': 'm4a',
+  'audio/x-caf': 'caf',
   'audio/mp4;codecs=mp4a.40.2': 'mp4',
   'audio/webm;codecs=opus': 'webm',
 };
@@ -42,6 +43,8 @@ export const transcribeAudio = action({
     const rawMime = args.mimeType ?? 'audio/webm';
     const baseMime = rawMime.split(';')[0].trim();
     const ext = extForMime(rawMime);
+
+    console.log(`Transcribing: mime=${rawMime}, ext=${ext}, size=${args.audio.byteLength}`);
 
     try {
       const blob = new Blob([args.audio], { type: baseMime });

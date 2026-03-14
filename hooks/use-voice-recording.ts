@@ -4,6 +4,16 @@ import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants/chat';
 
+function detectDefaultMime(): string {
+  if (
+    typeof navigator !== 'undefined' &&
+    /iPad|iPhone|iPod/.test(navigator.userAgent)
+  ) {
+    return 'audio/mp4';
+  }
+  return 'audio/webm';
+}
+
 interface UseVoiceRecordingReturn {
   isRecording: boolean;
   isTranscribing: boolean;
@@ -35,10 +45,13 @@ export function useVoiceRecording(
       const preferredTypes = [
         'audio/webm;codecs=opus',
         'audio/webm',
+        'audio/mp4;codecs=mp4a.40.2',
         'audio/mp4',
+        'audio/aac',
       ];
       const mimeType = preferredTypes.find((t) => MediaRecorder.isTypeSupported(t));
       const options = mimeType ? { mimeType } : undefined;
+      const chosenMime = mimeType ?? detectDefaultMime();
 
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
@@ -52,7 +65,7 @@ export function useVoiceRecording(
 
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
-        const actualMimeType = mediaRecorder.mimeType || 'audio/webm';
+        const actualMimeType = mediaRecorder.mimeType || chosenMime;
 
         if (audioChunksRef.current.length > 0) {
           setIsTranscribing(true);
