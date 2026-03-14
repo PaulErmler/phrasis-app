@@ -19,7 +19,7 @@ export const transcribeAudio = action({
 
     try {
       const transcript = await transcribe({
-        model: openai.transcription('gpt-4o-mini-transcribe'),
+        model: openai.transcription('gpt-4o-transcribe'),
         audio: args.audio,
       });
 

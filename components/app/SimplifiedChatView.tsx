@@ -27,6 +27,7 @@ export function SimplifiedChatView({ threadId }: SimplifiedChatViewProps) {
     <ChatPanel
       threadId={threadId}
       toolRenderers={toolRenderers}
+      className="max-w-xl mx-auto"
     />
   );
 }

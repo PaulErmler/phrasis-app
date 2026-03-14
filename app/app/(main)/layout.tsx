@@ -24,19 +24,22 @@ import { ContentView } from '@/components/app/ContentView';
 import { LibraryView } from '@/components/app/LibraryView';
 import { SettingsView } from '@/components/app/SettingsView';
 import { LearnView } from '@/components/app/learning/LearnView';
+import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
 
-const VIEW_PATHS: Record<View, string> = {
+const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   home: '/app',
   content: '/app/content',
   library: '/app/library',
   settings: '/app/settings',
 };
 
-function viewFromPathname(pathname: string): View {
-  if (pathname.startsWith('/app/content')) return 'content';
-  if (pathname.startsWith('/app/library')) return 'library';
-  if (pathname.startsWith('/app/settings')) return 'settings';
-  return 'home';
+function viewFromPathname(pathname: string): { view: View; chatThreadId?: string } {
+  if (pathname.startsWith('/app/content')) return { view: 'content' };
+  if (pathname.startsWith('/app/library')) return { view: 'library' };
+  if (pathname.startsWith('/app/settings')) return { view: 'settings' };
+  const chatMatch = pathname.match(/^\/app\/chat\/(.+)/);
+  if (chatMatch) return { view: 'chat', chatThreadId: chatMatch[1] };
+  return { view: 'home' };
 }
 
 export default function MainLayout({
@@ -64,8 +67,12 @@ export default function MainLayout({
   const { isAuthenticated } = useConvexAuth();
 
   const [activeView, setActiveView] = useState<View>(() =>
-    viewFromPathname(pathname),
+    viewFromPathname(pathname).view,
   );
+  const [chatThreadId, setChatThreadId] = useState<string | null>(() =>
+    viewFromPathname(pathname).chatThreadId ?? null,
+  );
+  const viewBeforeChatRef = useRef<Exclude<View, 'chat'>>('home');
   const [isLearnOpen, setIsLearnOpen] = useState(false);
   const [courseMenuOpen, setCourseMenuOpen] = useState(false);
 
@@ -114,7 +121,25 @@ export default function MainLayout({
   const handleViewChange = useCallback((view: View) => {
     setActiveView(view);
     setIsLearnOpen(false);
-    history.pushState(null, '', VIEW_PATHS[view]);
+    if (view !== 'chat') {
+      history.pushState(null, '', VIEW_PATHS[view]);
+    }
+  }, []);
+
+  const handleOpenChat = useCallback((threadId: string) => {
+    setActiveView((prev) => {
+      if (prev !== 'chat') viewBeforeChatRef.current = prev;
+      return 'chat';
+    });
+    setChatThreadId(threadId);
+    setIsLearnOpen(false);
+    history.pushState(null, '', `/app/chat/${threadId}`);
+  }, []);
+
+  const handleChatBack = useCallback(() => {
+    const target = viewBeforeChatRef.current;
+    setActiveView(target);
+    history.pushState(null, '', VIEW_PATHS[target]);
   }, []);
 
   // Learn overlay — pushState so the browser back button can close it
@@ -138,7 +163,16 @@ export default function MainLayout({
         setIsLearnOpen(true);
       } else {
         setIsLearnOpen(false);
-        setActiveView(viewFromPathname(url));
+        const parsed = viewFromPathname(url);
+        setActiveView((prev) => {
+          if (parsed.view === 'chat' && prev !== 'chat') {
+            viewBeforeChatRef.current = prev;
+          }
+          return parsed.view;
+        });
+        if (parsed.chatThreadId) {
+          setChatThreadId(parsed.chatThreadId);
+        }
       }
     };
     window.addEventListener('popstate', onPopState);
@@ -167,6 +201,15 @@ export default function MainLayout({
                 <ChevronLeft className="h-4 w-4" />
                 {courseButtonLabel}
               </Button>
+            ) : activeView === 'chat' ? (
+              <Button
+                variant="ghost"
+                onClick={handleChatBack}
+                className="gap-2 -ml-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                {t('views.chat')}
+              </Button>
             ) : (
               <h1 className="heading-section capitalize">
                 {t(`views.${activeView}`)}
@@ -188,6 +231,7 @@ export default function MainLayout({
                 preloadedCustomCollectionsProgress
               }
               onLearnOpen={handleLearnOpen}
+              onChatOpen={handleOpenChat}
             />
           )}
           <div
@@ -198,7 +242,7 @@ export default function MainLayout({
                   : 'none',
             }}
           >
-            <ContentView />
+            <ContentView onChatOpen={handleOpenChat} />
           </div>
           {!isLearnOpen && activeView === 'library' && <LibraryView />}
           <div
@@ -211,6 +255,9 @@ export default function MainLayout({
           >
             <SettingsView />
           </div>
+          {!isLearnOpen && activeView === 'chat' && chatThreadId && (
+            <SimplifiedChatView threadId={chatThreadId} />
+          )}
         </main>
 
         <BottomNav

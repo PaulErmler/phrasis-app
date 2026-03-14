@@ -6,6 +6,7 @@ import { Lock } from 'lucide-react';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Shimmer } from '@/components/ai-elements/shimmer';
 import { getLanguageByCode } from '@/lib/languages';
 import type { CreateCardToolPart } from '@/lib/types/tool-parts';
 import type { CardApprovalStatus } from '@/convex/types';
@@ -62,7 +63,7 @@ export function CardApproval({
     errorText?: string;
     output?: unknown;
   };
-  const { state: toolState, errorText: toolErrorText, output: toolOutput } = tool;
+  const { state: toolState, output: toolOutput } = tool;
 
   const entries = toolPart.input?.translations ?? [];
   const approval = toolCallId ? approvalsByToolCallId.get(toolCallId) : undefined;
@@ -104,12 +105,27 @@ export function CardApproval({
     );
   }
 
+  if (isWaiting && !isToolComplete) {
+    return (
+      <Alert className="my-3 border-muted animate-pulse">
+        <AlertDescription>
+          <div className="space-y-2">
+            <div className="h-4 w-3/4 rounded bg-muted" />
+            <div className="h-5 w-5/6 rounded bg-muted" />
+          </div>
+          <div className="mt-3">
+            <Shimmer duration={1.5}>{t('creatingApproval')}</Shimmer>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
   if (isWaiting) {
-    const msg = isToolComplete ? t('loading') : t('creatingApproval');
     return (
       <Alert className="my-3 border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
         <AlertDescription className="text-yellow-700 dark:text-yellow-300">
-          {msg}
+          {t('loading')}
         </AlertDescription>
       </Alert>
     );
@@ -117,6 +133,30 @@ export function CardApproval({
 
   const targetEntries = entries.filter((e) => targetLanguages.includes(e.language));
   const baseEntries = entries.filter((e) => !targetLanguages.includes(e.language));
+
+  if (!isToolComplete) {
+    return (
+      <Alert className="my-3 flex flex-col gap-3 border-muted">
+        <AlertDescription>
+          <div className="space-y-1.5 text-sm opacity-60">
+            {baseEntries.map((entry, i) => (
+              <p key={`base-${i}`} className="text-sm text-muted-foreground">
+                <Lang code={entry.language} /> {entry.text}
+              </p>
+            ))}
+            {targetEntries.map((entry, i) => (
+              <p key={`target-${i}`} className="text-base font-semibold">
+                <Lang code={entry.language} /> {entry.text}
+              </p>
+            ))}
+          </div>
+          <div className="mt-3">
+            <Shimmer duration={1.5}>{t('creatingApproval')}</Shimmer>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   const cardContent = (
     <div className="space-y-1.5 text-sm">

@@ -23,6 +23,7 @@ interface NewChatInputProps {
   placeholder?: string;
   className?: string;
   showSuggestions?: boolean;
+  onChatCreated?: (threadId: string) => void;
 }
 
 /**
@@ -39,6 +40,7 @@ interface NewChatInputProps {
 export function NewChatInput({
   className,
   showSuggestions = true,
+  onChatCreated,
 }: NewChatInputProps) {
   const t = useTranslations('Chat.errors');
   const router = useRouter();
@@ -81,7 +83,11 @@ export function NewChatInput({
         });
 
         setText('');
-        router.push(`/app/chat/${threadId}`);
+        if (onChatCreated) {
+          onChatCreated(threadId);
+        } else {
+          router.push(`/app/chat/${threadId}`);
+        }
       } catch (error) {
         if (
           error instanceof ConvexError &&
@@ -96,7 +102,7 @@ export function NewChatInput({
         setIsProcessing(false);
       }
     },
-    [createThread, sendMessageMutation, router, isAvailable, t],
+    [createThread, sendMessageMutation, router, isAvailable, t, onChatCreated],
   );
 
   // Handle suggestion click - populate input instead of sending

@@ -19,6 +19,7 @@ export function HomeView({
   preloadedCourseStats,
   preloadedCustomCollectionsProgress,
   onLearnOpen,
+  onChatOpen,
 }: {
   preloadedCollectionProgress: Preloaded<
     typeof api.features.decks.getCollectionProgress
@@ -33,6 +34,7 @@ export function HomeView({
     typeof api.features.decks.getCustomCollectionsProgress
   >;
   onLearnOpen: () => void;
+  onChatOpen: (threadId: string) => void;
 }) {
   const t = useTranslations('AppPage');
 
@@ -89,6 +91,7 @@ export function HomeView({
         <NewChatInput
           showSuggestions={false}
           className="[&_[data-slot=input-group]]:rounded-xl"
+          onChatCreated={onChatOpen}
         />
 
         <div className="space-y-2" data-tutorial="collection-carousel">

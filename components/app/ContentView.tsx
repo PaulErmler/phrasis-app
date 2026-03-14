@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useTranslations } from 'next-intl';
@@ -9,9 +8,8 @@ import { MessageSquare, Upload, PenLine, ChevronRight, Loader2 } from 'lucide-re
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 
-export function ContentView() {
+export function ContentView({ onChatOpen }: { onChatOpen: (threadId: string) => void }) {
   const t = useTranslations('AppPage');
-  const router = useRouter();
   const getOrCreateEmptyThread = useMutation(
     api.features.chat.threads.getOrCreateEmptyThread,
   );
@@ -21,13 +19,14 @@ export function ContentView() {
     setIsNavigating(true);
     try {
       const threadId = await getOrCreateEmptyThread({});
-      router.push(`/app/chat/${threadId}`);
+      onChatOpen(threadId);
     } catch (error) {
       console.error('Failed to open chat:', error);
       toast.error('Failed to open chat');
+    } finally {
       setIsNavigating(false);
     }
-  }, [getOrCreateEmptyThread, router]);
+  }, [getOrCreateEmptyThread, onChatOpen]);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-8">

@@ -72,12 +72,10 @@ function MessageParts({
   message,
   isStreaming,
   toolRenderers,
-  thinkingLabel,
 }: {
   message: ExtendedUIMessage;
   isStreaming: boolean;
   toolRenderers?: Record<string, ToolRenderer>;
-  thinkingLabel: string;
 }) {
   const parts = message.parts!;
   const renderedTextParts = new Set<string>();
@@ -132,39 +130,11 @@ function MessageParts({
     }
   }
 
-  return (
-    <>
-      {elements}
-      {isStreaming && (
-        <div key={`${message.id}-streaming`} className="mt-2">
-          <Shimmer duration={1}>{thinkingLabel}</Shimmer>
-        </div>
-      )}
-    </>
-  );
+  return <>{elements}</>;
 }
 
-function PlainTextContent({
-  messageId,
-  text,
-  isStreaming,
-  thinkingLabel,
-}: {
-  messageId: string;
-  text: string;
-  isStreaming: boolean;
-  thinkingLabel: string;
-}) {
-  return (
-    <>
-      <MessageResponse>{text}</MessageResponse>
-      {isStreaming && text && (
-        <div key={`${messageId}-streaming`} className="mt-2">
-          <Shimmer duration={1}>{thinkingLabel}</Shimmer>
-        </div>
-      )}
-    </>
-  );
+function PlainTextContent({ text }: { text: string }) {
+  return <MessageResponse>{text}</MessageResponse>;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,15 +212,9 @@ export function ChatMessages({
                               message={message}
                               isStreaming={isAssistantStreaming}
                               toolRenderers={toolRenderers}
-                              thinkingLabel={t('thinking')}
                             />
                           ) : (
-                            <PlainTextContent
-                              messageId={message.id}
-                              text={messageText}
-                              isStreaming={isAssistantStreaming}
-                              thinkingLabel={t('thinking')}
-                            />
+                            <PlainTextContent text={messageText} />
                           )}
                         </MessageContent>
                       </Message>
