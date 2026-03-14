@@ -29,7 +29,7 @@ export function CreateCourseDialog({
   onOpenChange,
 }: CreateCourseDialogProps) {
   const t = useTranslations('AppPage.courses.createDialog');
-  const tLevels = useTranslations('Onboarding.step4');
+  const tLevels = useTranslations('Onboarding.difficulty');
   const locale = useLocale();
 
   const [step, setStep] = useState(1);
@@ -128,9 +128,7 @@ export function CreateCourseDialog({
       id: 'beginner' as const,
       icon: LEVEL_ICONS.beginner,
       title: tLevels('beginner.title'),
-      description: tLevels('beginner.description', {
-        language: targetLanguageName || 'the language',
-      }),
+      description: tLevels('beginner.description'),
     },
     {
       id: 'elementary' as const,
@@ -155,6 +153,12 @@ export function CreateCourseDialog({
       icon: LEVEL_ICONS.advanced,
       title: tLevels('advanced.title'),
       description: tLevels('advanced.description'),
+    },
+    {
+      id: 'proficient' as const,
+      icon: LEVEL_ICONS.proficient,
+      title: tLevels('proficient.title'),
+      description: tLevels('proficient.description'),
     },
   ];
 

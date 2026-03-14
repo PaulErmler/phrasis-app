@@ -230,6 +230,7 @@
     "chat": "Chat",
     "back": "Zurück",
     "settings": "Einstellungen",
+    "tutorial": "Tutorial wiederholen",
     "loading": "Lädt...",
     "baseLanguage": "Ausgangssprache",
     "targetLanguage": "Zielsprache",
@@ -594,6 +595,74 @@
       "title": "Du bist bereit!",
       "subtitle": "Deine personalisierte Lernerfahrung ist nun vorbereitet.",
       "button": "Zur App"
+    }
+  },
+  "Tutorial": {
+    "home": {
+      "welcome": {
+        "title": "Willkommen bei Cacatua!",
+        "description": "Wir geben dir einen kurzen Überblick, damit du direkt loslegen kannst. Du kannst dies jederzeit schließen."
+      },
+      "learningModes": {
+        "title": "Lernmodi",
+        "description": "Cacatua bietet 2 verschiedene Übungsmodi. Voll-Übung lässt dich Übersetzungen eintippen — ideal für konzentriertes Lernen. Audio-Übung spielt Sätze vor, damit du unterwegs lernen kannst."
+      },
+      "difficultySelection": {
+        "title": "Schwierigkeitsauswahl",
+        "description": "Hier kannst du deine Schwierigkeit auswählen. Jede Schwierigkeit ist eine Sammlung von Sätzen zum Lernen. Klicke auf eine Sammlung, um die nächsten Sätze zu sehen."
+      }
+    },
+    "audioReview": {
+      "welcome": {
+        "title": "Willkommen zur Audio-Übung",
+        "description": "In diesem Modus kannst du Sätze freihändig wiederholen. Die Texte werden automatisch vorgelesen und es geht automatisch zur nächsten Karte weiter. Du kannst das Timing in den Einstellungen anpassen."
+      },
+      "card": {
+        "title": "Die Karte",
+        "description": "Diese Karte zeigt die Texte in den Sprachen, die du lernst. Du kannst später weitere Sprachen zum Kurs hinzufügen."
+      },
+      "targetText": {
+        "title": "Zieltext und Audio",
+        "description": "Die Zielübersetzung ist standardmäßig ausgeblendet. Sie wird automatisch eingeblendet oder wenn du darauf klickst. Du kannst auch Audio abspielen, indem du auf den Audio-Button klickst."
+      },
+      "rating": {
+        "title": "Bewerte dein Erinnern",
+        "description": "Jede Karte wird anfangs mehrmals angezeigt, bevor die Wiederholung mit Abständen beginnt. \"Verstanden\" überspringt den Rest dieser anfänglichen Wiederholungen. Danach siehst du detailliertere Bewertungen: Nochmal, Schwer, Gut, Leicht."
+      },
+      "audioControls": {
+        "title": "Audio-Wiedergabe",
+        "description": "Standardmäßig wird das Audio automatisch abgespielt. Zuerst die Ausgangssprache, dann eine Pause zum Nachdenken, dann die Zielsprache, bevor automatisch zur nächsten Karte gewechselt wird."
+      },
+      "settings": {
+        "title": "Einstellungen",
+        "description": "Hier kannst du Wiedergabegeschwindigkeit, Sprachreihenfolge, automatisches Weiterschalten, Ausblenden des Zieltextes, die Anzahl der anfänglichen Wiederholungen und mehr ändern."
+      }
+    },
+    "fullReview": {
+      "welcome": {
+        "title": "Willkommen zur Voll-Übung",
+        "description": "In diesem Modus übst du aktiv das Schreiben und bekommst sofort Feedback."
+      },
+      "card": {
+        "title": "Die Karte",
+        "description": "Die Karte zeigt in diesem Modus die Ziel- und Ausgangssprachen an und ermöglicht dir, die Übersetzungen einzutippen."
+      },
+      "input": {
+        "title": "Übersetzung eingeben",
+        "description": "Hier gibst du die Übersetzung ein. Du kannst auch das Audio der Zielsprache anhören, bevor du sie eintippst."
+      },
+      "rating": {
+        "title": "Bewerte deine Antwort",
+        "description": "Nach dem Feedback bewerte, wie gut du dich erinnert hast: Nochmal, Schwer, Gut oder Leicht. Dies steuert den Wiederholungsplan."
+      },
+      "settings": {
+        "title": "Einstellungen",
+        "description": "Hier kannst du deine Einstellungen anpassen. Du kannst zwischen Übungsmodi wechseln und Audio-Einstellungen ändern."
+      }
+    },
+    "chat": {
+      "title": "Chat-Assistent",
+      "description": "Nutze den Chat, um nach Grammatik zu fragen, Erklärungen zu erhalten oder neue Lernkarten zu erstellen. Der KI-Assistent hilft dir beim Lernen!"
     }
   }
 }

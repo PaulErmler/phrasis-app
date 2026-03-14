@@ -21,13 +21,14 @@ export const COLLECTION_PREVIEW_SIZE = 5;
  * Maps the onboarding `currentLevel` value to the collection name that should
  * be preselected as the user's starting difficulty.
  *
- * | currentLevel       | Collection |
- * |--------------------|------------|
- * | beginner           | Essential  |
- * | elementary         | A2         |
- * | intermediate       | B1         |
- * | upper_intermediate | B2         |
- * | advanced           | C1         |
+ * | currentLevel       | Collection | Approx. words known |
+ * |--------------------|------------|---------------------|
+ * | beginner           | Essential  | ~0                  |
+ * | elementary         | A2         | ~1,000              |
+ * | intermediate       | B1         | ~2,000              |
+ * | upper_intermediate | B2         | ~3,500              |
+ * | advanced           | C1         | ~5,000              |
+ * | proficient         | C2         | 8,000+              |
  */
 export const LEVEL_TO_COLLECTION: Record<string, string> = {
   beginner: 'Essential',
@@ -35,6 +36,7 @@ export const LEVEL_TO_COLLECTION: Record<string, string> = {
   intermediate: 'B1',
   upper_intermediate: 'B2',
   advanced: 'C1',
+  proficient: 'C2',
 };
 
 /**

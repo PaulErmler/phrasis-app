@@ -68,49 +68,52 @@ export function LearningCardContent({
   };
 
   return (
-    <CardShell
-      reviewCount={displayReviewCount}
-      sourceText={sourceText}
-      translations={translations}
-      audioRecordings={audioRecordings}
-      isFavorite={isFavorite}
-      isPendingMaster={isPendingMaster}
-      isPendingHide={isPendingHide}
-      onMaster={onMaster}
-      onHide={onHide}
-      onFavorite={onFavorite}
-      onAudioPlay={onAudioPlay}
-      bare={bare}
-    >
-      {({ targetTranslations }) => (
-        <div className="space-y-2">
-          {targetTranslations.map((translation) => {
-            const audio = audioRecordings.find(
-              (a) => a.language === translation.language,
-            );
-            const isAudioRevealed = autoRevealLanguages && (revealedLanguages?.has(translation.language) ?? false);
-            const isBlurred = hideTargetLanguages && !isAudioRevealed && !manuallyRevealed.has(translation.language);
-            return (
-              <div
-                key={translation.language}
-                className="flex items-start gap-2"
-              >
-                <p
-                  className={`flex-1 body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
-                  onClick={isBlurred ? () => handleReveal(translation.language) : undefined}
+    <div data-tutorial="card-content" className="flex flex-col flex-1 min-h-0">
+      <CardShell
+        reviewCount={displayReviewCount}
+        sourceText={sourceText}
+        translations={translations}
+        audioRecordings={audioRecordings}
+        isFavorite={isFavorite}
+        isPendingMaster={isPendingMaster}
+        isPendingHide={isPendingHide}
+        onMaster={onMaster}
+        onHide={onHide}
+        onFavorite={onFavorite}
+        onAudioPlay={onAudioPlay}
+        bare={bare}
+      >
+        {({ targetTranslations }) => (
+          <div className="space-y-2">
+            {targetTranslations.map((translation, index) => {
+              const audio = audioRecordings.find(
+                (a) => a.language === translation.language,
+              );
+              const isAudioRevealed = autoRevealLanguages && (revealedLanguages?.has(translation.language) ?? false);
+              const isBlurred = hideTargetLanguages && !isAudioRevealed && !manuallyRevealed.has(translation.language);
+              return (
+                <div
+                  key={translation.language}
+                  className="flex items-start gap-2"
+                  {...(index === 0 ? { 'data-tutorial': 'target-text-audio' } : {})}
                 >
-                  {translation.text || '...'}
-                </p>
-                <AudioButton
-                  url={audio?.url ?? null}
-                  language={translation.language.toUpperCase()}
-                  onPlay={onAudioPlay}
-                />
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </CardShell>
+                  <p
+                    className={`flex-1 body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                    onClick={isBlurred ? () => handleReveal(translation.language) : undefined}
+                  >
+                    {translation.text || '...'}
+                  </p>
+                  <AudioButton
+                    url={audio?.url ?? null}
+                    language={translation.language.toUpperCase()}
+                    onPlay={onAudioPlay}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardShell>
+    </div>
   );
 }

@@ -17,6 +17,7 @@ export const currentLevelValidator = v.union(
   v.literal('intermediate'),
   v.literal('upper_intermediate'),
   v.literal('advanced'),
+  v.literal('proficient'),
 );
 
 // FSRS scheduling state (inner object, wrap with v.optional / v.union as needed)

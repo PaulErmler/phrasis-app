@@ -67,6 +67,7 @@ export function LearningControls({
           onClick={openChat}
           className="h-9 w-9 shrink-0"
           aria-label="Open chat"
+          data-tutorial="chat-button"
         >
           <MessageCircle className="h-5 w-5" />
         </Button>
@@ -74,7 +75,7 @@ export function LearningControls({
 
       <div className="border-t lg:border-t-0 max-w-lg mx-auto px-4 py-4 space-y-3">
         {/* Rating buttons */}
-        <div className="flex gap-2">
+        <div className="flex gap-2" data-tutorial="rating-buttons">
           {validRatings.map((rating) => (
             <div
               key={rating}
@@ -114,7 +115,7 @@ export function LearningControls({
         )}
 
         {/* Restart + Play + Next row */}
-        <div className="flex gap-2">
+        <div className="flex gap-2" data-tutorial="audio-controls">
           <Button
             variant="outline"
             size="icon"

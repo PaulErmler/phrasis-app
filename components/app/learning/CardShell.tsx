@@ -53,7 +53,7 @@ export function CardShell({
   const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
 
   const cardSurface = (
-    <div className="card-surface">
+    <div className="card-surface" data-tutorial="card-flashcard">
       {/* Card top bar: metadata left, actions right */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
@@ -113,7 +113,7 @@ export function CardShell({
       {/* Card text content */}
       <div className="px-6 pb-6 space-y-4">
         {/* Base language texts */}
-        <div className="space-y-2">
+        <div className="space-y-2" data-tutorial="base-languages">
           {baseTranslations.map((translation) => {
             const audio = audioRecordings.find(
               (a) => a.language === translation.language,

@@ -157,6 +157,7 @@ export function CollectionCarouselUI({
                     isActive && !isComplete && "state-active",
                     isComplete && "opacity-50"
                   )}
+                  {...(isActive ? { 'data-tutorial': 'active-collection' } : {})}
                 >
                   {/* Header: title + select button */}
                   <div className="flex items-start justify-between gap-2 mb-2">

@@ -21,6 +21,8 @@ import { useCardApprovals } from '@/hooks/use-card-approvals';
 import { useThread } from '@/hooks/use-thread';
 import { Loader } from '@/components/ai-elements/loader';
 import { useAppData } from '@/components/app/AppDataProvider';
+import { useTutorial } from '@/lib/tutorials/use-tutorial';
+import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
 import type { Id } from '@/convex/_generated/dataModel';
 
 function WrappedChatPanel({
@@ -96,7 +98,17 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
     courseSettings: preloadedCourseSettings,
     activeCourse: preloadedActiveCourse,
   });
-  const { audio, openSettings } = useLearningAudio(state);
+  const reviewMode = state.status !== 'loading' ? (state.courseSettings?.reviewMode ?? 'audio') : 'audio';
+  const tutorialId = reviewMode === 'full' ? TUTORIAL_IDS.FULL_REVIEW_INTRO : TUTORIAL_IDS.AUDIO_REVIEW_INTRO;
+  const { isActive, isCompleted } = useTutorial(tutorialId, {
+    delayMs: 1000,
+    enabled: state.status === 'reviewing' && !state.settingsOpen,
+  });
+  const { audio, openSettings } = useLearningAudio(state, {
+    disableAutoAdvance: reviewMode === 'audio' && isActive,
+    disableAutoPlay:
+      reviewMode === 'audio' && (isActive || !isCompleted),
+  });
 
   const goHome = useCallback(() => {
     audio.pause();

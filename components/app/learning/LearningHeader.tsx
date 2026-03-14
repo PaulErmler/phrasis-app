@@ -85,6 +85,7 @@ export function LearningHeader({
             size="icon"
             onClick={onSettingsOpen}
             className="-mr-2"
+            data-tutorial="settings-button"
           >
             <Settings className="h-5 w-5" />
           </Button>

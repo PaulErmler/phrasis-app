@@ -1,5 +1,3 @@
-export type LearningStyle = 'casual' | 'focused' | 'advanced';
-
 export type ReviewMode = 'audio' | 'full';
 
 export type CurrentLevel =
@@ -7,10 +5,10 @@ export type CurrentLevel =
   | 'elementary'
   | 'intermediate'
   | 'upper_intermediate'
-  | 'advanced';
+  | 'advanced'
+  | 'proficient';
 
 export interface OnboardingData {
-  learningStyle: LearningStyle | null;
   reviewMode: ReviewMode | null;
   targetLanguages: string[];
   currentLevel: CurrentLevel | null;

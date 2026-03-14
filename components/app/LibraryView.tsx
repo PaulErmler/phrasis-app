@@ -156,7 +156,7 @@ export function LibraryView() {
       </div>
 
       {/* Card list */}
-      <div className="max-w-xl mx-auto w-full pt-2.5 pb-4 space-y-2.5">
+      <div className="max-w-xl mx-auto w-full pt-2.5 pb-4 space-y-4">
         {isLoading && (
           <div className="card-surface p-4 flex items-center justify-center h-[180px]">
             <div className="flex flex-col items-center gap-2 text-muted-foreground">

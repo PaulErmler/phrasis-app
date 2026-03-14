@@ -1,5 +1,6 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query } from '../_generated/server';
+import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import { learningStyleValidator, currentLevelValidator, reviewModeValidator } from '../types';
 import {
@@ -24,6 +25,8 @@ import {
   validateInitialReviewCount,
 } from '../../lib/scheduling';
 import { LEVEL_TO_COLLECTION } from '../lib/collections';
+import { getNextTextsFromRank } from '../db/collections';
+import { createCardsFromTexts, updateCollectionProgress } from './decks';
 
 // ============================================================================
 // QUERIES
@@ -42,6 +45,7 @@ export const getUserSettings = query({
       hasCompletedOnboarding: v.boolean(),
       learningStyle: v.optional(learningStyleValidator),
       activeCourseId: v.optional(v.id('courses')),
+      completedTutorials: v.optional(v.array(v.string())),
     }),
     v.null(),
   ),
@@ -131,7 +135,6 @@ export const getOnboardingProgress = query({
       _creationTime: v.number(),
       userId: v.string(),
       step: v.number(),
-      learningStyle: v.optional(learningStyleValidator),
       reviewMode: v.optional(reviewModeValidator),
       currentLevel: v.optional(currentLevelValidator),
       targetLanguages: v.optional(v.array(v.string())),
@@ -234,7 +237,6 @@ export const setActiveCourse = mutation({
 export const saveOnboardingProgress = mutation({
   args: {
     step: v.number(),
-    learningStyle: v.optional(learningStyleValidator),
     reviewMode: v.optional(reviewModeValidator),
     targetLanguages: v.optional(v.array(v.string())),
     currentLevel: v.optional(currentLevelValidator),
@@ -245,7 +247,6 @@ export const saveOnboardingProgress = mutation({
     _creationTime: v.number(),
     userId: v.string(),
     step: v.number(),
-    learningStyle: v.optional(learningStyleValidator),
     reviewMode: v.optional(reviewModeValidator),
     currentLevel: v.optional(currentLevelValidator),
     targetLanguages: v.optional(v.array(v.string())),
@@ -254,7 +255,6 @@ export const saveOnboardingProgress = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
 
-    // Upsert onboarding progress
     const existingProgress = await dbGetOnboardingProgress(ctx, userId);
     let progressId;
     if (existingProgress) {
@@ -267,17 +267,11 @@ export const saveOnboardingProgress = mutation({
       });
     }
 
-    // Ensure userSettings exists
     const existingSettings = await dbGetUserSettings(ctx, userId);
     if (!existingSettings) {
       await ctx.db.insert('userSettings', {
         userId,
         hasCompletedOnboarding: false,
-        learningStyle: args.learningStyle,
-      });
-    } else {
-      await ctx.db.patch(existingSettings._id, {
-        learningStyle: args.learningStyle,
       });
     }
 
@@ -321,7 +315,7 @@ export const createCourse = mutation({
     let activeCollectionId: Id<'collections'> | undefined;
     if (args.currentLevel) {
       const collectionName =
-        LEVEL_TO_COLLECTION[args.currentLevel] ?? 'A1';
+        LEVEL_TO_COLLECTION[args.currentLevel] ?? 'Essential';
       const collection = await ctx.db
         .query('collections')
         .withIndex('by_name', (q) => q.eq('name', collectionName))
@@ -365,10 +359,10 @@ export const completeOnboarding = mutation({
 
     const existingSettings = await dbGetUserSettings(ctx, userId);
     const targetLanguages = progress.targetLanguages || [];
+    const baseLanguages = progress.baseLanguages || [];
 
-    // Create the course
     const courseId = await ctx.db.insert('courses', {
-      baseLanguages: progress.baseLanguages || [],
+      baseLanguages,
       targetLanguages,
       currentLevel: progress.currentLevel,
       userId,
@@ -377,7 +371,7 @@ export const completeOnboarding = mutation({
 
     // Map the user's level to a starting collection
     const collectionName =
-      LEVEL_TO_COLLECTION[progress.currentLevel ?? 'beginner'] ?? 'A1';
+      LEVEL_TO_COLLECTION[progress.currentLevel ?? 'beginner'] ?? 'Essential';
     const collection = await ctx.db
       .query('collections')
       .withIndex('by_name', (q) => q.eq('name', collectionName))
@@ -398,24 +392,54 @@ export const completeOnboarding = mutation({
       cardCount: 0,
     });
 
+    // Auto-add first 5 cards from the selected difficulty collection
+    const INITIAL_CARDS = 5;
+    if (collection) {
+      const textsToAdd = await getNextTextsFromRank(ctx, collection._id, 0, INITIAL_CARDS);
+
+      if (textsToAdd.length > 0) {
+        const deck = await ctx.db.get(deckId);
+        const course = await ctx.db.get(courseId);
+        if (!deck || !course) throw new ConvexError('Failed to load deck or course');
+
+        const { cardsInserted, newLastRank } = await createCardsFromTexts(
+          ctx, textsToAdd, deck, collection._id, course,
+        );
+
+        if (cardsInserted > 0) {
+          await ctx.db.patch(deckId, { cardCount: deck.cardCount + cardsInserted });
+        }
+
+        await useQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
+        await updateCollectionProgress(
+          ctx, userId, courseId, collection._id, textsToAdd.length, newLastRank,
+        );
+
+        for (const text of textsToAdd) {
+          await ctx.scheduler.runAfter(0, internal.features.decks.prepareCardContent, {
+            textId: text._id,
+            baseLanguages,
+            targetLanguages,
+          });
+        }
+      }
+    }
+
     let settingsId;
     if (!existingSettings) {
       settingsId = await ctx.db.insert('userSettings', {
         userId,
         hasCompletedOnboarding: true,
-        learningStyle: progress.learningStyle,
         activeCourseId: courseId,
       });
     } else {
       await ctx.db.patch(existingSettings._id, {
         hasCompletedOnboarding: true,
-        learningStyle: progress.learningStyle,
         activeCourseId: courseId,
       });
       settingsId = existingSettings._id;
     }
 
-    // Delete the onboarding progress
     await ctx.db.delete(progress._id);
 
     return { settingsId, courseId, deckId };
@@ -633,6 +657,71 @@ export const updateCourseSettings = mutation({
         fullReviewTargetAudioMode: args.fullReviewTargetAudioMode,
       });
     }
+
+    return null;
+  },
+});
+
+// ============================================================================
+// TUTORIALS
+// ============================================================================
+
+/**
+ * Get completed tutorials for the authenticated user.
+ */
+export const getCompletedTutorials = query({
+  args: {},
+  returns: v.array(v.string()),
+  handler: async (ctx) => {
+    try {
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return [];
+      const settings = await dbGetUserSettings(ctx, userId);
+      return settings?.completedTutorials ?? [];
+    } catch {
+      return [];
+    }
+  },
+});
+
+/**
+ * Mark a tutorial as completed.
+ */
+export const completeTutorial = mutation({
+  args: {
+    tutorialId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+    const settings = await dbGetUserSettings(ctx, userId);
+    if (!settings) throw new ConvexError('User settings not found');
+
+    const existing = settings.completedTutorials ?? [];
+    if (!existing.includes(args.tutorialId)) {
+      await ctx.db.patch(settings._id, {
+        completedTutorials: [...existing, args.tutorialId],
+      });
+    }
+
+    return null;
+  },
+});
+
+/**
+ * Reset all completed tutorials (for testing).
+ */
+export const resetTutorials = mutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const userId = await requireAuthUserId(ctx);
+    const settings = await dbGetUserSettings(ctx, userId);
+    if (!settings) throw new ConvexError('User settings not found');
+
+    await ctx.db.patch(settings._id, {
+      completedTutorials: [],
+    });
 
     return null;
   },

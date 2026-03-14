@@ -503,7 +503,7 @@ export const toggleCustomCollection = mutation({
  * Creates cards from a list of texts and returns count of new cards inserted.
  * Shared by both chat-collection and difficulty-collection card creation.
  */
-async function createCardsFromTexts(
+export async function createCardsFromTexts(
   ctx: MutationCtx,
   texts: Doc<'texts'>[],
   deck: Doc<'decks'>,
@@ -552,7 +552,7 @@ async function createCardsFromTexts(
 /**
  * Updates collection progress after adding cards.
  */
-async function updateCollectionProgress(
+export async function updateCollectionProgress(
   ctx: MutationCtx,
   userId: string,
   courseId: Id<'courses'>,

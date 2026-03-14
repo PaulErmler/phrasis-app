@@ -3,4 +3,5 @@ export type CurrentLevel =
   | 'elementary'
   | 'intermediate'
   | 'upper_intermediate'
-  | 'advanced';
+  | 'advanced'
+  | 'proficient';

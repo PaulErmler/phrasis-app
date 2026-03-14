@@ -12,7 +12,7 @@ export function BaseLanguagesStep({
   excludeLanguages,
   onToggleLanguage,
 }: BaseLanguagesStepProps) {
-  const t = useTranslations('Onboarding.step3');
+  const t = useTranslations('Onboarding.baseLanguage');
 
   return (
     <LanguageSelector

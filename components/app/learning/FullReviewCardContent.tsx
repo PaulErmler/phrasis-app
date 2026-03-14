@@ -103,54 +103,57 @@ export function FullReviewCardContent({
   }, []);
 
   return (
-    <CardShell
-      reviewCount={preReviewCount}
-      sourceText={sourceText}
-      translations={translations}
-      audioRecordings={audioRecordings}
-      isFavorite={isFavorite}
-      isPendingMaster={isPendingMaster}
-      isPendingHide={isPendingHide}
-      onMaster={onMaster}
-      onHide={onHide}
-      onFavorite={onFavorite}
-      onAudioPlay={onAudioPlay}
-      bare={bare}
-    >
-      {({ targetTranslations: targets }) => (
-        <div className="space-y-4">
-          {targets.map((translation, index) => {
-            const audio = audioRecordings.find(
-              (a) => a.language === translation.language,
-            );
-            const state = inputs.get(translation.language) ?? {
-              submitted: false,
-              userText: '',
-            };
+    <div data-tutorial="card-content-full" className="flex flex-col flex-1 min-h-0">
+      <CardShell
+        reviewCount={preReviewCount}
+        sourceText={sourceText}
+        translations={translations}
+        audioRecordings={audioRecordings}
+        isFavorite={isFavorite}
+        isPendingMaster={isPendingMaster}
+        isPendingHide={isPendingHide}
+        onMaster={onMaster}
+        onHide={onHide}
+        onFavorite={onFavorite}
+        onAudioPlay={onAudioPlay}
+        bare={bare}
+      >
+        {({ targetTranslations: targets }) => (
+          <div className="space-y-4">
+            {targets.map((translation, index) => {
+              const audio = audioRecordings.find(
+                (a) => a.language === translation.language,
+              );
+              const state = inputs.get(translation.language) ?? {
+                submitted: false,
+                userText: '',
+              };
 
-            return (
-              <TargetLanguageInput
-                key={translation.language}
-                translation={translation}
-                audioUrl={audio?.url ?? null}
-                state={state}
-                targetAudioMode={targetAudioMode}
-                autoPlayedRef={autoPlayedRef}
-                onInputChange={handleInputChange}
-                onSubmit={handleSubmit}
-                onAudioPlay={onAudioPlay}
-                submitLabel={t('submitAnswer')}
-                placeholder={t('typeTranslation')}
-                showLanguageLabel={showLanguageLabel}
-                locale={locale}
-                inputRef={index === 0 ? firstInputRef : undefined}
-                autoFocus={index === 0}
-              />
-            );
-          })}
-        </div>
-      )}
-    </CardShell>
+              return (
+                <TargetLanguageInput
+                  key={translation.language}
+                  translation={translation}
+                  audioUrl={audio?.url ?? null}
+                  state={state}
+                  targetAudioMode={targetAudioMode}
+                  autoPlayedRef={autoPlayedRef}
+                  onInputChange={handleInputChange}
+                  onSubmit={handleSubmit}
+                  onAudioPlay={onAudioPlay}
+                  submitLabel={t('submitAnswer')}
+                  placeholder={t('typeTranslation')}
+                  showLanguageLabel={showLanguageLabel}
+                  locale={locale}
+                  inputRef={index === 0 ? firstInputRef : undefined}
+                  autoFocus={index === 0}
+                  isFirstTarget={index === 0}
+                />
+              );
+            })}
+          </div>
+        )}
+      </CardShell>
+    </div>
   );
 }
 
@@ -169,6 +172,7 @@ interface TargetLanguageInputProps {
   locale: string;
   inputRef?: React.RefObject<HTMLInputElement | null>;
   autoFocus?: boolean;
+  isFirstTarget?: boolean;
 }
 
 function TargetLanguageInput({
@@ -186,6 +190,7 @@ function TargetLanguageInput({
   locale,
   inputRef,
   autoFocus,
+  isFirstTarget = false,
 }: TargetLanguageInputProps) {
   const t = useTranslations('LearningMode');
   const [showClean, setShowClean] = useState(false);
@@ -236,7 +241,10 @@ function TargetLanguageInput({
 
   if (state.submitted) {
     return (
-      <div className="space-y-1">
+      <div
+        className="space-y-1"
+        {...(isFirstTarget ? { 'data-tutorial': 'target-input-full' } : {})}
+      >
         {languageDisplayName ? (
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-muted-foreground uppercase">
@@ -290,7 +298,10 @@ function TargetLanguageInput({
   }
 
   return (
-    <div className="space-y-1">
+    <div
+      className="space-y-1"
+      {...(isFirstTarget ? { 'data-tutorial': 'target-input-full' } : {})}
+    >
       {languageDisplayName ? (
         <div className="flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground uppercase">
@@ -311,7 +322,10 @@ function TargetLanguageInput({
           />
         </div>
       )}
-      <div className="flex items-center gap-2">
+      <div
+        className="flex items-center gap-2"
+        {...(isFirstTarget ? { 'data-tutorial': 'target-input-and-submit' } : {})}
+      >
         <Input
           ref={inputRef}
           autoFocus={autoFocus}
@@ -331,6 +345,7 @@ function TargetLanguageInput({
           onClick={() => onSubmit(translation.language)}
           className="h-9 w-9 shrink-0"
           aria-label={submitLabel}
+          {...(isFirstTarget ? { 'data-tutorial': 'submit-answer' } : {})}
         >
           <Check className="h-4 w-4" />
         </Button>

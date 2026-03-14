@@ -6,6 +6,7 @@ import {
   MessageSquare,
   Globe,
   Star,
+  Crown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -15,7 +16,8 @@ export type DifficultyLevel =
   | 'elementary'
   | 'intermediate'
   | 'upper_intermediate'
-  | 'advanced';
+  | 'advanced'
+  | 'proficient';
 
 interface LevelOption {
   id: DifficultyLevel;
@@ -82,11 +84,11 @@ export function DifficultySelector({
   );
 }
 
-// Export the level icons for use in other components
 export const LEVEL_ICONS = {
   beginner: GraduationCap,
   elementary: BookOpen,
   intermediate: MessageSquare,
   upper_intermediate: Globe,
   advanced: Star,
+  proficient: Crown,
 };

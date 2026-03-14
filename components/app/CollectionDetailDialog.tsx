@@ -89,7 +89,7 @@ export function CollectionDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col gap-0 p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-md max-h-[80vh] flex flex-col gap-0 p-0 overflow-hidden" data-tutorial="collection-detail">
         {/* Static header section */}
         <div className="flex-shrink-0 p-6 pb-4 space-y-4">
           <DialogHeader>

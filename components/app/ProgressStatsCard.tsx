@@ -43,7 +43,7 @@ export function ProgressStatsCard({
   const time = formatTimeMs(stats?.totalTimeMs ?? 0);
 
   return (
-    <div className="card-surface p-4 space-y-4">
+    <div className="card-surface p-4 space-y-4" data-tutorial="progress-stats">
       <div className="grid grid-cols-4 gap-3">
         <StatItem icon={Flame} label={t('stats.streak')} value={String(streak)} />
         <StatItem icon={RotateCcw} label={t('stats.reps')} value={String(reps)} />

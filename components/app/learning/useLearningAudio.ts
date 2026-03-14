@@ -8,7 +8,18 @@ import type { LearningState } from './useLearningMode';
 
 const alwaysFalse = () => false;
 
-export function useLearningAudio(state: LearningState) {
+export interface UseLearningAudioOptions {
+  /** When true, auto-advance after audio is disabled (e.g. during the audio tutorial). */
+  disableAutoAdvance?: boolean;
+  /** When true, audio does not start automatically (e.g. when the audio tutorial is about to start or is running). */
+  disableAutoPlay?: boolean;
+}
+
+export function useLearningAudio(
+  state: LearningState,
+  options: UseLearningAudioOptions = {},
+) {
+  const { disableAutoAdvance = false, disableAutoPlay = false } = options;
   const cs =
     state.status === 'reviewing' ||
     state.status === 'noCardsDue' ||
@@ -17,7 +28,8 @@ export function useLearningAudio(state: LearningState) {
       : null;
 
   const isReviewing = state.status === 'reviewing';
-  const autoPlay = cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY;
+  const autoPlay =
+    disableAutoPlay ? false : (cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY);
   const reviewMode = cs?.reviewMode ?? 'audio';
   const fullReviewTargetAudioMode = cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
 
@@ -29,10 +41,15 @@ export function useLearningAudio(state: LearningState) {
 
   // In audio mode, auto-advance after schedule completes; in full mode, never auto-advance
   const handleScheduleComplete = useCallback(() => {
-    if (state.status === 'reviewing' && reviewMode === 'audio' && audioSettings.autoAdvance) {
+    if (
+      state.status === 'reviewing' &&
+      reviewMode === 'audio' &&
+      audioSettings.autoAdvance &&
+      !disableAutoAdvance
+    ) {
       state.handleNext();
     }
-  }, [state, reviewMode, audioSettings.autoAdvance]);
+  }, [state, reviewMode, audioSettings.autoAdvance, disableAutoAdvance]);
 
   const resetReviewFlag = useCallback(() => {
     if (state.status === 'reviewing') state.resetReviewFlag();

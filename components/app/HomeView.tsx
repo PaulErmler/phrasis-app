@@ -8,6 +8,8 @@ import { NewChatInput } from '@/components/chat/NewChatInput';
 import { CollectionCarousel } from '@/components/app/CollectionCarousel';
 import { CustomCollectionCarousel } from '@/components/app/CustomCollectionCarousel';
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
+import { useTutorial } from '@/lib/tutorials/use-tutorial';
+import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
 
 type ReviewMode = 'audio' | 'full';
 
@@ -33,6 +35,11 @@ export function HomeView({
   onLearnOpen: () => void;
 }) {
   const t = useTranslations('AppPage');
+
+  useTutorial(TUTORIAL_IDS.HOME_TOUR, {
+    delayMs: 1200,
+    stepCompleteOnClickIndex: 2,
+  });
 
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const updateCourseSettings = useMutation(
@@ -84,7 +91,7 @@ export function HomeView({
           className="[&_[data-slot=input-group]]:rounded-xl"
         />
 
-        <div className="space-y-2">
+        <div className="space-y-2" data-tutorial="collection-carousel">
           <h2 className="heading-section">
             {t('collections.carousel.sectionTitle')}
           </h2>

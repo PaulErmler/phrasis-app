@@ -230,6 +230,7 @@
     "chat": "Chat",
     "back": "Back",
     "settings": "Settings",
+    "tutorial": "Replay Tutorial",
     "loading": "Loading...",
     "baseLanguage": "Base Language",
     "targetLanguage": "Target Language",
@@ -501,38 +502,6 @@
     "changeMessage": "You are about to change your subscription."
   },
   "Onboarding": {
-    "welcome": {
-      "title": "Welcome to Cacatua!",
-      "subtitle": "Let's customize your learning experience in just a few steps",
-      "description": "This will only take a minute, and you can always change these settings later.",
-      "feature1": {
-        "title": "Personalized Content",
-        "description": "Get learning materials tailored to your level and goals"
-      },
-      "feature2": {
-        "title": "Your Pace",
-        "description": "Learn at a speed that works for you"
-      },
-      "feature3": {
-        "title": "Multiple Languages",
-        "description": "Choose from many popular languages to learn"
-      }
-    },
-    "step1": {
-      "title": "What kind of language learner are you?",
-      "casual": {
-        "title": "Casual",
-        "description": "I want a simple learning experience"
-      },
-      "focused": {
-        "title": "Intermediate",
-        "description": "I like to customize my content and settings"
-      },
-      "advanced": {
-        "title": "Advanced",
-        "description": "I want to cutomize everything"
-      }
-    },
     "reviewMode": {
       "title": "How do you want to review?",
       "full": {
@@ -544,56 +513,128 @@
         "description": "Practice listening and speaking with audio playback. There is no need to look at the screen. Ideal for learning on the go — while walking, commuting, or relaxing."
       }
     },
-    "step2": {
-      "title": "What language do you want to learn?",
-      "titleMulti": "What languages do you want to learn?",
-      "subtitle": "Select a language",
-      "subtitleMulti": "Select up to {max} target languages ({count}/{max})",
-      "addAnother": "Add another language",
-      "primaryHint": "The first language is your primary learning language",
-      "primary": "Primary"
-    },
-    "step3": {
+    "baseLanguage": {
       "title": "What language will you learn from?",
-      "titleMulti": "What languages will you learn from?",
-      "subtitle": "Select your base language",
-      "subtitleMulti": "Select up to {max} base languages ({count}/{max})"
+      "subtitle": "Select your base language"
     },
-    "step4": {
-      "title": "What's your current level?",
+    "targetLanguage": {
+      "title": "What language do you want to learn?",
+      "subtitle": "Select a language"
+    },
+    "difficulty": {
+      "title": "How much do you already know?",
       "beginner": {
-        "title": "Beginner",
-        "description": "I'm new to {language}"
+        "title": "Absolute Beginner",
+        "description": "I know almost no words",
+        "wordCount": "~0 words"
       },
       "elementary": {
-        "title": "Elementary",
-        "description": "I know some common words"
+        "title": "Basic",
+        "description": "I know the most common words",
+        "wordCount": "~1,000 words"
       },
       "intermediate": {
-        "title": "Intermediate",
-        "description": "I can have basic conversations"
+        "title": "Elementary",
+        "description": "I can understand common phrases",
+        "wordCount": "~2,000 words"
       },
       "upper_intermediate": {
-        "title": "Upper Intermediate",
-        "description": "I can talk about various topics"
+        "title": "Intermediate",
+        "description": "I understand everyday conversations",
+        "wordCount": "~3,500 words"
       },
       "advanced": {
+        "title": "Upper Intermediate",
+        "description": "I can discuss many topics",
+        "wordCount": "~5,000 words"
+      },
+      "proficient": {
         "title": "Advanced",
-        "description": "I can discuss most topics in detail"
+        "description": "I have a broad vocabulary",
+        "wordCount": "8,000+ words"
       }
+    },
+    "feedback": {
+      "languageSelected": "Great choice!",
+      "difficultySelected": "Perfect, we'll tailor your content!",
+      "reviewModeSelected": "You're all set!"
     },
     "continue": "Continue",
     "back": "Back",
     "getStarted": "Get Started",
     "finish": "Finish",
-    "loading": {
-      "title": "Customizing Your Learning Journey",
-      "subtitle": "We're preparing everything just for you..."
-    },
     "finished": {
       "title": "You're all set!",
       "subtitle": "Your personalized learning experience is ready.",
       "button": "Start Learning"
+    }
+  },
+  "Tutorial": {
+    "home": {
+      "welcome": {
+        "title": "Welcome to Cacatua!",
+        "description": "We'll give you a quick overview to help you get started. You can dismiss this at any time."
+      },
+      "learningModes": {
+        "title": "Learning Modes",
+        "description": "Cacatua has 2 different types of review modes. Full Review lets you practice by typing translations — great for focused study. Audio Review plays sentences aloud so you can learn on the go."
+      },
+      "difficultySelection": {
+        "title": "Difficulty Selection",
+        "description": "Here you can select your difficulty. Each difficulty is a collection of sentences for you to learn. You can click on a collection to preview the upcoming sentences."
+      }
+    },
+    "audioReview": {
+      "welcome": {
+        "title": "Welcome to Audio Review",
+        "description": "In this mode you can review sentences hands-off. The texts are read aloud automatically and it proceeds to the next card automatically. You can adjust the timing in the settings."
+      },
+      "card": {
+        "title": "The Card",
+        "description": "This card shows the texts in the languages you are learning. You can add more languages to the course later if you want."
+      },
+      "targetText": {
+        "title": "Target Text and Audio",
+        "description": "The target translation is hidden by default. It will be unblurred automatically or if you click on it. You can also play audio by clicking on the audio button."
+      },
+      "rating": {
+        "title": "Rate Your Recall",
+        "description": "Each card is shown an initial number of times before spaced repetition starts. \"Understood\" skips the rest of those initial reviews. After that, you'll see more detailed ratings: Again, Hard, Good, Easy."
+      },
+      "audioControls": {
+        "title": "Audio Playing",
+        "description": "By default the audio is played automatically. First the base audio, then there is a pause for you to think and then the target audio is played before automatically proceeding to the next card."
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Here you can change playback speed, language order, auto-advance, whether to hide or blur the target text, how many initial reviews each card gets and more."
+      }
+    },
+    "fullReview": {
+      "welcome": {
+        "title": "Welcome to Full Review",
+        "description": "In this mode you actively practice writing and get instant feedback."
+      },
+      "card": {
+        "title": "The Card",
+        "description": "The card in this mode shows the target and base languages and allows you to type in the translations."
+      },
+      "input": {
+        "title": "Enter Your Translation",
+        "description": "Here you enter the translation. You can also listen to the audio of the target language before typing it in."
+      },
+      "rating": {
+        "title": "Rate Your Answer",
+        "description": "After viewing the feedback, rate how well you recalled: Again, Hard, Good, or Easy. This drives the spaced repetition schedule."
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Here you can customize your settings. You can switch between review modes and adjust audio settings."
+      }
+    },
+    "chat": {
+      "title": "Chat Assistant",
+      "description": "Use the chat to ask about grammar, get explanations, or create new flashcards. The AI assistant is here to help you learn!"
     }
   }
 }

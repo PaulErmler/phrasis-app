@@ -14,7 +14,7 @@ export function StartLearningButton({ onStartReview }: StartLearningButtonProps)
   const t = useTranslations('AppPage');
 
   return (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-2 gap-2" data-tutorial="start-learning">
       <Button
         size="lg"
         className="w-full gap-2"
