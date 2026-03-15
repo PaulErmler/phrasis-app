@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAction } from 'convex/react';
+import { ConvexError } from 'convex/values';
 import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants/chat';
@@ -28,6 +29,7 @@ interface UseVoiceRecordingReturn {
  */
 export function useVoiceRecording(
   onTranscript: (transcript: string) => void,
+  onUsageLimit?: () => void,
 ): UseVoiceRecordingReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -83,8 +85,15 @@ export function useVoiceRecording(
             onTranscript(transcript);
             toast.success(SUCCESS_MESSAGES.VOICE_TRANSCRIBED);
           } catch (error) {
-            console.error('Transcription error:', error);
-            toast.error(ERROR_MESSAGES.FAILED_TO_TRANSCRIBE);
+            if (
+              error instanceof ConvexError &&
+              (error.data as { code?: string })?.code === 'USAGE_LIMIT'
+            ) {
+              onUsageLimit?.();
+            } else {
+              console.error('Transcription error:', error);
+              toast.error(ERROR_MESSAGES.FAILED_TO_TRANSCRIBE);
+            }
           } finally {
             setIsTranscribing(false);
           }
@@ -97,7 +106,7 @@ export function useVoiceRecording(
       console.error('Error starting recording:', error);
       toast.error(ERROR_MESSAGES.MICROPHONE_ACCESS);
     }
-  }, [transcribeAudio, onTranscript]);
+  }, [transcribeAudio, onTranscript, onUsageLimit]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {

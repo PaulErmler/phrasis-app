@@ -52,6 +52,13 @@ export const custom_sentences = feature({
 	consumable: true,
 });
 
+export const transcriptions = feature({
+	id: 'transcriptions',
+	name: 'Transcriptions',
+	type: 'metered',
+	consumable: true,
+});
+
 // Plans
 export const free = plan({
 	id: 'free',
@@ -79,6 +86,13 @@ export const free = plan({
 		item({
 			featureId: sentences.id,
 			included: 150,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: transcriptions.id,
+			included: 10,
 			reset: {
 				interval: 'month',
 			},
@@ -119,6 +133,13 @@ export const basic = plan({
 				interval: 'month',
 			},
 		}),
+		item({
+			featureId: transcriptions.id,
+			included: 80,
+			reset: {
+				interval: 'month',
+			},
+		}),
 	],
 });
 
@@ -151,6 +172,13 @@ export const pro = plan({
 		item({
 			featureId: sentences.id,
 			included: 1000,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: transcriptions.id,
+			included: 200,
 			reset: {
 				interval: 'month',
 			},

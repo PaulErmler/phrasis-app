@@ -708,21 +708,3 @@ export const completeTutorial = mutation({
   },
 });
 
-/**
- * Reset all completed tutorials (for testing).
- */
-export const resetTutorials = mutation({
-  args: {},
-  returns: v.null(),
-  handler: async (ctx) => {
-    const userId = await requireAuthUserId(ctx);
-    const settings = await dbGetUserSettings(ctx, userId);
-    if (!settings) throw new ConvexError('User settings not found');
-
-    await ctx.db.patch(settings._id, {
-      completedTutorials: [],
-    });
-
-    return null;
-  },
-});

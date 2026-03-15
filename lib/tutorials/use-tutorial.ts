@@ -57,23 +57,6 @@ function writeCompleted(ids: string[]) {
   notifyStorageListeners();
 }
 
-/**
- * Reset all completed tutorials (localStorage + Convex).
- * Any mounted `useTutorial` hooks will re-evaluate automatically via the
- * localStorage external store. Pass the Convex mutation so the DB stays in sync.
- */
-export function resetAllTutorials(
-  resetMutation?: () => Promise<null>,
-): void {
-  try {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-  } catch {
-    // ignore
-  }
-  notifyStorageListeners();
-  resetMutation?.().catch((e) => console.error('Failed to reset tutorials in DB:', e));
-}
-
 interface UseTutorialOptions {
   enabled?: boolean;
   delayMs?: number;

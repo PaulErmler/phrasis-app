@@ -1,8 +1,9 @@
-'use node';
-
-import { action } from '../../_generated/server';
+import { action, internalMutation } from '../../_generated/server';
+import { internal } from '../../_generated/api';
 import { v, ConvexError } from 'convex/values';
 import { requireAuthUserId } from '../../db/users';
+import { useQuota } from '../../usage/helpers';
+import { FEATURE_IDS } from '../featureIds';
 
 const MIME_TO_EXT: Record<string, string> = {
   'audio/webm': 'webm',
@@ -23,6 +24,15 @@ function extForMime(mime: string): string {
   return MIME_TO_EXT[mime] ?? MIME_TO_EXT[base] ?? 'webm';
 }
 
+export const consumeTranscriptionQuota = internalMutation({
+  args: { userId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await useQuota(ctx, args.userId, FEATURE_IDS.TRANSCRIPTIONS, 1);
+    return null;
+  },
+});
+
 /**
  * Transcribe audio using OpenAI Transcription API.
  * Calls the API directly to ensure the correct MIME type / file extension
@@ -35,7 +45,12 @@ export const transcribeAudio = action({
   },
   returns: v.string(),
   handler: async (ctx, args) => {
-    await requireAuthUserId(ctx);
+    const userId = await requireAuthUserId(ctx);
+
+    await ctx.runMutation(
+      internal.features.chat.transcribe.consumeTranscriptionQuota,
+      { userId },
+    );
 
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) throw new ConvexError('OPENAI_API_KEY is not configured');
@@ -43,8 +58,6 @@ export const transcribeAudio = action({
     const rawMime = args.mimeType ?? 'audio/webm';
     const baseMime = rawMime.split(';')[0].trim();
     const ext = extForMime(rawMime);
-
-    console.log(`Transcribing: mime=${rawMime}, ext=${ext}, size=${args.audio.byteLength}`);
 
     try {
       const blob = new Blob([args.audio], { type: baseMime });

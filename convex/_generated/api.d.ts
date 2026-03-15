@@ -34,14 +34,10 @@ import type * as http from "../http.js";
 import type * as lib_audio from "../lib/audio.js";
 import type * as lib_cardContent from "../lib/cardContent.js";
 import type * as lib_collections from "../lib/collections.js";
-import type * as testing_texts from "../testing/texts.js";
-import type * as testing_translation from "../testing/translation.js";
-import type * as testing_tts from "../testing/tts.js";
 import type * as types from "../types.js";
 import type * as usage_actions from "../usage/actions.js";
 import type * as usage_helpers from "../usage/helpers.js";
 import type * as usage_queries from "../usage/queries.js";
-import type * as usage_testOperations from "../usage/testOperations.js";
 import type * as usage_tracking from "../usage/tracking.js";
 
 import type {
@@ -77,14 +73,10 @@ declare const fullApi: ApiFromModules<{
   "lib/audio": typeof lib_audio;
   "lib/cardContent": typeof lib_cardContent;
   "lib/collections": typeof lib_collections;
-  "testing/texts": typeof testing_texts;
-  "testing/translation": typeof testing_translation;
-  "testing/tts": typeof testing_tts;
   types: typeof types;
   "usage/actions": typeof usage_actions;
   "usage/helpers": typeof usage_helpers;
   "usage/queries": typeof usage_queries;
-  "usage/testOperations": typeof usage_testOperations;
   "usage/tracking": typeof usage_tracking;
 }>;
 

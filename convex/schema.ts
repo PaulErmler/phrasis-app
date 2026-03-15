@@ -8,7 +8,7 @@ import {
   cardApprovalStatusValidator,
   schedulingPhaseValidator
 } from './types';
-import { testingTables } from './testing/schema';
+
 
 export default defineSchema({
   // Collections table - groups texts by difficulty level or potentially other topics
@@ -214,6 +214,4 @@ export default defineSchema({
     lastSyncedAt: v.number(),
   }).index('by_userId', ['userId']),
 
-  // Testing-only tables (translationRequests, ttsRequests)
-  ...testingTables,
 });

@@ -410,6 +410,9 @@
       "name": "Up to 5 languages per course",
       "pricingLabel": "Up to {count} languages per course",
       "pricingLabelUnlimited": "Unlimited languages per course"
+    },
+    "transcriptions": {
+      "name": "Transcriptions"
     }
   },
   "FeatureTracking": {

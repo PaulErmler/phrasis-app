@@ -156,17 +156,3 @@ export const syncAllFeatures = internalMutation({
   },
 });
 
-/**
- * Delete the quota doc for a user (for testing/reset).
- */
-export const resetQuotas = internalMutation({
-  args: { userId: v.string() },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const doc = await getQuotaDoc(ctx, args.userId);
-    if (doc) {
-      await ctx.db.delete(doc._id);
-    }
-    return null;
-  },
-});

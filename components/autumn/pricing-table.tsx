@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
-import { FEATURE_META, getFeatureI18nKey, getFeatureDisplayCount } from "@/lib/features/feature-meta";
+import { FEATURE_META, getFeatureI18nKey, getFeatureDisplayCount, isFeatureHidden } from "@/lib/features/feature-meta";
 import type { Product, ProductItem } from "autumn-js";
 import { Loader2 } from "lucide-react";
 import {
@@ -349,7 +349,7 @@ export const PricingFeatureList = ({
         </p>
       )}
       <div className="space-y-3">
-        {items.map((item, index) => {
+        {items.filter((item) => !isFeatureHidden(item.feature_id ?? '')).map((item, index) => {
           const label = getFeatureLabel(item);
           return (
             <div

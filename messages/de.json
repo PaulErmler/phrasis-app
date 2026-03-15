@@ -410,6 +410,9 @@
       "name": "Bis zu 5 Sprachen pro Kurs",
       "pricingLabel": "Bis zu {count} Sprachen pro Kurs",
       "pricingLabelUnlimited": "Unbegrenzte Sprachen pro Kurs"
+    },
+    "transcriptions": {
+      "name": "Transkriptionen"
     }
   },
   "FeatureTracking": {
