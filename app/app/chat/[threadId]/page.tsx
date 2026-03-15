@@ -5,10 +5,9 @@ import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer
 import { useCardApprovals } from '@/hooks/use-card-approvals';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { RedirectToSignIn } from '@daveyplate/better-auth-ui';
-import { Authenticated } from 'convex/react';
+import { Authenticated, AuthLoading } from 'convex/react';
 import { use, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 
@@ -21,7 +20,11 @@ export default function ChatPage({
 
   return (
     <>
-      <RedirectToSignIn />
+      <AuthLoading>
+        <div className="h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AuthLoading>
       <Authenticated>
         <ChatPageContent threadId={threadId} />
       </Authenticated>

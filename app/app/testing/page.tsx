@@ -1,8 +1,7 @@
 'use client';
 
-import { RedirectToSignIn } from '@daveyplate/better-auth-ui';
-import { Authenticated } from 'convex/react';
-import { FlaskConical, Settings } from 'lucide-react';
+import { Authenticated, AuthLoading } from 'convex/react';
+import { FlaskConical, Loader2, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { TranslationTest } from '@/components/testing/TranslationTest';
 import { TTSTest } from '@/components/testing/TTSTest';
@@ -13,7 +12,11 @@ import { FlashcardUITest } from '@/components/testing/FlashcardUITest';
 export default function TestingPage() {
   return (
     <>
-      <RedirectToSignIn />
+      <AuthLoading>
+        <div className="h-screen flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AuthLoading>
       <Authenticated>
         <div className="max-w-5xl mx-auto p-4">
           {/* Page Header */}

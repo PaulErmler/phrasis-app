@@ -1,7 +1,7 @@
 import React from "react";
 
 import { useCustomer, usePricingTable, ProductDetails } from "autumn-js/react";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
@@ -28,7 +28,15 @@ export default function PricingTable({
   const { customer, checkout } = useCustomer({ errorOnNotFound: false });
 
   const [isAnnual, setIsAnnual] = useState(false);
-  const { products, isLoading, error } = usePricingTable({ productDetails });
+  const { products, isLoading, error, refetch } = usePricingTable({ productDetails });
+
+  const prevCustomerRef = useRef(customer);
+  useEffect(() => {
+    if (customer && !prevCustomerRef.current) {
+      refetch();
+    }
+    prevCustomerRef.current = customer;
+  }, [customer, refetch]);
 
   if (isLoading) {
     return (
