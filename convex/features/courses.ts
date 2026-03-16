@@ -530,6 +530,8 @@ export const getActiveCourseSettings = query({
       autoRevealLanguages: v.optional(v.boolean()),
       baseLanguageOrder: v.optional(v.array(v.string())),
       targetLanguageOrder: v.optional(v.array(v.string())),
+      instantProceedAudio: v.optional(v.boolean()),
+      instantProceedFull: v.optional(v.boolean()),
       // Review mode
       reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))),
       fullReviewTargetAudioMode: v.optional(
