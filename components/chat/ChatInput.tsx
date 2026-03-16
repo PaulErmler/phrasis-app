@@ -15,10 +15,11 @@ import {
   PromptInputTextarea,
   // PromptInputTools,
 } from '@/components/ai-elements/prompt-input';
+import { useTranslations } from 'next-intl';
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
 import { VoiceRecordButton } from './VoiceRecordButton';
 import type { ChatStatus } from '@/lib/types/chat';
-import { DEFAULT_SUGGESTIONS, CHAT_STATUS } from '@/lib/constants/chat';
+import { CHAT_STATUS } from '@/lib/constants/chat';
 import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
@@ -56,7 +57,13 @@ export function ChatInput({
   footerAction,
   suggestionsAction,
 }: ChatInputProps) {
-  const items = suggestions ?? DEFAULT_SUGGESTIONS;
+  const t = useTranslations('Chat.input');
+  const defaultPrompts = [
+    t('prompts.grammar'),
+    t('prompts.sayInLanguage'),
+    t('prompts.moreExamples'),
+  ] as const;
+  const items = suggestions ?? defaultPrompts;
 
   return (
     <div className={cn("w-full min-w-0", className ?? "")}>
@@ -93,6 +100,7 @@ export function ChatInput({
 
             <PromptInputBody>
               <PromptInputTextarea
+                placeholder={t('placeholder')}
                 onChange={(event) => onTextChange(event.target.value)}
                 value={text}
               />

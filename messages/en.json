@@ -356,6 +356,14 @@
     "emptyBullet1": "Ask about vocabulary, grammar, or any sentence.",
     "emptyBullet2": "The chat knows the card you are currently learning.",
     "emptyBullet3": "It can create flashcards for you — you just confirm them.",
+    "input": {
+      "placeholder": "What would you like to know?",
+      "prompts": {
+        "grammar": "Explain me the grammar of this sentence.",
+        "sayInLanguage": "What is a simpler way to say this?",
+        "moreExamples": "Give me three more examples using this verb."
+      }
+    },
     "suggestions": {
       "grammar": "Explain me the grammar of this sentence word by word.",
       "simpler": "How can I say this simpler?",
@@ -457,6 +465,7 @@
     "contactUs": "Contact Us"
   },
   "Pricing": {
+    "loading": "Loading",
     "startFreeTrial": "Start Free Trial",
     "planScheduled": "Plan Scheduled",
     "updatePlan": "Update Plan",
@@ -472,6 +481,8 @@
     "forever": "forever",
     "monthly": "Monthly",
     "annual": "Annual",
+    "perMonth": "per month",
+    "perYear": "per year",
     "everythingFrom": "Everything from {planName}, plus:",
     "error": "Something went wrong. Please try again later."
   },

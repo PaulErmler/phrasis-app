@@ -356,6 +356,14 @@
     "emptyBullet1": "Stelle Fragen zu Vokabeln, Grammatik oder beliebigen Sätzen.",
     "emptyBullet2": "Der Chat kennt die Karte, die du gerade lernst.",
     "emptyBullet3": "Er kann Lernkarten für dich erstellen — du bestätigst sie einfach.",
+    "input": {
+      "placeholder": "Was möchtest du wissen?",
+      "prompts": {
+        "grammar": "Erkläre mir die Grammatik dieses Satzes.",
+        "sayInLanguage": "Wie kann ich das einfacher sagen?",
+        "moreExamples": "Gib mir drei weitere Beispiele mit diesem Verb."
+      }
+    },
     "suggestions": {
       "grammar": "Erkläre mir die Grammatik dieses Satzes Wort für Wort.",
       "simpler": "Wie kann ich das einfacher sagen?",
@@ -457,6 +465,7 @@
     "contactUs": "Kontakt"
   },
   "Pricing": {
+    "loading": "Laden",
     "startFreeTrial": "Kostenlose Testversion starten",
     "planScheduled": "Plan geplant",
     "updatePlan": "Plan aktualisieren",
@@ -472,6 +481,8 @@
     "forever": "für immer",
     "monthly": "Monatlich",
     "annual": "Jährlich",
+    "perMonth": "pro Monat",
+    "perYear": "pro Jahr",
     "everythingFrom": "Alles aus {planName}, plus:",
     "error": "Etwas ist schiefgelaufen. Bitte versuche es später erneut."
   },
@@ -552,6 +563,39 @@
       "audio": {
         "title": "Audio-Übung",
         "description": "Übe Hören und Sprechen mit Audio-Wiedergabe. Kein Blick auf den Bildschirm nötig. Ideal für unterwegs — beim Spazieren, Pendeln oder Entspannen."
+      }
+    },
+    "difficulty": {
+      "title": "Wie viel kannst du schon?",
+      "beginner": {
+        "title": "Anfänger",
+        "description": "Ich kenne fast keine Wörter",
+        "wordCount": "~0 Wörter"
+      },
+      "elementary": {
+        "title": "Grundstufe",
+        "description": "Ich kenne die gebräuchlichsten Wörter",
+        "wordCount": "~1.000 Wörter"
+      },
+      "intermediate": {
+        "title": "Elementar",
+        "description": "Ich verstehe gängige Phrasen",
+        "wordCount": "~2.000 Wörter"
+      },
+      "upper_intermediate": {
+        "title": "Mittelstufe",
+        "description": "Ich verstehe Alltagsgespräche",
+        "wordCount": "~3.500 Wörter"
+      },
+      "advanced": {
+        "title": "Obere Mittelstufe",
+        "description": "Ich kann über viele Themen sprechen",
+        "wordCount": "~5.000 Wörter"
+      },
+      "proficient": {
+        "title": "Fortgeschritten",
+        "description": "Ich habe einen großen Wortschatz",
+        "wordCount": "8.000+ Wörter"
       }
     },
     "step2": {

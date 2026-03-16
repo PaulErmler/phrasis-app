@@ -47,7 +47,12 @@ export default function PricingTable({
   }
 
   if (error) {
-    return <div className="text-center text-muted-foreground py-8">{t("error")}</div>;
+    return (
+      <div className="w-full h-full flex flex-col justify-center items-center gap-2 min-h-[300px]">
+        <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
+        <span className="text-muted-foreground">{t("loading")}</span>
+      </div>
+    );
   }
 
   const intervals = Array.from(
@@ -234,6 +239,14 @@ export const PricingCard = ({
   const { buttonText } = getPricingTableContent(product, t);
 
   const isRecommended = productDisplay?.recommend_text ? true : false;
+  const intervalGroup = product.properties?.interval_group;
+  const periodLabel =
+    !product.properties?.is_free && intervalGroup
+      ? intervalGroup === "year"
+        ? t("perYear")
+        : t("perMonth")
+      : undefined;
+
   const mainPriceDisplay = product.properties?.is_free
     ? {
         primary_text: t("free"),
@@ -280,9 +293,9 @@ export const PricingCard = ({
               <h3 className="font-semibold h-16 flex px-6 items-center border-y mb-4 bg-secondary/40">
                 <div className="line-clamp-2">
                   {mainPriceDisplay?.primary_text}{" "}
-                  {mainPriceDisplay?.secondary_text && (
+                  {(periodLabel ?? mainPriceDisplay?.secondary_text) && (
                     <span className="font-normal text-muted-foreground mt-1">
-                      {mainPriceDisplay?.secondary_text}
+                      {periodLabel ?? mainPriceDisplay?.secondary_text}
                     </span>
                   )}
                 </div>
