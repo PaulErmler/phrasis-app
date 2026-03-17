@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, ChevronsLeft, ChevronRight, MessageCircle, Loader2 } from 'lucide-react';
+import { Play, Pause, ChevronsLeft, ChevronRight, Eye, MessageCircle, Loader2 } from 'lucide-react';
 import { AudioProgressBar } from './AudioProgressBar';
 import { useLearningChatToggle } from './LearningChatLayout';
 import type { ReviewRating } from '@/lib/scheduling';
@@ -24,6 +24,9 @@ interface LearningControlsProps {
   isReviewing: boolean;
   showProgressBar?: boolean;
   instantProceed?: boolean;
+  isFullReview?: boolean;
+  fullReviewRevealed?: boolean;
+  onReveal?: () => void;
 }
 
 export function LearningControls({
@@ -42,6 +45,9 @@ export function LearningControls({
   isReviewing,
   showProgressBar = false,
   instantProceed = false,
+  isFullReview = false,
+  fullReviewRevealed = false,
+  onReveal,
 }: LearningControlsProps) {
   const t = useTranslations('LearningMode');
   const { openChat } = useLearningChatToggle();
@@ -152,19 +158,30 @@ export function LearningControls({
               <Play className="h-4 w-4" />
             )}
           </Button>
-          <Button
-            size="sm"
-            onClick={onNext}
-            disabled={isReviewing}
-            className="flex-[1] gap-2"
-          >
-            {t('actions.next')}
-            {showSpinner ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-          </Button>
+          {isFullReview && !fullReviewRevealed ? (
+            <Button
+              size="sm"
+              onClick={onReveal}
+              className="flex-[1] gap-2"
+            >
+              {t('actions.reveal')}
+              <Eye className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={onNext}
+              disabled={isReviewing}
+              className="flex-[1] gap-2"
+            >
+              {t('actions.next')}
+              {showSpinner ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </Button>
+          )}
         </div>
       </div>
       </div>

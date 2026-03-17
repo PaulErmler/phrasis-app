@@ -39,6 +39,8 @@ interface FullReviewCardContentProps {
   onFavorite: () => void;
   onAudioPlay?: () => void;
   targetAudioMode: TargetAudioMode;
+  allRevealed?: boolean;
+  onAllSubmittedChange?: (allSubmitted: boolean) => void;
   bare?: boolean;
 }
 
@@ -57,6 +59,8 @@ export function FullReviewCardContent({
   onFavorite,
   onAudioPlay,
   targetAudioMode,
+  allRevealed = false,
+  onAllSubmittedChange,
   bare = false,
 }: FullReviewCardContentProps) {
   const t = useTranslations('LearningMode');
@@ -75,6 +79,8 @@ export function FullReviewCardContent({
   );
 
   const autoPlayedRef = useRef<Set<string>>(new Set());
+  const revealAudioRef = useRef<HTMLAudioElement | null>(null);
+  const revealAbortedRef = useRef(false);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
 
   const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
@@ -86,6 +92,64 @@ export function FullReviewCardContent({
     );
     autoPlayedRef.current = new Set();
   }
+
+  const allSubmitted = targetTranslations.length > 0 &&
+    targetTranslations.every((tr) => inputs.get(tr.language)?.submitted);
+
+  const onAllSubmittedChangeRef = useRef(onAllSubmittedChange);
+  onAllSubmittedChangeRef.current = onAllSubmittedChange;
+  useEffect(() => {
+    onAllSubmittedChangeRef.current?.(allSubmitted);
+  }, [allSubmitted]);
+
+  const onAudioPlayRef = useRef(onAudioPlay);
+  onAudioPlayRef.current = onAudioPlay;
+
+  useEffect(() => {
+    if (!allRevealed) return;
+
+    const unsubmittedAudio = targetTranslations
+      .filter((tr) => !inputs.get(tr.language)?.submitted)
+      .map((tr) => ({
+        language: tr.language,
+        url: audioRecordings.find((a) => a.language === tr.language)?.url ?? null,
+      }))
+      .filter((entry): entry is { language: string; url: string } => entry.url != null);
+
+    if (unsubmittedAudio.length === 0) return;
+
+    revealAbortedRef.current = false;
+    onAudioPlayRef.current?.();
+
+    let idx = 0;
+    const playNext = () => {
+      if (revealAbortedRef.current || idx >= unsubmittedAudio.length) {
+        revealAudioRef.current = null;
+        return;
+      }
+      const entry = unsubmittedAudio[idx];
+      autoPlayedRef.current.add(entry.language);
+      const audio = new Audio(entry.url);
+      revealAudioRef.current = audio;
+      audio.onended = () => {
+        idx++;
+        playNext();
+      };
+      audio.play().catch((err) => {
+        if (err.name !== 'AbortError') console.error('Reveal auto-play failed:', err);
+        idx++;
+        playNext();
+      });
+    };
+    playNext();
+
+    return () => {
+      revealAbortedRef.current = true;
+      revealAudioRef.current?.pause();
+      revealAudioRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRevealed, translationKey]);
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
@@ -157,6 +221,7 @@ export function FullReviewCardContent({
                   inputRef={index === 0 ? firstInputRef : undefined}
                   autoFocus={index === 0}
                   isFirstTarget={index === 0}
+                  allRevealed={allRevealed}
                 />
               );
             })}
@@ -183,6 +248,7 @@ interface TargetLanguageInputProps {
   inputRef?: React.RefObject<HTMLInputElement | null>;
   autoFocus?: boolean;
   isFirstTarget?: boolean;
+  allRevealed?: boolean;
 }
 
 function TargetLanguageInput({
@@ -201,6 +267,7 @@ function TargetLanguageInput({
   inputRef,
   autoFocus,
   isFirstTarget = false,
+  allRevealed = false,
 }: TargetLanguageInputProps) {
   const t = useTranslations('LearningMode');
   const [showClean, setShowClean] = useState(false);
@@ -248,6 +315,68 @@ function TargetLanguageInput({
     : null;
 
   const hasUserText = !!state.userText.trim();
+
+  if (allRevealed && !state.submitted) {
+    return (
+      <div
+        className="space-y-1"
+        {...(isFirstTarget ? { 'data-tutorial': 'target-input-full' } : {})}
+      >
+        {languageDisplayName ? (
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground uppercase">
+              {languageDisplayName}
+            </span>
+            <AudioButton
+              url={audioUrl}
+              language={translation.language.toUpperCase()}
+              onPlay={onAudioPlay}
+            />
+          </div>
+        ) : (
+          <div className="flex justify-end">
+            <AudioButton
+              url={audioUrl}
+              language={translation.language.toUpperCase()}
+              onPlay={onAudioPlay}
+            />
+          </div>
+        )}
+        {hasUserText ? (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <DiffDisplay
+                expected={translation.text}
+                actual={state.userText}
+                hideAccuracy={false}
+                hideErrors={showClean}
+              />
+            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowClean((v) => !v)}
+                  className={`h-9 w-9 shrink-0 ${showClean ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
+                  aria-label={showClean ? t('showCorrections') : t('showSentence')}
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {showClean ? t('showCorrections') : t('showSentence')}
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        ) : (
+          <p className="body-large text-muted-foreground">
+            {translation.text || '...'}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   if (state.submitted) {
     return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import {
@@ -27,6 +27,16 @@ interface LearningModeProps {
  */
 export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
+  const [allSubmitted, setAllSubmitted] = useState(false);
+
+  const cardId = state.status === 'reviewing' ? state.cardId : null;
+  useEffect(() => {
+    setFullReviewRevealed(false);
+    setAllSubmitted(false);
+  }, [cardId]);
+
+  const handleReveal = useCallback(() => setFullReviewRevealed(true), []);
 
   if (state.status === 'loading') {
     return (
@@ -117,6 +127,8 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         onFavorite={state.handleFavorite}
         onAudioPlay={audio.stop}
         targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
+        allRevealed={fullReviewRevealed}
+        onAllSubmittedChange={setAllSubmitted}
       />
     ) : (
       <LearningCardContent
@@ -174,6 +186,9 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         isReviewing={state.isReviewing}
         showProgressBar={state.courseSettings.showProgressBar ?? false}
         instantProceed={instantProceed}
+        isFullReview={reviewMode === 'full'}
+        fullReviewRevealed={fullReviewRevealed || allSubmitted}
+        onReveal={handleReveal}
       />
 
       <LearningModeSettings
