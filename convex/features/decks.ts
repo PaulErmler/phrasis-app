@@ -32,6 +32,7 @@ import {
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { useQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
+import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
 
 // ============================================================================
 // HELPERS
@@ -600,7 +601,7 @@ export const addCardsFromCollection = mutation({
     const { userId, settings, course } = await requireActiveCourse(ctx);
     const courseId = course._id;
 
-    const clampedBatchSize = Math.max(1, Math.min(5, Math.floor(args.batchSize)));
+    const clampedBatchSize = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(args.batchSize)));
 
     // Get or create deck
     let deck = await getDeckByCourseId(ctx, courseId);

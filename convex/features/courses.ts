@@ -24,6 +24,7 @@ import {
   DEFAULT_INITIAL_REVIEW_COUNT,
   validateInitialReviewCount,
 } from '../../lib/scheduling';
+import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
 import { LEVEL_TO_COLLECTION } from '../lib/collections';
 import { getNextTextsFromRank } from '../db/collections';
 import { createCardsFromTexts, updateCollectionProgress } from './decks';
@@ -627,7 +628,10 @@ export const updateCourseSettings = mutation({
     const existing = await dbGetCourseSettings(ctx, args.courseId);
     const patch: Record<string, unknown> = {};
     for (const key of PATCHABLE_KEYS) {
-      const value = args[key];
+      let value = args[key];
+      if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
+        value = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(value)));
+      }
       if (value !== undefined) patch[key] = value;
     }
 

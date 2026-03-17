@@ -32,6 +32,7 @@ import {
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
 } from '@/lib/constants/audioPlayback';
+import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 
 interface LearningModeSettingsProps {
@@ -80,7 +81,7 @@ export function LearningModeSettings({
   // ---- existing setting handlers ----
 
   const handleBatchSizeChange = async (value: number) => {
-    if (value < 1 || value > 50) return;
+    if (value < 1 || value > MAX_CARDS_PER_BATCH) return;
     await updateSettings({
       courseId: courseSettings.courseId,
       cardsToAddBatchSize: value,
@@ -353,7 +354,7 @@ export function LearningModeSettings({
               <StepperControl
                 value={courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE}
                 min={1}
-                max={50}
+                max={MAX_CARDS_PER_BATCH}
                 onChange={handleBatchSizeChange}
               />
             </div>
