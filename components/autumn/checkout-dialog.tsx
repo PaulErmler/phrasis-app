@@ -198,6 +198,16 @@ function DueAmounts({ checkoutResult }: { checkoutResult: CheckoutResult }) {
 	);
 }
 
+function formatPeriodLabel(
+	secondaryText: string | undefined,
+	tPricing: (key: "perMonth" | "perYear") => string
+): string {
+	if (!secondaryText) return "";
+	if (secondaryText === "per month") return tPricing("perMonth");
+	if (secondaryText === "per year") return tPricing("perYear");
+	return secondaryText;
+}
+
 function ProductItems({
 	checkoutResult,
 	setCheckoutResult,
@@ -206,6 +216,7 @@ function ProductItems({
 	setCheckoutResult: (checkoutResult: CheckoutResult) => void;
 }) {
 	const t = useTranslations("Checkout");
+	const tPricing = useTranslations("Pricing");
 
 	const isUpdateQuantity =
 		checkoutResult?.product.scenario === "active" &&
@@ -244,7 +255,8 @@ function ProductItems({
 										: t("subscription")}
 							</p>
 							<p>
-								{item.display?.primary_text} {item.display?.secondary_text}
+								{item.display?.primary_text}{" "}
+								{formatPeriodLabel(item.display?.secondary_text, tPricing)}
 							</p>
 						</div>
 					);
@@ -322,6 +334,7 @@ const PrepaidItem = ({
 	setCheckoutResult: (checkoutResult: CheckoutResult) => void;
 }) => {
 	const t = useTranslations("Checkout");
+	const tPricing = useTranslations("Pricing");
 	const { quantity = 0, billing_units: billingUnits = 1 } = item;
 	const [quantityInput, setQuantityInput] = useState<string>(
 		(quantity / billingUnits).toString(),
@@ -396,7 +409,8 @@ const PrepaidItem = ({
 						<div className="flex flex-col gap-1">
 							<p className="text-sm font-medium">{item.feature?.name}</p>
 							<p className="text-muted-foreground">
-								{item.display?.primary_text} {item.display?.secondary_text}
+								{item.display?.primary_text}{" "}
+								{formatPeriodLabel(item.display?.secondary_text, tPricing)}
 							</p>
 						</div>
 
@@ -429,7 +443,8 @@ const PrepaidItem = ({
 				</Popover>
 			</div>
 			<p className="text-end">
-				{item.display?.primary_text} {item.display?.secondary_text}
+				{item.display?.primary_text}{" "}
+				{formatPeriodLabel(item.display?.secondary_text, tPricing)}
 			</p>
 		</div>
 	);
