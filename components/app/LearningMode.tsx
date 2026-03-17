@@ -104,6 +104,8 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
     reviewMode === 'full' ? (
       <FullReviewCardContent
         preReviewCount={state.preReviewCount}
+        schedulingPhase={state.phase}
+        fsrsState={state.fsrsState}
         sourceText={state.sourceText}
         translations={state.translations}
         audioRecordings={state.audioRecordings}

@@ -25,6 +25,9 @@ interface LanguageInputState {
 
 interface FullReviewCardContentProps {
   preReviewCount: number;
+  /** When in FSRS phase, total reviews = preReviewCount + fsrsState.reps */
+  schedulingPhase?: 'preReview' | 'review';
+  fsrsState?: { reps: number } | null;
   sourceText: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
@@ -41,6 +44,8 @@ interface FullReviewCardContentProps {
 
 export function FullReviewCardContent({
   preReviewCount,
+  schedulingPhase,
+  fsrsState,
   sourceText,
   translations,
   audioRecordings,
@@ -56,6 +61,11 @@ export function FullReviewCardContent({
 }: FullReviewCardContentProps) {
   const t = useTranslations('LearningMode');
   const locale = useLocale();
+
+  const displayReviewCount =
+    schedulingPhase === 'review' && fsrsState != null
+      ? preReviewCount + fsrsState.reps
+      : preReviewCount;
 
   const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
   const showLanguageLabel = targetTranslations.length > 1;
@@ -105,7 +115,7 @@ export function FullReviewCardContent({
   return (
     <div data-tutorial="card-content-full" className="flex flex-col flex-1 min-h-0">
       <CardShell
-        reviewCount={preReviewCount}
+        reviewCount={displayReviewCount}
         sourceText={sourceText}
         translations={translations}
         audioRecordings={audioRecordings}
