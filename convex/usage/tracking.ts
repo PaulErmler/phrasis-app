@@ -27,9 +27,18 @@ export type AutumnFeatureEntry = {
   overage_allowed: boolean | null;
 };
 
+type AutumnFlagEntry = {
+  id: string;
+  plan_id: string | null;
+  expires_at: number | null;
+  feature_id: string;
+};
+
 type AutumnCustomerResponse = {
   id: string;
-  features: Record<string, AutumnFeatureEntry>;
+  features?: Record<string, AutumnFeatureEntry>;
+  balances?: Record<string, AutumnFeatureEntry>;
+  flags?: Record<string, AutumnFlagEntry>;
 };
 
 /**
@@ -65,12 +74,12 @@ export const trackUsage = internalAction({
       return null;
     }
 
-    const autumnFeatures = await fetchCustomerFeatures(secretKey, args.userId);
-    if (!autumnFeatures) return null;
+    const customerData = await fetchCustomerData(secretKey, args.userId);
+    if (!customerData) return null;
 
     await ctx.runMutation(internal.usage.helpers.syncAllFeatures, {
       userId: args.userId,
-      features: toFeaturesRecord(autumnFeatures),
+      features: toFeaturesRecord(customerData),
     });
 
     return null;
@@ -78,12 +87,12 @@ export const trackUsage = internalAction({
 });
 
 /**
- * Fetch all features for a customer in a single request.
+ * Fetch customer data including both metered features and boolean flags.
  */
-export async function fetchCustomerFeatures(
+export async function fetchCustomerData(
   secretKey: string,
   userId: string,
-): Promise<Record<string, AutumnFeatureEntry> | null> {
+): Promise<AutumnCustomerResponse | null> {
   const res = await fetch(`${AUTUMN_API}/customers/${encodeURIComponent(userId)}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${secretKey}` },
@@ -95,26 +104,42 @@ export async function fetchCustomerFeatures(
     return null;
   }
 
-  const data: AutumnCustomerResponse = await res.json();
-  return data.features;
+  return await res.json();
 }
 
 /**
- * Convert Autumn's features dict to our local format.
+ * Convert Autumn's customer response to our local format.
+ * Boolean features (type === 'boolean') are stored with unlimited=true
+ * so that checkQuota / useFeatureQuota treat them as "available".
+ * Also handles the newer API format where boolean features appear
+ * in a separate `flags` field instead of `features`.
  */
 export function toFeaturesRecord(
-  autumnFeatures: Record<string, AutumnFeatureEntry>,
+  data: AutumnCustomerResponse,
 ): Record<string, FeatureState> {
   const result: Record<string, FeatureState> = {};
-  for (const [id, entry] of Object.entries(autumnFeatures)) {
-    result[id] = {
-      balance: entry.balance ?? 0,
-      included: entry.included_usage ?? 0,
-      used: entry.usage ?? 0,
-      interval: entry.interval ?? undefined,
-      unlimited: entry.unlimited ?? undefined,
-    };
+
+  const allFeatures = data.features ?? data.balances ?? {};
+  for (const [id, entry] of Object.entries(allFeatures)) {
+    if (entry.type === 'boolean' || entry.type === 'static') {
+      result[id] = { balance: 1, included: 1, used: 0, unlimited: true };
+    } else {
+      result[id] = {
+        balance: entry.balance ?? 0,
+        included: entry.included_usage ?? 0,
+        used: entry.usage ?? 0,
+        interval: entry.interval ?? undefined,
+        unlimited: entry.unlimited ?? undefined,
+      };
+    }
   }
+
+  if (data.flags) {
+    for (const [id] of Object.entries(data.flags)) {
+      result[id] = { balance: 1, included: 1, used: 0, unlimited: true };
+    }
+  }
+
   return result;
 }
 
@@ -132,12 +157,12 @@ export async function syncQuotasForUser(
   userId: string,
 ): Promise<void> {
   const secretKey = getSecretKey();
-  const autumnFeatures = await fetchCustomerFeatures(secretKey, userId);
-  if (!autumnFeatures) return;
+  const customerData = await fetchCustomerData(secretKey, userId);
+  if (!customerData) return;
 
   await ctx.runMutation(internal.usage.helpers.syncAllFeatures, {
     userId,
-    features: toFeaturesRecord(autumnFeatures),
+    features: toFeaturesRecord(customerData),
   });
 }
 
