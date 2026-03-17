@@ -34,17 +34,24 @@ function StableAuthenticated({ children, fallback }: {
 
   if (isAuthenticated) {
     wasAuthenticated.current = true;
+    sessionStorage.removeItem('auth_recovery_reload');
   }
+
+  useEffect(() => {
+    if (wasAuthenticated.current && !isAuthenticated && !isLoading) {
+      const alreadyReloaded = sessionStorage.getItem('auth_recovery_reload');
+      if (!alreadyReloaded) {
+        sessionStorage.setItem('auth_recovery_reload', '1');
+        window.location.reload();
+      }
+    }
+  }, [isAuthenticated, isLoading]);
 
   if (isAuthenticated || (wasAuthenticated.current && isLoading)) {
     return <>{children}</>;
   }
 
-  if (isLoading) {
-    return <>{fallback ?? null}</>;
-  }
-
-  return null;
+  return <>{fallback ?? null}</>;
 }
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
