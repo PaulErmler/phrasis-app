@@ -16,7 +16,7 @@ import { BottomNav, type View } from '@/components/app/BottomNav';
 import { CourseMenu } from '@/components/app/CourseMenu';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, Loader2 } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { HomeView } from '@/components/app/HomeView';
 import { ContentView } from '@/components/app/ContentView';
@@ -210,8 +210,15 @@ export default function MainLayout({
 
   return (
     <StableAuthenticated fallback={
-      <div className="h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background">
+        <div className="relative flex items-center justify-center">
+          <svg className="absolute size-28 animate-spin" viewBox="0 0 112 112" fill="none">
+            <circle cx="56" cy="56" r="52" stroke="currentColor" strokeWidth="3" className="text-muted/40" />
+            <path d="M56 4a52 52 0 0 1 52 52" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-muted-foreground" />
+          </svg>
+          <img src="/icons/icon.svg" alt="Cacatua" width={72} height={72} />
+        </div>
+        <p className="mt-5 text-lg font-semibold text-foreground">Cacatua</p>
       </div>
     }>
       <div className="h-screen flex flex-col overflow-hidden">
