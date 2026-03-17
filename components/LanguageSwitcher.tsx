@@ -52,6 +52,36 @@ export function LanguageSwitcher({
 
   const currentLocale = locales.find((l) => l.code === locale);
 
+  // Defer Radix (DropdownMenu / Select) until after mount to avoid hydration mismatch
+  if (!mounted) {
+    if (compact) {
+      return (
+        <div
+          className={cn(
+            'inline-flex items-center justify-center size-9 rounded-md',
+            className,
+          )}
+          aria-hidden
+        >
+          <span className="text-base">{currentLocale?.flag}</span>
+          <span className="sr-only">{t('title')}</span>
+        </div>
+      );
+    }
+    return (
+      <div
+        className={cn(
+          'flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm',
+          className,
+        )}
+        aria-hidden
+      >
+        <span>{currentLocale?.flag}</span>
+        <span>{currentLocale?.label}</span>
+      </div>
+    );
+  }
+
   // Compact mode - use DropdownMenu like ThemeSwitcher
   if (compact) {
     return (
@@ -61,7 +91,7 @@ export function LanguageSwitcher({
             variant="ghost"
             size="icon"
             className={cn('size-9', className)}
-            disabled={isPending || !mounted}
+            disabled={isPending}
           >
             <span className="text-base">{currentLocale?.flag}</span>
             <span className="sr-only">{t('title')}</span>
@@ -88,7 +118,7 @@ export function LanguageSwitcher({
     <Select
       value={locale}
       onValueChange={handleLocaleChange}
-      disabled={isPending || !mounted}
+      disabled={isPending}
     >
       <SelectTrigger className={cn('w-full', className)}>
         <SelectValue placeholder={t('title')} />

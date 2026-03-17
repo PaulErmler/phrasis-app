@@ -23,14 +23,31 @@ export function ThemeSwitcher({ className }: { className?: string }) {
     setMounted(true);
   }, []);
 
+  // Defer Radix DropdownMenu until after mount to avoid hydration mismatch
+  // (Radix generates different IDs on server vs client)
+  if (!mounted) {
+    return (
+      <div
+        className={cn(
+          'inline-flex items-center justify-center size-9 rounded-md',
+          className,
+        )}
+        aria-hidden
+      >
+        <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+        <span className="sr-only">{t('toggle')}</span>
+      </div>
+    );
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className={cn("size-9", className)}
-          disabled={!mounted}
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn('size-9', className)}
         >
           <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
