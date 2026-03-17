@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import {
-  Authenticated,
   useConvexAuth,
   usePreloadedQuery,
   useQuery,
@@ -188,7 +187,6 @@ export default function MainLayout({
     : t('changeCourse');
 
   return (
-    <Authenticated>
       <div className="h-screen flex flex-col overflow-hidden">
         <header className="sticky-header">
           <div className="header-bar">
@@ -279,6 +277,5 @@ export default function MainLayout({
           <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
         </div>
       </div>
-    </Authenticated>
   );
 }
