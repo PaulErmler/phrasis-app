@@ -555,6 +555,14 @@
         "description": "Ich möchte meine Inhalte und Einstellung auf mich anpassen"
       }
     },
+    "baseLanguage": {
+      "title": "Von welcher Sprache aus möchtest du lernen?",
+      "subtitle": "Wähle deine Ausgangssprache"
+    },
+    "targetLanguage": {
+      "title": "Welche Sprache möchtest du lernen?",
+      "subtitle": "Wähle eine Sprache"
+    },
     "reviewMode": {
       "title": "Wie möchtest du üben?",
       "full": {
