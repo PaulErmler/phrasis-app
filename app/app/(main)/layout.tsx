@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import {
@@ -16,7 +16,7 @@ import { BottomNav, type View } from '@/components/app/BottomNav';
 import { CourseMenu } from '@/components/app/CourseMenu';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Loader2 } from 'lucide-react';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { HomeView } from '@/components/app/HomeView';
 import { ContentView } from '@/components/app/ContentView';
@@ -24,6 +24,28 @@ import { LibraryView } from '@/components/app/LibraryView';
 import { SettingsView } from '@/components/app/SettingsView';
 import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
+
+function StableAuthenticated({ children, fallback }: {
+  children: ReactNode;
+  fallback?: ReactNode;
+}) {
+  const { isAuthenticated, isLoading } = useConvexAuth();
+  const wasAuthenticated = useRef(false);
+
+  if (isAuthenticated) {
+    wasAuthenticated.current = true;
+  }
+
+  if (isAuthenticated || (wasAuthenticated.current && isLoading)) {
+    return <>{children}</>;
+  }
+
+  if (isLoading) {
+    return <>{fallback ?? null}</>;
+  }
+
+  return null;
+}
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   home: '/app',
@@ -187,6 +209,11 @@ export default function MainLayout({
     : t('changeCourse');
 
   return (
+    <StableAuthenticated fallback={
+      <div className="h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
       <div className="h-screen flex flex-col overflow-hidden">
         <header className="sticky-header">
           <div className="header-bar">
@@ -277,5 +304,6 @@ export default function MainLayout({
           <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
         </div>
       </div>
+    </StableAuthenticated>
   );
 }
