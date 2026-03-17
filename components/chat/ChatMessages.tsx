@@ -91,17 +91,11 @@ function MessageParts({
       renderedTextParts.add(text);
 
       elements.push(
-        isStreaming ? (
-          <SmoothMessageResponse
-            key={`${message.id}-text-${idx}`}
-            text={text}
-            isStreaming
-          />
-        ) : (
-          <MessageResponse key={`${message.id}-text-${idx}`}>
-            {text}
-          </MessageResponse>
-        ),
+        <SmoothMessageResponse
+          key={`${message.id}-text-${idx}`}
+          text={text}
+          isStreaming={isStreaming}
+        />,
       );
       continue;
     }
@@ -199,13 +193,18 @@ export function ChatMessages({
                     message.status === 'pending');
 
                 const hasParts = message.parts && message.parts.length > 0;
+                const hasVisibleParts = hasParts && message.parts!.some(
+                  (p) =>
+                    (p.type === 'text' && (p as { text: string }).text?.trim()) ||
+                    p.type.startsWith('tool-'),
+                );
 
                 return (
-                  <MessageBranch key={message.id} defaultBranch={0}>
+                  <MessageBranch key={message.key ?? message.id} defaultBranch={0}>
                     <MessageBranchContent>
                       <Message from={message.role}>
                         <MessageContent>
-                          {isAssistantStreaming && !messageText && !hasParts ? (
+                          {isAssistantStreaming && !messageText && !hasVisibleParts ? (
                             <Shimmer>{t('thinking')}</Shimmer>
                           ) : hasParts ? (
                             <MessageParts
