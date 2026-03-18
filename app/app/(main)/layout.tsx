@@ -240,16 +240,7 @@ export default function MainLayout({
             <ContentView onChatOpen={handleOpenChat} />
           </div>
           {!isLearnOpen && activeView === 'library' && <LibraryView />}
-          <div
-            style={{
-              display:
-                !isLearnOpen && activeView === 'settings'
-                  ? 'contents'
-                  : 'none',
-            }}
-          >
-            <SettingsView />
-          </div>
+          {!isLearnOpen && activeView === 'settings' && <SettingsView />}
           {!isLearnOpen && activeView === 'chat' && chatThreadId && (
             <SimplifiedChatView threadId={chatThreadId} />
           )}
