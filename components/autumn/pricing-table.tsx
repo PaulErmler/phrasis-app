@@ -37,7 +37,7 @@ export default function PricingTable({
     if (customer && !hasRefetchedRef.current) {
       hasRefetchedRef.current = true;
       setIsRefetching(true);
-      refetch().finally(() => setIsRefetching(false));
+      Promise.resolve(refetch()).finally(() => setIsRefetching(false));
     }
   }, [customer, refetch]);
 
