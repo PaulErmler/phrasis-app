@@ -485,7 +485,8 @@
     "perMonth": "per month",
     "perYear": "per year",
     "everythingFrom": "Everything from {planName}, plus:",
-    "error": "Something went wrong. Please try again later."
+    "error": "Something went wrong. Please try again later.",
+    "retry": "Retry"
   },
   "Checkout": {
     "confirm": "Confirm",

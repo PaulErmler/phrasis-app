@@ -25,20 +25,23 @@ export default function PricingTable({
   productDetails?: ProductDetails[];
 }) {
   const t = useTranslations("Pricing");
-  const { customer, checkout } = useCustomer({ errorOnNotFound: false });
+  const { customer, checkout, isLoading: isCustomerLoading } = useCustomer({ errorOnNotFound: false });
 
   const [isAnnual, setIsAnnual] = useState(false);
-  const { products, isLoading, error, refetch } = usePricingTable({ productDetails });
+  const { products, isLoading: isProductsLoading, error, refetch } = usePricingTable({ productDetails });
 
-  const prevCustomerRef = useRef(customer);
+  const hasRefetchedRef = useRef(false);
+  const [isRefetching, setIsRefetching] = useState(false);
+
   useEffect(() => {
-    if (customer && !prevCustomerRef.current) {
-      refetch();
+    if (customer && !hasRefetchedRef.current) {
+      hasRefetchedRef.current = true;
+      setIsRefetching(true);
+      refetch().finally(() => setIsRefetching(false));
     }
-    prevCustomerRef.current = customer;
   }, [customer, refetch]);
 
-  if (isLoading) {
+  if (isCustomerLoading || isProductsLoading || isRefetching) {
     return (
       <div className="w-full h-full flex justify-center items-center min-h-[300px]">
         <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
@@ -48,9 +51,11 @@ export default function PricingTable({
 
   if (error) {
     return (
-      <div className="w-full h-full flex flex-col justify-center items-center gap-2 min-h-[300px]">
-        <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
-        <span className="text-muted-foreground">{t("loading")}</span>
+      <div className="w-full h-full flex flex-col justify-center items-center gap-3 min-h-[300px]">
+        <span className="text-sm text-muted-foreground">{t("error")}</span>
+        <Button variant="ghost" size="sm" onClick={() => refetch()}>
+          {t("retry")}
+        </Button>
       </div>
     );
   }

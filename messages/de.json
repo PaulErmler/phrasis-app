@@ -485,7 +485,8 @@
     "perMonth": "pro Monat",
     "perYear": "pro Jahr",
     "everythingFrom": "Alles aus {planName}, plus:",
-    "error": "Etwas ist schiefgelaufen. Bitte versuche es später erneut."
+    "error": "Etwas ist schiefgelaufen. Bitte versuche es später erneut.",
+    "retry": "Erneut versuchen"
   },
   "Checkout": {
     "confirm": "Bestätigen",
