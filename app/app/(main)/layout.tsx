@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import {
-  useConvexAuth,
   usePreloadedQuery,
   useQuery,
   useMutation,
@@ -24,35 +23,6 @@ import { LibraryView } from '@/components/app/LibraryView';
 import { SettingsView } from '@/components/app/SettingsView';
 import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
-
-function StableAuthenticated({ children, fallback }: {
-  children: ReactNode;
-  fallback?: ReactNode;
-}) {
-  const { isAuthenticated, isLoading } = useConvexAuth();
-  const wasAuthenticated = useRef(false);
-
-  if (isAuthenticated) {
-    wasAuthenticated.current = true;
-    sessionStorage.removeItem('auth_recovery_reload');
-  }
-
-  useEffect(() => {
-    if (wasAuthenticated.current && !isAuthenticated && !isLoading) {
-      const alreadyReloaded = sessionStorage.getItem('auth_recovery_reload');
-      if (!alreadyReloaded) {
-        sessionStorage.setItem('auth_recovery_reload', '1');
-        window.location.reload();
-      }
-    }
-  }, [isAuthenticated, isLoading]);
-
-  if (isAuthenticated || (wasAuthenticated.current && isLoading)) {
-    return <>{children}</>;
-  }
-
-  return <>{fallback ?? null}</>;
-}
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   home: '/app',
@@ -92,8 +62,6 @@ export default function MainLayout({
   const settings = usePreloadedQuery(preloadedSettings);
   const activeCourse = usePreloadedQuery(preloadedActiveCourse);
 
-  const { isAuthenticated } = useConvexAuth();
-
   const [activeView, setActiveView] = useState<View>(() =>
     viewFromPathname(pathname).view,
   );
@@ -108,7 +76,7 @@ export default function MainLayout({
   // skip once learn is open since useLearningMode manages its own subscription
   useQuery(
     api.features.scheduling.getCardForReview,
-    isAuthenticated && !isLearnOpen ? {} : 'skip',
+    !isLearnOpen ? {} : 'skip',
   );
 
   // Pre-create a chat thread so LearnView can use it immediately
@@ -121,21 +89,21 @@ export default function MainLayout({
   const didPrefetchThread = useRef(false);
 
   useEffect(() => {
-    if (!isAuthenticated || didPrefetchThread.current) return;
+    if (didPrefetchThread.current) return;
     didPrefetchThread.current = true;
     getOrCreateEmptyThread({}).then(setPrefetchedThreadId).catch(() => {});
-  }, [isAuthenticated, getOrCreateEmptyThread]);
+  }, [getOrCreateEmptyThread]);
 
   const syncQuotas = useAction(api.usage.actions.syncQuotas);
   const didSyncQuotas = useRef(false);
 
   useEffect(() => {
-    if (!isAuthenticated || didSyncQuotas.current) return;
+    if (didSyncQuotas.current) return;
     didSyncQuotas.current = true;
     syncQuotas().catch((err) => {
       console.error('Failed to sync quotas on app load:', err);
     });
-  }, [syncQuotas, isAuthenticated]);
+  }, [syncQuotas]);
 
   // Onboarding redirect
   const hasCompletedOnboarding = settings?.hasCompletedOnboarding ?? true;
@@ -216,18 +184,6 @@ export default function MainLayout({
     : t('changeCourse');
 
   return (
-    <StableAuthenticated fallback={
-      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background">
-        <div className="relative flex items-center justify-center">
-          <svg className="absolute size-28 animate-spin" viewBox="0 0 112 112" fill="none">
-            <circle cx="56" cy="56" r="52" stroke="currentColor" strokeWidth="3" className="text-muted/40" />
-            <path d="M56 4a52 52 0 0 1 52 52" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-muted-foreground" />
-          </svg>
-          <img src="/icons/icon.svg" alt="Cacatua" width={72} height={72} />
-        </div>
-        <p className="mt-5 text-lg font-semibold text-foreground">Cacatua</p>
-      </div>
-    }>
       <div className="h-screen flex flex-col overflow-hidden">
         <header className="sticky-header">
           <div className="header-bar">
@@ -318,6 +274,5 @@ export default function MainLayout({
           <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
         </div>
       </div>
-    </StableAuthenticated>
   );
 }

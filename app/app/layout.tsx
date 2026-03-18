@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { isAuthenticated, preloadAuthQuery } from '@/lib/auth-server';
 import { api } from '@/convex/_generated/api';
 import { AppDataProvider } from '@/components/app/AppDataProvider';
+import { ClientAuthBoundary } from '@/components/ClientAuthBoundary';
 
 export default async function AppLayout({
   children,
@@ -38,7 +39,9 @@ export default async function AppLayout({
       preloadedCourseStats={preloadedCourseStats}
       preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
     >
-      {children}
+      <ClientAuthBoundary>
+        {children}
+      </ClientAuthBoundary>
     </AppDataProvider>
   );
 }

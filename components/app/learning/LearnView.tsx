@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Authenticated } from 'convex/react';
 import { LearningMode } from '@/components/app/LearningMode';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
@@ -84,11 +83,7 @@ interface LearnViewProps {
 }
 
 export function LearnView({ onBack, prefetchedThreadId }: LearnViewProps) {
-  return (
-    <Authenticated>
-      <LearnViewInner onBack={onBack} prefetchedThreadId={prefetchedThreadId} />
-    </Authenticated>
-  );
+  return <LearnViewInner onBack={onBack} prefetchedThreadId={prefetchedThreadId} />;
 }
 
 function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
