@@ -226,7 +226,9 @@
       "streak": "Streak",
       "reps": "Reps",
       "sentences": "Sentences",
-      "time": "Time"
+      "time": "Time",
+      "today": "today",
+      "new": "new"
     }
   },
   "LearningMode": {

@@ -15,9 +15,6 @@ export interface AppData {
   preloadedCollectionProgress: Preloaded<
     typeof api.features.decks.getCollectionProgress
   >;
-  preloadedCourseStats: Preloaded<
-    typeof api.features.courses.getCourseStats
-  >;
   preloadedCustomCollectionsProgress: Preloaded<
     typeof api.features.decks.getCustomCollectionsProgress
   >;

@@ -17,7 +17,10 @@ import {
 import {
   getCourseStats as dbGetCourseStats,
   createCourseStats,
+  getTodayInTimezone,
+  getPreviousDay,
 } from '../db/courseStats';
+import { getDailyStats } from '../db/dailyStats';
 import { useQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import {
@@ -158,17 +161,19 @@ export const getOnboardingProgress = query({
  * Get stats for the user's active course.
  */
 export const getCourseStats = query({
-  args: {},
+  args: { timezone: v.string() },
   returns: v.union(
     v.object({
       totalRepetitions: v.number(),
       totalTimeMs: v.number(),
       totalCards: v.number(),
       currentStreak: v.number(),
+      streakFreezeCount: v.number(),
+      streakFrozenToday: v.boolean(),
     }),
     v.null(),
   ),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     try {
       const userId = await getAuthUserId(ctx);
       if (!userId) return null;
@@ -176,22 +181,51 @@ export const getCourseStats = query({
       const active = await getActiveCourseForUser(ctx, userId);
       if (!active) return null;
 
-      const stats = await dbGetCourseStats(
-        ctx,
-        userId,
-        active.course._id,
-      );
+      const stats = await dbGetCourseStats(ctx, userId, active.course._id);
       if (!stats) return null;
+
+      const todayStr = getTodayInTimezone(args.timezone);
+      const yesterday = getPreviousDay(todayStr);
+      const streakFrozenToday =
+        !!stats.streakFreezeUsedDate &&
+        stats.streakFreezeUsedDate === yesterday;
 
       return {
         totalRepetitions: stats.totalRepetitions,
         totalTimeMs: stats.totalTimeMs,
         totalCards: stats.totalCards,
         currentStreak: stats.currentStreak,
+        streakFreezeCount: stats.streakFreezeCount ?? 0,
+        streakFrozenToday,
       };
     } catch {
       return null;
     }
+  },
+});
+
+/**
+ * Get today's learning stats for the user's active course.
+ */
+export const getTodayStats = query({
+  args: { timezone: v.string() },
+  returns: v.union(
+    v.object({
+      reps: v.number(),
+      newCards: v.number(),
+      timeMs: v.number(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return null;
+    const todayStr = getTodayInTimezone(args.timezone);
+    const daily = await getDailyStats(ctx, userId, active.course._id, todayStr);
+    if (!daily) return null;
+    return { reps: daily.reps, newCards: daily.newCards, timeMs: daily.timeMs };
   },
 });
 

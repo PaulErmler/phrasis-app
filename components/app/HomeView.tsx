@@ -10,16 +10,15 @@ import { CustomCollectionCarousel } from '@/components/app/CustomCollectionCarou
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
 import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
-
-type ReviewMode = 'audio' | 'full';
+import type { ReviewMode } from '@/convex/types';
 
 export function HomeView({
   preloadedCollectionProgress,
   preloadedCourseSettings,
-  preloadedCourseStats,
   preloadedCustomCollectionsProgress,
   onLearnOpen,
   onChatOpen,
+  animateEntrance,
 }: {
   preloadedCollectionProgress: Preloaded<
     typeof api.features.decks.getCollectionProgress
@@ -27,14 +26,12 @@ export function HomeView({
   preloadedCourseSettings: Preloaded<
     typeof api.features.courses.getActiveCourseSettings
   >;
-  preloadedCourseStats: Preloaded<
-    typeof api.features.courses.getCourseStats
-  >;
   preloadedCustomCollectionsProgress: Preloaded<
     typeof api.features.decks.getCustomCollectionsProgress
   >;
   onLearnOpen: () => void;
   onChatOpen: (threadId: string) => void;
+  animateEntrance?: boolean;
 }) {
   const t = useTranslations('AppPage');
 
@@ -84,8 +81,8 @@ export function HomeView({
     <div className="flex-1 overflow-y-auto px-4 py-6">
       <div className="app-view">
         <ProgressStatsCard
-          preloadedCourseStats={preloadedCourseStats}
           onStartReview={handleStartReview}
+          animateEntrance={animateEntrance}
         />
 
         <NewChatInput

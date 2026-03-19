@@ -226,7 +226,9 @@
       "streak": "Serie",
       "reps": "Wiederholungen",
       "sentences": "Sätze",
-      "time": "Zeit"
+      "time": "Zeit",
+      "today": "heute",
+      "new": "neu"
     }
   },
   "LearningMode": {

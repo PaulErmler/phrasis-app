@@ -81,9 +81,10 @@ export default function MainLayout({
     preloadedActiveCourse,
     preloadedCourseSettings,
     preloadedCollectionProgress,
-    preloadedCourseStats,
     preloadedCustomCollectionsProgress,
   } = useAppData();
+
+  const justReturnedFromLearn = useRef(false);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -95,14 +96,23 @@ export default function MainLayout({
 
   const { isAuthenticated } = useConvexAuth();
 
-  const [activeView, setActiveView] = useState<View>(() =>
-    viewFromPathname(pathname).view,
-  );
-  const [chatThreadId, setChatThreadId] = useState<string | null>(() =>
-    viewFromPathname(pathname).chatThreadId ?? null,
+  const [initialView] = useState(() => viewFromPathname(pathname));
+  const [activeView, setActiveView] = useState<View>(initialView.view);
+  const [chatThreadId, setChatThreadId] = useState<string | null>(
+    initialView.chatThreadId ?? null,
   );
   const viewBeforeChatRef = useRef<Exclude<View, 'chat'>>('home');
   const [isLearnOpen, setIsLearnOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isLearnOpen && justReturnedFromLearn.current) {
+      const id = requestAnimationFrame(() => {
+        justReturnedFromLearn.current = false;
+      });
+      return () => cancelAnimationFrame(id);
+    }
+  }, [isLearnOpen]);
+
   const [courseMenuOpen, setCourseMenuOpen] = useState(false);
   const [chatSidebarOpen, setChatSidebarOpen] = useState(false);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
@@ -134,13 +144,17 @@ export default function MainLayout({
   const [prefetchedThreadId, setPrefetchedThreadId] = useState<string | null>(
     null,
   );
+  const refreshPrefetchedThread = useCallback(() => {
+    getOrCreateEmptyThread({}).then(setPrefetchedThreadId).catch(() => {});
+  }, [getOrCreateEmptyThread]);
+
   const didPrefetchThread = useRef(false);
 
   useEffect(() => {
     if (!isAuthenticated || didPrefetchThread.current) return;
     didPrefetchThread.current = true;
-    getOrCreateEmptyThread({}).then(setPrefetchedThreadId).catch(() => {});
-  }, [isAuthenticated, getOrCreateEmptyThread]);
+    refreshPrefetchedThread();
+  }, [isAuthenticated, refreshPrefetchedThread]);
 
   const syncQuotas = useAction(api.usage.actions.syncQuotas);
   const didSyncQuotas = useRef(false);
@@ -199,15 +213,15 @@ export default function MainLayout({
   const handleLearnOpen = useCallback(() => {
     setIsLearnOpen(true);
     history.pushState(null, '', '/app/learn');
-    getOrCreateEmptyThread({}).then(setPrefetchedThreadId).catch(() => {});
-  }, [getOrCreateEmptyThread]);
+    refreshPrefetchedThread();
+  }, [refreshPrefetchedThread]);
 
   const handleLearnClose = useCallback(() => {
+    justReturnedFromLearn.current = true;
     setIsLearnOpen(false);
     history.back();
-    // Re-prefetch a fresh thread for the next learn session
-    getOrCreateEmptyThread({}).then(setPrefetchedThreadId).catch(() => {});
-  }, [getOrCreateEmptyThread]);
+    refreshPrefetchedThread();
+  }, [refreshPrefetchedThread]);
 
   // Sync state when the user navigates with browser back/forward buttons
   useEffect(() => {
@@ -309,12 +323,12 @@ export default function MainLayout({
             <HomeView
               preloadedCollectionProgress={preloadedCollectionProgress}
               preloadedCourseSettings={preloadedCourseSettings}
-              preloadedCourseStats={preloadedCourseStats}
               preloadedCustomCollectionsProgress={
                 preloadedCustomCollectionsProgress
               }
               onLearnOpen={handleLearnOpen}
               onChatOpen={handleOpenChat}
+              animateEntrance={justReturnedFromLearn.current}
             />
           )}
           <div

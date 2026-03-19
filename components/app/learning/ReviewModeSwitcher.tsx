@@ -3,8 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { Headphones, PenLine } from 'lucide-react';
-
-type ReviewMode = 'audio' | 'full';
+import type { ReviewMode } from '@/convex/types';
 
 interface ReviewModeSwitcherProps {
   value: ReviewMode;
