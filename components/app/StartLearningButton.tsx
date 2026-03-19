@@ -3,8 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { BookOpen, Headphones } from 'lucide-react';
-
-type ReviewMode = 'audio' | 'full';
+import type { ReviewMode } from '@/convex/types';
 
 interface StartLearningButtonProps {
   onStartReview: (mode: ReviewMode) => void;

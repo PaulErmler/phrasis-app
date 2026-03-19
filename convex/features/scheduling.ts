@@ -11,6 +11,7 @@ import {
   getTodayInTimezone,
   computeStreakUpdate,
 } from '../db/courseStats';
+import { upsertDailyStats } from '../db/dailyStats';
 import {
   scheduleCard,
   getValidRatings,
@@ -270,10 +271,17 @@ export const reviewCard = mutation({
       throw new ConvexError('Course stats not found');
     }
     const todayDate = getTodayInTimezone(args.timezone);
-    const { newStreak, newLastActivityDate } = computeStreakUpdate(
+    const {
+      newStreak,
+      newLastActivityDate,
+      newFreezeCount,
+      newFreezeUsedDate,
+    } = computeStreakUpdate(
       stats.lastActivityDate,
       todayDate,
       stats.currentStreak,
+      stats.streakFreezeCount,
+      stats.streakFreezeUsedDate,
     );
     const isFirstReview =
       card.schedulingPhase === 'preReview' && card.preReviewCount === 0;
@@ -283,6 +291,16 @@ export const reviewCard = mutation({
       totalCards: stats.totalCards + (isFirstReview ? 1 : 0),
       currentStreak: newStreak,
       lastActivityDate: newLastActivityDate,
+      streakFreezeCount: newFreezeCount,
+      streakFreezeUsedDate: newFreezeUsedDate,
+    });
+
+    await upsertDailyStats(ctx, {
+      userId,
+      courseId: deck.courseId,
+      date: todayDate,
+      timeMs: clampedTime,
+      isNewCard: isFirstReview,
     });
 
     return {

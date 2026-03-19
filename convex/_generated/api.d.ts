@@ -14,6 +14,7 @@ import type * as db_collections from "../db/collections.js";
 import type * as db_courseSettings from "../db/courseSettings.js";
 import type * as db_courseStats from "../db/courseStats.js";
 import type * as db_courses from "../db/courses.js";
+import type * as db_dailyStats from "../db/dailyStats.js";
 import type * as db_decks from "../db/decks.js";
 import type * as db_seed from "../db/seed.js";
 import type * as db_users from "../db/users.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   "db/courseSettings": typeof db_courseSettings;
   "db/courseStats": typeof db_courseStats;
   "db/courses": typeof db_courses;
+  "db/dailyStats": typeof db_dailyStats;
   "db/decks": typeof db_decks;
   "db/seed": typeof db_seed;
   "db/users": typeof db_users;

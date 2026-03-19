@@ -165,7 +165,20 @@ export default defineSchema({
     totalCards: v.number(),
     currentStreak: v.number(),
     lastActivityDate: v.optional(v.string()), // "YYYY-MM-DD" in user's local timezone
+    streakFreezeCount: v.optional(v.number()),
+    streakFreezeUsedDate: v.optional(v.string()),
   }).index('by_userId_and_courseId', ['userId', 'courseId']),
+
+  // Daily stats table - one document per user + course + day
+  dailyStats: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    date: v.string(),
+    reps: v.number(),
+    newCards: v.number(),
+    timeMs: v.number(),
+    cardsReviewed: v.number(),
+  }).index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date']),
 
   // Collection progress table - tracks cards added per collection/course
   collectionProgress: defineTable({

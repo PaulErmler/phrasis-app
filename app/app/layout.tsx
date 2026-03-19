@@ -19,14 +19,12 @@ export default async function AppLayout({
     preloadedActiveCourse,
     preloadedCourseSettings,
     preloadedCollectionProgress,
-    preloadedCourseStats,
     preloadedCustomCollectionsProgress,
   ] = await Promise.all([
     preloadAuthQuery(api.features.courses.getUserSettings),
     preloadAuthQuery(api.features.courses.getActiveCourse),
     preloadAuthQuery(api.features.courses.getActiveCourseSettings),
     preloadAuthQuery(api.features.decks.getCollectionProgress),
-    preloadAuthQuery(api.features.courses.getCourseStats),
     preloadAuthQuery(api.features.decks.getCustomCollectionsProgress),
   ]);
 
@@ -36,7 +34,6 @@ export default async function AppLayout({
       preloadedActiveCourse={preloadedActiveCourse}
       preloadedCourseSettings={preloadedCourseSettings}
       preloadedCollectionProgress={preloadedCollectionProgress}
-      preloadedCourseStats={preloadedCourseStats}
       preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
     >
       <ClientAuthBoundary>

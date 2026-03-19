@@ -37,7 +37,9 @@ export async function getCourseStats(
 }
 
 /**
- * Mutation-context reader used when updating stats in write paths.
+ * Mutation-context variant of getCourseStats.
+ * Convex's MutationCtx is not a subtype of QueryCtx, so we need a
+ * separate function with the identical query to use inside mutations.
  */
 export async function getCourseStatsForMutation(
   ctx: MutationCtx,
@@ -73,27 +75,89 @@ function getNextDay(dateStr: string): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+export function getPreviousDay(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d - 1));
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(date.getUTCDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export interface StreakUpdateResult {
+  newStreak: number;
+  newLastActivityDate: string;
+  freezeConsumed: boolean;
+  newFreezeCount: number;
+  newFreezeUsedDate: string | undefined;
+}
+
 /**
  * Pure function: given the last activity date and today's date,
- * return the updated streak and activity date.
+ * return the updated streak, activity date, and freeze state.
  */
 export function computeStreakUpdate(
   lastActivityDate: string | undefined,
   todayDate: string,
   currentStreak: number,
-): { newStreak: number; newLastActivityDate: string } {
+  streakFreezeCount?: number,
+  streakFreezeUsedDate?: string,
+): StreakUpdateResult {
+  const freezeCount = streakFreezeCount ?? 0;
+
   if (!lastActivityDate) {
-    return { newStreak: 1, newLastActivityDate: todayDate };
+    return {
+      newStreak: 1,
+      newLastActivityDate: todayDate,
+      freezeConsumed: false,
+      newFreezeCount: freezeCount,
+      newFreezeUsedDate: streakFreezeUsedDate,
+    };
   }
 
   if (lastActivityDate === todayDate) {
-    return { newStreak: currentStreak, newLastActivityDate: todayDate };
+    return {
+      newStreak: currentStreak,
+      newLastActivityDate: todayDate,
+      freezeConsumed: false,
+      newFreezeCount: freezeCount,
+      newFreezeUsedDate: streakFreezeUsedDate,
+    };
   }
 
   const expectedNextDay = getNextDay(lastActivityDate);
   if (todayDate === expectedNextDay) {
-    return { newStreak: currentStreak + 1, newLastActivityDate: todayDate };
+    return {
+      newStreak: currentStreak + 1,
+      newLastActivityDate: todayDate,
+      freezeConsumed: false,
+      newFreezeCount: freezeCount,
+      newFreezeUsedDate: streakFreezeUsedDate,
+    };
   }
 
-  return { newStreak: 1, newLastActivityDate: todayDate };
+  // Gap of exactly 2 days (skipped yesterday) — try to use a freeze
+  const yesterday = getPreviousDay(todayDate);
+  const dayBeforeYesterday = getPreviousDay(yesterday);
+  if (
+    lastActivityDate === dayBeforeYesterday &&
+    freezeCount > 0 &&
+    streakFreezeUsedDate !== yesterday
+  ) {
+    return {
+      newStreak: currentStreak + 1,
+      newLastActivityDate: todayDate,
+      freezeConsumed: true,
+      newFreezeCount: freezeCount - 1,
+      newFreezeUsedDate: yesterday,
+    };
+  }
+
+  return {
+    newStreak: 1,
+    newLastActivityDate: todayDate,
+    freezeConsumed: false,
+    newFreezeCount: freezeCount,
+    newFreezeUsedDate: streakFreezeUsedDate,
+  };
 }
