@@ -59,9 +59,10 @@ function WrappedChatPanel({
         processingApprovals,
         handleApprove,
         handleReject,
+        isLoaded: approvalsLoaded,
       }),
     }),
-    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject],
+    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject, approvalsLoaded],
   );
 
   return (

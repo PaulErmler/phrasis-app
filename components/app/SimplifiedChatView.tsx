@@ -49,9 +49,10 @@ export function SimplifiedChatView({
         processingApprovals,
         handleApprove,
         handleReject,
+        isLoaded: approvalsLoaded,
       }),
     }),
-    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject],
+    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject, approvalsLoaded],
   );
 
   const handleThreadSelect = (id: string) => {

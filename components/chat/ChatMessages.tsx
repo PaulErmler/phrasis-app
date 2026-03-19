@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import 'react';
 import { useTranslations } from 'next-intl';
 import {
   Conversation,
@@ -171,14 +171,7 @@ export function ChatMessages({
   const t = useTranslations('Chat');
 
   const visibleMessages = messages?.filter((m) => m.role !== 'system') ?? [];
-
-  const bufferedMessagesRef = useRef<ExtendedUIMessage[]>([]);
-  if (!isLoading) {
-    bufferedMessagesRef.current = visibleMessages;
-  }
-  const displayMessages = isLoading && visibleMessages.length === 0
-    ? bufferedMessagesRef.current
-    : visibleMessages;
+  const displayMessages = isLoading ? [] : visibleMessages;
 
   return (
     <div className="relative flex-1 h-full w-full flex flex-col overflow-hidden">
