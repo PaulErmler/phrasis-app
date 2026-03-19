@@ -74,6 +74,7 @@ function WrappedChatPanel({
       onMessageSent={onMessageSent}
       suggestions={suggestions}
       showSuggestions
+      autoFocus={false}
       approvalsLoading={!approvalsLoaded}
       aboveFooterAction={
         <Button

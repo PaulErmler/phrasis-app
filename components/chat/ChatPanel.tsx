@@ -36,6 +36,8 @@ interface ChatPanelProps {
   aboveFooterAction?: ReactNode;
   /** When true, delays showing messages until approvals have loaded */
   approvalsLoading?: boolean;
+  /** When false, prevents the chat input from auto-focusing on mount */
+  autoFocus?: boolean;
 }
 
 /**
@@ -57,6 +59,7 @@ export function ChatPanel({
   suggestionsAction,
   aboveFooterAction,
   approvalsLoading = false,
+  autoFocus,
 }: ChatPanelProps) {
   const { isAvailable } = useFeatureQuota(FEATURE_IDS.CHAT_MESSAGES);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -168,6 +171,7 @@ export function ChatPanel({
               isTranscribing={chat.voice.isTranscribing}
               onVoiceClick={chat.voice.toggle}
               suggestions={suggestions}
+              autoFocus={autoFocus}
                 showSuggestions={
                   !chat.isLoading && (showSuggestions ?? chat.messages.length === 0)
                 }
