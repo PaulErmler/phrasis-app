@@ -38,6 +38,7 @@ interface ChatInputProps {
   className?: string;
   footerAction?: React.ReactNode;
   suggestionsAction?: React.ReactNode;
+  autoFocus?: boolean;
 }
 
 /**
@@ -58,15 +59,17 @@ export function ChatInput({
   className,
   footerAction,
   suggestionsAction,
+  autoFocus = true,
 }: ChatInputProps) {
   const t = useTranslations('Chat.input');
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!autoFocus) return;
     requestAnimationFrame(() => {
       containerRef.current?.querySelector<HTMLTextAreaElement>('textarea')?.focus();
     });
-  }, []);
+  }, [autoFocus]);
 
   const isOverLimit = text.length > MAX_MESSAGE_LENGTH;
   const showCounter = text.length >= MAX_MESSAGE_LENGTH * 0.8;

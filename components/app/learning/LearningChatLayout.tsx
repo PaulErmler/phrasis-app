@@ -107,7 +107,7 @@ export function LearningChatLayout({
           </AnimatePresence>
 
           {/* Mobile: both panels always mounted, slide to toggle */}
-          <div className="flex-1 lg:hidden min-w-0 min-h-0 relative overflow-hidden">
+          <div className="flex-1 lg:hidden min-w-0 min-h-0 relative overflow-clip">
             <motion.div
               className="absolute inset-0 flex flex-col"
               initial={false}
