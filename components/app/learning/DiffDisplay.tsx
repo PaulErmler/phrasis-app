@@ -20,10 +20,8 @@ function computeAccuracy(expected: string, actual: string): number {
     const len = change.value.length;
     if (!change.added && !change.removed) {
       matchingChars += len;
-      totalChars += len;
-    } else if (change.removed) {
-      totalChars += len;
     }
+    totalChars += len;
   }
 
   if (totalChars === 0) return 100;

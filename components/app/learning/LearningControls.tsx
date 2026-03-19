@@ -65,6 +65,14 @@ export function LearningControls({
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'Enter') {
+        if (isFullReview && !fullReviewRevealed && onReveal) {
+          onReveal();
+        } else if (!isReviewing) {
+          onNext();
+        }
+        return;
+      }
       const idx = parseInt(e.key, 10) - 1;
       if (idx >= 0 && idx < validRatings.length) {
         onSelectRating(validRatings[idx]);
@@ -73,7 +81,7 @@ export function LearningControls({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [validRatings, onSelectRating, instantProceed, onNext]);
+  }, [validRatings, onSelectRating, instantProceed, onNext, isFullReview, fullReviewRevealed, onReveal, isReviewing]);
 
   return (
     <div className="relative bg-background pb-safe">
