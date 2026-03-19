@@ -49,11 +49,22 @@ export const listThreads = query({
       agentComponent.threads.listThreadsByUserId,
       {
         userId,
-        paginationOpts: { cursor: null, numItems: 10 },
+        paginationOpts: { cursor: null, numItems: 20 },
       },
     );
 
-    return threads.page;
+    const nonEmpty = [];
+    for (const thread of threads.page) {
+      const msgs = await listMessages(ctx, agentComponent, {
+        threadId: thread._id,
+        paginationOpts: { cursor: null, numItems: 1 },
+      });
+      if (msgs.page.length > 0) {
+        nonEmpty.push(thread);
+      }
+    }
+
+    return nonEmpty;
   },
 });
 

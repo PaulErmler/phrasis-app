@@ -35,7 +35,13 @@ function WrappedChatPanel({
   onMessageSent?: () => void;
 }) {
   const { closeChat } = useLearningChatToggle();
-  const approvals = useCardApprovals(threadId);
+  const {
+    approvalsByToolCallId,
+    processingApprovals,
+    handleApprove,
+    handleReject,
+    isLoaded: approvalsLoaded,
+  } = useCardApprovals(threadId);
   const t = useTranslations('Chat');
 
   const suggestions = useMemo(
@@ -49,9 +55,14 @@ function WrappedChatPanel({
 
   const toolRenderers = useMemo(
     () => ({
-      createCard: createCardToolRenderer(approvals),
+      createCard: createCardToolRenderer({
+        approvalsByToolCallId,
+        processingApprovals,
+        handleApprove,
+        handleReject,
+      }),
     }),
-    [approvals],
+    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject],
   );
 
   return (
@@ -62,6 +73,7 @@ function WrappedChatPanel({
       onMessageSent={onMessageSent}
       suggestions={suggestions}
       showSuggestions
+      approvalsLoading={!approvalsLoaded}
       aboveFooterAction={
         <Button
           type="button"

@@ -57,7 +57,9 @@ function ThreadItem({
           : 'hover:bg-accent/50',
       )}
     >
-      <div className="font-medium truncate">{label}</div>
+      <div className="font-medium truncate">
+        {thread.title && thread.title !== 'New Chat' ? thread.title : label}
+      </div>
     </button>
   );
 }

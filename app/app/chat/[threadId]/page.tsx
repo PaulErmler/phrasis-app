@@ -56,15 +56,26 @@ function ChatPageContent({ threadId: initialThreadId }: { threadId: string }) {
     }
   }, [isDesktop]);
 
-  const approvals = useCardApprovals(currentThreadId);
+  const {
+    approvalsByToolCallId,
+    processingApprovals,
+    handleApprove,
+    handleReject,
+    isLoaded: approvalsLoaded,
+  } = useCardApprovals(currentThreadId);
   const threads = useQuery(api.features.chat.threads.listThreads);
   const getOrCreateEmptyThread = useMutation(api.features.chat.threads.getOrCreateEmptyThread);
 
   const toolRenderers = useMemo(
     () => ({
-      createCard: createCardToolRenderer(approvals),
+      createCard: createCardToolRenderer({
+        approvalsByToolCallId,
+        processingApprovals,
+        handleApprove,
+        handleReject,
+      }),
     }),
-    [approvals],
+    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject],
   );
 
   const handleThreadSelect = useCallback((id: string) => {
@@ -159,6 +170,7 @@ function ChatPageContent({ threadId: initialThreadId }: { threadId: string }) {
             toolRenderers={toolRenderers}
             onNewChat={handleNewChat}
             className="max-w-3xl mx-auto"
+            approvalsLoading={!approvalsLoaded}
           />
         </div>
       </main>

@@ -32,15 +32,26 @@ export function SimplifiedChatView({
   sidebarOpen = false,
   onSidebarOpenChange,
 }: SimplifiedChatViewProps) {
-  const approvals = useCardApprovals(threadId);
+  const {
+    approvalsByToolCallId,
+    processingApprovals,
+    handleApprove,
+    handleReject,
+    isLoaded: approvalsLoaded,
+  } = useCardApprovals(threadId);
   const t = useTranslations('Chat.sidebar');
   const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   const toolRenderers = useMemo(
     () => ({
-      createCard: createCardToolRenderer(approvals),
+      createCard: createCardToolRenderer({
+        approvalsByToolCallId,
+        processingApprovals,
+        handleApprove,
+        handleReject,
+      }),
     }),
-    [approvals],
+    [approvalsByToolCallId, processingApprovals, handleApprove, handleReject],
   );
 
   const handleThreadSelect = (id: string) => {
@@ -103,6 +114,7 @@ export function SimplifiedChatView({
           toolRenderers={toolRenderers}
           onNewChat={onNewChat}
           className="max-w-xl mx-auto"
+          approvalsLoading={!approvalsLoaded}
         />
       </div>
     </div>

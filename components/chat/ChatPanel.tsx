@@ -34,6 +34,8 @@ interface ChatPanelProps {
   suggestionsAction?: ReactNode;
   /** Renders above the footer (mobile only), e.g. back button matching open-chat style */
   aboveFooterAction?: ReactNode;
+  /** When true, delays showing messages until approvals have loaded */
+  approvalsLoading?: boolean;
 }
 
 /**
@@ -54,6 +56,7 @@ export function ChatPanel({
   footerAction,
   suggestionsAction,
   aboveFooterAction,
+  approvalsLoading = false,
 }: ChatPanelProps) {
   const { isAvailable } = useFeatureQuota(FEATURE_IDS.CHAT_MESSAGES);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -125,7 +128,7 @@ export function ChatPanel({
       <div className={cn("flex-1 min-h-0 relative px-4 pt-2 w-full", className)}>
         <ChatMessages
           messages={chat.messages}
-          isLoading={chat.isLoading}
+          isLoading={chat.isLoading || approvalsLoading}
           threadId={threadId}
           toolRenderers={toolRenderers}
           messageFooter={messageFooter}
@@ -154,6 +157,7 @@ export function ChatPanel({
             </div>
           ) : (
             <ChatInput
+              key={threadId}
               onSubmit={handleSubmit}
               onSuggestionClick={handleSuggestionClick}
               text={chat.text}

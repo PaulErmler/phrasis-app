@@ -121,6 +121,34 @@ export function CardApproval({
     );
   }
 
+  const targetEntries = entries.filter((e) => targetLanguages.includes(e.language));
+  const baseEntries = entries.filter((e) => !targetLanguages.includes(e.language));
+
+  if (isWaiting && entries.length > 0) {
+    const waitingContent = (
+      <div className="space-y-1.5 text-sm">
+        {baseEntries.map((entry, i) => (
+          <p key={`base-${i}`} className="text-sm text-muted-foreground">
+            <Lang code={entry.language} /> {entry.text}
+          </p>
+        ))}
+        {targetEntries.map((entry, i) => (
+          <p key={`target-${i}`} className="text-base font-semibold">
+            <Lang code={entry.language} /> {entry.text}
+          </p>
+        ))}
+      </div>
+    );
+    return (
+      <Alert className="my-3 flex flex-col gap-3 border-muted">
+        <AlertDescription>{waitingContent}</AlertDescription>
+        <div className="flex items-center justify-end gap-2 h-8">
+          <Shimmer duration={1.5}>{t('loading')}</Shimmer>
+        </div>
+      </Alert>
+    );
+  }
+
   if (isWaiting) {
     return (
       <Alert className="my-3 border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
@@ -130,9 +158,6 @@ export function CardApproval({
       </Alert>
     );
   }
-
-  const targetEntries = entries.filter((e) => targetLanguages.includes(e.language));
-  const baseEntries = entries.filter((e) => !targetLanguages.includes(e.language));
 
   if (!isToolComplete) {
     return (
