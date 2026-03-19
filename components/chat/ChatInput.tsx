@@ -22,6 +22,7 @@ import { VoiceRecordButton } from './VoiceRecordButton';
 import type { ChatStatus } from '@/lib/types/chat';
 import { CHAT_STATUS } from '@/lib/constants/chat';
 import { cn } from '@/lib/utils';
+import { MAX_MESSAGE_LENGTH } from '@/convex/features/chat/constants';
 
 interface ChatInputProps {
   onSubmit: (message: PromptInputMessage) => Promise<void>;
@@ -66,6 +67,9 @@ export function ChatInput({
       containerRef.current?.querySelector<HTMLTextAreaElement>('textarea')?.focus();
     });
   }, []);
+
+  const isOverLimit = text.length > MAX_MESSAGE_LENGTH;
+  const showCounter = text.length >= MAX_MESSAGE_LENGTH * 0.8;
 
   const defaultPrompts = [
     t('prompts.grammar'),
@@ -118,16 +122,16 @@ export function ChatInput({
             <PromptInputFooter>
               <div className="flex items-center gap-2">
                 {footerAction}
-                {/* File attachment action menu — disabled for now
-                <PromptInputTools>
-                  <PromptInputActionMenu>
-                    <PromptInputActionMenuTrigger />
-                    <PromptInputActionMenuContent>
-                      <PromptInputActionAddAttachments />
-                    </PromptInputActionMenuContent>
-                  </PromptInputActionMenu>
-                </PromptInputTools>
-                */}
+                {showCounter && (
+                  <span
+                    className={cn(
+                      "text-xs tabular-nums",
+                      isOverLimit ? "text-destructive" : "text-muted-foreground",
+                    )}
+                  >
+                    {text.length}/{MAX_MESSAGE_LENGTH}
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <VoiceRecordButton
@@ -138,6 +142,7 @@ export function ChatInput({
                 <PromptInputSubmit
                   disabled={
                     !text.trim() ||
+                    isOverLimit ||
                     status === CHAT_STATUS.STREAMING ||
                     status === CHAT_STATUS.SUBMITTED ||
                     isRecording ||

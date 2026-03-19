@@ -38,7 +38,11 @@ function SmoothMessageResponse({
   isStreaming: boolean;
 }) {
   const [smoothText] = useSmoothText(text, { startStreaming: isStreaming });
-  return <MessageResponse>{smoothText}</MessageResponse>;
+  return (
+    <MessageResponse mode={isStreaming ? 'streaming' : 'static'}>
+      {smoothText}
+    </MessageResponse>
+  );
 }
 
 function DefaultToolDisplay({
@@ -65,8 +69,8 @@ function DefaultToolDisplay({
 }
 
 /**
- * Deduplicates text & tool parts, renders each via the appropriate component,
- * and appends a streaming indicator when the assistant is still generating.
+ * Deduplicates text & tool parts, renders each via the appropriate component
+ * in their natural order to avoid layout shifts during streaming.
  */
 function MessageParts({
   message,
@@ -80,8 +84,7 @@ function MessageParts({
   const parts = message.parts!;
   const renderedTextParts = new Set<string>();
   const renderedToolCalls = new Set<string>();
-  const textElements: ReactNode[] = [];
-  const toolElements: ReactNode[] = [];
+  const elements: ReactNode[] = [];
 
   for (let idx = 0; idx < parts.length; idx++) {
     const part = parts[idx];
@@ -91,7 +94,7 @@ function MessageParts({
       if (!text || text.trim() === '' || renderedTextParts.has(text)) continue;
       renderedTextParts.add(text);
 
-      textElements.push(
+      elements.push(
         <SmoothMessageResponse
           key={`${message.id}-text-${idx}`}
           text={text}
@@ -110,11 +113,11 @@ function MessageParts({
       const toolName = toolPart.type.replace('tool-', '');
       const custom = toolRenderers?.[toolName]?.(toolPart, message.id, idx);
       if (custom) {
-        toolElements.push(custom);
+        elements.push(custom);
         continue;
       }
 
-      toolElements.push(
+      elements.push(
         <DefaultToolDisplay
           key={`${message.id}-tool-${idx}`}
           toolPart={toolPart}
@@ -125,7 +128,7 @@ function MessageParts({
     }
   }
 
-  return <>{textElements}{toolElements}</>;
+  return <>{elements}</>;
 }
 
 function PlainTextContent({ text }: { text: string }) {

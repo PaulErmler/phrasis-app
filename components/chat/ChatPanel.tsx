@@ -127,6 +127,7 @@ export function ChatPanel({
 
       <div className={cn("flex-1 min-h-0 relative px-4 pt-2 w-full", className)}>
         <ChatMessages
+          key={threadId}
           messages={chat.messages}
           isLoading={chat.isLoading || approvalsLoading}
           threadId={threadId}

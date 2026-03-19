@@ -97,6 +97,14 @@ export function NewChatInput({
           setIsProcessing(false);
           return;
         }
+        if (
+          error instanceof ConvexError &&
+          (error.data as { code?: string })?.code === 'MESSAGE_TOO_LONG'
+        ) {
+          toast.error(t('messageTooLong'));
+          setIsProcessing(false);
+          return;
+        }
         console.error('Failed to start chat:', error);
         toast.error(t('failedToCreateThread'));
         setIsProcessing(false);

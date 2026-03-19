@@ -12,7 +12,7 @@ import { FEATURE_IDS } from '../featureIds';
 import { agent } from './agent';
 import type { MutationCtx } from '../../_generated/server';
 import type { Id } from '../../_generated/dataModel';
-import { THREAD_MESSAGE_LIMIT } from './constants';
+import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
@@ -140,6 +140,14 @@ export const sendMessage = mutation({
   returns: v.string(),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
+
+    if (args.prompt.length > MAX_MESSAGE_LENGTH) {
+      throw new ConvexError({
+        code: 'MESSAGE_TOO_LONG',
+        message: `Message exceeds the ${MAX_MESSAGE_LENGTH} character limit`,
+      });
+    }
+
     await useQuota(ctx, userId, FEATURE_IDS.CHAT_MESSAGES, 1);
 
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {

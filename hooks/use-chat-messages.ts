@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { useUIMessages } from '@convex-dev/agent/react';
 import type { UIMessagesQuery } from '@convex-dev/agent/react';
 import { api } from '@/convex/_generated/api';
@@ -90,6 +90,8 @@ export function useChatMessages({
     hasStreamingMessages: false,
   });
 
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(threadId);
+
   // Track previous streaming state to avoid unnecessary dispatches
   const prevStreamingRef = useRef<boolean | null>(null);
 
@@ -110,14 +112,14 @@ export function useChatMessages({
     } as any,
   );
 
-  const isLoading = !messageResult || messageResult.status === 'LoadingFirstPage';
-  const prevThreadIdRef = useRef(threadId);
+  const isTransitioning = threadId !== activeThreadId;
+  const isLoading = isTransitioning || !messageResult || messageResult.status === 'LoadingFirstPage';
 
-  const messages: ExtendedUIMessage[] = messageResult?.results ?? [];
+  const messages: ExtendedUIMessage[] = isTransitioning ? [] : (messageResult?.results ?? []);
 
   // Monitor streaming status and update button state
   useEffect(() => {
-    if (!messageResult?.results) return;
+    if (isTransitioning || !messageResult?.results) return;
 
     // Check if there are any messages currently streaming or pending
     const hasStreamingMessages = messageResult.results.some(
@@ -131,16 +133,16 @@ export function useChatMessages({
       prevStreamingRef.current = hasStreamingMessages;
       dispatch({ type: 'UPDATE_STREAMING', hasStreamingMessages });
     }
-  }, [messageResult?.results]);
+  }, [messageResult?.results, isTransitioning]);
 
   // Reset status when thread changes
   useEffect(() => {
-    if (threadId && threadId !== prevThreadIdRef.current) {
-      prevThreadIdRef.current = threadId;
+    if (threadId !== activeThreadId) {
+      setActiveThreadId(threadId);
       prevStreamingRef.current = null;
       dispatch({ type: 'RESET_THREAD' });
     }
-  }, [threadId]);
+  }, [threadId, activeThreadId]);
 
   // Wrapper to allow external status updates
   const setStatus = (status: ChatStatus) => {
