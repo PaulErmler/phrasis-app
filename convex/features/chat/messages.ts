@@ -12,6 +12,9 @@ import { FEATURE_IDS } from '../featureIds';
 import { agent } from './agent';
 import type { MutationCtx } from '../../_generated/server';
 import type { Id } from '../../_generated/dataModel';
+import { THREAD_MESSAGE_LIMIT } from './constants';
+import { generateText } from 'ai';
+import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
 export type ListMessagesStreamArgs = {
   kind: 'list';
@@ -147,6 +150,17 @@ export const sendMessage = mutation({
       throw new ConvexError('Thread not found or access denied');
     }
 
+    const existingMessages = await ctx.runQuery(
+      agentComponent.messages.listMessagesByThreadId,
+      { threadId: args.threadId, order: 'asc', paginationOpts: { cursor: null, numItems: 200 } },
+    );
+    const userMessageCount = existingMessages.page.filter(
+      (m: any) => m.message?.role === 'user',
+    ).length;
+    if (userMessageCount >= THREAD_MESSAGE_LIMIT) {
+      throw new ConvexError({ code: 'THREAD_MESSAGE_LIMIT', message: 'Thread message limit reached' });
+    }
+
     const { messageId } = await saveMessage(ctx, agentComponent, {
       threadId: args.threadId,
       prompt: args.prompt,
@@ -160,6 +174,17 @@ export const sendMessage = mutation({
         cardContextSection = buildCardContextSection(cardData);
         languageSection = buildLanguageSection(cardData);
       }
+    }
+
+    if (userMessageCount === 0) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.chat.messages.generateThreadTitle,
+        {
+          threadId: args.threadId,
+          userMessage: args.prompt,
+        },
+      );
     }
 
     await ctx.scheduler.runAfter(
@@ -272,6 +297,42 @@ export const generateResponse = internalAction({
       console.error('Failed to generate AI response:', error);
     }
 
+    return null;
+  },
+});
+
+/**
+ * Generate a short title for a thread based on the first user message.
+ */
+export const generateThreadTitle = internalAction({
+  args: {
+    threadId: v.string(),
+    userMessage: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    try {
+      const openrouter = createOpenRouter({
+        apiKey: process.env.OPENROUTER_API_KEY,
+      });
+      const { text } = await generateText({
+        model: openrouter('google/gemini-3.1-flash-lite-preview'),
+        system: `You generate short titles for chat conversations. Respond with ONLY the title, nothing else.
+The title MUST be written in the SAME language the user wrote their message in. Do NOT translate into any other language.
+For example: if the user writes in English, respond in English. If the user writes in German, respond in German.
+Maximum 6 words. No quotes. No period.`,
+        prompt: args.userMessage,
+      });
+      const title = text.trim().slice(0, 80);
+      if (title) {
+        await ctx.runMutation(agentComponent.threads.updateThread, {
+          threadId: args.threadId,
+          patch: { title },
+        });
+      }
+    } catch (e) {
+      console.error('Failed to generate thread title:', e);
+    }
     return null;
   },
 });

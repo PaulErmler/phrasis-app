@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import {
   PromptInput,
   // File attachment imports — disabled for now, re-enable when file upload is supported
@@ -58,15 +59,24 @@ export function ChatInput({
   suggestionsAction,
 }: ChatInputProps) {
   const t = useTranslations('Chat.input');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      containerRef.current?.querySelector<HTMLTextAreaElement>('textarea')?.focus();
+    });
+  }, []);
+
   const defaultPrompts = [
     t('prompts.grammar'),
     t('prompts.sayInLanguage'),
+    t('prompts.sayDifferently'),
     t('prompts.moreExamples'),
   ] as const;
   const items = suggestions ?? defaultPrompts;
 
   return (
-    <div className={cn("w-full min-w-0", className ?? "")}>
+    <div ref={containerRef} className={cn("w-full min-w-0", className ?? "")}>
       <div className="w-full min-w-0">
         {showSuggestions && (
           <div className="w-full min-w-0 mb-3 flex items-center gap-2">

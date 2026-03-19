@@ -19,6 +19,7 @@ export interface UseCardApprovalsReturn {
   handleApprove: (approvalId: Id<'cardApprovals'>) => Promise<void>;
   handleReject: (approvalId: Id<'cardApprovals'>) => Promise<void>;
   usageLimitHit: boolean;
+  isLoaded: boolean;
 }
 
 /**
@@ -106,5 +107,6 @@ export function useCardApprovals(
     handleApprove,
     handleReject,
     usageLimitHit,
+    isLoaded: threadApprovals !== undefined,
   };
 }

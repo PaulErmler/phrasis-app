@@ -19,6 +19,7 @@ import type * as db_seed from "../db/seed.js";
 import type * as db_users from "../db/users.js";
 import type * as features_chat_agent from "../features/chat/agent.js";
 import type * as features_chat_cardApprovals from "../features/chat/cardApprovals.js";
+import type * as features_chat_constants from "../features/chat/constants.js";
 import type * as features_chat_messages from "../features/chat/messages.js";
 import type * as features_chat_threads from "../features/chat/threads.js";
 import type * as features_chat_transcribe from "../features/chat/transcribe.js";
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   "db/users": typeof db_users;
   "features/chat/agent": typeof features_chat_agent;
   "features/chat/cardApprovals": typeof features_chat_cardApprovals;
+  "features/chat/constants": typeof features_chat_constants;
   "features/chat/messages": typeof features_chat_messages;
   "features/chat/threads": typeof features_chat_threads;
   "features/chat/transcribe": typeof features_chat_transcribe;

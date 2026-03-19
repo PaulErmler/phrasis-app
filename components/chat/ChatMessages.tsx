@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   Conversation,
@@ -12,7 +13,6 @@ import {
 import { Message, MessageContent } from '@/components/ai-elements/message';
 import { MessageResponse } from '@/components/ai-elements/message';
 import { Shimmer } from '@/components/ai-elements/shimmer';
-import { Loader } from '@/components/ai-elements/loader';
 import {
   Tool,
   ToolHeader,
@@ -80,7 +80,8 @@ function MessageParts({
   const parts = message.parts!;
   const renderedTextParts = new Set<string>();
   const renderedToolCalls = new Set<string>();
-  const elements: ReactNode[] = [];
+  const textElements: ReactNode[] = [];
+  const toolElements: ReactNode[] = [];
 
   for (let idx = 0; idx < parts.length; idx++) {
     const part = parts[idx];
@@ -90,7 +91,7 @@ function MessageParts({
       if (!text || text.trim() === '' || renderedTextParts.has(text)) continue;
       renderedTextParts.add(text);
 
-      elements.push(
+      textElements.push(
         <SmoothMessageResponse
           key={`${message.id}-text-${idx}`}
           text={text}
@@ -109,11 +110,11 @@ function MessageParts({
       const toolName = toolPart.type.replace('tool-', '');
       const custom = toolRenderers?.[toolName]?.(toolPart, message.id, idx);
       if (custom) {
-        elements.push(custom);
+        toolElements.push(custom);
         continue;
       }
 
-      elements.push(
+      toolElements.push(
         <DefaultToolDisplay
           key={`${message.id}-tool-${idx}`}
           toolPart={toolPart}
@@ -124,7 +125,7 @@ function MessageParts({
     }
   }
 
-  return <>{elements}</>;
+  return <>{textElements}{toolElements}</>;
 }
 
 function PlainTextContent({ text }: { text: string }) {
@@ -171,21 +172,21 @@ export function ChatMessages({
 
   const visibleMessages = messages?.filter((m) => m.role !== 'system') ?? [];
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader size={24} />
-      </div>
-    );
+  const bufferedMessagesRef = useRef<ExtendedUIMessage[]>([]);
+  if (!isLoading) {
+    bufferedMessagesRef.current = visibleMessages;
   }
+  const displayMessages = isLoading && visibleMessages.length === 0
+    ? bufferedMessagesRef.current
+    : visibleMessages;
 
   return (
     <div className="relative flex-1 h-full w-full flex flex-col overflow-hidden">
       <Conversation className="flex-1 h-full w-full">
         <ConversationContent className={`px-4 ${contentClassName ?? ''}`}>
-          {visibleMessages.length > 0 ? (
+          {displayMessages.length > 0 ? (
             <>
-              {visibleMessages.map((message: ExtendedUIMessage) => {
+              {displayMessages.map((message: ExtendedUIMessage) => {
                 const messageText = message.content ?? message.text ?? '';
                 const isAssistantStreaming =
                   message.role === 'assistant' &&
@@ -225,7 +226,7 @@ export function ChatMessages({
                 );
               })}
             </>
-          ) : (
+          ) : !isLoading ? (
             <ConversationEmptyState title={t('emptyTitle')}>
               <ul className="text-muted-foreground text-sm space-y-1.5 text-left list-none">
                 {(['emptyBullet1', 'emptyBullet2', 'emptyBullet3'] as const).map((key) => (
@@ -236,7 +237,7 @@ export function ChatMessages({
                 ))}
               </ul>
             </ConversationEmptyState>
-          )}
+          ) : null}
         </ConversationContent>
       </Conversation>
 

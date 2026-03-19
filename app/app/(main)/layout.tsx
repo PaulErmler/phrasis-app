@@ -15,7 +15,8 @@ import { BottomNav, type View } from '@/components/app/BottomNav';
 import { CourseMenu } from '@/components/app/CourseMenu';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, MessageSquarePlus, PanelLeft } from 'lucide-react';
+import { useMediaQuery } from '@/hooks/use-media-query';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { HomeView } from '@/components/app/HomeView';
 import { ContentView } from '@/components/app/ContentView';
@@ -71,12 +72,27 @@ export default function MainLayout({
   const viewBeforeChatRef = useRef<Exclude<View, 'chat'>>('home');
   const [isLearnOpen, setIsLearnOpen] = useState(false);
   const [courseMenuOpen, setCourseMenuOpen] = useState(false);
+  const [chatSidebarOpen, setChatSidebarOpen] = useState(false);
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const sidebarInitializedRef = useRef(false);
+
+  useEffect(() => {
+    if (isDesktop && !sidebarInitializedRef.current) {
+      sidebarInitializedRef.current = true;
+      setChatSidebarOpen(true);
+    }
+  }, [isDesktop]);
 
   // Warm the getCardForReview Convex subscription before learn opens;
   // skip once learn is open since useLearningMode manages its own subscription
   useQuery(
     api.features.scheduling.getCardForReview,
     !isLearnOpen ? {} : 'skip',
+  );
+
+  const threads = useQuery(
+    api.features.chat.threads.listThreads,
+    isAuthenticated && activeView === 'chat' ? {} : 'skip',
   );
 
   // Pre-create a chat thread so LearnView can use it immediately
@@ -138,11 +154,21 @@ export default function MainLayout({
     history.pushState(null, '', VIEW_PATHS[target]);
   }, []);
 
+  const handleNewChat = useCallback(async () => {
+    try {
+      const newThreadId = await getOrCreateEmptyThread({});
+      handleOpenChat(newThreadId);
+    } catch (err) {
+      console.error('Failed to create new chat:', err);
+    }
+  }, [getOrCreateEmptyThread, handleOpenChat]);
+
   // Learn overlay — pushState so the browser back button can close it
   const handleLearnOpen = useCallback(() => {
     setIsLearnOpen(true);
     history.pushState(null, '', '/app/learn');
-  }, []);
+    getOrCreateEmptyThread({}).then(setPrefetchedThreadId).catch(() => {});
+  }, [getOrCreateEmptyThread]);
 
   const handleLearnClose = useCallback(() => {
     setIsLearnOpen(false);
@@ -197,14 +223,32 @@ export default function MainLayout({
                 {courseButtonLabel}
               </Button>
             ) : activeView === 'chat' ? (
-              <Button
-                variant="ghost"
-                onClick={handleChatBack}
-                className="gap-2 -ml-2"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                {t('views.chat')}
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  onClick={handleChatBack}
+                  className="gap-2 -ml-2"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  {t('views.chat')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setChatSidebarOpen((prev) => !prev)}
+                  aria-label="Toggle conversations"
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleNewChat}
+                  aria-label="New chat"
+                >
+                  <MessageSquarePlus className="h-4 w-4" />
+                </Button>
+              </div>
             ) : (
               <h1 className="heading-section capitalize">
                 {t(`views.${activeView}`)}
@@ -242,7 +286,14 @@ export default function MainLayout({
           {!isLearnOpen && activeView === 'library' && <LibraryView />}
           {!isLearnOpen && activeView === 'settings' && <SettingsView />}
           {!isLearnOpen && activeView === 'chat' && chatThreadId && (
-            <SimplifiedChatView threadId={chatThreadId} />
+            <SimplifiedChatView
+              threadId={chatThreadId}
+              onNewChat={handleNewChat}
+              onThreadSelect={handleOpenChat}
+              threads={threads}
+              sidebarOpen={chatSidebarOpen}
+              onSidebarOpenChange={setChatSidebarOpen}
+            />
           )}
         </main>
 
