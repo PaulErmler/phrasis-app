@@ -38,6 +38,15 @@ export function useCardApprovals(
     new Set(),
   );
   const [usageLimitHit, setUsageLimitHit] = useState(false);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(threadId);
+
+  React.useEffect(() => {
+    if (threadId !== activeThreadId) {
+      setActiveThreadId(threadId);
+    }
+  }, [threadId, activeThreadId]);
+
+  const isTransitioning = threadId !== activeThreadId;
 
   const threadApprovals = useQuery(
     api.features.chat.cardApprovals.getApprovalsByThread,
@@ -46,7 +55,7 @@ export function useCardApprovals(
 
   const approvalsByToolCallId = React.useMemo(() => {
     const byToolCallId = new Map<string, ApprovalData>();
-    if (!threadApprovals) return byToolCallId;
+    if (isTransitioning || !threadApprovals) return byToolCallId;
     for (const approval of threadApprovals) {
       byToolCallId.set(approval.toolCallId, approval);
       const trimmed = approval.toolCallId.trim();
@@ -55,7 +64,7 @@ export function useCardApprovals(
       }
     }
     return byToolCallId;
-  }, [threadApprovals]);
+  }, [threadApprovals, isTransitioning]);
 
   const handleApprove = useCallback(
     async (approvalId: Id<'cardApprovals'>) => {
@@ -107,6 +116,6 @@ export function useCardApprovals(
     handleApprove,
     handleReject,
     usageLimitHit,
-    isLoaded: threadApprovals !== undefined,
+    isLoaded: !isTransitioning && threadApprovals !== undefined,
   };
 }

@@ -15,6 +15,7 @@ interface UseSendMessageProps {
   onError?: () => void;
   onUsageLimit?: (featureId: string) => void;
   onThreadLimit?: () => void;
+  onMessageTooLong?: () => void;
   cardId?: Id<'cards'>;
 }
 
@@ -35,6 +36,7 @@ export function useSendMessage({
   onError,
   onUsageLimit,
   onThreadLimit,
+  onMessageTooLong,
   cardId,
 }: UseSendMessageProps) {
   const sendMessageMutation = useMutation(
@@ -97,6 +99,19 @@ export function useSendMessage({
           return;
         }
 
+        if (
+          error instanceof ConvexError &&
+          (error.data as { code?: string })?.code === 'MESSAGE_TOO_LONG'
+        ) {
+          if (onMessageTooLong) {
+            onMessageTooLong();
+          }
+          if (setStatus) {
+            setStatus(CHAT_STATUS.READY);
+          }
+          return;
+        }
+
         console.error('Failed to send message:', error);
         toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
 
@@ -112,7 +127,7 @@ export function useSendMessage({
         throw error;
       }
     },
-    [threadId, sendMessageMutation, setStatus, onSuccess, onError, onUsageLimit, onThreadLimit, cardId],
+    [threadId, sendMessageMutation, setStatus, onSuccess, onError, onUsageLimit, onThreadLimit, onMessageTooLong, cardId],
   );
 
   return { sendMessage };
