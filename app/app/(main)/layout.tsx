@@ -92,7 +92,7 @@ export default function MainLayout({
 
   const threads = useQuery(
     api.features.chat.threads.listThreads,
-    isAuthenticated && activeView === 'chat' ? {} : 'skip',
+    activeView === 'chat' ? {} : 'skip',
   );
 
   // Pre-create a chat thread so LearnView can use it immediately
