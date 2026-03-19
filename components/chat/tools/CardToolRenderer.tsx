@@ -12,6 +12,7 @@ interface CardToolRendererProps {
   processingApprovals: Set<string>;
   handleApprove: (approvalId: Id<'cardApprovals'>) => Promise<void>;
   handleReject: (approvalId: Id<'cardApprovals'>) => Promise<void>;
+  isLoaded: boolean;
 }
 
 /**
@@ -24,6 +25,7 @@ export function createCardToolRenderer({
   processingApprovals,
   handleApprove,
   handleReject,
+  isLoaded,
 }: CardToolRendererProps): (
   toolPart: ToolUIPart,
   messageId: string,
@@ -31,6 +33,8 @@ export function createCardToolRenderer({
 ) => ReactNode | null {
   return (toolPart: ToolUIPart, messageId: string, idx: number) => {
     if (!isCreateCardToolPart(toolPart)) return null;
+
+    if (!isLoaded) return <span key={`${messageId}-card-${idx}`} />;
 
     return (
       <CardApproval
