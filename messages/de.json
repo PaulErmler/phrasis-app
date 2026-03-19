@@ -362,6 +362,7 @@
       "prompts": {
         "grammar": "Erkläre mir die Grammatik dieses Satzes.",
         "sayInLanguage": "Wie kann ich das einfacher sagen?",
+        "sayDifferently": "Wie kann ich das anders sagen?",
         "moreExamples": "Gib mir drei weitere Beispiele mit diesem Verb."
       }
     },
@@ -392,6 +393,15 @@
       "loading": "Lädt...",
       "creatingApproval": "Karte wird erstellt...",
       "failed": "Kartenerstellung fehlgeschlagen"
+    },
+    "threadLimit": {
+      "reached": "Du hast das Nachrichtenlimit für diese Konversation erreicht.",
+      "newConversation": "Neue Konversation starten"
+    },
+    "sidebar": {
+      "title": "Konversationen",
+      "newChat": "Neuer Chat",
+      "noConversations": "Noch keine Konversationen"
     }
   },
   "Features": {

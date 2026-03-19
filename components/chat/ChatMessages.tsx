@@ -12,7 +12,6 @@ import {
 import { Message, MessageContent } from '@/components/ai-elements/message';
 import { MessageResponse } from '@/components/ai-elements/message';
 import { Shimmer } from '@/components/ai-elements/shimmer';
-import { Loader } from '@/components/ai-elements/loader';
 import {
   Tool,
   ToolHeader,
@@ -171,14 +170,6 @@ export function ChatMessages({
 
   const visibleMessages = messages?.filter((m) => m.role !== 'system') ?? [];
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <Loader size={24} />
-      </div>
-    );
-  }
-
   return (
     <div className="relative flex-1 h-full w-full flex flex-col overflow-hidden">
       <Conversation className="flex-1 h-full w-full">
@@ -225,7 +216,7 @@ export function ChatMessages({
                 );
               })}
             </>
-          ) : (
+          ) : !isLoading ? (
             <ConversationEmptyState title={t('emptyTitle')}>
               <ul className="text-muted-foreground text-sm space-y-1.5 text-left list-none">
                 {(['emptyBullet1', 'emptyBullet2', 'emptyBullet3'] as const).map((key) => (
@@ -236,7 +227,7 @@ export function ChatMessages({
                 ))}
               </ul>
             </ConversationEmptyState>
-          )}
+          ) : null}
         </ConversationContent>
       </Conversation>
 

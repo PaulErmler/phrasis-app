@@ -12,6 +12,7 @@ import { FEATURE_IDS } from '../featureIds';
 import { agent } from './agent';
 import type { MutationCtx } from '../../_generated/server';
 import type { Id } from '../../_generated/dataModel';
+import { THREAD_MESSAGE_LIMIT } from './constants';
 
 export type ListMessagesStreamArgs = {
   kind: 'list';
@@ -145,6 +146,17 @@ export const sendMessage = mutation({
 
     if (!thread || thread.userId !== userId) {
       throw new ConvexError('Thread not found or access denied');
+    }
+
+    const existingMessages = await ctx.runQuery(
+      agentComponent.messages.listMessagesByThreadId,
+      { threadId: args.threadId, order: 'asc', paginationOpts: { cursor: null, numItems: 200 } },
+    );
+    const userMessageCount = existingMessages.page.filter(
+      (m: any) => m.message?.role === 'user',
+    ).length;
+    if (userMessageCount >= THREAD_MESSAGE_LIMIT) {
+      throw new ConvexError({ code: 'THREAD_MESSAGE_LIMIT', message: 'Thread message limit reached' });
     }
 
     const { messageId } = await saveMessage(ctx, agentComponent, {

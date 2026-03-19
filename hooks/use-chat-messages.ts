@@ -17,6 +17,7 @@ interface UseChatMessagesReturn {
   messages: ExtendedUIMessage[];
   status: ChatStatus;
   setStatus: (status: ChatStatus) => void;
+  isLoading: boolean;
 }
 
 // State for the reducer
@@ -109,6 +110,9 @@ export function useChatMessages({
     } as any,
   );
 
+  const isLoading = !messageResult || messageResult.status === 'LoadingFirstPage';
+  const prevThreadIdRef = useRef(threadId);
+
   const messages: ExtendedUIMessage[] = messageResult?.results ?? [];
 
   // Monitor streaming status and update button state
@@ -129,9 +133,10 @@ export function useChatMessages({
     }
   }, [messageResult?.results]);
 
-  // Reset state when thread changes
+  // Reset status when thread changes
   useEffect(() => {
-    if (threadId) {
+    if (threadId && threadId !== prevThreadIdRef.current) {
+      prevThreadIdRef.current = threadId;
       prevStreamingRef.current = null;
       dispatch({ type: 'RESET_THREAD' });
     }
@@ -146,5 +151,6 @@ export function useChatMessages({
     messages,
     status: state.status,
     setStatus,
+    isLoading,
   };
 }

@@ -61,6 +61,7 @@ export function ChatInput({
   const defaultPrompts = [
     t('prompts.grammar'),
     t('prompts.sayInLanguage'),
+    t('prompts.sayDifferently'),
     t('prompts.moreExamples'),
   ] as const;
   const items = suggestions ?? defaultPrompts;

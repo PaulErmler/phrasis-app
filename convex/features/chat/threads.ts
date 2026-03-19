@@ -27,7 +27,7 @@ export const createThread = mutation({
 });
 
 /**
- * List all threads for the current user.
+ * List threads for the current user, excluding empty threads (no messages).
  */
 export const listThreads = query({
   args: {},
@@ -49,7 +49,7 @@ export const listThreads = query({
       agentComponent.threads.listThreadsByUserId,
       {
         userId,
-        paginationOpts: { cursor: null, numItems: 100 },
+        paginationOpts: { cursor: null, numItems: 10 },
       },
     );
 
