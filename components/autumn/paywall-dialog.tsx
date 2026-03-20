@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,8 +11,9 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePaywall, useCustomer } from "autumn-js/react";
-import { getPaywallContent } from "@/lib/autumn/paywall-content";
+import { getPaywallContent, filterProductsByFeatureIncrease } from "@/lib/autumn/paywall-content";
 import { getFeatureI18nKey, isFeatureConsumable } from "@/lib/features/feature-meta";
+import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
 import { cn } from "@/lib/utils";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 
@@ -32,6 +33,12 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
   });
   const { checkout } = useCustomer();
   const [upgrading, setUpgrading] = useState(false);
+  const { included } = useFeatureQuota(params?.featureId ?? "");
+
+  const relevantProducts = useMemo(
+    () => filterProductsByFeatureIncrease(preview?.products ?? [], params?.featureId ?? "", included),
+    [preview?.products, params?.featureId, included],
+  );
 
   if (!params) {
     return <></>;
@@ -56,8 +63,11 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
   }
 
   const consumable = isFeatureConsumable(featureId);
-  const { title, message } = getPaywallContent(preview, t, featureName, consumable);
-  const nextProduct = preview?.products?.[0];
+  const effectivePreview = preview
+    ? { ...preview, products: relevantProducts }
+    : preview;
+  const { title, message } = getPaywallContent(effectivePreview, t, featureName, consumable);
+  const nextProduct = relevantProducts[0];
 
   const handleUpgrade = async () => {
     if (!nextProduct) return;
