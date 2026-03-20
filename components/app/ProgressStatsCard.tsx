@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { useCachedQuery } from '@/hooks/use-cached-query';
@@ -10,14 +10,26 @@ import { formatTimeMs } from '@/lib/formatTime';
 import { StartLearningButton } from '@/components/app/StartLearningButton';
 import type { ReviewMode } from '@/convex/types';
 
-function useAnimatedCounter(target: number, durationMs = 800, delay = 0): number {
-  const [value, setValue] = useState(0);
+const useBrowserLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+type TodaySnapshot = { date: string; reps: number; newCards: number; timeMs: number };
+const SNAPSHOT_KEY = 'todayStats_snapshot';
+
+function useAnimatedCounter(
+  target: number,
+  from = 0,
+  durationMs = 800,
+  delay = 0,
+  enabled = true,
+): number {
+  const [value, setValue] = useState(enabled ? from : target);
   const startTimeRef = useRef<number | null>(null);
   const rafRef = useRef<number>(0);
 
   useEffect(() => {
-    if (target === 0) {
-      setValue(0);
+    if (!enabled || target === from) {
+      setValue(target);
       return;
     }
 
@@ -29,7 +41,7 @@ function useAnimatedCounter(target: number, durationMs = 800, delay = 0): number
         const elapsed = timestamp - startTimeRef.current;
         const progress = Math.min(elapsed / durationMs, 1);
         const eased = 1 - Math.pow(1 - progress, 3);
-        setValue(Math.round(eased * target));
+        setValue(Math.round(from + eased * (target - from)));
 
         if (progress < 1) {
           rafRef.current = requestAnimationFrame(animate);
@@ -43,7 +55,7 @@ function useAnimatedCounter(target: number, durationMs = 800, delay = 0): number
       clearTimeout(timeout);
       cancelAnimationFrame(rafRef.current);
     };
-  }, [target, durationMs, delay]);
+  }, [target, from, durationMs, delay, enabled]);
 
   return value;
 }
@@ -56,6 +68,7 @@ function StatColumn({
   todayPrefix,
   todayLabel = 'today',
   todayFormatter,
+  animateToday = true,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -64,6 +77,7 @@ function StatColumn({
   todayPrefix?: string;
   todayLabel?: string;
   todayFormatter?: (v: number) => string;
+  animateToday?: boolean;
 }) {
   const displayValue =
     todayValue != null && todayValue > 0
@@ -71,6 +85,9 @@ function StatColumn({
         ? todayFormatter(todayValue)
         : String(todayValue)
       : null;
+
+  const todayClassName =
+    'text-xs font-medium text-primary tabular-nums leading-none mt-0.5 whitespace-nowrap';
 
   return (
     <div className="flex flex-col items-center text-center gap-1">
@@ -80,19 +97,27 @@ function StatColumn({
       </p>
       <p className="text-muted-xs leading-none">{label}</p>
 
-      <AnimatePresence initial={false}>
-        {displayValue != null && (
-          <motion.p
-            initial={{ opacity: 0, height: 0, y: 4 }}
-            animate={{ opacity: 1, height: 'auto', y: 0 }}
-            exit={{ opacity: 0, height: 0, y: 4 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-            className="text-xs font-medium text-primary tabular-nums leading-none mt-0.5 whitespace-nowrap"
-          >
+      {animateToday ? (
+        <AnimatePresence initial={false}>
+          {displayValue != null && (
+            <motion.p
+              initial={{ opacity: 0, height: 0, y: 4 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: 4 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className={todayClassName}
+            >
+              {todayPrefix}{displayValue} {todayLabel}
+            </motion.p>
+          )}
+        </AnimatePresence>
+      ) : (
+        displayValue != null && (
+          <p className={todayClassName}>
             {todayPrefix}{displayValue} {todayLabel}
-          </motion.p>
-        )}
-      </AnimatePresence>
+          </p>
+        )
+      )}
     </div>
   );
 }
@@ -110,6 +135,34 @@ export function ProgressStatsCard({
   const stats = useCachedQuery(api.features.courses.getCourseStats, { timezone }, 'courseStats');
   const todayStats = useCachedQuery(api.features.courses.getTodayStats, { timezone }, 'todayStats');
 
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+
+  const prevTodaySnapshot = useRef<TodaySnapshot | null>(null);
+  useBrowserLayoutEffect(() => {
+    try {
+      const stored = localStorage.getItem(SNAPSHOT_KEY);
+      if (stored) {
+        const parsed: TodaySnapshot = JSON.parse(stored);
+        if (parsed.date === today) prevTodaySnapshot.current = parsed;
+      }
+    } catch {}
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (todayStats == null) return;
+    try {
+      const snapshot: TodaySnapshot = { date: today, ...todayStats };
+      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+    } catch {}
+  }, [todayStats, today]);
+
+  const statsChanged = todayStats != null && (
+    prevTodaySnapshot.current == null ||
+    prevTodaySnapshot.current.reps !== todayStats.reps ||
+    prevTodaySnapshot.current.newCards !== todayStats.newCards ||
+    prevTodaySnapshot.current.timeMs !== todayStats.timeMs
+  );
+
   const streak = stats?.currentStreak ?? 0;
   const reps = stats?.totalRepetitions ?? 0;
   const cards = stats?.totalCards ?? 0;
@@ -119,20 +172,30 @@ export function ProgressStatsCard({
   const isFrozen = stats?.streakFrozenToday === true && !hasLearned;
   const isInactive = streak === 0 && !hasLearned && !isFrozen;
 
+  const prevReps = prevTodaySnapshot.current?.reps ?? 0;
+  const prevNew = prevTodaySnapshot.current?.newCards ?? 0;
+  const prevTime = prevTodaySnapshot.current?.timeMs ?? 0;
+
   const animatedReps = useAnimatedCounter(
     hasLearned ? todayStats.reps : 0,
+    prevReps,
     700,
     250,
+    statsChanged,
   );
   const animatedNew = useAnimatedCounter(
     hasLearned ? todayStats.newCards : 0,
+    prevNew,
     700,
     350,
+    statsChanged,
   );
   const animatedTimeMs = useAnimatedCounter(
     hasLearned ? todayStats.timeMs : 0,
+    prevTime,
     700,
     450,
+    statsChanged,
   );
 
   const content = (
@@ -153,7 +216,7 @@ export function ProgressStatsCard({
                   : hasLearned
                     ? {
                         backgroundColor: 'color-mix(in oklch, var(--streak-active) 15%, transparent)',
-                        scale: [1, 1.15, 1],
+                        scale: statsChanged ? [1, 1.15, 1] : 1,
                       }
                     : {
                         backgroundColor: 'color-mix(in oklch, var(--accent-orange) 10%, transparent)',
@@ -187,11 +250,11 @@ export function ProgressStatsCard({
                   initial={{ opacity: 0, scale: 0.3, rotate: 90, filter: 'blur(4px)' }}
                   animate={{
                     opacity: 1,
-                    scale: hasLearned ? [0.3, 1.3, 1] : 1,
-                    rotate: hasLearned ? [90, -10, 0] : 0,
+                    scale: hasLearned && statsChanged ? [0.3, 1.3, 1] : 1,
+                    rotate: hasLearned && statsChanged ? [90, -10, 0] : 0,
                     filter: 'blur(0px)',
                   }}
-                  transition={{ duration: hasLearned ? 0.7 : 0.4, ease: 'easeOut' }}
+                  transition={{ duration: hasLearned && statsChanged ? 0.7 : 0.4, ease: 'easeOut' }}
                 >
                   <Flame
                     className="h-5 w-5 transition-colors duration-400"
@@ -235,6 +298,7 @@ export function ProgressStatsCard({
             value={String(reps)}
             todayValue={hasLearned ? animatedReps : undefined}
             todayLabel={t('stats.today')}
+            animateToday={statsChanged}
           />
           <StatColumn
             icon={<MessageSquare className="h-4 w-4" />}
@@ -243,6 +307,7 @@ export function ProgressStatsCard({
             todayValue={hasLearned && todayStats.newCards > 0 ? animatedNew : undefined}
             todayPrefix="+"
             todayLabel={t('stats.new')}
+            animateToday={statsChanged}
           />
           <StatColumn
             icon={<Clock className="h-4 w-4" />}
@@ -251,6 +316,7 @@ export function ProgressStatsCard({
             todayValue={hasLearned && todayStats.timeMs > 0 ? animatedTimeMs : undefined}
             todayFormatter={formatTimeMs}
             todayLabel={t('stats.today')}
+            animateToday={statsChanged}
           />
         </div>
       </div>
