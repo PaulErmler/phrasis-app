@@ -87,6 +87,7 @@ export function HomeView({
 
         <NewChatInput
           showSuggestions={false}
+          autoFocus={false}
           className="[&_[data-slot=input-group]]:rounded-xl"
           onChatCreated={onChatOpen}
         />

@@ -121,28 +121,28 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       createChirp3Voice("Charon", "male", "pt-BR", "Brazil"),
     ],
   },
-  {
-    code: 'zh',
-    displayCode: 'zh-CN',
-    name: 'Chinese (Simplified)',
-    nativeName: '中文（简体）',
-    flag: '🇨🇳',
-    voices: [
-      createChirp3Voice('Leda', 'female', 'cmn-CN', 'Mandarin'),
-      createChirp3Voice('Charon', 'male', 'cmn-CN', 'Mandarin'),
-    ],
-  },
-  {
-    code: 'ja',
-    displayCode: 'ja',
-    name: 'Japanese',
-    nativeName: '日本語',
-    flag: '🇯🇵',
-    voices: [
-      createChirp3Voice('Leda', 'female', 'ja-JP', 'Japan'),
-      createChirp3Voice('Charon', 'male', 'ja-JP', 'Japan'),
-    ],
-  },
+  // {
+  //   code: 'zh',
+  //   displayCode: 'zh-CN',
+  //   name: 'Chinese (Simplified)',
+  //   nativeName: '中文（简体）',
+  //   flag: '🇨🇳',
+  //   voices: [
+  //     createChirp3Voice('Leda', 'female', 'cmn-CN', 'Mandarin'),
+  //     createChirp3Voice('Charon', 'male', 'cmn-CN', 'Mandarin'),
+  //   ],
+  // },
+  // {
+  //   code: 'ja',
+  //   displayCode: 'ja',
+  //   name: 'Japanese',
+  //   nativeName: '日本語',
+  //   flag: '🇯🇵',
+  //   voices: [
+  //     createChirp3Voice('Leda', 'female', 'ja-JP', 'Japan'),
+  //     createChirp3Voice('Charon', 'male', 'ja-JP', 'Japan'),
+  //   ],
+  // },
   {
     code: 'sv',
     displayCode: 'sv',
