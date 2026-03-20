@@ -25,6 +25,7 @@ import { LibraryView } from '@/components/app/LibraryView';
 import { SettingsView } from '@/components/app/SettingsView';
 import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
+import { AppLoadingSplash } from '@/components/LogoSpinner';
 
 function StableAuthenticated({ children, fallback }: {
   children: ReactNode;
@@ -250,14 +251,7 @@ export default function MainLayout({
   return (
     <StableAuthenticated fallback={
       <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-background">
-        <div className="relative flex items-center justify-center">
-          <svg className="absolute size-28 animate-spin" viewBox="0 0 112 112" fill="none">
-            <circle cx="56" cy="56" r="52" stroke="currentColor" strokeWidth="3" className="text-muted/40" />
-            <path d="M56 4a52 52 0 0 1 52 52" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-muted-foreground" />
-          </svg>
-          <img src="/icons/icon.svg" alt="Flexling" width={72} height={72} />
-        </div>
-        <p className="mt-5 text-lg font-semibold text-foreground">Flexling</p>
+        <AppLoadingSplash />
       </div>
     }>
       <div className="h-screen flex flex-col overflow-hidden">
@@ -311,7 +305,14 @@ export default function MainLayout({
         <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
         <main className="flex-1 min-h-0 flex flex-col">
-          {!isLearnOpen && activeView === 'home' && (
+          <div
+            style={{
+              display:
+                !isLearnOpen && activeView === 'home'
+                  ? 'contents'
+                  : 'none',
+            }}
+          >
             <HomeView
               preloadedCollectionProgress={preloadedCollectionProgress}
               preloadedCourseSettings={preloadedCourseSettings}
@@ -322,7 +323,7 @@ export default function MainLayout({
               onChatOpen={handleOpenChat}
               animateEntrance={justReturnedFromLearn.current}
             />
-          )}
+          </div>
           <div
             style={{
               display:

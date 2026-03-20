@@ -438,9 +438,21 @@ export const setActiveCollection = mutation({
     const { userId, course } = await requireActiveCourse(ctx);
     const courseId = course._id;
 
-    // Validate collection exists
     const collection = await ctx.db.get(args.collectionId);
     if (!collection) throw new ConvexError('Collection not found');
+
+    const isLevelCollection = (LEVEL_ORDER as readonly string[]).includes(collection.name);
+    if (!isLevelCollection) {
+      const courseSettings = await getCourseSettings(ctx, courseId);
+      const isChatCollection =
+        courseSettings?.chatCollectionId?.toString() === args.collectionId.toString();
+      const isCustomCollection = (courseSettings?.activeCustomCollectionIds ?? []).some(
+        (id) => id.toString() === args.collectionId.toString(),
+      );
+      if (!isChatCollection && !isCustomCollection) {
+        throw new ConvexError('Collection not accessible');
+      }
+    }
 
     const progress = await getCollectionProgressHelper(
       ctx,
@@ -475,7 +487,22 @@ export const toggleCustomCollection = mutation({
     const collection = await ctx.db.get(args.collectionId);
     if (!collection) throw new ConvexError('Collection not found');
 
+    const isLevelCollection = (LEVEL_ORDER as readonly string[]).includes(collection.name);
+    if (isLevelCollection) {
+      throw new ConvexError('Cannot toggle a level collection');
+    }
+
     const courseSettings = await getCourseSettings(ctx, courseId);
+
+    const isChatCollection =
+      courseSettings?.chatCollectionId?.toString() === args.collectionId.toString();
+    const isAlreadyCustom = (courseSettings?.activeCustomCollectionIds ?? []).some(
+      (id) => id.toString() === args.collectionId.toString(),
+    );
+    if (!isChatCollection && !isAlreadyCustom) {
+      throw new ConvexError('Collection not accessible');
+    }
+
     const currentIds = courseSettings?.activeCustomCollectionIds ?? [];
     const idStr = args.collectionId.toString();
     const isCurrentlySelected = currentIds.some((id) => id.toString() === idStr);

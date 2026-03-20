@@ -9,15 +9,19 @@ export async function getContent(
   locale: string,
   slug: string,
 ) {
-  const filePath = path.join(CONTENT_PATH, category, locale, `${slug}.md`);
+  try {
+    const filePath = path.join(CONTENT_PATH, category, locale, `${slug}.md`);
 
-  if (!fs.existsSync(filePath)) return null;
+    if (!fs.existsSync(filePath)) return null;
 
-  const fileContent = fs.readFileSync(filePath, 'utf8');
-  const { data, content } = matter(fileContent);
+    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const { data, content } = matter(fileContent);
 
-  return {
-    metadata: data as { title: string; lastUpdated: string },
-    content,
-  };
+    return {
+      metadata: data as { title: string; lastUpdated: string },
+      content,
+    };
+  } catch {
+    return null;
+  }
 }

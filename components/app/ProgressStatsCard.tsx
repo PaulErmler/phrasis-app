@@ -207,7 +207,7 @@ export function ProgressStatsCard({
             className="flex items-center justify-center h-10 w-10 rounded-xl"
             animate={
               isInactive
-                ? { backgroundColor: 'transparent', scale: 1 }
+                ? { backgroundColor: 'rgba(0, 0, 0, 0)', scale: 1 }
                 : isFrozen
                   ? {
                       backgroundColor: 'color-mix(in oklch, var(--primary) 15%, transparent)',

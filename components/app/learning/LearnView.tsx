@@ -129,7 +129,7 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
     onBack();
   }, [audio, onBack]);
 
-  const { threadId, isLoading: isThreadLoading, createThread } = useThread({
+  const { threadId, isLoading: isThreadLoading, getOrCreateEmptyThread } = useThread({
     threadId: prefetchedThreadId,
     autoCreate: !prefetchedThreadId,
   });
@@ -150,11 +150,11 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
 
     if (threadHasMessagesRef.current) {
       threadHasMessagesRef.current = false;
-      createThread().catch((err) =>
+      getOrCreateEmptyThread().catch((err) =>
         console.error('Failed to create new thread on card change:', err),
       );
     }
-  }, [currentCardId, createThread]);
+  }, [currentCardId, getOrCreateEmptyThread]);
 
   const handleMessageSent = useCallback(() => {
     audio.pause();

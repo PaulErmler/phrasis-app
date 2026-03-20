@@ -742,5 +742,15 @@
       "title": "Chat-Assistent",
       "description": "Nutze den Chat, um nach Grammatik zu fragen, Erklärungen zu erhalten oder neue Lernkarten zu erstellen. Der KI-Assistent hilft dir beim Lernen!"
     }
+  },
+  "ErrorPage": {
+    "title": "Etwas ist schiefgelaufen",
+    "description": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.",
+    "retry": "Erneut versuchen"
+  },
+  "NotFoundPage": {
+    "title": "Seite nicht gefunden",
+    "description": "Die Seite, die du suchst, existiert nicht oder wurde verschoben.",
+    "goHome": "Zur Startseite"
   }
 }

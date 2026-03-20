@@ -23,20 +23,41 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const siteUrl = process.env.SITE_URL ?? 'https://flexling.app';
+
 export const metadata: Metadata = {
-  title: 'Flexling',
+  title: {
+    default: 'Flexling',
+    template: '%s | Flexling',
+  },
   description:
-    'Master languages with Flexling. Learn, practice pronunciation, and build fluency in any language.',
+    'The language learning app that grows with you and adapts to your needs.',
+  metadataBase: new URL(siteUrl),
   manifest: '/manifest.json',
   icons: {
     icon: [
-      { url: '/favicon.svg', sizes: '32x32', type: 'image/png' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
       { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
     apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
+  },
+  openGraph: {
+    title: 'Flexling',
+    description:
+      'The language learning app that grows with you and adapts to your needs.',
+    url: siteUrl,
+    siteName: 'Flexling',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'Flexling',
+    description:
+      'The language learning app that grows with you and adapts to your needs.',
   },
   appleWebApp: {
     capable: true,

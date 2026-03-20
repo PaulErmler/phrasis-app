@@ -14,6 +14,8 @@ interface ChatHistorySidebarProps {
   onNewChat: () => void;
   isCreating?: boolean;
   className?: string;
+  /** When used inside a sheet with an absolute close control, add top inset so the header sits below it. */
+  insetForSheetClose?: boolean;
 }
 
 function useThreadLabel(creationTime: number): string {
@@ -51,15 +53,15 @@ function ThreadItem({
     <button
       onClick={onSelect}
       className={cn(
-        'w-full text-left px-3 py-2.5 rounded-md text-sm transition-colors',
+        'w-full h-9 overflow-hidden flex items-center text-left px-4 rounded-md border text-sm font-medium transition-all',
         isActive
           ? 'bg-accent text-accent-foreground'
-          : 'hover:bg-accent/50',
+          : 'bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
       )}
     >
-      <div className="font-medium truncate">
+      <span className="truncate w-full">
         {thread.title && thread.title !== 'New Chat' ? thread.title : label}
-      </div>
+      </span>
     </button>
   );
 }
@@ -71,13 +73,20 @@ export function ChatHistorySidebar({
   onNewChat,
   isCreating,
   className,
+  insetForSheetClose = false,
 }: ChatHistorySidebarProps) {
   const t = useTranslations('Chat.sidebar');
   const recentThreads = threads?.slice(0, 10);
 
   return (
-    <div className={cn('flex flex-col h-full bg-background', className)}>
-      <div className="p-4">
+    <div
+      className={cn(
+        'flex flex-col h-full min-w-0 overflow-hidden bg-background',
+        insetForSheetClose && 'pt-14',
+        className,
+      )}
+    >
+      <div className={cn('px-4 pb-2', insetForSheetClose ? 'pt-0' : 'pt-4')}>
         <Button
           onClick={onNewChat}
           disabled={isCreating}
@@ -89,9 +98,9 @@ export function ChatHistorySidebar({
         </Button>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-w-0">
         {recentThreads && recentThreads.length > 0 ? (
-          <div className="px-2 pb-4 space-y-1">
+          <div className="px-4 pb-4 space-y-1">
             {recentThreads.map((thread) => (
               <ThreadItem
                 key={thread._id}

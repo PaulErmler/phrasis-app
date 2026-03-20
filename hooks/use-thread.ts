@@ -12,7 +12,7 @@ interface UseThreadOptions {
 interface UseThreadReturn {
   threadId: string | null;
   isLoading: boolean;
-  createThread: () => Promise<string>;
+  getOrCreateEmptyThread: () => Promise<string>;
 }
 
 /**
@@ -30,14 +30,10 @@ export function useThread({
   const [isLoading, setIsLoading] = useState(autoCreate && !explicitThreadId);
   const didAutoCreate = useRef(false);
 
-  const createThreadMutation = useMutation(
-    api.features.chat.threads.createThread,
-  );
   const getOrCreateEmptyThreadMutation = useMutation(
     api.features.chat.threads.getOrCreateEmptyThread,
   );
 
-  // Sync explicit threadId changes
   useEffect(() => {
     if (explicitThreadId) {
       setThreadId(explicitThreadId);
@@ -45,7 +41,6 @@ export function useThread({
     }
   }, [explicitThreadId]);
 
-  // Auto-create on mount: reuse the latest empty thread or create a new one
   useEffect(() => {
     if (!autoCreate || explicitThreadId || didAutoCreate.current) return;
     didAutoCreate.current = true;
@@ -63,25 +58,25 @@ export function useThread({
       });
   }, [autoCreate, explicitThreadId, getOrCreateEmptyThreadMutation]);
 
-  const createThread = useCallback(async () => {
+  const getOrCreateEmptyThread = useCallback(async () => {
     setThreadId(null);
     setIsLoading(true);
     try {
-      const id = await createThreadMutation({});
+      const id = await getOrCreateEmptyThreadMutation({});
       setThreadId(id);
       return id;
     } catch (error) {
-      console.error('Failed to create thread:', error);
+      console.error('Failed to get or create thread:', error);
       toast.error(ERROR_MESSAGES.FAILED_TO_CREATE_THREAD);
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [createThreadMutation]);
+  }, [getOrCreateEmptyThreadMutation]);
 
   return {
     threadId,
     isLoading,
-    createThread,
+    getOrCreateEmptyThread,
   };
 }

@@ -55,6 +55,7 @@ export const getCourseLanguagesForUser = internalQuery({
 async function resolveCardContext(
   ctx: MutationCtx,
   cardId: Id<'cards'>,
+  userId: string,
 ): Promise<{
   sourceText: string;
   sourceLanguage: string;
@@ -70,6 +71,8 @@ async function resolveCardContext(
 
   const course = await ctx.db.get(deck.courseId);
   if (!course) return null;
+
+  if (course.userId !== userId) return null;
 
   const text = await ctx.db.get(card.textId);
   if (!text) return null;
@@ -177,7 +180,7 @@ export const sendMessage = mutation({
     let cardContextSection: string | undefined;
     let languageSection: string | undefined;
     if (args.cardId) {
-      const cardData = await resolveCardContext(ctx, args.cardId);
+      const cardData = await resolveCardContext(ctx, args.cardId, userId);
       if (cardData) {
         cardContextSection = buildCardContextSection(cardData);
         languageSection = buildLanguageSection(cardData);
@@ -185,6 +188,11 @@ export const sendMessage = mutation({
     }
 
     if (userMessageCount === 0) {
+      await ctx.runMutation(agentComponent.threads.updateThread, {
+        threadId: args.threadId,
+        patch: { status: 'active' },
+      });
+
       await ctx.scheduler.runAfter(
         0,
         internal.features.chat.messages.generateThreadTitle,
@@ -328,7 +336,7 @@ export const generateThreadTitle = internalAction({
         system: `You generate short titles for chat conversations. Respond with ONLY the title, nothing else.
 The title MUST be written in the SAME language the user wrote their message in. Do NOT translate into any other language.
 For example: if the user writes in English, respond in English. If the user writes in German, respond in German.
-Maximum 6 words. No quotes. No period.`,
+Maximum 4 words. No quotes. No period.`,
         prompt: args.userMessage,
       });
       const title = text.trim().slice(0, 80);

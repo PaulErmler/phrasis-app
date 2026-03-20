@@ -1,33 +1,37 @@
-import { v, ConvexError } from 'convex/values';
+import { v } from 'convex/values';
 import { mutation, query } from '../../_generated/server';
-import { createThread as createAgentThread, listMessages } from '@convex-dev/agent';
+import { createThread as createAgentThread } from '@convex-dev/agent';
 import { components } from '../../_generated/api';
 import { getAuthUserId, requireAuthUserId } from '../../db/users';
 
 const agentComponent = components.agent;
 
 /**
- * Create a new chat thread for the current user.
+ * Create a thread and immediately mark it as "archived" so it stays
+ * hidden from listThreads until the first message is sent (which
+ * flips it to "active").
  */
-export const createThread = mutation({
-  args: {
-    title: v.optional(v.string()),
-  },
-  returns: v.string(),
-  handler: async (ctx, args) => {
-    const userId = await requireAuthUserId(ctx);
-
-    const threadId = await createAgentThread(ctx, agentComponent, {
-      userId,
-      title: args.title || 'New Chat',
-    });
-
-    return threadId;
-  },
-});
+async function createHiddenThread(
+  ctx: Parameters<typeof createAgentThread>[0],
+  userId: string,
+  title?: string,
+): Promise<string> {
+  const threadId = await createAgentThread(ctx, agentComponent, {
+    userId,
+    title: title || 'New Chat',
+  });
+  await ctx.runMutation(agentComponent.threads.updateThread, {
+    threadId,
+    patch: { status: 'archived' },
+  });
+  return threadId;
+}
 
 /**
- * List threads for the current user, excluding empty threads (no messages).
+ * List threads for the current user, showing only those with messages.
+ * Threads start as "archived" (hidden) and are flipped to "active" by
+ * sendMessage on the first message, so filtering on status === "active"
+ * gives us non-empty threads without per-thread message queries.
  */
 export const listThreads = query({
   args: {},
@@ -53,24 +57,14 @@ export const listThreads = query({
       },
     );
 
-    const nonEmpty = [];
-    for (const thread of threads.page) {
-      const msgs = await listMessages(ctx, agentComponent, {
-        threadId: thread._id,
-        paginationOpts: { cursor: null, numItems: 1 },
-      });
-      if (msgs.page.length > 0) {
-        nonEmpty.push(thread);
-      }
-    }
-
-    return nonEmpty;
+    return threads.page.filter((t) => t.status === 'active');
   },
 });
 
 /**
- * Return the user's most recent thread if it has no messages yet,
- * otherwise create a fresh one.
+ * Return the user's most recent empty thread, or create a fresh one.
+ * Empty threads are identified by status "archived" (set at creation).
+ * Once a message is sent, sendMessage flips them to "active".
  */
 export const getOrCreateEmptyThread = mutation({
   args: {},
@@ -83,27 +77,16 @@ export const getOrCreateEmptyThread = mutation({
       {
         userId,
         order: 'desc',
-        paginationOpts: { cursor: null, numItems: 1 },
+        paginationOpts: { cursor: null, numItems: 10 },
       },
     );
 
-    const latest = threads.page[0];
-    if (latest) {
-      const messages = await listMessages(ctx, agentComponent, {
-        threadId: latest._id,
-        paginationOpts: { cursor: null, numItems: 1 },
-      });
-      if (messages.page.length === 0) {
-        return latest._id;
-      }
+    const emptyThread = threads.page.find((t) => t.status === 'archived');
+    if (emptyThread) {
+      return emptyThread._id;
     }
 
-    const threadId = await createAgentThread(ctx, agentComponent, {
-      userId,
-      title: 'New Chat',
-    });
-
-    return threadId;
+    return createHiddenThread(ctx, userId);
   },
 });
 

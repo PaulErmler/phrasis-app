@@ -18,7 +18,12 @@ function ScrollArea({
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
+        className={cn(
+          'focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1',
+          // Radix wraps content in a div with display:table + min-width:100%, which grows to
+          // intrinsic content width and breaks truncation in narrow panels (e.g. chat sheet).
+          '[&>div]:!block [&>div]:!min-w-0 [&>div]:w-full [&>div]:max-w-full',
+        )}
       >
         {children}
       </ScrollAreaPrimitive.Viewport>

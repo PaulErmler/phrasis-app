@@ -673,5 +673,15 @@
       "title": "Chat Assistant",
       "description": "Use the chat to ask about grammar, get explanations, or create new flashcards. The AI assistant is here to help you learn!"
     }
+  },
+  "ErrorPage": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. Please try again.",
+    "retry": "Try again"
+  },
+  "NotFoundPage": {
+    "title": "Page not found",
+    "description": "The page you're looking for doesn't exist or has been moved.",
+    "goHome": "Go home"
   }
 }
