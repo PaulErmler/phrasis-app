@@ -13,18 +13,15 @@ function getSecretKey(): string {
   return key;
 }
 
-export type AutumnFeatureEntry = {
-  id: string;
-  type: string;
-  name: string | null;
-  interval: string | null;
-  interval_count: number | null;
-  unlimited: boolean | null;
-  balance: number | null;
-  usage: number | null;
-  included_usage: number | null;
+/** Fields returned per balance entry by `GET /customers/:id`. */
+export type AutumnBalanceEntry = {
+  feature_id: string;
+  granted: number;
+  remaining: number;
+  usage: number;
+  unlimited: boolean;
+  overage_allowed: boolean;
   next_reset_at: number | null;
-  overage_allowed: boolean | null;
 };
 
 type AutumnFlagEntry = {
@@ -36,8 +33,7 @@ type AutumnFlagEntry = {
 
 type AutumnCustomerResponse = {
   id: string;
-  features?: Record<string, AutumnFeatureEntry>;
-  balances?: Record<string, AutumnFeatureEntry>;
+  balances?: Record<string, AutumnBalanceEntry>;
   flags?: Record<string, AutumnFlagEntry>;
 };
 
@@ -87,16 +83,20 @@ export const trackUsage = internalAction({
 });
 
 /**
- * Fetch customer data including both metered features and boolean flags.
+ * Fetch an existing customer via `GET /customers/:id`.
+ * Used after `POST /track` where the customer is known to exist.
  */
 export async function fetchCustomerData(
   secretKey: string,
   userId: string,
 ): Promise<AutumnCustomerResponse | null> {
-  const res = await fetch(`${AUTUMN_API}/customers/${encodeURIComponent(userId)}`, {
-    method: 'GET',
-    headers: { Authorization: `Bearer ${secretKey}` },
-  });
+  const res = await fetch(
+    `${AUTUMN_API}/customers/${encodeURIComponent(userId)}`,
+    {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${secretKey}` },
+    },
+  );
 
   if (!res.ok) {
     const body = await res.text();
@@ -104,34 +104,55 @@ export async function fetchCustomerData(
     return null;
   }
 
-  return await res.json();
+  return (await res.json()) as AutumnCustomerResponse;
 }
 
 /**
- * Convert Autumn's customer response to our local format.
- * Boolean features (type === 'boolean') are stored with unlimited=true
- * so that checkQuota / useFeatureQuota treat them as "available".
- * Also handles the newer API format where boolean features appear
- * in a separate `flags` field instead of `features`.
+ * Idempotent getOrCreate via `POST /customers`.
+ * Creates the customer if new; returns existing if known.
+ * Combined with `autoEnable: true` on the free plan, this also
+ * attaches the free plan automatically for new customers.
+ */
+async function getOrCreateCustomer(
+  secretKey: string,
+  userId: string,
+): Promise<AutumnCustomerResponse | null> {
+  const res = await fetch(`${AUTUMN_API}/customers`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secretKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ id: userId }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    console.error(`Autumn getOrCreate customer failed (${res.status}): ${body}`);
+    return null;
+  }
+
+  return (await res.json()) as AutumnCustomerResponse;
+}
+
+/**
+ * Convert Autumn's customer response to our local FeatureState format.
+ *
+ * Metered features come from `balances` (fields: granted/remaining/usage).
+ * Boolean features come from `flags` (on/off access).
  */
 export function toFeaturesRecord(
   data: AutumnCustomerResponse,
 ): Record<string, FeatureState> {
   const result: Record<string, FeatureState> = {};
 
-  const allFeatures = data.features ?? data.balances ?? {};
-  for (const [id, entry] of Object.entries(allFeatures)) {
-    if (entry.type === 'boolean' || entry.type === 'static') {
-      result[id] = { balance: 1, included: 1, used: 0, unlimited: true };
-    } else {
-      result[id] = {
-        balance: entry.balance ?? 0,
-        included: entry.included_usage ?? 0,
-        used: entry.usage ?? 0,
-        interval: entry.interval ?? undefined,
-        unlimited: entry.unlimited ?? undefined,
-      };
-    }
+  for (const [id, entry] of Object.entries(data.balances ?? {})) {
+    result[id] = {
+      balance: entry.remaining,
+      included: entry.granted,
+      used: entry.usage,
+      unlimited: entry.unlimited || undefined,
+    };
   }
 
   if (data.flags) {
@@ -143,6 +164,7 @@ export function toFeaturesRecord(
   return result;
 }
 
+/** Pass JWT `subject` (same id as Autumn `customerId` and `useQuota`), not Convex user table `_id`. */
 export const syncQuotasInternal = internalAction({
   args: { userId: v.string() },
   returns: v.null(),
@@ -157,12 +179,13 @@ export async function syncQuotasForUser(
   userId: string,
 ): Promise<void> {
   const secretKey = getSecretKey();
-  const customerData = await fetchCustomerData(secretKey, userId);
+  const customerData = await getOrCreateCustomer(secretKey, userId);
   if (!customerData) return;
+
+  const features = toFeaturesRecord(customerData);
 
   await ctx.runMutation(internal.usage.helpers.syncAllFeatures, {
     userId,
-    features: toFeaturesRecord(customerData),
+    features,
   });
 }
-

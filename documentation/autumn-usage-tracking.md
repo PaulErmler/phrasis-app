@@ -45,7 +45,7 @@ The system uses a **two-layer** approach:
 │    4. trackUsage fetches fresh entitlements, writes back      │
 │                                                              │
 │  syncQuotas action  ◀── called on app load                   │
-│    GET /customers/:id ──▶ syncAllFeatures mutation            │
+│    POST /customers (getOrCreate) ──▶ syncAllFeatures mutation │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -64,22 +64,29 @@ export const FEATURE_IDS = {
   SENTENCES: 'sentences',
   CUSTOM_SENTENCES: 'custom_sentences',
   MULTIPLE_LANGUAGES: 'multiple_languages',
+  TRANSCRIPTIONS: 'transcriptions',
 } as const;
 ```
 
-These IDs **must** match the feature IDs configured in Autumn's dashboard. `FEATURE_IDS` is imported on both the server and client wherever quota checks are needed.
+These IDs **must** match the feature IDs configured in Autumn's dashboard and `autumn.config.ts`. `FEATURE_IDS` is imported on both the server and client wherever quota checks are needed.
 
 **Types of features:**
 
 | Feature ID | Type | Description |
 |---|---|---|
-| `chat_messages` | Usage (metered) | Messages sent in chat, resets per interval |
-| `courses` | Usage (metered) | Number of active courses |
-| `sentences` | Usage (metered) | Number of sentences added from collections |
-| `custom_sentences` | Usage (metered) | Number of custom cards approved via chat |
-| `multiple_languages` | Boolean (feature flag) | Whether the user can add >2 languages per course |
+| `chat_messages` | Usage (metered, consumable) | Messages sent in chat, resets monthly |
+| `courses` | Usage (metered, non-consumable) | Number of active courses |
+| `sentences` | Usage (metered, consumable) | Number of sentences added from collections, resets monthly |
+| `custom_sentences` | Usage (metered, consumable) | Number of custom cards approved via chat, resets monthly |
+| `transcriptions` | Usage (metered, consumable) | Number of transcription uses, resets monthly |
+| `multiple_languages` | Boolean (feature flag) | Whether the user can add >2 languages per course (Pro only) |
 
-Boolean features have `balance: 1` and `unlimited: false` when enabled, or `balance: 0` when disabled. The local `isAvailable` check (`balance > 0 || unlimited`) works for both types.
+**How types map to the Autumn API response:**
+
+- Metered features appear in the `balances` object of the customer response with fields `granted`, `remaining`, `usage`, `unlimited`.
+- Boolean features appear in the `flags` object with fields `id`, `plan_id`, `expires_at`, `feature_id`.
+
+In the local `usageQuotas` cache, boolean features are stored as `{ balance: 1, included: 1, used: 0, unlimited: true }`. The `isAvailable` check (`balance > 0 || unlimited`) works for both types.
 
 ---
 
@@ -90,7 +97,7 @@ All quota logic lives in `convex/usage/`:
 | File | Purpose |
 |---|---|
 | `helpers.ts` | Core functions: `checkQuota`, `decrementQuota`, `useQuota`, `syncAllFeatures` |
-| `tracking.ts` | Node actions: `trackUsage` (POST to Autumn /track + re-sync), `syncQuotasForUser` |
+| `tracking.ts` | Node actions: `trackUsage` (POST to Autumn /track + re-sync), `syncQuotasForUser`, `getOrCreateCustomer` |
 | `actions.ts` | Public action: `syncQuotas` (called from frontend on app load) |
 | `queries.ts` | Public query: `getMyQuotas` (reactive, powers `useFeatureQuota` hook) |
 | `testOperations.ts` | Dev-only mutations for manually testing quota operations |
@@ -146,11 +153,73 @@ This file exports Autumn's API functions (`track`, `check`, `checkout`, `listPro
 
 ---
 
+## Autumn REST API Contract
+
+Our `tracking.ts` uses raw `fetch` calls (not the SDK) because Convex scheduled actions lack auth context. The Autumn REST API response format differs from the `autumn-js` SDK's normalised types.
+
+### Customer response shape (`GET /customers/:id` or `POST /customers`)
+
+```json
+{
+  "id": "user_subject_id",
+  "subscriptions": [{ "plan_id": "free", "status": "active", ... }],
+  "balances": {
+    "chat_messages": {
+      "feature_id": "chat_messages",
+      "granted": 5,
+      "remaining": 5,
+      "usage": 0,
+      "unlimited": false,
+      "overage_allowed": false,
+      "next_reset_at": 1776706479436
+    }
+  },
+  "flags": {
+    "multiple_languages": {
+      "id": "flag_xxx",
+      "plan_id": "pro",
+      "expires_at": null,
+      "feature_id": "multiple_languages"
+    }
+  }
+}
+```
+
+Key points:
+- **`balances`** contains metered features. Fields: `granted` (included amount), `remaining` (available balance), `usage` (consumed this period), `unlimited`, `overage_allowed`, `next_reset_at`.
+- **`flags`** contains boolean features (added March 16, 2026). Fields: `id`, `plan_id`, `expires_at`, `feature_id`.
+- There is **no `features` field** in the raw API. The `features` key is an SDK abstraction that merges `balances` + `flags`. Since we use raw `fetch`, we read `balances` and `flags` separately.
+
+### `POST /customers` (getOrCreate) -- used by `syncQuotasForUser`
+
+Idempotent: creates the customer if new, returns existing if known. With `autoEnable: true` on the free plan, new customers automatically get the free plan attached. Returns the full customer object including `balances` and `flags`.
+
+### `GET /customers/:id` -- used by `trackUsage` (post-track re-sync)
+
+Returns the customer object. Used after `POST /track` where the customer is guaranteed to exist.
+
+### `POST /track` -- used by `trackUsage`
+
+Records a usage event. As of March 17, 2026, this endpoint no longer auto-creates customers. The customer must already exist (ensured by calling `POST /customers` during sync/app load).
+
+### Field mapping: Autumn API → local `FeatureState`
+
+| Autumn raw field | Local `FeatureState` field |
+|---|---|
+| `balances[id].remaining` | `balance` |
+| `balances[id].granted` | `included` |
+| `balances[id].usage` | `used` |
+| `balances[id].unlimited` | `unlimited` |
+| (no interval in raw balances) | `interval` (unused) |
+| `flags[id]` (presence) | `{ balance: 1, included: 1, used: 0, unlimited: true }` |
+
+---
+
 ## Quota Sync Lifecycle
 
-1. **On app load** – `app/app/(main)/layout.tsx` calls `syncQuotas` action once per session (guarded by a `useRef`). This fetches all entitlements from Autumn's `GET /customers/:userId` endpoint and writes them to the local `usageQuotas` table.
+1. **On app load** – `app/app/(main)/layout.tsx` calls `syncQuotas` action once per session (guarded by a `useRef`). This calls `POST /customers` (getOrCreate) to ensure the customer exists in Autumn and fetch all entitlements, then writes them to the local `usageQuotas` table. For new users, this idempotently creates the customer and auto-enables the free plan.
 
-2. **After each tracked usage** – when `useQuota` is called in a mutation, it schedules `trackUsage` via `ctx.scheduler.runAfter(0, ...)`. The `trackUsage` action POSTs to Autumn's `/track` endpoint, then immediately re-fetches the customer's entitlements and syncs them back to Convex. This keeps the local cache consistent with Autumn's server-side state.
+2. **After each tracked usage** – when `useQuota` is called in a mutation, it schedules `trackUsage` via `ctx.scheduler.runAfter(0, ...)`. The `trackUsage` action POSTs to Autumn's `/track` endpoint, then fetches the customer via `GET /customers/:id` and syncs back to Convex. This keeps the local cache consistent with Autumn's server-side state.
 
 3. **Frontend reactivity** – `getMyQuotas` is a Convex query, so any write to `usageQuotas` automatically triggers re-renders in components using `useFeatureQuota`.
 
@@ -365,7 +434,7 @@ After a user completes checkout via `CheckoutDialog`, Autumn updates their entit
 |---|---|
 | `convex/features/featureIds.ts` | Feature ID constants |
 | `convex/usage/helpers.ts` | `checkQuota`, `useQuota`, `decrementQuota`, `syncAllFeatures` |
-| `convex/usage/tracking.ts` | Autumn API calls: `trackUsage`, `fetchCustomerFeatures`, `syncQuotasForUser` |
+| `convex/usage/tracking.ts` | Autumn API calls: `trackUsage`, `fetchCustomerData`, `getOrCreateCustomer`, `syncQuotasForUser`, `toFeaturesRecord` |
 | `convex/usage/actions.ts` | Public `syncQuotas` action |
 | `convex/usage/queries.ts` | Public `getMyQuotas` query |
 | `convex/autumn.ts` | Autumn component config and API exports |

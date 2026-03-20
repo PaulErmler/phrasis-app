@@ -1,26 +1,6 @@
 import { ConvexError } from 'convex/values';
 import { QueryCtx, MutationCtx, ActionCtx } from '../_generated/server';
-import { authComponent } from '../auth';
 import { Doc } from '../_generated/dataModel';
-
-/**
- * Get the authenticated user from the auth component.
- * Works with query, mutation, and action contexts.
- * Returns null if not authenticated.
- */
-export async function getAuthUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
-  return authComponent.getAuthUser(ctx);
-}
-
-/**
- * Require an authenticated user, throwing if not logged in.
- * Use in mutations and actions that should never run unauthenticated.
- */
-export async function requireAuthUser(ctx: QueryCtx | MutationCtx | ActionCtx) {
-  const user = await getAuthUser(ctx);
-  if (!user) throw new ConvexError('Unauthenticated');
-  return user;
-}
 
 /**
  * Get the authenticated user ID from the JWT (no session validation).
@@ -37,7 +17,6 @@ export async function getAuthUserId(
 
 /**
  * Require an authenticated user ID, throwing if not logged in.
- * Lightweight alternative to requireAuthUser when you only need the user ID.
  */
 export async function requireAuthUserId(
   ctx: QueryCtx | MutationCtx | ActionCtx,

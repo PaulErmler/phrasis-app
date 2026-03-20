@@ -11,8 +11,6 @@ const siteUrl = process.env.SITE_URL!;
 // as well as helper methods for general use.
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
-export const { getAuthUser } = authComponent.clientApi();
-
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
   return betterAuth({
     baseURL: siteUrl,

@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 import { query } from '../_generated/server';
-import { getAuthUser } from '../db/users';
+import { getAuthUserId } from '../db/users';
 import { featureStateValidator } from './helpers';
 
 /**
@@ -18,12 +18,12 @@ export const getMyQuotas = query({
   ),
   handler: async (ctx) => {
     try {
-      const user = await getAuthUser(ctx);
-      if (!user) return null;
+      const userId = await getAuthUserId(ctx);
+      if (!userId) return null;
 
       const doc = await ctx.db
         .query('usageQuotas')
-        .withIndex('by_userId', (q) => q.eq('userId', user._id))
+        .withIndex('by_userId', (q) => q.eq('userId', userId))
         .first();
 
       if (!doc) return null;

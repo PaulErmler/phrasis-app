@@ -418,14 +418,14 @@
       "pricingLabelUnlimited": "Unbegrenzte Kurse"
     },
     "sentences": {
-      "name": "Sätze",
-      "pricingLabel": "{count} Sätze pro Monat",
-      "pricingLabelUnlimited": "Unbegrenzte Sätze pro Monat"
+      "name": "Vorgefertigte Sätze",
+      "pricingLabel": "{count} vorgefertigte Sätze pro Monat",
+      "pricingLabelUnlimited": "Unbegrenzte vorgefertigte Sätze pro Monat"
     },
     "customSentences": {
-      "name": "Eigene Lernkarten",
-      "pricingLabel": "{count} eigene Lernkarten pro Monat",
-      "pricingLabelUnlimited": "Unbegrenzte eigene Lernkarten"
+      "name": "Eigene Sätze",
+      "pricingLabel": "{count} eigene Sätze pro Monat",
+      "pricingLabelUnlimited": "Unbegrenzte eigene Sätze"
     },
     "multipleLanguages": {
       "name": "Bis zu 5 Sprachen pro Kurs",
