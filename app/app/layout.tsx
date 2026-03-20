@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { isAuthenticated, preloadAuthQuery } from '@/lib/auth-server';
 import { api } from '@/convex/_generated/api';
 import { AppDataProvider } from '@/components/app/AppDataProvider';
+import { OnboardingGuard } from '@/components/app/OnboardingGuard';
 
 export default async function AppLayout({
   children,
@@ -35,7 +36,9 @@ export default async function AppLayout({
       preloadedCollectionProgress={preloadedCollectionProgress}
       preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
     >
-      {children}
+      <OnboardingGuard>
+        {children}
+      </OnboardingGuard>
     </AppDataProvider>
   );
 }

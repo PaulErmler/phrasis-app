@@ -167,14 +167,6 @@ export default function MainLayout({
     });
   }, [syncQuotas, isAuthenticated]);
 
-  // Onboarding redirect
-  const hasCompletedOnboarding = settings?.hasCompletedOnboarding ?? true;
-  useEffect(() => {
-    if (hasCompletedOnboarding === false) {
-      router.push('/app/onboarding');
-    }
-  }, [hasCompletedOnboarding, router]);
-
   // Tab switching — pushState so browser back/forward works between tabs
   const handleViewChange = useCallback((view: View) => {
     setActiveView(view);
