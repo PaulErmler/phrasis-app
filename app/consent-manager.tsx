@@ -4,8 +4,6 @@ import {
   ConsentManagerProvider,
   CookieBanner,
 } from '@c15t/nextjs';
-// For client-only apps (non-SSR), you can use:
-// import { ConsentManagerProvider } from '@c15t/nextjs/client';
 import { ConsentManagerClient } from './consent-manager.client';
 
 /**
@@ -50,7 +48,7 @@ export function ConsentManager({ children }: { children: ReactNode }) {
     <ConsentManagerProvider
       options={{
         mode: 'offline',
-        consentCategories: ['necessary'], // Optional: Specify which consent categories to show in the banner.
+        consentCategories: ['necessary'],
       }}
     >
       <CookieBanner />

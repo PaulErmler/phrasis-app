@@ -233,6 +233,56 @@
   }
 }
 
+/* ── C15T consent UI button overrides ──
+ * c15t renders accept/reject as neutral-stroke which hardcodes
+ * background-color:transparent on hover. CSS variables alone cannot
+ * override pseudo-class hardcoded values, so we target by data-testid.
+ */
+
+/* Accept All / Save Settings → filled primary (the only prominently colored buttons) */
+[data-testid="cookie-banner-accept-button"],
+[data-testid="consent-manager-widget-footer-accept-button"],
+[data-testid="consent-manager-widget-footer-save-button"] {
+  background-color: var(--primary) !important;
+  color: oklch(1 0 0) !important;
+  box-shadow: none !important;
+}
+[data-testid="cookie-banner-accept-button"]:hover,
+[data-testid="consent-manager-widget-footer-accept-button"]:hover,
+[data-testid="consent-manager-widget-footer-save-button"]:hover {
+  background-color: oklch(0.66 0.119 217.31) !important;
+  color: oklch(1 0 0) !important;
+}
+.dark [data-testid="cookie-banner-accept-button"]:hover,
+.dark [data-testid="consent-manager-widget-footer-accept-button"]:hover,
+.dark [data-testid="consent-manager-widget-footer-save-button"]:hover {
+  background-color: oklch(0.62 0.119 217.31) !important;
+}
+
+/* Reject All → ghost (no border/shadow, muted hover) */
+[data-testid="cookie-banner-reject-button"],
+[data-testid="consent-manager-widget-footer-reject-button"] {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+[data-testid="cookie-banner-reject-button"]:hover,
+[data-testid="consent-manager-widget-footer-reject-button"]:hover {
+  background-color: var(--muted) !important;
+  box-shadow: none !important;
+}
+
+/* Customize → neutral outline, NOT primary colored */
+[data-testid="cookie-banner-customize-button"],
+[data-testid="consent-manager-widget-footer-customize-button"] {
+  color: var(--foreground) !important;
+  box-shadow: 0 1px 2px 0 oklch(0 0 0 / 4%), inset 0 0 0 1px var(--border) !important;
+}
+[data-testid="cookie-banner-customize-button"]:hover,
+[data-testid="consent-manager-widget-footer-customize-button"]:hover {
+  background-color: var(--muted) !important;
+  box-shadow: 0 1px 2px 0 oklch(0 0 0 / 4%), inset 0 0 0 1px var(--border) !important;
+}
+
 /* Hide C15T branding footer in consent manager dialog */
 [data-c15t-dialog-footer] {
   display: none !important;
@@ -306,4 +356,45 @@
 }
 .driver-popover .driver-popover-prev-btn:hover {
   background: hsl(var(--accent));
+}
+
+/* c15t consent UI — :root tokens (was inline <style> in layout; avoids head hydration mismatches) */
+:root {
+  /* ── Button focus rings (applies to all button variants) ── */
+  --button-focus-ring: var(--primary) !important;
+  --button-focus-ring-dark: var(--primary) !important;
+  --button-shadow-primary-focus: 0 0 0 2px var(--primary) !important;
+  --button-shadow-primary-focus-dark: 0 0 0 2px var(--primary) !important;
+  --button-shadow-neutral-focus: 0 0 0 2px var(--primary) !important;
+  --button-shadow-neutral-focus-dark: 0 0 0 2px var(--primary) !important;
+
+  /* ── Switch ── */
+  --switch-background-color-checked: var(--primary) !important;
+  --switch-background-color-checked-dark: var(--primary) !important;
+  --switch-focus-ring: var(--primary) !important;
+  --switch-focus-ring-dark: var(--primary) !important;
+  --switch-focus-shadow: 0 0 0 2px var(--primary) !important;
+  --switch-focus-shadow-dark: 0 0 0 2px var(--primary) !important;
+
+  /* ── Accordion ── */
+  --accordion-focus-ring: var(--primary) !important;
+  --accordion-focus-ring-dark: var(--primary) !important;
+  --accordion-focus-shadow: 0 0 0 2px var(--primary) !important;
+  --accordion-focus-shadow-dark: 0 0 0 2px var(--primary) !important;
+
+  /* ── Widget ── */
+  --widget-branding-link-color: var(--primary) !important;
+  --widget-accordion-focus-ring: var(--primary) !important;
+  --widget-accordion-focus-ring-dark: var(--primary) !important;
+  --widget-accordion-focus-shadow: 0 0 0 2px var(--primary) !important;
+  --widget-accordion-focus-shadow-dark: 0 0 0 2px var(--primary) !important;
+
+  /* ── Dialog ── */
+  --dialog-branding-focus-color: var(--primary) !important;
+  --dialog-branding-focus-color-dark: var(--primary) !important;
+
+  /* ── Legal links ── */
+  --legal-links-color: var(--primary) !important;
+  --legal-links-focus-color: var(--primary) !important;
+  --legal-links-focus-color-dark: var(--primary) !important;
 }
