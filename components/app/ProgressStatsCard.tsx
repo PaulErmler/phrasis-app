@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useCachedQuery } from '@/hooks/use-cached-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { Flame, RotateCcw, MessageSquare, Clock, Snowflake } from 'lucide-react';
 import { formatTimeMs } from '@/lib/formatTime';
@@ -107,8 +107,8 @@ export function ProgressStatsCard({
   const t = useTranslations('AppPage');
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const stats = useQuery(api.features.courses.getCourseStats, { timezone });
-  const todayStats = useQuery(api.features.courses.getTodayStats, { timezone });
+  const stats = useCachedQuery(api.features.courses.getCourseStats, { timezone }, 'courseStats');
+  const todayStats = useCachedQuery(api.features.courses.getTodayStats, { timezone }, 'todayStats');
 
   const streak = stats?.currentStreak ?? 0;
   const reps = stats?.totalRepetitions ?? 0;

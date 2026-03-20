@@ -15,10 +15,16 @@ Mutation                      Convex DB                 Autumn API
   │  (balance >= amount?)        │                          │
   │  YES: patch feature entry ──>│                          │
   │       scheduler.runAfter ────┼──── trackUsage ─────────>│
-  │                              │<── POST /v1/track        │
-  │                              │<── GET /v1/customers/{id}│
+  │                              │    POST /v1/track ──────>│
+  │                              │    GET /v1/customers/{id}>│
   │                              │<── syncAllFeatures       │
   │  NO: throw USAGE_LIMIT      │                          │
+
+syncQuotas (on app load):
+  │                              │                          │
+  │                              │    POST /v1/customers ──>│  (getOrCreate, idempotent)
+  │                              │<── balances + flags      │
+  │                              │<── syncAllFeatures       │
 ```
 
 ### Key constraints
@@ -31,14 +37,14 @@ Mutation                      Convex DB                 Autumn API
 
 Defined in `autumn.config.ts`. Features with their plan limits:
 
-| Feature | Type | Free | Basic ($8/mo) | Pro ($19/mo) | Reset |
+| Feature | Type | Free | Basic ($8/mo) | Pro ($16/mo) | Reset |
 |---|---|---|---|---|---|
-| `chat_messages` | metered, consumable | 5 | 40 | 100 | monthly |
-| `courses` | metered, non-consumable | 1 | 2 | 5 | never |
-| `sentences` | metered, consumable | 150 | 300 | 1000 | monthly |
-| `custom_sentences` | metered, consumable | 10 | 50 | 200 | monthly |
-| `reviews` | metered, consumable | - | - | - | not tracked |
-| `multiple_languages` | boolean | no | no | no | - |
+| `chat_messages` | metered, consumable | 5 | 50 | 200 | monthly |
+| `courses` | metered, non-consumable | 1 | 1 | 10 | never |
+| `sentences` | metered, consumable | 150 | 400 | 1000 | monthly |
+| `custom_sentences` | metered, consumable | 10 | 200 | 500 | monthly |
+| `transcriptions` | metered, consumable | 10 | 100 | 400 | monthly |
+| `multiple_languages` | boolean | no | no | yes (Pro only) | - |
 
 ### What is NOT tracked
 
@@ -129,10 +135,29 @@ Internal actions and shared Autumn API utilities. Requires `"use node"` for `fet
 
 ### Autumn REST API endpoints used
 
-- `POST https://api.useautumn.com/v1/track` — record a usage event
-- `GET https://api.useautumn.com/v1/customers/{customer_id}` — get all features in a single request (used after track, for full sync, and for live entitlements)
+- `POST https://api.useautumn.com/v1/customers` — **getOrCreate** (idempotent). Creates the customer if new, returns existing if known. With `autoEnable: true` on the free plan, new customers get the free plan attached automatically. Used by `syncQuotasForUser`.
+- `GET https://api.useautumn.com/v1/customers/{customer_id}` — fetch an existing customer. Used by `trackUsage` after recording usage (customer is guaranteed to exist).
+- `POST https://api.useautumn.com/v1/track` — record a usage event. As of March 17, 2026, does **not** auto-create customers; the customer must already exist.
 
 All require `Authorization: Bearer <AUTUMN_SECRET_KEY>`.
+
+### Autumn API response format
+
+The raw REST API returns metered features under `balances` and boolean features under `flags`. There is **no `features` field** in the raw API (that is an SDK abstraction).
+
+```
+balances: {
+  "chat_messages": { granted: 5, remaining: 5, usage: 0, unlimited: false, ... },
+  ...
+}
+flags: {
+  "multiple_languages": { id: "...", plan_id: "pro", feature_id: "multiple_languages", ... }
+}
+```
+
+Field mapping to local `FeatureState`:
+- `remaining` → `balance`, `granted` → `included`, `usage` → `used`, `unlimited` → `unlimited`
+- Boolean flags are stored as `{ balance: 1, included: 1, used: 0, unlimited: true }`
 
 ### Registered functions
 
@@ -141,7 +166,7 @@ All require `Authorization: Bearer <AUTUMN_SECRET_KEY>`.
 Args: `{ userId, featureId, value }`. Called from mutations via `scheduler.runAfter(0, ...)`.
 
 1. `POST /v1/track` with `{ customer_id, feature_id, value }`
-2. `GET /v1/customers/{customer_id}` to fetch updated state for all features
+2. `GET /v1/customers/{customer_id}` to fetch updated state (customer exists)
 3. Calls `syncAllFeatures` to overwrite the entire local features record
 
 If either API call fails, logs the error and returns without syncing.
@@ -152,9 +177,10 @@ Args: `{ userId }`. Full sync of all features for a given user. For use in sched
 
 ### Shared utilities (exported for use in `actions.ts`)
 
-- **`fetchCustomerFeatures(secretKey, userId)`** — `GET /customers/{id}`, returns raw Autumn feature entries or `null` on error
-- **`toFeaturesRecord(autumnFeatures)`** — converts Autumn's response format to the local `Record<string, FeatureState>`
-- **`syncQuotasForUser(ctx, userId)`** — fetches all features and calls `syncAllFeatures`
+- **`fetchCustomerData(secretKey, userId)`** — `GET /customers/{id}`, returns raw Autumn customer response or `null` on error. Used after `POST /track`.
+- **`getOrCreateCustomer(secretKey, userId)`** — `POST /customers`, idempotent getOrCreate. Used by `syncQuotasForUser`.
+- **`toFeaturesRecord(data)`** — converts Autumn's `balances` + `flags` to the local `Record<string, FeatureState>`
+- **`syncQuotasForUser(ctx, userId)`** — calls `getOrCreateCustomer`, maps to local format, calls `syncAllFeatures`
 
 ## `convex/usage/actions.ts`
 
@@ -261,17 +287,19 @@ import { useCustomer } from 'autumn-js/react';
 const { customer, isLoading } = useCustomer();
 ```
 
-`customer.features` is a record keyed by feature ID (e.g. `"chat_messages"`) with the same shape returned by Autumn's `GET /customers` endpoint. Each entry has:
+`customer` contains `balances` (metered features) and `flags` (boolean features). The SDK normalises these into a unified `features` record. Each balance entry has:
 
 ```typescript
 {
-  balance?: number | null;   // remaining units
+  balance?: number | null;   // remaining units (maps to API's `remaining`)
   unlimited?: boolean;       // true on unlimited plans
   usage?: number;            // units consumed this period
-  included_usage?: number;   // included units on current plan
+  included_usage?: number;   // included units on current plan (maps to API's `granted`)
   interval?: string;         // reset interval, e.g. "month"
 }
 ```
+
+Note: The SDK's `features` field is an abstraction over the raw API's `balances` + `flags`. Our server-side `tracking.ts` reads `balances` and `flags` directly since it uses raw `fetch`.
 
 Data is fetched via SWR (cached, reactive). On first page load the data may be briefly `null` while the request completes; design UI to handle this gracefully (no badge shown until loaded).
 
@@ -400,10 +428,10 @@ Each card shows:
 
 | Trigger | What happens |
 |---|---|
-| User lands on prototype page | `getMyQuotas` query runs reactively; `useCustomer()` fetches live Autumn state via SWR |
-| "Sync from Autumn" clicked | Single `GET /customers` call, entire features record overwritten |
-| Simulate button clicked | Feature entry decremented instantly; `trackUsage` action scheduled |
-| `trackUsage` completes (~200ms) | Track event sent to Autumn, all features synced back via `syncAllFeatures` |
+| User lands on app / prototype page | `getMyQuotas` query runs reactively; `useCustomer()` fetches live Autumn state via SWR |
+| App load / `syncQuotas` called | `POST /customers` (getOrCreate, idempotent), entire features record overwritten from `balances` + `flags` |
+| Simulate / use button clicked | Feature entry decremented instantly in local cache; `trackUsage` action scheduled |
+| `trackUsage` completes (~200ms) | Track event sent to Autumn via `POST /track`, then `GET /customers/:id` to re-sync all features |
 | Subscription change / plan upgrade | Should trigger `syncQuotas` (not yet wired — see TODO) |
 
 ## Environment variables

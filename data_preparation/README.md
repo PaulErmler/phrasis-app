@@ -1,6 +1,6 @@
-# Cacatua Data Preparation
+# Flexling Data Preparation
 
-This directory contains the tools and data used to process, filter, and classify the sentence dataset for the Cacatua application.
+This directory contains the tools and data used to process, filter, and classify the sentence dataset for the Flexling application.
 
 We use two main pipelines:
 
@@ -56,8 +56,8 @@ Located in `language_intelligence/`:
 Create and activate a conda environment using the provided `requirements.txt`:
 
 ```bash
-conda create --name cacatua-prep --file requirements.txt
-conda activate cacatua-prep
+conda create --name flexling-prep --file requirements.txt
+conda activate flexling-prep
 ```
 
 ### 2. Environment Variables

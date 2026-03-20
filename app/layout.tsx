@@ -24,9 +24,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Cacatua',
+  title: 'Flexling',
   description:
-    'Master languages with Cacatua. Learn, practice pronunciation, and build fluency in any language.',
+    'Master languages with Flexling. Learn, practice pronunciation, and build fluency in any language.',
   manifest: '/manifest.json',
   icons: {
     icon: [
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Cacatua',
+    title: 'Flexling',
   },
 };
 
@@ -61,7 +61,7 @@ export default async function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Cacatua" />
+        <meta name="apple-mobile-web-app-title" content="Flexling" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

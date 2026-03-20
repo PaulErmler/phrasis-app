@@ -1,6 +1,6 @@
-# Cacatua App Summary
+# Flexling App Summary
 
-Cacatua is a language-learning web app (Next.js + Convex) that teaches vocabulary through spaced-repetition flashcards built from frequency-ranked sentence collections.
+Flexling is a language-learning web app (Next.js + Convex) that teaches vocabulary through spaced-repetition flashcards built from frequency-ranked sentence collections.
 
 ## Tech Stack
 
@@ -127,7 +127,7 @@ Top to bottom:
 
 ## Supported Languages
 
-Defined in `lib/languages.ts` — `SUPPORTED_LANGUAGES` array with code, name, nativeName, flag, and Chirp3 HD TTS voices. Includes English, Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Arabic, Turkish, Polish, Dutch, and more.
+Defined in `lib/languages.ts` — `SUPPORTED_LANGUAGES` array with code, name, nativeName, flag, and Chirp3 HD TTS voices. Currently: English, Spanish, French, German, Italian, Portuguese (Brazil), Swedish, and Dutch (Chinese and Japanese temporarily removed).
 
 ## i18n
 

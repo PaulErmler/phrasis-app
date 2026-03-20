@@ -43,12 +43,12 @@ export function PWASplashScreen() {
     >
       <Image
         src="/icons/icon.svg"
-        alt="Cacatua"
+        alt="Flexling"
         width={96}
         height={96}
         priority
       />
-      <p className="mt-4 text-lg font-semibold text-white">Cacatua</p>
+      <p className="mt-4 text-lg font-semibold text-white">Flexling</p>
       <Loader2Icon className="mt-6 size-6 animate-spin text-white/60" />
     </div>
   );

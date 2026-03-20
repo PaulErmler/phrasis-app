@@ -28,7 +28,7 @@ export function PWAInstallButton() {
       className="gap-2"
     >
       <Download className="w-4 h-4" />
-      Install Cacatua
+      Install Flexling
     </Button>
   );
 }

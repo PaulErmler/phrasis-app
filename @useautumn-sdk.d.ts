@@ -5,12 +5,10 @@ declare module '@useautumn/sdk' {
   // Features
   export const chat_messages: Feature;
   export const courses: Feature;
-  export const reviews: Feature;
   export const sentences: Feature;
   export const custom_sentences: Feature;
-  export const multiple_languages: Feature;
   export const transcriptions: Feature;
-  export const custom_phrases: Feature;
+  export const multiple_languages: Feature;
 
   // Plans
   export const free: Plan;

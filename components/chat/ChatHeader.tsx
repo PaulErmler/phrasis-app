@@ -28,7 +28,7 @@ export function ChatHeader({ onBack }: ChatHeaderProps) {
           <div className="w-8 h-8 rounded-lg bg-linear-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
             <span className="text-sm font-bold text-white">P</span>
           </div>
-          <span className="heading-section">Cacatua</span>
+          <span className="heading-section">Flexling</span>
         </div>
         <div className="flex items-center gap-4">
           <Authenticated>

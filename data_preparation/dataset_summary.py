@@ -92,7 +92,7 @@ def main():
     # Write summary to file
     print(f"Writing summary to {output_path}...")
     with open(output_path, 'w', encoding='utf-8') as f:
-        f.write("CACATUA DATASET SUMMARY\n")
+        f.write("FLEXLING DATASET SUMMARY\n")
         f.write("=" * 60 + "\n\n")
         
         f.write("OVERALL STATISTICS\n")

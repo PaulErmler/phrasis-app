@@ -188,9 +188,13 @@ export function CollectionDetailDialog({
             <>
               <Separator className="mb-4" />
               {isLoadingTexts ? (
-                <div className="space-y-3">
-                  {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-14 w-full rounded-xl" />
+                <div className="space-y-4">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="content-box p-4 space-y-2">
+                      <Skeleton className="h-5 w-3/4 rounded" />
+                      <Separator />
+                      <Skeleton className="h-5 w-2/3 rounded" />
+                    </div>
                   ))}
                 </div>
               ) : texts.length === 0 ? (

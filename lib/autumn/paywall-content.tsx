@@ -1,4 +1,25 @@
-import { type CheckFeaturePreview } from "autumn-js";
+import { type CheckFeaturePreview, type Product } from "autumn-js";
+
+/**
+ * Filters Autumn upgrade products to only those that actually increase the
+ * quota for `featureId` beyond `currentIncluded`. This prevents recommending
+ * a plan that has the same (or lower) limit for the feature in question.
+ */
+export function filterProductsByFeatureIncrease(
+  products: Product[],
+  featureId: string,
+  currentIncluded: number,
+): Product[] {
+  return products.filter((product) => {
+    const featureItem = product.items.find((i) => i.feature_id === featureId);
+    if (!featureItem) return false;
+    if (featureItem.included_usage === "inf") return true;
+    return (
+      typeof featureItem.included_usage === "number" &&
+      featureItem.included_usage > currentIncluded
+    );
+  });
+}
 
 export type PaywallTranslateFn = (
   key: string,

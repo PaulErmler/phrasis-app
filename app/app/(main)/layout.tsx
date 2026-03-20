@@ -135,14 +135,6 @@ export default function MainLayout({
     });
   }, [syncQuotas]);
 
-  // Onboarding redirect
-  const hasCompletedOnboarding = settings?.hasCompletedOnboarding ?? true;
-  useEffect(() => {
-    if (hasCompletedOnboarding === false) {
-      router.push('/app/onboarding');
-    }
-  }, [hasCompletedOnboarding, router]);
-
   // Tab switching — pushState so browser back/forward works between tabs
   const handleViewChange = useCallback((view: View) => {
     setActiveView(view);
@@ -325,10 +317,6 @@ export default function MainLayout({
             />
           </div>
         )}
-
-        <div className="fixed inset-0 -z-10 overflow-hidden">
-          <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
-        </div>
       </div>
   );
 }

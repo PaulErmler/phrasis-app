@@ -9,8 +9,8 @@ Paul Ermler & Franziska Hradilak
 Friedrich-Ebert Straße 62  
 14467 Potsdam
 
-E-Mail: contact@cacatua.app  
-  Website: cacatua.app
+E-Mail: contact@flexling.com  
+  Website: flexling.com
 
 Umsatzsteuer-Identifikationsnummer gem. § 27 a Umsatzsteuergesetz: DE 1234567  
 Wirtschaftsidentifikationsnummer gem. § 139 c Abgabenordnung: DE 1234567

@@ -1,6 +1,6 @@
 {
   "HomePage": {
-    "title": "Master Languages with Cacatua",
+    "title": "Master Languages with Flexling",
     "subtitle": "Learn phrases, practice pronunciation, and build fluency in any language",
     "signIn": "Sign In",
     "getStarted": "Get Started",
@@ -332,7 +332,7 @@
     }
   },
   "Footer": {
-    "copyright": "© {year} Cacatua. All rights reserved.",
+    "copyright": "© {year} Flexling. All rights reserved.",
     "theme": "Theme:",
     "language": "Language:",
     "madeInGermany": "Made in Germany",
@@ -449,8 +449,8 @@
     "descriptionCap": "You can only create {balance, plural, one {# more} other {# more}} {featureName}. Upgrade your plan to create more.",
     "dismiss": "Not now",
     "upgrade": "Upgrade to {productName}",
-    "noUpgradeAvailable": "You've used most of your {featureName}. Contact us at support@cacatua.app for additional usage.",
-    "noUpgradeAvailableCap": "You've almost reached your maximum number of {featureName}. Contact us at support@cacatua.app for additional capacity.",
+    "noUpgradeAvailable": "You've used most of your {featureName}. Contact us at support@flexling.com for additional usage.",
+    "noUpgradeAvailableCap": "You've almost reached your maximum number of {featureName}. Contact us at support@flexling.com for additional capacity.",
     "contactUs": "Contact Us"
   },
   "Paywall": {
@@ -461,9 +461,9 @@
     "notAvailableForAccount": "This feature is not available on your current plan.",
     "usageLimitReached": "You've used all your {featureName} for this period.",
     "capReached": "You've reached your maximum number of {featureName}.",
-    "usageLimitNoProducts": "You've used all your {featureName}. Contact us at support@cacatua.app for additional usage.",
-    "capReachedNoProducts": "You've reached your maximum number of {featureName}. Contact us at support@cacatua.app for additional capacity.",
-    "notAvailableContactUs": "This feature is not available on your current plan. Contact us at support@cacatua.app to enable it.",
+    "usageLimitNoProducts": "You've used all your {featureName}. Contact us at support@flexling.com for additional usage.",
+    "capReachedNoProducts": "You've reached your maximum number of {featureName}. Contact us at support@flexling.com for additional capacity.",
+    "notAvailableContactUs": "This feature is not available on your current plan. Contact us at support@flexling.com to enable it.",
     "startTrial": "Start trial for {productName}",
     "purchaseAddOn": "Purchase {productName}",
     "upgradeTo": "Upgrade to {productName}",
@@ -474,7 +474,7 @@
     "usageLimitWithDetail": "You've used all your {featureName} for this period. {detail}",
     "capReachedWithDetail": "You've reached your maximum number of {featureName}. {detail}",
     "featureFlagWithDetail": "{featureName} is not available on your current plan. {detail}",
-    "noUpgradeAvailable": "You've reached your limit for {featureName}. Contact us at support@cacatua.app for additional usage.",
+    "noUpgradeAvailable": "You've reached your limit for {featureName}. Contact us at support@flexling.com for additional usage.",
     "contactUs": "Contact Us"
   },
   "Pricing": {
@@ -606,12 +606,12 @@
   "Tutorial": {
     "home": {
       "welcome": {
-        "title": "Welcome to Cacatua!",
+        "title": "Welcome to Flexling!",
         "description": "We'll give you a quick overview to help you get started. You can dismiss this at any time."
       },
       "learningModes": {
         "title": "Learning Modes",
-        "description": "Cacatua has 2 different types of review modes. Full Review lets you practice by typing translations — great for focused study. Audio Review plays sentences aloud so you can learn on the go."
+        "description": "Flexling has 2 different types of review modes. Full Review lets you practice by typing translations — great for focused study. Audio Review plays sentences aloud so you can learn on the go."
       },
       "difficultySelection": {
         "title": "Difficulty Selection",

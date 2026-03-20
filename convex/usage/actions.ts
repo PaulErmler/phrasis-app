@@ -2,7 +2,7 @@
 
 import { v } from 'convex/values';
 import { action } from '../_generated/server';
-import { requireAuthUser } from '../db/users';
+import { requireAuthUserId } from '../db/users';
 import { syncQuotasForUser } from './tracking';
 
 /**
@@ -12,8 +12,8 @@ export const syncQuotas = action({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
-    const user = await requireAuthUser(ctx);
-    await syncQuotasForUser(ctx, user._id);
+    const quotaUserId = await requireAuthUserId(ctx);
+    await syncQuotasForUser(ctx, quotaUserId);
     return null;
   },
 });

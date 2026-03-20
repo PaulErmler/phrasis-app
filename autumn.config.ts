@@ -3,25 +3,10 @@ import { feature, item, plan } from 'atmn';
 import { FEATURE_IDS } from './convex/features/featureIds';
 
 // Features
-export const reviews = feature({
-	id: 'reviews',
-	name: 'Reviews',
-	type: 'metered',
-	consumable: true,
-});
-
 export const multiple_languages = feature({
 	id: 'multiple_languages',
 	name: 'Up To 5 Languages per Course',
 	type: 'boolean',
-});
-
-export const custom_phrases = feature({
-	id: 'custom_phrases',
-	name: 'Custom Phrases',
-	type: 'metered',
-	consumable: true,
-	archived: true,
 });
 
 export const chat_messages = feature({
@@ -110,32 +95,32 @@ export const basic = plan({
 	items: [
 		item({
 			featureId: chat_messages.id,
-			included: 40,
-			reset: {
-				interval: 'month',
-			},
-		}),
-		item({
-			featureId: courses.id,
-			included: 2,
-		}),
-		item({
-			featureId: custom_sentences.id,
 			included: 50,
 			reset: {
 				interval: 'month',
 			},
 		}),
 		item({
+			featureId: courses.id,
+			included: 1,
+		}),
+		item({
+			featureId: custom_sentences.id,
+			included: 200,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
 			featureId: sentences.id,
-			included: 300,
+			included: 400,
 			reset: {
 				interval: 'month',
 			},
 		}),
 		item({
 			featureId: transcriptions.id,
-			included: 80,
+			included: 100,
 			reset: {
 				interval: 'month',
 			},
@@ -147,24 +132,24 @@ export const pro = plan({
 	id: 'pro',
 	name: 'Pro',
 	price: {
-		amount: 18,
+		amount: 16,
 		interval: 'month',
 	},
 	items: [
 		item({
 			featureId: chat_messages.id,
-			included: 100,
+			included: 200,
 			reset: {
 				interval: 'month',
 			},
 		}),
 		item({
 			featureId: courses.id,
-			included: 5,
+			included: 10,
 		}),
 		item({
 			featureId: custom_sentences.id,
-			included: 200,
+			included: 500,
 			reset: {
 				interval: 'month',
 			},
@@ -178,7 +163,7 @@ export const pro = plan({
 		}),
 		item({
 			featureId: transcriptions.id,
-			included: 200,
+			included: 400,
 			reset: {
 				interval: 'month',
 			},

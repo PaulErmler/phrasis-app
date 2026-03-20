@@ -12,6 +12,7 @@ import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCustomer, usePricingTable } from "autumn-js/react";
 import { getFeatureI18nKey, isFeatureConsumable } from "@/lib/features/feature-meta";
+import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 
 export interface LowQuotaDialogProps {
@@ -33,13 +34,19 @@ export default function LowQuotaDialog({
   const { products } = usePricingTable();
   const [upgrading, setUpgrading] = useState(false);
 
+  const { included } = useFeatureQuota(featureId);
+
   const featureI18nKey = getFeatureI18nKey(featureId);
   const featureName = tFeatures(`${featureI18nKey}.name`);
   const consumable = isFeatureConsumable(featureId);
 
-  const upgradeProduct = products?.find(
-    (p) => p.scenario === "upgrade" || (p.scenario === "new" && !p.properties?.is_free),
-  );
+  const upgradeProduct = products?.find((p) => {
+    if (p.scenario !== "upgrade" && !(p.scenario === "new" && !p.properties?.is_free)) return false;
+    const featureItem = p.items.find((i) => i.feature_id === featureId);
+    if (!featureItem) return false;
+    if (featureItem.included_usage === "inf") return true;
+    return typeof featureItem.included_usage === "number" && featureItem.included_usage > included;
+  });
 
   const handleUpgrade = async () => {
     if (!upgradeProduct) return;
@@ -100,7 +107,7 @@ export default function LowQuotaDialog({
               className="font-medium shadow transition min-w-20 gap-1.5"
               asChild
             >
-              <a href="mailto:support@cacatua.app">
+              <a href="mailto:support@flexling.com">
                 <Mail className="h-3.5 w-3.5" />
                 {t("contactUs")}
               </a>

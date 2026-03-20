@@ -23,6 +23,7 @@ interface NewChatInputProps {
   placeholder?: string;
   className?: string;
   showSuggestions?: boolean;
+  autoFocus?: boolean;
   onChatCreated?: (threadId: string) => void;
 }
 
@@ -40,6 +41,7 @@ interface NewChatInputProps {
 export function NewChatInput({
   className,
   showSuggestions = true,
+  autoFocus = false,
   onChatCreated,
 }: NewChatInputProps) {
   const t = useTranslations('Chat.errors');
@@ -130,6 +132,7 @@ export function NewChatInput({
         isTranscribing={isTranscribing}
         onVoiceClick={handleVoiceClick}
         showSuggestions={showSuggestions}
+        autoFocus={autoFocus}
         footerAction={<FeatureBadge featureId={FEATURE_IDS.CHAT_MESSAGES} />}
       />
       {paywallOpen && (
