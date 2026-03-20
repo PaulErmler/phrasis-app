@@ -106,6 +106,9 @@
     "settings": {
       "account": "Account",
       "language": "App Language",
+      "legal": {
+        "label": "Legal"
+      },
       "attribution": {
         "label": "Data Sources",
         "text": "A lot of the sentences are from <tatoeba>Tatoeba</tatoeba>'s massive dataset, released under a <ccby>CC-BY License</ccby>."

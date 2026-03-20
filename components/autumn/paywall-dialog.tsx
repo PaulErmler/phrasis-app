@@ -33,11 +33,19 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
   });
   const { checkout } = useCustomer();
   const [upgrading, setUpgrading] = useState(false);
-  const { included } = useFeatureQuota(params?.featureId ?? "");
+  const filterFeatureId = params?.featureId ?? "";
+  const consumable = isFeatureConsumable(filterFeatureId);
+  const { included } = useFeatureQuota(filterFeatureId);
 
   const relevantProducts = useMemo(
-    () => filterProductsByFeatureIncrease(preview?.products ?? [], params?.featureId ?? "", included),
-    [preview?.products, params?.featureId, included],
+    () =>
+      filterProductsByFeatureIncrease(
+        preview?.products ?? [],
+        filterFeatureId,
+        included,
+        consumable,
+      ),
+    [preview?.products, filterFeatureId, included, consumable],
   );
 
   if (!params) {
@@ -62,7 +70,6 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
     );
   }
 
-  const consumable = isFeatureConsumable(featureId);
   const effectivePreview = preview
     ? { ...preview, products: relevantProducts }
     : preview;
