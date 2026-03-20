@@ -74,6 +74,16 @@ export function SimplifiedChatView({
     />
   );
 
+  const sidebarContentForSheet = (
+    <ChatHistorySidebar
+      threads={threads}
+      currentThreadId={threadId}
+      onThreadSelect={handleThreadSelect}
+      onNewChat={handleNewChat}
+      insetForSheetClose
+    />
+  );
+
   return (
     <div className="flex h-full w-full min-w-0">
       {/* Desktop inline sidebar */}
@@ -87,7 +97,7 @@ export function SimplifiedChatView({
               transition={{ duration: 0.2, ease: 'easeInOut' }}
               className="flex flex-shrink-0 border-r overflow-hidden"
             >
-              <div className="w-[280px]">
+              <div className="w-[280px] min-w-0 max-w-[280px] overflow-x-hidden">
                 {sidebarContent}
               </div>
             </motion.div>
@@ -101,9 +111,12 @@ export function SimplifiedChatView({
           open={sidebarOpen}
           onOpenChange={onSidebarOpenChange}
         >
-          <SheetContent side="left" className="w-[280px] p-0">
+          <SheetContent
+            side="left"
+            className="w-[280px] min-w-0 max-w-[280px] overflow-x-hidden p-0"
+          >
             <SheetTitle className="sr-only">{t('title')}</SheetTitle>
-            {sidebarContent}
+            {sidebarContentForSheet}
           </SheetContent>
         </Sheet>
       )}

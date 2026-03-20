@@ -66,8 +66,8 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.61 0.11 222);
-  --primary-foreground: oklch(0.98 0.02 201);
+  --primary: oklch(0.7162 0.119 217.31);
+  --primary-foreground: oklch(0.98 0.02 217.31);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.97 0 0);
@@ -76,29 +76,29 @@
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.58 0.22 27);
   --success: oklch(0.52 0.16 155);
-  --favorite: oklch(0.83 0.18 95);
-  --warning: oklch(0.75 0.15 70);
-  --warning-foreground: oklch(0.2 0.05 70);
-  --accent-orange: oklch(0.82 0.17 78);
-  --streak-active: oklch(0.816 0.171 79.0);
+  --favorite: oklch(0.8179 0.1705 77.95);
+  --warning: oklch(0.8179 0.1705 77.95);
+  --warning-foreground: oklch(0.28 0.08 77.95);
+  --accent-orange: oklch(0.6189 0.1636 40.89);
+  --streak-active: oklch(0.78 0.16 77.95);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0.12 207);
-  --chart-2: oklch(0.8 0.13 212);
-  --chart-3: oklch(0.71 0.13 215);
-  --chart-4: oklch(0.61 0.11 222);
-  --chart-5: oklch(0.52 0.09 223);
+  --chart-1: oklch(0.87 0.119 217.31);
+  --chart-2: oklch(0.8 0.119 217.31);
+  --chart-3: oklch(0.71 0.119 217.31);
+  --chart-4: oklch(0.7162 0.119 217.31);
+  --chart-5: oklch(0.52 0.09 217.31);
   --radius: 0.625rem;
   /* Timeline colors — base (blue, derived from primary) and target (warm orange) */
-  --timeline-base: oklch(0.93 0.04 222);
-  --timeline-base-border: oklch(0.8 0.07 222);
-  --timeline-target: oklch(0.93 0.05 70);
-  --timeline-target-border: oklch(0.8 0.11 70);
+  --timeline-base: oklch(0.93 0.04 217.31);
+  --timeline-base-border: oklch(0.8 0.07 217.31);
+  --timeline-target: oklch(0.93 0.06 40.89);
+  --timeline-target-border: oklch(0.78 0.13 40.89);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.61 0.11 222);
-  --sidebar-primary-foreground: oklch(0.98 0.02 201);
+  --sidebar-primary: oklch(0.7162 0.119 217.31);
+  --sidebar-primary-foreground: oklch(0.98 0.02 217.31);
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
@@ -112,38 +112,38 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.71 0.13 215);
-  --primary-foreground: oklch(0.3 0.05 230);
+  --primary: oklch(0.7162 0.119 217.31);
+  --primary-foreground: oklch(0.28 0.07 217.31);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.371 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --accent-orange: oklch(0.82 0.17 78);
-  --streak-active: oklch(0.816 0.171 79.0);
+  --accent-orange: oklch(0.6189 0.1636 40.89);
+  --streak-active: oklch(0.82 0.16 77.95);
   --destructive: oklch(0.704 0.191 22.216);
   --success: oklch(0.65 0.18 155);
-  --favorite: oklch(0.88 0.15 95);
-  --warning: oklch(0.8 0.15 70);
-  --warning-foreground: oklch(0.2 0.05 70);
+  --favorite: oklch(0.85 0.17 77.95);
+  --warning: oklch(0.82 0.17 77.95);
+  --warning-foreground: oklch(0.22 0.07 77.95);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0.12 207);
-  --chart-2: oklch(0.8 0.13 212);
-  --chart-3: oklch(0.71 0.13 215);
-  --chart-4: oklch(0.61 0.11 222);
-  --chart-5: oklch(0.52 0.09 223);
+  --chart-1: oklch(0.87 0.119 217.31);
+  --chart-2: oklch(0.8 0.119 217.31);
+  --chart-3: oklch(0.71 0.119 217.31);
+  --chart-4: oklch(0.7162 0.119 217.31);
+  --chart-5: oklch(0.52 0.09 217.31);
   /* Timeline colors — dark mode */
-  --timeline-base: oklch(0.25 0.04 222);
-  --timeline-base-border: oklch(0.42 0.07 222);
-  --timeline-target: oklch(0.25 0.05 70);
-  --timeline-target-border: oklch(0.42 0.09 70);
+  --timeline-base: oklch(0.25 0.04 217.31);
+  --timeline-base-border: oklch(0.42 0.07 217.31);
+  --timeline-target: oklch(0.28 0.06 40.89);
+  --timeline-target-border: oklch(0.48 0.12 40.89);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.8 0.13 212);
-  --sidebar-primary-foreground: oklch(0.3 0.05 230);
+  --sidebar-primary: oklch(0.82 0.119 217.31);
+  --sidebar-primary-foreground: oklch(0.28 0.07 217.31);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
@@ -233,6 +233,56 @@
   }
 }
 
+/* ── C15T consent UI button overrides ──
+ * c15t renders accept/reject as neutral-stroke which hardcodes
+ * background-color:transparent on hover. CSS variables alone cannot
+ * override pseudo-class hardcoded values, so we target by data-testid.
+ */
+
+/* Accept All / Save Settings → filled primary (the only prominently colored buttons) */
+[data-testid="cookie-banner-accept-button"],
+[data-testid="consent-manager-widget-footer-accept-button"],
+[data-testid="consent-manager-widget-footer-save-button"] {
+  background-color: var(--primary) !important;
+  color: oklch(1 0 0) !important;
+  box-shadow: none !important;
+}
+[data-testid="cookie-banner-accept-button"]:hover,
+[data-testid="consent-manager-widget-footer-accept-button"]:hover,
+[data-testid="consent-manager-widget-footer-save-button"]:hover {
+  background-color: oklch(0.66 0.119 217.31) !important;
+  color: oklch(1 0 0) !important;
+}
+.dark [data-testid="cookie-banner-accept-button"]:hover,
+.dark [data-testid="consent-manager-widget-footer-accept-button"]:hover,
+.dark [data-testid="consent-manager-widget-footer-save-button"]:hover {
+  background-color: oklch(0.62 0.119 217.31) !important;
+}
+
+/* Reject All → ghost (no border/shadow, muted hover) */
+[data-testid="cookie-banner-reject-button"],
+[data-testid="consent-manager-widget-footer-reject-button"] {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+[data-testid="cookie-banner-reject-button"]:hover,
+[data-testid="consent-manager-widget-footer-reject-button"]:hover {
+  background-color: var(--muted) !important;
+  box-shadow: none !important;
+}
+
+/* Customize → neutral outline, NOT primary colored */
+[data-testid="cookie-banner-customize-button"],
+[data-testid="consent-manager-widget-footer-customize-button"] {
+  color: var(--foreground) !important;
+  box-shadow: 0 1px 2px 0 oklch(0 0 0 / 4%), inset 0 0 0 1px var(--border) !important;
+}
+[data-testid="cookie-banner-customize-button"]:hover,
+[data-testid="consent-manager-widget-footer-customize-button"]:hover {
+  background-color: var(--muted) !important;
+  box-shadow: 0 1px 2px 0 oklch(0 0 0 / 4%), inset 0 0 0 1px var(--border) !important;
+}
+
 /* Hide C15T branding footer in consent manager dialog */
 [data-c15t-dialog-footer] {
   display: none !important;
@@ -306,4 +356,45 @@
 }
 .driver-popover .driver-popover-prev-btn:hover {
   background: hsl(var(--accent));
+}
+
+/* c15t consent UI — :root tokens (was inline <style> in layout; avoids head hydration mismatches) */
+:root {
+  /* ── Button focus rings (applies to all button variants) ── */
+  --button-focus-ring: var(--primary) !important;
+  --button-focus-ring-dark: var(--primary) !important;
+  --button-shadow-primary-focus: 0 0 0 2px var(--primary) !important;
+  --button-shadow-primary-focus-dark: 0 0 0 2px var(--primary) !important;
+  --button-shadow-neutral-focus: 0 0 0 2px var(--primary) !important;
+  --button-shadow-neutral-focus-dark: 0 0 0 2px var(--primary) !important;
+
+  /* ── Switch ── */
+  --switch-background-color-checked: var(--primary) !important;
+  --switch-background-color-checked-dark: var(--primary) !important;
+  --switch-focus-ring: var(--primary) !important;
+  --switch-focus-ring-dark: var(--primary) !important;
+  --switch-focus-shadow: 0 0 0 2px var(--primary) !important;
+  --switch-focus-shadow-dark: 0 0 0 2px var(--primary) !important;
+
+  /* ── Accordion ── */
+  --accordion-focus-ring: var(--primary) !important;
+  --accordion-focus-ring-dark: var(--primary) !important;
+  --accordion-focus-shadow: 0 0 0 2px var(--primary) !important;
+  --accordion-focus-shadow-dark: 0 0 0 2px var(--primary) !important;
+
+  /* ── Widget ── */
+  --widget-branding-link-color: var(--primary) !important;
+  --widget-accordion-focus-ring: var(--primary) !important;
+  --widget-accordion-focus-ring-dark: var(--primary) !important;
+  --widget-accordion-focus-shadow: 0 0 0 2px var(--primary) !important;
+  --widget-accordion-focus-shadow-dark: 0 0 0 2px var(--primary) !important;
+
+  /* ── Dialog ── */
+  --dialog-branding-focus-color: var(--primary) !important;
+  --dialog-branding-focus-color-dark: var(--primary) !important;
+
+  /* ── Legal links ── */
+  --legal-links-color: var(--primary) !important;
+  --legal-links-focus-color: var(--primary) !important;
+  --legal-links-focus-color-dark: var(--primary) !important;
 }

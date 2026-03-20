@@ -59,7 +59,7 @@ export function NewChatInput({
   );
 
   // Mutations
-  const createThread = useMutation(api.features.chat.threads.createThread);
+  const getOrCreateEmptyThread = useMutation(api.features.chat.threads.getOrCreateEmptyThread);
   const sendMessageMutation = useMutation(
     api.features.chat.messages.sendMessage,
   );
@@ -77,7 +77,7 @@ export function NewChatInput({
       setIsProcessing(true);
 
       try {
-        const threadId = await createThread({});
+        const threadId = await getOrCreateEmptyThread({});
 
         await sendMessageMutation({
           threadId,
@@ -112,7 +112,7 @@ export function NewChatInput({
         setIsProcessing(false);
       }
     },
-    [createThread, sendMessageMutation, router, isAvailable, t, onChatCreated],
+    [getOrCreateEmptyThread, sendMessageMutation, router, isAvailable, t, onChatCreated],
   );
 
   // Handle suggestion click - populate input instead of sending

@@ -9,7 +9,34 @@ import {
 import { translationValidator, audioRecordingValidator } from '../types';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 import { scheduleMissingContent } from './decks';
-import { COLLECTION_PREVIEW_SIZE } from '../lib/collections';
+import { COLLECTION_PREVIEW_SIZE, LEVEL_ORDER } from '../lib/collections';
+import { getCourseSettings } from '../db/courseSettings';
+import type { Id } from '../_generated/dataModel';
+import type { QueryCtx } from '../_generated/server';
+
+async function isCollectionAccessible(
+  ctx: QueryCtx,
+  collectionId: Id<'collections'>,
+  courseId: Id<'courses'>,
+): Promise<boolean> {
+  const collection = await ctx.db.get(collectionId);
+  if (!collection) return false;
+
+  if ((LEVEL_ORDER as readonly string[]).includes(collection.name)) return true;
+
+  const courseSettings = await getCourseSettings(ctx, courseId);
+  if (!courseSettings) return false;
+
+  if (courseSettings.chatCollectionId?.toString() === collectionId.toString()) return true;
+  if (
+    (courseSettings.activeCustomCollectionIds ?? []).some(
+      (id) => id.toString() === collectionId.toString(),
+    )
+  )
+    return true;
+
+  return false;
+}
 
 // ============================================================================
 // QUERIES
@@ -42,6 +69,10 @@ export const getCollectionTextsWithContent = query({
     const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return { texts: [], hasMissingContent: false };
     const { course } = active;
+
+    if (!(await isCollectionAccessible(ctx, args.collectionId, course._id))) {
+      return { texts: [], hasMissingContent: false };
+    }
 
     const progress = await getCollectionProgress(
       ctx,
@@ -112,6 +143,10 @@ export const ensureContentForCollection = mutation({
   }),
   handler: async (ctx, args) => {
     const { userId, course } = await requireActiveCourse(ctx);
+
+    if (!(await isCollectionAccessible(ctx, args.collectionId, course._id))) {
+      return { totalTranslationsScheduled: 0, totalAudioScheduled: 0 };
+    }
 
     const progress = await getCollectionProgress(
       ctx,

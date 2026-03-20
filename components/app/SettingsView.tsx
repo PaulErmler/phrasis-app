@@ -1,7 +1,8 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
+import { Card, CardContent } from '@/components/ui/card';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
 import { authClient } from '@/lib/auth-client';
@@ -11,6 +12,7 @@ import PricingTable from '@/components/autumn/pricing-table';
 
 export function SettingsView() {
   const t = useTranslations('AppPage');
+  const tFooter = useTranslations('Footer');
   const tAuth = useTranslations('Auth');
   const { data: session } = authClient.useSession();
   const userEmail = session?.user?.email;
@@ -49,6 +51,44 @@ export function SettingsView() {
           <Separator/> 
 
           <PricingTable />
+
+          <Separator />
+
+          {/* Legal */}
+          <div className="space-y-2">
+            <label className="label-form">{t('settings.legal.label')}</label>
+            <nav
+              className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
+              aria-label={t('settings.legal.label')}
+            >
+              <Link
+                href="/legal/impressum"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                {tFooter('legal.impressum')}
+              </Link>
+              <span aria-hidden>•</span>
+              <Link
+                href="/legal/agb"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                {tFooter('legal.agb')}
+              </Link>
+              <span aria-hidden>•</span>
+              <Link
+                href="/legal/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                {tFooter('legal.privacy')}
+              </Link>
+            </nav>
+          </div>
 
           <Separator />
 

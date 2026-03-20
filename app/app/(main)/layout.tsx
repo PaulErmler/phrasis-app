@@ -24,6 +24,7 @@ import { LibraryView } from '@/components/app/LibraryView';
 import { SettingsView } from '@/components/app/SettingsView';
 import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
+import { AppLoadingSplash } from '@/components/LogoSpinner';
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   home: '/app',
@@ -267,7 +268,14 @@ export default function MainLayout({
         <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
         <main className="flex-1 min-h-0 flex flex-col">
-          {!isLearnOpen && activeView === 'home' && (
+          <div
+            style={{
+              display:
+                !isLearnOpen && activeView === 'home'
+                  ? 'contents'
+                  : 'none',
+            }}
+          >
             <HomeView
               preloadedCollectionProgress={preloadedCollectionProgress}
               preloadedCourseSettings={preloadedCourseSettings}
@@ -278,7 +286,7 @@ export default function MainLayout({
               onChatOpen={handleOpenChat}
               animateEntrance={justReturnedFromLearn.current}
             />
-          )}
+          </div>
           <div
             style={{
               display:
