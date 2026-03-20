@@ -1,4 +1,4 @@
-# Cacatua
+# Flexling
 
 ## Tech Stack
 
@@ -158,7 +158,7 @@ You can also add the MCP Servers for Convex, BetterAuth and AI Elements by setti
 ## Project Structure
 
 ```
-cacatua-app/
+flexling-app/
 ├── app/                    # Next.js app router
 │   ├── page.tsx           # Landing page with auth
 │   ├── app/page.tsx       # Authenticated app page

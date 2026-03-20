@@ -1,5 +1,5 @@
 /**
- * Language definitions and utilities for the Cacatua app
+ * Language definitions and utilities for the Flexling app
  */
 
 /**

@@ -25,7 +25,7 @@
   "features": {
     "title": "Alles was du brauchst, um",
     "titleHighlight": "schneller zu lernen",
-    "subtitle": "Cacatua kombiniert audio-basiertes Lernen, KI-Tutoring und Gedächtnisforschung, damit du dich aufs Lernen konzentrieren kannst.",
+    "subtitle": "Flexling kombiniert audio-basiertes Lernen, KI-Tutoring und Gedächtnisforschung, damit du dich aufs Lernen konzentrieren kannst.",
     "items": {
       "audioBased": {
         "title": "Audio-basiert",
@@ -33,7 +33,7 @@
       },
       "selfDriven": {
         "title": "Selbstbestimmt",
-        "description": "Füge eigene Phrasen aus Bildern oder Dateien hinzu. Bitte Cacatua, Sätze für dich zu erstellen. Oder nutze unsere vorgefertigten Sätze, die auf dein Niveau zugeschnitten werden."
+        "description": "Füge eigene Phrasen aus Bildern oder Dateien hinzu. Bitte Flexling, Sätze für dich zu erstellen. Oder nutze unsere vorgefertigten Sätze, die auf dein Niveau zugeschnitten werden."
       },
       "instantFeedback": {
         "title": "Sofortiges Feedback",
@@ -117,12 +117,12 @@
     "titleHighlight": "Sprachlernenden",
     "items": [
       {
-        "quote": "Cacatua hat komplett verändert, wie ich Sprachen lerne. Ich kann endlich während meines täglichen Pendelns Fortschritte machen!",
+        "quote": "Flexling hat komplett verändert, wie ich Sprachen lerne. Ich kann endlich während meines täglichen Pendelns Fortschritte machen!",
         "author": "Sarah M.",
         "role": "Lernt Spanisch"
       },
       {
-        "quote": "Die KI beantwortet meine Grammatikfragen sofort. Es ist, als hätte ich einen persönlichen Tutor, der 24/7 verfügbar ist. Immer wenn ich eine Frage habe, kann ich sie stellen und Cacatua erstellt automatisch eine Lernkarte für mich, damit ich die Antwort nicht vergesse.",
+        "quote": "Die KI beantwortet meine Grammatikfragen sofort. Es ist, als hätte ich einen persönlichen Tutor, der 24/7 verfügbar ist. Immer wenn ich eine Frage habe, kann ich sie stellen und Flexling erstellt automatisch eine Lernkarte für mich, damit ich die Antwort nicht vergesse.",
         "author": "Michael T.",
         "role": "Lernt Französisch"
       },
@@ -151,7 +151,7 @@
   "donation": {
     "title": "Lerne, das",
     "titleHighlight": "Gutes tut",
-    "description": "Wenn du Cacatua abonnierst, investierst du nicht nur in dich selbst. Wir spenden",
+    "description": "Wenn du Flexling abonnierst, investierst du nicht nur in dich selbst. Wir spenden",
     "percentage": "10% unserer Einnahmen",
     "description2": "an hochwirksame Wohltätigkeitsorganisationen, kuriert von",
     "givewellLink": "GiveWell"
@@ -159,32 +159,32 @@
   "faq": {
     "title": "Häufig gestellte",
     "titleHighlight": "Fragen",
-    "subtitle": "Alles was du über Cacatua wissen musst",
+    "subtitle": "Alles was du über Flexling wissen musst",
     "items": [
       {
-        "question": "Was ist Cacatua?",
+        "question": "Was ist Flexling?",
         "answer": [
-          "Cacatua ist eine audio-basierte Sprachlern-App. Anders als traditionelle Apps kannst du freihändig lernen, während du pendelst, trainierst oder kochst. Die App liest Sätze in einer Sprache vor und du hast dann etwas Zeit, um die Übersetzung zu finden, bevor die App dir die richtige Antwort sagt und zum nächsten Satz übergeht.",
+          "Flexling ist eine audio-basierte Sprachlern-App. Anders als traditionelle Apps kannst du freihändig lernen, während du pendelst, trainierst oder kochst. Die App liest Sätze in einer Sprache vor und du hast dann etwas Zeit, um die Übersetzung zu finden, bevor die App dir die richtige Antwort sagt und zum nächsten Satz übergeht.",
           "Wenn du etwas nicht verstehst, kannst du einen Chatbot bitten, es dir zu erklären. Dieser kann auch neue Lernkarten für dich erstellen."
         ]
       },
       {
-        "question": "Ist Cacatua kostenlos?",
+        "question": "Ist Flexling kostenlos?",
         "answer": [
-          "Cacatua bietet eine kostenlose Version, damit du es ausprobieren kannst. Leider können wir es nicht komplett kostenlos anbieten, da wir unsere laufenden Kosten decken müssen. Wenn du höhere Limits benötigst, kannst du auf unsere Basic- oder Pro-Pläne upgraden."
+          "Flexling bietet eine kostenlose Version, damit du es ausprobieren kannst. Leider können wir es nicht komplett kostenlos anbieten, da wir unsere laufenden Kosten decken müssen. Wenn du höhere Limits benötigst, kannst du auf unsere Basic- oder Pro-Pläne upgraden."
         ]
       },
       {
-        "question": "Wie funktioniert Cacatua?",
+        "question": "Wie funktioniert Flexling?",
         "answer": [
-          "Cacatua verwendet Audio-Lernkarten, die Phrasen in deiner Zielsprache abspielen, gefolgt von der Übersetzung. Du kannst bewerten, wie gut du jede Phrase kanntest, und unser Spaced-Repetition-Algorithmus zeigt dir die Karte wieder, wenn du sie wahrscheinlich gerade vergessen wirst.",
+          "Flexling verwendet Audio-Lernkarten, die Phrasen in deiner Zielsprache abspielen, gefolgt von der Übersetzung. Du kannst bewerten, wie gut du jede Phrase kanntest, und unser Spaced-Repetition-Algorithmus zeigt dir die Karte wieder, wenn du sie wahrscheinlich gerade vergessen wirst.",
           "Wenn du eine Phrase nicht verstehst, kannst du dem KI-Tutor jederzeit Fragen stellen — wie 'Wie kann ich das höflicher sagen?' oder 'Gib mir 3 weitere Beispiele mit diesem Verb in einer anderen Zeitform.' Wir generieren natürlich klingendes Audio mit modernster Text-zu-Sprache-Technologie."
         ]
       },
       {
         "question": "Kann ich meine eigenen Phrasen hinzufügen?",
         "answer": [
-          "Absolut! Du kannst entweder Bilder, PDF-, CSV- oder Textdateien hochladen und Cacatua erstellt automatisch Lernkarten für dich. Du kannst auch deine eigenen Lernkarten manuell hinzufügen.",
+          "Absolut! Du kannst entweder Bilder, PDF-, CSV- oder Textdateien hochladen und Flexling erstellt automatisch Lernkarten für dich. Du kannst auch deine eigenen Lernkarten manuell hinzufügen.",
           "Fehlt uns eine Methode, die du verwenden möchtest? Lass es uns wissen und wir versuchen, sie hinzuzufügen."
         ]
       },
@@ -192,21 +192,21 @@
         "question": "Wie lange dauert es, bis ich fließend spreche?",
         "answer": [
           "Fließend sprechen zu können, hängt von vielen Faktoren ab: der Sprache, deiner Muttersprache, der täglichen Übungszeit und den Lernmethoden.",
-          "Das Ziel von Cacatua ist es, dir alle Werkzeuge zu geben, die du brauchst, um es so schnell wie möglich zu lernen. Zum Beispiel bringt dir Cacatua neue Wörter in der Reihenfolge bei, in der sie am häufigsten vorkommen. So kannst du in mehr Kontexten schneller fließend sprechen, weil du die häufigsten Wörter zuerst lernst."
+          "Das Ziel von Flexling ist es, dir alle Werkzeuge zu geben, die du brauchst, um es so schnell wie möglich zu lernen. Zum Beispiel bringt dir Flexling neue Wörter in der Reihenfolge bei, in der sie am häufigsten vorkommen. So kannst du in mehr Kontexten schneller fließend sprechen, weil du die häufigsten Wörter zuerst lernst."
         ]
       },
       {
-        "question": "Welche Sprachen unterstützt Cacatua?",
+        "question": "Welche Sprachen unterstützt Flexling?",
         "answer": [
-          "Derzeit unterstützt Cacatua das Lernen von Spanisch, Französisch, Deutsch, Italienisch, Portugiesisch und Japanisch, wobei regelmäßig weitere Sprachen hinzugefügt werden.",
+          "Derzeit unterstützt Flexling das Lernen von Spanisch, Französisch, Deutsch, Italienisch, Portugiesisch und Japanisch, wobei regelmäßig weitere Sprachen hinzugefügt werden.",
           "Wird deine Sprache nicht unterstützt? Lass es uns wissen und wir werden versuchen, sie zu priorisieren."
         ]
       },
       {
-        "question": "Warum ist Cacatua ein Abonnement?",
+        "question": "Warum ist Flexling ein Abonnement?",
         "answer": [
           "Das Betreiben von KI-Modellen für Spracherzeugung und intelligentes Tutoring verursacht laufende Kosten. Du kannst es kostenlos ausprobieren und sehen, ob es für dich funktioniert.",
-          "Cacatua kann dir viel Zeit sparen, z.B. weil du unterwegs lernen kannst und es das Lernen neuer Sätze und Vokabeln viel einfacher macht."
+          "Flexling kann dir viel Zeit sparen, z.B. weil du unterwegs lernen kannst und es das Lernen neuer Sätze und Vokabeln viel einfacher macht."
         ]
       },
       {
@@ -216,9 +216,9 @@
         ]
       },
       {
-        "question": "Kann ich Cacatua als App herunterladen?",
+        "question": "Kann ich Flexling als App herunterladen?",
         "answer": [
-          "Du kannst Cacatua jetzt als Web-App installieren! Das gibt dir ein app-ähnliches Erlebnis und Zugriff über deinen Startbildschirm. Wir arbeiten auch an nativen iOS- und Android-Apps, die bald in den App-Stores verfügbar sein werden."
+          "Du kannst Flexling jetzt als Web-App installieren! Das gibt dir ein app-ähnliches Erlebnis und Zugriff über deinen Startbildschirm. Wir arbeiten auch an nativen iOS- und Android-Apps, die bald in den App-Stores verfügbar sein werden."
         ],
         "hasInstallButton": true
       }
@@ -226,7 +226,7 @@
     "contact": {
       "title": "Hast du noch Fragen?",
       "description": "Kontaktiere uns unter",
-      "email": "support@cacatua.app"
+      "email": "support@flexling.com"
     }
   },
   "newsletter": {

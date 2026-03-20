@@ -1,6 +1,6 @@
 {
   "HomePage": {
-    "title": "Sprachen meistern mit Cacatua",
+    "title": "Sprachen meistern mit Flexling",
     "subtitle": "Lerne Redewendungen, übe die Aussprache und werde fließend in jeder Sprache",
     "signIn": "Anmelden",
     "getStarted": "Jetzt starten",
@@ -332,7 +332,7 @@
     }
   },
   "Footer": {
-    "copyright": "© {year} Cacatua. Alle Rechte vorbehalten.",
+    "copyright": "© {year} Flexling. Alle Rechte vorbehalten.",
     "theme": "Design:",
     "language": "Sprache:",
     "madeInGermany": "Hergestellt in Deutschland",
@@ -449,8 +449,8 @@
     "descriptionCap": "Du kannst nur noch {balance, plural, one {# weiteren} other {# weitere}} {featureName} erstellen. Upgrade deinen Plan, um mehr zu erstellen.",
     "dismiss": "Nicht jetzt",
     "upgrade": "Upgrade auf {productName}",
-    "noUpgradeAvailable": "Du hast den Großteil deiner {featureName} aufgebraucht. Kontaktiere uns unter support@cacatua.app für zusätzliche Nutzung.",
-    "noUpgradeAvailableCap": "Du hast fast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@cacatua.app für zusätzliche Kapazität.",
+    "noUpgradeAvailable": "Du hast den Großteil deiner {featureName} aufgebraucht. Kontaktiere uns unter support@flexling.com für zusätzliche Nutzung.",
+    "noUpgradeAvailableCap": "Du hast fast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Kapazität.",
     "contactUs": "Kontakt"
   },
   "Paywall": {
@@ -461,9 +461,9 @@
     "notAvailableForAccount": "Diese Funktion ist in deinem aktuellen Plan nicht verfügbar.",
     "usageLimitReached": "Du hast alle deine {featureName} für diesen Zeitraum aufgebraucht.",
     "capReached": "Du hast die maximale Anzahl an {featureName} erreicht.",
-    "usageLimitNoProducts": "Du hast alle deine {featureName} aufgebraucht. Kontaktiere uns unter support@cacatua.app für zusätzliche Nutzung.",
-    "capReachedNoProducts": "Du hast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@cacatua.app für zusätzliche Kapazität.",
-    "notAvailableContactUs": "Diese Funktion ist in deinem aktuellen Plan nicht verfügbar. Kontaktiere uns unter support@cacatua.app, um sie zu aktivieren.",
+    "usageLimitNoProducts": "Du hast alle deine {featureName} aufgebraucht. Kontaktiere uns unter support@flexling.com für zusätzliche Nutzung.",
+    "capReachedNoProducts": "Du hast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Kapazität.",
+    "notAvailableContactUs": "Diese Funktion ist in deinem aktuellen Plan nicht verfügbar. Kontaktiere uns unter support@flexling.com, um sie zu aktivieren.",
     "startTrial": "Testversion für {productName} starten",
     "purchaseAddOn": "{productName} kaufen",
     "upgradeTo": "Upgrade auf {productName}",
@@ -474,7 +474,7 @@
     "usageLimitWithDetail": "Du hast alle deine {featureName} für diesen Zeitraum aufgebraucht. {detail}",
     "capReachedWithDetail": "Du hast die maximale Anzahl an {featureName} erreicht. {detail}",
     "featureFlagWithDetail": "{featureName} ist in deinem aktuellen Plan nicht verfügbar. {detail}",
-    "noUpgradeAvailable": "Du hast dein Limit für {featureName} erreicht. Kontaktiere uns unter support@cacatua.app für zusätzliche Nutzung.",
+    "noUpgradeAvailable": "Du hast dein Limit für {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Nutzung.",
     "contactUs": "Kontakt"
   },
   "Pricing": {
@@ -537,7 +537,7 @@
   },
   "Onboarding": {
     "welcome": {
-      "title": "Willkommen bei Cacatua!",
+      "title": "Willkommen bei Flexling!",
       "subtitle": "Lass uns deine Lernerfahrung in nur wenigen Schritten anpassen",
       "description": "Das dauert nur eine Minute, und du kannst diese Einstellungen jederzeit später ändern.",
       "feature1": {
@@ -675,12 +675,12 @@
   "Tutorial": {
     "home": {
       "welcome": {
-        "title": "Willkommen bei Cacatua!",
+        "title": "Willkommen bei Flexling!",
         "description": "Wir geben dir einen kurzen Überblick, damit du direkt loslegen kannst. Du kannst dies jederzeit schließen."
       },
       "learningModes": {
         "title": "Lernmodi",
-        "description": "Cacatua bietet 2 verschiedene Übungsmodi. Voll-Übung lässt dich Übersetzungen eintippen — ideal für konzentriertes Lernen. Audio-Übung spielt Sätze vor, damit du unterwegs lernen kannst."
+        "description": "Flexling bietet 2 verschiedene Übungsmodi. Voll-Übung lässt dich Übersetzungen eintippen — ideal für konzentriertes Lernen. Audio-Übung spielt Sätze vor, damit du unterwegs lernen kannst."
       },
       "difficultySelection": {
         "title": "Schwierigkeitsauswahl",

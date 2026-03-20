@@ -1,5 +1,5 @@
 /**
- * Text-to-Speech constants for the Cacatua app
+ * Text-to-Speech constants for the Flexling app
  */
 
 /** Maximum text length for TTS generation */

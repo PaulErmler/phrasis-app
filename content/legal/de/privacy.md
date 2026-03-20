@@ -19,7 +19,7 @@ Friedrich-Ebert-Straße 62
 
 Vertretungsberechtigte Personen: Paul Ermler
 
-E-Mail-Adresse: [contact@cacatua.app](mailto:contact@cacatua.app)
+E-Mail-Adresse: [contact@flexling.com](mailto:contact@flexling.com)
 
 ## Übersicht der Verarbeitungen
 

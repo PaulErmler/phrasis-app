@@ -263,9 +263,9 @@ export default function MainLayout({
             <circle cx="56" cy="56" r="52" stroke="currentColor" strokeWidth="3" className="text-muted/40" />
             <path d="M56 4a52 52 0 0 1 52 52" stroke="currentColor" strokeWidth="3" strokeLinecap="round" className="text-muted-foreground" />
           </svg>
-          <img src="/icons/icon.svg" alt="Cacatua" width={72} height={72} />
+          <img src="/icons/icon.svg" alt="Flexling" width={72} height={72} />
         </div>
-        <p className="mt-5 text-lg font-semibold text-foreground">Cacatua</p>
+        <p className="mt-5 text-lg font-semibold text-foreground">Flexling</p>
       </div>
     }>
       <div className="h-screen flex flex-col overflow-hidden">

@@ -1,6 +1,6 @@
-# Cacatua App Summary
+# Flexling App Summary
 
-Cacatua is a language-learning web app (Next.js + Convex) that teaches vocabulary through spaced-repetition flashcards built from frequency-ranked sentence collections.
+Flexling is a language-learning web app (Next.js + Convex) that teaches vocabulary through spaced-repetition flashcards built from frequency-ranked sentence collections.
 
 ## Tech Stack
 

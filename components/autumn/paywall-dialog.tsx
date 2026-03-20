@@ -105,7 +105,7 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
               className="font-medium shadow transition min-w-20 gap-1.5"
               asChild
             >
-              <a href="mailto:support@cacatua.app">
+              <a href="mailto:support@flexling.com">
                 <Mail className="h-3.5 w-3.5" />
                 {t("contactUs")}
               </a>
