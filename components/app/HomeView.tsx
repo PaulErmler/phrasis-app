@@ -78,7 +78,10 @@ export function HomeView({
   );
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6">
+    <div
+      className="flex-1 overflow-y-auto px-4 py-6"
+      style={{ scrollbarGutter: 'stable' }}
+    >
       <div className="app-view">
         <ProgressStatsCard
           onStartReview={handleStartReview}

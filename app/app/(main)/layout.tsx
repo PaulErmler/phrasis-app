@@ -369,10 +369,6 @@ export default function MainLayout({
             />
           </div>
         )}
-
-        <div className="fixed inset-0 -z-10 overflow-hidden">
-          <div className="absolute -top-1/2 -right-1/2 w-[800px] h-[800px] rounded-full bg-muted/20 blur-3xl" />
-        </div>
       </div>
     </StableAuthenticated>
   );

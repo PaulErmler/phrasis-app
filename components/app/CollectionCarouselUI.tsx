@@ -10,7 +10,6 @@ import {
 import { CarouselDots } from '@/components/ui/carousel-dots';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
@@ -98,15 +97,16 @@ export function CollectionCarouselUI({
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div className="flex gap-4 overflow-hidden">
           {[1, 2].map((i) => (
-            <Skeleton
+            <div
               key={i}
-              className="h-48 min-w-[85%] sm:min-w-[48%] md:min-w-[32%] rounded-xl"
+              className="h-[170px] min-w-[85%] sm:min-w-[48%] md:min-w-[48%] lg:min-w-[45%] rounded-xl border"
             />
           ))}
         </div>
+        <div className="min-h-[18px] pt-1" />
       </div>
     );
   }
