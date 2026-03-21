@@ -1,75 +1,114 @@
-import { ChevronDown } from 'lucide-react';
-import { useTranslations } from 'next-intl';
+import { ChevronDown, Mail } from 'lucide-react';
+import { getTranslations } from 'next-intl/server';
+import { Button } from '@/components/ui/button';
 import { PWAInstallButton } from './pwa-install-button';
 
-export function FAQSection() {
-  const t = useTranslations('LandingPage.faq');
+interface FaqItemConfig {
+  answerCount: number;
+  hasInstallButton?: boolean;
+  emailAction?: 'requestFeature' | 'requestLanguage';
+}
 
-  // Get FAQs from translations
-  const answerCounts = [2, 1, 3, 2, 2, 2, 2, 1, 1];
-  const faqs = Array.from({ length: 9 }, (_, i) => {
-    const answerCount = answerCounts[i] ?? 1;
-    return {
-      question: t(`items.${i}.question`),
-      answer: Array.from({ length: answerCount }, (_, j) =>
-        t(`items.${i}.answer.${j}`),
-      ),
-      hasInstallButton: i === 8,
-    };
-  });
+const faqConfig: FaqItemConfig[] = [
+  { answerCount: 2 },
+  { answerCount: 5 },
+  { answerCount: 2, emailAction: 'requestFeature' },
+  { answerCount: 3 },
+  { answerCount: 2, emailAction: 'requestLanguage' },
+  { answerCount: 2 },
+  { answerCount: 1 },
+  { answerCount: 1 },
+  { answerCount: 1, hasInstallButton: true },
+];
+
+const TATOEBA_FAQ_INDEX = 7;
+
+const emailSubjects: Record<string, string> = {
+  requestFeature: 'Feature Request',
+  requestLanguage: 'Language Request',
+};
+
+export async function FAQSection() {
+  const t = await getTranslations('LandingPage.faq');
+
   return (
-    <section id="faq" className="relative py-20 md:py-24 px-4">
+    <section id="faq" className="relative py-16 sm:py-20 md:py-24 px-4">
       <div className="max-w-3xl mx-auto">
-        {/* Section header */}
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-6">
+        <div className="text-center mb-8 sm:mb-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4 sm:mb-6">
             {t('title')}{' '}
             <span className="gradient-text">{t('titleHighlight')}</span>
           </h2>
-          <p className="text-lg md:text-xl text-muted-foreground">
+          <p className="text-base sm:text-lg md:text-xl text-muted-foreground">
             {t('subtitle')}
           </p>
         </div>
 
-        {/* FAQ Accordion using native details/summary */}
-        <div className="space-y-4">
-          {faqs.map((faq, index) => (
-            <details
-              key={index}
-              className="faq-details group border border-border/50 rounded-xl px-6 bg-card/50 backdrop-blur-sm open:bg-card"
-            >
-              <summary className="flex items-center justify-between cursor-pointer text-left text-base md:text-lg font-medium py-5 list-none [&::-webkit-details-marker]:hidden">
-                {faq.question}
-                <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0 ml-4 transition-transform duration-200 group-open:rotate-180" />
-              </summary>
-              <div className="text-muted-foreground pb-5 leading-relaxed">
-                <div className="space-y-3">
-                  {faq.answer.map((paragraph, pIndex) => (
-                    <p key={pIndex}>{paragraph}</p>
-                  ))}
-                </div>
-                {faq.hasInstallButton && (
-                  <div className="mt-4">
-                    <PWAInstallButton />
-                  </div>
-                )}
-              </div>
-            </details>
-          ))}
-        </div>
+        <div className="space-y-3 sm:space-y-4">
+          {faqConfig.map((config, index) => {
+            const answerParagraphs = Array.from({ length: config.answerCount }, (_, j) =>
+              t(`items.${index}.answer.${j}`),
+            );
 
-        {/* Still have questions */}
-        <div className="text-center mt-12 p-8 rounded-2xl bg-muted/50 border border-border/30">
-          <p className="text-lg font-medium mb-2">{t('contact.title')}</p>
-          <p className="text-muted-foreground">
-            {t('contact.description')}{' '}
-            <a
-              href={`mailto:${t('contact.email')}`}
-              className="text-primary hover:underline"
-            >
-              {t('contact.email')}
-            </a>
-          </p>
+            return (
+              <details
+                key={index}
+                className="faq-details group border border-border/50 rounded-xl px-4 sm:px-6 bg-card/50 backdrop-blur-sm open:bg-card"
+              >
+                <summary className="flex items-center justify-between cursor-pointer text-left text-sm sm:text-base md:text-lg font-medium py-4 sm:py-5 list-none [&::-webkit-details-marker]:hidden">
+                  {t(`items.${index}.question`)}
+                  <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0 ml-3 sm:ml-4 transition-transform duration-200 group-open:rotate-180" />
+                </summary>
+                <div className="text-muted-foreground pb-4 sm:pb-5 leading-relaxed text-sm sm:text-base">
+                  <div className="space-y-2.5 sm:space-y-3">
+                    {index === TATOEBA_FAQ_INDEX && (
+                      <p>
+                        {t(`items.${index}.tatoebaPrefix`)}
+                        <a
+                          href="http://tatoeba.org/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline font-medium"
+                        >
+                          Tatoeba
+                        </a>
+                        {t(`items.${index}.tatoebaMid`)}
+                        <a
+                          href="http://creativecommons.org/licenses/by/2.0/fr/"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline font-medium"
+                        >
+                          CC-BY License
+                        </a>
+                        {t(`items.${index}.tatoebaSuffix`)}
+                      </p>
+                    )}
+                    {answerParagraphs.map((paragraph, pIndex) => (
+                      <p key={pIndex}>{paragraph}</p>
+                    ))}
+                  </div>
+                  {config.emailAction && (
+                    <div className="mt-4">
+                      <Button asChild variant="outline" size="sm" className="gap-2">
+                        <a
+                          href={`mailto:support@flexling.com?subject=${encodeURIComponent(emailSubjects[config.emailAction] ?? '')}`}
+                        >
+                          <Mail className="w-4 h-4" />
+                          {t(config.emailAction)}
+                        </a>
+                      </Button>
+                    </div>
+                  )}
+                  {config.hasInstallButton && (
+                    <div className="mt-4">
+                      <PWAInstallButton />
+                    </div>
+                  )}
+                </div>
+              </details>
+            );
+          })}
         </div>
       </div>
     </section>

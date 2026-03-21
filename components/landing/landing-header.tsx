@@ -8,6 +8,7 @@ import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { openPwaInstallDialog } from './open-pwa-install-dialog';
 
 interface LandingHeaderProps {
   isAuthenticated: boolean;
@@ -30,15 +31,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
   }, []);
 
   const handleInstallClick = () => {
-    const pwaInstallElement = document.querySelector('pwa-install') as
-      | (HTMLElement & {
-          showDialog: () => void;
-        })
-      | null;
-
-    if (pwaInstallElement) {
-      pwaInstallElement.showDialog();
-    }
+    openPwaInstallDialog();
     setMobileMenuOpen(false);
   };
 
@@ -65,7 +58,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                 height={40}
               />
               <span className="text-xl md:text-2xl font-bold hidden sm:inline text-primary">
-                Flexling<sup className="text-muted-sm">alpha</sup>
+                Flexling
               </span>
             </Link>
 

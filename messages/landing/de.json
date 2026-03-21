@@ -14,30 +14,31 @@
     "theme": "Design"
   },
   "hero": {
-    "tagline": "Meistere Sprachen ganz nebenbei",
-    "subtitle": "Audio-Lernkarten, die sich deinem Niveau anpassen. KI, die deine Fragen sofort beantwortet. Spaced Repetition, die dich bis zu 10x mehr behalten lässt. Alles während du pendelst, trainierst oder kochst.",
+    "tagline": "Die Sprach-App, die mit dir wächst",
+    "subtitle": "Mehrsprachige (Audio-)Lernkarten mit Spaced Repetition und KI, damit du so effizient wie möglich lernen kannst. Minimalistisch und ablenkungsfrei. Bringe deine eigenen Inhalte mit, wenn du möchtest.",
     "cta": {
       "start": "Kostenlos starten",
       "howItWorks": "So funktioniert's",
-      "goToApp": "Zur App"
+      "goToApp": "Zur App",
+      "install": "App installieren"
     }
   },
   "features": {
     "title": "Alles was du brauchst, um",
     "titleHighlight": "schneller zu lernen",
-    "subtitle": "Flexling kombiniert audio-basiertes Lernen, KI-Tutoring und Gedächtnisforschung, damit du dich aufs Lernen konzentrieren kannst.",
+    "subtitle": "Flexling kombiniert das Beste aus audio-basiertem Lernen, KI-Tutoring und Gedächtnisforschung zu einem nahtlosen Erlebnis, das sich deinem vollen Alltag anpasst.",
     "items": {
       "audioBased": {
         "title": "Audio-basiert",
         "description": "Lerne während du pendelst, trainierst oder kochst. Kein Bildschirm nötig — einfach zuhören, wiederholen und lernen."
       },
       "selfDriven": {
-        "title": "Selbstbestimmt",
-        "description": "Füge eigene Phrasen aus Bildern oder Dateien hinzu. Bitte Flexling, Sätze für dich zu erstellen. Oder nutze unsere vorgefertigten Sätze, die auf dein Niveau zugeschnitten werden."
+        "title": "Selbstbestimmt und flexibel",
+        "description": "Füge deine eigenen Sätze hinzu oder bitte die KI, sie für dich zu erstellen. Oder nicht. Es gibt auch smarte Voreinstellungen."
       },
       "instantFeedback": {
         "title": "Sofortiges Feedback",
-        "description": "Stelle jederzeit Fragen zu Vokabeln oder Grammatik. Unser KI-Tutor erklärt Nuancen, Alternativen und Verwendung und erstellt Lernkarten und Notizen für dich."
+        "description": "Stelle jederzeit Fragen zu Vokabeln oder Grammatik. Unser KI-Tutor erklärt Nuancen, Alternativen und Verwendung. Und für jede Frage, die du stellst, werden automatisch Lernkarten erstellt, damit du dir die Antwort merkst."
       },
       "allInOne": {
         "title": "Alles-in-Einem",
@@ -54,7 +55,7 @@
     }
   },
   "pricing": {
-    "title": "Einfache, transparente",
+    "title": "Flexible",
     "titleHighlight": "Preise",
     "comparison": {
       "comparedWith": "Im Vergleich zu:",
@@ -78,36 +79,36 @@
         "cta": "Jetzt starten",
         "features": {
           "sentences": "150 Sätze pro Monat",
-          "customSentences": "10 eigene Lernkarten pro Monat",
+          "customSentences": "10 eigene Sätze pro Monat",
           "courses": "1 Kurs",
           "chatMessages": "5 Chat-Nachrichten pro Monat"
         }
       },
       "basic": {
         "name": "Basic",
-        "description": "Für engagierte Lernende",
+        "description": "Alles was du brauchst, um eine Sprache zu lernen.",
         "price": "8€",
         "period": "pro Monat",
-        "cta": "Kostenlos testen",
+        "cta": "Jetzt starten",
         "features": {
-          "sentences": "300 Sätze pro Monat",
-          "customSentences": "50 eigene Lernkarten pro Monat",
-          "courses": "Bis zu 2 Kurse",
-          "chatMessages": "40 Chat-Nachrichten pro Monat"
+          "sentences": "400 Sätze pro Monat",
+          "customSentences": "200 eigene Sätze pro Monat",
+          "courses": "1 Kurs",
+          "chatMessages": "50 Chat-Nachrichten pro Monat"
         }
       },
       "pro": {
         "name": "Pro",
-        "description": "Maximale Lernpower",
-        "price": "18€",
+        "description": "Für maximale Flexibilität und Polyglotte.",
+        "price": "16€",
         "period": "pro Monat",
-        "cta": "Kostenlos testen",
+        "cta": "Jetzt starten",
         "features": {
           "sentences": "1000 Sätze pro Monat",
-          "customSentences": "200 eigene Lernkarten pro Monat",
-          "courses": "Bis zu 5 Kurse",
-          "chatMessages": "100 Chat-Nachrichten pro Monat",
-          "multipleLanguages": "Mehrere Sprachen pro Kurs"
+          "customSentences": "500 eigene Sätze pro Monat",
+          "courses": "Bis zu 10 Kurse",
+          "chatMessages": "200 Chat-Nachrichten pro Monat",
+          "multipleLanguages": "Bis zu 5 Sprachen pro Kurs"
         }
       }
     }
@@ -149,12 +150,16 @@
     ]
   },
   "donation": {
-    "title": "Lerne, das",
-    "titleHighlight": "Gutes tut",
+    "title": "Support &",
+    "titleHighlight": "Gutes tun",
     "description": "Wenn du Flexling abonnierst, investierst du nicht nur in dich selbst. Wir spenden",
     "percentage": "10% unserer Einnahmen",
     "description2": "an hochwirksame Wohltätigkeitsorganisationen, kuriert von",
-    "givewellLink": "GiveWell"
+    "givewellLink": "GiveWell",
+    "supportTitle": "Brauchst du Hilfe?",
+    "supportDescription": "Hast du Fragen, Feedback oder brauchst Unterstützung? Wir freuen uns von dir zu hören.",
+    "emailButton": "Support kontaktieren",
+    "email": "support@flexling.com"
   },
   "faq": {
     "title": "Häufig gestellte",
@@ -164,28 +169,24 @@
       {
         "question": "Was ist Flexling?",
         "answer": [
-          "Flexling ist eine audio-basierte Sprachlern-App. Anders als traditionelle Apps kannst du freihändig lernen, während du pendelst, trainierst oder kochst. Die App liest Sätze in einer Sprache vor und du hast dann etwas Zeit, um die Übersetzung zu finden, bevor die App dir die richtige Antwort sagt und zum nächsten Satz übergeht.",
-          "Wenn du etwas nicht verstehst, kannst du einen Chatbot bitten, es dir zu erklären. Dieser kann auch neue Lernkarten für dich erstellen."
-        ]
-      },
-      {
-        "question": "Ist Flexling kostenlos?",
-        "answer": [
-          "Flexling bietet eine kostenlose Version, damit du es ausprobieren kannst. Leider können wir es nicht komplett kostenlos anbieten, da wir unsere laufenden Kosten decken müssen. Wenn du höhere Limits benötigst, kannst du auf unsere Basic- oder Pro-Pläne upgraden."
+          "Flexling ist eine Sprachlern-App, die sich deinen Bedürfnissen anpasst. Anders als viele traditionelle Apps kannst du mit dem Audio-Modus freihändig lernen — beim Pendeln, beim Sport oder im Haushalt.",
+          "Du kannst außerdem eigene Inhalte hinzufügen."
         ]
       },
       {
         "question": "Wie funktioniert Flexling?",
         "answer": [
-          "Flexling verwendet Audio-Lernkarten, die Phrasen in deiner Zielsprache abspielen, gefolgt von der Übersetzung. Du kannst bewerten, wie gut du jede Phrase kanntest, und unser Spaced-Repetition-Algorithmus zeigt dir die Karte wieder, wenn du sie wahrscheinlich gerade vergessen wirst.",
-          "Wenn du eine Phrase nicht verstehst, kannst du dem KI-Tutor jederzeit Fragen stellen — wie 'Wie kann ich das höflicher sagen?' oder 'Gib mir 3 weitere Beispiele mit diesem Verb in einer anderen Zeitform.' Wir generieren natürlich klingendes Audio mit modernster Text-zu-Sprache-Technologie.",
-          "Hinweis: Die Stimmen werden per KI generiert."
+          "Flexling hat zwei Lernmodi: einen Audio-Modus und einen vollständigen Wiederholungsmodus.",
+          "Im Audio-Modus werden Lernkarten automatisch abgespielt: Zuerst hörst du einen Satz in einer Sprache, die du schon gut verstehst, dann hast du Zeit, dir die Übersetzung zu überlegen, danach spielt die App den Satz in der Sprache ab, die du lernen möchtest.",
+          "Im Wiederholungsmodus übst du, Übersetzungen einzutippen, und bekommst sofort Feedback zu deiner Rechtschreibung.",
+          "Das Besondere an Flexling: Wenn du einen Satz nicht verstehst oder eine Frage hast, kannst du die KI fragen — etwa „Wie kann ich das höflicher sagen?“ oder „Gib mir drei weitere Beispiele mit diesem Verb in einer anderen Zeitform.“ — und sie erstellt automatisch neue Lernkarten mit Audio für dich.",
+          "Hinweis: Wir erzeugen natürlich klingendes Audio mit modernster Text-zu-Sprache-Technologie."
         ]
       },
       {
-        "question": "Kann ich meine eigenen Phrasen hinzufügen?",
+        "question": "Kann ich eigene Sätze hinzufügen?",
         "answer": [
-          "Absolut! Du kannst entweder Bilder, PDF-, CSV- oder Textdateien hochladen und Flexling erstellt automatisch Lernkarten für dich. Du kannst auch deine eigenen Lernkarten manuell hinzufügen.",
+          "Absolut! Flexling erstellt automatisch Lernkarten, die du über den Chat anforderst. Weitere Methoden zum Hinzufügen von Karten sind in Arbeit.",
           "Fehlt uns eine Methode, die du verwenden möchtest? Lass es uns wissen und wir versuchen, sie hinzuzufügen."
         ]
       },
@@ -193,13 +194,14 @@
         "question": "Wie lange dauert es, bis ich fließend spreche?",
         "answer": [
           "Fließend sprechen zu können, hängt von vielen Faktoren ab: der Sprache, deiner Muttersprache, der täglichen Übungszeit und den Lernmethoden.",
-          "Das Ziel von Flexling ist es, dir alle Werkzeuge zu geben, die du brauchst, um es so schnell wie möglich zu lernen. Zum Beispiel bringt dir Flexling neue Wörter in der Reihenfolge bei, in der sie am häufigsten vorkommen. So kannst du in mehr Kontexten schneller fließend sprechen, weil du die häufigsten Wörter zuerst lernst."
+          "Das Ziel von Flexling ist es, dir alle Werkzeuge zu geben, die du brauchst, um es so schnell wie möglich zu lernen. Zum Beispiel bringt dir Flexling neue Wörter in der Reihenfolge bei, in der sie am häufigsten vorkommen. So kannst du in mehr Kontexten schneller fließend sprechen, weil du die häufigsten Wörter zuerst lernst.",
+          "Flexling ist jedoch kein vollständiger Sprachkurs, sondern vielmehr die effizienteste Ergänzung zu einem. Wenn du die grundlegende Grammatik bereits kennst oder gerade einen Kurs machst, ist Flexling wahrscheinlich die richtige App für dich."
         ]
       },
       {
         "question": "Welche Sprachen unterstützt Flexling?",
         "answer": [
-          "Derzeit unterstützt Flexling das Lernen von Spanisch, Französisch, Deutsch, Italienisch, Portugiesisch und Japanisch, wobei regelmäßig weitere Sprachen hinzugefügt werden.",
+          "In Flexling kannst du Englisch, Spanisch, Französisch, Deutsch, Italienisch, Portugiesisch (Brasilien), Russisch, Hindi, Chinesisch (vereinfacht), Japanisch, Schwedisch und Niederländisch lernen; weitere Sprachen kommen regelmäßig dazu.",
           "Wird deine Sprache nicht unterstützt? Lass es uns wissen und wir werden versuchen, sie zu priorisieren."
         ]
       },
@@ -207,14 +209,23 @@
         "question": "Warum ist Flexling ein Abonnement?",
         "answer": [
           "Das Betreiben von KI-Modellen für Spracherzeugung und intelligentes Tutoring verursacht laufende Kosten. Du kannst es kostenlos ausprobieren und sehen, ob es für dich funktioniert.",
-          "Flexling kann dir viel Zeit sparen, z.B. weil du unterwegs lernen kannst und es das Lernen neuer Sätze und Vokabeln viel einfacher macht."
+          "Nutzer berichten, dass es ihnen viel Zeit spart, weil sie nicht mehr Dinge lernen müssen, die sie nicht wichtig finden, Flexling das Erstellen von Lernkarten viel einfacher macht und weil sie unterwegs lernen können."
+        ]
+      },
+      {
+        "question": "Ist Flexling kostenlos?",
+        "answer": [
+          "Flexling bietet eine kostenlose Stufe, damit du es ausprobieren kannst. Leider können wir es nicht komplett kostenlos anbieten, da wir unsere laufenden Kosten decken müssen. Wenn du höhere Limits benötigst, kannst du auf unsere Basic- oder Pro-Pläne upgraden."
         ]
       },
       {
         "question": "Woher stammen eure Sätze?",
         "answer": [
-          "Viele unserer Sätze stammen aus dem umfangreichen Datensatz von Tatoeba, veröffentlicht unter einer CC-BY-Lizenz. Einige der Sätze wurden von uns erstellt."
-        ]
+          "Einige der Sätze wurden von uns erstellt."
+        ],
+        "tatoebaPrefix": "Viele unserer Sätze stammen aus dem umfangreichen Datensatz von ",
+        "tatoebaMid": ", veröffentlicht unter einer ",
+        "tatoebaSuffix": "."
       },
       {
         "question": "Kann ich Flexling als App herunterladen?",
@@ -228,7 +239,15 @@
       "title": "Hast du noch Fragen?",
       "description": "Kontaktiere uns unter",
       "email": "support@flexling.com"
-    }
+    },
+    "requestFeature": "Feature anfragen",
+    "requestLanguage": "Sprache anfragen"
+  },
+  "installCta": {
+    "title": "Lerne auf deine Art",
+    "subtitle": "Installiere Flexling auf deinem Gerät für schnellen Zugriff jederzeit. Lerne beim Pendeln, in der Mittagspause oder vor dem Schlafen.",
+    "button": "Flexling installieren",
+    "note": "Funktioniert auf iOS, Android und Desktop"
   },
   "newsletter": {
     "title": "Erhalte Sprachtipps & Updates",

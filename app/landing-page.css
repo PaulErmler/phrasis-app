@@ -173,6 +173,64 @@
     );
 }
 
+/* ── Section-level gradients for flowing backgrounds ── */
+
+/* Pricing section — centered blue glow */
+.pricing-gradient {
+  background:
+    radial-gradient(
+      ellipse 60% 50% at 50% 30%,
+      oklch(0.7162 0.119 217.31 / 0.06),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 40% 40% at 20% 70%,
+      oklch(0.8 0.119 217.31 / 0.04),
+      transparent
+    );
+}
+.dark .pricing-gradient {
+  background:
+    radial-gradient(
+      ellipse 60% 50% at 50% 30%,
+      oklch(0.7162 0.119 217.31 / 0.1),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 40% 40% at 20% 70%,
+      oklch(0.8 0.119 217.31 / 0.07),
+      transparent
+    );
+}
+
+/* Install CTA section — blue bottom-center */
+.install-cta-gradient {
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 50% 80%,
+      oklch(0.7162 0.119 217.31 / 0.08),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 40% 30% at 30% 30%,
+      oklch(0.8179 0.1705 77.95 / 0.04),
+      transparent
+    );
+}
+.dark .install-cta-gradient {
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 50% 80%,
+      oklch(0.7162 0.119 217.31 / 0.15),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 40% 30% at 30% 30%,
+      oklch(0.8179 0.1705 77.95 / 0.06),
+      transparent
+    );
+}
+
 /* Noise texture overlay */
 .noise-bg::before {
   content: '';
@@ -195,29 +253,28 @@
   transform: translateY(-8px);
 }
 
-/* Feature card */
+/* ── Feature card — scroll-triggered mobile animation ── */
+
 .feature-card {
   transition: all 0.3s ease;
 }
 
-.feature-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 40px -12px oklch(0 0 0 / 0.15);
+/* Desktop: simple hover lift */
+@media (min-width: 768px) {
+  .feature-card {
+    opacity: 1;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px -12px oklch(0 0 0 / 0.15);
+  }
+
+  .dark .feature-card:hover {
+    box-shadow: 0 20px 40px -12px oklch(0 0 0 / 0.4);
+  }
 }
 
-.dark .feature-card:hover {
-  box-shadow: 0 20px 40px -12px oklch(0 0 0 / 0.4);
-}
-
-/* Pricing carousel - hide scrollbar but keep functionality */
-.pricing-carousel {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
-}
-
-.pricing-carousel::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
-}
 
 /* FAQ details/summary styling */
 .faq-details summary::-webkit-details-marker {

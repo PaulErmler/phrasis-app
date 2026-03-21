@@ -14,30 +14,31 @@
     "theme": "Theme"
   },
   "hero": {
-    "tagline": "Master Languages While Living Your Life",
-    "subtitle": "Audio flashcards that adapt to your level, AI that answers your questions instantly, and spaced repetition that makes you remember up to 10x more — all while you commute, exercise, or cook.",
+    "tagline": "The language app that grows with you",
+    "subtitle": "Multilingual (audio) flashcards with spaced repetition and AI to allow you to learn as efficiently as possible. Minimalist and distraction free. Bring your own content if you want.",
     "cta": {
       "start": "Start Learning Free",
       "howItWorks": "See How It Works",
-      "goToApp": "Go to App"
+      "goToApp": "Go to App",
+      "install": "Install App"
     }
   },
   "features": {
     "title": "Everything You Need to",
     "titleHighlight": "Learn Faster",
-    "subtitle": "Flexling combines the best of audio learning, AI tutoring, and memory science into one seamless experience that fits your busy life.",
+    "subtitle": "Flexling combines the best of audio learning, AI tutoring, and memory science into one seamless experience that adapts to your busy life.",
     "items": {
       "audioBased": {
         "title": "Audio Based",
         "description": "Learn while commuting, exercising, or cooking. No screen required — just listen, repeat, and absorb."
       },
       "selfDriven": {
-        "title": "Self Driven",
-        "description": "Add your own phrases from images or files. Ask Flexling to create sentences for you. Or use our smart defaults tailored to your level."
+        "title": "Self Driven and Flexible",
+        "description": "Add your own sentences or ask AI to create them for you if you want. Or don't. There are smart defaults too."
       },
       "instantFeedback": {
         "title": "Instant Feedback",
-        "description": "Ask any vocabulary or grammar question anytime. Our AI tutor explains nuances, alternatives, and usage and creates flashcards and notes for you."
+        "description": "Ask any vocabulary or grammar question anytime. Our AI tutor explains nuances, alternatives and usage. And for any question you ask more flashcards are automatically created for you to remember."
       },
       "allInOne": {
         "title": "All-in-One",
@@ -54,7 +55,7 @@
     }
   },
   "pricing": {
-    "title": "Simple, Transparent",
+    "title": "Flexible",
     "titleHighlight": "Pricing",
     "comparison": {
       "comparedWith": "Compared with:",
@@ -78,36 +79,36 @@
         "cta": "Get Started",
         "features": {
           "sentences": "150 sentences per month",
-          "customSentences": "10 custom flashcards per month",
+          "customSentences": "10 custom sentences per month",
           "courses": "1 course",
           "chatMessages": "5 chat messages per month"
         }
       },
       "basic": {
         "name": "Basic",
-        "description": "For dedicated learners",
+        "description": "Everything you need to learn one language.",
         "price": "€8",
         "period": "per month",
-        "cta": "Start Free Trial",
+        "cta": "Get Started",
         "features": {
-          "sentences": "300 sentences per month",
-          "customSentences": "50 custom flashcards per month",
-          "courses": "Up to 2 courses",
-          "chatMessages": "40 chat messages per month"
+          "sentences": "400 sentences per month",
+          "customSentences": "200 custom sentences per month",
+          "courses": "1 course",
+          "chatMessages": "50 chat messages per month"
         }
       },
       "pro": {
         "name": "Pro",
-        "description": "Maximum learning power",
-        "price": "€18",
+        "description": "For maximum flexibility and polyglots.",
+        "price": "€16",
         "period": "per month",
-        "cta": "Start Free Trial",
+        "cta": "Get Started",
         "features": {
           "sentences": "1000 sentences per month",
-          "customSentences": "200 custom flashcards per month",
-          "courses": "Up to 5 courses",
-          "chatMessages": "100 chat messages per month",
-          "multipleLanguages": "Multiple languages per course"
+          "customSentences": "500 custom sentences per month",
+          "courses": "Up to 10 courses",
+          "chatMessages": "200 chat messages per month",
+          "multipleLanguages": "Up to 5 languages per course"
         }
       }
     }
@@ -149,12 +150,16 @@
     ]
   },
   "donation": {
-    "title": "Learning that",
-    "titleHighlight": "Gives Back",
+    "title": "Support &",
+    "titleHighlight": "Giving Back",
     "description": "When you subscribe to Flexling, you're not just investing in yourself. We donate",
     "percentage": "10% of our earnings",
     "description2": "to highly effective charities recommended by",
-    "givewellLink": "GiveWell"
+    "givewellLink": "GiveWell",
+    "supportTitle": "Need Help?",
+    "supportDescription": "Have questions, feedback, or need assistance? We'd love to hear from you.",
+    "emailButton": "Contact Support",
+    "email": "support@flexling.com"
   },
   "faq": {
     "title": "Frequently Asked",
@@ -164,28 +169,24 @@
       {
         "question": "What is Flexling?",
         "answer": [
-          "Flexling is an audio-first language learning app. Unlike traditional apps, you can learn hands-free while commuting, exercising, or doing chores. It reads out sentences in one language and then you have some time to come up with the translation before the app tells you the correct answer and moves on to the next sentence.",
-          "If you don't understand something, you can ask a state of the art language model to explain it to you. You can also let it create new flashcards for you."
-        ]
-      },
-      {
-        "question": "Is Flexling free?",
-        "answer": [
-          "Flexling offers a free tier such that you can try it. Unfortunately, we cannot offer it completely free as we have to cover our running costs. If you need higher limits you can upgrade to our Basic or Pro plans."
+          "Flexling is a language learning app that adapts to your needs. Unlike traditional apps, you can learn hands-free while commuting, exercising, or doing chores using the audio mode.",
+          "It also allows you to add your own content."
         ]
       },
       {
         "question": "How does Flexling work?",
         "answer": [
-          "Flexling uses audio flashcards that play phrases in your target language, followed by the translation. You can rate how well you knew each phrase, and our spaced repetition algorithm shows the card again when you are likely about to forget it.",
-          "If you dont understand a phrase you can ask the AI tutor questions anytime — like 'How can I say this more politely?' or 'Give me 3 more examples with this verb in a different tense.' We generate natural-sounding audio using state of the art text-to-speech technology.",
-          "Note: The voices you hear are AI-generated."
+          "Flexling has two learning modes: an audio mode and a full review mode.",
+          "In audio mode, flashcards play automatically: first a sentence in a language you already know, then you get time to think of the translation, then the app plays the sentence in the language you're learning.",
+          "In full review mode, you practice typing your translations and get instant feedback on spelling.",
+          "What makes Flexling special is that if you don't understand a sentence or have any question, you can ask the AI — like \"How can I say this more politely?\" or \"Give me 3 more examples with this verb in a different tense.\" — and it automatically creates new flashcards with audio for you.",
+          "Note: We generate natural-sounding audio using state of the art text-to-speech technology."
         ]
       },
       {
-        "question": "Can I add my own phrases?",
+        "question": "Can I add my own sentences?",
         "answer": [
-          "Absolutely! You can either upload images, PDF, CSV or text files and Flexling will automatically create flashcards for you. You can also add your own flashcards manually.",
+          "Absolutely! Flexling will automatically create flashcards you ask for through the chat. More methods to add cards are on their way.",
           "Are we missing a method that you would like to use? Let us know and we will try to add it."
         ]
       },
@@ -193,28 +194,38 @@
         "question": "How long does it take to get fluent?",
         "answer": [
           "Fluency depends on many factors: the language, your native language, daily practice time, and learning methods.",
-          "The goal of Flexling is to give you all the tools you need to learn it as fast as possible. For instance Flexling teaches you new words in the order they appear most commonly. This way you can become fluent faster in more contexts because you learn the most frequent words first."
+          "The goal of Flexling is to give you all the tools you need to learn it as fast as possible. For instance Flexling teaches you new words in the order they appear most commonly. This way you can become fluent faster in more contexts because you learn the most frequent words first.",
+          "However, Flexling is not a full language course but rather the most efficient companion to one. If you already know the basic grammar or are currently doing a course, Flexling is likely the right app for you."
         ]
       },
       {
         "question": "What languages does Flexling support?",
         "answer": [
-          "Currently, Flexling supports learning Spanish, French, German, Italian, Portuguese, and Japanese, with more languages being added regularly.",
-          "Is your langauge not supported? Let us know and we will try to prioritize it."
+          "You can learn English, Spanish, French, German, Italian, Portuguese (Brazil), Russian, Hindi, Chinese (Simplified), Japanese, Swedish, and Dutch in Flexling, with more languages being added regularly.",
+          "Is your language not supported? Let us know and we will try to prioritize it."
         ]
       },
       {
         "question": "Why is Flexling a subscription?",
         "answer": [
           "Running AI models for voice generation and intelligent tutoring has ongoing costs. You can try it for free and see if it works for you.",
-          "Flexling can save you a lot of time e.g. because you can learn while on the go and it makes learning new sentences and vocabulary way easier."
+          "Users have reported that it saves them a lot of time because they no longer have to learn things they don't find important, Flexling makes creating flashcards way easier and because they can learn on the go."
+        ]
+      },
+      {
+        "question": "Is Flexling free?",
+        "answer": [
+          "Flexling offers a free tier so you can try it. Unfortunately, we cannot offer it completely free as we have to cover our running costs. If you need higher limits you can upgrade to our Basic or Pro plans."
         ]
       },
       {
         "question": "Where do your sentences come from?",
         "answer": [
-          "A lot of our sentences are from Tatoeba's massive dataset, released under a CC-BY License. Some of the sentences have been created by us."
-        ]
+          "Some of the sentences have been created by us."
+        ],
+        "tatoebaPrefix": "A lot of our sentences are from ",
+        "tatoebaMid": "'s massive dataset, released under a ",
+        "tatoebaSuffix": "."
       },
       {
         "question": "Can I download Flexling as an app?",
@@ -228,7 +239,15 @@
       "title": "Still have questions?",
       "description": "Reach out to us at",
       "email": "support@flexling.com"
-    }
+    },
+    "requestFeature": "Request a Feature",
+    "requestLanguage": "Request a Language"
+  },
+  "installCta": {
+    "title": "Start Learning Your Way",
+    "subtitle": "Install Flexling on your device for quick access anytime. Learn on your commute, during lunch, or before bed.",
+    "button": "Install Flexling",
+    "note": "Works on iOS, Android, and desktop"
   },
   "newsletter": {
     "title": "Get Language Tips & Updates",

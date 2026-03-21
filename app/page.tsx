@@ -7,6 +7,7 @@ import { PricingSection } from '@/components/landing/pricing-section';
 // import { NewsletterSection } from '@/components/landing/newsletter-section';
 import { FAQSection } from '@/components/landing/faq-section';
 import { DonationSection } from '@/components/landing/donation-section';
+import { InstallCtaSection } from '@/components/landing/install-cta-section';
 import { getToken } from '@/lib/auth-server';
 
 export default async function Home() {
@@ -24,6 +25,7 @@ export default async function Home() {
         <FAQSection />
         <DonationSection />
         {/* <NewsletterSection /> */}
+        <InstallCtaSection />
       </main>
       <Footer />
     </div>

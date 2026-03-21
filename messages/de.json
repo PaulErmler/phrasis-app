@@ -327,7 +327,7 @@
       "pauseBeforeAutoAdvance": "Vor dem Weitergehen",
       "repetitions": "Wiederholungen",
       "repetitionsDescription": "Wie oft jede Sprache pro Karte abgespielt wird",
-      "plays": "Plays",
+      "plays": "Wiedergaben",
       "pause": "Pause",
       "pauseBetweenRepetitions": "Pause zwischen Wiederholungen",
       "base": "Basis",
@@ -344,7 +344,7 @@
       "timesPlayed": "{count}x",
       "pauseBetweenPlays": "{seconds}s dazwischen",
       "reviewModeAudio": "Audio",
-      "reviewModeFull": "Vollständig",
+      "reviewModeFull": "Voll-Übung",
       "reviewModeAudioDescription": "Höre dir die Audio-Wiedergabe deiner Phrasen an. Kein Blick auf den Bildschirm nötig, Karten werden automatisch bewertet. Ideal zum Lernen unterwegs — beim Spazieren, Pendeln oder Entspannen.",
       "reviewModeFullDescription": "Tippe die Übersetzungen ein und sieh einen zeichengenauen Vergleich mit der richtigen Antwort. Ideal für aktives Üben — fördert Erinnerung und Rechtschreibung.",
       "fullReviewSettings": "Vollständige Wiederholung",
@@ -476,7 +476,7 @@
     "dismiss": "Nicht jetzt",
     "upgrade": "Upgrade auf {productName}",
     "noUpgradeAvailable": "Du hast den Großteil deiner {featureName} aufgebraucht. Kontaktiere uns unter support@flexling.com für zusätzliche Nutzung.",
-    "noUpgradeAvailableCap": "Du hast fast die maximale Anzahl {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Kapazität.",
+    "noUpgradeAvailableCap": "Du hast fast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Kapazität.",
     "contactUs": "Kontakt"
   },
   "Paywall": {
@@ -486,9 +486,9 @@
     "featureUnavailable": "Limit erreicht",
     "notAvailableForAccount": "Diese Funktion ist in deinem aktuellen Plan nicht verfügbar.",
     "usageLimitReached": "Du hast alle deine {featureName} für diesen Zeitraum aufgebraucht.",
-    "capReached": "Du hast die maximale Anzahl {featureName} erreicht.",
+    "capReached": "Du hast die maximale Anzahl an {featureName} erreicht.",
     "usageLimitNoProducts": "Du hast alle deine {featureName} aufgebraucht. Kontaktiere uns unter support@flexling.com für zusätzliche Nutzung.",
-    "capReachedNoProducts": "Du hast die maximale Anzahl {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Kapazität.",
+    "capReachedNoProducts": "Du hast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Kapazität.",
     "notAvailableContactUs": "Diese Funktion ist in deinem aktuellen Plan nicht verfügbar. Kontaktiere uns unter support@flexling.com, um sie zu aktivieren.",
     "startTrial": "Testversion für {productName} starten",
     "purchaseAddOn": "{productName} kaufen",
@@ -498,7 +498,7 @@
     "upgradeDetailUsageLimit": "Upgrade auf {productName} für mehr {featureName}.",
     "upgradeDetailCap": "Upgrade auf {productName}, um dein Limit für {featureName} zu erhöhen.",
     "usageLimitWithDetail": "Du hast alle deine {featureName} für diesen Zeitraum aufgebraucht. {detail}",
-    "capReachedWithDetail": "Du hast die maximale Anzahl {featureName} erreicht. {detail}",
+    "capReachedWithDetail": "Du hast die maximale Anzahl an {featureName} erreicht. {detail}",
     "featureFlagWithDetail": "Der Zugriff auf {featureName} ist in deinem aktuellen Plan nicht verfügbar. {detail}",
     "noUpgradeAvailable": "Du hast dein Limit für {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Nutzung.",
     "contactUs": "Kontakt"
@@ -531,7 +531,7 @@
     "price": "Preis",
     "subscription": "Abonnement",
     "totalDueToday": "Heute fällig",
-    "dueNextCycle": "Fällig nächster Zyklus ({date})",
+    "dueNextCycle": "Fällig beim nächsten Zyklus ({date})",
     "plusUsagePrices": "+ Nutzungspreise",
     "viewDetails": "Details anzeigen",
     "save": "Speichern",
@@ -586,12 +586,12 @@
         "description": "Ich halte es gerne einfach"
       },
       "focused": {
-        "title": "Fortgeschritten",
+        "title": "Fokussiert",
         "description": "Ich passe gerne einzelne Inhalte und Einstellungen auf mich an"
       },
       "advanced": {
         "title": "Experte",
-        "description": "Ich möchte meine Inhalte und Einstellung auf mich anpassen"
+        "description": "Ich möchte meine Inhalte und Einstellungen individuell anpassen"
       }
     },
     "baseLanguage": {
@@ -695,7 +695,7 @@
     "finished": {
       "title": "Du bist bereit!",
       "subtitle": "Deine personalisierte Lernerfahrung ist nun vorbereitet.",
-      "button": "Zur App"
+      "button": "Jetzt lernen"
     }
   },
   "Tutorial": {

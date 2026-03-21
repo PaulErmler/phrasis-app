@@ -6,3 +6,4 @@ export { NewsletterSection } from './newsletter-section';
 export { FAQSection } from './faq-section';
 export { DonationSection } from './donation-section';
 export { FloatingSpeechBubble } from './speech-bubble';
+export { InstallCtaSection } from './install-cta-section';

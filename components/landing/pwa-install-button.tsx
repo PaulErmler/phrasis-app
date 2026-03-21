@@ -2,33 +2,43 @@
 
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { openPwaInstallDialog } from './open-pwa-install-dialog';
+
+type ButtonProps = React.ComponentProps<typeof Button>;
 
 /**
- * Button that triggers the global PWA install dialog.
- * The actual pwa-install element is rendered in PWAInstallGlobal component at the root level.
+ * Client button that opens the global PWA install dialog (see PWAInstallGlobal).
  */
-export function PWAInstallButton() {
-  const handleInstallClick = () => {
-    const pwaInstallElement = document.querySelector('pwa-install') as
-      | (HTMLElement & {
-          showDialog: () => void;
-        })
-      | null;
-
-    if (pwaInstallElement) {
-      pwaInstallElement.showDialog();
-    }
-  };
-
+export function PwaInstallTrigger({
+  className,
+  onClick,
+  children,
+  ...props
+}: ButtonProps) {
   return (
     <Button
-      onClick={handleInstallClick}
-      variant="outline"
-      size="sm"
-      className="gap-2"
+      type="button"
+      className={cn(className)}
+      onClick={(e) => {
+        onClick?.(e);
+        openPwaInstallDialog();
+      }}
+      {...props}
     >
+      {children}
+    </Button>
+  );
+}
+
+/**
+ * FAQ-sized outline install control (label is not localized yet).
+ */
+export function PWAInstallButton() {
+  return (
+    <PwaInstallTrigger variant="outline" size="sm" className="gap-2">
       <Download className="w-4 h-4" />
       Install Flexling
-    </Button>
+    </PwaInstallTrigger>
   );
 }
