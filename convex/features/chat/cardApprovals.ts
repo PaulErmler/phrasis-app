@@ -229,7 +229,7 @@ export const getApprovalsByThread = query({
       .withIndex('by_thread_and_user', (q) =>
         q.eq('threadId', args.threadId).eq('userId', userId),
       )
-      .collect();
+      .take(500);
 
     return approvals.map((a) => ({
       _id: a._id,

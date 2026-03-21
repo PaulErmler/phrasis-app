@@ -3,6 +3,7 @@ import { mutation, query } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import { learningStyleValidator, currentLevelValidator, reviewModeValidator } from '../types';
+import { tutorialIdValidator } from './tutorialIds';
 import {
   getAuthUserId,
   requireAuthUserId,
@@ -729,7 +730,7 @@ export const getCompletedTutorials = query({
  */
 export const completeTutorial = mutation({
   args: {
-    tutorialId: v.string(),
+    tutorialId: tutorialIdValidator,
   },
   returns: v.null(),
   handler: async (ctx, args) => {

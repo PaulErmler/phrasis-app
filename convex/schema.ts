@@ -151,6 +151,9 @@ export default defineSchema({
       'dueDate',
     ])
     .index('by_deckId_and_lastReviewedAt', ['deckId', 'lastReviewedAt'])
+    .index('by_deckId_and_isHidden_and_lastReviewedAt', ['deckId', 'isHidden', 'lastReviewedAt'])
+    .index('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', ['deckId', 'isHidden', 'isMastered', 'lastReviewedAt'])
+    .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
     .searchIndex('search_text', {
       searchField: 'searchableText',
       filterFields: ['deckId', 'isHidden', 'isMastered', 'isFavorite'],

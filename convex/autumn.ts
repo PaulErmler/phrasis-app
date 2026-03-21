@@ -2,7 +2,11 @@ import { components } from "./_generated/api";
 import { Autumn } from "@useautumn/convex";
 
 export const autumn = new Autumn(components.autumn, {
-	secretKey: process.env.AUTUMN_SECRET_KEY!,
+	secretKey: (() => {
+		const key = process.env.AUTUMN_SECRET_KEY;
+		if (!key) throw new Error('Missing required Convex environment variable: AUTUMN_SECRET_KEY');
+		return key;
+	})(),
 	identify: async (ctx: any) => {
 		const user = await ctx.auth.getUserIdentity();
 		if (!user) return null

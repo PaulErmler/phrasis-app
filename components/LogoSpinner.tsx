@@ -1,5 +1,7 @@
+import Image from 'next/image';
+
 export function LogoSpinner() {
-  return <img src="/icons/icon.svg" alt="Flexling" width={72} height={72} />;
+  return <Image src="/icons/icon.svg" alt="Flexling" width={72} height={72} />;
 }
 
 export function AppLoadingSplash() {

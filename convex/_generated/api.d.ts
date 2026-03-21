@@ -32,6 +32,7 @@ import type * as features_library from "../features/library.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_translation from "../features/translation.js";
 import type * as features_tts from "../features/tts.js";
+import type * as features_tutorialIds from "../features/tutorialIds.js";
 import type * as http from "../http.js";
 import type * as lib_audio from "../lib/audio.js";
 import type * as lib_cardContent from "../lib/cardContent.js";
@@ -73,6 +74,7 @@ declare const fullApi: ApiFromModules<{
   "features/scheduling": typeof features_scheduling;
   "features/translation": typeof features_translation;
   "features/tts": typeof features_tts;
+  "features/tutorialIds": typeof features_tutorialIds;
   http: typeof http;
   "lib/audio": typeof lib_audio;
   "lib/cardContent": typeof lib_cardContent;

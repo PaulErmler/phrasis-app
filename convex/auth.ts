@@ -5,7 +5,8 @@ import { DataModel } from './_generated/dataModel';
 import { betterAuth } from 'better-auth';
 import authConfig from './auth.config';
 
-const siteUrl = process.env.SITE_URL!;
+const siteUrl = process.env.SITE_URL;
+if (!siteUrl) throw new Error('Missing required Convex environment variable: SITE_URL');
 
 // The component client has methods needed for integrating Convex with Better Auth,
 // as well as helper methods for general use.
