@@ -120,23 +120,27 @@ export const getCardForReview = query({
     // Load translations
     const translations = await Promise.all(
       allLanguages.map(async (lang) => {
-        let translatedText;
         if (lang === sourceLanguage) {
-          translatedText = text.text;
-        } else {
-          const translation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', card.textId).eq('targetLanguage', lang),
-            )
-            .first();
-          translatedText = translation?.translatedText || '';
+          return {
+            language: lang,
+            text: text.text,
+            isBaseLanguage: course.baseLanguages.includes(lang),
+            isTargetLanguage: course.targetLanguages.includes(lang),
+            romanization: text.romanizedText ?? undefined,
+          };
         }
+        const translation = await ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', card.textId).eq('targetLanguage', lang),
+          )
+          .first();
         return {
           language: lang,
-          text: translatedText,
+          text: translation?.translatedText || '',
           isBaseLanguage: course.baseLanguages.includes(lang),
           isTargetLanguage: course.targetLanguages.includes(lang),
+          romanization: translation?.romanizedText ?? undefined,
         };
       }),
     );

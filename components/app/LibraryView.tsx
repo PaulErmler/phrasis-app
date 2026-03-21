@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -37,6 +37,24 @@ export function LibraryView() {
   const masterCard = useMutation(api.features.scheduling.masterCard);
   const hideCard = useMutation(api.features.scheduling.hideCard);
   const toggleFavorite = useMutation(api.features.scheduling.toggleFavoriteCard);
+  const ensureCardContent = useMutation(api.features.decks.ensureCardContent);
+
+  const regeneratedCardsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!result) return;
+    const cardsWithMissingContent = result.filter(
+      (card) => card.hasMissingContent && !regeneratedCardsRef.current.has(card.textId),
+    );
+    const cardsToProcess = cardsWithMissingContent.slice(0, 5);
+    for (const card of cardsToProcess) {
+      regeneratedCardsRef.current.add(card.textId);
+      ensureCardContent({ textId: card.textId as Id<'texts'> }).catch((err) => {
+        console.error('Failed to ensure card content:', err);
+        regeneratedCardsRef.current.delete(card.textId);
+      });
+    }
+  }, [result, ensureCardContent]);
 
   const [pendingMaster, setPendingMaster] = useState<Set<string>>(new Set());
   const [pendingHide, setPendingHide] = useState<Set<string>>(new Set());

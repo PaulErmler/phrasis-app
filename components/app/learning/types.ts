@@ -15,6 +15,7 @@ export interface CardTranslation {
   text: string;
   isBaseLanguage: boolean;
   isTargetLanguage: boolean;
+  romanization?: string;
 }
 
 export interface CardAudioRecording {
@@ -43,6 +44,7 @@ export interface CourseSettings {
   showProgressBar?: boolean;
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
+  showRomanization?: boolean;
   // Instant proceed on rating
   instantProceedAudio?: boolean;
   instantProceedFull?: boolean;

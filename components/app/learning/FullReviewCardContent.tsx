@@ -42,6 +42,7 @@ interface FullReviewCardContentProps {
   allRevealed?: boolean;
   onAllSubmittedChange?: (allSubmitted: boolean) => void;
   bare?: boolean;
+  showRomanization?: boolean;
 }
 
 export function FullReviewCardContent({
@@ -62,6 +63,7 @@ export function FullReviewCardContent({
   allRevealed = false,
   onAllSubmittedChange,
   bare = false,
+  showRomanization = true,
 }: FullReviewCardContentProps) {
   const t = useTranslations('LearningMode');
   const locale = useLocale();
@@ -191,6 +193,7 @@ export function FullReviewCardContent({
         onFavorite={onFavorite}
         onAudioPlay={onAudioPlay}
         bare={bare}
+        showRomanization={showRomanization}
       >
         {({ targetTranslations: targets }) => (
           <div className="space-y-4">
@@ -222,6 +225,7 @@ export function FullReviewCardContent({
                   autoFocus={index === 0}
                   isFirstTarget={index === 0}
                   allRevealed={allRevealed}
+                  showRomanization={showRomanization}
                 />
               );
             })}
@@ -249,6 +253,7 @@ interface TargetLanguageInputProps {
   autoFocus?: boolean;
   isFirstTarget?: boolean;
   allRevealed?: boolean;
+  showRomanization?: boolean;
 }
 
 function TargetLanguageInput({
@@ -268,6 +273,7 @@ function TargetLanguageInput({
   autoFocus,
   isFirstTarget = false,
   allRevealed = false,
+  showRomanization = true,
 }: TargetLanguageInputProps) {
   const t = useTranslations('LearningMode');
   const [showClean, setShowClean] = useState(false);
@@ -374,6 +380,11 @@ function TargetLanguageInput({
             {translation.text || '...'}
           </p>
         )}
+        {showRomanization && translation.romanization && (
+          <p className="text-xs text-muted-foreground leading-tight">
+            {translation.romanization}
+          </p>
+        )}
       </div>
     );
   }
@@ -432,6 +443,11 @@ function TargetLanguageInput({
             </Tooltip>
           )}
         </div>
+        {showRomanization && translation.romanization && (
+          <p className="text-xs text-muted-foreground leading-tight">
+            {translation.romanization}
+          </p>
+        )}
       </div>
     );
   }

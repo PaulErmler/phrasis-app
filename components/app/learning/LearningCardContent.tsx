@@ -24,6 +24,7 @@ interface LearningCardContentProps {
   autoRevealLanguages?: boolean;
   revealedLanguages?: ReadonlySet<string>;
   bare?: boolean;
+  showRomanization?: boolean;
 }
 
 export function LearningCardContent({
@@ -44,6 +45,7 @@ export function LearningCardContent({
   autoRevealLanguages = false,
   revealedLanguages,
   bare = false,
+  showRomanization = true,
 }: LearningCardContentProps) {
   const displayReviewCount =
     schedulingPhase === 'review' && fsrsState != null
@@ -82,6 +84,7 @@ export function LearningCardContent({
         onFavorite={onFavorite}
         onAudioPlay={onAudioPlay}
         bare={bare}
+        showRomanization={showRomanization}
       >
         {({ targetTranslations }) => (
           <div className="space-y-2">
@@ -97,12 +100,23 @@ export function LearningCardContent({
                   className="flex items-start gap-2"
                   {...(index === 0 ? { 'data-tutorial': 'target-text-audio' } : {})}
                 >
-                  <p
-                    className={`flex-1 body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                  <div
+                    className="flex-1"
                     onClick={isBlurred ? () => handleReveal(translation.language) : undefined}
                   >
-                    {translation.text || '...'}
-                  </p>
+                    <p
+                      className={`body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                    >
+                      {translation.text || '...'}
+                    </p>
+                    {showRomanization && translation.romanization && (
+                      <p
+                        className={`text-xs text-muted-foreground leading-tight mt-0.5 ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                      >
+                        {translation.romanization}
+                      </p>
+                    )}
+                  </div>
                   <AudioButton
                     url={audio?.url ?? null}
                     language={translation.language.toUpperCase()}

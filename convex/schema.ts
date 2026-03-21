@@ -22,6 +22,7 @@ export default defineSchema({
     datasetSentenceId: v.optional(v.number()), // Unique ID from the dataset (optional for user-created)
     text: v.string(),
     language: v.string(), // e.g., "en" for English
+    romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
     userCreated: v.boolean(), // false for uploaded data, true for user-created
     userId: v.optional(v.string()), // User who created (for user-created texts)
     collectionId: v.optional(v.id('collections')), // Reference to collection
@@ -36,6 +37,7 @@ export default defineSchema({
     textId: v.id('texts'),
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
+    romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),
@@ -102,6 +104,7 @@ export default defineSchema({
     showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
     hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
     autoRevealLanguages: v.optional(v.boolean()), // unblur when audio starts playing
+    showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
     // Language order overrides
     baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
     targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages

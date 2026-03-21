@@ -141,14 +141,22 @@ export function DeckCardsView() {
                           {index + 1}.
                         </span>
                         <div className="flex-1">
-                          {/* Show base language text (what user knows) */}
                           <p className="font-medium text-sm leading-relaxed">
                             {baseTranslation?.text || card.sourceText}
                           </p>
-                          {/* Show target language text (what user is learning) */}
+                          {baseTranslation?.romanization && (
+                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                              {baseTranslation.romanization}
+                            </p>
+                          )}
                           {targetTranslation?.text && (
                             <p className="text-muted-sm mt-1 leading-relaxed">
                               {targetTranslation.text}
+                            </p>
+                          )}
+                          {targetTranslation?.romanization && (
+                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                              {targetTranslation.romanization}
                             </p>
                           )}
                         </div>
@@ -172,6 +180,11 @@ export function DeckCardsView() {
                         <p className="text-sm">
                           {baseTranslation?.text || card.sourceText}
                         </p>
+                        {baseTranslation?.romanization && (
+                          <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                            {baseTranslation.romanization}
+                          </p>
+                        )}
                         {!baseTranslation?.text &&
                           baseTranslation === undefined && (
                           <p className="text-muted-sm italic">
@@ -202,7 +215,14 @@ export function DeckCardsView() {
                           </span>
                         </div>
                         {targetTranslation?.text ? (
-                          <p className="text-sm">{targetTranslation.text}</p>
+                          <>
+                            <p className="text-sm">{targetTranslation.text}</p>
+                            {targetTranslation.romanization && (
+                              <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                                {targetTranslation.romanization}
+                              </p>
+                            )}
+                          </>
                         ) : (
                           <p className="text-muted-sm italic">Translating...</p>
                         )}

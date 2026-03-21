@@ -40,6 +40,7 @@ export const translationValidator = v.object({
   text: v.string(),
   isBaseLanguage: v.boolean(),
   isTargetLanguage: v.boolean(),
+  romanization: v.optional(v.string()),
 });
 
 export const audioRecordingValidator = v.object({

@@ -20,7 +20,8 @@ import {
   getCollectionProgress as getCollectionProgressHelper,
   getNextTextsFromRank,
 } from '../db/collections';
-import { translateText } from './translation';
+import { translateText, romanizeText } from './translation';
+import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
 import { synthesizeSpeech } from './tts';
 import { translationValidator, audioRecordingValidator } from '../types';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
@@ -107,6 +108,15 @@ export async function scheduleMissingContent(
   let translationsScheduled = 0;
   let audioScheduled = 0;
 
+  // Schedule romanization for source text if needed and missing
+  if (ROMANIZATION_LANGUAGES.has(sourceLanguage) && !text.romanizedText) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.decks.processRomanizationForSourceText,
+      { textId, text: text.text, language: sourceLanguage },
+    );
+  }
+
   // Schedule missing content for each required language
   for (const lang of allRequiredLanguages) {
     const hasAudio = audioMap.get(lang) != null;
@@ -131,7 +141,7 @@ export async function scheduleMissingContent(
       // Different language — need translation
       const translation = translationMap.get(lang);
       if (!translation) {
-        // Schedule translation (which also triggers TTS after completion)
+        // Schedule translation (which also triggers TTS and romanization after completion)
         await ctx.scheduler.runAfter(
           0,
           internal.features.decks.processTranslationForCard,
@@ -143,20 +153,29 @@ export async function scheduleMissingContent(
           },
         );
         translationsScheduled++;
-      } else if (!hasAudio) {
-        // Translation exists but TTS is missing
-        const voiceName = getRandomVoiceForLanguage(lang);
-        await ctx.scheduler.runAfter(
-          0,
-          internal.features.decks.processTTSForCard,
-          {
-            textId,
-            text: translation.translatedText,
-            language: lang,
-            voiceName,
-          },
-        );
-        audioScheduled++;
+      } else {
+        // Translation exists — backfill romanization if missing
+        if (ROMANIZATION_LANGUAGES.has(lang) && !translation.romanizedText) {
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.decks.processRomanizationForTranslation,
+            { textId, translatedText: translation.translatedText, language: lang },
+          );
+        }
+        if (!hasAudio) {
+          const voiceName = getRandomVoiceForLanguage(lang);
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.decks.processTTSForCard,
+            {
+              textId,
+              text: translation.translatedText,
+              language: lang,
+              voiceName,
+            },
+          );
+          audioScheduled++;
+        }
       }
     }
   }
@@ -222,6 +241,7 @@ export const getDeckCards = query({
           textId: card.textId,
           sourceText: text.text,
           sourceLanguage: text.language,
+          sourceRomanization: text.romanizedText ?? undefined,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -958,6 +978,15 @@ export const processTranslationForCard = internalAction({
       );
       const voiceName = getRandomVoiceForLanguage(args.targetLanguage);
 
+      let romanizedText: string | undefined;
+      if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
+        try {
+          romanizedText = await romanizeText(translation, args.targetLanguage);
+        } catch (err) {
+          console.error('Romanization error (non-fatal):', err);
+        }
+      }
+
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,
         {
@@ -965,6 +994,7 @@ export const processTranslationForCard = internalAction({
           targetLanguage: args.targetLanguage,
           translatedText: translation,
           voiceName,
+          romanizedText,
         },
       );
     } catch (err) {
@@ -984,6 +1014,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     targetLanguage: v.string(),
     translatedText: v.string(),
     voiceName: v.string(),
+    romanizedText: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -999,7 +1030,10 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         textId: args.textId,
         targetLanguage: args.targetLanguage,
         translatedText: args.translatedText,
+        ...(args.romanizedText ? { romanizedText: args.romanizedText } : {}),
       });
+    } else if (args.romanizedText && !existing.romanizedText) {
+      await ctx.db.patch(existing._id, { romanizedText: args.romanizedText });
     }
 
     const existingAudioForVoice = await ctx.db
@@ -1025,6 +1059,96 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       );
     }
 
+    return null;
+  },
+});
+
+/**
+ * Internal action to romanize a source text (in the texts table).
+ */
+export const processRomanizationForSourceText = internalAction({
+  args: {
+    textId: v.id('texts'),
+    text: v.string(),
+    language: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    try {
+      const romanized = await romanizeText(args.text, args.language);
+      await ctx.runMutation(
+        internal.features.decks.storeSourceRomanization,
+        { textId: args.textId, romanizedText: romanized },
+      );
+    } catch (err) {
+      console.error('Source romanization error:', err);
+    }
+    return null;
+  },
+});
+
+/**
+ * Internal mutation to store romanized text on a source text document.
+ */
+export const storeSourceRomanization = internalMutation({
+  args: {
+    textId: v.id('texts'),
+    romanizedText: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const text = await ctx.db.get(args.textId);
+    if (text && !text.romanizedText) {
+      await ctx.db.patch(args.textId, { romanizedText: args.romanizedText });
+    }
+    return null;
+  },
+});
+
+/**
+ * Internal action to romanize an existing translation (backfill).
+ */
+export const processRomanizationForTranslation = internalAction({
+  args: {
+    textId: v.id('texts'),
+    translatedText: v.string(),
+    language: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    try {
+      const romanized = await romanizeText(args.translatedText, args.language);
+      await ctx.runMutation(
+        internal.features.decks.storeTranslationRomanization,
+        { textId: args.textId, language: args.language, romanizedText: romanized },
+      );
+    } catch (err) {
+      console.error('Translation romanization error:', err);
+    }
+    return null;
+  },
+});
+
+/**
+ * Internal mutation to store romanized text on a translation document.
+ */
+export const storeTranslationRomanization = internalMutation({
+  args: {
+    textId: v.id('texts'),
+    language: v.string(),
+    romanizedText: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const translation = await ctx.db
+      .query('translations')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('targetLanguage', args.language),
+      )
+      .first();
+    if (translation && !translation.romanizedText) {
+      await ctx.db.patch(translation._id, { romanizedText: args.romanizedText });
+    }
     return null;
   },
 });

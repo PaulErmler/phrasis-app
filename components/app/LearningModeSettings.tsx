@@ -141,6 +141,13 @@ export function LearningModeSettings({
     });
   };
 
+  const handleShowRomanizationChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      showRomanization: checked,
+    });
+  };
+
   const handleRepetitionChange = async (language: string, value: number) => {
     if (value < 0 || value > 10) return;
     const current = courseSettings.languageRepetitions ?? {};
@@ -697,6 +704,22 @@ export function LearningModeSettings({
               )}
             </div>
           )}
+
+          {/* Show romanization */}
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-0.5">
+              <Label htmlFor="showRomanization" className="text-sm font-medium">
+                {t('showRomanization')}
+              </Label>
+              <p className="text-muted-xs">{t('showRomanizationDescription')}</p>
+            </div>
+            <Switch
+              id="showRomanization"
+              checked={courseSettings.showRomanization ?? true}
+              onCheckedChange={handleShowRomanizationChange}
+              className="mt-0.5"
+            />
+          </div>
 
           {/* Show progress bar */}
           <div className="flex items-start justify-between gap-4">

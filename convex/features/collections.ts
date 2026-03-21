@@ -98,6 +98,7 @@ export const getCollectionTextsWithContent = query({
       textId: text._id,
       sourceText: text.text,
       sourceLanguage: text.language,
+      sourceRomanization: text.romanizedText ?? undefined,
     }));
 
     const contentMap = await buildTextContentBatchForLanguages(

@@ -300,6 +300,8 @@
       "hideTargetLanguagesDescription": "Text der Zielsprache standardmäßig unscharf anzeigen",
       "autoRevealLanguages": "Automatisch einblenden",
       "autoRevealLanguagesDescription": "Text einblenden, sobald dessen Audio abgespielt wird",
+      "showRomanization": "Romanisierung anzeigen",
+      "showRomanizationDescription": "Lateinische Aussprache unter nicht-lateinischem Text anzeigen",
       "autoAdvance": "Automatisch weiter",
       "autoAdvanceDescription": "Zur nächsten Karte wechseln, nachdem das Audio fertig ist",
       "pauseBeforeAutoAdvance": "Vor dem Weitergehen",

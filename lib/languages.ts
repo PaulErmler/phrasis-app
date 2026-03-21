@@ -20,6 +20,7 @@ export interface Language {
   nativeName: string; // Name in the language itself
   flag: string; // Flag emoji
   voices: Voice[]; // Available TTS voices for this language
+  needsRomanization: boolean; // Whether the script requires Latin transliteration
 }
 
 /**
@@ -46,14 +47,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'English',
     nativeName: 'English',
     flag: '🇬🇧',
+    needsRomanization: false,
     voices: [
-      // US English
       createChirp3Voice('Leda', 'female', 'en-US', 'US'),
       createChirp3Voice('Charon', 'male', 'en-US', 'US'),
-      // UK English
       createChirp3Voice('Aoede', 'female', 'en-GB', 'UK'),
       createChirp3Voice('Orus', 'male', 'en-GB', 'UK'),
-      // Australian English
       createChirp3Voice('Achernar', 'female', 'en-AU', 'AU'),
       createChirp3Voice('Achird', 'male', 'en-AU', 'AU'),
     ],
@@ -64,11 +63,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Spanish',
     nativeName: 'Español',
     flag: '🇪🇸',
+    needsRomanization: false,
     voices: [
-      // Spain Spanish
       createChirp3Voice('Leda', 'female', 'es-ES', 'Spain'),
       createChirp3Voice('Charon', 'male', 'es-ES', 'Spain'),
-      // US Spanish
       createChirp3Voice('Aoede', 'female', 'es-US', 'US'),
       createChirp3Voice('Orus', 'male', 'es-US', 'US'),
     ],
@@ -79,11 +77,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'French',
     nativeName: 'Français',
     flag: '🇫🇷',
+    needsRomanization: false,
     voices: [
-      // France French
       createChirp3Voice('Leda', 'female', 'fr-FR', 'France'),
       createChirp3Voice('Charon', 'male', 'fr-FR', 'France'),
-      // Canadian French
       createChirp3Voice('Aoede', 'female', 'fr-CA', 'Canada'),
       createChirp3Voice('Orus', 'male', 'fr-CA', 'Canada'),
     ],
@@ -94,6 +91,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'German',
     nativeName: 'Deutsch',
     flag: '🇩🇪',
+    needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'de-DE', 'Germany'),
       createChirp3Voice('Charon', 'male', 'de-DE', 'Germany'),
@@ -105,50 +103,79 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Italian',
     nativeName: 'Italiano',
     flag: '🇮🇹',
+    needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'it-IT', 'Italy'),
       createChirp3Voice('Charon', 'male', 'it-IT', 'Italy'),
     ],
   },
   {
-    code: "pt",
-    displayCode: "pt",
-    name: "Portuguese (Brazil)",
-    nativeName: "Português",
-    flag: "🇧🇷",
+    code: 'pt',
+    displayCode: 'pt',
+    name: 'Portuguese (Brazil)',
+    nativeName: 'Português',
+    flag: '🇧🇷',
+    needsRomanization: false,
     voices: [
-      createChirp3Voice("Leda", "female", "pt-BR", "Brazil"),
-      createChirp3Voice("Charon", "male", "pt-BR", "Brazil"),
+      createChirp3Voice('Leda', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Charon', 'male', 'pt-BR', 'Brazil'),
     ],
   },
-  // {
-  //   code: 'zh',
-  //   displayCode: 'zh-CN',
-  //   name: 'Chinese (Simplified)',
-  //   nativeName: '中文（简体）',
-  //   flag: '🇨🇳',
-  //   voices: [
-  //     createChirp3Voice('Leda', 'female', 'cmn-CN', 'Mandarin'),
-  //     createChirp3Voice('Charon', 'male', 'cmn-CN', 'Mandarin'),
-  //   ],
-  // },
-  // {
-  //   code: 'ja',
-  //   displayCode: 'ja',
-  //   name: 'Japanese',
-  //   nativeName: '日本語',
-  //   flag: '🇯🇵',
-  //   voices: [
-  //     createChirp3Voice('Leda', 'female', 'ja-JP', 'Japan'),
-  //     createChirp3Voice('Charon', 'male', 'ja-JP', 'Japan'),
-  //   ],
-  // },
+  {
+    code: 'ru',
+    displayCode: 'ru',
+    name: 'Russian',
+    nativeName: 'Русский',
+    flag: '🇷🇺',
+    needsRomanization: true,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Charon', 'male', 'ru-RU', 'Russia'),
+    ],
+  },
+  {
+    code: 'hi',
+    displayCode: 'hi',
+    name: 'Hindi',
+    nativeName: 'हिन्दी',
+    flag: '🇮🇳',
+    needsRomanization: true,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Charon', 'male', 'hi-IN', 'India'),
+    ],
+  },
+  {
+    code: 'zh',
+    displayCode: 'zh-CN',
+    name: 'Chinese (Simplified)',
+    nativeName: '中文（简体）',
+    flag: '🇨🇳',
+    needsRomanization: true,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Charon', 'male', 'cmn-CN', 'Mandarin'),
+    ],
+  },
+  {
+    code: 'ja',
+    displayCode: 'ja',
+    name: 'Japanese',
+    nativeName: '日本語',
+    flag: '🇯🇵',
+    needsRomanization: true,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Charon', 'male', 'ja-JP', 'Japan'),
+    ],
+  },
   {
     code: 'sv',
     displayCode: 'sv',
     name: 'Swedish',
     nativeName: 'Svenska',
     flag: '🇸🇪',
+    needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'sv-SE', 'Sweden'),
       createChirp3Voice('Charon', 'male', 'sv-SE', 'Sweden'),
@@ -160,6 +187,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Dutch',
     nativeName: 'Nederlands',
     flag: '🇳🇱',
+    needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'nl-NL', 'Netherlands'),
       createChirp3Voice('Charon', 'male', 'nl-NL', 'Netherlands'),
@@ -242,6 +270,17 @@ export function generateCourseName(
   return `${baseName} → ${targetName}`;
 }
 
+/** Override Intl for zh-CN: engines label it "Chinese (China)" / regional variants; we use script-based naming. */
+const ZH_CN_DISPLAY_NAMES: Record<string, string> = {
+  en: 'Chinese (Simplified)',
+  de: 'Chinesisch (Vereinfacht)',
+};
+
+function localizedZhCnName(locale: string): string {
+  const lang = locale.split('-')[0]?.toLowerCase() ?? 'en';
+  return ZH_CN_DISPLAY_NAMES[lang] ?? ZH_CN_DISPLAY_NAMES.en;
+}
+
 /**
  * Get a localized language name using the Intl.DisplayNames API
  * @param displayCode - BCP 47 language tag (e.g., "es-MX", "zh-CN")
@@ -252,6 +291,9 @@ export function getLocalizedLanguageName(
   displayCode: string,
   locale: string,
 ): string {
+  if (displayCode.toLowerCase() === 'zh-cn') {
+    return localizedZhCnName(locale);
+  }
   try {
     const displayNames = new Intl.DisplayNames([locale], { type: 'language' });
     return displayNames.of(displayCode) || displayCode;
@@ -280,4 +322,14 @@ export function getLocalizedLanguageNameByCode(
     return code;
   }
   return getLocalizedLanguageName(language.displayCode, locale);
+}
+
+/**
+ * Languages whose script requires romanization (Latin transliteration).
+ * Usable in both frontend and Convex backend.
+ */
+export const ROMANIZATION_LANGUAGES = new Set(['ru', 'hi', 'ja', 'zh']);
+
+export function languageNeedsRomanization(code: string): boolean {
+  return ROMANIZATION_LANGUAGES.has(code);
 }

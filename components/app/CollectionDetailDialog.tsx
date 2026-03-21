@@ -23,6 +23,7 @@ interface Translation {
   text: string;
   isBaseLanguage: boolean;
   isTargetLanguage: boolean;
+  romanization?: string;
 }
 
 interface AudioRecording {
@@ -228,9 +229,16 @@ export function CollectionDetailDialog({
                                 key={translation.language}
                                 className="flex items-start gap-2"
                               >
-                                <p className="flex-1 text-sm font-medium leading-relaxed">
-                                  {translation.text || '...'}
-                                </p>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium leading-relaxed">
+                                    {translation.text || '...'}
+                                  </p>
+                                  {translation.romanization && (
+                                    <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                                      {translation.romanization}
+                                    </p>
+                                  )}
+                                </div>
                                 <AudioButton
                                   url={audio?.url ?? null}
                                   language={translation.language.toUpperCase()}
@@ -258,9 +266,16 @@ export function CollectionDetailDialog({
                                 key={translation.language}
                                 className="flex items-start gap-2"
                               >
-                                <p className="flex-1 text-sm leading-relaxed">
-                                  {translation.text || '...'}
-                                </p>
+                                <div className="flex-1">
+                                  <p className="text-sm leading-relaxed">
+                                    {translation.text || '...'}
+                                  </p>
+                                  {translation.romanization && (
+                                    <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                                      {translation.romanization}
+                                    </p>
+                                  )}
+                                </div>
                                 <AudioButton
                                   url={audio?.url ?? null}
                                   language={translation.language.toUpperCase()}
