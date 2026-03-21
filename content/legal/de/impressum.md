@@ -1,29 +1,34 @@
 ---
 title: 'Impressum'
-lastUpdated: '2025-12-26'
+lastUpdated: '2026-03-21'
 ---
 
-Ermler und Hradilak GbR  
-vertretungsberechtigte Gesellschafter:  
-Paul Ermler & Franziska Hradilak  
-Friedrich-Ebert Straße 62  
-14467 Potsdam
+## Angaben gemäß § 5 TMG
 
-E-Mail: contact@flexling.com  
-  Website: flexling.com
-
-Umsatzsteuer-Identifikationsnummer gem. § 27 a Umsatzsteuergesetz: DE 1234567  
-Wirtschaftsidentifikationsnummer gem. § 139 c Abgabenordnung: DE 1234567
-
-Bei redaktionellen Inhalten:
-
-Verantwortlich nach § 55 Abs.2 RStV  
 Paul Ermler  
-Friedrich-Ebert Straße 62  
+Einzelunternehmen  
+Friedrich-Ebert-Straße 62  
+14467 Potsdam  
+Deutschland
+
+## Kontakt
+
+E-Mail: support@flexling.com
+
+## Umsatzsteuer
+
+Gemäß § 19 UStG wird keine Umsatzsteuer erhoben (Kleinunternehmerregelung).
+
+## Redaktionell verantwortlich
+
+Verantwortlich nach § 55 Abs. 2 RStV:  
+Paul Ermler  
+Friedrich-Ebert-Straße 62  
 14467 Potsdam
 
-Link auf die Plattform der EU-Kommission zur Online-Streitbeilegung [https://ec.europa.eu/consumers/odr](https://ec.europa.eu/consumers/odr)
+## Streitschlichtung
+
+Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:  
+[https://ec.europa.eu/consumers/odr](https://ec.europa.eu/consumers/odr)
 
 Zur Teilnahme an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle sind wir nicht verpflichtet und grundsätzlich nicht bereit.
-
-Weitere Informationen unter: [www.abmahnung.de/os-plattform/](www.abmahnung.de/os-plattform/)

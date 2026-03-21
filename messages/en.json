@@ -361,6 +361,7 @@
     "back": "Back",
     "thinking": "Thinking...",
     "emptyTitle": "Your language tutor",
+    "aiNotice": "You are chatting with an AI assistant. It can make mistakes — always verify important information.",
     "emptyBullet1": "Ask about vocabulary, grammar, or any sentence.",
     "emptyBullet2": "The chat knows the card you are currently learning.",
     "emptyBullet3": "It can create flashcards for you — you just confirm them.",

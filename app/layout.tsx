@@ -23,7 +23,7 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
-const siteUrl = process.env.SITE_URL ?? 'https://flexling.app';
+const siteUrl = process.env.SITE_URL ?? 'https://flexling.com';
 
 export const metadata: Metadata = {
   title: {

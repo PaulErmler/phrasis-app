@@ -117,6 +117,11 @@
 
     "EMAIL_CAN_NOT_BE_UPDATED": "E-Mail-Adresse konnte nicht aktualisiert werden",
     "FAILED_TO_UNLINK_LAST_ACCOUNT": "Du kannst das letzte Konto nicht trennen",
-    "ACCOUNT_NOT_FOUND": "Konto nicht gefunden"
+    "ACCOUNT_NOT_FOUND": "Konto nicht gefunden",
+
+    "TERMS_AND_CONDITIONS": "AGB",
+    "ACCEPT_TERMS_AND": "und der",
+    "ACCEPT_TERMS_PRIVACY": "Datenschutzerklärung",
+    "BY_SIGNING_UP_AGREE": "Mit der Registrierung stimmst du unseren"
   }
 }

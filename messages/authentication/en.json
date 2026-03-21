@@ -3,6 +3,11 @@
     "SIGN_OUT": "Sign Out",
     "SIGN_IN_DESCRIPTION": "",
     "SIGN_UP_DESCRIPTION": "",
-    "OR_CONTINUE_WITH": "or enter an email and password"
+    "OR_CONTINUE_WITH": "or enter an email and password",
+
+    "TERMS_AND_CONDITIONS": "Terms & Conditions",
+    "ACCEPT_TERMS_AND": "and the",
+    "ACCEPT_TERMS_PRIVACY": "Privacy Policy",
+    "BY_SIGNING_UP_AGREE": "By signing up, you agree to our"
   }
 }

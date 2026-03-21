@@ -178,7 +178,8 @@
         "question": "How does Flexling work?",
         "answer": [
           "Flexling uses audio flashcards that play phrases in your target language, followed by the translation. You can rate how well you knew each phrase, and our spaced repetition algorithm shows the card again when you are likely about to forget it.",
-          "If you dont understand a phrase you can ask the AI tutor questions anytime — like 'How can I say this more politely?' or 'Give me 3 more examples with this verb in a different tense.' We generate natural-sounding audio using state of the art text-to-speech technology."
+          "If you dont understand a phrase you can ask the AI tutor questions anytime — like 'How can I say this more politely?' or 'Give me 3 more examples with this verb in a different tense.' We generate natural-sounding audio using state of the art text-to-speech technology.",
+          "Note: The voices you hear are AI-generated."
         ]
       },
       {

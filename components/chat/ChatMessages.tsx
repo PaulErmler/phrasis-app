@@ -1,5 +1,6 @@
 import 'react';
 import { useTranslations } from 'next-intl';
+import { BotIcon } from 'lucide-react';
 import {
   Conversation,
   ConversationContent,
@@ -224,6 +225,10 @@ export function ChatMessages({
             </>
           ) : !isLoading ? (
             <ConversationEmptyState title={t('emptyTitle')}>
+              <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground">
+                <BotIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 opacity-70" />
+                <span>{t('aiNotice')}</span>
+              </div>
               <ul className="text-muted-foreground text-sm space-y-1.5 text-left list-none">
                 {(['emptyBullet1', 'emptyBullet2', 'emptyBullet3'] as const).map((key) => (
                   <li key={key} className="flex items-start gap-2">

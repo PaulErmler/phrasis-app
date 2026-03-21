@@ -178,7 +178,8 @@
         "question": "Wie funktioniert Flexling?",
         "answer": [
           "Flexling verwendet Audio-Lernkarten, die Phrasen in deiner Zielsprache abspielen, gefolgt von der Übersetzung. Du kannst bewerten, wie gut du jede Phrase kanntest, und unser Spaced-Repetition-Algorithmus zeigt dir die Karte wieder, wenn du sie wahrscheinlich gerade vergessen wirst.",
-          "Wenn du eine Phrase nicht verstehst, kannst du dem KI-Tutor jederzeit Fragen stellen — wie 'Wie kann ich das höflicher sagen?' oder 'Gib mir 3 weitere Beispiele mit diesem Verb in einer anderen Zeitform.' Wir generieren natürlich klingendes Audio mit modernster Text-zu-Sprache-Technologie."
+          "Wenn du eine Phrase nicht verstehst, kannst du dem KI-Tutor jederzeit Fragen stellen — wie 'Wie kann ich das höflicher sagen?' oder 'Gib mir 3 weitere Beispiele mit diesem Verb in einer anderen Zeitform.' Wir generieren natürlich klingendes Audio mit modernster Text-zu-Sprache-Technologie.",
+          "Hinweis: Die Stimmen werden per KI generiert."
         ]
       },
       {
