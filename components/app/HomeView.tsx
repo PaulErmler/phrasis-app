@@ -18,6 +18,8 @@ export function HomeView({
   preloadedCustomCollectionsProgress,
   onLearnOpen,
   onChatOpen,
+  onNavigateToContent,
+  onNavigateToChat,
   onTutorialReady,
   animateEntrance,
   isHidden,
@@ -33,6 +35,8 @@ export function HomeView({
   >;
   onLearnOpen: () => void;
   onChatOpen: (threadId: string) => void;
+  onNavigateToContent: () => void;
+  onNavigateToChat: () => void;
   onTutorialReady?: (restart: () => void) => void;
   animateEntrance?: boolean;
   isHidden?: boolean;
@@ -119,6 +123,8 @@ export function HomeView({
         <CustomCollectionCarousel
           preloadedCourseSettings={preloadedCourseSettings}
           preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
+          onNavigateToContent={onNavigateToContent}
+          onNavigateToChat={onNavigateToChat}
         />
       </div>
     </div>

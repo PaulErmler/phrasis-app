@@ -176,6 +176,14 @@ export default function MainLayout({
     }
   }, [getOrCreateEmptyThread, handleOpenChat]);
 
+  const handleNavigateToChat = useCallback(() => {
+    if (prefetchedThreadId) {
+      handleOpenChat(prefetchedThreadId);
+    } else {
+      void handleNewChat();
+    }
+  }, [prefetchedThreadId, handleOpenChat, handleNewChat]);
+
   // Learn overlay — pushState so the browser back button can close it
   const handleLearnOpen = useCallback(() => {
     setIsLearnOpen(true);
@@ -309,6 +317,8 @@ export default function MainLayout({
               }
               onLearnOpen={handleLearnOpen}
               onChatOpen={handleOpenChat}
+              onNavigateToContent={() => handleViewChange('content')}
+              onNavigateToChat={handleNavigateToChat}
               onTutorialReady={handleTutorialReady}
               animateEntrance={justReturnedFromLearn.current}
               isHidden={isLearnOpen || activeView !== 'home'}

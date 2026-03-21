@@ -11,6 +11,18 @@ import { getTutorial } from './registry';
 
 const STORAGE_PREFIX = 'phrasis_completed_tutorials';
 
+const DRIVER_OVERLAY_OPACITY_VAR = '--driver-overlay-opacity';
+
+/** Opaque fill + single opacity for driver.js SVG overlay (see app/globals.css). */
+function getDriverOverlayOpacity(): number {
+  if (typeof document === 'undefined') return 0.5;
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue(DRIVER_OVERLAY_OPACITY_VAR)
+    .trim();
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0.5;
+}
+
 let currentUserId: string | null = null;
 
 function getStorageKey(): string {
@@ -224,7 +236,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       animate: true,
       showProgress: true,
       showButtons: ['next', 'previous', 'close'],
-      overlayColor: 'var(--overlay)',
+      overlayColor: '#000',
+      overlayOpacity: getDriverOverlayOpacity(),
       stagePadding: 8,
       stageRadius: 8,
       steps: resolvedSteps,
@@ -272,7 +285,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   const showCompletionStep = useCallback((title: string, description: string) => {
     const d = driver({
       showButtons: ['close'],
-      overlayColor: 'var(--overlay)',
+      overlayColor: '#000',
+      overlayOpacity: getDriverOverlayOpacity(),
       steps: [{
         popover: { title, description },
       }],
@@ -290,7 +304,8 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     const tr = tRef.current;
     const d = driver({
       showButtons: ['close'],
-      overlayColor: 'var(--overlay)',
+      overlayColor: '#000',
+      overlayOpacity: getDriverOverlayOpacity(),
       steps: [{
         element: '[data-tutorial="chat-button"]',
         popover: {

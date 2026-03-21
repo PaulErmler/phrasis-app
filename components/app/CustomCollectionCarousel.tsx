@@ -6,8 +6,8 @@ import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { toast } from 'sonner';
-import { MessageSquarePlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import {
   CollectionCarouselUI,
   type CollectionProgressItem,
@@ -18,6 +18,8 @@ import { useCollectionDetail } from './useCollectionDetail';
 export function CustomCollectionCarousel({
   preloadedCourseSettings,
   preloadedCustomCollectionsProgress,
+  onNavigateToContent,
+  onNavigateToChat,
 }: {
   preloadedCourseSettings: Preloaded<
     typeof api.features.courses.getActiveCourseSettings
@@ -25,8 +27,11 @@ export function CustomCollectionCarousel({
   preloadedCustomCollectionsProgress: Preloaded<
     typeof api.features.decks.getCustomCollectionsProgress
   >;
+  onNavigateToContent: () => void;
+  onNavigateToChat: () => void;
 }) {
   const t = useTranslations('AppPage.collections');
+  const tApp = useTranslations('AppPage');
   const [carouselReady, setCarouselReady] = useState(false);
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const activeCourseId = courseSettings?.courseId ?? null;
@@ -73,16 +78,50 @@ export function CustomCollectionCarousel({
 
   // Empty state: no custom collections yet
   if (customCollections.length === 0) {
+    const emptyStateDescription = t('customCarousel.emptyState', {
+      content: tApp('views.content'),
+      chat: tApp('views.chat'),
+    });
+
     return (
       <div className="space-y-2">
         <h2 className="heading-section">
           {t('customCarousel.sectionTitle')}
         </h2>
-        <div className="rounded-xl border border-dashed border-border bg-card p-6 text-center space-y-2">
-          <MessageSquarePlus className="h-8 w-8 mx-auto text-muted-foreground/50" />
-          <p className="text-muted-sm">
-            {t('customCarousel.emptyState')}
-          </p>
+        <div className="rounded-xl border border-dashed border-border bg-card p-4 sm:p-6">
+          <div className="flex flex-col md:flex-row md:items-stretch gap-4 md:gap-0">
+            <div className="flex-[2] min-w-0 md:pr-6 flex items-center">
+              <p className="text-muted-sm text-left">
+                {emptyStateDescription}
+              </p>
+            </div>
+            <div
+              className="md:hidden h-px w-full shrink-0 bg-border"
+              aria-hidden
+            />
+            <div
+              className="hidden md:block w-px shrink-0 bg-border self-stretch min-h-[4.5rem]"
+              aria-hidden
+            />
+            <div className="flex-1 min-w-0 md:pl-6 flex flex-col gap-2 justify-center">
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={onNavigateToContent}
+              >
+                {t('customCarousel.customContentButton')}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="w-full"
+                onClick={onNavigateToChat}
+              >
+                {tApp('views.chat')}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );
