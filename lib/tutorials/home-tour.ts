@@ -10,7 +10,7 @@ export function createHomeTour(t: TranslateFn): TutorialDefinition {
       },
     },
     {
-      element: '[data-tutorial="start-learning"]',
+      element: '[data-tutorial="progress-stats"]',
       popover: {
         title: t('home.learningModes.title'),
         description: t('home.learningModes.description'),

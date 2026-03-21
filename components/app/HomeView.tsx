@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Preloaded, usePreloadedQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -18,6 +18,7 @@ export function HomeView({
   preloadedCustomCollectionsProgress,
   onLearnOpen,
   onChatOpen,
+  onTutorialReady,
   animateEntrance,
   isHidden,
 }: {
@@ -32,15 +33,20 @@ export function HomeView({
   >;
   onLearnOpen: () => void;
   onChatOpen: (threadId: string) => void;
+  onTutorialReady?: (restart: () => void) => void;
   animateEntrance?: boolean;
   isHidden?: boolean;
 }) {
   const t = useTranslations('AppPage');
 
-  useTutorial(TUTORIAL_IDS.HOME_TOUR, {
+  const { restartTutorial } = useTutorial(TUTORIAL_IDS.HOME_TOUR, {
     delayMs: 1200,
     stepCompleteOnClickIndex: 2,
   });
+
+  useEffect(() => {
+    onTutorialReady?.(restartTutorial);
+  }, [onTutorialReady, restartTutorial]);
 
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const updateCourseSettings = useMutation(

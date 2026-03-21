@@ -62,10 +62,11 @@
 :root {
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
+  /* Elevated surfaces (library rows, stats, settings blocks, dialogs, collection tiles, driver.js): use --card / bg-card / .card-surface */
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --popover: var(--card);
+  --popover-foreground: var(--card-foreground);
   --primary: oklch(0.7162 0.119 217.31);
   --primary-foreground: oklch(0.98 0.02 217.31);
   --secondary: oklch(0.967 0.001 286.375);
@@ -103,15 +104,17 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --overlay: rgba(0, 0, 0, 0.5);
 }
 
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
+  /* Dark grey card surface — single oklch here; popover/sidebar match for consistency */
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --popover: var(--card);
+  --popover-foreground: var(--card-foreground);
   --primary: oklch(0.7162 0.119 217.31);
   --primary-foreground: oklch(0.28 0.07 217.31);
   --secondary: oklch(0.274 0.006 286.033);
@@ -140,7 +143,7 @@
   --timeline-base-border: oklch(0.42 0.07 217.31);
   --timeline-target: oklch(0.28 0.06 40.89);
   --timeline-target-border: oklch(0.48 0.12 40.89);
-  --sidebar: oklch(0.205 0 0);
+  --sidebar: var(--card);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.82 0.119 217.31);
   --sidebar-primary-foreground: oklch(0.28 0.07 217.31);
@@ -148,6 +151,7 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --overlay: rgba(0, 0, 0, 0.7);
 }
 
 @layer base {
@@ -288,38 +292,57 @@
   display: none !important;
 }
 
-/* ── driver.js tutorial overrides ── */
+/* ── driver.js tutorial overrides ──
+   !important is needed because driver.js uses `all: unset` which resets
+   properties to their initial values; combined with Tailwind v4's layer
+   ordering our overrides may otherwise lose the cascade fight.
+   Popover fill uses --card (same elevated surface as .card-surface / dialogs).
+   NOTE: theme vars (--card etc.) contain oklch() values — do NOT wrap in hsl(). */
+
 .driver-popover {
-  background: hsl(var(--card));
-  color: hsl(var(--card-foreground));
-  border: 1px solid hsl(var(--border));
-  border-radius: 0.75rem;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  background-color: var(--card) !important;
+  color: var(--card-foreground) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
   max-width: 360px;
+  padding: 20px !important;
+}
+.dark .driver-popover {
+  border: 1.5px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 24px 4px rgba(255, 255, 255, 0.04),
+    0 8px 40px rgba(0, 0, 0, 0.5) !important;
+}
+
+.driver-popover-footer .driver-popover-btn-disabled {
+  display: none !important;
 }
 
 .driver-popover .driver-popover-title {
   font-size: 1.05rem;
   font-weight: 600;
   line-height: 1.4;
+  color: var(--card-foreground) !important;
 }
 
 .driver-popover .driver-popover-description {
   font-size: 0.875rem;
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground) !important;
   line-height: 1.55;
 }
 
 .driver-popover .driver-popover-progress-text {
   font-size: 0.75rem;
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground) !important;
 }
 
 .driver-popover .driver-popover-close-btn {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground) !important;
 }
 .driver-popover .driver-popover-close-btn:hover {
-  color: hsl(var(--foreground));
+  color: var(--foreground) !important;
 }
 
 .driver-popover .driver-popover-navigation-btns {
@@ -336,26 +359,56 @@
   border-radius: 0.375rem;
   font-size: 0.875rem;
   font-weight: 500;
-  text-shadow: none;
+  text-shadow: none !important;
   transition: background-color 0.15s, opacity 0.15s;
 }
 
 .driver-popover .driver-popover-next-btn {
-  background: hsl(var(--primary));
-  color: hsl(var(--primary-foreground));
-  border: none;
+  background-color: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  border: none !important;
 }
 .driver-popover .driver-popover-next-btn:hover {
   opacity: 0.9;
 }
 
 .driver-popover .driver-popover-prev-btn {
-  background: transparent;
-  color: hsl(var(--foreground));
-  border: 1px solid hsl(var(--border));
+  background-color: transparent !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--border) !important;
+  text-shadow: none !important;
 }
 .driver-popover .driver-popover-prev-btn:hover {
-  background: hsl(var(--accent));
+  background-color: var(--accent) !important;
+}
+
+.driver-popover-arrow {
+  border-width: 8px !important;
+  border-color: var(--card) !important;
+}
+.driver-popover-arrow-side-left {
+  border-left-color: var(--card) !important;
+  border-right-color: transparent !important;
+  border-bottom-color: transparent !important;
+  border-top-color: transparent !important;
+}
+.driver-popover-arrow-side-right {
+  border-right-color: var(--card) !important;
+  border-left-color: transparent !important;
+  border-bottom-color: transparent !important;
+  border-top-color: transparent !important;
+}
+.driver-popover-arrow-side-top {
+  border-top-color: var(--card) !important;
+  border-right-color: transparent !important;
+  border-bottom-color: transparent !important;
+  border-left-color: transparent !important;
+}
+.driver-popover-arrow-side-bottom {
+  border-bottom-color: var(--card) !important;
+  border-left-color: transparent !important;
+  border-top-color: transparent !important;
+  border-right-color: transparent !important;
 }
 
 /* c15t consent UI — :root tokens (was inline <style> in layout; avoids head hydration mismatches) */

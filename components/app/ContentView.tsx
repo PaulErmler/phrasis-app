@@ -4,9 +4,20 @@ import { useState, useCallback } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useTranslations } from 'next-intl';
-import { MessageSquare, Upload, PenLine, ChevronRight, Loader2 } from 'lucide-react';
+import {
+  MessageSquare,
+  Upload,
+  PenLine,
+  ChevronRight,
+  Loader2,
+  CircleHelp,
+  Mail,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+
+const SUPPORT_EMAIL = 'support@flexling.com';
 
 export function ContentView({ onChatOpen }: { onChatOpen: (threadId: string) => void }) {
   const t = useTranslations('AppPage');
@@ -83,6 +94,21 @@ export function ContentView({ onChatOpen }: { onChatOpen: (threadId: string) => 
             </h3>
             <p className="text-muted-sm">{t('content.enterTexts.description')}</p>
           </div>
+        </div>
+
+        <div className="card-surface p-4 flex items-center gap-4 w-full">
+          <div className="p-2.5 rounded-lg bg-primary/10 text-primary shrink-0">
+            <CircleHelp className="h-5 w-5" aria-hidden />
+          </div>
+          <p className="flex-1 min-w-0 text-muted-sm">{t('content.feedback.prompt')}</p>
+          <Button variant="outline" size="sm" className="shrink-0" asChild>
+            <a
+              href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(t('content.feedback.emailSubject'))}`}
+            >
+              <Mail className="h-4 w-4" />
+              {t('content.feedback.emailButton')}
+            </a>
+          </Button>
         </div>
       </div>
     </div>

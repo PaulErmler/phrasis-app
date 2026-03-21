@@ -10,6 +10,8 @@ import { LogOut, Mail } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import PricingTable from '@/components/autumn/pricing-table';
 
+const SUPPORT_EMAIL = 'support@flexling.com';
+
 export function SettingsView() {
   const t = useTranslations('AppPage');
   const tFooter = useTranslations('Footer');
@@ -51,6 +53,25 @@ export function SettingsView() {
           <Separator/> 
 
           <PricingTable />
+
+          <Separator />
+
+          <div className="space-y-3">
+            <label className="label-form">
+              {t('settings.contactPrompt.title')}
+            </label>
+            <p className="text-sm text-muted-foreground">
+              {t('settings.contactPrompt.description')}
+            </p>
+            <Button variant="outline" className="w-full sm:w-auto" asChild>
+              <a
+                href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(t('settings.contactPrompt.emailSubject'))}`}
+              >
+                <Mail className="h-4 w-4" />
+                {t('help.contactUs')}
+              </a>
+            </Button>
+          </div>
 
           <Separator />
 

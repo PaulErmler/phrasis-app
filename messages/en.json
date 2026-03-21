@@ -40,6 +40,16 @@
       "settings": "Settings"
     },
     "loading": "Loading...",
+    "help": {
+      "title": "Need Help?",
+      "description": "If you have any questions or run into issues, feel free to reach out to us or replay the tutorial to get reacquainted.",
+      "contactUs": "Contact Us",
+      "restartTutorial": "Restart Tutorial",
+      "supportOnly": {
+        "title": "Need Help?",
+        "description": "If you have any questions or run into issues, feel free to reach out to us."
+      }
+    },
     "welcome": "Welcome back, {viewer}!",
     "notifications": {
       "title": "Notifications",
@@ -83,7 +93,12 @@
         "title": "Enter Your Own Texts",
         "description": "Type or paste sentences to create custom flashcards"
       },
-      "comingSoon": "Coming Soon"
+      "comingSoon": "Coming Soon",
+      "feedback": {
+        "prompt": "Is any of these features especially important for you? Let us know!",
+        "emailButton": "Email us",
+        "emailSubject": "Feature feedback (Content)"
+      }
     },
     "librarySoon": "Coming Soon: Manage and organize your saved phrases.",
     "library": {
@@ -106,11 +121,16 @@
     "settings": {
       "account": "Account",
       "language": "App Language",
+      "contactPrompt": {
+        "title": "Need anything?",
+        "description": "Questions about your plan, billing, or the app? Let us know—we're happy to help.",
+        "emailSubject": "Settings / account help"
+      },
       "legal": {
         "label": "Legal"
       },
       "attribution": {
-        "label": "Data Sources",
+        "label": "Attributions",
         "text": "A lot of the sentences are from <tatoeba>Tatoeba</tatoeba>'s massive dataset, released under a <ccby>CC-BY License</ccby>."
       }
     },
@@ -147,12 +167,12 @@
         "noCardsToAdd": "No more cards to add from this collection",
         "descriptions": {
           "Essential": "The most essential survival sentences",
-          "A1": "Sentences with vocabulary at CEFR A1 Level",
-          "A2": "Sentences with vocabulary at CEFR A2 Level",
-          "B1": "Sentences with vocabulary at CEFR B1 Level",
-          "B2": "Sentences with vocabulary at CEFR B2 Level",
-          "C1": "Sentences with vocabulary at CEFR C1 Level",
-          "C2": "Sentences with vocabulary at CEFR C2 Level",
+          "A1": "CEFR A1 — learn the 500 most common words",
+          "A2": "CEFR A2 — words ranked ~500-2,000 by frequency",
+          "B1": "CEFR B1 — words ranked ~2000-3,500 by frequency",
+          "B2": "CEFR B2 — words ranked ~3,500-5000 by frequency",
+          "C1": "CEFR C1 — learn the 5,000–8,000 most common words",
+          "C2": "CEFR C2 — words ranked 8,000+ by frequency",
           "Chat": "Phrases and vocabulary from the chat"
         },
         "detail": {
@@ -503,8 +523,8 @@
     "perMonth": "per month",
     "perYear": "per year",
     "everythingFrom": "Everything from {planName}, plus:",
-    "error": "Something went wrong. Please try again later.",
-    "retry": "Retry"
+    "error": "Error loading pricing table.",
+    "retry": "Load again"
   },
   "Checkout": {
     "confirm": "Confirm",
@@ -616,12 +636,12 @@
         "description": "We'll give you a quick overview to help you get started. You can dismiss this at any time."
       },
       "learningModes": {
-        "title": "Learning Modes",
-        "description": "Flexling has 2 different types of review modes. Full Review lets you practice by typing translations — great for focused study. Audio Review plays sentences aloud so you can learn on the go."
+        "title": "Stats & Learning Modes",
+        "description": "This card shows your learning stats — streak, reps, sentences and time — which update as you study. Below are 2 review modes: Full Review lets you practice by typing translations, great for focused study. Audio Review plays sentences aloud so you can learn on the go."
       },
       "difficultySelection": {
         "title": "Difficulty Selection",
-        "description": "Here you can select your difficulty. Each difficulty is a collection of sentences for you to learn. You can click on a collection to preview the upcoming sentences."
+        "description": "Here you can select your difficulty. Each difficulty is a collection of sentences for you to learn. They have been chosen based on word frequency such that you learn the most common words first. You can click on a collection to preview the upcoming sentences. Once you are ready, start with one of the learning modes."
       }
     },
     "audioReview": {
@@ -639,7 +659,7 @@
       },
       "rating": {
         "title": "Rate Your Recall",
-        "description": "Each card is shown an initial number of times before spaced repetition starts. \"Understood\" skips the rest of those initial reviews. After that, you'll see more detailed ratings: Again, Hard, Good, Easy."
+        "description": "Each card is shown an initial number of times before spaced repetition starts. \"Understood\" skips the rest of those initial reviews. After that, you'll see more detailed ratings: Again, Hard, Good, Easy. Above the buttons you can see roughly when the card will be shown again."
       },
       "audioControls": {
         "title": "Audio Playing",

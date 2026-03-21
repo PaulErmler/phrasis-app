@@ -102,7 +102,7 @@ export function CollectionCarouselUI({
           {[1, 2].map((i) => (
             <div
               key={i}
-              className="h-[170px] min-w-[85%] sm:min-w-[48%] md:min-w-[48%] lg:min-w-[45%] rounded-xl border"
+              className="card-surface h-[170px] min-w-[85%] sm:min-w-[48%] md:min-w-[48%] lg:min-w-[45%]"
             />
           ))}
         </div>
@@ -151,7 +151,7 @@ export function CollectionCarouselUI({
                     }
                   }}
                   className={cn(
-                    'w-full text-left rounded-xl border p-4 transition-all cursor-pointer h-[170px] flex flex-col',
+                    'card-surface w-full text-left p-4 transition-all cursor-pointer h-[170px] flex flex-col',
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     "hover:shadow-md",
                     isActive && !isComplete && "state-active",

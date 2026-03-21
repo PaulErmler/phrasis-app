@@ -40,6 +40,16 @@
       "settings": "Einstellungen"
     },
     "loading": "Lädt...",
+    "help": {
+      "title": "Brauchst du Hilfe?",
+      "description": "Bei Fragen oder Problemen kannst du uns jederzeit kontaktieren oder das Tutorial erneut starten.",
+      "contactUs": "Kontaktiere uns",
+      "restartTutorial": "Tutorial neu starten",
+      "supportOnly": {
+        "title": "Brauchst du Hilfe?",
+        "description": "Bei Fragen oder Problemen kannst du uns jederzeit kontaktieren."
+      }
+    },
     "welcome": "Willkommen zurück, {viewer}!",
     "notifications": {
       "title": "Benachrichtigungen",
@@ -83,7 +93,12 @@
         "title": "Eigene Texte eingeben",
         "description": "Tippe oder füge Sätze ein, um eigene Lernkarten zu erstellen"
       },
-      "comingSoon": "Demnächst"
+      "comingSoon": "Demnächst",
+      "feedback": {
+        "prompt": "Ist eine dieser Funktionen besonders wichtig für dich? Sag uns Bescheid!",
+        "emailButton": "E-Mail schreiben",
+        "emailSubject": "Feature-Feedback (Inhalte)"
+      }
     },
     "librarySoon": "Demnächst: Verwalte und organisiere deine gespeicherten Phrasen.",
     "library": {
@@ -106,11 +121,16 @@
     "settings": {
       "account": "Konto",
       "language": "App-Sprache",
+      "contactPrompt": {
+        "title": "Brauchst du noch etwas?",
+        "description": "Fragen zu deinem Tarif, zur Abrechnung oder zur App? Schreib uns gern – wir helfen dir weiter.",
+        "emailSubject": "Einstellungen / Konto-Hilfe"
+      },
       "legal": {
         "label": "Rechtliches"
       },
       "attribution": {
-        "label": "Datenquellen",
+        "label": "Attributionen",
         "text": "Viele der Sätze stammen aus dem umfangreichen Datensatz von <tatoeba>Tatoeba</tatoeba>, veröffentlicht unter einer <ccby>CC-BY-Lizenz</ccby>."
       }
     },
@@ -146,13 +166,13 @@
         "cardsAdded": "{count} Karten zu deinem Deck hinzugefügt",
         "noCardsToAdd": "Keine weiteren Karten aus dieser Sammlung hinzuzufügen",
         "descriptions": {
-          "Essential": "Die wichtigsten Sätze am Anfang",
-          "A1": "Sätze mit Vokabular auf CEFR A1-Niveau",
-          "A2": "Sätze mit Vokabular auf CEFR A2-Niveau",
-          "B1": "Sätze mit Vokabular auf CEFR B1-Niveau",
-          "B2": "Sätze mit Vokabular auf CEFR B2-Niveau",
-          "C1": "Sätze mit Vokabular auf CEFR C1-Niveau",
-          "C2": "Sätze mit Vokabular auf CEFR C2-Niveau",
+          "Essential": "CEFR Essenziell — die wichtigsten 30.000 Sätze zuerst lernen",
+          "A1": "CEFR A1 — lerne die 500 häufigsten Wörter",
+          "A2": "CEFR A2 — Wörter auf Rang ~500–2.000 nach Häufigkeit",
+          "B1": "CEFR B1 — Wörter auf Rang ~2.000–3.500 nach Häufigkeit",
+          "B2": "CEFR B2 — Wörter auf Rang ~3.500–5.000 nach Häufigkeit",
+          "C1": "CEFR C1 —  Wörter auf Rang ~5000–8.000 nach Häufigkeit",
+          "C2": "CEFR C2 — Wörter auf Rang 8.000+ nach Häufigkeit",
           "Chat": "Phrasen und Vokabular aus dem Chat"
         },
         "detail": {
@@ -503,8 +523,8 @@
     "perMonth": "pro Monat",
     "perYear": "pro Jahr",
     "everythingFrom": "Alles aus {planName}, plus:",
-    "error": "Etwas ist schiefgelaufen. Bitte versuche es später erneut.",
-    "retry": "Erneut versuchen"
+    "error": "Fehler beim Laden der Preistabelle.",
+    "retry": "Erneut laden"
   },
   "Checkout": {
     "confirm": "Bestätigen",
@@ -685,12 +705,12 @@
         "description": "Wir geben dir einen kurzen Überblick, damit du direkt loslegen kannst. Du kannst dies jederzeit schließen."
       },
       "learningModes": {
-        "title": "Lernmodi",
-        "description": "Flexling bietet 2 verschiedene Übungsmodi. Voll-Übung lässt dich Übersetzungen eintippen — ideal für konzentriertes Lernen. Audio-Übung spielt Sätze vor, damit du unterwegs lernen kannst."
+        "title": "Statistiken & Lernmodi",
+        "description": "Diese Karte zeigt deine Lernstatistiken — Serie, Wiederholungen, Sätze und Zeit — die sich beim Lernen aktualisieren. Darunter findest du 2 Übungsmodi: Voll-Übung lässt dich Übersetzungen eintippen, ideal für konzentriertes Lernen. Audio-Übung spielt Sätze vor, damit du unterwegs lernen kannst."
       },
       "difficultySelection": {
         "title": "Schwierigkeitsauswahl",
-        "description": "Hier kannst du deine Schwierigkeit auswählen. Jede Schwierigkeit ist eine Sammlung von Sätzen zum Lernen. Klicke auf eine Sammlung, um die nächsten Sätze zu sehen."
+        "description": "Hier kannst du deine Schwierigkeit auswählen. Jede Schwierigkeit ist eine Sammlung von Sätzen zum Lernen. Die Sätze wurden nach Worthäufigkeit ausgewählt, sodass du zuerst die gebräuchlichsten Wörter lernst. Klicke auf eine Sammlung, um die nächsten Sätze zu sehen. Wenn du bereit bist, starte mit einem der Lernmodi."
       }
     },
     "audioReview": {
@@ -708,7 +728,7 @@
       },
       "rating": {
         "title": "Bewerte dein Erinnern",
-        "description": "Jede Karte wird anfangs mehrmals angezeigt, bevor die Wiederholung mit Abständen beginnt. \"Verstanden\" überspringt den Rest dieser anfänglichen Wiederholungen. Danach siehst du detailliertere Bewertungen: Nochmal, Schwer, Gut, Leicht."
+        "description": "Jede Karte wird anfangs mehrmals angezeigt, bevor die Wiederholung mit Abständen beginnt. \"Verstanden\" überspringt den Rest dieser anfänglichen Wiederholungen. Danach siehst du detailliertere Bewertungen: Nochmal, Schwer, Gut, Leicht. Über den Schaltflächen siehst du ungefähr, wann die Karte wieder angezeigt wird."
       },
       "audioControls": {
         "title": "Audio-Wiedergabe",

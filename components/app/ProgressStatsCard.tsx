@@ -19,7 +19,7 @@ const SNAPSHOT_KEY = 'todayStats_snapshot';
 function useAnimatedCounter(
   target: number,
   from = 0,
-  durationMs = 800,
+  durationMs = 1500,
   delay = 0,
   enabled = true,
 ): number {
@@ -151,9 +151,14 @@ export function ProgressStatsCard({
       const stored = localStorage.getItem(snapshotKey);
       if (stored) {
         const parsed: TodaySnapshot = JSON.parse(stored);
-        if (parsed.date === today) prevTodaySnapshot.current = parsed;
+        if (parsed.date === today) {
+          prevTodaySnapshot.current = parsed;
+          return;
+        }
       }
     } catch {}
+    // Baseline for today so the first update still animates (ref was null before).
+    prevTodaySnapshot.current = { date: today, reps: 0, newCards: 0, timeMs: 0 };
   }, [snapshotKey, today]);
 
   useEffect(() => {
@@ -170,20 +175,20 @@ export function ProgressStatsCard({
     prevTodaySnapshot.current.timeMs !== todayStats.timeMs
   );
 
-  // Latch: flip to true when stats change, then flip back after animations
-  // finish so the animation only plays once per change.
-  const [statsChanged, setStatsChanged] = useState(false);
+  // Commit prev snapshot after animations. Ref updates do not re-render, so bump state
+  // when done. Use statsActuallyChanged (sync) to drive animation — not useState in an
+  // effect, which lags one frame and caused counters to snap to target before animating.
+  const [, setAnimationSettledEpoch] = useState(0);
 
   useEffect(() => {
     if (!statsActuallyChanged) return;
-    setStatsChanged(true);
 
     const timer = setTimeout(() => {
       if (todayStats) {
         prevTodaySnapshot.current = { date: today, ...todayStats };
       }
-      setStatsChanged(false);
-    }, 1200);
+      setAnimationSettledEpoch((e) => e + 1);
+    }, 2400);
 
     return () => clearTimeout(timer);
   }, [statsActuallyChanged, todayStats, today]);
@@ -204,23 +209,23 @@ export function ProgressStatsCard({
   const animatedReps = useAnimatedCounter(
     hasLearned ? todayStats.reps : 0,
     prevReps,
-    700,
-    250,
-    statsChanged,
+    1500,
+    300,
+    statsActuallyChanged,
   );
   const animatedNew = useAnimatedCounter(
     hasLearned ? todayStats.newCards : 0,
     prevNew,
-    700,
-    350,
-    statsChanged,
+    1500,
+    450,
+    statsActuallyChanged,
   );
   const animatedTimeMs = useAnimatedCounter(
     hasLearned ? todayStats.timeMs : 0,
     prevTime,
-    700,
-    450,
-    statsChanged,
+    1500,
+    600,
+    statsActuallyChanged,
   );
 
   const content = (
@@ -241,7 +246,7 @@ export function ProgressStatsCard({
                   : hasLearned
                     ? {
                         backgroundColor: 'color-mix(in oklch, var(--streak-active) 15%, transparent)',
-                        scale: statsChanged ? [1, 1.15, 1] : 1,
+                        scale: statsActuallyChanged ? [1, 1.15, 1] : 1,
                       }
                     : {
                         backgroundColor: 'color-mix(in oklch, var(--accent-orange) 10%, transparent)',
@@ -254,7 +259,7 @@ export function ProgressStatsCard({
                 : isFrozen
                   ? { duration: 2, repeat: Infinity, repeatType: 'reverse' as const }
                   : hasLearned
-                    ? { backgroundColor: { duration: 0.4 }, scale: { duration: 0.5, ease: 'easeOut' } }
+                    ? { backgroundColor: { duration: 0.4 }, scale: { duration: 1, ease: 'easeOut' } }
                     : { duration: 0.3 }
             }
           >
@@ -275,11 +280,11 @@ export function ProgressStatsCard({
                   initial={{ opacity: 0, scale: 0.3, rotate: 90, filter: 'blur(4px)' }}
                   animate={{
                     opacity: 1,
-                    scale: hasLearned && statsChanged ? [0.3, 1.3, 1] : 1,
-                    rotate: hasLearned && statsChanged ? [90, -10, 0] : 0,
+                    scale: hasLearned && statsActuallyChanged ? [0.3, 1.3, 1] : 1,
+                    rotate: hasLearned && statsActuallyChanged ? [90, -10, 0] : 0,
                     filter: 'blur(0px)',
                   }}
-                  transition={{ duration: hasLearned && statsChanged ? 0.7 : 0.4, ease: 'easeOut' }}
+                  transition={{ duration: hasLearned && statsActuallyChanged ? 1.4 : 0.4, ease: 'easeOut' }}
                 >
                   <Flame
                     className="h-5 w-5 transition-colors duration-400"
@@ -323,7 +328,7 @@ export function ProgressStatsCard({
             value={String(reps)}
             todayValue={hasLearned ? animatedReps : undefined}
             todayLabel={t('stats.today')}
-            animateToday={statsChanged}
+            animateToday={statsActuallyChanged}
           />
           <StatColumn
             icon={<MessageSquare className="h-4 w-4" />}
@@ -332,7 +337,7 @@ export function ProgressStatsCard({
             todayValue={hasLearned && todayStats.newCards > 0 ? animatedNew : undefined}
             todayPrefix="+"
             todayLabel={t('stats.new')}
-            animateToday={statsChanged}
+            animateToday={statsActuallyChanged}
           />
           <StatColumn
             icon={<Clock className="h-4 w-4" />}
@@ -341,7 +346,7 @@ export function ProgressStatsCard({
             todayValue={hasLearned && todayStats.timeMs > 0 ? animatedTimeMs : undefined}
             todayFormatter={formatTimeMs}
             todayLabel={t('stats.today')}
-            animateToday={statsChanged}
+            animateToday={statsActuallyChanged}
           />
         </div>
       </div>

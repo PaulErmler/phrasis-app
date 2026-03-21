@@ -124,7 +124,7 @@ function FeedbackBadge({ message }: { message: string | null }) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -5, scale: 0.95 }}
           transition={{ duration: 0.25 }}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-medium shadow-lg"
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-warning text-warning-foreground px-4 py-2 rounded-full text-sm font-medium shadow-lg"
         >
           {message}
         </motion.div>

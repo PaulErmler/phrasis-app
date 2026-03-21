@@ -6,9 +6,29 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TutorialId } from '@/convex/features/tutorialIds';
+import { authClient } from '@/lib/auth-client';
 import { getTutorial } from './registry';
 
-const LOCAL_STORAGE_KEY = 'phrasis_completed_tutorials';
+const STORAGE_PREFIX = 'phrasis_completed_tutorials';
+
+let currentUserId: string | null = null;
+
+function getStorageKey(): string {
+  return currentUserId ? `${STORAGE_PREFIX}_${currentUserId}` : STORAGE_PREFIX;
+}
+
+/**
+ * Switch the localStorage namespace when the authenticated user changes.
+ * Invalidates the cached snapshot so subscribers re-read for the new user.
+ */
+function setTutorialUser(userId: string | null) {
+  if (userId === currentUserId) return;
+  currentUserId = userId;
+  cachedRaw = null;
+  cachedSnapshot = EMPTY;
+  readSnapshot();
+  notifyStorageListeners();
+}
 
 const storageListeners = new Set<() => void>();
 let cachedSnapshot: string[] = [];
@@ -19,7 +39,7 @@ const EMPTY: string[] = [];
 function readSnapshot(): string[] {
   if (typeof window === 'undefined') return EMPTY;
   try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const raw = localStorage.getItem(getStorageKey());
     if (raw === cachedRaw) return cachedSnapshot;
     cachedRaw = raw;
     cachedSnapshot = raw ? JSON.parse(raw) : EMPTY;
@@ -51,7 +71,7 @@ readSnapshot();
 
 function writeCompleted(ids: string[]) {
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(ids));
+    localStorage.setItem(getStorageKey(), JSON.stringify(ids));
   } catch {
     // ignore
   }
@@ -81,6 +101,16 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   const [isActive, setIsActive] = useState(false);
   const t = useTranslations('Tutorial');
 
+  // ---- bind localStorage to the current authenticated user ----
+  const { data: session } = authClient.useSession();
+  const userId = session?.user?.id ?? null;
+  const prevUserIdRef = useRef(userId);
+
+  useEffect(() => {
+    setTutorialUser(userId);
+    prevUserIdRef.current = userId;
+  }, [userId]);
+
   // ---- localStorage is the primary source of truth for UI decisions ----
   const completed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const isCompleted = completed.includes(tutorialId);
@@ -108,7 +138,13 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   // doesn't, merge them into localStorage so the user doesn't re-see tutorials
   // they already finished on another device.
   const didSyncRef = useRef(false);
+  const syncedForUserRef = useRef(userId);
+
   useEffect(() => {
+    if (userId !== syncedForUserRef.current) {
+      didSyncRef.current = false;
+      syncedForUserRef.current = userId;
+    }
     if (!dbCompleted || didSyncRef.current) return;
     didSyncRef.current = true;
 
@@ -117,7 +153,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     if (missing.length > 0) {
       writeCompleted([...local, ...missing]);
     }
-  }, [dbCompleted]);
+  }, [dbCompleted, userId]);
 
   // ---- callbacks ----
   const onInteractiveStepRef = useRef(onInteractiveStep);
@@ -185,8 +221,10 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     }
 
     const d = driver({
+      animate: true,
       showProgress: true,
       showButtons: ['next', 'previous', 'close'],
+      overlayColor: 'var(--overlay)',
       stagePadding: 8,
       stageRadius: 8,
       steps: resolvedSteps,
@@ -234,6 +272,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   const showCompletionStep = useCallback((title: string, description: string) => {
     const d = driver({
       showButtons: ['close'],
+      overlayColor: 'var(--overlay)',
       steps: [{
         popover: { title, description },
       }],
@@ -251,6 +290,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     const tr = tRef.current;
     const d = driver({
       showButtons: ['close'],
+      overlayColor: 'var(--overlay)',
       steps: [{
         element: '[data-tutorial="chat-button"]',
         popover: {

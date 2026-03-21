@@ -78,7 +78,7 @@ export function CustomCollectionCarousel({
         <h2 className="heading-section">
           {t('customCarousel.sectionTitle')}
         </h2>
-        <div className="rounded-xl border border-dashed p-6 text-center space-y-2">
+        <div className="rounded-xl border border-dashed border-border bg-card p-6 text-center space-y-2">
           <MessageSquarePlus className="h-8 w-8 mx-auto text-muted-foreground/50" />
           <p className="text-muted-sm">
             {t('customCarousel.emptyState')}

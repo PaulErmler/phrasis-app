@@ -24,6 +24,7 @@ import { LibraryView } from '@/components/app/LibraryView';
 import { SettingsView } from '@/components/app/SettingsView';
 import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
+import { HelpDialog } from '@/components/app/HelpDialog';
 import { AppLoadingSplash } from '@/components/LogoSpinner';
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
@@ -56,6 +57,11 @@ export default function MainLayout({
   } = useAppData();
 
   const justReturnedFromLearn = useRef(false);
+  const restartTutorialRef = useRef<(() => void) | null>(null);
+
+  const handleTutorialReady = useCallback((restart: () => void) => {
+    restartTutorialRef.current = restart;
+  }, []);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -261,7 +267,26 @@ export default function MainLayout({
                 {t(`views.${activeView}`)}
               </h1>
             )}
-            <ThemeSwitcher className="-mr-2" />
+            <div className="flex items-center gap-1 -mr-2">
+              {(activeView === 'home' ||
+                activeView === 'content' ||
+                activeView === 'library' ||
+                activeView === 'settings') && (
+                <HelpDialog
+                  supportOnly={
+                    activeView === 'content' ||
+                    activeView === 'library' ||
+                    activeView === 'settings'
+                  }
+                  onRestartTutorial={
+                    activeView === 'home'
+                      ? () => restartTutorialRef.current?.()
+                      : undefined
+                  }
+                />
+              )}
+              <ThemeSwitcher />
+            </div>
           </div>
         </header>
 
@@ -284,6 +309,7 @@ export default function MainLayout({
               }
               onLearnOpen={handleLearnOpen}
               onChatOpen={handleOpenChat}
+              onTutorialReady={handleTutorialReady}
               animateEntrance={justReturnedFromLearn.current}
               isHidden={isLearnOpen || activeView !== 'home'}
             />
@@ -299,7 +325,16 @@ export default function MainLayout({
             <ContentView onChatOpen={handleOpenChat} />
           </div>
           {!isLearnOpen && activeView === 'library' && <LibraryView />}
-          {!isLearnOpen && activeView === 'settings' && <SettingsView />}
+          <div
+            style={{
+              display:
+                !isLearnOpen && activeView === 'settings'
+                  ? 'contents'
+                  : 'none',
+            }}
+          >
+            <SettingsView />
+          </div>
           {!isLearnOpen && activeView === 'chat' && chatThreadId && (
             <SimplifiedChatView
               threadId={chatThreadId}
