@@ -1,26 +1,33 @@
 import { Heart, ExternalLink, Mail } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
+import { LandingSquircleIcon } from './landing-squircle-icon';
+import { DonationMobileStack } from './donation-mobile-stack';
 
 export async function DonationSection() {
   const t = await getTranslations('LandingPage.donation');
   return (
-    <section id="donate" className="relative py-10 sm:py-12 md:py-16 px-4">
+    <section
+      id="donate"
+      className="relative px-4 py-10 sm:py-12 md:py-16 max-md:z-[2] max-md:isolate md:z-auto"
+    >
       <div className="max-w-5xl mx-auto">
-        <div className="text-center mb-8 sm:mb-10">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3 sm:mb-4">
+        <div className="mb-8 hidden text-center sm:mb-10 md:block">
+          <h2 className="mb-3 text-2xl font-bold sm:mb-4 sm:text-3xl md:text-4xl">
             {t('title')}{' '}
             <span className="gradient-text">{t('titleHighlight')}</span>
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+        <DonationMobileStack />
+
+        <div className="hidden grid-cols-1 gap-4 sm:gap-6 md:grid md:grid-cols-2">
           <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 sm:p-8 flex flex-col">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-accent-orange/10 mb-4">
-              <Heart className="w-6 h-6 text-accent-orange fill-accent-orange/20" />
-            </div>
+            <LandingSquircleIcon variant="accent" className="mb-4">
+              <Heart className="h-7 w-7 text-white fill-white/25" />
+            </LandingSquircleIcon>
             <h3 className="text-lg sm:text-xl font-semibold mb-3">
-              10% for Good
+              {t('givingTitle')}
             </h3>
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed flex-1">
               {t('description')}{' '}
@@ -42,9 +49,9 @@ export async function DonationSection() {
           </div>
 
           <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 sm:p-8 flex flex-col">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-4">
-              <Mail className="w-6 h-6 text-primary" />
-            </div>
+            <LandingSquircleIcon className="mb-4">
+              <Mail className="h-7 w-7 text-white" />
+            </LandingSquircleIcon>
             <h3 className="text-lg sm:text-xl font-semibold mb-3">
               {t('supportTitle')}
             </h3>

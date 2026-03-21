@@ -1,19 +1,6 @@
 /* Landing Page Specific Styles */
 
 /* Landing Page Animations */
-@keyframes float {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  25% {
-    transform: translateY(-10px) rotate(1deg);
-  }
-  75% {
-    transform: translateY(5px) rotate(-1deg);
-  }
-}
-
 @keyframes fade-in-up {
   from {
     opacity: 0;
@@ -55,10 +42,6 @@
 }
 
 /* Animation utility classes */
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
-
 .animate-fade-in-up {
   animation: fade-in-up 0.8s ease-out forwards;
 }
@@ -105,7 +88,7 @@
     ),
     radial-gradient(
       ellipse 60% 40% at 80% 60%,
-      oklch(0.8 0.119 217.31 / 0.1),
+      oklch(0.8179 0.1705 77.95 / 0.1),
       transparent
     ),
     radial-gradient(
@@ -124,7 +107,7 @@
     ),
     radial-gradient(
       ellipse 60% 40% at 80% 60%,
-      oklch(0.8 0.119 217.31 / 0.15),
+      oklch(0.8179 0.1705 77.95 / 0.15),
       transparent
     ),
     radial-gradient(

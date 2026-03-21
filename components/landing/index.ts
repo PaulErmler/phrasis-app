@@ -5,5 +5,6 @@ export { TestimonialsSection } from './testimonials-section';
 export { NewsletterSection } from './newsletter-section';
 export { FAQSection } from './faq-section';
 export { DonationSection } from './donation-section';
-export { FloatingSpeechBubble } from './speech-bubble';
+export { DonationMobileStack } from './donation-mobile-stack';
 export { InstallCtaSection } from './install-cta-section';
+export { LandingSquircleIcon } from './landing-squircle-icon';
