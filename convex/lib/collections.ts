@@ -18,7 +18,7 @@ export const LEVEL_ORDER = [
 export const COLLECTION_PREVIEW_SIZE = 5;
 
 /** How many upcoming texts to pre-generate content for (translations + audio). */
-export const CONTENT_LOOKAHEAD_SIZE = 10;
+export const CONTENT_LOOKAHEAD_SIZE = 5;
 
 /**
  * Maps the onboarding `currentLevel` value to the collection name that should

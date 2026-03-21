@@ -22,8 +22,8 @@ import {
 } from '../db/collections';
 import { translateText, romanizeText } from './translation';
 import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
-import { synthesizeSpeech } from './tts';
-import { translationValidator, audioRecordingValidator } from '../types';
+import { translationValidator, audioRecordingValidator, ttsQualityValidator } from '../types';
+import { claimTtsIfAvailable } from './ttsProcessing';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
   LEVEL_ORDER,
@@ -34,7 +34,7 @@ import {
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { useQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
-import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
+import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 
 // ============================================================================
 // HELPERS
@@ -124,11 +124,11 @@ export async function scheduleMissingContent(
 
     if (lang === sourceLanguage) {
       // Source language — no translation needed, maybe TTS
-      if (!hasAudio) {
+      if (!hasAudio && await claimTtsIfAvailable(ctx, textId, lang)) {
         const voiceName = getRandomVoiceForLanguage(lang);
         await ctx.scheduler.runAfter(
           0,
-          internal.features.decks.processTTSForCard,
+          internal.features.ttsProcessing.processTTSForCard,
           {
             textId,
             text: text.text,
@@ -163,11 +163,11 @@ export async function scheduleMissingContent(
             { textId, translatedText: translation.translatedText, language: lang },
           );
         }
-        if (!hasAudio) {
+        if (!hasAudio && await claimTtsIfAvailable(ctx, textId, lang)) {
           const voiceName = getRandomVoiceForLanguage(lang);
           await ctx.scheduler.runAfter(
             0,
-            internal.features.decks.processTTSForCard,
+            internal.features.ttsProcessing.processTTSForCard,
             {
               textId,
               text: translation.translatedText,
@@ -938,10 +938,8 @@ export const ensureCardContent = mutation({
   },
 });
 
-const UPCOMING_CARDS_LOOKAHEAD = 5;
-
 /**
- * Ensure content for the next 5 due cards in the user's active deck.
+ * Ensure content for the next N due cards in the user's active deck.
  * Called from the learning mode to pre-generate translations and audio
  * for upcoming cards so they're ready before the user reaches them.
  */
@@ -966,7 +964,7 @@ export const ensureUpcomingCardsContent = mutation({
           .lte('dueDate', now),
       )
       .order('asc')
-      .take(UPCOMING_CARDS_LOOKAHEAD);
+      .take(ENSURE_CONTENT_LOOKAHEAD);
 
     let processed = 0;
     for (const card of cards) {
@@ -1105,10 +1103,10 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       )
       .first();
 
-    if (!existingAudioForVoice) {
+    if (!existingAudioForVoice && await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage)) {
       await ctx.scheduler.runAfter(
         0,
-        internal.features.decks.processTTSForCard,
+        internal.features.ttsProcessing.processTTSForCard,
         {
           textId: args.textId,
           text: args.translatedText,
@@ -1213,36 +1211,6 @@ export const storeTranslationRomanization = internalMutation({
 });
 
 /**
- * Internal action to process TTS for a card.
- */
-export const processTTSForCard = internalAction({
-  args: {
-    textId: v.id('texts'),
-    text: v.string(),
-    language: v.string(),
-    voiceName: v.string(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    try {
-      const blob = await synthesizeSpeech(args.text, args.voiceName, 0.9);
-      const storageId: Id<'_storage'> = await ctx.storage.store(blob);
-
-      await ctx.runMutation(internal.features.decks.storeAudioRecording, {
-        textId: args.textId,
-        language: args.language,
-        voiceName: args.voiceName,
-        storageId,
-      });
-    } catch (err) {
-      console.error('TTS error:', err);
-    }
-
-    return null;
-  },
-});
-
-/**
  * Internal mutation to store an audio recording.
  */
 export const storeAudioRecording = internalMutation({
@@ -1251,6 +1219,7 @@ export const storeAudioRecording = internalMutation({
     language: v.string(),
     voiceName: v.string(),
     storageId: v.id('_storage'),
+    ttsQuality: v.optional(ttsQualityValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1275,6 +1244,7 @@ export const storeAudioRecording = internalMutation({
         language: args.language,
         voiceName: args.voiceName,
         storageId: args.storageId,
+        ttsQuality: args.ttsQuality,
       });
       return null;
     }
@@ -1286,8 +1256,8 @@ export const storeAudioRecording = internalMutation({
     await ctx.db.patch(recordToUpdate._id, {
       voiceName: args.voiceName,
       storageId: args.storageId,
+      ttsQuality: args.ttsQuality,
     });
-    // Keep the newly generated file and clean up the replaced storage file.
     if (previousStorageId !== args.storageId) {
       await ctx.storage.delete(previousStorageId);
     }

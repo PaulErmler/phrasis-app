@@ -202,7 +202,6 @@ export function useAudioPlayer(
   // Merge audio when card changes, audio URLs arrive, or settings change
   // --------------------------------------------------------------------------
   const allAudioReady = audioRecordings.length > 0 && audioRecordings.every((a) => a.url);
-  const audioUrlsKey = audioRecordings.map((a) => a.url ?? '').join('|');
 
   // Stable key that changes whenever any playback-affecting setting changes
   const settingsKey = useMemo(
@@ -315,7 +314,6 @@ export function useAudioPlayer(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     cardId,
-    audioUrlsKey,
     allAudioReady,
     settingsKey,
     baseOrderKey,

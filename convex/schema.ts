@@ -6,7 +6,8 @@ import {
   reviewModeValidator,
   fsrsStateValidator,
   cardApprovalStatusValidator,
-  schedulingPhaseValidator
+  schedulingPhaseValidator,
+  ttsQualityValidator,
 } from './types';
 
 
@@ -48,6 +49,7 @@ export default defineSchema({
     language: v.string(), // Base language code (e.g., "en", "es", "de")
     voiceName: v.string(), // Full voice identifier (e.g., "en-US-Chirp3-HD-Leda")
     storageId: v.id('_storage'), // Convex file storage reference
+    ttsQuality: v.optional(ttsQualityValidator), // TTS validation status
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'language'])
@@ -215,6 +217,28 @@ export default defineSchema({
   })
     .index('by_toolCallId', ['toolCallId'])
     .index('by_thread_and_user', ['threadId', 'userId']),
+
+  // TTS mismatches — stores audio that failed validation for later analysis
+  ttsMismatches: defineTable({
+    textId: v.id('texts'),
+    language: v.string(),
+    voiceName: v.string(),
+    storageId: v.id('_storage'),
+    expectedText: v.string(),
+    transcribedText: v.string(),
+    attempt: v.number(), // 1-based attempt number
+  })
+    .index('by_textId', ['textId'])
+    .index('by_language', ['language']),
+
+  // TTS generation claims — prevents duplicate processTTSForCard scheduling.
+  // Mutations atomically check-and-insert before scheduling; Convex OCC
+  // guarantees only one claim per (textId, language) wins.
+  ttsGenerationClaims: defineTable({
+    textId: v.id('texts'),
+    language: v.string(),
+    claimedAt: v.number(),
+  }).index('by_text_and_language', ['textId', 'language']),
 
   // Usage quotas — local cache of Autumn entitlements for synchronous checks.
   // One document per user; features stored as a record keyed by feature ID.

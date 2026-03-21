@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { driver, type Driver, type DriveStep } from 'driver.js';
+import type { TutorialId } from '@/convex/features/tutorialIds';
 import { getTutorial } from './registry';
 
 const LOCAL_STORAGE_KEY = 'phrasis_completed_tutorials';
@@ -67,7 +68,7 @@ interface UseTutorialOptions {
   stepCompleteOnClickIndex?: number;
 }
 
-export function useTutorial(tutorialId: string, options: UseTutorialOptions = {}) {
+export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions = {}) {
   const {
     enabled = true,
     delayMs = 800,

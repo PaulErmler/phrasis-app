@@ -23,6 +23,7 @@ import {
 } from './types';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { ENSURE_CONTENT_REVIEW_INTERVAL } from '@/lib/constants/learning';
 
 function effectivePhase(
   reviewMode: string,
@@ -164,8 +165,6 @@ export function useLearningMode(
   // Track when the current card was first shown (for time-spent stats)
   const cardShownAtRef = useRef<number>(Date.now());
 
-  const ensuredUpcomingRef = useRef(false);
-
   // Cross-tab coordination: only the tab that initiated the review should auto-play
   const reviewInitiatedByThisTabRef = useRef(true); // true initially so first card auto-plays
 
@@ -178,15 +177,35 @@ export function useLearningMode(
     reviewInitiatedByThisTabRef.current = false;
   }, []);
 
+  const prevCardIdForEnsureRef = useRef<string | null>(null);
+  const reviewsSinceEnsureRef = useRef(ENSURE_CONTENT_REVIEW_INTERVAL);
+  const ensureInFlightRef = useRef(false);
+
   useEffect(() => {
-    if (!cardForReview?.hasMissingContent) return;
-    if (ensuredUpcomingRef.current) return;
-    ensuredUpcomingRef.current = true;
-    ensureUpcomingContentMutation().catch((err) => {
-      console.error('Failed to ensure upcoming cards content:', err);
-      ensuredUpcomingRef.current = false;
-    });
-  }, [cardForReview?.hasMissingContent, ensureUpcomingContentMutation]);
+    if (!cardForReview || ensureInFlightRef.current) return;
+
+    if (prevCardIdForEnsureRef.current === cardForReview._id) return;
+
+    if (prevCardIdForEnsureRef.current !== null) {
+      reviewsSinceEnsureRef.current++;
+    }
+    prevCardIdForEnsureRef.current = cardForReview._id;
+
+    const shouldEnsure =
+      cardForReview.hasMissingContent ||
+      reviewsSinceEnsureRef.current >= ENSURE_CONTENT_REVIEW_INTERVAL;
+    if (!shouldEnsure) return;
+
+    reviewsSinceEnsureRef.current = 0;
+    ensureInFlightRef.current = true;
+    ensureUpcomingContentMutation()
+      .catch((err) => {
+        console.error('Failed to ensure upcoming cards content:', err);
+      })
+      .finally(() => {
+        ensureInFlightRef.current = false;
+      });
+  }, [cardForReview?._id, cardForReview?.hasMissingContent, ensureUpcomingContentMutation]);
 
   // --------------------------------------------------------------------------
   // Add cards
