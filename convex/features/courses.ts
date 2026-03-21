@@ -3,6 +3,7 @@ import { mutation, query } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import { learningStyleValidator, currentLevelValidator, reviewModeValidator } from '../types';
+import { tutorialIdValidator } from './tutorialIds';
 import {
   getAuthUserId,
   requireAuthUserId,
@@ -563,6 +564,7 @@ export const getActiveCourseSettings = query({
       showProgressBar: v.optional(v.boolean()),
       hideTargetLanguages: v.optional(v.boolean()),
       autoRevealLanguages: v.optional(v.boolean()),
+      showRomanization: v.optional(v.boolean()),
       baseLanguageOrder: v.optional(v.array(v.string())),
       targetLanguageOrder: v.optional(v.array(v.string())),
       instantProceedAudio: v.optional(v.boolean()),
@@ -613,6 +615,7 @@ export const updateCourseSettings = mutation({
     showProgressBar: v.optional(v.boolean()),
     hideTargetLanguages: v.optional(v.boolean()),
     autoRevealLanguages: v.optional(v.boolean()),
+    showRomanization: v.optional(v.boolean()),
     baseLanguageOrder: v.optional(v.array(v.string())),
     targetLanguageOrder: v.optional(v.array(v.string())),
     instantProceedAudio: v.optional(v.boolean()),
@@ -651,6 +654,7 @@ export const updateCourseSettings = mutation({
       'showProgressBar',
       'hideTargetLanguages',
       'autoRevealLanguages',
+      'showRomanization',
       'baseLanguageOrder',
       'targetLanguageOrder',
       'instantProceedAudio',
@@ -729,7 +733,7 @@ export const getCompletedTutorials = query({
  */
 export const completeTutorial = mutation({
   args: {
-    tutorialId: v.string(),
+    tutorialId: tutorialIdValidator,
   },
   returns: v.null(),
   handler: async (ctx, args) => {

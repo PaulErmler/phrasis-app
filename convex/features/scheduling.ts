@@ -25,6 +25,7 @@ import {
   schedulingPhaseValidator
 } from '../types';
 import { getAudioForText } from '../lib/audio';
+import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
@@ -75,6 +76,7 @@ export const getCardForReview = query({
       preReviewCount: v.number(),
       initialReviewCount: v.number(),
       fsrsState: v.union(fsrsStateValidator, v.null()),
+      hasMissingContent: v.boolean(),
     }),
     v.null(),
   ),
@@ -120,28 +122,40 @@ export const getCardForReview = query({
     // Load translations
     const translations = await Promise.all(
       allLanguages.map(async (lang) => {
-        let translatedText;
         if (lang === sourceLanguage) {
-          translatedText = text.text;
-        } else {
-          const translation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', card.textId).eq('targetLanguage', lang),
-            )
-            .first();
-          translatedText = translation?.translatedText || '';
+          return {
+            language: lang,
+            text: text.text,
+            isBaseLanguage: course.baseLanguages.includes(lang),
+            isTargetLanguage: course.targetLanguages.includes(lang),
+            romanization: text.romanizedText ?? undefined,
+          };
         }
+        const translation = await ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', card.textId).eq('targetLanguage', lang),
+          )
+          .first();
         return {
           language: lang,
-          text: translatedText,
+          text: translation?.translatedText || '',
           isBaseLanguage: course.baseLanguages.includes(lang),
           isTargetLanguage: course.targetLanguages.includes(lang),
+          romanization: translation?.romanizedText ?? undefined,
         };
       }),
     );
 
     const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
+
+    const hasMissingTranslation = translations.some(
+      (tr) => tr.language !== sourceLanguage && !tr.text,
+    );
+    const hasMissingAudio = audioRecordings.some((a) => !a.url);
+    const hasMissingRomanization = translations.some(
+      (tr) => ROMANIZATION_LANGUAGES.has(tr.language) && !tr.romanization,
+    );
 
     return {
       _id: card._id,
@@ -159,6 +173,7 @@ export const getCardForReview = query({
       preReviewCount: card.preReviewCount,
       initialReviewCount,
       fsrsState: card.fsrsState ?? null,
+      hasMissingContent: hasMissingTranslation || hasMissingAudio || hasMissingRomanization,
     };
   },
 });

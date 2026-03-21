@@ -23,6 +23,7 @@ import {
 } from './types';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { ENSURE_CONTENT_REVIEW_INTERVAL } from '@/lib/constants/learning';
 
 function effectivePhase(
   reviewMode: string,
@@ -146,10 +147,9 @@ export function useLearningMode(
   const addCardsMutation = useMutation(
     api.features.decks.addCardsFromCollection,
   );
-  const ensureContentMutation = useMutation(
-    api.features.decks.ensureCardContent,
+  const ensureUpcomingContentMutation = useMutation(
+    api.features.decks.ensureUpcomingCardsContent,
   );
-
   const sentencesQuota = useFeatureQuota(FEATURE_IDS.SENTENCES);
 
   const [isReviewing, setIsReviewing] = useState(false);
@@ -161,9 +161,6 @@ export function useLearningMode(
   const [isPendingMaster, setIsPendingMaster] = useState(false);
   const [isPendingHide, setIsPendingHide] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
-
-  // Track cards we've already ensured content for
-  const ensuredCardsRef = useRef<Set<string>>(new Set());
 
   // Track when the current card was first shown (for time-spent stats)
   const cardShownAtRef = useRef<number>(Date.now());
@@ -180,25 +177,35 @@ export function useLearningMode(
     reviewInitiatedByThisTabRef.current = false;
   }, []);
 
-  // --------------------------------------------------------------------------
-  // Ensure content exists for the current card
-  // --------------------------------------------------------------------------
-  useEffect(() => {
-    if (!cardForReview) return;
-    const hasMissing =
-      cardForReview.translations.some((t) => !t.text) ||
-      cardForReview.audioRecordings.some((a) => !a.url);
+  const prevCardIdForEnsureRef = useRef<string | null>(null);
+  const reviewsSinceEnsureRef = useRef(ENSURE_CONTENT_REVIEW_INTERVAL);
+  const ensureInFlightRef = useRef(false);
 
-    if (hasMissing && !ensuredCardsRef.current.has(cardForReview.textId)) {
-      ensuredCardsRef.current.add(cardForReview.textId);
-      ensureContentMutation({
-        textId: cardForReview.textId as Id<'texts'>,
-      }).catch((err) => {
-        console.error('Failed to ensure card content:', err);
-        ensuredCardsRef.current.delete(cardForReview.textId);
-      });
+  useEffect(() => {
+    if (!cardForReview || ensureInFlightRef.current) return;
+
+    if (prevCardIdForEnsureRef.current === cardForReview._id) return;
+
+    if (prevCardIdForEnsureRef.current !== null) {
+      reviewsSinceEnsureRef.current++;
     }
-  }, [cardForReview, ensureContentMutation]);
+    prevCardIdForEnsureRef.current = cardForReview._id;
+
+    const shouldEnsure =
+      cardForReview.hasMissingContent ||
+      reviewsSinceEnsureRef.current >= ENSURE_CONTENT_REVIEW_INTERVAL;
+    if (!shouldEnsure) return;
+
+    reviewsSinceEnsureRef.current = 0;
+    ensureInFlightRef.current = true;
+    ensureUpcomingContentMutation()
+      .catch((err) => {
+        console.error('Failed to ensure upcoming cards content:', err);
+      })
+      .finally(() => {
+        ensureInFlightRef.current = false;
+      });
+  }, [cardForReview?._id, cardForReview?.hasMissingContent, ensureUpcomingContentMutation]);
 
   // --------------------------------------------------------------------------
   // Add cards

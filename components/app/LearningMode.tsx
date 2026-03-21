@@ -129,6 +129,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
         allRevealed={fullReviewRevealed}
         onAllSubmittedChange={setAllSubmitted}
+        showRomanization={state.courseSettings.showRomanization ?? true}
       />
     ) : (
       <LearningCardContent
@@ -148,6 +149,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
         autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? false}
         revealedLanguages={audio.revealedLanguages}
+        showRomanization={state.courseSettings.showRomanization ?? true}
       />
     );
 

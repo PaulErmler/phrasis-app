@@ -27,6 +27,7 @@ interface CardShellProps {
   onFavorite: () => void;
   onAudioPlay?: () => void;
   bare?: boolean;
+  showRomanization?: boolean;
   children: (ctx: {
     baseTranslations: CardTranslation[];
     targetTranslations: CardTranslation[];
@@ -46,6 +47,7 @@ export function CardShell({
   onFavorite,
   onAudioPlay,
   bare = false,
+  showRomanization = true,
   children,
 }: CardShellProps) {
   const t = useTranslations('LearningMode');
@@ -123,9 +125,16 @@ export function CardShell({
                 key={translation.language}
                 className="flex items-start gap-2"
               >
-                <p className="flex-1 body-large font-medium">
-                  {translation.text || '...'}
-                </p>
+                <div className="flex-1">
+                  <p className="body-large font-medium">
+                    {translation.text || '...'}
+                  </p>
+                  {showRomanization && translation.romanization && (
+                    <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                      {translation.romanization}
+                    </p>
+                  )}
+                </div>
                 <AudioButton
                   url={audio?.url ?? null}
                   language={translation.language.toUpperCase()}

@@ -9,7 +9,7 @@ import {
 import { translationValidator, audioRecordingValidator } from '../types';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 import { scheduleMissingContent } from './decks';
-import { COLLECTION_PREVIEW_SIZE, LEVEL_ORDER } from '../lib/collections';
+import { COLLECTION_PREVIEW_SIZE, CONTENT_LOOKAHEAD_SIZE, LEVEL_ORDER } from '../lib/collections';
 import { getCourseSettings } from '../db/courseSettings';
 import type { Id } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
@@ -98,6 +98,7 @@ export const getCollectionTextsWithContent = query({
       textId: text._id,
       sourceText: text.text,
       sourceLanguage: text.language,
+      sourceRomanization: text.romanizedText ?? undefined,
     }));
 
     const contentMap = await buildTextContentBatchForLanguages(
@@ -160,7 +161,7 @@ export const ensureContentForCollection = mutation({
       ctx,
       args.collectionId,
       lastRankProcessed,
-      COLLECTION_PREVIEW_SIZE,
+      CONTENT_LOOKAHEAD_SIZE,
     );
 
     let totalTranslationsScheduled = 0;

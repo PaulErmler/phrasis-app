@@ -19,6 +19,7 @@ export function HomeView({
   onLearnOpen,
   onChatOpen,
   animateEntrance,
+  isHidden,
 }: {
   preloadedCollectionProgress: Preloaded<
     typeof api.features.decks.getCollectionProgress
@@ -32,6 +33,7 @@ export function HomeView({
   onLearnOpen: () => void;
   onChatOpen: (threadId: string) => void;
   animateEntrance?: boolean;
+  isHidden?: boolean;
 }) {
   const t = useTranslations('AppPage');
 
@@ -84,8 +86,11 @@ export function HomeView({
     >
       <div className="app-view">
         <ProgressStatsCard
+          key={courseSettings?.courseId}
           onStartReview={handleStartReview}
           animateEntrance={animateEntrance}
+          skipLiveStats={isHidden}
+          courseId={courseSettings?.courseId}
         />
 
         <NewChatInput

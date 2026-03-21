@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
+import { useEnsureContent } from '@/hooks/use-ensure-content';
 import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
 import { Search, Star, EyeOff, CircleCheck, X, Loader2 } from 'lucide-react';
@@ -37,6 +38,8 @@ export function LibraryView() {
   const masterCard = useMutation(api.features.scheduling.masterCard);
   const hideCard = useMutation(api.features.scheduling.hideCard);
   const toggleFavorite = useMutation(api.features.scheduling.toggleFavoriteCard);
+
+  useEnsureContent(result);
 
   const [pendingMaster, setPendingMaster] = useState<Set<string>>(new Set());
   const [pendingHide, setPendingHide] = useState<Set<string>>(new Set());

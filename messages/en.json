@@ -300,6 +300,8 @@
       "hideTargetLanguagesDescription": "Blur target language text by default",
       "autoRevealLanguages": "Auto-reveal",
       "autoRevealLanguagesDescription": "Unblur text as soon as its audio starts playing",
+      "showRomanization": "Show romanization",
+      "showRomanizationDescription": "Display Latin script pronunciation below non-Latin text",
       "autoAdvance": "Auto-advance",
       "autoAdvanceDescription": "Advance to next card after audio finishes",
       "pauseBeforeAutoAdvance": "Before Advancing",

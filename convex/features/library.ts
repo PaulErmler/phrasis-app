@@ -94,32 +94,29 @@ export const getLibraryCards = query({
           return sq;
         })
         .take(LIBRARY_LIMIT);
+    } else if (filter === 'mastered') {
+      cards = await ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', (q) =>
+          q.eq('deckId', deck._id).eq('isHidden', false).eq('isMastered', true),
+        )
+        .order('desc')
+        .take(LIBRARY_LIMIT);
+    } else if (filter === 'favorites') {
+      cards = await ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', (q) =>
+          q.eq('deckId', deck._id).eq('isHidden', false).eq('isFavorite', true),
+        )
+        .order('desc')
+        .take(LIBRARY_LIMIT);
     } else {
       cards = await ctx.db
         .query('cards')
-        .withIndex('by_deckId_and_lastReviewedAt', (q) =>
-          q.eq('deckId', deck._id),
+        .withIndex('by_deckId_and_isHidden_and_lastReviewedAt', (q) =>
+          q.eq('deckId', deck._id).eq('isHidden', filter === 'hidden'),
         )
         .order('desc')
-        .filter((q) => {
-          if (filter === 'mastered') {
-            return q.and(
-              q.eq(q.field('isHidden'), false),
-              q.eq(q.field('isMastered'), true),
-            );
-          }
-          if (filter === 'hidden') {
-            return q.eq(q.field('isHidden'), true);
-          }
-          if (filter === 'favorites') {
-            return q.and(
-              q.eq(q.field('isHidden'), false),
-              q.eq(q.field('isFavorite'), true),
-            );
-          }
-          // default: all non-hidden
-          return q.eq(q.field('isHidden'), false);
-        })
         .take(LIBRARY_LIMIT);
     }
 
@@ -138,6 +135,7 @@ export const getLibraryCards = query({
           textId: card.textId,
           sourceText: text.text,
           sourceLanguage: text.language,
+          sourceRomanization: text.romanizedText ?? undefined,
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);

@@ -6,7 +6,8 @@ import {
   reviewModeValidator,
   fsrsStateValidator,
   cardApprovalStatusValidator,
-  schedulingPhaseValidator
+  schedulingPhaseValidator,
+  ttsQualityValidator,
 } from './types';
 
 
@@ -22,6 +23,7 @@ export default defineSchema({
     datasetSentenceId: v.optional(v.number()), // Unique ID from the dataset (optional for user-created)
     text: v.string(),
     language: v.string(), // e.g., "en" for English
+    romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
     userCreated: v.boolean(), // false for uploaded data, true for user-created
     userId: v.optional(v.string()), // User who created (for user-created texts)
     collectionId: v.optional(v.id('collections')), // Reference to collection
@@ -36,6 +38,7 @@ export default defineSchema({
     textId: v.id('texts'),
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
+    romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),
@@ -46,6 +49,7 @@ export default defineSchema({
     language: v.string(), // Base language code (e.g., "en", "es", "de")
     voiceName: v.string(), // Full voice identifier (e.g., "en-US-Chirp3-HD-Leda")
     storageId: v.id('_storage'), // Convex file storage reference
+    ttsQuality: v.optional(ttsQualityValidator), // TTS validation status
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'language'])
@@ -102,6 +106,7 @@ export default defineSchema({
     showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
     hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
     autoRevealLanguages: v.optional(v.boolean()), // unblur when audio starts playing
+    showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
     // Language order overrides
     baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
     targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
@@ -151,6 +156,9 @@ export default defineSchema({
       'dueDate',
     ])
     .index('by_deckId_and_lastReviewedAt', ['deckId', 'lastReviewedAt'])
+    .index('by_deckId_and_isHidden_and_lastReviewedAt', ['deckId', 'isHidden', 'lastReviewedAt'])
+    .index('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', ['deckId', 'isHidden', 'isMastered', 'lastReviewedAt'])
+    .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
     .searchIndex('search_text', {
       searchField: 'searchableText',
       filterFields: ['deckId', 'isHidden', 'isMastered', 'isFavorite'],
@@ -209,6 +217,28 @@ export default defineSchema({
   })
     .index('by_toolCallId', ['toolCallId'])
     .index('by_thread_and_user', ['threadId', 'userId']),
+
+  // TTS mismatches — stores audio that failed validation for later analysis
+  ttsMismatches: defineTable({
+    textId: v.id('texts'),
+    language: v.string(),
+    voiceName: v.string(),
+    storageId: v.id('_storage'),
+    expectedText: v.string(),
+    transcribedText: v.string(),
+    attempt: v.number(), // 1-based attempt number
+  })
+    .index('by_textId', ['textId'])
+    .index('by_language', ['language']),
+
+  // TTS generation claims — prevents duplicate processTTSForCard scheduling.
+  // Mutations atomically check-and-insert before scheduling; Convex OCC
+  // guarantees only one claim per (textId, language) wins.
+  ttsGenerationClaims: defineTable({
+    textId: v.id('texts'),
+    language: v.string(),
+    claimedAt: v.number(),
+  }).index('by_text_and_language', ['textId', 'language']),
 
   // Usage quotas — local cache of Autumn entitlements for synchronous checks.
   // One document per user; features stored as a record keyed by feature ID.

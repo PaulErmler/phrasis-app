@@ -1,5 +1,6 @@
 import { Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
+import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -8,6 +9,7 @@ export interface CardTranslationContent {
   text: string;
   isBaseLanguage: boolean;
   isTargetLanguage: boolean;
+  romanization?: string;
 }
 
 export interface CardAudioContent {
@@ -27,6 +29,7 @@ interface TextContentInput {
   textId: Id<'texts'>;
   sourceText: string;
   sourceLanguage: string;
+  sourceRomanization?: string;
 }
 
 export function getCourseLanguages(
@@ -78,10 +81,13 @@ export async function buildTextContentBatchForLanguages(
     ),
   ]);
 
-  const translationMap = new Map<string, string>();
+  const translationMap = new Map<string, { text: string; romanization?: string }>();
   translationFetches.forEach((item, idx) => {
-    const translatedText = translationResults[idx]?.translatedText ?? '';
-    translationMap.set(`${item.key}:${item.lang}`, translatedText);
+    const row = translationResults[idx];
+    translationMap.set(`${item.key}:${item.lang}`, {
+      text: row?.translatedText ?? '',
+      romanization: row?.romanizedText ?? undefined,
+    });
   });
 
   const audioByKeyAndLang = new Map<string, (typeof audioResults)[number]>();
@@ -108,15 +114,25 @@ export async function buildTextContentBatchForLanguages(
 
   const result = new Map<string, TextContentResult>();
   for (const input of inputs) {
-    const translations = allLanguages.map((lang) => ({
-      language: lang,
-      text:
-        lang === input.sourceLanguage
-          ? input.sourceText
-          : (translationMap.get(`${input.key}:${lang}`) ?? ''),
-      isBaseLanguage: baseLanguages.includes(lang),
-      isTargetLanguage: targetLanguages.includes(lang),
-    }));
+    const translations = allLanguages.map((lang) => {
+      if (lang === input.sourceLanguage) {
+        return {
+          language: lang,
+          text: input.sourceText,
+          isBaseLanguage: baseLanguages.includes(lang),
+          isTargetLanguage: targetLanguages.includes(lang),
+          romanization: input.sourceRomanization,
+        };
+      }
+      const entry = translationMap.get(`${input.key}:${lang}`);
+      return {
+        language: lang,
+        text: entry?.text ?? '',
+        isBaseLanguage: baseLanguages.includes(lang),
+        isTargetLanguage: targetLanguages.includes(lang),
+        romanization: entry?.romanization,
+      };
+    });
 
     const audioRecordings = allLanguages.map((lang) => {
       const audio = audioByKeyAndLang.get(`${input.key}:${lang}`);
@@ -128,15 +144,17 @@ export async function buildTextContentBatchForLanguages(
     });
 
     const hasMissingTranslation = translations.some(
-      (translation) =>
-        translation.language !== input.sourceLanguage && !translation.text,
+      (tr) => tr.language !== input.sourceLanguage && !tr.text,
     );
     const hasMissingAudio = audioRecordings.some((audio) => !audio.url);
+    const hasMissingRomanization = translations.some(
+      (tr) => ROMANIZATION_LANGUAGES.has(tr.language) && !tr.romanization,
+    );
 
     result.set(input.key, {
       translations,
       audioRecordings,
-      hasMissingContent: hasMissingTranslation || hasMissingAudio,
+      hasMissingContent: hasMissingTranslation || hasMissingAudio || hasMissingRomanization,
     });
   }
 
@@ -157,26 +175,36 @@ export async function buildCardSearchableText(
   sourceText: string,
   courseLanguages: string[],
 ): Promise<{ searchableText: string; searchableTextLanguages: string[] }> {
-  const translationResults = await Promise.all(
-    courseLanguages.map(async (lang) => {
-      const translation = await ctx.db
-        .query('translations')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', textId).eq('targetLanguage', lang),
-        )
-        .unique();
-      return translation ? { lang, text: translation.translatedText } : null;
-    }),
-  );
+  const [text, translationResults] = await Promise.all([
+    ctx.db.get(textId),
+    Promise.all(
+      courseLanguages.map(async (lang) => {
+        const translation = await ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('targetLanguage', lang),
+          )
+          .unique();
+        return translation
+          ? { lang, text: translation.translatedText, romanization: translation.romanizedText }
+          : null;
+      }),
+    ),
+  ]);
 
   const foundTranslations = translationResults.filter(
     (t): t is NonNullable<typeof t> => t !== null,
   );
 
+  const parts = [
+    sourceText,
+    text?.romanizedText,
+    ...foundTranslations.map((t) => t.text),
+    ...foundTranslations.map((t) => t.romanization),
+  ];
+
   return {
-    searchableText: [sourceText, ...foundTranslations.map((t) => t.text)]
-      .filter(Boolean)
-      .join(' '),
+    searchableText: parts.filter(Boolean).join(' '),
     searchableTextLanguages: foundTranslations.map((t) => t.lang),
   };
 }

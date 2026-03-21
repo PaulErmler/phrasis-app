@@ -1,10 +1,9 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { Id } from '@/convex/_generated/dataModel';
+import { useEnsureContent } from '@/hooks/use-ensure-content';
 import {
   Card,
   CardContent,
@@ -28,33 +27,8 @@ export function DeckCardsView() {
   const t = useTranslations('AppPage.deckCards');
   const deckCards = useQuery(api.features.decks.getDeckCards, {});
   const activeCourse = useQuery(api.features.courses.getActiveCourse);
-  const ensureCardContent = useMutation(api.features.decks.ensureCardContent);
 
-  // Track which cards we've already triggered regeneration for
-  // to avoid calling the mutation repeatedly
-  const regeneratedCardsRef = useRef<Set<string>>(new Set());
-
-  // Automatically trigger content generation for cards with missing content
-  useEffect(() => {
-    if (!deckCards) return;
-
-    const cardsWithMissingContent = deckCards.filter(
-      (card) =>
-        card.hasMissingContent && !regeneratedCardsRef.current.has(card.textId),
-    );
-
-    // Trigger regeneration for each card with missing content (limit to avoid too many mutations)
-    const cardsToProcess = cardsWithMissingContent.slice(0, 5);
-
-    for (const card of cardsToProcess) {
-      regeneratedCardsRef.current.add(card.textId);
-      ensureCardContent({ textId: card.textId as Id<'texts'> }).catch((err) => {
-        console.error('Failed to ensure card content:', err);
-        // Remove from set so it can be retried later
-        regeneratedCardsRef.current.delete(card.textId);
-      });
-    }
-  }, [deckCards, ensureCardContent]);
+  useEnsureContent(deckCards);
 
   if (deckCards === undefined || activeCourse === undefined) {
     return (
@@ -141,14 +115,22 @@ export function DeckCardsView() {
                           {index + 1}.
                         </span>
                         <div className="flex-1">
-                          {/* Show base language text (what user knows) */}
                           <p className="font-medium text-sm leading-relaxed">
                             {baseTranslation?.text || card.sourceText}
                           </p>
-                          {/* Show target language text (what user is learning) */}
+                          {baseTranslation?.romanization && (
+                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                              {baseTranslation.romanization}
+                            </p>
+                          )}
                           {targetTranslation?.text && (
                             <p className="text-muted-sm mt-1 leading-relaxed">
                               {targetTranslation.text}
+                            </p>
+                          )}
+                          {targetTranslation?.romanization && (
+                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                              {targetTranslation.romanization}
                             </p>
                           )}
                         </div>
@@ -172,6 +154,11 @@ export function DeckCardsView() {
                         <p className="text-sm">
                           {baseTranslation?.text || card.sourceText}
                         </p>
+                        {baseTranslation?.romanization && (
+                          <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                            {baseTranslation.romanization}
+                          </p>
+                        )}
                         {!baseTranslation?.text &&
                           baseTranslation === undefined && (
                           <p className="text-muted-sm italic">
@@ -202,7 +189,14 @@ export function DeckCardsView() {
                           </span>
                         </div>
                         {targetTranslation?.text ? (
-                          <p className="text-sm">{targetTranslation.text}</p>
+                          <>
+                            <p className="text-sm">{targetTranslation.text}</p>
+                            {targetTranslation.romanization && (
+                              <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                                {targetTranslation.romanization}
+                              </p>
+                            )}
+                          </>
                         ) : (
                           <p className="text-muted-sm italic">Translating...</p>
                         )}

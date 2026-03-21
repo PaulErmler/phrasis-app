@@ -285,6 +285,7 @@ export default function MainLayout({
               onLearnOpen={handleLearnOpen}
               onChatOpen={handleOpenChat}
               animateEntrance={justReturnedFromLearn.current}
+              isHidden={isLearnOpen || activeView !== 'home'}
             />
           </div>
           <div
