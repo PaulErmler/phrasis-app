@@ -25,6 +25,7 @@ import {
   schedulingPhaseValidator
 } from '../types';
 import { getAudioForText } from '../lib/audio';
+import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
@@ -75,6 +76,7 @@ export const getCardForReview = query({
       preReviewCount: v.number(),
       initialReviewCount: v.number(),
       fsrsState: v.union(fsrsStateValidator, v.null()),
+      hasMissingContent: v.boolean(),
     }),
     v.null(),
   ),
@@ -147,6 +149,14 @@ export const getCardForReview = query({
 
     const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
 
+    const hasMissingTranslation = translations.some(
+      (tr) => tr.language !== sourceLanguage && !tr.text,
+    );
+    const hasMissingAudio = audioRecordings.some((a) => !a.url);
+    const hasMissingRomanization = translations.some(
+      (tr) => ROMANIZATION_LANGUAGES.has(tr.language) && !tr.romanization,
+    );
+
     return {
       _id: card._id,
       _creationTime: card._creationTime,
@@ -163,6 +173,7 @@ export const getCardForReview = query({
       preReviewCount: card.preReviewCount,
       initialReviewCount,
       fsrsState: card.fsrsState ?? null,
+      hasMissingContent: hasMissingTranslation || hasMissingAudio || hasMissingRomanization,
     };
   },
 });

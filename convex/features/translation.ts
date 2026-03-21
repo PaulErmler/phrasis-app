@@ -44,9 +44,11 @@ let cachedToken: { token: string; projectId: string; expiresAt: number } | null 
 
 async function getGoogleAccessToken(): Promise<{ token: string; projectId: string }> {
   if (cachedToken && Date.now() < cachedToken.expiresAt) {
+    console.log('[GoogleAuth] Using cached token, expires in', Math.round((cachedToken.expiresAt - Date.now()) / 1000), 's');
     return { token: cachedToken.token, projectId: cachedToken.projectId };
   }
 
+  console.log('[GoogleAuth] Fetching new access token');
   const creds = getServiceAccountCredentials();
   const privateKey = await importPKCS8(creds.private_key, 'RS256');
   const jwt = await new SignJWT({

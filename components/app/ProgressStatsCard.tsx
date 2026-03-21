@@ -125,43 +125,68 @@ function StatColumn({
 export function ProgressStatsCard({
   onStartReview,
   animateEntrance,
+  skipLiveStats,
+  courseId,
 }: {
   onStartReview: (mode: ReviewMode) => void;
   animateEntrance?: boolean;
+  skipLiveStats?: boolean;
+  courseId?: string;
 }) {
   const t = useTranslations('AppPage');
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const stats = useCachedQuery(api.features.courses.getCourseStats, { timezone }, 'courseStats');
-  const todayStats = useCachedQuery(api.features.courses.getTodayStats, { timezone }, 'todayStats');
+  const queryArgs = skipLiveStats ? ('skip' as const) : { timezone };
+  const cacheSuffix = courseId ? `_${courseId}` : '';
+  const stats = useCachedQuery(api.features.courses.getCourseStats, queryArgs, `courseStats${cacheSuffix}`);
+  const todayStats = useCachedQuery(api.features.courses.getTodayStats, queryArgs, `todayStats${cacheSuffix}`);
 
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+
+  const snapshotKey = courseId ? `${SNAPSHOT_KEY}_${courseId}` : SNAPSHOT_KEY;
 
   const prevTodaySnapshot = useRef<TodaySnapshot | null>(null);
   useBrowserLayoutEffect(() => {
     try {
-      const stored = localStorage.getItem(SNAPSHOT_KEY);
+      const stored = localStorage.getItem(snapshotKey);
       if (stored) {
         const parsed: TodaySnapshot = JSON.parse(stored);
         if (parsed.date === today) prevTodaySnapshot.current = parsed;
       }
     } catch {}
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [snapshotKey, today]);
 
   useEffect(() => {
     if (todayStats == null) return;
     try {
       const snapshot: TodaySnapshot = { date: today, ...todayStats };
-      localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
+      localStorage.setItem(snapshotKey, JSON.stringify(snapshot));
     } catch {}
-  }, [todayStats, today]);
+  }, [todayStats, today, snapshotKey]);
 
-  const statsChanged = todayStats != null && (
-    prevTodaySnapshot.current == null ||
+  const statsActuallyChanged = todayStats != null && prevTodaySnapshot.current != null && (
     prevTodaySnapshot.current.reps !== todayStats.reps ||
     prevTodaySnapshot.current.newCards !== todayStats.newCards ||
     prevTodaySnapshot.current.timeMs !== todayStats.timeMs
   );
+
+  // Latch: flip to true when stats change, then flip back after animations
+  // finish so the animation only plays once per change.
+  const [statsChanged, setStatsChanged] = useState(false);
+
+  useEffect(() => {
+    if (!statsActuallyChanged) return;
+    setStatsChanged(true);
+
+    const timer = setTimeout(() => {
+      if (todayStats) {
+        prevTodaySnapshot.current = { date: today, ...todayStats };
+      }
+      setStatsChanged(false);
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [statsActuallyChanged, todayStats, today]);
 
   const streak = stats?.currentStreak ?? 0;
   const reps = stats?.totalRepetitions ?? 0;

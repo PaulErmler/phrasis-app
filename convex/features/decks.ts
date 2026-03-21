@@ -28,6 +28,7 @@ import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../l
 import {
   LEVEL_ORDER,
   COLLECTION_PREVIEW_SIZE,
+  CONTENT_LOOKAHEAD_SIZE,
   getNextCollectionName,
 } from '../lib/collections';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
@@ -738,6 +739,17 @@ export const addCardsFromCollection = mutation({
               { textId: text._id, baseLanguages: course.baseLanguages, targetLanguages: course.targetLanguages },
             );
           }
+
+          const customFinalRank = Math.max(entry.lastRank, newLastRank);
+          const upcomingCustomTexts = await getNextTextsFromRank(
+            ctx, entry.id, customFinalRank, CONTENT_LOOKAHEAD_SIZE,
+          );
+          for (const text of upcomingCustomTexts) {
+            await ctx.scheduler.runAfter(
+              0, internal.features.decks.prepareCardContent,
+              { textId: text._id, baseLanguages: course.baseLanguages, targetLanguages: course.targetLanguages },
+            );
+          }
         }
       }
     }
@@ -819,7 +831,7 @@ export const addCardsFromCollection = mutation({
           ctx,
           args.collectionId,
           finalLastRank,
-          COLLECTION_PREVIEW_SIZE,
+          CONTENT_LOOKAHEAD_SIZE,
         );
 
         for (const text of upcomingTexts) {
@@ -923,6 +935,53 @@ export const ensureCardContent = mutation({
       active.course.baseLanguages,
       active.course.targetLanguages,
     );
+  },
+});
+
+const UPCOMING_CARDS_LOOKAHEAD = 5;
+
+/**
+ * Ensure content for the next 5 due cards in the user's active deck.
+ * Called from the learning mode to pre-generate translations and audio
+ * for upcoming cards so they're ready before the user reaches them.
+ */
+export const ensureUpcomingCardsContent = mutation({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const userId = await requireAuthUserId(ctx);
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return 0;
+    const deck = await getDeckByCourseId(ctx, active.course._id);
+    if (!deck) return 0;
+
+    const now = Date.now();
+    const cards = await ctx.db
+      .query('cards')
+      .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
+        q
+          .eq('deckId', deck._id)
+          .eq('isHidden', false)
+          .eq('isMastered', false)
+          .lte('dueDate', now),
+      )
+      .order('asc')
+      .take(UPCOMING_CARDS_LOOKAHEAD);
+
+    let processed = 0;
+    for (const card of cards) {
+      const text = await ctx.db.get(card.textId);
+      if (!text) continue;
+      await scheduleMissingContent(
+        ctx,
+        card.textId,
+        text,
+        active.course.baseLanguages,
+        active.course.targetLanguages,
+      );
+      processed++;
+    }
+    return processed;
   },
 });
 

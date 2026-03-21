@@ -221,12 +221,16 @@ export function useAudioPlayer(
   const baseOrderKey = orderedBase.join(',');
   const targetOrderKey = orderedTarget.join(',');
 
-  // Track whether this merge was triggered by a card change vs a settings change
   const prevCardIdRef = useRef<string | null>(null);
+  const hasAutoPlayedForCardRef = useRef(false);
 
   useEffect(() => {
     const isCardChange = prevCardIdRef.current !== cardId;
     prevCardIdRef.current = cardId;
+
+    if (isCardChange) {
+      hasAutoPlayedForCardRef.current = false;
+    }
 
     clearCurrentAudio();
 
@@ -283,9 +287,11 @@ export function useAudioPlayer(
         setDurationSec(result.durationSec);
         setIsMerging(false);
 
-        // Only auto-play on card changes when this tab owns playback.
-        // Settings-only changes re-merge silently without auto-playing.
-        if (isCardChange && autoPlay && getReviewInitiatedByThisTab()) {
+        // Auto-play once per card when this tab owns playback.
+        // Uses a ref so late-arriving audio (e.g. after content generation)
+        // still triggers auto-play, while settings-only re-merges stay silent.
+        if (!hasAutoPlayedForCardRef.current && autoPlay && getReviewInitiatedByThisTab()) {
+          hasAutoPlayedForCardRef.current = true;
           onResetReviewFlagRef.current();
           audio.play().catch((err) => {
             if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;

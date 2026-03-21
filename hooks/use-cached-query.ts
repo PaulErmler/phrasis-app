@@ -7,7 +7,7 @@ const useBrowserLayoutEffect =
 
 export function useCachedQuery<F extends FunctionReference<'query'>>(
   query: F,
-  args: FunctionArgs<F>,
+  args: FunctionArgs<F> | 'skip',
   cacheKey: string,
 ): FunctionReturnType<F> | undefined {
   const live = useQuery(query, args);
@@ -30,6 +30,7 @@ export function useCachedQuery<F extends FunctionReference<'query'>>(
   useEffect(() => {
     if (live !== undefined && live !== prevLive.current) {
       prevLive.current = live;
+      setCached(live);
       try {
         localStorage.setItem(cacheKey, JSON.stringify(live));
       } catch {}

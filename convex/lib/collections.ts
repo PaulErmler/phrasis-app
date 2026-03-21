@@ -14,8 +14,11 @@ export const LEVEL_ORDER = [
   'C2',
 ] as const;
 
-/** How many upcoming texts to fetch/pre-generate for collection previews. */
+/** How many upcoming texts to fetch for collection previews. */
 export const COLLECTION_PREVIEW_SIZE = 5;
+
+/** How many upcoming texts to pre-generate content for (translations + audio). */
+export const CONTENT_LOOKAHEAD_SIZE = 10;
 
 /**
  * Maps the onboarding `currentLevel` value to the collection name that should
