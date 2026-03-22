@@ -1,6 +1,6 @@
 {
   "HomePage": {
-    "title": "Master Languages with Phrasis",
+    "title": "Master Languages with Cacatua",
     "subtitle": "Learn phrases, practice pronunciation, and build fluency in any language",
     "signIn": "Sign In",
     "getStarted": "Get Started",
@@ -75,6 +75,55 @@
       "account": "Account",
       "language": "App Language"
     },
+    "deckCards": {
+      "statusFavorite": "Favorite",
+      "statusMastered": "Mastered",
+      "statusHidden": "Hidden",
+      "due": "Due"
+    },
+    "collections": {
+      "carousel": {
+        "sectionTitle": "Difficulty Selection",
+        "title": "Collections",
+        "select": "Select",
+        "selected": "Selected",
+        "done": "Done",
+        "cards": "{count} cards",
+        "notStarted": "Not started",
+        "addCards": "Add {count} cards to deck",
+        "adding": "Adding...",
+        "complete": "Done",
+        "collectionComplete": "{name} complete!",
+        "allCardsAdded": "All cards from this collection have been added to your deck.",
+        "noMoreCards": "No more cards to add from {name}",
+        "nextCards": "Next {count} cards from {name}",
+        "progress": "{added} / {total}",
+        "failedToSelect": "Failed to select collection",
+        "failedToAdd": "Failed to add cards",
+        "cardsAdded": "Added {count} cards to your deck",
+        "noCardsToAdd": "No more cards to add from this collection",
+        "descriptions": {
+          "Essential": "The most essential survival sentences",
+          "A1": "Sentences with vocabulary at CEFR A1 Level",
+          "A2": "Sentences with vocabulary at CEFR A2 Level",
+          "B1": "Sentences with vocabulary at CEFR B1 Level",
+          "B2": "Sentences with vocabulary at CEFR B2 Level",
+          "C1": "Sentences with vocabulary at CEFR C1 Level",
+          "C2": "Sentences with vocabulary at CEFR C2 Level"
+        },
+        "detail": {
+          "totalCards": "{count} cards",
+          "progress": "Progress",
+          "select": "Select",
+          "done": "Done",
+          "allCardsAdded": "All cards from this collection have been added to your deck.",
+          "nextSentences": "Next Sentences",
+          "adding": "Adding...",
+          "addN": "Add {count}",
+          "noMoreCards": "No more cards to add"
+        }
+      }
+    },
     "courses": {
       "title": "Your Courses",
       "description": "Select a course to switch to or create a new one",
@@ -82,7 +131,7 @@
       "noCourses": "No courses yet. Create your first course to get started.",
       "active": "Active",
       "learning": "Learning {language}",
-      "currentCourse": "Current Course",
+      "currentCourse": "Course",
       "from": "from {language}",
       "createDialog": {
         "title": "Create New Course",
@@ -107,10 +156,96 @@
         "create": "Create Course"
       }
     },
-    "changeCourse": "Change Course"
+    "changeCourse": "Change Course",
+    "currentCourseWithLanguages": "Current Course: {targetLanguages}",
+    "startLearning": "Start Learning",
+    "stats": {
+      "streak": "Streak",
+      "reps": "Reps",
+      "sentences": "Sentences",
+      "time": "Time"
+    }
+  },
+  "LearningMode": {
+    "title": "Learning",
+    "chat": "Chat",
+    "back": "Back",
+    "settings": "Settings",
+    "loading": "Loading...",
+    "baseLanguage": "Base Language",
+    "targetLanguage": "Target Language",
+    "reviewCount": "{count} reviews",
+    "nextReview": "Next review in {time}",
+    "nextReviewNow": "Due now",
+    "ratings": {
+      "stillLearning": "Still learning",
+      "understood": "Understood",
+      "again": "Again",
+      "hard": "Hard",
+      "good": "Good",
+      "easy": "Easy"
+    },
+    "actions": {
+      "favorite": "Favorite",
+      "master": "Master",
+      "hide": "Hide",
+      "next": "Next",
+      "pause": "Pause",
+      "play": "Play"
+    },
+    "empty": {
+      "noCardsDue": "No cards due for review",
+      "addCards": "Add {count} cards",
+      "adding": "Adding...",
+      "noCollection": "No collection selected",
+      "goHome": "Go to Home",
+      "allDone": "All caught up! Add more cards to continue learning.",
+      "noCardsInDeck": "No cards in your deck yet. Add cards from a collection to start learning."
+    },
+    "settingsPanel": {
+      "title": "Learning Settings",
+      "iconLegend": "Card Icons",
+      "iconFavorite": "Mark card as a favorite",
+      "iconMaster": "Mark card as mastered (won't appear again after next review)",
+      "iconHide": "Hide card from review (won't appear again after next review)",
+      "cardsPerBatch": "Cards per batch",
+      "cardsPerBatchDescription": "Number of cards to add at once",
+      "reviewSettings": "Review Settings",
+      "autoAddCards": "Auto-add cards",
+      "autoAddCardsDescription": "Automatically add new cards when none are due",
+      "initialReviews": "Initial reviews",
+      "initialReviewsDescription": "Number of pre-reviews before spaced repetition",
+      "audioPlayback": "Audio Playback",
+      "autoPlay": "Auto-play audio",
+      "autoPlayDescription": "Automatically play audio when a card is shown",
+      "uiSettings": "UI Settings",
+      "showProgressBar": "Progress bar",
+      "showProgressBarDescription": "Show the audio progress bar and seek controls",
+      "autoAdvance": "Auto-advance",
+      "autoAdvanceDescription": "Advance to next card after audio finishes",
+      "pauseBeforeAutoAdvance": "Before Advancing",
+      "repetitions": "Repetitions",
+      "repetitionsDescription": "How many times each language is played per card",
+      "plays": "Plays",
+      "pause": "Pause",
+      "pauseBetweenRepetitions": "Pause between repetitions",
+      "base": "Base",
+      "target": "Target",
+      "playbackSequence": "Playback Sequence",
+      "playbackSequenceDescription": "Preview of the audio playback order",
+      "pauseBaseToBase": "Base → Base Pause",
+      "pauseBaseToTarget": "Base → Target Pause",
+      "pauseTargetToTarget": "Target → Target Pause",
+      "autoAdvanceIndicator": "Auto-advance to next card",
+      "noAutoAdvance": "Manual advance (tap Next)",
+      "allSkipped": "All languages set to 0 plays",
+      "seconds": "s",
+      "timesPlayed": "{count}x",
+      "pauseBetweenPlays": "{seconds}s between"
+    }
   },
   "Footer": {
-    "copyright": "© {year} Phrasis. All rights reserved.",
+    "copyright": "© {year} Cacatua. All rights reserved.",
     "theme": "Theme:",
     "language": "Language:",
     "madeInGermany": "Made in Germany",
@@ -131,20 +266,40 @@
     "title": "Language"
   },
   "Chat": {
-    "flashcardConfirmation": {
-      "textLabel": "Text",
-      "noteLabel": "Note",
-      "approveButton": "Create Flashcard",
+    "back": "Back",
+    "thinking": "Thinking...",
+    "emptyTitle": "No messages yet",
+    "emptyDescription": "Start a conversation to see messages here",
+    "suggestions": {
+      "explain": "Explain this sentence to me.",
+      "meaning": "What does this word mean?",
+      "example": "Give me a similar example.",
+      "conversation": "How would I use this in a conversation?"
+    },
+    "voice": {
+      "startRecording": "Start recording",
+      "stopRecording": "Stop recording",
+      "recording": "Recording...",
+      "transcribing": "Transcribing..."
+    },
+    "attachments": {
+      "filesAttached": "Files attached",
+      "filesAttachedDescription": "{count} file(s) attached to message",
+      "sentWithAttachments": "Sent with attachments"
+    },
+    "cardApproval": {
+      "approveButton": "Add Card",
       "rejectButton": "Reject",
-      "approved": "Flashcard created successfully!",
-      "rejected": "Flashcard creation cancelled",
+      "approved": "Card added!",
+      "rejected": "Card creation cancelled",
       "loading": "Loading...",
-      "creatingApproval": "Creating approval request..."
+      "creatingApproval": "Creating card...",
+      "failed": "Card creation failed"
     }
   },
   "Onboarding": {
     "welcome": {
-      "title": "Welcome to Phrasis!",
+      "title": "Welcome to Cacatua!",
       "subtitle": "Let's customize your learning experience in just a few steps",
       "description": "This will only take a minute, and you can always change these settings later.",
       "feature1": {

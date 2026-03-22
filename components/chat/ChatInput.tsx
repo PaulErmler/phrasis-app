@@ -13,11 +13,12 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
   PromptInputTools,
-} from "@/components/ai-elements/prompt-input";
-import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
-import { VoiceRecordButton } from "./VoiceRecordButton";
-import type { ChatStatus } from "@/lib/types/chat";
-import { DEFAULT_SUGGESTIONS, CHAT_STATUS } from "@/lib/constants/chat";
+} from '@/components/ai-elements/prompt-input';
+import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
+import { VoiceRecordButton } from './VoiceRecordButton';
+import type { ChatStatus } from '@/lib/types/chat';
+import { DEFAULT_SUGGESTIONS, CHAT_STATUS } from '@/lib/constants/chat';
+import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
   onSubmit: (message: PromptInputMessage) => Promise<void>;
@@ -29,6 +30,10 @@ interface ChatInputProps {
   isTranscribing: boolean;
   onVoiceClick: () => void;
   showSuggestions?: boolean;
+  suggestions?: readonly string[];
+  className?: string;
+  footerAction?: React.ReactNode;
+  suggestionsAction?: React.ReactNode;
 }
 
 /**
@@ -44,47 +49,63 @@ export function ChatInput({
   isTranscribing,
   onVoiceClick,
   showSuggestions = false,
+  suggestions,
+  className,
+  footerAction,
+  suggestionsAction,
 }: ChatInputProps) {
-
-
+  const items = suggestions ?? DEFAULT_SUGGESTIONS;
 
   return (
-    <div>
-      <div>
+    <div className={cn("w-full min-w-0", className ?? "")}>
+      <div className="w-full min-w-0">
         {showSuggestions && (
-          <Suggestions className="px-4">
-            {DEFAULT_SUGGESTIONS.map((suggestion) => (
-              <Suggestion
-                key={suggestion}
-                onClick={() => onSuggestionClick(suggestion)}
-                suggestion={suggestion}
-              />
-            ))}
-          </Suggestions>
+          <div className="w-full min-w-0 mb-3 flex items-center gap-2">
+            {suggestionsAction}
+            <div className="flex-1 min-w-0">
+              <Suggestions className="px-4">
+                {items.map((suggestion) => (
+                  <Suggestion
+                    key={suggestion}
+                    onClick={() => onSuggestionClick(suggestion)}
+                    suggestion={suggestion}
+                  />
+                ))}
+              </Suggestions>
+            </div>
+          </div>
         )}
-        <div>
-          <PromptInput globalDrop multiple onSubmit={onSubmit} className="container mx-auto" >
-            <PromptInputHeader >
+        <div className="w-full min-w-0">
+          <PromptInput
+            globalDrop
+            multiple
+            onSubmit={onSubmit}
+            className="w-full"
+          >
+            <PromptInputHeader>
               <PromptInputAttachments>
                 {(attachment) => <PromptInputAttachment data={attachment} />}
               </PromptInputAttachments>
             </PromptInputHeader>
-            
-            <PromptInputBody  >
+
+            <PromptInputBody>
               <PromptInputTextarea
                 onChange={(event) => onTextChange(event.target.value)}
                 value={text}
               />
             </PromptInputBody>
             <PromptInputFooter>
-              <PromptInputTools>
-                <PromptInputActionMenu>
-                  <PromptInputActionMenuTrigger />
-                  <PromptInputActionMenuContent>
-                    <PromptInputActionAddAttachments />
-                  </PromptInputActionMenuContent>
-                </PromptInputActionMenu>
-              </PromptInputTools>
+              <div className="flex items-center gap-2">
+                {footerAction}
+                <PromptInputTools>
+                  <PromptInputActionMenu>
+                    <PromptInputActionMenuTrigger />
+                    <PromptInputActionMenuContent>
+                      <PromptInputActionAddAttachments />
+                    </PromptInputActionMenuContent>
+                  </PromptInputActionMenu>
+                </PromptInputTools>
+              </div>
               <div className="flex items-center gap-2">
                 <VoiceRecordButton
                   isRecording={isRecording}
@@ -109,7 +130,3 @@ export function ChatInput({
     </div>
   );
 }
-
-
-
-

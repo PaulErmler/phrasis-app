@@ -2,7 +2,8 @@
 
 /* Landing Page Animations */
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0) rotate(0deg);
   }
   25% {
@@ -34,7 +35,8 @@
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 20px oklch(0.61 0.11 222 / 0.3);
   }
   50% {
@@ -43,7 +45,8 @@
 }
 
 @keyframes pulse-glow-orange {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(255, 179, 0, 0.3);
   }
   50% {
@@ -73,12 +76,20 @@
 }
 
 /* Staggered animations */
-.stagger-1 { animation-delay: 0.1s; }
-.stagger-3 { animation-delay: 0.3s; }
+.stagger-1 {
+  animation-delay: 0.1s;
+}
+.stagger-3 {
+  animation-delay: 0.3s;
+}
 
 /* Gradient text */
 .gradient-text {
-  background: linear-gradient(135deg, oklch(0.61 0.11 222), oklch(0.80 0.13 212));
+  background: linear-gradient(
+    135deg,
+    oklch(0.61 0.11 222),
+    oklch(0.8 0.13 212)
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -86,37 +97,85 @@
 
 /* Hero gradient background */
 .hero-gradient {
-  background: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.61 0.11 222 / 0.15), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 60%, oklch(0.80 0.13 212 / 0.1), transparent),
-    radial-gradient(ellipse 50% 30% at 20% 80%, oklch(0.71 0.13 215 / 0.08), transparent);
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% -20%,
+      oklch(0.61 0.11 222 / 0.15),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 80% 60%,
+      oklch(0.8 0.13 212 / 0.1),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 50% 30% at 20% 80%,
+      oklch(0.71 0.13 215 / 0.08),
+      transparent
+    );
 }
 
 .dark .hero-gradient {
-  background: 
-    radial-gradient(ellipse 80% 50% at 50% -20%, oklch(0.61 0.11 222 / 0.25), transparent),
-    radial-gradient(ellipse 60% 40% at 80% 60%, oklch(0.80 0.13 212 / 0.15), transparent),
-    radial-gradient(ellipse 50% 30% at 20% 80%, oklch(0.71 0.13 215 / 0.1), transparent);
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 50% -20%,
+      oklch(0.61 0.11 222 / 0.25),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 80% 60%,
+      oklch(0.8 0.13 212 / 0.15),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 50% 30% at 20% 80%,
+      oklch(0.71 0.13 215 / 0.1),
+      transparent
+    );
 }
 
 /* Newsletter gradient background */
 .newsletter-gradient {
-  background: 
-    radial-gradient(ellipse 70% 50% at 50% 120%, oklch(0.61 0.11 222 / 0.12), transparent),
-    radial-gradient(ellipse 50% 40% at 20% 40%, oklch(0.80 0.13 212 / 0.08), transparent),
-    radial-gradient(ellipse 60% 35% at 80% 30%, oklch(0.71 0.13 215 / 0.06), transparent);
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 50% 120%,
+      oklch(0.61 0.11 222 / 0.12),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 50% 40% at 20% 40%,
+      oklch(0.8 0.13 212 / 0.08),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 60% 35% at 80% 30%,
+      oklch(0.71 0.13 215 / 0.06),
+      transparent
+    );
 }
 
 .dark .newsletter-gradient {
-  background: 
-    radial-gradient(ellipse 70% 50% at 50% 120%, oklch(0.61 0.11 222 / 0.2), transparent),
-    radial-gradient(ellipse 50% 40% at 20% 40%, oklch(0.80 0.13 212 / 0.12), transparent),
-    radial-gradient(ellipse 60% 35% at 80% 30%, oklch(0.71 0.13 215 / 0.1), transparent);
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 50% 120%,
+      oklch(0.61 0.11 222 / 0.2),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 50% 40% at 20% 40%,
+      oklch(0.8 0.13 212 / 0.12),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 60% 35% at 80% 30%,
+      oklch(0.71 0.13 215 / 0.1),
+      transparent
+    );
 }
 
 /* Noise texture overlay */
 .noise-bg::before {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
@@ -127,7 +186,9 @@
 
 /* Pricing card hover effect */
 .pricing-card {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .pricing-card:hover {
@@ -166,4 +227,3 @@
 .faq-details[open] summary {
   border-bottom: none;
 }
-

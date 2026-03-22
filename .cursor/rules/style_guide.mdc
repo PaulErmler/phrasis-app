@@ -1,0 +1,60 @@
+# App Style Guide Rules
+
+When writing or editing React components in `components/` or `app/`, always follow the project style guide at `documentation/style_guide.md`. Prefer the reusable CSS classes in `app/globals.css` over inline Tailwind when they match.
+
+## Reusable CSS Classes (prefer these)
+
+- **Layout**: `sticky-header`, `header-bar`, `app-view`, `sheet-header`, `sheet-body`, `sheet-footer`
+- **Typography**: `heading-section`, `heading-dialog`, `body-large`, `label-form`, `text-muted-sm`, `text-muted-xs`
+- **Surfaces**: `card-surface`, `content-box`, `surface-muted`, `state-active`
+
+## Typography
+
+- **Page/section/card heading**: use `heading-section`
+- **Dialog/sheet title**: `text-xl font-bold` — this is the ONLY place `font-bold` is used for headings
+- **Body text**: `text-sm`
+- **Body large**: use `body-large`
+- **Muted text (sm)**: use `text-muted-sm`
+- **Muted text (xs)**: use `text-muted-xs`
+- **Form label**: use `label-form`
+- Never use `text-2xl` for card or dialog titles
+- Prefer `font-semibold` over `font-bold` for in-page headings
+
+## Cards and Surfaces
+
+- **Standard card**: Use the `Card` component from `components/ui/card`
+- **Inline card** (where Card component doesn't fit): use `card-surface`
+- **Content box**: use `content-box`
+- **Muted surface**: use `surface-muted`
+- **Active state**: use `state-active`
+- Always use `rounded-xl` for cards and bordered containers. Never use `rounded-2xl` for cards.
+- Use `rounded-lg` only for muted surfaces and skeleton placeholders.
+
+## Page Layout
+
+- **View wrapper**: use `app-view`
+- Views must NOT add their own `px-*` or `py-*` — the parent layout provides `container mx-auto px-4`
+- Use `space-y-6` between major sections, `space-y-2` within sections
+
+## Sheet/Dialog Headers
+
+- **Sheet header**: use `sheet-header`
+- **Sheet body**: use `sheet-body`
+- **Sheet footer**: use `sheet-footer`
+- **Sheet title**: use `heading-section`
+
+## Icons
+
+- **Standard**: `h-4 w-4`
+- **Large**: `h-5 w-5`
+- **Small**: `h-3.5 w-3.5`
+- Always use `h-X w-X` syntax. Never use `size-X`.
+
+## Semantic Colors
+
+- **Success**: use `text-success` — never use `text-green-500` or `text-green-600` directly
+- **Warning/hide**: use `text-warning` — never use `text-orange-600` directly
+- **Active accent**: `text-primary`
+- **Destructive**: `text-destructive`
+- **Muted**: `text-muted-foreground`
+- Use theme tokens over raw color values whenever a semantic match exists

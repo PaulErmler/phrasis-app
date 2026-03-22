@@ -1,8 +1,8 @@
 {
   "Auth": {
-    "SIGN_IN_DESCRIPTION": "", 
+    "SIGN_IN_DESCRIPTION": "",
     "SIGN_UP_DESCRIPTION": "",
-    "OR_CONTINUE_WITH": "oder nutze Email und Passwort", 
+    "OR_CONTINUE_WITH": "oder nutze Email und Passwort",
     "SIGN_IN": "Anmelden",
     "SIGN_UP": "Registrieren",
     "SIGN_OUT": "Abmelden",
@@ -93,40 +93,30 @@
     "AVATAR_DESCRIPTION": "Klicke auf den Avatar, um ein eigenes Bild hochzuladen.",
     "AVATAR_INSTRUCTIONS": "Ein Avatar ist optional, aber empfohlen.",
     "EMAIL_DESCRIPTION": "Gib die E-Mail-Adresse ein, mit der du dich anmelden möchtest.",
-    "EMAIL_INSTRUCTIONS": "Bitte gib eine gültige E-Mail-Adresse ein.", 
+    "EMAIL_INSTRUCTIONS": "Bitte gib eine gültige E-Mail-Adresse ein.",
 
+    "FAILED_TO_CREATE_USER": "Benutzer konnte nicht erstellt werden",
+    "FAILED_TO_UPDATE_USER": "Benutzer konnte nicht aktualisiert werden",
 
-	"FAILED_TO_CREATE_USER": "Benutzer konnte nicht erstellt werden",
-	"FAILED_TO_UPDATE_USER": "Benutzer konnte nicht aktualisiert werden",
+    "USER_EMAIL_NOT_FOUND": "E-Mail-Adresse des Benutzers nicht gefunden",
+    "USER_ALREADY_HAS_PASSWORD": "Benutzer hat bereits ein Passwort. Bitte gib es ein, um das Konto zu löschen.",
+    "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL": "Benutzer existiert bereits. Verwende eine andere E-Mail-Adresse.",
 
-	"USER_EMAIL_NOT_FOUND": "E-Mail-Adresse des Benutzers nicht gefunden",
-	"USER_ALREADY_HAS_PASSWORD":
-		"Benutzer hat bereits ein Passwort. Bitte gib es ein, um das Konto zu löschen.",
-	"USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL":
-		"Benutzer existiert bereits. Verwende eine andere E-Mail-Adresse.",
+    "FAILED_TO_CREATE_SESSION": "Sitzung konnte nicht erstellt werden",
+    "FAILED_TO_GET_SESSION": "Sitzung konnte nicht abgerufen werden",
+    "SESSION_EXPIRED": "Sitzung abgelaufen. Bitte melde dich erneut an, um diese Aktion auszuführen.",
 
-
-	"FAILED_TO_CREATE_SESSION": "Sitzung konnte nicht erstellt werden",
-	"FAILED_TO_GET_SESSION": "Sitzung konnte nicht abgerufen werden",
-	"SESSION_EXPIRED":
-		"Sitzung abgelaufen. Bitte melde dich erneut an, um diese Aktion auszuführen.",
-
-
-	"INVALID_TOKEN": "Ungültiger Token",
-	"CREDENTIAL_ACCOUNT_NOT_FOUND": "Konto nicht gefunden",
+    "INVALID_TOKEN": "Ungültiger Token",
+    "CREDENTIAL_ACCOUNT_NOT_FOUND": "Konto nicht gefunden",
     "IS_INVALID": "ist ungültig",
 
+    "SOCIAL_ACCOUNT_ALREADY_LINKED": "Konto bereits verknüpft",
+    "PROVIDER_NOT_FOUND": "Anbieter nicht gefunden",
+    "ID_TOKEN_NOT_SUPPORTED": "id_token nicht unterstützt",
+    "FAILED_TO_GET_USER_INFO": "Informationen des Benutzers konnten nicht abgerufen werden",
 
-
-	"SOCIAL_ACCOUNT_ALREADY_LINKED": "Konto bereits verknüpft",
-	"PROVIDER_NOT_FOUND": "Anbieter nicht gefunden",
-	"ID_TOKEN_NOT_SUPPORTED": "id_token nicht unterstützt",
-	"FAILED_TO_GET_USER_INFO":
-		"Informationen des Benutzers konnten nicht abgerufen werden",
-
-	"EMAIL_CAN_NOT_BE_UPDATED": "E-Mail-Adresse konnte nicht aktualisiert werden",
-	"FAILED_TO_UNLINK_LAST_ACCOUNT": "Du kannst das letzte Konto nicht trennen",
-	"ACCOUNT_NOT_FOUND": "Konto nicht gefunden"
+    "EMAIL_CAN_NOT_BE_UPDATED": "E-Mail-Adresse konnte nicht aktualisiert werden",
+    "FAILED_TO_UNLINK_LAST_ACCOUNT": "Du kannst das letzte Konto nicht trennen",
+    "ACCOUNT_NOT_FOUND": "Konto nicht gefunden"
   }
 }
-

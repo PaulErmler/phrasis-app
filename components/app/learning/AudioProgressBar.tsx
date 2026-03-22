@@ -1,0 +1,77 @@
+'use client';
+
+import { useState, useEffect, memo } from 'react';
+import { Slider } from '@/components/ui/slider';
+import { updateMediaSessionPosition } from '@/lib/audio/mediaSession';
+
+function formatTime(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+export const AudioProgressBar = memo(function AudioProgressBar({
+  audioRef,
+  durationSec,
+  isPlaying,
+  onSeek,
+  isMerging = false,
+}: {
+  audioRef: React.RefObject<HTMLAudioElement | null>;
+  durationSec: number;
+  isPlaying: boolean;
+  onSeek: (seconds: number) => void;
+  isMerging?: boolean;
+}) {
+  const [currentTime, setCurrentTime] = useState(0);
+
+  useEffect(() => {
+    setCurrentTime(0);
+  }, [durationSec]);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updatePosition = () => {
+      setCurrentTime(audio.currentTime);
+      updateMediaSessionPosition(audio.duration || 0, audio.currentTime);
+    };
+
+    updatePosition();
+
+    if (!isPlaying) return;
+
+    audio.addEventListener('timeupdate', updatePosition);
+    audio.addEventListener('seeked', updatePosition);
+
+    return () => {
+      audio.removeEventListener('timeupdate', updatePosition);
+      audio.removeEventListener('seeked', updatePosition);
+    };
+  }, [isPlaying, audioRef]);
+
+  const inactive = durationSec <= 0 || isMerging;
+
+  return (
+    <div className={`flex items-center gap-2 transition-opacity duration-150 ${inactive ? 'opacity-30 pointer-events-none' : ''}`}>
+      <span className="text-[11px] text-muted-foreground tabular-nums w-8 text-right">
+        {formatTime(inactive ? 0 : currentTime)}
+      </span>
+      <Slider
+        value={[inactive ? 0 : currentTime]}
+        max={inactive ? 1 : durationSec}
+        step={0.1}
+        onValueChange={([v]) => {
+          setCurrentTime(v);
+          onSeek(v);
+        }}
+        className="flex-1"
+        disabled={inactive}
+      />
+      <span className="text-[11px] text-muted-foreground tabular-nums w-8">
+        {formatTime(inactive ? 0 : durationSec)}
+      </span>
+    </div>
+  );
+});

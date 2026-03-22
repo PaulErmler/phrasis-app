@@ -1,5 +1,5 @@
-import { Heart, ExternalLink } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Heart, ExternalLink } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 export function DonationSection() {
   const t = useTranslations('LandingPage.donation');
@@ -10,13 +10,18 @@ export function DonationSection() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-accent-orange/10 mb-6 animate-pulse-glow-orange">
             <Heart className="w-8 h-8 text-accent-orange fill-accent-orange/20" />
           </div>
-          
+
           <h2 className="text-2xl md:text-3xl font-bold mb-4">
-            {t('title')} <span className="gradient-text">{t('titleHighlight')}</span>
+            {t('title')}{' '}
+            <span className="gradient-text">{t('titleHighlight')}</span>
           </h2>
-          
+
           <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto mb-6">
-            {t('description')} <span className="font-semibold text-foreground">{t('percentage')}</span> {t('description2')} {" "}
+            {t('description')}{' '}
+            <span className="font-semibold text-foreground">
+              {t('percentage')}
+            </span>{' '}
+            {t('description2')}{' '}
             <a
               href="https://www.givewell.org"
               target="_blank"
@@ -25,11 +30,11 @@ export function DonationSection() {
             >
               {t('givewellLink')}
               <ExternalLink className="w-4 h-4" />
-            </a>. 
+            </a>
+            .
           </p>
         </div>
       </div>
     </section>
   );
 }
-

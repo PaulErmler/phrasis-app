@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { ThemeSwitcher } from "./ThemeSwitcher";
-import { LanguageSwitcher } from "./LanguageSwitcher";
+import Link from 'next/link';
+import { ThemeSwitcher } from './ThemeSwitcher';
+import { LanguageSwitcher } from './LanguageSwitcher';
 
 export function Header() {
   return (
@@ -10,15 +10,18 @@ export function Header() {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           {/* Logo and Brand */}
-          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <Link
+            href="/"
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          >
             <img
               src="/icons/icon.svg"
-              alt="Phrasis Logo"
+              alt="Cacatua Logo"
               className="w-10 h-10"
               width={40}
               height={40}
             />
-            <span className="text-xl font-bold text-foreground">Phrasis</span>
+            <span className="heading-dialog text-foreground">Cacatua</span>
           </Link>
 
           <div className="flex items-center gap-4">
@@ -30,4 +33,3 @@ export function Header() {
     </header>
   );
 }
-

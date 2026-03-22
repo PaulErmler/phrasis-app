@@ -1,103 +1,35 @@
-"use client";
+'use client';
 
-import { useState, useRef, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { Id } from "@/convex/_generated/dataModel";
+import { useRef, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
+import { useQuery, useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { ScrollArea } from "@/components/ui/scroll-area";
+} from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Layers, Volume2, VolumeX, Loader2, Languages } from "lucide-react";
-
-interface AudioPlayerProps {
-  url: string | null;
-  language: string;
-}
-
-function AudioPlayer({ url, language }: AudioPlayerProps) {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  const handlePlay = async () => {
-    if (!url) return;
-
-    if (isPlaying && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      if (!audioRef.current || audioRef.current.src !== url) {
-        audioRef.current = new Audio(url);
-        audioRef.current.onended = () => setIsPlaying(false);
-        audioRef.current.onerror = () => {
-          setIsPlaying(false);
-          setIsLoading(false);
-        };
-      }
-
-      await audioRef.current.play();
-      setIsPlaying(true);
-    } catch (error) {
-      console.error("Error playing audio:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Audio is still being generated
-  if (!url) {
-    return (
-      <Button variant="ghost" size="sm" disabled className="gap-1 text-muted-foreground">
-        <Loader2 className="h-3 w-3 animate-spin" />
-        <span className="text-xs">Generating {language}...</span>
-      </Button>
-    );
-  }
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      onClick={handlePlay}
-      disabled={isLoading}
-      className="gap-1"
-    >
-      {isLoading ? (
-        <Loader2 className="h-3 w-3 animate-spin" />
-      ) : isPlaying ? (
-        <VolumeX className="h-3 w-3" />
-      ) : (
-        <Volume2 className="h-3 w-3" />
-      )}
-      <span className="text-xs">{language}</span>
-    </Button>
-  );
-}
+} from '@/components/ui/accordion';
+import { Layers, Languages } from 'lucide-react';
+import { AudioButton } from '@/components/app/learning/AudioButton';
 
 export function DeckCardsView() {
-  const deckCards = useQuery(api.decks.getDeckCards, {});
-  const activeCourse = useQuery(api.courses.getActiveCourse);
-  const ensureCardContent = useMutation(api.decks.ensureCardContent);
-  
+  const t = useTranslations('AppPage.deckCards');
+  const deckCards = useQuery(api.features.decks.getDeckCards, {});
+  const activeCourse = useQuery(api.features.courses.getActiveCourse);
+  const ensureCardContent = useMutation(api.features.decks.ensureCardContent);
+
   // Track which cards we've already triggered regeneration for
   // to avoid calling the mutation repeatedly
   const regeneratedCardsRef = useRef<Set<string>>(new Set());
@@ -107,16 +39,17 @@ export function DeckCardsView() {
     if (!deckCards) return;
 
     const cardsWithMissingContent = deckCards.filter(
-      (card) => card.hasMissingContent && !regeneratedCardsRef.current.has(card.textId)
+      (card) =>
+        card.hasMissingContent && !regeneratedCardsRef.current.has(card.textId),
     );
 
     // Trigger regeneration for each card with missing content (limit to avoid too many mutations)
     const cardsToProcess = cardsWithMissingContent.slice(0, 5);
-    
+
     for (const card of cardsToProcess) {
       regeneratedCardsRef.current.add(card.textId);
-      ensureCardContent({ textId: card.textId as Id<"texts"> }).catch((err) => {
-        console.error("Failed to ensure card content:", err);
+      ensureCardContent({ textId: card.textId as Id<'texts'> }).catch((err) => {
+        console.error('Failed to ensure card content:', err);
         // Remove from set so it can be retried later
         regeneratedCardsRef.current.delete(card.textId);
       });
@@ -143,7 +76,7 @@ export function DeckCardsView() {
   }
 
   if (deckCards.length === 0) {
-      return (
+    return (
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -168,9 +101,7 @@ export function DeckCardsView() {
             {deckCards.length} cards
           </Badge>
         </CardTitle>
-        <CardDescription>
-          Cards with translations and audio
-        </CardDescription>
+        <CardDescription>Cards with translations and audio</CardDescription>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[400px] pr-4">
@@ -178,19 +109,23 @@ export function DeckCardsView() {
             {deckCards.map((card, index) => {
               // Get base language translation (the language the user knows)
               const baseTranslation = card.translations.find(
-                (t) => t.isBaseLanguage && t.text
+                (t) => t.isBaseLanguage && t.text,
               );
               // Get target language translation (the language being learned)
               const targetTranslation = card.translations.find(
-                (t) => t.isTargetLanguage && t.text
+                (t) => t.isTargetLanguage && t.text,
               );
 
               // Get audio for each
               const baseAudio = baseTranslation
-                ? card.audioRecordings.find((a) => a.language === baseTranslation.language)
+                ? card.audioRecordings.find(
+                  (a) => a.language === baseTranslation.language,
+                )
                 : null;
               const targetAudio = targetTranslation
-                ? card.audioRecordings.find((a) => a.language === targetTranslation.language)
+                ? card.audioRecordings.find(
+                  (a) => a.language === targetTranslation.language,
+                )
                 : null;
 
               return (
@@ -212,7 +147,7 @@ export function DeckCardsView() {
                           </p>
                           {/* Show target language text (what user is learning) */}
                           {targetTranslation?.text && (
-                            <p className="text-sm text-muted-foreground mt-1 leading-relaxed">
+                            <p className="text-muted-sm mt-1 leading-relaxed">
                               {targetTranslation.text}
                             </p>
                           )}
@@ -226,18 +161,30 @@ export function DeckCardsView() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-xs">
-                            {(baseTranslation?.language || card.sourceLanguage).toUpperCase()}
+                            {(
+                              baseTranslation?.language || card.sourceLanguage
+                            ).toUpperCase()}
                           </Badge>
-                          <span className="text-sm font-medium">Base (You know this)</span>
+                          <span className="text-sm font-medium">
+                            Base (You know this)
+                          </span>
                         </div>
-                        <p className="text-sm">{baseTranslation?.text || card.sourceText}</p>
-                        {!baseTranslation?.text && baseTranslation === undefined && (
-                          <p className="text-sm text-muted-foreground italic">Translating...</p>
+                        <p className="text-sm">
+                          {baseTranslation?.text || card.sourceText}
+                        </p>
+                        {!baseTranslation?.text &&
+                          baseTranslation === undefined && (
+                          <p className="text-muted-sm italic">
+                              Translating...
+                          </p>
                         )}
                         <div className="flex gap-2">
-                          <AudioPlayer
+                          <AudioButton
                             url={baseAudio?.url ?? null}
-                            language={(baseTranslation?.language || card.sourceLanguage).toUpperCase()}
+                            language={(
+                              baseTranslation?.language || card.sourceLanguage
+                            ).toUpperCase()}
+                            showLabel
                           />
                         </div>
                       </div>
@@ -247,37 +194,48 @@ export function DeckCardsView() {
                         <div className="flex items-center gap-2">
                           <Languages className="h-4 w-4 text-muted-foreground" />
                           <Badge variant="secondary" className="text-xs">
-                            {targetTranslation?.language.toUpperCase() || "TARGET"}
+                            {targetTranslation?.language.toUpperCase() ||
+                              'TARGET'}
                           </Badge>
-                          <span className="text-sm font-medium">Target (Learning this)</span>
+                          <span className="text-sm font-medium">
+                            Target (Learning this)
+                          </span>
                         </div>
                         {targetTranslation?.text ? (
                           <p className="text-sm">{targetTranslation.text}</p>
                         ) : (
-                          <p className="text-sm text-muted-foreground italic">Translating...</p>
+                          <p className="text-muted-sm italic">Translating...</p>
                         )}
                         <div className="flex gap-2">
-                          <AudioPlayer
+                          <AudioButton
                             url={targetAudio?.url ?? null}
-                            language={targetTranslation?.language.toUpperCase() || ""}
+                            language={
+                              targetTranslation?.language.toUpperCase() || ''
+                            }
+                            showLabel
                           />
                         </div>
                       </div>
 
                       {/* Card Status */}
                       <div className="flex items-center gap-2 pt-2 border-t">
+                        {card.isFavorite && (
+                          <Badge variant="secondary" className="text-xs">
+                            {t('statusFavorite')}
+                          </Badge>
+                        )}
                         {card.isMastered && (
                           <Badge variant="default" className="text-xs">
-                            Mastered
+                            {t('statusMastered')}
                           </Badge>
                         )}
                         {card.isHidden && (
                           <Badge variant="outline" className="text-xs">
-                            Hidden
+                            {t('statusHidden')}
                           </Badge>
                         )}
-                        <span className="text-xs text-muted-foreground">
-                          Due: {new Date(card.dueDate).toLocaleDateString()}
+                        <span className="text-muted-xs">
+                          {t('due')}: {new Date(card.dueDate).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
@@ -291,4 +249,3 @@ export function DeckCardsView() {
     </Card>
   );
 }
-

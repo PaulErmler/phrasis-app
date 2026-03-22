@@ -40,6 +40,9 @@ yarn-error.log*
 # convex temp directory
 .convex-tmp
 
+# local convex branch snapshots
+.convex-snapshots/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
@@ -57,8 +60,6 @@ data_preparation/pipeline.py
 **/__pycache__/**
 
 
-
-convex/_generated
 data_preparation/language_intelligence/spacy_classifier_documentation.md
 .gitignore
 data_preparation/data/output/sentences_with_topics_cache.tsv

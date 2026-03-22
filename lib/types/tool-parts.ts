@@ -1,43 +1,41 @@
-import type { ToolUIPart } from "ai";
+import type { ToolUIPart } from 'ai';
 
 /**
- * Input shape for the createFlashcard tool
+ * Input shape for the createCard tool
  */
-export interface CreateFlashcardInput {
-  text: string;
-  note: string;
+export interface CreateCardInput {
+  languages: string[];
+  translations: string[];
+  mainLanguage: string;
 }
 
 /**
- * Specific type for createFlashcard tool parts
- * Note: input may be undefined during streaming until it's fully populated
- * Note: toolCallId exists at runtime but is not in the base ToolUIPart type
+ * Specific type for createCard tool parts.
+ * Input may be undefined during streaming until it's fully populated.
+ * toolCallId exists at runtime but is not in the base ToolUIPart type.
  */
-export interface CreateFlashcardToolPart {
-  type: "tool-createFlashcard";
-  input?: CreateFlashcardInput;
+export interface CreateCardToolPart {
+  type: 'tool-createCard';
+  input?: CreateCardInput;
   toolCallId?: string;
 }
 
 /**
- * Type guard to check if a tool part is a createFlashcard tool
- * Also validates that the input field exists (may not be populated during streaming)
+ * Type guard to check if a tool part is a createCard tool.
+ * Only checks the type name — `input` can be undefined for error/streaming
+ * states, which `CardApproval` handles gracefully.
  */
-export function isCreateFlashcardToolPart(
-  toolPart: ToolUIPart
-): toolPart is CreateFlashcardToolPart & ToolUIPart {
-  return (
-    toolPart.type === "tool-createFlashcard" &&
-    typeof toolPart.input === "object" &&
-    toolPart.input !== null
-  );
+export function isCreateCardToolPart(
+  toolPart: ToolUIPart,
+): toolPart is CreateCardToolPart & ToolUIPart {
+  return toolPart.type === 'tool-createCard';
 }
 
 /**
  * Type guard to check if a tool part has a toolCallId
  */
 export function hasToolCallId(toolPart: ToolUIPart): boolean {
-  return "toolCallId" in toolPart && typeof toolPart.toolCallId === "string";
+  return 'toolCallId' in toolPart && typeof toolPart.toolCallId === 'string';
 }
 
 /**
@@ -49,4 +47,3 @@ export function getToolCallId(toolPart: ToolUIPart): string | undefined {
   }
   return undefined;
 }
-

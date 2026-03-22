@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import { useTranslations } from "next-intl";
-import Link from "next/link";
-import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { useTranslations } from 'next-intl';
+import Link from 'next/link';
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 
 export function Footer() {
-  const t = useTranslations("Footer");
+  const t = useTranslations('Footer');
 
   return (
     <footer className="w-full border-t border-border bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
@@ -14,31 +14,31 @@ export function Footer() {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
-              <Link 
-                href="/legal/impressum" 
+              <Link
+                href="/legal/impressum"
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                {t("legal.impressum")}
+                {t('legal.impressum')}
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link 
-                href="/legal/agb" 
+              <Link
+                href="/legal/agb"
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                {t("legal.agb")}
+                {t('legal.agb')}
               </Link>
               <span className="text-muted-foreground">•</span>
-              <Link 
-                href="/legal/privacy" 
+              <Link
+                href="/legal/privacy"
                 className="text-muted-foreground hover:text-foreground transition-colors"
               >
-                {t("legal.privacy")}
+                {t('legal.privacy')}
               </Link>
             </div>
-            
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+
+            <div className="flex items-center gap-2 text-muted-sm">
               <span>🇩🇪</span>
-              <span>{t("madeInGermany")}</span>
+              <span>{t('madeInGermany')}</span>
             </div>
           </div>
 
