@@ -95,11 +95,11 @@ export function LearningChatLayout({
                 key="desktop-chat"
                 className="hidden lg:flex shrink-0 min-w-0 min-h-0 bg-background relative z-10"
                 initial={{ width: 0 }}
-                animate={{ width: "min(420px, 40vw)" }}
+                animate={{ width: "calc(33vw - 1rem)" }}
                 exit={{ width: 0 }}
                 transition={{ type: "spring", stiffness: 350, damping: 35 }}
               >
-                <div className="w-[min(420px,40vw)] min-w-[min(420px,40vw)] h-full overflow-hidden border-l">
+                <div className="w-[calc(33vw-1rem)] min-w-[calc(33vw-1rem)] h-full overflow-hidden border-l">
                   {chatPanel}
                 </div>
               </motion.div>

@@ -109,7 +109,7 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
   });
   const reviewMode = state.status !== 'loading' ? (state.courseSettings?.reviewMode ?? 'audio') : 'audio';
   const tutorialId = reviewMode === 'full' ? TUTORIAL_IDS.FULL_REVIEW_INTRO : TUTORIAL_IDS.AUDIO_REVIEW_INTRO;
-  const { isActive, isCompleted } = useTutorial(tutorialId, {
+  const { isActive, isCompleted, restartTutorial } = useTutorial(tutorialId, {
     delayMs: 1000,
     enabled: state.status === 'reviewing' && !state.settingsOpen,
   });
@@ -177,6 +177,8 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
     <LearningHeader
       onBack={goHome}
       onSettingsOpen={openSettings}
+      onRestartTutorial={restartTutorial}
+      onHelpOpen={audio.pause}
     />
   );
 

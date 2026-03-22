@@ -1,7 +1,9 @@
 'use client';
 
+import { useLayoutEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import type { View } from '@/components/app/BottomNav';
 import { Card, CardContent } from '@/components/ui/card';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
@@ -12,15 +14,30 @@ import PricingTable from '@/components/autumn/pricing-table';
 
 const SUPPORT_EMAIL = 'support@flexling.com';
 
-export function SettingsView() {
+export function SettingsView({ activeView }: { activeView: View }) {
   const t = useTranslations('AppPage');
   const tFooter = useTranslations('Footer');
   const tAuth = useTranslations('Auth');
   const { data: session } = authClient.useSession();
   const userEmail = session?.user?.email;
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const prevViewRef = useRef<View | null>(null);
+
+  useLayoutEffect(() => {
+    if (
+      activeView === 'settings' &&
+      prevViewRef.current !== 'settings' &&
+      scrollRef.current
+    ) {
+      scrollRef.current.scrollTop = 0;
+    }
+    prevViewRef.current = activeView;
+  }, [activeView]);
+
   return (
     <div
+      ref={scrollRef}
       className="flex-1 overflow-y-auto px-4 py-6"
       style={{ scrollbarGutter: 'stable' }}
     >

@@ -2,23 +2,23 @@
 
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
-import { ChevronLeft, CircleCheck, EyeOff, Info, Settings, Star } from 'lucide-react';
+import { HelpDialog } from '@/components/app/HelpDialog';
+import { ChevronLeft, CircleCheck, EyeOff, Settings, Star } from 'lucide-react';
 import { useLearningChatToggle } from './LearningChatLayout';
 
 interface LearningHeaderProps {
   onBack: () => void;
   onSettingsOpen: () => void;
+  onRestartTutorial?: () => void;
+  onHelpOpen?: () => void;
 }
 
 export function LearningHeader({
   onBack,
   onSettingsOpen,
+  onRestartTutorial,
+  onHelpOpen,
 }: LearningHeaderProps) {
   const t = useTranslations('LearningMode');
   const tSettings = useTranslations('LearningMode.settingsPanel');
@@ -48,19 +48,13 @@ export function LearningHeader({
         </h1>
 
         <div className={`ml-auto flex items-center gap-1 z-10 ${isChatOpen ? 'hidden lg:flex' : 'flex'}`}>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="-mr-1"
-                aria-label={tSettings('iconLegend')}
-              >
-                <Info className="h-5 w-5" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" side="bottom" className="w-64 p-3">
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <HelpDialog
+            onRestartTutorial={onRestartTutorial}
+            onOpen={onHelpOpen}
+            triggerClassName="-mr-1"
+          >
+            <div className="space-y-2">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                 {tSettings('iconLegend')}
               </p>
               <div className="flex flex-col gap-1.5">
@@ -77,8 +71,8 @@ export function LearningHeader({
                   <span>{tSettings('iconHide')}</span>
                 </div>
               </div>
-            </PopoverContent>
-          </Popover>
+            </div>
+          </HelpDialog>
           <ThemeSwitcher className="-mr-1" />
           <Button
             variant="ghost"

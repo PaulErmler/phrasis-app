@@ -343,7 +343,7 @@ export default function MainLayout({
                   : 'none',
             }}
           >
-            <SettingsView />
+            <SettingsView activeView={activeView} />
           </div>
           {!isLearnOpen && activeView === 'chat' && chatThreadId && (
             <SimplifiedChatView
