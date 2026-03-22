@@ -10,7 +10,7 @@ export function FooterControls() {
   return (
     <div className="flex items-center gap-3">
       <div className="flex items-center gap-2 text-muted-sm">
-        <span>🇩🇪</span>
+        <span aria-hidden="true">🇩🇪</span>
         <span>{t('madeInGermany')}</span>
       </div>
       <div className="w-[140px]">

@@ -83,7 +83,8 @@
     "content": {
       "chat": {
         "title": "Chat",
-        "description": "Lass einen Chatbot Lernkarten für dich erstellen"
+        "description": "Lass einen Chatbot Lernkarten für dich erstellen",
+        "openError": "Chat konnte nicht geöffnet werden. Prüfe deine Verbindung und versuche es erneut."
       },
       "fileUpload": {
         "title": "Datei hochladen",

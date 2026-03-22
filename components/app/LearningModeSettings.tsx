@@ -696,7 +696,7 @@ export function LearningModeSettings({
                   </div>
                   <Switch
                     id="autoRevealLanguages"
-                    checked={courseSettings.autoRevealLanguages ?? false}
+                    checked={courseSettings.autoRevealLanguages ?? true}
                     onCheckedChange={handleAutoRevealLanguagesChange}
                     className="mt-0.5"
                   />

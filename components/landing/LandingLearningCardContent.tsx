@@ -61,11 +61,10 @@ export function LandingLearningCardContent({
   const [manuallyRevealed, setManuallyRevealed] = useState<Set<string>>(new Set());
 
   const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
-  const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
-  if (translationKey !== prevTranslationKey) {
-    setPrevTranslationKey(translationKey);
+
+  useEffect(() => {
     setManuallyRevealed(new Set());
-  }
+  }, [translationKey]);
 
   const handleReveal = (language: string) => {
     setManuallyRevealed((prev) => {

@@ -147,7 +147,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         onFavorite={state.handleFavorite}
         onAudioPlay={audio.stop}
         hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
-        autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? false}
+        autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? true}
         revealedLanguages={audio.revealedLanguages}
         showRomanization={state.courseSettings.showRomanization ?? true}
       />

@@ -11,8 +11,7 @@ interface DiffDisplayProps {
   hideErrors?: boolean;
 }
 
-function computeAccuracy(expected: string, actual: string): number {
-  const changes = diffChars(expected, actual, { ignoreCase: true });
+function computeAccuracyFromChanges(changes: ReturnType<typeof diffChars>): number {
   let matchingChars = 0;
   let totalChars = 0;
 
@@ -33,7 +32,7 @@ export function DiffDisplay({ expected, actual, hideAccuracy = false, hideErrors
 
   const { changes, accuracy } = useMemo(() => {
     const changes = diffChars(expected, actual);
-    const accuracy = computeAccuracy(expected, actual);
+    const accuracy = computeAccuracyFromChanges(changes);
     return { changes, accuracy };
   }, [expected, actual]);
 

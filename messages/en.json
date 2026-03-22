@@ -83,7 +83,8 @@
     "content": {
       "chat": {
         "title": "Chat",
-        "description": "Let a chatbot create flashcards for you"
+        "description": "Let a chatbot create flashcards for you",
+        "openError": "Could not open chat. Check your connection and try again."
       },
       "fileUpload": {
         "title": "File Upload",

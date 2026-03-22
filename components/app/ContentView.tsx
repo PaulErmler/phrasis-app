@@ -33,11 +33,11 @@ export function ContentView({ onChatOpen }: { onChatOpen: (threadId: string) => 
       onChatOpen(threadId);
     } catch (error) {
       console.error('Failed to open chat:', error);
-      toast.error('Failed to open chat');
+      toast.error(t('content.chat.openError'));
     } finally {
       setIsNavigating(false);
     }
-  }, [getOrCreateEmptyThread, onChatOpen]);
+  }, [getOrCreateEmptyThread, onChatOpen, t]);
 
   return (
     <div

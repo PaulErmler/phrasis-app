@@ -115,8 +115,7 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
   });
   const { audio, openSettings } = useLearningAudio(state, {
     disableAutoAdvance: reviewMode === 'audio' && isActive,
-    disableAutoPlay:
-      reviewMode === 'audio' && (isActive || !isCompleted),
+    disableAutoPlay: isActive || !isCompleted,
   });
 
   const goHome = useCallback(() => {
