@@ -14,7 +14,7 @@ import { getCourseSettings } from '../db/courseSettings';
 import type { Id } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
 
-async function isCollectionAccessible(
+export async function isCollectionAccessible(
   ctx: QueryCtx,
   collectionId: Id<'collections'>,
   courseId: Id<'courses'>,

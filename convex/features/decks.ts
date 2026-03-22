@@ -35,6 +35,7 @@ import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { useQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
+import { isCollectionAccessible } from './collections';
 
 // ============================================================================
 // HELPERS
@@ -418,6 +419,11 @@ export const getNextTextsFromCollection = query({
     if (!settings?.activeCourseId) return [];
 
     const courseId = settings.activeCourseId;
+
+    if (!(await isCollectionAccessible(ctx, args.collectionId, courseId))) {
+      return [];
+    }
+
     const maxTexts = Math.min(args.limit ?? 5, 20);
 
     const progress = await getCollectionProgressHelper(

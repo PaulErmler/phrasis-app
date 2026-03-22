@@ -46,7 +46,7 @@
     "audioBody": "Hör den Satz in einer Sprache, die du schon verstehst, denk an die Übersetzung — jede Zielzeile startet unscharf und wird automatisch weich scharf, so als wäre das Audio gerade zu Ende. In der App passiert das nach dem Abspielen. Mit Wiederholen siehst du die Demo erneut. Bewerte, wie gut du dich erinnerst — ideal für Pendeln und freihändiges Üben.",
     "fullTitle": "Vollständige Wiederholung",
     "fullBody": "Tippe die Übersetzung für jede Zielsprache. Nach dem Absenden siehst du einen Zeichen-für-Zeichen-Vergleich: Richtiges in Grün, Fehler markiert, Ausgelassenes gedämpft — plus eine Genauigkeit in Prozent.",
-    "multiLabel": "Multiple Language",
+    "multiLabel": "Mehrere Sprachen",
     "replay": "Demo erneut abspielen",
     "mock": {
       "base": "Guten Morgen, wie geht es Ihnen?",
