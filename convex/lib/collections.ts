@@ -17,8 +17,12 @@ export const LEVEL_ORDER = [
 /** How many upcoming texts to fetch for collection previews. */
 export const COLLECTION_PREVIEW_SIZE = 5;
 
-/** How many upcoming texts to pre-generate content for (translations + audio). */
-export const CONTENT_LOOKAHEAD_SIZE = 5;
+/**
+ * How many upcoming texts (after current collection progress) to pre-generate
+ * content for. Should be at least 2× {@link COLLECTION_PREVIEW_SIZE} so a +5 add
+ * still leaves the next preview batch (and one more) covered.
+ */
+export const CONTENT_LOOKAHEAD_SIZE = 10;
 
 /**
  * Maps the onboarding `currentLevel` value to the collection name that should
