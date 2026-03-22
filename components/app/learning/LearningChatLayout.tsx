@@ -79,16 +79,16 @@ export function LearningChatLayout({
             </div>
           </div>
 
-          {/* Desktop: full height toggle bar */}
+          {/* Desktop: full height toggle bar — carries tutorial attr only when chat is closed */}
           <div
             className="hidden lg:flex flex-col justify-center items-center w-8 shrink-0 border-l bg-muted/10 hover:bg-muted/30 cursor-pointer transition-colors z-20"
             onClick={toggleChat}
-            data-tutorial="chat-button"
+            {...(!isChatOpen ? { 'data-tutorial': 'chat-button' } : {})}
           >
             {isChatOpen ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <MessageCircle className="h-4 w-4 text-muted-foreground" />}
           </div>
 
-          {/* Desktop: collapsible chat sidebar */}
+          {/* Desktop: collapsible chat sidebar — carries tutorial attr when open */}
           <AnimatePresence initial={false}>
             {isChatOpen && (
               <motion.div
@@ -98,6 +98,7 @@ export function LearningChatLayout({
                 animate={{ width: "calc(33vw - 1rem)" }}
                 exit={{ width: 0 }}
                 transition={{ type: "spring", stiffness: 350, damping: 35 }}
+                data-tutorial="chat-button"
               >
                 <div className="w-[calc(33vw-1rem)] min-w-[calc(33vw-1rem)] h-full overflow-hidden border-l">
                   {chatPanel}
@@ -121,6 +122,7 @@ export function LearningChatLayout({
               initial={false}
               animate={{ x: isChatOpen ? 0 : '100%' }}
               transition={{ type: 'spring', stiffness: 350, damping: 35 }}
+              {...(isChatOpen ? { 'data-tutorial': 'chat-button' } : {})}
             >
               {chatPanel}
             </motion.div>
