@@ -65,8 +65,8 @@ export function CollectionCarousel({
   const initialScrollIndex =
     collectionProgress && activeCollectionId
       ? collectionProgress.findIndex(
-          (c) => c.collectionId === activeCollectionId,
-        )
+        (c) => c.collectionId === activeCollectionId,
+      )
       : undefined;
 
   const handleSelectCollection = useCallback(

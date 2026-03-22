@@ -22,7 +22,7 @@ import {
   getPreviousDay,
 } from '../db/courseStats';
 import { getDailyStats } from '../db/dailyStats';
-import { useQuota, checkQuota } from '../usage/helpers';
+import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import {
   DEFAULT_INITIAL_REVIEW_COUNT,
@@ -334,7 +334,7 @@ export const createCourse = mutation({
   }),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
-    await useQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
+    await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
 
     const initialReviewCount =
       args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
@@ -388,7 +388,7 @@ export const completeOnboarding = mutation({
   handler: async (ctx) => {
     const userId = await requireAuthUserId(ctx);
 
-    await useQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
+    await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
 
     const progress = await dbGetOnboardingProgress(ctx, userId);
     if (!progress) throw new ConvexError('Onboarding progress not found');
@@ -446,7 +446,7 @@ export const completeOnboarding = mutation({
           await ctx.db.patch(deckId, { cardCount: deck.cardCount + cardsInserted });
         }
 
-        await useQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
+        await consumeQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
         await updateCollectionProgress(
           ctx, userId, courseId, collection._id, textsToAdd.length, newLastRank,
         );

@@ -31,7 +31,7 @@ export function createCardToolRenderer({
   messageId: string,
   idx: number,
 ) => ReactNode | null {
-  return (toolPart: ToolUIPart, messageId: string, idx: number) => {
+  function CardToolRenderer(toolPart: ToolUIPart, messageId: string, idx: number) {
     if (!isCreateCardToolPart(toolPart)) return null;
 
     if (!isLoaded) return <span key={`${messageId}-card-${idx}`} />;
@@ -46,5 +46,6 @@ export function createCardToolRenderer({
         processingApprovals={processingApprovals}
       />
     );
-  };
+  }
+  return CardToolRenderer;
 }

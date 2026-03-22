@@ -2,7 +2,7 @@ import { action, internalMutation } from '../../_generated/server';
 import { internal } from '../../_generated/api';
 import { v, ConvexError } from 'convex/values';
 import { requireAuthUserId } from '../../db/users';
-import { useQuota } from '../../usage/helpers';
+import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -28,7 +28,7 @@ export const consumeTranscriptionQuota = internalMutation({
   args: { userId: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await useQuota(ctx, args.userId, FEATURE_IDS.TRANSCRIPTIONS, 1);
+    await consumeQuota(ctx, args.userId, FEATURE_IDS.TRANSCRIPTIONS, 1);
     return null;
   },
 });

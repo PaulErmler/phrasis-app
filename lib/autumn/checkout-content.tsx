@@ -44,69 +44,69 @@ export const getCheckoutContent = (
   }
 
   switch (scenario) {
-    case "scheduled":
-      return {
-        title: t("scheduledTitle", { productName }),
-        message: t("scheduledMessage", {
-          productName,
-          currentProduct: current_product.name,
-          date: nextCycleAtStr ?? "",
-        }),
-      };
+  case "scheduled":
+    return {
+      title: t("scheduledTitle", { productName }),
+      message: t("scheduledMessage", {
+        productName,
+        currentProduct: current_product.name,
+        date: nextCycleAtStr ?? "",
+      }),
+    };
 
-    case "active":
-      return {
-        title: t("alreadyActiveTitle"),
-        message: t("alreadyActiveMessage"),
-      };
+  case "active":
+    return {
+      title: t("alreadyActiveTitle"),
+      message: t("alreadyActiveMessage"),
+    };
 
-    case "new":
-      if (is_free) {
-        return {
-          title: t("enableTitle", { productName }),
-          message: t("enableMessage", { productName }),
-        };
-      }
+  case "new":
+    if (is_free) {
       return {
-        title: t("subscribeTitle", { productName }),
-        message: t("subscribeMessage", { productName }),
+        title: t("enableTitle", { productName }),
+        message: t("enableMessage", { productName }),
       };
+    }
+    return {
+      title: t("subscribeTitle", { productName }),
+      message: t("subscribeMessage", { productName }),
+    };
 
-    case "renew":
-      return {
-        title: t("renewTitle"),
-        message: t("renewMessage", { productName }),
-      };
+  case "renew":
+    return {
+      title: t("renewTitle"),
+      message: t("renewMessage", { productName }),
+    };
 
-    case "upgrade":
-      return {
-        title: t("upgradeTitle", { productName }),
-        message: t("upgradeMessage", { productName }),
-      };
+  case "upgrade":
+    return {
+      title: t("upgradeTitle", { productName }),
+      message: t("upgradeMessage", { productName }),
+    };
 
-    case "downgrade":
-      return {
-        title: t("downgradeTitle", { productName }),
-        message: t("downgradeMessage", {
-          productName,
-          currentProduct: current_product.name,
-          date: nextCycleAtStr ?? "",
-        }),
-      };
+  case "downgrade":
+    return {
+      title: t("downgradeTitle", { productName }),
+      message: t("downgradeMessage", {
+        productName,
+        currentProduct: current_product.name,
+        date: nextCycleAtStr ?? "",
+      }),
+    };
 
-    case "cancel":
-      return {
-        title: t("cancelTitle"),
-        message: t("cancelMessage", {
-          currentProduct: current_product.name,
-          date: nextCycleAtStr ?? "",
-        }),
-      };
+  case "cancel":
+    return {
+      title: t("cancelTitle"),
+      message: t("cancelMessage", {
+        currentProduct: current_product.name,
+        date: nextCycleAtStr ?? "",
+      }),
+    };
 
-    default:
-      return {
-        title: t("changeTitle"),
-        message: t("changeMessage"),
-      };
+  default:
+    return {
+      title: t("changeTitle"),
+      message: t("changeMessage"),
+    };
   }
 };

@@ -127,12 +127,12 @@ const PricingTableContext = createContext<{
   setIsAnnualToggle: (isAnnual: boolean) => void;
   products: Product[];
   showFeatures: boolean;
-}>({
-  isAnnualToggle: false,
-  setIsAnnualToggle: () => {},
-  products: [],
-  showFeatures: true,
-});
+    }>({
+      isAnnualToggle: false,
+      setIsAnnualToggle: () => {},
+      products: [],
+      showFeatures: true,
+    });
 
 export const usePricingTableContext = (componentName: string) => {
   const context = useContext(PricingTableContext);
@@ -254,8 +254,8 @@ export const PricingCard = ({
 
   const mainPriceDisplay = product.properties?.is_free
     ? {
-        primary_text: t("free"),
-      }
+      primary_text: t("free"),
+    }
     : product.items[0].display;
 
   const featureItems = product.properties?.is_free

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Authenticated, AuthLoading, useMutation, useQuery, useAction, useConvexAuth } from 'convex/react';
@@ -145,9 +145,7 @@ export default function OnboardingPage() {
   return (
     <>
       <AuthLoading>
-        <div className="h-screen flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <div className="h-screen" />
       </AuthLoading>
       <Authenticated>
         <OnboardingContent />
@@ -206,11 +204,7 @@ function OnboardingContent() {
     onboardingProgress === undefined ||
     userSettings?.hasCompletedOnboarding
   ) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <div className="h-screen" />;
   }
 
   return (
@@ -285,7 +279,9 @@ function OnboardingUI({
   };
 
   const flowDataRef = useRef(flowData);
-  flowDataRef.current = flowData;
+  useLayoutEffect(() => {
+    flowDataRef.current = flowData;
+  });
 
   const saveCurrentProgress = useCallback(async (nextStep: number) => {
     const fd = flowDataRef.current;

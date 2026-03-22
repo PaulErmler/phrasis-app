@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState, useSyncExternalStore } from 'react';
+import { useEffect, useLayoutEffect, useRef, useCallback, useState, useSyncExternalStore } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -169,11 +169,13 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
 
   // ---- callbacks ----
   const onInteractiveStepRef = useRef(onInteractiveStep);
-  onInteractiveStepRef.current = onInteractiveStep;
   const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
   const extraStepsRef = useRef(extraSteps);
-  extraStepsRef.current = extraSteps;
+  useLayoutEffect(() => {
+    onInteractiveStepRef.current = onInteractiveStep;
+    onCompleteRef.current = onComplete;
+    extraStepsRef.current = extraSteps;
+  });
 
   const completeTutorial = useCallback(() => {
     const prev = getSnapshot();
@@ -262,7 +264,9 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   }, [tutorial, completeTutorial, stepCompleteOnClickIndex]);
 
   const launchDriverRef = useRef(launchDriver);
-  launchDriverRef.current = launchDriver;
+  useLayoutEffect(() => {
+    launchDriverRef.current = launchDriver;
+  });
 
   useEffect(() => {
     if (!shouldStart) return;
@@ -298,7 +302,9 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   }, []);
 
   const tRef = useRef(t);
-  tRef.current = t;
+  useLayoutEffect(() => {
+    tRef.current = t;
+  });
 
   const showChatStep = useCallback(() => {
     const tr = tRef.current;

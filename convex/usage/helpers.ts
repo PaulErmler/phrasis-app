@@ -60,7 +60,7 @@ export async function checkQuota(
 
 /**
  * Decrement the local quota for a feature.
- * Does NOT check — caller must check first or use `useQuota`.
+ * Does NOT check — caller must check first or use `consumeQuota`.
  */
 export async function decrementQuota(
   ctx: MutationCtx,
@@ -90,7 +90,7 @@ export async function decrementQuota(
  * Combined check + decrement. Throws ConvexError if not allowed.
  * Schedules trackUsage action automatically.
  */
-export async function useQuota(
+export async function consumeQuota(
   ctx: MutationCtx,
   userId: string,
   featureId: string,

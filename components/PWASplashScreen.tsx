@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Loader2Icon } from 'lucide-react';
 
 export function PWASplashScreen() {
   const [visible, setVisible] = useState(false);
@@ -49,7 +48,6 @@ export function PWASplashScreen() {
         priority
       />
       <p className="mt-4 text-lg font-semibold text-white">Flexling</p>
-      <Loader2Icon className="mt-6 size-6 animate-spin text-white/60" />
     </div>
   );
 }

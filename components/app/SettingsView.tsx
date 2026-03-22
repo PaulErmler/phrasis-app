@@ -41,140 +41,140 @@ export function SettingsView({ activeView }: { activeView: View }) {
       className="flex-1 overflow-y-auto px-4 py-6"
       style={{ scrollbarGutter: 'stable' }}
     >
-    <div className="app-view">
-      <Card>
-        <CardContent className="space-y-6">
-          {/* User Email Section */}
-          {userEmail && (
+      <div className="app-view">
+        <Card>
+          <CardContent className="space-y-6">
+            {/* User Email Section */}
+            {userEmail && (
+              <div className="space-y-2">
+                <label className="label-form">
+                  {t('settings.account') || 'Account'}
+                </label>
+                <div className="flex items-center gap-2 p-3 surface-muted">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{userEmail}</span>
+                </div>
+              </div>
+            )}
+
+            <Separator />
+
+            {/* Language Section */}
             <div className="space-y-2">
               <label className="label-form">
-                {t('settings.account') || 'Account'}
+                {t('settings.language') || 'Language'}
               </label>
-              <div className="flex items-center gap-2 p-3 surface-muted">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">{userEmail}</span>
-              </div>
+              <LanguageSwitcher />
             </div>
-          )}
 
-          <Separator />
+            <Separator/> 
 
-          {/* Language Section */}
-          <div className="space-y-2">
-            <label className="label-form">
-              {t('settings.language') || 'Language'}
-            </label>
-            <LanguageSwitcher />
-          </div>
+            <PricingTable />
 
-          <Separator/> 
+            <Separator />
 
-          <PricingTable />
+            <div className="space-y-3">
+              <label className="label-form">
+                {t('settings.contactPrompt.title')}
+              </label>
+              <p className="text-sm text-muted-foreground">
+                {t('settings.contactPrompt.description')}
+              </p>
+              <Button variant="outline" className="w-full sm:w-auto" asChild>
+                <a
+                  href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(t('settings.contactPrompt.emailSubject'))}`}
+                >
+                  <Mail className="h-4 w-4" />
+                  {t('help.contactUs')}
+                </a>
+              </Button>
+            </div>
 
-          <Separator />
+            <Separator />
 
-          <div className="space-y-3">
-            <label className="label-form">
-              {t('settings.contactPrompt.title')}
-            </label>
-            <p className="text-sm text-muted-foreground">
-              {t('settings.contactPrompt.description')}
-            </p>
-            <Button variant="outline" className="w-full sm:w-auto" asChild>
-              <a
-                href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(t('settings.contactPrompt.emailSubject'))}`}
+            {/* Legal */}
+            <div className="space-y-2">
+              <label className="label-form">{t('settings.legal.label')}</label>
+              <nav
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
+                aria-label={t('settings.legal.label')}
               >
-                <Mail className="h-4 w-4" />
-                {t('help.contactUs')}
-              </a>
-            </Button>
-          </div>
+                <Link
+                  href="/legal/impressum"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {tFooter('legal.impressum')}
+                </Link>
+                <span aria-hidden>•</span>
+                <Link
+                  href="/legal/agb"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {tFooter('legal.agb')}
+                </Link>
+                <span aria-hidden>•</span>
+                <Link
+                  href="/legal/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  {tFooter('legal.privacy')}
+                </Link>
+              </nav>
+            </div>
 
-          <Separator />
+            <Separator />
 
-          {/* Legal */}
-          <div className="space-y-2">
-            <label className="label-form">{t('settings.legal.label')}</label>
-            <nav
-              className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
-              aria-label={t('settings.legal.label')}
-            >
-              <Link
-                href="/legal/impressum"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                {tFooter('legal.impressum')}
-              </Link>
-              <span aria-hidden>•</span>
-              <Link
-                href="/legal/agb"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                {tFooter('legal.agb')}
-              </Link>
-              <span aria-hidden>•</span>
-              <Link
-                href="/legal/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                {tFooter('legal.privacy')}
-              </Link>
-            </nav>
-          </div>
+            {/* Attribution Section */}
+            <div className="space-y-2">
+              <label className="label-form">
+                {t('settings.attribution.label')}
+              </label>
+              <p className="text-sm text-muted-foreground">
+                {t.rich('settings.attribution.text', {
+                  tatoeba: (chunks) => (
+                    <a href="http://tatoeba.org/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {chunks}
+                    </a>
+                  ),
+                  ccby: (chunks) => (
+                    <a href="http://creativecommons.org/licenses/by/2.0/fr/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {chunks}
+                    </a>
+                  ),
+                })}
+              </p>
+            </div>
 
-          <Separator />
+            <Separator />
 
-          {/* Attribution Section */}
-          <div className="space-y-2">
-            <label className="label-form">
-              {t('settings.attribution.label')}
-            </label>
-            <p className="text-sm text-muted-foreground">
-              {t.rich('settings.attribution.text', {
-                tatoeba: (chunks) => (
-                  <a href="http://tatoeba.org/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    {chunks}
-                  </a>
-                ),
-                ccby: (chunks) => (
-                  <a href="http://creativecommons.org/licenses/by/2.0/fr/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    {chunks}
-                  </a>
-                ),
-              })}
-            </p>
-          </div>
-
-          <Separator />
-
-          {/* Sign Out Section */}
-          <div className="space-y-2">
-            <Button
-              variant="destructive"
-              className="w-full"
-              onClick={() =>
-                authClient.signOut({
-                  fetchOptions: {
-                    onSuccess: () => {
-                      window.location.href = '/';
+            {/* Sign Out Section */}
+            <div className="space-y-2">
+              <Button
+                variant="destructive"
+                className="w-full"
+                onClick={() =>
+                  authClient.signOut({
+                    fetchOptions: {
+                      onSuccess: () => {
+                        window.location.href = '/';
+                      },
                     },
-                  },
-                })
-              }
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              {tAuth('SIGN_OUT')}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+                  })
+                }
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                {tAuth('SIGN_OUT')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

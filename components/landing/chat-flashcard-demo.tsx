@@ -203,108 +203,108 @@ export function ChatFlashcardDemo() {
     ];
 
     switch (scenario) {
-      case 'grammar': {
-        const user = t('grammar.userMessage');
-        const assistant = t('grammar.assistantMessage');
-        if (!multiCourse) {
-          return {
-            userFull: user,
-            assistantFull: assistant,
-            cards: [
-              { lines: simpleLine(t('grammar.card1Base'), t('grammar.card1Target')) },
-              { lines: simpleLine(t('grammar.card2Base'), t('grammar.card2Target')) },
-            ] satisfies DemoCard[],
-            highlightCardIndex: 1,
-          };
-        }
-        const m1 = readMultiCard(t.raw('grammar.multiCard1'));
-        const m2 = readMultiCard(t.raw('grammar.multiCard2'));
-        return {
-          userFull: user,
-          assistantFull: assistant,
-          cards: [{ lines: multiLines(m1) }, { lines: multiLines(m2) }],
-          highlightCardIndex: 1,
-        };
-      }
-      case 'threeCards': {
-        const user = t('threeCards.userMessage');
-        const assistant = multiCourse
-          ? t('threeCards.assistantMessageMulti')
-          : t('threeCards.assistantMessage');
-        if (!multiCourse) {
-          return {
-            userFull: user,
-            assistantFull: assistant,
-            cards: [
-              {
-                lines: simpleLine(
-                  t('threeCards.simple.card1Base'),
-                  t('threeCards.simple.card1Target'),
-                ),
-              },
-              {
-                lines: simpleLine(
-                  t('threeCards.simple.card2Base'),
-                  t('threeCards.simple.card2Target'),
-                ),
-              },
-              {
-                lines: simpleLine(
-                  t('threeCards.simple.card3Base'),
-                  t('threeCards.simple.card3Target'),
-                ),
-              },
-            ],
-            highlightCardIndex: 2,
-          };
-        }
-        const c1 = readMultiCard(t.raw('threeCards.multi.card1'));
-        const c2 = readMultiCard(t.raw('threeCards.multi.card2'));
-        const c3 = readMultiCard(t.raw('threeCards.multi.card3'));
+    case 'grammar': {
+      const user = t('grammar.userMessage');
+      const assistant = t('grammar.assistantMessage');
+      if (!multiCourse) {
         return {
           userFull: user,
           assistantFull: assistant,
           cards: [
-            { lines: multiLines(c1) },
-            { lines: multiLines(c2) },
-            { lines: multiLines(c3) },
+            { lines: simpleLine(t('grammar.card1Base'), t('grammar.card1Target')) },
+            { lines: simpleLine(t('grammar.card2Base'), t('grammar.card2Target')) },
+          ] satisfies DemoCard[],
+          highlightCardIndex: 1,
+        };
+      }
+      const m1 = readMultiCard(t.raw('grammar.multiCard1'));
+      const m2 = readMultiCard(t.raw('grammar.multiCard2'));
+      return {
+        userFull: user,
+        assistantFull: assistant,
+        cards: [{ lines: multiLines(m1) }, { lines: multiLines(m2) }],
+        highlightCardIndex: 1,
+      };
+    }
+    case 'threeCards': {
+      const user = t('threeCards.userMessage');
+      const assistant = multiCourse
+        ? t('threeCards.assistantMessageMulti')
+        : t('threeCards.assistantMessage');
+      if (!multiCourse) {
+        return {
+          userFull: user,
+          assistantFull: assistant,
+          cards: [
+            {
+              lines: simpleLine(
+                t('threeCards.simple.card1Base'),
+                t('threeCards.simple.card1Target'),
+              ),
+            },
+            {
+              lines: simpleLine(
+                t('threeCards.simple.card2Base'),
+                t('threeCards.simple.card2Target'),
+              ),
+            },
+            {
+              lines: simpleLine(
+                t('threeCards.simple.card3Base'),
+                t('threeCards.simple.card3Target'),
+              ),
+            },
           ],
           highlightCardIndex: 2,
         };
       }
-      case 'curiosity': {
-        const user = t('curiosity.userMessage');
-        const assistant = t('curiosity.assistantMessage');
-        if (!multiCourse) {
-          return {
-            userFull: user,
-            assistantFull: assistant,
-            cards: [
-              {
-                lines: simpleLine(
-                  t('curiosity.simple.card1Base'),
-                  t('curiosity.simple.card1Target'),
-                ),
-              },
-              {
-                lines: simpleLine(
-                  t('curiosity.simple.card2Base'),
-                  t('curiosity.simple.card2Target'),
-                ),
-              },
-            ],
-            highlightCardIndex: 1,
-          };
-        }
-        const c1 = readMultiCard(t.raw('curiosity.multi.card1'));
-        const c2 = readMultiCard(t.raw('curiosity.multi.card2'));
+      const c1 = readMultiCard(t.raw('threeCards.multi.card1'));
+      const c2 = readMultiCard(t.raw('threeCards.multi.card2'));
+      const c3 = readMultiCard(t.raw('threeCards.multi.card3'));
+      return {
+        userFull: user,
+        assistantFull: assistant,
+        cards: [
+          { lines: multiLines(c1) },
+          { lines: multiLines(c2) },
+          { lines: multiLines(c3) },
+        ],
+        highlightCardIndex: 2,
+      };
+    }
+    case 'curiosity': {
+      const user = t('curiosity.userMessage');
+      const assistant = t('curiosity.assistantMessage');
+      if (!multiCourse) {
         return {
           userFull: user,
           assistantFull: assistant,
-          cards: [{ lines: multiLines(c1) }, { lines: multiLines(c2) }],
+          cards: [
+            {
+              lines: simpleLine(
+                t('curiosity.simple.card1Base'),
+                t('curiosity.simple.card1Target'),
+              ),
+            },
+            {
+              lines: simpleLine(
+                t('curiosity.simple.card2Base'),
+                t('curiosity.simple.card2Target'),
+              ),
+            },
+          ],
           highlightCardIndex: 1,
         };
       }
+      const c1 = readMultiCard(t.raw('curiosity.multi.card1'));
+      const c2 = readMultiCard(t.raw('curiosity.multi.card2'));
+      return {
+        userFull: user,
+        assistantFull: assistant,
+        cards: [{ lines: multiLines(c1) }, { lines: multiLines(c2) }],
+        highlightCardIndex: 1,
+      };
+    }
     }
   }, [scenario, t, multiCourse, baseLangCode]);
 

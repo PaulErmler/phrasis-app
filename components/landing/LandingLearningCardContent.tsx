@@ -143,9 +143,9 @@ export function LandingLearningCardContent({
                         'body-large',
                         isBlurred
                           ? cn(
-                              'blur-md opacity-90 select-none',
-                              audioDemoAutoUnlockSequence ? 'cursor-default' : 'cursor-pointer',
-                            )
+                            'blur-md opacity-90 select-none',
+                            audioDemoAutoUnlockSequence ? 'cursor-default' : 'cursor-pointer',
+                          )
                           : 'blur-0 cursor-auto opacity-100 transition-[filter,opacity] duration-700 ease-out',
                       )}
                     >
@@ -157,9 +157,9 @@ export function LandingLearningCardContent({
                           'text-xs text-muted-foreground leading-tight mt-0.5',
                           isBlurred
                             ? cn(
-                                'blur-md opacity-90 select-none',
-                                audioDemoAutoUnlockSequence ? 'cursor-default' : 'cursor-pointer',
-                              )
+                              'blur-md opacity-90 select-none',
+                              audioDemoAutoUnlockSequence ? 'cursor-default' : 'cursor-pointer',
+                            )
                             : 'blur-0 cursor-auto opacity-100 transition-[filter,opacity] duration-700 ease-out',
                         )}
                       >

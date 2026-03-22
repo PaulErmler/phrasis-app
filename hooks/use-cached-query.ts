@@ -23,7 +23,9 @@ export function useCachedQuery<F extends FunctionReference<'query'>>(
     try {
       const stored = localStorage.getItem(cacheKey);
       if (stored) setCached(JSON.parse(stored));
-    } catch {}
+    } catch {
+      // ignore parse errors from stale/corrupted cache
+    }
   }, [cacheKey]);
 
   const prevLive = useRef(live);
@@ -33,7 +35,9 @@ export function useCachedQuery<F extends FunctionReference<'query'>>(
       setCached(live);
       try {
         localStorage.setItem(cacheKey, JSON.stringify(live));
-      } catch {}
+      } catch {
+        // ignore storage errors
+      }
     }
   }, [live, cacheKey]);
 

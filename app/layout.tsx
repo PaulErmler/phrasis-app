@@ -93,7 +93,7 @@ export default async function RootLayout({
           <ConvexClientProvider initialToken={initialToken}>
             <Providers locale={locale} messages={messages} timeZone={timeZone}>
               <AutumnWrapper>
-              {children}
+                {children}
               </AutumnWrapper>
               <Toaster position="top-center" />
             </Providers>

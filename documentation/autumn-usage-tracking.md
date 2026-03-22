@@ -38,7 +38,7 @@ The system uses a **two-layer** approach:
 ├──────────────────────────────────────────────────────────────┤
 │  Backend (Convex)                                            │
 │                                                              │
-│  Mutation: useQuota(ctx, userId, featureId, amount)          │
+│  Mutation: consumeQuota(ctx, userId, featureId, amount)          │
 │    1. checkQuota() against local cache                       │
 │    2. decrementQuota() optimistically                        │
 │    3. scheduler.runAfter(trackUsage) ──POST──▶ Autumn /track │
@@ -96,7 +96,7 @@ All quota logic lives in `convex/usage/`:
 
 | File | Purpose |
 |---|---|
-| `helpers.ts` | Core functions: `checkQuota`, `decrementQuota`, `useQuota`, `syncAllFeatures` |
+| `helpers.ts` | Core functions: `checkQuota`, `decrementQuota`, `consumeQuota`, `syncAllFeatures` |
 | `tracking.ts` | Node actions: `trackUsage` (POST to Autumn /track + re-sync), `syncQuotasForUser`, `getOrCreateCustomer` |
 | `actions.ts` | Public action: `syncQuotas` (called from frontend on app load) |
 | `queries.ts` | Public query: `getMyQuotas` (reactive, powers `useFeatureQuota` hook) |
@@ -106,7 +106,7 @@ All quota logic lives in `convex/usage/`:
 
 - **`checkQuota(ctx, userId, featureId, amount)`** – read-only check. Returns `{ allowed, balance, synced }`. Returns `allowed: false` if no quota doc exists or the feature is missing.
 - **`decrementQuota(ctx, userId, featureId, amount)`** – writes to the local cache. Does NOT validate; caller must check first.
-- **`useQuota(ctx, userId, featureId, amount)`** – the main enforcement function. Combines check + decrement + schedules async Autumn tracking. Throws `ConvexError` with `code: 'USAGE_LIMIT'` when the limit is hit, or `code: 'QUOTA_NOT_SYNCED'` when no quota doc exists.
+- **`consumeQuota(ctx, userId, featureId, amount)`** – the main enforcement function. Combines check + decrement + schedules async Autumn tracking. Throws `ConvexError` with `code: 'USAGE_LIMIT'` when the limit is hit, or `code: 'QUOTA_NOT_SYNCED'` when no quota doc exists.
 - **`syncAllFeatures(userId, features)`** – internal mutation that overwrites the `usageQuotas` doc with fresh data from Autumn.
 
 ### Schema
@@ -219,7 +219,7 @@ Records a usage event. As of March 17, 2026, this endpoint no longer auto-create
 
 1. **On app load** – `app/app/(main)/layout.tsx` calls `syncQuotas` action once per session (guarded by a `useRef`). This calls `POST /customers` (getOrCreate) to ensure the customer exists in Autumn and fetch all entitlements, then writes them to the local `usageQuotas` table. For new users, this idempotently creates the customer and auto-enables the free plan.
 
-2. **After each tracked usage** – when `useQuota` is called in a mutation, it schedules `trackUsage` via `ctx.scheduler.runAfter(0, ...)`. The `trackUsage` action POSTs to Autumn's `/track` endpoint, then fetches the customer via `GET /customers/:id` and syncs back to Convex. This keeps the local cache consistent with Autumn's server-side state.
+2. **After each tracked usage** – when `consumeQuota` is called in a mutation, it schedules `trackUsage` via `ctx.scheduler.runAfter(0, ...)`. The `trackUsage` action POSTs to Autumn's `/track` endpoint, then fetches the customer via `GET /customers/:id` and syncs back to Convex. This keeps the local cache consistent with Autumn's server-side state.
 
 3. **Frontend reactivity** – `getMyQuotas` is a Convex query, so any write to `usageQuotas` automatically triggers re-renders in components using `useFeatureQuota`.
 
@@ -227,7 +227,7 @@ Records a usage event. As of March 17, 2026, this endpoint no longer auto-create
 
 ## Backend Enforcement (Mutations)
 
-Every mutation that consumes a gated resource calls `useQuota`. The current enforcement points:
+Every mutation that consumes a gated resource calls `consumeQuota`. The current enforcement points:
 
 | Mutation | File | Feature ID | Amount |
 |---|---|---|---|
@@ -241,13 +241,13 @@ The pattern is always:
 
 ```typescript
 const userId = await requireAuthUserId(ctx);
-await useQuota(ctx, userId, FEATURE_IDS.SOME_FEATURE, amount);
+await consumeQuota(ctx, userId, FEATURE_IDS.SOME_FEATURE, amount);
 // ... proceed with the actual logic
 ```
 
-If `useQuota` throws, the mutation aborts and the client receives the `ConvexError`.
+If `consumeQuota` throws, the mutation aborts and the client receives the `ConvexError`.
 
-**Boolean features** (like `MULTIPLE_LANGUAGES`) are NOT enforced via `useQuota`. Instead, the frontend uses `useFeatureQuota` to read the boolean state and conditionally limits the UI (e.g., max 2 languages vs. max 5).
+**Boolean features** (like `MULTIPLE_LANGUAGES`) are NOT enforced via `consumeQuota`. Instead, the frontend uses `useFeatureQuota` to read the boolean state and conditionally limits the UI (e.g., max 2 languages vs. max 5).
 
 ---
 
@@ -365,12 +365,12 @@ export const FEATURE_IDS = {
 ### 3. Backend enforcement (for metered features)
 In the relevant mutation, add:
 ```typescript
-import { useQuota } from '../usage/helpers';
+import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from '../features/featureIds';
 
 // Inside the handler:
 const userId = await requireAuthUserId(ctx);
-await useQuota(ctx, userId, FEATURE_IDS.MY_NEW_FEATURE, 1);
+await consumeQuota(ctx, userId, FEATURE_IDS.MY_NEW_FEATURE, 1);
 ```
 
 ### 4. Frontend gating
@@ -415,10 +415,10 @@ Add entries in `messages/en.json` and `messages/de.json` for any new user-facing
 While the Convex query is loading (`quotas === undefined`), the hook returns `isAvailable: true` to avoid UI flicker. The **backend mutation is the authoritative gate**. Never rely solely on the frontend check for security-critical enforcement.
 
 ### Quota doc not synced
-If a user's `usageQuotas` doc doesn't exist yet (e.g., first visit before `syncQuotas` completes), `useFeatureQuota` returns `isAvailable: false` and `useQuota` throws `QUOTA_NOT_SYNCED`. The app calls `syncQuotas` on load in `app/app/(main)/layout.tsx` to handle this.
+If a user's `usageQuotas` doc doesn't exist yet (e.g., first visit before `syncQuotas` completes), `useFeatureQuota` returns `isAvailable: false` and `consumeQuota` throws `QUOTA_NOT_SYNCED`. The app calls `syncQuotas` on load in `app/app/(main)/layout.tsx` to handle this.
 
 ### Boolean vs metered features
-Boolean features (like `multiple_languages`) have `balance: 1` when enabled and `balance: 0` when disabled. They are **not** decremented via `useQuota`. They are read-only on the frontend via `useFeatureQuota(...).isAvailable`. Don't call `useQuota` for boolean features — it would decrement the balance to 0 and effectively disable the feature.
+Boolean features (like `multiple_languages`) have `balance: 1` when enabled and `balance: 0` when disabled. They are **not** decremented via `consumeQuota`. They are read-only on the frontend via `useFeatureQuota(...).isAvailable`. Don't call `consumeQuota` for boolean features — it would decrement the balance to 0 and effectively disable the feature.
 
 ### The `identify` function
 Autumn identifies users by `user.subject` from the Convex auth identity. This must match the customer ID used in Autumn's dashboard. If auth changes, the mapping may break.
@@ -433,7 +433,7 @@ After a user completes checkout via `CheckoutDialog`, Autumn updates their entit
 | File | Role |
 |---|---|
 | `convex/features/featureIds.ts` | Feature ID constants |
-| `convex/usage/helpers.ts` | `checkQuota`, `useQuota`, `decrementQuota`, `syncAllFeatures` |
+| `convex/usage/helpers.ts` | `checkQuota`, `consumeQuota`, `decrementQuota`, `syncAllFeatures` |
 | `convex/usage/tracking.ts` | Autumn API calls: `trackUsage`, `fetchCustomerData`, `getOrCreateCustomer`, `syncQuotasForUser`, `toFeaturesRecord` |
 | `convex/usage/actions.ts` | Public `syncQuotas` action |
 | `convex/usage/queries.ts` | Public `getMyQuotas` query |

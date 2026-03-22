@@ -164,7 +164,7 @@ export function toFeaturesRecord(
   return result;
 }
 
-/** Pass JWT `subject` (same id as Autumn `customerId` and `useQuota`), not Convex user table `_id`. */
+/** Pass JWT `subject` (same id as Autumn `customerId` and `consumeQuota`), not Convex user table `_id`. */
 export const syncQuotasInternal = internalAction({
   args: { userId: v.string() },
   returns: v.null(),
