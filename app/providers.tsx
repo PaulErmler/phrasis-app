@@ -58,6 +58,7 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
           social={{
             providers: ['google'],
           }}
+          credentials={false}
           Link={Link}
           localization={authLocalization}
         >
