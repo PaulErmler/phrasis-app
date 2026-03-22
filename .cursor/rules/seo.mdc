@@ -1,0 +1,33 @@
+---
+description: SEO checklist when editing landing page files — metadata, structured data, headings, images, sitemap
+globs: app/page.tsx, app/layout.tsx, app/opengraph-image.tsx, app/sitemap.ts, app/robots.ts, components/landing/**
+alwaysApply: false
+---
+
+# Landing Page SEO
+
+When modifying any landing-page file, check and maintain the following:
+
+## Metadata
+- `app/layout.tsx` has global OG + Twitter metadata. Keep descriptions aligned with actual page content.
+- `app/page.tsx` has page-level title, description, and `alternates.canonical`. Update if the hero tagline or core messaging changes.
+- `app/opengraph-image.tsx` dynamically generates the OG image using the icon from `public/icons/icon-512x512.png`. Update tagline/subtitle there if it changes on the page.
+
+## Structured Data (JSON-LD)
+- `components/landing/landing-json-ld.tsx` renders three schemas: `WebSite`, `SoftwareApplication`, `FAQPage`.
+- When FAQ items change in `messages/landing/en.json` → `faq.items`, the FAQ schema updates automatically via i18n.
+- When pricing changes → update the `offers` array in `landing-json-ld.tsx`.
+
+## Heading Hierarchy
+- Exactly one `<h1>` on the landing page (in `hero-section.tsx`).
+- Each section uses `<h2>`, sub-items use `<h3>`. Do not skip levels.
+
+## Images
+- Every `<img>` must have a descriptive `alt` attribute (not just "logo").
+
+## Sitemap & Robots
+- `app/sitemap.ts` — add entries when new public pages are created.
+- `app/robots.ts` — keep `/app/`, `/api/`, `/auth/` disallowed.
+
+## i18n
+- Keep `messages/landing/en.json` and `de.json` in sync for any user-visible text changes.

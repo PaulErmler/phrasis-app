@@ -1,27 +1,8 @@
 import { ChevronDown, Mail } from 'lucide-react';
 import { getTranslations } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
+import { landingFaqConfig, TATOEBA_FAQ_INDEX } from './faq-config';
 import { PWAInstallButton } from './pwa-install-button';
-
-interface FaqItemConfig {
-  answerCount: number;
-  hasInstallButton?: boolean;
-  emailAction?: 'requestFeature' | 'requestLanguage';
-}
-
-const faqConfig: FaqItemConfig[] = [
-  { answerCount: 2 },
-  { answerCount: 5 },
-  { answerCount: 2, emailAction: 'requestFeature' },
-  { answerCount: 3 },
-  { answerCount: 2, emailAction: 'requestLanguage' },
-  { answerCount: 2 },
-  { answerCount: 1 },
-  { answerCount: 1 },
-  { answerCount: 1, hasInstallButton: true },
-];
-
-const TATOEBA_FAQ_INDEX = 7;
 
 export async function FAQSection() {
   const t = await getTranslations('LandingPage.faq');
@@ -40,7 +21,7 @@ export async function FAQSection() {
         </div>
 
         <div className="space-y-3 sm:space-y-4">
-          {faqConfig.map((config, index) => {
+          {landingFaqConfig.map((config, index) => {
             const answerParagraphs = Array.from({ length: config.answerCount }, (_, j) =>
               t(`items.${index}.answer.${j}`),
             );

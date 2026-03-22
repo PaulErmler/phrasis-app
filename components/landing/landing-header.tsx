@@ -53,7 +53,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
             <Link href="/" className="flex items-center gap-2 shrink-0">
               <img
                 src="/icons/icon.svg"
-                alt="Flexling"
+                alt="Flexling language learning app"
                 className="w-8 h-8 md:w-10 md:h-10"
                 width={40}
                 height={40}

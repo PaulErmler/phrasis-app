@@ -70,8 +70,8 @@
     "approved": "Card added!",
     "replay": "Replay",
     "grammar": {
-      "userMessage": "A neutral English line like Good morning, how are you? is often matched to Buenos días, ¿cómo estás? in Spanish. Why is that informal tú instead of formal usted?",
-      "assistantMessage": "Buenos días, ¿cómo estás? is the everyday tú form — one person, friendly or familiar, the version learners hear most in real chats. ¿Cómo está (usted)? is the formal one-person line (service counters, first meetings, some workplaces). ¿Cómo están? addresses several people at once. If you want the usted line as its own card, say so and I will draft it.",
+      "userMessage": "How do I conjugate estar for I and they in Spanish?",
+      "assistantMessage": "For yo (I), estar is estoy — e.g. Estoy bien. For ellos or ellas (they), it is están; the second card shows that in a greeting: Buenos días, ¿cómo están? The first card uses está with usted, the formal one-person form (same ending as él/ella). Tap Add Card when you want either line in your deck.",
       "card1Base": "Good morning — formal, one person",
       "card1Target": "Buenos días, ¿cómo está usted?",
       "card2Base": "Good morning — to several people",

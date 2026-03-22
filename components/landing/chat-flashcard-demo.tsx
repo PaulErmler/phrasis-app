@@ -499,11 +499,7 @@ export function ChatFlashcardDemo() {
           ref={wrapRef}
           className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden"
         >
-          <Conversation
-            className="h-full min-h-0 flex-1 touch-none overscroll-none"
-            onWheel={(e) => e.preventDefault()}
-            onTouchMove={(e) => e.preventDefault()}
-          >
+          <Conversation className="h-full min-h-0 flex-1 overflow-y-hidden">
             <LandingChatScrollBinder tick={scrollTick} rootRef={wrapRef} />
             <ConversationContent className="gap-4 px-4 py-4">
               {userShown.length > 0 && (

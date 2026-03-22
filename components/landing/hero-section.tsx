@@ -20,7 +20,7 @@ export async function HeroSection({ isAuthenticated }: HeroSectionProps) {
         <div className="inline-flex items-center justify-center w-36 h-36 sm:w-44 sm:h-44 md:w-48 md:h-48">
           <img
             src="/icons/icon.svg"
-            alt="Flexling Logo"
+            alt="Flexling language learning app logo"
             className="w-full h-full"
             width={500}
             height={500}

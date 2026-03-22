@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Flexling',
     description:
-      'The language learning app that grows with you and adapts to your needs.',
+      'Master languages with audio flashcards, spaced repetition, and AI chat. Bring your own content.',
     url: siteUrl,
     siteName: 'Flexling',
     type: 'website',
@@ -57,7 +57,7 @@ export const metadata: Metadata = {
     card: 'summary',
     title: 'Flexling',
     description:
-      'The language learning app that grows with you and adapts to your needs.',
+      'Master languages with audio flashcards, spaced repetition, and AI chat. Bring your own content.',
   },
   appleWebApp: {
     capable: true,

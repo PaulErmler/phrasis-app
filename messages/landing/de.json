@@ -70,8 +70,8 @@
     "approved": "Karte hinzugefügt!",
     "replay": "Erneut abspielen",
     "grammar": {
-      "userMessage": "Eine neutrale englische Zeile wie Good morning, how are you? wird im Spanischen oft mit Buenos días, ¿cómo estás? gepaart. Warum steht da tú und nicht höfliches usted?",
-      "assistantMessage": "Buenos días, ¿cómo estás? ist der übliche tú-Alltagssatz — eine Person, freundlich-vertraut, so hören Lernende ihn zuerst am häufigsten. ¿Cómo está (usted)? ist höflicher für eine Person (Service, erste Begegnung). ¿Cómo están? richtet sich an mehrere Personen. Wenn du die usted-Zeile als eigene Karte willst, sag kurz Bescheid.",
+      "userMessage": "Wie konjugiere ich estar für ich und sie (mehrere Personen) auf Spanisch?",
+      "assistantMessage": "Für yo (ich) heißt estar estoy — z. B. Estoy bien. Für ellos oder ellas (sie, Plural) heißt es están; die zweite Karte zeigt das in einer Begrüßung: Buenos días, ¿cómo están? Die erste Karte nutzt está mit usted, der höflichen Einzelperson (gleiche Endung wie él/ella). Tippe auf Karte hinzufügen, wenn du einen der Sätze speichern willst.",
       "card1Base": "Guten Morgen — formell, eine Person",
       "card1Target": "Buenos días, ¿cómo está usted?",
       "card2Base": "Guten Morgen — an mehrere Personen",

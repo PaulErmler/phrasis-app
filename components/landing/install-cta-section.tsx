@@ -10,7 +10,7 @@ export async function InstallCtaSection() {
       <div className="max-w-3xl mx-auto text-center">
         <img
           src="/icons/icon.svg"
-          alt="Flexling"
+          alt="Flexling language learning app logo"
           className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-8"
           width={80}
           height={80}
