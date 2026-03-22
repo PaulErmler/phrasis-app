@@ -172,9 +172,9 @@ export function ChatPanel({
               onVoiceClick={chat.voice.toggle}
               suggestions={suggestions}
               autoFocus={autoFocus}
-                showSuggestions={
-                  !chat.isLoading && (showSuggestions ?? chat.messages.length === 0)
-                }
+              showSuggestions={
+                !chat.isLoading && (showSuggestions ?? chat.messages.length === 0)
+              }
               footerAction={
                 <>
                   {footerAction}

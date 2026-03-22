@@ -61,7 +61,7 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
           Link={Link}
           localization={authLocalization}
         >
-            {children}
+          {children}
         </AuthUIProvider>
       </ThemeProvider>
     </NextIntlClientProvider>

@@ -7,7 +7,7 @@ import { listUIMessages, syncStreams } from '@convex-dev/agent';
 import { components } from '../../_generated/api';
 import { requireAuthUserId, getAuthUserId } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
-import { useQuota } from '../../usage/helpers';
+import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import { agent } from './agent';
 import type { MutationCtx } from '../../_generated/server';
@@ -151,7 +151,7 @@ export const sendMessage = mutation({
       });
     }
 
-    await useQuota(ctx, userId, FEATURE_IDS.CHAT_MESSAGES, 1);
+    await consumeQuota(ctx, userId, FEATURE_IDS.CHAT_MESSAGES, 1);
 
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {
       threadId: args.threadId,
@@ -281,9 +281,9 @@ export const generateResponse = internalAction({
         });
         const courseLanguages = thread?.userId
           ? await ctx.runQuery(
-              internal.features.chat.messages.getCourseLanguagesForUser,
-              { userId: thread.userId },
-            )
+            internal.features.chat.messages.getCourseLanguagesForUser,
+            { userId: thread.userId },
+          )
           : null;
         if (courseLanguages) {
           languageSection = buildLanguageSection(courseLanguages);

@@ -156,7 +156,9 @@ export function ProgressStatsCard({
           return;
         }
       }
-    } catch {}
+    } catch {
+      // ignore parse errors from stale/corrupted cache
+    }
     // Baseline for today so the first update still animates (ref was null before).
     prevTodaySnapshot.current = { date: today, reps: 0, newCards: 0, timeMs: 0 };
   }, [snapshotKey, today]);
@@ -166,7 +168,9 @@ export function ProgressStatsCard({
     try {
       const snapshot: TodaySnapshot = { date: today, ...todayStats };
       localStorage.setItem(snapshotKey, JSON.stringify(snapshot));
-    } catch {}
+    } catch {
+      // ignore storage errors
+    }
   }, [todayStats, today, snapshotKey]);
 
   const statsActuallyChanged = todayStats != null && prevTodaySnapshot.current != null && (
@@ -240,18 +244,18 @@ export function ProgressStatsCard({
                 ? { backgroundColor: 'rgba(0, 0, 0, 0)', scale: 1 }
                 : isFrozen
                   ? {
-                      backgroundColor: 'color-mix(in oklch, var(--primary) 15%, transparent)',
-                      scale: [1, 1.05, 1],
-                    }
+                    backgroundColor: 'color-mix(in oklch, var(--primary) 15%, transparent)',
+                    scale: [1, 1.05, 1],
+                  }
                   : hasLearned
                     ? {
-                        backgroundColor: 'color-mix(in oklch, var(--streak-active) 15%, transparent)',
-                        scale: statsActuallyChanged ? [1, 1.15, 1] : 1,
-                      }
+                      backgroundColor: 'color-mix(in oklch, var(--streak-active) 15%, transparent)',
+                      scale: statsActuallyChanged ? [1, 1.15, 1] : 1,
+                    }
                     : {
-                        backgroundColor: 'color-mix(in oklch, var(--accent-orange) 10%, transparent)',
-                        scale: 1,
-                      }
+                      backgroundColor: 'color-mix(in oklch, var(--accent-orange) 10%, transparent)',
+                      scale: 1,
+                    }
             }
             transition={
               isInactive

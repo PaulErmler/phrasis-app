@@ -101,97 +101,97 @@ export function LearningControls({
       </div>
 
       <div className="border-t lg:border-t-0">
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
-        {/* Rating buttons */}
-        <div className="flex gap-2" data-tutorial="rating-buttons">
-          {validRatings.map((rating) => (
-            <div
-              key={rating}
-              className="flex-1 flex flex-col items-center gap-1"
-            >
-              <span className="text-[11px] text-muted-foreground">
-                {ratingIntervals[rating]}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  onSelectRating(rating);
-                  if (instantProceed) onNext();
-                }}
-                className={`w-full ${
-                  activeRating === rating
-                    ? 'ring-2 ring-primary border-primary bg-primary/5'
-                    : ''
-                }`}
+        <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
+          {/* Rating buttons */}
+          <div className="flex gap-2" data-tutorial="rating-buttons">
+            {validRatings.map((rating) => (
+              <div
+                key={rating}
+                className="flex-1 flex flex-col items-center gap-1"
               >
-                {t(`ratings.${rating}`)}
-              </Button>
-            </div>
-          ))}
-        </div>
+                <span className="text-[11px] text-muted-foreground">
+                  {ratingIntervals[rating]}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    onSelectRating(rating);
+                    if (instantProceed) onNext();
+                  }}
+                  className={`w-full ${
+                    activeRating === rating
+                      ? 'ring-2 ring-primary border-primary bg-primary/5'
+                      : ''
+                  }`}
+                >
+                  {t(`ratings.${rating}`)}
+                </Button>
+              </div>
+            ))}
+          </div>
 
         
-        {showProgressBar && (
-          <AudioProgressBar
-            audioRef={audioRef}
-            durationSec={durationSec}
-            isPlaying={isPlaying}
-            onSeek={onSeek}
-            isMerging={isMerging}
-          />
-        )}
+          {showProgressBar && (
+            <AudioProgressBar
+              audioRef={audioRef}
+              durationSec={durationSec}
+              isPlaying={isPlaying}
+              onSeek={onSeek}
+              isMerging={isMerging}
+            />
+          )}
 
-        {/* Restart + Play + Next row */}
-        <div className="flex gap-2" data-tutorial="audio-controls">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onSeek(0)}
-            disabled={isMerging || durationSec === 0}
-            className="h-9 w-9 shrink-0"
-          >
-            <ChevronsLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={isPlaying ? onPause : onPlay}
-            disabled={isMerging || durationSec === 0}
-            className="h-9 flex-[2] min-w-0"
-          >
-            {isPlaying ? (
-              <Pause className="h-4 w-4" />
-            ) : (
-              <Play className="h-4 w-4" />
-            )}
-          </Button>
-          {isFullReview && !fullReviewRevealed ? (
+          {/* Restart + Play + Next row */}
+          <div className="flex gap-2" data-tutorial="audio-controls">
             <Button
-              size="sm"
-              onClick={onReveal}
-              className="flex-[1] gap-2"
+              variant="outline"
+              size="icon"
+              onClick={() => onSeek(0)}
+              disabled={isMerging || durationSec === 0}
+              className="h-9 w-9 shrink-0"
             >
-              {t('actions.reveal')}
-              <Eye className="h-4 w-4" />
+              <ChevronsLeft className="h-4 w-4" />
             </Button>
-          ) : (
             <Button
-              size="sm"
-              onClick={onNext}
-              disabled={isReviewing}
-              className="flex-[1] gap-2"
+              variant="outline"
+              size="icon"
+              onClick={isPlaying ? onPause : onPlay}
+              disabled={isMerging || durationSec === 0}
+              className="h-9 flex-[2] min-w-0"
             >
-              {t('actions.next')}
-              {showSpinner ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+              {isPlaying ? (
+                <Pause className="h-4 w-4" />
               ) : (
-                <ChevronRight className="h-4 w-4" />
+                <Play className="h-4 w-4" />
               )}
             </Button>
-          )}
+            {isFullReview && !fullReviewRevealed ? (
+              <Button
+                size="sm"
+                onClick={onReveal}
+                className="flex-[1] gap-2"
+              >
+                {t('actions.reveal')}
+                <Eye className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                onClick={onNext}
+                disabled={isReviewing}
+                className="flex-[1] gap-2"
+              >
+                {t('actions.next')}
+                {showSpinner ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
       </div>
     </div>
   );

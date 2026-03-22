@@ -16,56 +16,56 @@ export const getPricingTableContent = (
   }
 
   switch (scenario) {
-    case "scheduled":
+  case "scheduled":
+    return {
+      buttonText: t("planScheduled"),
+    };
+
+  case "active":
+    if (updateable) {
       return {
-        buttonText: t("planScheduled"),
+        buttonText: t("updatePlan"),
       };
+    }
 
-    case "active":
-      if (updateable) {
-        return {
-          buttonText: t("updatePlan"),
-        };
-      }
+    return {
+      buttonText: t("currentPlan"),
+    };
 
+  case "new":
+    if (is_one_off) {
       return {
-        buttonText: t("currentPlan"),
+        buttonText: t("purchase"),
       };
+    }
 
-    case "new":
-      if (is_one_off) {
-        return {
-          buttonText: t("purchase"),
-        };
-      }
+    return {
+      buttonText: t("getStarted"),
+    };
 
-      return {
-        buttonText: t("getStarted"),
-      };
+  case "renew":
+    return {
+      buttonText: t("renew"),
+    };
 
-    case "renew":
-      return {
-        buttonText: t("renew"),
-      };
+  case "upgrade":
+    return {
+      buttonText: t("upgrade"),
+    };
 
-    case "upgrade":
-      return {
-        buttonText: t("upgrade"),
-      };
+  case "downgrade":
+    return {
+      buttonText: t("downgrade"),
+    };
 
-    case "downgrade":
-      return {
-        buttonText: t("downgrade"),
-      };
+  case "cancel":
+    return {
+      buttonText: t("cancelPlan"),
+    };
 
-    case "cancel":
-      return {
-        buttonText: t("cancelPlan"),
-      };
-
-    default:
-      return {
-        buttonText: t("getStartedDefault"),
-      };
+  default:
+    return {
+      buttonText: t("getStartedDefault"),
+    };
   }
 };

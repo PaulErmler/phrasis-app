@@ -5,13 +5,11 @@ import { getAuthUserId } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
 import {
   getOrCreateChatCollection,
-  getCollectionProgress,
 } from '../../db/collections';
-import { getCourseSettings } from '../../db/courseSettings';
-import { cardApprovalStatusValidator, translationValidator } from '../../types';
+import { cardApprovalStatusValidator } from '../../types';
 import type { Id, Doc } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
-import { useQuota } from '../../usage/helpers';
+import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 
 /** Maximum length for main text in card approvals. */
@@ -170,7 +168,7 @@ export const approveCard = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError('Not authenticated');
-    await useQuota(ctx, userId, FEATURE_IDS.CUSTOM_SENTENCES, 1);
+    await consumeQuota(ctx, userId, FEATURE_IDS.CUSTOM_SENTENCES, 1);
 
     const approval = await getAuthenticatedPendingApproval(
       ctx,

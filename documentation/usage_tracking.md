@@ -111,7 +111,7 @@ Reads the user's quota document and looks up the feature entry. Returns `{ allow
 
 Patches the feature entry within the document: `balance -= amount`, `used += amount`. Throws if no document or feature entry exists.
 
-**`useQuota(ctx, userId, featureId, amount?)`**
+**`consumeQuota(ctx, userId, featureId, amount?)`**
 
 Combined check + decrement + auto-schedules `trackUsage`. This is the primary API for mutations. Returns `{ balance: number }`.
 
@@ -202,7 +202,7 @@ Returns `{ features: Record<string, FeatureState>, lastSyncedAt: number } | null
 
 ## Feature-to-Mutation Mapping
 
-Which mutations should call `useQuota` when integrated into production code:
+Which mutations should call `consumeQuota` when integrated into production code:
 
 | Feature | Mutation(s) | Amount | Notes |
 |---|---|---|---|
@@ -214,7 +214,7 @@ Which mutations should call `useQuota` when integrated into production code:
 ### Integration pattern for production mutations
 
 ```typescript
-import { useQuota } from '../usage/helpers';
+import { consumeQuota } from '../usage/helpers';
 
 export const sendMessage = mutation({
   args: { /* ... */ },
@@ -223,7 +223,7 @@ export const sendMessage = mutation({
     const user = await requireAuthUser(ctx);
 
     // Check and decrement quota (also schedules trackUsage)
-    await useQuota(ctx, user._id, 'chat_messages', 1);
+    await consumeQuota(ctx, user._id, 'chat_messages', 1);
 
     // ... existing sendMessage logic ...
   },
@@ -237,7 +237,7 @@ const collection = await ctx.db.get(collectionId);
 const isCustom = collection?.name?.startsWith('Chat:') || /* other custom check */;
 
 if (!isCustom) {
-  await useQuota(ctx, user._id, 'sentences', batchSize);
+  await consumeQuota(ctx, user._id, 'sentences', batchSize);
 }
 ```
 
@@ -440,7 +440,7 @@ Each card shows:
 
 ## TODO for production integration
 
-1. **Wire `useQuota` into real mutations** — `sendMessage`, `createCourse`, `completeOnboarding`, `approveCard`, `addCardsFromCollection` (non-custom only).
+1. **Wire `consumeQuota` into real mutations** — `sendMessage`, `createCourse`, `completeOnboarding`, `approveCard`, `addCardsFromCollection` (non-custom only).
 2. **Trigger sync on app load** — call `syncQuotas` when the user authenticates or opens the app.
 3. **Handle subscription changes** — Autumn webhooks or post-checkout sync to refresh local quotas immediately after plan changes.
 4. **Periodic cron sync** — safety net for drift. Run `syncQuotasInternal` every 15-30 minutes for active users.

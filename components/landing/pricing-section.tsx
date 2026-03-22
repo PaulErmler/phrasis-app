@@ -59,24 +59,24 @@ function PricingPlanCard({
         'group relative flex h-full flex-col rounded-2xl border',
         isDesktop
           ? cn(
-              'pricing-card p-6 sm:p-8',
-              'bg-card opacity-0 animate-fade-in-up',
-              plan.highlighted
-                ? 'border-primary/50 shadow-lg shadow-primary/10'
-                : 'border-border/50',
-            )
+            'pricing-card p-6 sm:p-8',
+            'bg-card opacity-0 animate-fade-in-up',
+            plan.highlighted
+              ? 'border-primary/50 shadow-lg shadow-primary/10'
+              : 'border-border/50',
+          )
           : cn(
-              'p-8',
-              'border-border/50 bg-card',
-              plan.highlighted && 'border-primary/50 shadow-lg shadow-primary/10',
-            ),
+            'p-8',
+            'border-border/50 bg-card',
+            plan.highlighted && 'border-primary/50 shadow-lg shadow-primary/10',
+          ),
       )}
       style={
         isDesktop
           ? {
-              animationDelay: `${index * 0.1}s`,
-              animationFillMode: 'forwards',
-            }
+            animationDelay: `${index * 0.1}s`,
+            animationFillMode: 'forwards',
+          }
           : undefined
       }
     >

@@ -65,19 +65,19 @@ export const getPaywallContent = (
 
   if (products.length === 0) {
     switch (scenario) {
-      case "usage_limit":
-        return {
-          title: t("featureUnavailable"),
-          message: t(
-            consumable === false ? "capReachedNoProducts" : "usageLimitNoProducts",
-            { featureName }
-          ),
-        };
-      default:
-        return {
-          title: t("featureUnavailable"),
-          message: t("notAvailableContactUs"),
-        };
+    case "usage_limit":
+      return {
+        title: t("featureUnavailable"),
+        message: t(
+          consumable === false ? "capReachedNoProducts" : "usageLimitNoProducts",
+          { featureName }
+        ),
+      };
+    default:
+      return {
+        title: t("featureUnavailable"),
+        message: t("notAvailableContactUs"),
+      };
     }
   }
 
@@ -92,45 +92,45 @@ export const getPaywallContent = (
 
   const upgradeDetailKey = (() => {
     switch (scenario) {
-      case "usage_limit":
-        return consumable === false ? "upgradeDetailCap" : "upgradeDetailUsageLimit";
-      case "feature_flag":
-      default:
-        return "upgradeDetail";
+    case "usage_limit":
+      return consumable === false ? "upgradeDetailCap" : "upgradeDetailUsageLimit";
+    case "feature_flag":
+    default:
+      return "upgradeDetail";
     }
   })();
 
   const detail = isAddOn
     ? t("addOnDetail", {
-        productName: nextProduct.name,
-        featureName,
-      })
+      productName: nextProduct.name,
+      featureName,
+    })
     : t(upgradeDetailKey, {
-        productName: nextProduct.name,
-        featureName,
-      });
+      productName: nextProduct.name,
+      featureName,
+    });
 
   switch (scenario) {
-    case "usage_limit":
-      return {
-        title,
-        message: t(usageLimitWithDetailKey, {
-          featureName,
-          detail,
-        }),
-      };
-    case "feature_flag":
-      return {
-        title,
-        message: t("featureFlagWithDetail", {
-          featureName,
-          detail,
-        }),
-      };
-    default:
-      return {
-        title: t("featureUnavailable"),
-        message: t("notAvailableForAccount"),
-      };
+  case "usage_limit":
+    return {
+      title,
+      message: t(usageLimitWithDetailKey, {
+        featureName,
+        detail,
+      }),
+    };
+  case "feature_flag":
+    return {
+      title,
+      message: t("featureFlagWithDetail", {
+        featureName,
+        detail,
+      }),
+    };
+  default:
+    return {
+      title: t("featureUnavailable"),
+      message: t("notAvailableForAccount"),
+    };
   }
 };

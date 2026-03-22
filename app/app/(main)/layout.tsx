@@ -56,7 +56,7 @@ export default function MainLayout({
     preloadedCustomCollectionsProgress,
   } = useAppData();
 
-  const justReturnedFromLearn = useRef(false);
+  const [justReturnedFromLearn, setJustReturnedFromLearn] = useState(false);
   const restartTutorialRef = useRef<(() => void) | null>(null);
 
   const handleTutorialReady = useCallback((restart: () => void) => {
@@ -80,13 +80,13 @@ export default function MainLayout({
   const [isLearnOpen, setIsLearnOpen] = useState(false);
 
   useEffect(() => {
-    if (!isLearnOpen && justReturnedFromLearn.current) {
+    if (!isLearnOpen && justReturnedFromLearn) {
       const id = requestAnimationFrame(() => {
-        justReturnedFromLearn.current = false;
+        setJustReturnedFromLearn(false);
       });
       return () => cancelAnimationFrame(id);
     }
-  }, [isLearnOpen]);
+  }, [isLearnOpen, justReturnedFromLearn]);
 
   const [courseMenuOpen, setCourseMenuOpen] = useState(false);
   const [chatSidebarOpen, setChatSidebarOpen] = useState(false);
@@ -192,7 +192,7 @@ export default function MainLayout({
   }, [refreshPrefetchedThread]);
 
   const handleLearnClose = useCallback(() => {
-    justReturnedFromLearn.current = true;
+    setJustReturnedFromLearn(true);
     setIsLearnOpen(false);
     history.back();
     refreshPrefetchedThread();
@@ -224,153 +224,153 @@ export default function MainLayout({
 
   const courseButtonLabel = activeCourse
     ? t('currentCourseWithLanguages', {
-        targetLanguages: activeCourse.targetLanguages
-          .map((code) => getLocalizedLanguageNameByCode(code, locale))
-          .join(', '),
-      })
+      targetLanguages: activeCourse.targetLanguages
+        .map((code) => getLocalizedLanguageNameByCode(code, locale))
+        .join(', '),
+    })
     : t('changeCourse');
 
   return (
-      <div className="h-screen flex flex-col overflow-hidden">
-        <header className="sticky-header">
-          <div className="header-bar">
-            {activeView === 'home' ? (
+    <div className="h-screen flex flex-col overflow-hidden">
+      <header className="sticky-header">
+        <div className="header-bar">
+          {activeView === 'home' ? (
+            <Button
+              variant="ghost"
+              onClick={() => setCourseMenuOpen(true)}
+              className="gap-2 -ml-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              {courseButtonLabel}
+            </Button>
+          ) : activeView === 'chat' ? (
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
-                onClick={() => setCourseMenuOpen(true)}
+                onClick={handleChatBack}
                 className="gap-2 -ml-2"
               >
                 <ChevronLeft className="h-4 w-4" />
-                {courseButtonLabel}
+                {t('views.chat')}
               </Button>
-            ) : activeView === 'chat' ? (
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  onClick={handleChatBack}
-                  className="gap-2 -ml-2"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                  {t('views.chat')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setChatSidebarOpen((prev) => !prev)}
-                  aria-label="Toggle conversations"
-                >
-                  <PanelLeft className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleNewChat}
-                  aria-label="New chat"
-                >
-                  <MessageSquarePlus className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <h1 className="heading-section capitalize">
-                {t(`views.${activeView}`)}
-              </h1>
-            )}
-            <div className="flex items-center gap-1 -mr-2">
-              {(activeView === 'home' ||
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setChatSidebarOpen((prev) => !prev)}
+                aria-label="Toggle conversations"
+              >
+                <PanelLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleNewChat}
+                aria-label="New chat"
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <h1 className="heading-section capitalize">
+              {t(`views.${activeView}`)}
+            </h1>
+          )}
+          <div className="flex items-center gap-1 -mr-2">
+            {(activeView === 'home' ||
                 activeView === 'content' ||
                 activeView === 'library' ||
                 activeView === 'settings') && (
-                <HelpDialog
-                  supportOnly={
-                    activeView === 'content' ||
+              <HelpDialog
+                supportOnly={
+                  activeView === 'content' ||
                     activeView === 'library' ||
                     activeView === 'settings'
-                  }
-                  onRestartTutorial={
-                    activeView === 'home'
-                      ? () => restartTutorialRef.current?.()
-                      : undefined
-                  }
-                />
-              )}
-              <ThemeSwitcher />
-            </div>
+                }
+                onRestartTutorial={
+                  activeView === 'home'
+                    ? () => restartTutorialRef.current?.()
+                    : undefined
+                }
+              />
+            )}
+            <ThemeSwitcher />
           </div>
-        </header>
+        </div>
+      </header>
 
-        <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
+      <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
-        <main className="flex-1 min-h-0 flex flex-col">
-          <div
-            style={{
-              display:
+      <main className="flex-1 min-h-0 flex flex-col">
+        <div
+          style={{
+            display:
                 !isLearnOpen && activeView === 'home'
                   ? 'contents'
                   : 'none',
-            }}
-          >
-            <HomeView
-              preloadedCollectionProgress={preloadedCollectionProgress}
-              preloadedCourseSettings={preloadedCourseSettings}
-              preloadedCustomCollectionsProgress={
-                preloadedCustomCollectionsProgress
-              }
-              onLearnOpen={handleLearnOpen}
-              onChatOpen={handleOpenChat}
-              onNavigateToContent={() => handleViewChange('content')}
-              onNavigateToChat={handleNavigateToChat}
-              onTutorialReady={handleTutorialReady}
-              animateEntrance={justReturnedFromLearn.current}
-              isHidden={isLearnOpen || activeView !== 'home'}
-            />
-          </div>
-          <div
-            style={{
-              display:
+          }}
+        >
+          <HomeView
+            preloadedCollectionProgress={preloadedCollectionProgress}
+            preloadedCourseSettings={preloadedCourseSettings}
+            preloadedCustomCollectionsProgress={
+              preloadedCustomCollectionsProgress
+            }
+            onLearnOpen={handleLearnOpen}
+            onChatOpen={handleOpenChat}
+            onNavigateToContent={() => handleViewChange('content')}
+            onNavigateToChat={handleNavigateToChat}
+            onTutorialReady={handleTutorialReady}
+            animateEntrance={justReturnedFromLearn}
+            isHidden={isLearnOpen || activeView !== 'home'}
+          />
+        </div>
+        <div
+          style={{
+            display:
                 !isLearnOpen && activeView === 'content'
                   ? 'contents'
                   : 'none',
-            }}
-          >
-            <ContentView onChatOpen={handleOpenChat} />
-          </div>
-          {!isLearnOpen && activeView === 'library' && <LibraryView />}
-          <div
-            style={{
-              display:
+          }}
+        >
+          <ContentView onChatOpen={handleOpenChat} />
+        </div>
+        {!isLearnOpen && activeView === 'library' && <LibraryView />}
+        <div
+          style={{
+            display:
                 !isLearnOpen && activeView === 'settings'
                   ? 'contents'
                   : 'none',
-            }}
-          >
-            <SettingsView activeView={activeView} />
-          </div>
-          {!isLearnOpen && activeView === 'chat' && chatThreadId && (
-            <SimplifiedChatView
-              threadId={chatThreadId}
-              onNewChat={handleNewChat}
-              onThreadSelect={handleOpenChat}
-              threads={threads}
-              sidebarOpen={chatSidebarOpen}
-              onSidebarOpenChange={setChatSidebarOpen}
-            />
-          )}
-        </main>
-
-        <BottomNav
-          currentView={activeView}
-          onViewChange={handleViewChange}
-          onLearnOpen={handleLearnOpen}
-        />
-
-        {isLearnOpen && (
-          <div className="fixed inset-0 z-50 bg-background">
-            <LearnView
-              onBack={handleLearnClose}
-              prefetchedThreadId={prefetchedThreadId ?? undefined}
-            />
-          </div>
+          }}
+        >
+          <SettingsView activeView={activeView} />
+        </div>
+        {!isLearnOpen && activeView === 'chat' && chatThreadId && (
+          <SimplifiedChatView
+            threadId={chatThreadId}
+            onNewChat={handleNewChat}
+            onThreadSelect={handleOpenChat}
+            threads={threads}
+            sidebarOpen={chatSidebarOpen}
+            onSidebarOpenChange={setChatSidebarOpen}
+          />
         )}
-      </div>
+      </main>
+
+      <BottomNav
+        currentView={activeView}
+        onViewChange={handleViewChange}
+        onLearnOpen={handleLearnOpen}
+      />
+
+      {isLearnOpen && (
+        <div className="fixed inset-0 z-50 bg-background">
+          <LearnView
+            onBack={handleLearnClose}
+            prefetchedThreadId={prefetchedThreadId ?? undefined}
+          />
+        </div>
+      )}
+    </div>
   );
 }

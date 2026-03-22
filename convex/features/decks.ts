@@ -32,7 +32,7 @@ import {
   getNextCollectionName,
 } from '../lib/collections';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
-import { useQuota, checkQuota } from '../usage/helpers';
+import { consumeQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 import { isCollectionAccessible } from './collections';
@@ -798,7 +798,7 @@ export const addCardsFromCollection = mutation({
       );
 
       if (textsToAdd.length > 0) {
-        await useQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
+        await consumeQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
 
         const { cardsInserted, newLastRank } = await createCardsFromTexts(
           ctx,
