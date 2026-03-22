@@ -18,6 +18,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
   const t = useTranslations('LandingPage.header');
 
   const navLinks = [
+    { href: '#review-modes', label: t('nav.howItWorks') },
     { href: '#features', label: t('nav.features') },
     { href: '#pricing', label: t('nav.pricing') },
     { href: '#faq', label: t('nav.faq') },
@@ -38,9 +39,9 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
   const themeOptions = [
-    { value: 'light', label: 'Light', icon: Sun },
-    { value: 'dark', label: 'Dark', icon: Moon },
-    { value: 'system', label: 'System', icon: Monitor },
+    { value: 'light', label: t('themeLight'), icon: Sun },
+    { value: 'dark', label: t('themeDark'), icon: Moon },
+    { value: 'system', label: t('themeSystem'), icon: Monitor },
   ];
 
   return (
@@ -123,7 +124,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all"
-                aria-label="Toggle menu"
+                aria-label={t('nav.menuAriaLabel')}
               >
                 {mobileMenuOpen ? (
                   <X className="h-5 w-5" />

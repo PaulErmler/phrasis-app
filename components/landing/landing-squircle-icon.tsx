@@ -24,15 +24,15 @@ export function LandingSquircleIcon({
   const back = backClassName ?? SQUIRCLE_BACK[variant];
 
   return (
-    <div className={cn('relative h-16 w-16 shrink-0', className)}>
+    <div className={cn('relative flex items-center justify-center h-16 w-16 shrink-0', className)}>
       <div
         className={cn(
-          'absolute top-2 left-2 h-14 w-14 rounded-[14px]',
+          'absolute h-14 w-14 rounded-[10px] -rotate-[18deg]',
           back,
         )}
         aria-hidden
       />
-      <div className="absolute top-0 left-0 flex h-14 w-14 items-center justify-center rounded-[14px] bg-primary shadow-lg">
+      <div className="absolute flex h-14 w-14 items-center justify-center rounded-[10px] bg-primary shadow-lg">
         {children}
       </div>
     </div>

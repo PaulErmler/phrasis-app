@@ -1,17 +1,21 @@
 {
   "header": {
     "nav": {
+      "howItWorks": "How it works",
       "features": "Features",
       "pricing": "Pricing",
-      "reviews": "Reviews",
-      "faq": "FAQ"
+      "faq": "FAQ",
+      "menuAriaLabel": "Toggle menu"
     },
     "install": "Install",
     "signIn": "Sign in",
     "signUp": "Sign up",
     "goToApp": "Go to App",
     "installApp": "Install App",
-    "theme": "Theme"
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System"
   },
   "hero": {
     "tagline": "The language app that grows with you",
@@ -21,6 +25,133 @@
       "howItWorks": "See How It Works",
       "goToApp": "Go to App",
       "install": "Install App"
+    }
+  },
+  "philosophy": {
+    "title": "What actually moves fluency.",
+    "titleHighlight": "Three core principles.",
+    "lead": "Languages stick when three things line up: enough repetition, input you can mostly follow, and genuine curiosity. Flexling is built around all three.",
+    "pillar1Title": "Repetition that fits your day",
+    "pillar1Body": "Short, frequent encounters with the same sentences beat rare cramming. Audio review lets you rehearse while you move; full review sharpens recall when you have a keyboard in front of you.",
+    "pillar2Title": "Comprehensible input",
+    "pillar2Body": "You always anchor on a line you already understand, then reach for the translation. That keeps difficulty in the sweet spot: challenging, but not overwhelming.",
+    "pillar3Title": "Curiosity on tap",
+    "pillar3Body": "When something clicks or confuses you, you can ask why — and turn the answer into cards you will hear again tomorrow."
+  },
+  "reviewModes": {
+    "title": "Two ways to review.",
+    "titleHighlight": "Choose how you learn best.",
+    "subtitle": "Same sentences, different muscle memory — switch between listening-first audio and typing-first full review anytime.",
+    "audioTitle": "Audio review",
+    "audioBody": "Hear the sentence in a language you know, think of the translation — each target line starts blurred and automatically eases into focus, as if audio had just finished. In the app, that happens after playback. Use replay to watch the demo again. Rate how well you recalled it — ideal for commutes and hands-free practice.",
+    "fullTitle": "Full review",
+    "fullBody": "Type your translation for each target language. After you submit, you see a character-level diff: correct text in green, mistakes highlighted, and anything you skipped in muted text — plus an accuracy score.",
+    "multiLabel": "Multiple Language",
+    "replay": "Replay demo",
+    "mock": {
+      "base": "Good morning, how are you?",
+      "hi": "सुप्रभात, आप कैसे हैं?",
+      "hiRoman": "suprabhaat, aap kaise hain?",
+      "es": "Buenos días, ¿cómo estás?",
+      "fr": "Bonjour, comment allez-vous ?",
+      "typedEs": "Buenos dias, como estas?",
+      "typedFr": "Bonjour, comment allez vous?"
+    }
+  },
+  "chatDemo": {
+    "title": "Ask any question.",
+    "titleHighlight": "Remember the answer.",
+    "subtitle": "Ask grammar, line up useful phrases, or follow a learning rabbit hole. The chat can draft cards from the conversation — you just tap to add. Creating new flashcards has never been easier.",
+    "scenarioGrammar": "Grammar",
+    "scenarioCards": "New cards",
+    "scenarioCuriosity": "Curiosity",
+    "approve": "Add Card",
+    "reject": "Reject",
+    "approved": "Card added!",
+    "replay": "Replay",
+    "grammar": {
+      "userMessage": "A neutral English line like Good morning, how are you? is often matched to Buenos días, ¿cómo estás? in Spanish. Why is that informal tú instead of formal usted?",
+      "assistantMessage": "Buenos días, ¿cómo estás? is the everyday tú form — one person, friendly or familiar, the version learners hear most in real chats. ¿Cómo está (usted)? is the formal one-person line (service counters, first meetings, some workplaces). ¿Cómo están? addresses several people at once. If you want the usted line as its own card, say so and I will draft it.",
+      "card1Base": "Good morning — formal, one person",
+      "card1Target": "Buenos días, ¿cómo está usted?",
+      "card2Base": "Good morning — to several people",
+      "card2Target": "Buenos días, ¿cómo están?",
+      "multiCard1": {
+        "base": "Good morning — formal, one person",
+        "hi": "सुप्रभात, आप कैसे हैं? (आप — औपचारिक)",
+        "hiRoman": "suprabhaat, aap kaise hain? (aap — formal)",
+        "es": "Buenos días, ¿cómo está usted?",
+        "fr": "Bonjour, comment allez-vous ?"
+      },
+      "multiCard2": {
+        "base": "Good morning — to several people",
+        "hi": "सुप्रभात, आप सब कैसे हैं?",
+        "hiRoman": "suprabhaat, aap sab kaise hain?",
+        "es": "Buenos días, ¿cómo están?",
+        "fr": "Bonjour à tous, comment allez-vous ?"
+      }
+    },
+    "threeCards": {
+      "userMessage": "Please add three flashcards for me: I would like a table for two, could we see the menu, and the bill please — for an upcoming restaurant trip.",
+      "assistantMessage": "Here are three cards in the same shape as your deck — one line per language you are studying. Tap Add Card on each when you are ready to save them.",
+      "assistantMessageMulti": "Three proposals with every active language line. Confirm each when it looks right.",
+      "simple": {
+        "card1Base": "I would like a table for two.",
+        "card1Target": "Quisiera una mesa para dos.",
+        "card2Base": "Could we see the menu?",
+        "card2Target": "¿Podemos ver el menú?",
+        "card3Base": "The bill, please.",
+        "card3Target": "La cuenta, por favor."
+      },
+      "multi": {
+        "card1": {
+          "base": "I would like a table for two.",
+          "hi": "मुझे दो लोगों के लिए मेज़ चाहिए।",
+          "hiRoman": "mujhe do logon ke liye mez chahiye.",
+          "es": "Quisiera una mesa para dos.",
+          "fr": "Une table pour deux, s'il vous plaît."
+        },
+        "card2": {
+          "base": "Could we see the menu?",
+          "hi": "क्या हम मेनू देख सकते हैं?",
+          "hiRoman": "kya hum menu dekh sakte hain?",
+          "es": "¿Podemos ver el menú?",
+          "fr": "Pourrions-nous voir le menu ?"
+        },
+        "card3": {
+          "base": "The bill, please.",
+          "hi": "बिल दीजिए, कृपया।",
+          "hiRoman": "bil dijiye, kripya.",
+          "es": "La cuenta, por favor.",
+          "fr": "L'addition, s'il vous plaît."
+        }
+      }
+    },
+    "curiosity": {
+      "userMessage": "What are some funny Spanish words?",
+      "assistantMessage": "Learners love chunky slang and sound-alike surprises. Chiripa is a fun noun for a lucky fluke; tocayo is the word for someone who shares your name — handy for jokes. Here are two cards if you want them in your deck.",
+      "simple": {
+        "card1Base": "What a lucky break! (colloquial)",
+        "card1Target": "¡Qué chiripa!",
+        "card2Base": "We have the same first name.",
+        "card2Target": "Somos tocayos."
+      },
+      "multi": {
+        "card1": {
+          "base": "What a lucky break! (colloquial)",
+          "hi": "कितनी अच्छी किस्मत!",
+          "hiRoman": "kitni achhi kismat!",
+          "es": "¡Qué chiripa!",
+          "fr": "Quelle veine !"
+        },
+        "card2": {
+          "base": "We have the same first name.",
+          "hi": "हमारा नाम एक जैसा है।",
+          "hiRoman": "hamaara naam ek jaisa hai.",
+          "es": "Somos tocayos.",
+          "fr": "Nous sommes homonymes."
+        }
+      }
     }
   },
   "features": {
@@ -57,6 +188,7 @@
   "pricing": {
     "title": "Flexible",
     "titleHighlight": "Pricing",
+    "mostPopular": "Most Popular",
     "comparison": {
       "comparedWith": "Compared with:",
       "traditionalCourses": "Traditional Courses",
@@ -113,42 +245,6 @@
       }
     }
   },
-  "testimonials": {
-    "title": "Loved by",
-    "titleHighlight": "Language Learners",
-    "items": [
-      {
-        "quote": "Flexling completely changed how I learn languages. I can finally make progress during my daily commute!",
-        "author": "Sarah M.",
-        "role": "Learning Spanish"
-      },
-      {
-        "quote": "The AI answers my grammar questions instantly. It's like having a personal tutor available 24/7. Whenever I have a question, I can ask and Flexling automatically creates a flashcard for me so that I dont forget the answer.",
-        "author": "Michael T.",
-        "role": "Learning French"
-      },
-      {
-        "quote": "I love that I can add my own phrases from books I'm reading. Finally, a language app that adapts to me!",
-        "author": "Anna K.",
-        "role": "Learning German"
-      },
-      {
-        "quote": "The spaced repetition actually works. I'm remembering vocabulary so much better than with other apps.",
-        "author": "David L.",
-        "role": "Learning Japanese"
-      },
-      {
-        "quote": "Being able to learn hands-free while cooking or exercising is a game-changer for me!",
-        "author": "Emma R.",
-        "role": "Learning Italian"
-      },
-      {
-        "quote": "Instead of having to sit at my desk for hours to learn Portuguese, I go on walks and can spend time outside while learning.",
-        "author": "Lisa P.",
-        "role": "Learning Portuguese"
-      }
-    ]
-  },
   "donation": {
     "title": "Support &",
     "titleHighlight": "Giving Back",
@@ -166,6 +262,14 @@
     "title": "Frequently Asked",
     "titleHighlight": "Questions",
     "subtitle": "Everything you need to know about Flexling",
+    "emailSubjects": {
+      "requestFeature": "Feature Request",
+      "requestLanguage": "Language Request"
+    },
+    "links": {
+      "tatoeba": "Tatoeba",
+      "ccByLicense": "CC-BY License"
+    },
     "items": [
       {
         "question": "What is Flexling?",
@@ -249,14 +353,5 @@
     "subtitle": "Install Flexling on your device for quick access anytime. Learn on your commute, during lunch, or before bed.",
     "button": "Install Flexling",
     "note": "Works on iOS, Android, and desktop"
-  },
-  "newsletter": {
-    "title": "Get Language Tips & Updates",
-    "subtitle": "Join our newsletter for exclusive learning strategies, new feature announcements, and tips. Unsubscribe anytime.",
-    "placeholder": "Enter your email",
-    "cta": "Subscribe",
-    "privacy": "We respect your privacy. No spam, ever.",
-    "success": "You're subscribed! Check your inbox for a welcome email.",
-    "done": "Done"
   }
 }

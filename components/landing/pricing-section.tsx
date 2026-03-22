@@ -67,7 +67,7 @@ function PricingPlanCard({
             )
           : cn(
               'p-8',
-              'border-border/50 bg-card/50 backdrop-blur-sm',
+              'border-border/50 bg-card',
               plan.highlighted && 'border-primary/50 shadow-lg shadow-primary/10',
             ),
       )}
@@ -83,7 +83,7 @@ function PricingPlanCard({
       {plan.highlighted && (
         <div className="absolute -top-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 whitespace-nowrap rounded-full bg-primary px-4 py-1 text-xs font-bold text-white">
           <Sprout className="h-3 w-3" />
-          Most Popular
+          {t('mostPopular')}
         </div>
       )}
 
@@ -146,7 +146,7 @@ export async function PricingSection() {
   return (
     <section
       id="pricing"
-      className="relative z-0 px-4 py-16 sm:py-20 md:py-24 pricing-gradient"
+      className="relative z-0 px-4 py-16 sm:py-20 md:py-24 border-t border-border/60 bg-muted/10"
     >
       <div className="relative mx-auto max-w-7xl">
         <div className="mx-auto mb-10 max-w-3xl text-center sm:mb-12">

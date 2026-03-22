@@ -17,7 +17,7 @@ export async function HeroSection({ isAuthenticated }: HeroSectionProps) {
       <LandingHeader isAuthenticated={isAuthenticated} />
 
       <div className="relative z-10 w-full max-w-5xl mx-auto text-center space-y-8 animate-fade-in-up">
-        <div className="inline-flex items-center justify-center w-36 h-36 sm:w-44 sm:h-44 md:w-46 md:h-46">
+        <div className="inline-flex items-center justify-center w-36 h-36 sm:w-44 sm:h-44 md:w-48 md:h-48">
           <img
             src="/icons/icon.svg"
             alt="Flexling Logo"
@@ -27,8 +27,9 @@ export async function HeroSection({ isAuthenticated }: HeroSectionProps) {
           />
         </div>
 
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.1]">
-          <span className="gradient-text">Flexling</span> – {t('tagline')}
+        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.1] flex flex-col items-center gap-1 sm:gap-2">
+          <span className="gradient-text">Flexling</span>
+          <span>{t('tagline')}.</span>
         </h1>
 
         <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto stagger-1 leading-relaxed">

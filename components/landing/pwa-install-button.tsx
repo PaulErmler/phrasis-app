@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -31,14 +32,13 @@ export function PwaInstallTrigger({
   );
 }
 
-/**
- * FAQ-sized outline install control (label is not localized yet).
- */
+/** FAQ-sized outline install control. */
 export function PWAInstallButton() {
+  const t = useTranslations('LandingPage.installCta');
   return (
     <PwaInstallTrigger variant="outline" size="sm" className="gap-2">
       <Download className="w-4 h-4" />
-      Install Flexling
+      {t('button')}
     </PwaInstallTrigger>
   );
 }

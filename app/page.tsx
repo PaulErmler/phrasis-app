@@ -1,10 +1,12 @@
 import './landing-page.css';
 import { Footer } from '@/components/Footer';
 import { HeroSection } from '@/components/landing/hero-section';
+import { PhilosophySection } from '@/components/landing/philosophy-section';
+import { LandingDemoProvider } from '@/components/landing/landing-demo-context';
+import { ReviewModesSection } from '@/components/landing/review-modes-section';
+import { ChatFlashcardSection } from '@/components/landing/chat-flashcard-section';
 import { FeaturesSection } from '@/components/landing/features-section';
 import { PricingSection } from '@/components/landing/pricing-section';
-// import { TestimonialsSection } from '@/components/landing/testimonials-section';
-// import { NewsletterSection } from '@/components/landing/newsletter-section';
 import { FAQSection } from '@/components/landing/faq-section';
 import { DonationSection } from '@/components/landing/donation-section';
 import { InstallCtaSection } from '@/components/landing/install-cta-section';
@@ -18,13 +20,16 @@ export default async function Home() {
     <div className="min-h-screen flex flex-col">
       <main className="flex-1">
         <HeroSection isAuthenticated={isAuthenticated} />
+        <PhilosophySection />
+        <LandingDemoProvider>
+          <ReviewModesSection />
+          <ChatFlashcardSection />
+        </LandingDemoProvider>
         <FeaturesSection />
         <PricingSection />
-        {/* <TestimonialsSection /> */}
 
         <FAQSection />
         <DonationSection />
-        {/* <NewsletterSection /> */}
         <InstallCtaSection />
       </main>
       <Footer />

@@ -49,7 +49,7 @@ export async function DonationSection() {
           </div>
 
           <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 sm:p-8 flex flex-col">
-            <LandingSquircleIcon className="mb-4">
+            <LandingSquircleIcon variant="orange" className="mb-4">
               <Mail className="h-7 w-7 text-white" />
             </LandingSquircleIcon>
             <h3 className="text-lg sm:text-xl font-semibold mb-3">

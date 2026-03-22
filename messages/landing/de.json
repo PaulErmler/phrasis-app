@@ -1,17 +1,21 @@
 {
   "header": {
     "nav": {
+      "howItWorks": "So funktioniert's",
       "features": "Funktionen",
       "pricing": "Preise",
-      "reviews": "Bewertungen",
-      "faq": "FAQ"
+      "faq": "FAQ",
+      "menuAriaLabel": "Menü umschalten"
     },
     "install": "Installieren",
     "signIn": "Anmelden",
     "signUp": "Registrieren",
     "goToApp": "Zur App",
     "installApp": "App installieren",
-    "theme": "Design"
+    "theme": "Design",
+    "themeLight": "Hell",
+    "themeDark": "Dunkel",
+    "themeSystem": "System"
   },
   "hero": {
     "tagline": "Die Sprach-App, die mit dir wächst",
@@ -21,6 +25,133 @@
       "howItWorks": "So funktioniert's",
       "goToApp": "Zur App",
       "install": "App installieren"
+    }
+  },
+  "philosophy": {
+    "title": "Was Sprachkompetenz wirklich bewegt.",
+    "titleHighlight": "Drei Grundprinzipien.",
+    "lead": "Flüssigkeit entsteht, wenn Wiederholung, verständlicher Input und echte Neugier zusammenfinden. Flexling baut genau darauf.",
+    "pillar1Title": "Wiederholung, die in den Tag passt",
+    "pillar1Body": "Kurze, häufige Kontakte mit denselben Sätzen schlagen seltenes Pauken. Audio-Modus übt unterwegs; die vollständige Wiederholung schärft das Erinnern, wenn du tippen kannst.",
+    "pillar2Title": "Verständlicher Input",
+    "pillar2Body": "Du hörst und liest zuerst eine Zeile, die du schon verstehst, und streckst dich dann zur Übersetzung. So bleibt die Schwierigkeit anspruchsvoll, aber nicht frustrierend.",
+    "pillar3Title": "Neugier, wenn sie aufkommt",
+    "pillar3Body": "Wenn etwas Klick macht oder stutzt, frag nach „Warum?“ — und mach aus der Antwort Karten, die du morgen wieder hörst."
+  },
+  "reviewModes": {
+    "title": "Zwei Wege zum Wiederholen.",
+    "titleHighlight": "Wähle, wie du am besten lernst.",
+    "subtitle": "Dieselben Sätze, anderes Training — wechsle jederzeit zwischen Audio-Wiederholung und vollständiger Texteingabe.",
+    "audioTitle": "Audio-Wiederholung",
+    "audioBody": "Hör den Satz in einer Sprache, die du schon verstehst, denk an die Übersetzung — jede Zielzeile startet unscharf und wird automatisch weich scharf, so als wäre das Audio gerade zu Ende. In der App passiert das nach dem Abspielen. Mit Wiederholen siehst du die Demo erneut. Bewerte, wie gut du dich erinnerst — ideal für Pendeln und freihändiges Üben.",
+    "fullTitle": "Vollständige Wiederholung",
+    "fullBody": "Tippe die Übersetzung für jede Zielsprache. Nach dem Absenden siehst du einen Zeichen-für-Zeichen-Vergleich: Richtiges in Grün, Fehler markiert, Ausgelassenes gedämpft — plus eine Genauigkeit in Prozent.",
+    "multiLabel": "Multiple Language",
+    "replay": "Demo erneut abspielen",
+    "mock": {
+      "base": "Guten Morgen, wie geht es Ihnen?",
+      "hi": "सुप्रभात, आप कैसे हैं?",
+      "hiRoman": "suprabhaat, aap kaise hain?",
+      "es": "Buenos días, ¿cómo estás?",
+      "fr": "Bonjour, comment allez-vous ?",
+      "typedEs": "Buenos dias, como estas?",
+      "typedFr": "Bonjour, comment allez vous?"
+    }
+  },
+  "chatDemo": {
+    "title": "Stell jede Frage.",
+    "titleHighlight": "Behalte die Antwort.",
+    "subtitle": "Grammatik klären, nützliche Sätze sammeln oder deiner Neugier folgen. Der Chat kann Karten aus dem Gespräch vorschlagen — zum Hinzufügen einfach tippen. Neue Karten anzulegen war noch nie einfacher.",
+    "scenarioGrammar": "Grammatik",
+    "scenarioCards": "Neue Karten",
+    "scenarioCuriosity": "Neugier",
+    "approve": "Karte hinzufügen",
+    "reject": "Ablehnen",
+    "approved": "Karte hinzugefügt!",
+    "replay": "Erneut abspielen",
+    "grammar": {
+      "userMessage": "Eine neutrale englische Zeile wie Good morning, how are you? wird im Spanischen oft mit Buenos días, ¿cómo estás? gepaart. Warum steht da tú und nicht höfliches usted?",
+      "assistantMessage": "Buenos días, ¿cómo estás? ist der übliche tú-Alltagssatz — eine Person, freundlich-vertraut, so hören Lernende ihn zuerst am häufigsten. ¿Cómo está (usted)? ist höflicher für eine Person (Service, erste Begegnung). ¿Cómo están? richtet sich an mehrere Personen. Wenn du die usted-Zeile als eigene Karte willst, sag kurz Bescheid.",
+      "card1Base": "Guten Morgen — formell, eine Person",
+      "card1Target": "Buenos días, ¿cómo está usted?",
+      "card2Base": "Guten Morgen — an mehrere Personen",
+      "card2Target": "Buenos días, ¿cómo están?",
+      "multiCard1": {
+        "base": "Guten Morgen — formell, eine Person",
+        "hi": "सुप्रभात, आप कैसे हैं? (आप — औपचारिक)",
+        "hiRoman": "suprabhaat, aap kaise hain? (aap — formal)",
+        "es": "Buenos días, ¿cómo está usted?",
+        "fr": "Bonjour, comment allez-vous ?"
+      },
+      "multiCard2": {
+        "base": "Guten Morgen — an mehrere Personen",
+        "hi": "सुप्रभात, आप सब कैसे हैं?",
+        "hiRoman": "suprabhaat, aap sab kaise hain?",
+        "es": "Buenos días, ¿cómo están?",
+        "fr": "Bonjour à tous, comment allez-vous ?"
+      }
+    },
+    "threeCards": {
+      "userMessage": "Bitte leg mir drei Karten an: Ich hätte gern einen Tisch für zwei, könnten wir die Speisekarte sehen, und die Rechnung bitte — für ein Restaurantbesuch demnächst.",
+      "assistantMessage": "Hier sind drei Karten im gleichen Aufbau wie dein Deck — eine Zeile pro Sprache. Tippe auf Karte hinzufügen, wenn du speichern willst.",
+      "assistantMessageMulti": "Drei Vorschläge mit allen aktiven Sprachzeilen. Bestätige jede Karte, wenn sie passt.",
+      "simple": {
+        "card1Base": "Ich hätte gern einen Tisch für zwei.",
+        "card1Target": "Quisiera una mesa para dos.",
+        "card2Base": "Könnten wir die Speisekarte sehen?",
+        "card2Target": "¿Podemos ver el menú?",
+        "card3Base": "Die Rechnung, bitte.",
+        "card3Target": "La cuenta, por favor."
+      },
+      "multi": {
+        "card1": {
+          "base": "Ich hätte gern einen Tisch für zwei.",
+          "hi": "मुझे दो लोगों के लिए मेज़ चाहिए।",
+          "hiRoman": "mujhe do logon ke liye mez chahiye.",
+          "es": "Quisiera una mesa para dos.",
+          "fr": "Une table pour deux, s'il vous plaît."
+        },
+        "card2": {
+          "base": "Könnten wir die Speisekarte sehen?",
+          "hi": "क्या हम मेनू देख सकते हैं?",
+          "hiRoman": "kya hum menu dekh sakte hain?",
+          "es": "¿Podemos ver el menú?",
+          "fr": "Pourrions-nous voir le menu ?"
+        },
+        "card3": {
+          "base": "Die Rechnung, bitte.",
+          "hi": "बिल दीजिए, कृपया।",
+          "hiRoman": "bil dijiye, kripya.",
+          "es": "La cuenta, por favor.",
+          "fr": "L'addition, s'il vous plaît."
+        }
+      }
+    },
+    "curiosity": {
+      "userMessage": "Was sind lustige spanische Wörter?",
+      "assistantMessage": "Lernende mögen knackigen Slang und Überraschungen beim Klang. Chiripa ist ein schönes Wort für einen glücklichen Zufall; tocayo heißt jemand mit demselben Namen — perfekt für Witze. Zwei Karten zum Mitnehmen.",
+      "simple": {
+        "card1Base": "Was für ein Glück! (umgangssprachlich)",
+        "card1Target": "¡Qué chiripa!",
+        "card2Base": "Wir haben denselben Vornamen.",
+        "card2Target": "Somos tocayos."
+      },
+      "multi": {
+        "card1": {
+          "base": "Was für ein Glück! (umgangssprachlich)",
+          "hi": "कितनी अच्छी किस्मत!",
+          "hiRoman": "kitni achhi kismat!",
+          "es": "¡Qué chiripa!",
+          "fr": "Quelle veine !"
+        },
+        "card2": {
+          "base": "Wir haben denselben Vornamen.",
+          "hi": "हमारा नाम एक जैसा है।",
+          "hiRoman": "hamaara naam ek jaisa hai.",
+          "es": "Somos tocayos.",
+          "fr": "Nous sommes homonymes."
+        }
+      }
     }
   },
   "features": {
@@ -57,6 +188,7 @@
   "pricing": {
     "title": "Flexible",
     "titleHighlight": "Preise",
+    "mostPopular": "Am beliebtesten",
     "comparison": {
       "comparedWith": "Im Vergleich zu:",
       "traditionalCourses": "Traditionelle Kurse",
@@ -113,42 +245,6 @@
       }
     }
   },
-  "testimonials": {
-    "title": "Geliebt von",
-    "titleHighlight": "Sprachlernenden",
-    "items": [
-      {
-        "quote": "Flexling hat komplett verändert, wie ich Sprachen lerne. Ich kann endlich während meines täglichen Pendelns Fortschritte machen!",
-        "author": "Sarah M.",
-        "role": "Lernt Spanisch"
-      },
-      {
-        "quote": "Die KI beantwortet meine Grammatikfragen sofort. Es ist, als hätte ich einen persönlichen Tutor, der 24/7 verfügbar ist. Immer wenn ich eine Frage habe, kann ich sie stellen und Flexling erstellt automatisch eine Lernkarte für mich, damit ich die Antwort nicht vergesse.",
-        "author": "Michael T.",
-        "role": "Lernt Französisch"
-      },
-      {
-        "quote": "Ich liebe es, dass ich meine eigenen Phrasen aus Büchern hinzufügen kann, die ich lese. Endlich eine Sprach-App, die sich mir anpasst!",
-        "author": "Anna K.",
-        "role": "Lernt Deutsch"
-      },
-      {
-        "quote": "Die Spaced Repetition funktioniert wirklich. Ich merke mir Vokabeln so viel besser als mit anderen Apps.",
-        "author": "David L.",
-        "role": "Lernt Japanisch"
-      },
-      {
-        "quote": "Freihändig lernen zu können, während ich koche oder trainiere, ist ein Gamechanger für mich!",
-        "author": "Emma R.",
-        "role": "Lernt Italienisch"
-      },
-      {
-        "quote": "Anstatt stundenlang am Schreibtisch zu sitzen, um Portugiesisch zu lernen, gehe ich spazieren und kann Zeit draußen verbringen, während ich lerne.",
-        "author": "Lisa P.",
-        "role": "Lernt Portugiesisch"
-      }
-    ]
-  },
   "donation": {
     "title": "Support &",
     "titleHighlight": "Gutes tun",
@@ -166,6 +262,14 @@
     "title": "Häufig gestellte",
     "titleHighlight": "Fragen",
     "subtitle": "Alles was du über Flexling wissen musst",
+    "emailSubjects": {
+      "requestFeature": "Feature-Anfrage",
+      "requestLanguage": "Sprach-Anfrage"
+    },
+    "links": {
+      "tatoeba": "Tatoeba",
+      "ccByLicense": "CC-BY-Lizenz"
+    },
     "items": [
       {
         "question": "Was ist Flexling?",
@@ -249,14 +353,5 @@
     "subtitle": "Installiere Flexling auf deinem Gerät für schnellen Zugriff jederzeit. Lerne beim Pendeln, in der Mittagspause oder vor dem Schlafen.",
     "button": "Flexling installieren",
     "note": "Funktioniert auf iOS, Android und Desktop"
-  },
-  "newsletter": {
-    "title": "Erhalte Sprachtipps & Updates",
-    "subtitle": "Abonniere unseren Newsletter für exklusive Lernstrategien, neue Feature-Ankündigungen und Tipps. Jederzeit abbestellbar.",
-    "placeholder": "Gib deine E-Mail ein",
-    "cta": "Abonnieren",
-    "privacy": "Wir respektieren deine Privatsphäre. Kein Spam, niemals.",
-    "success": "Du bist angemeldet! Schau in deinem Posteingang nach einer Willkommens-E-Mail.",
-    "done": "Fertig"
   }
 }

@@ -23,11 +23,6 @@ const faqConfig: FaqItemConfig[] = [
 
 const TATOEBA_FAQ_INDEX = 7;
 
-const emailSubjects: Record<string, string> = {
-  requestFeature: 'Feature Request',
-  requestLanguage: 'Language Request',
-};
-
 export async function FAQSection() {
   const t = await getTranslations('LandingPage.faq');
 
@@ -65,21 +60,21 @@ export async function FAQSection() {
                       <p>
                         {t(`items.${index}.tatoebaPrefix`)}
                         <a
-                          href="http://tatoeba.org/"
+                          href="https://tatoeba.org/"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:underline font-medium"
                         >
-                          Tatoeba
+                          {t('links.tatoeba')}
                         </a>
                         {t(`items.${index}.tatoebaMid`)}
                         <a
-                          href="http://creativecommons.org/licenses/by/2.0/fr/"
+                          href="https://creativecommons.org/licenses/by/2.0/fr/"
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-primary hover:underline font-medium"
                         >
-                          CC-BY License
+                          {t('links.ccByLicense')}
                         </a>
                         {t(`items.${index}.tatoebaSuffix`)}
                       </p>
@@ -92,7 +87,7 @@ export async function FAQSection() {
                     <div className="mt-4">
                       <Button asChild variant="outline" size="sm" className="gap-2">
                         <a
-                          href={`mailto:support@flexling.com?subject=${encodeURIComponent(emailSubjects[config.emailAction] ?? '')}`}
+                          href={`mailto:support@flexling.com?subject=${encodeURIComponent(t(`emailSubjects.${config.emailAction}`))}`}
                         >
                           <Mail className="w-4 h-4" />
                           {t(config.emailAction)}

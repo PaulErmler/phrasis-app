@@ -1,8 +1,10 @@
 export { HeroSection } from './hero-section';
+export { PhilosophySection } from './philosophy-section';
+export { LandingDemoProvider } from './landing-demo-context';
+export { ReviewModesSection } from './review-modes-section';
+export { ChatFlashcardSection } from './chat-flashcard-section';
 export { FeaturesSection } from './features-section';
 export { PricingSection } from './pricing-section';
-export { TestimonialsSection } from './testimonials-section';
-export { NewsletterSection } from './newsletter-section';
 export { FAQSection } from './faq-section';
 export { DonationSection } from './donation-section';
 export { DonationMobileStack } from './donation-mobile-stack';

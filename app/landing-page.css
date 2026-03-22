@@ -117,45 +117,6 @@
     );
 }
 
-/* Newsletter gradient background */
-.newsletter-gradient {
-  background:
-    radial-gradient(
-      ellipse 70% 50% at 50% 120%,
-      oklch(0.7162 0.119 217.31 / 0.12),
-      transparent
-    ),
-    radial-gradient(
-      ellipse 50% 40% at 20% 40%,
-      oklch(0.8 0.119 217.31 / 0.08),
-      transparent
-    ),
-    radial-gradient(
-      ellipse 60% 35% at 80% 30%,
-      oklch(0.72 0.119 217.31 / 0.06),
-      transparent
-    );
-}
-
-.dark .newsletter-gradient {
-  background:
-    radial-gradient(
-      ellipse 70% 50% at 50% 120%,
-      oklch(0.7162 0.119 217.31 / 0.2),
-      transparent
-    ),
-    radial-gradient(
-      ellipse 50% 40% at 20% 40%,
-      oklch(0.8 0.119 217.31 / 0.12),
-      transparent
-    ),
-    radial-gradient(
-      ellipse 60% 35% at 80% 30%,
-      oklch(0.72 0.119 217.31 / 0.1),
-      transparent
-    );
-}
-
 /* ── Section-level gradients for flowing backgrounds ── */
 
 /* Pricing section — centered blue glow */

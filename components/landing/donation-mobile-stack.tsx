@@ -25,17 +25,12 @@ function MobileDonationCard({
 
   const y = useTransform(stackIndex, (s) => {
     if (s < 0) return s * 200;
-    return s * 12;
-  });
-
-  const x = useTransform(stackIndex, (s) => {
-    if (s < 0) return 0;
-    return s * 12;
+    return 0;
   });
 
   const scale = useTransform(stackIndex, (s) => {
     if (s < 0) return 1 - s * -0.05;
-    return Math.max(1 - s * 0.05, 0.8);
+    return 1;
   });
 
   const opacity = useTransform(stackIndex, (s) => {
@@ -49,7 +44,7 @@ function MobileDonationCard({
 
   return (
     <motion.div
-      style={{ y, x, scale, opacity, zIndex }}
+      style={{ y, scale, opacity, zIndex }}
       className="absolute inset-x-0 top-0 flex flex-col rounded-2xl border border-border/50 bg-card/95 p-8 shadow-xl backdrop-blur-md"
     >
       {children}
@@ -68,8 +63,8 @@ export function DonationMobileStack() {
 
   return (
     <div className="md:hidden">
-      <div ref={containerRef} className="relative min-h-[130vh]">
-        <div className="sticky top-20 z-[1] mx-auto flex w-full max-w-sm flex-col bg-background pb-6 pt-2">
+      <div ref={containerRef} className="relative min-h-[150vh]">
+        <div className="sticky top-20 z-[1] mx-auto flex w-full max-w-sm flex-col bg-background pb-2 pt-2">
           <div className="relative z-[1] mb-8 text-center">
             <h2 className="mb-4 text-3xl font-bold tracking-tight">
               {t('title')}{' '}
@@ -105,7 +100,7 @@ export function DonationMobileStack() {
             </MobileDonationCard>
 
             <MobileDonationCard index={1} progress={scrollYProgress}>
-              <LandingSquircleIcon className="mb-6">
+              <LandingSquircleIcon variant="orange" className="mb-6">
                 <Mail className="h-7 w-7 text-white" />
               </LandingSquircleIcon>
               <h3 className="mb-3 text-xl font-semibold text-foreground">

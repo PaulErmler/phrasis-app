@@ -1,18 +1,27 @@
 import {
   Headphones,
-  SlidersHorizontal,
+  Sparkles,
   MessageCircle,
   Layers,
   Brain,
-  Target,
+  Globe,
+  type LucideIcon,
 } from 'lucide-react';
 
-/** Shared feature metadata (no `'use client'`) so RSC can iterate keys/icons safely. */
-export const landingFeatureConfig = [
-  { key: 'allInOne', icon: Layers, color: 'accent' as const },
-  { key: 'selfDriven', icon: SlidersHorizontal, color: 'primary' as const },
-  { key: 'instantFeedback', icon: MessageCircle, color: 'accent' as const },
-  { key: 'audioBased', icon: Headphones, color: 'primary' as const },
-  { key: 'spacedRepetition', icon: Brain, color: 'accent' as const },
-  { key: 'languageIntelligence', icon: Target, color: 'primary' as const },
-] as const;
+export const landingFeatureConfig: {
+  key:
+    | 'audioBased'
+    | 'selfDriven'
+    | 'instantFeedback'
+    | 'allInOne'
+    | 'spacedRepetition'
+    | 'languageIntelligence';
+  icon: LucideIcon;
+}[] = [
+  { key: 'audioBased', icon: Headphones },
+  { key: 'selfDriven', icon: Sparkles },
+  { key: 'instantFeedback', icon: MessageCircle },
+  { key: 'allInOne', icon: Layers },
+  { key: 'spacedRepetition', icon: Brain },
+  { key: 'languageIntelligence', icon: Globe },
+];
