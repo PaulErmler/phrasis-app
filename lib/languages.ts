@@ -170,6 +170,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ],
   },
   {
+    code: 'vi',
+    displayCode: 'vi-VN',
+    name: 'Vietnamese',
+    nativeName: 'Tiếng Việt',
+    flag: '🇻🇳',
+    needsRomanization: false,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Charon', 'male', 'vi-VN', 'Vietnam'),
+    ],
+  },
+  {
     code: 'sv',
     displayCode: 'sv',
     name: 'Swedish',
@@ -179,6 +191,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'sv-SE', 'Sweden'),
       createChirp3Voice('Charon', 'male', 'sv-SE', 'Sweden'),
+    ],
+  },
+  {
+    code: 'fi',
+    displayCode: 'fi',
+    name: 'Finnish',
+    nativeName: 'Suomi',
+    flag: '🇫🇮',
+    needsRomanization: false,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Charon', 'male', 'fi-FI', 'Finland'),
     ],
   },
   {
