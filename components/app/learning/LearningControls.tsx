@@ -20,7 +20,8 @@ interface LearningControlsProps {
   isMerging: boolean;
   durationSec: number;
   onSeek: (seconds: number) => void;
-  onNext: () => void;
+  /** Pass `ratingOverride` when advancing in the same tick as a rating pick (instant proceed). */
+  onNext: (ratingOverride?: ReviewRating) => void;
   isReviewing: boolean;
   showProgressBar?: boolean;
   instantProceed?: boolean;
@@ -75,8 +76,9 @@ export function LearningControls({
       }
       const idx = parseInt(e.key, 10) - 1;
       if (idx >= 0 && idx < validRatings.length) {
-        onSelectRating(validRatings[idx]);
-        if (instantProceed) onNext();
+        const chosen = validRatings[idx];
+        onSelectRating(chosen);
+        if (instantProceed) onNext(chosen);
       }
     };
     window.addEventListener('keydown', handler);
@@ -117,7 +119,7 @@ export function LearningControls({
                   size="sm"
                   onClick={() => {
                     onSelectRating(rating);
-                    if (instantProceed) onNext();
+                    if (instantProceed) onNext(rating);
                   }}
                   className={`w-full ${
                     activeRating === rating
@@ -178,7 +180,7 @@ export function LearningControls({
             ) : (
               <Button
                 size="sm"
-                onClick={onNext}
+                onClick={() => onNext()}
                 disabled={isReviewing}
                 className="flex-[1] gap-2"
               >

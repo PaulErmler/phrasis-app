@@ -89,7 +89,7 @@ interface ReviewingState extends BaseState {
   handleMaster: () => void;
   handleHide: () => void;
   handleFavorite: () => void;
-  handleNext: () => void;
+  handleNext: (ratingOverride?: ReviewRating) => void;
   setSelectedRating: (rating: ReviewRating) => void;
   // Status flags
   isReviewing: boolean;
@@ -305,7 +305,7 @@ export function useLearningMode(
   // --------------------------------------------------------------------------
   // Next
   // --------------------------------------------------------------------------
-  const handleNext = useCallback(async () => {
+  const handleNext = useCallback(async (ratingOverride?: ReviewRating) => {
     if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
       reviewInitiatedByThisTabRef.current = true;
@@ -336,7 +336,8 @@ export function useLearningMode(
       return;
     }
     const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
-    const rating = selectedRating ?? getDefaultRating(phase);
+    const rating =
+      ratingOverride ?? selectedRating ?? getDefaultRating(phase);
     handleReview(rating);
   }, [
     cardForReview,
