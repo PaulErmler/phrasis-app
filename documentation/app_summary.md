@@ -127,7 +127,7 @@ Top to bottom:
 
 ## Supported Languages
 
-Defined in `lib/languages.ts` — `SUPPORTED_LANGUAGES` array with code, name, nativeName, flag, and Chirp3 HD TTS voices. Currently: English, Spanish, French, German, Italian, Portuguese (Brazil), Swedish, and Dutch (Chinese and Japanese temporarily removed).
+Defined in `lib/languages.ts` — `SUPPORTED_LANGUAGES` array with code, name, nativeName, flag, and Chirp3 HD TTS voices. Currently: English, Spanish, French, German, Italian, Portuguese (Brazil), Russian, Hindi, Chinese (Simplified), Japanese, Vietnamese, Swedish, Finnish, and Dutch.
 
 ## i18n
 
