@@ -23,7 +23,7 @@ import {
 import { translateText, romanizeText } from './translation';
 import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
 import { translationValidator, audioRecordingValidator, ttsQualityValidator } from '../types';
-import { claimTtsIfAvailable } from './ttsProcessing';
+import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
   LEVEL_ORDER,
@@ -96,11 +96,17 @@ export async function scheduleMissingContent(
     allRequiredLanguages.map((lang, i) => [lang, existingAudio[i]]),
   );
 
-  // Validate storage files — delete stale rows where the file was removed
+  // Validate storage files — delete stale rows where the file was removed.
+  // Do not delete while TTS is in flight: `processTTSForCard` may have inserted
+  // a row whose URL is not yet resolvable, or concurrent cleanup would remove
+  // the row while later validation updates expect it to exist (silent no-op).
   for (const [lang, audio] of audioMap) {
     if (audio?.storageId) {
       const url = await ctx.storage.getUrl(audio.storageId);
       if (url === null) {
+        if (await hasActiveTtsClaim(ctx, textId, lang)) {
+          continue;
+        }
         await ctx.db.delete(audio._id);
         audioMap.set(lang, null);
       }
