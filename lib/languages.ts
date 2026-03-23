@@ -171,7 +171,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'vi',
-    displayCode: 'vi-VN',
+    displayCode: 'vi',
     name: 'Vietnamese',
     nativeName: 'Tiếng Việt',
     flag: '🇻🇳',
