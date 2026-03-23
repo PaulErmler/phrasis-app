@@ -51,18 +51,40 @@ export async function claimTtsIfAvailable(
 }
 
 /**
+ * True when a non-stale TTS claim exists for this text+language (generation in flight).
+ * Used to avoid deleting `audioRecordings` rows while `processTTSForCard` is running.
+ */
+export async function hasActiveTtsClaim(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  language: string,
+): Promise<boolean> {
+  const existing = await ctx.db
+    .query('ttsGenerationClaims')
+    .withIndex('by_text_and_language', (q) =>
+      q.eq('textId', textId).eq('language', language),
+    )
+    .first();
+  if (!existing) return false;
+  return Date.now() - existing.claimedAt < TTS_CLAIM_STALE_MS;
+}
+
+/**
  * Synthesize speech, transcribe it back, and compare to the original.
  * Retries up to `maxAttempts` times, storing each attempt's audio and
- * logging mismatches. Returns whether the final audio was validated.
+ * logging mismatches. Returns whether the final audio was validated and the
+ * last stored blob id (for upserting the DB row if it was removed mid-flight).
  */
 async function synthesizeAndValidate(
   ctx: ActionCtx,
   args: { textId: Id<'texts'>; text: string; language: string; voiceName: string },
   maxAttempts: number,
-): Promise<{ validated: boolean }> {
+): Promise<{ validated: boolean; lastStorageId: Id<'_storage'> | null }> {
+  let lastStorageId: Id<'_storage'> | null = null;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const blob = await synthesizeSpeech(args.text, args.voiceName, 0.9);
     const storageId: Id<'_storage'> = await ctx.storage.store(blob);
+    lastStorageId = storageId;
 
     if (attempt === 0) {
       await ctx.runMutation(internal.features.decks.storeAudioRecording, {
@@ -88,7 +110,7 @@ async function synthesizeAndValidate(
     try {
       const transcribed = await transcribeAudio(blob, args.language);
       if (textsMatch(args.text, transcribed)) {
-        return { validated: true };
+        return { validated: true, lastStorageId };
       }
       console.warn(
         `TTS validation mismatch (attempt ${attempt + 1}/${maxAttempts})`,
@@ -110,7 +132,7 @@ async function synthesizeAndValidate(
       );
     }
   }
-  return { validated: false };
+  return { validated: false, lastStorageId };
 }
 
 /**
@@ -130,7 +152,11 @@ export const processTTSForCard = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      const { validated } = await synthesizeAndValidate(ctx, args, MAX_TTS_VALIDATION_ATTEMPTS);
+      const { validated, lastStorageId } = await synthesizeAndValidate(
+        ctx,
+        args,
+        MAX_TTS_VALIDATION_ATTEMPTS,
+      );
 
       if (!validated) {
         console.error(
@@ -139,14 +165,18 @@ export const processTTSForCard = internalAction({
         );
       }
 
-      await ctx.runMutation(
-        internal.features.ttsProcessing.updateAudioRecordingQuality,
-        {
+      // Use storeAudioRecording (upsert) so that if the row was deleted mid-flight
+      // by the stale-storage cleanup, it gets recreated rather than silently lost.
+      // lastStorageId is the blob already in the row, so no old blob is deleted.
+      if (lastStorageId !== null) {
+        await ctx.runMutation(internal.features.decks.storeAudioRecording, {
           textId: args.textId,
           language: args.language,
+          voiceName: args.voiceName,
+          storageId: lastStorageId,
           ttsQuality: validated ? ('validated' as const) : ('unvalidated' as const),
-        },
-      );
+        });
+      }
     } catch (err) {
       console.error('TTS processing error:', err);
     } finally {
@@ -162,7 +192,7 @@ export const processTTSForCard = internalAction({
 
 /**
  * Update TTS quality and optionally swap the storage blob on an
- * existing audioRecording row.
+ * existing audioRecording row. No-ops if the row does not exist.
  */
 export const updateAudioRecordingQuality = internalMutation({
   args: {
