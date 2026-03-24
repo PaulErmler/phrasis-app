@@ -138,10 +138,9 @@ export function ProgressStatsCard({
 
   const queryArgs = skipLiveStats ? ('skip' as const) : { timezone };
   const cacheSuffix = courseId ? `_${courseId}` : '';
-  const stats = useCachedQuery(api.features.courses.getCourseStats, queryArgs, `courseStats${cacheSuffix}`);
-  const todayStats = useCachedQuery(api.features.courses.getTodayStats, queryArgs, `todayStats${cacheSuffix}`);
-
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
+  const stats = useCachedQuery(api.features.courses.getCourseStats, queryArgs, `courseStats${cacheSuffix}`);
+  const todayStats = useCachedQuery(api.features.courses.getTodayStats, queryArgs, `todayStats_${today}${cacheSuffix}`);
 
   const snapshotKey = courseId ? `${SNAPSHOT_KEY}_${courseId}` : SNAPSHOT_KEY;
 
