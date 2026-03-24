@@ -3,6 +3,8 @@
 import { useLayoutEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import type { View } from '@/components/app/BottomNav';
 import { Card, CardContent } from '@/components/ui/card';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
@@ -18,8 +20,8 @@ export function SettingsView({ activeView }: { activeView: View }) {
   const t = useTranslations('AppPage');
   const tFooter = useTranslations('Footer');
   const tAuth = useTranslations('Auth');
-  const { data: session } = authClient.useSession();
-  const userEmail = session?.user?.email;
+  const authUser = useQuery(api.auth.getAuthUser);
+  const userEmail = (authUser as Record<string, unknown> | null | undefined)?.email as string | undefined;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const prevViewRef = useRef<View | null>(null);

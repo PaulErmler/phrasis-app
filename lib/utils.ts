@@ -8,8 +8,8 @@ export function cn(...inputs: ClassValue[]) {
 
 export const isAuthError = (error: unknown) => {
   const message =
-    (error instanceof ConvexError && error.data) ||
+    (error instanceof ConvexError && typeof error.data === 'string' && error.data) ||
     (error instanceof Error && error.message) ||
     '';
-  return /auth/i.test(message);
+  return message === 'Unauthenticated' || message === 'Not authenticated';
 };
