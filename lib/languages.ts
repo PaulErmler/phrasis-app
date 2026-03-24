@@ -217,6 +217,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       createChirp3Voice('Charon', 'male', 'nl-NL', 'Netherlands'),
     ],
   },
+  {
+    code: 'el',
+    displayCode: 'el',
+    name: 'Greek',
+    nativeName: 'Ελληνικά',
+    flag: '🇬🇷',
+    needsRomanization: true,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Charon', 'male', 'el-GR', 'Greece'),
+    ],
+  },
 ];
 
 /**
@@ -352,7 +364,7 @@ export function getLocalizedLanguageNameByCode(
  * Languages whose script requires romanization (Latin transliteration).
  * Usable in both frontend and Convex backend.
  */
-export const ROMANIZATION_LANGUAGES = new Set(['ru', 'hi', 'ja', 'zh']);
+export const ROMANIZATION_LANGUAGES = new Set(['ru', 'hi', 'ja', 'zh', 'el']);
 
 export function languageNeedsRomanization(code: string): boolean {
   return ROMANIZATION_LANGUAGES.has(code);
