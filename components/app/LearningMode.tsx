@@ -39,7 +39,10 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   }, [cardId]);
 
   const handleReveal = useCallback(() => setFullReviewRevealed(true), []);
-  const handleEdit = useCallback(() => setEditDialogOpen(true), []);
+  const handleEdit = useCallback(() => {
+    audio.pause();
+    setEditDialogOpen(true);
+  }, [audio]);
 
   if (state.status === 'loading') {
     return (
