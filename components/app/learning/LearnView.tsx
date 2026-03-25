@@ -17,6 +17,7 @@ import {
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
 import { useCardApprovals } from '@/hooks/use-card-approvals';
+import { useScreenWakeLock } from '@/hooks/use-screen-wake-lock';
 import { useThread } from '@/hooks/use-thread';
 import { Loader } from '@/components/ai-elements/loader';
 import { useAppData } from '@/components/app/AppDataProvider';
@@ -107,6 +108,7 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
     courseSettings: preloadedCourseSettings,
     activeCourse: preloadedActiveCourse,
   });
+  useScreenWakeLock(state.status === 'reviewing');
   const reviewMode = state.status !== 'loading' ? (state.courseSettings?.reviewMode ?? 'audio') : 'audio';
   const tutorialId = reviewMode === 'full' ? TUTORIAL_IDS.FULL_REVIEW_INTRO : TUTORIAL_IDS.AUDIO_REVIEW_INTRO;
   const { isActive, isCompleted, restartTutorial } = useTutorial(tutorialId, {
