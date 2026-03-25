@@ -104,11 +104,14 @@ export function EditCardDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md">
+        <DialogContent
+          aria-describedby={undefined}
+          className="top-[calc(3.5rem+1.5rem)] max-h-[calc(100dvh-3.5rem-1.5rem-1rem-env(safe-area-inset-bottom,0px))] translate-y-0 overflow-y-auto sm:max-w-sm"
+        >
           <DialogHeader>
             <DialogTitle>{t('title')}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
+          <div className="space-y-4">
             {orderedLanguages.map((lang) => {
               const value = editedTexts[lang] ?? '';
               const isOverLimit = value.length > MAX_CARD_TEXT_LENGTH;
@@ -139,14 +142,25 @@ export function EditCardDialog({
               );
             })}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex !flex-row w-full gap-2 [&>*]:min-w-0">
             <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              disabled={isSaving}
+              onClick={() => onOpenChange(false)}
+            >
+              {t('cancel')}
+            </Button>
+            <Button
+              type="button"
+              className="flex-1"
               onClick={handleSave}
               disabled={isSaving || !hasChanges || hasOverLimit}
             >
               {isSaving ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin mr-2" />
                   {t('saving')}
                 </>
               ) : (

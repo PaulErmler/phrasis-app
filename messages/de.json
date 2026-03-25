@@ -779,6 +779,7 @@
   },
   "EditCard": {
     "title": "Karte bearbeiten",
+    "cancel": "Abbrechen",
     "save": "Speichern",
     "saving": "Speichern..."
   },

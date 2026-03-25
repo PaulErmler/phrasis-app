@@ -710,6 +710,7 @@
   },
   "EditCard": {
     "title": "Edit Card",
+    "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving..."
   },
