@@ -86,7 +86,7 @@ export function LearningControls({
   }, [validRatings, onSelectRating, instantProceed, onNext, isFullReview, fullReviewRevealed, onReveal, isReviewing]);
 
   return (
-    <div className="relative bg-background pb-safe">
+    <div className="relative bg-background pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="hidden lg:block pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] border-t border-border" />
       {/* Open chat button - above bordered area (mobile only) */}
       <div className="max-w-lg mx-auto flex justify-end px-4 pt-4 pb-3 lg:hidden">

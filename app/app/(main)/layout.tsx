@@ -231,7 +231,7 @@ export default function MainLayout({
     : t('changeCourse');
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-dvh max-h-dvh flex flex-col overflow-hidden">
       <header className="sticky-header">
         <div className="header-bar">
           {activeView === 'home' ? (
@@ -364,7 +364,7 @@ export default function MainLayout({
       />
 
       {isLearnOpen && (
-        <div className="fixed inset-0 z-50 bg-background">
+        <div className="fixed inset-x-0 top-0 z-50 h-dvh max-h-dvh bg-background">
           <LearnView
             onBack={handleLearnClose}
             prefetchedThreadId={prefetchedThreadId ?? undefined}
