@@ -3,7 +3,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
-import { usePreloadedQuery, useQuery, useMutation, Preloaded } from 'convex/react';
+import {
+  usePreloadedQuery,
+  useQuery,
+  useMutation,
+  Preloaded,
+  useConvexAuth,
+} from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import {
@@ -121,10 +127,68 @@ export function useLearningMode(
   preloaded: PreloadedLearningData,
 ): LearningState {
   const t = useTranslations('LearningMode');
+  const { isAuthenticated } = useConvexAuth();
 
-  const cardForReview = useQuery(api.features.scheduling.getCardForReview, {});
-  const courseSettings = usePreloadedQuery(preloaded.courseSettings);
-  const activeCourse = usePreloadedQuery(preloaded.activeCourse);
+  const cardForReviewQuery = useQuery(api.features.scheduling.getCardForReview, {});
+  const courseSettingsQuery = usePreloadedQuery(preloaded.courseSettings);
+  const activeCourseQuery = usePreloadedQuery(preloaded.activeCourse);
+
+  const lastCardRef = useRef<
+    Exclude<typeof cardForReviewQuery, undefined> | undefined
+  >(undefined);
+  const receivedCardRef = useRef(false);
+  const lastCourseSettingsRef = useRef<
+    Exclude<typeof courseSettingsQuery, undefined> | undefined
+  >(undefined);
+  const receivedCourseSettingsRef = useRef(false);
+  const lastActiveCourseRef = useRef<
+    Exclude<typeof activeCourseQuery, undefined> | undefined
+  >(undefined);
+  const receivedActiveCourseRef = useRef(false);
+
+  useEffect(() => {
+    if (isAuthenticated) return;
+    receivedCardRef.current = false;
+    lastCardRef.current = undefined;
+    receivedCourseSettingsRef.current = false;
+    lastCourseSettingsRef.current = undefined;
+    receivedActiveCourseRef.current = false;
+    lastActiveCourseRef.current = undefined;
+  }, [isAuthenticated]);
+
+  if (cardForReviewQuery !== undefined) {
+    receivedCardRef.current = true;
+    lastCardRef.current = cardForReviewQuery;
+  }
+  if (courseSettingsQuery !== undefined) {
+    receivedCourseSettingsRef.current = true;
+    lastCourseSettingsRef.current = courseSettingsQuery;
+  }
+  if (activeCourseQuery !== undefined) {
+    receivedActiveCourseRef.current = true;
+    lastActiveCourseRef.current = activeCourseQuery;
+  }
+
+  const cardForReview =
+    cardForReviewQuery !== undefined
+      ? cardForReviewQuery
+      : isAuthenticated && receivedCardRef.current
+        ? lastCardRef.current
+        : undefined;
+
+  const courseSettings =
+    courseSettingsQuery !== undefined
+      ? courseSettingsQuery
+      : isAuthenticated && receivedCourseSettingsRef.current
+        ? lastCourseSettingsRef.current
+        : undefined;
+
+  const activeCourse =
+    activeCourseQuery !== undefined
+      ? activeCourseQuery
+      : isAuthenticated && receivedActiveCourseRef.current
+        ? lastActiveCourseRef.current
+        : undefined;
 
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
 
