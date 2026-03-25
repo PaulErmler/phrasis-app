@@ -164,7 +164,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         <AnimatePresence mode="wait" initial={false}>
           {!state.isExiting && (
             <motion.div
-              key={state.cardId}
+              key={state.animationKey}
               className="h-full flex flex-col"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
