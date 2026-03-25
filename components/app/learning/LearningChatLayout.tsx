@@ -68,7 +68,7 @@ export function LearningChatLayout({
 
   return (
     <LearningChatContext.Provider value={{ isChatOpen, openChat, closeChat, toggleChat }}>
-      <div className="h-screen flex flex-col overflow-hidden">
+      <div className="h-dvh max-h-dvh flex flex-col overflow-hidden">
         {header}
 
         <div className="relative flex-1 flex flex-col lg:flex-row min-h-0 w-full">

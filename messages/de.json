@@ -280,6 +280,7 @@
       "favorite": "Favorit",
       "master": "Gemeistert",
       "hide": "Ausblenden",
+      "edit": "Bearbeiten",
       "next": "Weiter",
       "reveal": "Anzeigen",
       "pause": "Pause",
@@ -462,6 +463,9 @@
     },
     "transcriptions": {
       "name": "Transkriptionen"
+    },
+    "cardEdits": {
+      "name": "Kartenbearbeitungen"
     }
   },
   "FeatureTracking": {
@@ -772,6 +776,12 @@
     "title": "Etwas ist schiefgelaufen",
     "description": "Ein unerwarteter Fehler ist aufgetreten. Bitte versuche es erneut.",
     "retry": "Erneut versuchen"
+  },
+  "EditCard": {
+    "title": "Karte bearbeiten",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "saving": "Speichern..."
   },
   "NotFoundPage": {
     "title": "Seite nicht gefunden",

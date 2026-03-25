@@ -6,7 +6,6 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TutorialId } from '@/convex/features/tutorialIds';
-import { authClient } from '@/lib/auth-client';
 import { getTutorial } from './registry';
 
 const STORAGE_PREFIX = 'phrasis_completed_tutorials';
@@ -114,8 +113,15 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   const t = useTranslations('Tutorial');
 
   // ---- bind localStorage to the current authenticated user ----
-  const { data: session } = authClient.useSession();
-  const userId = session?.user?.id ?? null;
+  const authUser = useQuery(api.auth.getAuthUser);
+  const authSubject =
+    authUser != null
+      ? authUser.userId != null && authUser.userId !== ''
+        ? authUser.userId
+        : authUser._id
+      : null;
+  const userId =
+    authSubject != null && authSubject !== '' ? String(authSubject) : null;
   const prevUserIdRef = useRef(userId);
 
   useEffect(() => {

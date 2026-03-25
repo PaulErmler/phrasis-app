@@ -56,7 +56,7 @@ export function HelpDialog({
           <span className="sr-only">{title}</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-sm">
+      <DialogContent className="top-[calc(3.5rem+1.5rem)] max-h-[calc(100dvh-3.5rem-1.5rem-1rem-env(safe-area-inset-bottom,0px))] translate-y-0 overflow-y-auto sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>

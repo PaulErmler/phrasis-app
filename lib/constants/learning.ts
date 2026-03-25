@@ -11,3 +11,6 @@ export const ENSURE_CONTENT_LOOKAHEAD = 5;
 
 /** Re-trigger content pre-generation every N reviews. */
 export const ENSURE_CONTENT_REVIEW_INTERVAL = 4;
+
+/** Maximum character length for any single translation text when editing a card. */
+export const MAX_CARD_TEXT_LENGTH = 100;

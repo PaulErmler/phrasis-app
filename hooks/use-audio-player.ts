@@ -231,6 +231,13 @@ export function useAudioPlayer(
       hasAutoPlayedForCardRef.current = false;
     }
 
+    const audioBefore = audioRef.current;
+    const wasPlayingSameCard =
+      !!audioBefore &&
+      !audioBefore.paused &&
+      cardId != null &&
+      !isCardChange;
+
     clearCurrentAudio();
 
     if (!cardId || !allAudioReady) {
@@ -285,6 +292,16 @@ export function useAudioPlayer(
         audio.src = result.blobUrl;
         setDurationSec(result.durationSec);
         setIsMerging(false);
+
+        // Same-card remerge (e.g. settings tweak or client refresh): resume if
+        // playback was already running so JWT/query churn does not strand audio.
+        if (wasPlayingSameCard) {
+          audio.play().catch((err) => {
+            if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
+            console.error('Resume playback failed:', err);
+          });
+          return;
+        }
 
         // Auto-play once per card when this tab owns playback.
         // Uses a ref so late-arriving audio (e.g. after content generation)

@@ -2,6 +2,7 @@ import { createClient, type GenericCtx } from '@convex-dev/better-auth';
 import { convex } from '@convex-dev/better-auth/plugins';
 import { components } from './_generated/api';
 import { DataModel } from './_generated/dataModel';
+import { query } from './_generated/server';
 import { betterAuth } from 'better-auth';
 import authConfig from './auth.config';
 
@@ -12,7 +13,15 @@ if (!siteUrl) throw new Error('Missing required Convex environment variable: SIT
 // as well as helper methods for general use.
 export const authComponent = createClient<DataModel>(components.betterAuth);
 
-export const { getAuthUser } = authComponent.clientApi();
+// Use the safe (non-throwing) version so the AuthBoundary's ErrorBoundary
+// doesn't trigger during transient JWT refresh windows. True logout is
+// still handled by AuthBoundary's useEffect via useConvexAuth().
+export const getAuthUser = query({
+  args: {},
+  handler: async (ctx) => {
+    return (await authComponent.safeGetAuthUser(ctx)) ?? null;
+  },
+});
 
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
   return betterAuth({
@@ -31,6 +40,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     plugins: [
       convex({
         authConfig,
+        jwt: { expirationSeconds: 900 }, 
         jwksRotateOnTokenGenerationError: true,
       }),
     ],

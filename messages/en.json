@@ -280,6 +280,7 @@
       "favorite": "Favorite",
       "master": "Master",
       "hide": "Hide",
+      "edit": "Edit",
       "next": "Next",
       "reveal": "Reveal",
       "pause": "Pause",
@@ -462,6 +463,9 @@
     },
     "transcriptions": {
       "name": "Transcriptions"
+    },
+    "cardEdits": {
+      "name": "Card Edits"
     }
   },
   "FeatureTracking": {
@@ -703,6 +707,12 @@
     "title": "Something went wrong",
     "description": "An unexpected error occurred. Please try again.",
     "retry": "Try again"
+  },
+  "EditCard": {
+    "title": "Edit Card",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving..."
   },
   "NotFoundPage": {
     "title": "Page not found",

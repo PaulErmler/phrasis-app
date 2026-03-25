@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { CircleCheck, EyeOff, Star } from 'lucide-react';
+import { CircleCheck, EyeOff, Pencil, Star } from 'lucide-react';
 import {
   Tooltip,
   TooltipTrigger,
@@ -25,6 +25,7 @@ interface CardShellProps {
   onMaster: () => void;
   onHide: () => void;
   onFavorite: () => void;
+  onEdit?: () => void;
   onAudioPlay?: () => void;
   bare?: boolean;
   showRomanization?: boolean;
@@ -45,6 +46,7 @@ export function CardShell({
   onMaster,
   onHide,
   onFavorite,
+  onEdit,
   onAudioPlay,
   bare = false,
   showRomanization = true,
@@ -64,6 +66,24 @@ export function CardShell({
           </Badge>
         </div>
         <div className="flex items-center gap-1">
+          {onEdit && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onEdit}
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+                  aria-label={t('actions.edit')}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {t('actions.edit')}
+              </TooltipContent>
+            </Tooltip>
+          )}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button

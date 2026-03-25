@@ -44,12 +44,26 @@ export const transcriptions = feature({
   consumable: true,
 });
 
+export const card_edits = feature({
+  id: 'card_edits',
+  name: 'Card Edits',
+  type: 'metered',
+  consumable: true,
+});
+
 // Plans
 export const free = plan({
   id: 'free',
   name: 'Free',
   autoEnable: true,
   items: [
+    item({
+      featureId: card_edits.id,
+      included: 150,
+      reset: {
+        interval: 'month',
+      },
+    }),
     item({
       featureId: chat_messages.id,
       included: 5,
@@ -94,6 +108,13 @@ export const basic = plan({
   },
   items: [
     item({
+      featureId: card_edits.id,
+      included: 200,
+      reset: {
+        interval: 'month',
+      },
+    }),
+    item({
       featureId: chat_messages.id,
       included: 50,
       reset: {
@@ -136,6 +157,13 @@ export const pro = plan({
     interval: 'month',
   },
   items: [
+    item({
+      featureId: card_edits.id,
+      included: 300,
+      reset: {
+        interval: 'month',
+      },
+    }),
     item({
       featureId: chat_messages.id,
       included: 200,

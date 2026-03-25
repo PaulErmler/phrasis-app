@@ -3,7 +3,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
-import { usePreloadedQuery, useQuery, useMutation, Preloaded } from 'convex/react';
+import {
+  usePreloadedQuery,
+  useQuery,
+  useMutation,
+  Preloaded,
+  useConvexAuth,
+} from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import {
@@ -94,6 +100,7 @@ interface ReviewingState extends BaseState {
   // Status flags
   isReviewing: boolean;
   isExiting: boolean;
+  animationKey: number;
   // Cross-tab audio coordination
   getReviewInitiatedByThisTab: () => boolean;
   resetReviewFlag: () => void;
@@ -120,10 +127,74 @@ export function useLearningMode(
   preloaded: PreloadedLearningData,
 ): LearningState {
   const t = useTranslations('LearningMode');
+  const { isAuthenticated } = useConvexAuth();
 
-  const cardForReview = useQuery(api.features.scheduling.getCardForReview, {});
-  const courseSettings = usePreloadedQuery(preloaded.courseSettings);
-  const activeCourse = usePreloadedQuery(preloaded.activeCourse);
+  const cardForReviewQuery = useQuery(api.features.scheduling.getCardForReview, {});
+  const courseSettingsQuery = usePreloadedQuery(preloaded.courseSettings);
+  const activeCourseQuery = usePreloadedQuery(preloaded.activeCourse);
+
+  const lastCardRef = useRef<
+    Exclude<typeof cardForReviewQuery, undefined> | undefined
+  >(undefined);
+  const receivedCardRef = useRef(false);
+  const lastCourseSettingsRef = useRef<
+    Exclude<typeof courseSettingsQuery, undefined> | undefined
+  >(undefined);
+  const receivedCourseSettingsRef = useRef(false);
+  const lastActiveCourseRef = useRef<
+    Exclude<typeof activeCourseQuery, undefined> | undefined
+  >(undefined);
+  const receivedActiveCourseRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      receivedCardRef.current = false;
+      lastCardRef.current = undefined;
+      receivedCourseSettingsRef.current = false;
+      lastCourseSettingsRef.current = undefined;
+      receivedActiveCourseRef.current = false;
+      lastActiveCourseRef.current = undefined;
+      return;
+    }
+    if (cardForReviewQuery !== undefined) {
+      receivedCardRef.current = true;
+      lastCardRef.current = cardForReviewQuery;
+    }
+    if (courseSettingsQuery !== undefined) {
+      receivedCourseSettingsRef.current = true;
+      lastCourseSettingsRef.current = courseSettingsQuery;
+    }
+    if (activeCourseQuery !== undefined) {
+      receivedActiveCourseRef.current = true;
+      lastActiveCourseRef.current = activeCourseQuery;
+    }
+  }, [
+    isAuthenticated,
+    cardForReviewQuery,
+    courseSettingsQuery,
+    activeCourseQuery,
+  ]);
+
+  const cardForReview =
+    cardForReviewQuery !== undefined
+      ? cardForReviewQuery
+      : isAuthenticated && receivedCardRef.current
+        ? lastCardRef.current
+        : undefined;
+
+  const courseSettings =
+    courseSettingsQuery !== undefined
+      ? courseSettingsQuery
+      : isAuthenticated && receivedCourseSettingsRef.current
+        ? lastCourseSettingsRef.current
+        : undefined;
+
+  const activeCourse =
+    activeCourseQuery !== undefined
+      ? activeCourseQuery
+      : isAuthenticated && receivedActiveCourseRef.current
+        ? lastActiveCourseRef.current
+        : undefined;
 
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
 
@@ -161,6 +232,7 @@ export function useLearningMode(
   const [isPendingMaster, setIsPendingMaster] = useState(false);
   const [isPendingHide, setIsPendingHide] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
+  const [cardAnimationKey, setCardAnimationKey] = useState(0);
 
   // Track when the current card was first shown (for time-spent stats)
   const cardShownAtRef = useRef<number>(Date.now());
@@ -261,6 +333,7 @@ export function useLearningMode(
     async (rating: ReviewRating) => {
       if (!cardForReview || isReviewing) return;
       reviewInitiatedByThisTabRef.current = true;
+      setCardAnimationKey((k) => k + 1);
       setIsExiting(true);
       setIsReviewing(true);
       try {
@@ -309,6 +382,7 @@ export function useLearningMode(
     if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
       reviewInitiatedByThisTabRef.current = true;
+      setCardAnimationKey((k) => k + 1);
       setIsExiting(true);
       setIsReviewing(true);
       try {
@@ -323,6 +397,7 @@ export function useLearningMode(
     }
     if (isPendingHide) {
       reviewInitiatedByThisTabRef.current = true;
+      setCardAnimationKey((k) => k + 1);
       setIsExiting(true);
       setIsReviewing(true);
       try {
@@ -475,6 +550,7 @@ export function useLearningMode(
     setSelectedRating,
     isReviewing,
     isExiting,
+    animationKey: cardAnimationKey,
     getReviewInitiatedByThisTab,
     resetReviewFlag,
   };
