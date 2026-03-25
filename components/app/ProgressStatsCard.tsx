@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Flame, RotateCcw, MessageSquare, Clock, Snowflake } from 'lucide-react';
 import { formatTimeMs } from '@/lib/formatTime';
 import { StartLearningButton } from '@/components/app/StartLearningButton';
+import { cn } from '@/lib/utils';
 import type { ReviewMode } from '@/convex/types';
 
 const useBrowserLayoutEffect =
@@ -237,24 +238,21 @@ export function ProgressStatsCard({
         {/* Streak badge */}
         <div className="flex flex-col items-center gap-0.5">
           <motion.div
-            className="flex items-center justify-center h-10 w-10 rounded-xl"
+            className={cn(
+              'flex items-center justify-center h-10 w-10 rounded-xl transition-colors duration-400 ease-out',
+              isInactive && 'bg-transparent',
+              isFrozen && 'bg-primary/15',
+              hasLearned && 'bg-streak-active/15',
+              !isInactive && !isFrozen && !hasLearned && 'bg-accent-orange/10',
+            )}
             animate={
               isInactive
-                ? { backgroundColor: 'rgba(0, 0, 0, 0)', scale: 1 }
+                ? { scale: 1 }
                 : isFrozen
-                  ? {
-                    backgroundColor: 'color-mix(in oklch, var(--primary) 15%, transparent)',
-                    scale: [1, 1.05, 1],
-                  }
+                  ? { scale: [1, 1.05, 1] }
                   : hasLearned
-                    ? {
-                      backgroundColor: 'color-mix(in oklch, var(--streak-active) 15%, transparent)',
-                      scale: statsActuallyChanged ? [1, 1.15, 1] : 1,
-                    }
-                    : {
-                      backgroundColor: 'color-mix(in oklch, var(--accent-orange) 10%, transparent)',
-                      scale: 1,
-                    }
+                    ? { scale: statsActuallyChanged ? [1, 1.15, 1] : 1 }
+                    : { scale: 1 }
             }
             transition={
               isInactive
@@ -262,7 +260,7 @@ export function ProgressStatsCard({
                 : isFrozen
                   ? { duration: 2, repeat: Infinity, repeatType: 'reverse' as const }
                   : hasLearned
-                    ? { backgroundColor: { duration: 0.4 }, scale: { duration: 1, ease: 'easeOut' } }
+                    ? { duration: 1, ease: 'easeOut' }
                     : { duration: 0.3 }
             }
           >

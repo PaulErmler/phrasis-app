@@ -21,6 +21,8 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
+  // Avoid Chrome “preloaded but not used” when mono rarely paints on first screen.
+  preload: false,
 });
 
 const siteUrl = process.env.SITE_URL ?? 'https://flexling.com';
