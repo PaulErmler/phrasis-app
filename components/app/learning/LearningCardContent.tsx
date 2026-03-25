@@ -19,6 +19,7 @@ interface LearningCardContentProps {
   onMaster: () => void;
   onHide: () => void;
   onFavorite: () => void;
+  onEdit?: () => void;
   onAudioPlay?: () => void;
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
@@ -40,6 +41,7 @@ export function LearningCardContent({
   onMaster,
   onHide,
   onFavorite,
+  onEdit,
   onAudioPlay,
   hideTargetLanguages = false,
   autoRevealLanguages = false,
@@ -82,6 +84,7 @@ export function LearningCardContent({
         onMaster={onMaster}
         onHide={onHide}
         onFavorite={onFavorite}
+        onEdit={onEdit}
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}

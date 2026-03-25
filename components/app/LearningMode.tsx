@@ -13,6 +13,7 @@ import {
 import type { LearningState } from '@/components/app/learning/useLearningMode';
 import type { AudioPlayerState } from '@/hooks/use-audio-player';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
+import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 
 interface LearningModeProps {
@@ -27,6 +28,7 @@ interface LearningModeProps {
  */
 export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
   const [allSubmitted, setAllSubmitted] = useState(false);
 
@@ -37,6 +39,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   }, [cardId]);
 
   const handleReveal = useCallback(() => setFullReviewRevealed(true), []);
+  const handleEdit = useCallback(() => setEditDialogOpen(true), []);
 
   if (state.status === 'loading') {
     return (
@@ -125,6 +128,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         onMaster={state.handleMaster}
         onHide={state.handleHide}
         onFavorite={state.handleFavorite}
+        onEdit={handleEdit}
         onAudioPlay={audio.stop}
         targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
         allRevealed={fullReviewRevealed}
@@ -145,6 +149,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         onMaster={state.handleMaster}
         onHide={state.handleHide}
         onFavorite={state.handleFavorite}
+        onEdit={handleEdit}
         onAudioPlay={audio.stop}
         hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
         autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? true}
@@ -199,6 +204,13 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         courseSettings={state.courseSettings}
         baseLanguages={state.baseLanguages}
         targetLanguages={state.targetLanguages}
+      />
+
+      <EditCardDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        cardId={state.cardId}
+        translations={state.translations}
       />
     </div>
   );

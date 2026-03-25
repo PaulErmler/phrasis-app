@@ -1,7 +1,7 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query, MutationCtx } from '../_generated/server';
 import { buildCardSearchableText } from '../lib/cardContent';
-import { Id } from '../_generated/dataModel';
+import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getInitialReviewCount } from '../db/courseSettings';
@@ -26,6 +26,10 @@ import {
 } from '../types';
 import { getAudioForText } from '../lib/audio';
 import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
+import { consumeQuota } from '../usage/helpers';
+import { FEATURE_IDS } from './featureIds';
+import { scheduleMissingContent } from './decks';
+import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
@@ -373,6 +377,234 @@ export const toggleFavoriteCard = mutation({
     await ctx.db.patch(args.cardId, {
       isFavorite: !(card.isFavorite ?? false),
     });
+    return null;
+  },
+});
+
+/**
+ * Edit the translations of a card.
+ *
+ * Creates a replacement card with identical scheduling stats but updated text.
+ * Two paths:
+ *   A) User-owned text — patches rows in place, reuses textId.
+ *   B) Shared/dataset text — creates new textId, copies unchanged content.
+ */
+export const editCard = mutation({
+  args: {
+    cardId: v.id('cards'),
+    translations: v.array(
+      v.object({
+        language: v.string(),
+        text: v.string(),
+      }),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, card, deck, course } = await authorizeCardAccess(ctx, args.cardId);
+
+    const text = await ctx.db.get(card.textId);
+    if (!text) throw new ConvexError('Text not found');
+
+    const sourceLanguage = text.language;
+    const allLanguages = [
+      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
+    ];
+
+    // Load existing translations for non-source languages
+    const existingTranslations = await Promise.all(
+      allLanguages
+        .filter((lang) => lang !== sourceLanguage)
+        .map((lang) =>
+          ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', card.textId).eq('targetLanguage', lang),
+            )
+            .first(),
+        ),
+    );
+    const existingTranslationMap = new Map<string, Doc<'translations'>>();
+    allLanguages
+      .filter((lang) => lang !== sourceLanguage)
+      .forEach((lang, i) => {
+        if (existingTranslations[i]) {
+          existingTranslationMap.set(lang, existingTranslations[i]!);
+        }
+      });
+
+    // Build a map of submitted texts
+    const submittedMap = new Map<string, string>();
+    for (const t of args.translations) {
+      submittedMap.set(t.language, t.text);
+    }
+
+    // Diff: determine which languages actually changed
+    const changedLanguages = new Set<string>();
+    for (const lang of allLanguages) {
+      const submitted = submittedMap.get(lang);
+      if (submitted === undefined) continue;
+      if (lang === sourceLanguage) {
+        if (submitted !== text.text) changedLanguages.add(lang);
+      } else {
+        const existing = existingTranslationMap.get(lang);
+        if (submitted !== (existing?.translatedText ?? '')) changedLanguages.add(lang);
+      }
+    }
+
+    if (changedLanguages.size === 0) return null;
+
+    // Validate text lengths
+    for (const { language, text } of args.translations) {
+      if (text.length > MAX_CARD_TEXT_LENGTH) {
+        throw new ConvexError({
+          code: 'TEXT_TOO_LONG',
+          message: `Text for language "${language}" exceeds the maximum length of ${MAX_CARD_TEXT_LENGTH} characters.`,
+          language,
+          maxLength: MAX_CARD_TEXT_LENGTH,
+        });
+      }
+    }
+
+    // Consume quota before making changes
+    await consumeQuota(ctx, userId, FEATURE_IDS.CARD_EDITS);
+
+    const isUserOwned = text.userCreated && text.userId === userId;
+    let resolvedTextId: Id<'texts'>;
+
+    if (isUserOwned) {
+      // Path A: modify in place
+      resolvedTextId = card.textId;
+
+      if (changedLanguages.has(sourceLanguage)) {
+        await ctx.db.patch(text._id, {
+          text: submittedMap.get(sourceLanguage)!,
+          romanizedText: undefined,
+        });
+      }
+
+      for (const lang of allLanguages) {
+        if (lang === sourceLanguage) continue;
+        if (!changedLanguages.has(lang)) continue;
+        const existing = existingTranslationMap.get(lang);
+        if (existing) {
+          await ctx.db.patch(existing._id, {
+            translatedText: submittedMap.get(lang)!,
+            romanizedText: undefined,
+          });
+        } else {
+          await ctx.db.insert('translations', {
+            textId: card.textId,
+            targetLanguage: lang,
+            translatedText: submittedMap.get(lang)!,
+          });
+        }
+      }
+
+      // Delete audio recordings for changed languages
+      for (const lang of changedLanguages) {
+        const audioRows = await ctx.db
+          .query('audioRecordings')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', card.textId).eq('language', lang),
+          )
+          .take(10);
+        for (const row of audioRows) {
+          await ctx.db.delete(row._id);
+        }
+      }
+    } else {
+      // Path B: create new textId, copy unchanged content
+      const submittedSource = submittedMap.get(sourceLanguage);
+      const sourceChanged = changedLanguages.has(sourceLanguage);
+      const newTextId = await ctx.db.insert('texts', {
+        text: sourceChanged && submittedSource ? submittedSource : text.text,
+        language: text.language,
+        romanizedText: sourceChanged ? undefined : text.romanizedText,
+        userCreated: true,
+        userId,
+        collectionId: text.collectionId,
+        collectionRank: text.collectionRank,
+      });
+      resolvedTextId = newTextId;
+
+      // Create translations rows for all non-source languages
+      for (const lang of allLanguages) {
+        if (lang === sourceLanguage) continue;
+        const existing = existingTranslationMap.get(lang);
+        const changed = changedLanguages.has(lang);
+        await ctx.db.insert('translations', {
+          textId: newTextId,
+          targetLanguage: lang,
+          translatedText: changed
+            ? (submittedMap.get(lang) ?? '')
+            : (existing?.translatedText ?? ''),
+          ...(changed ? {} : existing?.romanizedText ? { romanizedText: existing.romanizedText } : {}),
+        });
+      }
+
+      // Copy audio recordings for unchanged languages
+      for (const lang of allLanguages) {
+        if (changedLanguages.has(lang)) continue;
+        const audioRows = await ctx.db
+          .query('audioRecordings')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', card.textId).eq('language', lang),
+          )
+          .take(20);
+        for (const row of audioRows) {
+          await ctx.db.insert('audioRecordings', {
+            textId: newTextId,
+            language: row.language,
+            voiceName: row.voiceName,
+            storageId: row.storageId,
+            ttsQuality: row.ttsQuality,
+          });
+        }
+      }
+    }
+
+    // Build searchable text for the new card
+    const resolvedText = await ctx.db.get(resolvedTextId);
+    if (!resolvedText) throw new ConvexError('Resolved text not found');
+
+    const courseLanguages = [...course.baseLanguages, ...course.targetLanguages];
+    const { searchableText, searchableTextLanguages } =
+      await buildCardSearchableText(ctx, resolvedTextId, resolvedText.text, courseLanguages);
+
+    // Insert replacement card with identical scheduling stats.
+    // Subtract 1ms from dueDate so this card sorts before any other card that
+    // happens to share the exact same dueDate (Convex uses _creationTime as the
+    // tiebreaker within equal index values, and the new doc would otherwise sort
+    // last, causing a different card to be returned by getCardForReview).
+    await ctx.db.insert('cards', {
+      deckId: card.deckId,
+      textId: resolvedTextId,
+      collectionId: card.collectionId,
+      dueDate: card.dueDate - 1,
+      isMastered: card.isMastered,
+      isHidden: card.isHidden,
+      isFavorite: card.isFavorite,
+      schedulingPhase: card.schedulingPhase,
+      preReviewCount: card.preReviewCount,
+      fsrsState: card.fsrsState,
+      lastReviewedAt: card.lastReviewedAt,
+      searchableText,
+      searchableTextLanguages,
+    });
+
+    // Delete old card
+    await ctx.db.delete(args.cardId);
+
+    // Trigger TTS + romanization for changed languages
+    await scheduleMissingContent(
+      ctx,
+      resolvedTextId,
+      resolvedText,
+      course.baseLanguages,
+      course.targetLanguages,
+    );
+
     return null;
   },
 });

@@ -37,6 +37,7 @@ interface FullReviewCardContentProps {
   onMaster: () => void;
   onHide: () => void;
   onFavorite: () => void;
+  onEdit?: () => void;
   onAudioPlay?: () => void;
   targetAudioMode: TargetAudioMode;
   allRevealed?: boolean;
@@ -58,6 +59,7 @@ export function FullReviewCardContent({
   onMaster,
   onHide,
   onFavorite,
+  onEdit,
   onAudioPlay,
   targetAudioMode,
   allRevealed = false,
@@ -191,6 +193,7 @@ export function FullReviewCardContent({
         onMaster={onMaster}
         onHide={onHide}
         onFavorite={onFavorite}
+        onEdit={onEdit}
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}

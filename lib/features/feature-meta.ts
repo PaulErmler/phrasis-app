@@ -25,6 +25,7 @@ export const FEATURE_META: Record<
   [FEATURE_IDS.CUSTOM_SENTENCES]: { i18nKey: 'customSentences', consumable: true },
   [FEATURE_IDS.MULTIPLE_LANGUAGES]: { i18nKey: 'multipleLanguages', displayCount: 5 },
   [FEATURE_IDS.TRANSCRIPTIONS]: { i18nKey: 'transcriptions', consumable: true, hidden: true },
+  [FEATURE_IDS.CARD_EDITS]: { i18nKey: 'cardEdits', consumable: true, hidden: true },
 };
 
 export function getFeatureI18nKey(featureId: string): string {

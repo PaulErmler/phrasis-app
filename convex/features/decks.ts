@@ -594,7 +594,7 @@ export async function createCardsFromTexts(
         deckId: deck._id,
         textId: text._id,
         collectionId,
-        dueDate: now,
+        dueDate: now + cardsInserted,
         isMastered: false,
         isHidden: false,
         isFavorite: false,

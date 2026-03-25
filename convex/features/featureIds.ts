@@ -9,6 +9,7 @@ export const FEATURE_IDS = {
   CUSTOM_SENTENCES: 'custom_sentences',
   MULTIPLE_LANGUAGES: 'multiple_languages',
   TRANSCRIPTIONS: 'transcriptions',
+  CARD_EDITS: 'card_edits',
 } as const;
 
 export type FeatureId = (typeof FEATURE_IDS)[keyof typeof FEATURE_IDS];
