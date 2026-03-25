@@ -9,6 +9,7 @@ declare module '@useautumn/sdk' {
   export const custom_sentences: Feature;
   export const transcriptions: Feature;
   export const multiple_languages: Feature;
+  export const card_edits: Feature;
 
   // Plans
   export const free: Plan;
