@@ -159,7 +159,7 @@ export const pro = plan({
 	items: [
 		item({
 			featureId: card_edits.id,
-			included: 500,
+			included: 300,
 			reset: {
 				interval: 'month',
 			},
