@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useLayoutEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -44,7 +44,7 @@ export function EditCardDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (open) {
       const initial: Record<string, string> = {};
       for (const tr of translations) {
@@ -80,7 +80,9 @@ export function EditCardDialog({
   };
 
   const hasChanges = translations.some(
-    (tr) => editedTexts[tr.language] !== tr.text,
+    (tr) =>
+      Object.hasOwn(editedTexts, tr.language) &&
+      editedTexts[tr.language] !== tr.text,
   );
 
   const hasOverLimit = Object.values(editedTexts).some(

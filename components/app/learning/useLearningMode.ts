@@ -147,27 +147,33 @@ export function useLearningMode(
   const receivedActiveCourseRef = useRef(false);
 
   useEffect(() => {
-    if (isAuthenticated) return;
-    receivedCardRef.current = false;
-    lastCardRef.current = undefined;
-    receivedCourseSettingsRef.current = false;
-    lastCourseSettingsRef.current = undefined;
-    receivedActiveCourseRef.current = false;
-    lastActiveCourseRef.current = undefined;
-  }, [isAuthenticated]);
-
-  if (cardForReviewQuery !== undefined) {
-    receivedCardRef.current = true;
-    lastCardRef.current = cardForReviewQuery;
-  }
-  if (courseSettingsQuery !== undefined) {
-    receivedCourseSettingsRef.current = true;
-    lastCourseSettingsRef.current = courseSettingsQuery;
-  }
-  if (activeCourseQuery !== undefined) {
-    receivedActiveCourseRef.current = true;
-    lastActiveCourseRef.current = activeCourseQuery;
-  }
+    if (!isAuthenticated) {
+      receivedCardRef.current = false;
+      lastCardRef.current = undefined;
+      receivedCourseSettingsRef.current = false;
+      lastCourseSettingsRef.current = undefined;
+      receivedActiveCourseRef.current = false;
+      lastActiveCourseRef.current = undefined;
+      return;
+    }
+    if (cardForReviewQuery !== undefined) {
+      receivedCardRef.current = true;
+      lastCardRef.current = cardForReviewQuery;
+    }
+    if (courseSettingsQuery !== undefined) {
+      receivedCourseSettingsRef.current = true;
+      lastCourseSettingsRef.current = courseSettingsQuery;
+    }
+    if (activeCourseQuery !== undefined) {
+      receivedActiveCourseRef.current = true;
+      lastActiveCourseRef.current = activeCourseQuery;
+    }
+  }, [
+    isAuthenticated,
+    cardForReviewQuery,
+    courseSettingsQuery,
+    activeCourseQuery,
+  ]);
 
   const cardForReview =
     cardForReviewQuery !== undefined

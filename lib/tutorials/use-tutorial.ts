@@ -114,7 +114,14 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
 
   // ---- bind localStorage to the current authenticated user ----
   const authUser = useQuery(api.auth.getAuthUser);
-  const userId = authUser ? String(authUser._id) : null;
+  const authSubject =
+    authUser != null
+      ? authUser.userId != null && authUser.userId !== ''
+        ? authUser.userId
+        : authUser._id
+      : null;
+  const userId =
+    authSubject != null && authSubject !== '' ? String(authSubject) : null;
   const prevUserIdRef = useRef(userId);
 
   useEffect(() => {

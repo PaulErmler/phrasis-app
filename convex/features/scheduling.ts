@@ -401,7 +401,7 @@ export const editCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { userId, card, deck, course } = await authorizeCardAccess(ctx, args.cardId);
+    const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
 
     const text = await ctx.db.get(card.textId);
     if (!text) throw new ConvexError('Text not found');
