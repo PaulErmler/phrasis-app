@@ -325,13 +325,13 @@ export function useLearningMode(
 
   const handleReview = useCallback(
     async (rating: ReviewRating) => {
-    if (!cardForReview || isReviewing) return;
-    reviewInitiatedByThisTabRef.current = true;
-    setCardAnimationKey((k) => k + 1);
-    setIsExiting(true);
-    setIsReviewing(true);
-    try {
-      await reviewCardMutation({
+      if (!cardForReview || isReviewing) return;
+      reviewInitiatedByThisTabRef.current = true;
+      setCardAnimationKey((k) => k + 1);
+      setIsExiting(true);
+      setIsReviewing(true);
+      try {
+        await reviewCardMutation({
           cardId: cardForReview._id,
           rating,
           timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
