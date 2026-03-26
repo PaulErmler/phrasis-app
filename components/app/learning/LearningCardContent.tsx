@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import type { CardTranslation, CardAudioRecording } from './types';
@@ -24,6 +24,10 @@ interface LearningCardContentProps {
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
   revealedLanguages?: ReadonlySet<string>;
+  /** When this value changes (e.g. incremented by parent), all target lines are manually revealed. */
+  revealAllSignal?: number;
+  /** Reports whether every target translation is visible (not blurred). */
+  onAllTargetsRevealedChange?: (allRevealed: boolean) => void;
   bare?: boolean;
   showRomanization?: boolean;
 }
@@ -46,6 +50,8 @@ export function LearningCardContent({
   hideTargetLanguages = false,
   autoRevealLanguages = false,
   revealedLanguages,
+  revealAllSignal = 0,
+  onAllTargetsRevealedChange,
   bare = false,
   showRomanization = true,
 }: LearningCardContentProps) {
@@ -55,6 +61,10 @@ export function LearningCardContent({
       : preReviewCount;
 
   const [manuallyRevealed, setManuallyRevealed] = useState<Set<string>>(new Set());
+
+  // Capture the signal value at mount so we don't treat a stale non-zero value
+  // (left over from the previous card) as a fresh "reveal all" request.
+  const mountRevealSignalRef = useRef(revealAllSignal);
 
   const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
   const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
@@ -70,6 +80,41 @@ export function LearningCardContent({
       return next;
     });
   };
+
+  const targetLanguages = useMemo(
+    () => translations.filter((tr) => tr.isTargetLanguage).map((tr) => tr.language),
+    [translations],
+  );
+
+  const allTargetsRevealed = useMemo(() => {
+    if (!hideTargetLanguages) return true;
+    return targetLanguages.every((lang) => {
+      const isAudioRevealed =
+        autoRevealLanguages && (revealedLanguages?.has(lang) ?? false);
+      return isAudioRevealed || manuallyRevealed.has(lang);
+    });
+  }, [
+    hideTargetLanguages,
+    targetLanguages,
+    autoRevealLanguages,
+    revealedLanguages,
+    manuallyRevealed,
+  ]);
+
+  useEffect(() => {
+    onAllTargetsRevealedChange?.(allTargetsRevealed);
+  }, [allTargetsRevealed, onAllTargetsRevealedChange]);
+
+  useEffect(() => {
+    if (revealAllSignal === 0 || revealAllSignal === mountRevealSignalRef.current) return;
+    setManuallyRevealed((prev) => {
+      const next = new Set(prev);
+      for (const lang of targetLanguages) {
+        next.add(lang);
+      }
+      return next;
+    });
+  }, [revealAllSignal, targetLanguages]);
 
   return (
     <div data-tutorial="card-content" className="flex flex-col flex-1 min-h-0">
