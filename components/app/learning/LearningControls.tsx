@@ -28,6 +28,13 @@ interface LearningControlsProps {
   isFullReview?: boolean;
   fullReviewRevealed?: boolean;
   onReveal?: () => void;
+  /** When true, window shortcuts (Space, Enter, ArrowRight, rating keys) are disabled — e.g. settings or edit dialog open. */
+  shortcutsDisabled?: boolean;
+  /** Audio review: Enter / ArrowRight reveals all blurred targets before advancing. */
+  isAudioReview?: boolean;
+  /** When false and `isAudioReview`, Enter / ArrowRight reveals targets instead of next. */
+  audioAllTargetsRevealed?: boolean;
+  onRevealAllAudioTargets?: () => void;
 }
 
 export function LearningControls({
@@ -49,6 +56,10 @@ export function LearningControls({
   isFullReview = false,
   fullReviewRevealed = false,
   onReveal,
+  shortcutsDisabled = false,
+  isAudioReview = false,
+  audioAllTargetsRevealed = true,
+  onRevealAllAudioTargets,
 }: LearningControlsProps) {
   const t = useTranslations('LearningMode');
   const { openChat } = useLearningChatToggle();
@@ -65,11 +76,57 @@ export function LearningControls({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'Enter') {
+      if (shortcutsDisabled) return;
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === ' ' || e.code === 'Space') {
+        // Let Space activate focused interactive controls so keyboard
+        // navigation and accessibility are not broken.
+        if (
+          target instanceof HTMLElement &&
+          target.closest(
+            'button, a, select, [role="button"], [role="link"], [role="menuitem"], [role="checkbox"], [role="radio"], [role="tab"]',
+          )
+        ) {
+          return;
+        }
+        if (e.repeat || isMerging || durationSec === 0) return;
+        e.preventDefault();
+        if (isPlaying) {
+          onPause();
+        } else {
+          onPlay();
+        }
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'ArrowRight') {
+        if (
+          target instanceof HTMLElement &&
+          target.closest(
+            'button, a, select, [role="button"], [role="link"], [role="menuitem"], [role="checkbox"], [role="radio"], [role="tab"]',
+          )
+        ) {
+          return;
+        }
         if (isFullReview && !fullReviewRevealed && onReveal) {
+          e.preventDefault();
           onReveal();
+        } else if (
+          isAudioReview &&
+          !audioAllTargetsRevealed &&
+          onRevealAllAudioTargets
+        ) {
+          e.preventDefault();
+          onRevealAllAudioTargets();
         } else if (!isReviewing) {
+          e.preventDefault();
           onNext();
         }
         return;
@@ -83,7 +140,25 @@ export function LearningControls({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [validRatings, onSelectRating, instantProceed, onNext, isFullReview, fullReviewRevealed, onReveal, isReviewing]);
+  }, [
+    shortcutsDisabled,
+    validRatings,
+    onSelectRating,
+    instantProceed,
+    onNext,
+    isFullReview,
+    fullReviewRevealed,
+    onReveal,
+    isReviewing,
+    isMerging,
+    durationSec,
+    isPlaying,
+    onPause,
+    onPlay,
+    isAudioReview,
+    audioAllTargetsRevealed,
+    onRevealAllAudioTargets,
+  ]);
 
   return (
     <div className="relative bg-background pb-[max(1rem,env(safe-area-inset-bottom))]">
@@ -168,10 +243,21 @@ export function LearningControls({
                 <Play className="h-4 w-4" />
               )}
             </Button>
-            {isFullReview && !fullReviewRevealed ? (
+            {isFullReview && !fullReviewRevealed && onReveal ? (
               <Button
                 size="sm"
                 onClick={onReveal}
+                className="flex-[1] gap-2"
+              >
+                {t('actions.reveal')}
+                <Eye className="h-4 w-4" />
+              </Button>
+            ) : isAudioReview &&
+              !audioAllTargetsRevealed &&
+              onRevealAllAudioTargets ? (
+              <Button
+                size="sm"
+                onClick={onRevealAllAudioTargets}
                 className="flex-[1] gap-2"
               >
                 {t('actions.reveal')}
