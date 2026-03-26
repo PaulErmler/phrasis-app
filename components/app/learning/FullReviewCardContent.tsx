@@ -111,6 +111,9 @@ export function FullReviewCardContent({
 
   useEffect(() => {
     if (!allRevealed) return;
+    // In afterSubmit mode, target clips play only from TargetLanguageInput on submit (see docs/review_modes).
+    // A reveal sweep here duplicates that audio (e.g. last submit + full sequence). never disables target auto-play.
+    if (targetAudioMode === 'afterSubmit' || targetAudioMode === 'never') return;
 
     const unsubmittedAudio = targetTranslations
       .filter((tr) => !inputs.get(tr.language)?.submitted)
@@ -153,7 +156,7 @@ export function FullReviewCardContent({
       revealAudioRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allRevealed, translationKey]);
+  }, [allRevealed, translationKey, targetAudioMode]);
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
