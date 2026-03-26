@@ -310,7 +310,7 @@
       "shortcuts": "Tastenkürzel",
       "shortcutRating": "Tasten 1–4 zum Bewerten.",
       "shortcutPause": "Leertaste zum Pausieren der Audio-Wiedergabe.",
-      "shortcutReveal": "Eingabetaste oder Pfeil nach links zum Aufdecken oder zur nächsten Karte.",
+      "shortcutReveal": "Eingabetaste oder Pfeil nach rechts zum Aufdecken oder zur nächsten Karte.",
       "cardsPerBatch": "Karten pro Stapel",
       "cardsPerBatchDescription": "Anzahl der Karten, die auf einmal hinzugefügt werden",
       "reviewSettings": "Wiederholungseinstellungen",

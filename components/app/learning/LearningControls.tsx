@@ -30,9 +30,9 @@ interface LearningControlsProps {
   onReveal?: () => void;
   /** When true, window shortcuts (Space, Enter, ArrowRight, rating keys) are disabled — e.g. settings or edit dialog open. */
   shortcutsDisabled?: boolean;
-  /** Audio review: Enter / ArrowLeft / ArrowRight reveals all blurred targets before advancing. */
+  /** Audio review: Enter / ArrowRight reveal all blurred targets, then the same keys advance to the next card. */
   isAudioReview?: boolean;
-  /** When false and `isAudioReview`, Enter / ArrowRight reveals targets instead of next. */
+  /** When false and `isAudioReview`, Enter / ArrowRight reveal targets instead of advancing. */
   audioAllTargetsRevealed?: boolean;
   onRevealAllAudioTargets?: () => void;
 }
@@ -106,11 +106,7 @@ export function LearningControls({
         }
         return;
       }
-      if (
-        e.key === 'Enter' ||
-        e.key === 'ArrowLeft' ||
-        e.key === 'ArrowRight'
-      ) {
+      if (e.key === 'Enter' || e.key === 'ArrowRight') {
         if (
           target instanceof HTMLElement &&
           target.closest(

@@ -310,7 +310,7 @@
       "shortcuts": "Shortcuts",
       "shortcutRating": "Keys 1–4 for rating.",
       "shortcutPause": "Space bar to pause audio.",
-      "shortcutReveal": "Enter or left arrow to reveal or go to the next card.",
+      "shortcutReveal": "Enter or right arrow to reveal hidden content or go to the next card.",
       "cardsPerBatch": "Cards per batch",
       "cardsPerBatchDescription": "Number of cards to add at once",
       "reviewSettings": "Review Settings",

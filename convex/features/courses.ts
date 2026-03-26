@@ -44,9 +44,15 @@ async function validateLanguageLimits(
   if (targetLanguages.length === 0)
     throw new ConvexError('At least one target language is required');
 
-  const hasMultiLang = await hasFeatureAccess(
-    ctx, userId, FEATURE_IDS.MULTIPLE_LANGUAGES,
-  );
+  const { available: hasMultiLang, synced: multiLangSynced } =
+    await hasFeatureAccess(ctx, userId, FEATURE_IDS.MULTIPLE_LANGUAGES);
+  if (!multiLangSynced) {
+    throw new ConvexError({
+      code: 'QUOTA_NOT_SYNCED',
+      message: `Quotas not yet synced. Please wait and try again.`,
+      featureId: FEATURE_IDS.MULTIPLE_LANGUAGES,
+    });
+  }
   const maxPerGroup = hasMultiLang ? 3 : 1;
   const maxTotal = hasMultiLang ? 5 : 2;
 
