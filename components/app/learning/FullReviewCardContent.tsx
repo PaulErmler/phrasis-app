@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Check, FileText } from 'lucide-react';
+import { Check, FileText, Undo2 } from 'lucide-react';
 import {
   Tooltip,
   TooltipTrigger,
@@ -15,6 +15,7 @@ import { CardShell } from './CardShell';
 import { DiffDisplay } from './DiffDisplay';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import type { CardTranslation, CardAudioRecording } from './types';
+import type { Id } from '@/convex/_generated/dataModel';
 
 type TargetAudioMode = 'always' | 'afterSubmit' | 'never';
 
@@ -44,6 +45,10 @@ interface FullReviewCardContentProps {
   onAllSubmittedChange?: (allSubmitted: boolean) => void;
   bare?: boolean;
   showRomanization?: boolean;
+  /** Clears submission stack when the reviewed card changes */
+  cardId?: Id<'cards'>;
+  /** When true, Left Arrow revert is disabled (e.g. settings or edit dialog open) */
+  shortcutsDisabled?: boolean;
 }
 
 export function FullReviewCardContent({
@@ -66,6 +71,8 @@ export function FullReviewCardContent({
   onAllSubmittedChange,
   bare = false,
   showRomanization = true,
+  cardId,
+  shortcutsDisabled = false,
 }: FullReviewCardContentProps) {
   const t = useTranslations('LearningMode');
   const locale = useLocale();
@@ -82,10 +89,15 @@ export function FullReviewCardContent({
     () => new Map(targetTranslations.map((tr) => [tr.language, { submitted: false, userText: '' }])),
   );
 
+  const [submissionOrder, setSubmissionOrder] = useState<string[]>([]);
+
   const autoPlayedRef = useRef<Set<string>>(new Set());
   const revealAudioRef = useRef<HTMLAudioElement | null>(null);
   const revealAbortedRef = useRef(false);
   const firstInputRef = useRef<HTMLInputElement | null>(null);
+  const inputRefsByLanguage = useRef<Record<string, HTMLInputElement | null>>({});
+  const submissionOrderRef = useRef<string[]>([]);
+  submissionOrderRef.current = submissionOrder;
 
   const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
   const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
@@ -94,8 +106,13 @@ export function FullReviewCardContent({
     setInputs(
       new Map(targetTranslations.map((tr) => [tr.language, { submitted: false, userText: '' }])),
     );
+    setSubmissionOrder([]);
     autoPlayedRef.current = new Set();
   }
+
+  useEffect(() => {
+    setSubmissionOrder([]);
+  }, [cardId]);
 
   const allSubmitted = targetTranslations.length > 0 &&
     targetTranslations.every((tr) => inputs.get(tr.language)?.submitted);
@@ -170,6 +187,61 @@ export function FullReviewCardContent({
     });
   }, []);
 
+  const applyRevertToLanguage = useCallback((language: string) => {
+    setInputs((prev) => {
+      const current = prev.get(language);
+      if (!current?.submitted) return prev;
+      const next = new Map(prev);
+      next.set(language, { submitted: false, userText: '' });
+      return next;
+    });
+    autoPlayedRef.current.delete(language);
+    requestAnimationFrame(() => {
+      inputRefsByLanguage.current[language]?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  const revertLanguage = useCallback(
+    (language: string) => {
+      const prev = submissionOrderRef.current;
+      const i = prev.lastIndexOf(language);
+      if (i < 0) return;
+      const next = [...prev];
+      next.splice(i, 1);
+      setSubmissionOrder(next);
+      applyRevertToLanguage(language);
+    },
+    [applyRevertToLanguage],
+  );
+
+  const revertLastSubmitted = useCallback(() => {
+    const prev = submissionOrderRef.current;
+    if (prev.length === 0) return;
+    const language = prev[prev.length - 1];
+    setSubmissionOrder(prev.slice(0, -1));
+    applyRevertToLanguage(language);
+  }, [applyRevertToLanguage]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (shortcutsDisabled || e.key !== 'ArrowLeft') return;
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+      if (submissionOrderRef.current.length === 0) return;
+      e.preventDefault();
+      revertLastSubmitted();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [shortcutsDisabled, revertLastSubmitted]);
+
   const handleSubmit = useCallback((language: string) => {
     setInputs((prev) => {
       const current = prev.get(language);
@@ -178,7 +250,18 @@ export function FullReviewCardContent({
       next.set(language, { ...current, submitted: true });
       return next;
     });
+    setSubmissionOrder((prev) => [...prev, language]);
   }, []);
+
+  const assignInputRef = useCallback(
+    (language: string, index: number) => (el: HTMLInputElement | null) => {
+      inputRefsByLanguage.current[language] = el;
+      if (index === 0) {
+        firstInputRef.current = el;
+      }
+    },
+    [],
+  );
 
   return (
     <div data-tutorial="card-content-full" className="flex flex-col flex-1 min-h-0">
@@ -219,12 +302,15 @@ export function FullReviewCardContent({
                   autoPlayedRef={autoPlayedRef}
                   onInputChange={handleInputChange}
                   onSubmit={handleSubmit}
+                  onRevert={() => revertLanguage(translation.language)}
                   onAudioPlay={onAudioPlay}
                   submitLabel={t('submitAnswer')}
                   placeholder={t('typeTranslation')}
+                  revertLabel={t('revertSubmission')}
+                  revertTooltip={t('revertSubmissionTooltip')}
                   showLanguageLabel={showLanguageLabel}
                   locale={locale}
-                  inputRef={index === 0 ? firstInputRef : undefined}
+                  inputRef={assignInputRef(translation.language, index)}
                   autoFocus={index === 0}
                   isFirstTarget={index === 0}
                   allRevealed={allRevealed}
@@ -247,12 +333,15 @@ interface TargetLanguageInputProps {
   autoPlayedRef: React.RefObject<Set<string>>;
   onInputChange: (language: string, text: string) => void;
   onSubmit: (language: string) => void;
+  onRevert: () => void;
   onAudioPlay?: () => void;
   submitLabel: string;
   placeholder: string;
+  revertLabel: string;
+  revertTooltip: string;
   showLanguageLabel: boolean;
   locale: string;
-  inputRef?: React.RefObject<HTMLInputElement | null>;
+  inputRef?: React.RefCallback<HTMLInputElement | null>;
   autoFocus?: boolean;
   isFirstTarget?: boolean;
   allRevealed?: boolean;
@@ -267,9 +356,12 @@ function TargetLanguageInput({
   autoPlayedRef,
   onInputChange,
   onSubmit,
+  onRevert,
   onAudioPlay,
   submitLabel,
   placeholder,
+  revertLabel,
+  revertTooltip,
   showLanguageLabel,
   locale,
   inputRef,
@@ -281,6 +373,12 @@ function TargetLanguageInput({
   const t = useTranslations('LearningMode');
   const [showClean, setShowClean] = useState(false);
   const autoPlayAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (!state.submitted) {
+      setShowClean(false);
+    }
+  }, [state.submitted]);
 
   useEffect(() => {
     if (
@@ -352,7 +450,7 @@ function TargetLanguageInput({
           </div>
         )}
         {hasUserText ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-start gap-2">
             <div className="flex-1 min-w-0">
               <DiffDisplay
                 expected={translation.text}
@@ -361,22 +459,24 @@ function TargetLanguageInput({
                 hideErrors={showClean}
               />
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setShowClean((v) => !v)}
-                  className={`h-9 w-9 shrink-0 ${showClean ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
-                  aria-label={showClean ? t('showCorrections') : t('showSentence')}
-                >
-                  <FileText className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {showClean ? t('showCorrections') : t('showSentence')}
-              </TooltipContent>
-            </Tooltip>
+            <div className="flex shrink-0 gap-2 pt-0.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowClean((v) => !v)}
+                    className={`h-9 w-9 shrink-0 ${showClean ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
+                    aria-label={showClean ? t('showCorrections') : t('showSentence')}
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {showClean ? t('showCorrections') : t('showSentence')}
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
         ) : (
           <p className="body-large text-muted-foreground">
@@ -418,7 +518,7 @@ function TargetLanguageInput({
             />
           </div>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
             <DiffDisplay
               expected={translation.text}
@@ -427,24 +527,40 @@ function TargetLanguageInput({
               hideErrors={showClean}
             />
           </div>
-          {hasUserText && (
+          <div className="flex shrink-0 gap-2 pt-0.5">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setShowClean((v) => !v)}
-                  className={`h-9 w-9 shrink-0 ${showClean ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
-                  aria-label={showClean ? t('showCorrections') : t('showSentence')}
+                  onClick={onRevert}
+                  className="h-9 w-9 shrink-0"
+                  aria-label={revertLabel}
                 >
-                  <FileText className="h-4 w-4" />
+                  <Undo2 className="h-4 w-4" />
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {showClean ? t('showCorrections') : t('showSentence')}
-              </TooltipContent>
+              <TooltipContent side="bottom">{revertTooltip}</TooltipContent>
             </Tooltip>
-          )}
+            {hasUserText && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowClean((v) => !v)}
+                    className={`h-9 w-9 shrink-0 ${showClean ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
+                    aria-label={showClean ? t('showCorrections') : t('showSentence')}
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  {showClean ? t('showCorrections') : t('showSentence')}
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
         {showRomanization && translation.romanization && (
           <p className="text-xs text-muted-foreground leading-tight">
@@ -485,7 +601,7 @@ function TargetLanguageInput({
         {...(isFirstTarget ? { 'data-tutorial': 'target-input-and-submit' } : {})}
       >
         <Input
-          ref={inputRef}
+          ref={inputRef ?? undefined}
           autoFocus={autoFocus}
           value={state.userText}
           onChange={(e) => onInputChange(translation.language, e.target.value)}

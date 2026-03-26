@@ -290,6 +290,8 @@
     "accuracy": "Accuracy",
     "showSentence": "Show sentence",
     "showCorrections": "Show corrections",
+    "revertSubmission": "Revert submission",
+    "revertSubmissionTooltip": "Undo submit. Shortcut: Left Arrow.",
     "typeTranslation": "Type the translation...",
     "empty": {
       "noCardsDue": "No cards due for review",
@@ -311,6 +313,7 @@
       "shortcutRating": "Keys 1–4 for rating.",
       "shortcutPause": "Space bar to pause audio.",
       "shortcutReveal": "Enter or right arrow to reveal hidden content or go to the next card.",
+      "shortcutRevertSubmission": "Left arrow to undo your last submitted translation (full review).",
       "cardsPerBatch": "Cards per batch",
       "cardsPerBatchDescription": "Number of cards to add at once",
       "reviewSettings": "Review Settings",

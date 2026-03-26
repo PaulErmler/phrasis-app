@@ -181,6 +181,7 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
       onSettingsOpen={openSettings}
       onRestartTutorial={restartTutorial}
       onHelpOpen={audio.pause}
+      reviewMode={reviewMode}
     />
   );
 

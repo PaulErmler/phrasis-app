@@ -19,6 +19,8 @@ interface LearningHeaderProps {
   onSettingsOpen: () => void;
   onRestartTutorial?: () => void;
   onHelpOpen?: () => void;
+  /** When `'full'`, the help dialog lists full-review-only shortcuts */
+  reviewMode?: 'audio' | 'full';
 }
 
 export function LearningHeader({
@@ -26,6 +28,7 @@ export function LearningHeader({
   onSettingsOpen,
   onRestartTutorial,
   onHelpOpen,
+  reviewMode = 'audio',
 }: LearningHeaderProps) {
   const t = useTranslations('LearningMode');
   const tSettings = useTranslations('LearningMode.settingsPanel');
@@ -92,6 +95,9 @@ export function LearningHeader({
                   <li>{tSettings('shortcutRating')}</li>
                   <li>{tSettings('shortcutPause')}</li>
                   <li>{tSettings('shortcutReveal')}</li>
+                  {reviewMode === 'full' && (
+                    <li>{tSettings('shortcutRevertSubmission')}</li>
+                  )}
                 </ul>
               </div>
             </div>

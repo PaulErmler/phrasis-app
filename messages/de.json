@@ -290,6 +290,8 @@
     "accuracy": "Genauigkeit",
     "showSentence": "Satz anzeigen",
     "showCorrections": "Korrekturen anzeigen",
+    "revertSubmission": "Eingabe zurücknehmen",
+    "revertSubmissionTooltip": "Eingabe zurücknehmen. Tastenkürzel: Pfeil links.",
     "typeTranslation": "Übersetzung eingeben...",
     "empty": {
       "noCardsDue": "Keine Karten zur Wiederholung fällig",
@@ -311,6 +313,7 @@
       "shortcutRating": "Tasten 1–4 zum Bewerten.",
       "shortcutPause": "Leertaste zum Pausieren der Audio-Wiedergabe.",
       "shortcutReveal": "Eingabetaste oder Pfeil nach rechts zum Aufdecken oder zur nächsten Karte.",
+      "shortcutRevertSubmission": "Pfeil nach links: zuletzt abgeschickte Übersetzung zurücknehmen (Voll-Übung).",
       "cardsPerBatch": "Karten pro Stapel",
       "cardsPerBatchDescription": "Anzahl der Karten, die auf einmal hinzugefügt werden",
       "reviewSettings": "Wiederholungseinstellungen",
