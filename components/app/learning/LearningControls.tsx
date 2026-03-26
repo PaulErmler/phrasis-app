@@ -81,11 +81,22 @@ export function LearningControls({
       if (
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
         (target instanceof HTMLElement && target.isContentEditable)
       ) {
         return;
       }
       if (e.key === ' ' || e.code === 'Space') {
+        // Let Space activate focused interactive controls so keyboard
+        // navigation and accessibility are not broken.
+        if (
+          target instanceof HTMLElement &&
+          target.closest(
+            'button, a, select, [role="button"], [role="link"], [role="menuitem"], [role="checkbox"], [role="radio"], [role="tab"]',
+          )
+        ) {
+          return;
+        }
         if (e.repeat || isMerging || durationSec === 0) return;
         e.preventDefault();
         if (isPlaying) {
