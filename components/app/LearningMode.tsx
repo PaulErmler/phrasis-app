@@ -63,6 +63,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
           onNext={() => {}}
           isReviewing={true}
           showProgressBar={false}
+          shortcutsDisabled={state.settingsOpen}
         />
       </div>
     );
@@ -199,6 +200,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         isFullReview={reviewMode === 'full'}
         fullReviewRevealed={fullReviewRevealed || allSubmitted}
         onReveal={handleReveal}
+        shortcutsDisabled={state.settingsOpen || editDialogOpen}
       />
 
       <LearningModeSettings

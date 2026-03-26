@@ -28,6 +28,8 @@ interface LearningControlsProps {
   isFullReview?: boolean;
   fullReviewRevealed?: boolean;
   onReveal?: () => void;
+  /** When true, window shortcuts (Space, Enter, rating keys) are disabled — e.g. settings or edit dialog open. */
+  shortcutsDisabled?: boolean;
 }
 
 export function LearningControls({
@@ -49,6 +51,7 @@ export function LearningControls({
   isFullReview = false,
   fullReviewRevealed = false,
   onReveal,
+  shortcutsDisabled = false,
 }: LearningControlsProps) {
   const t = useTranslations('LearningMode');
   const { openChat } = useLearningChatToggle();
@@ -65,7 +68,25 @@ export function LearningControls({
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (shortcutsDisabled) return;
+      const target = e.target;
+      if (
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        (target instanceof HTMLElement && target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === ' ' || e.code === 'Space') {
+        if (e.repeat || isMerging || durationSec === 0) return;
+        e.preventDefault();
+        if (isPlaying) {
+          onPause();
+        } else {
+          onPlay();
+        }
+        return;
+      }
       if (e.key === 'Enter') {
         if (isFullReview && !fullReviewRevealed && onReveal) {
           onReveal();
@@ -83,7 +104,22 @@ export function LearningControls({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [validRatings, onSelectRating, instantProceed, onNext, isFullReview, fullReviewRevealed, onReveal, isReviewing]);
+  }, [
+    shortcutsDisabled,
+    validRatings,
+    onSelectRating,
+    instantProceed,
+    onNext,
+    isFullReview,
+    fullReviewRevealed,
+    onReveal,
+    isReviewing,
+    isMerging,
+    durationSec,
+    isPlaying,
+    onPause,
+    onPlay,
+  ]);
 
   return (
     <div className="relative bg-background pb-[max(1rem,env(safe-area-inset-bottom))]">
