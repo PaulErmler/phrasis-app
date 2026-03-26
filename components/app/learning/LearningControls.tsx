@@ -107,16 +107,26 @@ export function LearningControls({
         return;
       }
       if (e.key === 'Enter' || e.key === 'ArrowRight') {
-        e.preventDefault();
+        if (
+          target instanceof HTMLElement &&
+          target.closest(
+            'button, a, select, [role="button"], [role="link"], [role="menuitem"], [role="checkbox"], [role="radio"], [role="tab"]',
+          )
+        ) {
+          return;
+        }
         if (isFullReview && !fullReviewRevealed && onReveal) {
+          e.preventDefault();
           onReveal();
         } else if (
           isAudioReview &&
           !audioAllTargetsRevealed &&
           onRevealAllAudioTargets
         ) {
+          e.preventDefault();
           onRevealAllAudioTargets();
         } else if (!isReviewing) {
+          e.preventDefault();
           onNext();
         }
         return;
