@@ -31,6 +31,8 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
   const [allSubmitted, setAllSubmitted] = useState(false);
+  const [audioAllTargetsRevealed, setAudioAllTargetsRevealed] = useState(true);
+  const [audioRevealNonce, setAudioRevealNonce] = useState(0);
 
   const cardId = state.status === 'reviewing' ? state.cardId : null;
   useEffect(() => {
@@ -38,7 +40,25 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
     setAllSubmitted(false);
   }, [cardId]);
 
+  const reviewingReviewMode =
+    state.status === 'reviewing'
+      ? (state.courseSettings.reviewMode ?? 'audio')
+      : null;
+  const reviewingHideTargets =
+    state.status === 'reviewing'
+      ? (state.courseSettings.hideTargetLanguages ?? true)
+      : null;
+
+  useEffect(() => {
+    if (reviewingReviewMode !== 'audio' || reviewingHideTargets === null) return;
+    setAudioAllTargetsRevealed(!reviewingHideTargets);
+    setAudioRevealNonce(0);
+  }, [cardId, reviewingReviewMode, reviewingHideTargets]);
+
   const handleReveal = useCallback(() => setFullReviewRevealed(true), []);
+  const handleRevealAllAudioTargets = useCallback(() => {
+    setAudioRevealNonce((n) => n + 1);
+  }, []);
   const handleEdit = useCallback(() => {
     audio.pause();
     setEditDialogOpen(true);
@@ -159,6 +179,8 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? true}
         revealedLanguages={audio.revealedLanguages}
         showRomanization={state.courseSettings.showRomanization ?? true}
+        revealAllSignal={audioRevealNonce}
+        onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
       />
     );
 
@@ -201,6 +223,9 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         fullReviewRevealed={fullReviewRevealed || allSubmitted}
         onReveal={handleReveal}
         shortcutsDisabled={state.settingsOpen || editDialogOpen}
+        isAudioReview={reviewMode === 'audio'}
+        audioAllTargetsRevealed={audioAllTargetsRevealed}
+        onRevealAllAudioTargets={handleRevealAllAudioTargets}
       />
 
       <LearningModeSettings
