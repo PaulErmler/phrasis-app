@@ -59,6 +59,22 @@ export async function checkQuota(
 }
 
 /**
+ * Check whether a boolean feature is available for the user.
+ * Mirrors the frontend `useFeatureQuota.isAvailable` logic.
+ */
+export async function hasFeatureAccess(
+  ctx: QueryCtx | MutationCtx,
+  userId: string,
+  featureId: string,
+): Promise<boolean> {
+  const doc = await getQuotaDoc(ctx, userId);
+  if (!doc) return false;
+  const feature = doc.features[featureId];
+  if (!feature) return false;
+  return feature.unlimited === true || feature.balance > 0;
+}
+
+/**
  * Decrement the local quota for a feature.
  * Does NOT check — caller must check first or use `consumeQuota`.
  */

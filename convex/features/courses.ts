@@ -1,5 +1,5 @@
 import { v, ConvexError } from 'convex/values';
-import { mutation, query } from '../_generated/server';
+import { mutation, query, MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import { learningStyleValidator, currentLevelValidator, reviewModeValidator } from '../types';
@@ -22,7 +22,7 @@ import {
   getPreviousDay,
 } from '../db/courseStats';
 import { getDailyStats } from '../db/dailyStats';
-import { consumeQuota } from '../usage/helpers';
+import { consumeQuota, hasFeatureAccess } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import {
   DEFAULT_INITIAL_REVIEW_COUNT,
@@ -32,6 +32,31 @@ import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
 import { LEVEL_TO_COLLECTION } from '../lib/collections';
 import { getNextTextsFromRank } from '../db/collections';
 import { createCardsFromTexts, updateCollectionProgress } from './decks';
+
+async function validateLanguageLimits(
+  ctx: MutationCtx,
+  userId: string,
+  baseLanguages: string[],
+  targetLanguages: string[],
+) {
+  if (baseLanguages.length === 0)
+    throw new ConvexError('At least one base language is required');
+  if (targetLanguages.length === 0)
+    throw new ConvexError('At least one target language is required');
+
+  const hasMultiLang = await hasFeatureAccess(
+    ctx, userId, FEATURE_IDS.MULTIPLE_LANGUAGES,
+  );
+  const maxPerGroup = hasMultiLang ? 3 : 1;
+  const maxTotal = hasMultiLang ? 5 : 2;
+
+  if (baseLanguages.length > maxPerGroup)
+    throw new ConvexError(`Maximum ${maxPerGroup} base languages allowed`);
+  if (targetLanguages.length > maxPerGroup)
+    throw new ConvexError(`Maximum ${maxPerGroup} target languages allowed`);
+  if (baseLanguages.length + targetLanguages.length > maxTotal)
+    throw new ConvexError(`Maximum ${maxTotal} languages total allowed`);
+}
 
 // ============================================================================
 // QUERIES
@@ -335,6 +360,7 @@ export const createCourse = mutation({
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
     await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
+    await validateLanguageLimits(ctx, userId, args.baseLanguages, args.targetLanguages);
 
     const initialReviewCount =
       args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
@@ -396,6 +422,7 @@ export const completeOnboarding = mutation({
     const existingSettings = await dbGetUserSettings(ctx, userId);
     const targetLanguages = progress.targetLanguages || [];
     const baseLanguages = progress.baseLanguages || [];
+    await validateLanguageLimits(ctx, userId, baseLanguages, targetLanguages);
 
     const courseId = await ctx.db.insert('courses', {
       baseLanguages,
@@ -500,16 +527,7 @@ export const updateCourseLanguages = mutation({
     if (course.userId !== userId)
       throw new ConvexError('Course does not belong to user');
 
-    if (args.baseLanguages.length === 0)
-      throw new ConvexError('At least one base language is required');
-    if (args.targetLanguages.length === 0)
-      throw new ConvexError('At least one target language is required');
-    if (args.baseLanguages.length > 3)
-      throw new ConvexError('Maximum 3 base languages');
-    if (args.targetLanguages.length > 3)
-      throw new ConvexError('Maximum 3 target languages');
-    if (args.baseLanguages.length + args.targetLanguages.length > 5)
-      throw new ConvexError('Maximum 5 languages total');
+    await validateLanguageLimits(ctx, userId, args.baseLanguages, args.targetLanguages);
 
     const existingCodes = new Set([
       ...course.baseLanguages,
