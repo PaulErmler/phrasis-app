@@ -160,16 +160,22 @@ export function CollectionDetailDialog({
                       onClick={onAddCards}
                       className="justify-center"
                     >
-                      <span className="grid">
-                        <span className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5${isAdding ? '' : ' invisible'}`}>
+                      {isAdding ? (
+                        <>
                           <Loader2 className="h-4 w-4 animate-spin" />
                           {t('adding')}
-                        </span>
-                        <span className={`col-start-1 row-start-1 flex items-center justify-center gap-1.5${isAdding ? ' invisible' : ''}`}>
+                        </>
+                      ) : (
+                        <>
                           <Plus className="h-4 w-4" />
-                          {t('addN', { count: sentencesRemaining != null ? Math.min(texts.length, sentencesRemaining) : texts.length })}
-                        </span>
-                      </span>
+                          {t('addN', {
+                            count:
+                              sentencesRemaining != null
+                                ? Math.min(texts.length, sentencesRemaining)
+                                : texts.length,
+                          })}
+                        </>
+                      )}
                     </Button>
                   )
                 )}
