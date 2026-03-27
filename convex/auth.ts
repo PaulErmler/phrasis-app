@@ -40,7 +40,7 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     plugins: [
       convex({
         authConfig,
-        jwt: { expirationSeconds: 900 }, 
+        jwt: { expirationSeconds: 60 }, 
         jwksRotateOnTokenGenerationError: true,
       }),
     ],
