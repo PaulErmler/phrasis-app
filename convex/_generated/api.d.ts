@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as authRedirectLog from "../authRedirectLog.js";
 import type * as autumn from "../autumn.js";
 import type * as db_collections from "../db/collections.js";
 import type * as db_courseSettings from "../db/courseSettings.js";
@@ -53,6 +54,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  authRedirectLog: typeof authRedirectLog;
   autumn: typeof autumn;
   "db/collections": typeof db_collections;
   "db/courseSettings": typeof db_courseSettings;
