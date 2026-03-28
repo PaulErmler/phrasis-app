@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -13,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { X, Headphones, PenLine } from 'lucide-react';
+import { X, Headphones, PenLine, Settings2 } from 'lucide-react';
 import {
   DEFAULT_BATCH_SIZE,
   type CourseSettings,
@@ -22,6 +23,7 @@ import { StepperControl } from '@/components/app/learning/StepperControl';
 import { TimelineLanguageCard } from '@/components/app/learning/TimelineLanguageCard';
 import { StepperPauseConnector } from '@/components/app/learning/StepperPauseConnector';
 import { ReviewModeSwitcher } from '@/components/app/learning/ReviewModeSwitcher';
+import { CourseLanguageSettings } from '@/components/course/CourseLanguageSettings';
 import {
   DEFAULT_AUTO_PLAY,
   DEFAULT_AUTO_ADVANCE,
@@ -51,6 +53,7 @@ export function LearningModeSettings({
   targetLanguages: targetProp,
 }: LearningModeSettingsProps) {
   const t = useTranslations('LearningMode.settingsPanel');
+  const [courseSettingsOpen, setCourseSettingsOpen] = useState(false);
   const updateSettings = useMutation(
     api.features.courses.updateCourseSettings,
   ).withOptimisticUpdate((localStore, args) => {
@@ -287,6 +290,12 @@ export function LearningModeSettings({
     });
   };
 
+  const courseData = {
+    _id: courseSettings.courseId,
+    baseLanguages: baseProp,
+    targetLanguages: targetProp,
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -519,10 +528,6 @@ export function LearningModeSettings({
             </div>
           )}
 
-          <p className="text-muted-xs pt-2">
-            {t('playbackSequenceDescription')}
-          </p>
-
           <div className="flex flex-col items-center gap-0 py-1">
             {/* Base languages */}
             {baseLanguages.map((code, idx) => {
@@ -549,6 +554,7 @@ export function LearningModeSettings({
                       handleRepetitionPauseChange(code, v)
                     }
                     repPauseLabel={t('pauseBetweenRepetitions')}
+                    showReorderButtons={baseLanguages.length > 1}
                     canMoveUp={idx > 0}
                     canMoveDown={idx < baseLanguages.length - 1}
                     onMoveUp={() => moveBaseUp(idx)}
@@ -606,6 +612,7 @@ export function LearningModeSettings({
                           handleRepetitionPauseChange(code, v)
                         }
                         repPauseLabel={t('pauseBetweenRepetitions')}
+                        showReorderButtons={targetLanguages.length > 1}
                         canMoveUp={idx > 0}
                         canMoveDown={idx < targetLanguages.length - 1}
                         onMoveUp={() => moveTargetUp(idx)}
@@ -655,6 +662,21 @@ export function LearningModeSettings({
                 </>
               )}
             </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-muted-xs">
+              {t('playbackSequenceDescription')}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 gap-1.5 h-7 text-xs"
+              onClick={() => setCourseSettingsOpen(true)}
+            >
+              <Settings2 className="h-3 w-3" />
+              {t('editLanguages')}
+            </Button>
           </div>
 
           <Separator />
@@ -738,6 +760,11 @@ export function LearningModeSettings({
           </div>
         </div>
       </SheetContent>
+
+      <CourseLanguageSettings
+        course={courseSettingsOpen ? courseData : null}
+        onClose={() => setCourseSettingsOpen(false)}
+      />
     </Sheet>
   );
 }

@@ -59,6 +59,30 @@ export async function checkQuota(
 }
 
 /**
+ * Check whether a boolean feature is available for the user.
+ * Mirrors the frontend `useFeatureQuota.isAvailable` logic.
+ * `synced: false` means no quota doc yet — same notion as `checkQuota`.
+ */
+export async function hasFeatureAccess(
+  ctx: QueryCtx | MutationCtx,
+  userId: string,
+  featureId: string,
+): Promise<{ available: boolean; synced: boolean }> {
+  const doc = await getQuotaDoc(ctx, userId);
+  if (!doc) {
+    return { available: false, synced: false };
+  }
+  const feature = doc.features[featureId];
+  if (!feature) {
+    return { available: false, synced: true };
+  }
+  if (feature.unlimited === true) {
+    return { available: true, synced: true };
+  }
+  return { available: feature.balance > 0, synced: true };
+}
+
+/**
  * Decrement the local quota for a feature.
  * Does NOT check — caller must check first or use `consumeQuota`.
  */

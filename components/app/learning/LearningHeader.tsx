@@ -4,7 +4,14 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { HelpDialog } from '@/components/app/HelpDialog';
-import { ChevronLeft, CircleCheck, EyeOff, Settings, Star } from 'lucide-react';
+import {
+  ChevronLeft,
+  CircleCheck,
+  EyeOff,
+  Pencil,
+  Settings,
+  Star,
+} from 'lucide-react';
 import { useLearningChatToggle } from './LearningChatLayout';
 
 interface LearningHeaderProps {
@@ -12,6 +19,8 @@ interface LearningHeaderProps {
   onSettingsOpen: () => void;
   onRestartTutorial?: () => void;
   onHelpOpen?: () => void;
+  /** When `'full'`, the help dialog lists full-review-only shortcuts */
+  reviewMode?: 'audio' | 'full';
 }
 
 export function LearningHeader({
@@ -19,6 +28,7 @@ export function LearningHeader({
   onSettingsOpen,
   onRestartTutorial,
   onHelpOpen,
+  reviewMode = 'audio',
 }: LearningHeaderProps) {
   const t = useTranslations('LearningMode');
   const tSettings = useTranslations('LearningMode.settingsPanel');
@@ -53,23 +63,42 @@ export function LearningHeader({
             onOpen={onHelpOpen}
             triggerClassName="-mr-1"
           >
-            <div className="space-y-2">
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                {tSettings('iconLegend')}
-              </p>
-              <div className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 text-xs">
-                  <Star className="h-3.5 w-3.5 text-favorite shrink-0" />
-                  <span>{tSettings('iconFavorite')}</span>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                  {tSettings('iconLegend')}
+                </p>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2 text-xs">
+                    <Star className="h-3.5 w-3.5 text-favorite shrink-0" />
+                    <span>{tSettings('iconFavorite')}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <CircleCheck className="h-3.5 w-3.5 text-success shrink-0" />
+                    <span>{tSettings('iconMaster')}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <EyeOff className="h-3.5 w-3.5 text-destructive shrink-0" />
+                    <span>{tSettings('iconHide')}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span>{tSettings('iconEdit')}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <CircleCheck className="h-3.5 w-3.5 text-success shrink-0" />
-                  <span>{tSettings('iconMaster')}</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs">
-                  <EyeOff className="h-3.5 w-3.5 text-destructive shrink-0" />
-                  <span>{tSettings('iconHide')}</span>
-                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                  {tSettings('shortcuts')}
+                </p>
+                <ul className="list-disc pl-4 space-y-1.5 text-xs text-muted-foreground">
+                  <li>{tSettings('shortcutRating')}</li>
+                  <li>{tSettings('shortcutPause')}</li>
+                  <li>{tSettings('shortcutReveal')}</li>
+                  {reviewMode === 'full' && (
+                    <li>{tSettings('shortcutRevertSubmission')}</li>
+                  )}
+                </ul>
               </div>
             </div>
           </HelpDialog>

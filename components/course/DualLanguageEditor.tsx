@@ -62,14 +62,12 @@ function SortableItem({
   code,
   containerId,
   canRemove,
-  locked,
   locale,
   onRemove,
 }: {
   code: string;
   containerId: ContainerId;
   canRemove: boolean;
-  locked: boolean;
   locale?: string;
   onRemove: () => void;
 }) {
@@ -81,7 +79,7 @@ function SortableItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: code, data: { containerId }, disabled: locked });
+  } = useSortable({ id: code, data: { containerId } });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -99,17 +97,14 @@ function SortableItem({
         containerId === 'base'
           ? 'border-timeline-base-border bg-timeline-base'
           : 'border-timeline-target-border bg-timeline-target',
-        locked && 'opacity-70',
       )}
     >
-      {!locked && (
-        <button
-          {...listeners}
-          className="touch-none text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing -ml-1"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
-      )}
+      <button
+        {...listeners}
+        className="touch-none text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing -ml-1"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
       <span className="text-lg">{lang?.flag}</span>
       <span className="text-sm font-medium flex-1">
         {getDisplayName(code, locale)}
@@ -160,7 +155,6 @@ function DroppableGroup({
   items,
   allItems,
   maxPerGroup,
-  minPerGroup,
   maxTotal,
   lockedCodes,
   locale,
@@ -175,7 +169,6 @@ function DroppableGroup({
   items: string[];
   allItems: string[];
   maxPerGroup: number;
-  minPerGroup: number;
   maxTotal?: number;
   lockedCodes?: string[];
   locale?: string;
@@ -195,7 +188,6 @@ function DroppableGroup({
     (lang) => !allItems.includes(lang.code),
   );
 
-  const isAtMin = items.length <= minPerGroup;
   const locked = lockedCodes ?? [];
 
   return (
@@ -225,7 +217,6 @@ function DroppableGroup({
               code={code}
               containerId={id}
               canRemove={!locked.includes(code)}
-              locked={isAtMin}
               locale={locale}
               onRemove={() => onRemove(code)}
             />
@@ -294,7 +285,8 @@ export function DualLanguageEditor({
   baseLanguages,
   targetLanguages,
   maxPerGroup = 3,
-  minPerGroup = 0,
+  // minPerGroup kept in interface for callers but not enforced during drag
+  minPerGroup: _minPerGroup = 0,
   maxTotal,
   lockedCodes,
   onChange,
@@ -348,9 +340,6 @@ export function DualLanguageEditor({
       overContainer === 'base'
         ? [...baseLanguages]
         : [...targetLanguages];
-
-    if (destList.length >= maxPerGroup) return;
-    if (sourceList.length <= minPerGroup) return;
 
     const activeCode = active.id as string;
     const activeIndex = sourceList.indexOf(activeCode);
@@ -420,7 +409,6 @@ export function DualLanguageEditor({
           items={baseLanguages}
           allItems={allItems}
           maxPerGroup={maxPerGroup}
-          minPerGroup={minPerGroup}
           maxTotal={maxTotal}
           lockedCodes={lockedCodes}
           locale={locale}
@@ -450,7 +438,6 @@ export function DualLanguageEditor({
           items={targetLanguages}
           allItems={allItems}
           maxPerGroup={maxPerGroup}
-          minPerGroup={minPerGroup}
           maxTotal={maxTotal}
           lockedCodes={lockedCodes}
           locale={locale}

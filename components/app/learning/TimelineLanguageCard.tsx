@@ -16,6 +16,7 @@ interface TimelineLanguageCardProps {
   canMoveDown: boolean;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  showReorderButtons?: boolean;
 }
 
 export function TimelineLanguageCard({
@@ -30,6 +31,7 @@ export function TimelineLanguageCard({
   canMoveDown,
   onMoveUp,
   onMoveDown,
+  showReorderButtons = true,
 }: TimelineLanguageCardProps) {
   const lang = getLanguageByCode(code);
   const isDisabled = plays === 0;
@@ -44,22 +46,32 @@ export function TimelineLanguageCard({
         } ${isDisabled ? 'opacity-50' : ''}`}
       >
         <div className="flex items-center gap-2">
-          <div className="flex flex-col -my-1">
-            <button
-              onClick={onMoveUp}
-              disabled={!canMoveUp}
-              className="text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none"
-            >
-              <ChevronUp className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={onMoveDown}
-              disabled={!canMoveDown}
-              className="text-muted-foreground hover:text-foreground disabled:opacity-25 disabled:pointer-events-none"
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          {showReorderButtons && (canMoveUp || canMoveDown) && (
+            <div className="grid grid-rows-2 gap-0 -my-1 w-[14px] place-items-center shrink-0">
+              <div className="flex h-4 items-center justify-center">
+                {canMoveUp && (
+                  <button
+                    type="button"
+                    onClick={onMoveUp}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <ChevronUp className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <div className="flex h-4 items-center justify-center">
+                {canMoveDown && (
+                  <button
+                    type="button"
+                    onClick={onMoveDown}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <span className="text-base">{lang?.flag}</span>
           <span className="text-sm font-medium">{lang?.name ?? code}</span>
