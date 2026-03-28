@@ -17,6 +17,7 @@ import type * as db_courses from "../db/courses.js";
 import type * as db_dailyStats from "../db/dailyStats.js";
 import type * as db_decks from "../db/decks.js";
 import type * as db_seed from "../db/seed.js";
+import type * as db_translationSeed from "../db/translationSeed.js";
 import type * as db_users from "../db/users.js";
 import type * as features_chat_agent from "../features/chat/agent.js";
 import type * as features_chat_cardApprovals from "../features/chat/cardApprovals.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   "db/dailyStats": typeof db_dailyStats;
   "db/decks": typeof db_decks;
   "db/seed": typeof db_seed;
+  "db/translationSeed": typeof db_translationSeed;
   "db/users": typeof db_users;
   "features/chat/agent": typeof features_chat_agent;
   "features/chat/cardApprovals": typeof features_chat_cardApprovals;

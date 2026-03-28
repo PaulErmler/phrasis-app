@@ -16,6 +16,19 @@ import pinyin from 'chinese-to-pinyin';
 import greekUtils from 'greek-utils';
 import { SignJWT, importPKCS8 } from 'jose';
 
+/**
+ * Map internal language codes to Google Translate / romanization API codes.
+ * Codes not listed here are passed through as-is.
+ */
+const GOOGLE_TRANSLATE_CODE_MAP: Record<string, string> = {
+  es: 'es-ES',
+  es_latam: 'es-US',
+};
+
+function toGoogleTranslateCode(code: string): string {
+  return GOOGLE_TRANSLATE_CODE_MAP[code] ?? code;
+}
+
 /** Google Translation API v2 response type */
 interface GoogleTranslateResponse {
   data: {
@@ -103,8 +116,8 @@ export async function translateText(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         q: text,
-        source: sourceLang,
-        target: targetLang,
+        source: toGoogleTranslateCode(sourceLang),
+        target: toGoogleTranslateCode(targetLang),
         format: 'text',
       }),
     },
@@ -155,7 +168,7 @@ export async function romanizeText(
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      source_language_code: sourceLanguage,
+      source_language_code: toGoogleTranslateCode(sourceLanguage),
       contents: [text],
     }),
   });
