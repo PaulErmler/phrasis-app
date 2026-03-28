@@ -7,7 +7,7 @@ import type { Id } from '@/convex/_generated/dataModel';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Shimmer } from '@/components/ai-elements/shimmer';
-import { getLanguageByCode } from '@/lib/languages';
+import { getLanguageShortLabel } from '@/lib/languages';
 import type { CreateCardToolPart } from '@/lib/types/tool-parts';
 import type { CardApprovalStatus } from '@/convex/types';
 import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
@@ -34,10 +34,9 @@ export interface CardApprovalProps {
 }
 
 function Lang({ code }: { code: string }) {
-  const lang = getLanguageByCode(code);
   return (
     <span className="font-medium text-muted-foreground uppercase text-xs">
-      {lang?.code ?? code}
+      {getLanguageShortLabel(code)}
     </span>
   );
 }

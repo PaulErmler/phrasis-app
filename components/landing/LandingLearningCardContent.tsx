@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { LandingAudioButton } from '@/components/landing/LandingAudioButton';
 import { LandingCardShell } from '@/components/landing/LandingCardShell';
 import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
+import { getLanguageShortLabel } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 
 interface LandingLearningCardContentProps {
@@ -167,7 +168,7 @@ export function LandingLearningCardContent({
                       </p>
                     )}
                   </div>
-                  <LandingAudioButton language={translation.language.toUpperCase()} />
+                  <LandingAudioButton language={getLanguageShortLabel(translation.language)} />
                 </div>
               );
             })}

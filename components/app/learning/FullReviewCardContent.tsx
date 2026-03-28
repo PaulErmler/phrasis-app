@@ -13,7 +13,10 @@ import {
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import { DiffDisplay } from './DiffDisplay';
-import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import {
+  getLanguageShortLabel,
+  getLocalizedLanguageNameByCode,
+} from '@/lib/languages';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -439,7 +442,7 @@ function TargetLanguageInput({
             </span>
             <AudioButton
               url={audioUrl}
-              language={translation.language.toUpperCase()}
+              language={getLanguageShortLabel(translation.language)}
               onPlay={onAudioPlay}
             />
           </div>
@@ -447,7 +450,7 @@ function TargetLanguageInput({
           <div className="flex justify-end">
             <AudioButton
               url={audioUrl}
-              language={translation.language.toUpperCase()}
+              language={getLanguageShortLabel(translation.language)}
               onPlay={onAudioPlay}
             />
           </div>
@@ -508,7 +511,7 @@ function TargetLanguageInput({
             </span>
             <AudioButton
               url={audioUrl}
-              language={translation.language.toUpperCase()}
+              language={getLanguageShortLabel(translation.language)}
               onPlay={onAudioPlay}
             />
           </div>
@@ -516,7 +519,7 @@ function TargetLanguageInput({
           <div className="flex justify-end">
             <AudioButton
               url={audioUrl}
-              language={translation.language.toUpperCase()}
+              language={getLanguageShortLabel(translation.language)}
               onPlay={onAudioPlay}
             />
           </div>
@@ -586,7 +589,7 @@ function TargetLanguageInput({
           </span>
           <AudioButton
             url={audioUrl}
-            language={translation.language.toUpperCase()}
+            language={getLanguageShortLabel(translation.language)}
             onPlay={onAudioPlay}
           />
         </div>
@@ -594,7 +597,7 @@ function TargetLanguageInput({
         <div className="flex justify-end">
           <AudioButton
             url={audioUrl}
-            language={translation.language.toUpperCase()}
+            language={getLanguageShortLabel(translation.language)}
             onPlay={onAudioPlay}
           />
         </div>

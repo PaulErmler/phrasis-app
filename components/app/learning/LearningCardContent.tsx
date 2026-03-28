@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
+import { getLanguageShortLabel } from '@/lib/languages';
 import type { CardTranslation, CardAudioRecording } from './types';
 
 interface LearningCardContentProps {
@@ -167,7 +168,7 @@ export function LearningCardContent({
                   </div>
                   <AudioButton
                     url={audio?.url ?? null}
-                    language={translation.language.toUpperCase()}
+                    language={getLanguageShortLabel(translation.language)}
                     onPlay={onAudioPlay}
                   />
                 </div>

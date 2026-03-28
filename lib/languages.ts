@@ -273,6 +273,22 @@ export function getLanguageByCode(code: string): Language | undefined {
 }
 
 /**
+ * Short tag for badges, chat previews, and audio button labels.
+ * Both Spanish variants map to "ES" so internal codes like es_latam never appear in the UI.
+ */
+export function getLanguageShortLabel(code: string): string {
+  const normalized = code.toLowerCase();
+  if (normalized === 'es' || normalized === 'es_latam') {
+    return 'ES';
+  }
+  const language = getLanguageByCode(code);
+  if (language) {
+    return language.code.toUpperCase();
+  }
+  return code.toUpperCase();
+}
+
+/**
  * Get multiple languages by their codes
  */
 export function getLanguagesByCodes(codes: string[]): Language[] {

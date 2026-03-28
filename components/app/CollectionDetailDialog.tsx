@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Check, Plus, Loader2, CheckCircle2, Lock } from 'lucide-react';
 import { getCollectionDescription } from './CollectionCarouselUI';
 import { AudioButton } from '@/components/app/learning/AudioButton';
+import { getLanguageShortLabel } from '@/lib/languages';
 import { useTranslations } from 'next-intl';
 import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
@@ -158,7 +159,7 @@ export function CollectionDetailDialog({
                       size="sm"
                       disabled={isAdding}
                       onClick={onAddCards}
-                      className="justify-center"
+                      className="justify-center min-w-[7.5rem]"
                     >
                       {isAdding ? (
                         <>
@@ -247,7 +248,7 @@ export function CollectionDetailDialog({
                                 </div>
                                 <AudioButton
                                   url={audio?.url ?? null}
-                                  language={translation.language.toUpperCase()}
+                                  language={getLanguageShortLabel(translation.language)}
                                 />
                               </div>
                             );
@@ -284,7 +285,7 @@ export function CollectionDetailDialog({
                                 </div>
                                 <AudioButton
                                   url={audio?.url ?? null}
-                                  language={translation.language.toUpperCase()}
+                                  language={getLanguageShortLabel(translation.language)}
                                 />
                               </div>
                             );
