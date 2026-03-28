@@ -1,5 +1,5 @@
 import { v, ConvexError } from 'convex/values';
-import { action, mutation, internalMutation } from '../_generated/server';
+import { action, mutation, internalMutation, internalQuery } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { requireAuthUserId, getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -18,6 +18,21 @@ export const consumeAutoFillQuota = internalMutation({
   handler: async (ctx, args) => {
     await consumeQuota(ctx, args.userId, FEATURE_IDS.TRANSLATION_AUTO_FILL, 1);
     return null;
+  },
+});
+
+/** Allowed ISO codes for the user’s active course (base ∪ target). Used to validate auto-fill before quota / LLM. */
+export const getAllowedLanguagesForAutoFill = internalQuery({
+  args: { userId: v.string() },
+  returns: v.union(v.null(), v.object({ allowedLanguages: v.array(v.string()) })),
+  handler: async (ctx, { userId }) => {
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return null;
+    const { course } = active;
+    const allowedLanguages = [
+      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
+    ];
+    return { allowedLanguages };
   },
 });
 
@@ -67,7 +82,47 @@ export const autoFillTranslations = action({
     if (args.texts.length === 0) {
       throw new ConvexError('At least one source text is required');
     }
-    if (args.targetLanguages.length === 0) {
+
+    const courseCtx = await ctx.runQuery(
+      internal.features.customTexts.getAllowedLanguagesForAutoFill,
+      { userId },
+    );
+    if (!courseCtx) {
+      throw new ConvexError('No active course found');
+    }
+    const allowed = new Set(courseCtx.allowedLanguages);
+
+    const sourceLangs = new Set<string>();
+    for (const entry of args.texts) {
+      if (!allowed.has(entry.language)) {
+        throw new ConvexError({
+          code: 'INVALID_LANGUAGES',
+          message: `Language "${entry.language}" is not in the active course.`,
+        });
+      }
+      if (entry.text.trim().length === 0) {
+        throw new ConvexError('Source texts must be non-empty');
+      }
+      sourceLangs.add(entry.language);
+    }
+
+    const targetLanguages = [...new Set(args.targetLanguages)];
+    for (const lang of targetLanguages) {
+      if (!allowed.has(lang)) {
+        throw new ConvexError({
+          code: 'INVALID_LANGUAGES',
+          message: `Target language "${lang}" is not in the active course.`,
+        });
+      }
+      if (sourceLangs.has(lang)) {
+        throw new ConvexError({
+          code: 'INVALID_LANGUAGES',
+          message: `Target language "${lang}" already has source text; remove it from targetLanguages.`,
+        });
+      }
+    }
+
+    if (targetLanguages.length === 0) {
       return [];
     }
 
@@ -83,7 +138,7 @@ export const autoFillTranslations = action({
       })
       .join('\n');
 
-    const targetList = args.targetLanguages
+    const targetList = targetLanguages
       .map((code) => {
         const lang = getLanguageByCode(code);
         return `${code}: ${lang?.name ?? code}`;
@@ -115,7 +170,7 @@ export const autoFillTranslations = action({
     }
 
     const results: { language: string; text: string }[] = [];
-    for (const lang of args.targetLanguages) {
+    for (const lang of targetLanguages) {
       const translation = parsed[lang];
       if (typeof translation !== 'string' || translation.trim().length === 0) {
         throw new ConvexError(`Missing translation for language: ${lang}`);

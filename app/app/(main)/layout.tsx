@@ -235,71 +235,71 @@ export default function MainLayout({
   return (
     <div className="h-dvh max-h-dvh flex flex-col overflow-hidden">
       {!(activeView === 'content' && isAddCardsRoute) && (
-      <header className="sticky-header">
-        <div className="header-bar">
-          {activeView === 'home' ? (
-            <Button
-              variant="ghost"
-              onClick={() => setCourseMenuOpen(true)}
-              className="gap-2 -ml-2"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              {courseButtonLabel}
-            </Button>
-          ) : activeView === 'chat' ? (
-            <div className="flex items-center gap-1">
+        <header className="sticky-header">
+          <div className="header-bar">
+            {activeView === 'home' ? (
               <Button
                 variant="ghost"
-                onClick={handleChatBack}
+                onClick={() => setCourseMenuOpen(true)}
                 className="gap-2 -ml-2"
               >
                 <ChevronLeft className="h-4 w-4" />
-                {t('views.chat')}
+                {courseButtonLabel}
               </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setChatSidebarOpen((prev) => !prev)}
-                aria-label="Toggle conversations"
-              >
-                <PanelLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleNewChat}
-                aria-label="New chat"
-              >
-                <MessageSquarePlus className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <h1 className="heading-section capitalize">
-              {t(`views.${activeView}`)}
-            </h1>
-          )}
-          <div className="flex items-center gap-1 -mr-2">
-            {(activeView === 'home' ||
+            ) : activeView === 'chat' ? (
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  onClick={handleChatBack}
+                  className="gap-2 -ml-2"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  {t('views.chat')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setChatSidebarOpen((prev) => !prev)}
+                  aria-label="Toggle conversations"
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleNewChat}
+                  aria-label="New chat"
+                >
+                  <MessageSquarePlus className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <h1 className="heading-section capitalize">
+                {t(`views.${activeView}`)}
+              </h1>
+            )}
+            <div className="flex items-center gap-1 -mr-2">
+              {(activeView === 'home' ||
                 activeView === 'content' ||
                 activeView === 'library' ||
                 activeView === 'settings') && (
-              <HelpDialog
-                supportOnly={
-                  activeView === 'content' ||
+                <HelpDialog
+                  supportOnly={
+                    activeView === 'content' ||
                     activeView === 'library' ||
                     activeView === 'settings'
-                }
-                onRestartTutorial={
-                  activeView === 'home'
-                    ? () => restartTutorialRef.current?.()
-                    : undefined
-                }
-              />
-            )}
-            <ThemeSwitcher />
+                  }
+                  onRestartTutorial={
+                    activeView === 'home'
+                      ? () => restartTutorialRef.current?.()
+                      : undefined
+                  }
+                />
+              )}
+              <ThemeSwitcher />
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
       )}
 
       <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />

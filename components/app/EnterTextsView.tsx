@@ -194,6 +194,7 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
               variant="ghost"
               size="icon"
               className="shrink-0 -ml-2"
+              aria-label={t('back')}
               onClick={onBack}
             >
               <ChevronLeft className="h-5 w-5" />
