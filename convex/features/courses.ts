@@ -365,12 +365,13 @@ export const createCourse = mutation({
   }),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
-    await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
     await validateLanguageLimits(ctx, userId, args.baseLanguages, args.targetLanguages);
 
     const initialReviewCount =
       args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
     validateInitialReviewCount(initialReviewCount);
+
+    await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
 
     const courseId = await ctx.db.insert('courses', {
       baseLanguages: args.baseLanguages,
@@ -420,8 +421,6 @@ export const completeOnboarding = mutation({
   handler: async (ctx) => {
     const userId = await requireAuthUserId(ctx);
 
-    await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
-
     const progress = await dbGetOnboardingProgress(ctx, userId);
     if (!progress) throw new ConvexError('Onboarding progress not found');
 
@@ -429,6 +428,8 @@ export const completeOnboarding = mutation({
     const targetLanguages = progress.targetLanguages || [];
     const baseLanguages = progress.baseLanguages || [];
     await validateLanguageLimits(ctx, userId, baseLanguages, targetLanguages);
+
+    await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
 
     const courseId = await ctx.db.insert('courses', {
       baseLanguages,
