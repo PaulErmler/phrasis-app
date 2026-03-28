@@ -799,6 +799,8 @@
   "EnterTexts": {
     "title": "Eigene Texte eingeben",
     "description": "Gib deine eigenen Sätze ein.",
+    "noLanguages": "Für diesen Kurs sind keine Sprachen eingestellt. Füge in den Einstellungen Sprachen hinzu, um eigene Texte einzugeben.",
+    "reset": "Zurücksetzen",
     "inputPlaceholder": "{language}-Text eingeben",
     "autoFill": "Ausfüllen",
     "autoFilling": "Übersetze...",

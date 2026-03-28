@@ -17,6 +17,7 @@ import {
 } from '@/lib/constants/learning';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { FeatureGatedButton } from '@/components/feature_tracking/FeatureGatedButton';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
 
@@ -39,7 +40,9 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
-  const [paywallFeatureId, setPaywallFeatureId] = useState(FEATURE_IDS.CUSTOM_SENTENCES);
+  const [paywallFeatureId, setPaywallFeatureId] = useState<string>(
+    FEATURE_IDS.CUSTOM_SENTENCES,
+  );
 
   const firstInputRef = useRef<HTMLInputElement>(null);
 
@@ -47,6 +50,8 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
     ...baseLanguages.filter((l) => !targetLanguages.includes(l)),
     ...targetLanguages,
   ];
+
+  const hasLanguages = orderedLanguages.length > 0;
 
   const sourceLangs = orderedLanguages.filter(
     (lang) => userEditedLangs.has(lang) && (texts[lang] ?? '').trim().length > 0,
@@ -57,9 +62,27 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
     (text) => text.length > MAX_CARD_TEXT_LENGTH,
   );
   const allFilled = orderedLanguages.length > 0 && emptyLanguages.length === 0;
-  const canSave = allFilled && !hasOverLimit && !isSaving && !isAutoFilling;
+  const canSave =
+    hasLanguages && allFilled && !hasOverLimit && !isSaving && !isAutoFilling;
   const hasMultipleLanguages = orderedLanguages.length > 1;
-  const canAutoFill = sourceLangs.length > 0 && hasMultipleLanguages && !isAutoFilling && !isSaving;
+  const canAutoFill =
+    hasLanguages &&
+    sourceLangs.length > 0 &&
+    hasMultipleLanguages &&
+    !allFilled &&
+    !isAutoFilling &&
+    !isSaving;
+
+  const hasAnythingToReset =
+    userEditedLangs.size > 0 ||
+    orderedLanguages.some((lang) => (texts[lang] ?? '').trim().length > 0);
+  const canReset = hasLanguages && hasAnythingToReset && !isSaving && !isAutoFilling;
+
+  const handleReset = useCallback(() => {
+    setTexts({});
+    setUserEditedLangs(new Set());
+    firstInputRef.current?.focus();
+  }, []);
 
   const handleAutoFill = useCallback(async () => {
     if (!autoFillQuota.isAvailable) {
@@ -78,6 +101,8 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
 
     if (langsToFill.length === 0) return;
 
+    const editedSnapshot = userEditedLangs;
+
     setIsAutoFilling(true);
     try {
       const results = await autoFillTranslations({
@@ -87,6 +112,10 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
       setTexts((prev) => {
         const next = { ...prev };
         for (const r of results) {
+          const manualBlock =
+            editedSnapshot.has(r.language) &&
+            (prev[r.language] ?? '').trim().length > 0;
+          if (manualBlock) continue;
           next[r.language] = r.text;
         }
         return next;
@@ -108,7 +137,15 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
     } finally {
       setIsAutoFilling(false);
     }
-  }, [autoFillQuota.isAvailable, sourceLangs, orderedLanguages, texts, autoFillTranslations, t]);
+  }, [
+    autoFillQuota.isAvailable,
+    sourceLangs,
+    orderedLanguages,
+    texts,
+    userEditedLangs,
+    autoFillTranslations,
+    t,
+  ]);
 
   const handleSave = useCallback(async () => {
     if (!saveQuota.isAvailable) {
@@ -148,10 +185,6 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
     }
   }, [saveQuota.isAvailable, orderedLanguages, texts, createCustomText, t]);
 
-  if (orderedLanguages.length === 0) {
-    return null;
-  }
-
   return (
     <>
       <div className="flex flex-col h-full">
@@ -174,86 +207,103 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
           style={{ scrollbarGutter: 'stable' }}
         >
           <div className="app-view space-y-4">
-            <p className="text-muted-sm">{t('description')}</p>
+            <p className="text-muted-sm">
+              {hasLanguages ? t('description') : t('noLanguages')}
+            </p>
 
-            {orderedLanguages.map((lang, idx) => {
-              const value = texts[lang] ?? '';
-              const isOverLimit = value.length > MAX_CARD_TEXT_LENGTH;
-              const remaining = MAX_CARD_TEXT_LENGTH - value.length;
-              const showCharCount =
-                isOverLimit ||
-                remaining <= CARD_TEXT_SHOW_COUNT_REMAINING_THRESHOLD;
-              return (
-                <div key={lang} className="space-y-1.5">
-                  <div className="flex items-baseline justify-between gap-2">
-                    <Label htmlFor={`enter-${lang}`}>
-                      {getLocalizedLanguageNameByCode(lang, locale)}
-                    </Label>
-                    {showCharCount && (
-                      <span
-                        className={`text-xs tabular-nums shrink-0 ${isOverLimit ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
-                      >
-                        {isOverLimit
-                          ? `+${value.length - MAX_CARD_TEXT_LENGTH}`
-                          : `${value.length}/${MAX_CARD_TEXT_LENGTH}`}
-                      </span>
-                    )}
+            {hasLanguages &&
+              orderedLanguages.map((lang, idx) => {
+                const value = texts[lang] ?? '';
+                const isOverLimit = value.length > MAX_CARD_TEXT_LENGTH;
+                const remaining = MAX_CARD_TEXT_LENGTH - value.length;
+                const showCharCount =
+                  isOverLimit ||
+                  remaining <= CARD_TEXT_SHOW_COUNT_REMAINING_THRESHOLD;
+                return (
+                  <div key={lang} className="space-y-1.5">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <Label htmlFor={`enter-${lang}`}>
+                        {getLocalizedLanguageNameByCode(lang, locale)}
+                      </Label>
+                      {showCharCount && (
+                        <span
+                          className={`text-xs tabular-nums shrink-0 ${isOverLimit ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
+                        >
+                          {isOverLimit
+                            ? `+${value.length - MAX_CARD_TEXT_LENGTH}`
+                            : `${value.length}/${MAX_CARD_TEXT_LENGTH}`}
+                        </span>
+                      )}
+                    </div>
+                    <Input
+                      ref={idx === 0 ? firstInputRef : undefined}
+                      id={`enter-${lang}`}
+                      value={value}
+                      placeholder={t('inputPlaceholder', {
+                        language: getLocalizedLanguageNameByCode(lang, locale),
+                      })}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setTexts((prev) => ({ ...prev, [lang]: val }));
+                        setUserEditedLangs((prev) => {
+                          if (prev.has(lang)) return prev;
+                          const next = new Set(prev);
+                          next.add(lang);
+                          return next;
+                        });
+                      }}
+                      className={
+                        isOverLimit
+                          ? 'border-destructive focus-visible:ring-destructive'
+                          : ''
+                      }
+                      disabled={isAutoFilling}
+                    />
                   </div>
-                  <Input
-                    ref={idx === 0 ? firstInputRef : undefined}
-                    id={`enter-${lang}`}
-                    value={value}
-                    placeholder={t('inputPlaceholder', {
-                      language: getLocalizedLanguageNameByCode(lang, locale),
-                    })}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setTexts((prev) => ({ ...prev, [lang]: val }));
-                      setUserEditedLangs((prev) => {
-                        if (prev.has(lang)) return prev;
-                        const next = new Set(prev);
-                        next.add(lang);
-                        return next;
-                      });
-                    }}
-                    className={
-                      isOverLimit
-                        ? 'border-destructive focus-visible:ring-destructive'
-                        : ''
-                    }
-                    disabled={isAutoFilling}
-                  />
-                </div>
-              );
-            })}
+                );
+              })}
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-col gap-2 pt-2">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleAutoFill}
+                  disabled={!canAutoFill}
+                >
+                  {isAutoFilling ? (
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin mr-2" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 shrink-0 mr-2" />
+                  )}
+                  {isAutoFilling ? t('autoFilling') : t('autoFill')}
+                </Button>
+                <FeatureGatedButton
+                  featureId={FEATURE_IDS.CUSTOM_SENTENCES}
+                  className="flex-1 gap-2"
+                  onAction={handleSave}
+                  disabled={
+                    saveQuota.isLoading ||
+                    (saveQuota.isAvailable && !canSave)
+                  }
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 shrink-0 animate-spin mr-2" />
+                      {t('saving')}
+                    </>
+                  ) : (
+                    t('save')
+                  )}
+                </FeatureGatedButton>
+              </div>
               <Button
                 variant="outline"
-                className="flex-1"
-                onClick={handleAutoFill}
-                disabled={!canAutoFill}
+                className="w-full"
+                onClick={handleReset}
+                disabled={!canReset}
               >
-                {isAutoFilling ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin mr-2" />
-                ) : (
-                  <Sparkles className="h-4 w-4 shrink-0 mr-2" />
-                )}
-                {isAutoFilling ? t('autoFilling') : t('autoFill')}
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={handleSave}
-                disabled={!canSave}
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="h-4 w-4 shrink-0 animate-spin mr-2" />
-                    {t('saving')}
-                  </>
-                ) : (
-                  t('save')
-                )}
+                {t('reset')}
               </Button>
             </div>
           </div>

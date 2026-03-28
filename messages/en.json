@@ -730,6 +730,8 @@
   "EnterTexts": {
     "title": "Enter Your Own Texts",
     "description": "Type in your custom sentences.",
+    "noLanguages": "This course has no languages configured. Add languages in settings to enter custom text.",
+    "reset": "Reset",
     "inputPlaceholder": "Enter {language} text",
     "autoFill": "Auto-fill",
     "autoFilling": "Translating...",

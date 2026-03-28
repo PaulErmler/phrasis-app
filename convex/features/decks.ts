@@ -367,10 +367,17 @@ export const getCustomCollectionsProgress = query({
     const courseId = settings.activeCourseId;
     const courseSettings = await getCourseSettings(ctx, courseId);
 
-    // Collect course-specific custom collection IDs
+    // Collect course-specific custom collection IDs (chat-approved + manually entered)
     const customCollectionIds: Id<'collections'>[] = [];
-    if (courseSettings?.chatCollectionId) {
-      customCollectionIds.push(courseSettings.chatCollectionId);
+    const seen = new Set<string>();
+    for (const id of [
+      courseSettings?.chatCollectionId,
+      courseSettings?.customCollectionId,
+    ]) {
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        customCollectionIds.push(id);
+      }
     }
 
     if (customCollectionIds.length === 0) return [];
