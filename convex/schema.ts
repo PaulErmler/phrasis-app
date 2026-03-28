@@ -28,6 +28,14 @@ export default defineSchema({
     userId: v.optional(v.string()), // User who created (for user-created texts)
     collectionId: v.optional(v.id('collections')), // Reference to collection
     collectionRank: v.optional(v.number()), // Rank within the collection
+    // Linguistic metadata (populated from translation pipeline)
+    register: v.optional(v.string()), // formal / informal / neutral
+    addresseeNumber: v.optional(v.string()), // singular / plural / not_applicable
+    speakerGender: v.optional(v.string()), // male / female / neutral
+    addresseeGender: v.optional(v.string()), // male / female / neutral / not_applicable
+    tenseAspect: v.optional(v.string()), // simple_present / past_continuous / etc.
+    sentenceType: v.optional(v.string()), // declarative / interrogative / imperative / exclamatory
+    literalFigurative: v.optional(v.string()), // literal / figurative
   })
     .index('by_text', ['text'])
     .index('by_datasetSentenceId', ['datasetSentenceId'])
@@ -119,6 +127,7 @@ export default defineSchema({
       v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
     ), // When to play target audio in full review mode
     chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
+    customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
     activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
   }).index('by_courseId', ['courseId']),
 

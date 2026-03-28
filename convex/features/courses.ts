@@ -599,6 +599,7 @@ export const getActiveCourseSettings = query({
         v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
       ),
       chatCollectionId: v.optional(v.id('collections')),
+      customCollectionId: v.optional(v.id('collections')),
       activeCustomCollectionIds: v.optional(v.array(v.id('collections'))),
     }),
     v.null(),

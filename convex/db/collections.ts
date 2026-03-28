@@ -80,3 +80,42 @@ export async function getOrCreateChatCollection(
   if (!collection) throw new Error('Failed to create chat collection');
   return collection;
 }
+
+/**
+ * Get or create the per-course custom collection used for manually entered texts.
+ */
+export async function getOrCreateCustomCollection(
+  ctx: MutationCtx,
+  courseId: Id<'courses'>,
+): Promise<Doc<'collections'>> {
+  const settings = await getCourseSettings(ctx, courseId);
+
+  if (settings?.customCollectionId) {
+    const existing = await ctx.db.get(settings.customCollectionId);
+    if (existing) return existing;
+  }
+
+  const collectionId = await ctx.db.insert('collections', {
+    name: 'Custom',
+    textCount: 0,
+  });
+
+  if (settings) {
+    const existingCustomIds = settings.activeCustomCollectionIds ?? [];
+    await ctx.db.patch(settings._id, {
+      customCollectionId: collectionId,
+      activeCustomCollectionIds: [...existingCustomIds, collectionId],
+    });
+  } else {
+    await ctx.db.insert('courseSettings', {
+      courseId,
+      initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+      customCollectionId: collectionId,
+      activeCustomCollectionIds: [collectionId],
+    });
+  }
+
+  const collection = await ctx.db.get(collectionId);
+  if (!collection) throw new Error('Failed to create custom collection');
+  return collection;
+}

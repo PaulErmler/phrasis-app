@@ -255,29 +255,29 @@ export function LearningControls({
             ) : isAudioReview &&
               !audioAllTargetsRevealed &&
               onRevealAllAudioTargets ? (
-              <Button
-                size="sm"
-                onClick={onRevealAllAudioTargets}
-                className="flex-[1] gap-2"
-              >
-                {t('actions.reveal')}
-                <Eye className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={() => onNext()}
-                disabled={isReviewing}
-                className="flex-[1] gap-2"
-              >
-                {t('actions.next')}
-                {showSpinner ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-              </Button>
-            )}
+                <Button
+                  size="sm"
+                  onClick={onRevealAllAudioTargets}
+                  className="flex-[1] gap-2"
+                >
+                  {t('actions.reveal')}
+                  <Eye className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => onNext()}
+                  disabled={isReviewing}
+                  className="flex-[1] gap-2"
+                >
+                  {t('actions.next')}
+                  {showSpinner ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
           </div>
         </div>
       </div>

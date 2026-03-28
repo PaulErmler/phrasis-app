@@ -51,6 +51,13 @@ export const card_edits = feature({
   consumable: true,
 });
 
+export const translation_auto_fill = feature({
+  id: 'translation_auto_fill',
+  name: 'Translation Auto Fill',
+  type: 'metered',
+  consumable: true,
+});
+
 // Plans
 export const free = plan({
   id: 'free',
@@ -59,7 +66,7 @@ export const free = plan({
   items: [
     item({
       featureId: card_edits.id,
-      included: 150,
+      included: 50,
       reset: {
         interval: 'month',
       },
@@ -92,6 +99,13 @@ export const free = plan({
     item({
       featureId: transcriptions.id,
       included: 10,
+      reset: {
+        interval: 'month',
+      },
+    }),
+    item({
+      featureId: translation_auto_fill.id,
+      included: 50,
       reset: {
         interval: 'month',
       },
@@ -146,6 +160,13 @@ export const basic = plan({
         interval: 'month',
       },
     }),
+    item({
+      featureId: translation_auto_fill.id,
+      included: 250,
+      reset: {
+        interval: 'month',
+      },
+    }),
   ],
 });
 
@@ -192,6 +213,13 @@ export const pro = plan({
     item({
       featureId: transcriptions.id,
       included: 400,
+      reset: {
+        interval: 'month',
+      },
+    }),
+    item({
+      featureId: translation_auto_fill.id,
+      included: 600,
       reset: {
         interval: 'month',
       },
