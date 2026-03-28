@@ -6,6 +6,8 @@
  * in ../lib/textComparison.ts and are re-exported here for convenience.
  */
 
+import { OPENAI_TRANSCRIPTION_MODEL } from '../config/aiModels';
+
 export { normalizeForComparison, textsMatch } from '../lib/textComparison';
 
 /** Google TTS API response type */
@@ -63,6 +65,20 @@ export async function synthesizeSpeech(
 }
 
 /**
+ * OpenAI audio transcription expects an ISO-639-1 language code (e.g. `es`).
+ * App-internal codes (e.g. `es_latam` for Latin American Spanish) must map to
+ * that form — regional Spanish variants still use `es` for the API.
+ *
+ * @see https://platform.openai.com/docs/guides/speech-to-text
+ */
+function toOpenAITranscriptionLanguage(internalCode: string): string {
+  const map: Record<string, string> = {
+    es_latam: 'es',
+  };
+  return map[internalCode] ?? internalCode;
+}
+
+/**
  * Transcribe an audio Blob via the OpenAI transcriptions API.
  * Used internally for TTS validation — no auth or quota checks.
  */
@@ -73,11 +89,13 @@ export async function transcribeAudio(
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
 
+  const openAiLang = toOpenAITranscriptionLanguage(languageCode);
+
   const file = new File([blob], 'audio.mp3', { type: 'audio/mp3' });
   const formData = new FormData();
   formData.append('file', file);
-  formData.append('model', 'gpt-4o-transcribe');
-  formData.append('language', languageCode);
+  formData.append('model', OPENAI_TRANSCRIPTION_MODEL);
+  formData.append('language', openAiLang);
 
   const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',

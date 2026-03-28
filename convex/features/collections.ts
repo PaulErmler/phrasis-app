@@ -28,6 +28,7 @@ export async function isCollectionAccessible(
   if (!courseSettings) return false;
 
   if (courseSettings.chatCollectionId?.toString() === collectionId.toString()) return true;
+  if (courseSettings.customCollectionId?.toString() === collectionId.toString()) return true;
   if (
     (courseSettings.activeCustomCollectionIds ?? []).some(
       (id) => id.toString() === collectionId.toString(),

@@ -109,6 +109,19 @@ export async function translateText(
   const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY;
   if (!apiKey) throw new Error('Translation service not configured');
 
+  const googleSource = toGoogleTranslateCode(sourceLang);
+  const googleTarget = toGoogleTranslateCode(targetLang);
+  const startedAt = Date.now();
+
+  console.log('[translation] Google Translate v2 request', {
+    sourceLang,
+    targetLang,
+    googleSource,
+    googleTarget,
+    textCharCount: text.length,
+    api: 'language/translate/v2',
+  });
+
   const response = await fetch(
     `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
     {
@@ -116,21 +129,37 @@ export async function translateText(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         q: text,
-        source: toGoogleTranslateCode(sourceLang),
-        target: toGoogleTranslateCode(targetLang),
+        source: googleSource,
+        target: googleTarget,
         format: 'text',
       }),
     },
   );
 
+  const elapsedMs = Date.now() - startedAt;
+
   if (!response.ok) {
     const errorText = await response.text();
+    console.error('[translation] Google Translate v2 error', {
+      status: response.status,
+      elapsedMs,
+      sourceLang,
+      targetLang,
+      bodyPreview: errorText.slice(0, 500),
+    });
     throw new Error(`Google API error: ${response.status} - ${errorText}`);
   }
 
   const data = (await response.json()) as GoogleTranslateResponse;
   const translation = data.data?.translations?.[0]?.translatedText;
   if (!translation) throw new Error('No translation returned from Google API');
+
+  console.log('[translation] Google Translate v2 ok', {
+    sourceLang,
+    targetLang,
+    elapsedMs,
+    resultCharCount: translation.length,
+  });
 
   return translation;
 }
@@ -160,6 +189,16 @@ export async function romanizeText(
 
   const { token, projectId } = await getGoogleAccessToken();
   const url = `https://translation.googleapis.com/v3/projects/${projectId}/locations/global:romanizeText`;
+  const googleLang = toGoogleTranslateCode(sourceLanguage);
+  const startedAt = Date.now();
+
+  console.log('[translation] Google romanizeText v3 request', {
+    sourceLanguage,
+    googleLang,
+    textCharCount: text.length,
+    api: 'v3/.../romanizeText',
+    projectId,
+  });
 
   const response = await fetch(url, {
     method: 'POST',
@@ -168,19 +207,33 @@ export async function romanizeText(
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify({
-      source_language_code: toGoogleTranslateCode(sourceLanguage),
+      source_language_code: googleLang,
       contents: [text],
     }),
   });
 
+  const elapsedMs = Date.now() - startedAt;
+
   if (!response.ok) {
     const errorText = await response.text();
+    console.error('[translation] Google romanizeText v3 error', {
+      status: response.status,
+      elapsedMs,
+      sourceLanguage,
+      bodyPreview: errorText.slice(0, 500),
+    });
     throw new Error(`Google romanize API error: ${response.status} - ${errorText}`);
   }
 
   const data = (await response.json()) as GoogleRomanizeResponse;
   const romanized = data.romanizations?.[0]?.romanizedText;
   if (!romanized) throw new Error('No romanization returned from Google API');
+
+  console.log('[translation] Google romanizeText v3 ok', {
+    sourceLanguage,
+    elapsedMs,
+    resultCharCount: romanized.length,
+  });
 
   return romanized;
 }

@@ -157,6 +157,9 @@ async function updateTranslations() {
     audioInvalidated: 0,
   };
 
+  /** @type {Set<number>} */
+  const allNotFoundDatasetSentenceIds = new Set();
+
   const startTime = Date.now();
 
   for (let i = 0; i < batches.length; i++) {
@@ -173,6 +176,12 @@ async function updateTranslations() {
         for (const key of Object.keys(totals)) {
           totals[key] += result[key] || 0;
         }
+        const nf = result.notFoundDatasetSentenceIds;
+        if (Array.isArray(nf)) {
+          for (const id of nf) {
+            allNotFoundDatasetSentenceIds.add(id);
+          }
+        }
       }
 
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -184,6 +193,21 @@ async function updateTranslations() {
           `audio invalidated: ${result?.audioInvalidated ?? 0} | ` +
           `${elapsed}s elapsed, ${rate} batches/s`,
       );
+
+      const nfIds = result?.notFoundDatasetSentenceIds;
+      if (Array.isArray(nfIds) && nfIds.length > 0) {
+        console.warn(
+          `  [texts NOT FOUND] batch ${batchNum}/${batches.length}: ${nfIds.length} row(s) — no texts document for datasetSentenceId: ${nfIds.join(', ')}`,
+        );
+        const items = result?.notFoundItems;
+        if (Array.isArray(items)) {
+          for (const row of items) {
+            console.warn(
+              `    datasetSentenceId=${row.datasetSentenceId}  text_en preview: ${row.textEnPreview}`,
+            );
+          }
+        }
+      }
     } catch (error) {
       console.error(`  Batch ${batchNum}/${batches.length} FAILED: ${error.message}`);
     }
@@ -194,11 +218,19 @@ async function updateTranslations() {
   console.log('\n=== Summary ===');
   console.log(`Time: ${elapsed}s`);
   console.log(`Texts updated: ${totals.textsUpdated}`);
-  console.log(`Texts not found: ${totals.textsNotFound}`);
+  console.log(`Texts not found (count): ${totals.textsNotFound}`);
   console.log(`Translations inserted: ${totals.translationsInserted}`);
   console.log(`Translations updated (text changed): ${totals.translationsUpdated}`);
   console.log(`Translations unchanged: ${totals.translationsUnchanged}`);
   console.log(`Audio recordings invalidated: ${totals.audioInvalidated}`);
+
+  const sortedUniqueNotFound = [...allNotFoundDatasetSentenceIds].sort((a, b) => a - b);
+  console.log(
+    `\nDataset sentence IDs with no matching texts row (unique, sorted): ${sortedUniqueNotFound.length}`,
+  );
+  if (sortedUniqueNotFound.length > 0) {
+    console.log(sortedUniqueNotFound.join(', '));
+  }
 }
 
 updateTranslations()

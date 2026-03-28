@@ -15,6 +15,7 @@ import type { Id } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { OPENROUTER_MODELS } from '../../config/aiModels';
 
 export type ListMessagesStreamArgs = {
   kind: 'list';
@@ -332,7 +333,7 @@ export const generateThreadTitle = internalAction({
         apiKey: process.env.OPENROUTER_API_KEY,
       });
       const { text } = await generateText({
-        model: openrouter('google/gemini-3.1-flash-lite-preview'),
+        model: openrouter(OPENROUTER_MODELS.threadTitle),
         system: `You generate short titles for chat conversations. Respond with ONLY the title, nothing else.
 The title MUST be written in the SAME language the user wrote their message in. Do NOT translate into any other language.
 For example: if the user writes in English, respond in English. If the user writes in German, respond in German.

@@ -13,6 +13,10 @@ Usage:
     python translate_sentences.py --limit 500           # 500 sentences, stratified
     python translate_sentences.py                       # All sentences
     python translate_sentences.py --resume              # Resume from cache
+    python translate_sentences.py --sync-from-cache    # copy cache → output only (no API)
+
+Checkpoints write both translation_cache.csv and sentences_translated.csv so the final output
+is not left stale if a long run stops before the script exits normally.
 """
 
 import argparse
@@ -303,6 +307,17 @@ def save_checkpoint(results: list[dict], path: Path, columns: list[str]):
     df = pd.DataFrame(results)
     available = [c for c in columns if c in df.columns]
     df[available].to_csv(path, index=False)
+
+
+def save_dual_checkpoint(
+    results: list[dict],
+    output_path: Path,
+    cache_path: Path,
+    columns: list[str],
+) -> None:
+    """Write the same snapshot to cache and final output so both stay in sync during long runs."""
+    save_checkpoint(results, cache_path, columns)
+    save_checkpoint(results, output_path, columns)
 
 
 def stratified_sample(df: pd.DataFrame, n: int) -> pd.DataFrame:
@@ -637,6 +652,11 @@ async def main():
                         help=f"OpenRouter model for Stage 3 verification (default: same as --model)")
     parser.add_argument("--verify-passes", type=int, default=1,
                         help="How many verification passes to run per sentence (Stage 3; requires --secure). Default 1.")
+    parser.add_argument(
+        "--sync-from-cache",
+        action="store_true",
+        help="Copy translation_cache.csv to the output CSV and exit (no API calls, no pipeline stages).",
+    )
     args = parser.parse_args()
 
     if args.verify_model == DEFAULT_VERIFY_MODEL and args.model != DEFAULT_MODEL:
@@ -651,6 +671,33 @@ async def main():
     input_path = Path(args.input) if args.input else data_dir / "sentences.csv"
     output_path = Path(args.output) if args.output else data_dir / "sentences_translated.csv"
     cache_path = output_path.with_name("translation_cache.csv")
+
+    if args.sync_from_cache:
+        if not cache_path.exists():
+            print(f"Error: Cache not found: {cache_path}")
+            return
+        cache_df = pd.read_csv(cache_path)
+        all_results = cache_df.to_dict("records")
+        if input_path.exists():
+            df_cols = pd.read_csv(input_path, nrows=0)
+            original_columns = list(df_cols.columns)
+            output_columns = (
+                original_columns
+                + ["text_en", "en_notes"]
+                + METADATA_FIELDS
+                + LANG_CODES
+                + ["corrections_summary", "verification_passes"]
+            )
+            save_checkpoint(all_results, output_path, output_columns)
+        else:
+            save_checkpoint(all_results, output_path, list(cache_df.columns))
+        print("=" * 64)
+        print("  SYNC FROM CACHE (no API)")
+        print("=" * 64)
+        print(f"  Source:  {cache_path}")
+        print(f"  Wrote:   {output_path}")
+        print(f"  Rows:    {len(all_results):,}")
+        return
 
     if not input_path.exists():
         print(f"Error: Input file not found: {input_path}")
@@ -737,7 +784,7 @@ async def main():
 
     if need_norm == 0 and need_trans == 0 and (not args.secure or need_verify == 0):
         print("  Nothing to process — all sentences up to date.")
-        save_checkpoint(all_results, output_path, output_columns)
+        save_dual_checkpoint(all_results, output_path, cache_path, output_columns)
         return
 
     # ── Initialize client ───────────────────────────────────────
@@ -801,10 +848,10 @@ async def main():
                 pbar.set_postfix(cost=f"${cost:.4f}", fail=s1["failed"])
 
                 if since_ckpt >= CHECKPOINT_INTERVAL:
-                    save_checkpoint(all_results, cache_path, output_columns)
+                    save_dual_checkpoint(all_results, output_path, cache_path, output_columns)
                     since_ckpt = 0
 
-        save_checkpoint(all_results, cache_path, output_columns)
+        save_dual_checkpoint(all_results, output_path, cache_path, output_columns)
         print(f"  Stage 1 done: {s1['processed']} normalized, {s1['failed']} failed")
         print()
 
@@ -844,10 +891,10 @@ async def main():
                 pbar.set_postfix(cost=f"${cost:.4f}", fail=s2["failed"])
 
                 if since_ckpt >= CHECKPOINT_INTERVAL:
-                    save_checkpoint(all_results, cache_path, output_columns)
+                    save_dual_checkpoint(all_results, output_path, cache_path, output_columns)
                     since_ckpt = 0
 
-        save_checkpoint(all_results, cache_path, output_columns)
+        save_dual_checkpoint(all_results, output_path, cache_path, output_columns)
         print(f"  Stage 2 done: {s2['processed']} translated, {s2['failed']} failed")
         print()
 
@@ -944,10 +991,10 @@ async def main():
                     pbar.set_postfix(cost=f"${cost:.4f}", corrected=s3["corrected"], fail=s3["failed"])
 
                     if since_ckpt >= CHECKPOINT_INTERVAL:
-                        save_checkpoint(all_results, cache_path, output_columns)
+                        save_dual_checkpoint(all_results, output_path, cache_path, output_columns)
                         since_ckpt = 0
 
-            save_checkpoint(all_results, cache_path, output_columns)
+            save_dual_checkpoint(all_results, output_path, cache_path, output_columns)
 
         if correction_log:
             log_path = output_path.with_name("verification_log.json")
@@ -963,8 +1010,8 @@ async def main():
                 json.dump(existing_log, f, ensure_ascii=False, indent=2)
             print(f"\n  Corrections log: {log_path} ({len(existing_log)} total entries)")
 
-    # ── Save final output ───────────────────────────────────────
-    save_checkpoint(all_results, output_path, output_columns)
+    # ── Save final output (also refreshes cache if stages were skipped) ──
+    save_dual_checkpoint(all_results, output_path, cache_path, output_columns)
 
     # ── Summary ─────────────────────────────────────────────────
     elapsed = time.time() - start_time

@@ -3,6 +3,7 @@ import {
   mutation,
   query,
   internalMutation,
+  internalQuery,
   internalAction,
   MutationCtx,
 } from '../_generated/server';
@@ -1028,6 +1029,36 @@ export const prepareCardContent = internalMutation({
 });
 
 /**
+ * Internal query: translation row for idempotency before calling Google Translate.
+ */
+export const getTranslationForTextLanguage = internalQuery({
+  args: {
+    textId: v.id('texts'),
+    targetLanguage: v.string(),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      translatedText: v.string(),
+      romanizedText: v.optional(v.string()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query('translations')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
+      )
+      .first();
+    if (!row) return null;
+    return {
+      translatedText: row.translatedText,
+      romanizedText: row.romanizedText,
+    };
+  },
+});
+
+/**
  * Internal action to process translation for a card.
  */
 export const processTranslationForCard = internalAction({
@@ -1040,21 +1071,44 @@ export const processTranslationForCard = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      const translation = await translateText(
-        args.text,
-        args.sourceLanguage,
-        args.targetLanguage,
+      const existingRow = await ctx.runQuery(
+        internal.features.decks.getTranslationForTextLanguage,
+        {
+          textId: args.textId,
+          targetLanguage: args.targetLanguage,
+        },
       );
-      const voiceName = getRandomVoiceForLanguage(args.targetLanguage);
 
+      let translation: string;
       let romanizedText: string | undefined;
-      if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
-        try {
-          romanizedText = await romanizeText(translation, args.targetLanguage);
-        } catch (err) {
-          console.error('Romanization error (non-fatal):', err);
+
+      if (existingRow) {
+        translation = existingRow.translatedText;
+        if (ROMANIZATION_LANGUAGES.has(args.targetLanguage) && !existingRow.romanizedText) {
+          try {
+            romanizedText = await romanizeText(translation, args.targetLanguage);
+          } catch (err) {
+            console.error('Romanization error (non-fatal):', err);
+          }
+        } else {
+          romanizedText = existingRow.romanizedText;
+        }
+      } else {
+        translation = await translateText(
+          args.text,
+          args.sourceLanguage,
+          args.targetLanguage,
+        );
+        if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
+          try {
+            romanizedText = await romanizeText(translation, args.targetLanguage);
+          } catch (err) {
+            console.error('Romanization error (non-fatal):', err);
+          }
         }
       }
+
+      const voiceName = getRandomVoiceForLanguage(args.targetLanguage);
 
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,

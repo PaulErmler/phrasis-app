@@ -11,9 +11,7 @@ import type { Id, Doc } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
 import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
-
-/** Maximum length for main text in card approvals. */
-const MAX_MAIN_TEXT_LENGTH = 300;
+import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
 
 /**
  * Fetches an approval and validates the user is authorized to act on it.
@@ -49,7 +47,7 @@ async function processApproval(
   const chatCollection = await getOrCreateChatCollection(ctx, course._id);
 
   const mainEntry = approval.translations[0];
-  const mainText = mainEntry.text.slice(0, MAX_MAIN_TEXT_LENGTH);
+  const mainText = mainEntry.text.slice(0, MAX_CARD_TEXT_LENGTH);
 
   const nextRank = chatCollection.textCount + 1;
 
@@ -138,7 +136,7 @@ export const createApprovalRequestInternal = internalMutation({
     }
 
     const cappedTranslations = args.translations.map((t, i) =>
-      i === 0 ? { ...t, text: t.text.slice(0, MAX_MAIN_TEXT_LENGTH) } : t,
+      i === 0 ? { ...t, text: t.text.slice(0, MAX_CARD_TEXT_LENGTH) } : t,
     );
 
     const approvalId = await ctx.db.insert('cardApprovals', {

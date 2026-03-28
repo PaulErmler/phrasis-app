@@ -175,7 +175,8 @@
           "B2": "CEFR B2 — Wörter auf Rang ~3.500–5.000 nach Häufigkeit",
           "C1": "CEFR C1 — Wörter auf Rang ~5.000–8.000 nach Häufigkeit",
           "C2": "CEFR C2 — Wörter auf Rang 8.000+ nach Häufigkeit",
-          "Chat": "Phrasen und Vokabular aus dem Chat"
+          "Chat": "Phrasen und Vokabular aus dem Chat",
+          "Custom": "Sätze, die du selbst eingegeben hast"
         },
         "detail": {
           "totalCards": "{count} Karten",
@@ -475,6 +476,9 @@
     },
     "cardEdits": {
       "name": "Kartenbearbeitungen"
+    },
+    "translationAutoFill": {
+      "name": "Automatische Übersetzung"
     }
   },
   "FeatureTracking": {
@@ -791,6 +795,18 @@
     "cancel": "Abbrechen",
     "save": "Speichern",
     "saving": "Speichern..."
+  },
+  "EnterTexts": {
+    "title": "Eigene Texte eingeben",
+    "description": "Gib deine eigenen Sätze ein.",
+    "inputPlaceholder": "{language}-Text eingeben",
+    "autoFill": "Ausfüllen",
+    "autoFilling": "Übersetze...",
+    "save": "Speichern",
+    "saving": "Speichern...",
+    "saveSuccess": "Text erfolgreich hinzugefügt",
+    "saveError": "Text konnte nicht gespeichert werden. Bitte versuche es erneut.",
+    "autoFillError": "Automatisches Ausfüllen fehlgeschlagen. Bitte versuche es erneut."
   },
   "NotFoundPage": {
     "title": "Seite nicht gefunden",

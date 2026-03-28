@@ -175,7 +175,8 @@
           "B2": "CEFR B2 — words ranked ~3,500-5000 by frequency",
           "C1": "CEFR C1 — learn the 5,000–8,000 most common words",
           "C2": "CEFR C2 — words ranked 8,000+ by frequency",
-          "Chat": "Phrases and vocabulary from the chat"
+          "Chat": "Phrases and vocabulary from the chat",
+          "Custom": "Sentences you entered yourself"
         },
         "detail": {
           "totalCards": "{count} cards",
@@ -475,6 +476,9 @@
     },
     "cardEdits": {
       "name": "Card Edits"
+    },
+    "translationAutoFill": {
+      "name": "Translation Auto-Fill"
     }
   },
   "FeatureTracking": {
@@ -722,6 +726,18 @@
     "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving..."
+  },
+  "EnterTexts": {
+    "title": "Enter Your Own Texts",
+    "description": "Type in your custom sentences.",
+    "inputPlaceholder": "Enter {language} text",
+    "autoFill": "Auto-fill",
+    "autoFilling": "Translating...",
+    "save": "Save",
+    "saving": "Saving...",
+    "saveSuccess": "Text added successfully",
+    "saveError": "Failed to save text. Please try again.",
+    "autoFillError": "Auto-fill failed. Please try again."
   },
   "NotFoundPage": {
     "title": "Page not found",

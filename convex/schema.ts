@@ -127,6 +127,7 @@ export default defineSchema({
       v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
     ), // When to play target audio in full review mode
     chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
+    customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
     activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
   }).index('by_courseId', ['courseId']),
 

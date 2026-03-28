@@ -6,6 +6,14 @@ const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es_latam: 'es-US',
 };
 
+const TEXT_EN_PREVIEW_LEN = 100;
+
+function textEnPreview(text: string): string {
+  const t = text.trim();
+  if (t.length <= TEXT_EN_PREVIEW_LEN) return t;
+  return `${t.slice(0, TEXT_EN_PREVIEW_LEN)}…`;
+}
+
 /**
  * Batch upsert translations and text metadata from the offline translation pipeline.
  *
@@ -42,6 +50,13 @@ export const batchUpsertTranslations = internalMutation({
     translationsUpdated: v.number(),
     translationsUnchanged: v.number(),
     audioInvalidated: v.number(),
+    notFoundDatasetSentenceIds: v.array(v.number()),
+    notFoundItems: v.array(
+      v.object({
+        datasetSentenceId: v.number(),
+        textEnPreview: v.string(),
+      }),
+    ),
   }),
   handler: async (ctx, args) => {
     const stats = {
@@ -52,6 +67,8 @@ export const batchUpsertTranslations = internalMutation({
       translationsUnchanged: 0,
       audioInvalidated: 0,
     };
+    const notFoundDatasetSentenceIds: number[] = [];
+    const notFoundItems: Array<{ datasetSentenceId: number; textEnPreview: string }> = [];
 
     for (const item of args.items) {
       const textDoc = await ctx.db
@@ -63,6 +80,11 @@ export const batchUpsertTranslations = internalMutation({
 
       if (!textDoc) {
         stats.textsNotFound++;
+        notFoundDatasetSentenceIds.push(item.datasetSentenceId);
+        notFoundItems.push({
+          datasetSentenceId: item.datasetSentenceId,
+          textEnPreview: textEnPreview(item.textEn),
+        });
         continue;
       }
 
@@ -151,6 +173,10 @@ export const batchUpsertTranslations = internalMutation({
       }
     }
 
-    return stats;
+    return {
+      ...stats,
+      notFoundDatasetSentenceIds,
+      notFoundItems,
+    };
   },
 });

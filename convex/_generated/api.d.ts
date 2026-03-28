@@ -10,6 +10,7 @@
 
 import type * as auth from "../auth.js";
 import type * as autumn from "../autumn.js";
+import type * as config_aiModels from "../config/aiModels.js";
 import type * as db_collections from "../db/collections.js";
 import type * as db_courseSettings from "../db/courseSettings.js";
 import type * as db_courseStats from "../db/courseStats.js";
@@ -27,6 +28,7 @@ import type * as features_chat_threads from "../features/chat/threads.js";
 import type * as features_chat_transcribe from "../features/chat/transcribe.js";
 import type * as features_collections from "../features/collections.js";
 import type * as features_courses from "../features/courses.js";
+import type * as features_customTexts from "../features/customTexts.js";
 import type * as features_decks from "../features/decks.js";
 import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_library from "../features/library.js";
@@ -55,6 +57,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   autumn: typeof autumn;
+  "config/aiModels": typeof config_aiModels;
   "db/collections": typeof db_collections;
   "db/courseSettings": typeof db_courseSettings;
   "db/courseStats": typeof db_courseStats;
@@ -72,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   "features/chat/transcribe": typeof features_chat_transcribe;
   "features/collections": typeof features_collections;
   "features/courses": typeof features_courses;
+  "features/customTexts": typeof features_customTexts;
   "features/decks": typeof features_decks;
   "features/featureIds": typeof features_featureIds;
   "features/library": typeof features_library;
