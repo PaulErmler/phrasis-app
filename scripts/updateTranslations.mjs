@@ -9,7 +9,7 @@ import { parse } from 'csv-parse/sync';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 50;
 const MAX_BUFFER_BYTES = 50 * 1024 * 1024;
 
 const LANGUAGE_COLUMNS = [
@@ -53,9 +53,13 @@ function runConvexMutation(functionPath, args) {
   });
 
   if (result.status !== 0) {
-    throw new Error(
-      `Convex mutation failed: ${result.stderr || result.stdout}`,
+    const parts = [result.stderr, result.stdout, result.error?.message].filter(
+      (s) => typeof s === 'string' && s.trim().length > 0,
     );
+    const detail =
+      parts.join('\n').trim() ||
+      (result.error ? String(result.error) : '(no stderr/stdout/error message)');
+    throw new Error(`Convex mutation failed: ${detail}`);
   }
 
   const trimmed = (result.stdout || '').trim();

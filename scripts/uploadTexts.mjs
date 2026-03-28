@@ -28,9 +28,13 @@ function runConvexMutation(functionPath, args) {
   });
 
   if (result.status !== 0) {
-    throw new Error(
-      `Convex mutation failed: ${result.stderr || result.stdout}`,
+    const parts = [result.stderr, result.stdout, result.error?.message].filter(
+      (s) => typeof s === 'string' && s.trim().length > 0,
     );
+    const detail =
+      parts.join('\n').trim() ||
+      (result.error ? String(result.error) : '(no stderr/stdout/error message)');
+    throw new Error(`Convex mutation failed: ${detail}`);
   }
 
   const trimmed = (result.stdout || '').trim();
