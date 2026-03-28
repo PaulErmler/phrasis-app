@@ -422,7 +422,7 @@ export const getNextTextsFromCollection = query({
     v.object({
       _id: v.id('texts'),
       text: v.string(),
-      collectionRank: v.optional(v.number()),
+      collectionRank: v.number(),
     }),
   ),
   handler: async (ctx, args) => {
@@ -448,11 +448,17 @@ export const getNextTextsFromCollection = query({
     );
     const lastRankProcessed = progress?.lastRankProcessed ?? 0;
 
+    const collection = await ctx.db.get(args.collectionId);
+    const isLevelCollection = collection
+      ? (LEVEL_ORDER as readonly string[]).includes(collection.name)
+      : false;
+
     const texts = await getNextTextsFromRank(
       ctx,
       args.collectionId,
       lastRankProcessed,
       maxTexts,
+      isLevelCollection ? { onlyCurriculum: true } : { forUserId: userId },
     );
 
     return texts.map((t) => ({
@@ -584,10 +590,7 @@ export async function createCardsFromTexts(
   let newLastRank = 0;
 
   for (const text of texts) {
-    if (
-      text.collectionRank !== undefined &&
-      text.collectionRank > newLastRank
-    ) {
+    if (text.collectionRank > newLastRank) {
       newLastRank = text.collectionRank;
     }
 
@@ -738,7 +741,7 @@ export const addCardsFromCollection = mutation({
           const count = allocations.get(entry.id.toString()) ?? 0;
           if (count === 0) continue;
 
-          const texts = await getNextTextsFromRank(ctx, entry.id, entry.lastRank, count);
+          const texts = await getNextTextsFromRank(ctx, entry.id, entry.lastRank, count, { forUserId: userId });
           if (texts.length === 0) continue;
 
           const { cardsInserted, newLastRank } = await createCardsFromTexts(
@@ -762,7 +765,7 @@ export const addCardsFromCollection = mutation({
 
           const customFinalRank = Math.max(entry.lastRank, newLastRank);
           const upcomingCustomTexts = await getNextTextsFromRank(
-            ctx, entry.id, customFinalRank, CONTENT_LOOKAHEAD_SIZE,
+            ctx, entry.id, customFinalRank, CONTENT_LOOKAHEAD_SIZE, { forUserId: userId },
           );
           for (const text of upcomingCustomTexts) {
             await ctx.scheduler.runAfter(
@@ -809,6 +812,7 @@ export const addCardsFromCollection = mutation({
         args.collectionId,
         lastRankProcessed,
         remainingBatch,
+        { onlyCurriculum: true },
       );
 
       if (textsToAdd.length > 0) {
@@ -852,6 +856,7 @@ export const addCardsFromCollection = mutation({
           args.collectionId,
           finalLastRank,
           CONTENT_LOOKAHEAD_SIZE,
+          { onlyCurriculum: true },
         );
 
         for (const text of upcomingTexts) {

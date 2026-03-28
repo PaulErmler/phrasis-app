@@ -464,7 +464,7 @@ export const completeOnboarding = mutation({
     // Auto-add first 5 cards from the selected difficulty collection
     const INITIAL_CARDS = 5;
     if (collection) {
-      const textsToAdd = await getNextTextsFromRank(ctx, collection._id, 0, INITIAL_CARDS);
+      const textsToAdd = await getNextTextsFromRank(ctx, collection._id, 0, INITIAL_CARDS, { onlyCurriculum: true });
 
       if (textsToAdd.length > 0) {
         const deck = await ctx.db.get(deckId);

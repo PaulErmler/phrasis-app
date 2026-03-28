@@ -25,13 +25,39 @@ export async function getCollectionProgress(
 
 /**
  * Get the next `limit` texts from a collection after the given rank.
+ *
+ * - `onlyCurriculum` — only seed/dataset texts (userCreated === false).
+ *   Prevents user forks from leaking into shared difficulty collections.
+ * - `forUserId` — only texts owned by this user.
+ *   Scopes custom/chat collections to the requesting user.
+ *
+ * The two flags are mutually exclusive; `onlyCurriculum` takes precedence.
  */
 export async function getNextTextsFromRank(
   ctx: QueryCtx,
   collectionId: Id<'collections'>,
   afterRank: number,
   limit: number,
+  options?: { onlyCurriculum?: boolean; forUserId?: string },
 ): Promise<Doc<'texts'>[]> {
+  if (options?.onlyCurriculum) {
+    return ctx.db
+      .query('texts')
+      .withIndex('by_collection_and_userCreated_and_rank', (q) =>
+        q.eq('collectionId', collectionId).eq('userCreated', false).gt('collectionRank', afterRank),
+      )
+      .order('asc')
+      .take(limit);
+  }
+  if (options?.forUserId) {
+    return ctx.db
+      .query('texts')
+      .withIndex('by_collection_and_userId_and_rank', (q) =>
+        q.eq('collectionId', collectionId).eq('userId', options.forUserId).gt('collectionRank', afterRank),
+      )
+      .order('asc')
+      .take(limit);
+  }
   return ctx.db
     .query('texts')
     .withIndex('by_collection_and_rank', (q) =>
@@ -39,6 +65,19 @@ export async function getNextTextsFromRank(
     )
     .order('asc')
     .take(limit);
+}
+
+/** Next rank for appending a text at the end of a collection (max existing rank + 1). */
+export async function nextCollectionRank(
+  ctx: QueryCtx | MutationCtx,
+  collectionId: Id<'collections'>,
+): Promise<number> {
+  const last = await ctx.db
+    .query('texts')
+    .withIndex('by_collection_and_rank', (q) => q.eq('collectionId', collectionId))
+    .order('desc')
+    .first();
+  return (last?.collectionRank ?? 0) + 1;
 }
 
 /**

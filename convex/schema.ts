@@ -26,8 +26,8 @@ export default defineSchema({
     romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
     userCreated: v.boolean(), // false for uploaded data, true for user-created
     userId: v.optional(v.string()), // User who created (for user-created texts)
-    collectionId: v.optional(v.id('collections')), // Reference to collection
-    collectionRank: v.optional(v.number()), // Rank within the collection
+    collectionId: v.id('collections'), // Reference to collection (required for all texts)
+    collectionRank: v.number(), // Rank within the collection (required for all texts)
     // Linguistic metadata (populated from translation pipeline)
     register: v.optional(v.string()), // formal / informal / neutral
     addresseeNumber: v.optional(v.string()), // singular / plural / not_applicable
@@ -39,7 +39,9 @@ export default defineSchema({
   })
     .index('by_text', ['text'])
     .index('by_datasetSentenceId', ['datasetSentenceId'])
-    .index('by_collection_and_rank', ['collectionId', 'collectionRank']),
+    .index('by_collection_and_rank', ['collectionId', 'collectionRank'])
+    .index('by_collection_and_userCreated_and_rank', ['collectionId', 'userCreated', 'collectionRank'])
+    .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank']),
 
   // Translations table - stores translations of texts
   translations: defineTable({

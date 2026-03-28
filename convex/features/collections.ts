@@ -75,6 +75,11 @@ export const getCollectionTextsWithContent = query({
       return { texts: [], hasMissingContent: false };
     }
 
+    const collection = await ctx.db.get(args.collectionId);
+    const isLevelCollection = collection
+      ? (LEVEL_ORDER as readonly string[]).includes(collection.name)
+      : false;
+
     const progress = await getCollectionProgress(
       ctx,
       userId,
@@ -88,6 +93,7 @@ export const getCollectionTextsWithContent = query({
       args.collectionId,
       lastRankProcessed,
       COLLECTION_PREVIEW_SIZE,
+      isLevelCollection ? { onlyCurriculum: true } : { forUserId: userId },
     );
 
     if (texts.length === 0) {
@@ -150,6 +156,11 @@ export const ensureContentForCollection = mutation({
       return { totalTranslationsScheduled: 0, totalAudioScheduled: 0 };
     }
 
+    const collection = await ctx.db.get(args.collectionId);
+    const isLevelCollection = collection
+      ? (LEVEL_ORDER as readonly string[]).includes(collection.name)
+      : false;
+
     const progress = await getCollectionProgress(
       ctx,
       userId,
@@ -163,6 +174,7 @@ export const ensureContentForCollection = mutation({
       args.collectionId,
       lastRankProcessed,
       CONTENT_LOOKAHEAD_SIZE,
+      isLevelCollection ? { onlyCurriculum: true } : { forUserId: userId },
     );
 
     let totalTranslationsScheduled = 0;
