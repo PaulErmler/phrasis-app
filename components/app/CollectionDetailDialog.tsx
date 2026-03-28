@@ -159,7 +159,7 @@ export function CollectionDetailDialog({
                       size="sm"
                       disabled={isAdding}
                       onClick={onAddCards}
-                      className="justify-center min-w-[7.5rem]"
+                      className="justify-center min-w-[7.5rem] transition-colors"
                     >
                       {isAdding ? (
                         <>
