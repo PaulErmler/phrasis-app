@@ -170,6 +170,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ],
   },
   {
+    code: 'ko',
+    displayCode: 'ko',
+    name: 'Korean',
+    nativeName: '한국어',
+    flag: '🇰🇷',
+    needsRomanization: true,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Charon', 'male', 'ko-KR', 'Korea'),
+    ],
+  },
+  {
     code: 'vi',
     displayCode: 'vi',
     name: 'Vietnamese',
@@ -364,7 +376,7 @@ export function getLocalizedLanguageNameByCode(
  * Languages whose script requires romanization (Latin transliteration).
  * Usable in both frontend and Convex backend.
  */
-export const ROMANIZATION_LANGUAGES = new Set(['ru', 'hi', 'ja', 'zh', 'el']);
+export const ROMANIZATION_LANGUAGES = new Set(['ru', 'hi', 'ja', 'ko', 'zh', 'el']);
 
 export function languageNeedsRomanization(code: string): boolean {
   return ROMANIZATION_LANGUAGES.has(code);

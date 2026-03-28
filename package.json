@@ -64,6 +64,7 @@
     "@radix-ui/react-toggle-group": "^1.1.11",
     "@radix-ui/react-tooltip": "^1.2.8",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
+    "hangul-romanization": "^1.0.1",
     "@useautumn/convex": "^0.0.23",
     "@xyflow/react": "^12.10.1",
     "ai": "^5.0.157",

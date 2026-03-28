@@ -5,9 +5,11 @@
  * Uses Google Cloud Translation API v2 (API key) for translations,
  * v3 (service account OAuth2) for romanization of ru/hi/ja,
  * chinese-to-pinyin for Chinese romanization,
+ * hangul-romanization for Korean (Revised Romanization),
  * and greek-utils for Greek phonetic Latin.
  */
 
+import { convert as romanizeHangul } from 'hangul-romanization';
 // @ts-expect-error no type declarations for chinese-to-pinyin
 import pinyin from 'chinese-to-pinyin';
 // @ts-expect-error no type declarations for greek-utils
@@ -124,6 +126,7 @@ export async function translateText(
  * Romanize non-Latin script text.
  * Chinese uses the local chinese-to-pinyin library;
  * Greek uses greek-utils phonetic Latin;
+ * Korean uses hangul-romanization (Revised Romanization);
  * other languages use the Google Cloud Translation v3 romanizeText endpoint.
  */
 export async function romanizeText(
@@ -136,6 +139,10 @@ export async function romanizeText(
 
   if (sourceLanguage === 'el') {
     return greekUtils.toPhoneticLatin(text);
+  }
+
+  if (sourceLanguage === 'ko') {
+    return romanizeHangul(text);
   }
 
   const { token, projectId } = await getGoogleAccessToken();
