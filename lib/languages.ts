@@ -59,16 +59,26 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'es',
-    displayCode: 'es',
-    name: 'Spanish',
-    nativeName: 'Español',
+    displayCode: 'es-ES',
+    name: 'Spanish (Spain)',
+    nativeName: 'Español (España)',
     flag: '🇪🇸',
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'es-ES', 'Spain'),
       createChirp3Voice('Charon', 'male', 'es-ES', 'Spain'),
-      createChirp3Voice('Aoede', 'female', 'es-US', 'US'),
-      createChirp3Voice('Orus', 'male', 'es-US', 'US'),
+    ],
+  },
+  {
+    code: 'es_latam',
+    displayCode: 'es-419',
+    name: 'Spanish (Latin America)',
+    nativeName: 'Español (Latinoamérica)',
+    flag: '🌎',
+    needsRomanization: false,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Charon', 'male', 'es-US', 'Latin America'),
     ],
   },
   {
@@ -170,6 +180,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ],
   },
   {
+    code: 'ko',
+    displayCode: 'ko',
+    name: 'Korean',
+    nativeName: '한국어',
+    flag: '🇰🇷',
+    needsRomanization: true,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Charon', 'male', 'ko-KR', 'Korea'),
+    ],
+  },
+  {
     code: 'vi',
     displayCode: 'vi',
     name: 'Vietnamese',
@@ -229,6 +251,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       createChirp3Voice('Charon', 'male', 'el-GR', 'Greece'),
     ],
   },
+  {
+    code: 'ar',
+    displayCode: 'ar',
+    name: 'Arabic',
+    nativeName: 'العربية',
+    flag: '🇸🇦',
+    needsRomanization: true,
+    voices: [
+      createChirp3Voice('Leda', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Charon', 'male', 'ar-XA', 'MSA'),
+    ],
+  },
 ];
 
 /**
@@ -236,6 +270,22 @@ export const SUPPORTED_LANGUAGES: Language[] = [
  */
 export function getLanguageByCode(code: string): Language | undefined {
   return SUPPORTED_LANGUAGES.find((lang) => lang.code === code);
+}
+
+/**
+ * Short tag for badges, chat previews, and audio button labels.
+ * Both Spanish variants map to "ES" so internal codes like es_latam never appear in the UI.
+ */
+export function getLanguageShortLabel(code: string): string {
+  const normalized = code.toLowerCase();
+  if (normalized === 'es' || normalized === 'es_latam') {
+    return 'ES';
+  }
+  const language = getLanguageByCode(code);
+  if (language) {
+    return language.code.toUpperCase();
+  }
+  return code.toUpperCase();
 }
 
 /**
@@ -364,7 +414,7 @@ export function getLocalizedLanguageNameByCode(
  * Languages whose script requires romanization (Latin transliteration).
  * Usable in both frontend and Convex backend.
  */
-export const ROMANIZATION_LANGUAGES = new Set(['ru', 'hi', 'ja', 'zh', 'el']);
+export const ROMANIZATION_LANGUAGES = new Set(['ru', 'hi', 'ja', 'ko', 'zh', 'el', 'ar']);
 
 export function languageNeedsRomanization(code: string): boolean {
   return ROMANIZATION_LANGUAGES.has(code);

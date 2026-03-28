@@ -175,7 +175,8 @@
           "B2": "CEFR B2 — Wörter auf Rang ~3.500–5.000 nach Häufigkeit",
           "C1": "CEFR C1 — Wörter auf Rang ~5.000–8.000 nach Häufigkeit",
           "C2": "CEFR C2 — Wörter auf Rang 8.000+ nach Häufigkeit",
-          "Chat": "Phrasen und Vokabular aus dem Chat"
+          "Chat": "Phrasen und Vokabular aus dem Chat",
+          "Custom": "Sätze, die du selbst eingegeben hast"
         },
         "detail": {
           "totalCards": "{count} Karten",
@@ -290,6 +291,8 @@
     "accuracy": "Genauigkeit",
     "showSentence": "Satz anzeigen",
     "showCorrections": "Korrekturen anzeigen",
+    "revertSubmission": "Eingabe zurücknehmen",
+    "revertSubmissionTooltip": "Eingabe zurücknehmen. Tastenkürzel: Pfeil links.",
     "typeTranslation": "Übersetzung eingeben...",
     "empty": {
       "noCardsDue": "Keine Karten zur Wiederholung fällig",
@@ -306,6 +309,12 @@
       "iconFavorite": "Karte als Favorit markieren",
       "iconMaster": "Karte als gemeistert markieren (erscheint nach der nächsten Wiederholung nicht mehr)",
       "iconHide": "Karte ausblenden (erscheint nach der nächsten Wiederholung nicht mehr)",
+      "iconEdit": "Redewendung auf dieser Karte bearbeiten",
+      "shortcuts": "Tastenkürzel",
+      "shortcutRating": "Tasten 1–4 zum Bewerten.",
+      "shortcutPause": "Leertaste zum Pausieren der Audio-Wiedergabe.",
+      "shortcutReveal": "Eingabetaste oder Pfeil nach rechts zum Aufdecken oder zur nächsten Karte.",
+      "shortcutRevertSubmission": "Pfeil nach links: zuletzt abgeschickte Übersetzung zurücknehmen (Voll-Übung).",
       "cardsPerBatch": "Karten pro Stapel",
       "cardsPerBatchDescription": "Anzahl der Karten, die auf einmal hinzugefügt werden",
       "reviewSettings": "Wiederholungseinstellungen",
@@ -336,7 +345,8 @@
       "base": "Basis",
       "target": "Ziel",
       "playbackSequence": "Wiedergabe-Reihenfolge",
-      "playbackSequenceDescription": "Vorschau der Audio-Reihenfolge",
+      "playbackSequenceDescription": "Um die Reihenfolge zu ändern, bearbeite deine Kurssprachen.",
+      "editLanguages": "Sprachen bearbeiten",
       "pauseBaseToBase": "Basis → Basis Pause",
       "pauseBaseToTarget": "Basis → Ziel Pause",
       "pauseTargetToTarget": "Ziel → Ziel Pause",
@@ -466,6 +476,9 @@
     },
     "cardEdits": {
       "name": "Kartenbearbeitungen"
+    },
+    "translationAutoFill": {
+      "name": "Automatische Übersetzung"
     }
   },
   "FeatureTracking": {
@@ -782,6 +795,21 @@
     "cancel": "Abbrechen",
     "save": "Speichern",
     "saving": "Speichern..."
+  },
+  "EnterTexts": {
+    "back": "Zurück",
+    "title": "Eigene Texte eingeben",
+    "description": "Gib deine eigenen Sätze ein.",
+    "noLanguages": "Für diesen Kurs sind keine Sprachen eingestellt. Füge in den Einstellungen Sprachen hinzu, um eigene Texte einzugeben.",
+    "reset": "Zurücksetzen",
+    "inputPlaceholder": "{language}-Text eingeben",
+    "autoFill": "Ausfüllen",
+    "autoFilling": "Übersetze...",
+    "save": "Speichern",
+    "saving": "Speichern...",
+    "saveSuccess": "Text erfolgreich hinzugefügt",
+    "saveError": "Text konnte nicht gespeichert werden. Bitte versuche es erneut.",
+    "autoFillError": "Automatisches Ausfüllen fehlgeschlagen. Bitte versuche es erneut."
   },
   "NotFoundPage": {
     "title": "Seite nicht gefunden",

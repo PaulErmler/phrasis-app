@@ -19,7 +19,13 @@ import { toast } from 'sonner';
 
 const SUPPORT_EMAIL = 'support@flexling.com';
 
-export function ContentView({ onChatOpen }: { onChatOpen: (threadId: string) => void }) {
+export function ContentView({
+  onChatOpen,
+  onEnterTexts,
+}: {
+  onChatOpen: (threadId: string) => void;
+  onEnterTexts: () => void;
+}) {
   const t = useTranslations('AppPage');
   const getOrCreateEmptyThread = useMutation(
     api.features.chat.threads.getOrCreateEmptyThread,
@@ -66,6 +72,22 @@ export function ContentView({ onChatOpen }: { onChatOpen: (threadId: string) => 
           <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
         </button>
 
+        <button
+          onClick={onEnterTexts}
+          className="card-surface p-4 flex items-center gap-4 transition-colors hover:bg-muted/50 w-full text-left"
+        >
+          <div className="p-2.5 rounded-lg bg-primary/10 text-primary shrink-0">
+            <PenLine className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-base leading-none mb-1">
+              {t('content.enterTexts.title')}
+            </h3>
+            <p className="text-muted-sm">{t('content.enterTexts.description')}</p>
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+        </button>
+
         <div className="card-surface p-4 flex items-center gap-4 opacity-50 cursor-not-allowed">
           <div className="p-2.5 rounded-lg bg-muted text-muted-foreground shrink-0">
             <Upload className="h-5 w-5" />
@@ -78,21 +100,6 @@ export function ContentView({ onChatOpen }: { onChatOpen: (threadId: string) => 
               </Badge>
             </h3>
             <p className="text-muted-sm">{t('content.fileUpload.description')}</p>
-          </div>
-        </div>
-
-        <div className="card-surface p-4 flex items-center gap-4 opacity-50 cursor-not-allowed">
-          <div className="p-2.5 rounded-lg bg-muted text-muted-foreground shrink-0">
-            <PenLine className="h-5 w-5" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-base leading-none mb-1 flex items-center gap-2">
-              {t('content.enterTexts.title')}
-              <Badge variant="secondary" className="text-[10px] font-medium">
-                {t('content.comingSoon')}
-              </Badge>
-            </h3>
-            <p className="text-muted-sm">{t('content.enterTexts.description')}</p>
           </div>
         </div>
 

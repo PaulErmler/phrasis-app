@@ -14,7 +14,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
 import type { ReviewMode } from '@/convex/types';
-import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import {
+  getLanguageShortLabel,
+  getLocalizedLanguageNameByCode,
+} from '@/lib/languages';
 import { Check, MousePointer2 } from 'lucide-react';
 import { useLandingDemo } from '@/components/landing/landing-demo-context';
 
@@ -365,11 +368,11 @@ export function ReviewModesDemo() {
                                 <span className="text-xs font-medium text-muted-foreground uppercase">
                                   {label}
                                 </span>
-                                <LandingAudioButton language={tr.language.toUpperCase()} />
+                                <LandingAudioButton language={getLanguageShortLabel(tr.language)} />
                               </div>
                             ) : (
                               <div className="flex justify-end">
-                                <LandingAudioButton language={tr.language.toUpperCase()} />
+                                <LandingAudioButton language={getLanguageShortLabel(tr.language)} />
                               </div>
                             )}
                             <div className="h-9 overflow-hidden">

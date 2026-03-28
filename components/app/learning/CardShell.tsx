@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip';
+import { getLanguageShortLabel } from '@/lib/languages';
 import { AudioButton } from './AudioButton';
 import type { CardTranslation, CardAudioRecording } from './types';
 
@@ -157,7 +158,7 @@ export function CardShell({
                 </div>
                 <AudioButton
                   url={audio?.url ?? null}
-                  language={translation.language.toUpperCase()}
+                  language={getLanguageShortLabel(translation.language)}
                   onPlay={onAudioPlay}
                 />
               </div>

@@ -10,6 +10,7 @@ declare module '@useautumn/sdk' {
   export const transcriptions: Feature;
   export const multiple_languages: Feature;
   export const card_edits: Feature;
+  export const translation_auto_fill: Feature;
 
   // Plans
   export const free: Plan;

@@ -17,7 +17,7 @@ import { MessageResponse } from '@/components/ai-elements/message';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getLanguageByCode } from '@/lib/languages';
+import { getLanguageShortLabel } from '@/lib/languages';
 import { useLandingDemo } from '@/components/landing/landing-demo-context';
 import { MousePointer2 } from 'lucide-react';
 
@@ -38,10 +38,9 @@ type DemoCard = { lines: ProposalLine[] };
 type MultiCardFields = { base: string; hi: string; hiRoman: string; es: string; fr: string };
 
 function LangChip({ code }: { code: string }) {
-  const lang = getLanguageByCode(code);
   return (
     <span className="font-medium text-muted-foreground uppercase text-xs">
-      {lang?.code ?? code}
+      {getLanguageShortLabel(code)}
     </span>
   );
 }

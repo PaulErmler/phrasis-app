@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/accordion';
 import { Layers, Languages } from 'lucide-react';
 import { AudioButton } from '@/components/app/learning/AudioButton';
+import { getLanguageShortLabel } from '@/lib/languages';
 
 export function DeckCardsView() {
   const t = useTranslations('AppPage.deckCards');
@@ -143,9 +144,9 @@ export function DeckCardsView() {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <Badge variant="outline" className="text-xs">
-                            {(
-                              baseTranslation?.language || card.sourceLanguage
-                            ).toUpperCase()}
+                            {getLanguageShortLabel(
+                              baseTranslation?.language || card.sourceLanguage,
+                            )}
                           </Badge>
                           <span className="text-sm font-medium">
                             Base (You know this)
@@ -168,9 +169,9 @@ export function DeckCardsView() {
                         <div className="flex gap-2">
                           <AudioButton
                             url={baseAudio?.url ?? null}
-                            language={(
-                              baseTranslation?.language || card.sourceLanguage
-                            ).toUpperCase()}
+                            language={getLanguageShortLabel(
+                              baseTranslation?.language || card.sourceLanguage,
+                            )}
                             showLabel
                           />
                         </div>
@@ -181,8 +182,11 @@ export function DeckCardsView() {
                         <div className="flex items-center gap-2">
                           <Languages className="h-4 w-4 text-muted-foreground" />
                           <Badge variant="secondary" className="text-xs">
-                            {targetTranslation?.language.toUpperCase() ||
-                              'TARGET'}
+                            {targetTranslation?.language
+                              ? getLanguageShortLabel(
+                                  targetTranslation.language,
+                                )
+                              : 'TARGET'}
                           </Badge>
                           <span className="text-sm font-medium">
                             Target (Learning this)
@@ -204,7 +208,11 @@ export function DeckCardsView() {
                           <AudioButton
                             url={targetAudio?.url ?? null}
                             language={
-                              targetTranslation?.language.toUpperCase() || ''
+                              targetTranslation?.language
+                                ? getLanguageShortLabel(
+                                    targetTranslation.language,
+                                  )
+                                : ''
                             }
                             showLabel
                           />

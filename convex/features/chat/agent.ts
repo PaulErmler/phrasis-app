@@ -5,6 +5,10 @@ import { stepCountIs } from 'ai';
 import { z } from 'zod/v3';
 import type { ToolCallOptions } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import {
+  OPENROUTER_CHAT_EXTRA_BODY,
+  OPENROUTER_MODELS,
+} from '../../config/aiModels';
 
 export const createCardTool = createTool({
   description:
@@ -79,14 +83,8 @@ export const agent: Agent = new Agent(components.agent, {
   name: 'Language Teacher',
   languageModel: createOpenRouter({
     apiKey: process.env.OPENROUTER_API_KEY,
-    extraBody: {
-      provider: {
-        order: ["fireworks"],
-        allow_fallbacks: true
-      }
-    }
-    
-  })('moonshotai/kimi-k2.5:nitro'),
+    extraBody: OPENROUTER_CHAT_EXTRA_BODY,
+  })(OPENROUTER_MODELS.languageTeacher),
 
   instructions: `
 - Every createCard call MUST include a translation for EVERY language in the course. Check the system message for the exact list.

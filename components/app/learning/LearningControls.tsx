@@ -30,9 +30,9 @@ interface LearningControlsProps {
   onReveal?: () => void;
   /** When true, window shortcuts (Space, Enter, ArrowRight, rating keys) are disabled — e.g. settings or edit dialog open. */
   shortcutsDisabled?: boolean;
-  /** Audio review: Enter / ArrowRight reveals all blurred targets before advancing. */
+  /** Audio review: Enter / ArrowRight reveal all blurred targets, then the same keys advance to the next card. */
   isAudioReview?: boolean;
-  /** When false and `isAudioReview`, Enter / ArrowRight reveals targets instead of next. */
+  /** When false and `isAudioReview`, Enter / ArrowRight reveal targets instead of advancing. */
   audioAllTargetsRevealed?: boolean;
   onRevealAllAudioTargets?: () => void;
 }
@@ -255,29 +255,29 @@ export function LearningControls({
             ) : isAudioReview &&
               !audioAllTargetsRevealed &&
               onRevealAllAudioTargets ? (
-              <Button
-                size="sm"
-                onClick={onRevealAllAudioTargets}
-                className="flex-[1] gap-2"
-              >
-                {t('actions.reveal')}
-                <Eye className="h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={() => onNext()}
-                disabled={isReviewing}
-                className="flex-[1] gap-2"
-              >
-                {t('actions.next')}
-                {showSpinner ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ChevronRight className="h-4 w-4" />
-                )}
-              </Button>
-            )}
+                <Button
+                  size="sm"
+                  onClick={onRevealAllAudioTargets}
+                  className="flex-[1] gap-2"
+                >
+                  {t('actions.reveal')}
+                  <Eye className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => onNext()}
+                  disabled={isReviewing}
+                  className="flex-[1] gap-2"
+                >
+                  {t('actions.next')}
+                  {showSpinner ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
           </div>
         </div>
       </div>

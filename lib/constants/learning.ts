@@ -12,5 +12,8 @@ export const ENSURE_CONTENT_LOOKAHEAD = 5;
 /** Re-trigger content pre-generation every N reviews. */
 export const ENSURE_CONTENT_REVIEW_INTERVAL = 4;
 
-/** Maximum character length for any single translation text when editing a card. */
-export const MAX_CARD_TEXT_LENGTH = 100;
+/** Maximum character length for any single translation text (editing and creating cards). */
+export const MAX_CARD_TEXT_LENGTH = 150;
+
+/** In custom text entry, show n/max only when this many or fewer characters remain (or over limit). */
+export const CARD_TEXT_SHOW_COUNT_REMAINING_THRESHOLD = 20;

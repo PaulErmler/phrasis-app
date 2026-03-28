@@ -38,6 +38,8 @@ export function getCollectionDescription(
     B2: 'Sentences with vocabulary at CEFR B2 Level',
     C1: 'Sentences with vocabulary at CEFR C1 Level',
     C2: 'Sentences with vocabulary at CEFR C2 Level',
+    Chat: 'Phrases and vocabulary from the chat',
+    Custom: 'Sentences you entered yourself',
   };
   return descriptions[name] ?? `${name} collection`;
 }

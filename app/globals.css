@@ -105,8 +105,9 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  --overlay: rgba(0, 0, 0, 0.5);
-  /* driver.js: opaque fill + this opacity (avoid var(--overlay) in SVG + default 0.7 stack) */
+  /* Dialogs, sheets, drawers, alert dialogs — single scrim tuned per theme */
+  --popup-overlay: oklch(0 0 0 / 0.28);
+  /* driver.js: opaque fill + this opacity (avoid CSS vars in SVG + default 0.7 stack) */
   --driver-overlay-opacity: 0.5;
 }
 
@@ -154,7 +155,8 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
-  --overlay: rgba(0, 0, 0, 0.7);
+  /* Dark UI needs slightly higher alpha so the scrim reads like light mode */
+  --popup-overlay: oklch(0 0 0 / 0.48);
   --driver-overlay-opacity: 0.7;
 }
 

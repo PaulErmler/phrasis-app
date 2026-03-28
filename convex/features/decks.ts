@@ -3,6 +3,7 @@ import {
   mutation,
   query,
   internalMutation,
+  internalQuery,
   internalAction,
   MutationCtx,
 } from '../_generated/server';
@@ -366,10 +367,17 @@ export const getCustomCollectionsProgress = query({
     const courseId = settings.activeCourseId;
     const courseSettings = await getCourseSettings(ctx, courseId);
 
-    // Collect course-specific custom collection IDs
+    // Collect course-specific custom collection IDs (chat-approved + manually entered)
     const customCollectionIds: Id<'collections'>[] = [];
-    if (courseSettings?.chatCollectionId) {
-      customCollectionIds.push(courseSettings.chatCollectionId);
+    const seen = new Set<string>();
+    for (const id of [
+      courseSettings?.chatCollectionId,
+      courseSettings?.customCollectionId,
+    ]) {
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        customCollectionIds.push(id);
+      }
     }
 
     if (customCollectionIds.length === 0) return [];
@@ -414,7 +422,7 @@ export const getNextTextsFromCollection = query({
     v.object({
       _id: v.id('texts'),
       text: v.string(),
-      collectionRank: v.optional(v.number()),
+      collectionRank: v.number(),
     }),
   ),
   handler: async (ctx, args) => {
@@ -440,11 +448,17 @@ export const getNextTextsFromCollection = query({
     );
     const lastRankProcessed = progress?.lastRankProcessed ?? 0;
 
+    const collection = await ctx.db.get(args.collectionId);
+    const isLevelCollection = collection
+      ? (LEVEL_ORDER as readonly string[]).includes(collection.name)
+      : false;
+
     const texts = await getNextTextsFromRank(
       ctx,
       args.collectionId,
       lastRankProcessed,
       maxTexts,
+      isLevelCollection ? { onlyCurriculum: true } : { forUserId: userId },
     );
 
     return texts.map((t) => ({
@@ -576,10 +590,7 @@ export async function createCardsFromTexts(
   let newLastRank = 0;
 
   for (const text of texts) {
-    if (
-      text.collectionRank !== undefined &&
-      text.collectionRank > newLastRank
-    ) {
+    if (text.collectionRank > newLastRank) {
       newLastRank = text.collectionRank;
     }
 
@@ -730,7 +741,7 @@ export const addCardsFromCollection = mutation({
           const count = allocations.get(entry.id.toString()) ?? 0;
           if (count === 0) continue;
 
-          const texts = await getNextTextsFromRank(ctx, entry.id, entry.lastRank, count);
+          const texts = await getNextTextsFromRank(ctx, entry.id, entry.lastRank, count, { forUserId: userId });
           if (texts.length === 0) continue;
 
           const { cardsInserted, newLastRank } = await createCardsFromTexts(
@@ -754,7 +765,7 @@ export const addCardsFromCollection = mutation({
 
           const customFinalRank = Math.max(entry.lastRank, newLastRank);
           const upcomingCustomTexts = await getNextTextsFromRank(
-            ctx, entry.id, customFinalRank, CONTENT_LOOKAHEAD_SIZE,
+            ctx, entry.id, customFinalRank, CONTENT_LOOKAHEAD_SIZE, { forUserId: userId },
           );
           for (const text of upcomingCustomTexts) {
             await ctx.scheduler.runAfter(
@@ -801,6 +812,7 @@ export const addCardsFromCollection = mutation({
         args.collectionId,
         lastRankProcessed,
         remainingBatch,
+        { onlyCurriculum: true },
       );
 
       if (textsToAdd.length > 0) {
@@ -844,6 +856,7 @@ export const addCardsFromCollection = mutation({
           args.collectionId,
           finalLastRank,
           CONTENT_LOOKAHEAD_SIZE,
+          { onlyCurriculum: true },
         );
 
         for (const text of upcomingTexts) {
@@ -1028,6 +1041,36 @@ export const prepareCardContent = internalMutation({
 });
 
 /**
+ * Internal query: translation row for idempotency before calling Google Translate.
+ */
+export const getTranslationForTextLanguage = internalQuery({
+  args: {
+    textId: v.id('texts'),
+    targetLanguage: v.string(),
+  },
+  returns: v.union(
+    v.null(),
+    v.object({
+      translatedText: v.string(),
+      romanizedText: v.optional(v.string()),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const row = await ctx.db
+      .query('translations')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
+      )
+      .first();
+    if (!row) return null;
+    return {
+      translatedText: row.translatedText,
+      romanizedText: row.romanizedText,
+    };
+  },
+});
+
+/**
  * Internal action to process translation for a card.
  */
 export const processTranslationForCard = internalAction({
@@ -1040,21 +1083,44 @@ export const processTranslationForCard = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      const translation = await translateText(
-        args.text,
-        args.sourceLanguage,
-        args.targetLanguage,
+      const existingRow = await ctx.runQuery(
+        internal.features.decks.getTranslationForTextLanguage,
+        {
+          textId: args.textId,
+          targetLanguage: args.targetLanguage,
+        },
       );
-      const voiceName = getRandomVoiceForLanguage(args.targetLanguage);
 
+      let translation: string;
       let romanizedText: string | undefined;
-      if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
-        try {
-          romanizedText = await romanizeText(translation, args.targetLanguage);
-        } catch (err) {
-          console.error('Romanization error (non-fatal):', err);
+
+      if (existingRow) {
+        translation = existingRow.translatedText;
+        if (ROMANIZATION_LANGUAGES.has(args.targetLanguage) && !existingRow.romanizedText) {
+          try {
+            romanizedText = await romanizeText(translation, args.targetLanguage);
+          } catch (err) {
+            console.error('Romanization error (non-fatal):', err);
+          }
+        } else {
+          romanizedText = existingRow.romanizedText;
+        }
+      } else {
+        translation = await translateText(
+          args.text,
+          args.sourceLanguage,
+          args.targetLanguage,
+        );
+        if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
+          try {
+            romanizedText = await romanizeText(translation, args.targetLanguage);
+          } catch (err) {
+            console.error('Romanization error (non-fatal):', err);
+          }
         }
       }
+
+      const voiceName = getRandomVoiceForLanguage(args.targetLanguage);
 
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,

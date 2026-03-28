@@ -78,10 +78,7 @@ export const batchUpsertTexts = internalMutation({
 
       if (existing) {
         // If text is moving to a different collection, adjust both counts
-        if (
-          existing.collectionId &&
-          existing.collectionId !== textData.collectionId
-        ) {
+        if (existing.collectionId !== textData.collectionId) {
           await adjustCollectionTextCount(ctx, existing.collectionId, -1);
           await adjustCollectionTextCount(ctx, textData.collectionId, +1);
         }

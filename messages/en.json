@@ -175,7 +175,8 @@
           "B2": "CEFR B2 — words ranked ~3,500-5000 by frequency",
           "C1": "CEFR C1 — learn the 5,000–8,000 most common words",
           "C2": "CEFR C2 — words ranked 8,000+ by frequency",
-          "Chat": "Phrases and vocabulary from the chat"
+          "Chat": "Phrases and vocabulary from the chat",
+          "Custom": "Sentences you entered yourself"
         },
         "detail": {
           "totalCards": "{count} cards",
@@ -290,6 +291,8 @@
     "accuracy": "Accuracy",
     "showSentence": "Show sentence",
     "showCorrections": "Show corrections",
+    "revertSubmission": "Revert submission",
+    "revertSubmissionTooltip": "Undo submit. Shortcut: Left Arrow.",
     "typeTranslation": "Type the translation...",
     "empty": {
       "noCardsDue": "No cards due for review",
@@ -306,6 +309,12 @@
       "iconFavorite": "Mark card as a favorite",
       "iconMaster": "Mark card as mastered (won't appear again after next review)",
       "iconHide": "Hide card (won't appear again after next review)",
+      "iconEdit": "Edit the phrase text on this card",
+      "shortcuts": "Shortcuts",
+      "shortcutRating": "Keys 1–4 for rating.",
+      "shortcutPause": "Space bar to pause audio.",
+      "shortcutReveal": "Enter or right arrow to reveal hidden content or go to the next card.",
+      "shortcutRevertSubmission": "Left arrow to undo your last submitted translation (full review).",
       "cardsPerBatch": "Cards per batch",
       "cardsPerBatchDescription": "Number of cards to add at once",
       "reviewSettings": "Review Settings",
@@ -336,7 +345,8 @@
       "base": "Base",
       "target": "Target",
       "playbackSequence": "Playback Sequence",
-      "playbackSequenceDescription": "Preview of the audio playback order",
+      "playbackSequenceDescription": "To change the order, edit your course languages.",
+      "editLanguages": "Edit Languages",
       "pauseBaseToBase": "Base → Base Pause",
       "pauseBaseToTarget": "Base → Target Pause",
       "pauseTargetToTarget": "Target → Target Pause",
@@ -466,6 +476,9 @@
     },
     "cardEdits": {
       "name": "Card Edits"
+    },
+    "translationAutoFill": {
+      "name": "Translation Auto-Fill"
     }
   },
   "FeatureTracking": {
@@ -713,6 +726,21 @@
     "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving..."
+  },
+  "EnterTexts": {
+    "back": "Back",
+    "title": "Enter Your Own Texts",
+    "description": "Type in your custom sentences.",
+    "noLanguages": "This course has no languages configured. Add languages in settings to enter custom text.",
+    "reset": "Reset",
+    "inputPlaceholder": "Enter {language} text",
+    "autoFill": "Auto-fill",
+    "autoFilling": "Translating...",
+    "save": "Save",
+    "saving": "Saving...",
+    "saveSuccess": "Text added successfully",
+    "saveError": "Failed to save text. Please try again.",
+    "autoFillError": "Auto-fill failed. Please try again."
   },
   "NotFoundPage": {
     "title": "Page not found",

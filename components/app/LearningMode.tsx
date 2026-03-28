@@ -158,6 +158,8 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         allRevealed={fullReviewRevealed}
         onAllSubmittedChange={setAllSubmitted}
         showRomanization={state.courseSettings.showRomanization ?? true}
+        cardId={state.cardId}
+        shortcutsDisabled={state.settingsOpen || editDialogOpen}
       />
     ) : (
       <LearningCardContent
