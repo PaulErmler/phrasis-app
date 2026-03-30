@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCustomer, usePricingTable } from "autumn-js/react";
+import { findUpgradeProductFromPricingTable } from "@/lib/autumn/find-upgrade-product";
 import { getFeatureI18nKey, isFeatureConsumable } from "@/lib/features/feature-meta";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
@@ -40,13 +41,12 @@ export default function LowQuotaDialog({
   const featureName = tFeatures(`${featureI18nKey}.name`);
   const consumable = isFeatureConsumable(featureId);
 
-  const upgradeProduct = products?.find((p) => {
-    if (p.scenario !== "upgrade" && !(p.scenario === "new" && !p.properties?.is_free)) return false;
-    const featureItem = p.items.find((i) => i.feature_id === featureId);
-    if (!featureItem) return false;
-    if (featureItem.included_usage === "inf") return true;
-    return typeof featureItem.included_usage === "number" && featureItem.included_usage > included;
-  });
+  const upgradeProduct = findUpgradeProductFromPricingTable(
+    products,
+    featureId,
+    included,
+    consumable,
+  );
 
   const handleUpgrade = async () => {
     if (!upgradeProduct) return;

@@ -10,7 +10,14 @@ import {
   getUserSettings as dbGetUserSettings,
   getOnboardingProgress as dbGetOnboardingProgress,
 } from '../db/users';
-import { getCoursesForUser, getActiveCourseForUser } from '../db/courses';
+import {
+  getCoursesForUser,
+  getActiveCourseForUser,
+  getActiveCourseCount,
+  getTotalCourseCount,
+  getCourseQuotaSnapshot,
+  getActiveCourses,
+} from '../db/courses';
 import {
   getCourseSettings as dbGetCourseSettings,
   upsertCourseSettings,
@@ -22,7 +29,8 @@ import {
   getPreviousDay,
 } from '../db/courseStats';
 import { getDailyStats } from '../db/dailyStats';
-import { consumeQuota, hasFeatureAccess } from '../usage/helpers';
+import { consumeQuota, hasFeatureAccess, releaseQuota } from '../usage/helpers';
+import { MAX_COURSES_PER_USER, ARCHIVE_COOLDOWN_MS } from '../../lib/constants/courses';
 import { FEATURE_IDS } from './featureIds';
 import {
   DEFAULT_INITIAL_REVIEW_COUNT,
@@ -62,6 +70,17 @@ async function validateLanguageLimits(
     throw new ConvexError(`Maximum ${maxPerGroup} target languages allowed`);
   if (baseLanguages.length + targetLanguages.length > maxTotal)
     throw new ConvexError(`Maximum ${maxTotal} languages total allowed`);
+}
+
+/** Independent hard cap safeguard, separate from plan quota accounting. */
+async function enforceCourseHardCap(ctx: MutationCtx, userId: string) {
+  const totalCount = await getTotalCourseCount(ctx, userId);
+  if (totalCount >= MAX_COURSES_PER_USER) {
+    throw new ConvexError({
+      code: 'HARD_COURSE_LIMIT',
+      message: `Maximum of ${MAX_COURSES_PER_USER} courses reached.`,
+    });
+  }
 }
 
 // ============================================================================
@@ -109,16 +128,85 @@ export const getUserCourses = query({
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
       currentLevel: v.optional(currentLevelValidator),
+      isArchived: v.optional(v.boolean()),
+      archivedAt: v.optional(v.number()),
     }),
   ),
   handler: async (ctx) => {
     try {
       const userId = await getAuthUserId(ctx);
       if (!userId) return [];
-      return getCoursesForUser(ctx, userId);
+      const courses = await getCoursesForUser(ctx, userId);
+      // Active courses first, archived at the bottom
+      return courses.sort((a, b) => {
+        const aArchived = a.isArchived === true ? 1 : 0;
+        const bArchived = b.isArchived === true ? 1 : 0;
+        return aArchived - bArchived;
+      });
     } catch {
       return [];
     }
+  },
+});
+
+/**
+ * Course quota info for the UI. `limit` is plan `included`; gating uses
+ * tracked `balance` / `unlimited`.
+ */
+export const getCourseQuotaInfo = query({
+  args: {},
+  returns: v.object({
+    activeCount: v.number(),
+    /** Plan cap (Autumn granted). */
+    limit: v.number(),
+    balance: v.number(),
+    unlimited: v.boolean(),
+    totalCount: v.number(),
+    canCreate: v.boolean(),
+    maxCourses: v.number(),
+  }),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId)
+      return {
+        activeCount: 0,
+        limit: 1,
+        balance: 0,
+        unlimited: false,
+        totalCount: 0,
+        canCreate: false,
+        maxCourses: MAX_COURSES_PER_USER,
+      };
+
+    const [activeCount, totalCount, quota] = await Promise.all([
+      getActiveCourseCount(ctx, userId),
+      getTotalCourseCount(ctx, userId),
+      getCourseQuotaSnapshot(ctx, userId),
+    ]);
+
+    if (!quota) {
+      return {
+        activeCount,
+        limit: 1,
+        balance: 0,
+        unlimited: false,
+        totalCount,
+        canCreate: false,
+        maxCourses: MAX_COURSES_PER_USER,
+      };
+    }
+
+    return {
+      activeCount,
+      limit: quota.included,
+      balance: quota.balance,
+      unlimited: quota.unlimited,
+      totalCount,
+      canCreate:
+        (quota.unlimited || quota.balance > 0) &&
+        totalCount < MAX_COURSES_PER_USER,
+      maxCourses: MAX_COURSES_PER_USER,
+    };
   },
 });
 
@@ -135,6 +223,8 @@ export const getActiveCourse = query({
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
       currentLevel: v.optional(currentLevelValidator),
+      isArchived: v.optional(v.boolean()),
+      archivedAt: v.optional(v.number()),
     }),
     v.null(),
   ),
@@ -145,15 +235,16 @@ export const getActiveCourse = query({
 
       const settings = await dbGetUserSettings(ctx, userId);
       if (!settings?.activeCourseId) {
-        // If no active course is set, return the first course
-        const firstCourse = await ctx.db
-          .query('courses')
-          .withIndex('by_userId', (q) => q.eq('userId', userId))
-          .first();
-        return firstCourse;
+        const courses = await getCoursesForUser(ctx, userId);
+        return courses.find((c) => c.isArchived !== true) ?? null;
       }
 
-      return ctx.db.get(settings.activeCourseId);
+      const course = await ctx.db.get(settings.activeCourseId);
+      if (!course || course.isArchived === true) {
+        const courses = await getCoursesForUser(ctx, userId);
+        return courses.find((c) => c.isArchived !== true) ?? null;
+      }
+      return course;
     } catch {
       return null;
     }
@@ -280,6 +371,8 @@ export const setActiveCourse = mutation({
     if (!course) throw new ConvexError('Course not found');
     if (course.userId !== userId)
       throw new ConvexError('Course does not belong to user');
+    if (course.isArchived === true)
+      throw new ConvexError('Cannot select an archived course');
 
     const existingSettings = await dbGetUserSettings(ctx, userId);
     if (existingSettings) {
@@ -295,6 +388,101 @@ export const setActiveCourse = mutation({
     }
 
     return null;
+  },
+});
+
+/**
+ * Archive a course. Releases an active-course slot.
+ */
+export const archiveCourse = mutation({
+  args: { courseId: v.id('courses') },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new ConvexError('Course not found');
+    if (course.userId !== userId)
+      throw new ConvexError('Course does not belong to user');
+    if (course.isArchived === true)
+      throw new ConvexError('Course is already archived');
+
+    await ctx.db.patch(args.courseId, {
+      isArchived: true,
+      archivedAt: Date.now(),
+    });
+    await releaseQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
+
+    const settings = await dbGetUserSettings(ctx, userId);
+    if (settings?.activeCourseId === args.courseId) {
+      const remaining = await getActiveCourses(ctx, userId);
+      const next = remaining.find((c) => c._id !== args.courseId);
+      await ctx.db.patch(settings._id, {
+        activeCourseId: next?._id,
+      });
+    }
+
+    return null;
+  },
+});
+
+/**
+ * Unarchive a course after the 30-day cooldown if quota allows.
+ */
+export const unarchiveCourse = mutation({
+  args: { courseId: v.id('courses') },
+  returns: v.union(
+    v.object({ status: v.literal('success') }),
+    v.object({
+      status: v.literal('cooldown'),
+      readyAt: v.number(),
+    }),
+    v.object({ status: v.literal('usage_limit') }),
+  ),
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+
+    const course = await ctx.db.get(args.courseId);
+    if (!course) throw new ConvexError('Course not found');
+    if (course.userId !== userId)
+      throw new ConvexError('Course does not belong to user');
+    if (course.isArchived !== true)
+      throw new ConvexError('Course is not archived');
+
+    if (course.archivedAt) {
+      const elapsed = Date.now() - course.archivedAt;
+      if (elapsed < ARCHIVE_COOLDOWN_MS) {
+        return {
+          status: 'cooldown',
+          readyAt: course.archivedAt + ARCHIVE_COOLDOWN_MS,
+        } as const;
+      }
+    }
+
+    await enforceCourseHardCap(ctx, userId);
+
+    try {
+      await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
+    } catch (error) {
+      if (
+        error instanceof ConvexError &&
+        typeof error.data === 'object' &&
+        error.data !== null
+      ) {
+        const code = (error.data as { code?: string }).code;
+        if (code === 'USAGE_LIMIT' || code === 'QUOTA_NOT_SYNCED') {
+          return { status: 'usage_limit' } as const;
+        }
+      }
+      throw error;
+    }
+
+    await ctx.db.patch(args.courseId, {
+      isArchived: undefined,
+      archivedAt: undefined,
+    });
+
+    return { status: 'success' } as const;
   },
 });
 
@@ -371,6 +559,7 @@ export const createCourse = mutation({
       args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
     validateInitialReviewCount(initialReviewCount);
 
+    await enforceCourseHardCap(ctx, userId);
     await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
 
     const courseId = await ctx.db.insert('courses', {
@@ -429,6 +618,7 @@ export const completeOnboarding = mutation({
     const baseLanguages = progress.baseLanguages || [];
     await validateLanguageLimits(ctx, userId, baseLanguages, targetLanguages);
 
+    await enforceCourseHardCap(ctx, userId);
     await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
 
     const courseId = await ctx.db.insert('courses', {

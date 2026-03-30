@@ -224,6 +224,12 @@ export default function MainLayout({
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  const hasActiveCourse = !!activeCourse;
+
+  const handleOpenCourseMenu = useCallback(() => {
+    setCourseMenuOpen(true);
+  }, []);
+
   const courseButtonLabel = activeCourse
     ? t('currentCourseWithLanguages', {
       targetLanguages: activeCourse.targetLanguages
@@ -326,6 +332,8 @@ export default function MainLayout({
             onTutorialReady={handleTutorialReady}
             animateEntrance={justReturnedFromLearn}
             isHidden={isLearnOpen || activeView !== 'home'}
+            hasActiveCourse={hasActiveCourse}
+            onOpenCourseMenu={handleOpenCourseMenu}
           />
         </div>
         <div
@@ -342,10 +350,17 @@ export default function MainLayout({
             <ContentView
               onChatOpen={handleOpenChat}
               onEnterTexts={() => router.push('/app/content/add-cards')}
+              hasActiveCourse={hasActiveCourse}
+              onOpenCourseMenu={handleOpenCourseMenu}
             />
           )}
         </div>
-        {!isLearnOpen && activeView === 'library' && <LibraryView />}
+        {!isLearnOpen && activeView === 'library' && (
+          <LibraryView
+            hasActiveCourse={hasActiveCourse}
+            onOpenCourseMenu={handleOpenCourseMenu}
+          />
+        )}
         <div
           style={{
             display:

@@ -39,6 +39,11 @@
       "library": "Library",
       "settings": "Settings"
     },
+    "noCourse": {
+      "title": "No active course",
+      "description": "Create or unarchive a course to get started.",
+      "action": "Open Courses"
+    },
     "loading": "Loading...",
     "help": {
       "title": "Need Help?",
@@ -67,10 +72,10 @@
       "testMessage": "Time to practice your phrases! 🌟"
     },
     "flashcards": {
-      "title": "Flashcards",
-      "description": "Practice your phrases with interactive flashcards.",
-      "goToFlashcard": "Go to Flashcards",
-      "goToAudioFlashcard": "Go to Audio Flashcards"
+      "title": "Sentences",
+      "description": "Practice your phrases one sentence at a time — interactive and structured.",
+      "goToFlashcard": "Go to Sentences",
+      "goToAudioFlashcard": "Go to Audio Sentences"
     },
     "randomNumber": {
       "title": "Random Numbers",
@@ -83,16 +88,16 @@
     "content": {
       "chat": {
         "title": "Chat",
-        "description": "Let a chatbot create flashcards for you",
+        "description": "Let a chatbot create sentences for you",
         "openError": "Could not open chat. Check your connection and try again."
       },
       "fileUpload": {
         "title": "File Upload",
-        "description": "Upload documents to generate flashcards from your own content"
+        "description": "Upload documents to generate sentences from your own content"
       },
       "enterTexts": {
         "title": "Enter Your Own Texts",
-        "description": "Type or paste sentences to create custom flashcards"
+        "description": "Type or paste text to create your own sentences"
       },
       "comingSoon": "Coming Soon",
       "feedback": {
@@ -104,20 +109,20 @@
     "librarySoon": "Coming Soon: Manage and organize your saved phrases.",
     "library": {
       "title": "Library",
-      "searchPlaceholder": "Search cards...",
+      "searchPlaceholder": "Search sentences...",
       "filterMastered": "Mastered",
       "filterHidden": "Hidden",
       "filterFavorites": "Favorites",
       "filtersLabel": "Filters",
-      "emptyTitle": "No cards yet",
-      "emptyDescription": "Add cards from a collection to start building your library.",
+      "emptyTitle": "No sentences yet",
+      "emptyDescription": "Add sentences from a collection to start building your library.",
       "emptySearchTitle": "No results",
-      "emptySearchDescription": "No cards match your search or filters.",
+      "emptySearchDescription": "No sentences match your search or filters.",
       "unhide": "Unhide",
       "hide": "Hide",
       "master": "Master",
       "unmaster": "Unmaster",
-      "loadingCards": "Loading cards..."
+      "loadingCards": "Loading sentences..."
     },
     "settings": {
       "account": "Account",
@@ -136,6 +141,9 @@
       }
     },
     "deckCards": {
+      "baseLabel": "Base (You know this)",
+      "targetLabel": "Target (Learning this)",
+      "translating": "Translating...",
       "statusFavorite": "Favorite",
       "statusMastered": "Mastered",
       "statusHidden": "Hidden",
@@ -153,42 +161,42 @@
         "select": "Select",
         "selected": "Selected",
         "done": "Done",
-        "cards": "{count} cards",
+        "cards": "{count, plural, one {# sentence} other {# sentences}}",
         "notStarted": "Not started",
-        "addCards": "Add {count} cards to deck",
+        "addCards": "Add {count, plural, one {# sentence} other {# sentences}} to deck",
         "adding": "Adding...",
         "complete": "Done",
         "collectionComplete": "{name} complete!",
-        "allCardsAdded": "All cards from this collection have been added to your deck.",
-        "noMoreCards": "No more cards to add from {name}",
-        "nextCards": "Next {count} cards from {name}",
+        "allCardsAdded": "All sentences from this collection have been added to your deck.",
+        "noMoreCards": "No more sentences to add from {name}",
+        "nextCards": "{count, plural, one {Next sentence from {name}} other {Next {count} sentences from {name}}}",
         "progress": "{added} / {total}",
         "failedToSelect": "Failed to select collection",
-        "failedToAdd": "Failed to add cards",
-        "cardsAdded": "Added {count} cards to your deck",
-        "noCardsToAdd": "No more cards to add from this collection",
+        "failedToAdd": "Failed to add sentences",
+        "cardsAdded": "{count, plural, one {Added # sentence to your deck} other {Added # sentences to your deck}}",
+        "noCardsToAdd": "No more sentences to add from this collection",
         "descriptions": {
           "Essential": "The most essential survival sentences",
           "A1": "CEFR A1 — learn the 500 most common words",
-          "A2": "CEFR A2 — words ranked ~500-2,000 by frequency",
-          "B1": "CEFR B1 — words ranked ~2000-3,500 by frequency",
-          "B2": "CEFR B2 — words ranked ~3,500-5000 by frequency",
-          "C1": "CEFR C1 — learn the 5,000–8,000 most common words",
-          "C2": "CEFR C2 — words ranked 8,000+ by frequency",
+          "A2": "CEFR A2 — roughly the 500–2,000 most common words",
+          "B1": "CEFR B1 — roughly the 2,000–3,500 most common words",
+          "B2": "CEFR B2 — roughly the 3,500–5,000 most common words",
+          "C1": "CEFR C1 — roughly the 5,000–8,000 most common words",
+          "C2": "CEFR C2 — the 8,000+ most common words",
           "Chat": "Phrases and vocabulary from the chat",
           "Custom": "Sentences you entered yourself"
         },
         "detail": {
-          "totalCards": "{count} cards",
+          "totalCards": "{count, plural, one {# sentence} other {# sentences}}",
           "progress": "Progress",
           "select": "Select",
           "selected": "Selected",
           "done": "Done",
-          "allCardsAdded": "All cards from this collection have been added to your deck.",
+          "allCardsAdded": "All sentences from this collection have been added to your deck.",
           "nextSentences": "Next Sentences",
           "adding": "Adding...",
           "addN": "Add {count}",
-          "noMoreCards": "No more cards to add"
+          "noMoreCards": "No more sentences to add"
         }
       }
     },
@@ -230,7 +238,7 @@
         "baseLanguages": "Base Languages",
         "addLanguage": "Add Language",
         "noMoreAvailable": "No more languages available",
-        "infoText": "Once you have added at least 3 languages, drag and drop to reorder them. Once saved, languages cannot be removed. You can add up to {max} languages total.",
+        "infoText": "Drag and drop languages to reorder them. Once saved, languages cannot be removed. You can add up to {max} languages total.",
         "saveChanges": "Save Changes",
         "confirmTitle": "Confirm changes",
         "confirmAdding": "Adding {languages}. This cannot be undone.",
@@ -240,8 +248,25 @@
         "warningBase": "You need at least one base language.",
         "warningTarget": "You need at least one target language.",
         "upgradeForMoreLanguages": "Upgrade your plan to add more than 2 languages per course.",
-        "saveFailed": "Failed to save changes. Please try again."
-      }
+        "saveFailed": "Failed to save changes. Please try again.",
+        "archiveSectionTitle": "Course management",
+        "archiveCourse": "Archive Course",
+        "archiveConfirmTitle": "Archive this course?",
+        "archiveConfirmDescription": "This course will be archived. Archiving frees up a slot so you can create a new course. You can unarchive it after 30 days.",
+        "archiveConfirmButton": "Archive",
+        "archiveCancel": "Cancel"
+      },
+      "archived": "Archived",
+      "unarchive": "Unarchive",
+      "unarchiveConfirmTitle": "Unarchive this course?",
+      "unarchiveConfirmDescription": "This course will become active again if you have a free active-course slot.",
+      "unarchiveConfirmButton": "Unarchive",
+      "unarchiveCooldown": "You can unarchive this course after {date}.",
+      "unarchiveNoSlot": "You've reached the maximum number of active courses. Upgrade your plan or archive another course first.",
+      "hardLimitReached": "Maximum of {max} courses reached.",
+      "activeSlotReachedTitle": "Active Course Limit Reached",
+      "activeSlotReachedDescription": "You've reached your active course limit. Archive an existing course to free up a slot, or upgrade your plan for more active courses.",
+      "cancel": "Cancel"
     },
     "changeCourse": "Change Course",
     "currentCourseWithLanguages": "Current Course: {targetLanguages}",
@@ -295,36 +320,36 @@
     "revertSubmissionTooltip": "Undo submit. Shortcut: Left Arrow.",
     "typeTranslation": "Type the translation...",
     "empty": {
-      "noCardsDue": "No cards due for review",
-      "addCards": "Add {count} cards",
+      "noCardsDue": "No sentences due for review",
+      "addCards": "{count, plural, one {Add # sentence} other {Add # sentences}}",
       "adding": "Adding...",
       "noCollection": "No collection selected",
       "goHome": "Go to Home",
-      "allDone": "All caught up! Add more cards to continue learning.",
-      "noCardsInDeck": "No cards in your deck yet. Add cards from a collection to start learning."
+      "allDone": "All caught up! Add more sentences to continue learning.",
+      "noCardsInDeck": "No sentences in your deck yet. Add sentences from a collection to start learning."
     },
     "settingsPanel": {
       "title": "Learning Settings",
-      "iconLegend": "Card Icons",
-      "iconFavorite": "Mark card as a favorite",
-      "iconMaster": "Mark card as mastered (won't appear again after next review)",
-      "iconHide": "Hide card (won't appear again after next review)",
-      "iconEdit": "Edit the phrase text on this card",
+      "iconLegend": "Sentence icons",
+      "iconFavorite": "Mark sentence as a favorite",
+      "iconMaster": "Mark sentence as mastered (won't appear again after next review)",
+      "iconHide": "Hide sentence (won't appear again after next review)",
+      "iconEdit": "Edit the phrase text on this sentence",
       "shortcuts": "Shortcuts",
       "shortcutRating": "Keys 1–4 for rating.",
       "shortcutPause": "Space bar to pause audio.",
-      "shortcutReveal": "Enter or right arrow to reveal hidden content or go to the next card.",
+      "shortcutReveal": "Enter or right arrow to reveal hidden content or go to the next sentence.",
       "shortcutRevertSubmission": "Left arrow to undo your last submitted translation (full review).",
-      "cardsPerBatch": "Cards per batch",
-      "cardsPerBatchDescription": "Number of cards to add at once",
+      "cardsPerBatch": "Sentences per batch",
+      "cardsPerBatchDescription": "Number of sentences to add at once",
       "reviewSettings": "Review Settings",
-      "autoAddCards": "Auto-add cards",
-      "autoAddCardsDescription": "Automatically add new cards when none are due",
+      "autoAddCards": "Auto-add sentences",
+      "autoAddCardsDescription": "Automatically add new sentences when none are due",
       "initialReviews": "Initial reviews",
-      "initialReviewsDescription": "Number of initial reviews for new cards",
+      "initialReviewsDescription": "Number of initial reviews for new sentences",
       "audioPlayback": "Audio Playback",
       "autoPlay": "Auto-play audio",
-      "autoPlayDescription": "Auto-play audio when a card is shown",
+      "autoPlayDescription": "Auto-play audio when a sentence is shown",
       "uiSettings": "UI Settings",
       "showProgressBar": "Progress bar",
       "showProgressBarDescription": "Show the audio progress bar and seek controls",
@@ -338,7 +363,7 @@
       "autoAdvanceDescription": "Advance to next card after audio finishes",
       "pauseBeforeAutoAdvance": "Before Advancing",
       "repetitions": "Repetitions",
-      "repetitionsDescription": "How many times each language is played per card",
+      "repetitionsDescription": "How many times each language is played per sentence",
       "plays": "Plays",
       "pause": "Pause",
       "pauseBetweenRepetitions": "Pause between repetitions",
@@ -350,7 +375,7 @@
       "pauseBaseToBase": "Base → Base Pause",
       "pauseBaseToTarget": "Base → Target Pause",
       "pauseTargetToTarget": "Target → Target Pause",
-      "autoAdvanceIndicator": "Auto-advance to next card",
+      "autoAdvanceIndicator": "Auto-advance to next sentence",
       "noAutoAdvance": "Manual advance (tap Next)",
       "allSkipped": "All languages set to 0 plays",
       "seconds": "s",
@@ -358,7 +383,7 @@
       "pauseBetweenPlays": "{seconds}s between",
       "reviewModeAudio": "Audio",
       "reviewModeFull": "Full Review",
-      "reviewModeAudioDescription": "Listen to audio playback of your phrases. No need to look at the screen and manually rate the cards. Ideal for learning without looking at the screen — practice on the go while walking, commuting, or relaxing.",
+      "reviewModeAudioDescription": "Listen to audio playback of your phrases. No need to look at the screen and manually rate sentences. Ideal for learning without looking at the screen — practice on the go while walking, commuting, or relaxing.",
       "reviewModeFullDescription": "Type the translations and see a character-level comparison with the correct answer. Best for active practice — engages recall and spelling.",
       "fullReviewSettings": "Full Review Settings",
       "fullReviewTargetAudio": "Auto-play target audio",
@@ -366,7 +391,7 @@
       "fullReviewTargetAudio_always": "After base audio",
       "fullReviewTargetAudio_afterSubmit": "After submitting text",
       "instantProceed": "Instant proceed on rating",
-      "instantProceedDescription": "Advance to the next card immediately when a rating button is clicked"
+      "instantProceedDescription": "Advance to the next sentence immediately when a rating button is clicked"
     }
   },
   "Footer": {
@@ -396,8 +421,8 @@
     "emptyTitle": "Your language tutor",
     "aiNotice": "You are chatting with an AI assistant. It can make mistakes — always verify important information.",
     "emptyBullet1": "Ask about vocabulary, grammar, or any sentence.",
-    "emptyBullet2": "The chat knows the card you are currently learning.",
-    "emptyBullet3": "It can create flashcards for you — you just confirm them.",
+    "emptyBullet2": "The chat knows the sentence you are currently learning.",
+    "emptyBullet3": "It can create sentences for you — you just confirm them.",
     "input": {
       "placeholder": "What would you like to know?",
       "prompts": {
@@ -410,7 +435,7 @@
     "suggestions": {
       "grammar": "Explain me the grammar of this sentence word by word.",
       "simpler": "How can I say this simpler?",
-      "moreCards": "Create more cards using these verbs."
+      "moreCards": "Create more sentences using these verbs."
     },
     "voice": {
       "startRecording": "Start recording",
@@ -427,13 +452,13 @@
       "failedToCreateThread": "Failed to create new conversation"
     },
     "cardApproval": {
-      "approveButton": "Add Card",
+      "approveButton": "Add Sentence",
       "rejectButton": "Reject",
-      "approved": "Card added!",
-      "rejected": "Card creation cancelled",
+      "approved": "Sentence added!",
+      "rejected": "Sentence creation cancelled",
       "loading": "Loading...",
-      "creatingApproval": "Creating card...",
-      "failed": "Card creation failed"
+      "creatingApproval": "Creating sentence...",
+      "failed": "Sentence creation failed"
     },
     "threadLimit": {
       "reached": "You've reached the message limit for this conversation.",
@@ -442,43 +467,44 @@
     "sidebar": {
       "title": "Conversations",
       "newChat": "New Chat",
+      "creating": "Creating...",
       "noConversations": "No conversations yet"
     }
   },
   "Features": {
     "chatMessages": {
-      "name": "Chat Messages",
+      "name": "chat messages",
       "pricingLabel": "{count} chat messages per month",
       "pricingLabelUnlimited": "Unlimited chat messages"
     },
     "courses": {
-      "name": "Courses",
+      "name": "courses",
       "pricingLabel": "{count, plural, one {# course} other {Up to # courses}}",
       "pricingLabelUnlimited": "Unlimited courses"
     },
     "sentences": {
-      "name": "Sentences",
-      "pricingLabel": "{count} sentences per month",
-      "pricingLabelUnlimited": "Unlimited sentences per month"
+      "name": "ready-made sentences",
+      "pricingLabel": "{count, plural, one {# ready-made sentence} other {# ready-made sentences}} per month",
+      "pricingLabelUnlimited": "Unlimited ready-made sentences per month"
     },
     "customSentences": {
-      "name": "Custom Flashcards",
-      "pricingLabel": "{count} custom flashcards per month",
-      "pricingLabelUnlimited": "Unlimited custom flashcards"
+      "name": "custom sentences",
+      "pricingLabel": "{count, plural, one {# custom sentence} other {# custom sentences}} per month",
+      "pricingLabelUnlimited": "Unlimited custom sentences per month"
     },
     "multipleLanguages": {
-      "name": "Up to 5 languages per course",
+      "name": "multiple languages",
       "pricingLabel": "Up to {count} languages per course",
       "pricingLabelUnlimited": "Unlimited languages per course"
     },
     "transcriptions": {
-      "name": "Transcriptions"
+      "name": "transcriptions"
     },
     "cardEdits": {
-      "name": "Card Edits"
+      "name": "sentence edits"
     },
     "translationAutoFill": {
-      "name": "Translation Auto-Fill"
+      "name": "translation auto-fill"
     }
   },
   "FeatureTracking": {
@@ -518,7 +544,8 @@
     "upgradeDetailCap": "Upgrade to {productName} to increase your {featureName} limit.",
     "usageLimitWithDetail": "You've used all your {featureName} for this period. {detail}",
     "capReachedWithDetail": "You've reached your maximum number of {featureName}. {detail}",
-    "featureFlagWithDetail": "{featureName} is not available on your current plan. {detail}",
+    "courseCapWithArchiveOption": "You currently have {activeCount} of {maxCourses} active courses. Archive a course to free up a slot, or upgrade to {productName} for more.",
+    "featureFlagWithDetail": "Your current plan doesn't include {featureName}. {detail}",
     "noUpgradeAvailable": "You've reached your limit for {featureName}. Contact us at support@flexling.com for additional usage.",
     "contactUs": "Contact Us"
   },
@@ -636,7 +663,23 @@
     "feedback": {
       "languageSelected": "Great choice!",
       "difficultySelected": "Perfect, we'll tailor your content!",
-      "reviewModeSelected": "You're all set!"
+      "reviewModeSelected": "You're all set!",
+      "difficulty": {
+        "beginner": "We'll start with the basics!",
+        "elementary": "Great, you already know the essentials!",
+        "intermediate": "Nice, you have a solid foundation!",
+        "upper_intermediate": "Impressive, you're well on your way!",
+        "advanced": "Excellent, you're nearly fluent!",
+        "proficient": "Amazing, let's refine your mastery!"
+      },
+      "reviewMode": {
+        "full": "Great for active practice!",
+        "audio": "Perfect for learning on the go!"
+      }
+    },
+    "errors": {
+      "completeFailed": "Failed to complete onboarding",
+      "tryAgain": "Please try again."
     },
     "continue": "Continue",
     "back": "Back",
@@ -656,7 +699,7 @@
       },
       "learningModes": {
         "title": "Stats & Learning Modes",
-        "description": "This card shows your learning stats — streak, reps, sentences and time — which update as you study. Below are 2 review modes: Full Review lets you practice by typing translations, great for focused study. Audio Review plays sentences aloud so you can learn on the go."
+        "description": "This area shows your learning stats — streak, reps, sentences and time — which update as you study. Below are 2 review modes: Full Review lets you practice by typing translations, great for focused study. Audio Review plays sentences aloud so you can learn on the go."
       },
       "difficultySelection": {
         "title": "Difficulty Selection",
@@ -666,11 +709,11 @@
     "audioReview": {
       "welcome": {
         "title": "Welcome to Audio Review",
-        "description": "In this mode you can review sentences hands-off. The texts are read aloud automatically and it proceeds to the next card automatically. You can adjust the timing in the settings."
+        "description": "In this mode you can review sentences hands-off. The texts are read aloud automatically and it proceeds to the next sentence automatically. You can adjust the timing in the settings."
       },
       "card": {
-        "title": "The Card",
-        "description": "This card shows the texts in the languages you are learning. You can add more languages to the course later if you want."
+        "title": "The Sentence",
+        "description": "This sentence shows the texts in the languages you are learning. You can add more languages to the course later if you want."
       },
       "targetText": {
         "title": "Target Text and Audio",
@@ -678,15 +721,15 @@
       },
       "rating": {
         "title": "Rate Your Recall",
-        "description": "Each card is shown an initial number of times before spaced repetition starts. \"Understood\" skips the rest of those initial reviews. After that, you'll see more detailed ratings: Again, Hard, Good, Easy. Above the buttons you can see roughly when the card will be shown again."
+        "description": "Each sentence is shown an initial number of times before spaced repetition starts. \"Understood\" skips the rest of those initial reviews. After that, you'll see more detailed ratings: Again, Hard, Good, Easy. Above the buttons you can see roughly when the sentence will be shown again."
       },
       "audioControls": {
         "title": "Audio Playing",
-        "description": "By default the audio is played automatically. First the base audio, then there is a pause for you to think and then the target audio is played before automatically proceeding to the next card."
+        "description": "By default the audio is played automatically. First the base audio, then there is a pause for you to think and then the target audio is played before automatically proceeding to the next sentence."
       },
       "settings": {
         "title": "Settings",
-        "description": "Here you can change playback speed, language order, auto-advance, whether to hide or blur the target text, how many initial reviews each card gets and more."
+        "description": "Here you can change playback speed, language order, auto-advance, whether to hide or blur the target text, how many initial reviews each sentence gets and more."
       }
     },
     "fullReview": {
@@ -695,8 +738,8 @@
         "description": "In this mode you actively practice writing and get instant feedback."
       },
       "card": {
-        "title": "The Card",
-        "description": "The card in this mode shows the target and base languages and allows you to type in the translations."
+        "title": "The Sentence",
+        "description": "The sentence in this mode shows the target and base languages and allows you to type in the translations."
       },
       "input": {
         "title": "Enter Your Translation",
@@ -713,7 +756,7 @@
     },
     "chat": {
       "title": "Chat Assistant",
-      "description": "Use the chat to ask about grammar, get explanations, or create new flashcards. The AI assistant is here to help you learn!"
+      "description": "Use the chat to ask about grammar, get explanations, or create new sentences. The AI assistant is here to help you learn!"
     }
   },
   "ErrorPage": {
@@ -722,7 +765,7 @@
     "retry": "Try again"
   },
   "EditCard": {
-    "title": "Edit Card",
+    "title": "Edit Sentence",
     "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving..."
@@ -746,5 +789,8 @@
     "title": "Page not found",
     "description": "The page you're looking for doesn't exist or has been moved.",
     "goHome": "Go home"
+  },
+  "Legal": {
+    "lastUpdated": "Last updated:"
   }
 }

@@ -50,7 +50,7 @@ export function SettingsView({ activeView }: { activeView: View }) {
             {userEmail && (
               <div className="space-y-2">
                 <label className="label-form">
-                  {t('settings.account') || 'Account'}
+                  {t('settings.account')}
                 </label>
                 <div className="flex items-center gap-2 p-3 surface-muted">
                   <Mail className="h-4 w-4 text-muted-foreground" />
@@ -64,7 +64,7 @@ export function SettingsView({ activeView }: { activeView: View }) {
             {/* Language Section */}
             <div className="space-y-2">
               <label className="label-form">
-                {t('settings.language') || 'Language'}
+                {t('settings.language')}
               </label>
               <LanguageSwitcher />
             </div>

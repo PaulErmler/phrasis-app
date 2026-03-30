@@ -8,6 +8,7 @@ import { NewChatInput } from '@/components/chat/NewChatInput';
 import { CollectionCarousel } from '@/components/app/CollectionCarousel';
 import { CustomCollectionCarousel } from '@/components/app/CustomCollectionCarousel';
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
+import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
 import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
 import type { ReviewMode } from '@/convex/types';
@@ -23,6 +24,8 @@ export function HomeView({
   onTutorialReady,
   animateEntrance,
   isHidden,
+  hasActiveCourse,
+  onOpenCourseMenu,
 }: {
   preloadedCollectionProgress: Preloaded<
     typeof api.features.decks.getCollectionProgress
@@ -40,6 +43,8 @@ export function HomeView({
   onTutorialReady?: (restart: () => void) => void;
   animateEntrance?: boolean;
   isHidden?: boolean;
+  hasActiveCourse: boolean;
+  onOpenCourseMenu: () => void;
 }) {
   const t = useTranslations('AppPage');
 
@@ -88,6 +93,17 @@ export function HomeView({
     },
     [courseSettings, updateCourseSettings, onLearnOpen],
   );
+
+  if (!hasActiveCourse) {
+    return (
+      <div
+        className="flex-1 overflow-y-auto px-4 py-6"
+        style={{ scrollbarGutter: 'stable' }}
+      >
+        <NoCourseEmptyState onOpenCourseMenu={onOpenCourseMenu} />
+      </div>
+    );
+  }
 
   return (
     <div

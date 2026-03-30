@@ -52,16 +52,8 @@ function BaseLanguageStepComponent() {
   );
 }
 
-const DIFFICULTY_FEEDBACK: Record<CurrentLevel, string> = {
-  beginner: "We'll start with the basics!",
-  elementary: 'Great, you already know the essentials!',
-  intermediate: 'Nice, you have a solid foundation!',
-  upper_intermediate: "Impressive, you're well on your way!",
-  advanced: "Excellent, you're nearly fluent!",
-  proficient: "Amazing, let's refine your mastery!",
-};
-
 function DifficultyStepComponent() {
+  const t = useTranslations('Onboarding.feedback.difficulty');
   const { state, updateContext } = useOnboarding();
   const flowData = (state?.context?.flowData ?? {}) as OnboardingData;
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -70,7 +62,7 @@ function DifficultyStepComponent() {
   const handleSelect = (level: CurrentLevel) => {
     updateContext({ flowData: { ...flowData, currentLevel: level } });
     if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
-    setFeedback(DIFFICULTY_FEEDBACK[level]);
+    setFeedback(t(level));
     feedbackTimer.current = setTimeout(() => setFeedback(null), 1500);
   };
 
@@ -85,12 +77,8 @@ function DifficultyStepComponent() {
   );
 }
 
-const REVIEW_MODE_FEEDBACK: Record<ReviewMode, string> = {
-  full: 'Great for active practice!',
-  audio: 'Perfect for learning on the go!',
-};
-
 function ReviewModeStepComponent() {
+  const t = useTranslations('Onboarding.feedback.reviewMode');
   const { state, updateContext } = useOnboarding();
   const flowData = (state?.context?.flowData ?? {}) as OnboardingData;
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -99,7 +87,7 @@ function ReviewModeStepComponent() {
   const handleSelect = (mode: ReviewMode) => {
     updateContext({ flowData: { ...flowData, reviewMode: mode } });
     if (feedbackTimer.current) clearTimeout(feedbackTimer.current);
-    setFeedback(REVIEW_MODE_FEEDBACK[mode]);
+    setFeedback(t(mode));
     feedbackTimer.current = setTimeout(() => setFeedback(null), 1500);
   };
 
@@ -134,10 +122,10 @@ function FeedbackBadge({ message }: { message: string | null }) {
 }
 
 const onboardingSteps: OnboardingStep[] = [
-  { id: 'target-language', component: TargetLanguageStepComponent },
-  { id: 'base-language', component: BaseLanguageStepComponent },
-  { id: 'difficulty', component: DifficultyStepComponent },
-  { id: 'review-mode', component: ReviewModeStepComponent },
+  { id: 'target-language', component: TargetLanguageStepComponent, nextStep: 'base-language' },
+  { id: 'base-language', component: BaseLanguageStepComponent, nextStep: 'difficulty' },
+  { id: 'difficulty', component: DifficultyStepComponent, nextStep: 'review-mode' },
+  { id: 'review-mode', component: ReviewModeStepComponent, nextStep: 'finish' },
   { id: 'finish', component: () => null, nextStep: null },
 ];
 
@@ -145,7 +133,7 @@ export default function OnboardingPage() {
   return (
     <>
       <AuthLoading>
-        <div className="h-screen" />
+        <div className="h-dvh" />
       </AuthLoading>
       <Authenticated>
         <OnboardingContent />
@@ -204,7 +192,7 @@ function OnboardingContent() {
     onboardingProgress === undefined ||
     userSettings?.hasCompletedOnboarding
   ) {
-    return <div className="h-screen" />;
+    return <div className="h-dvh" />;
   }
 
   return (
@@ -310,8 +298,8 @@ function OnboardingUI({
       router.push('/app');
     } catch (error) {
       console.error('Error completing onboarding:', error);
-      toast.error('Failed to complete onboarding', {
-        description: 'Please try again.',
+      toast.error(t('errors.completeFailed'), {
+        description: t('errors.tryAgain'),
       });
       setIsSubmitting(false);
     }
@@ -336,7 +324,7 @@ function OnboardingUI({
   };
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-dvh max-h-dvh flex flex-col overflow-hidden">
       {!isFinishStep && (
         <div className="bg-background border-b shrink-0">
           <div className="container mx-auto px-4 py-4">

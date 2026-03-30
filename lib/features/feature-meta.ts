@@ -17,10 +17,10 @@ import { FEATURE_IDS, type FeatureId } from '@/convex/features/featureIds';
  */
 export const FEATURE_META: Record<
   FeatureId,
-  { i18nKey: string; consumable?: boolean; displayCount?: number; hidden?: boolean }
+  { i18nKey: string; consumable?: boolean; displayCount?: number; hidden?: boolean; paywallKey?: string }
 > = {
   [FEATURE_IDS.CHAT_MESSAGES]: { i18nKey: 'chatMessages', consumable: true },
-  [FEATURE_IDS.COURSES]: { i18nKey: 'courses', consumable: false },
+  [FEATURE_IDS.COURSES]: { i18nKey: 'courses', consumable: false, paywallKey: 'courseCapWithArchiveOption' },
   [FEATURE_IDS.SENTENCES]: { i18nKey: 'sentences', consumable: true },
   [FEATURE_IDS.CUSTOM_SENTENCES]: { i18nKey: 'customSentences', consumable: true },
   [FEATURE_IDS.MULTIPLE_LANGUAGES]: { i18nKey: 'multipleLanguages', displayCount: 5 },
@@ -43,4 +43,8 @@ export function getFeatureDisplayCount(featureId: string): number | undefined {
 
 export function isFeatureHidden(featureId: string): boolean {
   return FEATURE_META[featureId as FeatureId]?.hidden === true;
+}
+
+export function getFeaturePaywallKey(featureId: string): string | undefined {
+  return FEATURE_META[featureId as FeatureId]?.paywallKey;
 }

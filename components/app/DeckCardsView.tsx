@@ -149,7 +149,7 @@ export function DeckCardsView() {
                             )}
                           </Badge>
                           <span className="text-sm font-medium">
-                            Base (You know this)
+                            {t('baseLabel')}
                           </span>
                         </div>
                         <p className="text-sm">
@@ -163,7 +163,7 @@ export function DeckCardsView() {
                         {!baseTranslation?.text &&
                           baseTranslation === undefined && (
                           <p className="text-muted-sm italic">
-                              Translating...
+                              {t('translating')}
                           </p>
                         )}
                         <div className="flex gap-2">
@@ -189,7 +189,7 @@ export function DeckCardsView() {
                               : 'TARGET'}
                           </Badge>
                           <span className="text-sm font-medium">
-                            Target (Learning this)
+                            {t('targetLabel')}
                           </span>
                         </div>
                         {targetTranslation?.text ? (
@@ -202,7 +202,7 @@ export function DeckCardsView() {
                             )}
                           </>
                         ) : (
-                          <p className="text-muted-sm italic">Translating...</p>
+                          <p className="text-muted-sm italic">{t('translating')}</p>
                         )}
                         <div className="flex gap-2">
                           <AudioButton

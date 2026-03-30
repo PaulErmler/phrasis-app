@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { toast } from 'sonner';
 
 const SUPPORT_EMAIL = 'support@flexling.com';
@@ -22,9 +23,13 @@ const SUPPORT_EMAIL = 'support@flexling.com';
 export function ContentView({
   onChatOpen,
   onEnterTexts,
+  hasActiveCourse,
+  onOpenCourseMenu,
 }: {
   onChatOpen: (threadId: string) => void;
   onEnterTexts: () => void;
+  hasActiveCourse: boolean;
+  onOpenCourseMenu: () => void;
 }) {
   const t = useTranslations('AppPage');
   const getOrCreateEmptyThread = useMutation(
@@ -44,6 +49,17 @@ export function ContentView({
       setIsNavigating(false);
     }
   }, [getOrCreateEmptyThread, onChatOpen, t]);
+
+  if (!hasActiveCourse) {
+    return (
+      <div
+        className="flex-1 overflow-y-auto px-4 py-6"
+        style={{ scrollbarGutter: 'stable' }}
+      >
+        <NoCourseEmptyState onOpenCourseMenu={onOpenCourseMenu} />
+      </div>
+    );
+  }
 
   return (
     <div

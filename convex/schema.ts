@@ -94,6 +94,8 @@ export default defineSchema({
     baseLanguages: v.array(v.string()), // ISO codes (e.g., ["en"])
     targetLanguages: v.array(v.string()), // ISO codes (e.g., ["es", "fr"])
     currentLevel: v.optional(currentLevelValidator), // User's current level in this course
+    isArchived: v.optional(v.boolean()),
+    archivedAt: v.optional(v.number()), // Timestamp; 30-day cooldown before unarchive
   }).index('by_userId', ['userId']),
 
   // Course settings table — separated so changes don't trigger course re-fetches

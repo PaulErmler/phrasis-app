@@ -24,24 +24,9 @@ export interface CollectionProgressItem {
 /** Generate a human-readable CEFR description using i18n, with fallback. */
 export function getCollectionDescription(
   name: string,
-  t?: (key: string) => string,
+  t: (key: string) => string,
 ): string {
-  if (t) {
-    return t(name);
-  }
-  // Fallback if no translation function is provided
-  const descriptions: Record<string, string> = {
-    Essential: 'The most essential survival sentences',
-    A1: 'Sentences with vocabulary at CEFR A1 Level',
-    A2: 'Sentences with vocabulary at CEFR A2 Level',
-    B1: 'Sentences with vocabulary at CEFR B1 Level',
-    B2: 'Sentences with vocabulary at CEFR B2 Level',
-    C1: 'Sentences with vocabulary at CEFR C1 Level',
-    C2: 'Sentences with vocabulary at CEFR C2 Level',
-    Chat: 'Phrases and vocabulary from the chat',
-    Custom: 'Sentences you entered yourself',
-  };
-  return descriptions[name] ?? `${name} collection`;
+  return t(name);
 }
 
 interface CollectionCarouselUIProps {
@@ -204,14 +189,14 @@ export function CollectionCarouselUI({
                     {hasStarted ? (
                       <div className="space-y-1.5">
                         <span className="text-sm font-semibold">
-                          {collection.cardsAdded} / {t('cards', { count: collection.totalTexts.toLocaleString() })}
+                          {collection.cardsAdded} / {t('cards', { count: collection.totalTexts })}
                         </span>
                         <Progress value={progress} className="h-2" />
                       </div>
                     ) : (
                       <p className="text-sm font-semibold">
                         {t('cards', {
-                          count: collection.totalTexts.toLocaleString(),
+                          count: collection.totalTexts,
                         })}
                       </p>
                     )}

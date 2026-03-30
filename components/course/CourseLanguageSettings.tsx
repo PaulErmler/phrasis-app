@@ -6,6 +6,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import {
   AlertCircle,
   AlertTriangle,
+  Archive,
   Check,
   Info,
   Lock,
@@ -14,13 +15,23 @@ import {
 } from 'lucide-react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Sheet,
   SheetContent,
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { DualLanguageEditor } from '@/components/course/DualLanguageEditor';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
@@ -36,11 +47,13 @@ interface CourseData {
 interface CourseLanguageSettingsProps {
   course: CourseData | null;
   onClose: () => void;
+  showArchiveButton?: boolean;
 }
 
 export function CourseLanguageSettings({
   course,
   onClose,
+  showArchiveButton = true,
 }: CourseLanguageSettingsProps) {
   const t = useTranslations('AppPage.courses.manage');
   const locale = useLocale();
@@ -53,6 +66,10 @@ export function CourseLanguageSettings({
 
   const maxTotal = hasMultipleLanguages ? 5 : 2;
   const maxPerGroup = hasMultipleLanguages ? 3 : 1;
+
+  const archiveCourse = useMutation(api.features.courses.archiveCourse);
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   const [draftBase, setDraftBase] = useState<string[]>([]);
   const [draftTarget, setDraftTarget] = useState<string[]>([]);
@@ -114,6 +131,21 @@ export function CourseLanguageSettings({
     onClose();
     setHasChanges(false);
     setError(null);
+    setArchiveConfirmOpen(false);
+  };
+
+  const handleArchive = async () => {
+    if (!course) return;
+    setArchiving(true);
+    try {
+      await archiveCourse({ courseId: course._id });
+      handleClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to archive course');
+    } finally {
+      setArchiving(false);
+      setArchiveConfirmOpen(false);
+    }
   };
 
   const formatName = (codes: string[]) =>
@@ -133,7 +165,7 @@ export function CourseLanguageSettings({
     <Sheet open={!!course} onOpenChange={handleClose}>
       <SheetContent
         side="left"
-        className="w-full sm:max-w-md p-0 [&>button:last-child]:hidden z-[60]"
+        className="w-full sm:max-w-md flex flex-col gap-0 p-0 [&>button:last-child]:hidden"
       >
         <SheetDescription className="sr-only">{t('title')}</SheetDescription>
 
@@ -153,7 +185,7 @@ export function CourseLanguageSettings({
               </Button>
             </div>
 
-            <div className="sheet-body space-y-4">
+            <div className="sheet-body min-h-0 space-y-4">
               {hasMultipleLanguages && (
                 <div className="rounded-lg bg-muted/50 px-3 py-2.5 flex gap-2">
                   <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
@@ -238,6 +270,21 @@ export function CourseLanguageSettings({
                 </div>
               )}
             </div>
+
+            {showArchiveButton && (
+              <div className="sheet-footer shrink-0">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="w-full gap-1.5"
+                  onClick={() => setArchiveConfirmOpen(true)}
+                  disabled={archiving}
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                  {t('archiveCourse')}
+                </Button>
+              </div>
+            )}
           </>
         )}
       </SheetContent>
@@ -249,6 +296,32 @@ export function CourseLanguageSettings({
           featureId={FEATURE_IDS.MULTIPLE_LANGUAGES}
         />
       )}
+
+      <AlertDialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('archiveConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('archiveConfirmDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={archiving}>
+              {t('archiveCancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleArchive}
+              disabled={archiving}
+              className={buttonVariants({ variant: 'destructive' })}
+            >
+              {archiving ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : null}
+              {t('archiveConfirmButton')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

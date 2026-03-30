@@ -1,5 +1,6 @@
 import { getContent } from '@/lib/content';
 import { getUserLocale } from '@/i18n/locale';
+import { getTranslations } from 'next-intl/server';
 import ReactMarkdown from 'react-markdown';
 import { notFound } from 'next/navigation';
 import { Header } from '@/components/Header';
@@ -12,6 +13,7 @@ export default async function LegalPage({
 }) {
   const { slug } = await params;
   const locale = await getUserLocale();
+  const t = await getTranslations('Legal');
   const data = await getContent('legal', locale, slug);
 
   if (!data) return notFound();
@@ -24,8 +26,7 @@ export default async function LegalPage({
           <header className="mb-10 border-b pb-6">
             <h1 className="text-4xl font-bold mb-2">{data.metadata.title}</h1>
             <p className="text-muted-sm">
-              {locale === 'de' ? 'Zuletzt aktualisiert: ' : 'Last updated: '}
-              {data.metadata.lastUpdated}
+              {t('lastUpdated')} {data.metadata.lastUpdated}
             </p>
           </header>
 

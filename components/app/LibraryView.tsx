@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
 import { Search, Star, EyeOff, CircleCheck, X, Loader2 } from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
+import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
 
@@ -22,7 +23,13 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
-export function LibraryView() {
+export function LibraryView({
+  hasActiveCourse,
+  onOpenCourseMenu,
+}: {
+  hasActiveCourse: boolean;
+  onOpenCourseMenu: () => void;
+}) {
   const t = useTranslations('AppPage.library');
 
   const [searchInput, setSearchInput] = useState('');
@@ -91,6 +98,17 @@ export function LibraryView() {
   const cards = result ?? [];
   const hasResults = cards.length > 0;
   const hasActiveFilters = debouncedSearch.length > 0 || activeFilter !== null;
+
+  if (!hasActiveCourse) {
+    return (
+      <div
+        className="flex-1 min-h-0 overflow-y-auto px-4 py-6"
+        style={{ scrollbarGutter: 'stable' }}
+      >
+        <NoCourseEmptyState onOpenCourseMenu={onOpenCourseMenu} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-4" style={{ scrollbarGutter: 'stable' }}>

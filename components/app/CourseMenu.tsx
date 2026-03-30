@@ -12,24 +12,42 @@ import {
   SheetDescription,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Check, Plus, Settings2, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Archive, Check, Lock, Plus, Settings, X } from 'lucide-react';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 import { CreateCourseDialog } from '@/components/course/CreateCourseDialog';
-import { FeatureGatedButton } from '@/components/feature_tracking/FeatureGatedButton';
 import { CourseLanguageSettings } from '@/components/course/CourseLanguageSettings';
+import PaywallDialog from '@/components/autumn/paywall-dialog';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
 
 interface CourseMenuProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
+type CourseAlertState =
+  | null
+  | { variant: 'cooldown'; dateStr: string }
+  | { variant: 'hard_limit'; max: number };
+
 export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
   const t = useTranslations('AppPage');
   const locale = useLocale();
   const courses = useQuery(api.features.courses.getUserCourses);
   const activeCourse = useQuery(api.features.courses.getActiveCourse);
+  const quotaInfo = useQuery(api.features.courses.getCourseQuotaInfo);
   const setActiveCourse = useMutation(api.features.courses.setActiveCourse);
+  const unarchiveCourseMutation = useMutation(api.features.courses.unarchiveCourse);
   const setActiveCourseOptimistic = setActiveCourse.withOptimisticUpdate(
     (store, { courseId }) => {
       const allCourses = store.getQuery(
@@ -48,6 +66,10 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
   const [editingCourseId, setEditingCourseId] = useState<Id<'courses'> | null>(
     null,
   );
+  const [pendingUnarchiveCourseId, setPendingUnarchiveCourseId] =
+    useState<Id<'courses'> | null>(null);
+  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [courseAlert, setCourseAlert] = useState<CourseAlertState>(null);
 
   const editingCourse = courses?.find((c) => c._id === editingCourseId) ?? null;
 
@@ -67,6 +89,46 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
     setEditingCourseId(null);
   };
 
+  const handleUnarchiveRequest = (courseId: Id<'courses'>) => {
+    setPendingUnarchiveCourseId(courseId);
+  };
+
+  const handleUnarchive = async () => {
+    if (!pendingUnarchiveCourseId) return;
+    try {
+      const result = await unarchiveCourseMutation({
+        courseId: pendingUnarchiveCourseId,
+      });
+      setPendingUnarchiveCourseId(null);
+
+      if (result.status === 'cooldown') {
+        const dateStr = new Date(result.readyAt).toLocaleDateString(locale, {
+          dateStyle: 'medium',
+        });
+        setCourseAlert({ variant: 'cooldown', dateStr });
+      } else if (result.status === 'usage_limit') {
+        setPaywallOpen(true);
+      }
+    } catch (e: unknown) {
+      console.error('Unarchive error:', e);
+    }
+  };
+
+  const handleCreateClick = () => {
+    if (quotaInfo && !quotaInfo.canCreate) {
+      if (quotaInfo.totalCount >= quotaInfo.maxCourses) {
+        setCourseAlert({
+          variant: 'hard_limit',
+          max: quotaInfo.maxCourses,
+        });
+      } else {
+        setPaywallOpen(true);
+      }
+      return;
+    }
+    setCreateDialogOpen(true);
+  };
+
   const formatCourseName = (targetLanguages: string[]) => {
     return targetLanguages
       .map((code) => getLocalizedLanguageNameByCode(code, locale))
@@ -78,6 +140,8 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
       .map((code) => getLocalizedLanguageNameByCode(code, locale))
       .join(', ');
   };
+
+  const canCreate = quotaInfo?.canCreate ?? false;
 
   return (
     <>
@@ -104,15 +168,18 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
           </div>
 
           <div className="sheet-body">
-            <FeatureGatedButton
-              featureId="courses"
+            <Button
               variant="outline"
               className="w-full mb-3 gap-2 h-9"
-              onAction={() => setCreateDialogOpen(true)}
+              onClick={handleCreateClick}
             >
-              <Plus className="h-4 w-4" />
-              {t('courses.createNew')}
-            </FeatureGatedButton>
+              {canCreate ? (
+                <Plus className="h-4 w-4" />
+              ) : (
+                <Lock className="h-4 w-4" />
+              )}
+              {canCreate ? t('courses.createNew') : t('courses.createNew')}
+            </Button>
 
             <div className="flex flex-col gap-2">
               {courses === undefined ? (
@@ -130,6 +197,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
                 </div>
               ) : (
                 courses.map((course) => {
+                  const isArchived = course.isArchived === true;
                   const isActive = activeCourse?._id === course._id;
                   const targetLanguageName = formatCourseName(
                     course.targetLanguages,
@@ -137,6 +205,36 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
                   const baseLanguageName = formatBaseLanguageName(
                     course.baseLanguages,
                   );
+
+                  if (isArchived) {
+                    return (
+                      <div
+                        key={course._id}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl border border-muted bg-muted/30 text-left opacity-60"
+                      >
+                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                          <h3 className="font-semibold text-base leading-tight text-muted-foreground">
+                            {targetLanguageName}
+                          </h3>
+                          <p className="text-muted-xs">
+                            {t('courses.from', {
+                              language: baseLanguageName,
+                            })}
+                          </p>
+                        </div>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="shrink-0 gap-1.5"
+                          onClick={() => handleUnarchiveRequest(course._id)}
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                          {t('courses.unarchive')}
+                        </Button>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div
@@ -177,7 +275,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
                         className="h-8 w-8 shrink-0"
                         onClick={() => handleOpenSettings(course._id)}
                       >
-                        <Settings2 className="h-4 w-4" />
+                        <Settings className="h-4 w-4" />
                       </Button>
                     </div>
                   );
@@ -197,6 +295,65 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
         course={editingCourse}
         onClose={handleCloseSettings}
       />
+
+      {paywallOpen && (
+        <PaywallDialog
+          open={paywallOpen}
+          setOpen={setPaywallOpen}
+          featureId={FEATURE_IDS.COURSES}
+        />
+      )}
+
+      <AlertDialog
+        open={pendingUnarchiveCourseId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingUnarchiveCourseId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('courses.unarchiveConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('courses.unarchiveConfirmDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('courses.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleUnarchive}>
+              {t('courses.unarchiveConfirmButton')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={courseAlert !== null}
+        onOpenChange={(open) => {
+          if (!open) setCourseAlert(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {courseAlert?.variant === 'hard_limit'
+                ? t('courses.activeSlotReachedTitle')
+                : t('courses.unarchive')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {courseAlert?.variant === 'cooldown' &&
+                t('courses.unarchiveCooldown', {
+                  date: courseAlert.dateStr,
+                })}
+              {courseAlert?.variant === 'hard_limit' &&
+                t('courses.hardLimitReached', { max: courseAlert.max })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('courses.cancel')}</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </>
   );
 }

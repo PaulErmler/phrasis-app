@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/popover";
 import { useCustomer } from "autumn-js/react";
 import { useTranslations } from "next-intl";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getCheckoutContent } from "@/lib/autumn/checkout-content";
 
@@ -63,6 +64,14 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
   }, [params.checkoutResult]);
 
   const [loading, setLoading] = useState(false);
+  const pathname = usePathname();
+
+  // Close dialog when route changes (e.g. user navigates back)
+  useEffect(() => {
+    if (params.open) {
+      params.setOpen(false);
+    }
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!checkoutResult) {
     return <></>;
@@ -94,21 +103,23 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
             size="sm"
             onClick={async () => {
               setLoading(true);
-
-              const options = checkoutResult.options.map((option) => {
-                return {
+              try {
+                const options = checkoutResult.options.map((option) => ({
                   featureId: option.feature_id,
                   quantity: option.quantity,
-                };
-              });
+                }));
 
-              await attach({
-                productId: checkoutResult.product.id,
-                ...(params.checkoutParams || {}),
-                options,
-              });
-              setOpen(false);
-              setLoading(false);
+                await attach({
+                  productId: checkoutResult.product.id,
+                  ...(params.checkoutParams || {}),
+                  options,
+                });
+                setOpen(false);
+              } catch (e) {
+                console.error("Checkout failed:", e);
+              } finally {
+                setLoading(false);
+              }
             }}
             disabled={loading}
             className="min-w-16 flex items-center gap-2"

@@ -239,7 +239,8 @@ export function LearningModeSettings({
   // ---- resolved values (with defaults) ----
 
   const reviewMode = courseSettings.reviewMode ?? 'audio';
-  const fullReviewTargetAudioMode = courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit';
+  const fullReviewTargetAudioMode =
+    courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit';
   const reps = courseSettings.languageRepetitions ?? {};
   const repPauses = courseSettings.languageRepetitionPauses ?? {};
   const pauseB2B =
@@ -249,9 +250,10 @@ export function LearningModeSettings({
   const pauseT2T =
     courseSettings.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
   const autoAdvance = courseSettings.autoAdvance ?? DEFAULT_AUTO_ADVANCE;
-  const instantProceed = reviewMode === 'full'
-    ? (courseSettings.instantProceedFull ?? true)
-    : (courseSettings.instantProceedAudio ?? false);
+  const instantProceed =
+    reviewMode === 'full'
+      ? (courseSettings.instantProceedFull ?? true)
+      : (courseSettings.instantProceedAudio ?? false);
 
   // ---- reorder helpers (persist to backend) ----
 
@@ -321,7 +323,7 @@ export function LearningModeSettings({
           </div>
         </div>
 
-        <div className="px-6 py-4 space-y-4 overflow-y-auto max-h-[calc(100vh-3.5rem)]">
+        <div className="px-6 py-4 space-y-4 overflow-y-auto max-h-[calc(100dvh-3.5rem)]">
           {/* ================================================================
               REVIEW MODE SWITCHER
               ================================================================ */}
@@ -336,14 +338,18 @@ export function LearningModeSettings({
               <Headphones className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs font-medium">{t('reviewModeAudio')}</p>
-                <p className="text-muted-xs">{t('reviewModeAudioDescription')}</p>
+                <p className="text-muted-xs">
+                  {t('reviewModeAudioDescription')}
+                </p>
               </div>
             </div>
             <div className="flex items-start gap-2.5">
               <PenLine className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
               <div>
                 <p className="text-xs font-medium">{t('reviewModeFull')}</p>
-                <p className="text-muted-xs">{t('reviewModeFullDescription')}</p>
+                <p className="text-muted-xs">
+                  {t('reviewModeFullDescription')}
+                </p>
               </div>
             </div>
           </div>
@@ -479,16 +485,23 @@ export function LearningModeSettings({
             <div className="space-y-0">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-0.5">
-                  <Label htmlFor="targetAudioEnabled" className="text-sm font-medium">
+                  <Label
+                    htmlFor="targetAudioEnabled"
+                    className="text-sm font-medium"
+                  >
                     {t('fullReviewTargetAudio')}
                   </Label>
-                  <p className="text-muted-xs">{t('fullReviewTargetAudioDescription')}</p>
+                  <p className="text-muted-xs">
+                    {t('fullReviewTargetAudioDescription')}
+                  </p>
                 </div>
                 <Switch
                   id="targetAudioEnabled"
                   checked={fullReviewTargetAudioMode !== 'never'}
                   onCheckedChange={(checked) => {
-                    handleFullReviewTargetAudioModeChange(checked ? 'afterSubmit' : 'never');
+                    handleFullReviewTargetAudioModeChange(
+                      checked ? 'afterSubmit' : 'never',
+                    );
                   }}
                   className="mt-0.5"
                 />
@@ -497,28 +510,36 @@ export function LearningModeSettings({
               {fullReviewTargetAudioMode !== 'never' && (
                 <div className="ml-4 mt-3 pl-3 border-l-2 border-border space-y-3">
                   <div className="flex items-start justify-between gap-4">
-                    <Label htmlFor="targetAudio_afterSubmit" className="text-sm font-medium">
+                    <Label
+                      htmlFor="targetAudio_afterSubmit"
+                      className="text-sm font-medium"
+                    >
                       {t('fullReviewTargetAudio_afterSubmit')}
                     </Label>
                     <Switch
                       id="targetAudio_afterSubmit"
                       checked={fullReviewTargetAudioMode === 'afterSubmit'}
                       onCheckedChange={(checked) => {
-                        if (checked) handleFullReviewTargetAudioModeChange('afterSubmit');
+                        if (checked)
+                          handleFullReviewTargetAudioModeChange('afterSubmit');
                       }}
                       className="mt-0.5"
                     />
                   </div>
 
                   <div className="flex items-start justify-between gap-4">
-                    <Label htmlFor="targetAudio_always" className="text-sm font-medium">
+                    <Label
+                      htmlFor="targetAudio_always"
+                      className="text-sm font-medium"
+                    >
                       {t('fullReviewTargetAudio_always')}
                     </Label>
                     <Switch
                       id="targetAudio_always"
                       checked={fullReviewTargetAudioMode === 'always'}
                       onCheckedChange={(checked) => {
-                        if (checked) handleFullReviewTargetAudioModeChange('always');
+                        if (checked)
+                          handleFullReviewTargetAudioModeChange('always');
                       }}
                       className="mt-0.5"
                     />
@@ -575,7 +596,8 @@ export function LearningModeSettings({
             })}
 
             {/* Target languages in timeline — only when they're part of the main audio sequence */}
-            {(reviewMode === 'audio' || fullReviewTargetAudioMode === 'always') && (
+            {(reviewMode === 'audio' ||
+              fullReviewTargetAudioMode === 'always') && (
               <>
                 {/* Base → Target Pause connector */}
                 {baseLanguages.length > 0 && targetLanguages.length > 0 && (
@@ -635,18 +657,19 @@ export function LearningModeSettings({
             )}
 
             {/* Pause before auto-advance (only shown when auto-advance is enabled, audio mode only) */}
-            {reviewMode === 'audio' && autoAdvance &&
+            {reviewMode === 'audio' &&
+              autoAdvance &&
               (baseLanguages.length > 0 || targetLanguages.length > 0) && (
-              <StepperPauseConnector
-                label={t('pauseBeforeAutoAdvance')}
-                seconds={
-                  courseSettings.pauseBeforeAutoAdvance ??
+                <StepperPauseConnector
+                  label={t('pauseBeforeAutoAdvance')}
+                  seconds={
+                    courseSettings.pauseBeforeAutoAdvance ??
                     DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE
-                }
-                onChange={handlePauseBeforeAutoAdvanceChange}
-                accent
-              />
-            )}
+                  }
+                  onChange={handlePauseBeforeAutoAdvanceChange}
+                  accent
+                />
+              )}
 
             {/* End-of-sequence indicator */}
             <div className="mt-2 flex items-center gap-2 text-muted-xs">
@@ -665,9 +688,7 @@ export function LearningModeSettings({
           </div>
 
           <div className="flex items-center justify-between gap-2">
-            <p className="text-muted-xs">
-              {t('playbackSequenceDescription')}
-            </p>
+            <p className="text-muted-xs">{t('playbackSequenceDescription')}</p>
             <Button
               variant="outline"
               size="sm"
@@ -694,10 +715,15 @@ export function LearningModeSettings({
             <div className="space-y-0">
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-0.5">
-                  <Label htmlFor="hideTargetLanguages" className="text-sm font-medium">
+                  <Label
+                    htmlFor="hideTargetLanguages"
+                    className="text-sm font-medium"
+                  >
                     {t('hideTargetLanguages')}
                   </Label>
-                  <p className="text-muted-xs">{t('hideTargetLanguagesDescription')}</p>
+                  <p className="text-muted-xs">
+                    {t('hideTargetLanguagesDescription')}
+                  </p>
                 </div>
                 <Switch
                   id="hideTargetLanguages"
@@ -711,10 +737,15 @@ export function LearningModeSettings({
               {(courseSettings.hideTargetLanguages ?? true) && (
                 <div className="ml-4 mt-3 pl-3 border-l-2 border-border flex items-start justify-between gap-4">
                   <div className="space-y-0.5">
-                    <Label htmlFor="autoRevealLanguages" className="text-sm font-medium">
+                    <Label
+                      htmlFor="autoRevealLanguages"
+                      className="text-sm font-medium"
+                    >
                       {t('autoRevealLanguages')}
                     </Label>
-                    <p className="text-muted-xs">{t('autoRevealLanguagesDescription')}</p>
+                    <p className="text-muted-xs">
+                      {t('autoRevealLanguagesDescription')}
+                    </p>
                   </div>
                   <Switch
                     id="autoRevealLanguages"
@@ -733,7 +764,9 @@ export function LearningModeSettings({
               <Label htmlFor="showRomanization" className="text-sm font-medium">
                 {t('showRomanization')}
               </Label>
-              <p className="text-muted-xs">{t('showRomanizationDescription')}</p>
+              <p className="text-muted-xs">
+                {t('showRomanizationDescription')}
+              </p>
             </div>
             <Switch
               id="showRomanization"
@@ -764,6 +797,7 @@ export function LearningModeSettings({
       <CourseLanguageSettings
         course={courseSettingsOpen ? courseData : null}
         onClose={() => setCourseSettingsOpen(false)}
+        showArchiveButton={false}
       />
     </Sheet>
   );
