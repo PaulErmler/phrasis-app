@@ -405,7 +405,7 @@ export function LearningModeSettings({
           )}
 
           {/* Auto-add cards */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="settings-row">
             <div className="space-y-0.5">
               <Label htmlFor="autoAdd" className="text-sm font-medium">
                 {t('autoAddCards')}
@@ -422,7 +422,7 @@ export function LearningModeSettings({
 
           {/* Auto-advance — audio mode only */}
           {reviewMode === 'audio' && (
-            <div className="flex items-start justify-between gap-4">
+            <div className="settings-row">
               <div className="space-y-0.5">
                 <Label htmlFor="autoAdvance" className="text-sm font-medium">
                   {t('autoAdvance')}
@@ -439,7 +439,7 @@ export function LearningModeSettings({
           )}
 
           {/* Instant proceed on rating — both modes */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="settings-row">
             <div className="space-y-0.5">
               <Label htmlFor="instantProceed" className="text-sm font-medium">
                 {t('instantProceed')}
@@ -465,7 +465,7 @@ export function LearningModeSettings({
           </p>
 
           {/* Auto-play audio */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="settings-row">
             <div className="space-y-0.5">
               <Label htmlFor="autoPlayAudio" className="text-sm font-medium">
                 {t('autoPlay')}
@@ -483,7 +483,7 @@ export function LearningModeSettings({
           {/* Target language audio — full review mode only */}
           {reviewMode === 'full' && (
             <div className="space-y-0">
-              <div className="flex items-start justify-between gap-4">
+              <div className="settings-row">
                 <div className="space-y-0.5">
                   <Label
                     htmlFor="targetAudioEnabled"
@@ -509,7 +509,7 @@ export function LearningModeSettings({
 
               {fullReviewTargetAudioMode !== 'never' && (
                 <div className="ml-4 mt-3 pl-3 border-l-2 border-border space-y-3">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="settings-row">
                     <Label
                       htmlFor="targetAudio_afterSubmit"
                       className="text-sm font-medium"
@@ -527,7 +527,7 @@ export function LearningModeSettings({
                     />
                   </div>
 
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="settings-row">
                     <Label
                       htmlFor="targetAudio_always"
                       className="text-sm font-medium"
@@ -713,7 +713,7 @@ export function LearningModeSettings({
           {/* Hide target languages + sub-setting — audio mode only */}
           {reviewMode === 'audio' && (
             <div className="space-y-0">
-              <div className="flex items-start justify-between gap-4">
+              <div className="settings-row">
                 <div className="space-y-0.5">
                   <Label
                     htmlFor="hideTargetLanguages"
@@ -735,7 +735,7 @@ export function LearningModeSettings({
 
               {/* Auto-reveal — visually indented as a sub-setting */}
               {(courseSettings.hideTargetLanguages ?? true) && (
-                <div className="ml-4 mt-3 pl-3 border-l-2 border-border flex items-start justify-between gap-4">
+                <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
                   <div className="space-y-0.5">
                     <Label
                       htmlFor="autoRevealLanguages"
@@ -759,7 +759,7 @@ export function LearningModeSettings({
           )}
 
           {/* Show romanization */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="settings-row">
             <div className="space-y-0.5">
               <Label htmlFor="showRomanization" className="text-sm font-medium">
                 {t('showRomanization')}
@@ -777,7 +777,7 @@ export function LearningModeSettings({
           </div>
 
           {/* Show progress bar */}
-          <div className="flex items-start justify-between gap-4">
+          <div className="settings-row">
             <div className="space-y-0.5">
               <Label htmlFor="showProgressBar" className="text-sm font-medium">
                 {t('showProgressBar')}

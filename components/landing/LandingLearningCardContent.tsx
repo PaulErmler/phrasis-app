@@ -155,7 +155,7 @@ export function LandingLearningCardContent({
                     {showRomanization && translation.romanization && (
                       <p
                         className={cn(
-                          'text-xs text-muted-foreground leading-tight mt-0.5',
+                          'text-romanization',
                           isBlurred
                             ? cn(
                               'blur-md opacity-90 select-none',

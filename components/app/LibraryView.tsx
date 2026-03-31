@@ -102,7 +102,7 @@ export function LibraryView({
   if (!hasActiveCourse) {
     return (
       <div
-        className="flex-1 min-h-0 overflow-y-auto px-4 py-6"
+        className="scroll-view min-h-0"
         style={{ scrollbarGutter: 'stable' }}
       >
         <NoCourseEmptyState onOpenCourseMenu={onOpenCourseMenu} />

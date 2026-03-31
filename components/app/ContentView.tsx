@@ -53,7 +53,7 @@ export function ContentView({
   if (!hasActiveCourse) {
     return (
       <div
-        className="flex-1 overflow-y-auto px-4 py-6"
+        className="scroll-view"
         style={{ scrollbarGutter: 'stable' }}
       >
         <NoCourseEmptyState onOpenCourseMenu={onOpenCourseMenu} />
@@ -63,16 +63,16 @@ export function ContentView({
 
   return (
     <div
-      className="flex-1 overflow-y-auto px-4 py-6"
+      className="scroll-view"
       style={{ scrollbarGutter: 'stable' }}
     >
       <div className="app-view space-y-3">
         <button
           onClick={handleGoToChat}
           disabled={isNavigating}
-          className="card-surface p-4 flex items-center gap-4 transition-colors hover:bg-muted/50 w-full text-left disabled:opacity-70"
+          className="card-action-row disabled:opacity-70"
         >
-          <div className="p-2.5 rounded-lg bg-primary/10 text-primary shrink-0">
+          <div className="icon-badge-primary">
             {isNavigating ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
@@ -90,9 +90,9 @@ export function ContentView({
 
         <button
           onClick={onEnterTexts}
-          className="card-surface p-4 flex items-center gap-4 transition-colors hover:bg-muted/50 w-full text-left"
+          className="card-action-row"
         >
-          <div className="p-2.5 rounded-lg bg-primary/10 text-primary shrink-0">
+          <div className="icon-badge-primary">
             <PenLine className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -105,7 +105,7 @@ export function ContentView({
         </button>
 
         <div className="card-surface p-4 flex items-center gap-4 opacity-50 cursor-not-allowed">
-          <div className="p-2.5 rounded-lg bg-muted text-muted-foreground shrink-0">
+          <div className="icon-badge-muted">
             <Upload className="h-5 w-5" />
           </div>
           <div className="flex-1 min-w-0">
@@ -120,7 +120,7 @@ export function ContentView({
         </div>
 
         <div className="card-surface p-4 flex items-center gap-4 w-full">
-          <div className="p-2.5 rounded-lg bg-primary/10 text-primary shrink-0">
+          <div className="icon-badge-primary">
             <CircleHelp className="h-5 w-5" aria-hidden />
           </div>
           <p className="flex-1 min-w-0 text-muted-sm">{t('content.feedback.prompt')}</p>

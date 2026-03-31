@@ -120,7 +120,7 @@ export function DeckCardsView() {
                             {baseTranslation?.text || card.sourceText}
                           </p>
                           {baseTranslation?.romanization && (
-                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                            <p className="text-romanization">
                               {baseTranslation.romanization}
                             </p>
                           )}
@@ -130,7 +130,7 @@ export function DeckCardsView() {
                             </p>
                           )}
                           {targetTranslation?.romanization && (
-                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                            <p className="text-romanization">
                               {targetTranslation.romanization}
                             </p>
                           )}
@@ -156,7 +156,7 @@ export function DeckCardsView() {
                           {baseTranslation?.text || card.sourceText}
                         </p>
                         {baseTranslation?.romanization && (
-                          <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                          <p className="text-romanization">
                             {baseTranslation.romanization}
                           </p>
                         )}
@@ -196,7 +196,7 @@ export function DeckCardsView() {
                           <>
                             <p className="text-sm">{targetTranslation.text}</p>
                             {targetTranslation.romanization && (
-                              <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                              <p className="text-romanization">
                                 {targetTranslation.romanization}
                               </p>
                             )}

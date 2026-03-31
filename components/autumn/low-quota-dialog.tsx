@@ -76,7 +76,7 @@ export default function LowQuotaDialog({
             : t(consumable === false ? "noUpgradeAvailableCap" : "noUpgradeAvailable", { featureName })}
         </p>
 
-        <DialogFooter className="flex flex-col-reverse sm:flex-row justify-between gap-2 py-3 px-6 bg-secondary border-t">
+        <DialogFooter className="dialog-footer-bar">
           <Button
             size="sm"
             variant="ghost"
