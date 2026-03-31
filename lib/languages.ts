@@ -50,11 +50,17 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'en-US', 'US'),
+      createChirp3Voice('Kore', 'female', 'en-US', 'US'),
       createChirp3Voice('Charon', 'male', 'en-US', 'US'),
+      createChirp3Voice('Puck', 'male', 'en-US', 'US'),
       createChirp3Voice('Aoede', 'female', 'en-GB', 'UK'),
+      createChirp3Voice('Kore', 'female', 'en-GB', 'UK'),
       createChirp3Voice('Orus', 'male', 'en-GB', 'UK'),
+      createChirp3Voice('Puck', 'male', 'en-GB', 'UK'),
       createChirp3Voice('Achernar', 'female', 'en-AU', 'AU'),
+      createChirp3Voice('Kore', 'female', 'en-AU', 'AU'),
       createChirp3Voice('Achird', 'male', 'en-AU', 'AU'),
+      createChirp3Voice('Puck', 'male', 'en-AU', 'AU'),
     ],
   },
   {
@@ -66,7 +72,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'es-ES', 'Spain'),
+      createChirp3Voice('Kore', 'female', 'es-ES', 'Spain'),
       createChirp3Voice('Charon', 'male', 'es-ES', 'Spain'),
+      createChirp3Voice('Puck', 'male', 'es-ES', 'Spain'),
     ],
   },
   {
@@ -78,7 +86,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Kore', 'female', 'es-US', 'Latin America'),
       createChirp3Voice('Charon', 'male', 'es-US', 'Latin America'),
+      createChirp3Voice('Puck', 'male', 'es-US', 'Latin America'),
     ],
   },
   {
@@ -90,9 +100,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'fr-FR', 'France'),
+      createChirp3Voice('Kore', 'female', 'fr-FR', 'France'),
       createChirp3Voice('Charon', 'male', 'fr-FR', 'France'),
+      createChirp3Voice('Puck', 'male', 'fr-FR', 'France'),
       createChirp3Voice('Aoede', 'female', 'fr-CA', 'Canada'),
+      createChirp3Voice('Kore', 'female', 'fr-CA', 'Canada'),
       createChirp3Voice('Orus', 'male', 'fr-CA', 'Canada'),
+      createChirp3Voice('Puck', 'male', 'fr-CA', 'Canada'),
     ],
   },
   {
@@ -104,7 +118,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'de-DE', 'Germany'),
+      createChirp3Voice('Kore', 'female', 'de-DE', 'Germany'),
       createChirp3Voice('Charon', 'male', 'de-DE', 'Germany'),
+      createChirp3Voice('Puck', 'male', 'de-DE', 'Germany'),
     ],
   },
   {
@@ -116,7 +132,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'it-IT', 'Italy'),
+      createChirp3Voice('Kore', 'female', 'it-IT', 'Italy'),
       createChirp3Voice('Charon', 'male', 'it-IT', 'Italy'),
+      createChirp3Voice('Puck', 'male', 'it-IT', 'Italy'),
     ],
   },
   {
@@ -128,7 +146,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Kore', 'female', 'pt-BR', 'Brazil'),
       createChirp3Voice('Charon', 'male', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Puck', 'male', 'pt-BR', 'Brazil'),
     ],
   },
   {
@@ -140,7 +160,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Kore', 'female', 'ru-RU', 'Russia'),
       createChirp3Voice('Charon', 'male', 'ru-RU', 'Russia'),
+      createChirp3Voice('Puck', 'male', 'ru-RU', 'Russia'),
     ],
   },
   {
@@ -152,7 +174,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Kore', 'female', 'hi-IN', 'India'),
       createChirp3Voice('Charon', 'male', 'hi-IN', 'India'),
+      createChirp3Voice('Puck', 'male', 'hi-IN', 'India'),
     ],
   },
   {
@@ -164,7 +188,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Kore', 'female', 'cmn-CN', 'Mandarin'),
       createChirp3Voice('Charon', 'male', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Puck', 'male', 'cmn-CN', 'Mandarin'),
     ],
   },
   {
@@ -176,7 +202,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Kore', 'female', 'ja-JP', 'Japan'),
       createChirp3Voice('Charon', 'male', 'ja-JP', 'Japan'),
+      createChirp3Voice('Puck', 'male', 'ja-JP', 'Japan'),
     ],
   },
   {
@@ -188,7 +216,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Kore', 'female', 'ko-KR', 'Korea'),
       createChirp3Voice('Charon', 'male', 'ko-KR', 'Korea'),
+      createChirp3Voice('Puck', 'male', 'ko-KR', 'Korea'),
     ],
   },
   {
@@ -200,7 +230,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Kore', 'female', 'vi-VN', 'Vietnam'),
       createChirp3Voice('Charon', 'male', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Puck', 'male', 'vi-VN', 'Vietnam'),
     ],
   },
   {
@@ -212,7 +244,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Kore', 'female', 'sv-SE', 'Sweden'),
       createChirp3Voice('Charon', 'male', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Puck', 'male', 'sv-SE', 'Sweden'),
     ],
   },
   {
@@ -224,7 +258,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Kore', 'female', 'fi-FI', 'Finland'),
       createChirp3Voice('Charon', 'male', 'fi-FI', 'Finland'),
+      createChirp3Voice('Puck', 'male', 'fi-FI', 'Finland'),
     ],
   },
   {
@@ -236,7 +272,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Kore', 'female', 'nl-NL', 'Netherlands'),
       createChirp3Voice('Charon', 'male', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Puck', 'male', 'nl-NL', 'Netherlands'),
     ],
   },
   {
@@ -248,7 +286,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Kore', 'female', 'el-GR', 'Greece'),
       createChirp3Voice('Charon', 'male', 'el-GR', 'Greece'),
+      createChirp3Voice('Puck', 'male', 'el-GR', 'Greece'),
     ],
   },
   {
@@ -260,7 +300,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Kore', 'female', 'ar-XA', 'MSA'),
       createChirp3Voice('Charon', 'male', 'ar-XA', 'MSA'),
+      createChirp3Voice('Puck', 'male', 'ar-XA', 'MSA'),
     ],
   },
 ];
@@ -317,6 +359,44 @@ export function getRandomVoiceForLanguage(code: string): string {
       `No voices available for language code: "${code}". Add it to SUPPORTED_LANGUAGES.`,
     );
   }
+  const randomIndex = Math.floor(Math.random() * voices.length);
+  return voices[randomIndex].apiCode;
+}
+
+/**
+ * Look up the gender of a voice by its full apiCode.
+ * Returns undefined if the voice is not found.
+ */
+export function getVoiceGenderByApiCode(apiCode: string): 'male' | 'female' | undefined {
+  for (const lang of SUPPORTED_LANGUAGES) {
+    const voice = lang.voices.find((v) => v.apiCode === apiCode);
+    if (voice) return voice.gender;
+  }
+  return undefined;
+}
+
+/**
+ * Get a voice for a language, optionally matching a speaker gender.
+ * Falls back to random selection when gender is "neutral", undefined, or no matching voice exists.
+ */
+export function getVoiceForLanguage(
+  code: string,
+  speakerGender?: string,
+): string {
+  const voices = getVoicesByLanguageCode(code);
+  if (voices.length === 0) {
+    throw new Error(
+      `No voices available for language code: "${code}". Add it to SUPPORTED_LANGUAGES.`,
+    );
+  }
+
+  if (speakerGender === 'male' || speakerGender === 'female') {
+    const matching = voices.filter((v) => v.gender === speakerGender);
+    if (matching.length > 0) {
+      return matching[Math.floor(Math.random() * matching.length)].apiCode;
+    }
+  }
+
   const randomIndex = Math.floor(Math.random() * voices.length);
   return voices[randomIndex].apiCode;
 }
