@@ -1,73 +1,110 @@
+'use client';
+
 import Link from 'next/link';
-import { getTranslations } from 'next-intl/server';
-import { Button } from '@/components/ui/button';
+import { useTranslations } from 'next-intl';
 import { ArrowRight, Download } from 'lucide-react';
-import { LandingHeader } from './landing-header';
-import { PwaInstallTrigger } from './pwa-install-button';
+import { motion } from 'motion/react';
+import { Button } from '@/components/ui/button';
+import { PwaInstallTrigger } from '@/components/landing/pwa-install-button';
 
 interface HeroSectionProps {
   isAuthenticated: boolean;
 }
 
-export async function HeroSection({ isAuthenticated }: HeroSectionProps) {
-  const t = await getTranslations('LandingPage.hero');
+export function HeroSection({ isAuthenticated }: HeroSectionProps) {
+  const t = useTranslations('LandingPage.hero');
 
   return (
-    <section className="relative min-h-[90vh] flex flex-col items-center justify-center px-4 py-20 md:py-32 overflow-hidden hero-gradient noise-bg">
-      <LandingHeader isAuthenticated={isAuthenticated} />
-
-      <div className="relative z-10 w-full max-w-5xl mx-auto text-center space-y-8 animate-fade-in-up">
-        <div className="inline-flex items-center justify-center w-36 h-36 sm:w-44 sm:h-44 md:w-48 md:h-48">
-          <img
-            src="/icons/icon.svg"
-            alt="Flexling language learning app logo"
-            className="w-full h-full"
-            width={500}
-            height={500}
-          />
-        </div>
-
-        <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-bold tracking-tight text-foreground leading-[1.1] flex flex-col items-center gap-1 sm:gap-2">
-          <span className="gradient-text">Flexling</span>
-          <span>{t('tagline')}.</span>
-        </h1>
-
-        <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto stagger-1 leading-relaxed">
-          {t('subtitle')}
-        </p>
-
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-4 stagger-3">
-          {isAuthenticated ? (
-            <Button
-              asChild
-              size="lg"
-              className="w-full sm:w-auto min-w-[200px] text-base sm:text-lg h-12 sm:h-14 shadow-xl shadow-primary/20"
+    <section className="relative min-h-screen flex items-center ent-hero-gradient">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pt-24 pb-16 md:pt-32 md:pb-24">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          {/* Text column */}
+          <div className="space-y-8 text-center lg:text-left">
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              className="ent-section-label"
             >
-              <Link href="/app">
-                {t('cta.goToApp')}
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-          ) : (
-            <Button
-              asChild
-              size="lg"
-              className="w-full sm:w-auto min-w-[200px] text-base sm:text-lg h-12 sm:h-14 shadow-xl shadow-primary/20"
+              Language Learning, Reimagined
+            </motion.p>
+
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
+              className="text-[2.5rem] md:text-[3.5rem] lg:text-[5rem] font-semibold tracking-tight leading-[1.08]"
             >
-              <Link href="/auth/sign-up">
-                {t('cta.start')}
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-          )}
-          <PwaInstallTrigger
-            variant="outline"
-            size="lg"
-            className="w-full sm:w-auto min-w-[170px] text-base sm:text-lg h-12 sm:h-14"
+              The language app that{' '}
+              <span className="text-primary">grows with you</span>.
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
+              className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-xl mx-auto lg:mx-0"
+            >
+              {t('subtitle')}
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3, ease: 'easeOut' }}
+              className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 lg:justify-start justify-center"
+            >
+              {isAuthenticated ? (
+                <Button
+                  asChild
+                  size="lg"
+                  className="w-full sm:w-auto min-w-[200px] text-base h-12 sm:h-14 rounded-lg ent-cta-orange font-semibold"
+                >
+                  <Link href="/app">
+                    {t('cta.goToApp')}
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  asChild
+                  size="lg"
+                  className="w-full sm:w-auto min-w-[200px] text-base h-12 sm:h-14 rounded-lg ent-cta-orange font-semibold"
+                >
+                  <Link href="/auth/sign-up">
+                    {t('cta.start')}
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Link>
+                </Button>
+              )}
+              <PwaInstallTrigger
+                variant="outline"
+                size="lg"
+                className="w-full sm:w-auto min-w-[170px] text-base h-12 sm:h-14 rounded-lg"
+              >
+                <Download className="mr-2 h-5 w-5" />
+                {t('cta.install')}
+              </PwaInstallTrigger>
+            </motion.div>
+          </div>
+
+          {/* App icon column */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.7, delay: 0.2, ease: 'easeOut' }}
+            className="flex items-center justify-center lg:justify-end"
           >
-            <Download className="mr-2 h-5 w-5" />
-            {t('cta.install')}
-          </PwaInstallTrigger>
+            <div className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-80 lg:h-80">
+              <img
+                src="/icons/icon.svg"
+                alt="Flexling language learning app logo"
+                className="w-full h-full drop-shadow-2xl"
+                width={320}
+                height={320}
+              />
+            </div>
+          </motion.div>
         </div>
       </div>
     </section>

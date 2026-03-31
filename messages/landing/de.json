@@ -28,15 +28,15 @@
     }
   },
   "philosophy": {
-    "title": "Was Sprachkompetenz wirklich bewegt.",
+    "title": "Was dich fließend macht.",
     "titleHighlight": "Drei Grundprinzipien.",
     "lead": "Flüssigkeit entsteht, wenn Wiederholung, verständlicher Input und echte Neugier zusammenfinden. Flexling baut genau darauf.",
     "pillar1Title": "Wiederholung, die in den Tag passt",
     "pillar1Body": "Kurze, häufige Kontakte mit denselben Sätzen schlagen seltenes Pauken. Audio-Modus übt unterwegs; die vollständige Wiederholung schärft das Erinnern, wenn du tippen kannst.",
     "pillar2Title": "Verständlicher Input",
     "pillar2Body": "Du hörst und liest zuerst eine Zeile, die du schon verstehst, und streckst dich dann zur Übersetzung. So bleibt die Schwierigkeit anspruchsvoll, aber nicht frustrierend.",
-    "pillar3Title": "Neugier, wenn sie aufkommt",
-    "pillar3Body": "Wenn etwas Klick macht oder stutzt, frag nach „Warum?“ — und mach aus der Antwort Karten, die du morgen wieder hörst."
+    "pillar3Title": "Deine Inhalte, dein Weg",
+    "pillar3Body": "Füge eigene Sätze hinzu, lass KI individuelle Karteikarten erstellen und erhalte persönliche Grammatikerklärungen. Jeder lernt anders – dein Lernmaterial sollte das auch."
   },
   "reviewModes": {
     "title": "Zwei Wege zum Wiederholen.",
@@ -180,8 +180,8 @@
         "description": "Behalte bis zu 10x mehr mit wissenschaftlich bewährten Algorithmen, die dir Karten genau dann zeigen, wenn du sie brauchst."
       },
       "languageIntelligence": {
-        "title": "Sprachintelligenz",
-        "description": "Lerne zuerst die am häufigsten verwendeten Wörter und Phrasen oder konzentriere dich auf Vokabular für deine spezifischen Ziele und Interessen."
+        "title": "Verständlicher Input",
+        "description": "Jeder Satz ist in einer Sprache verankert, die du bereits kennst. Du streckst dich zur Übersetzung – herausfordernd, aber nie frustrierend."
       }
     }
   },

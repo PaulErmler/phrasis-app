@@ -1,35 +1,44 @@
-import { Heart, ExternalLink, Mail } from 'lucide-react';
-import { getTranslations } from 'next-intl/server';
+'use client';
+
+import { useTranslations } from 'next-intl';
+import { motion } from 'motion/react';
+import { Heart, Mail, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { LandingSquircleIcon } from './landing-squircle-icon';
-import { DonationMobileStack } from './donation-mobile-stack';
+import { LandingSquircleIcon } from '@/components/landing/landing-squircle-icon';
 
-export async function DonationSection() {
-  const t = await getTranslations('LandingPage.donation');
+export function DonationSection() {
+  const t = useTranslations('LandingPage.donation');
+
   return (
-    <section
-      id="donate"
-      className="relative px-4 py-10 sm:py-12 md:py-16 max-md:z-[2] max-md:isolate md:z-auto"
-    >
+    <section className="relative py-20 md:py-32 px-4 sm:px-6">
       <div className="max-w-5xl mx-auto">
-        <div className="mb-8 hidden text-center sm:mb-10 md:block">
-          <h2 className="mb-3 text-2xl font-bold sm:mb-4 sm:text-3xl md:text-4xl">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, ease: 'easeOut' as const }}
+          className="text-center mb-12 md:mb-16"
+        >
+          <p className="ent-section-label mb-4">Our Commitment</p>
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground">
             {t('title')}{' '}
-            <span className="gradient-text">{t('titleHighlight')}</span>
+            <span className="text-primary">{t('titleHighlight')}</span>
           </h2>
-        </div>
+        </motion.div>
 
-        <DonationMobileStack />
-
-        <div className="hidden grid-cols-1 gap-4 sm:gap-6 md:grid md:grid-cols-2">
-          <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 sm:p-8 flex flex-col">
-            <LandingSquircleIcon variant="accent" className="mb-4">
-              <Heart className="h-7 w-7 text-white fill-white/25" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' as const }}
+            className="rounded-2xl border border-border/40 bg-card p-7 md:p-8 flex flex-col"
+          >
+            <LandingSquircleIcon variant="orange" className="mb-5">
+              <Heart className="h-6 w-6 text-white" />
             </LandingSquircleIcon>
-            <h3 className="text-lg sm:text-xl font-semibold mb-3">
-              {t('givingTitle')}
-            </h3>
-            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed flex-1">
+            <h3 className="text-xl font-semibold mb-3">{t('givingTitle')}</h3>
+            <p className="text-muted-foreground leading-relaxed flex-1">
               {t('description')}{' '}
               <span className="font-semibold text-foreground">
                 {t('percentage')}
@@ -46,25 +55,33 @@ export async function DonationSection() {
               </a>
               .
             </p>
-          </div>
+          </motion.div>
 
-          <div className="rounded-2xl border border-border/50 bg-card/80 backdrop-blur-sm p-6 sm:p-8 flex flex-col">
-            <LandingSquircleIcon variant="orange" className="mb-4">
-              <Mail className="h-7 w-7 text-white" />
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 0.2, ease: 'easeOut' as const }}
+            className="rounded-2xl border border-border/40 bg-card p-7 md:p-8 flex flex-col"
+          >
+            <LandingSquircleIcon variant="accent" className="mb-5">
+              <Mail className="h-6 w-6 text-white" />
             </LandingSquircleIcon>
-            <h3 className="text-lg sm:text-xl font-semibold mb-3">
-              {t('supportTitle')}
-            </h3>
-            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed flex-1 mb-5">
+            <h3 className="text-xl font-semibold mb-3">{t('supportTitle')}</h3>
+            <p className="text-muted-foreground leading-relaxed flex-1 mb-6">
               {t('supportDescription')}
             </p>
-            <Button asChild variant="outline" className="w-full sm:w-auto gap-2">
+            <Button
+              asChild
+              variant="outline"
+              className="w-full sm:w-auto gap-2 rounded-lg"
+            >
               <a href={`mailto:${t('email')}`}>
                 <Mail className="w-4 h-4" />
                 {t('emailButton')}
               </a>
             </Button>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

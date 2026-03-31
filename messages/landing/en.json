@@ -28,15 +28,15 @@
     }
   },
   "philosophy": {
-    "title": "What actually moves fluency.",
+    "title": "What makes you fluent.",
     "titleHighlight": "Three core principles.",
     "lead": "Languages stick when three things line up: enough repetition, input you can mostly follow, and genuine curiosity. Flexling is built around all three.",
     "pillar1Title": "Repetition that fits your day",
     "pillar1Body": "Short, frequent encounters with the same sentences beat rare cramming. Audio review lets you rehearse while you move; full review sharpens recall when you have a keyboard in front of you.",
     "pillar2Title": "Comprehensible input",
     "pillar2Body": "You always anchor on a line you already understand, then reach for the translation. That keeps difficulty in the sweet spot: challenging, but not overwhelming.",
-    "pillar3Title": "Curiosity on tap",
-    "pillar3Body": "When something clicks or confuses you, you can ask why — and turn the answer into cards you will hear again tomorrow."
+    "pillar3Title": "Your content, your way",
+    "pillar3Body": "Add your own sentences, let AI create custom flashcards, and get personalized grammar explanations. Every learner is different – your study material should be too."
   },
   "reviewModes": {
     "title": "Two ways to review.",
@@ -180,8 +180,8 @@
         "description": "Remember up to 10x more with scientifically-proven algorithms that show you cards exactly when you need them."
       },
       "languageIntelligence": {
-        "title": "Language Intelligence",
-        "description": "Learn the most commonly used words and phrases first, or focus on vocabulary for your specific goals and interests."
+        "title": "Comprehensible Input",
+        "description": "Every sentence is anchored in a language you already know. You stretch toward the translation, keeping difficulty challenging but never frustrating."
       }
     }
   },
