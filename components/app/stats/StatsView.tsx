@@ -79,6 +79,7 @@ export function StatsView() {
           accuracySum={cs?.totalAccuracySum ?? 0}
           accuracyCount={cs?.totalAccuracyCount ?? 0}
           hasLearnedToday={(pageData?.todayReps ?? 0) > 0}
+          languageWordCounts={pageData?.languageWordCounts ?? []}
         />
 
         <CumulativeLineChart

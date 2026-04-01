@@ -178,14 +178,19 @@
         "noCardsToAdd": "No more sentences to add from this collection",
         "descriptions": {
           "Essential": "The most essential survival sentences",
-          "A1": "CEFR A1 — learn the 500 most common words",
-          "A2": "CEFR A2 — roughly the 500–2,000 most common words",
-          "B1": "CEFR B1 — roughly the 2,000–3,500 most common words",
-          "B2": "CEFR B2 — roughly the 3,500–5,000 most common words",
-          "C1": "CEFR C1 — roughly the 5,000–8,000 most common words",
-          "C2": "CEFR C2 — the 8,000+ most common words",
+          "A1": "Learn the 500 most common words",
+          "A2": "Learn the 500–2,000 most common words",
+          "B1": "Learn the 2,000–3,500 most common words",
+          "B2": "Learn the 3,500–5,000 most common words",
+          "C1": "Learn the 5,000–8,000 most common words",
+          "C2": "Learn words that are rarer than the 8,000 most frequent words",
           "Chat": "Phrases and vocabulary from the chat",
           "Custom": "Sentences you entered yourself"
+        },
+        "inline": {
+          "added": "added",
+          "remaining": "remaining",
+          "preview": "Preview"
         },
         "detail": {
           "totalCards": "{count, plural, one {# sentence} other {# sentences}}",

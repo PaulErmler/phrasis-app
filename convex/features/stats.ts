@@ -105,6 +105,24 @@ export const getStatsPageData = query({
       }));
     }
 
+    // Per-language word counts
+    const langStatsRows = await ctx.db
+      .query('languageStats')
+      .withIndex('by_userId_and_courseId', (q) =>
+        q.eq('userId', userId).eq('courseId', courseId),
+      )
+      .take(20);
+    // Merge variants (e.g. es + es_latam) into a single entry
+    const wordsByLang = new Map<string, number>();
+    for (const r of langStatsRows) {
+      if (baseLanguages.includes(r.language) || r.totalWords <= 0) continue;
+      const key = r.language.replace(/_latam$/, '');
+      wordsByLang.set(key, (wordsByLang.get(key) ?? 0) + r.totalWords);
+    }
+    const languageWordCounts = Array.from(wordsByLang.entries())
+      .map(([language, words]) => ({ language, words }))
+      .sort((a, b) => b.words - a.words);
+
     return {
       courseStats: stats ? {
         totalRepetitions: stats.totalRepetitions,
@@ -122,6 +140,7 @@ export const getStatsPageData = query({
       hourlyDistribution: hourlyTotals,
       monthlyStats,
       baseLanguages,
+      languageWordCounts,
     };
   },
 });

@@ -100,6 +100,7 @@ export function useAudioPlayer(
   }, [getAudio]);
 
   const pause = useCallback(() => {
+    hasAutoPlayedForCardRef.current = true; // suppress pending auto-play
     const audio = audioRef.current;
     if (audio && !audio.paused) {
       audio.pause();

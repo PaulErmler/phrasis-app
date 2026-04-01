@@ -3,6 +3,12 @@
 import { useTranslations } from 'next-intl';
 import { Flame, BookOpen, RotateCcw, MessageSquare, Clock, Target } from 'lucide-react';
 import { formatTimeMs } from '@/lib/formatTime';
+import { getLanguageByCode } from '@/lib/languages';
+
+interface LanguageWordCount {
+  language: string;
+  words: number;
+}
 
 interface NumbersRowProps {
   streak: number;
@@ -13,6 +19,7 @@ interface NumbersRowProps {
   accuracySum: number;
   accuracyCount: number;
   hasLearnedToday?: boolean;
+  languageWordCounts: LanguageWordCount[];
 }
 
 function StatCell({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
@@ -21,6 +28,46 @@ function StatCell({ icon, label, value }: { icon: React.ReactNode; label: string
       <div className="text-muted-foreground">{icon}</div>
       <p className="text-lg font-semibold tabular-nums leading-tight">{value}</p>
       <p className="text-muted-xs leading-none">{label}</p>
+    </div>
+  );
+}
+
+function getLanguageFlag(code: string): string {
+  const lang = getLanguageByCode(code);
+  return lang?.flag ?? '🌐';
+}
+
+function WordsCell({ languageWordCounts, totalWords, t }: {
+  languageWordCounts: LanguageWordCount[];
+  totalWords: number;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const showFlags = languageWordCounts.length >= 2;
+
+  if (!showFlags) {
+    return (
+      <StatCell
+        icon={<BookOpen className="h-3.5 w-3.5" />}
+        label={t('words')}
+        value={totalWords.toLocaleString()}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center text-center gap-0.5">
+      <div className="text-muted-foreground">
+        <BookOpen className="h-3.5 w-3.5" />
+      </div>
+      <div className="flex flex-wrap justify-center gap-x-2.5 gap-y-0.5">
+        {languageWordCounts.map((lw) => (
+          <span key={lw.language} className="text-sm font-semibold tabular-nums leading-tight">
+            {getLanguageFlag(lw.language)}{' '}
+            {lw.words.toLocaleString()}
+          </span>
+        ))}
+      </div>
+      <p className="text-muted-xs leading-none">{t('words')}</p>
     </div>
   );
 }
@@ -34,6 +81,7 @@ export function NumbersRow({
   accuracySum,
   accuracyCount,
   hasLearnedToday,
+  languageWordCounts,
 }: NumbersRowProps) {
   const t = useTranslations('StatsPage');
 
@@ -55,11 +103,7 @@ export function NumbersRow({
           </p>
           <p className="text-muted-xs leading-none">{t('streak')}</p>
         </div>
-        <StatCell
-          icon={<BookOpen className="h-3.5 w-3.5" />}
-          label={t('words')}
-          value={words.toLocaleString()}
-        />
+        <WordsCell languageWordCounts={languageWordCounts} totalWords={words} t={t} />
         <StatCell
           icon={<RotateCcw className="h-3.5 w-3.5" />}
           label={t('reviews')}

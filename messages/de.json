@@ -178,14 +178,19 @@
         "noCardsToAdd": "Keine weiteren Sätze aus dieser Sammlung hinzuzufügen",
         "descriptions": {
           "Essential": "Die wichtigsten Alltags- und Überlebens-Sätze",
-          "A1": "CEFR A1 — lerne die 500 häufigsten Wörter",
-          "A2": "CEFR A2 — etwa die 500 bis 2.000 häufigsten Wörter",
-          "B1": "CEFR B1 — etwa die 2.000 bis 3.500 häufigsten Wörter",
-          "B2": "CEFR B2 — etwa die 3.500 bis 5.000 häufigsten Wörter",
-          "C1": "CEFR C1 — etwa die 5.000 bis 8.000 häufigsten Wörter",
-          "C2": "CEFR C2 — die 8.000+ häufigsten Wörter",
+          "A1": "Lerne die 500 häufigsten Wörter",
+          "A2": "Lerne die 500 bis 2.000 häufigsten Wörter",
+          "B1": "Lerne die 2.000 bis 3.500 häufigsten Wörter",
+          "B2": "Lerne die 3.500 bis 5.000 häufigsten Wörter",
+          "C1": "Lerne die 5.000 bis 8.000 häufigsten Wörter",
+          "C2": "Lerne die 8.000+ häufigsten Wörter",
           "Chat": "Phrasen und Vokabular aus dem Chat",
           "Custom": "Sätze, die du selbst eingegeben hast"
+        },
+        "inline": {
+          "added": "hinzugefügt",
+          "remaining": "verbleibend",
+          "preview": "Vorschau"
         },
         "detail": {
           "totalCards": "{count, plural, one {# Satz} other {# Sätze}}",

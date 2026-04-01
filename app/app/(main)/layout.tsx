@@ -334,7 +334,10 @@ export default function MainLayout({
             onChatOpen={handleOpenChat}
             onNavigateToContent={() => handleViewChange('content')}
             onNavigateToChat={handleNavigateToChat}
-            onEnterTexts={() => router.push('/app/content/add-cards')}
+            onEnterTexts={() => {
+              handleViewChange('content');
+              router.push('/app/content/add-cards');
+            }}
             onTutorialReady={handleTutorialReady}
             animateEntrance={justReturnedFromLearn}
             isHidden={isLearnOpen || activeView !== 'home'}

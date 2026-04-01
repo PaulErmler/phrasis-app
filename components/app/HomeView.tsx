@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Preloaded, usePreloadedQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -11,6 +11,9 @@ import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
 import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
+import { MessageSquare, PenLine, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 import type { ReviewMode } from '@/convex/types';
 
 export function HomeView({
@@ -21,6 +24,7 @@ export function HomeView({
   onChatOpen,
   onNavigateToContent,
   onNavigateToChat,
+  onEnterTexts,
   onTutorialReady,
   animateEntrance,
   isHidden,
@@ -40,6 +44,7 @@ export function HomeView({
   onChatOpen: (threadId: string) => void;
   onNavigateToContent: () => void;
   onNavigateToChat: () => void;
+  onEnterTexts: () => void;
   onTutorialReady?: (restart: () => void) => void;
   animateEntrance?: boolean;
   isHidden?: boolean;
@@ -74,6 +79,24 @@ export function HomeView({
       );
     }
   });
+
+  const getOrCreateEmptyThread = useMutation(
+    api.features.chat.threads.getOrCreateEmptyThread,
+  );
+  const [isChatNavigating, setIsChatNavigating] = useState(false);
+
+  const handleGoToChat = useCallback(async () => {
+    setIsChatNavigating(true);
+    try {
+      const threadId = await getOrCreateEmptyThread({});
+      onChatOpen(threadId);
+    } catch (error) {
+      console.error('Failed to open chat:', error);
+      toast.error(t('content.chat.openError'));
+    } finally {
+      setIsChatNavigating(false);
+    }
+  }, [getOrCreateEmptyThread, onChatOpen, t]);
 
   const handleStartReview = useCallback(
     async (mode: ReviewMode) => {
@@ -119,12 +142,41 @@ export function HomeView({
           courseId={courseSettings?.courseId}
         />
 
-        <NewChatInput
-          showSuggestions={false}
-          autoFocus={false}
-          className="[&_[data-slot=input-group]]:rounded-xl"
-          onChatCreated={onChatOpen}
-        />
+        {/* Content actions */}
+        <div className="card-surface p-4 space-y-3">
+          <NewChatInput
+            showSuggestions={false}
+            autoFocus={false}
+            className="[&_[data-slot=input-group]]:rounded-xl"
+            onChatCreated={onChatOpen}
+          />
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full gap-2"
+              onClick={handleGoToChat}
+              disabled={isChatNavigating}
+            >
+              {isChatNavigating ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <MessageSquare className="h-5 w-5" />
+              )}
+              {t('content.chat.title')}
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full gap-2"
+              onClick={onEnterTexts}
+            >
+              <PenLine className="h-5 w-5" />
+              {t('customContent')}
+            </Button>
+          </div>
+        </div>
 
         <div className="space-y-2" data-tutorial="collection-carousel">
           <h2 className="heading-section">
