@@ -38,9 +38,12 @@ function SmoothMessageResponse({
   text: string;
   isStreaming: boolean;
 }) {
-  const [smoothText] = useSmoothText(text, { startStreaming: isStreaming });
+  const [smoothText, { isStreaming: isSmoothTextStreaming }] = useSmoothText(text, { startStreaming: isStreaming });
+  // Keep streaming mode active until smooth text has fully caught up,
+  // preventing Streamdown from switching rendering paths mid-animation.
+  const effectiveMode = isStreaming || isSmoothTextStreaming ? 'streaming' : 'static';
   return (
-    <MessageResponse mode={isStreaming ? 'streaming' : 'static'}>
+    <MessageResponse mode={effectiveMode}>
       {smoothText}
     </MessageResponse>
   );

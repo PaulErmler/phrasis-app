@@ -82,6 +82,8 @@ export default function MainLayout({
   );
   const viewBeforeChatRef = useRef<Exclude<View, 'chat'>>('home');
   const [isLearnOpen, setIsLearnOpen] = useState(false);
+  const isLearnOpenRef = useRef(false);
+  useEffect(() => { isLearnOpenRef.current = isLearnOpen; }, [isLearnOpen]);
   const isAddCardsRoute = pathname === '/app/content/add-cards';
 
   useEffect(() => {
@@ -209,6 +211,10 @@ export default function MainLayout({
       const url = window.location.pathname;
       if (url === '/app/learn') {
         setIsLearnOpen(true);
+      } else if (isLearnOpenRef.current) {
+        // Swipe-back or browser back detected while Learn is open.
+        // Re-push the learn URL to prevent accidental closure.
+        history.pushState(null, '', '/app/learn');
       } else {
         setIsLearnOpen(false);
         const parsed = viewFromPathname(url);
@@ -395,14 +401,16 @@ export default function MainLayout({
         )}
       </main>
 
-      <BottomNav
-        currentView={activeView}
-        onViewChange={handleViewChange}
-        onLearnOpen={handleLearnOpen}
-      />
+      <div className={isLearnOpen ? 'pointer-events-none' : undefined}>
+        <BottomNav
+          currentView={activeView}
+          onViewChange={handleViewChange}
+          onLearnOpen={handleLearnOpen}
+        />
+      </div>
 
       {isLearnOpen && (
-        <div className="fixed inset-x-0 top-0 z-50 h-dvh max-h-dvh bg-background">
+        <div className="fixed inset-0 z-50 bg-background">
           <LearnView
             onBack={handleLearnClose}
             prefetchedThreadId={prefetchedThreadId ?? undefined}
