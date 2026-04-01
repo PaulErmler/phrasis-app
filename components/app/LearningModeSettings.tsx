@@ -660,16 +660,16 @@ export function LearningModeSettings({
             {reviewMode === 'audio' &&
               autoAdvance &&
               (baseLanguages.length > 0 || targetLanguages.length > 0) && (
-                <StepperPauseConnector
-                  label={t('pauseBeforeAutoAdvance')}
-                  seconds={
-                    courseSettings.pauseBeforeAutoAdvance ??
+              <StepperPauseConnector
+                label={t('pauseBeforeAutoAdvance')}
+                seconds={
+                  courseSettings.pauseBeforeAutoAdvance ??
                     DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE
-                  }
-                  onChange={handlePauseBeforeAutoAdvanceChange}
-                  accent
-                />
-              )}
+                }
+                onChange={handlePauseBeforeAutoAdvanceChange}
+                accent
+              />
+            )}
 
             {/* End-of-sequence indicator */}
             <div className="mt-2 flex items-center gap-2 text-muted-xs">

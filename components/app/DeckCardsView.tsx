@@ -163,7 +163,7 @@ export function DeckCardsView() {
                         {!baseTranslation?.text &&
                           baseTranslation === undefined && (
                           <p className="text-muted-sm italic">
-                              {t('translating')}
+                            {t('translating')}
                           </p>
                         )}
                         <div className="flex gap-2">
@@ -184,8 +184,8 @@ export function DeckCardsView() {
                           <Badge variant="secondary" className="text-xs">
                             {targetTranslation?.language
                               ? getLanguageShortLabel(
-                                  targetTranslation.language,
-                                )
+                                targetTranslation.language,
+                              )
                               : 'TARGET'}
                           </Badge>
                           <span className="text-sm font-medium">
@@ -210,8 +210,8 @@ export function DeckCardsView() {
                             language={
                               targetTranslation?.language
                                 ? getLanguageShortLabel(
-                                    targetTranslation.language,
-                                  )
+                                  targetTranslation.language,
+                                )
                                 : ''
                             }
                             showLabel
