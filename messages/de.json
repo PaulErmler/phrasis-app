@@ -264,6 +264,7 @@
       "unarchiveConfirmButton": "Wiederherstellen",
       "unarchiveCooldown": "Du kannst diesen Kurs nach dem {date} wiederherstellen.",
       "unarchiveNoSlot": "Du hast die maximale Anzahl aktiver Kurse erreicht. Upgrade deinen Plan oder archiviere zuerst einen anderen Kurs.",
+      "hardLimitTitle": "Kurs-Limit erreicht",
       "hardLimitReached": "Maximal {max} Kurse erreicht.",
       "activeSlotReachedTitle": "Limit aktiver Kurse erreicht",
       "activeSlotReachedDescription": "Du hast dein Limit aktiver Kurse erreicht. Archiviere einen bestehenden Kurs, um einen Platz freizugeben, oder upgrade deinen Plan für mehr aktive Kurse.",
@@ -405,7 +406,11 @@
       "impressum": "Impressum",
       "agb": "AGB",
       "privacy": "Datenschutz"
-    }
+    },
+    "tagline": "Die Sprach-App, die mit dir wächst.",
+    "columnProduct": "Produkt",
+    "columnLegal": "Rechtliches",
+    "columnSettings": "Einstellungen"
   },
   "Theme": {
     "title": "Design",

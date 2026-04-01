@@ -28,14 +28,14 @@ export function LandingFooter() {
                 </h3>
               </div>
               <p className="text-sm text-muted-foreground">
-                The language app that grows with you.
+                {t('tagline')}
               </p>
             </div>
 
             {/* Column 2: Product */}
             <div className="space-y-4">
               <h4 className="text-xs font-semibold tracking-widest uppercase text-muted-foreground/70">
-                Product
+                {t('columnProduct')}
               </h4>
               <ul className="space-y-2.5 text-sm">
                 <li>
@@ -76,7 +76,7 @@ export function LandingFooter() {
             {/* Column 3: Legal */}
             <div className="space-y-4">
               <h4 className="text-xs font-semibold tracking-widest uppercase text-muted-foreground/70">
-                Legal
+                {t('columnLegal')}
               </h4>
               <ul className="space-y-2.5 text-sm">
                 <li>
@@ -109,7 +109,7 @@ export function LandingFooter() {
             {/* Column 4: Settings */}
             <div className="space-y-4">
               <h4 className="text-xs font-semibold tracking-widest uppercase text-muted-foreground/70">
-                Settings
+                {t('columnSettings')}
               </h4>
               <p className="text-sm text-muted-foreground">
                 {t('madeInGermany')} 🇩🇪

@@ -115,7 +115,8 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
   };
 
   const handleCreateClick = () => {
-    if (quotaInfo && !quotaInfo.canCreate) {
+    if (!quotaInfo) return;
+    if (!quotaInfo.canCreate) {
       if (quotaInfo.totalCount >= quotaInfo.maxCourses) {
         setCourseAlert({
           variant: 'hard_limit',
@@ -172,13 +173,14 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
               variant="outline"
               className="w-full mb-3 gap-2 h-9"
               onClick={handleCreateClick}
+              disabled={!quotaInfo}
             >
               {canCreate ? (
                 <Plus className="h-4 w-4" />
               ) : (
                 <Lock className="h-4 w-4" />
               )}
-              {canCreate ? t('courses.createNew') : t('courses.createNew')}
+              {t('courses.createNew')}
             </Button>
 
             <div className="flex flex-col gap-2">
@@ -336,7 +338,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>
               {courseAlert?.variant === 'hard_limit'
-                ? t('courses.activeSlotReachedTitle')
+                ? t('courses.hardLimitTitle')
                 : t('courses.unarchive')}
             </AlertDialogTitle>
             <AlertDialogDescription>

@@ -303,7 +303,7 @@ function OnboardingUI({
       });
       setIsSubmitting(false);
     }
-  }, [completeOnboarding, syncQuotas, router, setIsSubmitting]);
+  }, [completeOnboarding, syncQuotas, router, setIsSubmitting, t]);
 
   const handleContinue = async () => {
     if (isFinishStep) {

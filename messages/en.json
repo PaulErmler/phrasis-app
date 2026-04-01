@@ -264,6 +264,7 @@
       "unarchiveConfirmButton": "Unarchive",
       "unarchiveCooldown": "You can unarchive this course after {date}.",
       "unarchiveNoSlot": "You've reached the maximum number of active courses. Upgrade your plan or archive another course first.",
+      "hardLimitTitle": "Course Limit Reached",
       "hardLimitReached": "Maximum of {max} courses reached.",
       "activeSlotReachedTitle": "Active Course Limit Reached",
       "activeSlotReachedDescription": "You've reached your active course limit. Archive an existing course to free up a slot, or upgrade your plan for more active courses.",
@@ -405,7 +406,11 @@
       "impressum": "Imprint",
       "agb": "Terms & Conditions",
       "privacy": "Privacy Policy"
-    }
+    },
+    "tagline": "The language app that grows with you.",
+    "columnProduct": "Product",
+    "columnLegal": "Legal",
+    "columnSettings": "Settings"
   },
   "Theme": {
     "title": "Theme",
