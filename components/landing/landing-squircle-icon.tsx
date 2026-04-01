@@ -4,10 +4,6 @@ import { cn } from '@/lib/utils';
 type LandingSquircleIconProps = {
   children: ReactNode;
   className?: string;
-  /** @deprecated No longer used — kept for compatibility */
-  variant?: string;
-  /** @deprecated No longer used — kept for compatibility */
-  backClassName?: string;
 };
 
 export function LandingSquircleIcon({

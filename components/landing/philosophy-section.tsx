@@ -13,7 +13,6 @@ const fadeInUp = {
 };
 
 const pillarIcons = [RefreshCw, BookOpen, Pencil];
-const pillarVariants = ['orange', 'accent', 'orange'] as const;
 
 export function PhilosophySection() {
   const t = useTranslations('LandingPage.philosophy');
@@ -50,7 +49,7 @@ export function PhilosophySection() {
             className="relative md:col-span-7 rounded-2xl border border-border/40 bg-card p-8 md:p-10 overflow-hidden"
           >
             <span className="ent-pillar-number">{pillars[0].number}</span>
-            <LandingSquircleIcon variant={pillarVariants[0]} className="mb-5 relative">
+            <LandingSquircleIcon className="mb-5 relative">
               <RefreshCw className="h-6 w-6 text-white" />
             </LandingSquircleIcon>
             <h3 className="text-xl md:text-2xl font-semibold mb-3 relative">
@@ -67,7 +66,7 @@ export function PhilosophySection() {
             className="relative md:col-span-5 rounded-2xl border border-border/40 bg-card p-8 md:p-10 overflow-hidden"
           >
             <span className="ent-pillar-number">{pillars[1].number}</span>
-            <LandingSquircleIcon variant={pillarVariants[1]} className="mb-5 relative">
+            <LandingSquircleIcon className="mb-5 relative">
               <BookOpen className="h-6 w-6 text-white" />
             </LandingSquircleIcon>
             <h3 className="text-xl md:text-2xl font-semibold mb-3 relative">
@@ -85,7 +84,7 @@ export function PhilosophySection() {
             className="relative md:col-span-8 md:col-start-3 rounded-2xl border border-border/40 bg-card p-8 md:p-10 overflow-hidden"
           >
             <span className="ent-pillar-number">{pillars[2].number}</span>
-            <LandingSquircleIcon variant={pillarVariants[2]} className="mb-5 relative">
+            <LandingSquircleIcon className="mb-5 relative">
               <Pencil className="h-6 w-6 text-white" />
             </LandingSquircleIcon>
             <h3 className="text-xl md:text-2xl font-semibold mb-3 relative">

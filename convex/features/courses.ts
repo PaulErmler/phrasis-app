@@ -494,8 +494,6 @@ export const unarchiveCourse = mutation({
       }
     }
 
-    await enforceCourseHardCap(ctx, userId);
-
     try {
       await consumeQuota(ctx, userId, FEATURE_IDS.COURSES, 1);
     } catch (error) {
@@ -516,6 +514,19 @@ export const unarchiveCourse = mutation({
       isArchived: undefined,
       archivedAt: undefined,
     });
+
+    // Set activeCourseId if it's missing or points to an archived/deleted course
+    const settings = await dbGetUserSettings(ctx, userId);
+    if (settings) {
+      if (!settings.activeCourseId) {
+        await ctx.db.patch(settings._id, { activeCourseId: args.courseId });
+      } else {
+        const activeCourse = await ctx.db.get(settings.activeCourseId);
+        if (!activeCourse || activeCourse.isArchived === true) {
+          await ctx.db.patch(settings._id, { activeCourseId: args.courseId });
+        }
+      }
+    }
 
     return { status: 'success' } as const;
   },

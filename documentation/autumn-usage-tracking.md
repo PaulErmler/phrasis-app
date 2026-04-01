@@ -302,7 +302,7 @@ Used in `CourseMenu` for the "Create New Course" button.
 Shown when a feature limit is fully reached (balance = 0). Uses `usePaywall({ featureId })` from `autumn-js/react` to fetch Autumn's paywall preview (which includes the next product/plan to upgrade to).
 
 - Shows a spinner only while `isLoading` is true.
-- Once loaded, displays a title/message from `getPaywallContent()` (in `lib/autumn/paywall-content.tsx`).
+- Once loaded, displays a title from `getPaywallTitle()` and a message from `getPaywallMessage()` (both in `lib/autumn/paywall-content.tsx`).
 - Products from the paywall preview are filtered with `filterProductsByFeatureIncrease()` so the suggested plan actually raises the limit for that feature. If that filter removes every product (e.g. the next tier is Basic but both Free and Basic grant the same number of active courses), **`PaywallDialog` falls back to `usePricingTable()`** and `findUpgradeProductFromPricingTable()` in `lib/autumn/find-upgrade-product.ts`—the same resolution path as `LowQuotaDialog`—so checkout can still offer a real upgrade (e.g. Pro).
 - Footer has two buttons:
   - **"Not now"** – dismisses the dialog.

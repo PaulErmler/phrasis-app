@@ -34,7 +34,7 @@ export function DonationSection() {
             transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' as const }}
             className="rounded-2xl border border-border/40 bg-card p-7 md:p-8 flex flex-col"
           >
-            <LandingSquircleIcon variant="orange" className="mb-5">
+            <LandingSquircleIcon className="mb-5">
               <Heart className="h-6 w-6 text-white" />
             </LandingSquircleIcon>
             <h3 className="text-xl font-semibold mb-3">{t('givingTitle')}</h3>
@@ -64,7 +64,7 @@ export function DonationSection() {
             transition={{ duration: 0.5, delay: 0.2, ease: 'easeOut' as const }}
             className="rounded-2xl border border-border/40 bg-card p-7 md:p-8 flex flex-col"
           >
-            <LandingSquircleIcon variant="accent" className="mb-5">
+            <LandingSquircleIcon className="mb-5">
               <Mail className="h-6 w-6 text-white" />
             </LandingSquircleIcon>
             <h3 className="text-xl font-semibold mb-3">{t('supportTitle')}</h3>
