@@ -42,7 +42,7 @@ export default function LowQuotaDialog({
   const consumable = isFeatureConsumable(featureId);
 
   const upgradeProduct = findUpgradeProductFromPricingTable(
-    products,
+    products ?? undefined,
     featureId,
     included,
     consumable,
