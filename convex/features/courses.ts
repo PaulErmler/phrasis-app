@@ -28,7 +28,7 @@ import {
   getTodayInTimezone,
   getPreviousDay,
 } from '../db/courseStats';
-import { getDailyStats } from '../db/dailyStats';
+import { getDailyStats } from '../db/stats/dailyStats';
 import { consumeQuota, hasFeatureAccess, releaseQuota } from '../usage/helpers';
 import { MAX_COURSES_PER_USER, ARCHIVE_COOLDOWN_MS } from '../../lib/constants/courses';
 import { FEATURE_IDS } from './featureIds';
@@ -293,6 +293,14 @@ export const getCourseStats = query({
       currentStreak: v.number(),
       streakFreezeCount: v.number(),
       streakFrozenToday: v.boolean(),
+      totalWordCount: v.optional(v.number()),
+      totalChatMessages: v.optional(v.number()),
+      totalChatCardsApproved: v.optional(v.number()),
+      totalCardsEdited: v.optional(v.number()),
+      totalCardsAddedManually: v.optional(v.number()),
+      totalReviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+      totalAccuracySum: v.optional(v.number()),
+      totalAccuracyCount: v.optional(v.number()),
     }),
     v.null(),
   ),
@@ -320,6 +328,14 @@ export const getCourseStats = query({
         currentStreak: stats.currentStreak,
         streakFreezeCount: stats.streakFreezeCount ?? 0,
         streakFrozenToday,
+        totalWordCount: stats.totalWordCount,
+        totalChatMessages: stats.totalChatMessages,
+        totalChatCardsApproved: stats.totalChatCardsApproved,
+        totalCardsEdited: stats.totalCardsEdited,
+        totalCardsAddedManually: stats.totalCardsAddedManually,
+        totalReviewsByMode: stats.totalReviewsByMode,
+        totalAccuracySum: stats.totalAccuracySum,
+        totalAccuracyCount: stats.totalAccuracyCount,
       };
     } catch {
       return null;
@@ -337,6 +353,12 @@ export const getTodayStats = query({
       reps: v.number(),
       newCards: v.number(),
       timeMs: v.number(),
+      reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+      accuracyAvg: v.optional(v.number()),
+      chatMessagesSent: v.optional(v.number()),
+      chatCardsApproved: v.optional(v.number()),
+      cardsEdited: v.optional(v.number()),
+      cardsAddedManually: v.optional(v.number()),
     }),
     v.null(),
   ),
@@ -348,7 +370,20 @@ export const getTodayStats = query({
     const todayStr = getTodayInTimezone(args.timezone);
     const daily = await getDailyStats(ctx, userId, active.course._id, todayStr);
     if (!daily) return null;
-    return { reps: daily.reps, newCards: daily.newCards, timeMs: daily.timeMs };
+    return {
+      reps: daily.reps,
+      newCards: daily.newCards,
+      timeMs: daily.timeMs,
+      reviewsByMode: daily.reviewsByMode,
+      accuracyAvg:
+        daily.accuracyCount && daily.accuracyCount > 0
+          ? (daily.accuracySum ?? 0) / daily.accuracyCount
+          : undefined,
+      chatMessagesSent: daily.chatMessagesSent,
+      chatCardsApproved: daily.chatCardsApproved,
+      cardsEdited: daily.cardsEdited,
+      cardsAddedManually: daily.cardsAddedManually,
+    };
   },
 });
 

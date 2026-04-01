@@ -22,6 +22,7 @@ import { HomeView } from '@/components/app/HomeView';
 import { ContentView } from '@/components/app/ContentView';
 import { EnterTextsView } from '@/components/app/EnterTextsView';
 import { LibraryView } from '@/components/app/LibraryView';
+import { StatsView } from '@/components/app/stats/StatsView';
 import { SettingsView } from '@/components/app/SettingsView';
 import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
@@ -32,12 +33,14 @@ const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   home: '/app',
   content: '/app/content',
   library: '/app/library',
+  stats: '/app/stats',
   settings: '/app/settings',
 };
 
 function viewFromPathname(pathname: string): { view: View; chatThreadId?: string } {
   if (pathname.startsWith('/app/content')) return { view: 'content' };
   if (pathname.startsWith('/app/library')) return { view: 'library' };
+  if (pathname.startsWith('/app/stats')) return { view: 'stats' };
   if (pathname.startsWith('/app/settings')) return { view: 'settings' };
   const chatMatch = pathname.match(/^\/app\/chat\/(.+)/);
   if (chatMatch) return { view: 'chat', chatThreadId: chatMatch[1] };
@@ -288,11 +291,13 @@ export default function MainLayout({
               {(activeView === 'home' ||
                 activeView === 'content' ||
                 activeView === 'library' ||
+                activeView === 'stats' ||
                 activeView === 'settings') && (
                 <HelpDialog
                   supportOnly={
                     activeView === 'content' ||
                     activeView === 'library' ||
+                    activeView === 'stats' ||
                     activeView === 'settings'
                   }
                   onRestartTutorial={
@@ -329,6 +334,7 @@ export default function MainLayout({
             onChatOpen={handleOpenChat}
             onNavigateToContent={() => handleViewChange('content')}
             onNavigateToChat={handleNavigateToChat}
+            onEnterTexts={() => router.push('/app/content/add-cards')}
             onTutorialReady={handleTutorialReady}
             animateEntrance={justReturnedFromLearn}
             isHidden={isLearnOpen || activeView !== 'home'}
@@ -360,6 +366,9 @@ export default function MainLayout({
             hasActiveCourse={hasActiveCourse}
             onOpenCourseMenu={handleOpenCourseMenu}
           />
+        )}
+        {!isLearnOpen && activeView === 'stats' && (
+          <StatsView />
         )}
         <div
           style={{

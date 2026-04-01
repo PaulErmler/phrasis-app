@@ -9,6 +9,7 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
+import { insertCard } from '../db/stats/cardAggregates';
 import { getVoiceForLanguage, getVoiceGenderByApiCode } from '../../lib/languages';
 import {
   getCourseSettings,
@@ -609,7 +610,7 @@ export async function createCardsFromTexts(
       const { searchableText, searchableTextLanguages } =
         await buildCardSearchableText(ctx, text._id, text.text, courseLanguages);
 
-      await ctx.db.insert('cards', {
+      await insertCard(ctx, {
         deckId: deck._id,
         textId: text._id,
         collectionId,
@@ -617,7 +618,7 @@ export async function createCardsFromTexts(
         isMastered: false,
         isHidden: false,
         isFavorite: false,
-        schedulingPhase: 'preReview',
+        schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
         searchableText,
         searchableTextLanguages,

@@ -37,6 +37,7 @@
       "chat": "Chat",
       "content": "Inhalte",
       "library": "Bibliothek",
+      "stats": "Statistik",
       "settings": "Einstellungen"
     },
     "noCourse": {
@@ -273,6 +274,7 @@
     "startLearning": "Lernen starten",
     "fullReview": "Voll-Übung",
     "audioReview": "Audio-Übung",
+    "customContent": "Karten hinzufügen",
     "stats": {
       "streak": "Serie",
       "reps": "Wiederholungen",
@@ -430,6 +432,11 @@
         "sayInLanguage": "Wie kann ich das einfacher sagen?",
         "sayDifferently": "Wie kann ich das anders sagen?",
         "moreExamples": "Gib mir drei weitere Beispiele mit diesem Verb."
+      },
+      "generalPrompts": {
+        "howToSay": "Wie kann ich folgendes sagen:",
+        "createCards": "Erstelle mir Karten zum Thema:",
+        "whatDoesMean": "Was bedeutet folgendes:"
       }
     },
     "suggestions": {
@@ -866,5 +873,34 @@
   },
   "Legal": {
     "lastUpdated": "Zuletzt aktualisiert:"
+  },
+  "StatsPage": {
+    "streak": "Serie",
+    "words": "Wörter",
+    "reviews": "Wiederholungen",
+    "sentences": "Sätze",
+    "time": "Zeit",
+    "accuracy": "Genauigkeit",
+    "progress": "Fortschritt",
+    "metric": {
+      "words": "Wörter",
+      "reviews": "Wiederholungen",
+      "sentences": "Sätze",
+      "time": "Zeit"
+    },
+    "week": "Woche",
+    "month": "Monat",
+    "year": "Jahr",
+    "activity": "Aktivität",
+    "less": "Weniger",
+    "more": "Mehr",
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "studyHours": "Lernzeiten",
+    "appUsage": "App-Nutzung",
+    "manualCards": "Manuelle Karten",
+    "chatCards": "Chat-Karten",
+    "chatMessages": "Chat-Nachrichten",
+    "noData": "Noch keine Daten"
   }
 }

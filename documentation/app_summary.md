@@ -69,6 +69,7 @@ Flexling is a language-learning web app (Next.js + Convex) that teaches vocabula
 | `/app/content` | Content management tab |
 | `/app/library` | Library tab (card search) |
 | `/app/settings` | Settings tab |
+| `/app/stats` | Learning statistics dashboard |
 | `/app/learn` | Full-screen learning overlay (pushState, not a real route) |
 | `/app/chat/[threadId]` | Full chat page |
 
@@ -122,8 +123,112 @@ Top to bottom:
 | `translations` | `textId`, `targetLanguage`, `translatedText` |
 | `audioRecordings` | `textId`, `language`, `voiceName`, `storageId` |
 | `collectionProgress` | `userId`, `courseId`, `collectionId`, `cardsAdded`, `lastRankProcessed` |
-| `courseStats` | `userId`, `courseId`, `totalRepetitions`, `totalTimeMs`, `totalCards`, `currentStreak` |
+| `courseStats` | `userId`, `courseId`, `totalRepetitions`, `totalTimeMs`, `totalCards`, `currentStreak`, `totalWordCount`, `totalReviewsByMode`, `totalAccuracySum/Count` |
+| `dailyStats` | `userId`, `courseId`, `date`, `reps`, `newCards`, `timeMs`, `hourBuckets`, `ratingCounts`, `reviewsByCardState` |
+| `weeklyStats` | `userId`, `courseId`, `week`, `totalRepetitions`, `activeDays`, `reviewsByMode` |
+| `monthlyStats` | `userId`, `courseId`, `month`, `totalRepetitions`, `activeDays`, `activeWeeks` |
+| `yearlyStats` | `userId`, `courseId`, `year`, `totalRepetitions`, `activeDays`, `activeWeeks`, `activeMonths` |
+| `dailyLanguageStats` | `userId`, `courseId`, `date`, `language`, `reps`, `newWordsCount` |
+| `languageStats` | `userId`, `courseId`, `language`, `totalRepetitions`, `totalWords` |
+| `userWords` | `userId`, `language`, `word` |
+| `reviewDepthAccuracy` | `userId`, `courseId`, `reviewNumber`, `accuracySum`, `count` |
 | `usageQuotas` | `userId`, `features` (record of balances) |
+
+## Stats Tracking
+
+The app tracks comprehensive multi-dimensional learning statistics across several time scales and dimensions.
+
+### Stats Tables
+
+| Table | Key | Tracks |
+|-------|-----|--------|
+| `courseStats` | userId + courseId | All-time totals: reps, time, cards, streak, word count, chat messages, accuracy, mode split |
+| `dailyStats` | userId + courseId + date | Daily snapshot: reps, newCards, timeMs, hourBuckets[24], ratingCounts, reviewsByCardState, reviewsByMode, accuracy, event counters |
+| `weeklyStats` | userId + courseId + week (ISO `YYYY-Www`) | Weekly rollup: reps, newCards, timeMs, activeDays, reviewsByMode |
+| `monthlyStats` | userId + courseId + month (`YYYY-MM`) | Monthly rollup: + activeWeeks |
+| `yearlyStats` | userId + courseId + year (`YYYY`) | Yearly rollup: + activeWeeks, activeMonths |
+| `dailyLanguageStats` | userId + courseId + date + language | Per-language daily: reps, newCards, timeMs, newWordsCount |
+| `languageStats` | userId + courseId + language | All-time per-language totals |
+| `userWords` | userId + language + word | One row per unique word seen (deduped) |
+| `reviewDepthAccuracy` | userId + courseId + reviewNumber | Accuracy curve by Nth review of a card |
+
+### How Stats Get Updated
+
+**Primary trigger — `reviewCard` mutation** (`convex/features/scheduling.ts`):
+
+When a user rates a card, a cascading update runs in a single transaction:
+
+1. **courseStats** — increment reps, time (clamped to 180s), cards, streak, mode split, accuracy
+2. **dailyStats** — increment daily counters, hourBuckets[hour], ratingCounts[rating], reviewsByCardState
+3. **weekly/monthly/yearlyStats** — upsert period rollup, propagate `activeDays`/`activeWeeks`/`activeMonths`
+4. **Per-language stats** — on first review of a card: tokenize text, insert new words into `userWords`, update `dailyLanguageStats` and `languageStats`, increment `courseStats.totalWordCount`
+5. **reviewDepthAccuracy** — upsert accuracy at review depth = `preReviewCount + fsrsReps + 1`
+6. **collectionProgress** — increment `cardsLearned` if first review
+
+**Secondary triggers** via `trackEvent()` (atomic daily + course update):
+
+| Action | Field Updated | Source |
+|--------|--------------|--------|
+| Chat message sent | `chatMessagesSent` | `convex/features/chat/messages.ts` |
+| Chat card approved | `chatCardsApproved` | `convex/features/chat/cardApprovals.ts` |
+| Card created manually | `cardsAddedManually` | `convex/features/customTexts.ts` |
+| Card edited | `cardsEdited` | `convex/features/scheduling.ts` |
+
+### Card Aggregates (`convex/db/stats/cardAggregates.ts`)
+
+Uses the Convex `TableAggregate` component for O(log n) lookups instead of full table scans:
+
+- **cardsByState** — namespace: deckId, key: state label → enables instant count of cards per state
+- **cardsByDueDate** — namespace: deckId, key: dueDate → enables instant "cards due now" count
+
+Both aggregates auto-update via `insertCard()`, `patchCard()`, `deleteCard()` helpers.
+
+Card state labels are derived with priority: `hidden > mastered > preReview("new") > FSRS state` (new/learning/review/relearning).
+
+### Word Tracking (`convex/db/stats/wordTracking.ts`)
+
+- CJK/Thai languages: tokenized with `Intl.Segmenter` (word granularity)
+- Other languages: whitespace split + punctuation removal
+- All words normalized to lowercase NFC
+- Deduplicated per user+language in the `userWords` table
+
+### Date Utilities (`convex/lib/dateUtils.ts`)
+
+All functions operate on `YYYY-MM-DD` strings using `Date.UTC()` internally:
+
+- `getTodayInTimezone(tz)` — today's date in user's IANA timezone
+- `getNextDay` / `getPreviousDay` — date arithmetic
+- `getMonthString` → `YYYY-MM`, `getYearString` → `YYYY`
+- `getISOWeekString` → `YYYY-Www` (ISO 8601 week via Thursday-based calculation)
+
+User timezone comes from `lib/timezone.ts` (`Intl.DateTimeFormat().resolvedOptions().timeZone`).
+
+### Stats Queries & Display
+
+All queries in `convex/features/stats.ts`, displayed in `components/app/StatsView.tsx`:
+
+| Query | Returns |
+|-------|---------|
+| `getHeatmapData` | Date + reps + timeMs + newCards for activity heatmap |
+| `getStatsForRange` | Raw dailyStats for a date range |
+| `getWeekly/Monthly/YearlyStatsRange` | Period aggregates |
+| `getLanguageStats` | All-time per-language totals |
+| `getDailyLanguageStats` | Per-language daily breakdown |
+| `getHourlyDistribution` | Sum of hourBuckets[24] across date range |
+| `getRatingDistribution` | Sum of ratingCounts across date range |
+| `getAccuracyByReviewDepth` | Accuracy curve by review number |
+| `getCardStateDistribution` | Sum of reviewsByCardState |
+| `getCollectionLearningProgress` | Cards added/learned per collection |
+| `getCardMaturityDistribution` | Live card state counts via aggregate (6 states) |
+| `getDueCardCount` | Cards due now via aggregate |
+
+The StatsView displays: streak, words, reviews, time, average accuracy, due cards, card maturity distribution, activity heatmap, mode split, language breakdown, peak study hours, accuracy-by-review curve, rating distribution, reviews by card state, collection progress, and app usage counters.
+
+### Stats Route
+
+| Path | Purpose |
+|------|---------|
+| `/app/stats` | Stats page (StatsView component) |
 
 ## Supported Languages
 

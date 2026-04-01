@@ -37,6 +37,7 @@
       "chat": "Chat",
       "content": "Content",
       "library": "Library",
+      "stats": "Stats",
       "settings": "Settings"
     },
     "noCourse": {
@@ -273,6 +274,7 @@
     "startLearning": "Start Learning",
     "fullReview": "Full Review",
     "audioReview": "Audio Review",
+    "customContent": "Add Cards",
     "stats": {
       "streak": "Streak",
       "reps": "Reps",
@@ -430,6 +432,11 @@
         "sayInLanguage": "What is a simpler way to say this?",
         "sayDifferently": "How can I say this differently?",
         "moreExamples": "Give me three more examples using this verb."
+      },
+      "generalPrompts": {
+        "howToSay": "How can I say the following:",
+        "createCards": "Create me cards on the topic:",
+        "whatDoesMean": "What does the following mean:"
       }
     },
     "suggestions": {
@@ -792,5 +799,34 @@
   },
   "Legal": {
     "lastUpdated": "Last updated:"
+  },
+  "StatsPage": {
+    "streak": "Streak",
+    "words": "Words",
+    "reviews": "Reviews",
+    "sentences": "Sentences",
+    "time": "Time",
+    "accuracy": "Accuracy",
+    "progress": "Progress",
+    "metric": {
+      "words": "Words",
+      "reviews": "Reviews",
+      "sentences": "Sentences",
+      "time": "Time"
+    },
+    "week": "Week",
+    "month": "Month",
+    "year": "Year",
+    "activity": "Activity",
+    "less": "Less",
+    "more": "More",
+    "active": "Active",
+    "inactive": "Inactive",
+    "studyHours": "Study Hours",
+    "appUsage": "App Usage",
+    "manualCards": "Manual Cards",
+    "chatCards": "Chat Cards",
+    "chatMessages": "Chat Messages",
+    "noData": "No data yet"
   }
 }

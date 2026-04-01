@@ -27,6 +27,7 @@ import {
   type CardAudioRecording,
   type CourseSettings,
 } from './types';
+import { getUserTimezone } from '@/lib/timezone';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { ENSURE_CONTENT_REVIEW_INTERVAL } from '@/lib/constants/learning';
@@ -330,7 +331,7 @@ export function useLearningMode(
   const reviewMode = courseSettings?.reviewMode ?? 'audio';
 
   const handleReview = useCallback(
-    async (rating: ReviewRating) => {
+    async (rating: ReviewRating, wasDefaultRating: boolean) => {
       if (!cardForReview || isReviewing) return;
       reviewInitiatedByThisTabRef.current = true;
       setCardAnimationKey((k) => k + 1);
@@ -341,9 +342,10 @@ export function useLearningMode(
           cardId: cardForReview._id,
           rating,
           timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
-          timezone:
-            Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          timezone: getUserTimezone(),
           ...(reviewMode === 'full' && { forceReviewPhase: true }),
+          reviewMode,
+          wasDefaultRating,
         });
         setSelectedRating(null);
       } catch (error) {
@@ -411,9 +413,9 @@ export function useLearningMode(
       return;
     }
     const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
-    const rating =
-      ratingOverride ?? selectedRating ?? getDefaultRating(phase);
-    handleReview(rating);
+    const defaultRatingForPhase = getDefaultRating(phase);
+    const rating = ratingOverride ?? selectedRating ?? defaultRatingForPhase;
+    handleReview(rating, rating === defaultRatingForPhase);
   }, [
     cardForReview,
     isReviewing,
