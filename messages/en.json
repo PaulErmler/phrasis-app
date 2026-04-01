@@ -403,7 +403,11 @@
       "impressum": "Imprint",
       "agb": "Terms & Conditions",
       "privacy": "Privacy Policy"
-    }
+    },
+    "tagline": "The language app that grows with you.",
+    "columnProduct": "Product",
+    "columnLegal": "Legal",
+    "columnSettings": "Settings"
   },
   "Theme": {
     "title": "Theme",

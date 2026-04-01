@@ -49,7 +49,7 @@ export function FeaturesSection() {
                 }}
                 className="ent-bento-card relative flex flex-col rounded-2xl border border-border/40 bg-card p-8 md:p-10"
               >
-                <LandingSquircleIcon variant={index % 2 === 0 ? 'orange' : 'accent'} className="mb-6">
+                <LandingSquircleIcon className="mb-6">
                   <Icon className="h-6 w-6 text-white" />
                 </LandingSquircleIcon>
                 <h3 className="text-xl md:text-2xl font-semibold mb-3">
@@ -80,7 +80,7 @@ export function FeaturesSection() {
                 }}
                 className="ent-bento-card relative flex flex-col rounded-2xl border border-border/40 bg-card p-7 md:p-8"
               >
-                <LandingSquircleIcon variant={index % 2 === 0 ? 'accent' : 'orange'} className="mb-5">
+                <LandingSquircleIcon className="mb-5">
                   <Icon className="h-6 w-6 text-white" />
                 </LandingSquircleIcon>
                 <h3 className="text-lg font-semibold mb-2">

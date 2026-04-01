@@ -403,7 +403,11 @@
       "impressum": "Impressum",
       "agb": "AGB",
       "privacy": "Datenschutz"
-    }
+    },
+    "tagline": "Die Sprach-App, die mit dir wächst.",
+    "columnProduct": "Produkt",
+    "columnLegal": "Rechtliches",
+    "columnSettings": "Einstellungen"
   },
   "Theme": {
     "title": "Design",
