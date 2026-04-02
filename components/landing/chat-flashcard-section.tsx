@@ -13,7 +13,7 @@ export function ChatFlashcardSection() {
       className="relative py-20 md:py-32 px-4 sm:px-6 bg-muted/20"
     >
       <div className="max-w-7xl mx-auto">
-        <div className="grid lg:grid-cols-[2fr_3fr] gap-10 lg:gap-16 items-start">
+        <div className="grid lg:grid-cols-[3fr_4fr] gap-10 lg:gap-16 items-start">
           {/* Text column */}
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -22,7 +22,6 @@ export function ChatFlashcardSection() {
             transition={{ duration: 0.6, ease: 'easeOut' as const }}
             className="space-y-5"
           >
-            <p className="ent-section-label">AI-Powered Learning</p>
             <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground">
               {t('title')}{' '}
               <span className="text-primary">{t('titleHighlight')}</span>

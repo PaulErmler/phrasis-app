@@ -154,7 +154,7 @@ export function ActivityHeatmap({ data, timezone }: ActivityHeatmapProps) {
   return (
     <div className="card-surface p-3">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        <p className="text-sm font-semibold text-muted-foreground">
           {t('activity')}
         </p>
         <div className="flex gap-2 text-xs">

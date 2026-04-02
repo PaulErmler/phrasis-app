@@ -28,15 +28,15 @@
     }
   },
   "philosophy": {
-    "title": "Was dich fließend macht.",
+    "title": "Was macht einen fließend?",
     "titleHighlight": "Drei Grundprinzipien.",
     "lead": "Flüssigkeit entsteht, wenn Wiederholung, verständlicher Input und echte Neugier zusammenfinden. Flexling baut genau darauf.",
     "pillar1Title": "Wiederholung, die in den Tag passt",
-    "pillar1Body": "Kurze, häufige Kontakte mit denselben Sätzen schlagen seltenes Pauken. Audio-Modus übt unterwegs; die vollständige Wiederholung schärft das Erinnern, wenn du tippen kannst.",
-    "pillar2Title": "Verständlicher Input",
-    "pillar2Body": "Du hörst und liest zuerst eine Zeile, die du schon verstehst, und streckst dich dann zur Übersetzung. So bleibt die Schwierigkeit anspruchsvoll, aber nicht frustrierend.",
-    "pillar3Title": "Deine Inhalte, dein Weg",
-    "pillar3Body": "Füge eigene Sätze hinzu, lass KI individuelle Karteikarten erstellen und erhalte persönliche Grammatikerklärungen. Jeder lernt anders – dein Lernmaterial sollte das auch."
+    "pillar1Body": "Kurze, häufige Kontakte mit denselben Sätzen schlagen seltenes Pauken und Wiederholung ist der Schlüssel, aber konsequent zu bleiben ist schwer. Flexling ermöglicht es dir, die wichtigsten Dinge mit modernster Spaced Repetition zu wiederholen und der Audio-Modus lässt dich flexibel üben, um in deinen vollen Tag zu passen.",
+    "pillar2Title": "Personalisierter Input",
+    "pillar2Body": "Anstatt Dinge zu lernen, die dich nicht interessieren, kannst du deinen Lehrplan anpassen. Füge eigene Sätze hinzu oder lass die KI sie für dich erstellen. Jeder lernt anders – dein Lernmaterial sollte das auch.",
+    "pillar3Title": "Motivation und Fortschrittsverfolgung",
+    "pillar3Body": "Eine Sprache zu lernen ist schwer und manchmal ist es auch schwer, motiviert zu bleiben. Flexling verfolgt detaillierte Statistiken über deinen Lernfortschritt, wie viele Wörter du bereits gelernt hast. Das hält dich motiviert."
   },
   "reviewModes": {
     "title": "Zwei Wege zum Wiederholen.",
@@ -153,6 +153,30 @@
         }
       }
     }
+  },
+  "analytics": {
+    "label": "Fortschritt verfolgen",
+    "title": "Sieh, wie deine Fähigkeiten",
+    "titleHighlight": "mit der Zeit wachsen.",
+    "lead": "Sieh genau, wie sich dein Wortschatz Woche für Woche erweitert. Detaillierte Statistiken zeigen deine Serie, gelernte Wörter pro Sprache und Lerngewohnheiten — damit du immer weißt, wie weit du gekommen bist.",
+    "progressTitle": "Wisse, was du weißt",
+    "progressBody": "Verfolge genau, welche Wörter du bereits kennst und wie viel Fortschritt du über Tage, Wochen und Monate gemacht hast — aufgeschlüsselt nach Sprache, wenn du mehr als eine lernst.",
+    "activityTitle": "Baue Konstanz auf",
+    "activityBody": "Sieh deine Lerngewohnheit auf einen Blick. Jeder Tag, an dem du übst, erscheint im Kalender — beobachte, wie deine Serie wächst und bleibe motiviert.",
+    "insightsTitle": "Sitzungsübersicht",
+    "insightsBody": "Nach jeder Wiederholung siehst du genau, was du geschafft hast: Wiederholungen, neue Wörter und aufgewendete Zeit — live aktualisiert, sobald du fertig bist.",
+    "habitsTitle": "Finde deine besten Stunden",
+    "habitsBody": "Entdecke, wann du am besten lernst. Eine Aufschlüsselung deiner Lernstunden zeigt deinen natürlichen Rhythmus, damit du Sitzungen planen kannst, wenn du am schärfsten bist.",
+    "goalsTitle": "Sieh das große Ganze",
+    "goalsBody": "Gesamtwörter, Sätze, Wiederholungen und Lernzeit — deine Gesamtstatistiken beweisen, wie weit du seit Tag eins gekommen bist.",
+    "multiLangTitle": "Vergleiche über Sprachen hinweg",
+    "multiLangBody": "Lernst du mehr als eine Sprache? Sieh den Fortschritt für jede Sprache nebeneinander und erkenne, welche mehr Aufmerksamkeit braucht.",
+    "accuracyTitle": "Miss dein Erinnerungsvermögen",
+    "accuracyBody": "Verfolge deine Genauigkeit über alle Wiederholungssitzungen. Beobachte, wie sie steigt, während Spaced Repetition dein Gedächtnis über die Zeit stärkt.",
+    "streakTitle": "Bleib am Ball",
+    "streakBody": "Deine Serie zählt jeden aufeinanderfolgenden Tag, an dem du übst. Ein einfacher, kraftvoller Motivator — und Streak-Freezes haben deinen Rücken, wenn das Leben dazwischenkommt.",
+    "feedbackTitle": "Sofortiges Feedback",
+    "feedbackBody": "Nach dem Tippen deiner Übersetzung bekommst du einen zeichengenauen Vergleich: was richtig war, was du verpasst hast, und deinen Genauigkeitswert — sofort."
   },
   "features": {
     "title": "Alles was du brauchst, um",

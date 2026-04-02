@@ -18,8 +18,6 @@ export function InstallCtaSection() {
           transition={{ duration: 0.6, ease: 'easeOut' }}
           className="space-y-8"
         >
-          <p className="ent-section-label">Get Started</p>
-
           <img
             src="/icons/icon.svg"
             alt="Flexling language learning app logo"

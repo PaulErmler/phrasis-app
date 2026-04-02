@@ -20,7 +20,6 @@ export function FAQSection() {
           transition={{ duration: 0.6, ease: 'easeOut' }}
           className="text-center mb-12 md:mb-16"
         >
-          <p className="ent-section-label mb-4">Questions & Answers</p>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground mb-4">
             {t('title')}{' '}
             <span className="text-primary">{t('titleHighlight')}</span>

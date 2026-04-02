@@ -248,7 +248,7 @@ export function CumulativeLineChart({ dailyData, monthlyData, languageDailyData 
   return (
     <div className="card-surface p-3">
       <div className="flex items-center justify-between mb-1">
-        <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+        <p className="text-sm font-semibold text-muted-foreground">
           {t('progress')}
         </p>
         <div className="flex gap-2 text-xs">

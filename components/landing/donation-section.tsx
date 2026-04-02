@@ -19,7 +19,6 @@ export function DonationSection() {
           transition={{ duration: 0.6, ease: 'easeOut' as const }}
           className="text-center mb-12 md:mb-16"
         >
-          <p className="ent-section-label mb-4">Our Commitment</p>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground">
             {t('title')}{' '}
             <span className="text-primary">{t('titleHighlight')}</span>

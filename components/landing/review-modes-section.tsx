@@ -21,7 +21,6 @@ export function ReviewModesSection() {
           transition={{ duration: 0.6, ease: 'easeOut' as const }}
           className="space-y-5 max-w-3xl mb-10 md:mb-14"
         >
-          <p className="ent-section-label">How It Works</p>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground">
             {t('title')}{' '}
             <span className="text-primary">{t('titleHighlight')}</span>

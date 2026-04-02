@@ -54,7 +54,6 @@ export function PricingSection() {
           transition={{ duration: 0.6, ease: 'easeOut' }}
           className="text-center max-w-3xl mx-auto mb-14 md:mb-20"
         >
-          <p className="ent-section-label mb-4">Plans & Pricing</p>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground">
             {t('title')}{' '}
             <span className="text-primary">{t('titleHighlight')}</span>

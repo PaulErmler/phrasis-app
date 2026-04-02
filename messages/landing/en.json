@@ -28,15 +28,15 @@
     }
   },
   "philosophy": {
-    "title": "What makes you fluent.",
+    "title": "What makes one fluent?",
     "titleHighlight": "Three core principles.",
     "lead": "Languages stick when three things line up: enough repetition, input you can mostly follow, and genuine curiosity. Flexling is built around all three.",
     "pillar1Title": "Repetition that fits your day",
-    "pillar1Body": "Short, frequent encounters with the same sentences beat rare cramming. Audio review lets you rehearse while you move; full review sharpens recall when you have a keyboard in front of you.",
-    "pillar2Title": "Comprehensible input",
-    "pillar2Body": "You always anchor on a line you already understand, then reach for the translation. That keeps difficulty in the sweet spot: challenging, but not overwhelming.",
-    "pillar3Title": "Your content, your way",
-    "pillar3Body": "Add your own sentences, let AI create custom flashcards, and get personalized grammar explanations. Every learner is different – your study material should be too."
+    "pillar1Body": "Short, frequent encounters with the same sentences beat rare cramming and repetition is key but staying consistent is hard. Flexling allows you to repeat the most important things with state of the art spaced repetition and the audio review lets you rehearse flexibly to fit into your busy day.",
+    "pillar2Title": "Personalized Input",
+    "pillar2Body": "Instead of learning things you do not care about we allow you to modify your curriculum. Add your own sentences or let AI create them for you. Every learner is different – your study material should be too.",
+    "pillar3Title": "Motivation and Progress Tracking",
+    "pillar3Body": "Learning a language is hard and so is staying motivated sometimes. Flexling tracks detailed statistics about your learning progress like how many words you have already learned. This keeps you motivated."
   },
   "reviewModes": {
     "title": "Two ways to review.",
@@ -153,6 +153,30 @@
         }
       }
     }
+  },
+  "analytics": {
+    "label": "Track Your Progress",
+    "title": "Watch your skills",
+    "titleHighlight": "grow over time.",
+    "lead": "See exactly how your vocabulary expands week by week. Detailed analytics show your streak, words learned per language, and study habits — so you always know how far you've come.",
+    "progressTitle": "Know What You Know",
+    "progressBody": "Track precisely which words you already know and how much progress you have made over days, weeks and months — broken down by language if you study more than one.",
+    "activityTitle": "Build Consistency",
+    "activityBody": "See your learning habit at a glance. Every day you show up earns a spot on the calendar — watch your streak grow and stay motivated.",
+    "insightsTitle": "Session Snapshot",
+    "insightsBody": "After every review, see exactly what you accomplished: repetitions, new words, and time spent — all updated live the moment you finish.",
+    "habitsTitle": "Find Your Peak Hours",
+    "habitsBody": "Discover when you learn best. A breakdown of your study hours reveals your natural rhythm so you can schedule sessions when you're sharpest.",
+    "goalsTitle": "See The Big Picture",
+    "goalsBody": "Total words, sentences, reviews, and study time — your all-time stats prove how far you've come since day one.",
+    "multiLangTitle": "Compare Across Languages",
+    "multiLangBody": "Learning more than one language? See side-by-side progress for each one and spot which needs more attention.",
+    "accuracyTitle": "Measure Your Recall",
+    "accuracyBody": "Track your accuracy across full-review sessions. Watch it climb as spaced repetition strengthens your memory over time.",
+    "streakTitle": "Stay On Track",
+    "streakBody": "Your streak counts every consecutive day you practice. It's a simple, powerful motivator — and streak freezes have your back if life gets in the way.",
+    "feedbackTitle": "Instant Review Feedback",
+    "feedbackBody": "After typing your translation, get a character-level diff showing what you got right, what you missed, and your accuracy score — right away."
   },
   "features": {
     "title": "Everything You Need to",

@@ -18,7 +18,7 @@ export function HourlyDistribution({ data }: HourlyDistributionProps) {
 
   return (
     <div className="card-surface p-3">
-      <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+      <p className="text-sm font-semibold text-muted-foreground mb-3">
         {t('studyHours')}
       </p>
       <div className="flex">

@@ -151,16 +151,16 @@ export default function MainLayout({
     });
   }, [syncQuotas]);
 
-  // Tab switching — router.push keeps usePathname in sync (e.g. /app/content/add-cards)
+  // Tab switching — pushState so browser back/forward works between tabs
   const handleViewChange = useCallback((view: View) => {
     setActiveView(view);
     setIsLearnOpen(false);
     if (view === 'stats') setHasVisitedStats(true);
     if (view === 'library') setHasVisitedLibrary(true);
     if (view !== 'chat') {
-      router.push(VIEW_PATHS[view]);
+      history.pushState(null, '', VIEW_PATHS[view]);
     }
-  }, [router]);
+  }, []);
 
   const handleOpenChat = useCallback((threadId: string) => {
     setActiveView((prev) => {
@@ -171,14 +171,14 @@ export default function MainLayout({
     setIsLearnOpen(false);
     setHasVisitedStats(false);
     setHasVisitedLibrary(false);
-    router.push(`/app/chat/${threadId}`);
-  }, [router]);
+    history.pushState(null, '', `/app/chat/${threadId}`);
+  }, []);
 
   const handleChatBack = useCallback(() => {
     const target = viewBeforeChatRef.current;
     setActiveView(target);
-    router.push(VIEW_PATHS[target]);
-  }, [router]);
+    history.pushState(null, '', VIEW_PATHS[target]);
+  }, []);
 
   const handleNewChat = useCallback(async () => {
     try {

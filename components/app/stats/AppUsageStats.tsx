@@ -13,7 +13,7 @@ export function AppUsageStats({ manualCards, chatCards, chatMessages }: AppUsage
 
   return (
     <div className="card-surface p-3">
-      <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+      <p className="text-sm font-semibold text-muted-foreground mb-3">
         {t('appUsage')}
       </p>
       <div className="grid grid-cols-3 gap-2">

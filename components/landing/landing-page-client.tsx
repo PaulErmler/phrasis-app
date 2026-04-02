@@ -7,6 +7,7 @@ import { PhilosophySection } from '@/components/landing/philosophy-section';
 import { ReviewModesSection } from '@/components/landing/review-modes-section';
 import { ChatFlashcardSection } from '@/components/landing/chat-flashcard-section';
 import { FeaturesSection } from '@/components/landing/features-section';
+import { AnalyticsSection } from '@/components/landing/analytics-section';
 import { PricingSection } from '@/components/landing/pricing-section';
 import { FAQSection } from '@/components/landing/faq-section';
 import { DonationSection } from '@/components/landing/donation-section';
@@ -27,6 +28,7 @@ export function LandingPageClient({ isAuthenticated }: LandingPageClientProps) {
         <ReviewModesSection />
         <ChatFlashcardSection />
       </LandingDemoProvider>
+      <AnalyticsSection />
       <FeaturesSection />
       <PricingSection />
       <FAQSection />

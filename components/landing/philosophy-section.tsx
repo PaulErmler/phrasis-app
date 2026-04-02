@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
-import { RefreshCw, BookOpen, Pencil } from 'lucide-react';
+import { RefreshCw, Pencil, TrendingUp } from 'lucide-react';
 import { LandingSquircleIcon } from '@/components/landing/landing-squircle-icon';
 
 const fadeInUp = {
@@ -12,7 +12,6 @@ const fadeInUp = {
   transition: { duration: 0.6, ease: 'easeOut' as const },
 };
 
-const pillarIcons = [RefreshCw, BookOpen, Pencil];
 
 export function PhilosophySection() {
   const t = useTranslations('LandingPage.philosophy');
@@ -30,7 +29,6 @@ export function PhilosophySection() {
           {...fadeInUp}
           className="mb-14 md:mb-20 max-w-2xl"
         >
-          <p className="ent-section-label mb-4">Our Approach</p>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground mb-5">
             {t('title')}{' '}
             <span className="text-primary">{t('titleHighlight')}</span>
@@ -67,7 +65,7 @@ export function PhilosophySection() {
           >
             <span className="ent-pillar-number">{pillars[1].number}</span>
             <LandingSquircleIcon className="mb-5 relative">
-              <BookOpen className="h-6 w-6 text-white" />
+              <Pencil className="h-6 w-6 text-white" />
             </LandingSquircleIcon>
             <h3 className="text-xl md:text-2xl font-semibold mb-3 relative">
               {pillars[1].title}
@@ -85,7 +83,7 @@ export function PhilosophySection() {
           >
             <span className="ent-pillar-number">{pillars[2].number}</span>
             <LandingSquircleIcon className="mb-5 relative">
-              <Pencil className="h-6 w-6 text-white" />
+              <TrendingUp className="h-6 w-6 text-white" />
             </LandingSquircleIcon>
             <h3 className="text-xl md:text-2xl font-semibold mb-3 relative">
               {pillars[2].title}
