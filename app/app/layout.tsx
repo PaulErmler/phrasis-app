@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { isAuthenticated, preloadAuthQuery } from '@/lib/auth-server';
 import { api } from '@/convex/_generated/api';
 import { AppDataProvider } from '@/components/app/AppDataProvider';
@@ -12,6 +13,12 @@ export default async function AppLayout({
 }) {
   const authed = await isAuthenticated();
   if (!authed) {
+    const cookieStore = await cookies();
+    const hasSessionCookie = cookieStore.has('better-auth.session_token');
+    console.warn('[AUTH_REDIRECT] Server layout redirect to /auth/sign-in', {
+      hasSessionCookie,
+      timestamp: new Date().toISOString(),
+    });
     redirect('/auth/sign-in');
   }
 
