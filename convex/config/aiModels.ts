@@ -6,17 +6,17 @@
 /** OpenRouter model IDs by agent or task */
 export const OPENROUTER_MODELS = {
   /** Main language-tutor chat (tools, streaming) */
-  languageTeacher: 'moonshotai/kimi-k2.5:nitro',
+  languageTeacher: 'anthropic/claude-sonnet-4-6',
   /** Bulk translation JSON for custom card auto-fill */
   translationAutoFill: 'google/gemini-3-flash-preview',
   /** Short thread title from first user message */
   threadTitle: 'google/gemini-3.1-flash-lite-preview',
 } as const;
 
-/** Routed first to Fireworks for the chat agent; falls back per OpenRouter */
+/** Provider routing for the chat agent via OpenRouter */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
   provider: {
-    order: ['fireworks'],
+    order: ['anthropic'],
     allow_fallbacks: true,
   },
 } as const;

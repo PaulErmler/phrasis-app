@@ -64,6 +64,115 @@ export const run = internalMutation({
       }
     }
 
+    // Create baseline dailyStats + monthlyStats entries for courses that have
+    // courseStats totals but incomplete daily/monthly breakdown rows.
+    // This ensures charts don't start from 0 when historical data exists.
+    for (const course of courses) {
+      const stats = await ctx.db
+        .query('courseStats')
+        .withIndex('by_userId_and_courseId', (q) =>
+          q.eq('userId', course.userId).eq('courseId', course._id),
+        )
+        .first();
+      if (!stats) continue;
+
+      // Sum existing dailyStats to find what's already tracked
+      const dailyRows = await ctx.db
+        .query('dailyStats')
+        .withIndex('by_userId_and_courseId_and_date', (q) =>
+          q.eq('userId', course.userId).eq('courseId', course._id),
+        )
+        .take(2000);
+
+      let trackedReps = 0;
+      let trackedTimeMs = 0;
+      let trackedNewCards = 0;
+      let earliestDate: string | null = null;
+
+      for (const row of dailyRows) {
+        trackedReps += row.reps;
+        trackedTimeMs += row.timeMs;
+        trackedNewCards += row.newCards;
+        if (!earliestDate || row.date < earliestDate) {
+          earliestDate = row.date;
+        }
+      }
+
+      const deltaReps = stats.totalRepetitions - trackedReps;
+      const deltaTimeMs = stats.totalTimeMs - trackedTimeMs;
+      const deltaNewCards = stats.totalCards - trackedNewCards;
+
+      if (deltaReps > 0 || deltaTimeMs > 0 || deltaNewCards > 0) {
+        // Place baseline the day before the earliest tracked day,
+        // or use the course creation date if no daily rows exist.
+        let baselineDate: string;
+        if (earliestDate) {
+          const d = new Date(earliestDate);
+          d.setDate(d.getDate() - 1);
+          baselineDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        } else {
+          const d = new Date(course._creationTime);
+          baselineDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        // Check if a baseline entry already exists for this date
+        const existing = await ctx.db
+          .query('dailyStats')
+          .withIndex('by_userId_and_courseId_and_date', (q) =>
+            q.eq('userId', course.userId).eq('courseId', course._id).eq('date', baselineDate),
+          )
+          .first();
+
+        if (!existing) {
+          await ctx.db.insert('dailyStats', {
+            userId: course.userId,
+            courseId: course._id,
+            date: baselineDate,
+            reps: Math.max(0, deltaReps),
+            newCards: Math.max(0, deltaNewCards),
+            timeMs: Math.max(0, deltaTimeMs),
+            cardsReviewed: Math.max(0, deltaReps),
+          });
+        } else {
+          // Adjust existing entry to absorb the delta
+          await ctx.db.patch(existing._id, {
+            reps: existing.reps + Math.max(0, deltaReps),
+            newCards: existing.newCards + Math.max(0, deltaNewCards),
+            timeMs: existing.timeMs + Math.max(0, deltaTimeMs),
+            cardsReviewed: existing.cardsReviewed + Math.max(0, deltaReps),
+          });
+        }
+
+        // Create/update corresponding monthlyStats baseline
+        const baselineMonth = baselineDate.slice(0, 7); // "YYYY-MM"
+        const existingMonthly = await ctx.db
+          .query('monthlyStats')
+          .withIndex('by_userId_and_courseId_and_month', (q) =>
+            q.eq('userId', course.userId).eq('courseId', course._id).eq('month', baselineMonth),
+          )
+          .first();
+
+        if (!existingMonthly) {
+          await ctx.db.insert('monthlyStats', {
+            userId: course.userId,
+            courseId: course._id,
+            month: baselineMonth,
+            totalRepetitions: Math.max(0, deltaReps),
+            totalNewCards: Math.max(0, deltaNewCards),
+            totalTimeMs: Math.max(0, deltaTimeMs),
+            activeDays: 1,
+            activeWeeks: 1,
+          });
+        } else {
+          await ctx.db.patch(existingMonthly._id, {
+            totalRepetitions: existingMonthly.totalRepetitions + Math.max(0, deltaReps),
+            totalNewCards: existingMonthly.totalNewCards + Math.max(0, deltaNewCards),
+            totalTimeMs: existingMonthly.totalTimeMs + Math.max(0, deltaTimeMs),
+          });
+        }
+      }
+    }
+
     // Collect unique userIds, then schedule userWords cleanup per user.
     // Each cleanup chains into processCourseBatch for that user's courses.
     const userCourses = new Map<string, typeof courses>();
