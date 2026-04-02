@@ -60,6 +60,8 @@ interface CollectionDetailDialogProps {
   sentencesRemaining?: number | null;
   /** Called when the user clicks the upgrade button (limit reached). */
   onUpgrade?: () => void;
+  /** When true, show toggle button even when collection is complete (for custom collections) */
+  showToggleWhenComplete?: boolean;
 }
 
 export function CollectionDetailDialog({
@@ -78,6 +80,7 @@ export function CollectionDetailDialog({
   hideAddCards = false,
   sentencesRemaining,
   onUpgrade,
+  showToggleWhenComplete = false,
 }: CollectionDetailDialogProps) {
   const t = useTranslations('AppPage.collections.carousel.detail');
   const tDesc = useTranslations('AppPage.collections.carousel.descriptions');
@@ -114,7 +117,7 @@ export function CollectionDetailDialog({
               <Progress value={progress} className="h-2" />
             </div>
 
-            {!isComplete && (
+            {(!isComplete || showToggleWhenComplete) ? (
               <Button
                 variant={isActive ? 'secondary' : 'outline'}
                 className="shrink-0 w-28 justify-center"
@@ -123,8 +126,7 @@ export function CollectionDetailDialog({
                 {isActive && <Check className="h-4 w-4" />}
                 {isActive ? t('selected') : t('select')}
               </Button>
-            )}
-            {isComplete && (
+            ) : (
               <div className="flex items-center gap-1.5 text-sm text-success font-medium shrink-0 px-3">
                 <CheckCircle2 className="h-5 w-5" />
                 {t('done')}

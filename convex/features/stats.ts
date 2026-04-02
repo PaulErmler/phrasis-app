@@ -112,16 +112,22 @@ export const getStatsPageData = query({
         q.eq('userId', userId).eq('courseId', courseId),
       )
       .take(20);
-    // Merge variants (e.g. es + es_latam) into a single entry
+    // Only include target languages, merging variants (e.g. es + es_latam)
+    const targetLanguages = active.course.targetLanguages ?? [];
+    const targetSet = new Set(targetLanguages.map((l) => l.replace(/_latam$/, '')));
     const wordsByLang = new Map<string, number>();
     for (const r of langStatsRows) {
-      if (baseLanguages.includes(r.language) || r.totalWords <= 0) continue;
+      if (r.totalWords <= 0) continue;
       const key = r.language.replace(/_latam$/, '');
+      if (!targetSet.has(key)) continue;
       wordsByLang.set(key, (wordsByLang.get(key) ?? 0) + r.totalWords);
     }
     const languageWordCounts = Array.from(wordsByLang.entries())
       .map(([language, words]) => ({ language, words }))
       .sort((a, b) => b.words - a.words);
+
+    // Derive total from the filtered per-language counts (target languages only)
+    const totalWordCount = languageWordCounts.reduce((sum, lw) => sum + lw.words, 0);
 
     return {
       courseStats: stats ? {
@@ -129,7 +135,7 @@ export const getStatsPageData = query({
         totalTimeMs: stats.totalTimeMs,
         totalCards: stats.totalCards,
         currentStreak: stats.currentStreak,
-        totalWordCount: stats.totalWordCount ?? 0,
+        totalWordCount,
         totalChatMessages: stats.totalChatMessages ?? 0,
         totalChatCardsApproved: stats.totalChatCardsApproved ?? 0,
         totalCardsAddedManually: stats.totalCardsAddedManually ?? 0,
@@ -140,6 +146,7 @@ export const getStatsPageData = query({
       hourlyDistribution: hourlyTotals,
       monthlyStats,
       baseLanguages,
+      targetLanguages,
       languageWordCounts,
     };
   },

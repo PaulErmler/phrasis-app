@@ -248,7 +248,7 @@ export default function MainLayout({
     : t('changeCourse');
 
   return (
-    <div className="h-dvh max-h-dvh flex flex-col overflow-hidden">
+    <div className="h-dvh max-h-dvh md:h-screen md:max-h-screen flex flex-col overflow-hidden">
       {!(activeView === 'content' && isAddCardsRoute) && (
         <header className="sticky-header">
           <div className="header-bar">

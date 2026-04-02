@@ -194,6 +194,9 @@ export function HomeView({
           onNavigateToContent={onNavigateToContent}
           onNavigateToChat={onNavigateToChat}
         />
+
+        {/* Extra space so the last inline detail can scroll above the bottom nav */}
+        <div className="h-32" />
       </div>
     </div>
   );

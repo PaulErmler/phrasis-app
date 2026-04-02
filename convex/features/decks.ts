@@ -552,10 +552,12 @@ export const toggleCustomCollection = mutation({
 
     const isChatCollection =
       courseSettings?.chatCollectionId?.toString() === args.collectionId.toString();
+    const isCustomCollection =
+      courseSettings?.customCollectionId?.toString() === args.collectionId.toString();
     const isAlreadyCustom = (courseSettings?.activeCustomCollectionIds ?? []).some(
       (id) => id.toString() === args.collectionId.toString(),
     );
-    if (!isChatCollection && !isAlreadyCustom) {
+    if (!isChatCollection && !isCustomCollection && !isAlreadyCustom) {
       throw new ConvexError('Collection not accessible');
     }
 
@@ -699,12 +701,28 @@ export const addCardsFromCollection = mutation({
     let totalTextsProcessed = 0;
     let remainingBatch = clampedBatchSize;
 
-    // --- Phase 1: Drain pending texts from selected custom collections randomly ---
+    // --- Phase 1: Add from custom collection(s) ---
+    // When the requested collection is a level collection (learning mode auto-add),
+    // drain pending texts from ALL selected custom collections randomly.
+    // When the requested collection is a custom collection (collection detail "add" button),
+    // only add from that specific collection.
     const courseSettings = await getCourseSettings(ctx, courseId);
-    const selectedCustomIds = courseSettings?.activeCustomCollectionIds ?? [];
+    const requestedCollection = await ctx.db.get(args.collectionId);
+    const isLevelCollection = requestedCollection
+      ? (LEVEL_ORDER as readonly string[]).includes(requestedCollection.name)
+      : false;
 
-    if (selectedCustomIds.length > 0 && remainingBatch > 0) {
-      // Load each selected collection and its pending count
+    const customCollectionIdsToProcess: Id<'collections'>[] = isLevelCollection
+      ? (courseSettings?.activeCustomCollectionIds ?? [])
+      : [args.collectionId].filter((id) =>
+          courseSettings?.chatCollectionId?.toString() === id.toString() ||
+          courseSettings?.customCollectionId?.toString() === id.toString() ||
+          (courseSettings?.activeCustomCollectionIds ?? []).some(
+            (cid) => cid.toString() === id.toString(),
+          ),
+        );
+
+    if (customCollectionIdsToProcess.length > 0 && remainingBatch > 0) {
       const collectionsWithPending: {
         id: Id<'collections'>;
         collection: Doc<'collections'>;
@@ -712,7 +730,7 @@ export const addCardsFromCollection = mutation({
         pendingCount: number;
       }[] = [];
 
-      for (const collId of selectedCustomIds) {
+      for (const collId of customCollectionIdsToProcess) {
         const coll = await ctx.db.get(collId);
         if (!coll) continue;
         const prog = await getCollectionProgressHelper(ctx, userId, courseId, collId);
@@ -729,7 +747,6 @@ export const addCardsFromCollection = mutation({
         }
       }
 
-      // Randomly allocate batch slots across collections with pending texts
       if (collectionsWithPending.length > 0) {
         const allocations = new Map<string, number>();
         const pool = [...collectionsWithPending];
@@ -745,7 +762,6 @@ export const addCardsFromCollection = mutation({
           remaining--;
         }
 
-        // Fetch sequential texts from each collection and create cards
         for (const entry of collectionsWithPending) {
           const count = allocations.get(entry.id.toString()) ?? 0;
           if (count === 0) continue;
@@ -786,8 +802,8 @@ export const addCardsFromCollection = mutation({
       }
     }
 
-    // --- Phase 2: Fill remaining batch from the difficulty collection ---
-    if (remainingBatch > 0) {
+    // --- Phase 2: Fill remaining batch from the difficulty collection (only for level collections) ---
+    if (isLevelCollection && remainingBatch > 0) {
       // Deduct sentences quota for difficulty-collection cards
       const quota = await checkQuota(ctx, userId, FEATURE_IDS.SENTENCES, remainingBatch);
       if (quota.synced && !quota.allowed) {

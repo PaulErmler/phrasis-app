@@ -157,6 +157,7 @@ export default defineSchema({
     searchableText: v.optional(v.string()), // Denormalized source text + translations for full-text search
     searchableTextLanguages: v.optional(v.array(v.string())), // Language codes included in searchableText; used to detect staleness when course languages change
     lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review and FSRS phases)
+    wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
   })
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_dueDate', ['deckId', 'dueDate'])

@@ -32,6 +32,8 @@ interface CollectionCarouselUIProps {
   initialScrollIndex?: number;
   /** Called once the carousel is fully initialized and safe to display */
   onReady?: () => void;
+  /** When true, show toggle button even when collection is complete (for custom collections) */
+  showToggleWhenComplete?: boolean;
 }
 
 export function CollectionCarouselUI({
@@ -41,15 +43,18 @@ export function CollectionCarouselUI({
   onOpenCollection,
   isLoading = false,
   onReady,
+  showToggleWhenComplete = false,
 }: CollectionCarouselUIProps) {
-  const activeId = activeCollectionIds[0] ?? null;
-  const [focusedId, setFocusedId] = useState<string | null>(activeId);
+  const [focusedId, setFocusedId] = useState<string | null>(
+    activeCollectionIds[0] ?? collections[0]?.collectionId ?? null,
+  );
   const t = useTranslations('AppPage.collections.carousel');
 
-  // Keep focused in sync when active collection changes (e.g. course switch)
+  // Keep focused in sync when active collections change (e.g. course switch)
+  const firstActiveId = activeCollectionIds[0] ?? null;
   useEffect(() => {
-    if (activeId) setFocusedId(activeId);
-  }, [activeId]);
+    if (firstActiveId) setFocusedId(firstActiveId);
+  }, [firstActiveId]);
 
   // Signal ready immediately since there's no carousel to initialize
   const isReady = !isLoading && collections.length > 0;
@@ -83,7 +88,7 @@ export function CollectionCarouselUI({
           const isComplete =
             collection.cardsAdded >= collection.totalTexts &&
             collection.totalTexts > 0;
-          const isActive = activeId === collection.collectionId;
+          const isActive = activeCollectionIds.includes(collection.collectionId);
           const isFocused = focusedId === collection.collectionId;
 
           return (
@@ -122,10 +127,10 @@ export function CollectionCarouselUI({
                 </span>
                 {/* Fixed-height indicator area */}
                 <div className="h-3 flex items-center justify-center">
-                  {isActive && !isComplete && (
+                  {isActive && (!isComplete || showToggleWhenComplete) && (
                     <div className="w-1.5 h-1.5 rounded-full bg-primary" />
                   )}
-                  {isComplete && (
+                  {isComplete && !showToggleWhenComplete && (
                     <Check className="h-3 w-3 text-green-600" />
                   )}
                 </div>
@@ -139,10 +144,11 @@ export function CollectionCarouselUI({
       {focusedCollection && (
         <InlineCollectionDetail
           collection={focusedCollection}
-          isActive={activeId === focusedCollection.collectionId}
+          isActive={activeCollectionIds.includes(focusedCollection.collectionId)}
           onSelect={() => onSelectCollection(focusedCollection.collectionId)}
           onOpenDetail={() => onOpenCollection(focusedCollection.collectionId)}
           t={t}
+          showToggleWhenComplete={showToggleWhenComplete}
         />
       )}
     </div>
@@ -159,12 +165,14 @@ function InlineCollectionDetail({
   onSelect,
   onOpenDetail,
   t,
+  showToggleWhenComplete = false,
 }: {
   collection: CollectionProgressItem;
   isActive: boolean;
   onSelect: () => void;
   onOpenDetail: () => void;
   t: ReturnType<typeof useTranslations>;
+  showToggleWhenComplete?: boolean;
 }) {
   const progress =
     collection.totalTexts > 0
@@ -232,7 +240,7 @@ function InlineCollectionDetail({
           <Eye className="h-3.5 w-3.5 mr-1.5" />
           {t('inline.preview')}
         </Button>
-        {!isComplete ? (
+        {!isComplete || showToggleWhenComplete ? (
           <Button
             size="sm"
             variant={isActive ? 'secondary' : 'outline'}

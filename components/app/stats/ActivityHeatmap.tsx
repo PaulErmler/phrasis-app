@@ -11,7 +11,8 @@ interface ActivityHeatmapProps {
   timezone: string;
 }
 
-const CELL = 'w-[11px] h-[11px] rounded-[2px]';
+const CELL_YEAR = 'aspect-square w-full rounded-[2px]';
+const CELL_FIXED = 'w-[11px] h-[11px] rounded-[2px]';
 
 function getColor(count: number) {
   return count > 0 ? 'bg-primary/70' : 'bg-muted/40';
@@ -33,20 +34,21 @@ function YearView({ lookup }: { lookup: Map<string, number> }) {
   if (week.length) weeks.push(week);
 
   return (
-    <div className="overflow-x-auto pb-1">
-      <div className="flex gap-[3px]" style={{ minWidth: weeks.length * 15 }}>
-        {weeks.map((w, wi) => (
-          <div key={wi} className="flex flex-col gap-[3px]">
-            {w.map((day) => (
-              <div
-                key={day}
-                className={cn(CELL, getColor(lookup.get(day) ?? 0))}
-                title={`${day}: ${lookup.get(day) ?? 0}`}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
+    <div
+      className="grid gap-[2px]"
+      style={{ gridTemplateColumns: `repeat(${weeks.length}, 1fr)` }}
+    >
+      {weeks.map((w, wi) => (
+        <div key={wi} className="flex flex-col gap-[2px]">
+          {w.map((day) => (
+            <div
+              key={day}
+              className={cn(CELL_YEAR, getColor(lookup.get(day) ?? 0))}
+              title={`${day}: ${lookup.get(day) ?? 0}`}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }
@@ -86,13 +88,13 @@ function MonthView({ lookup }: { lookup: Map<string, number> }) {
       {rows.map((row, ri) => (
         <div key={ri} className="grid grid-cols-7 gap-[3px] mb-[3px]">
           {row.map((day, ci) => {
-            if (day === null) return <div key={ci} className={cn(CELL, 'opacity-0')} />;
+            if (day === null) return <div key={ci} className={cn(CELL_FIXED, 'opacity-0')} />;
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const count = lookup.get(dateStr) ?? 0;
             return (
               <div
                 key={ci}
-                className={cn(CELL, getColor(count))}
+                className={cn(CELL_FIXED, getColor(count))}
                 title={`${dateStr}: ${count}`}
               />
             );
@@ -129,7 +131,7 @@ function WeekView({ lookup }: { lookup: Map<string, number> }) {
             <div key={day} className="flex flex-col items-center gap-[3px]">
               <span className="text-[9px] text-muted-foreground">{dayLabels[i]}</span>
               <div
-                className={cn(CELL, getColor(count))}
+                className={cn(CELL_FIXED, getColor(count))}
                 title={`${day}: ${count}`}
               />
               <span className="text-[9px] text-muted-foreground">{parseInt(dayNum, 10)}</span>
@@ -180,9 +182,9 @@ export function ActivityHeatmap({ data, timezone }: ActivityHeatmapProps) {
       )}
 
       <div className="flex items-center justify-end gap-1.5 mt-2 text-[9px] text-muted-foreground">
-        <div className={cn(CELL, 'bg-muted/40')} />
+        <div className="w-[9px] h-[9px] rounded-[2px] bg-muted/40" />
         <span>{t('inactive')}</span>
-        <div className={cn(CELL, 'bg-primary/70')} />
+        <div className="w-[9px] h-[9px] rounded-[2px] bg-primary/70" />
         <span>{t('active')}</span>
       </div>
     </div>

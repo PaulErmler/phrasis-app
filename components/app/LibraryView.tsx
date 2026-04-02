@@ -115,7 +115,7 @@ export function LibraryView({
       {/* Sticky search + filters card */}
       <div className="sticky top-0 z-10 bg-background">
         <div className="max-w-xl mx-auto w-full pt-6">
-          <div className="card-surface p-3 space-y-3">
+          <div className="card-surface p-4 space-y-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input

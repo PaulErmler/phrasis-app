@@ -139,6 +139,7 @@ export function CustomCollectionCarousel({
         onOpenCollection={setOpenCollectionId}
         isLoading={false}
         onReady={() => setCarouselReady(true)}
+        showToggleWhenComplete
       />
 
       <CollectionDetailDialog
@@ -158,6 +159,7 @@ export function CustomCollectionCarousel({
           if (openCollectionId) handleToggleCollection(openCollectionId);
         }}
         onAddCards={handleAddCards}
+        showToggleWhenComplete
       />
     </div>
   );

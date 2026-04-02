@@ -152,16 +152,22 @@ export async function recordReviewStats(
   const allLanguages = [...new Set([...course.baseLanguages, ...course.targetLanguages])];
   const timePerLanguage = Math.round(clampedTime / allLanguages.length);
 
+  // Determine which languages still need word tracking for this card.
+  const trackedSet = new Set(card.wordsTrackedLanguages ?? []);
+  const untrackedLanguages = allLanguages.filter((l) => !trackedSet.has(l));
+
   let newWordCounts: Record<string, number> = {};
   let totalNewWords = 0;
 
-  if (isFirstReview) {
+  if (untrackedLanguages.length > 0) {
     const text = await ctx.db.get(card.textId);
     if (text) {
-      const langTexts: Array<{ language: string; text: string }> = [
-        { language: text.language, text: text.text },
-      ];
-      for (const lang of allLanguages) {
+      const langTexts: Array<{ language: string; text: string }> = [];
+      // Include source text if its language is untracked
+      if (untrackedLanguages.includes(text.language)) {
+        langTexts.push({ language: text.language, text: text.text });
+      }
+      for (const lang of untrackedLanguages) {
         if (lang === text.language) continue;
         const translation = await ctx.db
           .query('translations')
@@ -173,10 +179,16 @@ export async function recordReviewStats(
           langTexts.push({ language: lang, text: translation.translatedText });
         }
       }
-      newWordCounts = await trackNewWords(ctx, { userId, languages: langTexts });
-      for (const count of Object.values(newWordCounts)) {
-        totalNewWords += count;
+      if (langTexts.length > 0) {
+        newWordCounts = await trackNewWords(ctx, { userId, languages: langTexts });
+        for (const count of Object.values(newWordCounts)) {
+          totalNewWords += count;
+        }
       }
+
+      // Stamp the card so these languages are not re-counted on future reviews
+      const nowTracked = [...trackedSet, ...untrackedLanguages];
+      await ctx.db.patch(card._id, { wordsTrackedLanguages: nowTracked });
     }
   }
 

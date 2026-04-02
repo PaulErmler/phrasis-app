@@ -49,12 +49,12 @@ export function StatsView() {
     endDate: todayStr,
   });
 
-  // Filter out base languages from language daily data
+  // Only include target languages in language daily data
   const filteredLanguageData = useMemo(() => {
-    if (!dailyData?.languageDailyData?.length || !pageData?.baseLanguages) return [];
-    const baseSet = new Set(pageData.baseLanguages);
-    return dailyData.languageDailyData.filter((d) => !baseSet.has(d.language));
-  }, [dailyData?.languageDailyData, pageData?.baseLanguages]);
+    if (!dailyData?.languageDailyData?.length || !pageData?.targetLanguages) return [];
+    const targetSet = new Set(pageData.targetLanguages.map((l: string) => l.replace(/_latam$/, '')));
+    return dailyData.languageDailyData.filter((d) => targetSet.has(d.language.replace(/_latam$/, '')));
+  }, [dailyData?.languageDailyData, pageData?.targetLanguages]);
 
   const isLoading = pageData === undefined;
   const cs = pageData?.courseStats;

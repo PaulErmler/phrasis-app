@@ -1,36 +1,150 @@
 import { v } from 'convex/values';
 import { internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { Id } from '../_generated/dataModel';
 import { trackNewWords } from '../db/stats/wordTracking';
-import { upsertLanguageStats } from '../db/stats/languageStats';
+import { upsertDailyLanguageStats } from '../db/stats/dailyLanguageStats';
 
 const BATCH_SIZE = 50;
+const DELETE_BATCH_SIZE = 200;
 
 /**
  * Entry point: run from dashboard with no parameters.
- * Iterates all courses and backfills word counts + language stats
- * from existing reviewed cards.
+ * Idempotent — resets all word-related stats before rebuilding them,
+ * so it can safely be run multiple times.
+ *
+ * Phase 1: Reset courseStats.totalWordCount and languageStats.totalWords,
+ *          then clear userWords per user before reprocessing.
+ * Phase 2: Re-scan reviewed cards and rebuild word counts.
  */
 export const run = internalMutation({
   args: {},
   handler: async (ctx) => {
-    // Gather all courses
     const courses = await ctx.db.query('courses').take(500);
+
+    // Reset courseStats.totalWordCount to 0 for every course
     for (const course of courses) {
+      const stats = await ctx.db
+        .query('courseStats')
+        .withIndex('by_userId_and_courseId', (q) =>
+          q.eq('userId', course.userId).eq('courseId', course._id),
+        )
+        .first();
+      if (stats && (stats.totalWordCount ?? 0) > 0) {
+        await ctx.db.patch(stats._id, { totalWordCount: 0 });
+      }
+    }
+
+    // Reset languageStats.totalWords to 0 for every course
+    for (const course of courses) {
+      const langRows = await ctx.db
+        .query('languageStats')
+        .withIndex('by_userId_and_courseId', (q) =>
+          q.eq('userId', course.userId).eq('courseId', course._id),
+        )
+        .take(50);
+      for (const row of langRows) {
+        if (row.totalWords > 0) {
+          await ctx.db.patch(row._id, { totalWords: 0 });
+        }
+      }
+    }
+
+    // Reset dailyLanguageStats.newWordsCount to 0 for every course
+    for (const course of courses) {
+      const dailyLangRows = await ctx.db
+        .query('dailyLanguageStats')
+        .withIndex('by_userId_and_courseId_and_date', (q) =>
+          q.eq('userId', course.userId).eq('courseId', course._id),
+        )
+        .take(2000);
+      for (const row of dailyLangRows) {
+        if (row.newWordsCount > 0) {
+          await ctx.db.patch(row._id, { newWordsCount: 0 });
+        }
+      }
+    }
+
+    // Collect unique userIds, then schedule userWords cleanup per user.
+    // Each cleanup chains into processCourseBatch for that user's courses.
+    const userCourses = new Map<string, typeof courses>();
+    for (const course of courses) {
+      const list = userCourses.get(course.userId) ?? [];
+      list.push(course);
+      userCourses.set(course.userId, list);
+    }
+
+    let usersQueued = 0;
+    for (const [userId, userCourseList] of userCourses) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.migrations.backfillUserStats.clearUserWords,
+        {
+          userId,
+          courseIds: userCourseList.map((c) => c._id),
+        },
+      );
+      usersQueued++;
+    }
+
+    return { status: 'started', coursesFound: courses.length, usersQueued };
+  },
+});
+
+/**
+ * Delete all userWords for a user (paginated), then schedule
+ * processCourseBatch for each of their courses.
+ */
+export const clearUserWords = internalMutation({
+  args: {
+    userId: v.string(),
+    courseIds: v.array(v.id('courses')),
+    cursor: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const result = await ctx.db
+      .query('userWords')
+      .withIndex('by_userId_and_language', (q) =>
+        q.eq('userId', args.userId),
+      )
+      .paginate({
+        cursor: args.cursor ?? null,
+        numItems: DELETE_BATCH_SIZE,
+      });
+
+    for (const row of result.page) {
+      await ctx.db.delete(row._id);
+    }
+
+    if (!result.isDone) {
+      // More words to delete — continue clearing before processing
+      await ctx.scheduler.runAfter(
+        0,
+        internal.migrations.backfillUserStats.clearUserWords,
+        {
+          userId: args.userId,
+          courseIds: args.courseIds,
+          cursor: result.continueCursor,
+        },
+      );
+      return { status: 'clearing', deleted: result.page.length };
+    }
+
+    // All words cleared — now schedule course processing
+    for (const courseId of args.courseIds) {
       await ctx.scheduler.runAfter(
         0,
         internal.migrations.backfillUserStats.processCourseBatch,
-        { courseId: course._id, userId: course.userId },
+        { courseId, userId: args.userId },
       );
     }
-    return { status: 'started', coursesQueued: courses.length };
+
+    return { status: 'cleared', coursesQueued: args.courseIds.length };
   },
 });
 
 /**
  * Process one course: iterate its reviewed cards, extract words,
- * and build language stats + word tracking.
+ * and rebuild language stats + word tracking.
  */
 export const processCourseBatch = internalMutation({
   args: {
@@ -84,16 +198,21 @@ export const processCourseBatch = internalMutation({
         }
       }
 
-      // Track new words (insertIfDoesNotExist pattern in trackNewWords)
+      // Track new words (idempotent: skips words already in userWords)
       const newWordCounts = await trackNewWords(ctx, {
         userId: args.userId,
         languages: langTexts,
       });
 
+      // Stamp the card so future reviews skip already-tracked languages
+      await ctx.db.patch(card._id, { wordsTrackedLanguages: allLanguages });
+
+      // Derive date from card's lastReviewedAt for daily language stats
+      const reviewDate = new Date(card.lastReviewedAt);
+      const dateStr = `${reviewDate.getFullYear()}-${String(reviewDate.getMonth() + 1).padStart(2, '0')}-${String(reviewDate.getDate()).padStart(2, '0')}`;
+
       for (const [lang, count] of Object.entries(newWordCounts)) {
         totalNewWords += count;
-        // Ensure languageStats row exists (upsert with 0 reps since we
-        // don't reconstruct daily history, just word counts)
         if (count > 0) {
           const existing = await ctx.db
             .query('languageStats')
@@ -116,6 +235,17 @@ export const processCourseBatch = internalMutation({
               totalWords: count,
             });
           }
+
+          // Also populate dailyLanguageStats so the words chart has data
+          await upsertDailyLanguageStats(ctx, {
+            userId: args.userId,
+            courseId: args.courseId,
+            date: dateStr,
+            language: lang,
+            timeMs: 0,
+            isNewCard: false,
+            newWordsCount: count,
+          });
         }
       }
     }
