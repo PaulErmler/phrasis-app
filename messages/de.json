@@ -908,9 +908,9 @@
     "inactive": "Inaktiv",
     "studyHours": "Lernzeiten",
     "appUsage": "App-Nutzung",
-    "manualCards": "Manuelle Karten",
-    "chatCards": "Chat-Karten",
-    "chatMessages": "Chat-Nachrichten",
+    "manualCards": "Manuell hinzugefügt",
+    "chatCards": "Chat-Karten hinzugefügt",
+    "chatMessages": "Chat-Nachrichten gesendet",
     "noData": "Noch keine Daten"
   }
 }

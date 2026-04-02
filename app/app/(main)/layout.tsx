@@ -81,6 +81,8 @@ export default function MainLayout({
     initialView.chatThreadId ?? null,
   );
   const viewBeforeChatRef = useRef<Exclude<View, 'chat'>>('home');
+  const [hasVisitedStats, setHasVisitedStats] = useState(initialView.view === 'stats');
+  const [hasVisitedLibrary, setHasVisitedLibrary] = useState(initialView.view === 'library');
   const [isLearnOpen, setIsLearnOpen] = useState(false);
   const isLearnOpenRef = useRef(false);
   useEffect(() => { isLearnOpenRef.current = isLearnOpen; }, [isLearnOpen]);
@@ -153,6 +155,8 @@ export default function MainLayout({
   const handleViewChange = useCallback((view: View) => {
     setActiveView(view);
     setIsLearnOpen(false);
+    if (view === 'stats') setHasVisitedStats(true);
+    if (view === 'library') setHasVisitedLibrary(true);
     if (view !== 'chat') {
       router.push(VIEW_PATHS[view]);
     }
@@ -165,6 +169,8 @@ export default function MainLayout({
     });
     setChatThreadId(threadId);
     setIsLearnOpen(false);
+    setHasVisitedStats(false);
+    setHasVisitedLibrary(false);
     router.push(`/app/chat/${threadId}`);
   }, [router]);
 
@@ -194,6 +200,8 @@ export default function MainLayout({
   // Learn overlay — pushState so the browser back button can close it
   const handleLearnOpen = useCallback(() => {
     setIsLearnOpen(true);
+    setHasVisitedStats(false);
+    setHasVisitedLibrary(false);
     history.pushState(null, '', '/app/learn');
     refreshPrefetchedThread();
   }, [refreshPrefetchedThread]);
@@ -370,14 +378,32 @@ export default function MainLayout({
             />
           )}
         </div>
-        {!isLearnOpen && activeView === 'library' && (
-          <LibraryView
-            hasActiveCourse={hasActiveCourse}
-            onOpenCourseMenu={handleOpenCourseMenu}
-          />
+        {hasVisitedLibrary && (
+          <div
+            style={{
+              display:
+                  !isLearnOpen && activeView === 'library'
+                    ? 'contents'
+                    : 'none',
+            }}
+          >
+            <LibraryView
+              hasActiveCourse={hasActiveCourse}
+              onOpenCourseMenu={handleOpenCourseMenu}
+            />
+          </div>
         )}
-        {!isLearnOpen && activeView === 'stats' && (
-          <StatsView />
+        {hasVisitedStats && (
+          <div
+            style={{
+              display:
+                  !isLearnOpen && activeView === 'stats'
+                    ? 'contents'
+                    : 'none',
+            }}
+          >
+            <StatsView />
+          </div>
         )}
         <div
           style={{

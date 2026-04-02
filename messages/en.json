@@ -834,9 +834,9 @@
     "inactive": "Inactive",
     "studyHours": "Study Hours",
     "appUsage": "App Usage",
-    "manualCards": "Manual Cards",
-    "chatCards": "Chat Cards",
-    "chatMessages": "Chat Messages",
+    "manualCards": "Manual Cards Added",
+    "chatCards": "Chat Cards Added",
+    "chatMessages": "Chat Messages Sent",
     "noData": "No data yet"
   }
 }
