@@ -309,6 +309,7 @@ export function CumulativeLineChart({ dailyData, monthlyData, languageDailyData 
                   stroke={LANGUAGE_COLORS[i % LANGUAGE_COLORS.length]}
                   strokeWidth={2}
                   dot={false}
+                  isAnimationActive={false}
                 />
               ))}
             </LineChart>
@@ -342,6 +343,7 @@ export function CumulativeLineChart({ dailyData, monthlyData, languageDailyData 
                 stroke="var(--primary)"
                 strokeWidth={2}
                 fill="url(#fillValue)"
+                isAnimationActive={false}
               />
             </AreaChart>
           )}
