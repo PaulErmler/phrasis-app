@@ -73,8 +73,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'es-ES', 'Spain'),
       createChirp3Voice('Kore', 'female', 'es-ES', 'Spain'),
+      createChirp3Voice('Aoede', 'female', 'es-ES', 'Spain'),
+      createChirp3Voice('Zephyr', 'female', 'es-ES', 'Spain'),
       createChirp3Voice('Charon', 'male', 'es-ES', 'Spain'),
       createChirp3Voice('Puck', 'male', 'es-ES', 'Spain'),
+      createChirp3Voice('Fenrir', 'male', 'es-ES', 'Spain'),
+      createChirp3Voice('Orus', 'male', 'es-ES', 'Spain'),
     ],
   },
   {
@@ -87,8 +91,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'es-US', 'Latin America'),
       createChirp3Voice('Kore', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Aoede', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Zephyr', 'female', 'es-US', 'Latin America'),
       createChirp3Voice('Charon', 'male', 'es-US', 'Latin America'),
       createChirp3Voice('Puck', 'male', 'es-US', 'Latin America'),
+      createChirp3Voice('Fenrir', 'male', 'es-US', 'Latin America'),
+      createChirp3Voice('Orus', 'male', 'es-US', 'Latin America'),
     ],
   },
   {
@@ -119,8 +127,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'de-DE', 'Germany'),
       createChirp3Voice('Kore', 'female', 'de-DE', 'Germany'),
+      createChirp3Voice('Aoede', 'female', 'de-DE', 'Germany'),
+      createChirp3Voice('Zephyr', 'female', 'de-DE', 'Germany'),
       createChirp3Voice('Charon', 'male', 'de-DE', 'Germany'),
       createChirp3Voice('Puck', 'male', 'de-DE', 'Germany'),
+      createChirp3Voice('Fenrir', 'male', 'de-DE', 'Germany'),
+      createChirp3Voice('Orus', 'male', 'de-DE', 'Germany'),
     ],
   },
   {
@@ -133,8 +145,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'it-IT', 'Italy'),
       createChirp3Voice('Kore', 'female', 'it-IT', 'Italy'),
+      createChirp3Voice('Aoede', 'female', 'it-IT', 'Italy'),
+      createChirp3Voice('Zephyr', 'female', 'it-IT', 'Italy'),
       createChirp3Voice('Charon', 'male', 'it-IT', 'Italy'),
       createChirp3Voice('Puck', 'male', 'it-IT', 'Italy'),
+      createChirp3Voice('Fenrir', 'male', 'it-IT', 'Italy'),
+      createChirp3Voice('Orus', 'male', 'it-IT', 'Italy'),
     ],
   },
   {
@@ -147,8 +163,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'pt-BR', 'Brazil'),
       createChirp3Voice('Kore', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Aoede', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Zephyr', 'female', 'pt-BR', 'Brazil'),
       createChirp3Voice('Charon', 'male', 'pt-BR', 'Brazil'),
       createChirp3Voice('Puck', 'male', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Fenrir', 'male', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Orus', 'male', 'pt-BR', 'Brazil'),
     ],
   },
   {
@@ -161,8 +181,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'ru-RU', 'Russia'),
       createChirp3Voice('Kore', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Aoede', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Zephyr', 'female', 'ru-RU', 'Russia'),
       createChirp3Voice('Charon', 'male', 'ru-RU', 'Russia'),
       createChirp3Voice('Puck', 'male', 'ru-RU', 'Russia'),
+      createChirp3Voice('Fenrir', 'male', 'ru-RU', 'Russia'),
+      createChirp3Voice('Orus', 'male', 'ru-RU', 'Russia'),
     ],
   },
   {
@@ -175,8 +199,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'hi-IN', 'India'),
       createChirp3Voice('Kore', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Aoede', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Zephyr', 'female', 'hi-IN', 'India'),
       createChirp3Voice('Charon', 'male', 'hi-IN', 'India'),
       createChirp3Voice('Puck', 'male', 'hi-IN', 'India'),
+      createChirp3Voice('Fenrir', 'male', 'hi-IN', 'India'),
+      createChirp3Voice('Orus', 'male', 'hi-IN', 'India'),
     ],
   },
   {
@@ -189,8 +217,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'cmn-CN', 'Mandarin'),
       createChirp3Voice('Kore', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Aoede', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Zephyr', 'female', 'cmn-CN', 'Mandarin'),
       createChirp3Voice('Charon', 'male', 'cmn-CN', 'Mandarin'),
       createChirp3Voice('Puck', 'male', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Fenrir', 'male', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Orus', 'male', 'cmn-CN', 'Mandarin'),
     ],
   },
   {
@@ -203,8 +235,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'ja-JP', 'Japan'),
       createChirp3Voice('Kore', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Aoede', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Zephyr', 'female', 'ja-JP', 'Japan'),
       createChirp3Voice('Charon', 'male', 'ja-JP', 'Japan'),
       createChirp3Voice('Puck', 'male', 'ja-JP', 'Japan'),
+      createChirp3Voice('Fenrir', 'male', 'ja-JP', 'Japan'),
+      createChirp3Voice('Orus', 'male', 'ja-JP', 'Japan'),
     ],
   },
   {
@@ -217,8 +253,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'ko-KR', 'Korea'),
       createChirp3Voice('Kore', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Aoede', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Zephyr', 'female', 'ko-KR', 'Korea'),
       createChirp3Voice('Charon', 'male', 'ko-KR', 'Korea'),
       createChirp3Voice('Puck', 'male', 'ko-KR', 'Korea'),
+      createChirp3Voice('Fenrir', 'male', 'ko-KR', 'Korea'),
+      createChirp3Voice('Orus', 'male', 'ko-KR', 'Korea'),
     ],
   },
   {
@@ -231,8 +271,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'vi-VN', 'Vietnam'),
       createChirp3Voice('Kore', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Aoede', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Zephyr', 'female', 'vi-VN', 'Vietnam'),
       createChirp3Voice('Charon', 'male', 'vi-VN', 'Vietnam'),
       createChirp3Voice('Puck', 'male', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Fenrir', 'male', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Orus', 'male', 'vi-VN', 'Vietnam'),
     ],
   },
   {
@@ -245,8 +289,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'sv-SE', 'Sweden'),
       createChirp3Voice('Kore', 'female', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Aoede', 'female', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Zephyr', 'female', 'sv-SE', 'Sweden'),
       createChirp3Voice('Charon', 'male', 'sv-SE', 'Sweden'),
       createChirp3Voice('Puck', 'male', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Fenrir', 'male', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Orus', 'male', 'sv-SE', 'Sweden'),
     ],
   },
   {
@@ -259,8 +307,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'fi-FI', 'Finland'),
       createChirp3Voice('Kore', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Aoede', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Zephyr', 'female', 'fi-FI', 'Finland'),
       createChirp3Voice('Charon', 'male', 'fi-FI', 'Finland'),
       createChirp3Voice('Puck', 'male', 'fi-FI', 'Finland'),
+      createChirp3Voice('Fenrir', 'male', 'fi-FI', 'Finland'),
+      createChirp3Voice('Orus', 'male', 'fi-FI', 'Finland'),
     ],
   },
   {
@@ -273,8 +325,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'nl-NL', 'Netherlands'),
       createChirp3Voice('Kore', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Aoede', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Zephyr', 'female', 'nl-NL', 'Netherlands'),
       createChirp3Voice('Charon', 'male', 'nl-NL', 'Netherlands'),
       createChirp3Voice('Puck', 'male', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Fenrir', 'male', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Orus', 'male', 'nl-NL', 'Netherlands'),
     ],
   },
   {
@@ -287,8 +343,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'el-GR', 'Greece'),
       createChirp3Voice('Kore', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Aoede', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Zephyr', 'female', 'el-GR', 'Greece'),
       createChirp3Voice('Charon', 'male', 'el-GR', 'Greece'),
       createChirp3Voice('Puck', 'male', 'el-GR', 'Greece'),
+      createChirp3Voice('Fenrir', 'male', 'el-GR', 'Greece'),
+      createChirp3Voice('Orus', 'male', 'el-GR', 'Greece'),
     ],
   },
   {
@@ -301,8 +361,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     voices: [
       createChirp3Voice('Leda', 'female', 'ar-XA', 'MSA'),
       createChirp3Voice('Kore', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Aoede', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Zephyr', 'female', 'ar-XA', 'MSA'),
       createChirp3Voice('Charon', 'male', 'ar-XA', 'MSA'),
       createChirp3Voice('Puck', 'male', 'ar-XA', 'MSA'),
+      createChirp3Voice('Fenrir', 'male', 'ar-XA', 'MSA'),
+      createChirp3Voice('Orus', 'male', 'ar-XA', 'MSA'),
     ],
   },
 ];
