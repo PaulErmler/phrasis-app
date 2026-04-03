@@ -38,6 +38,8 @@ interface ChatPanelProps {
   approvalsLoading?: boolean;
   /** When false, prevents the chat input from auto-focusing on mount */
   autoFocus?: boolean;
+  /** When true, skips bottom padding (e.g. when no bottom nav is present) */
+  noBottomPadding?: boolean;
 }
 
 /**
@@ -60,6 +62,7 @@ export function ChatPanel({
   aboveFooterAction,
   approvalsLoading = false,
   autoFocus,
+  noBottomPadding = false,
 }: ChatPanelProps) {
   const { isAvailable } = useFeatureQuota(FEATURE_IDS.CHAT_MESSAGES);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -145,7 +148,7 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className="flex-none border-t bg-background">
+      <div className={cn("flex-none border-t bg-background", !noBottomPadding && "pb-16")}>
         <div className={cn("p-4", className)}>
           {isThreadLimitReached ? (
             <div className="flex flex-col items-center gap-3 py-2 text-center">

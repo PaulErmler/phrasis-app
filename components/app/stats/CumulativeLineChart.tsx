@@ -24,6 +24,13 @@ interface MonthlyPoint {
   totalTimeMs: number;
 }
 
+interface WeeklyPoint {
+  week: string; // "YYYY-Www"
+  totalRepetitions: number;
+  totalNewCards: number;
+  totalTimeMs: number;
+}
+
 interface LanguageDailyPoint {
   date: string;
   language: string;
@@ -33,6 +40,7 @@ interface LanguageDailyPoint {
 interface CumulativeLineChartProps {
   dailyData: DailyPoint[];
   monthlyData: MonthlyPoint[];
+  weeklyData?: WeeklyPoint[];
   languageDailyData?: LanguageDailyPoint[];
 }
 
@@ -64,40 +72,62 @@ function getMonthlyValue(point: MonthlyPoint, metric: Metric): number {
   }
 }
 
+function getWeeklyValue(point: WeeklyPoint, metric: Metric): number {
+  switch (metric) {
+    case 'words': return point.totalNewCards;
+    case 'reviews': return point.totalRepetitions;
+    case 'sentences': return point.totalNewCards;
+    case 'time': return point.totalTimeMs;
+  }
+}
+
+/** Convert "YYYY-Www" to the Monday date of that ISO week, formatted as "MM-DD". */
+function weekToDateLabel(week: string): string {
+  const [yearStr, wStr] = week.split('-W');
+  const year = parseInt(yearStr, 10);
+  const weekNum = parseInt(wStr, 10);
+  // Jan 4 is always in ISO week 1
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const dayOfWeek = jan4.getUTCDay() || 7;
+  const monday = new Date(jan4);
+  monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1 + (weekNum - 1) * 7);
+  const mm = String(monday.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(monday.getUTCDate()).padStart(2, '0');
+  return `${mm}-${dd}`;
+}
+
+/** Convert a "YYYY-MM-DD" date string to ISO week "YYYY-Www". */
+function dateToISOWeek(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const dayOfWeek = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayOfWeek);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(
+    ((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
 function formatValue(value: number, metric: Metric): string {
   if (metric === 'time') return formatTimeMs(value);
   return value.toLocaleString();
 }
 
-function formatDateLabel(dateStr: string, range: TimeRange): string {
-  if (range === 'year') {
-    // dateStr is "MM" from month string — add year tick
-    return dateStr;
-  }
-  // dateStr is "MM-DD" — convert to "MM-DD"
-  return dateStr;
-}
-
-function formatTooltipDate(label: string, range: TimeRange): string {
+function formatTooltipDate(label: string): string {
+  // label is always "MM-DD" now (daily, weekly, or monthly views all use this format)
   const now = new Date();
-  if (range === 'year') {
-    // label is "MM" — figure out year from month number
-    const monthNum = parseInt(label, 10);
-    const currentMonth = now.getMonth() + 1;
-    const year = monthNum > currentMonth ? now.getFullYear() - 1 : now.getFullYear();
-    return `${label}-${String(year).slice(2)}`;
-  }
-  // label is "MM-DD" — figure out year
   const [mm, dd] = label.split('-');
+  if (!dd) return label; // fallback
   const monthNum = parseInt(mm, 10);
   const currentMonth = now.getMonth() + 1;
   const year = monthNum > currentMonth ? now.getFullYear() - 1 : now.getFullYear();
   return `${mm}-${dd}-${String(year).slice(2)}`;
 }
 
-export function CumulativeLineChart({ dailyData, monthlyData, languageDailyData }: CumulativeLineChartProps) {
+export function CumulativeLineChart({ dailyData, monthlyData, weeklyData, languageDailyData }: CumulativeLineChartProps) {
   const t = useTranslations('StatsPage');
-  const [metric, setMetric] = useState<Metric>('reviews');
+  const [metric, setMetric] = useState<Metric>('words');
   const [range, setRange] = useState<TimeRange>('month');
 
   // Detect unique languages from language data
@@ -114,11 +144,11 @@ export function CumulativeLineChart({ dailyData, monthlyData, languageDailyData 
     if (isWordsByLanguage) return []; // handled separately
 
     if (range === 'year') {
-      const sorted = [...monthlyData].sort((a, b) => a.month.localeCompare(b.month));
+      const sorted = [...(weeklyData ?? [])].sort((a, b) => a.week.localeCompare(b.week));
       let cumulative = 0;
       return sorted.map((p) => {
-        cumulative += getMonthlyValue(p, metric);
-        return { label: p.month.slice(5), value: cumulative };
+        cumulative += getWeeklyValue(p, metric);
+        return { label: weekToDateLabel(p.week), value: cumulative };
       });
     }
 
@@ -137,7 +167,7 @@ export function CumulativeLineChart({ dailyData, monthlyData, languageDailyData 
       cumulative += getDailyValue(p, metric);
       return { label: p.date.slice(5), value: cumulative };
     });
-  }, [dailyData, monthlyData, metric, range, isWordsByLanguage]);
+  }, [dailyData, weeklyData, metric, range, isWordsByLanguage]);
 
   // Per-language words chart data
   const langChartData = useMemo(() => {
@@ -146,22 +176,22 @@ export function CumulativeLineChart({ dailyData, monthlyData, languageDailyData 
     const now = new Date();
 
     if (range === 'year') {
-      // Aggregate daily language data into months, then accumulate
-      const monthMap = new Map<string, Map<string, number>>();
+      // Aggregate daily language data into ISO weeks, then accumulate
+      const weekMap = new Map<string, Map<string, number>>();
       for (const d of languageDailyData) {
-        const monthKey = d.date.slice(0, 7); // "YYYY-MM"
-        if (!monthMap.has(monthKey)) monthMap.set(monthKey, new Map());
-        const langMap = monthMap.get(monthKey)!;
+        const weekKey = dateToISOWeek(d.date);
+        if (!weekMap.has(weekKey)) weekMap.set(weekKey, new Map());
+        const langMap = weekMap.get(weekKey)!;
         langMap.set(d.language, (langMap.get(d.language) ?? 0) + d.newWordsCount);
       }
 
-      const sortedMonths = Array.from(monthMap.keys()).sort();
+      const sortedWeeks = Array.from(weekMap.keys()).sort();
       const cumulatives = new Map<string, number>();
       for (const lang of languages) cumulatives.set(lang, 0);
 
-      return sortedMonths.map((month) => {
-        const langMap = monthMap.get(month)!;
-        const point: Record<string, string | number> = { label: month.slice(5) };
+      return sortedWeeks.map((week) => {
+        const langMap = weekMap.get(week)!;
+        const point: Record<string, string | number> = { label: weekToDateLabel(week) };
         for (const lang of languages) {
           cumulatives.set(lang, (cumulatives.get(lang) ?? 0) + (langMap.get(lang) ?? 0));
           point[lang] = cumulatives.get(lang)!;
@@ -224,7 +254,7 @@ export function CumulativeLineChart({ dailyData, monthlyData, languageDailyData 
   // Custom tooltip
   const renderTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
-    const dateLabel = formatTooltipDate(label, range);
+    const dateLabel = formatTooltipDate(label);
     return (
       <div className="rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
         <p className="font-medium text-muted-foreground mb-1">{dateLabel}</p>

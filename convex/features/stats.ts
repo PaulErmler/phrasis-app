@@ -44,6 +44,8 @@ export const getStatsPageData = query({
     endDate: v.string(),
     startMonth: v.string(),
     endMonth: v.string(),
+    startWeek: v.optional(v.string()),
+    endWeek: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -105,6 +107,30 @@ export const getStatsPageData = query({
       }));
     }
 
+    // Weekly stats
+    let weeklyStats: Array<{
+      week: string;
+      totalRepetitions: number;
+      totalNewCards: number;
+      totalTimeMs: number;
+    }> = [];
+    if (args.startWeek && args.endWeek && isValidWeekString(args.startWeek) && isValidWeekString(args.endWeek)) {
+      const weekRows = await ctx.db
+        .query('weeklyStats')
+        .withIndex('by_userId_and_courseId_and_week', (q) =>
+          q.eq('userId', userId).eq('courseId', courseId)
+            .gte('week', args.startWeek!).lte('week', args.endWeek!),
+        )
+        .take(60);
+
+      weeklyStats = weekRows.map((r) => ({
+        week: r.week,
+        totalRepetitions: r.totalRepetitions,
+        totalNewCards: r.totalNewCards,
+        totalTimeMs: r.totalTimeMs,
+      }));
+    }
+
     // Per-language word counts
     const langStatsRows = await ctx.db
       .query('languageStats')
@@ -143,8 +169,11 @@ export const getStatsPageData = query({
         totalAccuracyCount: stats.totalAccuracyCount ?? 0,
       } : null,
       todayReps: todayDaily?.reps ?? 0,
+      todayNewCards: todayDaily?.newCards ?? 0,
+      todayTimeMs: todayDaily?.timeMs ?? 0,
       hourlyDistribution: hourlyTotals,
       monthlyStats,
+      weeklyStats,
       baseLanguages,
       targetLanguages,
       languageWordCounts,

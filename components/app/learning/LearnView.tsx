@@ -76,6 +76,7 @@ function WrappedChatPanel({
       showSuggestions
       autoFocus={false}
       approvalsLoading={!approvalsLoaded}
+      noBottomPadding
       aboveFooterAction={
         <Button
           type="button"

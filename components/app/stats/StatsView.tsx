@@ -29,18 +29,39 @@ function currentMonthStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function getISOWeekString(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  const dayOfWeek = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayOfWeek);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil(
+    ((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
+  return `${date.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+function weeksAgoStr(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - n * 7);
+  const iso = d.toISOString().slice(0, 10);
+  return getISOWeekString(iso);
+}
+
 export function StatsView() {
   const tz = getUserTimezone();
   const todayStr = today(tz);
   const yearStartStr = yearStart();
 
-  // Query 1: Small summary data (courseStats, todayReps, hourly, monthly)
+  // Query 1: Small summary data (courseStats, todayReps, hourly, monthly, weekly)
   const pageData = useQuery(api.features.stats.getStatsPageData, {
     timezone: tz,
     startDate: yearStartStr,
     endDate: todayStr,
     startMonth: monthsAgoStr(12),
     endMonth: currentMonthStr(),
+    startWeek: weeksAgoStr(52),
+    endWeek: getISOWeekString(todayStr),
   });
 
   // Query 2: Heavier daily data (heatmap + language daily stats)
@@ -80,6 +101,9 @@ export function StatsView() {
           accuracyCount={cs?.totalAccuracyCount ?? 0}
           hasLearnedToday={(pageData?.todayReps ?? 0) > 0}
           languageWordCounts={pageData?.languageWordCounts ?? []}
+          todayReps={pageData?.todayReps ?? 0}
+          todayNewCards={pageData?.todayNewCards ?? 0}
+          todayTimeMs={pageData?.todayTimeMs ?? 0}
         />
 
         <CumulativeLineChart
@@ -94,6 +118,12 @@ export function StatsView() {
             totalRepetitions: m.totalRepetitions,
             totalNewCards: m.totalNewCards,
             totalTimeMs: m.totalTimeMs,
+          }))}
+          weeklyData={(pageData?.weeklyStats ?? []).map((w) => ({
+            week: w.week,
+            totalRepetitions: w.totalRepetitions,
+            totalNewCards: w.totalNewCards,
+            totalTimeMs: w.totalTimeMs,
           }))}
           languageDailyData={filteredLanguageData}
         />
