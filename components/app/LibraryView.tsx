@@ -111,7 +111,7 @@ export function LibraryView({
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4" style={{ scrollbarGutter: 'stable' }}>
+    <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-20" style={{ scrollbarGutter: 'stable' }}>
       {/* Sticky search + filters card */}
       <div className="sticky top-0 z-10 bg-background">
         <div className="max-w-xl mx-auto w-full pt-6">

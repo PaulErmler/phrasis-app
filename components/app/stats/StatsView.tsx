@@ -69,7 +69,7 @@ export function StatsView() {
 
   return (
     <div className="scroll-view">
-      <div className="app-view pb-8">
+      <div className="app-view">
         <NumbersRow
           streak={cs?.currentStreak ?? 0}
           words={cs?.totalWordCount ?? 0}
