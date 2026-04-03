@@ -255,7 +255,7 @@ export default function MainLayout({
   return (
     <div className="h-svh max-h-svh md:h-screen md:max-h-screen flex flex-col overflow-hidden">
       {!isAddCardsRoute && (
-        <header className="fixed top-0 left-0 right-0 z-10 border-b bg-background">
+        <header className="fixed top-0 left-0 right-0 z-20 border-b bg-background">
           <div className="header-bar">
             {activeView === 'home' ? (
               <Button
@@ -326,7 +326,7 @@ export default function MainLayout({
 
       <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
-      <main className="flex-1 min-h-0 flex flex-col">
+      <main className="flex-1 min-h-0 flex flex-col relative z-0 overflow-hidden">
         <div
           style={{
             display:
@@ -412,7 +412,7 @@ export default function MainLayout({
 
       {!isAddCardsRoute && <div className="h-16 shrink-0" />}
       {!isAddCardsRoute && (
-        <div className={`fixed bottom-0 left-0 right-0 z-10 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
+        <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
           <BottomNav
             currentView={activeView}
             onViewChange={handleViewChange}
