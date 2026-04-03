@@ -137,6 +137,8 @@ export function CustomCollectionCarousel({
         activeCollectionIds={selectedIds}
         onSelectCollection={handleToggleCollection}
         onOpenCollection={setOpenCollectionId}
+        onAddCards={(collectionId) => handleAddCards(collectionId)}
+        isAdding={isAdding}
         isLoading={false}
         onReady={() => setCarouselReady(true)}
         showToggleWhenComplete
@@ -158,7 +160,7 @@ export function CustomCollectionCarousel({
         onSelect={() => {
           if (openCollectionId) handleToggleCollection(openCollectionId);
         }}
-        onAddCards={handleAddCards}
+        onAddCards={() => handleAddCards()}
         showToggleWhenComplete
       />
     </div>

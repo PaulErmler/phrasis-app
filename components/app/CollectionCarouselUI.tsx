@@ -1,9 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Check, Eye, CheckCircle2, Layers, BookOpen } from 'lucide-react';
+import {
+  Check,
+  Eye,
+  CheckCircle2,
+  Layers,
+  BookOpen,
+  Plus,
+  Loader2,
+  Lock,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 
@@ -27,6 +35,8 @@ interface CollectionCarouselUIProps {
   activeCollectionIds: string[];
   onSelectCollection: (collectionId: string) => void;
   onOpenCollection: (collectionId: string) => void;
+  onAddCards: (collectionId: string) => void;
+  isAdding?: boolean;
   isLoading?: boolean;
   /** Index to scroll to whenever it changes (e.g. active collection index after a course switch) */
   initialScrollIndex?: number;
@@ -34,6 +44,12 @@ interface CollectionCarouselUIProps {
   onReady?: () => void;
   /** When true, show toggle button even when collection is complete (for custom collections) */
   showToggleWhenComplete?: boolean;
+  /** Remaining sentences quota. null means unlimited. */
+  sentencesRemaining?: number | null;
+  /** Called when the user clicks upgrade (limit reached). */
+  onUpgrade?: () => void;
+  /** When true, hides the "Add N Cards" button */
+  hideAddCards?: boolean;
 }
 
 export function CollectionCarouselUI({
@@ -41,9 +57,14 @@ export function CollectionCarouselUI({
   activeCollectionIds,
   onSelectCollection,
   onOpenCollection,
+  onAddCards,
+  isAdding = false,
   isLoading = false,
   onReady,
   showToggleWhenComplete = false,
+  sentencesRemaining,
+  onUpgrade,
+  hideAddCards = false,
 }: CollectionCarouselUIProps) {
   const [focusedId, setFocusedId] = useState<string | null>(
     activeCollectionIds[0] ?? collections[0]?.collectionId ?? null,
@@ -147,8 +168,13 @@ export function CollectionCarouselUI({
           isActive={activeCollectionIds.includes(focusedCollection.collectionId)}
           onSelect={() => onSelectCollection(focusedCollection.collectionId)}
           onOpenDetail={() => onOpenCollection(focusedCollection.collectionId)}
+          onAddCards={() => onAddCards(focusedCollection.collectionId)}
+          isAdding={isAdding}
           t={t}
           showToggleWhenComplete={showToggleWhenComplete}
+          sentencesRemaining={sentencesRemaining}
+          onUpgrade={onUpgrade}
+          hideAddCards={hideAddCards}
         />
       )}
     </div>
@@ -164,15 +190,25 @@ function InlineCollectionDetail({
   isActive,
   onSelect,
   onOpenDetail,
+  onAddCards,
+  isAdding = false,
   t,
   showToggleWhenComplete = false,
+  sentencesRemaining,
+  onUpgrade,
+  hideAddCards = false,
 }: {
   collection: CollectionProgressItem;
   isActive: boolean;
   onSelect: () => void;
   onOpenDetail: () => void;
+  onAddCards: () => void;
+  isAdding?: boolean;
   t: ReturnType<typeof useTranslations>;
   showToggleWhenComplete?: boolean;
+  sentencesRemaining?: number | null;
+  onUpgrade?: () => void;
+  hideAddCards?: boolean;
 }) {
   const progress =
     collection.totalTexts > 0
@@ -181,9 +217,13 @@ function InlineCollectionDetail({
   const isComplete =
     collection.cardsAdded >= collection.totalTexts && collection.totalTexts > 0;
   const remaining = collection.totalTexts - collection.cardsAdded;
+  const addCount =
+    sentencesRemaining != null
+      ? Math.min(5, sentencesRemaining)
+      : 5;
 
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="rounded-xl border-2 bg-card overflow-hidden">
       {/* Progress accent bar */}
       <div className="h-1.5 bg-muted">
         <div
@@ -200,9 +240,8 @@ function InlineCollectionDetail({
           <h3 className="font-semibold text-sm">
             {collection.collectionName}
           </h3>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {collection.cardsAdded} /{' '}
-            {t('cards', { count: collection.totalTexts })}
+          <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
+            {Math.round(progress)}%
           </span>
         </div>
 
@@ -230,7 +269,28 @@ function InlineCollectionDetail({
       </div>
 
       {/* Action buttons */}
-      <div className="grid grid-cols-2 gap-2 px-3 pb-3">
+      <div
+        className={cn(
+          'grid gap-2 px-3 pb-3',
+          isComplete && !showToggleWhenComplete ? 'grid-cols-2' : 'grid-cols-3',
+        )}
+      >
+        {!isComplete || showToggleWhenComplete ? (
+          <Button
+            size="sm"
+            variant={isActive ? 'secondary' : 'outline'}
+            className="text-xs"
+            onClick={onSelect}
+          >
+            {isActive && <Check className="h-3.5 w-3.5 mr-1" />}
+            {isActive ? t('selected') : t('select')}
+          </Button>
+        ) : (
+          <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-green-600">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {t('done')}
+          </div>
+        )}
         <Button
           size="sm"
           variant="outline"
@@ -240,21 +300,33 @@ function InlineCollectionDetail({
           <Eye className="h-3.5 w-3.5 mr-1.5" />
           {t('inline.preview')}
         </Button>
-        {!isComplete || showToggleWhenComplete ? (
-          <Button
-            size="sm"
-            variant={isActive ? 'secondary' : 'outline'}
-            className="text-xs"
-            onClick={onSelect}
-          >
-            <Check className={cn('h-3.5 w-3.5 mr-1', !isActive && 'invisible')} />
-            {isActive ? t('selected') : t('select')}
-          </Button>
-        ) : (
-          <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-green-600">
-            <CheckCircle2 className="h-3.5 w-3.5" />
-            {t('done')}
-          </div>
+        {!isComplete && !hideAddCards && (
+          sentencesRemaining === 0 ? (
+            <Button
+              size="sm"
+              onClick={onUpgrade}
+              className="text-xs"
+            >
+              <Lock className="h-3.5 w-3.5 mr-1" />
+              Upgrade
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              disabled={isAdding}
+              onClick={onAddCards}
+              className="text-xs"
+            >
+              {isAdding ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <>
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  {t('detail.addN', { count: addCount })}
+                </>
+              )}
+            </Button>
+          )
         )}
       </div>
     </div>

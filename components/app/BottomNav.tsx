@@ -4,7 +4,7 @@ import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Home, Play, Library, Settings, BarChart3 } from 'lucide-react';
 
-export type View = 'home' | 'content' | 'library' | 'stats' | 'settings' | 'chat';
+export type View = 'home' | 'library' | 'stats' | 'settings' | 'chat';
 
 const NAV_ITEMS: { view: View; icon: typeof Home; labelKey: string }[] = [
   { view: 'home', icon: Home, labelKey: 'views.home' },

@@ -674,6 +674,8 @@ export const addCardsFromCollection = mutation({
   args: {
     collectionId: v.id('collections'),
     batchSize: v.number(),
+    /** When true, only add from this specific collection — skip custom collection mixing. */
+    exclusive: v.optional(v.boolean()),
   },
   returns: v.object({
     cardsAdded: v.number(),
@@ -712,15 +714,19 @@ export const addCardsFromCollection = mutation({
       ? (LEVEL_ORDER as readonly string[]).includes(requestedCollection.name)
       : false;
 
-    const customCollectionIdsToProcess: Id<'collections'>[] = isLevelCollection
-      ? (courseSettings?.activeCustomCollectionIds ?? [])
-      : [args.collectionId].filter((id) =>
-          courseSettings?.chatCollectionId?.toString() === id.toString() ||
-          courseSettings?.customCollectionId?.toString() === id.toString() ||
-          (courseSettings?.activeCustomCollectionIds ?? []).some(
-            (cid) => cid.toString() === id.toString(),
-          ),
-        );
+    const customCollectionIdsToProcess: Id<'collections'>[] = args.exclusive
+      ? (isLevelCollection
+          ? []
+          : [args.collectionId])
+      : isLevelCollection
+        ? (courseSettings?.activeCustomCollectionIds ?? [])
+        : [args.collectionId].filter((id) =>
+            courseSettings?.chatCollectionId?.toString() === id.toString() ||
+            courseSettings?.customCollectionId?.toString() === id.toString() ||
+            (courseSettings?.activeCustomCollectionIds ?? []).some(
+              (cid) => cid.toString() === id.toString(),
+            ),
+          );
 
     if (customCollectionIdsToProcess.length > 0 && remainingBatch > 0) {
       const collectionsWithPending: {

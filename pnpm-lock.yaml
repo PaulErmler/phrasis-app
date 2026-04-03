@@ -16,25 +16,25 @@ importers:
         version: 2.0.100(zod@4.3.6)
       '@c15t/backend':
         specifier: ^1.8.5
-        version: 1.8.5(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(typeorm@0.3.28(mongodb@6.21.0))(ws@8.19.0)
+        version: 1.8.5(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(typeorm@0.3.28(mongodb@6.21.0))(ws@8.19.0)
       '@c15t/nextjs':
         specifier: ^1.8.5
-        version: 1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)
+        version: 1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)
       '@c15t/react':
         specifier: ^1.8.5
-        version: 1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)
+        version: 1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)
       '@c15t/scripts':
         specifier: ^1.0.1
         version: 1.0.1
       '@convex-dev/agent':
         specifier: ^0.3.2
-        version: 0.3.2(@ai-sdk/provider-utils@4.0.15(zod@4.3.6))(ai@5.0.157(zod@4.3.6))(convex-helpers@0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6))(convex@1.34.0(react@19.2.4))(react@19.2.4)
+        version: 0.3.2(@ai-sdk/provider-utils@4.0.15(zod@4.3.6))(ai@5.0.157(zod@4.3.6))(convex-helpers@0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6))(convex@1.34.1(react@19.2.4))(react@19.2.4)
       '@convex-dev/aggregate':
         specifier: ^0.2.1
-        version: 0.2.1(convex@1.34.0(react@19.2.4))
+        version: 0.2.1(convex@1.34.1(react@19.2.4))
       '@convex-dev/better-auth':
         specifier: ^0.11.3
-        version: 0.11.3(@standard-schema/spec@1.1.0)(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(convex@1.34.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+        version: 0.11.3(@standard-schema/spec@1.1.0)(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
       '@daveyplate/better-auth-ui':
         specifier: ^3.3.15
         version: 3.3.15(77566cb6be696508cc228a3b1c290a13)
@@ -145,7 +145,7 @@ importers:
         version: 1.2.2(@types/react@19.2.14)(react@19.2.4)
       '@useautumn/convex':
         specifier: ^0.0.23
-        version: 0.0.23(@standard-schema/spec@1.1.0)(autumn-js@0.1.85(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.0(react@19.2.4))(react@19.2.4))(convex@1.34.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)
+        version: 0.0.23(@standard-schema/spec@1.1.0)(autumn-js@0.1.85(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.1(react@19.2.4))(react@19.2.4))(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)
       '@xyflow/react':
         specifier: ^12.10.1
         version: 12.10.1(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -160,7 +160,7 @@ importers:
         version: 1.0.0
       autumn-js:
         specifier: ^0.1.85
-        version: 0.1.85(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.0(react@19.2.4))(react@19.2.4)
+        version: 0.1.85(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.1(react@19.2.4))(react@19.2.4)
       axios:
         specifier: ^1.13.6
         version: 1.13.6
@@ -169,7 +169,7 @@ importers:
         version: 1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       c15t:
         specifier: ^1.8.5
-        version: 1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react@19.2.14)(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)
+        version: 1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react@19.2.14)(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)
       chinese-to-pinyin:
         specifier: ^1.3.1
         version: 1.3.1
@@ -183,8 +183,8 @@ importers:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       convex:
-        specifier: ^1.34.0
-        version: 1.34.0(react@19.2.4)
+        specifier: ^1.34.1
+        version: 1.34.1(react@19.2.4)
       csv-parse:
         specifier: ^6.2.1
         version: 6.2.1
@@ -308,7 +308,7 @@ importers:
     devDependencies:
       '@convex-dev/eslint-plugin':
         specifier: ^1.2.1
-        version: 1.2.1(convex@1.34.0(react@19.2.4))(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)
+        version: 1.2.1(convex@1.34.1(react@19.2.4))(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@9.39.4(jiti@2.6.1))
@@ -4256,8 +4256,8 @@ packages:
       zod:
         optional: true
 
-  convex@1.34.0:
-    resolution: {integrity: sha512-TbC509Z4urZMChZR2aLPgalQ8gMhAYSz2VMxaYsCvba8YqB0Uxma7zWnXwRn7aEGXuA8ro5/uHgD1IJ0HhYYPg==}
+  convex@1.34.1:
+    resolution: {integrity: sha512-ooyFnZVVq0u6b5zt0Ptq8QB2ixhf/2vXe+PIcUtdtrs0lq/TwpkmmruHdqkFmWgMd6N+Tmfy8AGkz6QnZUYZBA==}
     engines: {node: '>=18.0.0', npm: '>=7.0.0'}
     hasBin: true
     peerDependencies:
@@ -7940,7 +7940,7 @@ snapshots:
 
   '@braintree/sanitize-url@7.1.2': {}
 
-  '@c15t/backend@1.8.5(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(typeorm@0.3.28(mongodb@6.21.0))(ws@8.19.0)':
+  '@c15t/backend@1.8.5(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(typeorm@0.3.28(mongodb@6.21.0))(ws@8.19.0)':
     dependencies:
       '@c15t/logger': 1.0.1
       '@c15t/translations': 1.8.5
@@ -7956,7 +7956,7 @@ snapshots:
       base-x: 5.0.1
       defu: 6.1.4
       drizzle-orm: 0.44.7(@opentelemetry/api@1.9.0)(kysely@0.27.6)
-      fumadb: 0.1.2(convex@1.34.0(react@19.2.4))(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.27.6))(mongodb@6.21.0)(typeorm@0.3.28(mongodb@6.21.0))
+      fumadb: 0.1.2(convex@1.34.1(react@19.2.4))(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.27.6))(mongodb@6.21.0)(typeorm@0.3.28(mongodb@6.21.0))
       kysely: 0.27.6
       neverthrow: 8.2.0
       superjson: 2.2.6
@@ -8004,9 +8004,9 @@ snapshots:
       neverthrow: 8.2.0
       picocolors: 1.1.1
 
-  '@c15t/nextjs@1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)':
+  '@c15t/nextjs@1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)':
     dependencies:
-      '@c15t/react': 1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)
+      '@c15t/react': 1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)
       '@c15t/translations': 1.8.5
       next: 16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       react: 19.2.4
@@ -8053,12 +8053,12 @@ snapshots:
       - use-sync-external-store
       - ws
 
-  '@c15t/react@1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)':
+  '@c15t/react@1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)':
     dependencies:
       '@radix-ui/react-accordion': 1.2.12(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@radix-ui/react-slot': 1.2.4(@types/react@19.2.14)(react@19.2.4)
       '@radix-ui/react-switch': 1.1.4(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
-      c15t: 1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react@19.2.14)(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)
+      c15t: 1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react@19.2.14)(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0)
       clsx: 2.1.1
       react: 19.2.4
       react-dom: 19.2.4(react@19.2.4)
@@ -8145,27 +8145,27 @@ snapshots:
       picocolors: 1.1.1
       sisteransi: 1.0.5
 
-  '@convex-dev/agent@0.3.2(@ai-sdk/provider-utils@4.0.15(zod@4.3.6))(ai@5.0.157(zod@4.3.6))(convex-helpers@0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6))(convex@1.34.0(react@19.2.4))(react@19.2.4)':
+  '@convex-dev/agent@0.3.2(@ai-sdk/provider-utils@4.0.15(zod@4.3.6))(ai@5.0.157(zod@4.3.6))(convex-helpers@0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6))(convex@1.34.1(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@ai-sdk/provider-utils': 4.0.15(zod@4.3.6)
       ai: 5.0.157(zod@4.3.6)
-      convex: 1.34.0(react@19.2.4)
-      convex-helpers: 0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)
+      convex: 1.34.1(react@19.2.4)
+      convex-helpers: 0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)
     optionalDependencies:
       '@ungap/structured-clone': 1.3.0
       react: 19.2.4
 
-  '@convex-dev/aggregate@0.2.1(convex@1.34.0(react@19.2.4))':
+  '@convex-dev/aggregate@0.2.1(convex@1.34.1(react@19.2.4))':
     dependencies:
-      convex: 1.34.0(react@19.2.4)
+      convex: 1.34.1(react@19.2.4)
 
-  '@convex-dev/better-auth@0.11.3(@standard-schema/spec@1.1.0)(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(convex@1.34.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)':
+  '@convex-dev/better-auth@0.11.3(@standard-schema/spec@1.1.0)(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)':
     dependencies:
       '@better-fetch/fetch': 1.1.21
       better-auth: 1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       common-tags: 1.8.2
-      convex: 1.34.0(react@19.2.4)
-      convex-helpers: 0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)
+      convex: 1.34.1(react@19.2.4)
+      convex-helpers: 0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)
       jose: 6.2.2
       react: 19.2.4
       remeda: 2.33.6
@@ -8177,11 +8177,11 @@ snapshots:
       - hono
       - typescript
 
-  '@convex-dev/eslint-plugin@1.2.1(convex@1.34.0(react@19.2.4))(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)':
+  '@convex-dev/eslint-plugin@1.2.1(convex@1.34.1(react@19.2.4))(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/types': 8.49.0
       '@typescript-eslint/utils': 8.49.0(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)
-      convex: 1.34.0(react@19.2.4)
+      convex: 1.34.1(react@19.2.4)
     transitivePeerDependencies:
       - eslint
       - supports-color
@@ -11218,11 +11218,11 @@ snapshots:
       d3-selection: 3.0.0
       d3-transition: 3.0.1(d3-selection@3.0.0)
 
-  '@useautumn/convex@0.0.23(@standard-schema/spec@1.1.0)(autumn-js@0.1.85(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.0(react@19.2.4))(react@19.2.4))(convex@1.34.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)':
+  '@useautumn/convex@0.0.23(@standard-schema/spec@1.1.0)(autumn-js@0.1.85(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.1(react@19.2.4))(react@19.2.4))(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)':
     dependencies:
-      autumn-js: 0.1.85(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.0(react@19.2.4))(react@19.2.4)
-      convex: 1.34.0(react@19.2.4)
-      convex-helpers: 0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)
+      autumn-js: 0.1.85(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.1(react@19.2.4))(react@19.2.4)
+      convex: 1.34.1(react@19.2.4)
+      convex-helpers: 0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)
       react: 19.2.4
     transitivePeerDependencies:
       - '@standard-schema/spec'
@@ -11465,7 +11465,7 @@ snapshots:
 
   auto-bind@5.0.1: {}
 
-  autumn-js@0.1.85(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.0(react@19.2.4))(react@19.2.4):
+  autumn-js@0.1.85(better-auth@1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.1(react@19.2.4))(react@19.2.4):
     dependencies:
       query-string: 9.3.1
       rou3: 0.6.3
@@ -11474,7 +11474,7 @@ snapshots:
     optionalDependencies:
       better-auth: 1.5.5(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.28.14))(mongodb@6.21.0)(next@16.2.0(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       better-call: 1.3.2(zod@4.3.6)
-      convex: 1.34.0(react@19.2.4)
+      convex: 1.34.1(react@19.2.4)
       react: 19.2.4
 
   available-typed-arrays@1.0.7:
@@ -11578,9 +11578,9 @@ snapshots:
     dependencies:
       run-applescript: 7.1.0
 
-  c15t@1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react@19.2.14)(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0):
+  c15t@1.8.5(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@types/react@19.2.14)(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(react@19.2.4)(typeorm@0.3.28(mongodb@6.21.0))(use-sync-external-store@1.6.0(react@19.2.4))(ws@8.19.0):
     dependencies:
-      '@c15t/backend': 1.8.5(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(convex@1.34.0(react@19.2.4))(mongodb@6.21.0)(typeorm@0.3.28(mongodb@6.21.0))(ws@8.19.0)
+      '@c15t/backend': 1.8.5(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(convex@1.34.1(react@19.2.4))(mongodb@6.21.0)(typeorm@0.3.28(mongodb@6.21.0))(ws@8.19.0)
       '@c15t/translations': 1.8.5
       '@orpc/client': 1.13.6(@opentelemetry/api@1.9.0)
       '@orpc/server': 1.13.6(@opentelemetry/api@1.9.0)(ws@8.19.0)
@@ -11807,16 +11807,16 @@ snapshots:
 
   convert-to-spaces@2.0.1: {}
 
-  convex-helpers@0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.0(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6):
+  convex-helpers@0.1.114(@standard-schema/spec@1.1.0)(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6):
     dependencies:
-      convex: 1.34.0(react@19.2.4)
+      convex: 1.34.1(react@19.2.4)
     optionalDependencies:
       '@standard-schema/spec': 1.1.0
       react: 19.2.4
       typescript: 5.9.3
       zod: 4.3.6
 
-  convex@1.34.0(react@19.2.4):
+  convex@1.34.1(react@19.2.4):
     dependencies:
       esbuild: 0.27.0
       prettier: 3.8.1
@@ -12751,7 +12751,7 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
-  fumadb@0.1.2(convex@1.34.0(react@19.2.4))(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.27.6))(mongodb@6.21.0)(typeorm@0.3.28(mongodb@6.21.0)):
+  fumadb@0.1.2(convex@1.34.1(react@19.2.4))(drizzle-orm@0.44.7(@opentelemetry/api@1.9.0)(kysely@0.27.6))(mongodb@6.21.0)(typeorm@0.3.28(mongodb@6.21.0)):
     dependencies:
       '@clack/prompts': 0.11.0
       '@paralleldrive/cuid2': 2.3.1
@@ -12761,7 +12761,7 @@ snapshots:
       semver: 7.7.4
       zod: 4.3.6
     optionalDependencies:
-      convex: 1.34.0(react@19.2.4)
+      convex: 1.34.1(react@19.2.4)
       drizzle-orm: 0.44.7(@opentelemetry/api@1.9.0)(kysely@0.27.6)
       mongodb: 6.21.0
       typeorm: 0.3.28(mongodb@6.21.0)

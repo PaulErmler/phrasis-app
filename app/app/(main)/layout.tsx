@@ -19,7 +19,6 @@ import { ChevronLeft, MessageSquarePlus, PanelLeft } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { HomeView } from '@/components/app/HomeView';
-import { ContentView } from '@/components/app/ContentView';
 import { EnterTextsView } from '@/components/app/EnterTextsView';
 import { LibraryView } from '@/components/app/LibraryView';
 import { StatsView } from '@/components/app/stats/StatsView';
@@ -31,14 +30,13 @@ import { AppLoadingSplash } from '@/components/LogoSpinner';
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   home: '/app',
-  content: '/app/content',
   library: '/app/library',
   stats: '/app/stats',
   settings: '/app/settings',
 };
 
 function viewFromPathname(pathname: string): { view: View; chatThreadId?: string } {
-  if (pathname.startsWith('/app/content')) return { view: 'content' };
+  if (pathname.startsWith('/app/content')) return { view: 'home' };
   if (pathname.startsWith('/app/library')) return { view: 'library' };
   if (pathname.startsWith('/app/stats')) return { view: 'stats' };
   if (pathname.startsWith('/app/settings')) return { view: 'settings' };
@@ -175,9 +173,8 @@ export default function MainLayout({
   }, []);
 
   const handleChatBack = useCallback(() => {
-    const target = viewBeforeChatRef.current;
-    setActiveView(target);
-    history.pushState(null, '', VIEW_PATHS[target]);
+    setActiveView('home');
+    history.pushState(null, '', VIEW_PATHS['home']);
   }, []);
 
   const handleNewChat = useCallback(async () => {
@@ -256,18 +253,18 @@ export default function MainLayout({
     : t('changeCourse');
 
   return (
-    <div className="h-dvh max-h-dvh md:h-screen md:max-h-screen flex flex-col overflow-hidden">
-      {!(activeView === 'content' && isAddCardsRoute) && (
-        <header className="sticky-header">
+    <div className="h-svh max-h-svh md:h-screen md:max-h-screen flex flex-col overflow-hidden">
+      {!isAddCardsRoute && (
+        <header className="fixed top-0 left-0 right-0 z-10 border-b bg-background">
           <div className="header-bar">
             {activeView === 'home' ? (
               <Button
                 variant="ghost"
                 onClick={() => setCourseMenuOpen(true)}
-                className="gap-2 -ml-2"
+                className="gap-2 -ml-2 min-w-0 shrink overflow-hidden"
               >
-                <ChevronLeft className="h-4 w-4" />
-                {courseButtonLabel}
+                <ChevronLeft className="h-4 w-4 shrink-0" />
+                <span className="truncate">{courseButtonLabel}</span>
               </Button>
             ) : activeView === 'chat' ? (
               <div className="flex items-center gap-1">
@@ -301,15 +298,13 @@ export default function MainLayout({
                 {t(`views.${activeView}`)}
               </h1>
             )}
-            <div className="flex items-center gap-1 -mr-2">
+            <div className="flex items-center gap-1 -mr-2 shrink-0">
               {(activeView === 'home' ||
-                activeView === 'content' ||
                 activeView === 'library' ||
                 activeView === 'stats' ||
                 activeView === 'settings') && (
                 <HelpDialog
                   supportOnly={
-                    activeView === 'content' ||
                     activeView === 'library' ||
                     activeView === 'stats' ||
                     activeView === 'settings'
@@ -327,13 +322,15 @@ export default function MainLayout({
         </header>
       )}
 
+      {!isAddCardsRoute && <div className="h-14 shrink-0" />}
+
       <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
       <main className="flex-1 min-h-0 flex flex-col">
         <div
           style={{
             display:
-                !isLearnOpen && activeView === 'home'
+                !isLearnOpen && activeView === 'home' && !isAddCardsRoute
                   ? 'contents'
                   : 'none',
           }}
@@ -346,38 +343,24 @@ export default function MainLayout({
             }
             onLearnOpen={handleLearnOpen}
             onChatOpen={handleOpenChat}
-            onNavigateToContent={() => handleViewChange('content')}
+            onNavigateToContent={() => router.push('/app/content/add-cards')}
             onNavigateToChat={handleNavigateToChat}
-            onEnterTexts={() => {
-              handleViewChange('content');
-              router.push('/app/content/add-cards');
-            }}
+            onEnterTexts={() => router.push('/app/content/add-cards')}
             onTutorialReady={handleTutorialReady}
             animateEntrance={justReturnedFromLearn}
-            isHidden={isLearnOpen || activeView !== 'home'}
+            isHidden={isLearnOpen || activeView !== 'home' || isAddCardsRoute}
             hasActiveCourse={hasActiveCourse}
             onOpenCourseMenu={handleOpenCourseMenu}
           />
         </div>
-        <div
-          style={{
-            display:
-                !isLearnOpen && activeView === 'content'
-                  ? 'contents'
-                  : 'none',
-          }}
-        >
-          {isAddCardsRoute ? (
-            <EnterTextsView onBack={() => router.push('/app/content')} />
-          ) : (
-            <ContentView
-              onChatOpen={handleOpenChat}
-              onEnterTexts={() => router.push('/app/content/add-cards')}
-              hasActiveCourse={hasActiveCourse}
-              onOpenCourseMenu={handleOpenCourseMenu}
-            />
-          )}
-        </div>
+        {isAddCardsRoute && (
+          <div style={{ display: !isLearnOpen ? 'contents' : 'none' }}>
+            <EnterTextsView onBack={() => {
+              setActiveView('home');
+              router.push('/app');
+            }} />
+          </div>
+        )}
         {hasVisitedLibrary && (
           <div
             style={{
@@ -427,13 +410,16 @@ export default function MainLayout({
         )}
       </main>
 
-      <div className={isLearnOpen ? 'pointer-events-none' : undefined}>
-        <BottomNav
-          currentView={activeView}
-          onViewChange={handleViewChange}
-          onLearnOpen={handleLearnOpen}
-        />
-      </div>
+      {!isAddCardsRoute && <div className="h-16 shrink-0" />}
+      {!isAddCardsRoute && (
+        <div className={`fixed bottom-0 left-0 right-0 z-10 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
+          <BottomNav
+            currentView={activeView}
+            onViewChange={handleViewChange}
+            onLearnOpen={handleLearnOpen}
+          />
+        </div>
+      )}
 
       {isLearnOpen && (
         <div className="fixed inset-0 z-50 bg-background">

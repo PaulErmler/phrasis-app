@@ -202,7 +202,10 @@
           "nextSentences": "Next Sentences",
           "adding": "Adding...",
           "addN": "Add {count}",
-          "noMoreCards": "No more sentences to add"
+          "noMoreCards": "No more sentences to add",
+          "sentences": "sentences",
+          "added": "added",
+          "remaining": "remaining"
         }
       }
     },
@@ -276,7 +279,7 @@
       "cancel": "Cancel"
     },
     "changeCourse": "Change Course",
-    "currentCourseWithLanguages": "Current Course: {targetLanguages}",
+    "currentCourseWithLanguages": "Course: {targetLanguages}",
     "startLearning": "Start Learning",
     "fullReview": "Full Review",
     "audioReview": "Audio Review",
