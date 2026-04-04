@@ -54,23 +54,25 @@ export function LearningHeader({
           {t('back')}
         </Button>
 
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div className="flex-1 min-w-0 flex items-center justify-center">
           {isChatOpen ? (
             <span className="heading-section lg:hidden">{t('chat')}</span>
           ) : cardCounts ? (
-            <div className="flex items-center gap-3 text-xs tabular-nums">
-              <span className="flex items-center gap-1">
-                <span className="font-semibold text-foreground">{cardCounts.new}</span>
-                <span className="text-muted-foreground">new</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="font-semibold text-foreground">{cardCounts.learning}</span>
-                <span className="text-muted-foreground">learning</span>
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="font-semibold text-foreground">{cardCounts.review}</span>
-                <span className="text-muted-foreground">review</span>
-              </span>
+            <div className="flex flex-col items-center leading-tight">
+              <div className="flex items-center gap-1 text-sm font-semibold tabular-nums text-foreground">
+                <span>{cardCounts.new}</span>
+                <span className="text-muted-foreground font-normal">–</span>
+                <span>{cardCounts.learning}</span>
+                <span className="text-muted-foreground font-normal">–</span>
+                <span>{cardCounts.review}</span>
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                <span>new</span>
+                <span>–</span>
+                <span>learning</span>
+                <span>–</span>
+                <span>review</span>
+              </div>
             </div>
           ) : null}
         </div>
