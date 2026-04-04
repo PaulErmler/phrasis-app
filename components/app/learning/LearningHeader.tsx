@@ -58,20 +58,20 @@ export function LearningHeader({
           {isChatOpen ? (
             <span className="heading-section lg:hidden">{t('chat')}</span>
           ) : cardCounts ? (
-            <div className="flex flex-col items-center leading-tight">
-              <div className="flex items-center gap-1 text-sm font-semibold tabular-nums text-foreground">
-                <span>{cardCounts.new}</span>
-                <span className="text-muted-foreground font-normal">–</span>
-                <span>{cardCounts.learning}</span>
-                <span className="text-muted-foreground font-normal">–</span>
-                <span>{cardCounts.review}</span>
+            <div className="flex items-center gap-1 leading-tight">
+              <div className="flex flex-col items-center">
+                <span className="text-sm font-semibold tabular-nums text-foreground">{cardCounts.new}</span>
+                <span className="text-[10px] text-muted-foreground">{t('cardCounts.new')}</span>
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <span>{t('cardCounts.new')}</span>
-                <span>–</span>
-                <span>{t('cardCounts.learning')}</span>
-                <span>–</span>
-                <span>{t('cardCounts.review')}</span>
+              <span className="text-sm text-muted-foreground self-start">–</span>
+              <div className="flex flex-col items-center">
+                <span className="text-sm font-semibold tabular-nums text-foreground">{cardCounts.learning}</span>
+                <span className="text-[10px] text-muted-foreground">{t('cardCounts.learning')}</span>
+              </div>
+              <span className="text-sm text-muted-foreground self-start">–</span>
+              <div className="flex flex-col items-center">
+                <span className="text-sm font-semibold tabular-nums text-foreground">{cardCounts.review}</span>
+                <span className="text-[10px] text-muted-foreground">{t('cardCounts.review')}</span>
               </div>
             </div>
           ) : null}
