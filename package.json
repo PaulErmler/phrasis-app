@@ -35,6 +35,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.2.2",
+    "@isoterik/react-word-cloud": "^1.3.0",
     "@khmyznikov/pwa-install": "^0.6.3",
     "@onboardjs/core": "1.0.0-rc.3",
     "@onboardjs/react": "1.0.0-rc.3",

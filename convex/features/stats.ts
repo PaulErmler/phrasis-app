@@ -236,6 +236,56 @@ export const getStatsPageDailyData = query({
   },
 });
 
+/**
+ * Query 3: Recent words per target language for the word cloud.
+ */
+export const getRecentWords = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return [];
+
+    const targetLanguages = active.course.targetLanguages ?? [];
+    // Dedupe variants (e.g. es + es_latam → es)
+    const seen = new Set<string>();
+    const langPairs: Array<{ normalized: string; raw: string }> = [];
+    for (const lang of targetLanguages) {
+      const norm = lang.replace(/_latam$/, '');
+      if (!seen.has(norm)) {
+        seen.add(norm);
+        langPairs.push({ normalized: norm, raw: lang });
+      }
+    }
+
+    const result: Array<{ language: string; words: string[] }> = [];
+
+    for (const { normalized, raw } of langPairs) {
+      // Try both the raw and normalized variants
+      const variants = normalized !== raw ? [raw, normalized] : [raw];
+      const allWords: string[] = [];
+
+      for (const variant of variants) {
+        const rows = await ctx.db
+          .query('userWords')
+          .withIndex('by_userId_and_language', (q) =>
+            q.eq('userId', userId).eq('language', variant),
+          )
+          .order('desc')
+          .take(500);
+        allWords.push(...rows.map((r) => r.word));
+      }
+
+      if (allWords.length > 0) {
+        result.push({ language: normalized, words: allWords.slice(0, 500) });
+      }
+    }
+
+    return result;
+  },
+});
+
 // ============================================================================
 // INTERNAL QUERIES — currently unused by the UI but retained for future use
 // (e.g. expanded stats views, admin dashboards, data exports).

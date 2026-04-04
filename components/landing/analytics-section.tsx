@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Flame, RotateCcw, Clock,
-  TrendingUp, Calendar, Zap, MessageSquare,
+  TrendingUp, BookOpen, Zap, MessageSquare,
 } from 'lucide-react';
 import { LandingSquircleIcon } from '@/components/landing/landing-squircle-icon';
 import { cn } from '@/lib/utils';
@@ -81,22 +81,6 @@ function getWordData(range: TimeRange): { labels: string[]; values: number[] } {
   };
 }
 
-// Heatmap: 364 days (52 weeks × 7) with seeded randomness
-const MOCK_HEATMAP = (() => {
-  const rand = seededRandom(123);
-  const data: number[] = [];
-  for (let i = 0; i < 364; i++) {
-    const dayOfWeek = i % 7;
-    const weekendPenalty = dayOfWeek >= 5 ? 0.6 : 1;
-    const r = rand();
-    if (r < 0.07) data.push(0);
-    else if (r < 0.22 * weekendPenalty) data.push(1);
-    else if (r < 0.55 * weekendPenalty) data.push(2);
-    else data.push(3);
-  }
-  return data;
-})();
-
 /* ── SVG helpers ── */
 
 function buildSmoothPath(points: { x: number; y: number }[]): string {
@@ -171,26 +155,58 @@ function MiniChart({ range }: { range: TimeRange }) {
   );
 }
 
-function MiniHeatmap() {
-  const weeks = 52;
+const MOCK_WORDS: { text: string; x: number; y: number; size: number; color: number }[] = [
+  { text: 'amigo', x: 42, y: 38, size: 22, color: 0 },
+  { text: 'vida', x: 68, y: 42, size: 20, color: 1 },
+  { text: 'país', x: 28, y: 52, size: 19, color: 2 },
+  { text: 'manera', x: 52, y: 55, size: 18, color: 0 },
+  { text: 'tiempo', x: 75, y: 28, size: 17, color: 1 },
+  { text: 'parte', x: 38, y: 68, size: 17, color: 2 },
+  { text: 'estado', x: 62, y: 65, size: 16, color: 0 },
+  { text: 'quiere', x: 82, y: 50, size: 15, color: 1 },
+  { text: 'esta', x: 48, y: 25, size: 18, color: 2 },
+  { text: 'muy', x: 58, y: 78, size: 16, color: 0 },
+  { text: 'nunca', x: 20, y: 35, size: 14, color: 1 },
+  { text: 'casa', x: 78, y: 72, size: 14, color: 2 },
+  { text: 'fiesta', x: 15, y: 65, size: 13, color: 0 },
+  { text: 'todavía', x: 85, y: 38, size: 13, color: 1 },
+  { text: 'llegó', x: 32, y: 22, size: 13, color: 2 },
+  { text: 'cómo', x: 70, y: 18, size: 12, color: 0 },
+  { text: 'poco', x: 22, y: 78, size: 12, color: 1 },
+  { text: 'importante', x: 45, y: 82, size: 13, color: 2 },
+  { text: 'sami', x: 60, y: 15, size: 12, color: 0 },
+  { text: 'hasta', x: 88, y: 62, size: 11, color: 1 },
+  { text: 'era', x: 10, y: 48, size: 11, color: 2 },
+  { text: 'serle', x: 30, y: 85, size: 11, color: 0 },
+  { text: 'próxima', x: 52, y: 90, size: 11, color: 1 },
+  { text: 'dígame', x: 40, y: 12, size: 12, color: 2 },
+  { text: 'tiene', x: 15, y: 20, size: 12, color: 0 },
+];
+
+const WORD_COLORS = [
+  'oklch(0.7162 0.119 217.31)',   // primary blue
+  'oklch(0.6189 0.1636 40.89)',   // accent orange
+  'oklch(0.8179 0.1705 77.95)',   // warning yellow
+];
+
+function MiniWordCloud() {
   return (
-    <div className="grid gap-[2px]" style={{ gridTemplateColumns: `repeat(${weeks}, 1fr)` }}>
-      {Array.from({ length: weeks }, (_, wi) => (
-        <div key={wi} className="flex flex-col gap-[2px]">
-          {Array.from({ length: 7 }, (_, di) => {
-            const v = MOCK_HEATMAP[wi * 7 + di] ?? 0;
-            return (
-              <div
-                key={di}
-                className="aspect-square rounded-[1.5px]"
-                style={{
-                  backgroundColor: v > 0 ? 'var(--primary)' : 'var(--muted)',
-                  opacity: v === 0 ? 0.3 : 0.3 + v * 0.23,
-                }}
-              />
-            );
-          })}
-        </div>
+    <div className="relative w-full" style={{ paddingBottom: '55%' }}>
+      {MOCK_WORDS.map((w) => (
+        <span
+          key={w.text}
+          className="absolute font-bold select-none"
+          style={{
+            left: `${w.x}%`,
+            top: `${w.y}%`,
+            fontSize: w.size,
+            color: WORD_COLORS[w.color],
+            transform: 'translate(-50%, -50%)',
+            lineHeight: 1,
+          }}
+        >
+          {w.text}
+        </span>
       ))}
     </div>
   );
@@ -266,10 +282,10 @@ const ALL_CARDS: CardDef[] = [
     visual: (range) => <MiniChart range={range} />,
   },
   {
-    icon: Calendar,
+    icon: BookOpen,
     titleKey: 'activityTitle',
     bodyKey: 'activityBody',
-    visual: () => <MiniHeatmap />,
+    visual: () => <MiniWordCloud />,
   },
   {
     icon: Zap,

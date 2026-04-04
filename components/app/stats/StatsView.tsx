@@ -9,6 +9,7 @@ import { CumulativeLineChart } from './CumulativeLineChart';
 import { ActivityHeatmap } from './ActivityHeatmap';
 import { HourlyDistribution } from './HourlyDistribution';
 import { AppUsageStats } from './AppUsageStats';
+import { WordCloudSection } from './WordCloudCard';
 
 function today(tz: string) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
@@ -135,6 +136,8 @@ export function StatsView() {
           }))}
           languageDailyData={filteredLanguageData}
         />
+
+        <WordCloudSection />
 
         <ActivityHeatmap
           data={dailyData?.heatmapData ?? []}
