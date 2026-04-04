@@ -21,6 +21,7 @@ interface LearningHeaderProps {
   onHelpOpen?: () => void;
   /** When `'full'`, the help dialog lists full-review-only shortcuts */
   reviewMode?: 'audio' | 'full';
+  cardCounts?: { new: number; learning: number; review: number } | null;
 }
 
 export function LearningHeader({
@@ -29,6 +30,7 @@ export function LearningHeader({
   onRestartTutorial,
   onHelpOpen,
   reviewMode = 'audio',
+  cardCounts,
 }: LearningHeaderProps) {
   const t = useTranslations('LearningMode');
   const tSettings = useTranslations('LearningMode.settingsPanel');
@@ -52,10 +54,26 @@ export function LearningHeader({
           {t('back')}
         </Button>
 
-        <h1 className="heading-section absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="lg:hidden">{isChatOpen ? t('chat') : t('title')}</span>
-          <span className="hidden lg:inline">{t('title')}</span>
-        </h1>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          {isChatOpen ? (
+            <span className="heading-section lg:hidden">{t('chat')}</span>
+          ) : cardCounts ? (
+            <div className="flex items-center gap-3 text-xs tabular-nums">
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-foreground">{cardCounts.new}</span>
+                <span className="text-muted-foreground">new</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-foreground">{cardCounts.learning}</span>
+                <span className="text-muted-foreground">learning</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="font-semibold text-foreground">{cardCounts.review}</span>
+                <span className="text-muted-foreground">review</span>
+              </span>
+            </div>
+          ) : null}
+        </div>
 
         <div className={`ml-auto flex items-center gap-1 z-10 ${isChatOpen ? 'hidden lg:flex' : 'flex'}`}>
           <HelpDialog

@@ -10,5 +10,6 @@ app.use(agent);
 app.use(autumn);
 app.use(aggregate, { name: 'cardsByState' });
 app.use(aggregate, { name: 'cardsByDueDate' });
+app.use(aggregate, { name: 'cardsByStateAndDueDate' });
 
 export default app;

@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo, useRef, useLayoutEffect, useState } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { WordCloud, AnimatedWordRenderer } from '@isoterik/react-word-cloud';
+import { WordCloud } from '@isoterik/react-word-cloud';
 import type { Word, WordRendererData } from '@isoterik/react-word-cloud';
 
 // App brand colors: primary (blue), accent-orange, warning (yellow)
@@ -20,30 +20,28 @@ function buildWords(wordList: string[]): Word[] {
   }));
 }
 
-function AnimatedCloudRenderer(
-  data: WordRendererData,
-  ref?: React.Ref<SVGTextElement>,
-) {
-  return (
-    <AnimatedWordRenderer
-      ref={ref}
-      data={data}
-      animationDelay={(_, idx) => idx * 10}
-      textStyle={{ transition: 'all .5s ease' }}
-    />
-  );
-}
-
 function StaticWordRenderer(
   data: WordRendererData,
   ref?: React.Ref<SVGTextElement>,
 ) {
-  const { word, ...rest } = data;
+  const { index, onWordClick, onWordMouseOver, onWordMouseOut, ...word } = data;
   return (
     <text
       ref={ref}
-      {...rest}
       textAnchor="middle"
+      transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
+      style={{
+        fontFamily: word.font,
+        fontStyle: word.style,
+        fontWeight: word.weight,
+        fontSize: `${word.size}px`,
+        fill: word.fill,
+        transition: word.transition,
+        cursor: onWordClick ? 'pointer' : 'text',
+      }}
+      onClick={(event) => onWordClick?.(word, index, event)}
+      onMouseOver={(event) => onWordMouseOver?.(word, index, event)}
+      onMouseOut={(event) => onWordMouseOut?.(word, index, event)}
     >
       {word.text}
     </text>
@@ -73,32 +71,35 @@ function SingleWordCloud({
   isFirst: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const hasAnimated = useRef(false);
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const observer = new ResizeObserver((entries) => {
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const apply = (w: number, h: number) => {
+      if (w > 0 && h > 0) {
+        setSize({ width: Math.round(w), height: Math.round(h) });
+      }
+    };
+
+    const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        setContainerWidth(entry.contentRect.width);
+        const cr = entry.contentRect;
+        apply(cr.width, cr.height);
       }
     });
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, []);
+    ro.observe(el);
 
-  // Mark animated after the entrance animation completes
-  useEffect(() => {
-    if (containerWidth > 0 && !hasAnimated.current) {
-      const timer = setTimeout(() => { hasAnimated.current = true; }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [containerWidth]);
+    const r = el.getBoundingClientRect();
+    apply(r.width, r.height);
+
+    return () => ro.disconnect();
+  }, []);
 
   const wordData = useMemo(() => buildWords(words.slice(0, 500)), [words]);
 
-  const width = containerWidth || 300;
-  const height = Math.min(Math.round(width * 0.55), 280);
+  const { width, height } = size;
   const scale = Math.max(width / 400, 1); // scale up on wider screens, never shrink below base
 
   return (
@@ -110,10 +111,13 @@ function SingleWordCloud({
       </div>
       <div
         ref={containerRef}
-        className="overflow-hidden rounded-lg"
-        style={{ height }}
+        className={
+          width > 0 && height > 0
+            ? 'relative w-full aspect-[20/8] overflow-hidden rounded-lg'
+            : 'relative w-full aspect-[20/8] overflow-hidden rounded-lg bg-muted/20'
+        }
       >
-        {width > 0 && (
+        {width > 0 && height > 0 ? (
           <WordCloud
             words={wordData}
             width={width}
@@ -133,11 +137,11 @@ function SingleWordCloud({
             }}
             rotate={() => -360}
             fill={(_, i) => COLORS[i % COLORS.length]}
-            transition="all .5s ease"
+            transition="none"
             enableTooltip={false}
-            renderWord={hasAnimated.current ? StaticWordRenderer : AnimatedCloudRenderer}
+            renderWord={StaticWordRenderer}
           />
-        )}
+        ) : null}
       </div>
     </div>
   );

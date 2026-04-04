@@ -27,6 +27,7 @@ import {
   type CardAudioRecording,
   type CourseSettings,
 } from './types';
+import type { SchedulingMode } from '@/convex/types';
 import { getUserTimezone } from '@/lib/timezone';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
@@ -68,6 +69,8 @@ interface NoCardsDueState extends BaseState {
   isAddingCards: boolean;
   batchSize: number;
   sentencesRemaining: number | null;
+  schedulingMode: SchedulingMode;
+  handleSchedulingModeChange: (mode: SchedulingMode) => void;
 }
 
 interface ReviewingState extends BaseState {
@@ -105,6 +108,9 @@ interface ReviewingState extends BaseState {
   // Cross-tab audio coordination
   getReviewInitiatedByThisTab: () => boolean;
   resetReviewFlag: () => void;
+  // Scheduling mode
+  schedulingMode: SchedulingMode;
+  handleSchedulingModeChange: (mode: SchedulingMode) => void;
 }
 
 export type LearningState =
@@ -222,6 +228,22 @@ export function useLearningMode(
   const ensureUpcomingContentMutation = useMutation(
     api.features.decks.ensureUpcomingCardsContent,
   );
+  const updateCourseSettingsMutation = useMutation(
+    api.features.courses.updateCourseSettings,
+  ).withOptimisticUpdate((localStore, args) => {
+    const current = localStore.getQuery(
+      api.features.courses.getActiveCourseSettings,
+      {},
+    );
+    if (current !== undefined && current !== null) {
+      const { courseId, ...updates } = args;
+      localStore.setQuery(
+        api.features.courses.getActiveCourseSettings,
+        {},
+        { ...current, ...updates },
+      );
+    }
+  });
   const sentencesQuota = useFeatureQuota(FEATURE_IDS.SENTENCES);
 
   const [isReviewing, setIsReviewing] = useState(false);
@@ -378,6 +400,22 @@ export function useLearningMode(
   }, [cardForReview, toggleFavoriteCardMutation]);
 
   // --------------------------------------------------------------------------
+  // Scheduling mode
+  // --------------------------------------------------------------------------
+  const handleSchedulingModeChange = useCallback(
+    (mode: SchedulingMode) => {
+      if (!courseSettings?.courseId) return;
+      void updateCourseSettingsMutation({
+        courseId: courseSettings.courseId,
+        schedulingMode: mode,
+      }).catch((error) => {
+        console.error('Failed to update scheduling mode:', error);
+      });
+    },
+    [courseSettings?.courseId, updateCourseSettingsMutation],
+  );
+
+  // --------------------------------------------------------------------------
   // Next
   // --------------------------------------------------------------------------
   const handleNext = useCallback(async (ratingOverride?: ReviewRating) => {
@@ -475,6 +513,8 @@ export function useLearningMode(
       isAddingCards,
       batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
       sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
+      schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
+      handleSchedulingModeChange,
     };
   }
 
@@ -555,5 +595,7 @@ export function useLearningMode(
     animationKey: cardAnimationKey,
     getReviewInitiatedByThisTab,
     resetReviewFlag,
+    schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
+    handleSchedulingModeChange,
   };
 }

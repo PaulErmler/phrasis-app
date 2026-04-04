@@ -40,6 +40,20 @@ export const cardsByState = new TableAggregate<{
 });
 
 /**
+ * Cards grouped by [deckId:stateLabel], sorted by dueDate.
+ * Enables O(log n) count of due cards per state: e.g. count 'new' cards where dueDate <= now.
+ */
+export const cardsByStateAndDueDate = new TableAggregate<{
+  Namespace: string; // `${deckId}:${stateLabel}`
+  Key: number; // dueDate
+  DataModel: DataModel;
+  TableName: 'cards';
+}>(components.cardsByStateAndDueDate, {
+  namespace: (doc) => `${doc.deckId}:${getCardStateLabel(doc)}`,
+  sortKey: (doc) => doc.dueDate,
+});
+
+/**
  * Cards sorted by [deckId, dueDate].
  * Enables O(log n) count of due cards: count where dueDate <= now.
  */
@@ -68,6 +82,7 @@ export async function insertCard(
   const doc = (await ctx.db.get(id))!;
   await cardsByState.insertIfDoesNotExist(ctx, doc);
   await cardsByDueDate.insertIfDoesNotExist(ctx, doc);
+  await cardsByStateAndDueDate.insertIfDoesNotExist(ctx, doc);
   return id;
 }
 
@@ -85,6 +100,7 @@ export async function patchCard(
   const newDoc = (await ctx.db.get(cardId))!;
   await cardsByState.replaceOrInsert(ctx, oldDoc, newDoc);
   await cardsByDueDate.replaceOrInsert(ctx, oldDoc, newDoc);
+  await cardsByStateAndDueDate.replaceOrInsert(ctx, oldDoc, newDoc);
 }
 
 /**
@@ -98,5 +114,6 @@ export async function deleteCard(
   if (!oldDoc) return;
   await cardsByState.deleteIfExists(ctx, oldDoc);
   await cardsByDueDate.deleteIfExists(ctx, oldDoc);
+  await cardsByStateAndDueDate.deleteIfExists(ctx, oldDoc);
   await ctx.db.delete(cardId);
 }

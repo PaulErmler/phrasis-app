@@ -620,6 +620,7 @@ export async function createCardsFromTexts(
         isMastered: false,
         isHidden: false,
         isFavorite: false,
+        isGraduated: false,
         schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
         searchableText,

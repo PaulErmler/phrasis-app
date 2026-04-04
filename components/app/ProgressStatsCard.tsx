@@ -10,7 +10,7 @@ import { Flame, RotateCcw, MessageSquare, Clock, Snowflake } from 'lucide-react'
 import { formatTimeMs } from '@/lib/formatTime';
 import { StartLearningButton } from '@/components/app/StartLearningButton';
 import { cn } from '@/lib/utils';
-import type { ReviewMode } from '@/convex/types';
+import type { ReviewMode, SchedulingMode } from '@/convex/types';
 
 const useBrowserLayoutEffect =
   typeof window !== 'undefined' ? useLayoutEffect : useEffect;
@@ -81,12 +81,16 @@ function StatColumn({
 }
 
 export function ProgressStatsCard({
-  onStartReview,
+  onStartLearn,
+  reviewMode,
+  onReviewModeChange,
   animateEntrance,
   skipLiveStats,
   courseId,
 }: {
-  onStartReview: (mode: ReviewMode) => void;
+  onStartLearn: (schedulingMode: SchedulingMode) => void;
+  reviewMode: ReviewMode;
+  onReviewModeChange: (mode: ReviewMode) => void;
   animateEntrance?: boolean;
   skipLiveStats?: boolean;
   courseId?: string;
@@ -308,7 +312,11 @@ export function ProgressStatsCard({
           />
         </div>
       </div>
-      <StartLearningButton onStartReview={onStartReview} />
+      <StartLearningButton
+        onStartLearn={onStartLearn}
+        reviewMode={reviewMode}
+        onReviewModeChange={onReviewModeChange}
+      />
     </div>
   );
 

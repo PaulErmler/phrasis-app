@@ -14,7 +14,7 @@ import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
 import { MessageSquare, PenLine, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
-import type { ReviewMode } from '@/convex/types';
+import type { ReviewMode, SchedulingMode } from '@/convex/types';
 
 export function HomeView({
   preloadedCollectionProgress,
@@ -98,8 +98,27 @@ export function HomeView({
     }
   }, [getOrCreateEmptyThread, onChatOpen, t]);
 
-  const handleStartReview = useCallback(
-    async (mode: ReviewMode) => {
+  const handleStartLearn = useCallback(
+    async (schedulingMode: SchedulingMode) => {
+      if (!courseSettings?.courseId) return;
+
+      const currentMode = courseSettings.schedulingMode ?? 'learnAndReview';
+      if (currentMode !== schedulingMode) {
+        void updateCourseSettings({
+          courseId: courseSettings.courseId,
+          schedulingMode,
+        }).catch((error) => {
+          console.error('Failed to update scheduling mode:', error);
+        });
+      }
+
+      onLearnOpen();
+    },
+    [courseSettings, updateCourseSettings, onLearnOpen],
+  );
+
+  const handleReviewModeChange = useCallback(
+    (mode: ReviewMode) => {
       if (!courseSettings?.courseId) return;
 
       const currentMode = courseSettings.reviewMode ?? 'audio';
@@ -111,10 +130,8 @@ export function HomeView({
           console.error('Failed to update review mode:', error);
         });
       }
-
-      onLearnOpen();
     },
-    [courseSettings, updateCourseSettings, onLearnOpen],
+    [courseSettings, updateCourseSettings],
   );
 
   if (!hasActiveCourse) {
@@ -136,7 +153,9 @@ export function HomeView({
       <div className="app-view">
         <ProgressStatsCard
           key={courseSettings?.courseId}
-          onStartReview={handleStartReview}
+          onStartLearn={handleStartLearn}
+          reviewMode={courseSettings?.reviewMode ?? 'audio'}
+          onReviewModeChange={handleReviewModeChange}
           animateEntrance={animateEntrance}
           skipLiveStats={isHidden}
           courseId={courseSettings?.courseId}

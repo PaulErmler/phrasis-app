@@ -4,7 +4,7 @@ import { buildCardSearchableText } from '../lib/cardContent';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
-import { getInitialReviewCount } from '../db/courseSettings';
+import { getCourseSettings } from '../db/courseSettings';
 import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
 import { recordReviewStats } from '../db/stats/recordReviewStats';
@@ -12,6 +12,7 @@ import { patchCard, insertCard, deleteCard } from '../db/stats/cardAggregates';
 import {
   scheduleCard,
   getValidRatings,
+  DEFAULT_INITIAL_REVIEW_COUNT,
   type ReviewRating,
   type CardSchedulingState,
 } from '../../lib/scheduling';
@@ -92,23 +93,43 @@ export const getCardForReview = query({
     const deck = await getDeckByCourseId(ctx, course._id);
     if (!deck) return null;
 
-    // Load initialReviewCount from the separate courseSettings table
-    const initialReviewCount = await getInitialReviewCount(ctx, course._id);
+    // Load settings (initialReviewCount + schedulingMode) from the courseSettings table
+    const settings = await getCourseSettings(ctx, course._id);
+    const initialReviewCount = settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
+    const schedulingMode = settings?.schedulingMode ?? 'learnAndReview';
 
     const now = Date.now();
 
-    // Get the card with the earliest due date that is neither hidden nor mastered.
-    const card = await ctx.db
-      .query('cards')
-      .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
-        q
-          .eq('deckId', deck._id)
-          .eq('isHidden', false)
-          .eq('isMastered', false)
-          .lte('dueDate', now),
-      )
-      .order('asc')
-      .first();
+    // Get the next due card based on scheduling mode
+    let card;
+    if (schedulingMode === 'learn_new') {
+      // Learn mode: only cards that haven't graduated (still in initial learning cycle)
+      card = await ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .eq('isGraduated', false)
+            .lte('dueDate', now),
+        )
+        .order('asc')
+        .first();
+    } else {
+      // Learn+Review mode: all due cards (current behavior)
+      card = await ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .lte('dueDate', now),
+        )
+        .order('asc')
+        .first();
+    }
     if (!card) return null;
 
     // Load text
@@ -217,7 +238,8 @@ export const reviewCard = mutation({
   handler: async (ctx, args) => {
     const { userId, card, deck, course } = await authorizeCardAccess(ctx, args.cardId);
 
-    const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
+    const reviewSettings = await getCourseSettings(ctx, deck.courseId);
+    const initialReviewCount = reviewSettings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
 
     // When forceReviewPhase is true (full review mode), treat the card as
     // being in the 'review' phase so FSRS ratings are accepted directly.
@@ -271,6 +293,12 @@ export const reviewCard = mutation({
       }
     }
 
+    // Flip isGraduated once the card reaches FSRS Review state (one-way flag)
+    const isGraduatedPatch =
+      !(card.isGraduated ?? false) && result.fsrsState && result.fsrsState.state >= 2
+        ? { isGraduated: true as const }
+        : {};
+
     // Patch the card (via aggregate-aware helper)
     await patchCard(ctx, args.cardId, {
       schedulingPhase: result.schedulingPhase,
@@ -279,6 +307,7 @@ export const reviewCard = mutation({
       lastReviewedAt: Date.now(),
       ...searchableTextPatch,
       ...(result.fsrsState && { fsrsState: result.fsrsState }),
+      ...isGraduatedPatch,
     });
 
     // Record all stats for this review
@@ -562,6 +591,7 @@ export const editCard = mutation({
       isMastered: card.isMastered,
       isHidden: card.isHidden,
       isFavorite: card.isFavorite,
+      isGraduated: card.isGraduated ?? false,
       schedulingPhase: card.schedulingPhase,
       preReviewCount: card.preReviewCount,
       fsrsState: card.fsrsState,

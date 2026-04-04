@@ -17,6 +17,8 @@ import {
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
 import { useCardApprovals } from '@/hooks/use-card-approvals';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { useScreenWakeLock } from '@/hooks/use-screen-wake-lock';
 import { useThread } from '@/hooks/use-thread';
 import { Loader } from '@/components/ai-elements/loader';
@@ -176,6 +178,8 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
     </div>
   ) : null;
 
+  const cardCounts = useQuery(api.features.stats.getCardCounts, {});
+
   const header = (
     <LearningHeader
       onBack={goHome}
@@ -183,6 +187,7 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
       onRestartTutorial={restartTutorial}
       onHelpOpen={audio.pause}
       reviewMode={reviewMode}
+      cardCounts={cardCounts ?? null}
     />
   );
 

@@ -127,6 +127,8 @@ export default defineSchema({
     instantProceedFull: v.optional(v.boolean()), // auto-advance when rating is clicked (full mode, default true)
     // Review mode
     reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
+    // Scheduling mode
+    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))), // 'learnAndReview' (default) or 'learn'
     fullReviewTargetAudioMode: v.optional(
       v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
     ), // When to play target audio in full review mode
@@ -156,6 +158,7 @@ export default defineSchema({
     fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
     searchableText: v.optional(v.string()), // Denormalized source text + translations for full-text search
     searchableTextLanguages: v.optional(v.array(v.string())), // Language codes included in searchableText; used to detect staleness when course languages change
+    isGraduated: v.optional(v.boolean()), // One-way flag: true once card graduates from initial learning (FSRS state >= Review)
     lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review and FSRS phases)
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
   })
@@ -172,6 +175,13 @@ export default defineSchema({
     .index('by_deckId_and_lastReviewedAt', ['deckId', 'lastReviewedAt'])
     .index('by_deckId_and_isHidden_and_lastReviewedAt', ['deckId', 'isHidden', 'lastReviewedAt'])
     .index('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', ['deckId', 'isHidden', 'isMastered', 'lastReviewedAt'])
+    .index('by_deck_hidden_mastered_graduated_due', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'isGraduated',
+      'dueDate',
+    ])
     .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
     .searchIndex('search_text', {
       searchField: 'searchableText',

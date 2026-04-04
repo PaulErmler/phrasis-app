@@ -283,6 +283,13 @@
     "startLearning": "Start Learning",
     "fullReview": "Full Review",
     "audioReview": "Audio Review",
+    "learnNew": "Learn New",
+    "learnAndReview": "Review+Learn",
+    "cardCounts": {
+      "new": "N",
+      "learning": "L",
+      "review": "R"
+    },
     "customContent": "Add Cards",
     "stats": {
       "streak": "Streak",
@@ -322,6 +329,10 @@
       "reveal": "Reveal",
       "pause": "Pause",
       "play": "Play"
+    },
+    "schedulingMode": {
+      "learn": "L",
+      "learnAndReview": "L+R"
     },
     "submitAnswer": "Submit",
     "accuracy": "Accuracy",

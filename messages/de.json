@@ -280,6 +280,13 @@
     "startLearning": "Lernen starten",
     "fullReview": "Voll-Übung",
     "audioReview": "Audio-Übung",
+    "learnNew": "Neue lernen",
+    "learnAndReview": "Wiederholen+Lernen",
+    "cardCounts": {
+      "new": "N",
+      "learning": "L",
+      "review": "W"
+    },
     "customContent": "Karten hinzufügen",
     "stats": {
       "streak": "Serie",
@@ -319,6 +326,10 @@
       "reveal": "Anzeigen",
       "pause": "Pause",
       "play": "Abspielen"
+    },
+    "schedulingMode": {
+      "learn": "L",
+      "learnAndReview": "L+W"
     },
     "submitAnswer": "Absenden",
     "accuracy": "Genauigkeit",

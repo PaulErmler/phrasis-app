@@ -835,6 +835,8 @@ export const getActiveCourseSettings = query({
       fullReviewTargetAudioMode: v.optional(
         v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
       ),
+      // Scheduling mode
+      schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))),
       chatCollectionId: v.optional(v.id('collections')),
       customCollectionId: v.optional(v.id('collections')),
       activeCustomCollectionIds: v.optional(v.array(v.id('collections'))),
@@ -886,6 +888,7 @@ export const updateCourseSettings = mutation({
     fullReviewTargetAudioMode: v.optional(
       v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
     ),
+    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -923,6 +926,7 @@ export const updateCourseSettings = mutation({
       'instantProceedFull',
       'reviewMode',
       'fullReviewTargetAudioMode',
+      'schedulingMode',
     ] as const;
 
     const existing = await dbGetCourseSettings(ctx, args.courseId);
@@ -961,6 +965,7 @@ export const updateCourseSettings = mutation({
         instantProceedFull: args.instantProceedFull,
         reviewMode: args.reviewMode,
         fullReviewTargetAudioMode: args.fullReviewTargetAudioMode,
+        schedulingMode: args.schedulingMode,
       });
     }
 

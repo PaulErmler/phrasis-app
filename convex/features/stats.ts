@@ -3,7 +3,7 @@ import { query, internalQuery } from '../_generated/server';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId } from '../db/decks';
-import { cardsByState, cardsByDueDate } from '../db/stats/cardAggregates';
+import { cardsByState, cardsByDueDate, cardsByStateAndDueDate } from '../db/stats/cardAggregates';
 import {
   getCourseStats as dbGetCourseStats,
   getTodayInTimezone,
@@ -539,5 +539,42 @@ export const getDueCardCount = internalQuery({
         upper: { key: Date.now(), inclusive: true },
       },
     });
+  },
+});
+
+/** Due card counts by state for the active deck (O(log n) via aggregates). */
+export const getCardCounts = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      new: v.number(),
+      learning: v.number(),
+      review: v.number(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return null;
+    const deck = await getDeckByCourseId(ctx, active.course._id);
+    if (!deck) return null;
+
+    const now = Date.now();
+    const dueBounds = { upper: { key: now, inclusive: true } };
+
+    const [newCount, learningCount, reviewCount, relearningCount] = await Promise.all([
+      cardsByStateAndDueDate.count(ctx, { namespace: `${deck._id}:new`, bounds: dueBounds }),
+      cardsByStateAndDueDate.count(ctx, { namespace: `${deck._id}:learning`, bounds: dueBounds }),
+      cardsByStateAndDueDate.count(ctx, { namespace: `${deck._id}:review`, bounds: dueBounds }),
+      cardsByStateAndDueDate.count(ctx, { namespace: `${deck._id}:relearning`, bounds: dueBounds }),
+    ]);
+
+    return {
+      new: newCount,
+      learning: learningCount + relearningCount,
+      review: reviewCount,
+    };
   },
 });
