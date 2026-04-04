@@ -20,7 +20,7 @@ function buildWords(wordList: string[]): Word[] {
   }));
 }
 
-function CloudRenderer(
+function AnimatedCloudRenderer(
   data: WordRendererData,
   ref?: React.Ref<SVGTextElement>,
 ) {
@@ -31,6 +31,22 @@ function CloudRenderer(
       animationDelay={(_, idx) => idx * 10}
       textStyle={{ transition: 'all .5s ease' }}
     />
+  );
+}
+
+function StaticWordRenderer(
+  data: WordRendererData,
+  ref?: React.Ref<SVGTextElement>,
+) {
+  const { word, ...rest } = data;
+  return (
+    <text
+      ref={ref}
+      {...rest}
+      textAnchor="middle"
+    >
+      {word.text}
+    </text>
   );
 }
 
@@ -58,6 +74,7 @@ function SingleWordCloud({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
+  const hasAnimated = useRef(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -69,6 +86,14 @@ function SingleWordCloud({
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, []);
+
+  // Mark animated after the entrance animation completes
+  useEffect(() => {
+    if (containerWidth > 0 && !hasAnimated.current) {
+      const timer = setTimeout(() => { hasAnimated.current = true; }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [containerWidth]);
 
   const wordData = useMemo(() => buildWords(words.slice(0, 500)), [words]);
 
@@ -110,7 +135,7 @@ function SingleWordCloud({
             fill={(_, i) => COLORS[i % COLORS.length]}
             transition="all .5s ease"
             enableTooltip={false}
-            renderWord={CloudRenderer}
+            renderWord={hasAnimated.current ? StaticWordRenderer : AnimatedCloudRenderer}
           />
         )}
       </div>
