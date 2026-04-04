@@ -26,7 +26,7 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
               transition={{ duration: 0.5, ease: 'easeOut' }}
               className="ent-section-label"
             >
-              Language Learning, Reimagined
+              {t('sectionLabel')}
             </motion.p>
 
             <motion.h1
@@ -35,8 +35,9 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
               transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
               className="text-[2.5rem] md:text-[3.5rem] lg:text-[5rem] font-semibold tracking-tight leading-[1.08]"
             >
-              The language app that{' '}
-              <span className="text-primary">grows with you</span>.
+              {t.rich('tagline', {
+                highlight: (chunks) => <span className="text-primary">{chunks}</span>,
+              })}
             </motion.h1>
 
             <motion.p

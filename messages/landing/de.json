@@ -18,7 +18,8 @@
     "themeSystem": "System"
   },
   "hero": {
-    "tagline": "Die Sprach-App, die mit dir wächst",
+    "sectionLabel": "Sprachenlernen, neu gedacht",
+    "tagline": "Die Sprach-App, die <highlight>mit dir wächst</highlight>.",
     "subtitle": "Mehrsprachige (Audio-)Lernkarten mit Spaced Repetition und KI, damit du so effizient wie möglich lernen kannst. Minimalistisch und ablenkungsfrei. Bringe deine eigenen Inhalte mit, wenn du möchtest.",
     "cta": {
       "start": "Kostenlos starten",
@@ -43,7 +44,7 @@
     "titleHighlight": "Wähle, wie du am besten lernst.",
     "subtitle": "Dieselben Sätze, anderes Training — wechsle jederzeit zwischen Audio-Wiederholung und vollständiger Texteingabe.",
     "audioTitle": "Audio-Wiederholung",
-    "audioBody": "Hör den Satz in einer Sprache, die du schon verstehst, denk an die Übersetzung — jede Zielzeile startet unscharf und wird automatisch weich scharf, so als wäre das Audio gerade zu Ende. In der App passiert das nach dem Abspielen. Mit Wiederholen siehst du die Demo erneut. Bewerte, wie gut du dich erinnerst — ideal für Pendeln und freihändiges Üben.",
+    "audioBody": "Hör den Satz in einer Sprache, die du schon verstehst, denk an die Übersetzung — jede Zielzeile startet unscharf und wird nach und nach scharf, so als wäre das Audio gerade zu Ende. In der App passiert das nach dem Abspielen. Mit Wiederholen siehst du die Demo erneut. Bewerte, wie gut du dich erinnerst — ideal für Pendeln und freihändiges Üben.",
     "fullTitle": "Vollständige Wiederholung",
     "fullBody": "Tippe die Übersetzung für jede Zielsprache. Nach dem Absenden siehst du einen Zeichen-für-Zeichen-Vergleich: Richtiges in Grün, Fehler markiert, Ausgelassenes gedämpft — plus eine Genauigkeit in Prozent.",
     "multiLabel": "Mehrere Sprachen",
@@ -159,14 +160,14 @@
     "title": "Sieh, wie deine Fähigkeiten",
     "titleHighlight": "mit der Zeit wachsen.",
     "lead": "Sieh genau, wie sich dein Wortschatz Woche für Woche erweitert. Detaillierte Statistiken zeigen deine Serie, gelernte Wörter pro Sprache und Lerngewohnheiten — damit du immer weißt, wie weit du gekommen bist.",
-    "progressTitle": "Wisse, was du weißt",
+    "progressTitle": "Wissen, was du kannst",
     "progressBody": "Verfolge genau, welche Wörter du bereits kennst und wie viel Fortschritt du über Tage, Wochen und Monate gemacht hast — aufgeschlüsselt nach Sprache, wenn du mehr als eine lernst.",
     "activityTitle": "Baue Konstanz auf",
     "activityBody": "Sieh deine Lerngewohnheit auf einen Blick. Jeder Tag, an dem du übst, erscheint im Kalender — beobachte, wie deine Serie wächst und bleibe motiviert.",
     "insightsTitle": "Sitzungsübersicht",
     "insightsBody": "Nach jeder Wiederholung siehst du genau, was du geschafft hast: Wiederholungen, neue Wörter und aufgewendete Zeit — live aktualisiert, sobald du fertig bist.",
     "habitsTitle": "Finde deine besten Stunden",
-    "habitsBody": "Entdecke, wann du am besten lernst. Eine Aufschlüsselung deiner Lernstunden zeigt deinen natürlichen Rhythmus, damit du Sitzungen planen kannst, wenn du am schärfsten bist.",
+    "habitsBody": "Entdecke, wann du am besten lernst. Eine Aufschlüsselung deiner Lernstunden zeigt deinen natürlichen Rhythmus, damit du Sitzungen planen kannst, wenn du am aufnahmefähigsten bist.",
     "goalsTitle": "Sieh das große Ganze",
     "goalsBody": "Gesamtwörter, Sätze, Wiederholungen und Lernzeit — deine Gesamtstatistiken beweisen, wie weit du seit Tag eins gekommen bist.",
     "multiLangTitle": "Vergleiche über Sprachen hinweg",
@@ -174,7 +175,7 @@
     "accuracyTitle": "Miss dein Erinnerungsvermögen",
     "accuracyBody": "Verfolge deine Genauigkeit über alle Wiederholungssitzungen. Beobachte, wie sie steigt, während Spaced Repetition dein Gedächtnis über die Zeit stärkt.",
     "streakTitle": "Bleib am Ball",
-    "streakBody": "Deine Serie zählt jeden aufeinanderfolgenden Tag, an dem du übst. Ein einfacher, kraftvoller Motivator — und Streak-Freezes haben deinen Rücken, wenn das Leben dazwischenkommt.",
+    "streakBody": "Deine Serie zählt jeden aufeinanderfolgenden Tag, an dem du übst. Ein einfacher, kraftvoller Motivator — und Streak-Freezes sichern dich ab, wenn das Leben dazwischenkommt.",
     "feedbackTitle": "Sofortiges Feedback",
     "feedbackBody": "Nach dem Tippen deiner Übersetzung bekommst du einen zeichengenauen Vergleich: was richtig war, was du verpasst hast, und deinen Genauigkeitswert — sofort."
   },
@@ -205,7 +206,7 @@
       },
       "languageIntelligence": {
         "title": "Verständlicher Input",
-        "description": "Jeder Satz ist in einer Sprache verankert, die du bereits kennst. Du streckst dich zur Übersetzung – herausfordernd, aber nie frustrierend."
+        "description": "Jeder Satz ist in einer Sprache verankert, die du bereits kennst. Du näherst dich der Übersetzung an – herausfordernd, aber nie frustrierend."
       }
     }
   },
@@ -275,7 +276,7 @@
     "givingTitle": "10 % für Gutes",
     "description": "Wenn du Flexling abonnierst, investierst du nicht nur in dich selbst. Wir spenden",
     "percentage": "10% unserer Einnahmen",
-    "description2": "an hochwirksame Wohltätigkeitsorganisationen, kuriert von",
+    "description2": "an hochwirksame Wohltätigkeitsorganisationen, empfohlen von",
     "givewellLink": "GiveWell",
     "supportTitle": "Brauchst du Hilfe?",
     "supportDescription": "Hast du Fragen, Feedback oder brauchst Unterstützung? Wir freuen uns von dir zu hören.",

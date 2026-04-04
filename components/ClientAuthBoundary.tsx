@@ -2,7 +2,6 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useRef } from 'react';
-import { useMutation } from 'convex/react';
 import { AuthBoundary } from '@convex-dev/better-auth/react';
 import { api } from '@/convex/_generated/api';
 import { isAuthError } from '@/lib/utils';
@@ -11,7 +10,6 @@ import type { PropsWithChildren } from 'react';
 
 export function ClientAuthBoundary({ children }: PropsWithChildren) {
   const router = useRouter();
-  const logRedirect = useMutation(api.authRedirectLog.logAuthRedirect);
   const redirectingRef = useRef(false);
 
   const handleUnauth = useCallback(async () => {
@@ -28,30 +26,18 @@ export function ClientAuthBoundary({ children }: PropsWithChildren) {
       if (session?.session) {
         // Session is still valid — this was a transient JWT refresh gap.
         // The provider will eventually sync a new token.
-        logRedirect({
-          source: 'authBoundary',
-          details: 'suppressed redirect: session still valid',
-        }).catch(() => {});
         return;
       }
 
       // Session is genuinely gone — redirect to sign-in
-      logRedirect({
-        source: 'authBoundary',
-        details: 'redirecting: session invalid',
-      }).catch(() => {});
       router.replace('/auth/sign-in');
     } catch {
       // Session check failed — redirect to be safe
-      logRedirect({
-        source: 'authBoundary',
-        details: 'redirecting: session check failed',
-      }).catch(() => {});
       router.replace('/auth/sign-in');
     } finally {
       redirectingRef.current = false;
     }
-  }, [router, logRedirect]);
+  }, [router]);
 
   return (
     <AuthBoundary

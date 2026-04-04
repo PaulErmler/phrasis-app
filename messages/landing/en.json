@@ -18,7 +18,8 @@
     "themeSystem": "System"
   },
   "hero": {
-    "tagline": "The language app that grows with you",
+    "sectionLabel": "Language Learning, Reimagined",
+    "tagline": "The language app that <highlight>grows with you</highlight>.",
     "subtitle": "Multilingual (audio) flashcards with spaced repetition and AI to allow you to learn as efficiently as possible. Minimalist and distraction free. Bring your own content if you want.",
     "cta": {
       "start": "Start Learning Free",

@@ -67,6 +67,7 @@ export async function recordReviewStats(
       timeZone: args.timezone,
       hour: 'numeric',
       hour12: false,
+      hourCycle: 'h23',
     }).format(new Date()),
   );
 

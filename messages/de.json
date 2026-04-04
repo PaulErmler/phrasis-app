@@ -500,9 +500,9 @@
       "pricingLabelUnlimited": "Unbegrenzte Kurse"
     },
     "sentences": {
-      "name": "Ready-Made-Sätze",
-      "pricingLabel": "{count, plural, one {# Ready-Made-Satz} other {# Ready-Made-Sätze}} pro Monat",
-      "pricingLabelUnlimited": "Unbegrenzt viele Ready-Made-Sätze pro Monat"
+      "name": "Vorgefertigte Sätze",
+      "pricingLabel": "{count, plural, one {# vorgefertigter Satz} other {# vorgefertigte Sätze}} pro Monat",
+      "pricingLabelUnlimited": "Unbegrenzt viele vorgefertigte Sätze pro Monat"
     },
     "customSentences": {
       "name": "Eigene Sätze",

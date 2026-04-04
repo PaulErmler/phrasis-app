@@ -18,14 +18,18 @@ function getColor(count: number) {
   return count > 0 ? 'bg-primary/70' : 'bg-muted/40';
 }
 
-function YearView({ lookup }: { lookup: Map<string, number> }) {
+function formatDate(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(date);
+}
+
+function YearView({ lookup, timezone }: { lookup: Map<string, number>; timezone: string }) {
   const todayDate = new Date();
   const weeks: string[][] = [];
   let week: string[] = [];
   for (let i = 363; i >= 0; i--) {
     const d = new Date(todayDate);
     d.setDate(d.getDate() - i);
-    week.push(d.toISOString().slice(0, 10));
+    week.push(formatDate(d, timezone));
     if (week.length === 7) {
       weeks.push(week);
       week = [];
@@ -53,10 +57,11 @@ function YearView({ lookup }: { lookup: Map<string, number> }) {
   );
 }
 
-function MonthView({ lookup }: { lookup: Map<string, number> }) {
+function MonthView({ lookup, timezone }: { lookup: Map<string, number>; timezone: string }) {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit' }).formatToParts(now);
+  const year = parseInt(parts.find(p => p.type === 'year')!.value);
+  const month = parseInt(parts.find(p => p.type === 'month')!.value) - 1;
 
   const firstDay = new Date(year, month, 1);
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -105,7 +110,7 @@ function MonthView({ lookup }: { lookup: Map<string, number> }) {
   );
 }
 
-function WeekView({ lookup }: { lookup: Map<string, number> }) {
+function WeekView({ lookup, timezone }: { lookup: Map<string, number>; timezone: string }) {
   const now = new Date();
   const dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -118,7 +123,7 @@ function WeekView({ lookup }: { lookup: Map<string, number> }) {
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(d.getDate() + i);
-    days.push(d.toISOString().slice(0, 10));
+    days.push(formatDate(d, timezone));
   }
 
   return (
@@ -174,11 +179,11 @@ export function ActivityHeatmap({ data, timezone }: ActivityHeatmapProps) {
       </div>
 
       {view === 'year' ? (
-        <YearView lookup={lookup} />
+        <YearView lookup={lookup} timezone={timezone} />
       ) : view === 'week' ? (
-        <WeekView lookup={lookup} />
+        <WeekView lookup={lookup} timezone={timezone} />
       ) : (
-        <MonthView lookup={lookup} />
+        <MonthView lookup={lookup} timezone={timezone} />
       )}
 
       <div className="flex items-center justify-end gap-1.5 mt-2 text-[9px] text-muted-foreground">
