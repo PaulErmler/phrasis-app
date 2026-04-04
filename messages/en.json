@@ -730,7 +730,7 @@
       },
       "learningModes": {
         "title": "Stats & Learning Modes",
-        "description": "This area shows your learning stats — streak, reps, sentences and time — which update as you study. Below are 2 review modes: Full Review lets you practice by typing translations, great for focused study. Audio Review plays sentences aloud so you can learn on the go."
+        "description": "This area shows your learning stats — streak, reps, sentences and time — which update as you study. Below are 2 buttons: Learn New focuses on new sentences you haven't learned yet. Review+Learn includes both new and previously learned sentences for spaced repetition. Use the toggle below to switch between Audio mode (hands-free listening) and Full mode (type translations)."
       },
       "difficultySelection": {
         "title": "Difficulty Selection",
