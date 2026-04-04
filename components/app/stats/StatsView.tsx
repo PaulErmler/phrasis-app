@@ -77,6 +77,13 @@ export function StatsView() {
     return dailyData.languageDailyData.filter((d) => targetSet.has(d.language.replace(/_latam$/, '')));
   }, [dailyData?.languageDailyData, pageData?.targetLanguages]);
 
+  const todayNewWords = useMemo(() => {
+    if (!filteredLanguageData.length) return 0;
+    return filteredLanguageData
+      .filter((d) => d.date === todayStr)
+      .reduce((sum, d) => sum + d.newWordsCount, 0);
+  }, [filteredLanguageData, todayStr]);
+
   const isLoading = pageData === undefined;
   const cs = pageData?.courseStats;
 
@@ -104,6 +111,7 @@ export function StatsView() {
           todayReps={pageData?.todayReps ?? 0}
           todayNewCards={pageData?.todayNewCards ?? 0}
           todayTimeMs={pageData?.todayTimeMs ?? 0}
+          todayNewWords={todayNewWords}
         />
 
         <CumulativeLineChart

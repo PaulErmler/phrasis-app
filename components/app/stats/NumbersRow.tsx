@@ -29,9 +29,10 @@ interface NumbersRowProps {
   todayReps?: number;
   todayNewCards?: number;
   todayTimeMs?: number;
+  todayNewWords?: number;
 }
 
-type TodaySnapshot = { date: string; reps: number; newCards: number; timeMs: number };
+type TodaySnapshot = { date: string; reps: number; newCards: number; timeMs: number; newWords: number };
 const TODAY_SNAPSHOT_KEY = 'statsPage_todaySnapshot';
 
 function StatCell({
@@ -84,10 +85,12 @@ function getLanguageFlag(code: string): string {
   return lang?.flag ?? '🌐';
 }
 
-function WordsCell({ languageWordCounts, totalWords, t }: {
+function WordsCell({ languageWordCounts, totalWords, t, todayDisplay, animateToday }: {
   languageWordCounts: LanguageWordCount[];
   totalWords: number;
   t: ReturnType<typeof useTranslations>;
+  todayDisplay?: string | null;
+  animateToday?: boolean;
 }) {
   const showFlags = languageWordCounts.length >= 2;
 
@@ -97,9 +100,14 @@ function WordsCell({ languageWordCounts, totalWords, t }: {
         icon={<BookOpen className="h-3.5 w-3.5" />}
         label={t('words')}
         value={totalWords.toLocaleString()}
+        todayDisplay={todayDisplay}
+        animateToday={animateToday}
       />
     );
   }
+
+  const todayClassName =
+    'text-xs font-medium text-primary tabular-nums leading-none mt-0.5 whitespace-nowrap';
 
   return (
     <div className="flex flex-col items-center text-center gap-0.5">
@@ -115,6 +123,25 @@ function WordsCell({ languageWordCounts, totalWords, t }: {
         ))}
       </div>
       <p className="text-muted-xs leading-none">{t('words')}</p>
+      {animateToday ? (
+        <AnimatePresence initial={false}>
+          {todayDisplay != null && (
+            <motion.p
+              initial={{ opacity: 0, height: 0, y: 4 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: 4 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className={todayClassName}
+            >
+              {todayDisplay}
+            </motion.p>
+          )}
+        </AnimatePresence>
+      ) : (
+        todayDisplay != null && (
+          <p className={todayClassName}>{todayDisplay}</p>
+        )
+      )}
     </div>
   );
 }
@@ -132,6 +159,7 @@ export function NumbersRow({
   todayReps = 0,
   todayNewCards = 0,
   todayTimeMs = 0,
+  todayNewWords = 0,
 }: NumbersRowProps) {
   const t = useTranslations('StatsPage');
 
@@ -158,23 +186,24 @@ export function NumbersRow({
     } catch {
       // ignore
     }
-    prevTodaySnapshot.current = { date: today, reps: 0, newCards: 0, timeMs: 0 };
+    prevTodaySnapshot.current = { date: today, reps: 0, newCards: 0, timeMs: 0, newWords: 0 };
   }, [today]);
 
   useEffect(() => {
-    if (todayReps === 0 && todayNewCards === 0 && todayTimeMs === 0) return;
+    if (todayReps === 0 && todayNewCards === 0 && todayTimeMs === 0 && todayNewWords === 0) return;
     try {
-      const snapshot: TodaySnapshot = { date: today, reps: todayReps, newCards: todayNewCards, timeMs: todayTimeMs };
+      const snapshot: TodaySnapshot = { date: today, reps: todayReps, newCards: todayNewCards, timeMs: todayTimeMs, newWords: todayNewWords };
       localStorage.setItem(TODAY_SNAPSHOT_KEY, JSON.stringify(snapshot));
     } catch {
       // ignore
     }
-  }, [todayReps, todayNewCards, todayTimeMs, today]);
+  }, [todayReps, todayNewCards, todayTimeMs, todayNewWords, today]);
 
   const todayChanged = prevTodaySnapshot.current != null && (
     prevTodaySnapshot.current.reps !== todayReps ||
     prevTodaySnapshot.current.newCards !== todayNewCards ||
-    prevTodaySnapshot.current.timeMs !== todayTimeMs
+    prevTodaySnapshot.current.timeMs !== todayTimeMs ||
+    prevTodaySnapshot.current.newWords !== todayNewWords
   );
 
   const [, setTodaySettledEpoch] = useState(0);
@@ -182,19 +211,21 @@ export function NumbersRow({
   useEffect(() => {
     if (!todayChanged) return;
     const timer = setTimeout(() => {
-      prevTodaySnapshot.current = { date: today, reps: todayReps, newCards: todayNewCards, timeMs: todayTimeMs };
+      prevTodaySnapshot.current = { date: today, reps: todayReps, newCards: todayNewCards, timeMs: todayTimeMs, newWords: todayNewWords };
       setTodaySettledEpoch((e) => e + 1);
     }, 2400);
     return () => clearTimeout(timer);
-  }, [todayChanged, todayReps, todayNewCards, todayTimeMs, today]);
+  }, [todayChanged, todayReps, todayNewCards, todayTimeMs, todayNewWords, today]);
 
   const prevTodayReps = prevTodaySnapshot.current?.reps ?? 0;
   const prevTodayNew = prevTodaySnapshot.current?.newCards ?? 0;
   const prevTodayTime = prevTodaySnapshot.current?.timeMs ?? 0;
+  const prevTodayWords = prevTodaySnapshot.current?.newWords ?? 0;
 
   const animatedTodayReps = useAnimatedCounter(todayReps, prevTodayReps, 1500, 300, todayChanged);
   const animatedTodayNew = useAnimatedCounter(todayNewCards, prevTodayNew, 1500, 450, todayChanged);
   const animatedTodayTime = useAnimatedCounter(todayTimeMs, prevTodayTime, 1500, 600, todayChanged);
+  const animatedTodayWords = useAnimatedCounter(todayNewWords, prevTodayWords, 1500, 250, todayChanged);
 
   const tApp = useTranslations('AppPage');
   const todayLabel = tApp('stats.today');
@@ -209,6 +240,7 @@ export function NumbersRow({
   const todayRepsDisplay = todayReps > 0 ? `${animatedTodayReps} ${todayLabel}` : null;
   const todayNewDisplay = todayNewCards > 0 ? `+${animatedTodayNew} ${newLabel}` : null;
   const todayTimeDisplay = todayTimeMs > 0 ? `${formatTimeMs(animatedTodayTime)} ${todayLabel}` : null;
+  const todayWordsDisplay = todayNewWords > 0 ? `+${animatedTodayWords} ${todayLabel}` : null;
 
   return (
     <div className="card-surface p-3">
@@ -221,7 +253,7 @@ export function NumbersRow({
           </p>
           <p className="text-muted-xs leading-none">{t('streak')}</p>
         </div>
-        <WordsCell languageWordCounts={languageWordCounts} totalWords={words} t={t} />
+        <WordsCell languageWordCounts={languageWordCounts} totalWords={words} t={t} todayDisplay={todayWordsDisplay} animateToday={todayChanged} />
         <StatCell
           icon={<RotateCcw className="h-3.5 w-3.5" />}
           label={t('reviews')}
