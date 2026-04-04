@@ -69,6 +69,8 @@ export function useAudioPlayer(
   const mergeAbortRef = useRef<AbortController | null>(null);
   const mediaSessionCleanupRef = useRef<(() => void) | null>(null);
   const languageCuesRef = useRef<LanguageCue[]>([]);
+  const webLockResolveRef = useRef<(() => void) | null>(null);
+  const webLockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Stable refs for callbacks to avoid re-triggering effects
   const onScheduleCompleteRef = useRef(onScheduleComplete);
@@ -149,19 +151,46 @@ export function useAudioPlayer(
   useEffect(() => {
     const audio = getAudio();
 
+    const acquireWebLock = () => {
+      if (webLockResolveRef.current) return; // already held
+      if (webLockTimeoutRef.current) {
+        clearTimeout(webLockTimeoutRef.current);
+        webLockTimeoutRef.current = null;
+        return; // lock still held from delayed release
+      }
+      if (!navigator.locks) return;
+      navigator.locks.request('audio-playback', () => {
+        return new Promise<void>((resolve) => {
+          webLockResolveRef.current = resolve;
+        });
+      });
+    };
+
+    const releaseWebLockDelayed = () => {
+      if (webLockTimeoutRef.current) clearTimeout(webLockTimeoutRef.current);
+      webLockTimeoutRef.current = setTimeout(() => {
+        webLockTimeoutRef.current = null;
+        webLockResolveRef.current?.();
+        webLockResolveRef.current = null;
+      }, 180_000);
+    };
+
     const handlePlay = () => {
       setIsPlaying(true);
       setMediaSessionPlaybackState('playing');
+      acquireWebLock();
     };
 
     const handlePause = () => {
       setIsPlaying(false);
       setMediaSessionPlaybackState('paused');
+      releaseWebLockDelayed();
     };
 
     const handleEnded = () => {
       setIsPlaying(false);
       setMediaSessionPlaybackState('paused');
+      releaseWebLockDelayed();
       onScheduleCompleteRef.current();
     };
 
@@ -367,6 +396,9 @@ export function useAudioPlayer(
     return () => {
       mergeAbortRef.current?.abort();
       mediaSessionCleanupRef.current?.();
+      if (webLockTimeoutRef.current) clearTimeout(webLockTimeoutRef.current);
+      webLockResolveRef.current?.();
+      webLockResolveRef.current = null;
 
       const audio = audioRef.current;
       if (audio) {
