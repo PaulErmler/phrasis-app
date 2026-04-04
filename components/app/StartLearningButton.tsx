@@ -24,19 +24,19 @@ export function StartLearningButton({
       <div className="grid grid-cols-2 gap-2">
         <Button
           size="lg"
-          className="w-full gap-2"
+          className="h-auto min-h-10 w-full items-start justify-start gap-2 whitespace-normal py-2.5 text-left"
           onClick={() => onStartLearn('learn_new')}
         >
-          <BookOpen className="h-5 w-5" />
-          {t('learnNew')}
+          <BookOpen className="mt-0.5 h-5 w-5 shrink-0" />
+          <span className="min-w-0 text-left leading-snug">{t('learnNew')}</span>
         </Button>
         <Button
           size="lg"
-          className="w-full gap-2"
+          className="h-auto min-h-10 w-full items-start justify-start gap-2 whitespace-normal py-2.5 text-left"
           onClick={() => onStartLearn('learnAndReview')}
         >
-          <RefreshCw className="h-5 w-5" />
-          {t('learnAndReview')}
+          <RefreshCw className="mt-0.5 h-5 w-5 shrink-0" />
+          <span className="min-w-0 text-left leading-snug">{t('learnAndReview')}</span>
         </Button>
       </div>
 
@@ -51,14 +51,14 @@ export function StartLearningButton({
             type="button"
             onClick={() => onReviewModeChange(mode)}
             className={cn(
-              'flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all',
+              'flex min-h-8 flex-1 items-start justify-center gap-1.5 whitespace-normal rounded-md px-2.5 py-1.5 text-center text-xs font-medium transition-all',
               reviewMode === mode
                 ? 'bg-primary text-primary-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            <Icon className="h-3.5 w-3.5" />
-            {label}
+            <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 text-center leading-snug">{label}</span>
           </button>
         ))}
       </div>

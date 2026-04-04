@@ -67,11 +67,11 @@ export function LearningHeader({
                 <span>{cardCounts.review}</span>
               </div>
               <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                <span>new</span>
+                <span>{t('cardCounts.new')}</span>
                 <span>–</span>
-                <span>learning</span>
+                <span>{t('cardCounts.learning')}</span>
                 <span>–</span>
-                <span>review</span>
+                <span>{t('cardCounts.review')}</span>
               </div>
             </div>
           ) : null}

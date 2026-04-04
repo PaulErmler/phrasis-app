@@ -280,8 +280,8 @@
     "startLearning": "Lernen starten",
     "fullReview": "Voll-Übung",
     "audioReview": "Audio-Übung",
-    "learnNew": "Neue lernen",
-    "learnAndReview": "Wiederholen+Lernen",
+    "learnNew": "Neues lernen",
+    "learnAndReview": "Wiederholen",
     "cardCounts": {
       "new": "N",
       "learning": "L",
@@ -330,6 +330,11 @@
     "schedulingMode": {
       "learn": "L",
       "learnAndReview": "L+W"
+    },
+    "cardCounts": {
+      "new": "Neu",
+      "learning": "Lernen",
+      "review": "Überprüf."
     },
     "submitAnswer": "Absenden",
     "accuracy": "Genauigkeit",
@@ -801,7 +806,7 @@
       },
       "learningModes": {
         "title": "Statistiken & Lernmodi",
-        "description": "Dieser Bereich zeigt deine Lernstatistiken — Serie, Wiederholungen, Sätze und Zeit — die sich beim Lernen aktualisieren. Darunter findest du 2 Buttons: Neue lernen konzentriert sich auf neue Sätze, die du noch nicht gelernt hast. Wiederholen+Lernen umfasst sowohl neue als auch bereits gelernte Sätze für die verteilte Wiederholung. Mit dem Schalter darunter wechselst du zwischen Audio-Modus (freihändiges Zuhören) und Voll-Modus (Übersetzungen eintippen)."
+        "description": "Dieser Bereich zeigt deine Lernstatistiken — Serie, Wiederholungen, Sätze und Zeit — die sich beim Lernen aktualisieren. Darunter findest du 2 Buttons: Neues lernen konzentriert sich auf neue Sätze, die du noch nicht gelernt hast. Wiederholen umfasst sowohl neue als auch bereits gelernte Sätze für die verteilte Wiederholung. Mit dem Schalter darunter wechselst du zwischen Audio-Modus (freihändiges Zuhören) und Voll-Modus (Übersetzungen eintippen)."
       },
       "difficultySelection": {
         "title": "Schwierigkeitsauswahl",
@@ -922,6 +927,7 @@
     "manualCards": "Manuell hinzugefügt",
     "chatCards": "Chat-Karten hinzugefügt",
     "chatMessages": "Chat-Nachrichten gesendet",
-    "noData": "Noch keine Daten"
+    "noData": "Noch keine Daten",
+    "recentlyLearnedWords": "Kürzlich gelernte Wörter — {language}"
   }
 }

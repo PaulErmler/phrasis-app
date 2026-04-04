@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useLayoutEffect, useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { WordCloud } from '@isoterik/react-word-cloud';
@@ -65,8 +66,10 @@ function SingleWordCloud({
   language,
   words,
   isFirst,
+  t,
 }: {
   language: string;
+  t: ReturnType<typeof useTranslations<'StatsPage'>>;
   words: string[];
   isFirst: boolean;
 }) {
@@ -106,7 +109,7 @@ function SingleWordCloud({
     <div className="card-surface p-3">
       <div className="mb-2">
         <span className="text-sm font-medium text-muted-foreground">
-          {isFirst ? `Recently learned words — ${getLangName(language)}` : getLangName(language)}
+          {isFirst ? t('recentlyLearnedWords', { language: getLangName(language) }) : getLangName(language)}
         </span>
       </div>
       <div
@@ -148,6 +151,7 @@ function SingleWordCloud({
 }
 
 export function WordCloudSection() {
+  const t = useTranslations('StatsPage');
   const data = useQuery(api.features.stats.getRecentWords);
 
   if (!data || data.length === 0) return null;
@@ -160,6 +164,7 @@ export function WordCloudSection() {
           language={entry.language}
           words={entry.words}
           isFirst={i === 0}
+          t={t}
         />
       ))}
     </>

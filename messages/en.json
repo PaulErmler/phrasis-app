@@ -334,6 +334,11 @@
       "learn": "L",
       "learnAndReview": "L+R"
     },
+    "cardCounts": {
+      "new": "new",
+      "learning": "learning",
+      "review": "review"
+    },
     "submitAnswer": "Submit",
     "accuracy": "Accuracy",
     "showSentence": "Show sentence",
@@ -851,6 +856,7 @@
     "manualCards": "Manual Cards Added",
     "chatCards": "Chat Cards Added",
     "chatMessages": "Chat Messages Sent",
-    "noData": "No data yet"
+    "noData": "No data yet",
+    "recentlyLearnedWords": "Recently learned words — {language}"
   }
 }
