@@ -5,6 +5,7 @@ import { api } from '@/convex/_generated/api';
 import { AppDataProvider } from '@/components/app/AppDataProvider';
 import { ClientAuthBoundary } from '@/components/ClientAuthBoundary';
 import { OnboardingGuard } from '@/components/app/OnboardingGuard';
+import { AuthRefresh } from '@/components/AuthRefresh';
 
 export default async function AppLayout({
   children,
@@ -15,11 +16,17 @@ export default async function AppLayout({
   if (!authed) {
     const cookieStore = await cookies();
     const hasSessionCookie = cookieStore.has('better-auth.session_token');
-    console.warn('[AUTH_REDIRECT] Server layout redirect to /auth/sign-in', {
-      hasSessionCookie,
+
+    if (!hasSessionCookie) {
+      redirect('/auth/sign-in');
+    }
+
+    // Session cookie exists but server auth failed (stale tab).
+    // Auto-reload so the cookie gets re-validated on a fresh request.
+    console.warn('[AUTH_REFRESH] Session cookie exists but server auth failed, triggering client reload', {
       timestamp: new Date().toISOString(),
     });
-    redirect('/auth/sign-in');
+    return <AuthRefresh />;
   }
 
   const [

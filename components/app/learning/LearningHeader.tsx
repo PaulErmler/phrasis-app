@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { HelpDialog } from '@/components/app/HelpDialog';
 import {
+  BookOpen,
   ChevronLeft,
   CircleCheck,
   EyeOff,
   Pencil,
+  RefreshCw,
   Settings,
   Star,
 } from 'lucide-react';
@@ -21,7 +23,7 @@ interface LearningHeaderProps {
   onHelpOpen?: () => void;
   /** When `'full'`, the help dialog lists full-review-only shortcuts */
   reviewMode?: 'audio' | 'full';
-  cardCounts?: { new: number; learning: number; review: number } | null;
+  schedulingMode?: 'learn_new' | 'learnAndReview';
 }
 
 export function LearningHeader({
@@ -30,9 +32,10 @@ export function LearningHeader({
   onRestartTutorial,
   onHelpOpen,
   reviewMode = 'audio',
-  cardCounts,
+  schedulingMode = 'learnAndReview',
 }: LearningHeaderProps) {
   const t = useTranslations('LearningMode');
+  const tApp = useTranslations('AppPage');
   const tSettings = useTranslations('LearningMode.settingsPanel');
   const { isChatOpen, closeChat } = useLearningChatToggle();
 
@@ -57,24 +60,16 @@ export function LearningHeader({
         <div className="flex-1 min-w-0 flex items-center justify-center">
           {isChatOpen ? (
             <span className="heading-section lg:hidden">{t('chat')}</span>
-          ) : cardCounts ? (
-            <div className="flex items-center gap-1 leading-tight">
-              <div className="flex flex-col items-center">
-                <span className="text-sm font-semibold tabular-nums text-foreground">{cardCounts.new}</span>
-                <span className="text-[10px] text-muted-foreground">{t('cardCounts.new')}</span>
-              </div>
-              <span className="text-sm text-muted-foreground self-start">–</span>
-              <div className="flex flex-col items-center">
-                <span className="text-sm font-semibold tabular-nums text-foreground">{cardCounts.learning}</span>
-                <span className="text-[10px] text-muted-foreground">{t('cardCounts.learning')}</span>
-              </div>
-              <span className="text-sm text-muted-foreground self-start">–</span>
-              <div className="flex flex-col items-center">
-                <span className="text-sm font-semibold tabular-nums text-foreground">{cardCounts.review}</span>
-                <span className="text-[10px] text-muted-foreground">{t('cardCounts.review')}</span>
-              </div>
-            </div>
-          ) : null}
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
+              {schedulingMode === 'learn_new' ? (
+                <BookOpen className="h-3.5 w-3.5" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              {tApp(schedulingMode === 'learn_new' ? 'learnNew' : 'learnAndReview')}
+            </span>
+          )}
         </div>
 
         <div className={`ml-auto flex items-center gap-1 z-10 ${isChatOpen ? 'hidden lg:flex' : 'flex'}`}>

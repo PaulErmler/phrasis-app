@@ -24,19 +24,19 @@ export function StartLearningButton({
       <div className="grid grid-cols-2 gap-2">
         <Button
           size="lg"
-          className="h-auto min-h-10 w-full items-start justify-start gap-2 whitespace-normal py-2.5 text-left"
+          className="h-auto min-h-10 w-full gap-2 whitespace-normal py-2.5"
           onClick={() => onStartLearn('learn_new')}
         >
-          <BookOpen className="mt-0.5 h-5 w-5 shrink-0" />
-          <span className="min-w-0 text-left leading-snug">{t('learnNew')}</span>
+          <BookOpen className="h-5 w-5 shrink-0" />
+          <span className="min-w-0 leading-snug">{t('learnNew')}</span>
         </Button>
         <Button
           size="lg"
-          className="h-auto min-h-10 w-full items-start justify-start gap-2 whitespace-normal py-2.5 text-left"
+          className="h-auto min-h-10 w-full gap-2 whitespace-normal py-2.5"
           onClick={() => onStartLearn('learnAndReview')}
         >
-          <RefreshCw className="mt-0.5 h-5 w-5 shrink-0" />
-          <span className="min-w-0 text-left leading-snug">{t('learnAndReview')}</span>
+          <RefreshCw className="h-5 w-5 shrink-0" />
+          <span className="min-w-0 leading-snug">{t('learnAndReview')}</span>
         </Button>
       </div>
 

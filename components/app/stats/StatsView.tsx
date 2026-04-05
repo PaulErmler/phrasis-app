@@ -85,7 +85,40 @@ export function StatsView() {
       .reduce((sum, d) => sum + d.newWordsCount, 0);
   }, [filteredLanguageData, todayStr]);
 
-  const isLoading = pageData === undefined;
+  const periodStats = useMemo(() => {
+    const heatmap = dailyData?.heatmapData ?? [];
+    const now = new Date();
+    const daysAgo = (n: number) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - n);
+      return d.toISOString().slice(0, 10);
+    };
+    const weekCutoff = daysAgo(7);
+    const monthCutoff = daysAgo(30);
+
+    const sum = (arr: typeof heatmap) => ({
+      reps: arr.reduce((s, d) => s + d.reps, 0),
+      newCards: arr.reduce((s, d) => s + d.newCards, 0),
+      timeMs: arr.reduce((s, d) => s + d.timeMs, 0),
+    });
+
+    const weekHeatmap = heatmap.filter((d) => d.date >= weekCutoff);
+    const monthHeatmap = heatmap.filter((d) => d.date >= monthCutoff);
+
+    const weekNewWords = filteredLanguageData
+      .filter((d) => d.date >= weekCutoff)
+      .reduce((s, d) => s + d.newWordsCount, 0);
+    const monthNewWords = filteredLanguageData
+      .filter((d) => d.date >= monthCutoff)
+      .reduce((s, d) => s + d.newWordsCount, 0);
+
+    return {
+      week: { ...sum(weekHeatmap), newWords: weekNewWords },
+      month: { ...sum(monthHeatmap), newWords: monthNewWords },
+    };
+  }, [dailyData?.heatmapData, filteredLanguageData]);
+
+  const isLoading = pageData === undefined || dailyData === undefined;
   const cs = pageData?.courseStats;
 
   if (isLoading) {
@@ -113,6 +146,14 @@ export function StatsView() {
           todayNewCards={pageData?.todayNewCards ?? 0}
           todayTimeMs={pageData?.todayTimeMs ?? 0}
           todayNewWords={todayNewWords}
+          weekReps={periodStats.week.reps}
+          weekNewCards={periodStats.week.newCards}
+          weekTimeMs={periodStats.week.timeMs}
+          weekNewWords={periodStats.week.newWords}
+          monthReps={periodStats.month.reps}
+          monthNewCards={periodStats.month.newCards}
+          monthTimeMs={periodStats.month.timeMs}
+          monthNewWords={periodStats.month.newWords}
         />
 
         <CumulativeLineChart

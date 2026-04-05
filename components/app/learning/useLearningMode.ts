@@ -99,7 +99,7 @@ interface ReviewingState extends BaseState {
   handleMaster: () => void;
   handleHide: () => void;
   handleFavorite: () => void;
-  handleNext: (ratingOverride?: ReviewRating) => void;
+  handleNext: (ratingOverride?: ReviewRating, accuracy?: number) => void;
   setSelectedRating: (rating: ReviewRating) => void;
   // Status flags
   isReviewing: boolean;
@@ -353,7 +353,7 @@ export function useLearningMode(
   const reviewMode = courseSettings?.reviewMode ?? 'audio';
 
   const handleReview = useCallback(
-    async (rating: ReviewRating, wasDefaultRating: boolean) => {
+    async (rating: ReviewRating, wasDefaultRating: boolean, accuracy?: number) => {
       if (!cardForReview || isReviewing) return;
       reviewInitiatedByThisTabRef.current = true;
       setCardAnimationKey((k) => k + 1);
@@ -368,6 +368,7 @@ export function useLearningMode(
           ...(reviewMode === 'full' && { forceReviewPhase: true }),
           reviewMode,
           wasDefaultRating,
+          ...(accuracy != null && { accuracy: accuracy / 100 }),
         });
         setSelectedRating(null);
       } catch (error) {
@@ -418,7 +419,7 @@ export function useLearningMode(
   // --------------------------------------------------------------------------
   // Next
   // --------------------------------------------------------------------------
-  const handleNext = useCallback(async (ratingOverride?: ReviewRating) => {
+  const handleNext = useCallback(async (ratingOverride?: ReviewRating, accuracy?: number) => {
     if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
       reviewInitiatedByThisTabRef.current = true;
@@ -453,7 +454,7 @@ export function useLearningMode(
     const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
     const defaultRatingForPhase = getDefaultRating(phase);
     const rating = ratingOverride ?? selectedRating ?? defaultRatingForPhase;
-    handleReview(rating, rating === defaultRatingForPhase);
+    handleReview(rating, rating === defaultRatingForPhase, accuracy);
   }, [
     cardForReview,
     isReviewing,

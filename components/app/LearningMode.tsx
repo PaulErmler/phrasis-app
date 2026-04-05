@@ -11,6 +11,7 @@ import {
   NoCardsDueState,
 } from '@/components/app/learning';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
+import type { ReviewRating } from '@/lib/scheduling';
 import type { AudioPlayerState } from '@/hooks/use-audio-player';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
@@ -31,6 +32,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
   const [allSubmitted, setAllSubmitted] = useState(false);
+  const [fullReviewAccuracy, setFullReviewAccuracy] = useState<number | null>(null);
   const [audioAllTargetsRevealed, setAudioAllTargetsRevealed] = useState(true);
   const [audioRevealNonce, setAudioRevealNonce] = useState(0);
 
@@ -38,6 +40,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   useEffect(() => {
     setFullReviewRevealed(false);
     setAllSubmitted(false);
+    setFullReviewAccuracy(null);
   }, [cardId]);
 
   const reviewingReviewMode =
@@ -56,6 +59,15 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   }, [cardId, reviewingReviewMode, reviewingHideTargets]);
 
   const handleReveal = useCallback(() => setFullReviewRevealed(true), []);
+
+  // Wrap handleNext to include accuracy from full review mode
+  const handleNextWithAccuracy = useCallback(
+    (ratingOverride?: ReviewRating) => {
+      if (state.status !== 'reviewing') return;
+      state.handleNext(ratingOverride, fullReviewAccuracy ?? undefined);
+    },
+    [state, fullReviewAccuracy],
+  );
   const handleRevealAllAudioTargets = useCallback(() => {
     setAudioRevealNonce((n) => n + 1);
   }, []);
@@ -157,6 +169,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
         allRevealed={fullReviewRevealed}
         onAllSubmittedChange={setAllSubmitted}
+        onAccuracyChange={setFullReviewAccuracy}
         showRomanization={state.courseSettings.showRomanization ?? true}
         cardId={state.cardId}
         shortcutsDisabled={state.settingsOpen || editDialogOpen}
@@ -217,7 +230,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         isMerging={audio.isMerging}
         durationSec={audio.durationSec}
         onSeek={audio.seekTo}
-        onNext={state.handleNext}
+        onNext={handleNextWithAccuracy}
         isReviewing={state.isReviewing}
         showProgressBar={state.courseSettings.showProgressBar ?? false}
         instantProceed={instantProceed}
