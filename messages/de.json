@@ -497,6 +497,14 @@
       "reached": "Du hast das Nachrichtenlimit für diese Konversation erreicht.",
       "newConversation": "Neue Konversation starten"
     },
+    "messageError": {
+      "title": "Diese Nachricht konnte nicht angezeigt werden",
+      "retry": "Erneut versuchen"
+    },
+    "chatError": {
+      "title": "Im Chat ist ein Fehler aufgetreten",
+      "retry": "Erneut versuchen"
+    },
     "sidebar": {
       "title": "Konversationen",
       "newChat": "Neuer Chat",

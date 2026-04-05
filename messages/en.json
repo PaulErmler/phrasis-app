@@ -500,6 +500,14 @@
       "reached": "You've reached the message limit for this conversation.",
       "newConversation": "Start New Conversation"
     },
+    "messageError": {
+      "title": "This message couldn't be displayed",
+      "retry": "Try again"
+    },
+    "chatError": {
+      "title": "Something went wrong with the chat",
+      "retry": "Try again"
+    },
     "sidebar": {
       "title": "Conversations",
       "newChat": "New Chat",
