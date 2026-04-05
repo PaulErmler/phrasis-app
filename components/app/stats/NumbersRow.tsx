@@ -140,9 +140,8 @@ export function NumbersRow({
   const t = useTranslations('StatsPage');
   const [period, setPeriod] = useState<StatsPeriod>('week');
 
-  const accuracy = accuracyCount > 0 ? `${Math.round(accuracySum / accuracyCount)}%` : null;
+  const accuracy = accuracyCount > 0 ? `${Math.round((accuracySum / accuracyCount) * 100)}%` : null;
   const showAccuracy = accuracy !== null;
-  console.log("accuracy", accuracySum)
 
   // Select values based on chosen period
   const periodReps = period === 'day' ? todayReps : period === 'week' ? weekReps : monthReps;
