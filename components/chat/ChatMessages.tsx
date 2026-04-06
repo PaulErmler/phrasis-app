@@ -1,6 +1,7 @@
 import 'react';
 import { useTranslations } from 'next-intl';
 import { BotIcon } from 'lucide-react';
+import { MessageErrorBoundary } from '@/components/chat/MessageErrorBoundary';
 import {
   Conversation,
   ConversationContent,
@@ -38,10 +39,14 @@ function SmoothMessageResponse({
   text: string;
   isStreaming: boolean;
 }) {
-  const [smoothText] = useSmoothText(text, { startStreaming: isStreaming });
+  const [smoothText, { isStreaming: isSmoothTextStreaming }] = useSmoothText(text, { startStreaming: isStreaming });
+  // Keep streaming mode active until smooth text has fully caught up,
+  // preventing Streamdown from switching rendering paths mid-animation.
+  const effectiveMode = isStreaming || isSmoothTextStreaming ? 'streaming' : 'static';
+  const displayText = smoothText ?? text ?? '';
   return (
-    <MessageResponse mode={isStreaming ? 'streaming' : 'static'}>
-      {smoothText}
+    <MessageResponse mode={effectiveMode}>
+      {displayText}
     </MessageResponse>
   );
 }
@@ -200,24 +205,29 @@ export function ChatMessages({
                 return (
                   <MessageBranch key={message.key ?? message.id} defaultBranch={0}>
                     <MessageBranchContent>
-                      <Message from={message.role}>
-                        <MessageContent>
-                          {isAssistantStreaming && !messageText && !hasVisibleParts ? (
-                            <Shimmer>{t('thinking')}</Shimmer>
-                          ) : hasParts ? (
-                            <MessageParts
-                              message={message}
-                              isStreaming={isAssistantStreaming}
-                              toolRenderers={toolRenderers}
-                            />
-                          ) : (
-                            <PlainTextContent text={messageText} />
-                          )}
-                        </MessageContent>
-                      </Message>
-                      {messageFooter &&
-                        message.role === 'assistant' &&
-                        messageFooter(message)}
+                      <MessageErrorBoundary
+                        fallbackMessage={t('messageError.title')}
+                        retryLabel={t('messageError.retry')}
+                      >
+                        <Message from={message.role}>
+                          <MessageContent>
+                            {isAssistantStreaming && !messageText && !hasVisibleParts ? (
+                              <Shimmer>{t('thinking')}</Shimmer>
+                            ) : hasParts ? (
+                              <MessageParts
+                                message={message}
+                                isStreaming={isAssistantStreaming}
+                                toolRenderers={toolRenderers}
+                              />
+                            ) : (
+                              <PlainTextContent text={messageText} />
+                            )}
+                          </MessageContent>
+                        </Message>
+                        {messageFooter &&
+                          message.role === 'assistant' &&
+                          messageFooter(message)}
+                      </MessageErrorBoundary>
                     </MessageBranchContent>
                   </MessageBranch>
                 );

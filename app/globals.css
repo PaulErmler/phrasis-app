@@ -185,6 +185,9 @@
   .app-view {
     @apply max-w-xl mx-auto space-y-2;
   }
+  .scroll-view {
+    @apply flex-1 overflow-y-auto px-4 pt-6 pb-20;
+  }
 
   /* Sheet / panel layout */
   .sheet-header {
@@ -219,6 +222,9 @@
   .text-muted-xs {
     @apply text-xs text-muted-foreground;
   }
+  .text-romanization {
+    @apply text-xs text-muted-foreground leading-tight mt-0.5;
+  }
 
   /* Cards & surfaces */
   .card-surface {
@@ -232,6 +238,25 @@
   }
   .state-active {
     @apply border-primary bg-primary/5 shadow-sm;
+  }
+  .card-action-row {
+    @apply rounded-xl border bg-card shadow-sm p-4 flex items-center gap-4 w-full text-left transition-colors hover:bg-muted/50;
+  }
+
+  /* Badges */
+  .icon-badge-primary {
+    @apply p-2.5 rounded-lg bg-primary/10 text-primary shrink-0;
+  }
+  .icon-badge-muted {
+    @apply p-2.5 rounded-lg bg-muted text-muted-foreground shrink-0;
+  }
+
+  /* Forms */
+  .settings-row {
+    @apply flex items-start justify-between gap-4;
+  }
+  .dialog-footer-bar {
+    @apply flex flex-col-reverse sm:flex-row justify-between gap-2 py-3 px-6 bg-secondary border-t;
   }
 
   /* Semantic colors */

@@ -160,7 +160,7 @@ export function LearningCardContent({
                     </p>
                     {showRomanization && translation.romanization && (
                       <p
-                        className={`text-xs text-muted-foreground leading-tight mt-0.5 ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                        className={`text-romanization ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
                       >
                         {translation.romanization}
                       </p>

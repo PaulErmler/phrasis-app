@@ -6,7 +6,9 @@ import { authClient } from '@/lib/auth-client';
 import { ConvexBetterAuthProvider } from '@convex-dev/better-auth/react';
 import { env } from '@/lib/env';
 
-const convex = new ConvexReactClient(env.NEXT_PUBLIC_CONVEX_URL);
+const convex = new ConvexReactClient(env.NEXT_PUBLIC_CONVEX_URL, {
+  authRefreshTokenLeewaySeconds: 30,
+});
 
 export function ConvexClientProvider({
   children,

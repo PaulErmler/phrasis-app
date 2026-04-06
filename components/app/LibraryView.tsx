@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
 import { Search, Star, EyeOff, CircleCheck, X, Loader2 } from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
+import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
 
@@ -22,7 +23,13 @@ function useDebounce<T>(value: T, delay: number): T {
   return debounced;
 }
 
-export function LibraryView() {
+export function LibraryView({
+  hasActiveCourse,
+  onOpenCourseMenu,
+}: {
+  hasActiveCourse: boolean;
+  onOpenCourseMenu: () => void;
+}) {
   const t = useTranslations('AppPage.library');
 
   const [searchInput, setSearchInput] = useState('');
@@ -92,12 +99,23 @@ export function LibraryView() {
   const hasResults = cards.length > 0;
   const hasActiveFilters = debouncedSearch.length > 0 || activeFilter !== null;
 
+  if (!hasActiveCourse) {
+    return (
+      <div
+        className="scroll-view min-h-0"
+        style={{ scrollbarGutter: 'stable' }}
+      >
+        <NoCourseEmptyState onOpenCourseMenu={onOpenCourseMenu} />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4" style={{ scrollbarGutter: 'stable' }}>
+    <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-20" style={{ scrollbarGutter: 'stable' }}>
       {/* Sticky search + filters card */}
       <div className="sticky top-0 z-10 bg-background">
         <div className="max-w-xl mx-auto w-full pt-6">
-          <div className="card-surface p-3 space-y-3">
+          <div className="card-surface p-4 space-y-3">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input

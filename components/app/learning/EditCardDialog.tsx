@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
+import { getUserTimezone } from '@/lib/timezone';
 import {
   Dialog,
   DialogContent,
@@ -60,7 +61,7 @@ export function EditCardDialog({
       const translationArgs = Object.entries(editedTexts).map(
         ([language, text]) => ({ language, text }),
       );
-      await editCard({ cardId, translations: translationArgs });
+      await editCard({ cardId, translations: translationArgs, timezone: getUserTimezone() });
       onOpenChange(false);
     } catch (err) {
       if (

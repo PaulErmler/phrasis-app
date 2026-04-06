@@ -33,62 +33,43 @@ export type PaywallTranslateFn = (
   params?: Record<string, string | number>
 ) => string;
 
-/**
- * Generates title + message for the paywall dialog.
- * @param preview - Autumn's feature check preview (may be undefined)
- * @param t - translation function scoped to the "Paywall" namespace
- * @param featureName - the already-translated feature display name
- * @param consumable - whether the feature resets periodically (true) or is a permanent cap (false)
- */
-export const getPaywallContent = (
-  preview: CheckFeaturePreview | undefined,
+/** Pick the right title based on Autumn preview scenario + product type. */
+export function getPaywallTitle(
+  preview: CheckFeaturePreview,
   t: PaywallTranslateFn,
-  featureName: string,
-  consumable?: boolean
-) => {
-  const usageLimitKey = consumable === false
-    ? "capReached"
-    : "usageLimitReached";
-
-  const usageLimitWithDetailKey = consumable === false
-    ? "capReachedWithDetail"
-    : "usageLimitWithDetail";
-
-  if (!preview) {
-    return {
-      title: t("featureUnavailable"),
-      message: t("notAvailableForAccount"),
-    };
-  }
-
-  const { scenario, products } = preview;
-
-  if (products.length === 0) {
-    switch (scenario) {
-    case "usage_limit":
-      return {
-        title: t("featureUnavailable"),
-        message: t(
-          consumable === false ? "capReachedNoProducts" : "usageLimitNoProducts",
-          { featureName }
-        ),
-      };
-    default:
-      return {
-        title: t("featureUnavailable"),
-        message: t("notAvailableContactUs"),
-      };
-    }
-  }
+): string {
+  const { products } = preview;
+  if (products.length === 0) return t("featureUnavailable");
 
   const nextProduct = products[0];
-  const isAddOn = nextProduct && nextProduct.is_add_on;
-
-  const title = nextProduct.free_trial
+  return nextProduct.free_trial
     ? t("startTrial", { productName: nextProduct.name })
     : nextProduct.is_add_on
       ? t("purchaseAddOn", { productName: nextProduct.name })
       : t("upgradeTo", { productName: nextProduct.name });
+}
+
+/** Pick the right message body based on Autumn preview scenario. */
+export function getPaywallMessage(
+  preview: CheckFeaturePreview,
+  t: PaywallTranslateFn,
+  featureName: string,
+  consumable?: boolean,
+): string {
+  const { scenario, products } = preview;
+
+  if (products.length === 0) {
+    if (scenario === "usage_limit") {
+      return t(
+        consumable === false ? "capReachedNoProducts" : "usageLimitNoProducts",
+        { featureName },
+      );
+    }
+    return t("notAvailableContactUs");
+  }
+
+  const nextProduct = products[0];
+  const isAddOn = nextProduct.is_add_on;
 
   const upgradeDetailKey = (() => {
     switch (scenario) {
@@ -101,36 +82,18 @@ export const getPaywallContent = (
   })();
 
   const detail = isAddOn
-    ? t("addOnDetail", {
-      productName: nextProduct.name,
-      featureName,
-    })
-    : t(upgradeDetailKey, {
-      productName: nextProduct.name,
-      featureName,
-    });
+    ? t("addOnDetail", { productName: nextProduct.name, featureName })
+    : t(upgradeDetailKey, { productName: nextProduct.name, featureName });
 
   switch (scenario) {
   case "usage_limit":
-    return {
-      title,
-      message: t(usageLimitWithDetailKey, {
-        featureName,
-        detail,
-      }),
-    };
+    return t(
+      consumable === false ? "capReachedWithDetail" : "usageLimitWithDetail",
+      { featureName, detail },
+    );
   case "feature_flag":
-    return {
-      title,
-      message: t("featureFlagWithDetail", {
-        featureName,
-        detail,
-      }),
-    };
+    return t("featureFlagWithDetail", { featureName, detail });
   default:
-    return {
-      title: t("featureUnavailable"),
-      message: t("notAvailableForAccount"),
-    };
+    return t("notAvailableForAccount");
   }
-};
+}

@@ -1,16 +1,17 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  type CarouselApi,
-} from '@/components/ui/carousel';
-import { CarouselDots } from '@/components/ui/carousel-dots';
-import { Progress } from '@/components/ui/progress';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Check } from 'lucide-react';
+import {
+  Check,
+  Eye,
+  CheckCircle2,
+  Layers,
+  BookOpen,
+  Plus,
+  Loader2,
+  Lock,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 
@@ -24,24 +25,9 @@ export interface CollectionProgressItem {
 /** Generate a human-readable CEFR description using i18n, with fallback. */
 export function getCollectionDescription(
   name: string,
-  t?: (key: string) => string,
+  t: (key: string) => string,
 ): string {
-  if (t) {
-    return t(name);
-  }
-  // Fallback if no translation function is provided
-  const descriptions: Record<string, string> = {
-    Essential: 'The most essential survival sentences',
-    A1: 'Sentences with vocabulary at CEFR A1 Level',
-    A2: 'Sentences with vocabulary at CEFR A2 Level',
-    B1: 'Sentences with vocabulary at CEFR B1 Level',
-    B2: 'Sentences with vocabulary at CEFR B2 Level',
-    C1: 'Sentences with vocabulary at CEFR C1 Level',
-    C2: 'Sentences with vocabulary at CEFR C2 Level',
-    Chat: 'Phrases and vocabulary from the chat',
-    Custom: 'Sentences you entered yourself',
-  };
-  return descriptions[name] ?? `${name} collection`;
+  return t(name);
 }
 
 interface CollectionCarouselUIProps {
@@ -49,11 +35,21 @@ interface CollectionCarouselUIProps {
   activeCollectionIds: string[];
   onSelectCollection: (collectionId: string) => void;
   onOpenCollection: (collectionId: string) => void;
+  onAddCards: (collectionId: string) => void;
+  isAdding?: boolean;
   isLoading?: boolean;
   /** Index to scroll to whenever it changes (e.g. active collection index after a course switch) */
   initialScrollIndex?: number;
   /** Called once the carousel is fully initialized and safe to display */
   onReady?: () => void;
+  /** When true, show toggle button even when collection is complete (for custom collections) */
+  showToggleWhenComplete?: boolean;
+  /** Remaining sentences quota. null means unlimited. */
+  sentencesRemaining?: number | null;
+  /** Called when the user clicks upgrade (limit reached). */
+  onUpgrade?: () => void;
+  /** When true, hides the "Add N Cards" button */
+  hideAddCards?: boolean;
 }
 
 export function CollectionCarouselUI({
@@ -61,169 +57,278 @@ export function CollectionCarouselUI({
   activeCollectionIds,
   onSelectCollection,
   onOpenCollection,
+  onAddCards,
+  isAdding = false,
   isLoading = false,
-  initialScrollIndex,
   onReady,
+  showToggleWhenComplete = false,
+  sentencesRemaining,
+  onUpgrade,
+  hideAddCards = false,
 }: CollectionCarouselUIProps) {
-  const [api, setApi] = useState<CarouselApi>();
-  const [ready, setReady] = useState(false);
-  const lastScrolledIndexRef = useRef<number | undefined>(undefined);
+  const [focusedId, setFocusedId] = useState<string | null>(
+    activeCollectionIds[0] ?? collections[0]?.collectionId ?? null,
+  );
   const t = useTranslations('AppPage.collections.carousel');
 
+  // Keep focused in sync when active collections change (e.g. course switch)
+  const firstActiveId = activeCollectionIds[0] ?? null;
   useEffect(() => {
-    if (ready) onReady?.();
-  }, [ready, onReady]);
+    if (firstActiveId) setFocusedId(firstActiveId);
+  }, [firstActiveId]);
 
-  // Scroll to the active collection whenever the index changes (initial mount
-  // or after a course switch). First scroll jumps instantly; subsequent ones
-  // animate so the user can see the transition.
+  // Signal ready immediately since there's no carousel to initialize
+  const isReady = !isLoading && collections.length > 0;
   useEffect(() => {
-    if (!api || initialScrollIndex === undefined || initialScrollIndex < 0) {
-      if (api && !ready) setReady(true);
-      return;
-    }
-    if (lastScrolledIndexRef.current === initialScrollIndex) return;
-
-    const isFirstScroll = lastScrolledIndexRef.current === undefined;
-    lastScrolledIndexRef.current = initialScrollIndex;
-    api.scrollTo(initialScrollIndex, isFirstScroll);
-    if (!ready) setReady(true);
-  }, [api, initialScrollIndex, ready]);
-
-  // Fallback: mark ready once api is available even without an initialScrollIndex
-  useEffect(() => {
-    if (api && !ready && initialScrollIndex === undefined) {
-      setReady(true);
-    }
-  }, [api, ready, initialScrollIndex]);
+    if (isReady) onReady?.();
+  }, [isReady, onReady]);
 
   if (isLoading) {
     return (
       <div className="space-y-3">
-        <div className="flex gap-4 overflow-hidden">
-          {[1, 2].map((i) => (
-            <div
-              key={i}
-              className="card-surface h-[170px] min-w-[85%] sm:min-w-[48%] md:min-w-[48%] lg:min-w-[45%]"
-            />
-          ))}
-        </div>
-        <div className="min-h-[18px] pt-1" />
+        <div className="h-14 rounded-lg bg-muted animate-pulse" />
       </div>
     );
   }
 
   if (collections.length === 0) return null;
 
+  const focusedCollection = focusedId
+    ? collections.find((c) => c.collectionId === focusedId)
+    : null;
+
   return (
-    <div className={cn('space-y-3', !ready && 'invisible')}>
-      <Carousel
-        setApi={setApi}
-        opts={{
-          align: 'start',
-          loop: false,
-        }}
-        className="w-full"
-      >
-        <CarouselContent className="-ml-4">
-          {collections.map((collection) => {
-            const progress =
-              collection.totalTexts > 0
-                ? (collection.cardsAdded / collection.totalTexts) * 100
-                : 0;
-            const isComplete =
-              collection.cardsAdded >= collection.totalTexts &&
-              collection.totalTexts > 0;
-            const isActive = activeCollectionIds.includes(collection.collectionId);
-            const hasStarted = collection.cardsAdded > 0;
+    <div className="space-y-3">
+      {/* Segmented control */}
+      <div className="flex h-14 rounded-lg overflow-hidden bg-card border">
+        {collections.map((collection, i) => {
+          const progress =
+            collection.totalTexts > 0
+              ? (collection.cardsAdded / collection.totalTexts) * 100
+              : 0;
+          const isComplete =
+            collection.cardsAdded >= collection.totalTexts &&
+            collection.totalTexts > 0;
+          const isActive = activeCollectionIds.includes(collection.collectionId);
+          const isFocused = focusedId === collection.collectionId;
 
-            return (
-              <CarouselItem
-                key={collection.collectionId}
-                className="pl-4 basis-[85%] sm:basis-[48%] md:basis-[48%] lg:basis-[45%]"
-              >
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => onOpenCollection(collection.collectionId)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      onOpenCollection(collection.collectionId);
-                    }
-                  }}
+          return (
+            <button
+              key={collection.collectionId}
+              onClick={() => setFocusedId(collection.collectionId)}
+              className={cn(
+                'flex-1 relative flex items-center justify-center transition-colors',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:z-10',
+                i < collections.length - 1 && 'border-r border-border/50',
+                isFocused && 'bg-primary/10 ring-2 ring-primary ring-inset z-10',
+                isFocused && i === 0 && 'rounded-l-lg',
+                isFocused && i === collections.length - 1 && 'rounded-r-lg',
+                !isFocused && 'hover:bg-accent/50',
+              )}
+            >
+              {/* Progress fill from bottom */}
+              <div
+                className={cn(
+                  'absolute bottom-0 left-0 right-0 transition-all',
+                  isComplete ? 'bg-green-500/20' : 'bg-primary/15',
+                )}
+                style={{ height: `${progress}%` }}
+              />
+
+              {/* Content — fixed layout so text stays at same height */}
+              <div className="relative z-10 flex flex-col items-center gap-0.5">
+                <span
                   className={cn(
-                    'card-surface w-full text-left p-4 transition-all cursor-pointer h-[170px] flex flex-col',
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                    "hover:shadow-md",
-                    isActive && !isComplete && "state-active",
-                    isComplete && "opacity-50"
+                    'text-xs font-semibold leading-none',
+                    isFocused && 'text-foreground',
+                    !isFocused && 'text-muted-foreground',
                   )}
-                  {...(isActive ? { 'data-tutorial': 'active-collection' } : {})}
                 >
-                  {/* Header: title + select button */}
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="heading-section">
-                      {collection.collectionName}
-                    </h3>
-                    {!isComplete && (
-                      <Button
-                        size="sm"
-                        variant={isActive ? 'secondary' : 'outline'}
-                        className="shrink-0 text-xs h-8 w-24 justify-center"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSelectCollection(collection.collectionId);
-                        }}
-                      >
-                        {isActive && <Check className="h-3.5 w-3.5" />}
-                        {isActive ? t('selected') : t('select')}
-                      </Button>
-                    )}
-                    {isComplete && (
-                      <div className="flex items-center gap-1 text-xs text-success font-medium shrink-0">
-                        <Check className="h-4 w-4" />
-                        {t('done')}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Description */}
-                  <p className="text-muted-sm leading-relaxed mb-3 line-clamp-2 flex-shrink-0">
-                    {getCollectionDescription(
-                      collection.collectionName,
-                      (key) => t(`descriptions.${key}`),
-                    )}
-                  </p>
-
-                  {/* Spacer to push footer to bottom */}
-                  <div className="flex-1" />
-
-                  {/* Card count + Progress (pinned to bottom) */}
-                  <div>
-                    {hasStarted ? (
-                      <div className="space-y-1.5">
-                        <span className="text-sm font-semibold">
-                          {collection.cardsAdded} / {t('cards', { count: collection.totalTexts.toLocaleString() })}
-                        </span>
-                        <Progress value={progress} className="h-2" />
-                      </div>
-                    ) : (
-                      <p className="text-sm font-semibold">
-                        {t('cards', {
-                          count: collection.totalTexts.toLocaleString(),
-                        })}
-                      </p>
-                    )}
-                  </div>
+                  {collection.collectionName}
+                </span>
+                {/* Fixed-height indicator area */}
+                <div className="h-3 flex items-center justify-center">
+                  {isActive && (!isComplete || showToggleWhenComplete) && (
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                  )}
+                  {isComplete && !showToggleWhenComplete && (
+                    <Check className="h-3 w-3 text-green-600" />
+                  )}
                 </div>
-              </CarouselItem>
-            );
-          })}
-        </CarouselContent>
-      </Carousel>
+              </div>
+            </button>
+          );
+        })}
+      </div>
 
-      <CarouselDots api={api} className="min-h-[18px] pt-1" />
+      {/* Inline detail card for focused collection */}
+      {focusedCollection && (
+        <InlineCollectionDetail
+          collection={focusedCollection}
+          isActive={activeCollectionIds.includes(focusedCollection.collectionId)}
+          onSelect={() => onSelectCollection(focusedCollection.collectionId)}
+          onOpenDetail={() => onOpenCollection(focusedCollection.collectionId)}
+          onAddCards={() => onAddCards(focusedCollection.collectionId)}
+          isAdding={isAdding}
+          t={t}
+          showToggleWhenComplete={showToggleWhenComplete}
+          sentencesRemaining={sentencesRemaining}
+          onUpgrade={onUpgrade}
+          hideAddCards={hideAddCards}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// INLINE DETAIL CARD (Split style)
+// ============================================================================
+
+function InlineCollectionDetail({
+  collection,
+  isActive,
+  onSelect,
+  onOpenDetail,
+  onAddCards,
+  isAdding = false,
+  t,
+  showToggleWhenComplete = false,
+  sentencesRemaining,
+  onUpgrade,
+  hideAddCards = false,
+}: {
+  collection: CollectionProgressItem;
+  isActive: boolean;
+  onSelect: () => void;
+  onOpenDetail: () => void;
+  onAddCards: () => void;
+  isAdding?: boolean;
+  t: ReturnType<typeof useTranslations>;
+  showToggleWhenComplete?: boolean;
+  sentencesRemaining?: number | null;
+  onUpgrade?: () => void;
+  hideAddCards?: boolean;
+}) {
+  const progress =
+    collection.totalTexts > 0
+      ? (collection.cardsAdded / collection.totalTexts) * 100
+      : 0;
+  const isComplete =
+    collection.cardsAdded >= collection.totalTexts && collection.totalTexts > 0;
+  const remaining = collection.totalTexts - collection.cardsAdded;
+  const addCount =
+    sentencesRemaining != null
+      ? Math.min(5, sentencesRemaining)
+      : 5;
+
+  return (
+    <div className="rounded-xl border-2 bg-card overflow-hidden">
+      {/* Progress accent bar */}
+      <div className="h-1.5 bg-muted">
+        <div
+          className={cn(
+            'h-full transition-all',
+            isComplete ? 'bg-green-500' : 'bg-primary',
+          )}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      <div className="p-3 space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm">
+            {collection.collectionName}
+          </h3>
+          <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
+            {Math.round(progress)}%
+          </span>
+        </div>
+
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          {getCollectionDescription(collection.collectionName, (key) =>
+            t(`descriptions.${key}`),
+          )}
+        </p>
+
+        {/* Stats row */}
+        <div className="flex gap-3 text-xs">
+          <div className="flex items-center gap-1">
+            <Layers className="h-3 w-3 text-muted-foreground" />
+            <span>
+              {collection.cardsAdded} {t('inline.added')}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <BookOpen className="h-3 w-3 text-muted-foreground" />
+            <span>
+              {remaining} {t('inline.remaining')}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div
+        className={cn(
+          'grid gap-2 px-3 pb-3',
+          isComplete && !showToggleWhenComplete ? 'grid-cols-2' : 'grid-cols-3',
+        )}
+      >
+        {!isComplete || showToggleWhenComplete ? (
+          <Button
+            size="sm"
+            variant={isActive ? 'secondary' : 'outline'}
+            className="text-xs"
+            onClick={onSelect}
+          >
+            {isActive && <Check className="h-3.5 w-3.5 mr-1" />}
+            {isActive ? t('selected') : t('select')}
+          </Button>
+        ) : (
+          <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-green-600">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {t('done')}
+          </div>
+        )}
+        <Button
+          size="sm"
+          variant="outline"
+          className="text-xs"
+          onClick={onOpenDetail}
+        >
+          <Eye className="h-3.5 w-3.5 mr-1.5" />
+          {t('inline.preview')}
+        </Button>
+        {!isComplete && !hideAddCards && (
+          sentencesRemaining === 0 ? (
+            <Button
+              size="sm"
+              onClick={onUpgrade}
+              className="text-xs"
+            >
+              <Lock className="h-3.5 w-3.5 mr-1" />
+              Upgrade
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              disabled={isAdding}
+              onClick={onAddCards}
+              className="text-xs"
+            >
+              {isAdding ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <>
+                  <Plus className="h-3.5 w-3.5 mr-1" />
+                  {t('detail.addN', { count: addCount })}
+                </>
+              )}
+            </Button>
+          )
+        )}
+      </div>
     </div>
   );
 }

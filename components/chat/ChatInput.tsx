@@ -75,10 +75,9 @@ export function ChatInput({
   const showCounter = text.length >= MAX_MESSAGE_LENGTH * 0.8;
 
   const defaultPrompts = [
-    t('prompts.grammar'),
-    t('prompts.sayInLanguage'),
-    t('prompts.sayDifferently'),
-    t('prompts.moreExamples'),
+    t('generalPrompts.howToSay'),
+    t('generalPrompts.createCards'),
+    t('generalPrompts.whatDoesMean'),
   ] as const;
   const items = suggestions ?? defaultPrompts;
 

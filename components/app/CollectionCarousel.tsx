@@ -96,6 +96,7 @@ export function CollectionCarousel({
         activeCollectionIds={[]}
         onSelectCollection={() => {}}
         onOpenCollection={() => {}}
+        onAddCards={() => {}}
         isLoading={true}
       />
     );
@@ -112,12 +113,16 @@ export function CollectionCarousel({
         activeCollectionIds={activeCollectionId ? [activeCollectionId] : []}
         onSelectCollection={handleSelectCollection}
         onOpenCollection={setOpenCollectionId}
+        onAddCards={(collectionId) => handleAddCards(collectionId)}
+        isAdding={isAdding}
         isLoading={false}
         initialScrollIndex={
           initialScrollIndex !== undefined && initialScrollIndex >= 0
             ? initialScrollIndex
             : undefined
         }
+        sentencesRemaining={sentencesRemaining}
+        onUpgrade={() => setPaywallOpen(true)}
       />
 
       <CollectionDetailDialog
@@ -136,7 +141,7 @@ export function CollectionCarousel({
         onSelect={() => {
           if (openCollectionId) handleSelectCollection(openCollectionId);
         }}
-        onAddCards={handleAddCards}
+        onAddCards={() => handleAddCards()}
         sentencesRemaining={sentencesRemaining}
         onUpgrade={() => setPaywallOpen(true)}
       />

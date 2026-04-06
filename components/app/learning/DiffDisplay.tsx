@@ -11,6 +11,11 @@ interface DiffDisplayProps {
   hideErrors?: boolean;
 }
 
+/** Compute accuracy (0–100) from a character-level diff of expected vs actual text. */
+export function computeAccuracy(expected: string, actual: string): number {
+  return computeAccuracyFromChanges(diffChars(expected, actual));
+}
+
 function computeAccuracyFromChanges(changes: ReturnType<typeof diffChars>): number {
   let matchingChars = 0;
   let totalChars = 0;

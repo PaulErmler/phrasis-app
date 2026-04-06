@@ -12,6 +12,7 @@ import type { MutationCtx } from '../../_generated/server';
 import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
+import { trackEvent } from '../../db/stats/dailyStats';
 
 /**
  * Fetches an approval and validates the user is authorized to act on it.
@@ -174,6 +175,13 @@ export const approveCard = mutation({
       userId,
     );
     const textId = await processApproval(ctx, approval, userId);
+
+    // Track card approval event
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (active) {
+      await trackEvent(ctx, { userId, courseId: active.course._id, field: 'chatCardsApproved' });
+    }
+
     return { success: true, textId };
   },
 });

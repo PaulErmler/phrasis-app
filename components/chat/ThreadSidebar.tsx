@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import type { Thread } from '@/lib/types/chat';
 
@@ -19,10 +20,11 @@ export function ThreadSidebar({
   onNewThread,
   isCreating,
 }: ThreadSidebarProps) {
+  const t = useTranslations('Chat.sidebar');
   return (
     <aside className="w-64 border-r border-border bg-background/50 flex flex-col">
       <div className="p-4 border-b border-border">
-        <h2 className="heading-section">Conversations</h2>
+        <h2 className="heading-section">{t('title')}</h2>
       </div>
       <div className="flex-1 overflow-y-auto">
         {threads && threads.length > 0 ? (
@@ -38,7 +40,7 @@ export function ThreadSidebar({
                 }`}
               >
                 <div className="font-medium truncate">
-                  {thread.title || 'New Chat'}
+                  {thread.title || t('newChat')}
                 </div>
                 {thread.summary && (
                   <div className="text-xs opacity-70 truncate mt-1">
@@ -50,7 +52,7 @@ export function ThreadSidebar({
           </div>
         ) : (
           <div className="p-4 text-center text-muted-sm">
-            No conversations yet
+            {t('noConversations')}
           </div>
         )}
       </div>
@@ -61,7 +63,7 @@ export function ThreadSidebar({
           variant="outline"
           disabled={isCreating}
         >
-          {isCreating ? 'Creating...' : 'New Chat'}
+          {isCreating ? t('creating') : t('newChat')}
         </Button>
       </div>
     </aside>

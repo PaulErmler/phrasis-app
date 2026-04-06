@@ -4,17 +4,15 @@ import { buildCardSearchableText } from '../lib/cardContent';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
-import { getInitialReviewCount } from '../db/courseSettings';
+import { getCourseSettings } from '../db/courseSettings';
 import { getDeckByCourseId } from '../db/decks';
-import {
-  getCourseStatsForMutation,
-  getTodayInTimezone,
-  computeStreakUpdate,
-} from '../db/courseStats';
-import { upsertDailyStats } from '../db/dailyStats';
+import { trackEvent } from '../db/stats/dailyStats';
+import { recordReviewStats } from '../db/stats/recordReviewStats';
+import { patchCard, insertCard, deleteCard } from '../db/stats/cardAggregates';
 import {
   scheduleCard,
   getValidRatings,
+  DEFAULT_INITIAL_REVIEW_COUNT,
   type ReviewRating,
   type CardSchedulingState,
 } from '../../lib/scheduling';
@@ -95,23 +93,43 @@ export const getCardForReview = query({
     const deck = await getDeckByCourseId(ctx, course._id);
     if (!deck) return null;
 
-    // Load initialReviewCount from the separate courseSettings table
-    const initialReviewCount = await getInitialReviewCount(ctx, course._id);
+    // Load settings (initialReviewCount + schedulingMode) from the courseSettings table
+    const settings = await getCourseSettings(ctx, course._id);
+    const initialReviewCount = settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
+    const schedulingMode = settings?.schedulingMode ?? 'learnAndReview';
 
     const now = Date.now();
 
-    // Get the card with the earliest due date that is neither hidden nor mastered.
-    const card = await ctx.db
-      .query('cards')
-      .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
-        q
-          .eq('deckId', deck._id)
-          .eq('isHidden', false)
-          .eq('isMastered', false)
-          .lte('dueDate', now),
-      )
-      .order('asc')
-      .first();
+    // Get the next due card based on scheduling mode
+    let card;
+    if (schedulingMode === 'learn_new') {
+      // Learn mode: only cards that haven't graduated (still in initial learning cycle)
+      card = await ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .eq('isGraduated', false)
+            .lte('dueDate', now),
+        )
+        .order('asc')
+        .first();
+    } else {
+      // Learn+Review mode: all due cards (current behavior)
+      card = await ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .lte('dueDate', now),
+        )
+        .order('asc')
+        .first();
+    }
     if (!card) return null;
 
     // Load text
@@ -206,6 +224,9 @@ export const reviewCard = mutation({
     timeSpentMs: v.optional(v.number()),
     timezone: v.string(),
     forceReviewPhase: v.optional(v.boolean()),
+    reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))),
+    accuracy: v.optional(v.number()),
+    wasDefaultRating: v.optional(v.boolean()),
   },
   returns: v.object({
     schedulingPhase: schedulingPhaseValidator,
@@ -217,7 +238,8 @@ export const reviewCard = mutation({
   handler: async (ctx, args) => {
     const { userId, card, deck, course } = await authorizeCardAccess(ctx, args.cardId);
 
-    const initialReviewCount = await getInitialReviewCount(ctx, deck.courseId);
+    const reviewSettings = await getCourseSettings(ctx, deck.courseId);
+    const initialReviewCount = reviewSettings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
 
     // When forceReviewPhase is true (full review mode), treat the card as
     // being in the 'review' phase so FSRS ratings are accepted directly.
@@ -227,6 +249,10 @@ export const reviewCard = mutation({
       throw new ConvexError(
         `Invalid rating "${args.rating}" for ${phase} phase. Valid ratings: ${validRatings.join(', ')}`,
       );
+    }
+
+    if (args.accuracy != null && (args.accuracy < 0 || args.accuracy > 1 || !Number.isFinite(args.accuracy))) {
+      throw new ConvexError('Invalid accuracy value, must be between 0 and 1');
     }
 
     // Build current scheduling state
@@ -267,59 +293,35 @@ export const reviewCard = mutation({
       }
     }
 
-    // Patch the card
-    await ctx.db.patch(args.cardId, {
+    // Flip isGraduated once the card reaches FSRS Review state (one-way flag)
+    const isGraduatedPatch =
+      !(card.isGraduated ?? false) && result.fsrsState && result.fsrsState.state >= 2
+        ? { isGraduated: true as const }
+        : {};
+
+    // Patch the card (via aggregate-aware helper)
+    await patchCard(ctx, args.cardId, {
       schedulingPhase: result.schedulingPhase,
       preReviewCount: result.preReviewCount,
       dueDate: dueDateWithJitter,
       lastReviewedAt: Date.now(),
       ...searchableTextPatch,
       ...(result.fsrsState && { fsrsState: result.fsrsState }),
+      ...isGraduatedPatch,
     });
 
-    // Update course stats (reps, time, streak)
-    const MAX_TIME_PER_CARD_MS = 180_000; // 3 minutes
-    const nonNegativeTime = Math.max(args.timeSpentMs ?? 0, 0);
-    const clampedTime = Math.min(nonNegativeTime, MAX_TIME_PER_CARD_MS);
-    const stats = await getCourseStatsForMutation(
-      ctx,
+    // Record all stats for this review
+    await recordReviewStats(ctx, {
       userId,
-      deck.courseId,
-    );
-    if (!stats) {
-      throw new ConvexError('Course stats not found');
-    }
-    const todayDate = getTodayInTimezone(args.timezone);
-    const {
-      newStreak,
-      newLastActivityDate,
-      newFreezeCount,
-      newFreezeUsedDate,
-    } = computeStreakUpdate(
-      stats.lastActivityDate,
-      todayDate,
-      stats.currentStreak,
-      stats.streakFreezeCount,
-      stats.streakFreezeUsedDate,
-    );
-    const isFirstReview =
-      card.schedulingPhase === 'preReview' && card.preReviewCount === 0;
-    await ctx.db.patch(stats._id, {
-      totalRepetitions: stats.totalRepetitions + 1,
-      totalTimeMs: stats.totalTimeMs + clampedTime,
-      totalCards: stats.totalCards + (isFirstReview ? 1 : 0),
-      currentStreak: newStreak,
-      lastActivityDate: newLastActivityDate,
-      streakFreezeCount: newFreezeCount,
-      streakFreezeUsedDate: newFreezeUsedDate,
-    });
-
-    await upsertDailyStats(ctx, {
-      userId,
-      courseId: deck.courseId,
-      date: todayDate,
-      timeMs: clampedTime,
-      isNewCard: isFirstReview,
+      card,
+      deck,
+      course,
+      timezone: args.timezone,
+      timeSpentMs: args.timeSpentMs,
+      reviewMode: args.reviewMode,
+      rating: args.rating,
+      accuracy: args.accuracy,
+      wasDefaultRating: args.wasDefaultRating,
     });
 
     return {
@@ -342,7 +344,7 @@ export const masterCard = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     await authorizeCardAccess(ctx, args.cardId);
-    await ctx.db.patch(args.cardId, { isMastered: true });
+    await patchCard(ctx, args.cardId, { isMastered: true });
     return null;
   },
 });
@@ -357,7 +359,7 @@ export const hideCard = mutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     await authorizeCardAccess(ctx, args.cardId);
-    await ctx.db.patch(args.cardId, { isHidden: true });
+    await patchCard(ctx, args.cardId, { isHidden: true });
     return null;
   },
 });
@@ -374,7 +376,7 @@ export const toggleFavoriteCard = mutation({
     await authorizeCardAccess(ctx, args.cardId);
     const card = await ctx.db.get(args.cardId);
     if (!card) throw new Error('Card not found');
-    await ctx.db.patch(args.cardId, {
+    await patchCard(ctx, args.cardId, {
       isFavorite: !(card.isFavorite ?? false),
     });
     return null;
@@ -398,6 +400,7 @@ export const editCard = mutation({
         text: v.string(),
       }),
     ),
+    timezone: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -468,6 +471,9 @@ export const editCard = mutation({
 
     // Consume quota before making changes
     await consumeQuota(ctx, userId, FEATURE_IDS.CARD_EDITS);
+
+    // Track card edit event
+    await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsEdited' });
 
     const isUserOwned = text.userCreated && text.userId === userId;
     let resolvedTextId: Id<'texts'>;
@@ -577,7 +583,7 @@ export const editCard = mutation({
     // happens to share the exact same dueDate (Convex uses _creationTime as the
     // tiebreaker within equal index values, and the new doc would otherwise sort
     // last, causing a different card to be returned by getCardForReview).
-    await ctx.db.insert('cards', {
+    await insertCard(ctx, {
       deckId: card.deckId,
       textId: resolvedTextId,
       collectionId: card.collectionId,
@@ -585,6 +591,7 @@ export const editCard = mutation({
       isMastered: card.isMastered,
       isHidden: card.isHidden,
       isFavorite: card.isFavorite,
+      isGraduated: card.isGraduated ?? false,
       schedulingPhase: card.schedulingPhase,
       preReviewCount: card.preReviewCount,
       fsrsState: card.fsrsState,
@@ -594,7 +601,7 @@ export const editCard = mutation({
     });
 
     // Delete old card
-    await ctx.db.delete(args.cardId);
+    await deleteCard(ctx, args.cardId);
 
     // Trigger TTS + romanization for changed languages
     await scheduleMissingContent(

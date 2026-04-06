@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { HelpDialog } from '@/components/app/HelpDialog';
 import {
+  BookOpen,
   ChevronLeft,
   CircleCheck,
   EyeOff,
   Pencil,
+  RefreshCw,
   Settings,
   Star,
 } from 'lucide-react';
@@ -21,6 +23,7 @@ interface LearningHeaderProps {
   onHelpOpen?: () => void;
   /** When `'full'`, the help dialog lists full-review-only shortcuts */
   reviewMode?: 'audio' | 'full';
+  schedulingMode?: 'learn_new' | 'learnAndReview';
 }
 
 export function LearningHeader({
@@ -29,8 +32,10 @@ export function LearningHeader({
   onRestartTutorial,
   onHelpOpen,
   reviewMode = 'audio',
+  schedulingMode = 'learnAndReview',
 }: LearningHeaderProps) {
   const t = useTranslations('LearningMode');
+  const tApp = useTranslations('AppPage');
   const tSettings = useTranslations('LearningMode.settingsPanel');
   const { isChatOpen, closeChat } = useLearningChatToggle();
 
@@ -52,10 +57,20 @@ export function LearningHeader({
           {t('back')}
         </Button>
 
-        <h1 className="heading-section absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="lg:hidden">{isChatOpen ? t('chat') : t('title')}</span>
-          <span className="hidden lg:inline">{t('title')}</span>
-        </h1>
+        <div className="flex-1 min-w-0 flex items-center justify-center">
+          {isChatOpen ? (
+            <span className="heading-section lg:hidden">{t('chat')}</span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
+              {schedulingMode === 'learn_new' ? (
+                <BookOpen className="h-3.5 w-3.5" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
+              {tApp(schedulingMode === 'learn_new' ? 'learnNew' : 'learnAndReview')}
+            </span>
+          )}
+        </div>
 
         <div className={`ml-auto flex items-center gap-1 z-10 ${isChatOpen ? 'hidden lg:flex' : 'flex'}`}>
           <HelpDialog

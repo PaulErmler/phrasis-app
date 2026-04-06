@@ -1,5 +1,7 @@
 import { QueryCtx, MutationCtx } from '../_generated/server';
 import { Id, Doc } from '../_generated/dataModel';
+import { getNextDay, getPreviousDay } from '../lib/dateUtils';
+export { getTodayInTimezone, getPreviousDay } from '../lib/dateUtils';
 
 /**
  * Create the courseStats row for a given user + course.
@@ -54,35 +56,6 @@ export async function getCourseStatsForMutation(
     .first();
 }
 
-/**
- * Compute "today" in the user's IANA timezone as a "YYYY-MM-DD" string.
- */
-export function getTodayInTimezone(timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(
-    new Date(),
-  );
-}
-
-/**
- * Determine the next day after a "YYYY-MM-DD" date string.
- */
-function getNextDay(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d + 1));
-  const yyyy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
-
-export function getPreviousDay(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d - 1));
-  const yyyy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
 
 export interface StreakUpdateResult {
   newStreak: number;

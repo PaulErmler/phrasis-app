@@ -151,7 +151,7 @@ export function CardShell({
                     {translation.text || '...'}
                   </p>
                   {showRomanization && translation.romanization && (
-                    <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                    <p className="text-romanization">
                       {translation.romanization}
                     </p>
                   )}

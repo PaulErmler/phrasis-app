@@ -76,6 +76,7 @@ function WrappedChatPanel({
       showSuggestions
       autoFocus={false}
       approvalsLoading={!approvalsLoaded}
+      noBottomPadding
       aboveFooterAction={
         <Button
           type="button"
@@ -175,6 +176,10 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
     </div>
   ) : null;
 
+  const schedulingMode = state.status !== 'loading'
+    ? (state.courseSettings?.schedulingMode ?? 'learnAndReview')
+    : 'learnAndReview';
+
   const header = (
     <LearningHeader
       onBack={goHome}
@@ -182,6 +187,7 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
       onRestartTutorial={restartTutorial}
       onHelpOpen={audio.pause}
       reviewMode={reviewMode}
+      schedulingMode={schedulingMode}
     />
   );
 

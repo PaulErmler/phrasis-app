@@ -8,6 +8,7 @@ import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 import { getLanguageByCode } from '../../lib/languages';
+import { trackEvent } from '../db/stats/dailyStats';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS } from '../config/aiModels';
@@ -188,6 +189,7 @@ export const autoFillTranslations = action({
 export const createCustomText = mutation({
   args: {
     translations: v.array(v.object({ language: v.string(), text: v.string() })),
+    timezone: v.string(),
   },
   returns: v.object({
     textId: v.id('texts'),
@@ -267,6 +269,9 @@ export const createCustomText = mutation({
         targetLanguages: course.targetLanguages,
       },
     );
+
+    // Track manual card creation event
+    await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsAddedManually' });
 
     return { textId };
   },

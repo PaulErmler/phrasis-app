@@ -54,6 +54,11 @@ export const reviewModeValidator = v.union(
   v.literal('full'),
 );
 
+export const schedulingModeValidator = v.union(
+  v.literal('learn_new'),
+  v.literal('learnAndReview'),
+);
+
 export const ttsQualityValidator = v.union(
   v.literal('unknown'),
   v.literal('validated'),
@@ -69,6 +74,7 @@ export const cardApprovalStatusValidator = v.union(
 export type LearningStyle = Infer<typeof learningStyleValidator>;
 export type CurrentLevel = Infer<typeof currentLevelValidator>;
 export type ReviewMode = Infer<typeof reviewModeValidator>;
+export type SchedulingMode = Infer<typeof schedulingModeValidator>;
 export type FsrsState = Infer<typeof fsrsStateValidator>;
 export type TtsQuality = Infer<typeof ttsQualityValidator>;
 export type CardApprovalStatus = Infer<typeof cardApprovalStatusValidator>;

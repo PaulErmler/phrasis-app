@@ -9,7 +9,8 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
-import { getRandomVoiceForLanguage } from '../../lib/languages';
+import { insertCard } from '../db/stats/cardAggregates';
+import { getVoiceForLanguage, getVoiceGenderByApiCode } from '../../lib/languages';
 import {
   getCourseSettings,
   setActiveCollectionOnSettings,
@@ -110,6 +111,13 @@ export async function scheduleMissingContent(
         }
         await ctx.db.delete(audio._id);
         audioMap.set(lang, null);
+      } else if (
+        (text.speakerGender === 'male' || text.speakerGender === 'female') &&
+        getVoiceGenderByApiCode(audio.voiceName) !== text.speakerGender
+      ) {
+        await ctx.storage.delete(audio.storageId);
+        await ctx.db.delete(audio._id);
+        audioMap.set(lang, null);
       }
     }
   }
@@ -133,7 +141,7 @@ export async function scheduleMissingContent(
     if (lang === sourceLanguage) {
       // Source language — no translation needed, maybe TTS
       if (!hasAudio && await claimTtsIfAvailable(ctx, textId, lang)) {
-        const voiceName = getRandomVoiceForLanguage(lang);
+        const voiceName = getVoiceForLanguage(lang, text.speakerGender);
         await ctx.scheduler.runAfter(
           0,
           internal.features.ttsProcessing.processTTSForCard,
@@ -159,6 +167,7 @@ export async function scheduleMissingContent(
             sourceLanguage,
             targetLanguage: lang,
             text: text.text,
+            speakerGender: text.speakerGender,
           },
         );
         translationsScheduled++;
@@ -172,7 +181,7 @@ export async function scheduleMissingContent(
           );
         }
         if (!hasAudio && await claimTtsIfAvailable(ctx, textId, lang)) {
-          const voiceName = getRandomVoiceForLanguage(lang);
+          const voiceName = getVoiceForLanguage(lang, text.speakerGender);
           await ctx.scheduler.runAfter(
             0,
             internal.features.ttsProcessing.processTTSForCard,
@@ -543,10 +552,12 @@ export const toggleCustomCollection = mutation({
 
     const isChatCollection =
       courseSettings?.chatCollectionId?.toString() === args.collectionId.toString();
+    const isCustomCollection =
+      courseSettings?.customCollectionId?.toString() === args.collectionId.toString();
     const isAlreadyCustom = (courseSettings?.activeCustomCollectionIds ?? []).some(
       (id) => id.toString() === args.collectionId.toString(),
     );
-    if (!isChatCollection && !isAlreadyCustom) {
+    if (!isChatCollection && !isCustomCollection && !isAlreadyCustom) {
       throw new ConvexError('Collection not accessible');
     }
 
@@ -601,7 +612,7 @@ export async function createCardsFromTexts(
       const { searchableText, searchableTextLanguages } =
         await buildCardSearchableText(ctx, text._id, text.text, courseLanguages);
 
-      await ctx.db.insert('cards', {
+      await insertCard(ctx, {
         deckId: deck._id,
         textId: text._id,
         collectionId,
@@ -609,7 +620,8 @@ export async function createCardsFromTexts(
         isMastered: false,
         isHidden: false,
         isFavorite: false,
-        schedulingPhase: 'preReview',
+        isGraduated: false,
+        schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
         searchableText,
         searchableTextLanguages,
@@ -663,6 +675,8 @@ export const addCardsFromCollection = mutation({
   args: {
     collectionId: v.id('collections'),
     batchSize: v.number(),
+    /** When true, only add from this specific collection — skip custom collection mixing. */
+    exclusive: v.optional(v.boolean()),
   },
   returns: v.object({
     cardsAdded: v.number(),
@@ -690,12 +704,32 @@ export const addCardsFromCollection = mutation({
     let totalTextsProcessed = 0;
     let remainingBatch = clampedBatchSize;
 
-    // --- Phase 1: Drain pending texts from selected custom collections randomly ---
+    // --- Phase 1: Add from custom collection(s) ---
+    // When the requested collection is a level collection (learning mode auto-add),
+    // drain pending texts from ALL selected custom collections randomly.
+    // When the requested collection is a custom collection (collection detail "add" button),
+    // only add from that specific collection.
     const courseSettings = await getCourseSettings(ctx, courseId);
-    const selectedCustomIds = courseSettings?.activeCustomCollectionIds ?? [];
+    const requestedCollection = await ctx.db.get(args.collectionId);
+    const isLevelCollection = requestedCollection
+      ? (LEVEL_ORDER as readonly string[]).includes(requestedCollection.name)
+      : false;
 
-    if (selectedCustomIds.length > 0 && remainingBatch > 0) {
-      // Load each selected collection and its pending count
+    const customCollectionIdsToProcess: Id<'collections'>[] = args.exclusive
+      ? (isLevelCollection
+        ? []
+        : [args.collectionId])
+      : isLevelCollection
+        ? (courseSettings?.activeCustomCollectionIds ?? [])
+        : [args.collectionId].filter((id) =>
+          courseSettings?.chatCollectionId?.toString() === id.toString() ||
+            courseSettings?.customCollectionId?.toString() === id.toString() ||
+            (courseSettings?.activeCustomCollectionIds ?? []).some(
+              (cid) => cid.toString() === id.toString(),
+            ),
+        );
+
+    if (customCollectionIdsToProcess.length > 0 && remainingBatch > 0) {
       const collectionsWithPending: {
         id: Id<'collections'>;
         collection: Doc<'collections'>;
@@ -703,7 +737,7 @@ export const addCardsFromCollection = mutation({
         pendingCount: number;
       }[] = [];
 
-      for (const collId of selectedCustomIds) {
+      for (const collId of customCollectionIdsToProcess) {
         const coll = await ctx.db.get(collId);
         if (!coll) continue;
         const prog = await getCollectionProgressHelper(ctx, userId, courseId, collId);
@@ -720,7 +754,6 @@ export const addCardsFromCollection = mutation({
         }
       }
 
-      // Randomly allocate batch slots across collections with pending texts
       if (collectionsWithPending.length > 0) {
         const allocations = new Map<string, number>();
         const pool = [...collectionsWithPending];
@@ -736,7 +769,6 @@ export const addCardsFromCollection = mutation({
           remaining--;
         }
 
-        // Fetch sequential texts from each collection and create cards
         for (const entry of collectionsWithPending) {
           const count = allocations.get(entry.id.toString()) ?? 0;
           if (count === 0) continue;
@@ -777,8 +809,8 @@ export const addCardsFromCollection = mutation({
       }
     }
 
-    // --- Phase 2: Fill remaining batch from the difficulty collection ---
-    if (remainingBatch > 0) {
+    // --- Phase 2: Fill remaining batch from the difficulty collection (only for level collections) ---
+    if (isLevelCollection && remainingBatch > 0) {
       // Deduct sentences quota for difficulty-collection cards
       const quota = await checkQuota(ctx, userId, FEATURE_IDS.SENTENCES, remainingBatch);
       if (quota.synced && !quota.allowed) {
@@ -1079,6 +1111,7 @@ export const processTranslationForCard = internalAction({
     sourceLanguage: v.string(),
     targetLanguage: v.string(),
     text: v.string(),
+    speakerGender: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1120,7 +1153,7 @@ export const processTranslationForCard = internalAction({
         }
       }
 
-      const voiceName = getRandomVoiceForLanguage(args.targetLanguage);
+      const voiceName = getVoiceForLanguage(args.targetLanguage, args.speakerGender);
 
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,

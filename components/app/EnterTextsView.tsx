@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { useMutation, useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { ConvexError } from 'convex/values';
+import { getUserTimezone } from '@/lib/timezone';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -160,7 +161,7 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
         language: lang,
         text: texts[lang].trim(),
       }));
-      await createCustomText({ translations });
+      await createCustomText({ translations, timezone: getUserTimezone() });
       toast.success(t('saveSuccess'));
       setTexts({});
       setUserEditedLangs(new Set());
