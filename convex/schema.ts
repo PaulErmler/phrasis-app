@@ -313,14 +313,19 @@ export default defineSchema({
     .index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date'])
     .index('by_userId_and_courseId_and_language_and_date', ['userId', 'courseId', 'language', 'date']),
 
-  // Unique words per user per language
+  // Unique words per user per course per language.
+  // courseId is optional only to accommodate pre-migration rows; new writes
+  // always populate it and backfillUserStats rebuilds historical data.
   userWords: defineTable({
     userId: v.string(),
+    courseId: v.optional(v.id('courses')),
     language: v.string(),
     word: v.string(),
   })
-    .index('by_userId_and_language_and_word', ['userId', 'language', 'word'])
-    .index('by_userId_and_language', ['userId', 'language']),
+    .index('by_userId_and_courseId_and_language_and_word',
+      ['userId', 'courseId', 'language', 'word'])
+    .index('by_userId_and_courseId_and_language',
+      ['userId', 'courseId', 'language']),
 
   // All-time per-language totals
   languageStats: defineTable({

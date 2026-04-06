@@ -1,4 +1,5 @@
 import { MutationCtx } from '../../_generated/server';
+import { Id } from '../../_generated/dataModel';
 
 const SEGMENTER_LANGUAGES = new Set(['ja', 'zh', 'ko', 'th']);
 
@@ -25,6 +26,7 @@ export async function trackNewWords(
   ctx: MutationCtx,
   args: {
     userId: string;
+    courseId: Id<'courses'>;
     languages: Array<{ language: string; text: string }>;
   },
 ): Promise<Record<string, number>> {
@@ -38,14 +40,19 @@ export async function trackNewWords(
     for (const word of uniqueWords) {
       const existing = await ctx.db
         .query('userWords')
-        .withIndex('by_userId_and_language_and_word', (q) =>
-          q.eq('userId', args.userId).eq('language', language).eq('word', word),
+        .withIndex('by_userId_and_courseId_and_language_and_word', (q) =>
+          q
+            .eq('userId', args.userId)
+            .eq('courseId', args.courseId)
+            .eq('language', language)
+            .eq('word', word),
         )
         .first();
 
       if (!existing) {
         await ctx.db.insert('userWords', {
           userId: args.userId,
+          courseId: args.courseId,
           language,
           word,
         });
