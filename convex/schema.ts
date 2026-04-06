@@ -128,7 +128,7 @@ export default defineSchema({
     // Review mode
     reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
     // Scheduling mode
-    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))), // 'learnAndReview' (default) or 'learn'
+    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))), // 'learnAndReview' (default) or 'learn_new'
     fullReviewTargetAudioMode: v.optional(
       v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
     ), // When to play target audio in full review mode

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useLayoutEffect, useState } from 'react';
+import { useMemo, useRef, useLayoutEffect, useState, type Ref } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -23,7 +23,7 @@ function buildWords(wordList: string[]): Word[] {
 
 function StaticWordRenderer(
   data: WordRendererData,
-  ref?: React.Ref<SVGTextElement>,
+  ref?: Ref<SVGTextElement>,
 ) {
   const { index, onWordClick, onWordMouseOver, onWordMouseOut, ...word } = data;
   return (

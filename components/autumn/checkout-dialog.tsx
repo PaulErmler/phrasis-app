@@ -3,7 +3,7 @@ import * as AccordionPrimitive from "@radix-ui/react-accordion";
 import type { CheckoutParams, CheckoutResult, ProductItem } from "autumn-js";
 import { ArrowRight, ChevronDown, Loader2 } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -65,13 +65,17 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
 
   const [loading, setLoading] = useState(false);
   const pathname = usePathname();
+  const prevPathnameRef = useRef(pathname);
 
   // Close dialog when route changes (e.g. user navigates back)
   useEffect(() => {
-    if (params.open) {
-      params.setOpen(false);
+    if (prevPathnameRef.current !== pathname) {
+      prevPathnameRef.current = pathname;
+      if (params.open) {
+        params.setOpen(false);
+      }
     }
-  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pathname, params]);
 
   if (!checkoutResult) {
     return <></>;
