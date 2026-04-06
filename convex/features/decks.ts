@@ -717,17 +717,17 @@ export const addCardsFromCollection = mutation({
 
     const customCollectionIdsToProcess: Id<'collections'>[] = args.exclusive
       ? (isLevelCollection
-          ? []
-          : [args.collectionId])
+        ? []
+        : [args.collectionId])
       : isLevelCollection
         ? (courseSettings?.activeCustomCollectionIds ?? [])
         : [args.collectionId].filter((id) =>
-            courseSettings?.chatCollectionId?.toString() === id.toString() ||
+          courseSettings?.chatCollectionId?.toString() === id.toString() ||
             courseSettings?.customCollectionId?.toString() === id.toString() ||
             (courseSettings?.activeCustomCollectionIds ?? []).some(
               (cid) => cid.toString() === id.toString(),
             ),
-          );
+        );
 
     if (customCollectionIdsToProcess.length > 0 && remainingBatch > 0) {
       const collectionsWithPending: {

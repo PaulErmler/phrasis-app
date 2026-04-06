@@ -56,28 +56,28 @@ const LANGUAGE_COLORS = [
 
 function getDailyValue(point: DailyPoint, metric: Metric): number {
   switch (metric) {
-    case 'words': return point.newCards;
-    case 'reviews': return point.reps;
-    case 'sentences': return point.newCards;
-    case 'time': return point.timeMs;
+  case 'words': return point.newCards;
+  case 'reviews': return point.reps;
+  case 'sentences': return point.newCards;
+  case 'time': return point.timeMs;
   }
 }
 
 function getMonthlyValue(point: MonthlyPoint, metric: Metric): number {
   switch (metric) {
-    case 'words': return point.totalNewCards;
-    case 'reviews': return point.totalRepetitions;
-    case 'sentences': return point.totalNewCards;
-    case 'time': return point.totalTimeMs;
+  case 'words': return point.totalNewCards;
+  case 'reviews': return point.totalRepetitions;
+  case 'sentences': return point.totalNewCards;
+  case 'time': return point.totalTimeMs;
   }
 }
 
 function getWeeklyValue(point: WeeklyPoint, metric: Metric): number {
   switch (metric) {
-    case 'words': return point.totalNewCards;
-    case 'reviews': return point.totalRepetitions;
-    case 'sentences': return point.totalNewCards;
-    case 'time': return point.totalTimeMs;
+  case 'words': return point.totalNewCards;
+  case 'reviews': return point.totalRepetitions;
+  case 'sentences': return point.totalNewCards;
+  case 'time': return point.totalTimeMs;
   }
 }
 
@@ -232,23 +232,23 @@ export function CumulativeLineChart({ dailyData, monthlyData, weeklyData, langua
 
   const chartConfig: ChartConfig = isWordsByLanguage
     ? Object.fromEntries(
-        languages.map((lang, i) => [
-          lang,
-          { label: lang.toUpperCase(), color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length] },
-        ]),
-      )
+      languages.map((lang, i) => [
+        lang,
+        { label: lang.toUpperCase(), color: LANGUAGE_COLORS[i % LANGUAGE_COLORS.length] },
+      ]),
+    )
     : {
-        value: {
-          label: t(`metric.${metric}`),
-          color: 'var(--primary)',
-        },
-      };
+      value: {
+        label: t(`metric.${metric}`),
+        color: 'var(--primary)',
+      },
+    };
 
   const hasData = isWordsByLanguage
     ? langChartData.length > 0 && languages.some((lang) => {
-        const last = langChartData[langChartData.length - 1];
-        return last && (last[lang] as number) > 0;
-      })
+      const last = langChartData[langChartData.length - 1];
+      return last && (last[lang] as number) > 0;
+    })
     : chartData.length > 0 && chartData[chartData.length - 1]?.value > 0;
 
   // Custom tooltip

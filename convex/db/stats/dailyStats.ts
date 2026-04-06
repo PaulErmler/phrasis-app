@@ -102,9 +102,9 @@ export async function upsertDailyStats(
       ...(reviewsByCardState ? { reviewsByCardState } : {}),
       ...(args.accuracy != null
         ? {
-            accuracySum: (existing.accuracySum ?? 0) + args.accuracy,
-            accuracyCount: (existing.accuracyCount ?? 0) + 1,
-          }
+          accuracySum: (existing.accuracySum ?? 0) + args.accuracy,
+          accuracyCount: (existing.accuracyCount ?? 0) + 1,
+        }
         : {}),
       ...(args.wasDefaultRating === true
         ? { defaultRatingUsed: (existing.defaultRatingUsed ?? 0) + 1 }
@@ -144,9 +144,9 @@ export async function upsertDailyStats(
     reviewsByCardState: cardState,
     ...(args.reviewMode
       ? {
-          reviewsByMode: { audio: args.reviewMode === 'audio' ? 1 : 0, full: args.reviewMode === 'full' ? 1 : 0 },
-          timeMsByMode: { audio: args.reviewMode === 'audio' ? args.timeMs : 0, full: args.reviewMode === 'full' ? args.timeMs : 0 },
-        }
+        reviewsByMode: { audio: args.reviewMode === 'audio' ? 1 : 0, full: args.reviewMode === 'full' ? 1 : 0 },
+        timeMsByMode: { audio: args.reviewMode === 'audio' ? args.timeMs : 0, full: args.reviewMode === 'full' ? args.timeMs : 0 },
+      }
       : {}),
     ...(args.accuracy != null ? { accuracySum: args.accuracy, accuracyCount: 1 } : {}),
     ...(args.wasDefaultRating === true ? { defaultRatingUsed: 1, defaultRatingChanged: 0 } : {}),

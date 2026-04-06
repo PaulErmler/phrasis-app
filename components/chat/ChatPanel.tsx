@@ -135,76 +135,76 @@ export function ChatPanel({
       fallbackMessage={tError('title')}
       retryLabel={tError('retry')}
     >
-    <div className="flex flex-col h-full w-full min-w-0">
-      {header}
+      <div className="flex flex-col h-full w-full min-w-0">
+        {header}
 
-      <div className={cn("flex-1 min-h-0 relative px-4 pt-2 w-full", className)}>
-        <ChatMessages
-          key={threadId}
-          messages={chat.messages}
-          isLoading={chat.isLoading || approvalsLoading}
-          threadId={threadId}
-          toolRenderers={toolRenderers}
-          messageFooter={messageFooter}
-          contentClassName={aboveFooterAction ? 'pb-12 lg:pb-0' : undefined}
-        />
-        {aboveFooterAction && (
-          <div className="absolute bottom-3 left-4 lg:hidden z-10">
-            {aboveFooterAction}
-          </div>
-        )}
-      </div>
-
-      <div className={cn("flex-none border-t bg-background", !noBottomPadding && "pb-16")}>
-        <div className={cn("p-4", className)}>
-          {isThreadLimitReached ? (
-            <div className="flex flex-col items-center gap-3 py-2 text-center">
-              <p className="text-sm text-muted-foreground">
-                {tLimit('reached')}
-              </p>
-              {onNewChat && (
-                <Button onClick={onNewChat} className="gap-2">
-                  <MessageSquarePlus className="h-4 w-4" />
-                  {tLimit('newConversation')}
-                </Button>
-              )}
+        <div className={cn("flex-1 min-h-0 relative px-4 pt-2 w-full", className)}>
+          <ChatMessages
+            key={threadId}
+            messages={chat.messages}
+            isLoading={chat.isLoading || approvalsLoading}
+            threadId={threadId}
+            toolRenderers={toolRenderers}
+            messageFooter={messageFooter}
+            contentClassName={aboveFooterAction ? 'pb-12 lg:pb-0' : undefined}
+          />
+          {aboveFooterAction && (
+            <div className="absolute bottom-3 left-4 lg:hidden z-10">
+              {aboveFooterAction}
             </div>
-          ) : (
-            <ChatInput
-              key={threadId}
-              onSubmit={handleSubmit}
-              onSuggestionClick={handleSuggestionClick}
-              text={chat.text}
-              onTextChange={chat.setText}
-              status={chat.status}
-              isRecording={chat.voice.isRecording}
-              isTranscribing={chat.voice.isTranscribing}
-              onVoiceClick={chat.voice.toggle}
-              suggestions={suggestions}
-              autoFocus={autoFocus}
-              showSuggestions={
-                !chat.isLoading && (showSuggestions ?? chat.messages.length === 0)
-              }
-              footerAction={
-                <>
-                  {footerAction}
-                  <FeatureBadge featureId={FEATURE_IDS.CHAT_MESSAGES} />
-                </>
-              }
-              suggestionsAction={suggestionsAction}
-            />
           )}
         </div>
-      </div>
 
-      {paywallOpen && (
-        <PaywallDialog
-          open={paywallOpen}
-          setOpen={setPaywallOpen}
-          featureId={FEATURE_IDS.CHAT_MESSAGES}
-        />
-      )}
-    </div>
+        <div className={cn("flex-none border-t bg-background", !noBottomPadding && "pb-16")}>
+          <div className={cn("p-4", className)}>
+            {isThreadLimitReached ? (
+              <div className="flex flex-col items-center gap-3 py-2 text-center">
+                <p className="text-sm text-muted-foreground">
+                  {tLimit('reached')}
+                </p>
+                {onNewChat && (
+                  <Button onClick={onNewChat} className="gap-2">
+                    <MessageSquarePlus className="h-4 w-4" />
+                    {tLimit('newConversation')}
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <ChatInput
+                key={threadId}
+                onSubmit={handleSubmit}
+                onSuggestionClick={handleSuggestionClick}
+                text={chat.text}
+                onTextChange={chat.setText}
+                status={chat.status}
+                isRecording={chat.voice.isRecording}
+                isTranscribing={chat.voice.isTranscribing}
+                onVoiceClick={chat.voice.toggle}
+                suggestions={suggestions}
+                autoFocus={autoFocus}
+                showSuggestions={
+                  !chat.isLoading && (showSuggestions ?? chat.messages.length === 0)
+                }
+                footerAction={
+                  <>
+                    {footerAction}
+                    <FeatureBadge featureId={FEATURE_IDS.CHAT_MESSAGES} />
+                  </>
+                }
+                suggestionsAction={suggestionsAction}
+              />
+            )}
+          </div>
+        </div>
+
+        {paywallOpen && (
+          <PaywallDialog
+            open={paywallOpen}
+            setOpen={setPaywallOpen}
+            featureId={FEATURE_IDS.CHAT_MESSAGES}
+          />
+        )}
+      </div>
     </ChatErrorBoundary>
   );
 }

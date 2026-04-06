@@ -90,9 +90,9 @@ export async function recordReviewStats(
       : {}),
     ...(args.accuracy != null
       ? {
-          totalAccuracySum: (stats.totalAccuracySum ?? 0) + args.accuracy,
-          totalAccuracyCount: (stats.totalAccuracyCount ?? 0) + 1,
-        }
+        totalAccuracySum: (stats.totalAccuracySum ?? 0) + args.accuracy,
+        totalAccuracyCount: (stats.totalAccuracyCount ?? 0) + 1,
+      }
       : {}),
   });
 

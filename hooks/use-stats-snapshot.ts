@@ -28,8 +28,8 @@ export function useStatsSnapshot(
 
   const today = dateScoped
     ? new Intl.DateTimeFormat('en-CA', {
-        timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      }).format(new Date())
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    }).format(new Date())
     : null;
 
   // Read snapshot from localStorage synchronously on first render
@@ -73,7 +73,7 @@ export function useStatsSnapshot(
     }, settleDuration);
 
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [valuesJson, changed, storageKey, settleDuration, dateScoped, today]);
 
   // Return prev values keyed the same as input (default 0 for missing keys)
