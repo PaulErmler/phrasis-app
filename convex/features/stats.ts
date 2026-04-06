@@ -275,7 +275,7 @@ export const getRecentWords = query({
           )
           .order('desc')
           .take(500);
-        allWords.push(...rows.map((r) => r.word));
+        allWords.push(...rows.map((r) => r.displayWord ?? r.word));
       }
 
       if (allWords.length > 0) {

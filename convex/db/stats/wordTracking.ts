@@ -3,23 +3,40 @@ import { Id } from '../../_generated/dataModel';
 
 const SEGMENTER_LANGUAGES = new Set(['ja', 'zh', 'ko', 'th']);
 
-export function tokenizeText(text: string, language: string): string[] {
-  const normalized = text.toLowerCase().normalize('NFC');
+export type Token = { normalized: string; original: string };
+
+/**
+ * A word is "all lowercase" if lowercasing it is a no-op. Used to decide
+ * which casing variant to keep as the display form: if we've ever seen
+ * the word in all-lowercase form, prefer that (covers English "the" at
+ * sentence start being downgraded from "The"). Words that never appear
+ * lowercase — German nouns, proper nouns — keep their capitalized form.
+ */
+export function isAllLowercase(s: string): boolean {
+  return s === s.toLowerCase();
+}
+
+export function tokenizeText(text: string, language: string): Token[] {
+  const nfc = text.normalize('NFC');
 
   // Use Intl.Segmenter for languages without whitespace word boundaries
   // (Japanese, Chinese, Korean, Thai). This produces real words instead of
   // individual characters, which is critical for Japanese.
   if (SEGMENTER_LANGUAGES.has(language)) {
     const segmenter = new Intl.Segmenter(language, { granularity: 'word' });
-    return [...segmenter.segment(normalized)]
+    return [...segmenter.segment(nfc)]
       .filter((seg) => seg.isWordLike)
-      .map((seg) => seg.segment);
+      .map((seg) => ({
+        original: seg.segment,
+        normalized: seg.segment.toLowerCase(),
+      }));
   }
 
-  return normalized
+  return nfc
     .replace(/[^\p{L}\p{N}\s'-]/gu, '')
     .split(/\s+/)
-    .filter((w) => w.length > 0);
+    .filter((w) => w.length > 0)
+    .map((w) => ({ original: w, normalized: w.toLowerCase() }));
 }
 
 export async function trackNewWords(
@@ -33,11 +50,21 @@ export async function trackNewWords(
   const result: Record<string, number> = {};
 
   for (const { language, text } of args.languages) {
-    const words = tokenizeText(text, language);
-    const uniqueWords = [...new Set(words)];
+    const tokens = tokenizeText(text, language);
+
+    // Dedupe within this text by normalized key. If the same word appears
+    // in multiple casings in a single text, prefer the all-lowercase one.
+    const uniqueByNormalized = new Map<string, string>();
+    for (const { normalized, original } of tokens) {
+      const prev = uniqueByNormalized.get(normalized);
+      if (!prev || (isAllLowercase(original) && !isAllLowercase(prev))) {
+        uniqueByNormalized.set(normalized, original);
+      }
+    }
+
     let newCount = 0;
 
-    for (const word of uniqueWords) {
+    for (const [normalized, original] of uniqueByNormalized) {
       const existing = await ctx.db
         .query('userWords')
         .withIndex('by_userId_and_courseId_and_language_and_word', (q) =>
@@ -45,7 +72,7 @@ export async function trackNewWords(
             .eq('userId', args.userId)
             .eq('courseId', args.courseId)
             .eq('language', language)
-            .eq('word', word),
+            .eq('word', normalized),
         )
         .first();
 
@@ -54,9 +81,18 @@ export async function trackNewWords(
           userId: args.userId,
           courseId: args.courseId,
           language,
-          word,
+          word: normalized,
+          displayWord: original,
         });
         newCount++;
+      } else if (
+        existing.displayWord === undefined ||
+        (isAllLowercase(original) && !isAllLowercase(existing.displayWord))
+      ) {
+        // Upgrade the display form: either it was missing (pre-migration
+        // row) or the new occurrence is all-lowercase and the stored one
+        // isn't — per the rule "if one of them is lowercase, keep lowercase".
+        await ctx.db.patch(existing._id, { displayWord: original });
       }
     }
 

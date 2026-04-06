@@ -55,6 +55,7 @@ import type * as lib_dateUtils from "../lib/dateUtils.js";
 import type * as lib_fsrsStates from "../lib/fsrsStates.js";
 import type * as lib_textComparison from "../lib/textComparison.js";
 import type * as migrations_backfillCardAggregates from "../migrations/backfillCardAggregates.js";
+import type * as migrations_backfillDisplayWord from "../migrations/backfillDisplayWord.js";
 import type * as migrations_backfillIsGraduated from "../migrations/backfillIsGraduated.js";
 import type * as migrations_backfillUserStats from "../migrations/backfillUserStats.js";
 import type * as migrations_seedMockStats from "../migrations/seedMockStats.js";
@@ -118,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   "lib/fsrsStates": typeof lib_fsrsStates;
   "lib/textComparison": typeof lib_textComparison;
   "migrations/backfillCardAggregates": typeof migrations_backfillCardAggregates;
+  "migrations/backfillDisplayWord": typeof migrations_backfillDisplayWord;
   "migrations/backfillIsGraduated": typeof migrations_backfillIsGraduated;
   "migrations/backfillUserStats": typeof migrations_backfillUserStats;
   "migrations/seedMockStats": typeof migrations_seedMockStats;
