@@ -181,7 +181,11 @@ export async function recordReviewStats(
         }
       }
       if (langTexts.length > 0) {
-        newWordCounts = await trackNewWords(ctx, { userId, languages: langTexts });
+        newWordCounts = await trackNewWords(ctx, {
+          userId,
+          courseId: deck.courseId,
+          languages: langTexts,
+        });
         for (const count of Object.values(newWordCounts)) {
           totalNewWords += count;
         }

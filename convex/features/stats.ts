@@ -247,6 +247,7 @@ export const getRecentWords = query({
     const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return [];
 
+    const courseId = active.course._id;
     const targetLanguages = active.course.targetLanguages ?? [];
     // Dedupe variants (e.g. es + es_latam → es)
     const seen = new Set<string>();
@@ -269,8 +270,8 @@ export const getRecentWords = query({
       for (const variant of variants) {
         const rows = await ctx.db
           .query('userWords')
-          .withIndex('by_userId_and_language', (q) =>
-            q.eq('userId', userId).eq('language', variant),
+          .withIndex('by_userId_and_courseId_and_language', (q) =>
+            q.eq('userId', userId).eq('courseId', courseId).eq('language', variant),
           )
           .order('desc')
           .take(500);

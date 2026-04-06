@@ -212,7 +212,7 @@ export const clearUserWords = internalMutation({
   handler: async (ctx, args) => {
     const result = await ctx.db
       .query('userWords')
-      .withIndex('by_userId_and_language', (q) =>
+      .withIndex('by_userId_and_courseId_and_language_and_word', (q) =>
         q.eq('userId', args.userId),
       )
       .paginate({
@@ -307,9 +307,10 @@ export const processCourseBatch = internalMutation({
         }
       }
 
-      // Track new words (idempotent: skips words already in userWords)
+      // Track new words (idempotent: skips words already in userWords for this course)
       const newWordCounts = await trackNewWords(ctx, {
         userId: args.userId,
+        courseId: args.courseId,
         languages: langTexts,
       });
 
