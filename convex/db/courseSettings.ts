@@ -17,18 +17,6 @@ export async function getCourseSettings(
 }
 
 /**
- * Get the initialReviewCount for a course, falling back to the default.
- */
-export async function getInitialReviewCount(
-  ctx: QueryCtx,
-  courseId: Id<'courses'>,
-): Promise<number> {
-  const settings = await getCourseSettings(ctx, courseId);
-  if (!settings) return DEFAULT_INITIAL_REVIEW_COUNT;
-  return settings.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
-}
-
-/**
  * Create or update the course settings for a given course.
  */
 export async function upsertCourseSettings(

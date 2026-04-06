@@ -1,65 +1,17 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { useCachedQuery } from '@/hooks/use-cached-query';
+import { useAnimatedCounter } from '@/hooks/use-animated-counter';
+import { useStatsSnapshot } from '@/hooks/use-stats-snapshot';
 import { motion, AnimatePresence } from 'motion/react';
 import { Flame, RotateCcw, MessageSquare, Clock, Snowflake } from 'lucide-react';
 import { formatTimeMs } from '@/lib/formatTime';
 import { StartLearningButton } from '@/components/app/StartLearningButton';
 import { cn } from '@/lib/utils';
-import type { ReviewMode } from '@/convex/types';
-
-const useBrowserLayoutEffect =
-  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
-
-type TodaySnapshot = { date: string; reps: number; newCards: number; timeMs: number };
-const SNAPSHOT_KEY = 'todayStats_snapshot';
-
-function useAnimatedCounter(
-  target: number,
-  from = 0,
-  durationMs = 1500,
-  delay = 0,
-  enabled = true,
-): number {
-  const [value, setValue] = useState(enabled ? from : target);
-  const startTimeRef = useRef<number | null>(null);
-  const rafRef = useRef<number>(0);
-
-  useEffect(() => {
-    if (!enabled || target === from) {
-      setValue(target);
-      return;
-    }
-
-    const timeout = setTimeout(() => {
-      startTimeRef.current = null;
-
-      const animate = (timestamp: number) => {
-        if (startTimeRef.current === null) startTimeRef.current = timestamp;
-        const elapsed = timestamp - startTimeRef.current;
-        const progress = Math.min(elapsed / durationMs, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        setValue(Math.round(from + eased * (target - from)));
-
-        if (progress < 1) {
-          rafRef.current = requestAnimationFrame(animate);
-        }
-      };
-
-      rafRef.current = requestAnimationFrame(animate);
-    }, delay);
-
-    return () => {
-      clearTimeout(timeout);
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [target, from, durationMs, delay, enabled]);
-
-  return value;
-}
+import type { ReviewMode, SchedulingMode } from '@/convex/types';
 
 function StatColumn({
   icon,
@@ -124,12 +76,16 @@ function StatColumn({
 }
 
 export function ProgressStatsCard({
-  onStartReview,
+  onStartLearn,
+  reviewMode,
+  onReviewModeChange,
   animateEntrance,
   skipLiveStats,
   courseId,
 }: {
-  onStartReview: (mode: ReviewMode) => void;
+  onStartLearn: (schedulingMode: SchedulingMode) => void;
+  reviewMode: ReviewMode;
+  onReviewModeChange: (mode: ReviewMode) => void;
   animateEntrance?: boolean;
   skipLiveStats?: boolean;
   courseId?: string;
@@ -143,59 +99,13 @@ export function ProgressStatsCard({
   const stats = useCachedQuery(api.features.courses.getCourseStats, queryArgs, `courseStats${cacheSuffix}`);
   const todayStats = useCachedQuery(api.features.courses.getTodayStats, queryArgs, `todayStats_${today}${cacheSuffix}`);
 
-  const snapshotKey = courseId ? `${SNAPSHOT_KEY}_${courseId}` : SNAPSHOT_KEY;
+  const snapshotKey = courseId ? `todayStats_snapshot_${courseId}` : 'todayStats_snapshot';
 
-  const prevTodaySnapshot = useRef<TodaySnapshot | null>(null);
-  useBrowserLayoutEffect(() => {
-    try {
-      const stored = localStorage.getItem(snapshotKey);
-      if (stored) {
-        const parsed: TodaySnapshot = JSON.parse(stored);
-        if (parsed.date === today) {
-          prevTodaySnapshot.current = parsed;
-          return;
-        }
-      }
-    } catch {
-      // ignore parse errors from stale/corrupted cache
-    }
-    // Baseline for today so the first update still animates (ref was null before).
-    prevTodaySnapshot.current = { date: today, reps: 0, newCards: 0, timeMs: 0 };
-  }, [snapshotKey, today]);
-
-  useEffect(() => {
-    if (todayStats == null) return;
-    try {
-      const snapshot: TodaySnapshot = { date: today, ...todayStats };
-      localStorage.setItem(snapshotKey, JSON.stringify(snapshot));
-    } catch {
-      // ignore storage errors
-    }
-  }, [todayStats, today, snapshotKey]);
-
-  const statsActuallyChanged = todayStats != null && prevTodaySnapshot.current != null && (
-    prevTodaySnapshot.current.reps !== todayStats.reps ||
-    prevTodaySnapshot.current.newCards !== todayStats.newCards ||
-    prevTodaySnapshot.current.timeMs !== todayStats.timeMs
+  const { prev, changed: statsActuallyChanged } = useStatsSnapshot(
+    snapshotKey,
+    { reps: todayStats?.reps ?? 0, newCards: todayStats?.newCards ?? 0, timeMs: todayStats?.timeMs ?? 0 },
+    { dateScoped: true },
   );
-
-  // Commit prev snapshot after animations. Ref updates do not re-render, so bump state
-  // when done. Use statsActuallyChanged (sync) to drive animation — not useState in an
-  // effect, which lags one frame and caused counters to snap to target before animating.
-  const [, setAnimationSettledEpoch] = useState(0);
-
-  useEffect(() => {
-    if (!statsActuallyChanged) return;
-
-    const timer = setTimeout(() => {
-      if (todayStats) {
-        prevTodaySnapshot.current = { date: today, ...todayStats };
-      }
-      setAnimationSettledEpoch((e) => e + 1);
-    }, 2400);
-
-    return () => clearTimeout(timer);
-  }, [statsActuallyChanged, todayStats, today]);
 
   const streak = stats?.currentStreak ?? 0;
   const reps = stats?.totalRepetitions ?? 0;
@@ -206,27 +116,23 @@ export function ProgressStatsCard({
   const isFrozen = stats?.streakFrozenToday === true && !hasLearned;
   const isInactive = streak === 0 && !hasLearned && !isFrozen;
 
-  const prevReps = prevTodaySnapshot.current?.reps ?? 0;
-  const prevNew = prevTodaySnapshot.current?.newCards ?? 0;
-  const prevTime = prevTodaySnapshot.current?.timeMs ?? 0;
-
   const animatedReps = useAnimatedCounter(
     hasLearned ? todayStats.reps : 0,
-    prevReps,
+    prev.reps,
     1500,
     300,
     statsActuallyChanged,
   );
   const animatedNew = useAnimatedCounter(
     hasLearned ? todayStats.newCards : 0,
-    prevNew,
+    prev.newCards,
     1500,
     450,
     statsActuallyChanged,
   );
   const animatedTimeMs = useAnimatedCounter(
     hasLearned ? todayStats.timeMs : 0,
-    prevTime,
+    prev.timeMs,
     1500,
     600,
     statsActuallyChanged,
@@ -351,7 +257,11 @@ export function ProgressStatsCard({
           />
         </div>
       </div>
-      <StartLearningButton onStartReview={onStartReview} />
+      <StartLearningButton
+        onStartLearn={onStartLearn}
+        reviewMode={reviewMode}
+        onReviewModeChange={onReviewModeChange}
+      />
     </div>
   );
 

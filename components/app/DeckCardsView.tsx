@@ -120,7 +120,7 @@ export function DeckCardsView() {
                             {baseTranslation?.text || card.sourceText}
                           </p>
                           {baseTranslation?.romanization && (
-                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                            <p className="text-romanization">
                               {baseTranslation.romanization}
                             </p>
                           )}
@@ -130,7 +130,7 @@ export function DeckCardsView() {
                             </p>
                           )}
                           {targetTranslation?.romanization && (
-                            <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                            <p className="text-romanization">
                               {targetTranslation.romanization}
                             </p>
                           )}
@@ -149,21 +149,21 @@ export function DeckCardsView() {
                             )}
                           </Badge>
                           <span className="text-sm font-medium">
-                            Base (You know this)
+                            {t('baseLabel')}
                           </span>
                         </div>
                         <p className="text-sm">
                           {baseTranslation?.text || card.sourceText}
                         </p>
                         {baseTranslation?.romanization && (
-                          <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                          <p className="text-romanization">
                             {baseTranslation.romanization}
                           </p>
                         )}
                         {!baseTranslation?.text &&
                           baseTranslation === undefined && (
                           <p className="text-muted-sm italic">
-                              Translating...
+                            {t('translating')}
                           </p>
                         )}
                         <div className="flex gap-2">
@@ -184,25 +184,25 @@ export function DeckCardsView() {
                           <Badge variant="secondary" className="text-xs">
                             {targetTranslation?.language
                               ? getLanguageShortLabel(
-                                  targetTranslation.language,
-                                )
+                                targetTranslation.language,
+                              )
                               : 'TARGET'}
                           </Badge>
                           <span className="text-sm font-medium">
-                            Target (Learning this)
+                            {t('targetLabel')}
                           </span>
                         </div>
                         {targetTranslation?.text ? (
                           <>
                             <p className="text-sm">{targetTranslation.text}</p>
                             {targetTranslation.romanization && (
-                              <p className="text-xs text-muted-foreground leading-tight mt-0.5">
+                              <p className="text-romanization">
                                 {targetTranslation.romanization}
                               </p>
                             )}
                           </>
                         ) : (
-                          <p className="text-muted-sm italic">Translating...</p>
+                          <p className="text-muted-sm italic">{t('translating')}</p>
                         )}
                         <div className="flex gap-2">
                           <AudioButton
@@ -210,8 +210,8 @@ export function DeckCardsView() {
                             language={
                               targetTranslation?.language
                                 ? getLanguageShortLabel(
-                                    targetTranslation.language,
-                                  )
+                                  targetTranslation.language,
+                                )
                                 : ''
                             }
                             showLabel

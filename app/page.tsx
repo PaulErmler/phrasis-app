@@ -1,18 +1,8 @@
 import type { Metadata } from 'next';
 import './landing-page.css';
-import { Footer } from '@/components/Footer';
-import { HeroSection } from '@/components/landing/hero-section';
-import { PhilosophySection } from '@/components/landing/philosophy-section';
-import { LandingDemoProvider } from '@/components/landing/landing-demo-context';
-import { ReviewModesSection } from '@/components/landing/review-modes-section';
-import { ChatFlashcardSection } from '@/components/landing/chat-flashcard-section';
-import { FeaturesSection } from '@/components/landing/features-section';
-import { PricingSection } from '@/components/landing/pricing-section';
-import { FAQSection } from '@/components/landing/faq-section';
-import { DonationSection } from '@/components/landing/donation-section';
-import { InstallCtaSection } from '@/components/landing/install-cta-section';
 import { getToken } from '@/lib/auth-server';
 import { LandingJsonLd } from '@/components/landing/landing-json-ld';
+import { LandingPageClient } from '@/components/landing/landing-page-client';
 
 const siteUrl = process.env.SITE_URL ?? 'https://flexling.com';
 
@@ -33,20 +23,8 @@ export default async function Home() {
     <div className="min-h-screen flex flex-col">
       <LandingJsonLd siteUrl={siteUrl} />
       <main className="flex-1">
-        <HeroSection isAuthenticated={isAuthenticated} />
-        <PhilosophySection />
-        <LandingDemoProvider>
-          <ReviewModesSection />
-          <ChatFlashcardSection />
-        </LandingDemoProvider>
-        <FeaturesSection />
-        <PricingSection />
-
-        <FAQSection />
-        <DonationSection />
-        <InstallCtaSection />
+        <LandingPageClient isAuthenticated={isAuthenticated} />
       </main>
-      <Footer />
     </div>
   );
 }

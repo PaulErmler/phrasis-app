@@ -50,11 +50,37 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'en-US', 'US'),
+      createChirp3Voice('Kore', 'female', 'en-US', 'US'),
+      createChirp3Voice('Aoede', 'female', 'en-US', 'US'),
+      createChirp3Voice('Zephyr', 'female', 'en-US', 'US'),
       createChirp3Voice('Charon', 'male', 'en-US', 'US'),
+      createChirp3Voice('Puck', 'male', 'en-US', 'US'),
+      createChirp3Voice('Fenrir', 'male', 'en-US', 'US'),
+      createChirp3Voice('Orus', 'male', 'en-US', 'US'),
+      createChirp3Voice('Achernar', 'female', 'en-US', 'US'),
+      createChirp3Voice('Autonoe', 'female', 'en-US', 'US'),
+      createChirp3Voice('Callirrhoe', 'female', 'en-US', 'US'),
+      createChirp3Voice('Sulafat', 'female', 'en-US', 'US'),
+      createChirp3Voice('Achird', 'male', 'en-US', 'US'),
+      createChirp3Voice('Algenib', 'male', 'en-US', 'US'),
+      createChirp3Voice('Enceladus', 'male', 'en-US', 'US'),
+      createChirp3Voice('Umbriel', 'male', 'en-US', 'US'),
+      createChirp3Voice('Leda', 'female', 'en-GB', 'UK'),
+      createChirp3Voice('Kore', 'female', 'en-GB', 'UK'),
       createChirp3Voice('Aoede', 'female', 'en-GB', 'UK'),
+      createChirp3Voice('Zephyr', 'female', 'en-GB', 'UK'),
+      createChirp3Voice('Charon', 'male', 'en-GB', 'UK'),
+      createChirp3Voice('Puck', 'male', 'en-GB', 'UK'),
+      createChirp3Voice('Fenrir', 'male', 'en-GB', 'UK'),
       createChirp3Voice('Orus', 'male', 'en-GB', 'UK'),
-      createChirp3Voice('Achernar', 'female', 'en-AU', 'AU'),
-      createChirp3Voice('Achird', 'male', 'en-AU', 'AU'),
+      createChirp3Voice('Achernar', 'female', 'en-GB', 'UK'),
+      createChirp3Voice('Autonoe', 'female', 'en-GB', 'UK'),
+      createChirp3Voice('Callirrhoe', 'female', 'en-GB', 'UK'),
+      createChirp3Voice('Sulafat', 'female', 'en-GB', 'UK'),
+      createChirp3Voice('Achird', 'male', 'en-GB', 'UK'),
+      createChirp3Voice('Algenib', 'male', 'en-GB', 'UK'),
+      createChirp3Voice('Enceladus', 'male', 'en-GB', 'UK'),
+      createChirp3Voice('Umbriel', 'male', 'en-GB', 'UK'),
     ],
   },
   {
@@ -66,7 +92,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'es-ES', 'Spain'),
+      createChirp3Voice('Kore', 'female', 'es-ES', 'Spain'),
+      createChirp3Voice('Aoede', 'female', 'es-ES', 'Spain'),
+      createChirp3Voice('Zephyr', 'female', 'es-ES', 'Spain'),
       createChirp3Voice('Charon', 'male', 'es-ES', 'Spain'),
+      createChirp3Voice('Puck', 'male', 'es-ES', 'Spain'),
+      createChirp3Voice('Fenrir', 'male', 'es-ES', 'Spain'),
+      createChirp3Voice('Orus', 'male', 'es-ES', 'Spain'),
+      createChirp3Voice('Achernar', 'female', 'es-ES', 'Spain'),
+      createChirp3Voice('Autonoe', 'female', 'es-ES', 'Spain'),
+      createChirp3Voice('Callirrhoe', 'female', 'es-ES', 'Spain'),
+      createChirp3Voice('Sulafat', 'female', 'es-ES', 'Spain'),
+      createChirp3Voice('Achird', 'male', 'es-ES', 'Spain'),
+      createChirp3Voice('Algenib', 'male', 'es-ES', 'Spain'),
+      createChirp3Voice('Enceladus', 'male', 'es-ES', 'Spain'),
+      createChirp3Voice('Umbriel', 'male', 'es-ES', 'Spain'),
     ],
   },
   {
@@ -78,7 +118,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Kore', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Aoede', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Zephyr', 'female', 'es-US', 'Latin America'),
       createChirp3Voice('Charon', 'male', 'es-US', 'Latin America'),
+      createChirp3Voice('Puck', 'male', 'es-US', 'Latin America'),
+      createChirp3Voice('Fenrir', 'male', 'es-US', 'Latin America'),
+      createChirp3Voice('Orus', 'male', 'es-US', 'Latin America'),
+      createChirp3Voice('Achernar', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Autonoe', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Callirrhoe', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Sulafat', 'female', 'es-US', 'Latin America'),
+      createChirp3Voice('Achird', 'male', 'es-US', 'Latin America'),
+      createChirp3Voice('Algenib', 'male', 'es-US', 'Latin America'),
+      createChirp3Voice('Enceladus', 'male', 'es-US', 'Latin America'),
+      createChirp3Voice('Umbriel', 'male', 'es-US', 'Latin America'),
     ],
   },
   {
@@ -90,9 +144,22 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'fr-FR', 'France'),
+      createChirp3Voice('Kore', 'female', 'fr-FR', 'France'),
+      createChirp3Voice('Aoede', 'female', 'fr-FR', 'France'),
+      createChirp3Voice('Zephyr', 'female', 'fr-FR', 'France'),
       createChirp3Voice('Charon', 'male', 'fr-FR', 'France'),
-      createChirp3Voice('Aoede', 'female', 'fr-CA', 'Canada'),
-      createChirp3Voice('Orus', 'male', 'fr-CA', 'Canada'),
+      createChirp3Voice('Puck', 'male', 'fr-FR', 'France'),
+      createChirp3Voice('Fenrir', 'male', 'fr-FR', 'France'),
+      createChirp3Voice('Orus', 'male', 'fr-FR', 'France'),
+      createChirp3Voice('Achernar', 'female', 'fr-FR', 'France'),
+      createChirp3Voice('Autonoe', 'female', 'fr-FR', 'France'),
+      createChirp3Voice('Callirrhoe', 'female', 'fr-FR', 'France'),
+      createChirp3Voice('Sulafat', 'female', 'fr-FR', 'France'),
+      createChirp3Voice('Achird', 'male', 'fr-FR', 'France'),
+      createChirp3Voice('Algenib', 'male', 'fr-FR', 'France'),
+      createChirp3Voice('Enceladus', 'male', 'fr-FR', 'France'),
+      createChirp3Voice('Umbriel', 'male', 'fr-FR', 'France'),
+
     ],
   },
   {
@@ -104,7 +171,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'de-DE', 'Germany'),
+      createChirp3Voice('Kore', 'female', 'de-DE', 'Germany'),
+      createChirp3Voice('Aoede', 'female', 'de-DE', 'Germany'),
+      createChirp3Voice('Zephyr', 'female', 'de-DE', 'Germany'),
       createChirp3Voice('Charon', 'male', 'de-DE', 'Germany'),
+      createChirp3Voice('Puck', 'male', 'de-DE', 'Germany'),
+      createChirp3Voice('Fenrir', 'male', 'de-DE', 'Germany'),
+      createChirp3Voice('Orus', 'male', 'de-DE', 'Germany'),
+      createChirp3Voice('Achernar', 'female', 'de-DE', 'Germany'),
+      createChirp3Voice('Autonoe', 'female', 'de-DE', 'Germany'),
+      createChirp3Voice('Callirrhoe', 'female', 'de-DE', 'Germany'),
+      createChirp3Voice('Sulafat', 'female', 'de-DE', 'Germany'),
+      createChirp3Voice('Achird', 'male', 'de-DE', 'Germany'),
+      createChirp3Voice('Algenib', 'male', 'de-DE', 'Germany'),
+      createChirp3Voice('Enceladus', 'male', 'de-DE', 'Germany'),
+      createChirp3Voice('Umbriel', 'male', 'de-DE', 'Germany'),
     ],
   },
   {
@@ -116,7 +197,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'it-IT', 'Italy'),
+      createChirp3Voice('Kore', 'female', 'it-IT', 'Italy'),
+      createChirp3Voice('Aoede', 'female', 'it-IT', 'Italy'),
+      createChirp3Voice('Zephyr', 'female', 'it-IT', 'Italy'),
       createChirp3Voice('Charon', 'male', 'it-IT', 'Italy'),
+      createChirp3Voice('Puck', 'male', 'it-IT', 'Italy'),
+      createChirp3Voice('Fenrir', 'male', 'it-IT', 'Italy'),
+      createChirp3Voice('Orus', 'male', 'it-IT', 'Italy'),
+      createChirp3Voice('Achernar', 'female', 'it-IT', 'Italy'),
+      createChirp3Voice('Autonoe', 'female', 'it-IT', 'Italy'),
+      createChirp3Voice('Callirrhoe', 'female', 'it-IT', 'Italy'),
+      createChirp3Voice('Sulafat', 'female', 'it-IT', 'Italy'),
+      createChirp3Voice('Achird', 'male', 'it-IT', 'Italy'),
+      createChirp3Voice('Algenib', 'male', 'it-IT', 'Italy'),
+      createChirp3Voice('Enceladus', 'male', 'it-IT', 'Italy'),
+      createChirp3Voice('Umbriel', 'male', 'it-IT', 'Italy'),
     ],
   },
   {
@@ -128,7 +223,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Kore', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Aoede', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Zephyr', 'female', 'pt-BR', 'Brazil'),
       createChirp3Voice('Charon', 'male', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Puck', 'male', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Fenrir', 'male', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Orus', 'male', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Achernar', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Autonoe', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Callirrhoe', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Sulafat', 'female', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Achird', 'male', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Algenib', 'male', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Enceladus', 'male', 'pt-BR', 'Brazil'),
+      createChirp3Voice('Umbriel', 'male', 'pt-BR', 'Brazil'),
     ],
   },
   {
@@ -140,7 +249,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Kore', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Aoede', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Zephyr', 'female', 'ru-RU', 'Russia'),
       createChirp3Voice('Charon', 'male', 'ru-RU', 'Russia'),
+      createChirp3Voice('Puck', 'male', 'ru-RU', 'Russia'),
+      createChirp3Voice('Fenrir', 'male', 'ru-RU', 'Russia'),
+      createChirp3Voice('Orus', 'male', 'ru-RU', 'Russia'),
+      createChirp3Voice('Achernar', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Autonoe', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Callirrhoe', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Sulafat', 'female', 'ru-RU', 'Russia'),
+      createChirp3Voice('Achird', 'male', 'ru-RU', 'Russia'),
+      createChirp3Voice('Algenib', 'male', 'ru-RU', 'Russia'),
+      createChirp3Voice('Enceladus', 'male', 'ru-RU', 'Russia'),
+      createChirp3Voice('Umbriel', 'male', 'ru-RU', 'Russia'),
     ],
   },
   {
@@ -152,7 +275,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Kore', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Aoede', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Zephyr', 'female', 'hi-IN', 'India'),
       createChirp3Voice('Charon', 'male', 'hi-IN', 'India'),
+      createChirp3Voice('Puck', 'male', 'hi-IN', 'India'),
+      createChirp3Voice('Fenrir', 'male', 'hi-IN', 'India'),
+      createChirp3Voice('Orus', 'male', 'hi-IN', 'India'),
+      createChirp3Voice('Achernar', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Autonoe', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Callirrhoe', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Sulafat', 'female', 'hi-IN', 'India'),
+      createChirp3Voice('Achird', 'male', 'hi-IN', 'India'),
+      createChirp3Voice('Algenib', 'male', 'hi-IN', 'India'),
+      createChirp3Voice('Enceladus', 'male', 'hi-IN', 'India'),
+      createChirp3Voice('Umbriel', 'male', 'hi-IN', 'India'),
     ],
   },
   {
@@ -164,7 +301,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Kore', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Aoede', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Zephyr', 'female', 'cmn-CN', 'Mandarin'),
       createChirp3Voice('Charon', 'male', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Puck', 'male', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Fenrir', 'male', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Orus', 'male', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Achernar', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Autonoe', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Callirrhoe', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Sulafat', 'female', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Achird', 'male', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Algenib', 'male', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Enceladus', 'male', 'cmn-CN', 'Mandarin'),
+      createChirp3Voice('Umbriel', 'male', 'cmn-CN', 'Mandarin'),
     ],
   },
   {
@@ -176,7 +327,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Kore', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Aoede', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Zephyr', 'female', 'ja-JP', 'Japan'),
       createChirp3Voice('Charon', 'male', 'ja-JP', 'Japan'),
+      createChirp3Voice('Puck', 'male', 'ja-JP', 'Japan'),
+      createChirp3Voice('Fenrir', 'male', 'ja-JP', 'Japan'),
+      createChirp3Voice('Orus', 'male', 'ja-JP', 'Japan'),
+      createChirp3Voice('Achernar', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Autonoe', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Callirrhoe', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Sulafat', 'female', 'ja-JP', 'Japan'),
+      createChirp3Voice('Achird', 'male', 'ja-JP', 'Japan'),
+      createChirp3Voice('Algenib', 'male', 'ja-JP', 'Japan'),
+      createChirp3Voice('Enceladus', 'male', 'ja-JP', 'Japan'),
+      createChirp3Voice('Umbriel', 'male', 'ja-JP', 'Japan'),
     ],
   },
   {
@@ -188,7 +353,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Kore', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Aoede', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Zephyr', 'female', 'ko-KR', 'Korea'),
       createChirp3Voice('Charon', 'male', 'ko-KR', 'Korea'),
+      createChirp3Voice('Puck', 'male', 'ko-KR', 'Korea'),
+      createChirp3Voice('Fenrir', 'male', 'ko-KR', 'Korea'),
+      createChirp3Voice('Orus', 'male', 'ko-KR', 'Korea'),
+      createChirp3Voice('Achernar', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Autonoe', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Callirrhoe', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Sulafat', 'female', 'ko-KR', 'Korea'),
+      createChirp3Voice('Achird', 'male', 'ko-KR', 'Korea'),
+      createChirp3Voice('Algenib', 'male', 'ko-KR', 'Korea'),
+      createChirp3Voice('Enceladus', 'male', 'ko-KR', 'Korea'),
+      createChirp3Voice('Umbriel', 'male', 'ko-KR', 'Korea'),
     ],
   },
   {
@@ -200,7 +379,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Kore', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Aoede', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Zephyr', 'female', 'vi-VN', 'Vietnam'),
       createChirp3Voice('Charon', 'male', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Puck', 'male', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Fenrir', 'male', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Orus', 'male', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Achernar', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Autonoe', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Callirrhoe', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Sulafat', 'female', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Achird', 'male', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Algenib', 'male', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Enceladus', 'male', 'vi-VN', 'Vietnam'),
+      createChirp3Voice('Umbriel', 'male', 'vi-VN', 'Vietnam'),
     ],
   },
   {
@@ -212,7 +405,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Kore', 'female', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Aoede', 'female', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Zephyr', 'female', 'sv-SE', 'Sweden'),
       createChirp3Voice('Charon', 'male', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Puck', 'male', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Fenrir', 'male', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Orus', 'male', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Achernar', 'female', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Autonoe', 'female', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Callirrhoe', 'female', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Sulafat', 'female', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Achird', 'male', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Algenib', 'male', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Enceladus', 'male', 'sv-SE', 'Sweden'),
+      createChirp3Voice('Umbriel', 'male', 'sv-SE', 'Sweden'),
     ],
   },
   {
@@ -224,7 +431,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Kore', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Aoede', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Zephyr', 'female', 'fi-FI', 'Finland'),
       createChirp3Voice('Charon', 'male', 'fi-FI', 'Finland'),
+      createChirp3Voice('Puck', 'male', 'fi-FI', 'Finland'),
+      createChirp3Voice('Fenrir', 'male', 'fi-FI', 'Finland'),
+      createChirp3Voice('Orus', 'male', 'fi-FI', 'Finland'),
+      createChirp3Voice('Achernar', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Autonoe', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Callirrhoe', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Sulafat', 'female', 'fi-FI', 'Finland'),
+      createChirp3Voice('Achird', 'male', 'fi-FI', 'Finland'),
+      createChirp3Voice('Algenib', 'male', 'fi-FI', 'Finland'),
+      createChirp3Voice('Enceladus', 'male', 'fi-FI', 'Finland'),
+      createChirp3Voice('Umbriel', 'male', 'fi-FI', 'Finland'),
     ],
   },
   {
@@ -236,7 +457,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     voices: [
       createChirp3Voice('Leda', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Kore', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Aoede', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Zephyr', 'female', 'nl-NL', 'Netherlands'),
       createChirp3Voice('Charon', 'male', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Puck', 'male', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Fenrir', 'male', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Orus', 'male', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Achernar', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Autonoe', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Callirrhoe', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Sulafat', 'female', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Achird', 'male', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Algenib', 'male', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Enceladus', 'male', 'nl-NL', 'Netherlands'),
+      createChirp3Voice('Umbriel', 'male', 'nl-NL', 'Netherlands'),
     ],
   },
   {
@@ -248,7 +483,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Kore', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Aoede', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Zephyr', 'female', 'el-GR', 'Greece'),
       createChirp3Voice('Charon', 'male', 'el-GR', 'Greece'),
+      createChirp3Voice('Puck', 'male', 'el-GR', 'Greece'),
+      createChirp3Voice('Fenrir', 'male', 'el-GR', 'Greece'),
+      createChirp3Voice('Orus', 'male', 'el-GR', 'Greece'),
+      createChirp3Voice('Achernar', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Autonoe', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Callirrhoe', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Sulafat', 'female', 'el-GR', 'Greece'),
+      createChirp3Voice('Achird', 'male', 'el-GR', 'Greece'),
+      createChirp3Voice('Algenib', 'male', 'el-GR', 'Greece'),
+      createChirp3Voice('Enceladus', 'male', 'el-GR', 'Greece'),
+      createChirp3Voice('Umbriel', 'male', 'el-GR', 'Greece'),
     ],
   },
   {
@@ -260,7 +509,21 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     voices: [
       createChirp3Voice('Leda', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Kore', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Aoede', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Zephyr', 'female', 'ar-XA', 'MSA'),
       createChirp3Voice('Charon', 'male', 'ar-XA', 'MSA'),
+      createChirp3Voice('Puck', 'male', 'ar-XA', 'MSA'),
+      createChirp3Voice('Fenrir', 'male', 'ar-XA', 'MSA'),
+      createChirp3Voice('Orus', 'male', 'ar-XA', 'MSA'),
+      createChirp3Voice('Achernar', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Autonoe', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Callirrhoe', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Sulafat', 'female', 'ar-XA', 'MSA'),
+      createChirp3Voice('Achird', 'male', 'ar-XA', 'MSA'),
+      createChirp3Voice('Algenib', 'male', 'ar-XA', 'MSA'),
+      createChirp3Voice('Enceladus', 'male', 'ar-XA', 'MSA'),
+      createChirp3Voice('Umbriel', 'male', 'ar-XA', 'MSA'),
     ],
   },
 ];
@@ -317,6 +580,44 @@ export function getRandomVoiceForLanguage(code: string): string {
       `No voices available for language code: "${code}". Add it to SUPPORTED_LANGUAGES.`,
     );
   }
+  const randomIndex = Math.floor(Math.random() * voices.length);
+  return voices[randomIndex].apiCode;
+}
+
+/**
+ * Look up the gender of a voice by its full apiCode.
+ * Returns undefined if the voice is not found.
+ */
+export function getVoiceGenderByApiCode(apiCode: string): 'male' | 'female' | undefined {
+  for (const lang of SUPPORTED_LANGUAGES) {
+    const voice = lang.voices.find((v) => v.apiCode === apiCode);
+    if (voice) return voice.gender;
+  }
+  return undefined;
+}
+
+/**
+ * Get a voice for a language, optionally matching a speaker gender.
+ * Falls back to random selection when gender is "neutral", undefined, or no matching voice exists.
+ */
+export function getVoiceForLanguage(
+  code: string,
+  speakerGender?: string,
+): string {
+  const voices = getVoicesByLanguageCode(code);
+  if (voices.length === 0) {
+    throw new Error(
+      `No voices available for language code: "${code}". Add it to SUPPORTED_LANGUAGES.`,
+    );
+  }
+
+  if (speakerGender === 'male' || speakerGender === 'female') {
+    const matching = voices.filter((v) => v.gender === speakerGender);
+    if (matching.length > 0) {
+      return matching[Math.floor(Math.random() * matching.length)].apiCode;
+    }
+  }
+
   const randomIndex = Math.floor(Math.random() * voices.length);
   return voices[randomIndex].apiCode;
 }

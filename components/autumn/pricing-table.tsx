@@ -32,6 +32,8 @@ export default function PricingTable({
 
   const hasRefetchedRef = useRef(false);
   const [isRefetching, setIsRefetching] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
 
   useEffect(() => {
     if (customer && !hasRefetchedRef.current) {
@@ -41,7 +43,25 @@ export default function PricingTable({
     }
   }, [customer, refetch]);
 
-  if (isCustomerLoading || isProductsLoading || isRefetching) {
+  useEffect(() => {
+    if (error && retryCount < MAX_RETRIES) {
+      const timeout = setTimeout(() => {
+        setRetryCount((c) => c + 1);
+        refetch();
+      }, 1500);
+      return () => clearTimeout(timeout);
+    }
+  }, [error, retryCount, refetch]);
+
+  useEffect(() => {
+    if (!error && products) {
+      setRetryCount(0);
+    }
+  }, [error, products]);
+
+  const isRetrying = error && retryCount < MAX_RETRIES;
+
+  if (isCustomerLoading || isProductsLoading || isRefetching || isRetrying) {
     return (
       <div className="w-full h-full flex justify-center items-center min-h-[300px]">
         <Loader2 className="w-6 h-6 text-zinc-400 animate-spin" />
@@ -53,7 +73,7 @@ export default function PricingTable({
     return (
       <div className="w-full h-full flex flex-col justify-center items-center gap-3 min-h-[300px]">
         <span className="text-sm text-muted-foreground">{t("error")}</span>
-        <Button variant="ghost" size="sm" onClick={() => refetch()}>
+        <Button variant="ghost" size="sm" onClick={() => { setRetryCount(0); refetch(); }}>
           {t("retry")}
         </Button>
       </div>

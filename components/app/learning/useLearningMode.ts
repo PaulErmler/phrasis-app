@@ -27,6 +27,8 @@ import {
   type CardAudioRecording,
   type CourseSettings,
 } from './types';
+import type { SchedulingMode } from '@/convex/types';
+import { getUserTimezone } from '@/lib/timezone';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { ENSURE_CONTENT_REVIEW_INTERVAL } from '@/lib/constants/learning';
@@ -67,6 +69,8 @@ interface NoCardsDueState extends BaseState {
   isAddingCards: boolean;
   batchSize: number;
   sentencesRemaining: number | null;
+  schedulingMode: SchedulingMode;
+  handleSchedulingModeChange: (mode: SchedulingMode) => void;
 }
 
 interface ReviewingState extends BaseState {
@@ -95,7 +99,7 @@ interface ReviewingState extends BaseState {
   handleMaster: () => void;
   handleHide: () => void;
   handleFavorite: () => void;
-  handleNext: (ratingOverride?: ReviewRating) => void;
+  handleNext: (ratingOverride?: ReviewRating, accuracy?: number) => void;
   setSelectedRating: (rating: ReviewRating) => void;
   // Status flags
   isReviewing: boolean;
@@ -104,6 +108,9 @@ interface ReviewingState extends BaseState {
   // Cross-tab audio coordination
   getReviewInitiatedByThisTab: () => boolean;
   resetReviewFlag: () => void;
+  // Scheduling mode
+  schedulingMode: SchedulingMode;
+  handleSchedulingModeChange: (mode: SchedulingMode) => void;
 }
 
 export type LearningState =
@@ -221,6 +228,22 @@ export function useLearningMode(
   const ensureUpcomingContentMutation = useMutation(
     api.features.decks.ensureUpcomingCardsContent,
   );
+  const updateCourseSettingsMutation = useMutation(
+    api.features.courses.updateCourseSettings,
+  ).withOptimisticUpdate((localStore, args) => {
+    const current = localStore.getQuery(
+      api.features.courses.getActiveCourseSettings,
+      {},
+    );
+    if (current !== undefined && current !== null) {
+      const { courseId, ...updates } = args;
+      localStore.setQuery(
+        api.features.courses.getActiveCourseSettings,
+        {},
+        { ...current, ...updates },
+      );
+    }
+  });
   const sentencesQuota = useFeatureQuota(FEATURE_IDS.SENTENCES);
 
   const [isReviewing, setIsReviewing] = useState(false);
@@ -330,7 +353,7 @@ export function useLearningMode(
   const reviewMode = courseSettings?.reviewMode ?? 'audio';
 
   const handleReview = useCallback(
-    async (rating: ReviewRating) => {
+    async (rating: ReviewRating, wasDefaultRating: boolean, accuracy?: number) => {
       if (!cardForReview || isReviewing) return;
       reviewInitiatedByThisTabRef.current = true;
       setCardAnimationKey((k) => k + 1);
@@ -341,9 +364,11 @@ export function useLearningMode(
           cardId: cardForReview._id,
           rating,
           timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
-          timezone:
-            Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          timezone: getUserTimezone(),
           ...(reviewMode === 'full' && { forceReviewPhase: true }),
+          reviewMode,
+          wasDefaultRating,
+          ...(accuracy != null && { accuracy: accuracy / 100 }),
         });
         setSelectedRating(null);
       } catch (error) {
@@ -376,9 +401,25 @@ export function useLearningMode(
   }, [cardForReview, toggleFavoriteCardMutation]);
 
   // --------------------------------------------------------------------------
+  // Scheduling mode
+  // --------------------------------------------------------------------------
+  const handleSchedulingModeChange = useCallback(
+    (mode: SchedulingMode) => {
+      if (!courseSettings?.courseId) return;
+      void updateCourseSettingsMutation({
+        courseId: courseSettings.courseId,
+        schedulingMode: mode,
+      }).catch((error) => {
+        console.error('Failed to update scheduling mode:', error);
+      });
+    },
+    [courseSettings?.courseId, updateCourseSettingsMutation],
+  );
+
+  // --------------------------------------------------------------------------
   // Next
   // --------------------------------------------------------------------------
-  const handleNext = useCallback(async (ratingOverride?: ReviewRating) => {
+  const handleNext = useCallback(async (ratingOverride?: ReviewRating, accuracy?: number) => {
     if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
       reviewInitiatedByThisTabRef.current = true;
@@ -411,9 +452,9 @@ export function useLearningMode(
       return;
     }
     const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
-    const rating =
-      ratingOverride ?? selectedRating ?? getDefaultRating(phase);
-    handleReview(rating);
+    const defaultRatingForPhase = getDefaultRating(phase);
+    const rating = ratingOverride ?? selectedRating ?? defaultRatingForPhase;
+    handleReview(rating, rating === defaultRatingForPhase, accuracy);
   }, [
     cardForReview,
     isReviewing,
@@ -473,6 +514,8 @@ export function useLearningMode(
       isAddingCards,
       batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
       sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
+      schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
+      handleSchedulingModeChange,
     };
   }
 
@@ -553,5 +596,7 @@ export function useLearningMode(
     animationKey: cardAnimationKey,
     getReviewInitiatedByThisTab,
     resetReviewFlag,
+    schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
+    handleSchedulingModeChange,
   };
 }

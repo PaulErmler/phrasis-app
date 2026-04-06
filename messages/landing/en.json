@@ -18,7 +18,8 @@
     "themeSystem": "System"
   },
   "hero": {
-    "tagline": "The language app that grows with you",
+    "sectionLabel": "Language Learning, Reimagined",
+    "tagline": "The language app that <highlight>grows with you</highlight>.",
     "subtitle": "Multilingual (audio) flashcards with spaced repetition and AI to allow you to learn as efficiently as possible. Minimalist and distraction free. Bring your own content if you want.",
     "cta": {
       "start": "Start Learning Free",
@@ -28,15 +29,15 @@
     }
   },
   "philosophy": {
-    "title": "What actually moves fluency.",
-    "titleHighlight": "Three core principles.",
-    "lead": "Languages stick when three things line up: enough repetition, input you can mostly follow, and genuine curiosity. Flexling is built around all three.",
+    "title": "What makes language stick?",
+    "titleHighlight": "Repetition, personalized input, and motivation.",
+    "lead": "Consistent repetition, input tailored to your level and interests, and the motivation to keep going — Flexling is built around all three.",
     "pillar1Title": "Repetition that fits your day",
-    "pillar1Body": "Short, frequent encounters with the same sentences beat rare cramming. Audio review lets you rehearse while you move; full review sharpens recall when you have a keyboard in front of you.",
-    "pillar2Title": "Comprehensible input",
-    "pillar2Body": "You always anchor on a line you already understand, then reach for the translation. That keeps difficulty in the sweet spot: challenging, but not overwhelming.",
-    "pillar3Title": "Curiosity on tap",
-    "pillar3Body": "When something clicks or confuses you, you can ask why — and turn the answer into cards you will hear again tomorrow."
+    "pillar1Body": "Short, frequent encounters with the same sentences beat rare cramming and repetition is key but staying consistent is hard. Flexling allows you to repeat the most important things with state of the art spaced repetition and the audio review lets you rehearse flexibly to fit into your busy day.",
+    "pillar2Title": "Personalized Input",
+    "pillar2Body": "Instead of learning things you do not care about we allow you to modify your curriculum. Add your own sentences or let AI create them for you. Every learner is different – your study material should be too.",
+    "pillar3Title": "Motivation and Progress Tracking",
+    "pillar3Body": "Learning a language is hard and so is staying motivated sometimes. Flexling tracks detailed statistics about your learning progress like how many words you have already learned. This keeps you motivated."
   },
   "reviewModes": {
     "title": "Two ways to review.",
@@ -154,6 +155,30 @@
       }
     }
   },
+  "analytics": {
+    "label": "Track Your Progress",
+    "title": "Watch your skills",
+    "titleHighlight": "grow over time.",
+    "lead": "See exactly how your vocabulary expands week by week. Detailed analytics show your streak, words learned per language, and study habits — so you always know how far you've come.",
+    "progressTitle": "Know What You Know",
+    "progressBody": "Track precisely which words you already know and how much progress you have made over days, weeks and months — broken down by language if you study more than one.",
+    "activityTitle": "Feel Your Progress",
+    "activityBody": "See exactly what words you learned recently and stay motivated as your vocabulary expands.",
+    "insightsTitle": "Session Snapshot",
+    "insightsBody": "After every review, see exactly what you accomplished: repetitions, new words, and time spent — all updated live the moment you finish.",
+    "habitsTitle": "Find Your Peak Hours",
+    "habitsBody": "Discover when you learn best. A breakdown of your study hours reveals your natural rhythm so you can schedule sessions when you're sharpest.",
+    "goalsTitle": "See The Big Picture",
+    "goalsBody": "Total words, sentences, reviews, and study time — your all-time stats prove how far you've come since day one.",
+    "multiLangTitle": "Compare Across Languages",
+    "multiLangBody": "Learning more than one language? See side-by-side progress for each one and spot which needs more attention.",
+    "accuracyTitle": "Measure Your Recall",
+    "accuracyBody": "Track your accuracy across full-review sessions. Watch it climb as spaced repetition strengthens your memory over time.",
+    "streakTitle": "Stay On Track",
+    "streakBody": "Your streak counts every consecutive day you practice. It's a simple, powerful motivator — and streak freezes have your back if life gets in the way.",
+    "feedbackTitle": "Instant Review Feedback",
+    "feedbackBody": "After typing your translation, get a character-level diff showing what you got right, what you missed, and your accuracy score — right away."
+  },
   "features": {
     "title": "Everything You Need to",
     "titleHighlight": "Learn Faster",
@@ -180,8 +205,8 @@
         "description": "Remember up to 10x more with scientifically-proven algorithms that show you cards exactly when you need them."
       },
       "languageIntelligence": {
-        "title": "Language Intelligence",
-        "description": "Learn the most commonly used words and phrases first, or focus on vocabulary for your specific goals and interests."
+        "title": "Comprehensible Input",
+        "description": "Every sentence is anchored in a language you already know. You stretch toward the translation, keeping difficulty challenging but never frustrating."
       }
     }
   },

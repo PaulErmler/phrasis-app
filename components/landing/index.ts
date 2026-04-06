@@ -1,3 +1,5 @@
+export { LandingPageClient } from './landing-page-client';
+export { LandingHeader } from './landing-header';
 export { HeroSection } from './hero-section';
 export { PhilosophySection } from './philosophy-section';
 export { LandingDemoProvider } from './landing-demo-context';
@@ -7,6 +9,6 @@ export { FeaturesSection } from './features-section';
 export { PricingSection } from './pricing-section';
 export { FAQSection } from './faq-section';
 export { DonationSection } from './donation-section';
-export { DonationMobileStack } from './donation-mobile-stack';
 export { InstallCtaSection } from './install-cta-section';
+export { LandingFooter } from './landing-footer';
 export { LandingSquircleIcon } from './landing-squircle-icon';

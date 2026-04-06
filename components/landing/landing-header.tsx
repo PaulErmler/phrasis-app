@@ -8,7 +8,7 @@ import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
-import { openPwaInstallDialog } from './open-pwa-install-dialog';
+import { openPwaInstallDialog } from '@/components/landing/open-pwa-install-dialog';
 
 interface LandingHeaderProps {
   isAuthenticated: boolean;
@@ -16,27 +16,33 @@ interface LandingHeaderProps {
 
 export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
   const t = useTranslations('LandingPage.header');
-
-  const navLinks = [
-    { href: '#review-modes', label: t('nav.howItWorks') },
-    { href: '#features', label: t('nav.features') },
-    { href: '#pricing', label: t('nav.pricing') },
-    { href: '#faq', label: t('nav.faq') },
-  ];
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     setMounted(true);
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const navLinks = [
+    { href: '#philosophy', label: t('nav.howItWorks') },
+    { href: '#features', label: t('nav.features') },
+    { href: '#pricing', label: t('nav.pricing') },
+    { href: '#faq', label: t('nav.faq') },
+  ];
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   const handleInstallClick = () => {
     openPwaInstallDialog();
     setMobileMenuOpen(false);
   };
-
-  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   const themeOptions = [
     { value: 'light', label: t('themeLight'), icon: Sun },
@@ -46,50 +52,54 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
 
   return (
     <>
-      <header className="absolute top-0 left-0 right-0 z-50">
+      <header
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+          scrolled
+            ? 'bg-background/80 backdrop-blur-xl border-b border-border/40 shadow-sm'
+            : 'bg-transparent'
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative flex items-center justify-between h-16 md:h-20">
-            {/* Left: Logo + Name */}
-            <Link href="/" className="flex items-center gap-2 shrink-0">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2.5 shrink-0">
               <img
                 src="/icons/icon.svg"
-                alt="Flexling language learning app"
-                className="w-8 h-8 md:w-10 md:h-10"
-                width={40}
-                height={40}
+                alt="Flexling"
+                className="w-8 h-8 md:w-9 md:h-9"
+                width={36}
+                height={36}
               />
-              <span className="text-xl md:text-2xl font-bold hidden sm:inline text-primary">
+              <span className="text-xl font-bold hidden sm:inline text-foreground">
                 Flexling
               </span>
             </Link>
 
-            {/* Center: Navigation links (desktop only) - absolutely centered */}
+            {/* Center nav (desktop) */}
             <nav className="hidden lg:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
               {navLinks.map((link) => (
                 <a
                   key={link.href}
                   href={link.href}
-                  className="px-4 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground transition-all duration-300 hover:bg-primary/10"
+                  className="px-4 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200"
                 >
                   {link.label}
                 </a>
               ))}
             </nav>
 
-            {/* Right: Actions */}
-            <div className="flex items-center gap-1">
-              {/* Install button (desktop only) */}
+            {/* Right actions */}
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={handleInstallClick}
-                className="hidden lg:flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium text-muted-foreground hover:text-foreground transition-all duration-300 hover:bg-primary/10"
+                className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground transition-colors duration-200"
               >
                 <Download className="h-4 w-4" />
                 {t('install')}
               </button>
 
-              {/* Auth buttons */}
               {isAuthenticated ? (
-                <Button asChild size="sm" className="hidden sm:inline-flex">
+                <Button asChild size="sm" className="hidden sm:inline-flex rounded-lg">
                   <Link href="/app">{t('goToApp')}</Link>
                 </Button>
               ) : (
@@ -103,27 +113,23 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                   <Button
                     asChild
                     size="sm"
-                    className="shadow-lg shadow-primary/20"
+                    className="rounded-lg ent-cta-orange font-semibold"
                   >
                     <Link href="/auth/sign-up">{t('signUp')}</Link>
                   </Button>
                 </>
               )}
 
-              {/* Language switcher (desktop only) */}
               <div className="hidden lg:block">
                 <LanguageSwitcher compact />
               </div>
-
-              {/* Theme switcher (desktop only) */}
               <div className="hidden lg:block">
                 <ThemeSwitcher />
               </div>
 
-              {/* Mobile menu button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all"
+                className="lg:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
                 aria-label={t('nav.menuAriaLabel')}
               >
                 {mobileMenuOpen ? (
@@ -136,7 +142,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
           </div>
         </div>
 
-        {/* Mobile menu panel - expands from top */}
+        {/* Mobile menu */}
         <div
           className={`absolute top-full left-0 right-0 lg:hidden transition-all duration-300 ease-out overflow-hidden ${
             mobileMenuOpen
@@ -144,30 +150,27 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
               : 'opacity-0 max-h-0 pointer-events-none'
           }`}
         >
-          <div className="mx-4 mt-2 p-2 rounded-2xl bg-background border border-border">
+          <div className="mx-4 mt-2 p-2 rounded-2xl bg-background border border-border shadow-lg">
             <nav className="flex flex-col">
               {navLinks.map((link) => (
                 <a
                   key={link.href}
                   href={link.href}
                   onClick={closeMobileMenu}
-                  className="px-4 py-3 rounded-xl text-base font-medium text-foreground hover:bg-primary/10 transition-all"
+                  className="px-4 py-3 rounded-xl text-base font-medium text-foreground hover:bg-muted transition-all"
                 >
                   {link.label}
                 </a>
               ))}
-
               <div className="h-px bg-border my-1 mx-2" />
-
               <button
                 onClick={handleInstallClick}
-                className="px-4 py-3 rounded-xl text-base font-medium text-foreground hover:bg-primary/10 transition-all w-full text-left"
+                className="px-4 py-3 rounded-xl text-base font-medium text-foreground hover:bg-muted transition-all w-full text-left"
               >
                 {t('installApp')}
               </button>
-
               <div className="px-4 py-2">
-                <span className="text-muted-sm">{t('theme')}</span>
+                <span className="text-sm text-muted-foreground">{t('theme')}</span>
                 <div className="flex gap-1 mt-2">
                   {themeOptions.map((option) => {
                     const isActive = mounted && theme === option.value;
@@ -178,7 +181,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                         className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                           isActive
                             ? 'bg-primary/15 text-primary'
-                            : 'text-muted-foreground hover:bg-primary/10 hover:text-foreground'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                         }`}
                       >
                         <option.icon className="h-4 w-4" />
@@ -188,8 +191,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
                   })}
                 </div>
               </div>
-
-              <div className="px-4 py-3 rounded-xl hover:bg-primary/10 transition-all">
+              <div className="px-4 py-3 rounded-xl hover:bg-muted transition-all">
                 <LanguageSwitcher className="border-0 bg-transparent p-0 h-auto shadow-none text-base font-medium" />
               </div>
             </nav>
@@ -197,7 +199,6 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
         </div>
       </header>
 
-      {/* Mobile menu overlay */}
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 lg:hidden"

@@ -96,7 +96,7 @@ All quota logic lives in `convex/usage/`:
 
 | File | Purpose |
 |---|---|
-| `helpers.ts` | Core functions: `checkQuota`, `decrementQuota`, `consumeQuota`, `syncAllFeatures` |
+| `helpers.ts` | Core functions: `checkQuota`, `decrementQuota`, `incrementQuota`, `consumeQuota`, `releaseQuota`, `syncAllFeatures` |
 | `tracking.ts` | Node actions: `trackUsage` (POST to Autumn /track + re-sync), `syncQuotasForUser`, `getOrCreateCustomer` |
 | `actions.ts` | Public action: `syncQuotas` (called from frontend on app load) |
 | `queries.ts` | Public query: `getMyQuotas` (reactive, powers `useFeatureQuota` hook) |
@@ -106,7 +106,9 @@ All quota logic lives in `convex/usage/`:
 
 - **`checkQuota(ctx, userId, featureId, amount)`** – read-only check. Returns `{ allowed, balance, synced }`. Returns `allowed: false` if no quota doc exists or the feature is missing.
 - **`decrementQuota(ctx, userId, featureId, amount)`** – writes to the local cache. Does NOT validate; caller must check first.
+- **`incrementQuota(ctx, userId, featureId, amount)`** – inverse local write used for release semantics (`balance += amount`, `used -= amount`, clamped at 0).
 - **`consumeQuota(ctx, userId, featureId, amount)`** – the main enforcement function. Combines check + decrement + schedules async Autumn tracking. Throws `ConvexError` with `code: 'USAGE_LIMIT'` when the limit is hit, or `code: 'QUOTA_NOT_SYNCED'` when no quota doc exists.
+- **`releaseQuota(ctx, userId, featureId, amount)`** – optimistic local release + async Autumn tracking with negative value (e.g. `-1` for releasing one course slot).
 - **`syncAllFeatures(userId, features)`** – internal mutation that overwrites the `usageQuotas` doc with fresh data from Autumn.
 
 ### Schema
@@ -219,7 +221,7 @@ Records a usage event. As of March 17, 2026, this endpoint no longer auto-create
 
 1. **On app load** – `app/app/(main)/layout.tsx` calls `syncQuotas` action once per session (guarded by a `useRef`). This calls `POST /customers` (getOrCreate) to ensure the customer exists in Autumn and fetch all entitlements, then writes them to the local `usageQuotas` table. For new users, this idempotently creates the customer and auto-enables the free plan.
 
-2. **After each tracked usage** – when `consumeQuota` is called in a mutation, it schedules `trackUsage` via `ctx.scheduler.runAfter(0, ...)`. The `trackUsage` action POSTs to Autumn's `/track` endpoint, then fetches the customer via `GET /customers/:id` and syncs back to Convex. This keeps the local cache consistent with Autumn's server-side state.
+2. **After each tracked usage** – when `consumeQuota` or `releaseQuota` is called in a mutation, it schedules `trackUsage` via `ctx.scheduler.runAfter(0, ...)` (positive for consume, negative for release). The `trackUsage` action POSTs to Autumn's `/track` endpoint, then fetches the customer via `GET /customers/:id` and syncs back to Convex. This keeps the local cache consistent with Autumn's server-side state.
 
 3. **Frontend reactivity** – `getMyQuotas` is a Convex query, so any write to `usageQuotas` automatically triggers re-renders in components using `useFeatureQuota`.
 
@@ -227,17 +229,19 @@ Records a usage event. As of March 17, 2026, this endpoint no longer auto-create
 
 ## Backend Enforcement (Mutations)
 
-Every mutation that consumes a gated resource calls `consumeQuota`. The current enforcement points:
+Mutations that change metered usage call `consumeQuota` or `releaseQuota`. The current enforcement points:
 
 | Mutation | File | Feature ID | Amount |
 |---|---|---|---|
 | `sendMessage` | `convex/features/chat/messages.ts` | `CHAT_MESSAGES` | 1 |
 | `approveCard` | `convex/features/chat/cardApprovals.ts` | `CUSTOM_SENTENCES` | 1 |
-| `createCourse` | `convex/features/courses.ts` | `COURSES` | 1 |
-| `duplicateCourse` | `convex/features/courses.ts` | `COURSES` | 1 |
+| `createCourse` | `convex/features/courses.ts` | `COURSES` | consume 1 |
+| `completeOnboarding` (course creation) | `convex/features/courses.ts` | `COURSES` | consume 1 |
+| `unarchiveCourse` | `convex/features/courses.ts` | `COURSES` | consume 1 |
+| `archiveCourse` | `convex/features/courses.ts` | `COURSES` | release 1 (track `-1`) |
 | `addToUserDeck` | `convex/features/decks.ts` | `SENTENCES` | batch size |
 
-The pattern is always:
+Typical consume pattern:
 
 ```typescript
 const userId = await requireAuthUserId(ctx);
@@ -245,7 +249,14 @@ await consumeQuota(ctx, userId, FEATURE_IDS.SOME_FEATURE, amount);
 // ... proceed with the actual logic
 ```
 
-If `consumeQuota` throws, the mutation aborts and the client receives the `ConvexError`.
+Release pattern:
+
+```typescript
+const userId = await requireAuthUserId(ctx);
+await releaseQuota(ctx, userId, FEATURE_IDS.SOME_FEATURE, amount);
+```
+
+If `consumeQuota` or `releaseQuota` throws, the mutation aborts and the client receives the `ConvexError`.
 
 **Boolean features** (like `MULTIPLE_LANGUAGES`) are NOT enforced via `consumeQuota`. Instead, the frontend uses `useFeatureQuota` to read the boolean state and conditionally limits the UI (e.g., max 2 languages vs. max 5).
 
@@ -291,7 +302,8 @@ Used in `CourseMenu` for the "Create New Course" button.
 Shown when a feature limit is fully reached (balance = 0). Uses `usePaywall({ featureId })` from `autumn-js/react` to fetch Autumn's paywall preview (which includes the next product/plan to upgrade to).
 
 - Shows a spinner only while `isLoading` is true.
-- Once loaded, displays a title/message from `getPaywallContent()` (in `lib/autumn/paywall-content.tsx`).
+- Once loaded, displays a title from `getPaywallTitle()` and a message from `getPaywallMessage()` (both in `lib/autumn/paywall-content.tsx`).
+- Products from the paywall preview are filtered with `filterProductsByFeatureIncrease()` so the suggested plan actually raises the limit for that feature. If that filter removes every product (e.g. the next tier is Basic but both Free and Basic grant the same number of active courses), **`PaywallDialog` falls back to `usePricingTable()`** and `findUpgradeProductFromPricingTable()` in `lib/autumn/find-upgrade-product.ts`—the same resolution path as `LowQuotaDialog`—so checkout can still offer a real upgrade (e.g. Pro).
 - Footer has two buttons:
   - **"Not now"** – dismisses the dialog.
   - **"Upgrade to {plan}"** – calls `useCustomer().checkout({ productId, dialog: CheckoutDialog })` to initiate the Autumn checkout flow in a dialog.
@@ -301,7 +313,7 @@ Shown when a feature limit is fully reached (balance = 0). Uses `usePaywall({ fe
 
 Shown when quota is low but not zero (1–3 remaining). Does NOT use `usePaywall` (which only works for actually-limited features). Instead uses `usePricingTable()` to find the next upgrade product.
 
-- Identifies the upgrade product via `products.find(p => p.scenario === "upgrade" || (p.scenario === "new" && !p.properties?.is_free))`.
+- Identifies the upgrade product via `findUpgradeProductFromPricingTable()` (`lib/autumn/find-upgrade-product.ts`).
 - Footer has two buttons:
   - **"Not now"** – dismisses the dialog.
   - **"Upgrade to {plan}"** – same checkout flow as `PaywallDialog`.
@@ -433,7 +445,7 @@ After a user completes checkout via `CheckoutDialog`, Autumn updates their entit
 | File | Role |
 |---|---|
 | `convex/features/featureIds.ts` | Feature ID constants |
-| `convex/usage/helpers.ts` | `checkQuota`, `consumeQuota`, `decrementQuota`, `syncAllFeatures` |
+| `convex/usage/helpers.ts` | `checkQuota`, `consumeQuota`, `releaseQuota`, `decrementQuota`, `incrementQuota`, `syncAllFeatures` |
 | `convex/usage/tracking.ts` | Autumn API calls: `trackUsage`, `fetchCustomerData`, `getOrCreateCustomer`, `syncQuotasForUser`, `toFeaturesRecord` |
 | `convex/usage/actions.ts` | Public `syncQuotas` action |
 | `convex/usage/queries.ts` | Public `getMyQuotas` query |

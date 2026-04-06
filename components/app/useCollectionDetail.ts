@@ -70,19 +70,21 @@ export function useCollectionDetail({
     ? COLLECTION_PREVIEW_SIZE
     : Math.min(COLLECTION_PREVIEW_SIZE, Math.max(0, sentencesQuota.balance));
 
-  const handleAddCards = useCallback(async () => {
-    if (!openCollectionId) return;
+  const handleAddCards = useCallback(async (targetCollectionId?: string) => {
+    const collectionId = targetCollectionId ?? openCollectionId;
+    if (!collectionId) return;
 
     setIsAdding(true);
     setUsageLimitHit(false);
     try {
       const result = await addCardsFromCollection({
-        collectionId: openCollectionId as Id<'collections'>,
+        collectionId: collectionId as Id<'collections'>,
         batchSize: effectiveBatchSize > 0 ? effectiveBatchSize : COLLECTION_PREVIEW_SIZE,
+        exclusive: true,
       });
 
       if (activeCourseId) {
-        ensuredRef.current.delete(`${activeCourseId}:${openCollectionId}`);
+        ensuredRef.current.delete(`${activeCourseId}:${collectionId}`);
       }
 
       if (result.cardsAdded === 0) {
@@ -91,12 +93,15 @@ export function useCollectionDetail({
         toast.success(t('cardsAdded', { count: result.cardsAdded }));
       }
     } catch (error) {
-      if (
-        error instanceof ConvexError &&
-        (error.data as { code?: string })?.code === 'USAGE_LIMIT'
-      ) {
+      const code = error instanceof ConvexError
+        ? (error.data as { code?: string })?.code
+        : undefined;
+      if (code === 'USAGE_LIMIT') {
         setUsageLimitHit(true);
+      } else if (code === 'QUOTA_NOT_SYNCED') {
+        toast.error(t('failedToAdd'));
       } else {
+        console.error('Failed to add cards:', error);
         toast.error(t('failedToAdd'));
       }
     } finally {

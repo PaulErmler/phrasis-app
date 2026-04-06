@@ -1,9 +1,11 @@
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { isAuthenticated, preloadAuthQuery } from '@/lib/auth-server';
 import { api } from '@/convex/_generated/api';
 import { AppDataProvider } from '@/components/app/AppDataProvider';
 import { ClientAuthBoundary } from '@/components/ClientAuthBoundary';
 import { OnboardingGuard } from '@/components/app/OnboardingGuard';
+import { AuthRefresh } from '@/components/AuthRefresh';
 
 export default async function AppLayout({
   children,
@@ -12,7 +14,19 @@ export default async function AppLayout({
 }) {
   const authed = await isAuthenticated();
   if (!authed) {
-    redirect('/auth/sign-in');
+    const cookieStore = await cookies();
+    const hasSessionCookie = cookieStore.has('better-auth.session_token');
+
+    if (!hasSessionCookie) {
+      redirect('/auth/sign-in');
+    }
+
+    // Session cookie exists but server auth failed (stale tab).
+    // Auto-reload so the cookie gets re-validated on a fresh request.
+    console.warn('[AUTH_REFRESH] Session cookie exists but server auth failed, triggering client reload', {
+      timestamp: new Date().toISOString(),
+    });
+    return <AuthRefresh />;
   }
 
   const [

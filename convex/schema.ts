@@ -94,6 +94,8 @@ export default defineSchema({
     baseLanguages: v.array(v.string()), // ISO codes (e.g., ["en"])
     targetLanguages: v.array(v.string()), // ISO codes (e.g., ["es", "fr"])
     currentLevel: v.optional(currentLevelValidator), // User's current level in this course
+    isArchived: v.optional(v.boolean()),
+    archivedAt: v.optional(v.number()), // Timestamp; 30-day cooldown before unarchive
   }).index('by_userId', ['userId']),
 
   // Course settings table — separated so changes don't trigger course re-fetches
@@ -125,6 +127,8 @@ export default defineSchema({
     instantProceedFull: v.optional(v.boolean()), // auto-advance when rating is clicked (full mode, default true)
     // Review mode
     reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
+    // Scheduling mode
+    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))), // 'learnAndReview' (default) or 'learn_new'
     fullReviewTargetAudioMode: v.optional(
       v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
     ), // When to play target audio in full review mode
@@ -154,7 +158,9 @@ export default defineSchema({
     fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
     searchableText: v.optional(v.string()), // Denormalized source text + translations for full-text search
     searchableTextLanguages: v.optional(v.array(v.string())), // Language codes included in searchableText; used to detect staleness when course languages change
+    isGraduated: v.optional(v.boolean()), // One-way flag: true once card graduates from initial learning (FSRS state >= Review)
     lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review and FSRS phases)
+    wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
   })
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_dueDate', ['deckId', 'dueDate'])
@@ -169,6 +175,13 @@ export default defineSchema({
     .index('by_deckId_and_lastReviewedAt', ['deckId', 'lastReviewedAt'])
     .index('by_deckId_and_isHidden_and_lastReviewedAt', ['deckId', 'isHidden', 'lastReviewedAt'])
     .index('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', ['deckId', 'isHidden', 'isMastered', 'lastReviewedAt'])
+    .index('by_deck_hidden_mastered_graduated_due', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'isGraduated',
+      'dueDate',
+    ])
     .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
     .searchIndex('search_text', {
       searchField: 'searchableText',
@@ -184,8 +197,18 @@ export default defineSchema({
     totalCards: v.number(),
     currentStreak: v.number(),
     lastActivityDate: v.optional(v.string()), // "YYYY-MM-DD" in user's local timezone
+    timezone: v.optional(v.string()), // IANA timezone, updated on every review
     streakFreezeCount: v.optional(v.number()),
     streakFreezeUsedDate: v.optional(v.string()),
+    // Extended cumulative counters
+    totalWordCount: v.optional(v.number()),
+    totalChatMessages: v.optional(v.number()),
+    totalChatCardsApproved: v.optional(v.number()),
+    totalCardsEdited: v.optional(v.number()),
+    totalCardsAddedManually: v.optional(v.number()),
+    totalReviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    totalAccuracySum: v.optional(v.number()),
+    totalAccuracyCount: v.optional(v.number()),
   }).index('by_userId_and_courseId', ['userId', 'courseId']),
 
   // Daily stats table - one document per user + course + day
@@ -197,6 +220,30 @@ export default defineSchema({
     newCards: v.number(),
     timeMs: v.number(),
     cardsReviewed: v.number(),
+    // Review mode breakdown
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    timeMsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    // Rating distribution
+    ratingCounts: v.optional(v.object({
+      stillLearning: v.number(), understood: v.number(),
+      again: v.number(), hard: v.number(), good: v.number(), easy: v.number(),
+    })),
+    defaultRatingUsed: v.optional(v.number()),
+    defaultRatingChanged: v.optional(v.number()),
+    // Full review accuracy
+    accuracySum: v.optional(v.number()),
+    accuracyCount: v.optional(v.number()),
+    // Hour-of-day distribution (24-element array, index = hour 0-23)
+    hourBuckets: v.optional(v.array(v.number())),
+    // Card state distribution
+    reviewsByCardState: v.optional(v.object({
+      new: v.number(), learning: v.number(), review: v.number(), relearning: v.number(),
+    })),
+    // Event counters
+    chatMessagesSent: v.optional(v.number()),
+    chatCardsApproved: v.optional(v.number()),
+    cardsEdited: v.optional(v.number()),
+    cardsAddedManually: v.optional(v.number()),
   }).index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date']),
 
   // Collection progress table - tracks cards added per collection/course
@@ -205,6 +252,7 @@ export default defineSchema({
     courseId: v.id('courses'), // Reference to the course
     collectionId: v.id('collections'), // Reference to the collection
     cardsAdded: v.number(), // Count of cards added from this collection
+    cardsLearned: v.optional(v.number()), // Count of cards with first review completed
     lastRankProcessed: v.optional(v.number()), // Last collectionRank processed (for efficient pagination)
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])
@@ -250,6 +298,98 @@ export default defineSchema({
     language: v.string(),
     claimedAt: v.number(),
   }).index('by_text_and_language', ['textId', 'language']),
+
+  // Daily per-language stats
+  dailyLanguageStats: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    date: v.string(),
+    language: v.string(),
+    reps: v.number(),
+    newCards: v.number(),
+    timeMs: v.number(),
+    newWordsCount: v.number(),
+  })
+    .index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date'])
+    .index('by_userId_and_courseId_and_language_and_date', ['userId', 'courseId', 'language', 'date']),
+
+  // Unique words per user per language
+  userWords: defineTable({
+    userId: v.string(),
+    language: v.string(),
+    word: v.string(),
+  })
+    .index('by_userId_and_language_and_word', ['userId', 'language', 'word'])
+    .index('by_userId_and_language', ['userId', 'language']),
+
+  // All-time per-language totals
+  languageStats: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    language: v.string(),
+    totalRepetitions: v.number(),
+    totalNewCards: v.number(),
+    totalTimeMs: v.number(),
+    totalWords: v.number(),
+  })
+    .index('by_userId_and_courseId', ['userId', 'courseId'])
+    .index('by_userId_and_courseId_and_language', ['userId', 'courseId', 'language']),
+
+  // Weekly stats (ISO 8601 weeks)
+  weeklyStats: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    week: v.string(), // "YYYY-Www"
+    totalRepetitions: v.number(),
+    totalNewCards: v.number(),
+    totalTimeMs: v.number(),
+    activeDays: v.number(),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+  })
+    .index('by_userId_and_courseId_and_week', ['userId', 'courseId', 'week'])
+    .index('by_userId_and_courseId', ['userId', 'courseId']),
+
+  // Monthly stats
+  monthlyStats: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    month: v.string(), // "YYYY-MM"
+    totalRepetitions: v.number(),
+    totalNewCards: v.number(),
+    totalTimeMs: v.number(),
+    activeDays: v.number(),
+    activeWeeks: v.number(),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+  })
+    .index('by_userId_and_courseId_and_month', ['userId', 'courseId', 'month'])
+    .index('by_userId_and_courseId', ['userId', 'courseId']),
+
+  // Yearly stats
+  yearlyStats: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    year: v.string(), // "YYYY"
+    totalRepetitions: v.number(),
+    totalNewCards: v.number(),
+    totalTimeMs: v.number(),
+    activeDays: v.number(),
+    activeWeeks: v.number(),
+    activeMonths: v.number(),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+  })
+    .index('by_userId_and_courseId_and_year', ['userId', 'courseId', 'year'])
+    .index('by_userId_and_courseId', ['userId', 'courseId']),
+
+  // Accuracy by review depth
+  reviewDepthAccuracy: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    reviewNumber: v.number(),
+    accuracySum: v.number(),
+    count: v.number(),
+  })
+    .index('by_userId_and_courseId', ['userId', 'courseId'])
+    .index('by_userId_and_courseId_and_reviewNumber', ['userId', 'courseId', 'reviewNumber']),
 
   // Usage quotas — local cache of Autumn entitlements for synchronous checks.
   // One document per user; features stored as a record keyed by feature ID.

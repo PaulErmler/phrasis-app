@@ -1,22 +1,30 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { AuthBoundary } from '@convex-dev/better-auth/react';
-import { api } from '@/convex/_generated/api';
-import { isAuthError } from '@/lib/utils';
-import { authClient } from '@/lib/auth-client';
+import { useEffect } from 'react';
+import { Authenticated, AuthLoading, Unauthenticated } from 'convex/react';
 import type { PropsWithChildren } from 'react';
 
-export function ClientAuthBoundary({ children }: PropsWithChildren) {
+function UnauthRedirect() {
   const router = useRouter();
+  useEffect(() => {
+    router.replace('/auth/sign-in');
+  }, [router]);
+  return null;
+}
+
+export function ClientAuthBoundary({ children }: PropsWithChildren) {
   return (
-    <AuthBoundary
-      authClient={authClient}
-      onUnauth={() => router.replace('/auth/sign-in')}
-      getAuthUserFn={api.auth.getAuthUser}
-      isAuthError={isAuthError}
-    >
-      {children}
-    </AuthBoundary>
+    <>
+      <AuthLoading>
+        <div className="h-dvh" />
+      </AuthLoading>
+      <Authenticated>
+        {children}
+      </Authenticated>
+      <Unauthenticated>
+        <UnauthRedirect />
+      </Unauthenticated>
+    </>
   );
 }

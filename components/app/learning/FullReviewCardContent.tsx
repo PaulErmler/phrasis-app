@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/tooltip';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
-import { DiffDisplay } from './DiffDisplay';
+import { DiffDisplay, computeAccuracy } from './DiffDisplay';
 import {
   getLanguageShortLabel,
   getLocalizedLanguageNameByCode,
@@ -46,6 +46,7 @@ interface FullReviewCardContentProps {
   targetAudioMode: TargetAudioMode;
   allRevealed?: boolean;
   onAllSubmittedChange?: (allSubmitted: boolean) => void;
+  onAccuracyChange?: (accuracy: number | null) => void;
   bare?: boolean;
   showRomanization?: boolean;
   /** Clears submission stack when the reviewed card changes */
@@ -72,6 +73,7 @@ export function FullReviewCardContent({
   targetAudioMode,
   allRevealed = false,
   onAllSubmittedChange,
+  onAccuracyChange,
   bare = false,
   showRomanization = true,
   cardId,
@@ -125,6 +127,24 @@ export function FullReviewCardContent({
   useEffect(() => {
     onAllSubmittedChangeRef.current?.(allSubmitted);
   }, [allSubmitted]);
+
+  // Compute average accuracy across all target languages when all are submitted
+  const onAccuracyChangeRef = useRef(onAccuracyChange);
+  onAccuracyChangeRef.current = onAccuracyChange;
+  useEffect(() => {
+    if (!allSubmitted) {
+      onAccuracyChangeRef.current?.(null);
+      return;
+    }
+    let total = 0;
+    let count = 0;
+    for (const tr of targetTranslations) {
+      const userText = inputs.get(tr.language)?.userText ?? '';
+      total += computeAccuracy(tr.text, userText);
+      count++;
+    }
+    onAccuracyChangeRef.current?.(count > 0 ? Math.round(total / count) : null);
+  }, [allSubmitted, inputs, targetTranslations]);
 
   const onAudioPlayRef = useRef(onAudioPlay);
   onAudioPlayRef.current = onAudioPlay;

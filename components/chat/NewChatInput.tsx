@@ -85,6 +85,7 @@ export function NewChatInput({
         });
 
         setText('');
+        setIsProcessing(false);
         if (onChatCreated) {
           onChatCreated(threadId);
         } else {

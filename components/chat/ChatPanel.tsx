@@ -10,6 +10,7 @@ import { useChat } from '@/hooks/use-chat';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import type { ToolRenderer, MessageFooterRenderer } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
+import { ChatErrorBoundary } from '@/components/chat/MessageErrorBoundary';
 import { Button } from '@/components/ui/button';
 import type { Id } from '@/convex/_generated/dataModel';
 import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
@@ -38,6 +39,8 @@ interface ChatPanelProps {
   approvalsLoading?: boolean;
   /** When false, prevents the chat input from auto-focusing on mount */
   autoFocus?: boolean;
+  /** When true, skips bottom padding (e.g. when no bottom nav is present) */
+  noBottomPadding?: boolean;
 }
 
 /**
@@ -60,6 +63,7 @@ export function ChatPanel({
   aboveFooterAction,
   approvalsLoading = false,
   autoFocus,
+  noBottomPadding = false,
 }: ChatPanelProps) {
   const { isAvailable } = useFeatureQuota(FEATURE_IDS.CHAT_MESSAGES);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -124,7 +128,13 @@ export function ChatPanel({
     [chat],
   );
 
+  const tError = useTranslations('Chat.chatError');
+
   return (
+    <ChatErrorBoundary
+      fallbackMessage={tError('title')}
+      retryLabel={tError('retry')}
+    >
     <div className="flex flex-col h-full w-full min-w-0">
       {header}
 
@@ -145,7 +155,7 @@ export function ChatPanel({
         )}
       </div>
 
-      <div className="flex-none border-t bg-background">
+      <div className={cn("flex-none border-t bg-background", !noBottomPadding && "pb-16")}>
         <div className={cn("p-4", className)}>
           {isThreadLimitReached ? (
             <div className="flex flex-col items-center gap-3 py-2 text-center">
@@ -195,5 +205,6 @@ export function ChatPanel({
         />
       )}
     </div>
+    </ChatErrorBoundary>
   );
 }

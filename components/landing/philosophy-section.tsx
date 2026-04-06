@@ -1,52 +1,98 @@
-import { getTranslations } from 'next-intl/server';
-import { PhilosophyPillarsClient, type PhilosophyPillar } from './philosophy-pillars-client';
+'use client';
 
-function PhilosophyHeading({ title, titleHighlight }: { title: string; titleHighlight: string }) {
-  const highlight = titleHighlight.trim();
-  return (
-    <>
-      {title}
-      {highlight ? (
-        <>
-          {' '}
-          <span className="gradient-text">{highlight}</span>
-        </>
-      ) : null}
-    </>
-  );
-}
+import { useTranslations } from 'next-intl';
+import { motion } from 'motion/react';
+import { RefreshCw, Pencil, TrendingUp } from 'lucide-react';
+import { LandingSquircleIcon } from '@/components/landing/landing-squircle-icon';
 
-export async function PhilosophySection() {
-  const t = await getTranslations('LandingPage.philosophy');
-  const title = t('title');
-  const titleHighlight = t('titleHighlight');
+const fadeInUp = {
+  initial: { opacity: 0, y: 30 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true },
+  transition: { duration: 0.6, ease: 'easeOut' as const },
+};
 
-  const pillars: [PhilosophyPillar, PhilosophyPillar, PhilosophyPillar] = [
-    { title: t('pillar1Title'), body: t('pillar1Body') },
-    { title: t('pillar2Title'), body: t('pillar2Body') },
-    { title: t('pillar3Title'), body: t('pillar3Body') },
+
+export function PhilosophySection() {
+  const t = useTranslations('LandingPage.philosophy');
+
+  const pillars = [
+    { number: '01', title: t('pillar1Title'), body: t('pillar1Body') },
+    { number: '02', title: t('pillar2Title'), body: t('pillar2Body') },
+    { number: '03', title: t('pillar3Title'), body: t('pillar3Body') },
   ];
 
   return (
-    <section
-      id="philosophy"
-      className="relative py-16 md:py-24 px-4 border-t border-border/60 bg-muted/10 max-md:z-[2] max-md:isolate md:z-auto"
-    >
+    <section id="philosophy" className="relative py-20 md:py-32 px-4 sm:px-6">
       <div className="max-w-7xl mx-auto">
-        <div className="hidden md:block max-w-3xl mx-auto text-center space-y-5 mb-10 md:mb-14">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-            <PhilosophyHeading title={title} titleHighlight={titleHighlight} />
+        <motion.div
+          {...fadeInUp}
+          className="mb-14 md:mb-20 max-w-2xl"
+        >
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight text-foreground mb-5">
+            {t('title')}{' '}
+            <span className="text-primary">{t('titleHighlight')}</span>
           </h2>
           <p className="text-base md:text-lg text-muted-foreground leading-relaxed">
             {t('lead')}
           </p>
-        </div>
+        </motion.div>
 
-        <PhilosophyPillarsClient
-          pillars={pillars}
-          title={<PhilosophyHeading title={title} titleHighlight={titleHighlight} />}
-          lead={t('lead')}
-        />
+        {/* Asymmetric grid */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-5 md:gap-6">
+          {/* Row 1: pillar 1 (col-span-7) + pillar 2 (col-span-5) */}
+          <motion.div
+            {...fadeInUp}
+            transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' as const }}
+            className="relative md:col-span-7 rounded-2xl border border-border/40 bg-card p-8 md:p-10 overflow-hidden"
+          >
+            <span className="ent-pillar-number">{pillars[0].number}</span>
+            <LandingSquircleIcon className="mb-5 relative">
+              <RefreshCw className="h-6 w-6 text-white" />
+            </LandingSquircleIcon>
+            <h3 className="text-xl md:text-2xl font-semibold mb-3 relative">
+              {pillars[0].title}
+            </h3>
+            <p className="text-muted-foreground leading-relaxed relative">
+              {pillars[0].body}
+            </p>
+          </motion.div>
+
+          <motion.div
+            {...fadeInUp}
+            transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' as const }}
+            className="relative md:col-span-5 rounded-2xl border border-border/40 bg-card p-8 md:p-10 overflow-hidden"
+          >
+            <span className="ent-pillar-number">{pillars[1].number}</span>
+            <LandingSquircleIcon className="mb-5 relative">
+              <Pencil className="h-6 w-6 text-white" />
+            </LandingSquircleIcon>
+            <h3 className="text-xl md:text-2xl font-semibold mb-3 relative">
+              {pillars[1].title}
+            </h3>
+            <p className="text-muted-foreground leading-relaxed relative">
+              {pillars[1].body}
+            </p>
+          </motion.div>
+
+          {/* Row 2: pillar 3, centered col-span-8 */}
+          <motion.div
+            {...fadeInUp}
+            transition={{ duration: 0.6, delay: 0.3, ease: 'easeOut' as const }}
+            className="relative md:col-span-8 md:col-start-3 rounded-2xl border border-border/40 bg-card p-8 md:p-10 overflow-hidden"
+          >
+            <span className="ent-pillar-number">{pillars[2].number}</span>
+            <LandingSquircleIcon className="mb-5 relative">
+              <TrendingUp className="h-6 w-6 text-white" />
+            </LandingSquircleIcon>
+            <h3 className="text-xl md:text-2xl font-semibold mb-3 relative">
+              {pillars[2].title}
+            </h3>
+            <p className="text-muted-foreground leading-relaxed relative">
+              {pillars[2].body}
+            </p>
+          </motion.div>
+        </div>
       </div>
     </section>
   );

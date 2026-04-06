@@ -13,6 +13,7 @@ import { agent } from './agent';
 import type { MutationCtx } from '../../_generated/server';
 import type { Id } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
+import { trackEvent } from '../../db/stats/dailyStats';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS } from '../../config/aiModels';
@@ -215,6 +216,12 @@ export const sendMessage = mutation({
       },
     );
 
+    // Track chat message event
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (active) {
+      await trackEvent(ctx, { userId, courseId: active.course._id, field: 'chatMessagesSent' });
+    }
+
     return messageId;
   },
 });
@@ -308,7 +315,7 @@ export const generateResponse = internalAction({
           promptMessageId: args.promptMessageId,
           system,
         },
-        { saveStreamDeltas: { chunking: "word", throttleMs: 250 } },
+        { saveStreamDeltas: { chunking: "word", throttleMs: 500 } },
       );
     } catch (error) {
       console.error('Failed to generate AI response:', error);
