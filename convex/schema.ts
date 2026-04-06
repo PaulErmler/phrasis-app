@@ -320,7 +320,12 @@ export default defineSchema({
     userId: v.string(),
     courseId: v.optional(v.id('courses')),
     language: v.string(),
+    // Normalized (lowercased, NFC) form — used as the uniqueness key.
     word: v.string(),
+    // Preferred display form, preserving original casing from source text
+    // (e.g. German nouns stay capitalized). Optional to accommodate
+    // pre-migration rows; new writes always populate it.
+    displayWord: v.optional(v.string()),
   })
     .index('by_userId_and_courseId_and_language_and_word',
       ['userId', 'courseId', 'language', 'word'])
