@@ -28,7 +28,7 @@ export function tokenizeText(text: string, language: string): Token[] {
       .filter((seg) => seg.isWordLike)
       .map((seg) => ({
         original: seg.segment,
-        normalized: seg.segment.toLowerCase(),
+        normalized: seg.segment.toLowerCase().normalize('NFC'),
       }));
   }
 
@@ -36,7 +36,7 @@ export function tokenizeText(text: string, language: string): Token[] {
     .replace(/[^\p{L}\p{N}\s'-]/gu, '')
     .split(/\s+/)
     .filter((w) => w.length > 0)
-    .map((w) => ({ original: w, normalized: w.toLowerCase() }));
+    .map((w) => ({ original: w, normalized: w.toLowerCase().normalize('NFC') }));
 }
 
 export async function trackNewWords(
