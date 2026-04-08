@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { isAuthenticated, preloadAuthQuery } from '@/lib/auth-server';
 import { api } from '@/convex/_generated/api';
@@ -6,6 +5,7 @@ import { AppDataProvider } from '@/components/app/AppDataProvider';
 import { ClientAuthBoundary } from '@/components/ClientAuthBoundary';
 import { OnboardingGuard } from '@/components/app/OnboardingGuard';
 import { AuthRefresh } from '@/components/AuthRefresh';
+import { SignInPrompt } from '@/components/SignInPrompt';
 
 export default async function AppLayout({
   children,
@@ -18,7 +18,7 @@ export default async function AppLayout({
     const hasSessionCookie = cookieStore.has('better-auth.session_token');
 
     if (!hasSessionCookie) {
-      redirect('/auth/sign-in');
+      return <SignInPrompt />;
     }
 
     // Session cookie exists but server auth failed (stale tab).

@@ -157,6 +157,7 @@ export default function MainLayout({
   // Tab switching — pushState so browser back/forward works between tabs
   const handleViewChange = useCallback((view: View) => {
     setActiveView(view);
+    isLearnOpenRef.current = false;
     setIsLearnOpen(false);
     if (view === 'stats') setHasVisitedStats(true);
     if (view === 'library') setHasVisitedLibrary(true);
@@ -171,6 +172,7 @@ export default function MainLayout({
       return 'chat';
     });
     setChatThreadId(threadId);
+    isLearnOpenRef.current = false;
     setIsLearnOpen(false);
     setHasVisitedStats(false);
     setHasVisitedLibrary(false);
@@ -210,6 +212,9 @@ export default function MainLayout({
 
   const handleLearnClose = useCallback(() => {
     setJustReturnedFromLearn(true);
+    // Sync ref BEFORE history.back() to avoid a race where the popstate
+    // swipe-back guard sees a stale `true` value and re-pushes /app/learn.
+    isLearnOpenRef.current = false;
     setIsLearnOpen(false);
     history.back();
     refreshPrefetchedThread();
