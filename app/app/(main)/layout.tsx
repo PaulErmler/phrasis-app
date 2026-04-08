@@ -35,7 +35,12 @@ const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   settings: '/app/settings',
 };
 
-function viewFromPathname(pathname: string): { view: View; chatThreadId?: string } {
+function viewFromPathname(pathname: string): {
+  view: View;
+  chatThreadId?: string;
+  isLearnOpen?: boolean;
+} {
+  if (pathname.startsWith('/app/learn')) return { view: 'home', isLearnOpen: true };
   if (pathname.startsWith('/app/content')) return { view: 'home' };
   if (pathname.startsWith('/app/library')) return { view: 'library' };
   if (pathname.startsWith('/app/stats')) return { view: 'stats' };
@@ -81,7 +86,7 @@ export default function MainLayout({
   const viewBeforeChatRef = useRef<Exclude<View, 'chat'>>('home');
   const [hasVisitedStats, setHasVisitedStats] = useState(initialView.view === 'stats');
   const [hasVisitedLibrary, setHasVisitedLibrary] = useState(initialView.view === 'library');
-  const [isLearnOpen, setIsLearnOpen] = useState(false);
+  const [isLearnOpen, setIsLearnOpen] = useState(initialView.isLearnOpen ?? false);
   const isLearnOpenRef = useRef(false);
   useEffect(() => { isLearnOpenRef.current = isLearnOpen; }, [isLearnOpen]);
   const isAddCardsRoute = pathname === '/app/content/add-cards';

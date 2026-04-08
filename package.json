@@ -27,6 +27,7 @@
     "@c15t/nextjs": "^1.8.5",
     "@c15t/react": "^1.8.5",
     "@c15t/scripts": "^1.0.1",
+    "@convex-dev/action-retrier": "^0.3.0",
     "@convex-dev/agent": "^0.3.2",
     "@convex-dev/aggregate": "^0.2.1",
     "@convex-dev/better-auth": "^0.11.3",

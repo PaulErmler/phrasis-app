@@ -597,6 +597,17 @@ export function getVoiceGenderByApiCode(apiCode: string): 'male' | 'female' | un
 }
 
 /**
+ * Resolve a concrete audio voice gender from an optional linguistic speaker gender.
+ * If the linguistic speakerGender is "male" or "female" the result mirrors it; otherwise
+ * (neutral / undefined) the function coin-flips so all languages of one sentence end up
+ * using a single, consistent voice gender.
+ */
+export function resolveAudioSpeakerGender(speakerGender?: string): 'male' | 'female' {
+  if (speakerGender === 'male' || speakerGender === 'female') return speakerGender;
+  return Math.random() < 0.5 ? 'male' : 'female';
+}
+
+/**
  * Get a voice for a language, optionally matching a speaker gender.
  * Falls back to random selection when gender is "neutral", undefined, or no matching voice exists.
  */

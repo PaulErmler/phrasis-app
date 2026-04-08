@@ -36,8 +36,16 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
   const createCustomText = useMutation(api.features.customTexts.createCustomText);
   const autoFillTranslations = useAction(api.features.customTexts.autoFillTranslations);
 
+  type SentenceMetadata = {
+    register: string;
+    addresseeNumber: string;
+    speakerGender: string;
+    addresseeGender: string;
+  };
+
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [userEditedLangs, setUserEditedLangs] = useState<Set<string>>(new Set());
+  const [autoFillMetadata, setAutoFillMetadata] = useState<SentenceMetadata | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -82,6 +90,7 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
   const handleReset = useCallback(() => {
     setTexts({});
     setUserEditedLangs(new Set());
+    setAutoFillMetadata(null);
     firstInputRef.current?.focus();
   }, []);
 
@@ -106,7 +115,7 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
 
     setIsAutoFilling(true);
     try {
-      const results = await autoFillTranslations({
+      const { translations: results, metadata } = await autoFillTranslations({
         texts: sourceTexts,
         targetLanguages: langsToFill,
       });
@@ -121,6 +130,7 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
         }
         return next;
       });
+      setAutoFillMetadata(metadata);
     } catch (err) {
       if (
         err instanceof ConvexError &&
@@ -161,10 +171,15 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
         language: lang,
         text: texts[lang].trim(),
       }));
-      await createCustomText({ translations, timezone: getUserTimezone() });
+      await createCustomText({
+        translations,
+        timezone: getUserTimezone(),
+        ...(autoFillMetadata ? { metadata: autoFillMetadata } : {}),
+      });
       toast.success(t('saveSuccess'));
       setTexts({});
       setUserEditedLangs(new Set());
+      setAutoFillMetadata(null);
       firstInputRef.current?.focus();
     } catch (err) {
       if (
@@ -184,7 +199,7 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
     } finally {
       setIsSaving(false);
     }
-  }, [saveQuota.isAvailable, orderedLanguages, texts, createCustomText, t]);
+  }, [saveQuota.isAvailable, orderedLanguages, texts, createCustomText, t, autoFillMetadata]);
 
   return (
     <>
@@ -253,6 +268,8 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
                           next.add(lang);
                           return next;
                         });
+                        // Any edit invalidates auto-fill metadata; the server will regenerate it.
+                        setAutoFillMetadata(null);
                       }}
                       className={
                         isOverLimit
