@@ -37,10 +37,10 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
   const autoFillTranslations = useAction(api.features.customTexts.autoFillTranslations);
 
   type SentenceMetadata = {
-    register: string;
-    addresseeNumber: string;
-    speakerGender: string;
-    addresseeGender: string;
+    register: 'formal' | 'informal' | 'neutral';
+    addresseeNumber: 'singular' | 'plural' | 'not_applicable';
+    speakerGender: 'male' | 'female' | 'neutral';
+    addresseeGender: 'male' | 'female' | 'neutral' | 'not_applicable';
   };
 
   const [texts, setTexts] = useState<Record<string, string>>({});
