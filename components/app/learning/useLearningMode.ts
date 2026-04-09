@@ -69,6 +69,7 @@ interface NoCardsDueState extends BaseState {
   isAddingCards: boolean;
   batchSize: number;
   sentencesRemaining: number | null;
+  remainingInCollection: number | null;
   schedulingMode: SchedulingMode;
   handleSchedulingModeChange: (mode: SchedulingMode) => void;
 }
@@ -245,6 +246,8 @@ export function useLearningMode(
     }
   });
   const sentencesQuota = useFeatureQuota(FEATURE_IDS.SENTENCES);
+
+  const collectionProgress = useQuery(api.features.decks.getCollectionProgress, {});
 
   const [isReviewing, setIsReviewing] = useState(false);
   const [isAddingCards, setIsAddingCards] = useState(false);
@@ -504,6 +507,13 @@ export function useLearningMode(
 
   // No cards due
   if (cardForReview === null) {
+    const activeEntry = collectionProgress?.find(
+      (c) => c.collectionId === courseSettings.activeCollectionId,
+    );
+    const remainingInCollection = activeEntry
+      ? Math.max(0, activeEntry.totalTexts - activeEntry.cardsAdded)
+      : null;
+
     return {
       ...base,
       status: 'noCardsDue',
@@ -514,6 +524,7 @@ export function useLearningMode(
       isAddingCards,
       batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
       sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
+      remainingInCollection,
       schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
       handleSchedulingModeChange,
     };

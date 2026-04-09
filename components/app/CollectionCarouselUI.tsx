@@ -217,10 +217,11 @@ function InlineCollectionDetail({
   const isComplete =
     collection.cardsAdded >= collection.totalTexts && collection.totalTexts > 0;
   const remaining = collection.totalTexts - collection.cardsAdded;
-  const addCount =
-    sentencesRemaining != null
-      ? Math.min(5, sentencesRemaining)
-      : 5;
+  const addCount = Math.min(
+    5,
+    remaining,
+    ...(sentencesRemaining != null ? [sentencesRemaining] : []),
+  );
 
   return (
     <div className="rounded-xl border-2 bg-card overflow-hidden">
