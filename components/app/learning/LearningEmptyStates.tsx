@@ -56,8 +56,9 @@ export function NoCardsDueState({
   const displayCount = Math.min(
     batchSize,
     ...(sentencesRemaining != null ? [sentencesRemaining] : []),
-    ...(remainingInCollection != null && remainingInCollection > 0 ? [remainingInCollection] : []),
+    ...(remainingInCollection != null ? [remainingInCollection] : []),
   );
+  const noCardsAvailable = displayCount === 0;
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center gap-6 px-4">
@@ -79,7 +80,7 @@ export function NoCardsDueState({
           <Button
             size="lg"
             onClick={onAddCards}
-            disabled={isAddingCards}
+            disabled={isAddingCards || noCardsAvailable}
             className="gap-2"
           >
             {isAddingCards ? (

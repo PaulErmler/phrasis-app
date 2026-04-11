@@ -58,11 +58,14 @@ export async function scheduleMissingContent(
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sourceLanguage = text.language;
 
-  // Resolve audioSpeakerGender: prefer existing value, fall back to speakerGender,
+  // Resolve audioSpeakerGender: prefer existing valid value, fall back to speakerGender,
   // then coin-flip via resolveAudioSpeakerGender. Patch the text to make it durable.
-  let audioSpeakerGender = text.audioSpeakerGender as 'male' | 'female' | undefined;
-  if (!audioSpeakerGender) {
-    audioSpeakerGender = resolveAudioSpeakerGender(text.speakerGender);
+  const storedGender = text.audioSpeakerGender;
+  let audioSpeakerGender: 'male' | 'female' =
+    storedGender === 'male' || storedGender === 'female'
+      ? storedGender
+      : resolveAudioSpeakerGender(text.speakerGender);
+  if (storedGender !== audioSpeakerGender) {
     await ctx.db.patch(textId, { audioSpeakerGender });
   }
 

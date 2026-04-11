@@ -64,7 +64,7 @@ TRANSLATION RULES:
    - Japanese: match the formality of the source — informal → plain form (だ / する), formal → polite form (です / ます)
    - Korean: informal → 반말, formal → 해요체 or 합쇼체 as appropriate
    - Hindi: informal → तुम form, formal → आप form
-   - Arabic: MSA grammar; infer masculine/feminine from context
+   - Arabic: MSA grammar; when the input does not specify gender, pick a grammatically valid form but do not let that choice influence the metadata gender fields
    - Finnish: formal/informal distinction is minimal; focus on naturalness
 
 METADATA RULES:
