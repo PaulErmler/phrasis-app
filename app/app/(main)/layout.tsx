@@ -421,7 +421,7 @@ export default function MainLayout({
       </main>
 
       {!isAddCardsRoute && (
-        <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
+        <div className={`shrink-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
           <BottomNav
             currentView={activeView}
             onViewChange={handleViewChange}
