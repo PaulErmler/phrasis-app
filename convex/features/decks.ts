@@ -10,7 +10,7 @@ import {
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
 import { insertCard } from '../db/stats/cardAggregates';
-import { getVoiceForLanguage, getVoiceGenderByApiCode } from '../../lib/languages';
+import { getVoiceForLanguage, getVoiceGenderByApiCode, resolveAudioSpeakerGender } from '../../lib/languages';
 import {
   getCourseSettings,
   setActiveCollectionOnSettings,
@@ -57,6 +57,15 @@ export async function scheduleMissingContent(
   targetLanguages: string[],
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sourceLanguage = text.language;
+
+  // Resolve audioSpeakerGender: prefer existing value, fall back to speakerGender,
+  // then coin-flip via resolveAudioSpeakerGender. Patch the text to make it durable.
+  let audioSpeakerGender = text.audioSpeakerGender as 'male' | 'female' | undefined;
+  if (!audioSpeakerGender) {
+    audioSpeakerGender = resolveAudioSpeakerGender(text.speakerGender);
+    await ctx.db.patch(textId, { audioSpeakerGender });
+  }
+
   const allRequiredLanguages = [
     ...new Set([...baseLanguages, ...targetLanguages]),
   ];
@@ -112,8 +121,8 @@ export async function scheduleMissingContent(
         await ctx.db.delete(audio._id);
         audioMap.set(lang, null);
       } else if (
-        (text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female') &&
-        getVoiceGenderByApiCode(audio.voiceName) !== text.audioSpeakerGender
+        (audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
+        getVoiceGenderByApiCode(audio.voiceName) !== audioSpeakerGender
       ) {
         await ctx.storage.delete(audio.storageId);
         await ctx.db.delete(audio._id);
@@ -141,7 +150,7 @@ export async function scheduleMissingContent(
     if (lang === sourceLanguage) {
       // Source language — no translation needed, maybe TTS
       if (!hasAudio && await claimTtsIfAvailable(ctx, textId, lang)) {
-        const voiceName = getVoiceForLanguage(lang, text.audioSpeakerGender);
+        const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
         await ctx.scheduler.runAfter(
           0,
           internal.features.ttsProcessing.processTTSForCard,
@@ -167,7 +176,7 @@ export async function scheduleMissingContent(
             sourceLanguage,
             targetLanguage: lang,
             text: text.text,
-            audioSpeakerGender: text.audioSpeakerGender,
+            audioSpeakerGender,
           },
         );
         translationsScheduled++;
@@ -181,7 +190,7 @@ export async function scheduleMissingContent(
           );
         }
         if (!hasAudio && await claimTtsIfAvailable(ctx, textId, lang)) {
-          const voiceName = getVoiceForLanguage(lang, text.audioSpeakerGender);
+          const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
           await ctx.scheduler.runAfter(
             0,
             internal.features.ttsProcessing.processTTSForCard,

@@ -1,5 +1,5 @@
 import { v, ConvexError } from 'convex/values';
-import { action, mutation, query, internalMutation, internalQuery } from '../_generated/server';
+import { action, mutation, internalMutation, internalQuery } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { requireAuthUserId, getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -12,7 +12,7 @@ import { trackEvent } from '../db/stats/dailyStats';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS } from '../config/aiModels';
-import { resolveAudioSpeakerGender, getVoiceGenderByApiCode } from '../../lib/languages';
+import { resolveAudioSpeakerGender } from '../../lib/languages';
 import { validateSentenceMetadata } from './sentenceMetadata';
 
 export const consumeAutoFillQuota = internalMutation({
