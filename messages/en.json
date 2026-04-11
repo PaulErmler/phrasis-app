@@ -1,4 +1,9 @@
 {
+  "SignInPrompt": {
+    "title": "Sign in to continue",
+    "description": "Sign in to access your courses, progress, and saved phrases.",
+    "signInButton": "Sign In"
+  },
   "HomePage": {
     "title": "Master Languages with Flexling",
     "subtitle": "Learn phrases, practice pronunciation, and build fluency in any language",

@@ -21,6 +21,11 @@ export function setupMediaSession(options: MediaSessionOptions): () => void {
   navigator.mediaSession.metadata = new MediaMetadata({
     title: options.title,
     artist: options.artist,
+    album: 'Flexling',
+    artwork: [
+      { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
   });
 
   const handlers: [ActionType, MediaSessionActionHandler][] = [

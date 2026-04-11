@@ -74,11 +74,16 @@ async function processApproval(
     textCount: chatCollection.textCount + 1,
   });
 
+  // Generate linguistic metadata first using all chat-produced translations,
+  // then prepareCardContent runs from inside the metadata action so audio is
+  // generated with the correct, consistent voice gender from the start.
   await ctx.scheduler.runAfter(
     0,
-    internal.features.decks.prepareCardContent,
+    internal.features.sentenceMetadata.generateSentenceMetadata,
     {
       textId,
+      translations: approval.translations,
+      schedulePrepareCard: true,
       baseLanguages: course.baseLanguages,
       targetLanguages: course.targetLanguages,
     },

@@ -1,4 +1,9 @@
 {
+  "SignInPrompt": {
+    "title": "Anmelden, um fortzufahren",
+    "description": "Melde dich an, um auf deine Kurse, deinen Fortschritt und deine gespeicherten Redewendungen zuzugreifen.",
+    "signInButton": "Anmelden"
+  },
   "HomePage": {
     "title": "Sprachen meistern mit Flexling",
     "subtitle": "Lerne Redewendungen, übe die Aussprache und werde fließend in jeder Sprache",

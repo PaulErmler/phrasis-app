@@ -35,6 +35,8 @@ interface NoCardsDueStateProps {
   batchSize: number;
   /** Remaining sentences quota. null means unlimited. */
   sentencesRemaining?: number | null;
+  /** Remaining cards in the active collection. null means unknown. */
+  remainingInCollection?: number | null;
   /** Called when the user clicks the upgrade button (limit reached). */
   onUpgrade?: () => void;
 }
@@ -44,16 +46,19 @@ export function NoCardsDueState({
   isAddingCards,
   batchSize,
   sentencesRemaining,
+  remainingInCollection,
   onUpgrade,
 }: NoCardsDueStateProps) {
   const t = useTranslations('LearningMode');
   const tFeature = useTranslations('FeatureTracking');
 
   const isLimitReached = sentencesRemaining === 0;
-  const displayCount =
-    sentencesRemaining != null
-      ? Math.min(batchSize, sentencesRemaining)
-      : batchSize;
+  const displayCount = Math.min(
+    batchSize,
+    ...(sentencesRemaining != null ? [sentencesRemaining] : []),
+    ...(remainingInCollection != null ? [remainingInCollection] : []),
+  );
+  const noCardsAvailable = displayCount === 0;
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center gap-6 px-4">
@@ -75,7 +80,7 @@ export function NoCardsDueState({
           <Button
             size="lg"
             onClick={onAddCards}
-            disabled={isAddingCards}
+            disabled={isAddingCards || noCardsAvailable}
             className="gap-2"
           >
             {isAddingCards ? (

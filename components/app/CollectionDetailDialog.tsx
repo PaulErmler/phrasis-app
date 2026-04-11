@@ -173,10 +173,11 @@ export function CollectionDetailDialog({
                     <>
                       <Plus className="h-4 w-4" />
                       {t('addN', {
-                        count:
-                          sentencesRemaining != null
-                            ? Math.min(texts.length, sentencesRemaining)
-                            : texts.length,
+                        count: Math.min(
+                          texts.length,
+                          Math.max(0, totalTexts - cardsAdded),
+                          ...(sentencesRemaining != null ? [sentencesRemaining] : []),
+                        ),
                       })}
                     </>
                   )}

@@ -35,7 +35,12 @@ const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   settings: '/app/settings',
 };
 
-function viewFromPathname(pathname: string): { view: View; chatThreadId?: string } {
+function viewFromPathname(pathname: string): {
+  view: View;
+  chatThreadId?: string;
+  isLearnOpen?: boolean;
+} {
+  if (pathname.startsWith('/app/learn')) return { view: 'home', isLearnOpen: true };
   if (pathname.startsWith('/app/content')) return { view: 'home' };
   if (pathname.startsWith('/app/library')) return { view: 'library' };
   if (pathname.startsWith('/app/stats')) return { view: 'stats' };
@@ -81,7 +86,7 @@ export default function MainLayout({
   const viewBeforeChatRef = useRef<Exclude<View, 'chat'>>('home');
   const [hasVisitedStats, setHasVisitedStats] = useState(initialView.view === 'stats');
   const [hasVisitedLibrary, setHasVisitedLibrary] = useState(initialView.view === 'library');
-  const [isLearnOpen, setIsLearnOpen] = useState(false);
+  const [isLearnOpen, setIsLearnOpen] = useState(initialView.isLearnOpen ?? false);
   const isLearnOpenRef = useRef(false);
   useEffect(() => { isLearnOpenRef.current = isLearnOpen; }, [isLearnOpen]);
   const isAddCardsRoute = pathname === '/app/content/add-cards';
@@ -152,6 +157,7 @@ export default function MainLayout({
   // Tab switching — pushState so browser back/forward works between tabs
   const handleViewChange = useCallback((view: View) => {
     setActiveView(view);
+    isLearnOpenRef.current = false;
     setIsLearnOpen(false);
     if (view === 'stats') setHasVisitedStats(true);
     if (view === 'library') setHasVisitedLibrary(true);
@@ -166,6 +172,7 @@ export default function MainLayout({
       return 'chat';
     });
     setChatThreadId(threadId);
+    isLearnOpenRef.current = false;
     setIsLearnOpen(false);
     setHasVisitedStats(false);
     setHasVisitedLibrary(false);
@@ -205,6 +212,9 @@ export default function MainLayout({
 
   const handleLearnClose = useCallback(() => {
     setJustReturnedFromLearn(true);
+    // Sync ref BEFORE history.back() to avoid a race where the popstate
+    // swipe-back guard sees a stale `true` value and re-pushes /app/learn.
+    isLearnOpenRef.current = false;
     setIsLearnOpen(false);
     history.back();
     refreshPrefetchedThread();
@@ -411,7 +421,7 @@ export default function MainLayout({
       </main>
 
       {!isAddCardsRoute && (
-        <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
+        <div className={`shrink-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
           <BottomNav
             currentView={activeView}
             onViewChange={handleViewChange}
