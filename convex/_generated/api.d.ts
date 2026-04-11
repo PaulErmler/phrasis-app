@@ -42,6 +42,7 @@ import type * as features_decks from "../features/decks.js";
 import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_library from "../features/library.js";
 import type * as features_scheduling from "../features/scheduling.js";
+import type * as features_sentenceMetadata from "../features/sentenceMetadata.js";
 import type * as features_stats from "../features/stats.js";
 import type * as features_translation from "../features/translation.js";
 import type * as features_tts from "../features/tts.js";
@@ -55,10 +56,12 @@ import type * as lib_dateUtils from "../lib/dateUtils.js";
 import type * as lib_fsrsStates from "../lib/fsrsStates.js";
 import type * as lib_textComparison from "../lib/textComparison.js";
 import type * as migrations_backfillCardAggregates from "../migrations/backfillCardAggregates.js";
+import type * as migrations_backfillCustomSentenceMetadata from "../migrations/backfillCustomSentenceMetadata.js";
 import type * as migrations_backfillDisplayWord from "../migrations/backfillDisplayWord.js";
 import type * as migrations_backfillIsGraduated from "../migrations/backfillIsGraduated.js";
 import type * as migrations_backfillUserStats from "../migrations/backfillUserStats.js";
 import type * as migrations_seedMockStats from "../migrations/seedMockStats.js";
+import type * as retrier from "../retrier.js";
 import type * as types from "../types.js";
 import type * as usage_actions from "../usage/actions.js";
 import type * as usage_helpers from "../usage/helpers.js";
@@ -106,6 +109,7 @@ declare const fullApi: ApiFromModules<{
   "features/featureIds": typeof features_featureIds;
   "features/library": typeof features_library;
   "features/scheduling": typeof features_scheduling;
+  "features/sentenceMetadata": typeof features_sentenceMetadata;
   "features/stats": typeof features_stats;
   "features/translation": typeof features_translation;
   "features/tts": typeof features_tts;
@@ -119,10 +123,12 @@ declare const fullApi: ApiFromModules<{
   "lib/fsrsStates": typeof lib_fsrsStates;
   "lib/textComparison": typeof lib_textComparison;
   "migrations/backfillCardAggregates": typeof migrations_backfillCardAggregates;
+  "migrations/backfillCustomSentenceMetadata": typeof migrations_backfillCustomSentenceMetadata;
   "migrations/backfillDisplayWord": typeof migrations_backfillDisplayWord;
   "migrations/backfillIsGraduated": typeof migrations_backfillIsGraduated;
   "migrations/backfillUserStats": typeof migrations_backfillUserStats;
   "migrations/seedMockStats": typeof migrations_seedMockStats;
+  retrier: typeof retrier;
   types: typeof types;
   "usage/actions": typeof usage_actions;
   "usage/helpers": typeof usage_helpers;
@@ -24738,6 +24744,53 @@ export declare const components: {
           value: any;
         },
         any
+      >;
+    };
+  };
+  actionRetrier: {
+    public: {
+      cancel: FunctionReference<
+        "mutation",
+        "internal",
+        { runId: string },
+        boolean
+      >;
+      cleanup: FunctionReference<
+        "mutation",
+        "internal",
+        { runId: string },
+        any
+      >;
+      start: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          functionArgs: any;
+          functionHandle: string;
+          options: {
+            base: number;
+            initialBackoffMs: number;
+            logLevel: "DEBUG" | "INFO" | "WARN" | "ERROR";
+            maxFailures: number;
+            onComplete?: string;
+            runAfter?: number;
+            runAt?: number;
+          };
+        },
+        string
+      >;
+      status: FunctionReference<
+        "query",
+        "internal",
+        { runId: string },
+        | { type: "inProgress" }
+        | {
+            result:
+              | { returnValue: any; type: "success" }
+              | { error: string; type: "failed" }
+              | { type: "canceled" };
+            type: "completed";
+          }
       >;
     };
   };

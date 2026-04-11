@@ -124,6 +124,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
           isAddingCards={state.isAddingCards}
           batchSize={state.batchSize}
           sentencesRemaining={state.sentencesRemaining}
+          remainingInCollection={state.remainingInCollection}
           onUpgrade={() => setPaywallOpen(true)}
         />
         <LearningModeSettings

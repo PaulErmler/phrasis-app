@@ -32,6 +32,7 @@ export default defineSchema({
     register: v.optional(v.string()), // formal / informal / neutral
     addresseeNumber: v.optional(v.string()), // singular / plural / not_applicable
     speakerGender: v.optional(v.string()), // male / female / neutral
+    audioSpeakerGender: v.optional(v.string()), // male / female — resolved voice gender after coin-flip; mirrors speakerGender when male/female
     addresseeGender: v.optional(v.string()), // male / female / neutral / not_applicable
     tenseAspect: v.optional(v.string()), // simple_present / past_continuous / etc.
     sentenceType: v.optional(v.string()), // declarative / interrogative / imperative / exclamatory

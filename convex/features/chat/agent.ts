@@ -12,7 +12,7 @@ import {
 
 export const createCardTool = createTool({
   description:
-    'Create a flashcard with translations in all course languages. The user will be asked to approve before the card is added to their deck.',
+    'Create a flashcard with translations in all course languages. The user will be asked to approve before the card is added to their deck. Do not include any information in brackets.',
   args: z.object({
     translations: z
       .array(z.object({ language: z.string(), text: z.string() }))

@@ -12,6 +12,8 @@ import { trackEvent } from '../db/stats/dailyStats';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS } from '../config/aiModels';
+import { resolveAudioSpeakerGender } from '../../lib/languages';
+import { validateSentenceMetadata } from './sentenceMetadata';
 
 export const consumeAutoFillQuota = internalMutation({
   args: { userId: v.string() },
@@ -39,7 +41,7 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
 
 const TRANSLATION_SYSTEM_PROMPT = `You are an expert multilingual translator for a language-learning app. You will receive one or more sentences that the user has already written in specific languages, plus a list of target language codes that still need translations.
 
-Translate the given sentence(s) into every requested target language.
+Translate the given sentence(s) into every requested target language AND return linguistic metadata describing the sentence.
 
 TRANSLATION RULES:
 
@@ -65,18 +67,67 @@ TRANSLATION RULES:
    - Arabic: MSA grammar; infer masculine/feminine from context
    - Finnish: formal/informal distinction is minimal; focus on naturalness
 
-Most importantly: Make sure that the translation is as accurate as possible and matches across languages. 
-Return ONLY a valid JSON object where each key is a target language code and the value is the translated string. No markdown, no explanation, no extra keys.`;
+METADATA RULES:
+
+After producing the translations, infer linguistic metadata from the source AND your translations together. Use cross-lingual signals — if any translation requires gendered morphology referring to the speaker or addressee, that fixes the gender field.
+
+- register: "formal" | "informal" | "neutral" — the politeness/formality of the sentence as a whole.
+- addresseeNumber: "singular" | "plural" | "not_applicable" — how many people the sentence speaks to. "not_applicable" if the sentence has no addressee (e.g. "It is raining.").
+- speakerGender: "male" | "female" | "neutral" — return "male" or "female" ONLY when at least one rendering grammatically marks the speaker's gender (Spanish/Italian/French/Portuguese past participles or adjectives, Russian/Polish/Czech past tense, Arabic/Hebrew/Hindi verb agreement, etc.). Otherwise return "neutral". Never guess from topic or stereotype.
+- addresseeGender: "male" | "female" | "neutral" | "not_applicable" — same rule, for the addressee. "not_applicable" if there is no addressee.
+
+OUTPUT FORMAT:
+
+Return ONLY a valid JSON object with EXACTLY this shape, no markdown, no explanation:
+
+{
+  "translations": { "<lang_code>": "<translated string>", ... },
+  "metadata": {
+    "register": "...",
+    "addresseeNumber": "...",
+    "speakerGender": "...",
+    "addresseeGender": "..."
+  }
+}
+
+The "translations" object must contain exactly one key per requested target language. No extra keys, no missing keys.`;
 
 /**
  * Auto-fill missing translations using Gemini via OpenRouter.
  */
+const sentenceMetadataValidator = v.object({
+  register: v.union(
+    v.literal('formal'),
+    v.literal('informal'),
+    v.literal('neutral'),
+  ),
+  addresseeNumber: v.union(
+    v.literal('singular'),
+    v.literal('plural'),
+    v.literal('not_applicable'),
+  ),
+  speakerGender: v.union(
+    v.literal('male'),
+    v.literal('female'),
+    v.literal('neutral'),
+  ),
+  addresseeGender: v.union(
+    v.literal('male'),
+    v.literal('female'),
+    v.literal('neutral'),
+    v.literal('not_applicable'),
+  ),
+});
+
 export const autoFillTranslations = action({
   args: {
     texts: v.array(v.object({ language: v.string(), text: v.string() })),
     targetLanguages: v.array(v.string()),
   },
-  returns: v.array(v.object({ language: v.string(), text: v.string() })),
+  returns: v.object({
+    translations: v.array(v.object({ language: v.string(), text: v.string() })),
+    metadata: sentenceMetadataValidator,
+  }),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
 
@@ -124,7 +175,7 @@ export const autoFillTranslations = action({
     }
 
     if (targetLanguages.length === 0) {
-      return [];
+      throw new ConvexError('At least one target language is required for auto-fill');
     }
 
     await ctx.runMutation(
@@ -163,23 +214,41 @@ export const autoFillTranslations = action({
       .replace(/\s*```\s*$/, '')
       .trim();
 
-    let parsed: Record<string, string>;
+    let parsed: { translations?: Record<string, string>; metadata?: Record<string, unknown> };
     try {
       parsed = JSON.parse(cleaned);
     } catch {
       throw new ConvexError('Failed to parse translation response');
     }
 
+    if (!parsed.translations || typeof parsed.translations !== 'object') {
+      throw new ConvexError('Translation response missing "translations" object');
+    }
+    if (!parsed.metadata || typeof parsed.metadata !== 'object') {
+      throw new ConvexError('Translation response missing "metadata" object');
+    }
+
     const results: { language: string; text: string }[] = [];
     for (const lang of targetLanguages) {
-      const translation = parsed[lang];
+      const translation = parsed.translations[lang];
       if (typeof translation !== 'string' || translation.trim().length === 0) {
         throw new ConvexError(`Missing translation for language: ${lang}`);
       }
       results.push({ language: lang, text: translation.trim() });
     }
 
-    return results;
+    let metadata;
+    try {
+      metadata = validateSentenceMetadata(parsed.metadata);
+    } catch (err) {
+      throw new ConvexError(
+        err instanceof Error
+          ? err.message
+          : 'Invalid translation response metadata',
+      );
+    }
+
+    return { translations: results, metadata };
   },
 });
 
@@ -190,6 +259,7 @@ export const createCustomText = mutation({
   args: {
     translations: v.array(v.object({ language: v.string(), text: v.string() })),
     timezone: v.string(),
+    metadata: v.optional(sentenceMetadataValidator),
   },
   returns: v.object({
     textId: v.id('texts'),
@@ -245,6 +315,15 @@ export const createCustomText = mutation({
       userId,
       collectionId: collection._id,
       collectionRank: nextRank,
+      ...(args.metadata
+        ? {
+            register: args.metadata.register,
+            addresseeNumber: args.metadata.addresseeNumber,
+            speakerGender: args.metadata.speakerGender,
+            addresseeGender: args.metadata.addresseeGender,
+            audioSpeakerGender: resolveAudioSpeakerGender(args.metadata.speakerGender),
+          }
+        : {}),
     });
 
     for (let i = 1; i < args.translations.length; i++) {
@@ -260,15 +339,31 @@ export const createCustomText = mutation({
       textCount: collection.textCount + 1,
     });
 
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.decks.prepareCardContent,
-      {
-        textId,
-        baseLanguages: course.baseLanguages,
-        targetLanguages: course.targetLanguages,
-      },
-    );
+    if (args.metadata) {
+      // Auto-fill flow already provided metadata; jump straight to content prep.
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.decks.prepareCardContent,
+        {
+          textId,
+          baseLanguages: course.baseLanguages,
+          targetLanguages: course.targetLanguages,
+        },
+      );
+    } else {
+      // Pure manual flow: generate metadata first; that action will then schedule prepareCardContent.
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.sentenceMetadata.generateSentenceMetadata,
+        {
+          textId,
+          translations: args.translations,
+          schedulePrepareCard: true,
+          baseLanguages: course.baseLanguages,
+          targetLanguages: course.targetLanguages,
+        },
+      );
+    }
 
     // Track manual card creation event
     await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsAddedManually' });
@@ -276,3 +371,4 @@ export const createCustomText = mutation({
     return { textId };
   },
 });
+
