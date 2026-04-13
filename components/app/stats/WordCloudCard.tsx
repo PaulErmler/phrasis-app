@@ -6,7 +6,10 @@ import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { WordCloud } from '@isoterik/react-word-cloud';
 import type { Word, WordRendererData } from '@isoterik/react-word-cloud';
+import { Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { WordSentencesDialog } from './WordSentencesDialog';
+import { WordSearchDialog } from './WordSearchDialog';
 
 // App brand colors: primary (blue), accent-orange, warning (yellow)
 const COLORS = [
@@ -50,7 +53,7 @@ function StaticWordRenderer(
   );
 }
 
-const LANG_NAMES: Record<string, string> = {
+export const LANG_NAMES: Record<string, string> = {
   en: 'English', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian',
   pt: 'Portuguese', nl: 'Dutch', ru: 'Russian', ja: 'Japanese', ko: 'Korean',
   zh: 'Chinese', ar: 'Arabic', hi: 'Hindi', tr: 'Turkish', pl: 'Polish',
@@ -59,7 +62,7 @@ const LANG_NAMES: Record<string, string> = {
   vi: 'Vietnamese', id: 'Indonesian', ms: 'Malay', he: 'Hebrew', fa: 'Persian',
 };
 
-function getLangName(code: string): string {
+export function getLangName(code: string): string {
   return LANG_NAMES[code] ?? code.toUpperCase();
 }
 
@@ -69,12 +72,14 @@ function SingleWordCloud({
   isFirst,
   t,
   onWordClick,
+  onSearchClick,
 }: {
   language: string;
   t: ReturnType<typeof useTranslations<'StatsPage'>>;
   words: string[];
   isFirst: boolean;
   onWordClick: (word: string, language: string) => void;
+  onSearchClick: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -137,10 +142,18 @@ function SingleWordCloud({
 
   return (
     <div className="card-surface p-3">
-      <div className="mb-2">
+      <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">
           {isFirst ? t('recentlyLearnedWords', { language: getLangName(language) }) : getLangName(language)}
         </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-muted-foreground"
+          onClick={onSearchClick}
+        >
+          <Search className="h-3.5 w-3.5" />
+        </Button>
       </div>
       <div
         ref={containerRef}
@@ -184,6 +197,7 @@ export function WordCloudSection() {
     displayWord: string; // original casing from the cloud — shown in dialog title
     language: string;
   } | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const handleWordClick = useCallback(
     (displayWord: string, language: string) =>
@@ -207,6 +221,7 @@ export function WordCloudSection() {
           isFirst={i === 0}
           t={t}
           onWordClick={handleWordClick}
+          onSearchClick={() => setSearchOpen(true)}
         />
       ))}
       {selectedWord && (
@@ -220,6 +235,7 @@ export function WordCloudSection() {
           }}
         />
       )}
+      <WordSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
     </>
   );
 }

@@ -290,7 +290,55 @@ export const getRecentWords = query({
 });
 
 /**
- * Query 4: Paginated sentences containing a specific word.
+ * Query 4: Search learned words across all languages via full-text search.
+ */
+export const searchWords = query({
+  args: {
+    searchQuery: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return [];
+
+    const courseId = active.course._id;
+    const term = args.searchQuery.slice(0, 100).trim().toLowerCase().normalize('NFC');
+    if (term.length === 0) return [];
+
+    const rows = await ctx.db
+      .query('userWords')
+      .withSearchIndex('search_word', (q) =>
+        q.search('word', term).eq('userId', userId).eq('courseId', courseId),
+      )
+      .take(50);
+
+    // Deduplicate language variants (es_latam → es)
+    const seen = new Set<string>();
+    const results: Array<{
+      word: string;
+      displayWord: string;
+      language: string;
+    }> = [];
+
+    for (const row of rows) {
+      const lang = row.language.replace(/_latam$/, '');
+      const key = `${lang}:${row.word}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push({
+        word: row.word,
+        displayWord: row.displayWord ?? row.word,
+        language: lang,
+      });
+    }
+
+    return results;
+  },
+});
+
+/**
+ * Query 5: Paginated sentences containing a specific word.
  * Powers the word cloud → sentence dialog.
  */
 export const getSentencesForWord = query({

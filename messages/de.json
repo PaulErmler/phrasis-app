@@ -946,6 +946,11 @@
     "chatCards": "Chat-Karten hinzugefügt",
     "chatMessages": "Chat-Nachrichten gesendet",
     "noData": "Noch keine Daten",
-    "recentlyLearnedWords": "Kürzlich gelernte Wörter — {language}"
+    "recentlyLearnedWords": "Kürzlich gelernte Wörter — {language}",
+    "searchWords": "Wörter suchen",
+    "searchWordsDescription": "Durchsuche deine gelernten Wörter in allen Sprachen",
+    "searchWordsPlaceholder": "Wörter suchen...",
+    "searchWordsHint": "Tippe, um deine gelernten Wörter zu durchsuchen",
+    "searchWordsNoResults": "Keine passenden Wörter gefunden"
   }
 }

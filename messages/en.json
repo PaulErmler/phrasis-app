@@ -875,6 +875,11 @@
     "chatCards": "Chat Cards Added",
     "chatMessages": "Chat Messages Sent",
     "noData": "No data yet",
-    "recentlyLearnedWords": "Recently learned words — {language}"
+    "recentlyLearnedWords": "Recently learned words — {language}",
+    "searchWords": "Search Words",
+    "searchWordsDescription": "Search your learned words across all languages",
+    "searchWordsPlaceholder": "Search words...",
+    "searchWordsHint": "Type to search your learned words",
+    "searchWordsNoResults": "No matching words found"
   }
 }

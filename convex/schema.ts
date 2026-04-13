@@ -331,7 +331,11 @@ export default defineSchema({
     .index('by_userId_and_courseId_and_language_and_word',
       ['userId', 'courseId', 'language', 'word'])
     .index('by_userId_and_courseId_and_language',
-      ['userId', 'courseId', 'language']),
+      ['userId', 'courseId', 'language'])
+    .searchIndex('search_word', {
+      searchField: 'word',
+      filterFields: ['userId', 'courseId'],
+    }),
 
   // Junction table: links each tracked word to the texts it appeared in.
   // Capped at 30 texts per word to bound storage and write costs.
