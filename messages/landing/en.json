@@ -164,6 +164,7 @@
     "progressBody": "Track precisely which words you already know and how much progress you have made over days, weeks and months — broken down by language if you study more than one.",
     "activityTitle": "Feel Your Progress",
     "activityBody": "See exactly what words you learned recently and stay motivated as your vocabulary expands.",
+    "wordCloudHint": "Click any word to see the sentences you learned with that word",
     "insightsTitle": "Session Snapshot",
     "insightsBody": "After every review, see exactly what you accomplished: repetitions, new words, and time spent — all updated live the moment you finish.",
     "habitsTitle": "Find Your Peak Hours",
