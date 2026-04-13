@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /Users/paulermler/Documents/Phrasis/new/phrasis-app -name \"*.ts\" -exec grep -l \"ENSURE_CONTENT_LOOKAHEAD\" {} \\\\;)"
+      "Bash(find /Users/paulermler/Documents/Phrasis/new/phrasis-app -name \"*.ts\" -exec grep -l \"ENSURE_CONTENT_LOOKAHEAD\" {} \\\\;)",
+      "Bash(grep -r \"export.*Card\\\\|export.*Sentence\\\\|export.*Text\" /Users/paulermler/Documents/Phrasis/new/phrasis-app/components/app/learning/*.ts)"
     ]
   }
 }

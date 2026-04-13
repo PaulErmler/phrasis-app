@@ -345,7 +345,8 @@ export default defineSchema({
     .index('by_userId_courseId_language_word',
       ['userId', 'courseId', 'language', 'word'])
     .index('by_userId_courseId_language_word_textId',
-      ['userId', 'courseId', 'language', 'word', 'textId']),
+      ['userId', 'courseId', 'language', 'word', 'textId'])
+    .index('by_textId', ['textId']),
 
   // All-time per-language totals
   languageStats: defineTable({

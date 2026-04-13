@@ -3,7 +3,7 @@ import { paginationOptsValidator } from 'convex/server';
 import { query, internalQuery } from '../_generated/server';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
-import { getDeckByCourseId } from '../db/decks';
+import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import { cardsByState, cardsByDueDate, cardsByStateAndDueDate } from '../db/stats/cardAggregates';
 import {
   getCourseStats as dbGetCourseStats,
@@ -308,6 +308,7 @@ export const getSentencesForWord = query({
     const courseId = active.course._id;
     const baseLanguages = active.course.baseLanguages ?? [];
     const targetLanguages = active.course.targetLanguages ?? [];
+    const deck = await getDeckByCourseId(ctx, courseId);
 
     // The frontend passes a normalized language (e.g. "es"), but userWordTexts
     // stores the raw code from the course (e.g. "es_latam"). Resolve it from
@@ -329,10 +330,15 @@ export const getSentencesForWord = query({
       .order('desc')
       .paginate(args.paginationOpts);
 
-    // Fetch text docs for each link
-    const textDocs = await Promise.all(
-      result.page.map((link) => ctx.db.get(link.textId)),
-    );
+    // Fetch text docs and card docs for each link
+    const [textDocs, cardDocs] = await Promise.all([
+      Promise.all(result.page.map((link) => ctx.db.get(link.textId))),
+      Promise.all(
+        result.page.map((link) =>
+          deck ? getCardByDeckAndText(ctx, deck._id, link.textId) : null,
+        ),
+      ),
+    ]);
 
     // Build inputs for the batch content loader (translations + audio for all course languages)
     const inputs = result.page
@@ -345,6 +351,7 @@ export const getSentencesForWord = query({
           sourceText: text.text,
           sourceLanguage: text.language,
           sourceRomanization: text.romanizedText ?? undefined,
+          card: cardDocs[i] ?? null,
         };
       })
       .filter((input): input is NonNullable<typeof input> => input !== null);
@@ -362,6 +369,13 @@ export const getSentencesForWord = query({
         textId: input.textId,
         translations: content.translations,
         audioRecordings: content.audioRecordings,
+        cardId: input.card?._id ?? null,
+        isMastered: input.card?.isMastered ?? false,
+        isHidden: input.card?.isHidden ?? false,
+        isFavorite: input.card?.isFavorite ?? false,
+        reviewCount: input.card
+          ? input.card.preReviewCount + (input.card.fsrsState?.reps ?? 0)
+          : 0,
       };
     });
 
