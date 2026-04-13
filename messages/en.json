@@ -534,7 +534,7 @@
     "sentences": {
       "name": "ready-made sentences",
       "pricingLabel": "{count, plural, one {# ready-made sentence} other {# ready-made sentences}} per month",
-      "pricingLabelUnlimited": "Unlimited ready-made sentences per month"
+      "pricingLabelUnlimited": "Unlimited ready-made sentences"
     },
     "customSentences": {
       "name": "custom sentences",
@@ -554,6 +554,10 @@
     },
     "translationAutoFill": {
       "name": "translation auto-fill"
+    },
+    "detailedStatistics": {
+      "name": "detailed statistics",
+      "pricingLabel": "Detailed statistics"
     }
   },
   "FeatureTracking": {

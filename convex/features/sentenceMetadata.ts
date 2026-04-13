@@ -277,11 +277,11 @@ export const applyMetadataAndPrepareCard = internalMutation({
       audioSpeakerGender,
       ...(args.metadata
         ? {
-            register: args.metadata.register,
-            addresseeNumber: args.metadata.addresseeNumber,
-            speakerGender: args.metadata.speakerGender,
-            addresseeGender: args.metadata.addresseeGender,
-          }
+          register: args.metadata.register,
+          addresseeNumber: args.metadata.addresseeNumber,
+          speakerGender: args.metadata.speakerGender,
+          addresseeGender: args.metadata.addresseeGender,
+        }
         : {}),
     });
 

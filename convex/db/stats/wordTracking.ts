@@ -39,12 +39,15 @@ export function tokenizeText(text: string, language: string): Token[] {
     .map((w) => ({ original: w, normalized: w.toLowerCase().normalize('NFC') }));
 }
 
+const MAX_TEXTS_PER_WORD = 30;
+
 export async function trackNewWords(
   ctx: MutationCtx,
   args: {
     userId: string;
     courseId: Id<'courses'>;
     languages: Array<{ language: string; text: string }>;
+    textId?: Id<'texts'>;
   },
 ): Promise<Record<string, number>> {
   const result: Record<string, number> = {};
@@ -93,6 +96,48 @@ export async function trackNewWords(
         // row) or the new occurrence is all-lowercase and the stored one
         // isn't — per the rule "if one of them is lowercase, keep lowercase".
         await ctx.db.patch(existing._id, { displayWord: original });
+      }
+
+      // Link this word to the source text (for word → sentence lookup).
+      // Runs for every word, not just new ones, since a previously-known
+      // word may appear in a new text.
+      if (args.textId) {
+        // Check if this exact link already exists
+        const existingLink = await ctx.db
+          .query('userWordTexts')
+          .withIndex('by_userId_courseId_language_word_textId', (q) =>
+            q
+              .eq('userId', args.userId)
+              .eq('courseId', args.courseId)
+              .eq('language', language)
+              .eq('word', normalized)
+              .eq('textId', args.textId!),
+          )
+          .first();
+
+        if (!existingLink) {
+          // Enforce per-word cap to bound storage
+          const existingCount = await ctx.db
+            .query('userWordTexts')
+            .withIndex('by_userId_courseId_language_word', (q) =>
+              q
+                .eq('userId', args.userId)
+                .eq('courseId', args.courseId)
+                .eq('language', language)
+                .eq('word', normalized),
+            )
+            .take(MAX_TEXTS_PER_WORD);
+
+          if (existingCount.length < MAX_TEXTS_PER_WORD) {
+            await ctx.db.insert('userWordTexts', {
+              userId: args.userId,
+              courseId: args.courseId,
+              language,
+              word: normalized,
+              textId: args.textId!,
+            });
+          }
+        }
       }
     }
 

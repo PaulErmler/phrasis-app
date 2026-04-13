@@ -531,7 +531,7 @@
     "sentences": {
       "name": "Vorgefertigte Sätze",
       "pricingLabel": "{count, plural, one {# vorgefertigter Satz} other {# vorgefertigte Sätze}} pro Monat",
-      "pricingLabelUnlimited": "Unbegrenzt viele vorgefertigte Sätze pro Monat"
+      "pricingLabelUnlimited": "Unbegrenzt viele vorgefertigte Sätze"
     },
     "customSentences": {
       "name": "Eigene Sätze",
@@ -551,6 +551,10 @@
     },
     "translationAutoFill": {
       "name": "Automatische Übersetzung"
+    },
+    "detailedStatistics": {
+      "name": "Detaillierte Statistiken",
+      "pricingLabel": "Detaillierte Statistiken"
     }
   },
   "FeatureTracking": {

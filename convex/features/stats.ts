@@ -1,4 +1,5 @@
 import { v } from 'convex/values';
+import { paginationOptsValidator } from 'convex/server';
 import { query, internalQuery } from '../_generated/server';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -10,6 +11,7 @@ import {
 } from '../db/courseStats';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { EXTENDED_STATE_LABELS as STATE_LABELS } from '../lib/fsrsStates';
+import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 
 // Convention: query handlers return [] for array results and null for object results when unauthenticated.
 
@@ -284,6 +286,90 @@ export const getRecentWords = query({
     }
 
     return result;
+  },
+});
+
+/**
+ * Query 4: Paginated sentences containing a specific word.
+ * Powers the word cloud → sentence dialog.
+ */
+export const getSentencesForWord = query({
+  args: {
+    word: v.string(),
+    language: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { page: [], isDone: true, continueCursor: '' };
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return { page: [], isDone: true, continueCursor: '' };
+
+    const courseId = active.course._id;
+    const baseLanguages = active.course.baseLanguages ?? [];
+    const targetLanguages = active.course.targetLanguages ?? [];
+
+    // The frontend passes a normalized language (e.g. "es"), but userWordTexts
+    // stores the raw code from the course (e.g. "es_latam"). Resolve it from
+    // the course's targetLanguages — no extra DB query needed.
+    const allLangs = [...baseLanguages, ...targetLanguages];
+    const lang = allLangs.find(
+      (l) => l === args.language || l.replace(/_latam$/, '') === args.language,
+    ) ?? args.language;
+
+    const result = await ctx.db
+      .query('userWordTexts')
+      .withIndex('by_userId_courseId_language_word', (q) =>
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .eq('language', lang)
+          .eq('word', args.word),
+      )
+      .order('desc')
+      .paginate(args.paginationOpts);
+
+    // Fetch text docs for each link
+    const textDocs = await Promise.all(
+      result.page.map((link) => ctx.db.get(link.textId)),
+    );
+
+    // Build inputs for the batch content loader (translations + audio for all course languages)
+    const inputs = result.page
+      .map((link, i) => {
+        const text = textDocs[i];
+        if (!text) return null;
+        return {
+          key: link.textId as string,
+          textId: link.textId,
+          sourceText: text.text,
+          sourceLanguage: text.language,
+          sourceRomanization: text.romanizedText ?? undefined,
+        };
+      })
+      .filter((input): input is NonNullable<typeof input> => input !== null);
+
+    const contentMap = await buildTextContentBatchForLanguages(
+      ctx,
+      inputs,
+      baseLanguages,
+      targetLanguages,
+    );
+
+    const sentences = inputs.map((input) => {
+      const content = contentMap.get(input.key)!;
+      return {
+        textId: input.textId,
+        translations: content.translations,
+        audioRecordings: content.audioRecordings,
+      };
+    });
+
+    return {
+      page: sentences,
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
 

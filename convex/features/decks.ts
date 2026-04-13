@@ -61,7 +61,7 @@ export async function scheduleMissingContent(
   // Resolve audioSpeakerGender: prefer existing valid value, fall back to speakerGender,
   // then coin-flip via resolveAudioSpeakerGender. Patch the text to make it durable.
   const storedGender = text.audioSpeakerGender;
-  let audioSpeakerGender: 'male' | 'female' =
+  const audioSpeakerGender: 'male' | 'female' =
     storedGender === 'male' || storedGender === 'female'
       ? storedGender
       : resolveAudioSpeakerGender(text.speakerGender);
@@ -152,19 +152,22 @@ export async function scheduleMissingContent(
 
     if (lang === sourceLanguage) {
       // Source language — no translation needed, maybe TTS
-      if (!hasAudio && await claimTtsIfAvailable(ctx, textId, lang)) {
-        const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
-        await ctx.scheduler.runAfter(
-          0,
-          internal.features.ttsProcessing.processTTSForCard,
-          {
-            textId,
-            text: text.text,
-            language: lang,
-            voiceName,
-          },
-        );
-        audioScheduled++;
+      if (!hasAudio) {
+        const claimed = await claimTtsIfAvailable(ctx, textId, lang);
+        if (claimed) {
+          const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.ttsProcessing.processTTSForCard,
+            {
+              textId,
+              text: text.text,
+              language: lang,
+              voiceName,
+            },
+          );
+          audioScheduled++;
+        }
       }
     } else {
       // Different language — need translation
@@ -192,19 +195,22 @@ export async function scheduleMissingContent(
             { textId, translatedText: translation.translatedText, language: lang },
           );
         }
-        if (!hasAudio && await claimTtsIfAvailable(ctx, textId, lang)) {
-          const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
-          await ctx.scheduler.runAfter(
-            0,
-            internal.features.ttsProcessing.processTTSForCard,
-            {
-              textId,
-              text: translation.translatedText,
-              language: lang,
-              voiceName,
-            },
-          );
-          audioScheduled++;
+        if (!hasAudio) {
+          const claimed = await claimTtsIfAvailable(ctx, textId, lang);
+          if (claimed) {
+            const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
+            await ctx.scheduler.runAfter(
+              0,
+              internal.features.ttsProcessing.processTTSForCard,
+              {
+                textId,
+                text: translation.translatedText,
+                language: lang,
+                voiceName,
+              },
+            );
+            audioScheduled++;
+          }
         }
       }
     }
@@ -1022,24 +1028,43 @@ export const ensureUpcomingCardsContent = mutation({
     const deck = await getDeckByCourseId(ctx, active.course._id);
     if (!deck) return 0;
 
+    const settings = await getCourseSettings(ctx, active.course._id);
+    const schedulingMode = settings?.schedulingMode ?? 'learnAndReview';
+
     const now = Date.now();
-    const cards = await ctx.db
-      .query('cards')
-      .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
-        q
-          .eq('deckId', deck._id)
-          .eq('isHidden', false)
-          .eq('isMastered', false)
-          .lte('dueDate', now),
-      )
-      .order('asc')
-      .take(ENSURE_CONTENT_LOOKAHEAD);
+    let cards;
+    if (schedulingMode === 'learn_new') {
+      cards = await ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .eq('isGraduated', false)
+            .lte('dueDate', now),
+        )
+        .order('asc')
+        .take(ENSURE_CONTENT_LOOKAHEAD);
+    } else {
+      cards = await ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .lte('dueDate', now),
+        )
+        .order('asc')
+        .take(ENSURE_CONTENT_LOOKAHEAD);
+    }
 
     let processed = 0;
     for (const card of cards) {
       const text = await ctx.db.get(card.textId);
       if (!text) continue;
-      await scheduleMissingContent(
+      const result = await scheduleMissingContent(
         ctx,
         card.textId,
         text,
@@ -1068,10 +1093,7 @@ export const prepareCardContent = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const text = await ctx.db.get(args.textId);
-    if (!text) {
-      console.error('Text not found:', args.textId);
-      return null;
-    }
+    if (!text) return null;
 
     await scheduleMissingContent(
       ctx,
@@ -1144,8 +1166,8 @@ export const processTranslationForCard = internalAction({
         if (ROMANIZATION_LANGUAGES.has(args.targetLanguage) && !existingRow.romanizedText) {
           try {
             romanizedText = await romanizeText(translation, args.targetLanguage);
-          } catch (err) {
-            console.error('Romanization error (non-fatal):', err);
+          } catch {
+            // Romanization is non-fatal; skip silently
           }
         } else {
           romanizedText = existingRow.romanizedText;
@@ -1159,8 +1181,8 @@ export const processTranslationForCard = internalAction({
         if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
           try {
             romanizedText = await romanizeText(translation, args.targetLanguage);
-          } catch (err) {
-            console.error('Romanization error (non-fatal):', err);
+          } catch {
+            // Romanization is non-fatal; skip silently
           }
         }
       }
@@ -1178,7 +1200,12 @@ export const processTranslationForCard = internalAction({
         },
       );
     } catch (err) {
-      console.error('Translation error:', err);
+      console.error('[translateCard] Translation error:', {
+        textId: args.textId,
+        sourceLanguage: args.sourceLanguage,
+        targetLanguage: args.targetLanguage,
+        error: err,
+      });
     }
 
     return null;
@@ -1226,17 +1253,20 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       )
       .first();
 
-    if (!existingAudioForVoice && await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage)) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.features.ttsProcessing.processTTSForCard,
-        {
-          textId: args.textId,
-          text: args.translatedText,
-          language: args.targetLanguage,
-          voiceName: args.voiceName,
-        },
-      );
+    if (!existingAudioForVoice) {
+      const claimed = await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage);
+      if (claimed) {
+        await ctx.scheduler.runAfter(
+          0,
+          internal.features.ttsProcessing.processTTSForCard,
+          {
+            textId: args.textId,
+            text: args.translatedText,
+            language: args.targetLanguage,
+            voiceName: args.voiceName,
+          },
+        );
+      }
     }
 
     return null;
