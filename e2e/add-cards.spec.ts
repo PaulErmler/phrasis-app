@@ -49,8 +49,10 @@ test.describe("add cards", () => {
       return; // Disabled while empty — form correctly prevents submission.
     }
 
+    // Real click — `trial: true` only runs actionability checks and would
+    // skip the actual submit, making the assertion below a no-op.
     const urlBefore = page.url();
-    await submit.click({ trial: true }).catch(() => {});
+    await submit.click().catch(() => {});
     await page.waitForTimeout(500);
     expect(/add-cards/.test(page.url()) || page.url() === urlBefore).toBe(true);
   });

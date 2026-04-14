@@ -281,8 +281,12 @@ export const clearUserWordTexts = internalMutation({
 });
 
 /**
- * Process one course: iterate its reviewed cards, re-tokenize with the
- * new rules, and rebuild userWords + userWordTexts + language stats.
+ * Process one course: iterate all its cards, re-tokenize with the new
+ * rules, and rebuild userWords + userWordTexts + language stats. Words
+ * are attributed to the card's creation date so dailyLanguageStats
+ * reflects when a word was first introduced to the user, not when the
+ * card was last reviewed (previous behavior skewed timelines toward
+ * recent review activity).
  */
 export const processCourseBatch = internalMutation({
   args: {
@@ -312,8 +316,6 @@ export const processCourseBatch = internalMutation({
     let totalNewWords = 0;
 
     for (const card of result.page) {
-      if (!card.lastReviewedAt) continue;
-
       const text = await ctx.db.get(card.textId);
       if (!text) continue;
 
@@ -342,8 +344,11 @@ export const processCourseBatch = internalMutation({
 
       await ctx.db.patch(card._id, { wordsTrackedLanguages: allLanguages });
 
-      const reviewDate = new Date(card.lastReviewedAt);
-      const dateStr = `${reviewDate.getFullYear()}-${String(reviewDate.getMonth() + 1).padStart(2, '0')}-${String(reviewDate.getDate()).padStart(2, '0')}`;
+      // Attribute new words to the card's creation date — this is when the
+      // word was first introduced to the user, which is what the daily
+      // timeline should reflect.
+      const createdAt = new Date(card._creationTime);
+      const dateStr = `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}-${String(createdAt.getDate()).padStart(2, '0')}`;
 
       for (const [lang, count] of Object.entries(newWordCounts)) {
         totalNewWords += count;

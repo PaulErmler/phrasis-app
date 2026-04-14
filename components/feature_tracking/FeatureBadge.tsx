@@ -34,7 +34,7 @@ export function FeatureBadge({ featureId, className }: FeatureBadgeProps) {
       {balance > 0 ? (
         <Badge
           variant="secondary"
-          data-testid="chat-quota"
+          data-testid={`feature-quota-${featureId}`}
           className={`cursor-pointer text-amber-600 dark:text-amber-400 ${className ?? ''}`}
           onClick={() => setDialogOpen(true)}
         >
@@ -43,7 +43,7 @@ export function FeatureBadge({ featureId, className }: FeatureBadgeProps) {
       ) : (
         <Badge
           variant="destructive"
-          data-testid="chat-quota"
+          data-testid={`feature-quota-${featureId}`}
           className={`cursor-pointer ${className ?? ''}`}
           onClick={() => setDialogOpen(true)}
         >

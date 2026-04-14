@@ -36,7 +36,7 @@ async function readQuotaLeft(page: Page): Promise<number | null> {
   // return the first one with a readable value — avoids an isVisible race
   // against Convex refetches and tolerates duplicate test-ids if both the
   // home NewChatInput and the /app/chat ChatInput are in the DOM.
-  const badges = page.getByTestId("chat-quota");
+  const badges = page.getByTestId("feature-quota-chat_messages");
   const count = await badges.count().catch(() => 0);
   for (let i = 0; i < count; i++) {
     const raw = (await badges.nth(i).textContent().catch(() => null))?.trim();

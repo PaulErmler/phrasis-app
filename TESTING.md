@@ -69,7 +69,8 @@ We tag production components with `data-testid` attributes so Playwright selecto
 
 | Area | IDs |
 | ---- | --- |
-| Chat | `chat-new-input`, `chat-input`, `chat-submit`, `chat-quota`, `chat-toggle-conversations`, `chat-new-thread`, `chat-messages-log`, `chat-user-message`, `chat-assistant-message`, `chat-thread-entry` (+ `data-thread-id`) |
+| Chat | `chat-new-input`, `chat-input`, `chat-submit`, `chat-toggle-conversations`, `chat-new-thread`, `chat-messages-log`, `chat-user-message`, `chat-assistant-message`, `chat-thread-entry` (+ `data-thread-id`) |
+| Feature quota | `feature-quota-${featureId}` (e.g. `feature-quota-chat_messages`, `feature-quota-custom_sentences`) |
 | Card approval | `card-approval`, `card-approve`, `card-reject`, `card-approved-indicator` |
 | Learn | `learn-rating-{again,hard,good,easy,still-learning,understood}`, `learn-submit-translation`, `learn-translation-input`, `learn-settings` |
 | Learning settings | `settings-mode-audio`, `settings-mode-full` (switches use role=switch) |
