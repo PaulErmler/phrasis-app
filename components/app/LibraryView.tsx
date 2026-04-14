@@ -123,6 +123,7 @@ export function LibraryView({
                 placeholder={t('searchPlaceholder')}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
+                data-testid="library-search"
               />
               {searchInput && (
                 <button
@@ -146,6 +147,7 @@ export function LibraryView({
                   variant="outline"
                   size="sm"
                   aria-label={t('filterMastered')}
+                  data-testid="library-filter-mastered"
                 >
                   <CircleCheck className="h-3.5 w-3.5" />
                   {t('filterMastered')}
@@ -156,6 +158,7 @@ export function LibraryView({
                   variant="outline"
                   size="sm"
                   aria-label={t('filterHidden')}
+                  data-testid="library-filter-hidden"
                 >
                   <EyeOff className="h-3.5 w-3.5" />
                   {t('filterHidden')}
@@ -166,6 +169,7 @@ export function LibraryView({
                   variant="outline"
                   size="sm"
                   aria-label={t('filterFavorites')}
+                  data-testid="library-filter-favorites"
                 >
                   <Star className="h-3.5 w-3.5" />
                   {t('filterFavorites')}
@@ -208,23 +212,24 @@ export function LibraryView({
         {!isLoading && hasResults && (
           <>
             {cards.map((card) => (
-              <LearningCardContent
-                key={card._id}
-                bare
-                preReviewCount={card.preReviewCount}
-                schedulingPhase={card.schedulingPhase}
-                fsrsState={card.fsrsState}
-                sourceText={card.sourceText}
-                translations={card.translations}
-                audioRecordings={card.audioRecordings}
-                isFavorite={card.isFavorite ?? false}
-                isPendingMaster={pendingMaster.has(card._id) || card.isMastered}
-                isPendingHide={pendingHide.has(card._id) || card.isHidden}
-                onMaster={() => handleMaster(card._id)}
-                onHide={() => handleHide(card._id)}
-                onFavorite={() => handleFavorite(card._id)}
-                hideTargetLanguages={false}
-              />
+              <div key={card._id} data-testid="library-card">
+                <LearningCardContent
+                  bare
+                  preReviewCount={card.preReviewCount}
+                  schedulingPhase={card.schedulingPhase}
+                  fsrsState={card.fsrsState}
+                  sourceText={card.sourceText}
+                  translations={card.translations}
+                  audioRecordings={card.audioRecordings}
+                  isFavorite={card.isFavorite ?? false}
+                  isPendingMaster={pendingMaster.has(card._id) || card.isMastered}
+                  isPendingHide={pendingHide.has(card._id) || card.isHidden}
+                  onMaster={() => handleMaster(card._id)}
+                  onHide={() => handleHide(card._id)}
+                  onFavorite={() => handleFavorite(card._id)}
+                  hideTargetLanguages={false}
+                />
+              </div>
             ))}
           </>
         )}
