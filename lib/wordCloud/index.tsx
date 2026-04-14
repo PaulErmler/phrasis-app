@@ -91,13 +91,17 @@ export function useCloudSize(): {
  * sentence-example dialogs on both the stats page and the landing page. */
 export function highlightWord(text: string, word: string): React.ReactNode {
   const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Capture group makes split() interleave non-matches and matches: even
+  // indices are surrounding text, odd indices are the matched word. Avoid
+  // `/g` here since a stateful regex shared with .test() carries lastIndex
+  // across calls and mis-classifies parts.
   const regex = new RegExp(
     `(?<![\\p{L}\\p{N}])(${escaped})(?![\\p{L}\\p{N}])`,
-    'giu',
+    'iu',
   );
   const parts = text.split(regex);
   return parts.map((part, i) =>
-    regex.test(part) ? (
+    i % 2 === 1 ? (
       <span key={i} className="text-primary">
         {part}
       </span>

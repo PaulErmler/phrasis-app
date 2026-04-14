@@ -342,7 +342,11 @@ export const getRecentWordsForLanguage = query({
     const courseId = active.course._id;
     const variantSet = resolveLanguageVariants(targetLanguages, language);
 
+    // Dedup across variants: the same normalized word can appear in both
+    // `es` and `es_latam`. Keep first occurrence per normalized key so
+    // descending order is preserved and result size isn't inflated.
     const allWords: string[] = [];
+    const seen = new Set<string>();
     for (const variant of variantSet) {
       const rows = await ctx.db
         .query('userWords')
@@ -351,7 +355,11 @@ export const getRecentWordsForLanguage = query({
         )
         .order('desc')
         .take(cap);
-      allWords.push(...rows.map((r) => r.displayWord ?? r.word));
+      for (const r of rows) {
+        if (seen.has(r.word)) continue;
+        seen.add(r.word);
+        allWords.push(r.displayWord ?? r.word);
+      }
     }
 
     return allWords.slice(0, cap);

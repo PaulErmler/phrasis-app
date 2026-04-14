@@ -422,6 +422,15 @@ export default defineSchema({
     .index('by_userId_and_courseId', ['userId', 'courseId'])
     .index('by_userId_and_courseId_and_reviewNumber', ['userId', 'courseId', 'reviewNumber']),
 
+  // Per-user state for the retokenizeAllWords migration. Accumulated across
+  // paginated `run` passes so the clear-and-rebuild chain fires exactly once
+  // per user with their full course list, regardless of how many pages the
+  // user's courses span. Rows are deleted as each user's chain is scheduled.
+  retokenizeMigrationState: defineTable({
+    userId: v.string(),
+    courseIds: v.array(v.id('courses')),
+  }).index('by_userId', ['userId']),
+
   // Usage quotas — local cache of Autumn entitlements for synchronous checks.
   // One document per user; features stored as a record keyed by feature ID.
   usageQuotas: defineTable({

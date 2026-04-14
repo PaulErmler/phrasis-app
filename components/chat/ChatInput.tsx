@@ -39,6 +39,10 @@ interface ChatInputProps {
   footerAction?: React.ReactNode;
   suggestionsAction?: React.ReactNode;
   autoFocus?: boolean;
+  /** Data-testid for the textarea input. */
+  inputTestId?: string;
+  /** Data-testid for the submit button. */
+  submitTestId?: string;
 }
 
 /**
@@ -60,6 +64,8 @@ export function ChatInput({
   footerAction,
   suggestionsAction,
   autoFocus = true,
+  inputTestId,
+  submitTestId,
 }: ChatInputProps) {
   const t = useTranslations('Chat.input');
   const containerRef = useRef<HTMLDivElement>(null);
@@ -119,6 +125,7 @@ export function ChatInput({
                 placeholder={t('placeholder')}
                 onChange={(event) => onTextChange(event.target.value)}
                 value={text}
+                {...(inputTestId ? { 'data-testid': inputTestId } : {})}
               />
             </PromptInputBody>
             <PromptInputFooter>
@@ -151,6 +158,7 @@ export function ChatInput({
                     isTranscribing
                   }
                   status={status}
+                  {...(submitTestId ? { 'data-testid': submitTestId } : {})}
                 />
               </div>
             </PromptInputFooter>

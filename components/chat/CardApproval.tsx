@@ -199,10 +199,10 @@ export function CardApproval({
 
   if (approvalState === 'approved') {
     return (
-      <Alert className="my-3 flex flex-col gap-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+      <Alert data-testid="card-approval" className="my-3 flex flex-col gap-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
         <AlertDescription>{cardContent}</AlertDescription>
         <div className="flex items-center justify-end gap-2 h-8">
-          <p className="text-xs font-medium text-success">{t('approved')}</p>
+          <p data-testid="card-approved-indicator" className="text-xs font-medium text-success">{t('approved')}</p>
         </div>
       </Alert>
     );
@@ -210,7 +210,7 @@ export function CardApproval({
 
   if (approvalState === 'rejected') {
     return (
-      <Alert className="my-3 flex flex-col gap-3 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+      <Alert data-testid="card-approval" className="my-3 flex flex-col gap-3 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
         <AlertDescription>{cardContent}</AlertDescription>
         <div className="flex items-center justify-end gap-2 h-8">
           <p className="text-xs font-medium text-red-700 dark:text-red-300">{t('rejected')}</p>
@@ -220,7 +220,7 @@ export function CardApproval({
   }
 
   return (
-    <Alert className="my-3 flex flex-col gap-3">
+    <Alert data-testid="card-approval" className="my-3 flex flex-col gap-3">
       <AlertDescription>{cardContent}</AlertDescription>
       <div className="flex items-center justify-end gap-2">
         <FeatureBadge featureId="custom_sentences" />
@@ -230,6 +230,7 @@ export function CardApproval({
           variant="outline"
           size="sm"
           className="h-8 px-3 text-sm"
+          data-testid="card-reject"
         >
           {t('rejectButton')}
         </Button>
@@ -238,6 +239,7 @@ export function CardApproval({
             onClick={() => setPaywallOpen(true)}
             size="sm"
             className="h-8 px-3 text-sm gap-1.5"
+            data-testid="card-approve"
           >
             <Lock className="h-3.5 w-3.5" />
             Upgrade
@@ -248,6 +250,7 @@ export function CardApproval({
             disabled={isProcessing || !approvalId}
             size="sm"
             className="h-8 px-3 text-sm"
+            data-testid="card-approve"
           >
             {t('approveButton')}
           </Button>

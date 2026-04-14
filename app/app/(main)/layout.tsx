@@ -272,6 +272,7 @@ export default function MainLayout({
                 variant="ghost"
                 onClick={() => setCourseMenuOpen(true)}
                 className="gap-2 -ml-2 min-w-0 shrink overflow-hidden"
+                data-testid="course-menu-trigger"
               >
                 <ChevronLeft className="h-4 w-4 shrink-0" />
                 <span className="truncate">{courseButtonLabel}</span>
@@ -291,6 +292,7 @@ export default function MainLayout({
                   size="icon"
                   onClick={() => setChatSidebarOpen((prev) => !prev)}
                   aria-label="Toggle conversations"
+                  data-testid="chat-toggle-conversations"
                 >
                   <PanelLeft className="h-4 w-4" />
                 </Button>
@@ -299,6 +301,7 @@ export default function MainLayout({
                   size="icon"
                   onClick={handleNewChat}
                   aria-label="New chat"
+                  data-testid="chat-new-thread"
                 >
                   <MessageSquarePlus className="h-4 w-4" />
                 </Button>

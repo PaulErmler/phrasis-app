@@ -168,7 +168,11 @@ export function WordDiff({
     <div>
       <p className="leading-relaxed flex flex-wrap items-baseline gap-x-1 gap-y-3 pt-3">
         {words.map((w, i) => (
-          <WordChip key={i} word={w} language={language} />
+          <WordChip
+            key={`${i}-${w.tag}-${w.expected ?? ''}-${w.actual ?? ''}`}
+            word={w}
+            language={language}
+          />
         ))}
       </p>
       <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>

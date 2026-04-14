@@ -15,9 +15,11 @@ export const OPENROUTER_MODELS = {
 
 /** Provider routing for the chat agent via OpenRouter.
  *  `order` soft-forces io-net fp8 first, then together. `allow_fallbacks`
- *  stays true because io-net/together don't expose tool-calling endpoints
- *  for GLM, and the chat agent needs the createCard tool. preferred_*
- *  deprioritize endpoints slower than 2s p50 / under 50 tok/s p50. */
+ *  is false because io-net/together don't expose tool-calling endpoints
+ *  for GLM, and the chat agent needs the createCard tool — letting
+ *  OpenRouter silently fall back to a non-tool provider would break
+ *  createCard. preferred_* deprioritize endpoints slower than 2s p50 /
+ *  under 50 tok/s p50. */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
   provider: {
     order: ['io-net/fp8', 'io-net', 'together'],

@@ -82,7 +82,7 @@ function SingleWordCloud({
   }, []);
 
   return (
-    <div className="card-surface p-3">
+    <div className="card-surface p-3" data-testid="stats-wordcloud">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">
           {isFirst ? t('recentlyLearnedWords', { language: getLangName(language) }) : getLangName(language)}
