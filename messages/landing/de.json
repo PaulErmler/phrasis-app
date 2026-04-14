@@ -164,6 +164,7 @@
     "progressBody": "Verfolge genau, welche Wörter du bereits kennst und wie viel Fortschritt du über Tage, Wochen und Monate gemacht hast — aufgeschlüsselt nach Sprache, wenn du mehr als eine lernst.",
     "activityTitle": "Baue Konstanz auf",
     "activityBody": "Sieh deine Lerngewohnheit auf einen Blick. Jeder Tag, an dem du übst, erscheint im Kalender — beobachte, wie deine Serie wächst und bleibe motiviert.",
+    "wordCloudHint": "Klicke auf ein Wort, um die Sätze zu sehen, mit denen du es gelernt hast",
     "insightsTitle": "Sitzungsübersicht",
     "insightsBody": "Nach jeder Wiederholung siehst du genau, was du geschafft hast: Wiederholungen, neue Wörter und aufgewendete Zeit — live aktualisiert, sobald du fertig bist.",
     "habitsTitle": "Finde deine besten Stunden",
@@ -238,7 +239,8 @@
           "sentences": "150 Sätze pro Monat",
           "customSentences": "10 eigene Sätze pro Monat",
           "courses": "1 Kurs",
-          "chatMessages": "5 Chat-Nachrichten pro Monat"
+          "chatMessages": "5 Chat-Nachrichten pro Monat",
+          "detailedStatistics": "Detaillierte Statistiken"
         }
       },
       "basic": {
@@ -248,10 +250,11 @@
         "period": "pro Monat",
         "cta": "Jetzt starten",
         "features": {
-          "sentences": "400 Sätze pro Monat",
+          "sentences": "Unbegrenzt viele vorgefertigte Sätze",
           "customSentences": "200 eigene Sätze pro Monat",
           "courses": "1 Kurs",
-          "chatMessages": "50 Chat-Nachrichten pro Monat"
+          "chatMessages": "50 Chat-Nachrichten pro Monat",
+          "detailedStatistics": "Detaillierte Statistiken"
         }
       },
       "pro": {
@@ -261,11 +264,12 @@
         "period": "pro Monat",
         "cta": "Jetzt starten",
         "features": {
-          "sentences": "1000 Sätze pro Monat",
+          "sentences": "Unbegrenzt viele vorgefertigte Sätze",
           "customSentences": "500 eigene Sätze pro Monat",
           "courses": "Bis zu 10 Kurse",
           "chatMessages": "200 Chat-Nachrichten pro Monat",
-          "multipleLanguages": "Bis zu 5 Sprachen pro Kurs"
+          "multipleLanguages": "Bis zu 5 Sprachen pro Kurs",
+          "detailedStatistics": "Detaillierte Statistiken"
         }
       }
     }

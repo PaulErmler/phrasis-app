@@ -346,6 +346,12 @@
     },
     "submitAnswer": "Submit",
     "accuracy": "Accuracy",
+    "diff": {
+      "typo": "Typo",
+      "expected": "Expected",
+      "missingWord": "Missing word",
+      "extraWord": "Extra word"
+    },
     "showSentence": "Show sentence",
     "showCorrections": "Show corrections",
     "revertSubmission": "Revert submission",
@@ -534,7 +540,7 @@
     "sentences": {
       "name": "ready-made sentences",
       "pricingLabel": "{count, plural, one {# ready-made sentence} other {# ready-made sentences}} per month",
-      "pricingLabelUnlimited": "Unlimited ready-made sentences per month"
+      "pricingLabelUnlimited": "Unlimited ready-made sentences"
     },
     "customSentences": {
       "name": "custom sentences",
@@ -554,6 +560,10 @@
     },
     "translationAutoFill": {
       "name": "translation auto-fill"
+    },
+    "detailedStatistics": {
+      "name": "detailed statistics",
+      "pricingLabel": "Detailed statistics"
     }
   },
   "FeatureTracking": {
@@ -871,6 +881,18 @@
     "chatCards": "Chat Cards Added",
     "chatMessages": "Chat Messages Sent",
     "noData": "No data yet",
-    "recentlyLearnedWords": "Recently learned words — {language}"
+    "recentlyLearnedWords": "Recently learned words — {language}",
+    "searchWords": "Search Words",
+    "searchWordsDescription": "Search your learned words across all languages",
+    "searchWordsPlaceholder": "Search words...",
+    "searchWordsHint": "Type to search your learned words",
+    "searchWordsNoResults": "No matching words found",
+    "expandWords": "Expand words",
+    "viewSentencesForWord": "View sentences for word: {word}",
+    "recentWordsTitle": "Words in {language}",
+    "recentWordsCount": "{count, plural, =0 {No words yet} one {# word} other {# words}}",
+    "noWordsYet": "No words yet",
+    "loadMore": "Load more",
+    "clearSearch": "Clear search"
   }
 }

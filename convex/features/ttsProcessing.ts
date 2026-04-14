@@ -160,7 +160,7 @@ export const processTTSForCard = internalAction({
 
       if (!validated) {
         console.error(
-          `TTS validation failed after ${MAX_TTS_VALIDATION_ATTEMPTS} attempts — marking as unvalidated`,
+          `[ttsProcess] Validation failed after ${MAX_TTS_VALIDATION_ATTEMPTS} attempts — marking as unvalidated`,
           { textId: args.textId, language: args.language, text: args.text },
         );
       }
@@ -176,9 +176,18 @@ export const processTTSForCard = internalAction({
           storageId: lastStorageId,
           ttsQuality: validated ? ('validated' as const) : ('unvalidated' as const),
         });
+      } else {
+        console.error('[ttsProcess] No storageId produced, audio will be missing', {
+          textId: args.textId,
+          language: args.language,
+        });
       }
     } catch (err) {
-      console.error('TTS processing error:', err);
+      console.error('[ttsProcess] TTS processing error:', {
+        textId: args.textId,
+        language: args.language,
+        error: err,
+      });
     } finally {
       await ctx.runMutation(internal.features.ttsProcessing.releaseTtsClaim, {
         textId: args.textId,

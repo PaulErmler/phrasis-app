@@ -11,12 +11,12 @@ const plans = [
   {
     key: 'free' as const,
     highlighted: false,
-    features: ['sentences', 'customSentences', 'courses', 'chatMessages'],
+    features: ['sentences', 'customSentences', 'courses', 'chatMessages', 'detailedStatistics'],
   },
   {
     key: 'basic' as const,
     highlighted: true,
-    features: ['sentences', 'customSentences', 'courses', 'chatMessages'],
+    features: ['sentences', 'customSentences', 'courses', 'chatMessages', 'detailedStatistics'],
   },
   {
     key: 'pro' as const,
@@ -27,6 +27,7 @@ const plans = [
       'courses',
       'chatMessages',
       'multipleLanguages',
+      'detailedStatistics',
     ],
   },
 ] as const;

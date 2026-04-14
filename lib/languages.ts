@@ -256,14 +256,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
       createChirp3Voice('Puck', 'male', 'ru-RU', 'Russia'),
       createChirp3Voice('Fenrir', 'male', 'ru-RU', 'Russia'),
       createChirp3Voice('Orus', 'male', 'ru-RU', 'Russia'),
-      createChirp3Voice('Achernar', 'female', 'ru-RU', 'Russia'),
-      createChirp3Voice('Autonoe', 'female', 'ru-RU', 'Russia'),
-      createChirp3Voice('Callirrhoe', 'female', 'ru-RU', 'Russia'),
-      createChirp3Voice('Sulafat', 'female', 'ru-RU', 'Russia'),
-      createChirp3Voice('Achird', 'male', 'ru-RU', 'Russia'),
-      createChirp3Voice('Algenib', 'male', 'ru-RU', 'Russia'),
-      createChirp3Voice('Enceladus', 'male', 'ru-RU', 'Russia'),
-      createChirp3Voice('Umbriel', 'male', 'ru-RU', 'Russia'),
     ],
   },
   {
@@ -539,7 +531,8 @@ export function getLanguageByCode(code: string): Language | undefined {
  * Short tag for badges, chat previews, and audio button labels.
  * Both Spanish variants map to "ES" so internal codes like es_latam never appear in the UI.
  */
-export function getLanguageShortLabel(code: string): string {
+export function getLanguageShortLabel(code: string | null | undefined): string {
+  if (!code) return '';
   const normalized = code.toLowerCase();
   if (normalized === 'es' || normalized === 'es_latam') {
     return 'ES';
@@ -730,4 +723,13 @@ export const ROMANIZATION_LANGUAGES = new Set(['ru', 'hi', 'ja', 'ko', 'zh', 'el
 
 export function languageNeedsRomanization(code: string): boolean {
   return ROMANIZATION_LANGUAGES.has(code);
+}
+
+/**
+ * Normalize a language code by stripping regional variant suffixes
+ * (e.g. "es_latam" → "es"). Non-variant codes are returned unchanged.
+ * Single source of truth for variant collapsing across stats, search, and UI.
+ */
+export function normalizeLanguageCode(code: string): string {
+  return code.replace(/_latam$/, '');
 }

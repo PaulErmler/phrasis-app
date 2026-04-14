@@ -265,13 +265,14 @@ export default function MainLayout({
   return (
     <div className="h-svh max-h-svh md:h-screen md:max-h-screen flex flex-col overflow-hidden">
       {!isAddCardsRoute && (
-        <header className="fixed top-0 left-0 right-0 z-20 border-b bg-background">
+        <header className="fixed top-0 left-0 right-0 z-20 border-b bg-background pt-[env(safe-area-inset-top)]">
           <div className="header-bar">
             {activeView === 'home' ? (
               <Button
                 variant="ghost"
                 onClick={() => setCourseMenuOpen(true)}
                 className="gap-2 -ml-2 min-w-0 shrink overflow-hidden"
+                data-testid="course-menu-trigger"
               >
                 <ChevronLeft className="h-4 w-4 shrink-0" />
                 <span className="truncate">{courseButtonLabel}</span>
@@ -291,6 +292,7 @@ export default function MainLayout({
                   size="icon"
                   onClick={() => setChatSidebarOpen((prev) => !prev)}
                   aria-label="Toggle conversations"
+                  data-testid="chat-toggle-conversations"
                 >
                   <PanelLeft className="h-4 w-4" />
                 </Button>
@@ -299,6 +301,7 @@ export default function MainLayout({
                   size="icon"
                   onClick={handleNewChat}
                   aria-label="New chat"
+                  data-testid="chat-new-thread"
                 >
                   <MessageSquarePlus className="h-4 w-4" />
                 </Button>
@@ -332,7 +335,9 @@ export default function MainLayout({
         </header>
       )}
 
-      {!isAddCardsRoute && <div className="h-14 shrink-0" />}
+      {!isAddCardsRoute && (
+        <div className="shrink-0 h-[calc(3.5rem+env(safe-area-inset-top))]" />
+      )}
 
       <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
@@ -421,7 +426,10 @@ export default function MainLayout({
       </main>
 
       {!isAddCardsRoute && (
-        <div className={`shrink-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
+        <div className="shrink-0 h-16 pb-[env(safe-area-inset-bottom,0px)]" />
+      )}
+      {!isAddCardsRoute && (
+        <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
           <BottomNav
             currentView={activeView}
             onViewChange={handleViewChange}

@@ -134,6 +134,8 @@ export function NewChatInput({
         onVoiceClick={handleVoiceClick}
         showSuggestions={showSuggestions}
         autoFocus={autoFocus}
+        inputTestId="chat-new-input"
+        submitTestId="chat-submit"
         footerAction={<FeatureBadge featureId={FEATURE_IDS.CHAT_MESSAGES} />}
       />
       {paywallOpen && (

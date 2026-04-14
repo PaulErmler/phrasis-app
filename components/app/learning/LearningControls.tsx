@@ -196,6 +196,13 @@ export function LearningControls({
                     onSelectRating(rating);
                     if (instantProceed) onNext(rating);
                   }}
+                  data-testid={
+                    rating === 'stillLearning'
+                      ? 'learn-rating-still-learning'
+                      : rating === 'understood'
+                        ? 'learn-rating-understood'
+                        : `learn-rating-${rating}`
+                  }
                   className={`w-full ${
                     activeRating === rating
                       ? 'ring-2 ring-primary border-primary bg-primary/5'

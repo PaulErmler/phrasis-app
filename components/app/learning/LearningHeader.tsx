@@ -124,6 +124,7 @@ export function LearningHeader({
             onClick={onSettingsOpen}
             className="size-9 -mr-1"
             data-tutorial="settings-button"
+            data-testid="learn-settings"
           >
             <Settings className="h-5 w-5" />
           </Button>

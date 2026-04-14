@@ -27,6 +27,7 @@ import {
   createCourseStats,
   getTodayInTimezone,
   getPreviousDay,
+  getNextDay,
 } from '../db/courseStats';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { consumeQuota, hasFeatureAccess, releaseQuota } from '../usage/helpers';
@@ -321,12 +322,20 @@ export const getCourseStats = query({
         !!stats.streakFreezeUsedDate &&
         stats.streakFreezeUsedDate === yesterday;
 
+      // Freeze is a single slot derived from streakFreezeUsedDate plus
+      // last activity. It regenerates once the user has an activity day
+      // strictly after the day following the covered gap.
+      const freezeAvailable =
+        !stats.streakFreezeUsedDate ||
+        (!!stats.lastActivityDate &&
+          stats.lastActivityDate > getNextDay(stats.streakFreezeUsedDate));
+
       return {
         totalRepetitions: stats.totalRepetitions,
         totalTimeMs: stats.totalTimeMs,
         totalCards: stats.totalCards,
         currentStreak: stats.currentStreak,
-        streakFreezeCount: stats.streakFreezeCount ?? 0,
+        streakFreezeCount: freezeAvailable ? 1 : 0,
         streakFrozenToday,
         totalWordCount: stats.totalWordCount,
         totalChatMessages: stats.totalChatMessages,

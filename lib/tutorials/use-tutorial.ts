@@ -248,6 +248,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       overlayOpacity: getDriverOverlayOpacity(),
       stagePadding: 8,
       stageRadius: 8,
+      popoverClass: `phrasis-tutorial-${tutorialId}`,
       steps: resolvedSteps,
       onDestroyStarted: () => {
         completeTutorial();
@@ -297,6 +298,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       showButtons: ['close'],
       overlayColor: '#000',
       overlayOpacity: getDriverOverlayOpacity(),
+      popoverClass: 'phrasis-tutorial-completion',
       steps: [{
         popover: { title, description },
       }],
@@ -318,6 +320,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       showButtons: ['close'],
       overlayColor: '#000',
       overlayOpacity: getDriverOverlayOpacity(),
+      popoverClass: 'phrasis-tutorial-chat',
       steps: [{
         element: '[data-tutorial="chat-button"]',
         popover: {

@@ -174,6 +174,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
               className="w-full mb-3 gap-2 h-9"
               onClick={handleCreateClick}
               disabled={!quotaInfo}
+              data-testid="course-menu-create"
             >
               {canCreate ? (
                 <Plus className="h-4 w-4" />
@@ -241,6 +242,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
                   return (
                     <div
                       key={course._id}
+                      data-testid="course-menu-entry"
                       className={cn(
                         'w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left',
                         isActive
@@ -276,6 +278,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
                         size="icon"
                         className="h-8 w-8 shrink-0"
                         onClick={() => handleOpenSettings(course._id)}
+                        data-testid="course-settings"
                       >
                         <Settings className="h-4 w-4" />
                       </Button>
