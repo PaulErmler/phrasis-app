@@ -14,13 +14,25 @@ export function isAllLowercase(s: string): boolean {
   return s === s.toLowerCase();
 }
 
+// Segmenter construction is measurable on hot paths (review writes,
+// migrations, edit flows). Cache per normalized BCP-47 tag.
+const segmenterCache = new Map<string, Intl.Segmenter>();
+function getSegmenter(bcp47: string): Intl.Segmenter {
+  let s = segmenterCache.get(bcp47);
+  if (!s) {
+    s = new Intl.Segmenter(bcp47, { granularity: 'word' });
+    segmenterCache.set(bcp47, s);
+  }
+  return s;
+}
+
 export function tokenizeText(text: string, language: string): Token[] {
   const nfc = text.normalize('NFC');
   // `es_latam` and similar underscore-separated tags aren't valid BCP-47;
   // Intl.Segmenter would throw. Normalize to hyphens.
   const bcp47 = language.replace(/_/g, '-');
   try {
-    const segmenter = new Intl.Segmenter(bcp47, { granularity: 'word' });
+    const segmenter = getSegmenter(bcp47);
     return [...segmenter.segment(nfc)]
       .filter((seg) => seg.isWordLike)
       .map((seg) => ({
@@ -298,6 +310,24 @@ export async function updateWordTextsForEdit(
       ) {
         await ctx.db.patch(existingWord._id, { displayWord: original });
       }
+
+      // Defensive: re-check for an exact existing link before inserting.
+      // `survivingWords` is derived from the initial `existingLinks` snapshot
+      // and doesn't cover writes from a concurrent mutation that may have
+      // raced in (Convex OCC will retry, but only on write-set conflicts —
+      // this index read guards against the read-stale-then-insert case).
+      const existingLink = await ctx.db
+        .query('userWordTexts')
+        .withIndex('by_userId_courseId_language_word_textId', (q) =>
+          q
+            .eq('userId', args.userId)
+            .eq('courseId', args.courseId)
+            .eq('language', language)
+            .eq('word', normalized)
+            .eq('textId', args.textId),
+        )
+        .first();
+      if (existingLink) continue;
 
       // Insert userWordTexts link (check cap)
       const count = await ctx.db

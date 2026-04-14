@@ -26,12 +26,13 @@ export const run = internalMutation({
     cursor: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Paginate across all courses so this migration scales past the old
-    // 500-course cap. Each page zeros stats for its courses and enqueues
-    // per-user delete+reprocess chains. clearUserWords/clearUserWordTexts
-    // key on userId alone and are idempotent, so a user whose courses span
-    // multiple pages simply gets two chains — the second finds no rows to
-    // delete and proceeds directly to processCourseBatch for its slice.
+    // Phase 1: paginate all courses, zero their stats, and accumulate each
+    // user's full course list into `retokenizeMigrationState`. We do NOT
+    // schedule any per-user clear/process chains here, because a user whose
+    // courses span multiple pages would otherwise get their freshly-rebuilt
+    // rows wiped by a later page's `clearUserWords` (which scopes only on
+    // userId). When pagination finishes, Phase 2 (`startPerUserChains`)
+    // dispatches one chain per user with the complete course list.
     const result = await ctx.db.query('courses').paginate({
       cursor: args.cursor ?? null,
       numItems: COURSES_PER_PAGE,
@@ -78,24 +79,33 @@ export const run = internalMutation({
       }
     }
 
-    const userCourses = new Map<string, typeof courses>();
+    // Group this page's courses by userId so we patch each state row once.
+    const userCourses = new Map<string, Array<typeof courses[number]>>();
     for (const course of courses) {
       const list = userCourses.get(course.userId) ?? [];
       list.push(course);
       userCourses.set(course.userId, list);
     }
 
-    let usersQueued = 0;
     for (const [userId, userCourseList] of userCourses) {
-      await ctx.scheduler.runAfter(
-        0,
-        internal.migrations.retokenizeAllWords.clearUserWords,
-        {
+      const state = await ctx.db
+        .query('retokenizeMigrationState')
+        .withIndex('by_userId', (q) => q.eq('userId', userId))
+        .first();
+      const pageIds = userCourseList.map((c) => c._id);
+      if (state) {
+        const seen = new Set(state.courseIds);
+        const merged = state.courseIds.slice();
+        for (const id of pageIds) if (!seen.has(id)) merged.push(id);
+        if (merged.length !== state.courseIds.length) {
+          await ctx.db.patch(state._id, { courseIds: merged });
+        }
+      } else {
+        await ctx.db.insert('retokenizeMigrationState', {
           userId,
-          courseIds: userCourseList.map((c) => c._id),
-        },
-      );
-      usersQueued++;
+          courseIds: pageIds,
+        });
+      }
     }
 
     if (!result.isDone) {
@@ -104,11 +114,67 @@ export const run = internalMutation({
         internal.migrations.retokenizeAllWords.run,
         { cursor: result.continueCursor },
       );
+      return {
+        status: 'in_progress',
+        coursesFound: courses.length,
+      };
+    }
+
+    // Phase 1 complete — dispatch Phase 2.
+    await ctx.scheduler.runAfter(
+      0,
+      internal.migrations.retokenizeAllWords.startPerUserChains,
+      {},
+    );
+    return {
+      status: 'phase1_done',
+      coursesFound: courses.length,
+    };
+  },
+});
+
+/**
+ * Phase 2 dispatcher. Paginates `retokenizeMigrationState` and schedules one
+ * `clearUserWords` chain per user with that user's *full* course list. Each
+ * state row is deleted after scheduling so re-running `run` is idempotent.
+ */
+export const startPerUserChains = internalMutation({
+  args: {
+    cursor: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const STATE_PER_PAGE = 100;
+    const result = await ctx.db
+      .query('retokenizeMigrationState')
+      .paginate({
+        cursor: args.cursor ?? null,
+        numItems: STATE_PER_PAGE,
+      });
+
+    let usersQueued = 0;
+    for (const row of result.page) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.migrations.retokenizeAllWords.clearUserWords,
+        {
+          userId: row.userId,
+          courseIds: row.courseIds,
+        },
+      );
+      await ctx.db.delete(row._id);
+      usersQueued++;
+    }
+
+    if (!result.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.migrations.retokenizeAllWords.startPerUserChains,
+        { cursor: result.continueCursor },
+      );
     }
 
     return {
       status: result.isDone ? 'done' : 'in_progress',
-      coursesFound: courses.length,
       usersQueued,
     };
   },
