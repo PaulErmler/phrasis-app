@@ -118,7 +118,7 @@ export const processCourseBatch = internalMutation({
                 .eq('language', language)
                 .eq('word', normalized),
             )
-            .collect();
+            .take(MAX_TEXTS_PER_WORD);
 
           if (count.length >= MAX_TEXTS_PER_WORD) continue;
 

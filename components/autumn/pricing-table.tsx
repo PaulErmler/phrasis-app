@@ -370,7 +370,10 @@ export const PricingFeatureList = ({
       const i18nKey = getFeatureI18nKey(item.feature_id);
       const override = getFeatureDisplayCount(item.feature_id);
       const included = override ?? item.included_usage ?? 0;
-      const isUnlimited = included === Infinity || included === Number.POSITIVE_INFINITY || (isFeatureDisplayedAsUnlimited(item.feature_id) && Number(item.included_usage ?? 0) > 150);
+      const isUnlimited =
+        included === Infinity ||
+        included === Number.POSITIVE_INFINITY ||
+        (isFeatureDisplayedAsUnlimited(item.feature_id) && Number(item.included_usage ?? 0) >= 19000);
       if (isUnlimited) {
         return tFeatures(`${i18nKey}.pricingLabelUnlimited`);
       }

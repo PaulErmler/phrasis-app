@@ -150,6 +150,7 @@ function SingleWordCloud({
           variant="ghost"
           size="icon"
           className="h-7 w-7 text-muted-foreground"
+          aria-label={t('searchWords')}
           onClick={onSearchClick}
         >
           <Search className="h-3.5 w-3.5" />

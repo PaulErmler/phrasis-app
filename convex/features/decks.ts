@@ -1064,7 +1064,7 @@ export const ensureUpcomingCardsContent = mutation({
     for (const card of cards) {
       const text = await ctx.db.get(card.textId);
       if (!text) continue;
-      const result = await scheduleMissingContent(
+      await scheduleMissingContent(
         ctx,
         card.textId,
         text,
