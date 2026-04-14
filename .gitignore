@@ -71,3 +71,9 @@ playwright-report/index.html
 test-results/.last-run.json
 .gitignore
 e2e/.auth/user.json
+
+# Test artifacts
+coverage/
+playwright-report/
+test-results/
+e2e/.auth/credentials.json

@@ -317,6 +317,7 @@ function InlineCollectionDetail({
               disabled={isAdding}
               onClick={onAddCards}
               className="text-xs"
+              data-testid="collection-add-cards"
             >
               {isAdding ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

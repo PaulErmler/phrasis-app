@@ -52,6 +52,8 @@ function ThreadItem({
   return (
     <button
       onClick={onSelect}
+      data-testid="chat-thread-entry"
+      data-thread-id={thread._id}
       className={cn(
         'w-full h-9 overflow-hidden flex items-center text-left px-4 rounded-md border text-sm font-medium transition-all',
         isActive

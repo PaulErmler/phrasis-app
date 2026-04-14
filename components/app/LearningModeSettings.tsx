@@ -303,6 +303,7 @@ export function LearningModeSettings({
       <SheetContent
         side="right"
         className="w-full sm:max-w-[380px] p-0 [&>button:last-child]:hidden"
+        data-testid="learning-settings-sheet"
       >
         <SheetDescription className="sr-only">{t('title')}</SheetDescription>
 

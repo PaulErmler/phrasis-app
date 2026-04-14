@@ -236,6 +236,7 @@ export function CreateCourseDialog({
                 onClick={handleBack}
                 disabled={isSubmitting}
                 className="gap-2"
+                data-testid="course-dialog-back"
               >
                 <ChevronLeft className="h-4 w-4" />
                 {t('back')}
@@ -247,6 +248,7 @@ export function CreateCourseDialog({
               onClick={handleNext}
               disabled={!canContinue() || isSubmitting}
               className="min-w-[120px]"
+              data-testid={step === totalSteps ? 'course-dialog-create' : 'course-dialog-next'}
             >
               {step === totalSteps ? t('create') : t('next')}
             </Button>

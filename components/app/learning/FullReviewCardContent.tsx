@@ -640,6 +640,7 @@ function TargetLanguageInput({
           autoCorrect="off"
           autoCapitalize="sentences"
           spellCheck={false}
+          {...(isFirstTarget ? { 'data-testid': 'learn-translation-input' } : {})}
         />
         <Button
           variant="outline"
@@ -647,7 +648,7 @@ function TargetLanguageInput({
           onClick={() => onSubmit(translation.language)}
           className="h-9 w-9 shrink-0"
           aria-label={submitLabel}
-          {...(isFirstTarget ? { 'data-tutorial': 'submit-answer' } : {})}
+          {...(isFirstTarget ? { 'data-tutorial': 'submit-answer', 'data-testid': 'learn-submit-translation' } : {})}
         >
           <Check className="h-4 w-4" />
         </Button>

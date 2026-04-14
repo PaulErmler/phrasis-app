@@ -182,6 +182,8 @@ export function ChatPanel({
                 onVoiceClick={chat.voice.toggle}
                 suggestions={suggestions}
                 autoFocus={autoFocus}
+                inputTestId="chat-input"
+                submitTestId="chat-submit"
                 showSuggestions={
                   !chat.isLoading && (showSuggestions ?? chat.messages.length === 0)
                 }

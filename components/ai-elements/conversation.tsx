@@ -59,6 +59,7 @@ export const Conversation = ({ className, children, ...props }: ConversationProp
     <ConversationContext.Provider value={{ isAtBottom, scrollToBottom }}>
       <div
         ref={scrollRef}
+        data-testid="chat-messages-log"
         className={cn('relative flex-1 overflow-y-auto', className)}
         role="log"
         {...props}
