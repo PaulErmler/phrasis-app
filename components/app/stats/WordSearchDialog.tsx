@@ -13,7 +13,7 @@ import {
   CommandItem,
 } from '@/components/ui/command';
 import { WordSentencesDialog } from './WordSentencesDialog';
-import { LANG_NAMES, getLangName } from './WordCloudCard';
+import { getLangName } from './WordCloudCard';
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);

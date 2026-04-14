@@ -163,10 +163,17 @@ export async function updateWordTextsForEdit(
 
   const changedLangs = new Set(args.languages.map((l) => l.language));
 
-  // Fetch all existing links for this text
+  // Scope by userId+courseId: dataset texts can be shared across users, so a
+  // textId-only lookup would return other users' rows and the deletion loop
+  // below would then delete them.
   const existingLinks = await ctx.db
     .query('userWordTexts')
-    .withIndex('by_textId', (q) => q.eq('textId', args.textId))
+    .withIndex('by_userId_courseId_textId', (q) =>
+      q
+        .eq('userId', args.userId)
+        .eq('courseId', args.courseId)
+        .eq('textId', args.textId),
+    )
     .collect();
 
   // Track removed words per language for stats adjustment
