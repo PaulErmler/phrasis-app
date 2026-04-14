@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/tooltip';
 import { LandingAudioButton } from '@/components/landing/LandingAudioButton';
 import { CircleCheck, EyeOff, Star } from 'lucide-react';
+import { highlightWord } from '@/lib/wordCloud';
 
 interface MockSentence {
   id: string;
@@ -121,24 +122,6 @@ const MOCK_SENTENCES: Record<string, MockSentence[]> = {
   ],
 };
 
-function highlightWord(text: string, word: string): React.ReactNode {
-  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(
-    `(?<![\\p{L}\\p{N}])(${escaped})(?![\\p{L}\\p{N}])`,
-    'giu',
-  );
-  const parts = text.split(regex);
-  return parts.map((part, i) =>
-    regex.test(part) ? (
-      <span key={i} className="text-primary">
-        {part}
-      </span>
-    ) : (
-      part
-    ),
-  );
-}
-
 export function LandingWordSentencesDialog({
   word,
   open,
@@ -164,7 +147,7 @@ export function LandingWordSentencesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80vh] flex flex-col sm:max-w-md p-0 gap-0 overflow-hidden" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="max-h-[80vh] flex flex-col sm:max-w-md p-0 gap-0 overflow-hidden">
         <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-3">
           <DialogTitle>{word}</DialogTitle>
           <DialogDescription className="sr-only">

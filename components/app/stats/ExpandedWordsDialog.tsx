@@ -14,7 +14,8 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { getLangName, COLORS } from './WordCloudCard';
+import { getLangName } from './WordCloudCard';
+import { WORD_CLOUD_COLORS as COLORS } from '@/lib/wordCloud';
 
 const PAGE_SIZE = 500;
 const MAX_WORDS = 10000;
@@ -177,6 +178,7 @@ export function ExpandedWordsDialog({
                       <button
                         type="button"
                         onClick={() => onWordClick(w, language)}
+                        aria-label={t('viewSentencesForWord', { word: w })}
                         style={{ color: COLORS[originalIndex % COLORS.length] }}
                         className={
                           'inline-block rounded-md px-1 font-bold transition-colors hover:bg-muted active:scale-[0.97] ' +

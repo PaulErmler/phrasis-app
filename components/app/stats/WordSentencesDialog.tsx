@@ -24,24 +24,7 @@ import { AudioButton } from '@/components/app/learning/AudioButton';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { CircleCheck, EyeOff, Star, Loader2 } from 'lucide-react';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
-
-function highlightWord(text: string, word: string): React.ReactNode {
-  const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(
-    `(?<![\\p{L}\\p{N}])(${escaped})(?![\\p{L}\\p{N}])`,
-    'giu',
-  );
-  const parts = text.split(regex);
-  return parts.map((part, i) =>
-    regex.test(part) ? (
-      <span key={i} className="text-primary">
-        {part}
-      </span>
-    ) : (
-      part
-    ),
-  );
-}
+import { highlightWord } from '@/lib/wordCloud';
 
 export function WordSentencesDialog({
   word,

@@ -7,6 +7,7 @@ import {
   charDiff,
   scoreWordAlignment,
   getCompareConfig,
+  toDiffOptions,
   type AlignedWord,
   type CharChunk,
 } from '@/lib/textCompare';
@@ -24,8 +25,8 @@ export function computeWordAccuracy(
   actual: string,
   language: string,
 ): number {
-  const cfg = getCompareConfig(language);
-  const result = alignWords(expected, actual, cfg);
+  const diffOpts = toDiffOptions(getCompareConfig(language));
+  const result = alignWords(expected, actual, diffOpts);
   return scoreWordAlignment(result);
 }
 
@@ -83,8 +84,8 @@ function WordChip({ word, language }: { word: AlignedWord; language: string }) {
 
   // typo or wrong: render expected word inline at baseline; for each diverging
   // character, float the user's incorrect characters above as a small annotation.
-  const cfg = getCompareConfig(language);
-  const { chunks } = charDiff(word.expected, word.actual, cfg);
+  const diffOpts = toDiffOptions(getCompareConfig(language));
+  const { chunks } = charDiff(word.expected, word.actual, diffOpts);
   const segments = buildSegments(chunks);
 
   const wrapperClass =
@@ -139,15 +140,18 @@ export function WordDiff({
   hideErrors = false,
 }: WordDiffProps) {
   const t = useTranslations('LearningMode');
-  const cfg = useMemo(() => getCompareConfig(language), [language]);
+  const diffOpts = useMemo(
+    () => toDiffOptions(getCompareConfig(language)),
+    [language],
+  );
 
   const { words, accuracy } = useMemo(() => {
-    const result = alignWords(expected, actual, cfg);
+    const result = alignWords(expected, actual, diffOpts);
     return {
       words: result.words,
       accuracy: Math.round(scoreWordAlignment(result) * 100),
     };
-  }, [expected, actual, cfg]);
+  }, [expected, actual, diffOpts]);
 
   if (hideErrors) {
     return (

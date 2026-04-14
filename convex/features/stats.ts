@@ -255,6 +255,17 @@ function resolveLanguageVariants(
   return variants;
 }
 
+/** True if `language` matches any of `targetLanguages` after normalization.
+ * Used to reject client-supplied languages that don't belong to the active
+ * course before we pass them to tokenization or variant resolution. */
+function isTargetLanguage(
+  targetLanguages: readonly string[],
+  language: string,
+): boolean {
+  const norm = normalizeLanguageCode(language);
+  return targetLanguages.some((tl) => normalizeLanguageCode(tl) === norm);
+}
+
 function normalizeSearchTerm(raw: string): string {
   return raw.slice(0, 100).trim().toLowerCase().normalize('NFC');
 }
@@ -324,12 +335,12 @@ export const getRecentWordsForLanguage = query({
     const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return [];
 
+    const targetLanguages = active.course.targetLanguages ?? [];
+    if (!isTargetLanguage(targetLanguages, language)) return [];
+
     const cap = Math.min(Math.max(limit ?? 1000, 1), 10000);
     const courseId = active.course._id;
-    const variantSet = resolveLanguageVariants(
-      active.course.targetLanguages ?? [],
-      language,
-    );
+    const variantSet = resolveLanguageVariants(targetLanguages, language);
 
     const allWords: string[] = [];
     for (const variant of variantSet) {
@@ -364,13 +375,13 @@ export const searchWordsForLanguage = query({
     if (!active) return [];
 
     const courseId = active.course._id;
+    const targetLanguages = active.course.targetLanguages ?? [];
+    if (!isTargetLanguage(targetLanguages, args.language)) return [];
+
     const term = normalizeSearchTerm(args.searchQuery);
     if (term.length === 0) return [];
 
-    const variantSet = resolveLanguageVariants(
-      active.course.targetLanguages ?? [],
-      args.language,
-    );
+    const variantSet = resolveLanguageVariants(targetLanguages, args.language);
 
     const perVariantResults = await Promise.all(
       Array.from(variantSet).map((variant) =>
@@ -469,6 +480,9 @@ export const getSentencesForWord = query({
     const courseId = active.course._id;
     const baseLanguages = active.course.baseLanguages ?? [];
     const targetLanguages = active.course.targetLanguages ?? [];
+    if (!isTargetLanguage(targetLanguages, args.language)) {
+      return { page: [], isDone: true, continueCursor: '' };
+    }
     const deck = await getDeckByCourseId(ctx, courseId);
 
     // The frontend passes a normalized language (e.g. "es"), but userWordTexts

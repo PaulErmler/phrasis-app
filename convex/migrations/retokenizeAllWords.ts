@@ -19,10 +19,24 @@ const DELETE_BATCH_SIZE = 200;
  * backfillUserStats, but also wipes userWordTexts before reprocessing
  * so stale junction rows don't orphan when normalized tokens change.
  */
+const COURSES_PER_PAGE = 100;
+
 export const run = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    const courses = await ctx.db.query('courses').take(500);
+  args: {
+    cursor: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    // Paginate across all courses so this migration scales past the old
+    // 500-course cap. Each page zeros stats for its courses and enqueues
+    // per-user delete+reprocess chains. clearUserWords/clearUserWordTexts
+    // key on userId alone and are idempotent, so a user whose courses span
+    // multiple pages simply gets two chains — the second finds no rows to
+    // delete and proceeds directly to processCourseBatch for its slice.
+    const result = await ctx.db.query('courses').paginate({
+      cursor: args.cursor ?? null,
+      numItems: COURSES_PER_PAGE,
+    });
+    const courses = result.page;
 
     for (const course of courses) {
       const stats = await ctx.db
@@ -84,7 +98,19 @@ export const run = internalMutation({
       usersQueued++;
     }
 
-    return { status: 'started', coursesFound: courses.length, usersQueued };
+    if (!result.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.migrations.retokenizeAllWords.run,
+        { cursor: result.continueCursor },
+      );
+    }
+
+    return {
+      status: result.isDone ? 'done' : 'in_progress',
+      coursesFound: courses.length,
+      usersQueued,
+    };
   },
 });
 

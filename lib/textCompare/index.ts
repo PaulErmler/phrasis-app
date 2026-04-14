@@ -17,5 +17,5 @@ export type {
   WordAlignOptions,
 } from './wordAlign';
 export { scoreWordAlignment } from './score';
-export { getCompareConfig } from './languageConfig';
-export type { CompareConfig } from './languageConfig';
+export { getCompareConfig, toDiffOptions } from './languageConfig';
+export type { CompareConfig, DiffOptions } from './languageConfig';

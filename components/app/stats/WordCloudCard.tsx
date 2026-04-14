@@ -1,58 +1,22 @@
 'use client';
 
-import { useMemo, useCallback, useRef, useLayoutEffect, useState, type Ref } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { WordCloud } from '@isoterik/react-word-cloud';
-import type { Word, WordRendererData } from '@isoterik/react-word-cloud';
+import type { Word } from '@isoterik/react-word-cloud';
 import { Search, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WordSentencesDialog } from './WordSentencesDialog';
 import { WordSearchDialog } from './WordSearchDialog';
 import { ExpandedWordsDialog } from './ExpandedWordsDialog';
-
-// App brand colors: primary (blue), accent-orange, warning (yellow)
-export const COLORS = [
-  'oklch(0.7162 0.119 217.31)',   // --primary (blue)
-  'oklch(0.6189 0.1636 40.89)',   // --accent-orange
-  'oklch(0.8179 0.1705 77.95)',   // --warning (yellow)
-];
-
-function buildWords(wordList: string[]): Word[] {
-  return wordList.map((text, i) => ({
-    text,
-    value: wordList.length - i,
-  }));
-}
-
-function StaticWordRenderer(
-  data: WordRendererData,
-  ref?: Ref<SVGTextElement>,
-) {
-  const { index, onWordClick, onWordMouseOver, onWordMouseOut, ...word } = data;
-  return (
-    <text
-      ref={ref}
-      textAnchor="middle"
-      transform={`translate(${word.x}, ${word.y}) rotate(${word.rotate})`}
-      style={{
-        fontFamily: word.font,
-        fontStyle: word.style,
-        fontWeight: word.weight,
-        fontSize: `${word.size}px`,
-        fill: word.fill,
-        transition: word.transition,
-        cursor: onWordClick ? 'pointer' : 'text',
-      }}
-      onClick={(event) => onWordClick?.(word, index, event)}
-      onMouseOver={(event) => onWordMouseOver?.(word, index, event)}
-      onMouseOut={(event) => onWordMouseOut?.(word, index, event)}
-    >
-      {word.text}
-    </text>
-  );
-}
+import {
+  WORD_CLOUD_COLORS as COLORS,
+  StaticWordRenderer,
+  buildWords,
+  useCloudSize,
+} from '@/lib/wordCloud';
 
 export const LANG_NAMES: Record<string, string> = {
   en: 'English', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian',
@@ -84,36 +48,10 @@ function SingleWordCloud({
   onSearchClick: () => void;
   onExpandClick: () => void;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
-
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    const apply = (w: number, h: number) => {
-      if (w > 0 && h > 0) {
-        setSize({ width: Math.round(w), height: Math.round(h) });
-      }
-    };
-
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const cr = entry.contentRect;
-        apply(cr.width, cr.height);
-      }
-    });
-    ro.observe(el);
-
-    const r = el.getBoundingClientRect();
-    apply(r.width, r.height);
-
-    return () => ro.disconnect();
-  }, []);
+  const { ref: containerRef, width, height } = useCloudSize();
 
   const wordData = useMemo(() => buildWords(words.slice(0, 500)), [words]);
 
-  const { width, height } = size;
   const scale = Math.max(width / 400, 1); // scale up on wider screens, never shrink below base
 
   // Memoize all callback props so the WordCloud (React.memo) doesn't

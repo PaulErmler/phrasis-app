@@ -7,6 +7,7 @@ import {
   alignWords,
   scoreWordAlignment,
   getCompareConfig,
+  toDiffOptions,
 } from '@/lib/textCompare';
 import { WordDiff } from './WordDiff';
 
@@ -26,12 +27,13 @@ export function computeAccuracy(
   language: string = 'en',
 ): number {
   const cfg = getCompareConfig(language);
+  const diffOpts = toDiffOptions(cfg);
   if (cfg.hasWordBoundaries) {
     return Math.round(
-      scoreWordAlignment(alignWords(expected, actual, cfg)) * 100,
+      scoreWordAlignment(alignWords(expected, actual, diffOpts)) * 100,
     );
   }
-  return Math.round(charDiff(expected, actual, cfg).accuracy * 100);
+  return Math.round(charDiff(expected, actual, diffOpts).accuracy * 100);
 }
 
 export function DiffDisplay({
@@ -42,7 +44,7 @@ export function DiffDisplay({
   hideErrors = false,
 }: DiffDisplayProps) {
   const t = useTranslations('LearningMode');
-  const cfg = useMemo(() => getCompareConfig(language), [language]);
+  const cfg = getCompareConfig(language);
 
   if (cfg.hasWordBoundaries) {
     return (
@@ -85,10 +87,13 @@ function CharDiffView({
   hideErrors,
   accuracyLabel,
 }: CharDiffViewProps) {
-  const cfg = useMemo(() => getCompareConfig(language), [language]);
+  const diffOpts = useMemo(
+    () => toDiffOptions(getCompareConfig(language)),
+    [language],
+  );
   const { chunks, accuracy } = useMemo(
-    () => charDiff(expected, actual, cfg),
-    [expected, actual, cfg],
+    () => charDiff(expected, actual, diffOpts),
+    [expected, actual, diffOpts],
   );
   const accuracyPct = Math.round(accuracy * 100);
 

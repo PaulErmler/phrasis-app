@@ -1,10 +1,16 @@
 import type { NormalizeOptions } from './normalize';
 
-export interface CompareConfig extends Required<
+/** Subset of CompareConfig that's actually consumed by charDiff/alignWords.
+ * Kept separate so callers don't accidentally rely on hasWordBoundaries
+ * flowing through those functions (it doesn't — it's a caller-side branch). */
+export interface DiffOptions extends Required<
   Pick<NormalizeOptions, 'foldCase' | 'foldDiacritics' | 'collapseWhitespace'>
 > {
   /** BCP-47 locale passed to Intl.Segmenter */
   locale: string;
+}
+
+export interface CompareConfig extends DiffOptions {
   /** Whether the script uses spaces between words. False for zh/ja/th — falls back to char-level diff for short answers. */
   hasWordBoundaries: boolean;
 }
@@ -38,4 +44,11 @@ const PER_LANGUAGE: Record<string, Partial<CompareConfig>> = {
 
 export function getCompareConfig(languageCode: string): CompareConfig {
   return { ...DEFAULT, ...(PER_LANGUAGE[languageCode] ?? {}) };
+}
+
+/** Strip hasWordBoundaries before passing to charDiff/alignWords so option
+ * shapes match exactly. */
+export function toDiffOptions(cfg: CompareConfig): DiffOptions {
+  const { hasWordBoundaries: _ignored, ...rest } = cfg;
+  return rest;
 }
