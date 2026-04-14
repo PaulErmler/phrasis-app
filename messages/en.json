@@ -346,6 +346,12 @@
     },
     "submitAnswer": "Submit",
     "accuracy": "Accuracy",
+    "diff": {
+      "typo": "Typo",
+      "expected": "Expected",
+      "missingWord": "Missing word",
+      "extraWord": "Extra word"
+    },
     "showSentence": "Show sentence",
     "showCorrections": "Show corrections",
     "revertSubmission": "Revert submission",
@@ -882,9 +888,10 @@
     "searchWordsHint": "Type to search your learned words",
     "searchWordsNoResults": "No matching words found",
     "expandWords": "Expand words",
-    "recentWordsTitle": "{language} — recent words",
+    "recentWordsTitle": "Words in {language}",
     "recentWordsCount": "{count, plural, =0 {No words yet} one {# word} other {# words}}",
     "noWordsYet": "No words yet",
-    "loadMore": "Load more"
+    "loadMore": "Load more",
+    "clearSearch": "Clear search"
   }
 }

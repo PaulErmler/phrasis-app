@@ -1,8 +1,6 @@
 import { MutationCtx } from '../../_generated/server';
 import { Id } from '../../_generated/dataModel';
 
-const SEGMENTER_LANGUAGES = new Set(['ja', 'zh', 'ko', 'th']);
-
 export type Token = { normalized: string; original: string };
 
 /**
@@ -18,25 +16,16 @@ export function isAllLowercase(s: string): boolean {
 
 export function tokenizeText(text: string, language: string): Token[] {
   const nfc = text.normalize('NFC');
-
-  // Use Intl.Segmenter for languages without whitespace word boundaries
-  // (Japanese, Chinese, Korean, Thai). This produces real words instead of
-  // individual characters, which is critical for Japanese.
-  if (SEGMENTER_LANGUAGES.has(language)) {
-    const segmenter = new Intl.Segmenter(language, { granularity: 'word' });
-    return [...segmenter.segment(nfc)]
-      .filter((seg) => seg.isWordLike)
-      .map((seg) => ({
-        original: seg.segment,
-        normalized: seg.segment.toLowerCase().normalize('NFC'),
-      }));
-  }
-
-  return nfc
-    .replace(/[^\p{L}\p{N}\s'-]/gu, '')
-    .split(/\s+/)
-    .filter((w) => w.length > 0)
-    .map((w) => ({ original: w, normalized: w.toLowerCase().normalize('NFC') }));
+  // `es_latam` and similar underscore-separated tags aren't valid BCP-47;
+  // Intl.Segmenter would throw. Normalize to hyphens.
+  const bcp47 = language.replace(/_/g, '-');
+  const segmenter = new Intl.Segmenter(bcp47, { granularity: 'word' });
+  return [...segmenter.segment(nfc)]
+    .filter((seg) => seg.isWordLike)
+    .map((seg) => ({
+      original: seg.segment,
+      normalized: seg.segment.toLowerCase().normalize('NFC'),
+    }));
 }
 
 const MAX_TEXTS_PER_WORD = 30;

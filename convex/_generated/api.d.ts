@@ -61,6 +61,7 @@ import type * as migrations_backfillDisplayWord from "../migrations/backfillDisp
 import type * as migrations_backfillIsGraduated from "../migrations/backfillIsGraduated.js";
 import type * as migrations_backfillUserStats from "../migrations/backfillUserStats.js";
 import type * as migrations_backfillWordTexts from "../migrations/backfillWordTexts.js";
+import type * as migrations_retokenizeAllWords from "../migrations/retokenizeAllWords.js";
 import type * as migrations_seedMockStats from "../migrations/seedMockStats.js";
 import type * as retrier from "../retrier.js";
 import type * as types from "../types.js";
@@ -129,6 +130,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/backfillIsGraduated": typeof migrations_backfillIsGraduated;
   "migrations/backfillUserStats": typeof migrations_backfillUserStats;
   "migrations/backfillWordTexts": typeof migrations_backfillWordTexts;
+  "migrations/retokenizeAllWords": typeof migrations_retokenizeAllWords;
   "migrations/seedMockStats": typeof migrations_seedMockStats;
   retrier: typeof retrier;
   types: typeof types;

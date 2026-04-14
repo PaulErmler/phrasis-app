@@ -238,6 +238,26 @@ export const getStatsPageDailyData = query({
   },
 });
 
+// ----- Helpers shared by recent-words + word-search queries -----------------
+
+/** Resolve all stored language variants (e.g. "es" + "es_latam") for a given
+ * user-facing language code, looking at the active course's targetLanguages. */
+function resolveLanguageVariants(
+  targetLanguages: readonly string[],
+  language: string,
+): Set<string> {
+  const normalized = language.replace(/_latam$/, '');
+  const variants = new Set<string>([language, normalized]);
+  for (const tl of targetLanguages) {
+    if (tl.replace(/_latam$/, '') === normalized) variants.add(tl);
+  }
+  return variants;
+}
+
+function normalizeSearchTerm(raw: string): string {
+  return raw.slice(0, 100).trim().toLowerCase().normalize('NFC');
+}
+
 /**
  * Query 3: Recent words per target language for the word cloud.
  */
@@ -305,12 +325,10 @@ export const getRecentWordsForLanguage = query({
 
     const cap = Math.min(Math.max(limit ?? 1000, 1), 10000);
     const courseId = active.course._id;
-    const normalized = language.replace(/_latam$/, '');
-    const targetLanguages = active.course.targetLanguages ?? [];
-    const variantSet = new Set<string>([language, normalized]);
-    for (const tl of targetLanguages) {
-      if (tl.replace(/_latam$/, '') === normalized) variantSet.add(tl);
-    }
+    const variantSet = resolveLanguageVariants(
+      active.course.targetLanguages ?? [],
+      language,
+    );
 
     const allWords: string[] = [];
     for (const variant of variantSet) {
@@ -329,6 +347,61 @@ export const getRecentWordsForLanguage = query({
 });
 
 /**
+ * Query 3c: Full-text search for learned words within a single language.
+ * Used by the expanded word popup so users can find any word in that language,
+ * not just the ones currently loaded on the client.
+ */
+export const searchWordsForLanguage = query({
+  args: {
+    language: v.string(),
+    searchQuery: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return [];
+
+    const courseId = active.course._id;
+    const term = normalizeSearchTerm(args.searchQuery);
+    if (term.length === 0) return [];
+
+    const variantSet = resolveLanguageVariants(
+      active.course.targetLanguages ?? [],
+      args.language,
+    );
+
+    const perVariantResults = await Promise.all(
+      Array.from(variantSet).map((variant) =>
+        ctx.db
+          .query('userWords')
+          .withSearchIndex('search_word', (q) =>
+            q
+              .search('word', term)
+              .eq('userId', userId)
+              .eq('courseId', courseId)
+              .eq('language', variant),
+          )
+          .take(50),
+      ),
+    );
+
+    const seen = new Set<string>();
+    const results: string[] = [];
+    for (const rows of perVariantResults) {
+      for (const row of rows) {
+        if (seen.has(row.word)) continue;
+        seen.add(row.word);
+        results.push(row.displayWord ?? row.word);
+        if (results.length >= 50) break;
+      }
+      if (results.length >= 50) break;
+    }
+    return results;
+  },
+});
+
+/**
  * Query 4: Search learned words across all languages via full-text search.
  */
 export const searchWords = query({
@@ -342,7 +415,7 @@ export const searchWords = query({
     if (!active) return [];
 
     const courseId = active.course._id;
-    const term = args.searchQuery.slice(0, 100).trim().toLowerCase().normalize('NFC');
+    const term = normalizeSearchTerm(args.searchQuery);
     if (term.length === 0) return [];
 
     const rows = await ctx.db

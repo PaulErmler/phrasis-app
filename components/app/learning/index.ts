@@ -5,6 +5,7 @@ export { LearningCardContent } from './LearningCardContent';
 export { FullReviewCardContent } from './FullReviewCardContent';
 export { LearningControls } from './LearningControls';
 export { DiffDisplay } from './DiffDisplay';
+export { WordDiff } from './WordDiff';
 export { ReviewModeSwitcher } from './ReviewModeSwitcher';
 export { NoCollectionState, NoCardsDueState } from './LearningEmptyStates';
 export { useLearningMode } from './useLearningMode';

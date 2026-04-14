@@ -334,7 +334,7 @@ export default defineSchema({
       ['userId', 'courseId', 'language'])
     .searchIndex('search_word', {
       searchField: 'word',
-      filterFields: ['userId', 'courseId'],
+      filterFields: ['userId', 'courseId', 'language'],
     }),
 
   // Junction table: links each tracked word to the texts it appeared in.

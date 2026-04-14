@@ -140,7 +140,7 @@ export function FullReviewCardContent({
     let count = 0;
     for (const tr of targetTranslations) {
       const userText = inputs.get(tr.language)?.userText ?? '';
-      total += computeAccuracy(tr.text, userText);
+      total += computeAccuracy(tr.text, userText, tr.language);
       count++;
     }
     onAccuracyChangeRef.current?.(count > 0 ? Math.round(total / count) : null);
@@ -481,6 +481,7 @@ function TargetLanguageInput({
               <DiffDisplay
                 expected={translation.text}
                 actual={state.userText}
+                language={translation.language}
                 hideAccuracy={false}
                 hideErrors={showClean}
               />
@@ -549,6 +550,7 @@ function TargetLanguageInput({
             <DiffDisplay
               expected={translation.text}
               actual={state.userText}
+              language={translation.language}
               hideAccuracy={!hasUserText}
               hideErrors={showClean}
             />

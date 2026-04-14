@@ -343,6 +343,12 @@
     },
     "submitAnswer": "Absenden",
     "accuracy": "Genauigkeit",
+    "diff": {
+      "typo": "Tippfehler",
+      "expected": "Erwartet",
+      "missingWord": "Fehlendes Wort",
+      "extraWord": "Überzähliges Wort"
+    },
     "showSentence": "Satz anzeigen",
     "showCorrections": "Korrekturen anzeigen",
     "revertSubmission": "Eingabe zurücknehmen",
@@ -953,9 +959,10 @@
     "searchWordsHint": "Tippe, um deine gelernten Wörter zu durchsuchen",
     "searchWordsNoResults": "Keine passenden Wörter gefunden",
     "expandWords": "Wörter erweitern",
-    "recentWordsTitle": "{language} — letzte Wörter",
+    "recentWordsTitle": "Wörter auf {language}",
     "recentWordsCount": "{count, plural, =0 {Noch keine Wörter} one {# Wort} other {# Wörter}}",
     "noWordsYet": "Noch keine Wörter",
-    "loadMore": "Mehr laden"
+    "loadMore": "Mehr laden",
+    "clearSearch": "Suche zurücksetzen"
   }
 }
