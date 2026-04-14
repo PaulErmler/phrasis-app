@@ -238,7 +238,8 @@
           "sentences": "150 sentences per month",
           "customSentences": "10 custom sentences per month",
           "courses": "1 course",
-          "chatMessages": "5 chat messages per month"
+          "chatMessages": "5 chat messages per month",
+          "detailedStatistics": "Detailed statistics"
         }
       },
       "basic": {
@@ -248,10 +249,11 @@
         "period": "per month",
         "cta": "Get Started",
         "features": {
-          "sentences": "400 sentences per month",
-          "customSentences": "200 custom sentences per month",
+          "sentences": "Unlimited ready-made sentences",
+          "customSentences": "300 custom sentences per month",
           "courses": "1 course",
-          "chatMessages": "50 chat messages per month"
+          "chatMessages": "100 chat messages per month",
+          "detailedStatistics": "Detailed statistics"
         }
       },
       "pro": {
@@ -261,11 +263,12 @@
         "period": "per month",
         "cta": "Get Started",
         "features": {
-          "sentences": "1000 sentences per month",
-          "customSentences": "500 custom sentences per month",
+          "sentences": "Unlimited ready-made sentences",
+          "customSentences": "1,000 custom sentences per month",
           "courses": "Up to 10 courses",
-          "chatMessages": "200 chat messages per month",
-          "multipleLanguages": "Up to 5 languages per course"
+          "chatMessages": "400 chat messages per month",
+          "multipleLanguages": "Up to 5 languages per course",
+          "detailedStatistics": "Detailed statistics"
         }
       }
     }

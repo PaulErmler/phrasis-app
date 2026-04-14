@@ -238,7 +238,8 @@
           "sentences": "150 Sätze pro Monat",
           "customSentences": "10 eigene Sätze pro Monat",
           "courses": "1 Kurs",
-          "chatMessages": "5 Chat-Nachrichten pro Monat"
+          "chatMessages": "5 Chat-Nachrichten pro Monat",
+          "detailedStatistics": "Detaillierte Statistiken"
         }
       },
       "basic": {
@@ -248,10 +249,11 @@
         "period": "pro Monat",
         "cta": "Jetzt starten",
         "features": {
-          "sentences": "400 Sätze pro Monat",
-          "customSentences": "200 eigene Sätze pro Monat",
+          "sentences": "Unbegrenzt viele vorgefertigte Sätze",
+          "customSentences": "300 eigene Sätze pro Monat",
           "courses": "1 Kurs",
-          "chatMessages": "50 Chat-Nachrichten pro Monat"
+          "chatMessages": "100 Chat-Nachrichten pro Monat",
+          "detailedStatistics": "Detaillierte Statistiken"
         }
       },
       "pro": {
@@ -261,11 +263,12 @@
         "period": "pro Monat",
         "cta": "Jetzt starten",
         "features": {
-          "sentences": "1000 Sätze pro Monat",
-          "customSentences": "500 eigene Sätze pro Monat",
+          "sentences": "Unbegrenzt viele vorgefertigte Sätze",
+          "customSentences": "1.000 eigene Sätze pro Monat",
           "courses": "Bis zu 10 Kurse",
-          "chatMessages": "200 Chat-Nachrichten pro Monat",
-          "multipleLanguages": "Bis zu 5 Sprachen pro Kurs"
+          "chatMessages": "400 Chat-Nachrichten pro Monat",
+          "multipleLanguages": "Bis zu 5 Sprachen pro Kurs",
+          "detailedStatistics": "Detaillierte Statistiken"
         }
       }
     }
