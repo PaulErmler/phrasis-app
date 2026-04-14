@@ -112,7 +112,10 @@ export function WordSentencesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80vh] flex flex-col sm:max-w-md p-0 gap-0 overflow-hidden">
+      <DialogContent
+        className="max-h-[80vh] flex flex-col sm:max-w-md p-0 gap-0 overflow-hidden"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-3">
           <DialogTitle>{displayWord}</DialogTitle>
           <DialogDescription className="sr-only">

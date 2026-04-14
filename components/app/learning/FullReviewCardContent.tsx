@@ -547,13 +547,19 @@ function TargetLanguageInput({
         )}
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
-            <DiffDisplay
-              expected={translation.text}
-              actual={state.userText}
-              language={translation.language}
-              hideAccuracy={!hasUserText}
-              hideErrors={showClean}
-            />
+            {hasUserText ? (
+              <DiffDisplay
+                expected={translation.text}
+                actual={state.userText}
+                language={translation.language}
+                hideAccuracy={false}
+                hideErrors={showClean}
+              />
+            ) : (
+              <p className="body-large text-muted-foreground">
+                {translation.text || '...'}
+              </p>
+            )}
           </div>
           <div className="flex shrink-0 gap-2 pt-0.5">
             <Tooltip>
