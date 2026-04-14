@@ -185,6 +185,7 @@ export async function recordReviewStats(
           userId,
           courseId: deck.courseId,
           languages: langTexts,
+          textId: card.textId,
         });
         for (const count of Object.values(newWordCounts)) {
           totalNewWords += count;

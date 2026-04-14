@@ -17,11 +17,11 @@ import { FEATURE_IDS, type FeatureId } from '@/convex/features/featureIds';
  */
 export const FEATURE_META: Record<
   FeatureId,
-  { i18nKey: string; consumable?: boolean; displayCount?: number; hidden?: boolean; paywallKey?: string }
+  { i18nKey: string; consumable?: boolean; displayCount?: number; hidden?: boolean; paywallKey?: string; displayAsUnlimited?: boolean }
 > = {
   [FEATURE_IDS.CHAT_MESSAGES]: { i18nKey: 'chatMessages', consumable: true },
   [FEATURE_IDS.COURSES]: { i18nKey: 'courses', consumable: false, paywallKey: 'courseCapWithArchiveOption' },
-  [FEATURE_IDS.SENTENCES]: { i18nKey: 'sentences', consumable: true },
+  [FEATURE_IDS.SENTENCES]: { i18nKey: 'sentences', consumable: true, displayAsUnlimited: true },
   [FEATURE_IDS.CUSTOM_SENTENCES]: { i18nKey: 'customSentences', consumable: true },
   [FEATURE_IDS.MULTIPLE_LANGUAGES]: { i18nKey: 'multipleLanguages', displayCount: 5 },
   [FEATURE_IDS.TRANSCRIPTIONS]: { i18nKey: 'transcriptions', consumable: true, hidden: true },
@@ -39,6 +39,10 @@ export function isFeatureConsumable(featureId: string): boolean | undefined {
 
 export function getFeatureDisplayCount(featureId: string): number | undefined {
   return FEATURE_META[featureId as FeatureId]?.displayCount;
+}
+
+export function isFeatureDisplayedAsUnlimited(featureId: string): boolean {
+  return FEATURE_META[featureId as FeatureId]?.displayAsUnlimited === true;
 }
 
 export function isFeatureHidden(featureId: string): boolean {

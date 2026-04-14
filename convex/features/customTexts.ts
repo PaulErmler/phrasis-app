@@ -317,12 +317,12 @@ export const createCustomText = mutation({
       collectionRank: nextRank,
       ...(args.metadata
         ? {
-            register: args.metadata.register,
-            addresseeNumber: args.metadata.addresseeNumber,
-            speakerGender: args.metadata.speakerGender,
-            addresseeGender: args.metadata.addresseeGender,
-            audioSpeakerGender: resolveAudioSpeakerGender(args.metadata.speakerGender),
-          }
+          register: args.metadata.register,
+          addresseeNumber: args.metadata.addresseeNumber,
+          speakerGender: args.metadata.speakerGender,
+          addresseeGender: args.metadata.addresseeGender,
+          audioSpeakerGender: resolveAudioSpeakerGender(args.metadata.speakerGender),
+        }
         : {}),
     });
 

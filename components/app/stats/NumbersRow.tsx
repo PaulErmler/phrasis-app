@@ -47,14 +47,16 @@ function StatCell({
   label,
   value,
   subDisplay,
+  testId,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   subDisplay?: string | null;
+  testId?: string;
 }) {
   return (
-    <div className="flex flex-col items-center text-center gap-0.5">
+    <div className="flex flex-col items-center text-center gap-0.5" data-testid={testId}>
       <div className="text-muted-foreground">{icon}</div>
       <p className="text-lg font-semibold tabular-nums leading-tight">{value}</p>
       <p className="text-muted-xs leading-none">{label}</p>
@@ -87,12 +89,13 @@ function WordsCell({ languageWordCounts, totalWords, t, subDisplay }: {
         label={t('words')}
         value={totalWords.toLocaleString()}
         subDisplay={subDisplay}
+        testId="stats-tile-words"
       />
     );
   }
 
   return (
-    <div className="flex flex-col items-center text-center gap-0.5">
+    <div className="flex flex-col items-center text-center gap-0.5" data-testid="stats-tile-words">
       <div className="text-muted-foreground">
         <BookOpen className="h-3.5 w-3.5" />
       </div>
@@ -208,7 +211,7 @@ export function NumbersRow({
       </div>
       {/* Top row: always 3 items */}
       <div className="grid grid-cols-3 gap-x-4">
-        <div className="flex flex-col items-center text-center gap-0.5">
+        <div className="flex flex-col items-center text-center gap-0.5" data-testid="stats-tile-streak">
           <Flame className="h-3.5 w-3.5" style={{ color: streakColor ?? 'var(--muted-foreground)' }} />
           <p className="text-lg font-semibold tabular-nums leading-tight" style={{ color: streakColor }}>
             {streak}
@@ -221,6 +224,7 @@ export function NumbersRow({
           label={t('reviews')}
           value={reviews.toLocaleString()}
           subDisplay={repsDisplay}
+          testId="stats-tile-reviews"
         />
       </div>
 
@@ -232,17 +236,20 @@ export function NumbersRow({
             label={t('sentences')}
             value={sentences.toLocaleString()}
             subDisplay={newDisplay}
+            testId="stats-tile-sentences"
           />
           <StatCell
             icon={<Clock className="h-3.5 w-3.5" />}
             label={t('time')}
             value={formatTimeMs(timeMs)}
             subDisplay={timeDisplay}
+            testId="stats-tile-time"
           />
           <StatCell
             icon={<Target className="h-3.5 w-3.5" />}
             label={t('accuracy')}
             value={accuracy}
+            testId="stats-tile-accuracy"
           />
         </div>
       ) : (
@@ -252,12 +259,14 @@ export function NumbersRow({
             label={t('sentences')}
             value={sentences.toLocaleString()}
             subDisplay={newDisplay}
+            testId="stats-tile-sentences"
           />
           <StatCell
             icon={<Clock className="h-3.5 w-3.5" />}
             label={t('time')}
             value={formatTimeMs(timeMs)}
             subDisplay={timeDisplay}
+            testId="stats-tile-time"
           />
         </div>
       )}

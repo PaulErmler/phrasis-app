@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
-import { FEATURE_META, getFeatureI18nKey, getFeatureDisplayCount, isFeatureHidden } from "@/lib/features/feature-meta";
+import { FEATURE_META, getFeatureI18nKey, getFeatureDisplayCount, isFeatureHidden, isFeatureDisplayedAsUnlimited } from "@/lib/features/feature-meta";
 import type { Product, ProductItem } from "autumn-js";
 import { Loader2 } from "lucide-react";
 import {
@@ -370,7 +370,10 @@ export const PricingFeatureList = ({
       const i18nKey = getFeatureI18nKey(item.feature_id);
       const override = getFeatureDisplayCount(item.feature_id);
       const included = override ?? item.included_usage ?? 0;
-      const isUnlimited = included === Infinity || included === Number.POSITIVE_INFINITY;
+      const isUnlimited =
+        included === Infinity ||
+        included === Number.POSITIVE_INFINITY ||
+        (isFeatureDisplayedAsUnlimited(item.feature_id) && Number(item.included_usage ?? 0) >= 19000);
       if (isUnlimited) {
         return tFeatures(`${i18nKey}.pricingLabelUnlimited`);
       }
@@ -405,6 +408,11 @@ export const PricingFeatureList = ({
             </div>
           );
         })}
+        <div className="flex items-start gap-2 text-sm">
+          <div className="flex flex-col">
+            <span>{tFeatures ? tFeatures("detailedStatistics.pricingLabel") : "Detailed statistics"}</span>
+          </div>
+        </div>
       </div>
     </div>
   );

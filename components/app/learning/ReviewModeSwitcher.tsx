@@ -18,6 +18,7 @@ export function ReviewModeSwitcher({ value, onChange }: ReviewModeSwitcherProps)
       <button
         type="button"
         onClick={() => onChange('audio')}
+        data-testid="settings-mode-audio"
         className={cn(
           'flex-1 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all',
           value === 'audio'
@@ -31,6 +32,7 @@ export function ReviewModeSwitcher({ value, onChange }: ReviewModeSwitcherProps)
       <button
         type="button"
         onClick={() => onChange('full')}
+        data-testid="settings-mode-full"
         className={cn(
           'flex-1 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all',
           value === 'full'

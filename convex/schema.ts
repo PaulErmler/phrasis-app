@@ -331,7 +331,27 @@ export default defineSchema({
     .index('by_userId_and_courseId_and_language_and_word',
       ['userId', 'courseId', 'language', 'word'])
     .index('by_userId_and_courseId_and_language',
-      ['userId', 'courseId', 'language']),
+      ['userId', 'courseId', 'language'])
+    .searchIndex('search_word', {
+      searchField: 'word',
+      filterFields: ['userId', 'courseId', 'language'],
+    }),
+
+  // Junction table: links each tracked word to the texts it appeared in.
+  // Capped at 30 texts per word to bound storage and write costs.
+  userWordTexts: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    language: v.string(),
+    word: v.string(), // normalized (lowercase, NFC) — matches userWords.word
+    textId: v.id('texts'),
+  })
+    .index('by_userId_courseId_language_word',
+      ['userId', 'courseId', 'language', 'word'])
+    .index('by_userId_courseId_language_word_textId',
+      ['userId', 'courseId', 'language', 'word', 'textId'])
+    .index('by_userId_courseId_textId',
+      ['userId', 'courseId', 'textId']),
 
   // All-time per-language totals
   languageStats: defineTable({
@@ -401,6 +421,15 @@ export default defineSchema({
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])
     .index('by_userId_and_courseId_and_reviewNumber', ['userId', 'courseId', 'reviewNumber']),
+
+  // Per-user state for the retokenizeAllWords migration. Accumulated across
+  // paginated `run` passes so the clear-and-rebuild chain fires exactly once
+  // per user with their full course list, regardless of how many pages the
+  // user's courses span. Rows are deleted as each user's chain is scheduled.
+  retokenizeMigrationState: defineTable({
+    userId: v.string(),
+    courseIds: v.array(v.id('courses')),
+  }).index('by_userId', ['userId']),
 
   // Usage quotas — local cache of Autumn entitlements for synchronous checks.
   // One document per user; features stored as a record keyed by feature ID.

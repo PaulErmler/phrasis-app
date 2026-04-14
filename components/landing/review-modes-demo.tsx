@@ -377,7 +377,7 @@ export function ReviewModesDemo() {
                             )}
                             <div className="h-9 overflow-hidden">
                               {submitted && ft ? (
-                                <DiffDisplay expected={ft.expected} actual={typed} hideAccuracy />
+                                <DiffDisplay expected={ft.expected} actual={typed} language={tr.language} hideAccuracy />
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <Input

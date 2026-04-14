@@ -140,7 +140,7 @@ export function FullReviewCardContent({
     let count = 0;
     for (const tr of targetTranslations) {
       const userText = inputs.get(tr.language)?.userText ?? '';
-      total += computeAccuracy(tr.text, userText);
+      total += computeAccuracy(tr.text, userText, tr.language);
       count++;
     }
     onAccuracyChangeRef.current?.(count > 0 ? Math.round(total / count) : null);
@@ -481,6 +481,7 @@ function TargetLanguageInput({
               <DiffDisplay
                 expected={translation.text}
                 actual={state.userText}
+                language={translation.language}
                 hideAccuracy={false}
                 hideErrors={showClean}
               />
@@ -546,12 +547,19 @@ function TargetLanguageInput({
         )}
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
-            <DiffDisplay
-              expected={translation.text}
-              actual={state.userText}
-              hideAccuracy={!hasUserText}
-              hideErrors={showClean}
-            />
+            {hasUserText ? (
+              <DiffDisplay
+                expected={translation.text}
+                actual={state.userText}
+                language={translation.language}
+                hideAccuracy={false}
+                hideErrors={showClean}
+              />
+            ) : (
+              <p className="body-large text-muted-foreground">
+                {translation.text || '...'}
+              </p>
+            )}
           </div>
           <div className="flex shrink-0 gap-2 pt-0.5">
             <Tooltip>
@@ -638,6 +646,7 @@ function TargetLanguageInput({
           autoCorrect="off"
           autoCapitalize="sentences"
           spellCheck={false}
+          {...(isFirstTarget ? { 'data-testid': 'learn-translation-input' } : {})}
         />
         <Button
           variant="outline"
@@ -645,7 +654,7 @@ function TargetLanguageInput({
           onClick={() => onSubmit(translation.language)}
           className="h-9 w-9 shrink-0"
           aria-label={submitLabel}
-          {...(isFirstTarget ? { 'data-tutorial': 'submit-answer' } : {})}
+          {...(isFirstTarget ? { 'data-tutorial': 'submit-answer', 'data-testid': 'learn-submit-translation' } : {})}
         >
           <Check className="h-4 w-4" />
         </Button>

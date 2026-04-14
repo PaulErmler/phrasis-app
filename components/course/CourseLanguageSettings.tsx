@@ -166,6 +166,7 @@ export function CourseLanguageSettings({
       <SheetContent
         side="left"
         className="w-full sm:max-w-md flex flex-col gap-0 p-0 [&>button:last-child]:hidden"
+        data-testid="course-settings-sheet"
       >
         <SheetDescription className="sr-only">{t('title')}</SheetDescription>
 
@@ -279,6 +280,7 @@ export function CourseLanguageSettings({
                   className="w-full gap-1.5"
                   onClick={() => setArchiveConfirmOpen(true)}
                   disabled={archiving}
+                  data-testid="course-archive"
                 >
                   <Archive className="h-3.5 w-3.5" />
                   {t('archiveCourse')}
@@ -313,6 +315,7 @@ export function CourseLanguageSettings({
               onClick={handleArchive}
               disabled={archiving}
               className={buttonVariants({ variant: 'destructive' })}
+              data-testid="course-confirm-archive"
             >
               {archiving ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />

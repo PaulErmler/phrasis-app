@@ -97,14 +97,30 @@ export const processBatch = internalMutation({
     let skipped = 0;
 
     for (const text of result.page) {
-      // Already has audioSpeakerGender — nothing to do.
-      if (text.audioSpeakerGender) {
+      // A row is "fully backfilled" only when all four LLM-generated
+      // metadata fields AND the resolved audioSpeakerGender are present.
+      // Using audioSpeakerGender alone as the skip condition would miss
+      // custom sentences that have an audio gender (e.g. from an earlier
+      // partial run) but are still missing the linguistic metadata.
+      const hasAllMetadata =
+        text.register !== undefined &&
+        text.addresseeNumber !== undefined &&
+        text.speakerGender !== undefined &&
+        text.addresseeGender !== undefined;
+
+      if (hasAllMetadata && text.audioSpeakerGender) {
         skipped++;
         continue;
       }
 
       if (!text.userCreated) {
-        // Pre-made dataset sentence: just resolve and patch.
+        // Pre-made dataset sentence: no LLM call, just resolve audio gender.
+        // Dataset rows carry their metadata from the import, so the only
+        // missing piece here is audioSpeakerGender.
+        if (text.audioSpeakerGender) {
+          skipped++;
+          continue;
+        }
         await ctx.db.patch(text._id, {
           audioSpeakerGender: resolveAudioSpeakerGender(text.speakerGender),
         });
@@ -113,8 +129,8 @@ export const processBatch = internalMutation({
       }
 
       // Custom sentence.
-      if (text.speakerGender) {
-        // Linguistic metadata already present, just resolve audio gender.
+      if (hasAllMetadata) {
+        // Linguistic metadata already present; only audioSpeakerGender missing.
         await ctx.db.patch(text._id, {
           audioSpeakerGender: resolveAudioSpeakerGender(text.speakerGender),
         });
@@ -135,7 +151,9 @@ export const processBatch = internalMutation({
         continue;
       }
 
-      // Custom sentence with no metadata: collect translations and call the LLM.
+      // Custom sentence missing one or more metadata fields: call the LLM
+      // to (re)generate the full four-field struct. The mutation patches
+      // all four atomically, so partial states converge to complete.
       const langs = await getCourseLanguagesForText(ctx, text, courseLanguagesCache);
       if (!langs) {
         // No course found; can't schedule prepareCardContent meaningfully. Skip.
