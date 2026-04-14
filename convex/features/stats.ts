@@ -12,6 +12,7 @@ import {
 import { getDailyStats } from '../db/stats/dailyStats';
 import { EXTENDED_STATE_LABELS as STATE_LABELS } from '../lib/fsrsStates';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
+import { normalizeLanguageCode } from '../../lib/languages';
 
 // Convention: query handlers return [] for array results and null for object results when unauthenticated.
 
@@ -142,11 +143,11 @@ export const getStatsPageData = query({
       .take(20);
     // Only include target languages, merging variants (e.g. es + es_latam)
     const targetLanguages = active.course.targetLanguages ?? [];
-    const targetSet = new Set(targetLanguages.map((l) => l.replace(/_latam$/, '')));
+    const targetSet = new Set(targetLanguages.map((l) => normalizeLanguageCode(l)));
     const wordsByLang = new Map<string, number>();
     for (const r of langStatsRows) {
       if (r.totalWords <= 0) continue;
-      const key = r.language.replace(/_latam$/, '');
+      const key = normalizeLanguageCode(r.language);
       if (!targetSet.has(key)) continue;
       wordsByLang.set(key, (wordsByLang.get(key) ?? 0) + r.totalWords);
     }
@@ -246,10 +247,10 @@ function resolveLanguageVariants(
   targetLanguages: readonly string[],
   language: string,
 ): Set<string> {
-  const normalized = language.replace(/_latam$/, '');
+  const normalized = normalizeLanguageCode(language);
   const variants = new Set<string>([language, normalized]);
   for (const tl of targetLanguages) {
-    if (tl.replace(/_latam$/, '') === normalized) variants.add(tl);
+    if (normalizeLanguageCode(tl) === normalized) variants.add(tl);
   }
   return variants;
 }
@@ -275,7 +276,7 @@ export const getRecentWords = query({
     const seen = new Set<string>();
     const langPairs: Array<{ normalized: string; raw: string }> = [];
     for (const lang of targetLanguages) {
-      const norm = lang.replace(/_latam$/, '');
+      const norm = normalizeLanguageCode(lang);
       if (!seen.has(norm)) {
         seen.add(norm);
         langPairs.push({ normalized: norm, raw: lang });
@@ -434,7 +435,7 @@ export const searchWords = query({
     }> = [];
 
     for (const row of rows) {
-      const lang = row.language.replace(/_latam$/, '');
+      const lang = normalizeLanguageCode(row.language);
       const key = `${lang}:${row.word}`;
       if (seen.has(key)) continue;
       seen.add(key);
@@ -475,7 +476,7 @@ export const getSentencesForWord = query({
     // the course's targetLanguages — no extra DB query needed.
     const allLangs = [...baseLanguages, ...targetLanguages];
     const lang = allLangs.find(
-      (l) => l === args.language || l.replace(/_latam$/, '') === args.language,
+      (l) => l === args.language || normalizeLanguageCode(l) === args.language,
     ) ?? args.language;
 
     const result = await ctx.db

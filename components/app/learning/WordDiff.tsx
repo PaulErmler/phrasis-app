@@ -8,13 +8,8 @@ import {
   scoreWordAlignment,
   getCompareConfig,
   type AlignedWord,
-  type WordTag,
+  type CharChunk,
 } from '@/lib/textCompare';
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from '@/components/ui/tooltip';
 
 interface WordDiffProps {
   expected: string;
@@ -34,79 +29,105 @@ export function computeWordAccuracy(
   return scoreWordAlignment(result);
 }
 
-function tagClasses(tag: WordTag): string {
-  switch (tag) {
-    case 'equal':
-      return 'bg-success/15 text-success';
-    case 'typo':
-      return 'bg-amber-500/15 text-amber-700 dark:text-amber-300';
-    case 'wrong':
-      return 'bg-destructive/15 text-destructive';
-    case 'missing':
-      return 'bg-muted text-foreground border border-dashed border-muted-foreground/40';
-    case 'extra':
-      return 'bg-destructive/15 text-destructive line-through';
+interface AlignedSegment {
+  correct: string;
+  wrong: string | null;
+  equal: boolean;
+}
+
+function buildSegments(chunks: CharChunk[]): AlignedSegment[] {
+  const segments: AlignedSegment[] = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const c = chunks[i];
+    if (c.kind === 'equal') {
+      segments.push({ correct: c.text, wrong: null, equal: true });
+    } else if (c.kind === 'removed') {
+      const next = chunks[i + 1];
+      if (next && next.kind === 'added') {
+        segments.push({ correct: c.text, wrong: next.text, equal: false });
+        i++;
+      } else {
+        segments.push({ correct: c.text, wrong: '', equal: false });
+      }
+    } else if (c.kind === 'added') {
+      segments.push({ correct: '', wrong: c.text, equal: false });
+    }
   }
+  return segments;
 }
 
 function WordChip({ word, language }: { word: AlignedWord; language: string }) {
-  const t = useTranslations('LearningMode.diff');
-  const className = `rounded-sm px-1 py-0.5 ${tagClasses(word.tag)}`;
-  const surface = word.tag === 'missing' ? word.expected : word.actual;
-
   if (word.tag === 'equal') {
-    return <span className={className}>{surface}</span>;
+    return (
+      <span className="rounded-sm bg-success/15 text-success px-1 py-0.5">
+        {word.actual}
+      </span>
+    );
   }
 
-  const tooltipContent = (() => {
-    if (word.tag === 'typo') {
-      const cfg = getCompareConfig(language);
-      const { chunks } = charDiff(word.expected, word.actual, cfg);
-      return (
-        <span>
-          <span className="mr-1 text-xs uppercase opacity-70">
-            {t('typo')}:
-          </span>
-          {chunks.map((c, i) => {
-            if (c.kind === 'equal') return <span key={i}>{c.text}</span>;
-            if (c.kind === 'added')
-              return (
-                <span key={i} className="bg-destructive/30 rounded-sm px-0.5">
-                  {c.text}
-                </span>
-              );
-            return (
-              <span key={i} className="bg-success/30 rounded-sm px-0.5">
-                {c.text}
-              </span>
-            );
-          })}
-        </span>
-      );
-    }
-    if (word.tag === 'wrong') {
-      return (
-        <span>
-          <span className="mr-1 text-xs uppercase opacity-70">
-            {t('expected')}:
-          </span>
-          <span className="font-medium">{word.expected}</span>
-        </span>
-      );
-    }
-    if (word.tag === 'missing') {
-      return <span>{t('missingWord')}</span>;
-    }
-    return <span>{t('extraWord')}</span>;
-  })();
+  if (word.tag === 'extra') {
+    return (
+      <span className="rounded-sm bg-destructive/15 text-destructive line-through px-1 py-0.5">
+        {word.actual}
+      </span>
+    );
+  }
+
+  if (word.tag === 'missing') {
+    return (
+      <span className="rounded-sm border border-dashed border-success/50 bg-success/10 text-success px-1 py-0.5 font-medium">
+        {word.expected}
+      </span>
+    );
+  }
+
+  // typo or wrong: render expected word inline at baseline; for each diverging
+  // character, float the user's incorrect characters above as a small annotation.
+  const cfg = getCompareConfig(language);
+  const { chunks } = charDiff(word.expected, word.actual, cfg);
+  const segments = buildSegments(chunks);
+
+  const wrapperClass =
+    word.tag === 'typo'
+      ? 'rounded-sm bg-amber-500/15 text-amber-800 dark:text-amber-200 px-1 py-0.5'
+      : 'rounded-sm bg-destructive/10 text-destructive px-1 py-0.5';
+
+  const underlineClass =
+    word.tag === 'typo'
+      ? 'underline decoration-amber-500/60 decoration-2 underline-offset-2'
+      : 'underline decoration-destructive/60 decoration-2 underline-offset-2';
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className={className}>{surface}</span>
-      </TooltipTrigger>
-      <TooltipContent side="top">{tooltipContent}</TooltipContent>
-    </Tooltip>
+    <span className={wrapperClass}>
+      {segments.map((s, i) => {
+        // Unpaired extra char (user typed something that wasn't in the expected word).
+        // Render inline as small strike-through so we don't leave an annotation floating
+        // above empty space.
+        if (s.correct === '' && s.wrong) {
+          return (
+            <span
+              key={i}
+              className="text-destructive line-through text-[0.75em]"
+            >
+              {s.wrong}
+            </span>
+          );
+        }
+        return (
+          <span key={i} className="relative inline-block">
+            {s.wrong !== null && s.wrong.length > 0 && (
+              <span
+                aria-hidden
+                className="absolute left-1/2 -translate-x-1/2 -top-2.5 text-[0.7rem] leading-none text-destructive line-through whitespace-pre pointer-events-none font-medium"
+              >
+                {s.wrong}
+              </span>
+            )}
+            <span className={s.equal ? '' : underlineClass}>{s.correct}</span>
+          </span>
+        );
+      })}
+    </span>
   );
 }
 
@@ -141,7 +162,7 @@ export function WordDiff({
 
   return (
     <div>
-      <p className="leading-relaxed flex flex-wrap gap-1">
+      <p className="leading-relaxed flex flex-wrap items-baseline gap-x-1 gap-y-3 pt-3">
         {words.map((w, i) => (
           <WordChip key={i} word={w} language={language} />
         ))}

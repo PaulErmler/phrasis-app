@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { normalizeLanguageCode } from '@/lib/languages';
 import { Badge } from '@/components/ui/badge';
 import {
   Tooltip,
@@ -40,10 +41,6 @@ function highlightWord(text: string, word: string): React.ReactNode {
       part
     ),
   );
-}
-
-function normalizeLang(code: string): string {
-  return code.replace(/_latam$/, '');
 }
 
 export function WordSentencesDialog({
@@ -128,7 +125,7 @@ export function WordSentencesDialog({
     }
   };
 
-  const normalizedLang = normalizeLang(language);
+  const normalizedLang = normalizeLanguageCode(language);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -215,7 +212,7 @@ export function WordSentencesDialog({
                         (a) => a.language === tr.language,
                       );
                       const isWordLanguage =
-                        normalizeLang(tr.language) === normalizedLang;
+                        normalizeLanguageCode(tr.language) === normalizedLang;
                       return (
                         <div key={tr.language} className="flex items-start gap-2">
                           <div className="flex-1">
@@ -248,7 +245,7 @@ export function WordSentencesDialog({
                         (a) => a.language === tr.language,
                       );
                       const isWordLanguage =
-                        normalizeLang(tr.language) === normalizedLang;
+                        normalizeLanguageCode(tr.language) === normalizedLang;
                       return (
                         <div key={tr.language} className="flex items-start gap-2">
                           <div className="flex-1">
