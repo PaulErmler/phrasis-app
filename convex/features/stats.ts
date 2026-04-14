@@ -290,6 +290,45 @@ export const getRecentWords = query({
 });
 
 /**
+ * Query 3b: Recent words for a single language (up to 1000), for the expanded word view.
+ */
+export const getRecentWordsForLanguage = query({
+  args: {
+    language: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { language, limit }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return [];
+
+    const cap = Math.min(Math.max(limit ?? 1000, 1), 10000);
+    const courseId = active.course._id;
+    const normalized = language.replace(/_latam$/, '');
+    const targetLanguages = active.course.targetLanguages ?? [];
+    const variantSet = new Set<string>([language, normalized]);
+    for (const tl of targetLanguages) {
+      if (tl.replace(/_latam$/, '') === normalized) variantSet.add(tl);
+    }
+
+    const allWords: string[] = [];
+    for (const variant of variantSet) {
+      const rows = await ctx.db
+        .query('userWords')
+        .withIndex('by_userId_and_courseId_and_language', (q) =>
+          q.eq('userId', userId).eq('courseId', courseId).eq('language', variant),
+        )
+        .order('desc')
+        .take(cap);
+      allWords.push(...rows.map((r) => r.displayWord ?? r.word));
+    }
+
+    return allWords.slice(0, cap);
+  },
+});
+
+/**
  * Query 4: Search learned words across all languages via full-text search.
  */
 export const searchWords = query({
@@ -417,6 +456,7 @@ export const getSentencesForWord = query({
         textId: input.textId,
         translations: content.translations,
         audioRecordings: content.audioRecordings,
+        hasMissingContent: content.hasMissingContent,
         cardId: input.card?._id ?? null,
         isMastered: input.card?.isMastered ?? false,
         isHidden: input.card?.isHidden ?? false,

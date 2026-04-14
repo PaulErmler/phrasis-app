@@ -880,6 +880,11 @@
     "searchWordsDescription": "Search your learned words across all languages",
     "searchWordsPlaceholder": "Search words...",
     "searchWordsHint": "Type to search your learned words",
-    "searchWordsNoResults": "No matching words found"
+    "searchWordsNoResults": "No matching words found",
+    "expandWords": "Expand words",
+    "recentWordsTitle": "{language} — recent words",
+    "recentWordsCount": "{count, plural, =0 {No words yet} one {# word} other {# words}}",
+    "noWordsYet": "No words yet",
+    "loadMore": "Load more"
   }
 }

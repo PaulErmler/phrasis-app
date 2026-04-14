@@ -951,6 +951,11 @@
     "searchWordsDescription": "Durchsuche deine gelernten Wörter in allen Sprachen",
     "searchWordsPlaceholder": "Wörter suchen...",
     "searchWordsHint": "Tippe, um deine gelernten Wörter zu durchsuchen",
-    "searchWordsNoResults": "Keine passenden Wörter gefunden"
+    "searchWordsNoResults": "Keine passenden Wörter gefunden",
+    "expandWords": "Wörter erweitern",
+    "recentWordsTitle": "{language} — letzte Wörter",
+    "recentWordsCount": "{count, plural, =0 {Noch keine Wörter} one {# Wort} other {# Wörter}}",
+    "noWordsYet": "Noch keine Wörter",
+    "loadMore": "Mehr laden"
   }
 }

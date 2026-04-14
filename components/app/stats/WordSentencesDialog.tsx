@@ -22,6 +22,7 @@ import {
 import { AudioButton } from '@/components/app/learning/AudioButton';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { CircleCheck, EyeOff, Star, Loader2 } from 'lucide-react';
+import { useEnsureContent } from '@/hooks/use-ensure-content';
 
 function highlightWord(text: string, word: string): React.ReactNode {
   const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -62,6 +63,16 @@ export function WordSentencesDialog({
     api.features.stats.getSentencesForWord,
     open ? { word, language } : 'skip',
     { initialNumItems: 10 },
+  );
+
+  // Trigger on-demand regeneration for any sentence whose card content is missing.
+  useEnsureContent(
+    open
+      ? results.map((r) => ({
+          textId: r.textId as string,
+          hasMissingContent: r.hasMissingContent,
+        }))
+      : undefined,
   );
 
   const masterCard = useMutation(api.features.scheduling.masterCard);

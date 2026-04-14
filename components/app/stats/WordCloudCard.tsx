@@ -6,13 +6,14 @@ import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { WordCloud } from '@isoterik/react-word-cloud';
 import type { Word, WordRendererData } from '@isoterik/react-word-cloud';
-import { Search } from 'lucide-react';
+import { Search, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WordSentencesDialog } from './WordSentencesDialog';
 import { WordSearchDialog } from './WordSearchDialog';
+import { ExpandedWordsDialog } from './ExpandedWordsDialog';
 
 // App brand colors: primary (blue), accent-orange, warning (yellow)
-const COLORS = [
+export const COLORS = [
   'oklch(0.7162 0.119 217.31)',   // --primary (blue)
   'oklch(0.6189 0.1636 40.89)',   // --accent-orange
   'oklch(0.8179 0.1705 77.95)',   // --warning (yellow)
@@ -73,6 +74,7 @@ function SingleWordCloud({
   t,
   onWordClick,
   onSearchClick,
+  onExpandClick,
 }: {
   language: string;
   t: ReturnType<typeof useTranslations<'StatsPage'>>;
@@ -80,6 +82,7 @@ function SingleWordCloud({
   isFirst: boolean;
   onWordClick: (word: string, language: string) => void;
   onSearchClick: () => void;
+  onExpandClick: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
@@ -146,14 +149,26 @@ function SingleWordCloud({
         <span className="text-sm font-medium text-muted-foreground">
           {isFirst ? t('recentlyLearnedWords', { language: getLangName(language) }) : getLangName(language)}
         </span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-muted-foreground"
-          onClick={onSearchClick}
-        >
-          <Search className="h-3.5 w-3.5" />
-        </Button>
+        <div className="flex items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground"
+            onClick={onExpandClick}
+            aria-label={t('expandWords')}
+          >
+            <Maximize2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground"
+            onClick={onSearchClick}
+            aria-label={t('searchWords')}
+          >
+            <Search className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
       <div
         ref={containerRef}
@@ -198,6 +213,7 @@ export function WordCloudSection() {
     language: string;
   } | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [expandedLanguage, setExpandedLanguage] = useState<string | null>(null);
 
   const handleWordClick = useCallback(
     (displayWord: string, language: string) =>
@@ -222,6 +238,7 @@ export function WordCloudSection() {
           t={t}
           onWordClick={handleWordClick}
           onSearchClick={() => setSearchOpen(true)}
+          onExpandClick={() => setExpandedLanguage(entry.language)}
         />
       ))}
       {selectedWord && (
@@ -236,6 +253,14 @@ export function WordCloudSection() {
         />
       )}
       <WordSearchDialog open={searchOpen} onOpenChange={setSearchOpen} />
+      <ExpandedWordsDialog
+        open={expandedLanguage !== null}
+        language={expandedLanguage ?? ''}
+        onOpenChange={(open) => {
+          if (!open) setExpandedLanguage(null);
+        }}
+        onWordClick={handleWordClick}
+      />
     </>
   );
 }
