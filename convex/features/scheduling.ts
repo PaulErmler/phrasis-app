@@ -7,6 +7,7 @@ import { getActiveCourseForUser } from '../db/courses';
 import { getCourseSettings } from '../db/courseSettings';
 import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
+import { updateWordTextsForEdit } from '../db/stats/wordTracking';
 import { recordReviewStats } from '../db/stats/recordReviewStats';
 import { patchCard, insertCard, deleteCard } from '../db/stats/cardAggregates';
 import {
@@ -596,12 +597,30 @@ export const editCard = mutation({
       preReviewCount: card.preReviewCount,
       fsrsState: card.fsrsState,
       lastReviewedAt: card.lastReviewedAt,
+      wordsTrackedLanguages: card.wordsTrackedLanguages,
       searchableText,
       searchableTextLanguages,
     });
 
     // Delete old card
     await deleteCard(ctx, args.cardId);
+
+    // Update word-text links for changed languages (only if words were previously tracked)
+    if (card.wordsTrackedLanguages && card.wordsTrackedLanguages.length > 0) {
+      const changedLangTexts: Array<{ language: string; text: string }> = [];
+      for (const lang of changedLanguages) {
+        const submitted = submittedMap.get(lang);
+        if (submitted) changedLangTexts.push({ language: lang, text: submitted });
+      }
+      if (changedLangTexts.length > 0) {
+        await updateWordTextsForEdit(ctx, {
+          userId,
+          courseId: course._id,
+          textId: resolvedTextId,
+          languages: changedLangTexts,
+        });
+      }
+    }
 
     // Trigger TTS + romanization for changed languages
     await scheduleMissingContent(

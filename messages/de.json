@@ -343,6 +343,12 @@
     },
     "submitAnswer": "Absenden",
     "accuracy": "Genauigkeit",
+    "diff": {
+      "typo": "Tippfehler",
+      "expected": "Erwartet",
+      "missingWord": "Fehlendes Wort",
+      "extraWord": "Überzähliges Wort"
+    },
     "showSentence": "Satz anzeigen",
     "showCorrections": "Korrekturen anzeigen",
     "revertSubmission": "Eingabe zurücknehmen",
@@ -531,7 +537,7 @@
     "sentences": {
       "name": "Vorgefertigte Sätze",
       "pricingLabel": "{count, plural, one {# vorgefertigter Satz} other {# vorgefertigte Sätze}} pro Monat",
-      "pricingLabelUnlimited": "Unbegrenzt viele vorgefertigte Sätze pro Monat"
+      "pricingLabelUnlimited": "Unbegrenzt viele vorgefertigte Sätze"
     },
     "customSentences": {
       "name": "Eigene Sätze",
@@ -551,6 +557,10 @@
     },
     "translationAutoFill": {
       "name": "Automatische Übersetzung"
+    },
+    "detailedStatistics": {
+      "name": "Detaillierte Statistiken",
+      "pricingLabel": "Detaillierte Statistiken"
     }
   },
   "FeatureTracking": {
@@ -942,6 +952,18 @@
     "chatCards": "Chat-Karten hinzugefügt",
     "chatMessages": "Chat-Nachrichten gesendet",
     "noData": "Noch keine Daten",
-    "recentlyLearnedWords": "Kürzlich gelernte Wörter — {language}"
+    "recentlyLearnedWords": "Kürzlich gelernte Wörter — {language}",
+    "searchWords": "Wörter suchen",
+    "searchWordsDescription": "Durchsuche deine gelernten Wörter in allen Sprachen",
+    "searchWordsPlaceholder": "Wörter suchen...",
+    "searchWordsHint": "Tippe, um deine gelernten Wörter zu durchsuchen",
+    "searchWordsNoResults": "Keine passenden Wörter gefunden",
+    "expandWords": "Wörter erweitern",
+    "viewSentencesForWord": "Sätze zum Wort anzeigen: {word}",
+    "recentWordsTitle": "Wörter auf {language}",
+    "recentWordsCount": "{count, plural, =0 {Noch keine Wörter} one {# Wort} other {# Wörter}}",
+    "noWordsYet": "Noch keine Wörter",
+    "loadMore": "Mehr laden",
+    "clearSearch": "Suche zurücksetzen"
   }
 }

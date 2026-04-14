@@ -1,8 +1,9 @@
 import { v } from 'convex/values';
+import { paginationOptsValidator } from 'convex/server';
 import { query, internalQuery } from '../_generated/server';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
-import { getDeckByCourseId } from '../db/decks';
+import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import { cardsByState, cardsByDueDate, cardsByStateAndDueDate } from '../db/stats/cardAggregates';
 import {
   getCourseStats as dbGetCourseStats,
@@ -10,6 +11,8 @@ import {
 } from '../db/courseStats';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { EXTENDED_STATE_LABELS as STATE_LABELS } from '../lib/fsrsStates';
+import { buildTextContentBatchForLanguages } from '../lib/cardContent';
+import { normalizeLanguageCode } from '../../lib/languages';
 
 // Convention: query handlers return [] for array results and null for object results when unauthenticated.
 
@@ -140,11 +143,11 @@ export const getStatsPageData = query({
       .take(20);
     // Only include target languages, merging variants (e.g. es + es_latam)
     const targetLanguages = active.course.targetLanguages ?? [];
-    const targetSet = new Set(targetLanguages.map((l) => l.replace(/_latam$/, '')));
+    const targetSet = new Set(targetLanguages.map((l) => normalizeLanguageCode(l)));
     const wordsByLang = new Map<string, number>();
     for (const r of langStatsRows) {
       if (r.totalWords <= 0) continue;
-      const key = r.language.replace(/_latam$/, '');
+      const key = normalizeLanguageCode(r.language);
       if (!targetSet.has(key)) continue;
       wordsByLang.set(key, (wordsByLang.get(key) ?? 0) + r.totalWords);
     }
@@ -236,6 +239,37 @@ export const getStatsPageDailyData = query({
   },
 });
 
+// ----- Helpers shared by recent-words + word-search queries -----------------
+
+/** Resolve all stored language variants (e.g. "es" + "es_latam") for a given
+ * user-facing language code, looking at the active course's targetLanguages. */
+function resolveLanguageVariants(
+  targetLanguages: readonly string[],
+  language: string,
+): Set<string> {
+  const normalized = normalizeLanguageCode(language);
+  const variants = new Set<string>([language, normalized]);
+  for (const tl of targetLanguages) {
+    if (normalizeLanguageCode(tl) === normalized) variants.add(tl);
+  }
+  return variants;
+}
+
+/** True if `language` matches any of `targetLanguages` after normalization.
+ * Used to reject client-supplied languages that don't belong to the active
+ * course before we pass them to tokenization or variant resolution. */
+function isTargetLanguage(
+  targetLanguages: readonly string[],
+  language: string,
+): boolean {
+  const norm = normalizeLanguageCode(language);
+  return targetLanguages.some((tl) => normalizeLanguageCode(tl) === norm);
+}
+
+function normalizeSearchTerm(raw: string): string {
+  return raw.slice(0, 100).trim().toLowerCase().normalize('NFC');
+}
+
 /**
  * Query 3: Recent words per target language for the word cloud.
  */
@@ -253,7 +287,7 @@ export const getRecentWords = query({
     const seen = new Set<string>();
     const langPairs: Array<{ normalized: string; raw: string }> = [];
     for (const lang of targetLanguages) {
-      const norm = lang.replace(/_latam$/, '');
+      const norm = normalizeLanguageCode(lang);
       if (!seen.has(norm)) {
         seen.add(norm);
         langPairs.push({ normalized: norm, raw: lang });
@@ -284,6 +318,248 @@ export const getRecentWords = query({
     }
 
     return result;
+  },
+});
+
+/**
+ * Query 3b: Recent words for a single language (up to 1000), for the expanded word view.
+ */
+export const getRecentWordsForLanguage = query({
+  args: {
+    language: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { language, limit }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return [];
+
+    const targetLanguages = active.course.targetLanguages ?? [];
+    if (!isTargetLanguage(targetLanguages, language)) return [];
+
+    const cap = Math.min(Math.max(limit ?? 1000, 1), 10000);
+    const courseId = active.course._id;
+    const variantSet = resolveLanguageVariants(targetLanguages, language);
+
+    const allWords: string[] = [];
+    for (const variant of variantSet) {
+      const rows = await ctx.db
+        .query('userWords')
+        .withIndex('by_userId_and_courseId_and_language', (q) =>
+          q.eq('userId', userId).eq('courseId', courseId).eq('language', variant),
+        )
+        .order('desc')
+        .take(cap);
+      allWords.push(...rows.map((r) => r.displayWord ?? r.word));
+    }
+
+    return allWords.slice(0, cap);
+  },
+});
+
+/**
+ * Query 3c: Full-text search for learned words within a single language.
+ * Used by the expanded word popup so users can find any word in that language,
+ * not just the ones currently loaded on the client.
+ */
+export const searchWordsForLanguage = query({
+  args: {
+    language: v.string(),
+    searchQuery: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return [];
+
+    const courseId = active.course._id;
+    const targetLanguages = active.course.targetLanguages ?? [];
+    if (!isTargetLanguage(targetLanguages, args.language)) return [];
+
+    const term = normalizeSearchTerm(args.searchQuery);
+    if (term.length === 0) return [];
+
+    const variantSet = resolveLanguageVariants(targetLanguages, args.language);
+
+    const perVariantResults = await Promise.all(
+      Array.from(variantSet).map((variant) =>
+        ctx.db
+          .query('userWords')
+          .withSearchIndex('search_word', (q) =>
+            q
+              .search('word', term)
+              .eq('userId', userId)
+              .eq('courseId', courseId)
+              .eq('language', variant),
+          )
+          .take(50),
+      ),
+    );
+
+    const seen = new Set<string>();
+    const results: string[] = [];
+    for (const rows of perVariantResults) {
+      for (const row of rows) {
+        if (seen.has(row.word)) continue;
+        seen.add(row.word);
+        results.push(row.displayWord ?? row.word);
+        if (results.length >= 50) break;
+      }
+      if (results.length >= 50) break;
+    }
+    return results;
+  },
+});
+
+/**
+ * Query 4: Search learned words across all languages via full-text search.
+ */
+export const searchWords = query({
+  args: {
+    searchQuery: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return [];
+
+    const courseId = active.course._id;
+    const term = normalizeSearchTerm(args.searchQuery);
+    if (term.length === 0) return [];
+
+    const rows = await ctx.db
+      .query('userWords')
+      .withSearchIndex('search_word', (q) =>
+        q.search('word', term).eq('userId', userId).eq('courseId', courseId),
+      )
+      .take(50);
+
+    // Deduplicate language variants (es_latam → es)
+    const seen = new Set<string>();
+    const results: Array<{
+      word: string;
+      displayWord: string;
+      language: string;
+    }> = [];
+
+    for (const row of rows) {
+      const lang = normalizeLanguageCode(row.language);
+      const key = `${lang}:${row.word}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push({
+        word: row.word,
+        displayWord: row.displayWord ?? row.word,
+        language: lang,
+      });
+    }
+
+    return results;
+  },
+});
+
+/**
+ * Query 5: Paginated sentences containing a specific word.
+ * Powers the word cloud → sentence dialog.
+ */
+export const getSentencesForWord = query({
+  args: {
+    word: v.string(),
+    language: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { page: [], isDone: true, continueCursor: '' };
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return { page: [], isDone: true, continueCursor: '' };
+
+    const courseId = active.course._id;
+    const baseLanguages = active.course.baseLanguages ?? [];
+    const targetLanguages = active.course.targetLanguages ?? [];
+    if (!isTargetLanguage(targetLanguages, args.language)) {
+      return { page: [], isDone: true, continueCursor: '' };
+    }
+    const deck = await getDeckByCourseId(ctx, courseId);
+
+    // The frontend passes a normalized language (e.g. "es"), but userWordTexts
+    // stores the raw code from the course (e.g. "es_latam"). Resolve it from
+    // the course's targetLanguages — no extra DB query needed.
+    const allLangs = [...baseLanguages, ...targetLanguages];
+    const lang = allLangs.find(
+      (l) => l === args.language || normalizeLanguageCode(l) === args.language,
+    ) ?? args.language;
+
+    const result = await ctx.db
+      .query('userWordTexts')
+      .withIndex('by_userId_courseId_language_word', (q) =>
+        q
+          .eq('userId', userId)
+          .eq('courseId', courseId)
+          .eq('language', lang)
+          .eq('word', args.word),
+      )
+      .order('desc')
+      .paginate(args.paginationOpts);
+
+    // Fetch text docs and card docs for each link
+    const [textDocs, cardDocs] = await Promise.all([
+      Promise.all(result.page.map((link) => ctx.db.get(link.textId))),
+      Promise.all(
+        result.page.map((link) =>
+          deck ? getCardByDeckAndText(ctx, deck._id, link.textId) : null,
+        ),
+      ),
+    ]);
+
+    // Build inputs for the batch content loader (translations + audio for all course languages)
+    const inputs = result.page
+      .map((link, i) => {
+        const text = textDocs[i];
+        if (!text) return null;
+        return {
+          key: link.textId as string,
+          textId: link.textId,
+          sourceText: text.text,
+          sourceLanguage: text.language,
+          sourceRomanization: text.romanizedText ?? undefined,
+          card: cardDocs[i] ?? null,
+        };
+      })
+      .filter((input): input is NonNullable<typeof input> => input !== null);
+
+    const contentMap = await buildTextContentBatchForLanguages(
+      ctx,
+      inputs,
+      baseLanguages,
+      targetLanguages,
+    );
+
+    const sentences = inputs.map((input) => {
+      const content = contentMap.get(input.key)!;
+      return {
+        textId: input.textId,
+        translations: content.translations,
+        audioRecordings: content.audioRecordings,
+        hasMissingContent: content.hasMissingContent,
+        cardId: input.card?._id ?? null,
+        isMastered: input.card?.isMastered ?? false,
+        isHidden: input.card?.isHidden ?? false,
+        isFavorite: input.card?.isFavorite ?? false,
+        reviewCount: input.card
+          ? input.card.preReviewCount + (input.card.fsrsState?.reps ?? 0)
+          : 0,
+      };
+    });
+
+    return {
+      page: sentences,
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
   },
 });
 

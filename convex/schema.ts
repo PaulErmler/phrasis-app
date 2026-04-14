@@ -331,7 +331,27 @@ export default defineSchema({
     .index('by_userId_and_courseId_and_language_and_word',
       ['userId', 'courseId', 'language', 'word'])
     .index('by_userId_and_courseId_and_language',
-      ['userId', 'courseId', 'language']),
+      ['userId', 'courseId', 'language'])
+    .searchIndex('search_word', {
+      searchField: 'word',
+      filterFields: ['userId', 'courseId', 'language'],
+    }),
+
+  // Junction table: links each tracked word to the texts it appeared in.
+  // Capped at 30 texts per word to bound storage and write costs.
+  userWordTexts: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    language: v.string(),
+    word: v.string(), // normalized (lowercase, NFC) — matches userWords.word
+    textId: v.id('texts'),
+  })
+    .index('by_userId_courseId_language_word',
+      ['userId', 'courseId', 'language', 'word'])
+    .index('by_userId_courseId_language_word_textId',
+      ['userId', 'courseId', 'language', 'word', 'textId'])
+    .index('by_userId_courseId_textId',
+      ['userId', 'courseId', 'textId']),
 
   // All-time per-language totals
   languageStats: defineTable({

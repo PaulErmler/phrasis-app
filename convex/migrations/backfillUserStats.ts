@@ -312,6 +312,7 @@ export const processCourseBatch = internalMutation({
         userId: args.userId,
         courseId: args.courseId,
         languages: langTexts,
+        textId: card.textId,
       });
 
       // Stamp the card so future reviews skip already-tracked languages

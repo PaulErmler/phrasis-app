@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { getUserTimezone } from '@/lib/timezone';
+import { normalizeLanguageCode } from '@/lib/languages';
 import { NumbersRow } from './NumbersRow';
 import { CumulativeLineChart } from './CumulativeLineChart';
 import { ActivityHeatmap } from './ActivityHeatmap';
@@ -76,8 +77,8 @@ export function StatsView() {
   const targetLanguages = pageData?.targetLanguages;
   const filteredLanguageData = useMemo(() => {
     if (!languageDailyData?.length || !targetLanguages) return [];
-    const targetSet = new Set(targetLanguages.map((l: string) => l.replace(/_latam$/, '')));
-    return languageDailyData.filter((d) => targetSet.has(d.language.replace(/_latam$/, '')));
+    const targetSet = new Set(targetLanguages.map((l: string) => normalizeLanguageCode(l)));
+    return languageDailyData.filter((d) => targetSet.has(normalizeLanguageCode(d.language)));
   }, [languageDailyData, targetLanguages]);
 
   const todayNewWords = useMemo(() => {
