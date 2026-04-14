@@ -251,9 +251,9 @@
         "cta": "Get Started",
         "features": {
           "sentences": "Unlimited ready-made sentences",
-          "customSentences": "200 custom sentences per month",
+          "customSentences": "300 custom sentences per month",
           "courses": "1 course",
-          "chatMessages": "50 chat messages per month",
+          "chatMessages": "100 chat messages per month",
           "detailedStatistics": "Detailed statistics"
         }
       },
@@ -265,9 +265,9 @@
         "cta": "Get Started",
         "features": {
           "sentences": "Unlimited ready-made sentences",
-          "customSentences": "500 custom sentences per month",
+          "customSentences": "1,000 custom sentences per month",
           "courses": "Up to 10 courses",
-          "chatMessages": "200 chat messages per month",
+          "chatMessages": "400 chat messages per month",
           "multipleLanguages": "Up to 5 languages per course",
           "detailedStatistics": "Detailed statistics"
         }
