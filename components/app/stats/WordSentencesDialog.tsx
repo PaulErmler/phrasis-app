@@ -49,9 +49,9 @@ export function WordSentencesDialog({
   useEnsureContent(
     open
       ? results.map((r) => ({
-          textId: r.textId as string,
-          hasMissingContent: r.hasMissingContent,
-        }))
+        textId: r.textId as string,
+        hasMissingContent: r.hasMissingContent,
+      }))
       : undefined,
   );
 

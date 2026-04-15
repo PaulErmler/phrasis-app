@@ -56,7 +56,7 @@ export function useCloudSize(): {
   ref: RefObject<HTMLDivElement | null>;
   width: number;
   height: number;
-} {
+  } {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
