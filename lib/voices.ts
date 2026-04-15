@@ -136,9 +136,11 @@ const ELEVENLABS_VOICES_ES_LATAM: Voice[] = [
 // French (France) — all 4 native French speakers
 const ELEVENLABS_VOICES_FR: Voice[] = [
   createElevenLabsVoice('Camille', 'female', 'hFgOzpmS0CMtL2to8sAl'),
-  createElevenLabsVoice('Victoria', 'female', 'WeAAwKYcS06VmXw086yZ'),
-  createElevenLabsVoice('Francois Louis', 'male', 'UBXZKOKbt62aLQHhc1Jm'),
+  createElevenLabsVoice('Claire', 'female', 'HuLbOdhRlvQQN8oPP0AJ'),
+  createElevenLabsVoice('Marcel', 'male', 'kENkNtk0xyzG09WW40xE'),
+  createElevenLabsVoice('Yann', 'male', 'nr2EGJNe96rzn9FRlTId'),
   createElevenLabsVoice('Celian', 'male', 'DGTOOUoGpoP6UZ9uSWfA'),
+  createElevenLabsVoice('Anna', 'female', 'nVPCtAFzgyMX3FZKNzH0'),
 ];
 
 // German (Germany) — Juniper + Arabella + Irene (F); Alexander + Narration (M).
@@ -146,7 +148,7 @@ const ELEVENLABS_VOICES_DE: Voice[] = [
   createElevenLabsVoice('Ben', 'male', 'aTTiK3YzK3dXETpuDE2h'),
   createElevenLabsVoice('Irene', 'female', '8wPhfH9uUzEMHTmRkoAR'),
   createElevenLabsVoice('Carla', 'female', 'rKiu7lQ4c5P3az3745s3'),
-  createElevenLabsVoice('Alexander', 'male', 'kkJxCnlRCckmfFvzDW5Q'),
+  createElevenLabsVoice('Leo', 'male', 'f64OyGck4gc2zk7QOs55'),
 ];
 
 // Italian — 4 native Italian speakers
@@ -215,7 +217,7 @@ const ELEVENLABS_VOICES_SV: Voice[] = [
   createElevenLabsVoice('Jane', 'female', 'RILOU7YmBhvwJGDGjNmP'),
   createElevenLabsVoice('Sanna', 'female', '4xkUqaR9MYOJHoaC1Nak'), 
   createElevenLabsVoice('Louise', 'female', 'QLfvbukvQvrPOx9HXQ3x'), 
-  createElevenLabsVoice('Adam', 'male', 'x0u3EW21dbrORJzOq1m9'), 
+  createElevenLabsVoice('Peter', 'male', 'oJEeOXECH9V31Oci9WHK'), 
   createElevenLabsVoice('Martin', 'male', 'CuaAIFbkzX2kaNH5EtHZ'),
 ];
 

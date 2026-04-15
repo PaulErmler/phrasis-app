@@ -12,7 +12,7 @@
  *   --no-samples    skip MP3 generation; just check availability
  *   --limit=N       cap total sample generations (debug)
  */
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, access } from 'node:fs/promises';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SUPPORTED_LANGUAGES } from '../lib/languages';
@@ -52,8 +52,18 @@ const OUT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'voice-samples'
 
 const args = new Set(process.argv.slice(2));
 const generateSamples = !args.has('--no-samples');
+const force = args.has('--force');
 const limitArg = [...args].find((a) => a.startsWith('--limit='));
 const limit = limitArg ? parseInt(limitArg.split('=')[1], 10) : Infinity;
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 type VoiceJob = {
   languageCode: string;
@@ -125,6 +135,7 @@ type JobResult = {
   available: boolean;
   error?: string;
   sampleFile?: string;
+  cached?: boolean;
 };
 
 /**
@@ -132,6 +143,10 @@ type JobResult = {
  * permission the app's key needs is text_to_speech. A successful response
  * means the voice exists and is usable; a 404/400 voice-not-found means it
  * doesn't exist. This also gives us the audio file to review in the HTML.
+ *
+ * If an MP3 for the exact (language, voice name, voice_id) tuple already
+ * exists on disk, we skip the API call entirely and reuse the cached audio.
+ * Pass `--force` to regenerate everything.
  */
 async function runJob(job: VoiceJob, apiKey: string): Promise<JobResult> {
   const text = SAMPLE_TEXT[job.languageCode];
@@ -143,12 +158,16 @@ async function runJob(job: VoiceJob, apiKey: string): Promise<JobResult> {
     };
   }
 
+  const fname = sampleFileName(job);
+  if (generateSamples && !force && (await fileExists(resolve(OUT_DIR, fname)))) {
+    return { job, available: true, sampleFile: fname, cached: true };
+  }
+
   try {
     const bytes = await synthesizeSample(text, job.voice.apiCode, job.languageCode, apiKey);
     if (!generateSamples) {
       return { job, available: true };
     }
-    const fname = sampleFileName(job);
     await writeFile(resolve(OUT_DIR, fname), Buffer.from(bytes));
     return { job, available: true, sampleFile: fname };
   } catch (err) {
@@ -263,22 +282,23 @@ async function main() {
   );
 
   // Serialize requests — ElevenLabs free/starter plans cap at 3 concurrent
-  // requests. Going one-at-a-time avoids flaky 429s and is fast enough for
-  // a review script (~70 voices × ~1.5s each ≈ under 2 min).
+  // requests. Going one-at-a-time avoids flaky 429s. Cached entries are
+  // near-instant so a full run usually only pays for newly-changed voices.
   const results: JobResult[] = [];
   for (let i = 0; i < jobs.length; i++) {
     const job = jobs[i];
     const res = await runJob(job, apiKey);
     results.push(res);
     const tick = res.available ? '✓' : '✗';
-    const sample = res.sampleFile ? ' 🔊' : '';
+    const sample = res.cached ? ' ⋯ cached' : res.sampleFile ? ' 🔊 generated' : '';
     console.log(
       `  [${i + 1}/${jobs.length}] ${tick} ${job.flag} ${job.languageCode} ` +
         `${job.voice.name} (${job.voice.apiCode})${sample}` +
         (res.error ? `  — ${res.error}` : ''),
     );
-    // Small gap between calls so we never hit concurrency limits.
-    await sleep(120);
+    // Small gap between calls when we actually hit the API, to stay under
+    // the concurrency cap. Cached hits can go back-to-back.
+    if (!res.cached) await sleep(120);
   }
 
   const html = renderHtml(results);
@@ -286,7 +306,10 @@ async function main() {
   await writeFile(htmlPath, html);
 
   const missing = results.filter((r) => !r.available);
+  const generated = results.filter((r) => r.sampleFile && !r.cached).length;
+  const cached = results.filter((r) => r.cached).length;
   console.log('\n----- Summary -----');
+  console.log(`generated: ${generated}   cached: ${cached}   failed: ${missing.length}`);
   const uniqMissing = new Set(missing.map((r) => r.job.voice.apiCode));
   console.log(
     `${results.length - missing.length}/${results.length} pairs ok — ` +
