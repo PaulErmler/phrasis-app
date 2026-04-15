@@ -76,7 +76,7 @@ describe('voice helpers', () => {
   });
 
   it('getVoiceGenderByApiCode returns gender when found', () => {
-    const anyVoice = SUPPORTED_LANGUAGES[0].voices[0];
+    const anyVoice = getVoicesByLanguageCode(SUPPORTED_LANGUAGES[0].code)[0];
     expect(getVoiceGenderByApiCode(anyVoice.apiCode)).toBe(anyVoice.gender);
   });
 
@@ -114,8 +114,9 @@ describe('getLocaleFromApiCode', () => {
     expect(getLocaleFromApiCode('cmn-CN-Chirp3-HD-Foo')).toBe('cmn-CN');
   });
 
-  it('returns the original string when the pattern is missing', () => {
-    expect(getLocaleFromApiCode('weird')).toBe('weird');
+  it('returns null for non-Google apiCodes (e.g., ElevenLabs voice IDs)', () => {
+    expect(getLocaleFromApiCode('weird')).toBeNull();
+    expect(getLocaleFromApiCode('21m00Tcm4TlvDq8ikWAM')).toBeNull();
   });
 });
 

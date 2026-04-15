@@ -161,12 +161,25 @@ describe("features/ttsProcessing", () => {
       });
       vi.stubGlobal("fetch", fetchMock);
 
+      // Queue-based flow: pre-assign a slot like pumpQueue would, then invoke
+      // the action directly. The action releases the slot in its finally block.
+      const slotId = await t.run(async (ctx) =>
+        ctx.db.insert("ttsProviderSlots", {
+          provider: "google" as const,
+          claimedAt: Date.now(),
+        }),
+      );
+
       try {
         await t.action(internal.features.ttsProcessing.processTTSForCard, {
           textId,
           text: "Hola",
           language: "es",
           voiceName: "es-ES-Chirp3-HD-Leda",
+          provider: "google" as const,
+          voiceGender: "female" as const,
+          speed: 1,
+          slotId,
         });
       } finally {
         vi.unstubAllGlobals();
@@ -183,9 +196,80 @@ describe("features/ttsProcessing", () => {
       );
       expect(audio?.ttsQuality).toBe("validated");
       expect(audio?.voiceName).toBe("es-ES-Chirp3-HD-Leda");
+      expect(audio?.voiceGender).toBe("female");
+      expect(audio?.speed).toBe(1);
       const calls = fetchMock.mock.calls.map((c) => String(c[0]));
       expect(calls.some((c) => c.includes("texttospeech"))).toBe(true);
       expect(calls.some((c) => c.includes("api.openai.com"))).toBe(true);
+    });
+  });
+
+  describe("scheduleMissingContent sweep", () => {
+    // Every supported language is currently served by ElevenLabs, so any
+    // legacy row with `ttsProvider: 'google'` should be swept out on first
+    // touch. These tests drive that sweep via `prepareCardContent`.
+    it("deletes a row whose ttsProvider doesn't match the language's current provider", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      // Force a stable audioSpeakerGender so the sweep compares like-for-like.
+      await t.run(async (ctx) =>
+        ctx.db.patch(textId, { audioSpeakerGender: "female" }),
+      );
+      const storageId = await t.run(async (ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
+      );
+      const audioId = await t.run(async (ctx) =>
+        ctx.db.insert("audioRecordings", {
+          textId,
+          language: "es",
+          voiceName: "es-ES-Chirp3-HD-Leda",
+          storageId,
+          ttsQuality: "validated",
+          ttsProvider: "google",
+          voiceGender: "female",
+          speed: 0.9,
+        }),
+      );
+
+      await t.mutation(internal.features.decks.prepareCardContent, {
+        textId,
+        baseLanguages: ["es"],
+        targetLanguages: ["es"],
+      });
+
+      const left = await t.run(async (ctx) => ctx.db.get(audioId));
+      expect(left).toBeNull();
+    });
+
+    it("deletes a legacy row whose gender can't be determined (no voiceGender + voice not in curated list)", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) =>
+        ctx.db.patch(textId, { audioSpeakerGender: "female" }),
+      );
+      const storageId = await t.run(async (ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
+      );
+      const audioId = await t.run(async (ctx) =>
+        ctx.db.insert("audioRecordings", {
+          textId,
+          language: "es",
+          voiceName: "unknown-voice-id-removed-from-list",
+          storageId,
+          ttsQuality: "validated",
+          // Intentionally omit voiceGender and ttsProvider to simulate a
+          // legacy row for a voice that's been removed from the curated list.
+        }),
+      );
+
+      await t.mutation(internal.features.decks.prepareCardContent, {
+        textId,
+        baseLanguages: ["es"],
+        targetLanguages: ["es"],
+      });
+
+      const left = await t.run(async (ctx) => ctx.db.get(audioId));
+      expect(left).toBeNull();
     });
   });
 });

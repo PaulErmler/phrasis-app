@@ -3,7 +3,12 @@
     "allow": [
       "Bash(find /Users/paulermler/Documents/Phrasis/new/phrasis-app -name \"*.ts\" -exec grep -l \"ENSURE_CONTENT_LOOKAHEAD\" {} \\\\;)",
       "Bash(grep -r \"export.*Card\\\\|export.*Sentence\\\\|export.*Text\" /Users/paulermler/Documents/Phrasis/new/phrasis-app/components/app/learning/*.ts)",
-      "Bash(grep -n \"import.*tokenizeText\\\\|import.*trackNewWords\\\\|import.*updateWordTextsForEdit\" convex/**/*.ts)"
+      "Bash(grep -n \"import.*tokenizeText\\\\|import.*trackNewWords\\\\|import.*updateWordTextsForEdit\" convex/**/*.ts)",
+      "WebFetch(domain:elevenlabs.io)",
+      "WebFetch(domain:help.elevenlabs.io)",
+      "WebFetch(domain:json2video.com)",
+      "WebFetch(domain:elevenlabs-sdk.mintlify.app)",
+      "WebFetch(domain:gist.github.com)"
     ]
   }
 }

@@ -7,6 +7,7 @@
  */
 
 import { OPENAI_TRANSCRIPTION_MODEL } from '../config/aiModels';
+import type { TtsProvider } from '../types';
 
 export { normalizeForComparison, textsMatch } from '../lib/textComparison';
 
@@ -15,18 +16,54 @@ interface GoogleTTSResponse {
   audioContent: string; // Base64-encoded audio
 }
 
+/** ElevenLabs model ID used for all synthesis. */
+const ELEVENLABS_MODEL_ID = 'eleven_turbo_v2_5';
+/** ElevenLabs MP3 output format: 44.1 kHz, 128 kbps — matches our existing pipeline. */
+const ELEVENLABS_OUTPUT_FORMAT = 'mp3_44100_128';
+
 /**
- * Extract languageCode from voiceName (e.g., "en-US-Chirp3-HD-Leda" -> "en-US")
+ * Extract languageCode from a Google voice name (e.g., "en-US-Chirp3-HD-Leda" -> "en-US")
  */
 function extractLanguageCode(voiceName: string): string {
   return voiceName.split('-Chirp3-HD-')[0];
 }
 
 /**
+ * Map our internal language codes to ISO 639-1 language codes that ElevenLabs
+ * accepts in the `language_code` parameter. App-internal codes like `es_latam`
+ * and `cmn` are not valid ISO 639-1 and must be folded to their base form.
+ */
+export function toElevenLabsLanguageCode(internalCode: string): string {
+  const map: Record<string, string> = {
+    es_latam: 'es',
+    cmn: 'zh',
+  };
+  return map[internalCode] ?? internalCode;
+}
+
+/**
+ * Provider-agnostic entry point used by ttsProcessing's validation loop.
+ * Dispatches to the appropriate backend based on `provider`. Both backends
+ * return MP3 audio so downstream (storage, transcription validation) is uniform.
+ */
+export async function synthesizeSpeech(
+  text: string,
+  voiceName: string,
+  speed: number,
+  provider: TtsProvider,
+  language: string,
+): Promise<Blob> {
+  if (provider === 'elevenlabs') {
+    return synthesizeElevenLabs(text, voiceName, speed, language);
+  }
+  return synthesizeGoogle(text, voiceName, speed);
+}
+
+/**
  * Call the Google Cloud TTS REST API.
  * Returns a Blob of the synthesized MP3 audio. Throws on any error.
  */
-export async function synthesizeSpeech(
+async function synthesizeGoogle(
   text: string,
   voiceName: string,
   speed: number,
@@ -62,6 +99,56 @@ export async function synthesizeSpeech(
     [Uint8Array.from(atob(data.audioContent), (c) => c.charCodeAt(0))],
     { type: 'audio/mp3' },
   );
+}
+
+/**
+ * Call the ElevenLabs text-to-speech REST API.
+ * `voiceId` is the raw ElevenLabs voice_id (stored as `voiceName` on the audioRecording row).
+ * Returns a Blob of the synthesized MP3 audio. Throws on any error.
+ */
+async function synthesizeElevenLabs(
+  text: string,
+  voiceId: string,
+  speed: number,
+  language: string,
+): Promise<Blob> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
+
+  const response = await fetch(
+    `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}?output_format=${ELEVENLABS_OUTPUT_FORMAT}`,
+    {
+      method: 'POST',
+      headers: {
+        'xi-api-key': apiKey,
+        'Content-Type': 'application/json',
+        Accept: 'audio/mpeg',
+      },
+      body: JSON.stringify({
+        text,
+        model_id: ELEVENLABS_MODEL_ID,
+        // Enforce pronunciation/normalization for the target language.
+        // Accepted by flash/turbo v2.5 and v3; silently ignored by multilingual_v2.
+        language_code: toElevenLabsLanguageCode(language),
+        voice_settings: {
+          stability: 0.5,
+          similarity_boost: 0.75,
+          speed,
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ElevenLabs TTS API error: ${response.status} - ${errorText}`);
+  }
+
+  const bytes = await response.arrayBuffer();
+  if (bytes.byteLength === 0) {
+    throw new Error('No audio content returned from ElevenLabs TTS API');
+  }
+  return new Blob([bytes], { type: 'audio/mp3' });
 }
 
 /**

@@ -65,6 +65,16 @@ export const ttsQualityValidator = v.union(
   v.literal('unvalidated'),
 );
 
+export const ttsProviderValidator = v.union(
+  v.literal('google'),
+  v.literal('elevenlabs'),
+);
+
+export const voiceGenderValidator = v.union(
+  v.literal('male'),
+  v.literal('female'),
+);
+
 export const cardApprovalStatusValidator = v.union(
   v.literal('pending'),
   v.literal('approved'),
@@ -77,4 +87,6 @@ export type ReviewMode = Infer<typeof reviewModeValidator>;
 export type SchedulingMode = Infer<typeof schedulingModeValidator>;
 export type FsrsState = Infer<typeof fsrsStateValidator>;
 export type TtsQuality = Infer<typeof ttsQualityValidator>;
+export type TtsProvider = Infer<typeof ttsProviderValidator>;
+export type VoiceGender = Infer<typeof voiceGenderValidator>;
 export type CardApprovalStatus = Infer<typeof cardApprovalStatusValidator>;

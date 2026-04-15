@@ -8,6 +8,8 @@ import {
   cardApprovalStatusValidator,
   schedulingPhaseValidator,
   ttsQualityValidator,
+  ttsProviderValidator,
+  voiceGenderValidator,
 } from './types';
 
 
@@ -61,6 +63,9 @@ export default defineSchema({
     voiceName: v.string(), // Full voice identifier (e.g., "en-US-Chirp3-HD-Leda")
     storageId: v.id('_storage'), // Convex file storage reference
     ttsQuality: v.optional(ttsQualityValidator), // TTS validation status
+    ttsProvider: v.optional(ttsProviderValidator), // TTS provider used (missing = legacy google)
+    voiceGender: v.optional(voiceGenderValidator), // Gender of the synthesized voice (missing = legacy row; falls back to curated-list lookup on read)
+    speed: v.optional(v.number()), // Playback speed used at synthesis time (missing = legacy row, assume 0.9)
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'language'])
@@ -299,6 +304,30 @@ export default defineSchema({
     language: v.string(),
     claimedAt: v.number(),
   }).index('by_text_and_language', ['textId', 'language']),
+
+  // Global concurrency slots per TTS provider. Each row = one in-flight API
+  // call. Used to stay under provider concurrency caps (e.g. ElevenLabs'
+  // 3-parallel limit). Stale rows are reclaimed after SLOT_STALE_MS.
+  ttsProviderSlots: defineTable({
+    provider: ttsProviderValidator,
+    claimedAt: v.number(),
+  }).index('by_provider', ['provider']),
+
+  // FIFO queue of pending TTS jobs. Enqueued by scheduling mutations; drained
+  // by `pumpQueue` which dispatches oldest-first whenever a provider slot is
+  // free. Rows are deleted at dispatch time.
+  ttsQueue: defineTable({
+    provider: ttsProviderValidator,
+    args: v.object({
+      textId: v.id('texts'),
+      text: v.string(),
+      language: v.string(),
+      voiceName: v.string(),
+      voiceGender: voiceGenderValidator,
+      speed: v.number(),
+    }),
+    queuedAt: v.number(),
+  }).index('by_provider_and_queuedAt', ['provider', 'queuedAt']),
 
   // Daily per-language stats
   dailyLanguageStats: defineTable({

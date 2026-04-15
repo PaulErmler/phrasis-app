@@ -10,7 +10,12 @@ import {
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
 import { insertCard } from '../db/stats/cardAggregates';
-import { getVoiceForLanguage, getVoiceGenderByApiCode, resolveAudioSpeakerGender } from '../../lib/languages';
+import {
+  getVoiceForLanguage,
+  getVoiceGenderByApiCode,
+  resolveAudioSpeakerGender,
+  getTtsProviderForLanguage,
+} from '../../lib/languages';
 import {
   getCourseSettings,
   setActiveCollectionOnSettings,
@@ -24,7 +29,13 @@ import {
 } from '../db/collections';
 import { translateText, romanizeText } from './translation';
 import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
-import { translationValidator, audioRecordingValidator, ttsQualityValidator } from '../types';
+import {
+  translationValidator,
+  audioRecordingValidator,
+  ttsQualityValidator,
+  ttsProviderValidator,
+  voiceGenderValidator,
+} from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
@@ -123,13 +134,26 @@ export async function scheduleMissingContent(
         }
         await ctx.db.delete(audio._id);
         audioMap.set(lang, null);
-      } else if (
-        (audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
-        getVoiceGenderByApiCode(audio.voiceName) !== audioSpeakerGender
-      ) {
-        await ctx.storage.delete(audio.storageId);
-        await ctx.db.delete(audio._id);
-        audioMap.set(lang, null);
+      } else {
+        // Prefer the persisted gender; fall back to curated-list lookup for
+        // legacy rows written before voiceGender existed.
+        const storedGender =
+          audio.voiceGender ?? getVoiceGenderByApiCode(audio.voiceName);
+        // Unknown gender is itself a regenerate trigger — we can't trust the
+        // audio to match the card's speakerGender, so rebuild it.
+        const genderMismatch =
+          storedGender === undefined ||
+          ((audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
+            storedGender !== audioSpeakerGender);
+        // Rows predating this field are legacy Google audio; treat as 'google'.
+        const existingProvider = audio.ttsProvider ?? 'google';
+        const providerMismatch =
+          existingProvider !== getTtsProviderForLanguage(lang);
+        if (genderMismatch || providerMismatch) {
+          await ctx.storage.delete(audio.storageId);
+          await ctx.db.delete(audio._id);
+          audioMap.set(lang, null);
+        }
       }
     }
   }
@@ -156,14 +180,24 @@ export async function scheduleMissingContent(
         const claimed = await claimTtsIfAvailable(ctx, textId, lang);
         if (claimed) {
           const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
-          await ctx.scheduler.runAfter(
-            0,
-            internal.features.ttsProcessing.processTTSForCard,
+          const voiceGender = getVoiceGenderByApiCode(voiceName);
+          if (voiceGender === undefined) {
+            throw new Error(
+              `Cannot enqueue TTS: voice "${voiceName}" for language "${lang}" is not in the curated voice list.`,
+            );
+          }
+          await ctx.runMutation(
+            internal.features.ttsProcessing.enqueueTtsJob,
             {
-              textId,
-              text: text.text,
-              language: lang,
-              voiceName,
+              provider: getTtsProviderForLanguage(lang),
+              args: {
+                textId,
+                text: text.text,
+                language: lang,
+                voiceName,
+                voiceGender,
+                speed: 1,
+              },
             },
           );
           audioScheduled++;
@@ -199,14 +233,24 @@ export async function scheduleMissingContent(
           const claimed = await claimTtsIfAvailable(ctx, textId, lang);
           if (claimed) {
             const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
-            await ctx.scheduler.runAfter(
-              0,
-              internal.features.ttsProcessing.processTTSForCard,
+            const voiceGender = getVoiceGenderByApiCode(voiceName);
+            if (voiceGender === undefined) {
+              throw new Error(
+                `Cannot enqueue TTS: voice "${voiceName}" for language "${lang}" is not in the curated voice list.`,
+              );
+            }
+            await ctx.runMutation(
+              internal.features.ttsProcessing.enqueueTtsJob,
               {
-                textId,
-                text: translation.translatedText,
-                language: lang,
-                voiceName,
+                provider: getTtsProviderForLanguage(lang),
+                args: {
+                  textId,
+                  text: translation.translatedText,
+                  language: lang,
+                  voiceName,
+                  voiceGender,
+                  speed: 1,
+                },
               },
             );
             audioScheduled++;
@@ -1256,14 +1300,24 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     if (!existingAudioForVoice) {
       const claimed = await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage);
       if (claimed) {
-        await ctx.scheduler.runAfter(
-          0,
-          internal.features.ttsProcessing.processTTSForCard,
+        const voiceGender = getVoiceGenderByApiCode(args.voiceName);
+        if (voiceGender === undefined) {
+          throw new Error(
+            `Cannot enqueue TTS: voice "${args.voiceName}" for language "${args.targetLanguage}" is not in the curated voice list.`,
+          );
+        }
+        await ctx.runMutation(
+          internal.features.ttsProcessing.enqueueTtsJob,
           {
-            textId: args.textId,
-            text: args.translatedText,
-            language: args.targetLanguage,
-            voiceName: args.voiceName,
+            provider: getTtsProviderForLanguage(args.targetLanguage),
+            args: {
+              textId: args.textId,
+              text: args.translatedText,
+              language: args.targetLanguage,
+              voiceName: args.voiceName,
+              voiceGender,
+              speed: 1,
+            },
           },
         );
       }
@@ -1373,6 +1427,9 @@ export const storeAudioRecording = internalMutation({
     voiceName: v.string(),
     storageId: v.id('_storage'),
     ttsQuality: v.optional(ttsQualityValidator),
+    ttsProvider: v.optional(ttsProviderValidator),
+    voiceGender: voiceGenderValidator,
+    speed: v.number(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1398,6 +1455,9 @@ export const storeAudioRecording = internalMutation({
         voiceName: args.voiceName,
         storageId: args.storageId,
         ttsQuality: args.ttsQuality,
+        ttsProvider: args.ttsProvider,
+        voiceGender: args.voiceGender,
+        speed: args.speed,
       });
       return null;
     }
@@ -1410,6 +1470,9 @@ export const storeAudioRecording = internalMutation({
       voiceName: args.voiceName,
       storageId: args.storageId,
       ttsQuality: args.ttsQuality,
+      ttsProvider: args.ttsProvider,
+      voiceGender: args.voiceGender,
+      speed: args.speed,
     });
     if (previousStorageId !== args.storageId) {
       await ctx.storage.delete(previousStorageId);
