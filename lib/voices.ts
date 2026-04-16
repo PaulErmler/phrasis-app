@@ -223,10 +223,10 @@ const ELEVENLABS_VOICES_SV: Voice[] = [
 
 // Finnish — 4 native speakers.
 const ELEVENLABS_VOICES_FI: Voice[] = [
-  createElevenLabsVoice('Aurora', 'female', 'YSabzCJMvEHDduIDMdwV'),
-  createElevenLabsVoice('Soili', 'female', 'RiWFFlzYFZuu4lPMig3i'),
-  createElevenLabsVoice('Miika', 'male', 'fC33e0BIKA7wWK2MeARj'),
-  createElevenLabsVoice('Jussi', 'male', 'dlbXHgJnwobU5JdZ8F5M'),
+  createElevenLabsVoice('Lea', 'female', '7eVMgwCnXydb3CikjV7a'),
+  createElevenLabsVoice('Amy', 'female', 'bhJUNIXWQQ94l8eI2VUf'),
+  createElevenLabsVoice('Emilio', 'male', 'ZCh4e9eZSUf41K4cmCEL'),
+  createElevenLabsVoice('Rahul', 'male', 'u7bRcYbD7visSINTyAT8'),
 ];
 
 // Dutch (Netherlands) — 4 native Dutch speakers.
