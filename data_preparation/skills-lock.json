@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "speech-to-text": {
+      "source": "elevenlabs/skills",
+      "sourceType": "github",
+      "computedHash": "e3933b0c7d935af0953035fab416f65d9c92e66cc9d7a700eb034a429d5c8107"
+    },
+    "text-to-speech": {
+      "source": "elevenlabs/skills",
+      "sourceType": "github",
+      "computedHash": "dccf9155f284345ade4a5af5d3c3db5d5da77856011ff92fff725160b0df8370"
+    }
+  }
+}
