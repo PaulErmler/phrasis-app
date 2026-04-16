@@ -96,7 +96,7 @@ function buildChirp3Pool(
 const EL_MARK = createElevenLabsVoice('Mark', 'male', 'UgBBYS2sOqTuMpoF3BR0');
 const EL_JAMES = createElevenLabsVoice('James', 'male', 'EkK5I93UQWFDigLMpZcX');
 const EL_JUNIPER = createElevenLabsVoice('Juniper', 'female', 'aMSt68OGf4xUZAnLpTU8');
-const EL_ARABELLA = createElevenLabsVoice('Arabella', 'female', 'Z3R5wn05IrDiVCyEkUrK');
+const EL_CHRISTINA = createElevenLabsVoice('Christina', 'female', 'X03mvPuTfprif8QBAVeJ');
 // Camille Martin — multilingual female used across fr / pt.
 
 // ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@ const EL_ARABELLA = createElevenLabsVoice('Arabella', 'female', 'Z3R5wn05IrDiVCy
 // English — 4 original + 4 added natives (US + UK mix)
 const ELEVENLABS_VOICES_EN: Voice[] = [
   EL_JUNIPER,
-  EL_ARABELLA,
+  EL_CHRISTINA,
   createElevenLabsVoice('Adrea', 'female', 'ji8lGJ0ZLrpJ5KY4NwOd'),
   createElevenLabsVoice('Lauren', 'female', 'DODLEQrClDo8wCz460ld'),
   EL_MARK,
@@ -119,7 +119,7 @@ const ELEVENLABS_VOICES_EN: Voice[] = [
 // James + Emilio (native Spanish male).
 const ELEVENLABS_VOICES_ES: Voice[] = [
   createElevenLabsVoice('Aitana', 'female', 'AxFLn9byyiDbMn5fmyqu'),
-  createElevenLabsVoice('Eva', 'female', 'RgXx32WYOGrd7gFNifSf'),
+  createElevenLabsVoice('Lydia', 'female', 'SDVJaMLoJa7wc3s2sn7d'),
   createElevenLabsVoice('David' ,'male', "Nh2zY9kknu6z4pZy6FhD"), 
   createElevenLabsVoice('Emilio', 'male', 'ZCh4e9eZSUf41K4cmCEL'),
 ];
@@ -129,8 +129,8 @@ const ELEVENLABS_VOICES_ES: Voice[] = [
 const ELEVENLABS_VOICES_ES_LATAM: Voice[] = [
   createElevenLabsVoice('Kate', 'female', 'imFXYz8XIletRKLZZQaA'),
   createElevenLabsVoice('Alma', 'female', '3ttovAt5bt3Kk38UGIob'),
-  createElevenLabsVoice('Beto', 'male', 'ukupJ4zdf9bo1Py6MiO6'),
-  createElevenLabsVoice('Alessio', 'male', '8MlXhVr7f7x9lck6CiCF'),
+  createElevenLabsVoice('Antonio', 'male', 'htFfPSZGJwjBv1CL0aMD'),
+  createElevenLabsVoice('Mario', 'male', 'tomkxGQGz4b1kE0EM722'),
 ];
 
 // French (France) — all 4 native French speakers
@@ -143,7 +143,7 @@ const ELEVENLABS_VOICES_FR: Voice[] = [
   createElevenLabsVoice('Anna', 'female', 'nVPCtAFzgyMX3FZKNzH0'),
 ];
 
-// German (Germany) — Juniper + Arabella + Irene (F); Alexander + Narration (M).
+// German (Germany) — native German speakers (2F + 2M).
 const ELEVENLABS_VOICES_DE: Voice[] = [
   createElevenLabsVoice('Ben', 'male', 'aTTiK3YzK3dXETpuDE2h'),
   createElevenLabsVoice('Irene', 'female', '8wPhfH9uUzEMHTmRkoAR'),
@@ -180,7 +180,7 @@ const ELEVENLABS_VOICES_HI: Voice[] = [
   createElevenLabsVoice('Monika', 'female', '1qEiC6qsybMkmnNdVMbK'),
   createElevenLabsVoice('Devi', 'female', 'MF4J4IDTRo0AxOO4dpFR'),
   createElevenLabsVoice('Niraj', 'male', 'zgqefOY5FPQ3bB7OZTVR'),
-  createElevenLabsVoice('Leo', 'male', 'IvLWq57RKibBrqZGpQrC'),
+  createElevenLabsVoice('Bunty', 'male', 'ibbx9zDYGvLgtYzRbqqG'),
 ];
 
 // Chinese (Mandarin) — Stacy (native) + Jane (multilingual); Martin Li + Haytham.
@@ -199,7 +199,7 @@ const ELEVENLABS_VOICES_JA: Voice[] = [
   createElevenLabsVoice('Kozy', 'male', 'GxxMAMfQkDlnqjpzjLHH'),
 ];
 
-// Korean — Arabella + native JiYoung; native KKC.
+// Korean — native JiYoung (F) + native KKC (M).
 const ELEVENLABS_VOICES_KO: Voice[] = [
   createElevenLabsVoice('JiYoung', 'female', 'AW5wrnG1jVizOYY7R1Oo'),
   createElevenLabsVoice('KKC', 'male', '1W00IGEmNmwmsDeYy7ag'),
@@ -211,7 +211,7 @@ const ELEVENLABS_VOICES_VI: Voice[] = [
   createElevenLabsVoice('Ninh', 'male', 'aN7cv9yXNrfIR87bDmyD'),
 ];
 
-// Swedish — Arabella + Jane; James.
+// Swedish — Jane + native Sanna/Louise (F); native Peter/Martin (M).
 const ELEVENLABS_VOICES_SV: Voice[] = [
 
   createElevenLabsVoice('Jane', 'female', 'RILOU7YmBhvwJGDGjNmP'),
