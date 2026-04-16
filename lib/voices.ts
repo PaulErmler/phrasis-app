@@ -201,14 +201,16 @@ const ELEVENLABS_VOICES_JA: Voice[] = [
 
 // Korean — native JiYoung (F) + native KKC (M).
 const ELEVENLABS_VOICES_KO: Voice[] = [
-  createElevenLabsVoice('JiYoung', 'female', 'AW5wrnG1jVizOYY7R1Oo'),
-  createElevenLabsVoice('KKC', 'male', '1W00IGEmNmwmsDeYy7ag'),
+  createElevenLabsVoice('Han', 'female', '8jHHF8rMqMlg8if2mOUe'),
+  createElevenLabsVoice('Hyuk', 'male', 'ZJCNdZEjYwkOElxugmW2'),
 ];
 
 // Vietnamese — 2 native Vietnamese speakers. 1F + 1M.
 const ELEVENLABS_VOICES_VI: Voice[] = [
   createElevenLabsVoice('Nhu', 'female', 'A5w1fw5x0uXded1LDvZp'),
   createElevenLabsVoice('Ninh', 'male', 'aN7cv9yXNrfIR87bDmyD'),
+  createElevenLabsVoice('Chris', 'male', 'PDoCXqBQFGsvfO0hNkEs'),
+  createElevenLabsVoice('Seo', 'female', 'o2sPqaz4lRxUCRm2QqQK'),
 ];
 
 // Swedish — Jane + native Sanna/Louise (F); native Peter/Martin (M).

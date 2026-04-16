@@ -56,10 +56,12 @@ function findCurrentIndex(words: AlignedWord[], t: number): number {
 const MIN_MATCH_RATIO = 0.5;
 
 /**
- * Karaoke-style text: past words fade, current word is primary-coloured,
- * future words stay at reading weight. Always renders the canonical text from
- * the database — Scribe's timings are aligned onto those tokens, never shown
- * directly, so transcription drift can't change what the user reads.
+ * Karaoke-style text: the current word is primary-coloured, every other word
+ * renders as plain default text — same as before play and after the audio
+ * ends, so the rendered output is identical in those two states. Always
+ * renders the canonical text from the database; Scribe's timings are aligned
+ * onto those tokens but never shown directly, so transcription drift can't
+ * change what the user reads.
  */
 export function HighlightedText({
   text,
