@@ -185,9 +185,9 @@ const ELEVENLABS_VOICES_HI: Voice[] = [
 
 // Chinese (Mandarin) — Stacy (native) + Jane (multilingual); Martin Li + Haytham.
 const ELEVENLABS_VOICES_ZH: Voice[] = [
-  createElevenLabsVoice('Stacy', 'female', 'hkfHEbBvdQFNX4uWHqRF'),
+  createElevenLabsVoice('Amy', 'female', 'bhJUNIXWQQ94l8eI2VUf'),
   createElevenLabsVoice('Jane', 'female', 'RILOU7YmBhvwJGDGjNmP'),
-  createElevenLabsVoice('Martin Li', 'male', 'WuLq5z7nEcrhppO0ZQJw'),
+  createElevenLabsVoice('Jin', 'male', 'vZZLclMx4wouUtKBRfZn'),
   createElevenLabsVoice('Haytham', 'male', 'IES4nrmZdUBHByLBde0P'),
 ];
 
