@@ -11,6 +11,10 @@ export const OPENROUTER_MODELS = {
   translationAutoFill: 'google/gemini-3-flash-preview',
   /** Short thread title from first user message */
   threadTitle: 'google/gemini-3.1-flash-lite-preview',
+  /** Lenient TTS validation — decides whether a Scribe transcription is
+   *  semantically equivalent to the original (ignores phonetic name
+   *  spellings, digits-vs-words, punctuation, etc.). */
+  ttsValidation: 'google/gemini-3.1-flash-lite-preview',
 } as const;
 
 /** Provider routing for the chat agent via OpenRouter.

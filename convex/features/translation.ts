@@ -9,11 +9,7 @@
  * and greek-utils for Greek phonetic Latin.
  */
 
-import { convert as romanizeHangul } from 'hangul-romanization';
-// @ts-expect-error no type declarations for chinese-to-pinyin
-import pinyin from 'chinese-to-pinyin';
-// @ts-expect-error no type declarations for greek-utils
-import greekUtils from 'greek-utils';
+import { romanizeLocal } from '../lib/localRomanization';
 import { SignJWT, importPKCS8 } from 'jose';
 
 /**
@@ -175,17 +171,8 @@ export async function romanizeText(
   text: string,
   sourceLanguage: string,
 ): Promise<string> {
-  if (sourceLanguage === 'zh') {
-    return pinyin(text) as string;
-  }
-
-  if (sourceLanguage === 'el') {
-    return greekUtils.toPhoneticLatin(text);
-  }
-
-  if (sourceLanguage === 'ko') {
-    return romanizeHangul(text);
-  }
+  const local = romanizeLocal(text, sourceLanguage);
+  if (local !== null) return local;
 
   const { token, projectId } = await getGoogleAccessToken();
   const url = `https://translation.googleapis.com/v3/projects/${projectId}/locations/global:romanizeText`;

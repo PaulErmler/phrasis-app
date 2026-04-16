@@ -8,7 +8,8 @@ import {
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import { synthesizeSpeech, transcribeAudio, type WordTiming } from './tts';
-import { textsMatch } from '../lib/textComparison';
+import { textsMatchForLanguage } from '../lib/textComparison';
+import { textsMatchSemantic } from '../lib/ttsSemanticValidation';
 import {
   ttsQualityValidator,
   ttsProviderValidator,
@@ -16,7 +17,7 @@ import {
 } from '../types';
 import type { TtsProvider, VoiceGender } from '../types';
 
-const MAX_TTS_VALIDATION_ATTEMPTS = 2;
+const MAX_TTS_VALIDATION_ATTEMPTS = 3;
 const TTS_CLAIM_STALE_MS = 30 * 1000; // 30 seconds
 
 /**
@@ -148,7 +149,26 @@ async function synthesizeAndValidate(
         blob,
         args.language,
       );
-      if (textsMatch(args.text, transcribed)) {
+
+      // Cheap strict check first. For Chinese/Korean this compares
+      // pinyin/hangul-romanized strings so Scribe's homophone-character
+      // substitutions pass at edit distance 0. If strict still fails, ask
+      // Gemini — which also tolerates phonetic names, digits-vs-words,
+      // abbreviations, diacritic drift, and single-char noise. Only
+      // regenerate if both say no. Gemini errors fall back to the strict
+      // verdict (already "no match" at this point), so a flaky LLM can't
+      // let bad audio through.
+      let isMatch = textsMatchForLanguage(args.text, transcribed, args.language);
+      if (!isMatch) {
+        const semantic = await textsMatchSemantic(
+          args.text,
+          transcribed,
+          args.language,
+        );
+        if (semantic === 'match') isMatch = true;
+      }
+
+      if (isMatch) {
         return { validated: true, lastStorageId, wordTimings };
       }
       console.warn(

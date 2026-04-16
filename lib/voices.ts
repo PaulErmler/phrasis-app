@@ -179,7 +179,7 @@ const ELEVENLABS_VOICES_HI: Voice[] = [
   createElevenLabsVoice('Monika', 'female', '1qEiC6qsybMkmnNdVMbK'),
   createElevenLabsVoice('Devi', 'female', 'MF4J4IDTRo0AxOO4dpFR'),
   createElevenLabsVoice('Niraj', 'male', 'zgqefOY5FPQ3bB7OZTVR'),
-  createElevenLabsVoice('Bunty', 'male', 'ibbx9zDYGvLgtYzRbqqG'),
+  createElevenLabsVoice('Leo', 'male', 'IvLWq57RKibBrqZGpQrC'),
 ];
 
 // Chinese (Mandarin) — Stacy (native) + Jane (multilingual); Martin Li + Haytham.
@@ -218,15 +218,13 @@ const ELEVENLABS_VOICES_SV: Voice[] = [
   createElevenLabsVoice('Roberta', 'female', 'UgBBYS2sOqTuMpoF3BR0'), 
   createElevenLabsVoice('Louise', 'female', 'QLfvbukvQvrPOx9HXQ3x'), 
   createElevenLabsVoice('Martin', 'male', 'CuaAIFbkzX2kaNH5EtHZ'),
-  createElevenLabsVoice('Antonio', 'male', 'htFfPSZGJwjBv1CL0aMD'),
+  createElevenLabsVoice('Andres', 'male', 'hMTrLL2ZiyJiyKrdg2z4'),
 ];
 
 // Finnish — 4 native speakers.
 const ELEVENLABS_VOICES_FI: Voice[] = [
-  createElevenLabsVoice('Lea', 'female', '7eVMgwCnXydb3CikjV7a'),
-  createElevenLabsVoice('Amy', 'female', 'bhJUNIXWQQ94l8eI2VUf'),
-  createElevenLabsVoice('Emilio', 'male', 'ZCh4e9eZSUf41K4cmCEL'),
-  createElevenLabsVoice('Rahul', 'male', 'u7bRcYbD7visSINTyAT8'),
+  createElevenLabsVoice('Aurora', 'female', 'YSabzCJMvEHDduIDMdwV'),
+  createElevenLabsVoice('Miika', 'male', 'fC33e0BIKA7wWK2MeARj'),
 ];
 
 // Dutch (Netherlands) — 4 native Dutch speakers.
@@ -240,8 +238,7 @@ const ELEVENLABS_VOICES_NL: Voice[] = [
 // Greek — 4 native Greek speakers.
 const ELEVENLABS_VOICES_EL: Voice[] = [
   createElevenLabsVoice('Sophie', 'female', '7smwXrU3C1PfaspIIUZB'),
-  createElevenLabsVoice('Hope', 'female', 'tnSpp4vdxKPjI9w0GnoV'),
-  createElevenLabsVoice('Theos', 'male', 'n0vzWypeCK1NlWPVwhOc'),
+  createElevenLabsVoice('Eugene', 'male', '5DAtyqt3LGjv9jkjNVFd'),
   createElevenLabsVoice('Christos', 'male', 'PaZ8laODC1yRxHTPYJFh'),
 ];
 

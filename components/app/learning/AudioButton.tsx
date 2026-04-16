@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { getLanguageShortLabel } from '@/lib/languages';
+import { computeAttenuation, getPeak } from '@/lib/audio/peakCache';
 
 export interface AudioButtonProps {
   url: string | null;
@@ -100,6 +101,12 @@ export function AudioButton({
           setIsLoading(false);
           onStopRef.current?.(language);
         };
+      }
+      try {
+        const peak = await getPeak(url);
+        audioRef.current.volume = computeAttenuation(peak);
+      } catch (peakErr) {
+        console.warn('Peak measurement failed; playing at native volume', peakErr);
       }
       // Reusing a completed audio element: explicitly rewind so consecutive
       // replays actually play (and so the first onTimeUpdate broadcasts 0,

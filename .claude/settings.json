@@ -14,7 +14,13 @@
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
       "Bash(grep -n \"import.*getLanguageShortLabel\" /Users/paulermler/Documents/Phrasis/new/phrasis-app/components/app/*.tsx)",
       "Bash(pnpm test:app -- alignTimings activeClip use-button-playback HighlightedText)",
-      "Bash(pnpm test:convex -- ttsProcessing)"
+      "Bash(pnpm test:convex -- ttsProcessing)",
+      "Bash(grep -r \"playbackRate\\\\|speed\\\\|tempo\" /Users/paulermler/Documents/Phrasis/new/phrasis-app --include=\"*.ts\" --include=\"*.tsx\" ! -path \"*/node_modules/*\")",
+      "Bash(grep -r \"import.*from.*soundtouch\\\\|import.*from.*tone\\\\|import.*from.*wavesurfer\" /Users/paulermler/Documents/Phrasis/new/phrasis-app --include=\"*.ts\" --include=\"*.tsx\" ! -path \"*/node_modules/*\")",
+      "Bash(grep -r \"LearningModeSettings\\\\|CourseSettings\\\\|playbackRate\\\\|speed\" /Users/paulermler/Documents/Phrasis/new/phrasis-app --include=\"*.tsx\" ! -path \"*/node_modules/*\" -l)",
+      "Bash(grep -r \"soundtouch\\\\|SoundTouch\" /Users/paulermler/Documents/Phrasis/new/phrasis-app --include=\"*.ts\" --include=\"*.tsx\" ! -path \"*/node_modules/*\")",
+      "Bash(npx vitest:*)",
+      "Bash(pnpm test:convex -- scheduling ttsProcessing)"
     ]
   }
 }

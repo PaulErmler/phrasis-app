@@ -532,6 +532,20 @@ export const editCard = mutation({
         userId,
         collectionId: text.collectionId,
         collectionRank: text.collectionRank,
+        // This row is a logical copy of `text` — the user only edited
+        // translations, not the source — so preserve all pipeline-derived
+        // metadata rather than regenerating it. speakerGender specifically
+        // also prevents the downstream `scheduleMissingContent` sweep from
+        // coin-flipping a new gender that disagrees with the copied audio
+        // rows and deletes them.
+        speakerGender: text.speakerGender,
+        audioSpeakerGender: text.audioSpeakerGender,
+        register: text.register,
+        addresseeNumber: text.addresseeNumber,
+        addresseeGender: text.addresseeGender,
+        tenseAspect: text.tenseAspect,
+        sentenceType: text.sentenceType,
+        literalFigurative: text.literalFigurative,
       });
       resolvedTextId = newTextId;
 
@@ -566,6 +580,10 @@ export const editCard = mutation({
             voiceName: row.voiceName,
             storageId: row.storageId,
             ttsQuality: row.ttsQuality,
+            ttsProvider: row.ttsProvider,
+            voiceGender: row.voiceGender,
+            speed: row.speed,
+            wordTimings: row.wordTimings,
           });
         }
       }

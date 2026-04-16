@@ -9,6 +9,11 @@ import {
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
 } from '@/lib/constants/audioPlayback';
+import {
+  computeGain,
+  computePeakFromBuffer,
+  getDecodeContext,
+} from '@/lib/audio/peakCache';
 
 export interface ResolvedAudioSettings {
   reps: Record<string, number>;
@@ -51,15 +56,6 @@ export interface MergeResult {
  * into an OfflineAudioContext matching the playback sequence defined by the
  * user's settings (repetitions, pauses between languages, etc.).
  */
-let sharedCtx: AudioContext | null = null;
-
-function getDecodeContext(): AudioContext {
-  if (!sharedCtx || sharedCtx.state === 'closed') {
-    sharedCtx = new AudioContext();
-  }
-  return sharedCtx;
-}
-
 export async function mergeCardAudio(
   audioRecordings: CardAudioRecording[],
   orderedBase: string[],
@@ -105,6 +101,7 @@ export async function mergeCardAudio(
         if (signal?.aborted) return;
         const audioBuf = await ctx.decodeAudioData(arrayBuf);
         decoded.set(url, audioBuf);
+        computePeakFromBuffer(audioBuf, url);
       }),
     );
 
@@ -114,7 +111,7 @@ export async function mergeCardAudio(
     const repPause = (lang: string) =>
       settings.repPauses[lang] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
 
-    type ScheduledClip = { buffer: AudioBuffer; startSec: number };
+    type ScheduledClip = { buffer: AudioBuffer; startSec: number; gain: number };
     const clips: ScheduledClip[] = [];
     const languageCues: LanguageCue[] = [];
     let cursor = 0; // seconds
@@ -127,10 +124,12 @@ export async function mergeCardAudio(
         const entry = entries[i];
         const buffer = decoded.get(entry.url);
         if (!buffer) continue;
+        const peak = computePeakFromBuffer(buffer, entry.url);
+        const gain = computeGain(peak);
 
         for (let r = 0; r < entry.reps; r++) {
           languageCues.push({ language: entry.language, startSec: cursor });
-          clips.push({ buffer, startSec: cursor });
+          clips.push({ buffer, startSec: cursor, gain });
           cursor += buffer.duration;
           if (r < entry.reps - 1) {
             cursor += repPause(entry.language);
@@ -166,7 +165,10 @@ export async function mergeCardAudio(
     for (const clip of clips) {
       const source = offline.createBufferSource();
       source.buffer = clip.buffer;
-      source.connect(offline.destination);
+      const gainNode = offline.createGain();
+      gainNode.gain.value = clip.gain;
+      source.connect(gainNode);
+      gainNode.connect(offline.destination);
       source.start(clip.startSec);
     }
 
