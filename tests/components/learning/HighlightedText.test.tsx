@@ -82,7 +82,7 @@ describe('HighlightedText', () => {
     expect(container.querySelectorAll('span')).toHaveLength(3);
   });
 
-  it('applies the current/past/future class set based on localTime', () => {
+  it('only the current word gets the primary class; past/future render as default', () => {
     // timings: hola=[0,0.5], mundo=[0.5,1.0], bonito=[1.0,1.5]
     // At localTime=0.7 the current word is "mundo".
     const { container } = render(
@@ -95,9 +95,50 @@ describe('HighlightedText', () => {
       />,
     );
     const spans = container.querySelectorAll('span');
-    expect(spans[0].className).toContain('text-foreground/40'); // past
-    expect(spans[1].className).toContain('text-primary'); // current
-    expect(spans[2].className).toContain('text-foreground/80'); // future
+    expect(spans[0].className).not.toContain('text-primary');
+    expect(spans[0].className).not.toContain('text-foreground');
+    expect(spans[1].className).toContain('text-primary');
+    expect(spans[2].className).not.toContain('text-primary');
+    expect(spans[2].className).not.toContain('text-foreground');
+  });
+
+  it('reuses the same span elements when localTime advances within the same word', () => {
+    // Two ticks that both map to currentIndex=1 ("mundo") must produce the
+    // exact same DOM nodes — that's what proves the per-frame reconciliation
+    // is gated on currentIndex, not localTime, which is the flicker fix.
+    const props = {
+      text: 'hola mundo bonito',
+      wordTimings: timings('hola mundo bonito'),
+      isActive: true,
+      enabled: true,
+    } as const;
+    const { container, rerender } = render(
+      <HighlightedText {...props} localTime={0.6} />,
+    );
+    const before = Array.from(container.querySelectorAll('span'));
+    rerender(<HighlightedText {...props} localTime={0.9} />);
+    const after = Array.from(container.querySelectorAll('span'));
+    expect(after).toHaveLength(before.length);
+    after.forEach((span, i) => {
+      expect(span).toBe(before[i]);
+      expect(span.className).toBe(before[i].className);
+    });
+  });
+
+  it('renders the same DOM after isActive flips false as before play started', () => {
+    const props = {
+      text: 'hola mundo bonito',
+      wordTimings: timings('hola mundo bonito'),
+      enabled: true,
+      localTime: 0,
+    } as const;
+    const { container, rerender } = render(
+      <HighlightedText {...props} isActive={false} />,
+    );
+    const beforePlay = container.innerHTML;
+    rerender(<HighlightedText {...props} localTime={0.7} isActive={true} />);
+    rerender(<HighlightedText {...props} isActive={false} />);
+    expect(container.innerHTML).toBe(beforePlay);
   });
 
   it('clears the highlight once localTime passes the last word\'s end', () => {

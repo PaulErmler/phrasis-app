@@ -87,30 +87,29 @@ export function HighlightedText({
     [isActive, canHighlight, aligned, localTime],
   );
 
+  // Memoized on currentIndex (not localTime), so 60 Hz ticks that fall inside
+  // the same word reuse the cached children — React skips reconciliation of
+  // every span every frame, which is the main mobile flicker source. When
+  // currentIndex does change, only the previously-current and newly-current
+  // spans get a different className; the rest diff to a no-op.
+  const wordSpans = useMemo(() => {
+    return aligned.map((w, i) => (
+      <span
+        key={i}
+        className={cn(
+          'transition-colors duration-200',
+          i === currentIndex && 'text-primary',
+        )}
+      >
+        {w.leading}
+        {w.display}
+      </span>
+    ));
+  }, [aligned, currentIndex]);
+
   if (!enabled || !canHighlight || !isActive) {
     return <p className={className}>{fallback ?? text}</p>;
   }
 
-  return (
-    <p className={className}>
-      {aligned.map((w, i) => {
-        const isCurrent = i === currentIndex;
-        const isPast = i < currentIndex;
-        const cls = isCurrent
-          ? 'text-primary'
-          : isPast
-            ? 'text-foreground/40'
-            : 'text-foreground/80';
-        return (
-          <span
-            key={i}
-            className={cn('transition-colors duration-200', cls)}
-          >
-            {w.leading}
-            {w.display}
-          </span>
-        );
-      })}
-    </p>
-  );
+  return <p className={className}>{wordSpans}</p>;
 }
