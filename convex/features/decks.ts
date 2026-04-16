@@ -1430,6 +1430,17 @@ export const storeAudioRecording = internalMutation({
     ttsProvider: v.optional(ttsProviderValidator),
     voiceGender: voiceGenderValidator,
     speed: v.number(),
+    // Word-level timestamps from Scribe, captured during validation. Omit to
+    // clear any existing timings (e.g. on a voice swap where they'd be stale).
+    wordTimings: v.optional(
+      v.array(
+        v.object({
+          word: v.string(),
+          start: v.number(),
+          end: v.number(),
+        }),
+      ),
+    ),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1458,6 +1469,7 @@ export const storeAudioRecording = internalMutation({
         ttsProvider: args.ttsProvider,
         voiceGender: args.voiceGender,
         speed: args.speed,
+        wordTimings: args.wordTimings,
       });
       return null;
     }
@@ -1473,6 +1485,7 @@ export const storeAudioRecording = internalMutation({
       ttsProvider: args.ttsProvider,
       voiceGender: args.voiceGender,
       speed: args.speed,
+      wordTimings: args.wordTimings,
     });
     if (previousStorageId !== args.storageId) {
       await ctx.storage.delete(previousStorageId);

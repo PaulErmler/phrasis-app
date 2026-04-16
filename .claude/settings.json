@@ -8,7 +8,11 @@
       "WebFetch(domain:help.elevenlabs.io)",
       "WebFetch(domain:json2video.com)",
       "WebFetch(domain:elevenlabs-sdk.mintlify.app)",
-      "WebFetch(domain:gist.github.com)"
+      "WebFetch(domain:gist.github.com)",
+      "Read(//Users/paulermler/.claude/skills/**)",
+      "Read(//Users/paulermler/.claude/**)",
+      "Bash(pnpm lint:*)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
     ]
   }
 }

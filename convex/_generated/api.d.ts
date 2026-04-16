@@ -41,6 +41,7 @@ import type * as features_customTexts from "../features/customTexts.js";
 import type * as features_decks from "../features/decks.js";
 import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_library from "../features/library.js";
+import type * as features_prototypes from "../features/prototypes.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_sentenceMetadata from "../features/sentenceMetadata.js";
 import type * as features_stats from "../features/stats.js";
@@ -110,6 +111,7 @@ declare const fullApi: ApiFromModules<{
   "features/decks": typeof features_decks;
   "features/featureIds": typeof features_featureIds;
   "features/library": typeof features_library;
+  "features/prototypes": typeof features_prototypes;
   "features/scheduling": typeof features_scheduling;
   "features/sentenceMetadata": typeof features_sentenceMetadata;
   "features/stats": typeof features_stats;

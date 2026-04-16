@@ -28,6 +28,3 @@ export const OPENROUTER_CHAT_EXTRA_BODY = {
     preferred_min_throughput: 40,
   },
 } as const;
-
-/** OpenAI Audio API — speech-to-text */
-export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-transcribe';

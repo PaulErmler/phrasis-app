@@ -1,28 +1,10 @@
+import { v, ConvexError } from 'convex/values';
 import { action, internalMutation } from '../../_generated/server';
 import { internal } from '../../_generated/api';
-import { v, ConvexError } from 'convex/values';
 import { requireAuthUserId } from '../../db/users';
 import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
-
-const MIME_TO_EXT: Record<string, string> = {
-  'audio/webm': 'webm',
-  'audio/mp4': 'mp4',
-  'audio/aac': 'aac',
-  'audio/ogg': 'ogg',
-  'audio/mpeg': 'mp3',
-  'audio/wav': 'wav',
-  'audio/flac': 'flac',
-  'audio/x-m4a': 'm4a',
-  'audio/x-caf': 'caf',
-  'audio/mp4;codecs=mp4a.40.2': 'mp4',
-  'audio/webm;codecs=opus': 'webm',
-};
-
-function extForMime(mime: string): string {
-  const base = mime.split(';')[0].trim();
-  return MIME_TO_EXT[mime] ?? MIME_TO_EXT[base] ?? 'webm';
-}
+import { transcribeAudio as transcribeWithScribe } from '../tts';
 
 export const consumeTranscriptionQuota = internalMutation({
   args: { userId: v.string() },
@@ -34,9 +16,9 @@ export const consumeTranscriptionQuota = internalMutation({
 });
 
 /**
- * Transcribe audio using OpenAI Transcription API.
- * Calls the API directly to ensure the correct MIME type / file extension
- * is sent (the Vercel AI SDK's magic-byte detection fails for MP4 from iOS).
+ * Transcribe audio via ElevenLabs Scribe v2. Shared helper lives in
+ * `../tts.ts`; this action wraps it with auth + quota for chat voice input.
+ * Language is auto-detected (chat UI doesn't track source language).
  */
 export const transcribeAudio = action({
   args: {
@@ -52,34 +34,11 @@ export const transcribeAudio = action({
       { userId },
     );
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new ConvexError('OPENAI_API_KEY is not configured');
-
-    const rawMime = args.mimeType ?? 'audio/webm';
-    const baseMime = rawMime.split(';')[0].trim();
-    const ext = extForMime(rawMime);
-
     try {
+      const baseMime = (args.mimeType ?? 'audio/webm').split(';')[0].trim();
       const blob = new Blob([args.audio], { type: baseMime });
-      const file = new File([blob], `audio.${ext}`, { type: baseMime });
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('model', 'gpt-4o-transcribe');
-
-      const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${apiKey}` },
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`OpenAI transcription failed (${res.status}): ${body}`);
-      }
-
-      const data = (await res.json()) as { text: string };
-      return data.text;
+      const { text } = await transcribeWithScribe(blob);
+      return text;
     } catch (error) {
       console.error('Transcription error:', error);
       throw new ConvexError(

@@ -7,7 +7,7 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
-import { synthesizeSpeech, transcribeAudio } from './tts';
+import { synthesizeSpeech, transcribeAudio, type WordTiming } from './tts';
 import { textsMatch } from '../lib/textComparison';
 import {
   ttsQualityValidator,
@@ -102,7 +102,11 @@ async function synthesizeAndValidate(
     speed: number;
   },
   maxAttempts: number,
-): Promise<{ validated: boolean; lastStorageId: Id<'_storage'> | null }> {
+): Promise<{
+  validated: boolean;
+  lastStorageId: Id<'_storage'> | null;
+  wordTimings: WordTiming[] | null;
+}> {
   let lastStorageId: Id<'_storage'> | null = null;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const blob = await synthesizeSpeech(
@@ -140,9 +144,12 @@ async function synthesizeAndValidate(
     }
 
     try {
-      const transcribed = await transcribeAudio(blob, args.language);
+      const { text: transcribed, wordTimings } = await transcribeAudio(
+        blob,
+        args.language,
+      );
       if (textsMatch(args.text, transcribed)) {
-        return { validated: true, lastStorageId };
+        return { validated: true, lastStorageId, wordTimings };
       }
       console.warn(
         `TTS validation mismatch (attempt ${attempt + 1}/${maxAttempts})`,
@@ -164,7 +171,7 @@ async function synthesizeAndValidate(
       );
     }
   }
-  return { validated: false, lastStorageId };
+  return { validated: false, lastStorageId, wordTimings: null };
 }
 
 /**
@@ -190,11 +197,8 @@ export const processTTSForCard = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
-      const { validated, lastStorageId } = await synthesizeAndValidate(
-        ctx,
-        args,
-        MAX_TTS_VALIDATION_ATTEMPTS,
-      );
+      const { validated, lastStorageId, wordTimings } =
+        await synthesizeAndValidate(ctx, args, MAX_TTS_VALIDATION_ATTEMPTS);
 
       if (!validated) {
         console.error(
@@ -216,6 +220,9 @@ export const processTTSForCard = internalAction({
           ttsProvider: args.provider,
           voiceGender: args.voiceGender,
           speed: args.speed,
+          // Only persist timings alongside validated audio — mismatched
+          // transcriptions point to the wrong words.
+          wordTimings: validated && wordTimings ? wordTimings : undefined,
         });
       } else {
         console.error('[ttsProcess] No storageId produced, audio will be missing', {

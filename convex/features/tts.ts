@@ -6,10 +6,12 @@
  * in ../lib/textComparison.ts and are re-exported here for convenience.
  */
 
-import { OPENAI_TRANSCRIPTION_MODEL } from '../config/aiModels';
 import type { TtsProvider } from '../types';
 
 export { normalizeForComparison, textsMatch } from '../lib/textComparison';
+
+/** Word-level timing returned by Scribe, relative to the audio blob (seconds). */
+export type WordTiming = { word: string; start: number; end: number };
 
 /** Google TTS API response type */
 interface GoogleTTSResponse {
@@ -151,51 +153,70 @@ async function synthesizeElevenLabs(
   return new Blob([bytes], { type: 'audio/mp3' });
 }
 
-/**
- * OpenAI audio transcription expects an ISO-639-1 language code (e.g. `es`).
- * App-internal codes (e.g. `es_latam` for Latin American Spanish) must map to
- * that form — regional Spanish variants still use `es` for the API.
- *
- * @see https://platform.openai.com/docs/guides/speech-to-text
- */
-function toOpenAITranscriptionLanguage(internalCode: string): string {
-  const map: Record<string, string> = {
-    es_latam: 'es',
-  };
-  return map[internalCode] ?? internalCode;
+/** Shape of a word returned by Scribe. `start`/`end` are seconds. */
+interface ScribeWord {
+  text: string;
+  start?: number;
+  end?: number;
+  type: 'word' | 'spacing' | 'audio_event';
+}
+
+interface ScribeResponse {
+  text: string;
+  words: ScribeWord[];
+  language_code?: string;
 }
 
 /**
- * Transcribe an audio Blob via the OpenAI transcriptions API.
- * Used internally for TTS validation — no auth or quota checks.
+ * Transcribe an audio Blob via the ElevenLabs Scribe v2 API. Used internally
+ * for TTS validation — no auth or quota checks. Returns the transcribed text
+ * plus word-level timestamps so callers can persist alignment alongside the
+ * audio for later playback highlighting.
+ *
+ * `languageCode` is optional: when omitted, Scribe auto-detects. Callers that
+ * know the language (e.g. the TTS validation loop) should pass it for better
+ * accuracy. Uses raw `fetch` (like the TTS call above) so this file stays
+ * V8-runtime-compatible — the ElevenLabs SDK pulls in Node built-ins.
  */
 export async function transcribeAudio(
   blob: Blob,
-  languageCode: string,
-): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
+  languageCode?: string,
+): Promise<{ text: string; wordTimings: WordTiming[] }> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
 
-  const openAiLang = toOpenAITranscriptionLanguage(languageCode);
-
-  const file = new File([blob], 'audio.mp3', { type: 'audio/mp3' });
   const formData = new FormData();
-  formData.append('file', file);
-  formData.append('model', OPENAI_TRANSCRIPTION_MODEL);
-  formData.append('language', openAiLang);
+  formData.append('file', blob, 'audio.mp3');
+  formData.append('model_id', 'scribe_v2');
+  formData.append('tag_audio_events', 'true');
+  formData.append('diarize', 'true');
+  formData.append('timestamps_granularity', 'word');
+  if (languageCode) {
+    formData.append('language_code', toElevenLabsLanguageCode(languageCode));
+  }
 
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+  const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: { 'xi-api-key': apiKey },
     body: formData,
   });
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`OpenAI transcription failed (${res.status}): ${body}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `ElevenLabs Scribe API error: ${response.status} - ${errorText}`,
+    );
   }
 
-  const data = (await res.json()) as { text: string };
-  return data.text;
+  const data = (await response.json()) as ScribeResponse;
+
+  const wordTimings: WordTiming[] = [];
+  for (const w of data.words) {
+    if (w.type !== 'word') continue;
+    if (w.start === undefined || w.end === undefined) continue;
+    wordTimings.push({ word: w.text, start: w.start, end: w.end });
+  }
+
+  return { text: data.text, wordTimings };
 }
 
