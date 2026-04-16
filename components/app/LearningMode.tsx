@@ -174,6 +174,12 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         showRomanization={state.courseSettings.showRomanization ?? true}
         cardId={state.cardId}
         shortcutsDisabled={state.settingsOpen || editDialogOpen}
+        highlightEnabled={state.courseSettings.highlightWords !== false}
+        mergedPlayback={{
+          isPlaying: audio.isPlaying,
+          currentTime: audio.currentTime,
+          languageCues: audio.languageCues,
+        }}
       />
     ) : (
       <LearningCardContent
@@ -197,6 +203,12 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         showRomanization={state.courseSettings.showRomanization ?? true}
         revealAllSignal={audioRevealNonce}
         onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
+        highlightEnabled={state.courseSettings.highlightWords !== false}
+        mergedPlayback={{
+          isPlaying: audio.isPlaying,
+          currentTime: audio.currentTime,
+          languageCues: audio.languageCues,
+        }}
       />
     );
 

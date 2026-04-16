@@ -1,7 +1,10 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { usePaginatedQuery, useMutation } from 'convex/react';
+import { usePaginatedQuery, useMutation, usePreloadedQuery } from 'convex/react';
+import { useAppData } from '@/components/app/AppDataProvider';
+import { useButtonPlayback } from '@/hooks/use-button-playback';
+import { HighlightedText } from '@/components/app/learning/HighlightedText';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import {
@@ -21,7 +24,6 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 import { AudioButton } from '@/components/app/learning/AudioButton';
-import { getLanguageShortLabel } from '@/lib/languages';
 import { CircleCheck, EyeOff, Star, Loader2 } from 'lucide-react';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
 import { highlightWord } from '@/lib/wordCloud';
@@ -39,6 +41,11 @@ export function WordSentencesDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { preloadedCourseSettings } = useAppData();
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
+  const highlightEnabled = courseSettings?.highlightWords !== false;
+  const buttonPlayback = useButtonPlayback();
+
   const { results, status, loadMore } = usePaginatedQuery(
     api.features.stats.getSentencesForWord,
     open ? { word, language } : 'skip',
@@ -199,14 +206,24 @@ export function WordSentencesDialog({
                       );
                       const isWordLanguage =
                         normalizeLanguageCode(tr.language) === normalizedLang;
+                      const isActive =
+                        buttonPlayback.active?.language === tr.language;
                       return (
                         <div key={tr.language} className="flex items-start gap-2">
                           <div className="flex-1">
-                            <p className="text-sm font-medium leading-relaxed">
-                              {isWordLanguage
-                                ? highlightWord(tr.text, word)
-                                : tr.text}
-                            </p>
+                            <HighlightedText
+                              text={tr.text}
+                              wordTimings={audio?.wordTimings ?? null}
+                              localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                              isActive={isActive}
+                              enabled={highlightEnabled}
+                              className="text-sm font-medium leading-relaxed"
+                              fallback={
+                                isWordLanguage
+                                  ? highlightWord(tr.text, word)
+                                  : undefined
+                              }
+                            />
                             {tr.romanization && (
                               <p className="text-romanization">
                                 {tr.romanization}
@@ -215,7 +232,9 @@ export function WordSentencesDialog({
                           </div>
                           <AudioButton
                             url={audio?.url ?? null}
-                            language={getLanguageShortLabel(tr.language)}
+                            language={tr.language}
+                            onTimeUpdate={buttonPlayback.onTimeUpdate}
+                            onStop={buttonPlayback.onStop}
                           />
                         </div>
                       );
@@ -232,14 +251,24 @@ export function WordSentencesDialog({
                       );
                       const isWordLanguage =
                         normalizeLanguageCode(tr.language) === normalizedLang;
+                      const isActive =
+                        buttonPlayback.active?.language === tr.language;
                       return (
                         <div key={tr.language} className="flex items-start gap-2">
                           <div className="flex-1">
-                            <p className="text-sm leading-relaxed">
-                              {isWordLanguage
-                                ? highlightWord(tr.text, word)
-                                : tr.text}
-                            </p>
+                            <HighlightedText
+                              text={tr.text}
+                              wordTimings={audio?.wordTimings ?? null}
+                              localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                              isActive={isActive}
+                              enabled={highlightEnabled}
+                              className="text-sm leading-relaxed"
+                              fallback={
+                                isWordLanguage
+                                  ? highlightWord(tr.text, word)
+                                  : undefined
+                              }
+                            />
                             {tr.romanization && (
                               <p className="text-romanization">
                                 {tr.romanization}
@@ -248,7 +277,9 @@ export function WordSentencesDialog({
                           </div>
                           <AudioButton
                             url={audio?.url ?? null}
-                            language={getLanguageShortLabel(tr.language)}
+                            language={tr.language}
+                            onTimeUpdate={buttonPlayback.onTimeUpdate}
+                            onStop={buttonPlayback.onStop}
                           />
                         </div>
                       );

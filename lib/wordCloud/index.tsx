@@ -102,7 +102,11 @@ export function highlightWord(text: string, word: string): React.ReactNode {
   const parts = text.split(regex);
   return parts.map((part, i) =>
     i % 2 === 1 ? (
-      <span key={i} className="text-primary">
+      <span
+        key={i}
+        className="font-medium"
+        style={{ color: 'var(--accent-orange)' }}
+      >
         {part}
       </span>
     ) : (

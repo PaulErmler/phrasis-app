@@ -128,9 +128,8 @@ export async function mergeCardAudio(
         const buffer = decoded.get(entry.url);
         if (!buffer) continue;
 
-        languageCues.push({ language: entry.language, startSec: cursor });
-
         for (let r = 0; r < entry.reps; r++) {
+          languageCues.push({ language: entry.language, startSec: cursor });
           clips.push({ buffer, startSec: cursor });
           cursor += buffer.duration;
           if (r < entry.reps - 1) {

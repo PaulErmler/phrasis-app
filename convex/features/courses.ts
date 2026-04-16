@@ -823,6 +823,7 @@ export const getActiveCourseSettings = query({
       cardsToAddBatchSize: v.optional(v.number()),
       autoAddCards: v.optional(v.boolean()),
       // Audio playback settings
+      highlightWords: v.optional(v.boolean()),
       autoPlayAudio: v.optional(v.boolean()),
       autoAdvance: v.optional(v.boolean()),
       languageRepetitions: v.optional(v.record(v.string(), v.number())),
@@ -877,6 +878,7 @@ export const updateCourseSettings = mutation({
     cardsToAddBatchSize: v.optional(v.number()),
     autoAddCards: v.optional(v.boolean()),
     // Audio playback settings
+    highlightWords: v.optional(v.boolean()),
     autoPlayAudio: v.optional(v.boolean()),
     autoAdvance: v.optional(v.boolean()),
     languageRepetitions: v.optional(v.record(v.string(), v.number())),
@@ -917,6 +919,7 @@ export const updateCourseSettings = mutation({
       'initialReviewCount',
       'cardsToAddBatchSize',
       'autoAddCards',
+      'highlightWords',
       'autoPlayAudio',
       'autoAdvance',
       'languageRepetitions',
@@ -957,6 +960,7 @@ export const updateCourseSettings = mutation({
           args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
         cardsToAddBatchSize: args.cardsToAddBatchSize,
         autoAddCards: args.autoAddCards,
+        highlightWords: args.highlightWords,
         autoPlayAudio: args.autoPlayAudio,
         autoAdvance: args.autoAdvance,
         languageRepetitions: args.languageRepetitions,

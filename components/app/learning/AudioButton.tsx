@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { getLanguageShortLabel } from '@/lib/languages';
 
 export interface AudioButtonProps {
   url: string | null;
+  /** Canonical language code (e.g. "en", "es_latam"). Broadcast verbatim through onTimeUpdate/onStop so consumers can match against translation.language. The visible label is derived via getLanguageShortLabel. */
   language: string;
   /** Show a text label next to the icon (used in DeckCardsView). Default: false */
   showLabel?: boolean;
@@ -13,6 +15,10 @@ export interface AudioButtonProps {
   stopPlayback?: boolean;
   /** Called just before this button starts playing audio (e.g. to stop the main player). */
   onPlay?: () => void;
+  /** rAF-frequency time updates while playing; used for word highlighting. */
+  onTimeUpdate?: (language: string, localTime: number) => void;
+  /** Fired when playback ends, is paused, or the component unmounts. */
+  onStop?: (language: string) => void;
 }
 
 export function AudioButton({
@@ -21,10 +27,16 @@ export function AudioButton({
   showLabel = false,
   stopPlayback = false,
   onPlay,
+  onTimeUpdate,
+  onStop,
 }: AudioButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const onTimeUpdateRef = useRef(onTimeUpdate);
+  onTimeUpdateRef.current = onTimeUpdate;
+  const onStopRef = useRef(onStop);
+  onStopRef.current = onStop;
 
   useEffect(() => {
     if (!stopPlayback || !audioRef.current) return;
@@ -32,7 +44,8 @@ export function AudioButton({
     audioRef.current.currentTime = 0;
     setIsPlaying(false);
     setIsLoading(false);
-  }, [stopPlayback]);
+    onStopRef.current?.(language);
+  }, [stopPlayback, language]);
 
   useEffect(() => {
     return () => {
@@ -44,8 +57,23 @@ export function AudioButton({
         audio.onerror = null;
       }
       audioRef.current = null;
+      onStopRef.current?.(language);
     };
-  }, []);
+  }, [language]);
+
+  // rAF-driven time broadcast while playing. Native `timeupdate` at ~4 Hz is
+  // too coarse for smooth per-word highlighting.
+  useEffect(() => {
+    if (!isPlaying) return;
+    let raf = 0;
+    const tick = () => {
+      const audio = audioRef.current;
+      if (audio) onTimeUpdateRef.current?.(language, audio.currentTime);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying, language]);
 
   const handlePlay = async () => {
     if (!url) return;
@@ -54,6 +82,7 @@ export function AudioButton({
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       setIsPlaying(false);
+      onStop?.(language);
       return;
     }
 
@@ -62,11 +91,21 @@ export function AudioButton({
     try {
       if (!audioRef.current || audioRef.current.src !== url) {
         audioRef.current = new Audio(url);
-        audioRef.current.onended = () => setIsPlaying(false);
+        audioRef.current.onended = () => {
+          setIsPlaying(false);
+          onStopRef.current?.(language);
+        };
         audioRef.current.onerror = () => {
           setIsPlaying(false);
           setIsLoading(false);
+          onStopRef.current?.(language);
         };
+      }
+      // Reusing a completed audio element: explicitly rewind so consecutive
+      // replays actually play (and so the first onTimeUpdate broadcasts 0,
+      // not the previous run's final position).
+      if (audioRef.current.ended) {
+        audioRef.current.currentTime = 0;
       }
       await audioRef.current.play();
       setIsPlaying(true);
@@ -121,7 +160,7 @@ export function AudioButton({
         className="gap-1 text-muted-foreground"
       >
         <Loader2 className="h-3 w-3 animate-spin" />
-        <span className="text-xs">Generating {language}...</span>
+        <span className="text-xs">Generating {getLanguageShortLabel(language)}...</span>
       </Button>
     );
   }
@@ -141,7 +180,7 @@ export function AudioButton({
       ) : (
         <Volume2 className="h-3 w-3" />
       )}
-      <span className="text-xs">{language}</span>
+      <span className="text-xs">{getLanguageShortLabel(language)}</span>
     </Button>
   );
 }

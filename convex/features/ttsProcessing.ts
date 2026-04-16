@@ -325,6 +325,92 @@ export const storeTtsMismatch = internalMutation({
 });
 
 /**
+ * Backfill word-level timestamps for an existing audio recording that was
+ * generated before the Scribe integration (no `wordTimings` field). Called
+ * from `scheduleMissingContent` after acquiring a TTS claim on (textId, lang).
+ *
+ * Re-downloads the stored audio blob, runs it through Scribe, and persists
+ * the resulting timings — but only if the storageId still matches, so a
+ * concurrent voice swap doesn't get clobbered with stale alignment.
+ */
+export const backfillWordTimings = internalAction({
+  args: {
+    textId: v.id('texts'),
+    language: v.string(),
+    storageId: v.id('_storage'),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    try {
+      const blob = await ctx.storage.get(args.storageId);
+      if (!blob) {
+        console.warn('[backfillWordTimings] audio blob missing', {
+          textId: args.textId,
+          language: args.language,
+        });
+        return null;
+      }
+      const { wordTimings } = await transcribeAudio(blob, args.language);
+      if (wordTimings.length === 0) return null;
+      await ctx.runMutation(
+        internal.features.ttsProcessing.persistBackfilledWordTimings,
+        {
+          textId: args.textId,
+          language: args.language,
+          storageId: args.storageId,
+          wordTimings,
+        },
+      );
+    } catch (err) {
+      console.error('[backfillWordTimings] failed', {
+        textId: args.textId,
+        language: args.language,
+        error: err,
+      });
+    } finally {
+      await ctx.runMutation(
+        internal.features.ttsProcessing.releaseTtsClaim,
+        { textId: args.textId, language: args.language },
+      );
+    }
+    return null;
+  },
+});
+
+/**
+ * Persist word timings produced by `backfillWordTimings`. Guards against
+ * storage swaps: if the row's current `storageId` differs from the one we
+ * transcribed, the timings belong to a now-stale blob and are discarded.
+ */
+export const persistBackfilledWordTimings = internalMutation({
+  args: {
+    textId: v.id('texts'),
+    language: v.string(),
+    storageId: v.id('_storage'),
+    wordTimings: v.array(
+      v.object({
+        word: v.string(),
+        start: v.number(),
+        end: v.number(),
+      }),
+    ),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const record = await ctx.db
+      .query('audioRecordings')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('language', args.language),
+      )
+      .first();
+    if (!record) return null;
+    if (record.storageId !== args.storageId) return null;
+    await ctx.db.patch(record._id, { wordTimings: args.wordTimings });
+    return null;
+  },
+});
+
+/**
  * Release a TTS generation claim so the slot can be retried if needed.
  * Called from the processTTSForCard action's finally block.
  */

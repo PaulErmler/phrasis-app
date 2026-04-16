@@ -59,6 +59,7 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
         language: tr.language,
         voiceName: null,
         url: null,
+        wordTimings: null,
       }));
       const fullTargets = [
         { code: 'es', expected: t('mock.es'), typed: t('mock.typedEs') },
@@ -97,6 +98,7 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
       language: tr.language,
       voiceName: null,
       url: null,
+      wordTimings: null,
     }));
     const fullTargets = [
       { code: 'es', expected: t('mock.es'), typed: t('mock.typedEs') },

@@ -383,6 +383,8 @@
       "initialReviews": "Anfängliche Wiederholungen",
       "initialReviewsDescription": "Anzahl der anfänglichen Wiederholungen für neue Sätze",
       "audioPlayback": "Audio-Wiedergabe",
+      "highlightWords": "Wörter hervorheben",
+      "highlightWordsDescription": "Wörter während der Audiowiedergabe hervorheben",
       "autoPlay": "Audio automatisch abspielen",
       "autoPlayDescription": "Audio automatisch abspielen, wenn ein Satz angezeigt wird",
       "uiSettings": "Anzeigeeinstellungen",

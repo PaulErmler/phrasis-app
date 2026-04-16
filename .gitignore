@@ -62,6 +62,7 @@ data_preparation/language_intelligence/utils/output
 data_preparation/pipeline.py
 **/__pycache__/**
 tts-output
+voice-examples
 
 
 data_preparation/language_intelligence/spacy_classifier_documentation.md

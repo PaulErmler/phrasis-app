@@ -161,6 +161,19 @@ export async function scheduleMissingContent(
   let translationsScheduled = 0;
   let audioScheduled = 0;
 
+  /** Schedule a Scribe backfill for an existing audio row that lacks timings. */
+  const scheduleTimingsBackfillIfNeeded = async (lang: string) => {
+    const audio = audioMap.get(lang);
+    if (!audio || !audio.storageId || audio.wordTimings) return;
+    const claimed = await claimTtsIfAvailable(ctx, textId, lang);
+    if (!claimed) return;
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.ttsProcessing.backfillWordTimings,
+      { textId, language: lang, storageId: audio.storageId },
+    );
+  };
+
   // Schedule romanization for source text if needed and missing
   if (ROMANIZATION_LANGUAGES.has(sourceLanguage) && !text.romanizedText) {
     await ctx.scheduler.runAfter(
@@ -202,6 +215,8 @@ export async function scheduleMissingContent(
           );
           audioScheduled++;
         }
+      } else {
+        await scheduleTimingsBackfillIfNeeded(lang);
       }
     } else {
       // Different language — need translation
@@ -255,6 +270,8 @@ export async function scheduleMissingContent(
             );
             audioScheduled++;
           }
+        } else {
+          await scheduleTimingsBackfillIfNeeded(lang);
         }
       }
     }

@@ -47,6 +47,18 @@ export const audioRecordingValidator = v.object({
   language: v.string(),
   voiceName: v.union(v.string(), v.null()),
   url: v.union(v.string(), v.null()),
+  // Word-level timings from Scribe, captured during TTS validation.
+  // null on legacy rows; absent words array fine for clients to default to plain text.
+  wordTimings: v.union(
+    v.array(
+      v.object({
+        word: v.string(),
+        start: v.number(),
+        end: v.number(),
+      }),
+    ),
+    v.null(),
+  ),
 });
 
 export const reviewModeValidator = v.union(

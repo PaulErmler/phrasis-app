@@ -11,9 +11,10 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from '@/components/ui/tooltip';
-import { getLanguageShortLabel } from '@/lib/languages';
 import { AudioButton } from './AudioButton';
+import { HighlightedText } from './HighlightedText';
 import type { CardTranslation, CardAudioRecording } from './types';
+import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
 
 interface CardShellProps {
   reviewCount: number;
@@ -30,6 +31,14 @@ interface CardShellProps {
   onAudioPlay?: () => void;
   bare?: boolean;
   showRomanization?: boolean;
+  /** Karaoke word highlighting toggle (from courseSettings). */
+  highlightEnabled?: boolean;
+  /** Active per-language playback from an AudioButton; null when none. */
+  activeClip?: ButtonPlaybackActive | null;
+  /** AudioButton time callback; plumbed from the parent's useButtonPlayback. */
+  onButtonTimeUpdate?: (language: string, localTime: number) => void;
+  /** AudioButton stop callback. */
+  onButtonStop?: (language: string) => void;
   children: (ctx: {
     baseTranslations: CardTranslation[];
     targetTranslations: CardTranslation[];
@@ -51,6 +60,10 @@ export function CardShell({
   onAudioPlay,
   bare = false,
   showRomanization = true,
+  highlightEnabled = false,
+  activeClip = null,
+  onButtonTimeUpdate,
+  onButtonStop,
   children,
 }: CardShellProps) {
   const t = useTranslations('LearningMode');
@@ -141,15 +154,21 @@ export function CardShell({
             const audio = audioRecordings.find(
               (a) => a.language === translation.language,
             );
+            const isActive = activeClip?.language === translation.language;
             return (
               <div
                 key={translation.language}
                 className="flex items-start gap-2"
               >
                 <div className="flex-1">
-                  <p className="body-large font-medium">
-                    {translation.text || '...'}
-                  </p>
+                  <HighlightedText
+                    text={translation.text || '...'}
+                    wordTimings={audio?.wordTimings ?? null}
+                    localTime={isActive ? activeClip.localTime : 0}
+                    isActive={!!isActive}
+                    enabled={highlightEnabled}
+                    className={bare ? 'body-large' : 'body-large font-medium'}
+                  />
                   {showRomanization && translation.romanization && (
                     <p className="text-romanization">
                       {translation.romanization}
@@ -158,14 +177,18 @@ export function CardShell({
                 </div>
                 <AudioButton
                   url={audio?.url ?? null}
-                  language={getLanguageShortLabel(translation.language)}
+                  language={translation.language}
                   onPlay={onAudioPlay}
+                  onTimeUpdate={onButtonTimeUpdate}
+                  onStop={onButtonStop}
                 />
               </div>
             );
           })}
           {baseTranslations.length === 0 && (
-            <p className="body-large font-medium">{sourceText}</p>
+            <p className={bare ? 'body-large' : 'body-large font-medium'}>
+              {sourceText}
+            </p>
           )}
         </div>
 

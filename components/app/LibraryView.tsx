@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, usePreloadedQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
@@ -11,6 +11,7 @@ import { Toggle } from '@/components/ui/toggle';
 import { Search, Star, EyeOff, CircleCheck, X, Loader2 } from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
+import { useAppData } from '@/components/app/AppDataProvider';
 
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
 
@@ -31,6 +32,10 @@ export function LibraryView({
   onOpenCourseMenu: () => void;
 }) {
   const t = useTranslations('AppPage.library');
+
+  const { preloadedCourseSettings } = useAppData();
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
+  const highlightEnabled = courseSettings?.highlightWords !== false;
 
   const [searchInput, setSearchInput] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>(null);
@@ -228,6 +233,7 @@ export function LibraryView({
                   onHide={() => handleHide(card._id)}
                   onFavorite={() => handleFavorite(card._id)}
                   hideTargetLanguages={false}
+                  highlightEnabled={highlightEnabled}
                 />
               </div>
             ))}

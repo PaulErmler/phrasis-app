@@ -3,7 +3,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
-import { getLanguageShortLabel } from '@/lib/languages';
+import { HighlightedText } from './HighlightedText';
+import { resolveActiveClip } from '@/lib/audio/activeClip';
+import { useButtonPlayback } from '@/hooks/use-button-playback';
+import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import type { CardTranslation, CardAudioRecording } from './types';
 
 interface LearningCardContentProps {
@@ -31,6 +34,17 @@ interface LearningCardContentProps {
   onAllTargetsRevealedChange?: (allRevealed: boolean) => void;
   bare?: boolean;
   showRomanization?: boolean;
+  /** Karaoke word highlighting toggle (defaults true; pass false to force off). */
+  highlightEnabled?: boolean;
+  /**
+   * Merged-audio playback state from useAudioPlayer. When present and playing,
+   * takes priority over per-language AudioButton playback for highlight timing.
+   */
+  mergedPlayback?: {
+    isPlaying: boolean;
+    currentTime: number;
+    languageCues: ReadonlyArray<LanguageCue>;
+  };
 }
 
 export function LearningCardContent({
@@ -55,7 +69,24 @@ export function LearningCardContent({
   onAllTargetsRevealedChange,
   bare = false,
   showRomanization = true,
+  highlightEnabled = true,
+  mergedPlayback,
 }: LearningCardContentProps) {
+  const buttonPlayback = useButtonPlayback();
+
+  // Merged audio wins when it is actively playing; otherwise fall back to
+  // whichever per-language AudioButton is running (for library previews /
+  // individual replays). When nothing is playing, activeClip stays null and
+  // <HighlightedText> renders neutral words.
+  const activeClip = useMemo(() => {
+    if (mergedPlayback?.isPlaying) {
+      return resolveActiveClip(
+        mergedPlayback.languageCues,
+        mergedPlayback.currentTime,
+      );
+    }
+    return buttonPlayback.active;
+  }, [mergedPlayback, buttonPlayback.active]);
   const displayReviewCount =
     schedulingPhase === 'review' && fsrsState != null
       ? preReviewCount + fsrsState.reps
@@ -134,6 +165,10 @@ export function LearningCardContent({
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}
+        highlightEnabled={highlightEnabled}
+        activeClip={activeClip}
+        onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
+        onButtonStop={buttonPlayback.onStop}
       >
         {({ targetTranslations }) => (
           <div className="space-y-2">
@@ -143,6 +178,7 @@ export function LearningCardContent({
               );
               const isAudioRevealed = autoRevealLanguages && (revealedLanguages?.has(translation.language) ?? false);
               const isBlurred = hideTargetLanguages && !isAudioRevealed && !manuallyRevealed.has(translation.language);
+              const isActive = activeClip?.language === translation.language;
               return (
                 <div
                   key={translation.language}
@@ -153,11 +189,14 @@ export function LearningCardContent({
                     className="flex-1"
                     onClick={isBlurred ? () => handleReveal(translation.language) : undefined}
                   >
-                    <p
+                    <HighlightedText
+                      text={translation.text || '...'}
+                      wordTimings={audio?.wordTimings ?? null}
+                      localTime={isActive ? activeClip.localTime : 0}
+                      isActive={!!isActive}
+                      enabled={highlightEnabled}
                       className={`body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
-                    >
-                      {translation.text || '...'}
-                    </p>
+                    />
                     {showRomanization && translation.romanization && (
                       <p
                         className={`text-romanization ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
@@ -168,8 +207,10 @@ export function LearningCardContent({
                   </div>
                   <AudioButton
                     url={audio?.url ?? null}
-                    language={getLanguageShortLabel(translation.language)}
+                    language={translation.language}
                     onPlay={onAudioPlay}
+                    onTimeUpdate={buttonPlayback.onTimeUpdate}
+                    onStop={buttonPlayback.onStop}
                   />
                 </div>
               );

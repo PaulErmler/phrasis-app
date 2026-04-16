@@ -136,12 +136,15 @@ describe("features/ttsProcessing", () => {
       const { textId } = await seedText(t);
 
       vi.stubEnv("GOOGLE_TTS_API_KEY", "dummy");
-      vi.stubEnv("OPENAI_API_KEY", "dummy");
+      vi.stubEnv("ELEVENLABS_API_KEY", "dummy");
 
       const googleBody = JSON.stringify({
         audioContent: Buffer.from("fake-mp3-bytes").toString("base64"),
       });
-      const openAiBody = JSON.stringify({ text: "Hola" });
+      const scribeBody = JSON.stringify({
+        text: "Hola",
+        words: [{ text: "Hola", start: 0, end: 0.5, type: "word" }],
+      });
 
       const fetchMock = vi.fn(async (url: string | URL | Request) => {
         const u = typeof url === "string" ? url : url.toString();
@@ -151,8 +154,8 @@ describe("features/ttsProcessing", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
-        if (u.includes("api.openai.com")) {
-          return new Response(openAiBody, {
+        if (u.includes("api.elevenlabs.io/v1/speech-to-text")) {
+          return new Response(scribeBody, {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
@@ -200,7 +203,7 @@ describe("features/ttsProcessing", () => {
       expect(audio?.speed).toBe(1);
       const calls = fetchMock.mock.calls.map((c) => String(c[0]));
       expect(calls.some((c) => c.includes("texttospeech"))).toBe(true);
-      expect(calls.some((c) => c.includes("api.openai.com"))).toBe(true);
+      expect(calls.some((c) => c.includes("api.elevenlabs.io"))).toBe(true);
     });
   });
 
@@ -270,6 +273,298 @@ describe("features/ttsProcessing", () => {
 
       const left = await t.run(async (ctx) => ctx.db.get(audioId));
       expect(left).toBeNull();
+    });
+  });
+
+  describe('persistBackfilledWordTimings', () => {
+    it('no-ops when no audio row exists', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const fakeStorageId = await t.run(async (ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array([1])])),
+      );
+      const res = await t.mutation(
+        internal.features.ttsProcessing.persistBackfilledWordTimings,
+        {
+          textId,
+          language: 'es',
+          storageId: fakeStorageId,
+          wordTimings: [{ word: 'hola', start: 0, end: 0.5 }],
+        },
+      );
+      expect(res).toBeNull();
+    });
+
+    it('no-ops when storageId differs (stale-blob guard)', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const liveStorageId = await t.run(async (ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array([1])])),
+      );
+      const staleStorageId = await t.run(async (ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array([2])])),
+      );
+      await t.run(async (ctx) =>
+        ctx.db.insert('audioRecordings', {
+          textId,
+          language: 'es',
+          voiceName: 'es-ES-Chirp3-HD-Leda',
+          storageId: liveStorageId,
+          ttsQuality: 'validated',
+        }),
+      );
+      await t.mutation(
+        internal.features.ttsProcessing.persistBackfilledWordTimings,
+        {
+          textId,
+          language: 'es',
+          storageId: staleStorageId, // doesn't match the live row
+          wordTimings: [{ word: 'hola', start: 0, end: 0.5 }],
+        },
+      );
+      const after = await t.run(async (ctx) =>
+        ctx.db
+          .query('audioRecordings')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('language', 'es'),
+          )
+          .first(),
+      );
+      expect(after?.wordTimings).toBeUndefined();
+    });
+
+    it('patches wordTimings when storageId matches and leaves other fields intact', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const storageId = await t.run(async (ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array([1])])),
+      );
+      await t.run(async (ctx) =>
+        ctx.db.insert('audioRecordings', {
+          textId,
+          language: 'es',
+          voiceName: 'es-ES-Chirp3-HD-Leda',
+          storageId,
+          ttsQuality: 'validated',
+          voiceGender: 'female',
+          speed: 0.9,
+        }),
+      );
+      const wordTimings = [
+        { word: 'hola', start: 0, end: 0.5 },
+        { word: 'mundo', start: 0.5, end: 1.0 },
+      ];
+      await t.mutation(
+        internal.features.ttsProcessing.persistBackfilledWordTimings,
+        { textId, language: 'es', storageId, wordTimings },
+      );
+      const after = await t.run(async (ctx) =>
+        ctx.db
+          .query('audioRecordings')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('language', 'es'),
+          )
+          .first(),
+      );
+      expect(after?.wordTimings).toEqual(wordTimings);
+      expect(after?.voiceName).toBe('es-ES-Chirp3-HD-Leda');
+      expect(after?.voiceGender).toBe('female');
+      expect(after?.speed).toBe(0.9);
+      expect(after?.ttsQuality).toBe('validated');
+    });
+  });
+
+  describe('backfillWordTimings', () => {
+    /** Insert audio row + TTS claim. Returns ids for use in the action call. */
+    async function seedAudioAndClaim(t: ReturnType<typeof convexTest>) {
+      const { textId } = await seedText(t);
+      const storageId = await t.run(async (ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
+      );
+      await t.run(async (ctx) => {
+        await ctx.db.insert('audioRecordings', {
+          textId,
+          language: 'es',
+          voiceName: 'es-ES-Chirp3-HD-Leda',
+          storageId,
+          ttsQuality: 'validated',
+        });
+        await ctx.db.insert('ttsGenerationClaims', {
+          textId,
+          language: 'es',
+          claimedAt: Date.now(),
+        });
+      });
+      return { textId, storageId };
+    }
+
+    async function getClaim(
+      t: ReturnType<typeof convexTest>,
+      textId: Awaited<ReturnType<typeof seedText>>['textId'],
+    ) {
+      return t.run(async (ctx) =>
+        ctx.db
+          .query('ttsGenerationClaims')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('language', 'es'),
+          )
+          .first(),
+      );
+    }
+
+    async function getAudio(
+      t: ReturnType<typeof convexTest>,
+      textId: Awaited<ReturnType<typeof seedText>>['textId'],
+    ) {
+      return t.run(async (ctx) =>
+        ctx.db
+          .query('audioRecordings')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', textId).eq('language', 'es'),
+          )
+          .first(),
+      );
+    }
+
+    it('persists timings on success and releases the TTS claim', async () => {
+      const t = convexTest(schema, modules);
+      const { textId, storageId } = await seedAudioAndClaim(t);
+
+      vi.stubEnv('ELEVENLABS_API_KEY', 'dummy');
+      const scribeBody = JSON.stringify({
+        text: 'Hola mundo',
+        words: [
+          { text: 'Hola', start: 0, end: 0.4, type: 'word' },
+          { text: ' ', start: 0.4, end: 0.5, type: 'spacing' },
+          { text: 'mundo', start: 0.5, end: 1.0, type: 'word' },
+        ],
+      });
+      const fetchMock = vi.fn(async (url: string | URL | Request) => {
+        const u = typeof url === 'string' ? url : url.toString();
+        if (u.includes('api.elevenlabs.io')) {
+          return new Response(scribeBody, {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        throw new Error(`Unexpected fetch to ${u}`);
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      try {
+        await t.action(internal.features.ttsProcessing.backfillWordTimings, {
+          textId,
+          language: 'es',
+          storageId,
+        });
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+
+      const after = await getAudio(t, textId);
+      // Spacing entries are filtered out by transcribeAudio; only words land.
+      expect(after?.wordTimings).toEqual([
+        { word: 'Hola', start: 0, end: 0.4 },
+        { word: 'mundo', start: 0.5, end: 1.0 },
+      ]);
+      expect(await getClaim(t, textId)).toBeNull();
+    });
+
+    it('skips persistence on empty wordTimings but still releases the claim', async () => {
+      const t = convexTest(schema, modules);
+      const { textId, storageId } = await seedAudioAndClaim(t);
+
+      vi.stubEnv('ELEVENLABS_API_KEY', 'dummy');
+      const fetchMock = vi.fn(
+        async () =>
+          new Response(JSON.stringify({ text: '', words: [] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      try {
+        await t.action(internal.features.ttsProcessing.backfillWordTimings, {
+          textId,
+          language: 'es',
+          storageId,
+        });
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+
+      const after = await getAudio(t, textId);
+      expect(after?.wordTimings).toBeUndefined();
+      expect(await getClaim(t, textId)).toBeNull();
+    });
+
+    it('returns early without calling Scribe when the storage blob is missing, but still releases the claim', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const storageId = await t.run(async (ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array([1])])),
+      );
+      await t.run(async (ctx) => {
+        await ctx.db.insert('ttsGenerationClaims', {
+          textId,
+          language: 'es',
+          claimedAt: Date.now(),
+        });
+        await ctx.storage.delete(storageId);
+      });
+
+      const fetchMock = vi.fn(async () => {
+        throw new Error('Scribe should not be called when blob is missing');
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      vi.stubEnv('ELEVENLABS_API_KEY', 'dummy');
+
+      try {
+        await t.action(internal.features.ttsProcessing.backfillWordTimings, {
+          textId,
+          language: 'es',
+          storageId,
+        });
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(await getClaim(t, textId)).toBeNull();
+    });
+
+    it('still releases the claim when transcribeAudio throws', async () => {
+      const t = convexTest(schema, modules);
+      const { textId, storageId } = await seedAudioAndClaim(t);
+
+      vi.stubEnv('ELEVENLABS_API_KEY', 'dummy');
+      const fetchMock = vi.fn(
+        async () =>
+          new Response('boom', {
+            status: 500,
+            headers: { 'Content-Type': 'text/plain' },
+          }),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+
+      try {
+        await t.action(internal.features.ttsProcessing.backfillWordTimings, {
+          textId,
+          language: 'es',
+          storageId,
+        });
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+
+      const after = await getAudio(t, textId);
+      expect(after?.wordTimings).toBeUndefined();
+      expect(await getClaim(t, textId)).toBeNull();
     });
   });
 });

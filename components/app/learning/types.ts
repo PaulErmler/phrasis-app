@@ -18,10 +18,17 @@ export interface CardTranslation {
   romanization?: string;
 }
 
+export interface WordTiming {
+  word: string;
+  start: number;
+  end: number;
+}
+
 export interface CardAudioRecording {
   language: string;
   voiceName: string | null;
   url: string | null;
+  wordTimings: WordTiming[] | null;
 }
 
 export interface CourseSettings {
@@ -33,6 +40,7 @@ export interface CourseSettings {
   cardsToAddBatchSize?: number;
   autoAddCards?: boolean;
   // Audio playback settings
+  highlightWords?: boolean;
   autoPlayAudio?: boolean;
   autoAdvance?: boolean;
   languageRepetitions?: Record<string, number>;

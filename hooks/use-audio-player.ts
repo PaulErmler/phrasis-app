@@ -39,6 +39,15 @@ export interface AudioPlayerState {
   isMerging: boolean;
   durationSec: number;
   revealedLanguages: ReadonlySet<string>;
+  /**
+   * Position on the merged-audio timeline, in seconds. Updated ~60 Hz via
+   * requestAnimationFrame while playing (the native `timeupdate` event fires
+   * too slowly for smooth per-word highlighting). Callers should translate
+   * this into per-clip time via `resolveActiveClip(languageCues, currentTime)`.
+   */
+  currentTime: number;
+  /** Language-clip boundaries in the merged blob. Stable per card. */
+  languageCues: ReadonlyArray<LanguageCue>;
 }
 
 export function useAudioPlayer(
@@ -63,6 +72,8 @@ export function useAudioPlayer(
   const [isMerging, setIsMerging] = useState(false);
   const [durationSec, setDurationSec] = useState(0);
   const [revealedLanguages, setRevealedLanguages] = useState<ReadonlySet<string>>(new Set());
+  const [currentTime, setCurrentTime] = useState(0);
+  const [languageCues, setLanguageCues] = useState<ReadonlyArray<LanguageCue>>([]);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -95,10 +106,33 @@ export function useAudioPlayer(
   const play = useCallback(() => {
     const audio = getAudio();
     if (!audio.src || audio.src === '') return;
-    audio.play().catch((err) => {
-      if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
-      console.error('Audio play failed:', err);
-    });
+    // Replaying after the audio has run to completion: browsers are
+    // inconsistent about what a bare .play() call does on an ended element.
+    // In practice the element can stay "stuck" — play() resolves, but no
+    // 'play' event fires, which means our isPlaying stays false and the
+    // rAF loop never re-subscribes, so no word highlighting on the replay.
+    //
+    // .pause() + currentTime=0 first forces a clean "paused at 0" state;
+    // the subsequent .play() then reliably fires 'play' and our reactive
+    // currentTime snaps back so the highlight starts from the first word.
+    if (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.05)) {
+      audio.pause();
+      audio.currentTime = 0;
+      setCurrentTime(0);
+      setIsPlaying(false);
+    }
+    audio
+      .play()
+      .then(() => {
+        // Safety net: a handful of browsers skip the 'play' event after a
+        // post-`ended` replay, leaving isPlaying stale-false. Re-asserting
+        // here guarantees the rAF effect resubscribes and highlights update.
+        setIsPlaying(true);
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
+        console.error('Audio play failed:', err);
+      });
   }, [getAudio]);
 
   const pause = useCallback(() => {
@@ -123,6 +157,7 @@ export function useAudioPlayer(
     const audio = audioRef.current;
     if (audio && audio.duration) {
       audio.currentTime = Math.max(0, Math.min(seconds, audio.duration));
+      setCurrentTime(audio.currentTime);
       updateMediaSessionPosition(audio.duration, audio.currentTime);
     }
   }, []);
@@ -142,6 +177,8 @@ export function useAudioPlayer(
     setDurationSec(0);
     setIsPlaying(false);
     setRevealedLanguages(new Set());
+    setCurrentTime(0);
+    setLanguageCues([]);
     setMediaSessionPlaybackState('none');
   }, [getAudio]);
 
@@ -227,6 +264,22 @@ export function useAudioPlayer(
       audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
   }, [getAudio]);
+
+  // --------------------------------------------------------------------------
+  // rAF-driven currentTime for smooth word highlighting. The native
+  // `timeupdate` event fires ~4 Hz which is visibly laggy for karaoke.
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    if (!isPlaying) return;
+    let raf = 0;
+    const tick = () => {
+      const audio = audioRef.current;
+      if (audio) setCurrentTime(audio.currentTime);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying]);
 
   // --------------------------------------------------------------------------
   // Merge audio when card changes, audio URLs arrive, or settings change
@@ -319,6 +372,7 @@ export function useAudioPlayer(
 
         blobUrlRef.current = result.blobUrl;
         languageCuesRef.current = result.languageCues;
+        setLanguageCues(result.languageCues);
         audio.src = result.blobUrl;
         setDurationSec(result.durationSec);
         setIsMerging(false);
@@ -424,5 +478,7 @@ export function useAudioPlayer(
     isMerging,
     durationSec,
     revealedLanguages,
+    currentTime,
+    languageCues,
   };
 }

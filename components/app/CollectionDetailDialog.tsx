@@ -14,8 +14,12 @@ import { Check, Plus, Loader2, CheckCircle2, Lock, Layers, BookOpen } from 'luci
 import { cn } from '@/lib/utils';
 import { getCollectionDescription } from './CollectionCarouselUI';
 import { AudioButton } from '@/components/app/learning/AudioButton';
-import { getLanguageShortLabel } from '@/lib/languages';
+import { HighlightedText } from '@/components/app/learning/HighlightedText';
 import { useTranslations } from 'next-intl';
+import { usePreloadedQuery } from 'convex/react';
+import { useAppData } from '@/components/app/AppDataProvider';
+import { useButtonPlayback } from '@/hooks/use-button-playback';
+import type { WordTiming } from '@/components/app/learning/types';
 
 interface Translation {
   language: string;
@@ -29,6 +33,7 @@ interface AudioRecording {
   language: string;
   voiceName: string | null;
   url: string | null;
+  wordTimings: WordTiming[] | null;
 }
 
 export interface PreviewText {
@@ -82,6 +87,10 @@ export function CollectionDetailDialog({
 }: CollectionDetailDialogProps) {
   const t = useTranslations('AppPage.collections.carousel.detail');
   const tDesc = useTranslations('AppPage.collections.carousel.descriptions');
+
+  const { preloadedCourseSettings } = useAppData();
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
+  const highlightEnabled = courseSettings?.highlightWords !== false;
 
   if (!collectionName) return null;
 
@@ -211,92 +220,116 @@ export function CollectionDetailDialog({
             </div>
           ) : (
             <div className="space-y-4">
-              {texts.map((text) => {
-                const baseTranslations = text.translations.filter(
-                  (tr) => tr.isBaseLanguage,
-                );
-                const targetTranslations = text.translations.filter(
-                  (tr) => tr.isTargetLanguage,
-                );
-
-                return (
-                  <div
-                    key={text._id}
-                    className="content-box p-4 space-y-2"
-                  >
-                    {/* Base language translations */}
-                    <div className="space-y-1">
-                      {baseTranslations.map((translation) => {
-                        const audio = text.audioRecordings.find(
-                          (a) => a.language === translation.language,
-                        );
-                        return (
-                          <div
-                            key={translation.language}
-                            className="flex items-start gap-2"
-                          >
-                            <div className="flex-1">
-                              <p className="text-sm font-medium leading-relaxed">
-                                {translation.text || '...'}
-                              </p>
-                              {translation.romanization && (
-                                <p className="text-romanization">
-                                  {translation.romanization}
-                                </p>
-                              )}
-                            </div>
-                            <AudioButton
-                              url={audio?.url ?? null}
-                              language={getLanguageShortLabel(translation.language)}
-                            />
-                          </div>
-                        );
-                      })}
-                      {baseTranslations.length === 0 && (
-                        <p className="text-sm font-medium leading-relaxed">
-                          {text.text}
-                        </p>
-                      )}
-                    </div>
-
-                    <Separator />
-
-                    {/* Target language translations */}
-                    <div className="space-y-1">
-                      {targetTranslations.map((translation) => {
-                        const audio = text.audioRecordings.find(
-                          (a) => a.language === translation.language,
-                        );
-                        return (
-                          <div
-                            key={translation.language}
-                            className="flex items-start gap-2"
-                          >
-                            <div className="flex-1">
-                              <p className="text-sm leading-relaxed">
-                                {translation.text || '...'}
-                              </p>
-                              {translation.romanization && (
-                                <p className="text-romanization">
-                                  {translation.romanization}
-                                </p>
-                              )}
-                            </div>
-                            <AudioButton
-                              url={audio?.url ?? null}
-                              language={getLanguageShortLabel(translation.language)}
-                            />
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
+              {texts.map((text) => (
+                <PreviewTextRow
+                  key={text._id}
+                  text={text}
+                  highlightEnabled={highlightEnabled}
+                />
+              ))}
             </div>
           )}
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Each preview row owns its own button-playback state so per-language
+// highlighting stays scoped to the row whose AudioButton was clicked. A
+// single shared hook at the dialog level would highlight every row that
+// happens to share the active language.
+function PreviewTextRow({
+  text,
+  highlightEnabled,
+}: {
+  text: PreviewText;
+  highlightEnabled: boolean;
+}) {
+  const buttonPlayback = useButtonPlayback();
+  const baseTranslations = text.translations.filter((tr) => tr.isBaseLanguage);
+  const targetTranslations = text.translations.filter(
+    (tr) => tr.isTargetLanguage,
+  );
+
+  return (
+    <div className="content-box p-4 space-y-2">
+      <div className="space-y-1">
+        {baseTranslations.map((translation) => {
+          const audio = text.audioRecordings.find(
+            (a) => a.language === translation.language,
+          );
+          const isActive =
+            buttonPlayback.active?.language === translation.language;
+          return (
+            <div
+              key={translation.language}
+              className="flex items-start gap-2"
+            >
+              <div className="flex-1">
+                <HighlightedText
+                  text={translation.text || '...'}
+                  wordTimings={audio?.wordTimings ?? null}
+                  localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                  isActive={isActive}
+                  enabled={highlightEnabled}
+                  className="text-sm font-medium leading-relaxed"
+                />
+                {translation.romanization && (
+                  <p className="text-romanization">{translation.romanization}</p>
+                )}
+              </div>
+              <AudioButton
+                url={audio?.url ?? null}
+                language={translation.language}
+                onTimeUpdate={buttonPlayback.onTimeUpdate}
+                onStop={buttonPlayback.onStop}
+              />
+            </div>
+          );
+        })}
+        {baseTranslations.length === 0 && (
+          <p className="text-sm font-medium leading-relaxed">{text.text}</p>
+        )}
+      </div>
+
+      <Separator />
+
+      <div className="space-y-1">
+        {targetTranslations.map((translation) => {
+          const audio = text.audioRecordings.find(
+            (a) => a.language === translation.language,
+          );
+          const isActive =
+            buttonPlayback.active?.language === translation.language;
+          return (
+            <div
+              key={translation.language}
+              className="flex items-start gap-2"
+            >
+              <div className="flex-1">
+                <HighlightedText
+                  text={translation.text || '...'}
+                  wordTimings={audio?.wordTimings ?? null}
+                  localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                  isActive={isActive}
+                  enabled={highlightEnabled}
+                  className="text-sm leading-relaxed"
+                />
+                {translation.romanization && (
+                  <p className="text-romanization">{translation.romanization}</p>
+                )}
+              </div>
+              <AudioButton
+                url={audio?.url ?? null}
+                language={translation.language}
+                onTimeUpdate={buttonPlayback.onTimeUpdate}
+                onStop={buttonPlayback.onStop}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

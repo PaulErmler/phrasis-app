@@ -10,9 +10,11 @@
       "WebFetch(domain:elevenlabs-sdk.mintlify.app)",
       "WebFetch(domain:gist.github.com)",
       "Read(//Users/paulermler/.claude/skills/**)",
-      "Read(//Users/paulermler/.claude/**)",
       "Bash(pnpm lint:*)",
-      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(grep -n \"import.*getLanguageShortLabel\" /Users/paulermler/Documents/Phrasis/new/phrasis-app/components/app/*.tsx)",
+      "Bash(pnpm test:app -- alignTimings activeClip use-button-playback HighlightedText)",
+      "Bash(pnpm test:convex -- ttsProcessing)"
     ]
   }
 }

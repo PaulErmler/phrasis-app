@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,10 +13,12 @@ import {
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import { DiffDisplay, computeAccuracy } from './DiffDisplay';
-import {
-  getLanguageShortLabel,
-  getLocalizedLanguageNameByCode,
-} from '@/lib/languages';
+import { HighlightedText } from './HighlightedText';
+import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import { resolveActiveClip } from '@/lib/audio/activeClip';
+import { useButtonPlayback } from '@/hooks/use-button-playback';
+import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
+import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -53,6 +55,14 @@ interface FullReviewCardContentProps {
   cardId?: Id<'cards'>;
   /** When true, Left Arrow revert is disabled (e.g. settings or edit dialog open) */
   shortcutsDisabled?: boolean;
+  /** Karaoke word highlighting toggle (defaults true). */
+  highlightEnabled?: boolean;
+  /** Merged-audio state from useAudioPlayer; used when merged playback is active. */
+  mergedPlayback?: {
+    isPlaying: boolean;
+    currentTime: number;
+    languageCues: ReadonlyArray<LanguageCue>;
+  };
 }
 
 export function FullReviewCardContent({
@@ -78,9 +88,30 @@ export function FullReviewCardContent({
   showRomanization = true,
   cardId,
   shortcutsDisabled = false,
+  highlightEnabled = true,
+  mergedPlayback,
 }: FullReviewCardContentProps) {
   const t = useTranslations('LearningMode');
   const locale = useLocale();
+
+  const buttonPlayback = useButtonPlayback();
+  const activeClip = useMemo(() => {
+    if (mergedPlayback?.isPlaying) {
+      return resolveActiveClip(
+        mergedPlayback.languageCues,
+        mergedPlayback.currentTime,
+      );
+    }
+    return buttonPlayback.active;
+  }, [mergedPlayback, buttonPlayback.active]);
+
+  // Reveal-sweep / post-submit auto-play uses raw <Audio> elements; route their
+  // progress through the shared button-playback channel so <HighlightedText>
+  // lights up just like it does for manual AudioButton clicks.
+  const buttonTimeUpdateRef = useRef(buttonPlayback.onTimeUpdate);
+  buttonTimeUpdateRef.current = buttonPlayback.onTimeUpdate;
+  const buttonStopRef = useRef(buttonPlayback.onStop);
+  buttonStopRef.current = buttonPlayback.onStop;
 
   const displayReviewCount =
     schedulingPhase === 'review' && fsrsState != null
@@ -169,7 +200,22 @@ export function FullReviewCardContent({
     onAudioPlayRef.current?.();
 
     let idx = 0;
+    let raf = 0;
+    let activeLanguage: string | null = null;
+
+    const stopTracking = () => {
+      if (raf) {
+        cancelAnimationFrame(raf);
+        raf = 0;
+      }
+      if (activeLanguage) {
+        buttonStopRef.current(activeLanguage);
+        activeLanguage = null;
+      }
+    };
+
     const playNext = () => {
+      stopTracking();
       if (revealAbortedRef.current || idx >= unsubmittedAudio.length) {
         revealAudioRef.current = null;
         return;
@@ -178,20 +224,33 @@ export function FullReviewCardContent({
       autoPlayedRef.current.add(entry.language);
       const audio = new Audio(entry.url);
       revealAudioRef.current = audio;
+      activeLanguage = entry.language;
+      const tick = () => {
+        buttonTimeUpdateRef.current(entry.language, audio.currentTime);
+        raf = requestAnimationFrame(tick);
+      };
       audio.onended = () => {
+        stopTracking();
         idx++;
         playNext();
       };
-      audio.play().catch((err) => {
-        if (err.name !== 'AbortError') console.error('Reveal auto-play failed:', err);
-        idx++;
-        playNext();
-      });
+      audio
+        .play()
+        .then(() => {
+          raf = requestAnimationFrame(tick);
+        })
+        .catch((err) => {
+          if (err.name !== 'AbortError') console.error('Reveal auto-play failed:', err);
+          stopTracking();
+          idx++;
+          playNext();
+        });
     };
     playNext();
 
     return () => {
       revealAbortedRef.current = true;
+      stopTracking();
       revealAudioRef.current?.pause();
       revealAudioRef.current = null;
     };
@@ -306,6 +365,10 @@ export function FullReviewCardContent({
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}
+        highlightEnabled={highlightEnabled}
+        activeClip={activeClip}
+        onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
+        onButtonStop={buttonPlayback.onStop}
       >
         {({ targetTranslations: targets }) => (
           <div className="space-y-4">
@@ -323,6 +386,7 @@ export function FullReviewCardContent({
                   key={translation.language}
                   translation={translation}
                   audioUrl={audio?.url ?? null}
+                  wordTimings={audio?.wordTimings ?? null}
                   state={state}
                   targetAudioMode={targetAudioMode}
                   autoPlayedRef={autoPlayedRef}
@@ -341,6 +405,10 @@ export function FullReviewCardContent({
                   isFirstTarget={index === 0}
                   allRevealed={allRevealed}
                   showRomanization={showRomanization}
+                  highlightEnabled={highlightEnabled}
+                  activeClip={activeClip}
+                  onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
+                  onButtonStop={buttonPlayback.onStop}
                 />
               );
             })}
@@ -354,6 +422,7 @@ export function FullReviewCardContent({
 interface TargetLanguageInputProps {
   translation: CardTranslation;
   audioUrl: string | null;
+  wordTimings: CardAudioRecording['wordTimings'];
   state: LanguageInputState;
   targetAudioMode: TargetAudioMode;
   autoPlayedRef: React.RefObject<Set<string>>;
@@ -372,11 +441,16 @@ interface TargetLanguageInputProps {
   isFirstTarget?: boolean;
   allRevealed?: boolean;
   showRomanization?: boolean;
+  highlightEnabled: boolean;
+  activeClip: ButtonPlaybackActive | null;
+  onButtonTimeUpdate: (language: string, localTime: number) => void;
+  onButtonStop: (language: string) => void;
 }
 
 function TargetLanguageInput({
   translation,
   audioUrl,
+  wordTimings,
   state,
   targetAudioMode,
   autoPlayedRef,
@@ -395,7 +469,12 @@ function TargetLanguageInput({
   isFirstTarget = false,
   allRevealed = false,
   showRomanization = true,
+  highlightEnabled,
+  activeClip,
+  onButtonTimeUpdate,
+  onButtonStop,
 }: TargetLanguageInputProps) {
+  const isActive = activeClip?.language === translation.language;
   const t = useTranslations('LearningMode');
   const [showClean, setShowClean] = useState(false);
   const autoPlayAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -420,15 +499,33 @@ function TargetLanguageInput({
     onAudioPlay?.();
     const audio = new Audio(audioUrl);
     autoPlayAudioRef.current = audio;
-    audio.play().catch((err) => {
-      if (err.name !== 'AbortError') console.error('Auto-play failed:', err);
-    });
+
+    let raf = 0;
+    const tick = () => {
+      onButtonTimeUpdate(translation.language, audio.currentTime);
+      raf = requestAnimationFrame(tick);
+    };
+    audio.onended = () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+      onButtonStop(translation.language);
+    };
+    audio
+      .play()
+      .then(() => {
+        raf = requestAnimationFrame(tick);
+      })
+      .catch((err) => {
+        if (err.name !== 'AbortError') console.error('Auto-play failed:', err);
+      });
 
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       audio.pause();
       audio.currentTime = 0;
+      onButtonStop(translation.language);
     };
-  }, [state.submitted, targetAudioMode, audioUrl, translation.language, autoPlayedRef]);
+  }, [state.submitted, targetAudioMode, audioUrl, translation.language, autoPlayedRef, onButtonTimeUpdate, onButtonStop]);
 
   useEffect(() => {
     return () => {
@@ -462,16 +559,20 @@ function TargetLanguageInput({
             </span>
             <AudioButton
               url={audioUrl}
-              language={getLanguageShortLabel(translation.language)}
+              language={translation.language}
               onPlay={onAudioPlay}
+              onTimeUpdate={onButtonTimeUpdate}
+              onStop={onButtonStop}
             />
           </div>
         ) : (
           <div className="flex justify-end">
             <AudioButton
               url={audioUrl}
-              language={getLanguageShortLabel(translation.language)}
+              language={translation.language}
               onPlay={onAudioPlay}
+              onTimeUpdate={onButtonTimeUpdate}
+              onStop={onButtonStop}
             />
           </div>
         )}
@@ -506,9 +607,14 @@ function TargetLanguageInput({
             </div>
           </div>
         ) : (
-          <p className="body-large text-muted-foreground">
-            {translation.text || '...'}
-          </p>
+          <HighlightedText
+            text={translation.text || '...'}
+            wordTimings={wordTimings}
+            localTime={isActive ? activeClip!.localTime : 0}
+            isActive={isActive}
+            enabled={highlightEnabled}
+            className="body-large text-muted-foreground"
+          />
         )}
         {showRomanization && translation.romanization && (
           <p className="text-xs text-muted-foreground leading-tight">
@@ -532,16 +638,20 @@ function TargetLanguageInput({
             </span>
             <AudioButton
               url={audioUrl}
-              language={getLanguageShortLabel(translation.language)}
+              language={translation.language}
               onPlay={onAudioPlay}
+              onTimeUpdate={onButtonTimeUpdate}
+              onStop={onButtonStop}
             />
           </div>
         ) : (
           <div className="flex justify-end">
             <AudioButton
               url={audioUrl}
-              language={getLanguageShortLabel(translation.language)}
+              language={translation.language}
               onPlay={onAudioPlay}
+              onTimeUpdate={onButtonTimeUpdate}
+              onStop={onButtonStop}
             />
           </div>
         )}
@@ -556,9 +666,14 @@ function TargetLanguageInput({
                 hideErrors={showClean}
               />
             ) : (
-              <p className="body-large text-muted-foreground">
-                {translation.text || '...'}
-              </p>
+              <HighlightedText
+                text={translation.text || '...'}
+                wordTimings={wordTimings}
+                localTime={isActive ? activeClip!.localTime : 0}
+                isActive={isActive}
+                enabled={highlightEnabled}
+                className="body-large text-muted-foreground"
+              />
             )}
           </div>
           <div className="flex shrink-0 gap-2 pt-0.5">
@@ -617,16 +732,20 @@ function TargetLanguageInput({
           </span>
           <AudioButton
             url={audioUrl}
-            language={getLanguageShortLabel(translation.language)}
+            language={translation.language}
             onPlay={onAudioPlay}
+            onTimeUpdate={onButtonTimeUpdate}
+            onStop={onButtonStop}
           />
         </div>
       ) : (
         <div className="flex justify-end">
           <AudioButton
             url={audioUrl}
-            language={getLanguageShortLabel(translation.language)}
+            language={translation.language}
             onPlay={onAudioPlay}
+            onTimeUpdate={onButtonTimeUpdate}
+            onStop={onButtonStop}
           />
         </div>
       )}

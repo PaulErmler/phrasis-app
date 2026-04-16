@@ -1,9 +1,12 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useQuery } from 'convex/react';
+import { useQuery, usePreloadedQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
+import { useAppData } from '@/components/app/AppDataProvider';
+import { useButtonPlayback } from '@/hooks/use-button-playback';
+import { HighlightedText } from '@/components/app/learning/HighlightedText';
 import {
   Card,
   CardContent,
@@ -28,6 +31,11 @@ export function DeckCardsView() {
   const t = useTranslations('AppPage.deckCards');
   const deckCards = useQuery(api.features.decks.getDeckCards, {});
   const activeCourse = useQuery(api.features.courses.getActiveCourse);
+
+  const { preloadedCourseSettings } = useAppData();
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
+  const highlightEnabled = courseSettings?.highlightWords !== false;
+  const buttonPlayback = useButtonPlayback();
 
   useEnsureContent(deckCards);
 
@@ -152,9 +160,22 @@ export function DeckCardsView() {
                             {t('baseLabel')}
                           </span>
                         </div>
-                        <p className="text-sm">
-                          {baseTranslation?.text || card.sourceText}
-                        </p>
+                        {(() => {
+                          const lang =
+                            baseTranslation?.language || card.sourceLanguage;
+                          const isActive =
+                            buttonPlayback.active?.language === lang;
+                          return (
+                            <HighlightedText
+                              text={baseTranslation?.text || card.sourceText}
+                              wordTimings={baseAudio?.wordTimings ?? null}
+                              localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                              isActive={isActive}
+                              enabled={highlightEnabled}
+                              className="text-sm"
+                            />
+                          );
+                        })()}
                         {baseTranslation?.romanization && (
                           <p className="text-romanization">
                             {baseTranslation.romanization}
@@ -169,10 +190,12 @@ export function DeckCardsView() {
                         <div className="flex gap-2">
                           <AudioButton
                             url={baseAudio?.url ?? null}
-                            language={getLanguageShortLabel(
-                              baseTranslation?.language || card.sourceLanguage,
-                            )}
+                            language={
+                              baseTranslation?.language || card.sourceLanguage
+                            }
                             showLabel
+                            onTimeUpdate={buttonPlayback.onTimeUpdate}
+                            onStop={buttonPlayback.onStop}
                           />
                         </div>
                       </div>
@@ -194,7 +217,21 @@ export function DeckCardsView() {
                         </div>
                         {targetTranslation?.text ? (
                           <>
-                            <p className="text-sm">{targetTranslation.text}</p>
+                            {(() => {
+                              const isActive =
+                                buttonPlayback.active?.language ===
+                                targetTranslation.language;
+                              return (
+                                <HighlightedText
+                                  text={targetTranslation.text}
+                                  wordTimings={targetAudio?.wordTimings ?? null}
+                                  localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                                  isActive={isActive}
+                                  enabled={highlightEnabled}
+                                  className="text-sm"
+                                />
+                              );
+                            })()}
                             {targetTranslation.romanization && (
                               <p className="text-romanization">
                                 {targetTranslation.romanization}
@@ -207,14 +244,10 @@ export function DeckCardsView() {
                         <div className="flex gap-2">
                           <AudioButton
                             url={targetAudio?.url ?? null}
-                            language={
-                              targetTranslation?.language
-                                ? getLanguageShortLabel(
-                                  targetTranslation.language,
-                                )
-                                : ''
-                            }
+                            language={targetTranslation?.language ?? ''}
                             showLabel
+                            onTimeUpdate={buttonPlayback.onTimeUpdate}
+                            onStop={buttonPlayback.onStop}
                           />
                         </div>
                       </div>

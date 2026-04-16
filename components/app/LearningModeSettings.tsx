@@ -115,6 +115,13 @@ export function LearningModeSettings({
     });
   };
 
+  const handleHighlightWordsChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      highlightWords: checked,
+    });
+  };
+
   const handleAutoAdvanceChange = async (checked: boolean) => {
     await updateSettings({
       courseId: courseSettings.courseId,
@@ -464,6 +471,22 @@ export function LearningModeSettings({
           <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
             {t('audioPlayback')}
           </p>
+
+          {/* Highlight words */}
+          <div className="settings-row">
+            <div className="space-y-0.5">
+              <Label htmlFor="highlightWords" className="text-sm font-medium">
+                {t('highlightWords')}
+              </Label>
+              <p className="text-muted-xs">{t('highlightWordsDescription')}</p>
+            </div>
+            <Switch
+              id="highlightWords"
+              checked={courseSettings.highlightWords !== false}
+              onCheckedChange={handleHighlightWordsChange}
+              className="mt-0.5"
+            />
+          </div>
 
           {/* Auto-play audio */}
           <div className="settings-row">

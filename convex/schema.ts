@@ -124,6 +124,7 @@ export default defineSchema({
     autoAddCards: v.optional(v.boolean()), // Auto-add cards when none are due
 
     // Audio playback settings
+    highlightWords: v.optional(v.boolean()), // Karaoke-style word highlighting during audio playback (default true)
     autoPlayAudio: v.optional(v.boolean()), // Auto-play audio when card is shown
     autoAdvance: v.optional(v.boolean()), // Auto-advance after audio finishes
     languageRepetitions: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 2, "es": 2 }
