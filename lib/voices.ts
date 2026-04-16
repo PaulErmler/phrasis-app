@@ -112,7 +112,6 @@ const ELEVENLABS_VOICES_EN: Voice[] = [
   EL_MARK,
   EL_JAMES,
   createElevenLabsVoice('Alistair (UK)', 'male', 'l30f87tf05uxyknGdDw6'),
-  createElevenLabsVoice('US Male', 'male', 'tZssYepgGaQmegsMEXjK'),
 ];
 
 // Spanish (Spain / Castilian) — Clara + Carolina (native Castilian females);
