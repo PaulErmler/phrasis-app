@@ -189,7 +189,9 @@ export async function transcribeAudio(
   formData.append('file', blob, 'audio.mp3');
   formData.append('model_id', 'scribe_v2');
   formData.append('tag_audio_events', 'true');
-  formData.append('diarize', 'true');
+  // TTS validation blobs are always single-speaker, so diarization adds cost
+  // and latency without producing useful information.
+  formData.append('diarize', 'false');
   formData.append('timestamps_granularity', 'word');
   if (languageCode) {
     formData.append('language_code', toElevenLabsLanguageCode(languageCode));

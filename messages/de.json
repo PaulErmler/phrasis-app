@@ -147,6 +147,11 @@
       }
     },
     "deckCards": {
+      "title": "Dein Stapel",
+      "loading": "Karten werden geladen...",
+      "emptyState": "Du hast noch keine Karten im Stapel. Füge welche aus einer Sammlung oben hinzu!",
+      "description": "Karten mit Übersetzungen und Audio",
+      "cardCount": "{count, plural, one {# Karte} other {# Karten}}",
       "baseLabel": "Basis (Das kennst du)",
       "targetLabel": "Ziel (Das lernst du)",
       "translating": "Wird übersetzt...",

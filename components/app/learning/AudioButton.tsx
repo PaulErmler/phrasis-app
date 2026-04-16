@@ -82,7 +82,7 @@ export function AudioButton({
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       setIsPlaying(false);
-      onStop?.(language);
+      onStopRef.current?.(language);
       return;
     }
 

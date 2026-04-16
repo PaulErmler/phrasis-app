@@ -48,7 +48,10 @@ export const audioRecordingValidator = v.object({
   voiceName: v.union(v.string(), v.null()),
   url: v.union(v.string(), v.null()),
   // Word-level timings from Scribe, captured during TTS validation.
-  // null on legacy rows; absent words array fine for clients to default to plain text.
+  // The schema field is `v.optional(v.array(...))` so DB rows can be `undefined`,
+  // but this validator is stricter — `null | array` only. Callers building a
+  // response from a raw audioRecordings row MUST coerce `undefined → null`
+  // (`row.wordTimings ?? null`), or this validator will reject the response.
   wordTimings: v.union(
     v.array(
       v.object({

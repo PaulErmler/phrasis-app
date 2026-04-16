@@ -610,7 +610,7 @@ function TargetLanguageInput({
           <HighlightedText
             text={translation.text || '...'}
             wordTimings={wordTimings}
-            localTime={isActive ? activeClip!.localTime : 0}
+            localTime={activeClip?.localTime ?? 0}
             isActive={isActive}
             enabled={highlightEnabled}
             className="body-large text-muted-foreground"
@@ -669,7 +669,7 @@ function TargetLanguageInput({
               <HighlightedText
                 text={translation.text || '...'}
                 wordTimings={wordTimings}
-                localTime={isActive ? activeClip!.localTime : 0}
+                localTime={activeClip?.localTime ?? 0}
                 isActive={isActive}
                 enabled={highlightEnabled}
                 className="body-large text-muted-foreground"

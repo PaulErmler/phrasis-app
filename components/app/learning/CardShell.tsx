@@ -164,7 +164,7 @@ export function CardShell({
                   <HighlightedText
                     text={translation.text || '...'}
                     wordTimings={audio?.wordTimings ?? null}
-                    localTime={isActive ? activeClip.localTime : 0}
+                    localTime={activeClip?.localTime ?? 0}
                     isActive={!!isActive}
                     enabled={highlightEnabled}
                     className={bare ? 'body-large' : 'body-large font-medium'}

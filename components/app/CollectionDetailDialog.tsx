@@ -270,7 +270,7 @@ function PreviewTextRow({
                 <HighlightedText
                   text={translation.text || '...'}
                   wordTimings={audio?.wordTimings ?? null}
-                  localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                  localTime={buttonPlayback.active?.localTime ?? 0}
                   isActive={isActive}
                   enabled={highlightEnabled}
                   className="text-sm font-medium leading-relaxed"
@@ -311,7 +311,7 @@ function PreviewTextRow({
                 <HighlightedText
                   text={translation.text || '...'}
                   wordTimings={audio?.wordTimings ?? null}
-                  localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                  localTime={buttonPlayback.active?.localTime ?? 0}
                   isActive={isActive}
                   enabled={highlightEnabled}
                   className="text-sm leading-relaxed"

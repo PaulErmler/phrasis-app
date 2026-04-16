@@ -192,7 +192,7 @@ export function LearningCardContent({
                     <HighlightedText
                       text={translation.text || '...'}
                       wordTimings={audio?.wordTimings ?? null}
-                      localTime={isActive ? activeClip.localTime : 0}
+                      localTime={activeClip?.localTime ?? 0}
                       isActive={!!isActive}
                       enabled={highlightEnabled}
                       className={`body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}

@@ -184,21 +184,88 @@ describe("features/decks", () => {
         });
       });
 
-      const asUser = t.withIdentity({ subject: "user_A" });
-      const res = await asUser.mutation(
-        api.features.decks.addCardsFromCollection,
-        { collectionId: collA1, batchSize: 2 },
-      );
+      // addCardsFromCollection schedules prepareCardContent for each text,
+      // which in turn fans out into translation + TTS + Scribe actions. We
+      // drain that chain at the end of the test to avoid post-teardown
+      // setTimeout firings hitting a null db state. Fake timers keep those
+      // setTimeouts from firing mid-mutation; `finishAllScheduledFunctions`
+      // pumps them at a controlled point. Stub every host the chain can
+      // reach — unknown hosts throw so the test fails loudly if the chain
+      // wanders into unmocked territory.
+      vi.useFakeTimers();
+      vi.stubEnv("GOOGLE_TTS_API_KEY", "dummy");
+      vi.stubEnv("GOOGLE_TRANSLATE_API_KEY", "dummy");
+      vi.stubEnv("ELEVENLABS_API_KEY", "dummy");
 
-      expect(res.cardsAdded).toBeGreaterThan(0);
-      const cards = await t.run(async (ctx) =>
-        ctx.db
-          .query("cards")
-          .withIndex("by_deckId", (q) => q.eq("deckId", deckId))
-          .collect(),
-      );
-      expect(cards.length).toBe(res.cardsAdded);
-      expect(res.totalCardsInDeck).toBe(cards.length);
+      const translateBody = JSON.stringify({
+        data: { translations: [{ translatedText: "translated" }] },
+      });
+      const scribeBody = JSON.stringify({
+        text: "translated",
+        words: [{ text: "translated", start: 0, end: 0.5, type: "word" }],
+      });
+      const elevenTtsBytes = new Uint8Array([0, 1, 2, 3]);
+      const googleTtsBody = JSON.stringify({
+        audioContent: Buffer.from("fake-mp3-bytes").toString("base64"),
+      });
+
+      const fetchMock = vi.fn(async (url: string | URL | Request) => {
+        const u = typeof url === "string" ? url : url.toString();
+        if (u.includes("translation.googleapis.com/language/translate/v2")) {
+          return new Response(translateBody, {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (u.includes("api.elevenlabs.io/v1/speech-to-text")) {
+          return new Response(scribeBody, {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        if (u.includes("api.elevenlabs.io/v1/text-to-speech")) {
+          return new Response(elevenTtsBytes, {
+            status: 200,
+            headers: { "Content-Type": "audio/mpeg" },
+          });
+        }
+        if (u.includes("texttospeech.googleapis.com")) {
+          return new Response(googleTtsBody, {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        throw new Error(`Unexpected fetch to ${u}`);
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      try {
+        const asUser = t.withIdentity({ subject: "user_A" });
+        const res = await asUser.mutation(
+          api.features.decks.addCardsFromCollection,
+          { collectionId: collA1, batchSize: 2 },
+        );
+
+        // Drain the scheduled chain (prepareCardContent + fan-out) so that
+        // setTimeout callbacks don't fire after the test returns and hit a
+        // torn-down db. `finishAllScheduledFunctions` needs a way to advance
+        // time — pass vi.runAllTimers since we installed fake timers above.
+        await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+        expect(res.cardsAdded).toBeGreaterThan(0);
+        const cards = await t.run(async (ctx) =>
+          ctx.db
+            .query("cards")
+            .withIndex("by_deckId", (q) => q.eq("deckId", deckId))
+            .collect(),
+        );
+        expect(cards.length).toBe(res.cardsAdded);
+        expect(res.totalCardsInDeck).toBe(cards.length);
+      } finally {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
     });
   });
 });

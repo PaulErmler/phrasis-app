@@ -214,7 +214,7 @@ export function WordSentencesDialog({
                             <HighlightedText
                               text={tr.text}
                               wordTimings={audio?.wordTimings ?? null}
-                              localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                              localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}
                               enabled={highlightEnabled}
                               className="text-sm font-medium leading-relaxed"
@@ -259,7 +259,7 @@ export function WordSentencesDialog({
                             <HighlightedText
                               text={tr.text}
                               wordTimings={audio?.wordTimings ?? null}
-                              localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                              localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}
                               enabled={highlightEnabled}
                               className="text-sm leading-relaxed"

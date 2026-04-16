@@ -45,9 +45,9 @@ export function DeckCardsView() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Layers className="h-5 w-5" />
-            Your Deck
+            {t('title')}
           </CardTitle>
-          <CardDescription>Loading cards...</CardDescription>
+          <CardDescription>{t('loading')}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {[1, 2, 3].map((i) => (
@@ -64,11 +64,9 @@ export function DeckCardsView() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Layers className="h-5 w-5" />
-            Your Deck
+            {t('title')}
           </CardTitle>
-          <CardDescription>
-            No cards in your deck yet. Add some cards from a collection above!
-          </CardDescription>
+          <CardDescription>{t('emptyState')}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -79,12 +77,12 @@ export function DeckCardsView() {
       <CardHeader>
         <CardTitle className="text-lg flex items-center gap-2">
           <Layers className="h-5 w-5" />
-          Your Deck
+          {t('title')}
           <Badge variant="secondary" className="ml-2">
-            {deckCards.length} cards
+            {t('cardCount', { count: deckCards.length })}
           </Badge>
         </CardTitle>
-        <CardDescription>Cards with translations and audio</CardDescription>
+        <CardDescription>{t('description')}</CardDescription>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[400px] pr-4">
@@ -169,7 +167,7 @@ export function DeckCardsView() {
                             <HighlightedText
                               text={baseTranslation?.text || card.sourceText}
                               wordTimings={baseAudio?.wordTimings ?? null}
-                              localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                              localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}
                               enabled={highlightEnabled}
                               className="text-sm"
@@ -225,7 +223,7 @@ export function DeckCardsView() {
                                 <HighlightedText
                                   text={targetTranslation.text}
                                   wordTimings={targetAudio?.wordTimings ?? null}
-                                  localTime={isActive ? buttonPlayback.active!.localTime : 0}
+                                  localTime={buttonPlayback.active?.localTime ?? 0}
                                   isActive={isActive}
                                   enabled={highlightEnabled}
                                   className="text-sm"

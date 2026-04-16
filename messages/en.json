@@ -147,6 +147,11 @@
       }
     },
     "deckCards": {
+      "title": "Your Deck",
+      "loading": "Loading cards...",
+      "emptyState": "No cards in your deck yet. Add some cards from a collection above!",
+      "description": "Cards with translations and audio",
+      "cardCount": "{count, plural, one {# card} other {# cards}}",
       "baseLabel": "Base (You know this)",
       "targetLabel": "Target (Learning this)",
       "translating": "Translating...",
