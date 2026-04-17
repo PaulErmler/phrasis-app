@@ -215,7 +215,6 @@ const ELEVENLABS_VOICES_VI: Voice[] = [
 // Swedish — Jane + native Sanna/Louise (F); native Peter/Martin (M).
 const ELEVENLABS_VOICES_SV: Voice[] = [
   createElevenLabsVoice('Jane', 'female', 'RILOU7YmBhvwJGDGjNmP'),
-  createElevenLabsVoice('Roberta', 'female', 'UgBBYS2sOqTuMpoF3BR0'), 
   createElevenLabsVoice('Louise', 'female', 'QLfvbukvQvrPOx9HXQ3x'), 
   createElevenLabsVoice('Martin', 'male', 'CuaAIFbkzX2kaNH5EtHZ'),
   createElevenLabsVoice('Andres', 'male', 'hMTrLL2ZiyJiyKrdg2z4'),
