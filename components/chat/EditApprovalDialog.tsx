@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
@@ -98,12 +98,12 @@ export function EditApprovalDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         aria-describedby={undefined}
-        className="top-[calc(3.5rem+1.5rem)] max-h-[calc(100dvh-3.5rem-1.5rem-1rem-env(safe-area-inset-bottom,0px))] translate-y-0 overflow-y-auto sm:max-w-sm"
+        className="top-[calc(3.5rem+1.5rem)] max-h-[calc(100dvh-3.5rem-1.5rem-1rem-env(safe-area-inset-bottom,0px))] translate-y-0 grid-rows-[auto_minmax(0,1fr)_auto] sm:max-w-sm"
       >
         <DialogHeader>
           <DialogTitle>{t('title')}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto">
           {orderedLanguages.map((lang) => {
             const value = editedTexts[lang] ?? '';
             const isOverLimit = value.length > MAX_CARD_TEXT_LENGTH;
@@ -121,9 +121,10 @@ export function EditApprovalDialog({
                       : `${value.length}/${MAX_CARD_TEXT_LENGTH}`}
                   </span>
                 </div>
-                <Input
+                <Textarea
                   id={`edit-approval-${lang}`}
                   value={value}
+                  rows={2}
                   onChange={(e) =>
                     setEditedTexts((prev) => ({
                       ...prev,

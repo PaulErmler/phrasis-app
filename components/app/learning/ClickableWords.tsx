@@ -130,6 +130,7 @@ export function ClickableWords({
                 className={cn(
                   'cursor-pointer rounded-sm transition-colors duration-200 hover:bg-muted',
                   i === currentIndex && 'text-primary',
+                  openIndex === i && 'text-warning hover:bg-transparent',
                 )}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
