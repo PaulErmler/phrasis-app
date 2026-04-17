@@ -17,7 +17,7 @@ import {
 } from '../types';
 import type { TtsProvider, VoiceGender } from '../types';
 
-const MAX_TTS_VALIDATION_ATTEMPTS = 3;
+const MAX_TTS_VALIDATION_ATTEMPTS = 2;
 const TTS_CLAIM_STALE_MS = 30 * 1000; // 30 seconds
 
 /**
