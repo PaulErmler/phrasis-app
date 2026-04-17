@@ -286,6 +286,17 @@ export function useAudioPlayer(
   // --------------------------------------------------------------------------
   const allAudioReady = audioRecordings.length > 0 && audioRecordings.every((a) => a.url);
 
+  // Identity key for the audio set: changes on language changes, voice swaps,
+  // and URL null↔present transitions, but not on signed-URL refreshes. Using
+  // raw URL strings would cause needless remerges every time Convex refreshes
+  // signed URLs while allAudioReady stays true.
+  const audioIdentityKey = useMemo(() => {
+    if (audioRecordings.length === 0) return '';
+    return audioRecordings
+      .map((a) => `${a.language}:${a.voiceName ?? 'none'}:${a.url ? '1' : '0'}`)
+      .join('|');
+  }, [audioRecordings]);
+
   // Stable key that changes whenever any playback-affecting setting changes
   const settingsKey = useMemo(
     () =>
@@ -321,14 +332,26 @@ export function useAudioPlayer(
       cardId != null &&
       !isCardChange;
 
-    clearCurrentAudio();
-
-    if (!cardId || !allAudioReady) {
+    if (!cardId) {
+      clearCurrentAudio();
       mergeAbortRef.current?.abort();
       mergeAbortRef.current = null;
       setIsMerging(false);
       return;
     }
+
+    if (!allAudioReady) {
+      // URLs transiently missing for this card. Clear only on a real card
+      // change; otherwise leave the currently loaded blob playing and wait
+      // for URLs to return — so a reactive query hiccup doesn't strand audio.
+      mergeAbortRef.current?.abort();
+      mergeAbortRef.current = null;
+      setIsMerging(false);
+      if (isCardChange) clearCurrentAudio();
+      return;
+    }
+
+    if (isCardChange) clearCurrentAudio();
 
     // Cancel any in-flight merge
     mergeAbortRef.current?.abort();
@@ -415,7 +438,7 @@ export function useAudioPlayer(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     cardId,
-    allAudioReady,
+    audioIdentityKey,
     settingsKey,
     baseOrderKey,
     targetOrderKey,
