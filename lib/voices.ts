@@ -245,8 +245,8 @@ const ELEVENLABS_VOICES_EL: Voice[] = [
 const ELEVENLABS_VOICES_AR: Voice[] = [
   createElevenLabsVoice('Sara', 'female', 'XTa3iQyMA6f1qrI4F6kZ'),
   createElevenLabsVoice('Sara2', 'female', 'gMB389pj77Qe5nErWNjd'),
-  createElevenLabsVoice('Yahya', 'male', 'QRq5hPRAKf5ZhSlTBH6r'),
-  createElevenLabsVoice('Anas', 'male', 'R6nda3uM038xEEKi7GFl'),
+  createElevenLabsVoice('Mohammed', 'male', 'Qp2PG6sgef1EHtrNQKnf'),
+  createElevenLabsVoice('Mazen', 'male', 'rPNcQ53R703tTmtue1AT'),
 ];
 
 // ---------------------------------------------------------------------------
