@@ -233,6 +233,7 @@ export function CardApproval({
         {isPending ? (
           !isAvailable ? (
             <Button
+              key="approve-upgrade"
               onClick={() => setPaywallOpen(true)}
               size="sm"
               className="h-8 px-3 text-sm gap-1.5"
@@ -243,6 +244,7 @@ export function CardApproval({
             </Button>
           ) : (
             <Button
+              key="approve-action"
               onClick={handleApprove}
               disabled={isProcessing || !approvalId}
               size="sm"
@@ -254,11 +256,12 @@ export function CardApproval({
           )
         ) : (
           <Button
+            key="approval-status"
             disabled
             variant="ghost"
             size="sm"
             className={cn(
-              'ml-auto h-8 px-3 text-xs font-medium hover:bg-transparent disabled:opacity-100',
+              'h-8 px-3 text-xs font-medium hover:bg-transparent disabled:opacity-100',
               isApproved ? 'text-success' : 'text-red-700 dark:text-red-300',
             )}
             {...(isApproved ? { 'data-testid': 'card-approved-indicator' } : {})}
