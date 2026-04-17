@@ -17,6 +17,7 @@ import { trackEvent } from '../../db/stats/dailyStats';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS } from '../../config/aiModels';
+import { getLanguageByCode } from '../../../lib/languages';
 
 export type ListMessagesStreamArgs = {
   kind: 'list';
@@ -126,11 +127,26 @@ function buildLanguageSection(courseLanguages: {
     ...new Set([...courseLanguages.baseLanguages, ...courseLanguages.targetLanguages]),
   ];
 
-  return `Course language configuration:
-Base languages: ${courseLanguages.baseLanguages.join(', ')}
-Target languages: ${courseLanguages.targetLanguages.join(', ')}
-All language codes for cards (in required order): ${JSON.stringify(allLangs)}
-Every createCard call MUST include translations for ALL of these languages: ${JSON.stringify(allLangs)}. No exceptions.`;
+  const namedLines = allLangs
+    .map((code) => `- ${code}: ${getLanguageByCode(code)?.name ?? code}`)
+    .join('\n');
+
+  const firstName = getLanguageByCode(allLangs[0])?.name ?? allLangs[0];
+  const secondCode = allLangs[1] ?? allLangs[0];
+  const secondName = getLanguageByCode(secondCode)?.name ?? secondCode;
+
+  const schematic = allLangs
+    .map((code) => {
+      const name = getLanguageByCode(code)?.name ?? code;
+      return `{"language":"${code}","text":"<${name} sentence>"}`;
+    })
+    .join(',');
+
+  return `Course language configuration (required order; one translation per code per card):
+${namedLines}
+
+Each createCard call must pass exactly these entries, in this order. The "text" for each entry must be written in the language named above — e.g. the "${allLangs[0]}" text must be ${firstName}, the "${secondCode}" text must be ${secondName}. Never copy one entry's text into another.
+Schematic: [${schematic}]`;
 }
 
 /**

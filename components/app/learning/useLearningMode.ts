@@ -514,6 +514,18 @@ export function useLearningMode(
       ? Math.max(0, activeEntry.totalTexts - activeEntry.cardsAdded)
       : null;
 
+    // When auto-add is enabled and will actually add cards, suppress the
+    // noCardsDue screen so the transition to the next batch is seamless.
+    const autoAddWillRun =
+      !!courseSettings.autoAddCards &&
+      !settingsOpen &&
+      (sentencesQuota.unlimited || sentencesQuota.balance > 0) &&
+      (remainingInCollection === null || remainingInCollection > 0);
+
+    if (autoAddWillRun) {
+      return { ...base, status: 'loading' };
+    }
+
     return {
       ...base,
       status: 'noCardsDue',

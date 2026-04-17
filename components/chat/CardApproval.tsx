@@ -14,6 +14,7 @@ import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
+import { cn } from '@/lib/utils';
 
 const TOOL_SUCCESS = "Card has been created.";
 
@@ -197,62 +198,67 @@ export function CardApproval({
     </div>
   );
 
-  if (approvalState === 'approved') {
-    return (
-      <Alert data-testid="card-approval" className="my-3 flex flex-col gap-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-        <AlertDescription>{cardContent}</AlertDescription>
-        <div className="flex items-center justify-end gap-2 h-8">
-          <p data-testid="card-approved-indicator" className="text-xs font-medium text-success">{t('approved')}</p>
-        </div>
-      </Alert>
-    );
-  }
-
-  if (approvalState === 'rejected') {
-    return (
-      <Alert data-testid="card-approval" className="my-3 flex flex-col gap-3 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-        <AlertDescription>{cardContent}</AlertDescription>
-        <div className="flex items-center justify-end gap-2 h-8">
-          <p className="text-xs font-medium text-red-700 dark:text-red-300">{t('rejected')}</p>
-        </div>
-      </Alert>
-    );
-  }
+  const isPending = approvalState === 'pending';
+  const isApproved = approvalState === 'approved';
 
   return (
-    <Alert data-testid="card-approval" className="my-3 flex flex-col gap-3">
+    <Alert
+      data-testid="card-approval"
+      className={cn(
+        'my-3 flex flex-col gap-3',
+        isApproved && 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950',
+        approvalState === 'rejected' && 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
+      )}
+    >
       <AlertDescription>{cardContent}</AlertDescription>
-      <div className="flex items-center justify-end gap-2">
-        <FeatureBadge featureId="custom_sentences" />
-        <Button
-          onClick={handleReject}
-          disabled={isProcessing || !approvalId}
-          variant="outline"
-          size="sm"
-          className="h-8 px-3 text-sm"
-          data-testid="card-reject"
-        >
-          {t('rejectButton')}
-        </Button>
-        {!isAvailable ? (
+      <div className="flex items-center justify-end gap-2 h-8">
+        {isPending && <FeatureBadge featureId="custom_sentences" />}
+        {isPending && (
           <Button
-            onClick={() => setPaywallOpen(true)}
-            size="sm"
-            className="h-8 px-3 text-sm gap-1.5"
-            data-testid="card-approve"
-          >
-            <Lock className="h-3.5 w-3.5" />
-            Upgrade
-          </Button>
-        ) : (
-          <Button
-            onClick={handleApprove}
+            onClick={handleReject}
             disabled={isProcessing || !approvalId}
+            variant="outline"
             size="sm"
             className="h-8 px-3 text-sm"
-            data-testid="card-approve"
+            data-testid="card-reject"
           >
-            {t('approveButton')}
+            {t('rejectButton')}
+          </Button>
+        )}
+        {isPending ? (
+          !isAvailable ? (
+            <Button
+              onClick={() => setPaywallOpen(true)}
+              size="sm"
+              className="h-8 px-3 text-sm gap-1.5"
+              data-testid="card-approve"
+            >
+              <Lock className="h-3.5 w-3.5" />
+              Upgrade
+            </Button>
+          ) : (
+            <Button
+              onClick={handleApprove}
+              disabled={isProcessing || !approvalId}
+              size="sm"
+              className="h-8 px-3 text-sm"
+              data-testid="card-approve"
+            >
+              {t('approveButton')}
+            </Button>
+          )
+        ) : (
+          <Button
+            disabled
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'h-8 px-3 text-xs font-medium hover:bg-transparent disabled:opacity-100',
+              isApproved ? 'text-success' : 'text-red-700 dark:text-red-300',
+            )}
+            {...(isApproved ? { 'data-testid': 'card-approved-indicator' } : {})}
+          >
+            {isApproved ? t('approved') : t('rejected')}
           </Button>
         )}
       </div>
