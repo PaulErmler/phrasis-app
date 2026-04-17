@@ -510,6 +510,7 @@
     "cardApproval": {
       "approveButton": "Add Sentence",
       "rejectButton": "Reject",
+      "editButton": "Edit sentence",
       "approved": "Sentence added!",
       "rejected": "Sentence creation cancelled",
       "loading": "Loading...",
@@ -833,6 +834,12 @@
     "retry": "Try again"
   },
   "EditCard": {
+    "title": "Edit Sentence",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving..."
+  },
+  "EditCardApproval": {
     "title": "Edit Sentence",
     "cancel": "Cancel",
     "save": "Save",

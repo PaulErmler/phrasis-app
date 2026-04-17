@@ -10,7 +10,19 @@ vi.mock("@/components/feature_tracking/FeatureBadge", () => ({
 }));
 vi.mock("@/components/autumn/paywall-dialog", () => ({ default: () => null }));
 vi.mock("@/hooks/use-course-languages", () => ({
-  useCourseLanguages: () => ({ targetLanguages: ["es"] }),
+  useCourseLanguages: () => ({ baseLanguages: ["en"], targetLanguages: ["es"] }),
+}));
+vi.mock("@/components/chat/EditApprovalDialog", () => ({
+  EditApprovalDialog: ({
+    open,
+    approvalId,
+  }: {
+    open: boolean;
+    approvalId: unknown;
+  }) =>
+    open ? (
+      <div data-testid="edit-approval-dialog" data-approval-id={String(approvalId)} />
+    ) : null,
 }));
 
 import { CardApproval } from "@/components/chat/CardApproval";
@@ -107,6 +119,81 @@ describe("CardApproval", () => {
     );
     await user.click(screen.getByText("approveButton"));
     expect(onApprove).toHaveBeenCalledWith("ap1");
+  });
+
+  it("shows edit button in pending state and opens dialog", async () => {
+    const user = userEvent.setup();
+    const map = new Map();
+    map.set("tc-1", {
+      _id: "ap1",
+      toolCallId: "tc-1",
+      translations: [
+        { language: "en", text: "hello" },
+        { language: "es", text: "hola" },
+      ],
+      status: "pending",
+    });
+    render(
+      <CardApproval
+        toolPart={makeToolPart()}
+        approvalsByToolCallId={map}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        processingApprovals={new Set()}
+      />,
+    );
+    const editButton = screen.getByTestId("card-edit");
+    expect(editButton).toBeInTheDocument();
+    expect(screen.queryByTestId("edit-approval-dialog")).not.toBeInTheDocument();
+    await user.click(editButton);
+    const dialog = screen.getByTestId("edit-approval-dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.getAttribute("data-approval-id")).toBe("ap1");
+  });
+
+  it("hides edit button when approval is not pending", () => {
+    const map = new Map();
+    map.set("tc-1", {
+      _id: "ap1",
+      toolCallId: "tc-1",
+      translations: [],
+      status: "approved",
+    });
+    render(
+      <CardApproval
+        toolPart={makeToolPart()}
+        approvalsByToolCallId={map}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        processingApprovals={new Set()}
+      />,
+    );
+    expect(screen.queryByTestId("card-edit")).not.toBeInTheDocument();
+  });
+
+  it("prefers approval.translations over tool input for display", () => {
+    const map = new Map();
+    map.set("tc-1", {
+      _id: "ap1",
+      toolCallId: "tc-1",
+      translations: [
+        { language: "en", text: "edited english" },
+        { language: "es", text: "edited spanish" },
+      ],
+      status: "pending",
+    });
+    render(
+      <CardApproval
+        toolPart={makeToolPart()}
+        approvalsByToolCallId={map}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        processingApprovals={new Set()}
+      />,
+    );
+    expect(screen.getByText("edited english")).toBeInTheDocument();
+    expect(screen.getByText("edited spanish")).toBeInTheDocument();
+    expect(screen.queryByText("hello")).not.toBeInTheDocument();
   });
 
   it("shows error alert on tool error", () => {

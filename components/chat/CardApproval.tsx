@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Lock } from 'lucide-react';
+import { Lock, Pencil } from 'lucide-react';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
 import { cn } from '@/lib/utils';
+import { EditApprovalDialog } from './EditApprovalDialog';
 
 const TOOL_SUCCESS = "Card has been created.";
 
@@ -55,6 +56,7 @@ export function CardApproval({
     'approved' | 'rejected' | null
   >(null);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const { isAvailable } = useFeatureQuota('custom_sentences');
 
   const toolCallId = toolPart.toolCallId?.trim();
@@ -65,8 +67,11 @@ export function CardApproval({
   };
   const { state: toolState, output: toolOutput } = tool;
 
-  const entries = toolPart.input?.translations ?? [];
   const approval = toolCallId ? approvalsByToolCallId.get(toolCallId) : undefined;
+  const entries =
+    approval?.translations && approval.translations.length > 0
+      ? approval.translations
+      : (toolPart.input?.translations ?? []);
   const approvalId = approval?._id ?? null;
   const approvalState = optimisticState ?? approval?.status ?? 'pending';
   const isToolComplete =
@@ -211,7 +216,7 @@ export function CardApproval({
       )}
     >
       <AlertDescription>{cardContent}</AlertDescription>
-      <div className="flex items-center justify-end gap-2 h-8">
+      <div className="flex w-full items-center gap-2 h-8">
         {isPending && <FeatureBadge featureId="custom_sentences" />}
         {isPending && (
           <Button
@@ -253,7 +258,7 @@ export function CardApproval({
             variant="ghost"
             size="sm"
             className={cn(
-              'h-8 px-3 text-xs font-medium hover:bg-transparent disabled:opacity-100',
+              'ml-auto h-8 px-3 text-xs font-medium hover:bg-transparent disabled:opacity-100',
               isApproved ? 'text-success' : 'text-red-700 dark:text-red-300',
             )}
             {...(isApproved ? { 'data-testid': 'card-approved-indicator' } : {})}
@@ -261,7 +266,28 @@ export function CardApproval({
             {isApproved ? t('approved') : t('rejected')}
           </Button>
         )}
+        {isPending && approvalId && (
+          <Button
+            onClick={() => setEditOpen(true)}
+            disabled={isProcessing}
+            variant="outline"
+            size="icon"
+            className="ml-auto h-8 w-8"
+            aria-label={t('editButton')}
+            data-testid="card-edit"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+        )}
       </div>
+      {approvalId && (
+        <EditApprovalDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          approvalId={approvalId}
+          translations={entries}
+        />
+      )}
       {paywallOpen && (
         <PaywallDialog
           open={paywallOpen}

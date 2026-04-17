@@ -507,6 +507,7 @@
     "cardApproval": {
       "approveButton": "Satz hinzufügen",
       "rejectButton": "Ablehnen",
+      "editButton": "Satz bearbeiten",
       "approved": "Satz hinzugefügt!",
       "rejected": "Satzerstellung abgebrochen",
       "loading": "Lädt...",
@@ -904,6 +905,12 @@
     "retry": "Erneut versuchen"
   },
   "EditCard": {
+    "title": "Satz bearbeiten",
+    "cancel": "Abbrechen",
+    "save": "Speichern",
+    "saving": "Speichern..."
+  },
+  "EditCardApproval": {
     "title": "Satz bearbeiten",
     "cancel": "Abbrechen",
     "save": "Speichern",

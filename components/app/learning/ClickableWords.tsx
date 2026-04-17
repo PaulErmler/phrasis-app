@@ -126,6 +126,7 @@ export function ClickableWords({
               <span
                 role="button"
                 tabIndex={0}
+                data-testid="clickable-word"
                 className={cn(
                   'cursor-pointer rounded-sm transition-colors duration-200 hover:bg-muted',
                   i === currentIndex && 'text-primary',
@@ -149,6 +150,7 @@ export function ClickableWords({
               <Button
                 size="sm"
                 variant="secondary"
+                data-testid="ask-ai-button"
                 onClick={() => handleAsk(w.display)}
               >
                 <Sparkles className="h-3.5 w-3.5" />
