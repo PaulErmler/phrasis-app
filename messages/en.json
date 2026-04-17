@@ -466,6 +466,8 @@
   },
   "Chat": {
     "back": "Back",
+    "askAI": "Ask AI",
+    "explainWord": "Explain me this word: {word}",
     "thinking": "Thinking...",
     "emptyTitle": "Your language tutor",
     "aiNotice": "You are chatting with an AI assistant. It can make mistakes — always verify important information.",

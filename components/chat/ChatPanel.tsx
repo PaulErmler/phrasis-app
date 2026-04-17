@@ -41,6 +41,16 @@ interface ChatPanelProps {
   autoFocus?: boolean;
   /** When true, skips bottom padding (e.g. when no bottom nav is present) */
   noBottomPadding?: boolean;
+  /** External text to auto-submit. Fires whenever initialTextNonce changes. */
+  initialText?: string;
+  /** Monotonic counter — each new value re-fires the auto-submit, even if the text is identical. */
+  initialTextNonce?: number;
+  /**
+   * Optional dedup hook: returns true only for the first caller of a given
+   * nonce. Needed when multiple ChatPanel instances share the same context
+   * (e.g. learning mode mounts one for desktop and one for mobile).
+   */
+  claimInitialText?: (nonce: number) => boolean;
 }
 
 /**
@@ -64,6 +74,9 @@ export function ChatPanel({
   approvalsLoading = false,
   autoFocus,
   noBottomPadding = false,
+  initialText,
+  initialTextNonce,
+  claimInitialText,
 }: ChatPanelProps) {
   const { isAvailable } = useFeatureQuota(FEATURE_IDS.CHAT_MESSAGES);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -127,6 +140,18 @@ export function ChatPanel({
     },
     [chat],
   );
+
+  // Auto-submit externally-supplied initial text (e.g. from a word bubble in
+  // learning mode). Keyed on the nonce so the same prompt fires again when the
+  // user clicks the same word. Goes through handleSubmit so paywall + thread
+  // limit guards apply exactly like a normal send. claimInitialText dedups
+  // across concurrent ChatPanel mounts (see prop doc).
+  useEffect(() => {
+    if (initialTextNonce == null || initialText == null) return;
+    if (claimInitialText && !claimInitialText(initialTextNonce)) return;
+    void handleSubmit({ text: initialText, files: [] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTextNonce]);
 
   const tError = useTranslations('Chat.chatError');
 

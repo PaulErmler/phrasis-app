@@ -12,7 +12,7 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 import { AudioButton } from './AudioButton';
-import { HighlightedText } from './HighlightedText';
+import { ClickableWords } from './ClickableWords';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
 
@@ -161,7 +161,7 @@ export function CardShell({
                 className="flex items-start gap-2"
               >
                 <div className="flex-1">
-                  <HighlightedText
+                  <ClickableWords
                     text={translation.text || '...'}
                     wordTimings={audio?.wordTimings ?? null}
                     localTime={activeClip?.localTime ?? 0}

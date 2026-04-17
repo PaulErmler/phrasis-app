@@ -463,6 +463,8 @@
   },
   "Chat": {
     "back": "Zurück",
+    "askAI": "KI fragen",
+    "explainWord": "Erkläre mir dieses Wort: {word}",
     "thinking": "Denkt nach...",
     "emptyTitle": "Dein Sprachtutor",
     "aiNotice": "Du chattest mit einem KI-Assistenten. Er kann Fehler machen – überprüfe wichtige Informationen immer.",

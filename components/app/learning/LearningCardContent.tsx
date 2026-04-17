@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
-import { HighlightedText } from './HighlightedText';
+import { ClickableWords } from './ClickableWords';
 import { resolveActiveClip } from '@/lib/audio/activeClip';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
 import type { LanguageCue } from '@/lib/audio/mergeAudio';
@@ -189,12 +189,13 @@ export function LearningCardContent({
                     className="flex-1"
                     onClick={isBlurred ? () => handleReveal(translation.language) : undefined}
                   >
-                    <HighlightedText
+                    <ClickableWords
                       text={translation.text || '...'}
                       wordTimings={audio?.wordTimings ?? null}
                       localTime={activeClip?.localTime ?? 0}
                       isActive={!!isActive}
                       enabled={highlightEnabled}
+                      interactive={!isBlurred}
                       className={`body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
                     />
                     {showRomanization && translation.romanization && (
