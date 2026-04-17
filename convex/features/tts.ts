@@ -19,7 +19,7 @@ interface GoogleTTSResponse {
 }
 
 /** ElevenLabs model ID used for all synthesis. */
-const ELEVENLABS_MODEL_ID = 'eleven_turbo_v2_5';
+const ELEVENLABS_MODEL_ID = 'eleven_flash_v2_5';
 /** ElevenLabs MP3 output format: 44.1 kHz, 128 kbps — matches our existing pipeline. */
 const ELEVENLABS_OUTPUT_FORMAT = 'mp3_44100_128';
 

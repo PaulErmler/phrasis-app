@@ -46,7 +46,7 @@ const SAMPLE_TEXT: Record<string, string> = {
   ar: 'أحب التنزه في الحديقة في المساء والاستماع إلى الموسيقى الهادئة.',
 };
 
-const MODEL_ID = 'eleven_turbo_v2_5';
+const MODEL_ID = 'eleven_flash_v2_5';
 const OUTPUT_FORMAT = 'mp3_44100_128';
 const OUT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), 'voice-samples');
 
