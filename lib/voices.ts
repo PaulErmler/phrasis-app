@@ -117,7 +117,7 @@ const ELEVENLABS_VOICES_EN: Voice[] = [
 // Spanish (Spain / Castilian) — Clara + Carolina (native Castilian females);
 // James + Emilio (native Spanish male).
 const ELEVENLABS_VOICES_ES: Voice[] = [
-  createElevenLabsVoice('Aitana', 'female', 'AxFLn9byyiDbMn5fmyqu'),
+  createElevenLabsVoice('Eva', 'female', 'RgXx32WYOGrd7gFNifSf'),
   createElevenLabsVoice('Lydia', 'female', 'SDVJaMLoJa7wc3s2sn7d'),
   createElevenLabsVoice('David' ,'male', "Nh2zY9kknu6z4pZy6FhD"), 
   createElevenLabsVoice('Emilio', 'male', 'ZCh4e9eZSUf41K4cmCEL'),

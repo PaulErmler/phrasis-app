@@ -20,7 +20,19 @@
       "Bash(grep -r \"LearningModeSettings\\\\|CourseSettings\\\\|playbackRate\\\\|speed\" /Users/paulermler/Documents/Phrasis/new/phrasis-app --include=\"*.tsx\" ! -path \"*/node_modules/*\" -l)",
       "Bash(grep -r \"soundtouch\\\\|SoundTouch\" /Users/paulermler/Documents/Phrasis/new/phrasis-app --include=\"*.ts\" --include=\"*.tsx\" ! -path \"*/node_modules/*\")",
       "Bash(npx vitest:*)",
-      "Bash(pnpm test:convex -- scheduling ttsProcessing)"
+      "Bash(pnpm test:convex -- scheduling ttsProcessing)",
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "WebFetch(domain:convex-better-auth.netlify.app)",
+      "WebFetch(domain:www.better-auth.com)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts|json|css\\)$\")",
+      "Bash(grep -E \"\\\\.tsx$\")",
+      "Bash(curl -s -L \"https://www.better-auth.com/docs/concepts/session-management\" -o /tmp/ba-session.html)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -L \"https://www.better-auth.com/docs/integrations/expo\" -o /tmp/ba-expo.html)",
+      "Bash(curl -s -L \"https://labs.convex.dev/auth\" -o /tmp/convex-auth.html)",
+      "Bash(curl -s -L \"https://better-auth.convex.dev\" -o /tmp/ba-convex.html)",
+      "Bash(curl -sL https://labs.convex.dev/better-auth)",
+      "Bash(curl -sL https://labs.convex.dev/better-auth/framework-guides/next-js)"
     ]
   }
 }

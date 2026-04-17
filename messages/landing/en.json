@@ -53,9 +53,9 @@
       "base": "Good morning, how are you?",
       "hi": "सुप्रभात, आप कैसे हैं?",
       "hiRoman": "suprabhaat, aap kaise hain?",
-      "es": "Buenos días, ¿cómo estás?",
+      "es": "Buenos días ¿cómo está?",
       "fr": "Bonjour, comment allez-vous ?",
-      "typedEs": "Buenos dias, como estas?",
+      "typedEs": "Buenos dias como esta?",
       "typedFr": "Bonjour, comment allez vous?"
     }
   },
@@ -72,23 +72,23 @@
     "replay": "Replay",
     "grammar": {
       "userMessage": "How do I conjugate estar for I and they in Spanish?",
-      "assistantMessage": "For yo (I), estar is estoy — e.g. Estoy bien. For ellos or ellas (they), it is están; the second card shows that in a greeting: Buenos días, ¿cómo están? The first card uses está with usted, the formal one-person form (same ending as él/ella). Tap Add Card when you want either line in your deck.",
-      "card1Base": "Good morning — formal, one person",
-      "card1Target": "Buenos días, ¿cómo está usted?",
-      "card2Base": "Good morning — to several people",
-      "card2Target": "Buenos días, ¿cómo están?",
+      "assistantMessage": "For yo (I), estar is estoy — e.g. Estoy bien. For ellos or ellas (they), it is están; the second card shows that in a greeting: Buenos días ¿cómo están? The first card uses está with usted, the formal one-person form (same ending as él/ella). Tap Add Card when you want either line in your deck.",
+      "card1Base": "Good morning, how are you?",
+      "card1Target": "Buenos días ¿cómo está usted?",
+      "card2Base": "Good morning everyone, how are you all?",
+      "card2Target": "Buenos días ¿cómo están?",
       "multiCard1": {
-        "base": "Good morning — formal, one person",
-        "hi": "सुप्रभात, आप कैसे हैं? (आप — औपचारिक)",
-        "hiRoman": "suprabhaat, aap kaise hain? (aap — formal)",
-        "es": "Buenos días, ¿cómo está usted?",
+        "base": "Good morning, how are you?",
+        "hi": "सुप्रभात, आप कैसे हैं?",
+        "hiRoman": "suprabhaat, aap kaise hain?",
+        "es": "Buenos días ¿cómo está usted?",
         "fr": "Bonjour, comment allez-vous ?"
       },
       "multiCard2": {
-        "base": "Good morning — to several people",
+        "base": "Good morning everyone, how are you all?",
         "hi": "सुप्रभात, आप सब कैसे हैं?",
         "hiRoman": "suprabhaat, aap sab kaise hain?",
-        "es": "Buenos días, ¿cómo están?",
+        "es": "Buenos días ¿cómo están?",
         "fr": "Bonjour à tous, comment allez-vous ?"
       }
     },
@@ -129,28 +129,28 @@
       }
     },
     "curiosity": {
-      "userMessage": "What are some funny Spanish words?",
-      "assistantMessage": "Learners love chunky slang and sound-alike surprises. Chiripa is a fun noun for a lucky fluke; tocayo is the word for someone who shares your name — handy for jokes. Here are two cards if you want them in your deck.",
+      "userMessage": "Are there Spanish words English doesn't have?",
+      "assistantMessage": "Lots! Spanish often has a single compact word where English needs a whole phrase. Sobremesa is the leisurely chat after a meal; estrenar means to use or wear something for the first time. Both come up in everyday conversation. Tap Add Card on either to keep them.",
       "simple": {
-        "card1Base": "What a lucky break! (colloquial)",
-        "card1Target": "¡Qué chiripa!",
-        "card2Base": "We have the same first name.",
-        "card2Target": "Somos tocayos."
+        "card1Base": "Let's stay and chat after dinner.",
+        "card1Target": "Hagamos sobremesa.",
+        "card2Base": "I'm wearing these shoes for the first time.",
+        "card2Target": "Estoy estrenando estos zapatos."
       },
       "multi": {
         "card1": {
-          "base": "What a lucky break! (colloquial)",
-          "hi": "कितनी अच्छी किस्मत!",
-          "hiRoman": "kitni achhi kismat!",
-          "es": "¡Qué chiripa!",
-          "fr": "Quelle veine !"
+          "base": "Let's stay and chat after dinner.",
+          "hi": "रात के खाने के बाद थोड़ी और बातें करते हैं।",
+          "hiRoman": "raat ke khaane ke baad thodi aur baatein karte hain.",
+          "es": "Hagamos sobremesa.",
+          "fr": "Restons discuter après le dîner."
         },
         "card2": {
-          "base": "We have the same first name.",
-          "hi": "हमारा नाम एक जैसा है।",
-          "hiRoman": "hamaara naam ek jaisa hai.",
-          "es": "Somos tocayos.",
-          "fr": "Nous sommes homonymes."
+          "base": "I'm wearing these shoes for the first time.",
+          "hi": "मैं पहली बार ये जूते पहन रहा हूँ।",
+          "hiRoman": "main pehli baar ye joote pehen raha hoon.",
+          "es": "Estoy estrenando estos zapatos.",
+          "fr": "J'étrenne ces chaussures."
         }
       }
     }
