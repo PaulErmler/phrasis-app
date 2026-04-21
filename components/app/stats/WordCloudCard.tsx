@@ -69,17 +69,17 @@ function SingleWordCloud({
         </div>
       </div>
       <div
-        className="relative w-full aspect-[20/8] overflow-hidden rounded-lg px-1 py-1 leading-7 text-sm"
+        className="relative w-full aspect-[5/4] sm:aspect-[20/8] overflow-hidden rounded-lg px-1 py-1 leading-5 text-sm"
         style={{ textAlign: 'justify', textAlignLast: 'left' }}
       >
-        {words.map((w, i) => (
+        {words.slice(0, 50).map((w, i) => (
           <Fragment key={`${i}-${w}`}>
             <button
               type="button"
               onClick={() => onWordClick(w, language)}
               aria-label={t('viewSentencesForWord', { word: w })}
               style={{ color: COLORS[i % COLORS.length] }}
-              className="inline-block rounded-md px-1 font-bold transition-colors hover:bg-muted active:scale-[0.97]"
+              className="inline-block rounded-md px-0.5 font-bold transition-colors hover:bg-muted active:scale-[0.97]"
             >
               {w}
             </button>
