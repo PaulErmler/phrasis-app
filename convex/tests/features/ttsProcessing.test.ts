@@ -333,7 +333,7 @@ describe("features/ttsProcessing", () => {
         expect((await getMismatches(t, textId)).length).toBe(0);
       });
 
-      it("all three attempts strict+Gemini mismatch → unvalidated, 3 mismatches, 3 Gemini calls", async () => {
+      it("both attempts strict+Gemini mismatch → unvalidated, 2 mismatches, 2 Gemini calls", async () => {
         const t = convexTest(schema, modules);
         const { textId } = await seedText(t);
         mockSemantic.mockReset();
@@ -344,10 +344,10 @@ describe("features/ttsProcessing", () => {
         const audio = await getAudio(t, textId);
         expect(audio?.ttsQuality).toBe("unvalidated");
         // One Gemini call per attempt — strict fails first, then Gemini runs.
-        expect(mockSemantic).toHaveBeenCalledTimes(3);
+        expect(mockSemantic).toHaveBeenCalledTimes(2);
         const mismatches = await getMismatches(t, textId);
-        expect(mismatches.length).toBe(3);
-        expect(mismatches.map((m) => m.attempt).sort()).toEqual([1, 2, 3]);
+        expect(mismatches.length).toBe(2);
+        expect(mismatches.map((m) => m.attempt).sort()).toEqual([1, 2]);
       });
 
       it("Gemini error on every attempt → audio unvalidated (bad audio isn't silently accepted)", async () => {
@@ -360,8 +360,8 @@ describe("features/ttsProcessing", () => {
 
         const audio = await getAudio(t, textId);
         expect(audio?.ttsQuality).toBe("unvalidated");
-        expect(mockSemantic).toHaveBeenCalledTimes(3);
-        expect((await getMismatches(t, textId)).length).toBe(3);
+        expect(mockSemantic).toHaveBeenCalledTimes(2);
+        expect((await getMismatches(t, textId)).length).toBe(2);
       });
 
       it("Chinese homophone swap passes strict via pinyin match → no Gemini call", async () => {

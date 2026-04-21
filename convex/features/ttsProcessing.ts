@@ -21,13 +21,17 @@ const MAX_TTS_VALIDATION_ATTEMPTS = 2;
 const TTS_CLAIM_STALE_MS = 30 * 1000; // 30 seconds
 
 /**
- * Per-provider concurrency caps. ElevenLabs free/starter plans allow 3
- * parallel requests. Google has very generous quotas so we don't gate it.
+ * Per-provider concurrency caps. Dormant while TTS runs Google-only —
+ * `pumpQueue` below dispatches without consulting these limits. Google's
+ * own quota is generous enough that the semaphore is pure overhead at the
+ * moment. If rate limits start biting (or a second provider is re-enabled),
+ * restore the `while (used < cap)` gate in `pumpQueue` and re-enable
+ * `countLiveSlotsAndReclaimStale`.
  */
-const PROVIDER_MAX_CONCURRENCY: Record<TtsProvider, number> = {
-  google: 20,
-  elevenlabs: 3,
-};
+// const PROVIDER_MAX_CONCURRENCY: Record<TtsProvider, number> = {
+//   google: 20,
+//   elevenlabs: 3,
+// };
 const SLOT_STALE_MS = 60 * 1000; // 1 minute — longer than the longest API call
 
 /**
@@ -469,8 +473,12 @@ const ttsJobArgsValidator = v.object({
 /**
  * Count live slots for a provider and reclaim any stale rows (from crashed
  * actions) in-place. Returns the up-to-date live count.
+ *
+ * Exported but currently unused — called only by the dormant `while (used < cap)`
+ * branch in `pumpQueue`. Kept around so re-enabling concurrency gating is
+ * a one-line uncomment.
  */
-async function countLiveSlotsAndReclaimStale(
+export async function countLiveSlotsAndReclaimStale(
   ctx: MutationCtx,
   provider: TtsProvider,
 ): Promise<number> {
@@ -504,13 +512,18 @@ export const pumpQueue = internalMutation({
   args: { provider: ttsProviderValidator },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const cap = PROVIDER_MAX_CONCURRENCY[args.provider as TtsProvider];
-    let used = await countLiveSlotsAndReclaimStale(
-      ctx,
-      args.provider as TtsProvider,
-    );
+    // Concurrency gating is dormant — see PROVIDER_MAX_CONCURRENCY above. We
+    // still emit a slot row per dispatched job so `processTTSForCard` can
+    // keep its existing `slotId` contract and `releaseSlotAndPump` has
+    // something to delete in its finally block. The slot count is never
+    // consulted, so dispatch is bounded only by queue depth.
+    // const cap = PROVIDER_MAX_CONCURRENCY[args.provider as TtsProvider];
+    // let used = await countLiveSlotsAndReclaimStale(
+    //   ctx,
+    //   args.provider as TtsProvider,
+    // );
 
-    while (used < cap) {
+    while (true) {
       const next = await ctx.db
         .query('ttsQueue')
         .withIndex('by_provider_and_queuedAt', (q) =>
@@ -534,7 +547,6 @@ export const pumpQueue = internalMutation({
           slotId,
         },
       );
-      used++;
     }
 
     return null;

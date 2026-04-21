@@ -32,7 +32,10 @@
       "Bash(curl -s -L \"https://labs.convex.dev/auth\" -o /tmp/convex-auth.html)",
       "Bash(curl -s -L \"https://better-auth.convex.dev\" -o /tmp/ba-convex.html)",
       "Bash(curl -sL https://labs.convex.dev/better-auth)",
-      "Bash(curl -sL https://labs.convex.dev/better-auth/framework-guides/next-js)"
+      "Bash(curl -sL https://labs.convex.dev/better-auth/framework-guides/next-js)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")"
     ]
   }
 }

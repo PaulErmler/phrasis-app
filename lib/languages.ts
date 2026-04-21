@@ -33,7 +33,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'English',
     nativeName: 'English',
     flag: '🇬🇧',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: false,
   },
   {
@@ -60,7 +60,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'French',
     nativeName: 'Français',
     flag: '🇫🇷',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: false,
   },
   {
@@ -69,7 +69,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'German',
     nativeName: 'Deutsch',
     flag: '🇩🇪',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: false,
   },
   {
@@ -78,7 +78,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Italian',
     nativeName: 'Italiano',
     flag: '🇮🇹',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: false,
   },
   {
@@ -87,7 +87,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Portuguese (Brazil)',
     nativeName: 'Português',
     flag: '🇧🇷',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: false,
   },
   {
@@ -96,7 +96,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Russian',
     nativeName: 'Русский',
     flag: '🇷🇺',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: true,
   },
   {
@@ -105,7 +105,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Hindi',
     nativeName: 'हिन्दी',
     flag: '🇮🇳',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: true,
   },
   {
@@ -114,7 +114,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Chinese (Simplified)',
     nativeName: '中文（简体）',
     flag: '🇨🇳',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: true,
   },
   {
@@ -123,7 +123,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Japanese',
     nativeName: '日本語',
     flag: '🇯🇵',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: true,
   },
   {
@@ -132,7 +132,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Korean',
     nativeName: '한국어',
     flag: '🇰🇷',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: true,
   },
   {
@@ -141,7 +141,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Vietnamese',
     nativeName: 'Tiếng Việt',
     flag: '🇻🇳',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: false,
   },
   {
@@ -159,7 +159,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Finnish',
     nativeName: 'Suomi',
     flag: '🇫🇮',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: false,
   },
   {
@@ -168,7 +168,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Dutch',
     nativeName: 'Nederlands',
     flag: '🇳🇱',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: false,
   },
   {
@@ -177,7 +177,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Greek',
     nativeName: 'Ελληνικά',
     flag: '🇬🇷',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: true,
   },
   {
@@ -186,7 +186,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Arabic',
     nativeName: 'العربية',
     flag: '🇸🇦',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: true,
   },
   // Cantonese (Yue Chinese) — disabled until verified Cantonese-capable

@@ -20,6 +20,11 @@ export type { TtsProvider };
  * apiCode format depends on provider:
  *   - google:     "{locale}-Chirp3-HD-{name}"   e.g. "en-US-Chirp3-HD-Leda"
  *   - elevenlabs: raw voice_id (UUID)           e.g. "21m00Tcm4TlvDq8ikWAM"
+ *
+ * `active` gates whether a voice is eligible for selection. Dormant voices
+ * stay in VOICE_POOLS (so re-enabling is a one-line flip) but are filtered
+ * out of `getVoicesByLanguageCode`. ElevenLabs voices are currently dormant
+ * — TTS runs Google-only. See convex/lib/tts/index.ts for the provider wiring.
  */
 export interface Voice {
   provider: TtsProvider;
@@ -27,6 +32,8 @@ export interface Voice {
   displayName: string;
   apiCode: string;
   gender: 'female' | 'male';
+  /** Defaults to true when omitted. Set to false to keep the entry as dormant metadata. */
+  active?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +66,20 @@ function createElevenLabsVoice(
     displayName: `${name} (${gender === 'female' ? 'Female' : 'Male'}) - ElevenLabs`,
     apiCode: voiceId,
     gender,
+    // Default ElevenLabs voices to dormant. Pools for languages currently
+    // running on ElevenLabs run their list through `activate(...)` below to
+    // flip this back on.
+    active: false,
   };
+}
+
+/**
+ * Mark a voice list as selectable. Used by pools for languages whose
+ * `ttsProvider` is currently `'elevenlabs'` — wraps the list so every
+ * entry becomes `active: true` without touching the per-voice definitions.
+ */
+function activate(voices: Voice[]): Voice[] {
+  return voices.map((v) => ({ ...v, active: true }));
 }
 
 // Every Chirp3 HD locale ships the same 16 voice names (8 female + 8 male),
@@ -263,10 +283,10 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
     ...buildChirp3Pool('en-GB', 'UK'),
     ...ELEVENLABS_VOICES_EN,
   ],
-  es: [...buildChirp3Pool('es-ES', 'Spain'), ...ELEVENLABS_VOICES_ES],
+  es: [...buildChirp3Pool('es-ES', 'Spain'), ...activate(ELEVENLABS_VOICES_ES)],
   es_latam: [
     ...buildChirp3Pool('es-US', 'Latin America'),
-    ...ELEVENLABS_VOICES_ES_LATAM,
+    ...activate(ELEVENLABS_VOICES_ES_LATAM),
   ],
   fr: [...buildChirp3Pool('fr-FR', 'France'), ...ELEVENLABS_VOICES_FR],
   de: [...buildChirp3Pool('de-DE', 'Germany'), ...ELEVENLABS_VOICES_DE],
@@ -278,7 +298,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   ja: [...buildChirp3Pool('ja-JP', 'Japan'), ...ELEVENLABS_VOICES_JA],
   ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...ELEVENLABS_VOICES_KO],
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...ELEVENLABS_VOICES_VI],
-  sv: [...buildChirp3Pool('sv-SE', 'Sweden'), ...ELEVENLABS_VOICES_SV],
+  sv: [...buildChirp3Pool('sv-SE', 'Sweden'), ...activate(ELEVENLABS_VOICES_SV)],
   fi: [...buildChirp3Pool('fi-FI', 'Finland'), ...ELEVENLABS_VOICES_FI],
   nl: [...buildChirp3Pool('nl-NL', 'Netherlands'), ...ELEVENLABS_VOICES_NL],
   el: [...buildChirp3Pool('el-GR', 'Greece'), ...ELEVENLABS_VOICES_EL],
@@ -291,14 +311,17 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
 
 /**
  * Get voices available for synthesis for a language — filtered to the
- * language's currently active TTS provider. Use `getAllVoicesByLanguageCode`
- * if you need the full curated set across providers (e.g., for a settings UI).
+ * language's currently active TTS provider AND excluding dormant voices.
+ * Use `getAllVoicesByLanguageCode` if you need the full curated set
+ * across providers (e.g., for a settings UI).
  */
 export function getVoicesByLanguageCode(code: string): Voice[] {
   const language = getLanguageByCode(code);
   if (!language) return [];
   const pool = VOICE_POOLS[code] ?? [];
-  return pool.filter((v) => v.provider === language.ttsProvider);
+  return pool.filter(
+    (v) => v.provider === language.ttsProvider && v.active !== false,
+  );
 }
 
 /** Every curated voice for a language regardless of active provider. */

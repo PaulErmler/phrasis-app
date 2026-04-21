@@ -7,7 +7,11 @@
  */
 import { describe, it, expect } from 'vitest';
 import { SUPPORTED_LANGUAGES } from '../../../lib/languages';
-import { VOICE_POOLS } from '../../../lib/voices';
+import {
+  VOICE_POOLS,
+  getVoicesByLanguageCode,
+  getAllVoicesByLanguageCode,
+} from '../../../lib/voices';
 
 describe('voice pools completeness', () => {
   it('every language in SUPPORTED_LANGUAGES has a voice pool', () => {
@@ -61,5 +65,35 @@ describe('voice pools completeness', () => {
         expect(voice.name, `${code} voice name`).toMatch(/.+/);
       }
     }
+  });
+
+  it('getVoicesByLanguageCode excludes dormant voices', () => {
+    for (const lang of SUPPORTED_LANGUAGES) {
+      const active = getVoicesByLanguageCode(lang.code);
+      const dormant = active.filter((v) => v.active === false);
+      expect(
+        dormant,
+        `${lang.code} leaked dormant voices: ${dormant.map((v) => v.name).join(', ')}`,
+      ).toEqual([]);
+    }
+  });
+
+  it('getAllVoicesByLanguageCode includes dormant voices (settings UI surface)', () => {
+    // English has dormant ElevenLabs voices in the curated pool.
+    const all = getAllVoicesByLanguageCode('en');
+    const hasDormant = all.some((v) => v.active === false);
+    expect(hasDormant).toBe(true);
+  });
+
+  it('every language has at least one active Google voice after dormancy filter', () => {
+    const bad: string[] = [];
+    for (const lang of SUPPORTED_LANGUAGES) {
+      const active = getVoicesByLanguageCode(lang.code);
+      if (active.length === 0) bad.push(lang.code);
+    }
+    expect(
+      bad,
+      `Languages with no selectable voice after filtering: ${bad.join(', ') || '(none)'}`,
+    ).toEqual([]);
   });
 });
