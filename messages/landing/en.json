@@ -35,7 +35,7 @@
     "pillar1Title": "Repetition that fits your day",
     "pillar1Body": "Short, frequent encounters with the same sentences beat rare cramming and repetition is key but staying consistent is hard. Flexling allows you to repeat the most important things with state of the art spaced repetition and the audio review lets you rehearse flexibly to fit into your busy day.",
     "pillar2Title": "Personalized Input",
-    "pillar2Body": "Instead of learning things you do not care about we allow you to modify your curriculum. Add your own sentences or let AI create them for you. Every learner is different – your study material should be too.",
+    "pillar2Body": "Instead of learning things you do not care about we allow you to modify your curriculum. Add your own sentences, bulk-import a CSV or spreadsheet, or let AI create them for you. Every learner is different – your study material should be too.",
     "pillar3Title": "Motivation and Progress Tracking",
     "pillar3Body": "Learning a language is hard and so is staying motivated sometimes. Flexling tracks detailed statistics about your learning progress like how many words you have already learned. This keeps you motivated."
   },
@@ -191,7 +191,7 @@
       },
       "selfDriven": {
         "title": "Self Driven and Flexible",
-        "description": "Add your own sentences or ask AI to create them for you if you want. Or don't. There are smart defaults too."
+        "description": "Type your own sentences, bulk-import a CSV or spreadsheet, or let AI generate them. Or don't — smart defaults are ready if you just want to start."
       },
       "instantFeedback": {
         "title": "Instant Feedback",
@@ -320,7 +320,8 @@
       {
         "question": "Can I add my own sentences?",
         "answer": [
-          "Absolutely! Flexling will automatically create flashcards you ask for through the chat. More methods to add cards are on their way.",
+          "Yes, in three ways: type them in one at a time, bulk-import from a CSV, TSV, or pasted spreadsheet (Excel, Numbers, Google Sheets), or ask the AI to create them through chat.",
+          "For bulk import you just map the columns in your file to your course languages and Flexling handles the rest — audio and metadata are generated automatically.",
           "Are we missing a method that you would like to use? Let us know and we will try to add it."
         ]
       },

@@ -80,6 +80,7 @@ export const getCardForReview = query({
       initialReviewCount: v.number(),
       fsrsState: v.union(fsrsStateValidator, v.null()),
       hasMissingContent: v.boolean(),
+      audioSpeedOverrides: v.optional(v.record(v.string(), v.number())),
     }),
     v.null(),
   ),
@@ -197,6 +198,7 @@ export const getCardForReview = query({
       initialReviewCount,
       fsrsState: card.fsrsState ?? null,
       hasMissingContent: hasMissingTranslation || hasMissingAudio || hasMissingRomanization,
+      audioSpeedOverrides: card.audioSpeedOverrides,
     };
   },
 });
@@ -361,6 +363,41 @@ export const hideCard = mutation({
   handler: async (ctx, args) => {
     await authorizeCardAccess(ctx, args.cardId);
     await patchCard(ctx, args.cardId, { isHidden: true });
+    return null;
+  },
+});
+
+/**
+ * Set or clear a per-card, per-language playback-speed override.
+ *
+ * `speed === null` removes the override for that language so playback falls
+ * back to the course-level general speed. Valid override values are 0.7, 0.8,
+ * 0.9, or 1.0 (the fixed cycle exposed by the card-speed indicator).
+ */
+export const setCardAudioSpeedOverride = mutation({
+  args: {
+    cardId: v.id('cards'),
+    language: v.string(),
+    speed: v.union(v.number(), v.null()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await authorizeCardAccess(ctx, args.cardId);
+    if (args.speed !== null) {
+      if (!Number.isFinite(args.speed) || args.speed < 0.7 || args.speed > 1.0) {
+        throw new ConvexError('audioSpeedOverride must be between 0.7 and 1.0');
+      }
+    }
+    const card = await ctx.db.get(args.cardId);
+    if (!card) throw new ConvexError('Card not found');
+    const current = card.audioSpeedOverrides ?? {};
+    const next: Record<string, number> = { ...current };
+    if (args.speed === null) {
+      delete next[args.language];
+    } else {
+      next[args.language] = args.speed;
+    }
+    await patchCard(ctx, args.cardId, { audioSpeedOverrides: next });
     return null;
   },
 });

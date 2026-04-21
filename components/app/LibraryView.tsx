@@ -51,6 +51,28 @@ export function LibraryView({
   const hideCard = useMutation(api.features.scheduling.hideCard);
   const toggleFavorite = useMutation(api.features.scheduling.toggleFavoriteCard);
 
+  // Ephemeral per-card per-language speed overrides — live only for as long
+  // as this view is mounted. The library is a preview surface: the user
+  // should be able to slow a clip down to check pronunciation without
+  // persisting that choice onto the card (which LearningMode would then
+  // inherit). Keyed by cardId with a nested language→speed map so we can
+  // pass the inner map straight to LearningCardContent's per-card props.
+  const [ephemeralOverrides, setEphemeralOverrides] = useState<
+    Record<string, Record<string, number>>
+  >({});
+
+  const handleSpeedCycle = useCallback(
+    (cardId: Id<'cards'>, language: string, next: number | null) => {
+      setEphemeralOverrides((prev) => {
+        const cardMap = { ...(prev[cardId] ?? {}) };
+        if (next === null) delete cardMap[language];
+        else cardMap[language] = next;
+        return { ...prev, [cardId]: cardMap };
+      });
+    },
+    [],
+  );
+
   useEnsureContent(result);
 
   const [pendingMaster, setPendingMaster] = useState<Set<string>>(new Set());
@@ -234,6 +256,11 @@ export function LibraryView({
                   onFavorite={() => handleFavorite(card._id)}
                   hideTargetLanguages={false}
                   highlightEnabled={highlightEnabled}
+                  audioSpeedOverrides={ephemeralOverrides[card._id]}
+                  onSpeedCycle={(language, next) =>
+                    handleSpeedCycle(card._id, language, next)
+                  }
+                  speedBadgeVariant="ephemeral"
                 />
               </div>
             ))}

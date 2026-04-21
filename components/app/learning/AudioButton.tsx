@@ -20,6 +20,12 @@ export interface AudioButtonProps {
   onTimeUpdate?: (language: string, localTime: number) => void;
   /** Fired when playback ends, is paused, or the component unmounts. */
   onStop?: (language: string) => void;
+  /**
+   * Playback rate applied via `HTMLMediaElement.playbackRate`. Pitch is kept
+   * stable by `preservesPitch = true`. Defaults to 1 so call sites that don't
+   * care about speed (e.g. collection previews) get native speed automatically.
+   */
+  speed?: number;
 }
 
 export function AudioButton({
@@ -30,6 +36,7 @@ export function AudioButton({
   onPlay,
   onTimeUpdate,
   onStop,
+  speed = 1,
 }: AudioButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,6 +68,15 @@ export function AudioButton({
       onStopRef.current?.(language);
     };
   }, [language]);
+
+  // Keep an already-running HTMLAudioElement in sync when the `speed` prop
+  // changes mid-playback (e.g. user cycles the per-card speed badge while a
+  // clip is playing). No-op when no element is mounted yet.
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = speed;
+    }
+  }, [speed]);
 
   // rAF-driven time broadcast while playing. Native `timeupdate` at ~4 Hz is
   // too coarse for smooth per-word highlighting.
@@ -102,6 +118,15 @@ export function AudioButton({
           onStopRef.current?.(language);
         };
       }
+      // Keep pitch stable across playbackRate changes. `preservesPitch`
+      // defaults to true in modern browsers; setting it explicitly (including
+      // the webkit alias) guards older Safari and makes intent obvious.
+      audioRef.current.preservesPitch = true;
+      const el = audioRef.current as HTMLAudioElement & {
+        webkitPreservesPitch?: boolean;
+      };
+      el.webkitPreservesPitch = true;
+      audioRef.current.playbackRate = speed;
       try {
         const peak = await getPeak(url);
         audioRef.current.volume = computeAttenuation(peak);

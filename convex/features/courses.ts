@@ -883,6 +883,7 @@ export const updateCourseSettings = mutation({
     autoAdvance: v.optional(v.boolean()),
     languageRepetitions: v.optional(v.record(v.string(), v.number())),
     languageRepetitionPauses: v.optional(v.record(v.string(), v.number())),
+    languagePlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
     pauseBaseToBase: v.optional(v.number()),
     pauseBaseToTarget: v.optional(v.number()),
     pauseTargetToTarget: v.optional(v.number()),
@@ -924,6 +925,7 @@ export const updateCourseSettings = mutation({
       'autoAdvance',
       'languageRepetitions',
       'languageRepetitionPauses',
+      'languagePlaybackSpeeds',
       'pauseBaseToBase',
       'pauseBaseToTarget',
       'pauseTargetToTarget',
@@ -948,6 +950,14 @@ export const updateCourseSettings = mutation({
       if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
         value = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(value)));
       }
+      if (key === 'languagePlaybackSpeeds' && value && typeof value === 'object') {
+        const clamped: Record<string, number> = {};
+        for (const [lang, speed] of Object.entries(value as Record<string, number>)) {
+          if (typeof speed !== 'number' || !Number.isFinite(speed)) continue;
+          clamped[lang] = Math.max(0.7, Math.min(2.0, speed));
+        }
+        value = clamped;
+      }
       if (value !== undefined) patch[key] = value;
     }
 
@@ -965,6 +975,7 @@ export const updateCourseSettings = mutation({
         autoAdvance: args.autoAdvance,
         languageRepetitions: args.languageRepetitions,
         languageRepetitionPauses: args.languageRepetitionPauses,
+        languagePlaybackSpeeds: (patch.languagePlaybackSpeeds as Record<string, number> | undefined) ?? args.languagePlaybackSpeeds,
         pauseBaseToBase: args.pauseBaseToBase,
         pauseBaseToTarget: args.pauseBaseToTarget,
         pauseTargetToTarget: args.pauseTargetToTarget,

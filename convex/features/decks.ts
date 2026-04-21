@@ -308,6 +308,7 @@ export const getDeckCards = query({
       isHidden: v.boolean(),
       isFavorite: v.optional(v.boolean()),
       hasMissingContent: v.boolean(),
+      audioSpeedOverrides: v.optional(v.record(v.string(), v.number())),
     }),
   ),
   handler: async (ctx, args) => {
@@ -369,6 +370,7 @@ export const getDeckCards = query({
         isHidden: card.isHidden,
         isFavorite: card.isFavorite ?? false,
         hasMissingContent: content.hasMissingContent,
+        audioSpeedOverrides: card.audioSpeedOverrides,
       };
     });
 

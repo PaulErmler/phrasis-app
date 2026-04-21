@@ -12,9 +12,11 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 import { AudioButton } from './AudioButton';
+import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
+import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 
 interface CardShellProps {
   reviewCount: number;
@@ -39,6 +41,14 @@ interface CardShellProps {
   onButtonTimeUpdate?: (language: string, localTime: number) => void;
   /** AudioButton stop callback. */
   onButtonStop?: (language: string) => void;
+  /** Course-level per-language general speed (e.g. { "en": 1.0, "es": 0.8 }). */
+  languagePlaybackSpeeds?: Record<string, number>;
+  /** Per-card per-language override stored on the card. Absent = no override. */
+  audioSpeedOverrides?: Record<string, number>;
+  /** Cycle handler for a language's speed badge; null clears the override. */
+  onSpeedCycle?: (language: string, next: number | null) => void;
+  /** Badge behavior — `ephemeral` hides the null/default slot and greys 1.0. */
+  speedBadgeVariant?: 'persistent' | 'ephemeral';
   children: (ctx: {
     baseTranslations: CardTranslation[];
     targetTranslations: CardTranslation[];
@@ -64,6 +74,10 @@ export function CardShell({
   activeClip = null,
   onButtonTimeUpdate,
   onButtonStop,
+  languagePlaybackSpeeds,
+  audioSpeedOverrides,
+  onSpeedCycle,
+  speedBadgeVariant,
   children,
 }: CardShellProps) {
   const t = useTranslations('LearningMode');
@@ -155,6 +169,15 @@ export function CardShell({
               (a) => a.language === translation.language,
             );
             const isActive = activeClip?.language === translation.language;
+            const override = audioSpeedOverrides?.[translation.language];
+            const isEphemeral = speedBadgeVariant === 'ephemeral';
+            // Ephemeral surfaces ignore the course-level general speed — the
+            // resting state is always 1.0, same as what the badge renders.
+            const generalSpeed = isEphemeral
+              ? DEFAULT_PLAYBACK_SPEED
+              : (languagePlaybackSpeeds?.[translation.language] ??
+                DEFAULT_PLAYBACK_SPEED);
+            const effectiveSpeed = override ?? generalSpeed;
             return (
               <div
                 key={translation.language}
@@ -175,13 +198,26 @@ export function CardShell({
                     </p>
                   )}
                 </div>
-                <AudioButton
-                  url={audio?.url ?? null}
-                  language={translation.language}
-                  onPlay={onAudioPlay}
-                  onTimeUpdate={onButtonTimeUpdate}
-                  onStop={onButtonStop}
-                />
+                <div className="flex flex-col items-center gap-0.5">
+                  <AudioButton
+                    url={audio?.url ?? null}
+                    language={translation.language}
+                    onPlay={onAudioPlay}
+                    onTimeUpdate={onButtonTimeUpdate}
+                    onStop={onButtonStop}
+                    speed={effectiveSpeed}
+                  />
+                  {onSpeedCycle && (
+                    <CardSpeedBadge
+                      override={override ?? null}
+                      generalSpeed={generalSpeed}
+                      onCycle={(next) =>
+                        onSpeedCycle(translation.language, next)
+                      }
+                      variant={speedBadgeVariant}
+                    />
+                  )}
+                </div>
               </div>
             );
           })}

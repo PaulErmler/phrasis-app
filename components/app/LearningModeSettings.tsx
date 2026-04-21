@@ -33,6 +33,9 @@ import {
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
+  DEFAULT_PLAYBACK_SPEED,
+  PLAYBACK_SPEED_MIN,
+  PLAYBACK_SPEED_MAX,
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
@@ -179,6 +182,18 @@ export function LearningModeSettings({
     });
   };
 
+  const handleLanguageSpeedChange = async (language: string, value: number) => {
+    const clamped = Math.max(
+      PLAYBACK_SPEED_MIN,
+      Math.min(PLAYBACK_SPEED_MAX, Math.round(value * 10) / 10),
+    );
+    const current = courseSettings.languagePlaybackSpeeds ?? {};
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      languagePlaybackSpeeds: { ...current, [language]: clamped },
+    });
+  };
+
   const handlePauseBaseToBaseChange = async (value: number) => {
     if (value < 0 || value > 30) return;
     await updateSettings({
@@ -250,6 +265,7 @@ export function LearningModeSettings({
     courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit';
   const reps = courseSettings.languageRepetitions ?? {};
   const repPauses = courseSettings.languageRepetitionPauses ?? {};
+  const speeds = courseSettings.languagePlaybackSpeeds ?? {};
   const pauseB2B =
     courseSettings.pauseBaseToBase ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
   const pauseB2T =
@@ -594,11 +610,14 @@ export function LearningModeSettings({
                     type="base"
                     plays={plays}
                     repPause={repPause}
+                    speed={speeds[code] ?? DEFAULT_PLAYBACK_SPEED}
                     onPlaysChange={(v) => handleRepetitionChange(code, v)}
                     onRepPauseChange={(v) =>
                       handleRepetitionPauseChange(code, v)
                     }
+                    onSpeedChange={(v) => handleLanguageSpeedChange(code, v)}
                     repPauseLabel={t('pauseBetweenRepetitions')}
+                    speedLabel={t('playbackSpeed')}
                     showReorderButtons={baseLanguages.length > 1}
                     canMoveUp={idx > 0}
                     canMoveDown={idx < baseLanguages.length - 1}
@@ -653,11 +672,14 @@ export function LearningModeSettings({
                         type="target"
                         plays={plays}
                         repPause={repPause}
+                        speed={speeds[code] ?? DEFAULT_PLAYBACK_SPEED}
                         onPlaysChange={(v) => handleRepetitionChange(code, v)}
                         onRepPauseChange={(v) =>
                           handleRepetitionPauseChange(code, v)
                         }
+                        onSpeedChange={(v) => handleLanguageSpeedChange(code, v)}
                         repPauseLabel={t('pauseBetweenRepetitions')}
+                        speedLabel={t('playbackSpeed')}
                         showReorderButtons={targetLanguages.length > 1}
                         canMoveUp={idx > 0}
                         canMoveDown={idx < targetLanguages.length - 1}

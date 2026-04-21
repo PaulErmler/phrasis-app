@@ -45,6 +45,7 @@ export interface CourseSettings {
   autoAdvance?: boolean;
   languageRepetitions?: Record<string, number>;
   languageRepetitionPauses?: Record<string, number>;
+  languagePlaybackSpeeds?: Record<string, number>;
   pauseBaseToBase?: number;
   pauseBaseToTarget?: number;
   pauseTargetToTarget?: number;

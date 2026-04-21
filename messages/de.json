@@ -409,6 +409,7 @@
       "plays": "Wiedergaben",
       "pause": "Pause",
       "pauseBetweenRepetitions": "Pause zwischen Wiederholungen",
+      "playbackSpeed": "Wiedergabegeschwindigkeit",
       "base": "Basis",
       "target": "Ziel",
       "playbackSequence": "Wiedergabe-Reihenfolge",

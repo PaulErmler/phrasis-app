@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/tooltip';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
+import { CardSpeedBadge } from './CardSpeedBadge';
+import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { DiffDisplay, computeAccuracy } from './DiffDisplay';
 import { HighlightedText } from './HighlightedText';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
@@ -62,7 +64,15 @@ interface FullReviewCardContentProps {
     isPlaying: boolean;
     currentTime: number;
     languageCues: ReadonlyArray<LanguageCue>;
+    /** Speeds each clip was stretched to at merge time, for word-timing scaling. */
+    speedByLanguage: Record<string, number>;
   };
+  /** Course-level per-language general speed. */
+  languagePlaybackSpeeds?: Record<string, number>;
+  /** Per-card per-language speed override. Absent entry = use general. */
+  audioSpeedOverrides?: Record<string, number>;
+  /** Cycle handler for the speed badge; null clears the override. */
+  onSpeedCycle?: (language: string, next: number | null) => void;
 }
 
 export function FullReviewCardContent({
@@ -90,6 +100,9 @@ export function FullReviewCardContent({
   shortcutsDisabled = false,
   highlightEnabled = true,
   mergedPlayback,
+  languagePlaybackSpeeds,
+  audioSpeedOverrides,
+  onSpeedCycle,
 }: FullReviewCardContentProps) {
   const t = useTranslations('LearningMode');
   const locale = useLocale();
@@ -100,6 +113,7 @@ export function FullReviewCardContent({
       return resolveActiveClip(
         mergedPlayback.languageCues,
         mergedPlayback.currentTime,
+        mergedPlayback.speedByLanguage,
       );
     }
     return buttonPlayback.active;
@@ -369,6 +383,9 @@ export function FullReviewCardContent({
         activeClip={activeClip}
         onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
         onButtonStop={buttonPlayback.onStop}
+        languagePlaybackSpeeds={languagePlaybackSpeeds}
+        audioSpeedOverrides={audioSpeedOverrides}
+        onSpeedCycle={onSpeedCycle}
       >
         {({ targetTranslations: targets }) => (
           <div className="space-y-4">
@@ -380,6 +397,13 @@ export function FullReviewCardContent({
                 submitted: false,
                 userText: '',
               };
+
+              const override =
+                audioSpeedOverrides?.[translation.language] ?? null;
+              const generalSpeed =
+                languagePlaybackSpeeds?.[translation.language] ??
+                DEFAULT_PLAYBACK_SPEED;
+              const effectiveSpeed = override ?? generalSpeed;
 
               return (
                 <TargetLanguageInput
@@ -409,6 +433,14 @@ export function FullReviewCardContent({
                   activeClip={activeClip}
                   onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
                   onButtonStop={buttonPlayback.onStop}
+                  speed={effectiveSpeed}
+                  speedOverride={override}
+                  generalSpeed={generalSpeed}
+                  onSpeedCycle={
+                    onSpeedCycle
+                      ? (next) => onSpeedCycle(translation.language, next)
+                      : undefined
+                  }
                 />
               );
             })}
@@ -445,6 +477,14 @@ interface TargetLanguageInputProps {
   activeClip: ButtonPlaybackActive | null;
   onButtonTimeUpdate: (language: string, localTime: number) => void;
   onButtonStop: (language: string) => void;
+  /** Effective playback speed (override ?? general ?? 1). */
+  speed: number;
+  /** Stored override value, or null when none is stored. */
+  speedOverride: number | null;
+  /** Course-level general speed for this language. */
+  generalSpeed: number;
+  /** Cycle handler; null clears the override. */
+  onSpeedCycle?: (next: number | null) => void;
 }
 
 function TargetLanguageInput({
@@ -473,6 +513,10 @@ function TargetLanguageInput({
   activeClip,
   onButtonTimeUpdate,
   onButtonStop,
+  speed,
+  speedOverride,
+  generalSpeed,
+  onSpeedCycle,
 }: TargetLanguageInputProps) {
   const isActive = activeClip?.language === translation.language;
   const t = useTranslations('LearningMode');
@@ -498,6 +542,12 @@ function TargetLanguageInput({
     autoPlayedRef.current.add(translation.language);
     onAudioPlay?.();
     const audio = new Audio(audioUrl);
+    audio.preservesPitch = true;
+    const audioEl = audio as HTMLAudioElement & {
+      webkitPreservesPitch?: boolean;
+    };
+    audioEl.webkitPreservesPitch = true;
+    audio.playbackRate = speed;
     autoPlayAudioRef.current = audio;
 
     let raf = 0;
@@ -557,23 +607,43 @@ function TargetLanguageInput({
             <span className="text-xs font-medium text-muted-foreground uppercase">
               {languageDisplayName}
             </span>
-            <AudioButton
-              url={audioUrl}
-              language={translation.language}
-              onPlay={onAudioPlay}
-              onTimeUpdate={onButtonTimeUpdate}
-              onStop={onButtonStop}
-            />
+            <div className="flex flex-col items-center gap-0.5">
+              <AudioButton
+                url={audioUrl}
+                language={translation.language}
+                onPlay={onAudioPlay}
+                onTimeUpdate={onButtonTimeUpdate}
+                onStop={onButtonStop}
+                speed={speed}
+              />
+              {onSpeedCycle && (
+                <CardSpeedBadge
+                  override={speedOverride}
+                  generalSpeed={generalSpeed}
+                  onCycle={onSpeedCycle}
+                />
+              )}
+            </div>
           </div>
         ) : (
           <div className="flex justify-end">
-            <AudioButton
-              url={audioUrl}
-              language={translation.language}
-              onPlay={onAudioPlay}
-              onTimeUpdate={onButtonTimeUpdate}
-              onStop={onButtonStop}
-            />
+            <div className="flex flex-col items-center gap-0.5">
+              <AudioButton
+                url={audioUrl}
+                language={translation.language}
+                onPlay={onAudioPlay}
+                onTimeUpdate={onButtonTimeUpdate}
+                onStop={onButtonStop}
+                speed={speed}
+              />
+              {onSpeedCycle && (
+                <CardSpeedBadge
+                  override={speedOverride}
+                  generalSpeed={generalSpeed}
+                  onCycle={onSpeedCycle}
+                />
+              )}
+            </div>
           </div>
         )}
         {hasUserText ? (
@@ -636,23 +706,43 @@ function TargetLanguageInput({
             <span className="text-xs font-medium text-muted-foreground uppercase">
               {languageDisplayName}
             </span>
-            <AudioButton
-              url={audioUrl}
-              language={translation.language}
-              onPlay={onAudioPlay}
-              onTimeUpdate={onButtonTimeUpdate}
-              onStop={onButtonStop}
-            />
+            <div className="flex flex-col items-center gap-0.5">
+              <AudioButton
+                url={audioUrl}
+                language={translation.language}
+                onPlay={onAudioPlay}
+                onTimeUpdate={onButtonTimeUpdate}
+                onStop={onButtonStop}
+                speed={speed}
+              />
+              {onSpeedCycle && (
+                <CardSpeedBadge
+                  override={speedOverride}
+                  generalSpeed={generalSpeed}
+                  onCycle={onSpeedCycle}
+                />
+              )}
+            </div>
           </div>
         ) : (
           <div className="flex justify-end">
-            <AudioButton
-              url={audioUrl}
-              language={translation.language}
-              onPlay={onAudioPlay}
-              onTimeUpdate={onButtonTimeUpdate}
-              onStop={onButtonStop}
-            />
+            <div className="flex flex-col items-center gap-0.5">
+              <AudioButton
+                url={audioUrl}
+                language={translation.language}
+                onPlay={onAudioPlay}
+                onTimeUpdate={onButtonTimeUpdate}
+                onStop={onButtonStop}
+                speed={speed}
+              />
+              {onSpeedCycle && (
+                <CardSpeedBadge
+                  override={speedOverride}
+                  generalSpeed={generalSpeed}
+                  onCycle={onSpeedCycle}
+                />
+              )}
+            </div>
           </div>
         )}
         <div className="flex items-start gap-2">

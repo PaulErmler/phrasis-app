@@ -88,6 +88,7 @@ interface ReviewingState extends BaseState {
   sourceLanguage: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
+  audioSpeedOverrides: Record<string, number> | undefined;
   // Rating data
   validRatings: ReviewRating[];
   activeRating: ReviewRating;
@@ -624,6 +625,7 @@ export function useLearningMode(
     sourceLanguage: displayCard.sourceLanguage,
     translations: sortedTranslations,
     audioRecordings: displayCard.audioRecordings,
+    audioSpeedOverrides: displayCard.audioSpeedOverrides,
     isFavorite: displayCard.isFavorite ?? false,
     isPendingMaster,
     isPendingHide,

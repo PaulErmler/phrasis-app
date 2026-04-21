@@ -33,7 +33,12 @@ export function useLearningAudio(
   const reviewMode = cs?.reviewMode ?? 'audio';
   const fullReviewTargetAudioMode = cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
 
-  const audioSettings = useMemo(() => resolveAudioSettings(cs), [cs]);
+  const cardSpeedOverrides =
+    state.status === 'reviewing' ? state.audioSpeedOverrides : undefined;
+  const audioSettings = useMemo(
+    () => resolveAudioSettings(cs, cardSpeedOverrides),
+    [cs, cardSpeedOverrides],
+  );
 
   const handleNextFromAudio = useCallback(() => {
     if (state.status === 'reviewing') state.handleNext();

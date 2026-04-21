@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useMutation } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import {
   LearningCardContent,
@@ -59,6 +61,45 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   }, [cardId, reviewingReviewMode, reviewingHideTargets]);
 
   const handleReveal = useCallback(() => setFullReviewRevealed(true), []);
+
+  // Per-card speed override mutation with an optimistic update so the badge
+  // displays the new value immediately without waiting for the server round
+  // trip. The Convex query validator returns `audioSpeedOverrides` as part of
+  // the card payload, so we mutate that field on the cached card.
+  const setCardAudioSpeedOverrideMutation = useMutation(
+    api.features.scheduling.setCardAudioSpeedOverride,
+  ).withOptimisticUpdate((localStore, args) => {
+    const current = localStore.getQuery(
+      api.features.scheduling.getCardForReview,
+      {},
+    );
+    if (current == null || current._id !== args.cardId) return;
+    const nextOverrides: Record<string, number> = {
+      ...(current.audioSpeedOverrides ?? {}),
+    };
+    if (args.speed === null) {
+      delete nextOverrides[args.language];
+    } else {
+      nextOverrides[args.language] = args.speed;
+    }
+    localStore.setQuery(api.features.scheduling.getCardForReview, {}, {
+      ...current,
+      audioSpeedOverrides: nextOverrides,
+    });
+  });
+
+  const reviewingCardId = state.status === 'reviewing' ? state.cardId : null;
+  const handleSpeedCycle = useCallback(
+    (language: string, next: number | null) => {
+      if (reviewingCardId === null) return;
+      setCardAudioSpeedOverrideMutation({
+        cardId: reviewingCardId,
+        language,
+        speed: next,
+      });
+    },
+    [reviewingCardId, setCardAudioSpeedOverrideMutation],
+  );
 
   // Wrap handleNext to include accuracy from full review mode
   const handleNextWithAccuracy = useCallback(
@@ -179,7 +220,11 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
           isPlaying: audio.isPlaying,
           currentTime: audio.currentTime,
           languageCues: audio.languageCues,
+          speedByLanguage: audio.speedByLanguage,
         }}
+        languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
+        audioSpeedOverrides={state.audioSpeedOverrides}
+        onSpeedCycle={handleSpeedCycle}
       />
     ) : (
       <LearningCardContent
@@ -208,7 +253,11 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
           isPlaying: audio.isPlaying,
           currentTime: audio.currentTime,
           languageCues: audio.languageCues,
+          speedByLanguage: audio.speedByLanguage,
         }}
+        languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
+        audioSpeedOverrides={state.audioSpeedOverrides}
+        onSpeedCycle={handleSpeedCycle}
       />
     );
 

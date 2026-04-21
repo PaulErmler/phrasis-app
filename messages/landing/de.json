@@ -35,9 +35,9 @@
     "pillar1Title": "Wiederholung, die in den Tag passt",
     "pillar1Body": "Kurze, häufige Kontakte mit denselben Sätzen schlagen seltenes Pauken und Wiederholung ist der Schlüssel, aber konsequent zu bleiben ist schwer. Flexling ermöglicht es dir, die wichtigsten Dinge mit modernster Spaced Repetition zu wiederholen und der Audio-Modus lässt dich flexibel üben, um in deinen vollen Tag zu passen.",
     "pillar2Title": "Personalisierter Input",
-    "pillar2Body": "Anstatt Dinge zu lernen, die dich nicht interessieren, kannst du deinen Lehrplan anpassen. Füge eigene Sätze hinzu oder lass die KI sie für dich erstellen. Jeder lernt anders – dein Lernmaterial sollte das auch.",
+    "pillar2Body": "Anstatt Dinge zu lernen, die dich nicht interessieren, kannst du deinen Lehrplan anpassen. Füge eigene Sätze hinzu, importiere eine CSV Datei, oder lass die KI sie für dich erstellen. Jeder lernt anders – dein Lernmaterial sollte sich anpassen.",
     "pillar3Title": "Motivation und Fortschrittsverfolgung",
-    "pillar3Body": "Eine Sprache zu lernen ist schwer und manchmal ist es auch schwer, motiviert zu bleiben. Flexling verfolgt detaillierte Statistiken über deinen Lernfortschritt, wie viele Wörter du bereits gelernt hast. Das hält dich motiviert."
+    "pillar3Body": "Eine Sprache zu lernen ist schwer und manchmal ist es auch schwer, motiviert zu bleiben. Flexling erstellt detaillierte Statistiken über deinen Lernfortschritt, z.B. wie viele Wörter du bereits gelernt hast. Das hält dich motiviert."
   },
   "reviewModes": {
     "title": "Zwei Wege zum Wiederholen.",
@@ -191,7 +191,7 @@
       },
       "selfDriven": {
         "title": "Selbstbestimmt und flexibel",
-        "description": "Füge deine eigenen Sätze hinzu oder bitte die KI, sie für dich zu erstellen. Oder nicht. Es gibt auch smarte Voreinstellungen."
+        "description": "Tippe eigene Sätze, importiere sie per CSV oder Tabelle, oder lass die KI welche erstellen. Oder nicht — smarte Voreinstellungen sind bereit, falls du einfach loslegen willst."
       },
       "instantFeedback": {
         "title": "Sofortiges Feedback",
@@ -320,8 +320,9 @@
       {
         "question": "Kann ich eigene Sätze hinzufügen?",
         "answer": [
-          "Absolut! Flexling erstellt automatisch Lernkarten, die du über den Chat anforderst. Weitere Methoden zum Hinzufügen von Karten sind in Arbeit.",
-          "Fehlt uns eine Methode, die du verwenden möchtest? Lass es uns wissen und wir versuchen, sie hinzuzufügen."
+          "Ja, auf drei Wegen: einzeln eintippen, per CSV, TSV oder eingefügter Tabelle (Excel, Numbers, Google Sheets) im Bulk importieren oder die KI im Chat darum bitten.",
+          "Beim Bulk-Import ordnest du einfach die Spalten deiner Datei deinen Kurssprachen zu — Flexling erzeugt Audio und Metadaten automatisch.",
+          "Fehlt dir eine Methode, die du nutzen möchtest? Sag uns Bescheid und wir versuchen, sie hinzuzufügen."
         ]
       },
       {

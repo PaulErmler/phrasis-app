@@ -48,6 +48,13 @@ export interface AudioPlayerState {
   currentTime: number;
   /** Language-clip boundaries in the merged blob. Stable per card. */
   languageCues: ReadonlyArray<LanguageCue>;
+  /**
+   * Effective playback speed each language was stretched to at merge time.
+   * Word-highlight consumers using merged-clip `localTime` must scale by this
+   * value so lookups hit the original (1×) word timings. Pass this straight
+   * into `resolveActiveClip(cues, currentTime, speedByLanguage)`.
+   */
+  speedByLanguage: Record<string, number>;
 }
 
 export function useAudioPlayer(
@@ -74,6 +81,7 @@ export function useAudioPlayer(
   const [revealedLanguages, setRevealedLanguages] = useState<ReadonlySet<string>>(new Set());
   const [currentTime, setCurrentTime] = useState(0);
   const [languageCues, setLanguageCues] = useState<ReadonlyArray<LanguageCue>>([]);
+  const [speedByLanguage, setSpeedByLanguage] = useState<Record<string, number>>({});
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -96,6 +104,14 @@ export function useAudioPlayer(
     if (!audioRef.current) {
       audioRef.current = new Audio();
       audioRef.current.preload = 'auto';
+      // Defensive: modern browsers default preservesPitch to true, but set it
+      // explicitly (plus the webkit prefix for older Safari) so any future
+      // call that touches `playbackRate` on this element stays pitch-stable.
+      audioRef.current.preservesPitch = true;
+      const el = audioRef.current as HTMLAudioElement & {
+        webkitPreservesPitch?: boolean;
+      };
+      el.webkitPreservesPitch = true;
     }
     return audioRef.current;
   }, []);
@@ -179,6 +195,7 @@ export function useAudioPlayer(
     setRevealedLanguages(new Set());
     setCurrentTime(0);
     setLanguageCues([]);
+    setSpeedByLanguage({});
     setMediaSessionPlaybackState('none');
   }, [getAudio]);
 
@@ -303,6 +320,7 @@ export function useAudioPlayer(
       JSON.stringify({
         reps: settings.reps,
         repPauses: settings.repPauses,
+        speeds: settings.speeds,
         pauseB2B: settings.pauseB2B,
         pauseB2T: settings.pauseB2T,
         pauseT2T: settings.pauseT2T,
@@ -396,6 +414,7 @@ export function useAudioPlayer(
         blobUrlRef.current = result.blobUrl;
         languageCuesRef.current = result.languageCues;
         setLanguageCues(result.languageCues);
+        setSpeedByLanguage(result.speedByLanguage);
         audio.src = result.blobUrl;
         setDurationSec(result.durationSec);
         setIsMerging(false);
@@ -503,5 +522,6 @@ export function useAudioPlayer(
     revealedLanguages,
     currentTime,
     languageCues,
+    speedByLanguage,
   };
 }

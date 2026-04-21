@@ -412,6 +412,7 @@
       "plays": "Plays",
       "pause": "Pause",
       "pauseBetweenRepetitions": "Pause between repetitions",
+      "playbackSpeed": "Playback speed",
       "base": "Base",
       "target": "Target",
       "playbackSequence": "Playback Sequence",

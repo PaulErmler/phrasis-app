@@ -41,3 +41,51 @@ export const DEFAULT_AUTO_PLAY = true;
 
 /** Whether the next card is shown automatically after all audio finishes */
 export const DEFAULT_AUTO_ADVANCE = true;
+
+// ---------------------------------------------------------------------------
+// Playback speed (pitch-preserved; see lib/audio/timeStretch.ts)
+// ---------------------------------------------------------------------------
+
+/** Default playback speed when no per-language setting exists */
+export const DEFAULT_PLAYBACK_SPEED = 1.0;
+
+/** General per-language speed range exposed in LearningModeSettings */
+export const PLAYBACK_SPEED_MIN = 0.7;
+export const PLAYBACK_SPEED_MAX = 2.0;
+export const PLAYBACK_SPEED_STEP = 0.1;
+
+/**
+ * Persistent cycle used by LearningMode where the override is stored on the
+ * card. `null` = "default" state — clears any stored override so the
+ * course-level general speed applies.
+ */
+export const CARD_OVERRIDE_CYCLE = [null, 0.7, 0.8, 0.9, 1.0] as const;
+export type CardOverrideValue = (typeof CARD_OVERRIDE_CYCLE)[number];
+
+/** Advance through CARD_OVERRIDE_CYCLE, wrapping at the end. */
+export function nextCardOverrideValue(
+  current: number | null,
+): CardOverrideValue {
+  const idx = CARD_OVERRIDE_CYCLE.findIndex((v) => v === current);
+  const nextIdx = (idx + 1) % CARD_OVERRIDE_CYCLE.length;
+  return CARD_OVERRIDE_CYCLE[nextIdx];
+}
+
+/**
+ * Ephemeral cycle used by the Library and word-cloud sentences dialog. Those
+ * surfaces don't persist the override and ignore the course-level general
+ * speed — the badge is a pure preview control that resets to 1.0 when the
+ * view remounts. 1.0 is rendered greyed to signal "no change" (the same way
+ * the persistent cycle renders its null default). There is no null slot, so
+ * once the user starts cycling they stay inside 0.7–1.0 until unmount.
+ */
+export const CARD_OVERRIDE_CYCLE_EPHEMERAL = [0.7, 0.8, 0.9, 1.0] as const;
+
+export function nextEphemeralCardOverrideValue(current: number | null): number {
+  const idx =
+    current === null
+      ? -1
+      : CARD_OVERRIDE_CYCLE_EPHEMERAL.findIndex((v) => v === current);
+  const nextIdx = (idx + 1) % CARD_OVERRIDE_CYCLE_EPHEMERAL.length;
+  return CARD_OVERRIDE_CYCLE_EPHEMERAL[nextIdx];
+}

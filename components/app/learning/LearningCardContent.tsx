@@ -3,9 +3,11 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
+import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
 import { resolveActiveClip } from '@/lib/audio/activeClip';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
+import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import type { CardTranslation, CardAudioRecording } from './types';
 
@@ -44,7 +46,17 @@ interface LearningCardContentProps {
     isPlaying: boolean;
     currentTime: number;
     languageCues: ReadonlyArray<LanguageCue>;
+    /** Speeds each clip was stretched to at merge time, for word-timing scaling. */
+    speedByLanguage: Record<string, number>;
   };
+  /** Course-level per-language general speed (used by both CardShell base rows and target rows here). */
+  languagePlaybackSpeeds?: Record<string, number>;
+  /** Per-card per-language override stored on the card. Absent = no override. */
+  audioSpeedOverrides?: Record<string, number>;
+  /** Cycle handler for a language's speed badge; null clears the override. */
+  onSpeedCycle?: (language: string, next: number | null) => void;
+  /** Badge behavior — `ephemeral` hides the null/default slot and greys 1.0. */
+  speedBadgeVariant?: 'persistent' | 'ephemeral';
 }
 
 export function LearningCardContent({
@@ -71,6 +83,10 @@ export function LearningCardContent({
   showRomanization = true,
   highlightEnabled = true,
   mergedPlayback,
+  languagePlaybackSpeeds,
+  audioSpeedOverrides,
+  onSpeedCycle,
+  speedBadgeVariant,
 }: LearningCardContentProps) {
   const buttonPlayback = useButtonPlayback();
 
@@ -83,6 +99,7 @@ export function LearningCardContent({
       return resolveActiveClip(
         mergedPlayback.languageCues,
         mergedPlayback.currentTime,
+        mergedPlayback.speedByLanguage,
       );
     }
     return buttonPlayback.active;
@@ -169,6 +186,10 @@ export function LearningCardContent({
         activeClip={activeClip}
         onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
         onButtonStop={buttonPlayback.onStop}
+        languagePlaybackSpeeds={languagePlaybackSpeeds}
+        audioSpeedOverrides={audioSpeedOverrides}
+        onSpeedCycle={onSpeedCycle}
+        speedBadgeVariant={speedBadgeVariant}
       >
         {({ targetTranslations }) => (
           <div className="space-y-2">
@@ -179,6 +200,13 @@ export function LearningCardContent({
               const isAudioRevealed = autoRevealLanguages && (revealedLanguages?.has(translation.language) ?? false);
               const isBlurred = hideTargetLanguages && !isAudioRevealed && !manuallyRevealed.has(translation.language);
               const isActive = activeClip?.language === translation.language;
+              const override = audioSpeedOverrides?.[translation.language];
+              const isEphemeral = speedBadgeVariant === 'ephemeral';
+              const generalSpeed = isEphemeral
+                ? DEFAULT_PLAYBACK_SPEED
+                : (languagePlaybackSpeeds?.[translation.language] ??
+                  DEFAULT_PLAYBACK_SPEED);
+              const effectiveSpeed = override ?? generalSpeed;
               return (
                 <div
                   key={translation.language}
@@ -206,13 +234,26 @@ export function LearningCardContent({
                       </p>
                     )}
                   </div>
-                  <AudioButton
-                    url={audio?.url ?? null}
-                    language={translation.language}
-                    onPlay={onAudioPlay}
-                    onTimeUpdate={buttonPlayback.onTimeUpdate}
-                    onStop={buttonPlayback.onStop}
-                  />
+                  <div className="flex flex-col items-center gap-0.5">
+                    <AudioButton
+                      url={audio?.url ?? null}
+                      language={translation.language}
+                      onPlay={onAudioPlay}
+                      onTimeUpdate={buttonPlayback.onTimeUpdate}
+                      onStop={buttonPlayback.onStop}
+                      speed={effectiveSpeed}
+                    />
+                    {onSpeedCycle && (
+                      <CardSpeedBadge
+                        override={override ?? null}
+                        generalSpeed={generalSpeed}
+                        onCycle={(next) =>
+                          onSpeedCycle(translation.language, next)
+                        }
+                        variant={speedBadgeVariant}
+                      />
+                    )}
+                  </div>
                 </div>
               );
             })}

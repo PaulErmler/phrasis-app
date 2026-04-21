@@ -24,6 +24,8 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 import { AudioButton } from '@/components/app/learning/AudioButton';
+import { CardSpeedBadge } from '@/components/app/learning/CardSpeedBadge';
+import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { CircleCheck, EyeOff, Star, Loader2 } from 'lucide-react';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
 import { highlightWord } from '@/lib/wordCloud';
@@ -45,6 +47,26 @@ export function WordSentencesDialog({
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords !== false;
   const buttonPlayback = useButtonPlayback();
+
+  // Ephemeral per-card per-language speed overrides. This dialog is a
+  // preview surface launched from the word cloud, so speed changes are not
+  // persisted: they reset the next time the dialog opens. Keyed by cardId
+  // with a nested language→speed map.
+  const [ephemeralOverrides, setEphemeralOverrides] = useState<
+    Record<string, Record<string, number>>
+  >({});
+
+  const handleSpeedCycle = useCallback(
+    (cardId: Id<'cards'>, lang: string, next: number | null) => {
+      setEphemeralOverrides((prev) => {
+        const cardMap = { ...(prev[cardId] ?? {}) };
+        if (next === null) delete cardMap[lang];
+        else cardMap[lang] = next;
+        return { ...prev, [cardId]: cardMap };
+      });
+    },
+    [],
+  );
 
   const { results, status, loadMore } = usePaginatedQuery(
     api.features.stats.getSentencesForWord,
@@ -208,6 +230,11 @@ export function WordSentencesDialog({
                         normalizeLanguageCode(tr.language) === normalizedLang;
                       const isActive =
                         buttonPlayback.active?.language === tr.language;
+                      const override = cardId
+                        ? (ephemeralOverrides[cardId]?.[tr.language] ?? null)
+                        : null;
+                      // Ephemeral surface: ignore the course-level general speed.
+                      const effectiveSpeed = override ?? DEFAULT_PLAYBACK_SPEED;
                       return (
                         <div key={tr.language} className="flex items-start gap-2">
                           <div className="flex-1">
@@ -230,12 +257,25 @@ export function WordSentencesDialog({
                               </p>
                             )}
                           </div>
-                          <AudioButton
-                            url={audio?.url ?? null}
-                            language={tr.language}
-                            onTimeUpdate={buttonPlayback.onTimeUpdate}
-                            onStop={buttonPlayback.onStop}
-                          />
+                          <div className="flex flex-col items-center gap-0.5">
+                            <AudioButton
+                              url={audio?.url ?? null}
+                              language={tr.language}
+                              onTimeUpdate={buttonPlayback.onTimeUpdate}
+                              onStop={buttonPlayback.onStop}
+                              speed={effectiveSpeed}
+                            />
+                            {cardId && (
+                              <CardSpeedBadge
+                                override={override}
+                                generalSpeed={DEFAULT_PLAYBACK_SPEED}
+                                onCycle={(next) =>
+                                  handleSpeedCycle(cardId, tr.language, next)
+                                }
+                                variant="ephemeral"
+                              />
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -253,6 +293,10 @@ export function WordSentencesDialog({
                         normalizeLanguageCode(tr.language) === normalizedLang;
                       const isActive =
                         buttonPlayback.active?.language === tr.language;
+                      const override = cardId
+                        ? (ephemeralOverrides[cardId]?.[tr.language] ?? null)
+                        : null;
+                      const effectiveSpeed = override ?? DEFAULT_PLAYBACK_SPEED;
                       return (
                         <div key={tr.language} className="flex items-start gap-2">
                           <div className="flex-1">
@@ -275,12 +319,25 @@ export function WordSentencesDialog({
                               </p>
                             )}
                           </div>
-                          <AudioButton
-                            url={audio?.url ?? null}
-                            language={tr.language}
-                            onTimeUpdate={buttonPlayback.onTimeUpdate}
-                            onStop={buttonPlayback.onStop}
-                          />
+                          <div className="flex flex-col items-center gap-0.5">
+                            <AudioButton
+                              url={audio?.url ?? null}
+                              language={tr.language}
+                              onTimeUpdate={buttonPlayback.onTimeUpdate}
+                              onStop={buttonPlayback.onStop}
+                              speed={effectiveSpeed}
+                            />
+                            {cardId && (
+                              <CardSpeedBadge
+                                override={override}
+                                generalSpeed={DEFAULT_PLAYBACK_SPEED}
+                                onCycle={(next) =>
+                                  handleSpeedCycle(cardId, tr.language, next)
+                                }
+                                variant="ephemeral"
+                              />
+                            )}
+                          </div>
                         </div>
                       );
                     })}
