@@ -200,18 +200,18 @@ function renderHtml(results: JobResult[]): string {
         <h2>${lang.flag} ${lang.name} <code class="small">(${lang.code})</code></h2>
         <div class="grid">
           ${rows
-            .map((r) => {
-              const v = r.job.voice;
-              const genderBadge = v.gender === 'female' ? '♀' : '♂';
-              const status = r.available
-                ? '<span class="ok">✓ available</span>'
-                : `<span class="err">✗ ${r.error ?? 'missing'}</span>`;
-              const audio = r.sampleFile
-                ? `<audio controls preload="none" src="${r.sampleFile}"></audio>`
-                : r.error && !r.available
-                  ? `<span class="err small">${r.error}</span>`
-                  : '<span class="small">(no sample)</span>';
-              return `
+    .map((r) => {
+      const v = r.job.voice;
+      const genderBadge = v.gender === 'female' ? '♀' : '♂';
+      const status = r.available
+        ? '<span class="ok">✓ available</span>'
+        : `<span class="err">✗ ${r.error ?? 'missing'}</span>`;
+      const audio = r.sampleFile
+        ? `<audio controls preload="none" src="${r.sampleFile}"></audio>`
+        : r.error && !r.available
+          ? `<span class="err small">${r.error}</span>`
+          : '<span class="small">(no sample)</span>';
+      return `
                 <div class="card ${r.available ? '' : 'card-err'}">
                   <div class="card-head">
                     <strong>${genderBadge} ${v.name}</strong>
@@ -221,8 +221,8 @@ function renderHtml(results: JobResult[]): string {
                   <div>${audio}</div>
                 </div>
               `;
-            })
-            .join('')}
+    })
+    .join('')}
         </div>
       </section>
     `);
@@ -257,8 +257,8 @@ function renderHtml(results: JobResult[]): string {
   <div class="summary">
     <strong>${totalVoices}</strong> unique voices across <strong>${SUPPORTED_LANGUAGES.length}</strong> languages.
     ${uniqueUnavailable > 0
-      ? `<span class="err">${uniqueUnavailable} NOT available on this account</span>`
-      : '<span class="ok">All voice IDs resolved successfully</span>'}.
+    ? `<span class="err">${uniqueUnavailable} NOT available on this account</span>`
+    : '<span class="ok">All voice IDs resolved successfully</span>'}.
     Generated ${new Date().toISOString()}.
   </div>
   ${sections.join('\n')}

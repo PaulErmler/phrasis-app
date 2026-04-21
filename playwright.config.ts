@@ -60,6 +60,7 @@ export default defineConfig({
         /library\.spec\.ts/,
         /stats\.spec\.ts/,
         /add-cards\.spec\.ts/,
+        /add-cards-import\.spec\.ts/,
       ],
       dependencies: ["tutorial"],
       fullyParallel: true,

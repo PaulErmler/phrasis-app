@@ -931,6 +931,93 @@
     "saveError": "Text konnte nicht gespeichert werden. Bitte versuche es erneut.",
     "autoFillError": "Automatisches Ausfüllen fehlgeschlagen. Bitte versuche es erneut."
   },
+  "ImportTexts": {
+    "switcher": {
+      "ariaLabel": "Modus zum Hinzufügen"
+    },
+    "toggleIndividual": "Einzelne Sätze",
+    "toggleImport": "Sätze importieren",
+    "dropzone": {
+      "title": "CSV- / TSV- / TXT-Datei hier ablegen",
+      "subtitle": "…oder klicke, um eine auszuwählen",
+      "orPaste": "Oder Zeilen unten einfügen",
+      "info": {
+        "columns": "Eine Spalte pro Sprache ({languages})",
+        "separators": "Trennzeichen: Komma, Semikolon, Tab oder Pipe",
+        "maxLength": "Max. {max} Zeichen pro Zelle",
+        "maxRows": "Bis zu {max} Zeilen pro Import",
+        "headerOptional": "Erste Zeile kann Überschrift sein (auto-erkannt)"
+      }
+    },
+    "pastePlaceholder": "Zeilen hier einfügen — Kommas, Semikolons, Tabs oder Pipes funktionieren.",
+    "delimiter": {
+      "label": "Trennzeichen",
+      "auto": "Automatisch",
+      "comma": "Komma",
+      "semicolon": "Semikolon",
+      "tab": "Tab",
+      "pipe": "Pipe"
+    },
+    "hasHeader": "Erste Zeile ist Überschrift",
+    "mapping": {
+      "title": "Spalten den Kurssprachen zuordnen",
+      "notMapped": "— nicht zugeordnet —",
+      "incomplete": "Ordne jede Sprache zu, um zu importieren.",
+      "columnLabel": "Spalte {index}"
+    },
+    "errors": {
+      "tooLong": "{language}: {length}/{max} Zeichen",
+      "emptyCell": "{language}: leer",
+      "duplicate": "Duplikat von Zeile {row}",
+      "mappingIncomplete": "Fehlende Zuordnung"
+    },
+    "review": {
+      "editAria": "{language} bearbeiten",
+      "deleteAria": "Zeile entfernen",
+      "saveAria": "Speichern",
+      "cancelAria": "Abbrechen"
+    },
+    "summary": {
+      "valid": "bereit",
+      "warnings": "Warnungen",
+      "errors": "Probleme",
+      "quotaRemaining": "eigene Karten übrig",
+      "quotaUnlimited": "Unbegrenzte eigene Karten"
+    },
+    "importButton": "{count} Karten importieren",
+    "importButtonEmpty": "Karten importieren",
+    "importing": "Importiere…",
+    "quota": {
+      "insufficient": "Du hast {balance} eigene Karten in dieser Periode übrig, versuchst aber {count} zu importieren.",
+      "insufficientCta": "Mehr erhalten",
+      "unlimited": "Unbegrenzter Plan"
+    },
+    "success": "{count} Karten importiert",
+    "partialSuccess": "{count} von {total} Karten importiert. {skipped} übersprungen.",
+    "failure": "Import fehlgeschlagen. Bitte versuche es erneut.",
+    "file": {
+      "tooLarge": "Datei ist zu groß. Maximal {maxMb} MB.",
+      "readError": "Datei konnte nicht gelesen werden."
+    },
+    "step": {
+      "input": "1. Eingabe",
+      "map": "2. Zuordnen",
+      "review": "3. Überprüfen",
+      "next": "Weiter",
+      "back": "Zurück",
+      "jumpToError": "Zum nächsten Problem springen"
+    },
+    "confirmDialog": {
+      "title": "{count} Karten importieren?",
+      "description": "Sie werden deiner eigenen Sammlung hinzugefügt.",
+      "descriptionWithWarnings": "{count} Zeilen werden importiert, davon {warnings} mit Warnungen. Sie werden deiner eigenen Sammlung hinzugefügt.",
+      "cancel": "Abbrechen",
+      "confirm": "Importieren"
+    },
+    "preview": {
+      "rowsCounted": "{count} Zeilen erkannt"
+    }
+  },
   "NotFoundPage": {
     "title": "Seite nicht gefunden",
     "description": "Die Seite, die du suchst, existiert nicht oder wurde verschoben.",

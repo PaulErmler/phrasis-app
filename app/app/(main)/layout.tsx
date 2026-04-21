@@ -19,7 +19,7 @@ import { ChevronLeft, MessageSquarePlus, PanelLeft } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { HomeView } from '@/components/app/HomeView';
-import { EnterTextsView } from '@/components/app/EnterTextsView';
+import { AddCardsView } from '@/components/app/AddCardsView';
 import { LibraryView } from '@/components/app/LibraryView';
 import { StatsView } from '@/components/app/stats/StatsView';
 import { SettingsView } from '@/components/app/SettingsView';
@@ -374,7 +374,7 @@ export default function MainLayout({
         </div>
         {isAddCardsRoute && (
           <div style={{ display: !isLearnOpen ? 'contents' : 'none' }}>
-            <EnterTextsView onBack={() => {
+            <AddCardsView onBack={() => {
               setActiveView('home');
               router.push('/app');
             }} />

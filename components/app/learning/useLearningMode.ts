@@ -144,6 +144,9 @@ export function useLearningMode(
   const lastCardRef = useRef<
     Exclude<typeof cardForReviewQuery, undefined> | undefined
   >(undefined);
+  const lastReviewingCardRef = useRef<
+    NonNullable<typeof cardForReviewQuery> | undefined
+  >(undefined);
   const receivedCardRef = useRef(false);
   const lastCourseSettingsRef = useRef<
     Exclude<typeof courseSettingsQuery, undefined> | undefined
@@ -158,6 +161,7 @@ export function useLearningMode(
     if (!isAuthenticated) {
       receivedCardRef.current = false;
       lastCardRef.current = undefined;
+      lastReviewingCardRef.current = undefined;
       receivedCourseSettingsRef.current = false;
       lastCourseSettingsRef.current = undefined;
       receivedActiveCourseRef.current = false;
@@ -167,6 +171,9 @@ export function useLearningMode(
     if (cardForReviewQuery !== undefined) {
       receivedCardRef.current = true;
       lastCardRef.current = cardForReviewQuery;
+    }
+    if (cardForReviewQuery != null) {
+      lastReviewingCardRef.current = cardForReviewQuery;
     }
     if (courseSettingsQuery !== undefined) {
       receivedCourseSettingsRef.current = true;
@@ -182,6 +189,10 @@ export function useLearningMode(
     courseSettingsQuery,
     activeCourseQuery,
   ]);
+
+  useEffect(() => {
+    lastReviewingCardRef.current = undefined;
+  }, [courseSettingsQuery?.activeCollectionId]);
 
   const cardForReview =
     cardForReviewQuery !== undefined
@@ -505,7 +516,9 @@ export function useLearningMode(
     };
   }
 
-  // No cards due
+  // No cards due — or a transient gap between cards while auto-add runs.
+  let displayCard: NonNullable<typeof cardForReview> | undefined =
+    cardForReview ?? undefined;
   if (cardForReview === null) {
     const activeEntry = collectionProgress?.find(
       (c) => c.collectionId === courseSettings.activeCollectionId,
@@ -522,28 +535,36 @@ export function useLearningMode(
       (sentencesQuota.unlimited || sentencesQuota.balance > 0) &&
       (remainingInCollection === null || remainingInCollection > 0);
 
-    if (autoAddWillRun) {
+    if (autoAddWillRun && lastReviewingCardRef.current) {
+      // Keep the previously shown card on screen until the next card arrives,
+      // to avoid a brief flash of the loading UI between cards.
+      displayCard = lastReviewingCardRef.current;
+    } else if (autoAddWillRun) {
       return { ...base, status: 'loading' };
+    } else {
+      return {
+        ...base,
+        status: 'noCardsDue',
+        courseSettings,
+        baseLanguages,
+        targetLanguages,
+        handleAddCards,
+        isAddingCards,
+        batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
+        sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
+        remainingInCollection,
+        schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
+        handleSchedulingModeChange,
+      };
     }
+  }
 
-    return {
-      ...base,
-      status: 'noCardsDue',
-      courseSettings,
-      baseLanguages,
-      targetLanguages,
-      handleAddCards,
-      isAddingCards,
-      batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
-      sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
-      remainingInCollection,
-      schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
-      handleSchedulingModeChange,
-    };
+  if (!displayCard) {
+    return { ...base, status: 'loading' };
   }
 
   // Reviewing — in full review mode, always use FSRS ratings (skip pre-review)
-  const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
+  const phase = effectivePhase(reviewMode, displayCard.schedulingPhase as SchedulingPhase);
   const validRatings = getValidRatings(phase);
   const defaultRating = getDefaultRating(phase);
   const activeRating = selectedRating ?? defaultRating;
@@ -551,9 +572,9 @@ export function useLearningMode(
   // Compute projected next-due interval for each rating
   const cardState: CardSchedulingState = {
     schedulingPhase: phase,
-    preReviewCount: cardForReview.preReviewCount,
-    dueDate: cardForReview.dueDate,
-    fsrsState: cardForReview.fsrsState ?? null,
+    preReviewCount: displayCard.preReviewCount,
+    dueDate: displayCard.dueDate,
+    fsrsState: displayCard.fsrsState ?? null,
   };
   const now = Date.now();
   const ratingIntervals: Record<string, string> = {};
@@ -562,7 +583,7 @@ export function useLearningMode(
       const result = scheduleCard(
         cardState,
         rating,
-        cardForReview.initialReviewCount,
+        displayCard.initialReviewCount,
         now,
       );
       const diff = result.dueDate - now;
@@ -575,7 +596,7 @@ export function useLearningMode(
 
   // Sort translations according to the persisted language order so the
   // flashcard displays languages in the same order as the settings timeline.
-  const sortedTranslations = [...cardForReview.translations].sort((a, b) => {
+  const sortedTranslations = [...displayCard.translations].sort((a, b) => {
     const groupA = a.isBaseLanguage ? 0 : 1;
     const groupB = b.isBaseLanguage ? 0 : 1;
     if (groupA !== groupB) return groupA - groupB;
@@ -595,15 +616,15 @@ export function useLearningMode(
     courseSettings,
     baseLanguages,
     targetLanguages,
-    cardId: cardForReview._id,
+    cardId: displayCard._id,
     phase,
-    preReviewCount: cardForReview.preReviewCount,
-    fsrsState: cardForReview.fsrsState,
-    sourceText: cardForReview.sourceText,
-    sourceLanguage: cardForReview.sourceLanguage,
+    preReviewCount: displayCard.preReviewCount,
+    fsrsState: displayCard.fsrsState,
+    sourceText: displayCard.sourceText,
+    sourceLanguage: displayCard.sourceLanguage,
     translations: sortedTranslations,
-    audioRecordings: cardForReview.audioRecordings,
-    isFavorite: cardForReview.isFavorite ?? false,
+    audioRecordings: displayCard.audioRecordings,
+    isFavorite: displayCard.isFavorite ?? false,
     isPendingMaster,
     isPendingHide,
     validRatings,

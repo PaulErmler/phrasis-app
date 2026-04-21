@@ -9,7 +9,7 @@ import { internal } from "../../_generated/api";
 vi.mock("../../lib/ttsSemanticValidation", () => ({
   textsMatchSemantic: vi.fn(),
 }));
-// eslint-disable-next-line @typescript-eslint/consistent-type-imports
+ 
 import { textsMatchSemantic } from "../../lib/ttsSemanticValidation";
 const mockSemantic = vi.mocked(textsMatchSemantic);
 

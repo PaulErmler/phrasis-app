@@ -252,7 +252,7 @@ export const fetchSentenceMetadata = internalAction({
     });
 
     const { text } = await generateText({
-      model: openrouter(OPENROUTER_MODELS.translationAutoFill),
+      model: openrouter(OPENROUTER_MODELS.sentenceMetadata),
       system: METADATA_SYSTEM_PROMPT,
       prompt: userPrompt,
     });

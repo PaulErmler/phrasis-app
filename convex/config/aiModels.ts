@@ -9,6 +9,10 @@ export const OPENROUTER_MODELS = {
   languageTeacher: 'z-ai/glm-5.1:nitro',
   /** Bulk translation JSON for custom card auto-fill */
   translationAutoFill: 'google/gemini-3-flash-preview',
+  /** Linguistic metadata inference (register, gender, addresseeNumber) for
+   *  newly-created cards. Runs once per row, including during bulk import,
+   *  so we pick the cheaper/faster lite tier. */
+  sentenceMetadata: 'google/gemini-3.1-flash-lite-preview',
   /** Short thread title from first user message */
   threadTitle: 'google/gemini-3.1-flash-lite-preview',
   /** Lenient TTS validation — decides whether a Scribe transcription is

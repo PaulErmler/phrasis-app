@@ -17,3 +17,10 @@ export const MAX_CARD_TEXT_LENGTH = 150;
 
 /** In custom text entry, show n/max only when this many or fewer characters remain (or over limit). */
 export const CARD_TEXT_SHOW_COUNT_REMAINING_THRESHOLD = 20;
+
+/** Max number of items accepted in a single bulk-import call (client and server clamp). */
+export const MAX_IMPORT_BATCH = 500;
+
+/** Max file size (bytes) accepted by the bulk-import dropzone. ~5 MB is well above the
+ * theoretical worst case of MAX_IMPORT_BATCH * MAX_CARD_TEXT_LENGTH per language. */
+export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
