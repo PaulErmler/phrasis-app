@@ -225,23 +225,33 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
       "library-search input should render on /app/library",
     ).toBeVisible({ timeout: 20_000 });
 
-    // Rough initial cardinality via main-region text length.
-    const initialLen = (
-      await page.locator("main").innerText().catch(() => "")
-    ).length;
+    // Let the initial, unfiltered list settle before counting. Search uses a
+    // 300ms debounce so the test needs room for at least one full debounce +
+    // query round-trip.
+    const cards = page.getByTestId("library-card");
+    await expect
+      .poll(async () => cards.count(), { timeout: 10_000 })
+      .toBeGreaterThan(0);
+    const initialCount = await cards.count();
 
-    await searchInput.fill("e");
-    await page.waitForTimeout(600); // debounce
+    // Use a rare-ish string that's unlikely to match every card; this makes
+    // a distinct count change expected regardless of which seed data ran.
+    await searchInput.fill("zzzzq");
 
     const emptyState = page.getByText(/no results|nothing found/i).first();
-    const afterLen = (
-      await page.locator("main").innerText().catch(() => "")
-    ).length;
-
-    const filtered =
-      (await emptyState.isVisible().catch(() => false)) ||
-      Math.abs(afterLen - initialLen) > 5;
-
-    expect(filtered).toBe(true);
+    // Wait for either the empty state to appear, or the card count to change.
+    // 2s covers debounce (300ms) + query + re-render with plenty of margin.
+    await expect
+      .poll(
+        async () => {
+          const isEmpty = await emptyState
+            .isVisible()
+            .catch(() => false);
+          const current = await cards.count();
+          return isEmpty || current !== initialCount;
+        },
+        { timeout: 3_000 },
+      )
+      .toBe(true);
   });
 });

@@ -145,7 +145,9 @@ test.describe("chat (live)", { tag: "@live" }, () => {
 
       const dialog = page.getByRole("dialog");
       await expect(dialog).toBeVisible({ timeout: 10_000 });
-      const firstInput = dialog.locator("input").first();
+      // EditApprovalDialog renders each translation as a <Textarea>, not an
+      // <Input>, so target textarea elements here.
+      const firstInput = dialog.locator("textarea").first();
       await expect(firstInput).toBeVisible({ timeout: 5_000 });
       await firstInput.fill(editedText);
 

@@ -5,7 +5,7 @@
 
 import {
   romanizeLocal,
-  useRomanizationForTtsMatch,
+  shouldRomanizeForTtsMatch,
 } from './localRomanization';
 
 /**
@@ -79,7 +79,7 @@ export function textsMatchForLanguage(
   transcribed: string,
   language: string,
 ): boolean {
-  if (useRomanizationForTtsMatch(language)) {
+  if (shouldRomanizeForTtsMatch(language)) {
     const a = romanizeLocal(original, language);
     const b = romanizeLocal(transcribed, language);
     if (a !== null && b !== null) {

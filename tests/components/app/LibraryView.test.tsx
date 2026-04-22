@@ -21,22 +21,22 @@ vi.mock('convex/react', () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
   useMutation: (ref: { __mockKey?: string }) => {
     switch (ref.__mockKey) {
-      case 'masterCard':
-        return masterCardFn;
-      case 'unmasterCard':
-        return unmasterCardFn;
-      case 'hideCard':
-        return hideCardFn;
-      case 'unhideCard':
-        return unhideCardFn;
-      case 'toggleFavoriteCard':
-        return toggleFavoriteFn;
-      case 'deleteCardPermanently':
-        return deleteCardFn;
-      case 'editCard':
-        return editCardFn;
-      default:
-        return vi.fn();
+    case 'masterCard':
+      return masterCardFn;
+    case 'unmasterCard':
+      return unmasterCardFn;
+    case 'hideCard':
+      return hideCardFn;
+    case 'unhideCard':
+      return unhideCardFn;
+    case 'toggleFavoriteCard':
+      return toggleFavoriteFn;
+    case 'deleteCardPermanently':
+      return deleteCardFn;
+    case 'editCard':
+      return editCardFn;
+    default:
+      return vi.fn();
     }
   },
   usePreloadedQuery: () => ({ highlightWords: true }),

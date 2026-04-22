@@ -268,7 +268,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     driverRef.current = d;
     setIsActive(true);
     d.drive();
-  }, [tutorial, completeTutorial, stepCompleteOnClickIndex]);
+  }, [tutorial, tutorialId, completeTutorial, stepCompleteOnClickIndex]);
 
   const launchDriverRef = useRef(launchDriver);
   useLayoutEffect(() => {

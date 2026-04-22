@@ -30,7 +30,7 @@ export function hasLocalRomanization(code: string): boolean {
  */
 export const TTS_ROMANIZATION_LANGUAGES = new Set(['zh', 'ko']);
 
-export function useRomanizationForTtsMatch(code: string): boolean {
+export function shouldRomanizeForTtsMatch(code: string): boolean {
   return TTS_ROMANIZATION_LANGUAGES.has(code);
 }
 

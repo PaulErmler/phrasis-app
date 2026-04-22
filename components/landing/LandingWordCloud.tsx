@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useCallback, useState } from 'react';
+import { useMemo, useCallback, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { WordCloud } from '@isoterik/react-word-cloud';
 import type { Word } from '@isoterik/react-word-cloud';
@@ -45,12 +45,14 @@ export function LandingWordCloud() {
     [],
   );
 
-  const randomFn = useMemo(() => {
-    let seed = 42;
-    return () => {
-      seed = (seed * 16807 + 0) % 2147483647;
-      return (seed - 1) / 2147483646;
-    };
+  // Deterministic PRNG. The seed lives in a ref so the closure's mutation
+  // isn't flagged as an after-render reassignment. `randomFn` is only invoked
+  // by the word-cloud layout (inside WordCloud), not during this component's
+  // render body, so reading/writing the ref there is safe.
+  const seedRef = useRef(42);
+  const randomFn = useCallback(() => {
+    seedRef.current = (seedRef.current * 16807 + 0) % 2147483647;
+    return (seedRef.current - 1) / 2147483646;
   }, []);
 
   return (

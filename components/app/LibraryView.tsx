@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, usePreloadedQuery } from 'convex/react';
 import type { FunctionReturnType } from 'convex/server';
@@ -117,11 +117,11 @@ export function LibraryView({
 
   // Captures the displayed order across renders so cards keep their position
   // when a toggle removes them from (or returns them to) the live query.
-  const orderRef = useRef<Id<'cards'>[]>([]);
+  const [orderIds, setOrderIds] = useState<Id<'cards'>[]>([]);
 
   useEffect(() => {
     setStickyCards(new Map());
-    orderRef.current = [];
+    setOrderIds([]);
   }, [activeFilter, debouncedSearch]);
 
   const handleMaster = useCallback(
@@ -185,7 +185,7 @@ export function LibraryView({
       next.delete(cardId);
       return next;
     });
-    orderRef.current = orderRef.current.filter((id) => id !== cardId);
+    setOrderIds((prev) => prev.filter((id) => id !== cardId));
     try {
       await deleteCard({ cardId });
     } catch (error) {
@@ -208,7 +208,7 @@ export function LibraryView({
     const liveById = new Map(liveCards.map((c) => [c._id, c]));
     const newOrder: Id<'cards'>[] = [];
     const seen = new Set<Id<'cards'>>();
-    for (const id of orderRef.current) {
+    for (const id of orderIds) {
       if ((liveById.has(id) || stickyCards.has(id)) && !seen.has(id)) {
         newOrder.push(id);
         seen.add(id);
@@ -220,7 +220,6 @@ export function LibraryView({
         seen.add(card._id);
       }
     }
-    orderRef.current = newOrder;
 
     return newOrder.map((id) => {
       const sticky = stickyCards.get(id);
@@ -232,7 +231,23 @@ export function LibraryView({
         isHidden: sticky?.isHidden ?? card.isHidden,
       };
     });
-  }, [liveCards, stickyCards]);
+  }, [liveCards, stickyCards, orderIds]);
+
+  // Persist the displayed order so the next render can seed from it without
+  // mutating a ref during render. No-op when the computed order matches what
+  // we already stored, so this doesn't spiral into a re-render loop.
+  useEffect(() => {
+    const next = displayCards.map(({ card }) => card._id);
+    setOrderIds((prev) => {
+      if (
+        prev.length === next.length &&
+        prev.every((id, i) => id === next[i])
+      ) {
+        return prev;
+      }
+      return next;
+    });
+  }, [displayCards]);
 
   const hasResults = displayCards.length > 0;
   const hasActiveFilters = debouncedSearch.length > 0 || activeFilter !== null;

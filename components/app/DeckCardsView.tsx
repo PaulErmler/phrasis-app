@@ -55,14 +55,14 @@ export function DeckCardsView() {
       current.map((c) =>
         c._id === args.cardId
           ? {
-              ...c,
-              audioSpeedOverrides: (() => {
-                const next = { ...(c.audioSpeedOverrides ?? {}) };
-                if (args.speed === null) delete next[args.language];
-                else next[args.language] = args.speed;
-                return next;
-              })(),
-            }
+            ...c,
+            audioSpeedOverrides: (() => {
+              const next = { ...(c.audioSpeedOverrides ?? {}) };
+              if (args.speed === null) delete next[args.language];
+              else next[args.language] = args.speed;
+              return next;
+            })(),
+          }
           : c,
       ),
     );

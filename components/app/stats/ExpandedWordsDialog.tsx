@@ -38,6 +38,9 @@ export function ExpandedWordsDialog({
   // larger page is being fetched so the UI doesn't flicker and only the new
   // words animate in at the bottom.
   const [displayed, setDisplayed] = useState<string[]>([]);
+  // Index of the first item in the newest batch — used to animate only the
+  // tail that just arrived. Updated in the same effect that commits `words`.
+  const [newFromIndex, setNewFromIndex] = useState(0);
   const prevLengthRef = useRef(0);
 
   // Reset everything whenever the dialog is opened or the language changes.
@@ -46,6 +49,7 @@ export function ExpandedWordsDialog({
       setLimit(PAGE_SIZE);
       setDisplayed([]);
       setSearch('');
+      setNewFromIndex(0);
       prevLengthRef.current = 0;
     }
   }, [open, language]);
@@ -59,15 +63,10 @@ export function ExpandedWordsDialog({
   // existing chips stay mounted and keep their DOM identity.
   useEffect(() => {
     if (!words) return;
-    setDisplayed((prev) => {
-      if (words.length >= prev.length) {
-        prevLengthRef.current = prev.length;
-        return words;
-      }
-      // Shouldn't happen normally (limit only grows), but be safe.
-      prevLengthRef.current = words.length;
-      return words;
-    });
+    const prev = prevLengthRef.current;
+    setNewFromIndex(words.length >= prev ? prev : words.length);
+    prevLengthRef.current = words.length;
+    setDisplayed(words);
   }, [words]);
 
   const isInitialLoading = words === undefined && displayed.length === 0;
@@ -75,7 +74,6 @@ export function ExpandedWordsDialog({
   const exhausted = words !== undefined && words.length < limit;
   const isFetchingMore = words === undefined && displayed.length > 0;
   const canLoadMore = !isFetchingMore && !exhausted && limit < MAX_WORDS;
-  const newFromIndex = prevLengthRef.current;
 
   const trimmedSearch = search.trim();
   const isSearching = trimmedSearch.length > 0;
