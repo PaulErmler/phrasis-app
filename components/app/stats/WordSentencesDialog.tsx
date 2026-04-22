@@ -37,7 +37,6 @@ import {
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { Loader2 } from 'lucide-react';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
-import { highlightWord } from '@/lib/wordCloud';
 
 export function WordSentencesDialog({
   word,
@@ -297,11 +296,7 @@ export function WordSentencesDialog({
                               isActive={isActive}
                               enabled={highlightEnabled}
                               className="text-sm font-medium leading-relaxed"
-                              fallback={
-                                isWordLanguage
-                                  ? highlightWord(tr.text, word)
-                                  : undefined
-                              }
+                              highlightTerm={isWordLanguage ? word : undefined}
                             />
                             {tr.romanization && (
                               <p className="text-romanization">
@@ -359,11 +354,7 @@ export function WordSentencesDialog({
                               isActive={isActive}
                               enabled={highlightEnabled}
                               className="text-sm leading-relaxed"
-                              fallback={
-                                isWordLanguage
-                                  ? highlightWord(tr.text, word)
-                                  : undefined
-                              }
+                              highlightTerm={isWordLanguage ? word : undefined}
                             />
                             {tr.romanization && (
                               <p className="text-romanization">

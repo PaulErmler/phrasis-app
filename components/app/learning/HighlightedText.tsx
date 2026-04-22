@@ -1,12 +1,14 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import {
   alignWordTimings,
   findCurrentIndex,
   matchRatio,
+  normalise,
 } from '@/lib/audio/alignTimings';
+import { highlightWord } from '@/lib/wordCloud';
 import type { WordTiming } from './types';
 
 interface Props {
@@ -22,11 +24,13 @@ interface Props {
   enabled: boolean;
   className?: string;
   /**
-   * Optional content to render in place of the plain text when highlighting
-   * isn't active (e.g. a word-cloud dialog showing the searched word with
-   * its own accent). Karaoke takes over during playback.
+   * Optional search term (e.g. the word a user tapped in the word cloud) to
+   * persistently mark in accent-orange. The marked word stays orange whether
+   * audio is playing or not; when karaoke reaches it, the blue current-word
+   * highlight wins for that single span and orange resumes once playback
+   * passes it.
    */
-  fallback?: ReactNode;
+  highlightTerm?: string;
 }
 
 /**
@@ -52,7 +56,7 @@ export function HighlightedText({
   isActive,
   enabled,
   className,
-  fallback,
+  highlightTerm,
 }: Props) {
   const aligned = useMemo(
     () => alignWordTimings(text, wordTimings),
@@ -71,29 +75,62 @@ export function HighlightedText({
     [isActive, canHighlight, aligned, localTime],
   );
 
+  // Indices of aligned tokens that match the search term (case-insensitive,
+  // punctuation-tolerant via the same normalise() the alignment uses). When
+  // karaoke is rendering, these tokens get the accent-orange colour — except
+  // the currently-spoken one, which stays blue so playback position remains
+  // visually unambiguous.
+  const highlightedIndices = useMemo(() => {
+    if (!highlightTerm) return null;
+    const target = normalise(highlightTerm);
+    if (!target) return null;
+    const set = new Set<number>();
+    aligned.forEach((w, i) => {
+      if (normalise(w.display) === target) set.add(i);
+    });
+    return set.size > 0 ? set : null;
+  }, [aligned, highlightTerm]);
+
   // Memoized on currentIndex (not localTime), so 60 Hz ticks that fall inside
   // the same word reuse the cached children — React skips reconciliation of
   // every span every frame, which is the main mobile flicker source. When
   // currentIndex does change, only the previously-current and newly-current
   // spans get a different className; the rest diff to a no-op.
   const wordSpans = useMemo(() => {
-    return aligned.map((w, i) => (
-      <span
-        key={i}
-        className={cn(
-          'transition-colors duration-200',
-          i === currentIndex && 'text-primary',
-        )}
-      >
-        {w.leading}
-        {w.display}
-      </span>
-    ));
-  }, [aligned, currentIndex]);
+    return aligned.map((w, i) => {
+      const isCurrent = i === currentIndex;
+      const isHighlighted = highlightedIndices?.has(i) ?? false;
+      return (
+        <span
+          key={i}
+          className={cn(
+            'transition-colors duration-200',
+            isCurrent && 'text-primary',
+          )}
+          style={
+            !isCurrent && isHighlighted
+              ? { color: 'var(--accent-orange)' }
+              : undefined
+          }
+        >
+          {w.leading}
+          {w.display}
+        </span>
+      );
+    });
+  }, [aligned, currentIndex, highlightedIndices]);
 
-  if (!enabled || !canHighlight || !isActive) {
-    return <p className={className}>{fallback ?? text}</p>;
+  if (!enabled || !canHighlight) {
+    return (
+      <p className={className}>
+        {highlightTerm ? highlightWord(text, highlightTerm) : text}
+      </p>
+    );
   }
 
+  // Single render path for active + idle when highlighting is possible. Idle
+  // still renders per-word spans (currentIndex is -1 so no blue is applied),
+  // which keeps the DOM structure identical across an isActive flip — that's
+  // what prevents the search-word orange from disappearing at play start.
   return <p className={className}>{wordSpans}</p>;
 }

@@ -27,7 +27,7 @@ export interface AlignedWord {
 }
 
 /** Strip surrounding punctuation/symbols + lowercase + NFC normalise. */
-function normalise(s: string): string {
+export function normalise(s: string): string {
   return s
     .toLocaleLowerCase()
     .normalize('NFC')
