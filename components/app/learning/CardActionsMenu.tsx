@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   CircleCheck,
@@ -51,6 +52,12 @@ export function CardActionsMenu({
   triggerIconClassName = 'h-4 w-4',
 }: CardActionsMenuProps) {
   const t = useTranslations('LearningMode');
+  // Controlled so the trigger only opens on a true tap (onClick fires after
+  // pointerup with no significant movement). Radix's default behaviour opens
+  // on pointerdown, which fires the moment a finger first lands on the
+  // button — so on mobile, a scroll that starts on the button pops the menu
+  // open. Suppressing pointerdown and toggling via click avoids that.
+  const [open, setOpen] = useState(false);
 
   return (
     <div className="flex items-center">
@@ -102,13 +109,15 @@ export function CardActionsMenu({
           <TooltipContent side="bottom">{t('actions.unhide')}</TooltipContent>
         </Tooltip>
       )}
-      <DropdownMenu>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
             size="icon"
             aria-label={t('actions.more')}
             className={`${triggerClassName} text-muted-foreground hover:text-foreground hover:bg-muted`}
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => setOpen((v) => !v)}
           >
             <MoreHorizontal className={triggerIconClassName} />
           </Button>

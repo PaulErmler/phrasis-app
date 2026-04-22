@@ -243,7 +243,7 @@ export function LearningCardContent({
                       </p>
                     )}
                   </div>
-                  <div className="flex flex-col items-center gap-0.5">
+                  <div className="flex items-center gap-1">
                     <AudioButton
                       url={audio?.url ?? null}
                       language={translation.language}
