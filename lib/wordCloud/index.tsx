@@ -56,7 +56,7 @@ export function useCloudSize(): {
   ref: RefObject<HTMLDivElement | null>;
   width: number;
   height: number;
-} {
+  } {
   const ref = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -102,7 +102,11 @@ export function highlightWord(text: string, word: string): React.ReactNode {
   const parts = text.split(regex);
   return parts.map((part, i) =>
     i % 2 === 1 ? (
-      <span key={i} className="text-primary">
+      <span
+        key={i}
+        className="font-medium"
+        style={{ color: 'var(--accent-orange)' }}
+      >
         {part}
       </span>
     ) : (

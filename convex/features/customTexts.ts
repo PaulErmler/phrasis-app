@@ -1,14 +1,16 @@
 import { v, ConvexError } from 'convex/values';
 import { action, mutation, internalMutation, internalQuery } from '../_generated/server';
 import { internal } from '../_generated/api';
+import type { Id } from '../_generated/dataModel';
 import { requireAuthUserId, getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getOrCreateCustomCollection } from '../db/collections';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
-import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
+import { MAX_CARD_TEXT_LENGTH, MAX_IMPORT_BATCH } from '../../lib/constants/learning';
 import { getLanguageByCode } from '../../lib/languages';
 import { trackEvent } from '../db/stats/dailyStats';
+import { isValidTimezone } from '../lib/dateUtils';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS } from '../config/aiModels';
@@ -268,6 +270,13 @@ export const createCustomText = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new ConvexError('Not authenticated');
 
+    if (!isValidTimezone(args.timezone)) {
+      throw new ConvexError({
+        code: 'INVALID_TIMEZONE',
+        message: `Invalid IANA timezone: "${args.timezone}".`,
+      });
+    }
+
     const active = await getActiveCourseForUser(ctx, userId);
     if (!active) throw new ConvexError('No active course found');
     const { course } = active;
@@ -291,6 +300,13 @@ export const createCustomText = mutation({
     }
 
     for (const { language, text } of args.translations) {
+      if (text.length === 0) {
+        throw new ConvexError({
+          code: 'EMPTY_TEXT',
+          message: `Empty text for language "${language}".`,
+          language,
+        });
+      }
       if (text.length > MAX_CARD_TEXT_LENGTH) {
         throw new ConvexError({
           code: 'TEXT_TOO_LONG',
@@ -369,6 +385,184 @@ export const createCustomText = mutation({
     await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsAddedManually' });
 
     return { textId };
+  },
+});
+
+/**
+ * Create many custom texts in a single transaction. Used by the bulk-import
+ * UI. Each item must cover the course's base + target languages exactly.
+ *
+ * Partial-success semantics: items that fail per-item validation (bad
+ * language set, over-length text) are reported in `skipped` rather than
+ * aborting the whole batch. Quota is consumed only for accepted items.
+ * Authentication, course membership, and the USAGE_LIMIT check are still
+ * hard errors — the client is expected to pre-check quota.
+ */
+export const createCustomTextsBatch = mutation({
+  args: {
+    items: v.array(
+      v.object({
+        translations: v.array(
+          v.object({ language: v.string(), text: v.string() }),
+        ),
+      }),
+    ),
+    timezone: v.string(),
+  },
+  returns: v.object({
+    createdTextIds: v.array(v.id('texts')),
+    skipped: v.array(
+      v.object({
+        index: v.number(),
+        code: v.string(),
+        message: v.string(),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError('Not authenticated');
+
+    if (!isValidTimezone(args.timezone)) {
+      throw new ConvexError({
+        code: 'INVALID_TIMEZONE',
+        message: `Invalid IANA timezone: "${args.timezone}".`,
+      });
+    }
+
+    if (args.items.length === 0) {
+      throw new ConvexError({
+        code: 'BATCH_EMPTY',
+        message: 'No items provided for import.',
+      });
+    }
+    if (args.items.length > MAX_IMPORT_BATCH) {
+      throw new ConvexError({
+        code: 'BATCH_TOO_LARGE',
+        message: `Batch exceeds maximum of ${MAX_IMPORT_BATCH} items.`,
+        maxBatch: MAX_IMPORT_BATCH,
+      });
+    }
+
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) throw new ConvexError('No active course found');
+    const { course } = active;
+
+    const requiredLanguages = [
+      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
+    ];
+
+    const skipped: { index: number; code: string; message: string }[] = [];
+    const accepted: { index: number; translations: { language: string; text: string }[] }[] = [];
+
+    for (let i = 0; i < args.items.length; i++) {
+      const { translations } = args.items[i];
+      const providedLanguages = translations.map((t) => t.language);
+      const missing = requiredLanguages.filter((l) => !providedLanguages.includes(l));
+      const extras = providedLanguages.filter((l) => !requiredLanguages.includes(l));
+      if (
+        missing.length > 0 ||
+        extras.length > 0 ||
+        new Set(providedLanguages).size !== providedLanguages.length
+      ) {
+        skipped.push({
+          index: i,
+          code: 'INVALID_LANGUAGES',
+          message: `Translations must cover exactly the course languages. Missing: ${JSON.stringify(missing)}. Extra: ${JSON.stringify(extras)}.`,
+        });
+        continue;
+      }
+      let tooLong: string | null = null;
+      for (const { language, text } of translations) {
+        if (text.length === 0) {
+          tooLong = language;
+          skipped.push({
+            index: i,
+            code: 'EMPTY_TEXT',
+            message: `Empty text for language "${language}".`,
+          });
+          break;
+        }
+        if (text.length > MAX_CARD_TEXT_LENGTH) {
+          tooLong = language;
+          skipped.push({
+            index: i,
+            code: 'TEXT_TOO_LONG',
+            message: `Text for language "${language}" exceeds the maximum length of ${MAX_CARD_TEXT_LENGTH} characters.`,
+          });
+          break;
+        }
+      }
+      if (tooLong !== null) continue;
+      accepted.push({ index: i, translations });
+    }
+
+    if (accepted.length === 0) {
+      return { createdTextIds: [], skipped };
+    }
+
+    // Quota is authoritative here — client pre-check is advisory.
+    await consumeQuota(ctx, userId, FEATURE_IDS.CUSTOM_SENTENCES, accepted.length);
+
+    const collection = await getOrCreateCustomCollection(ctx, course._id);
+    const baseRank = collection.textCount;
+
+    const createdTextIds: Id<'texts'>[] = [];
+
+    for (let i = 0; i < accepted.length; i++) {
+      const { translations } = accepted[i];
+      const mainEntry = translations[0];
+      const rank = baseRank + i + 1;
+
+      const textId = await ctx.db.insert('texts', {
+        text: mainEntry.text,
+        language: mainEntry.language,
+        userCreated: true,
+        userId,
+        collectionId: collection._id,
+        collectionRank: rank,
+      });
+
+      for (let j = 1; j < translations.length; j++) {
+        const entry = translations[j];
+        await ctx.db.insert('translations', {
+          textId,
+          targetLanguage: entry.language,
+          translatedText: entry.text,
+        });
+      }
+
+      createdTextIds.push(textId);
+
+      // Pure-manual path: generate metadata first, which then schedules
+      // prepareCardContent. Mirrors createCustomText's no-metadata branch.
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.sentenceMetadata.generateSentenceMetadata,
+        {
+          textId,
+          translations,
+          schedulePrepareCard: true,
+          baseLanguages: course.baseLanguages,
+          targetLanguages: course.targetLanguages,
+        },
+      );
+    }
+
+    await ctx.db.patch(collection._id, {
+      textCount: collection.textCount + accepted.length,
+    });
+
+    // Track all accepted items in a single daily + total counter bump.
+    await trackEvent(ctx, {
+      userId,
+      courseId: course._id,
+      timezone: args.timezone,
+      field: 'cardsAddedManually',
+      count: accepted.length,
+    });
+
+    return { createdTextIds, skipped };
   },
 });
 

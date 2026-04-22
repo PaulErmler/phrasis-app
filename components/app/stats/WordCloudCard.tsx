@@ -1,34 +1,28 @@
 'use client';
 
-import { useMemo, useCallback, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { WordCloud } from '@isoterik/react-word-cloud';
-import type { Word } from '@isoterik/react-word-cloud';
 import { Search, Maximize2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { WordSentencesDialog } from './WordSentencesDialog';
 import { WordSearchDialog } from './WordSearchDialog';
 import { ExpandedWordsDialog } from './ExpandedWordsDialog';
-import {
-  WORD_CLOUD_COLORS as COLORS,
-  StaticWordRenderer,
-  buildWords,
-  useCloudSize,
-} from '@/lib/wordCloud';
+import { WORD_CLOUD_COLORS as COLORS } from '@/lib/wordCloud';
 
-export const LANG_NAMES: Record<string, string> = {
-  en: 'English', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian',
-  pt: 'Portuguese', nl: 'Dutch', ru: 'Russian', ja: 'Japanese', ko: 'Korean',
-  zh: 'Chinese', ar: 'Arabic', hi: 'Hindi', tr: 'Turkish', pl: 'Polish',
-  sv: 'Swedish', da: 'Danish', no: 'Norwegian', fi: 'Finnish', el: 'Greek',
-  cs: 'Czech', ro: 'Romanian', hu: 'Hungarian', uk: 'Ukrainian', th: 'Thai',
-  vi: 'Vietnamese', id: 'Indonesian', ms: 'Malay', he: 'Hebrew', fa: 'Persian',
-};
-
-export function getLangName(code: string): string {
-  return LANG_NAMES[code] ?? code.toUpperCase();
+export function useLangName(): (code: string) => string {
+  const locale = useLocale();
+  return useMemo(() => {
+    const dn = new Intl.DisplayNames([locale], { type: 'language' });
+    return (code: string) => {
+      try {
+        return dn.of(code) ?? code.toUpperCase();
+      } catch {
+        return code.toUpperCase();
+      }
+    };
+  }, [locale]);
 }
 
 function SingleWordCloud({
@@ -36,56 +30,51 @@ function SingleWordCloud({
   words,
   isFirst,
   t,
+  langName,
   onWordClick,
   onSearchClick,
   onExpandClick,
 }: {
   language: string;
   t: ReturnType<typeof useTranslations<'StatsPage'>>;
+  langName: (code: string) => string;
   words: string[];
   isFirst: boolean;
   onWordClick: (word: string, language: string) => void;
   onSearchClick: () => void;
   onExpandClick: () => void;
 }) {
-  const { ref: containerRef, width, height } = useCloudSize();
+  const candidateWords = words.slice(0, 200);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [visibleCount, setVisibleCount] = useState(candidateWords.length);
 
-  const wordData = useMemo(() => buildWords(words.slice(0, 500)), [words]);
-
-  const scale = Math.max(width / 400, 1); // scale up on wider screens, never shrink below base
-
-  // Memoize all callback props so the WordCloud (React.memo) doesn't
-  // re-render and re-animate on every parent state change.
-  const wordCount = wordData.length;
-  const fontSizeFn = useCallback(
-    (word: Word) => Math.round((10 + (word.value / wordCount) * 10) * scale),
-    [wordCount, scale],
-  );
-  const fontWeightFn = useCallback(
-    (word: Word) => Math.round(400 + (word.value / wordCount) * 100),
-    [wordCount],
-  );
-  const rotateFn = useCallback(() => -360, []);
-  const fillFn = useCallback((_: Word, i: number) => COLORS[i % COLORS.length], []);
-  const handleWordClick = useCallback(
-    (word: { text: string }) => onWordClick(word.text, language),
-    [onWordClick, language],
-  );
-
-  // Fixed seed so layout is deterministic across any forced recompute
-  const randomFn = useMemo(() => {
-    let seed = 42;
-    return () => {
-      seed = (seed * 16807 + 0) % 2147483647;
-      return (seed - 1) / 2147483646;
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const update = () => {
+      const h = container.clientHeight;
+      const buttons = container.querySelectorAll<HTMLElement>('[data-cloud-word]');
+      let firstOverflow = buttons.length;
+      for (let i = 0; i < buttons.length; i++) {
+        const btn = buttons[i];
+        if (btn.offsetTop + btn.offsetHeight > h) {
+          firstOverflow = i;
+          break;
+        }
+      }
+      setVisibleCount(firstOverflow);
     };
-  }, []);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [words]);
 
   return (
     <div className="card-surface p-3" data-testid="stats-wordcloud">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">
-          {isFirst ? t('recentlyLearnedWords', { language: getLangName(language) }) : getLangName(language)}
+          {isFirst ? t('recentlyLearnedWords', { language: langName(language) }) : langName(language)}
         </span>
         <div className="flex items-center gap-0.5">
           <Button
@@ -110,33 +99,27 @@ function SingleWordCloud({
       </div>
       <div
         ref={containerRef}
-        className={
-          width > 0 && height > 0
-            ? 'relative w-full aspect-[20/8] overflow-hidden rounded-lg'
-            : 'relative w-full aspect-[20/8] overflow-hidden rounded-lg bg-muted/20'
-        }
+        className="relative w-full aspect-[5/4] sm:aspect-[20/8] overflow-hidden rounded-lg px-1 py-1 leading-5 text-sm"
+        style={{ textAlign: 'justify', textAlignLast: 'left' }}
       >
-        {width > 0 && height > 0 ? (
-          <WordCloud
-            words={wordData}
-            width={width}
-            height={height}
-            timeInterval={1.0}
-            spiral="archimedean"
-            padding={0}
-            font="Impact"
-            fontStyle="normal"
-            fontSize={fontSizeFn}
-            fontWeight={fontWeightFn}
-            rotate={rotateFn}
-            fill={fillFn}
-            random={randomFn}
-            transition="none"
-            enableTooltip={false}
-            renderWord={StaticWordRenderer}
-            onWordClick={handleWordClick}
-          />
-        ) : null}
+        {candidateWords.map((w, i) => (
+          <Fragment key={`${i}-${w}`}>
+            <button
+              data-cloud-word
+              type="button"
+              onClick={() => onWordClick(w, language)}
+              aria-label={t('viewSentencesForWord', { word: w })}
+              style={{
+                color: COLORS[i % COLORS.length],
+                visibility: i < visibleCount ? 'visible' : 'hidden',
+              }}
+              className="inline-block rounded-md px-0.5 font-bold transition-colors hover:bg-muted active:scale-[0.97]"
+            >
+              {w}
+            </button>
+            {' '}
+          </Fragment>
+        ))}
       </div>
     </div>
   );
@@ -144,6 +127,7 @@ function SingleWordCloud({
 
 export function WordCloudSection() {
   const t = useTranslations('StatsPage');
+  const langName = useLangName();
   const data = useQuery(api.features.stats.getRecentWords);
   const [selectedWord, setSelectedWord] = useState<{
     word: string;       // normalized (lowercase NFC) — used for the query
@@ -174,6 +158,7 @@ export function WordCloudSection() {
           words={entry.words}
           isFirst={i === 0}
           t={t}
+          langName={langName}
           onWordClick={handleWordClick}
           onSearchClick={() => setSearchOpen(true)}
           onExpandClick={() => setExpandedLanguage(entry.language)}

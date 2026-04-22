@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Check,
@@ -20,6 +20,13 @@ export interface CollectionProgressItem {
   collectionName: string;
   cardsAdded: number;
   totalTexts: number;
+}
+
+export interface CollectionAction {
+  label: string;
+  icon: ReactNode;
+  onClick: () => void;
+  isLoading?: boolean;
 }
 
 /** Generate a human-readable CEFR description using i18n, with fallback. */
@@ -50,6 +57,9 @@ interface CollectionCarouselUIProps {
   onUpgrade?: () => void;
   /** When true, hides the "Add N Cards" button */
   hideAddCards?: boolean;
+  /** Per-collection action overrides (keyed by collection name). When a collection has an override,
+   *  the override button replaces the "Add N Cards" button in the bottom-right slot. */
+  collectionActions?: Record<string, CollectionAction>;
 }
 
 export function CollectionCarouselUI({
@@ -65,6 +75,7 @@ export function CollectionCarouselUI({
   sentencesRemaining,
   onUpgrade,
   hideAddCards = false,
+  collectionActions,
 }: CollectionCarouselUIProps) {
   const [focusedId, setFocusedId] = useState<string | null>(
     activeCollectionIds[0] ?? collections[0]?.collectionId ?? null,
@@ -175,6 +186,7 @@ export function CollectionCarouselUI({
           sentencesRemaining={sentencesRemaining}
           onUpgrade={onUpgrade}
           hideAddCards={hideAddCards}
+          actionOverride={collectionActions?.[focusedCollection.collectionName]}
         />
       )}
     </div>
@@ -197,6 +209,7 @@ function InlineCollectionDetail({
   sentencesRemaining,
   onUpgrade,
   hideAddCards = false,
+  actionOverride,
 }: {
   collection: CollectionProgressItem;
   isActive: boolean;
@@ -209,6 +222,7 @@ function InlineCollectionDetail({
   sentencesRemaining?: number | null;
   onUpgrade?: () => void;
   hideAddCards?: boolean;
+  actionOverride?: CollectionAction;
 }) {
   const progress =
     collection.totalTexts > 0
@@ -273,7 +287,9 @@ function InlineCollectionDetail({
       <div
         className={cn(
           'grid gap-2 px-3 pb-3',
-          isComplete && !showToggleWhenComplete ? 'grid-cols-2' : 'grid-cols-3',
+          isComplete && !showToggleWhenComplete && !actionOverride
+            ? 'grid-cols-2'
+            : 'grid-cols-3',
         )}
       >
         {!isComplete || showToggleWhenComplete ? (
@@ -301,33 +317,51 @@ function InlineCollectionDetail({
           <Eye className="h-3.5 w-3.5 mr-1.5" />
           {t('inline.preview')}
         </Button>
-        {!isComplete && !hideAddCards && (
-          sentencesRemaining === 0 ? (
-            <Button
-              size="sm"
-              onClick={onUpgrade}
-              className="text-xs"
-            >
-              <Lock className="h-3.5 w-3.5 mr-1" />
-              Upgrade
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              disabled={isAdding}
-              onClick={onAddCards}
-              className="text-xs"
-              data-testid="collection-add-cards"
-            >
-              {isAdding ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <>
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  {t('detail.addN', { count: addCount })}
-                </>
-              )}
-            </Button>
+        {actionOverride ? (
+          <Button
+            size="sm"
+            disabled={actionOverride.isLoading}
+            onClick={actionOverride.onClick}
+            className="text-xs"
+          >
+            {actionOverride.isLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <>
+                <span className="mr-1 inline-flex">{actionOverride.icon}</span>
+                {actionOverride.label}
+              </>
+            )}
+          </Button>
+        ) : (
+          !isComplete && !hideAddCards && (
+            sentencesRemaining === 0 ? (
+              <Button
+                size="sm"
+                onClick={onUpgrade}
+                className="text-xs"
+              >
+                <Lock className="h-3.5 w-3.5 mr-1" />
+                Upgrade
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                disabled={isAdding}
+                onClick={onAddCards}
+                className="text-xs"
+                data-testid="collection-add-cards"
+              >
+                {isAdding ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <>
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    {t('detail.addN', { count: addCount })}
+                  </>
+                )}
+              </Button>
+            )
           )
         )}
       </div>

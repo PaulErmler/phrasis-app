@@ -29,6 +29,28 @@ describe('getLanguageByCode', () => {
   });
 });
 
+describe('SUPPORTED_LANGUAGES ttsProvider', () => {
+  // Currently Google is the default. Only Swedish stays on ElevenLabs —
+  // this guards against accidental provider flips.
+  const ELEVENLABS_LANGUAGES = new Set(['sv']);
+
+  it('non-ElevenLabs languages are all routed through Google TTS', () => {
+    const offenders = SUPPORTED_LANGUAGES.filter(
+      (l) => !ELEVENLABS_LANGUAGES.has(l.code) && l.ttsProvider !== 'google',
+    ).map((l) => `${l.code}=${l.ttsProvider}`);
+    expect(
+      offenders,
+      `Languages unexpectedly off google: ${offenders.join(', ') || '(none)'}`,
+    ).toEqual([]);
+  });
+
+  it('ElevenLabs-pinned languages stay on ElevenLabs', () => {
+    for (const code of ELEVENLABS_LANGUAGES) {
+      expect(getLanguageByCode(code)?.ttsProvider).toBe('elevenlabs');
+    }
+  });
+});
+
 describe('getLanguageShortLabel', () => {
   it('uppercases known codes', () => {
     expect(getLanguageShortLabel('en')).toBe('EN');
@@ -76,7 +98,7 @@ describe('voice helpers', () => {
   });
 
   it('getVoiceGenderByApiCode returns gender when found', () => {
-    const anyVoice = SUPPORTED_LANGUAGES[0].voices[0];
+    const anyVoice = getVoicesByLanguageCode(SUPPORTED_LANGUAGES[0].code)[0];
     expect(getVoiceGenderByApiCode(anyVoice.apiCode)).toBe(anyVoice.gender);
   });
 
@@ -114,8 +136,9 @@ describe('getLocaleFromApiCode', () => {
     expect(getLocaleFromApiCode('cmn-CN-Chirp3-HD-Foo')).toBe('cmn-CN');
   });
 
-  it('returns the original string when the pattern is missing', () => {
-    expect(getLocaleFromApiCode('weird')).toBe('weird');
+  it('returns null for non-Google apiCodes (e.g., ElevenLabs voice IDs)', () => {
+    expect(getLocaleFromApiCode('weird')).toBeNull();
+    expect(getLocaleFromApiCode('21m00Tcm4TlvDq8ikWAM')).toBeNull();
   });
 });
 

@@ -10,6 +10,17 @@ export function getTodayInTimezone(timezone: string): string {
   );
 }
 
+/** True if `timezone` is an IANA zone accepted by Intl.DateTimeFormat. */
+export function isValidTimezone(timezone: string): boolean {
+  if (typeof timezone !== 'string' || timezone.length === 0) return false;
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: timezone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Determine the next day after a "YYYY-MM-DD" date string. */
 export function getNextDay(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number);

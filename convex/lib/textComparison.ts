@@ -3,6 +3,11 @@
  * potentially other fuzzy-match scenarios.
  */
 
+import {
+  romanizeLocal,
+  shouldRomanizeForTtsMatch,
+} from './localRomanization';
+
 /**
  * Strip punctuation, collapse whitespace, lowercase — so that minor
  * transcription differences (e.g. period vs no period) don't cause
@@ -57,4 +62,29 @@ export function textsMatch(original: string, transcribed: string): boolean {
   if (a === b) return true;
 
   return levenshtein(a, b) <= MAX_EDIT_DISTANCE;
+}
+
+/**
+ * Language-aware strict comparison.
+ *
+ * For Chinese and Korean (languages with a local romanizer and where Scribe
+ * commonly produces homophone-character substitutions), romanize both sides
+ * before comparing. A hanzi homophone swap — e.g. 在 vs 再, 他 vs 她 — maps
+ * to the same pinyin and matches at edit distance 0.
+ *
+ * For all other languages, falls back to character-level `textsMatch`.
+ */
+export function textsMatchForLanguage(
+  original: string,
+  transcribed: string,
+  language: string,
+): boolean {
+  if (shouldRomanizeForTtsMatch(language)) {
+    const a = romanizeLocal(original, language);
+    const b = romanizeLocal(transcribed, language);
+    if (a !== null && b !== null) {
+      return textsMatch(a, b);
+    }
+  }
+  return textsMatch(original, transcribed);
 }

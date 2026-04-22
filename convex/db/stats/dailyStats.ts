@@ -157,6 +157,8 @@ export async function upsertDailyStats(
 
 /**
  * Increment a single event counter on dailyStats without touching review fields.
+ * Pass `count` to add more than 1 at a time (used by bulk flows like the
+ * custom-text importer).
  */
 export async function incrementDailyEventCounter(
   ctx: MutationCtx,
@@ -165,8 +167,11 @@ export async function incrementDailyEventCounter(
     courseId: Id<'courses'>;
     date: string;
     field: 'chatMessagesSent' | 'chatCardsApproved' | 'cardsEdited' | 'cardsAddedManually';
+    count?: number;
   },
 ): Promise<void> {
+  const amount = args.count ?? 1;
+  if (amount <= 0) return;
   const existing = await ctx.db
     .query('dailyStats')
     .withIndex('by_userId_and_courseId_and_date', (q) =>
@@ -176,7 +181,7 @@ export async function incrementDailyEventCounter(
 
   if (existing) {
     await ctx.db.patch(existing._id, {
-      [args.field]: ((existing[args.field] as number | undefined) ?? 0) + 1,
+      [args.field]: ((existing[args.field] as number | undefined) ?? 0) + amount,
     });
   } else {
     await ctx.db.insert('dailyStats', {
@@ -187,7 +192,7 @@ export async function incrementDailyEventCounter(
       newCards: 0,
       timeMs: 0,
       cardsReviewed: 0,
-      [args.field]: 1,
+      [args.field]: amount,
     });
   }
 }
@@ -203,7 +208,8 @@ const DAILY_TO_TOTAL_MAP: Record<DailyField, keyof Doc<'courseStats'>> = {
 
 /**
  * Track a user event by incrementing both the daily counter and the
- * cumulative courseStats total in one call.
+ * cumulative courseStats total in one call. Pass `count` > 1 for bulk flows
+ * (e.g. importing many custom cards at once) to avoid doing N round-trips.
  *
  * Timezone is optional — if omitted, it's read from courseStats.timezone
  * (set during card reviews). Falls back to 'UTC' if neither is available.
@@ -215,8 +221,11 @@ export async function trackEvent(
     courseId: Id<'courses'>;
     timezone?: string;
     field: DailyField;
+    count?: number;
   },
 ): Promise<void> {
+  const amount = args.count ?? 1;
+  if (amount <= 0) return;
   const stats = await getCourseStatsForMutation(ctx, args.userId, args.courseId);
   const tz = args.timezone || stats?.timezone || 'UTC';
   const date = getTodayInTimezone(tz);
@@ -225,11 +234,12 @@ export async function trackEvent(
     courseId: args.courseId,
     date,
     field: args.field,
+    count: amount,
   });
   if (stats) {
     const totalField = DAILY_TO_TOTAL_MAP[args.field];
     await ctx.db.patch(stats._id, {
-      [totalField]: ((stats[totalField] as number | undefined) ?? 0) + 1,
+      [totalField]: ((stats[totalField] as number | undefined) ?? 0) + amount,
     });
   }
 }

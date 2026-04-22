@@ -16,6 +16,7 @@ export interface CardAudioContent {
   language: string;
   voiceName: string | null;
   url: string | null;
+  wordTimings: { word: string; start: number; end: number }[] | null;
 }
 
 export interface TextContentResult {
@@ -140,6 +141,7 @@ export async function buildTextContentBatchForLanguages(
         language: lang,
         voiceName: audio?.voiceName ?? null,
         url: urlMap.get(`${input.key}:${lang}`) ?? null,
+        wordTimings: audio?.wordTimings ?? null,
       };
     });
 
@@ -150,11 +152,21 @@ export async function buildTextContentBatchForLanguages(
     const hasMissingRomanization = translations.some(
       (tr) => ROMANIZATION_LANGUAGES.has(tr.language) && !tr.romanization,
     );
+    // Legacy audio (generated before Scribe integration) has a URL but no
+    // wordTimings. Flag it as missing so useEnsureContent → scheduleMissingContent
+    // triggers a backfill transcription.
+    const hasMissingWordTimings = audioRecordings.some(
+      (audio) => audio.url !== null && audio.wordTimings === null,
+    );
 
     result.set(input.key, {
       translations,
       audioRecordings,
-      hasMissingContent: hasMissingTranslation || hasMissingAudio || hasMissingRomanization,
+      hasMissingContent:
+        hasMissingTranslation ||
+        hasMissingAudio ||
+        hasMissingRomanization ||
+        hasMissingWordTimings,
     });
   }
 

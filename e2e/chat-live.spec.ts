@@ -6,19 +6,32 @@ import { dismissTour } from "./helpers";
  *
  * Cost-aware design: a fresh test account starts with only 5 chat
  * messages (quota tracked by the "N left" badge next to the chat input).
- * Each message burns real LLM tokens, so this file sends EXACTLY ONE
- * live chat message per full run and asserts as many behaviors as
- * possible off of that single exchange:
+ * Each message burns real LLM tokens, so this file sends EXACTLY TWO
+ * live chat messages per full run and asserts as many behaviors as
+ * possible off of those exchanges:
  *
+ * Test 1 — the card-generation exchange:
  *   1. sendMessage       → user turn appears in the UI
  *   2. generateResponse  → assistant turn comes back with substantive text
  *   3. agent emits card-approval proposals (structured output)
- *   4. approveCard       → user clicks "Add Sentence" and state flips
- *   5. generateThreadTitle → sidebar entry shows a non-default title
- *   6. quota decrement   → "N left" counter drops by exactly 1
- *   7. library persistence → approved card shows up in /app/library
+ *   4. updateApprovalTranslations → user opens the edit dialog on the first
+ *      card, rewrites its base-language text, saves, and the card surface
+ *      reflects the edit before approval
+ *   5. approveCard       → user clicks "Add Sentence" and state flips
+ *   6. generateThreadTitle → sidebar entry shows a non-default title
+ *   7. quota decrement   → "N left" counter drops by exactly 1
+ *   8. library persistence → the *edited* card text shows up in /app/library
+ *
+ * Test 2 — thread persistence (no extra messages):
  *   8. getThread         → navigating away and back restores messages
  *   9. listThreads       → the thread is still listed in the sidebar
+ *
+ * Test 3 — the word-explain exchange (learning mode → "Ask AI" popover):
+ *  10. ClickableWords trigger → popover opens next to a clicked word
+ *  11. openChatWithPrompt + auto-submit → user bubble shows
+ *      "Explain me this word: <word>" without the user pressing send
+ *  12. generateResponse  → assistant reply arrives in the in-learn chat
+ *  13. quota decrement   → another message is counted against the quota
  *
  * Nondeterministic pieces (LLM content, exact card count) are asserted
  * structurally with generous timeouts.
@@ -116,32 +129,51 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       const cardCount = await addSentence.count();
       expect(cardCount).toBeGreaterThanOrEqual(1);
 
-      // (7) Approve the first card. After approval the card's "Add
-      // Sentence" button should either disappear from the DOM, become
-      // disabled, or be replaced by a confirmation ("Added", a checkmark,
-      // etc.) — but other unapproved cards still have enabled buttons.
-      // Assertion: the TOTAL count of enabled "Add Sentence" buttons
-      // drops by 1 (or more, if the approval clears the whole group).
+      // (7) Edit the first card BEFORE approving. This exercises
+      // updateApprovalTranslations on the real backend: open the edit
+      // dialog, overwrite the first input (base language) with a unique
+      // marker, save, and verify the marker is now visible in the card
+      // surface (which prefers approval.translations over the frozen
+      // tool-call input once edited).
       const firstCardAlert = page.getByTestId("card-approval").first();
-      const cardTextBefore = (await firstCardAlert
-        .innerText()
-        .catch(() => ""))
-        .trim()
-        .slice(0, 200);
-      const enabledBefore = cardCount;
+      const editMarker = `edt${Date.now().toString(36)}`;
+      const editedText = `Edited sentence ${editMarker}`;
 
-      await addSentence.first().click();
-      await expect(async () => {
-        const now = await addSentence.count();
-        const enabledNow = await Promise.all(
-          Array.from({ length: now }, (_, i) =>
-            addSentence.nth(i).isEnabled().catch(() => false),
-          ),
-        ).then((xs) => xs.filter(Boolean).length);
-        expect(enabledNow).toBeLessThan(enabledBefore);
-      }).toPass({ timeout: 15_000 });
+      const firstEdit = firstCardAlert.getByTestId("card-edit").first();
+      await expect(firstEdit).toBeVisible({ timeout: 10_000 });
+      await firstEdit.click();
 
-      // (8) Thread auto-titles — a sidebar entry with substantive text
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible({ timeout: 10_000 });
+      // EditApprovalDialog renders each translation as a <Textarea>, not an
+      // <Input>, so target textarea elements here.
+      const firstInput = dialog.locator("textarea").first();
+      await expect(firstInput).toBeVisible({ timeout: 5_000 });
+      await firstInput.fill(editedText);
+
+      const saveButton = dialog.getByRole("button", { name: /^save$/i });
+      await saveButton.click();
+      // Dialog closes on success.
+      await expect(dialog).toBeHidden({ timeout: 10_000 });
+
+      // The edited marker should now surface in the card approval alert.
+      await expect(firstCardAlert).toContainText(editMarker, {
+        timeout: 10_000,
+      });
+
+      // (8) Approve the first card. After approval the card's "Add
+      // Sentence" button is replaced by the "approved" indicator inside
+      // that specific card-approval alert. Scope the assertion to the
+      // first card's subtree — counting enabled buttons across the whole
+      // page would race with the AI streaming in additional cards after
+      // we captured cardCount, inflating the count and masking the flip.
+      const firstApprove = firstCardAlert.getByTestId("card-approve").first();
+      await firstApprove.click();
+      await expect(
+        firstCardAlert.getByTestId("card-approved-indicator"),
+      ).toBeVisible({ timeout: 15_000 });
+
+      // (9) Thread auto-titles — a sidebar entry with substantive text
       // appears within TITLE_TIMEOUT.
       const toggle = page.getByTestId("chat-toggle-conversations").first();
       if (await toggle.count()) await toggle.click().catch(() => {});
@@ -153,7 +185,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
         expect(substantive).toBe(true);
       }).toPass({ timeout: TITLE_TIMEOUT });
 
-      // (9) Quota decrement — the "N left" badge is rendered both on
+      // (10) Quota decrement — the "N left" badge is rendered both on
       // /app (NewChatInput) and on /app/chat/* (ChatInput). We're
       // already on the chat page; poll in place and wait for the
       // Convex mutation to propagate.
@@ -164,10 +196,10 @@ test.describe("chat (live)", { tag: "@live" }, () => {
         }).toPass({ timeout: 30_000 });
       }
 
-      // (10) Approved card persists to /app/library. We pull a distinctive
-      // word from the alert text and search for it.
-      const searchSeed =
-        cardTextBefore.match(/[A-Za-zÀ-ÿ]{4,}/)?.[0]?.toLowerCase() ?? "café";
+      // (11) Approved card persists to /app/library. We search for the
+      // unique edit marker so the assertion pins the *edited* text to the
+      // persisted card, not a coincidental phrase from the AI response.
+      const searchSeed = editMarker;
 
       await page.goto("/app/library");
       await page.waitForLoadState("domcontentloaded");
@@ -233,4 +265,110 @@ test.describe("chat (live)", { tag: "@live" }, () => {
     const threadEntries = page.getByTestId("chat-thread-entry");
     await expect(threadEntries.first()).toBeVisible({ timeout: 10_000 });
   });
+
+  test(
+    "word-explain flow: click a word on a learning card → Ask AI auto-submits 'Explain me this word: <word>'",
+    async ({ page }) => {
+      // The assistant reply can take up to a minute; add headroom for the
+      // navigation + word-click setup on top of that. Playwright's 30s
+      // default would fire before the assistant response comes back.
+      test.setTimeout(120_000);
+
+      // (1) Read the quota from /app (the home NewChatInput always renders
+      // the badge). Capture before we burn the message.
+      await page.goto("/app");
+      await page.waitForLoadState("domcontentloaded");
+      await dismissTour(page, "home_tour");
+
+      const quotaBefore = await readQuotaLeft(page);
+      test.skip(
+        quotaBefore !== null && quotaBefore < 1,
+        `Chat quota exhausted (${quotaBefore} left) — cannot run live word-explain test.`,
+      );
+
+      // (2) Enter the learn overlay. Depending on prior test state the card
+      // may be in audio or full review; dismiss either intro tour.
+      await page.goto("/app/learn");
+      await page.waitForLoadState("domcontentloaded");
+      await dismissTour(page, "audio_review_intro", 500);
+      await dismissTour(page, "full_review_intro", 500);
+
+      // The review tour can launch ~1s after reviewing state begins —
+      // try again in case we missed it on first sweep.
+      await dismissTour(page, "audio_review_intro", 1_500);
+      await dismissTour(page, "full_review_intro", 500);
+
+      // (3) Wait for a clickable word span to appear. If the deck happens
+      // to be empty on this run (no cards approved in test 1, or review
+      // phase not yet loaded), skip rather than fail — the first test in
+      // this spec is what seeds the deck, and its failure would already
+      // have propagated via serial-mode.
+      const firstWord = page.getByTestId("clickable-word").first();
+      const hasWord = await firstWord
+        .waitFor({ state: "visible", timeout: 20_000 })
+        .then(() => true)
+        .catch(() => false);
+      test.skip(
+        !hasWord,
+        "No reviewable card with clickable words — prior test did not seed a usable deck.",
+      );
+
+      // (4) Capture the word text so we can assert the prompt template
+      // receives the right argument. ClickableWords strips surrounding
+      // punctuation before injecting into the template (e.g. "Haus," →
+      // "Haus") — mirror that here so the regex matches.
+      const rawWord = (await firstWord.innerText()).trim();
+      const cleanedWord = rawWord.replace(
+        /^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu,
+        "",
+      );
+      expect(
+        cleanedWord.length,
+        "Clickable word should have a non-empty display after stripping punctuation.",
+      ).toBeGreaterThan(0);
+
+      // (5) Open the popover and confirm the Ask AI action.
+      await firstWord.click();
+      const askBtn = page.getByTestId("ask-ai-button").first();
+      await expect(
+        askBtn,
+        "Ask AI button should appear inside the word popover after clicking a clickable-word",
+      ).toBeVisible({ timeout: 5_000 });
+      await askBtn.click();
+
+      // (6) Auto-submit fires from ChatPanel's initialTextNonce effect —
+      // no user send-press involved. The user bubble should contain the
+      // templated prompt. Escape cleanedWord for safe regex embedding.
+      const escaped = cleanedWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const userBubble = page
+        .getByTestId("chat-user-message")
+        .filter({ hasText: new RegExp(`Explain me this word:\\s*${escaped}`) })
+        .first();
+      await expect(
+        userBubble,
+        'User bubble should show "Explain me this word: <word>" after Ask AI is clicked',
+      ).toBeVisible({ timeout: 15_000 });
+
+      // (7) Assistant reply arrives in the in-learn chat. Use .first()
+      // because LearningChatLayout renders the chat panel in two sibling
+      // slots (desktop + mobile) — on a desktop viewport the mobile copy
+      // is display:none, so .last() would target the hidden one and never
+      // resolve to visible.
+      const assistant = page.getByTestId("chat-assistant-message").first();
+      await expect(assistant).toBeVisible({ timeout: ASSISTANT_TIMEOUT });
+      await expect(assistant).not.toBeEmpty();
+
+      // (8) Quota drops by one — a fresh message was sent via the
+      // learning-mode chat panel. Poll because the Convex mutation is
+      // asynchronous. Assert strict decrement rather than exact count to
+      // tolerate races with unrelated usage refreshes.
+      if (quotaBefore !== null) {
+        await expect(async () => {
+          const quotaAfter = await readQuotaLeft(page);
+          expect(quotaAfter).not.toBeNull();
+          expect(quotaAfter!).toBeLessThan(quotaBefore);
+        }).toPass({ timeout: 30_000 });
+      }
+    },
+  );
 });

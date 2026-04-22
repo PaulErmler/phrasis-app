@@ -192,6 +192,53 @@ export const approveCard = mutation({
 });
 
 /**
+ * Update the translations on a pending approval before it's accepted.
+ */
+export const updateApprovalTranslations = mutation({
+  args: {
+    approvalId: v.id('cardApprovals'),
+    translations: v.array(v.object({ language: v.string(), text: v.string() })),
+  },
+  returns: v.object({ success: v.boolean() }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError('Not authenticated');
+
+    const approval = await getAuthenticatedPendingApproval(
+      ctx,
+      args.approvalId,
+      userId,
+    );
+
+    const existingLanguages = new Set(
+      approval.translations.map((t) => t.language),
+    );
+    const incomingLanguages = new Set(args.translations.map((t) => t.language));
+    if (
+      existingLanguages.size !== incomingLanguages.size ||
+      [...existingLanguages].some((l) => !incomingLanguages.has(l))
+    ) {
+      throw new ConvexError('Translation languages must match the original set');
+    }
+
+    for (const { text } of args.translations) {
+      if (text.trim().length === 0) {
+        throw new ConvexError('Translation text must not be empty');
+      }
+    }
+
+    const cappedTranslations = args.translations.map((t) => ({
+      language: t.language,
+      text: t.text.slice(0, MAX_CARD_TEXT_LENGTH),
+    }));
+
+    await ctx.db.patch(args.approvalId, { translations: cappedTranslations });
+
+    return { success: true };
+  },
+});
+
+/**
  * Reject a card creation.
  */
 export const rejectCard = mutation({

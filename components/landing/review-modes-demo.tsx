@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
 import type { ReviewMode } from '@/convex/types';
+import { getLandingAudioUrl } from '@/lib/landing/audio';
 import {
   getLanguageShortLabel,
   getLocalizedLanguageNameByCode,
@@ -59,6 +60,7 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
         language: tr.language,
         voiceName: null,
         url: null,
+        wordTimings: null,
       }));
       const fullTargets = [
         { code: 'es', expected: t('mock.es'), typed: t('mock.typedEs') },
@@ -97,6 +99,7 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
       language: tr.language,
       voiceName: null,
       url: null,
+      wordTimings: null,
     }));
     const fullTargets = [
       { code: 'es', expected: t('mock.es'), typed: t('mock.typedEs') },
@@ -273,7 +276,9 @@ export function ReviewModesDemo() {
   useEffect(() => {
     if (reviewMode !== 'audio' || reducedMotion) return;
     const targetCount = multi ? 2 : 1;
-    const totalMs = 720 + (targetCount - 1) * 640 + 3000;
+    // Tail accounts for the last target audio finishing (~1.5–2.5s mp3) plus
+    // a brief breath before restarting the demo loop.
+    const totalMs = 720 + (targetCount - 1) * 640 + 4000;
     const id = window.setTimeout(() => setPlayKey((k) => k + 1), totalMs);
     return () => clearTimeout(id);
   }, [reviewMode, playKey, multi, reducedMotion]);
@@ -368,11 +373,17 @@ export function ReviewModesDemo() {
                                 <span className="text-xs font-medium text-muted-foreground uppercase">
                                   {label}
                                 </span>
-                                <LandingAudioButton language={getLanguageShortLabel(tr.language)} />
+                                <LandingAudioButton
+                                  url={getLandingAudioUrl(tr.text, tr.language)}
+                                  language={getLanguageShortLabel(tr.language)}
+                                />
                               </div>
                             ) : (
                               <div className="flex justify-end">
-                                <LandingAudioButton language={getLanguageShortLabel(tr.language)} />
+                                <LandingAudioButton
+                                  url={getLandingAudioUrl(tr.text, tr.language)}
+                                  language={getLanguageShortLabel(tr.language)}
+                                />
                               </div>
                             )}
                             <div className="h-9 overflow-hidden">

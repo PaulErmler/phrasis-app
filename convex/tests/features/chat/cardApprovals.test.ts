@@ -183,6 +183,204 @@ describe("features/chat/cardApprovals", () => {
     });
   });
 
+  describe("updateApprovalTranslations", () => {
+    async function seedPending(t: ReturnType<typeof convexTest>, userId = "user_A") {
+      return t.run(async (ctx) =>
+        ctx.db.insert("cardApprovals", {
+          threadId: "thread_1",
+          messageId: "m1",
+          toolCallId: "tc1",
+          translations: [
+            { language: "en", text: "Hello" },
+            { language: "es", text: "Hola" },
+          ],
+          userId,
+          status: "pending",
+        }),
+      );
+    }
+
+    it("rejects unauthenticated", async () => {
+      const t = convexTest(schema, modules);
+      const approvalId = await seedPending(t);
+      await expect(
+        t.mutation(
+          api.features.chat.cardApprovals.updateApprovalTranslations,
+          {
+            approvalId,
+            translations: [
+              { language: "en", text: "Hi" },
+              { language: "es", text: "Hola" },
+            ],
+          },
+        ),
+      ).rejects.toThrow();
+    });
+
+    it("rejects another user's approval", async () => {
+      const t = convexTest(schema, modules);
+      const approvalId = await seedPending(t, "user_B");
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(
+          api.features.chat.cardApprovals.updateApprovalTranslations,
+          {
+            approvalId,
+            translations: [
+              { language: "en", text: "Hi" },
+              { language: "es", text: "Hola" },
+            ],
+          },
+        ),
+      ).rejects.toThrow();
+    });
+
+    it("updates translations on a pending approval", async () => {
+      const t = convexTest(schema, modules);
+      const approvalId = await seedPending(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.chat.cardApprovals.updateApprovalTranslations,
+        {
+          approvalId,
+          translations: [
+            { language: "en", text: "Good morning" },
+            { language: "es", text: "Buenos días" },
+          ],
+        },
+      );
+      expect(res.success).toBe(true);
+      const approval = await t.run(async (ctx) => ctx.db.get(approvalId));
+      expect(approval?.status).toBe("pending");
+      expect(approval?.translations).toEqual([
+        { language: "en", text: "Good morning" },
+        { language: "es", text: "Buenos días" },
+      ]);
+    });
+
+    it("rejects edits to already-approved approvals", async () => {
+      const t = convexTest(schema, modules);
+      const approvalId = await t.run(async (ctx) =>
+        ctx.db.insert("cardApprovals", {
+          threadId: "thread_1",
+          messageId: "m1",
+          toolCallId: "tc1",
+          translations: [
+            { language: "en", text: "Hello" },
+            { language: "es", text: "Hola" },
+          ],
+          userId: "user_A",
+          status: "approved",
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(
+          api.features.chat.cardApprovals.updateApprovalTranslations,
+          {
+            approvalId,
+            translations: [
+              { language: "en", text: "Hi" },
+              { language: "es", text: "Hola" },
+            ],
+          },
+        ),
+      ).rejects.toThrow();
+    });
+
+    it("rejects language set mismatch", async () => {
+      const t = convexTest(schema, modules);
+      const approvalId = await seedPending(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(
+          api.features.chat.cardApprovals.updateApprovalTranslations,
+          {
+            approvalId,
+            translations: [
+              { language: "en", text: "Hi" },
+              { language: "fr", text: "Salut" },
+            ],
+          },
+        ),
+      ).rejects.toThrow();
+    });
+
+    it("rejects empty text", async () => {
+      const t = convexTest(schema, modules);
+      const approvalId = await seedPending(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(
+          api.features.chat.cardApprovals.updateApprovalTranslations,
+          {
+            approvalId,
+            translations: [
+              { language: "en", text: "   " },
+              { language: "es", text: "Hola" },
+            ],
+          },
+        ),
+      ).rejects.toThrow();
+    });
+
+    it("caps text to MAX_CARD_TEXT_LENGTH", async () => {
+      const t = convexTest(schema, modules);
+      const approvalId = await seedPending(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const longText = "a".repeat(500);
+      await asUser.mutation(
+        api.features.chat.cardApprovals.updateApprovalTranslations,
+        {
+          approvalId,
+          translations: [
+            { language: "en", text: longText },
+            { language: "es", text: "Hola" },
+          ],
+        },
+      );
+      const approval = await t.run(async (ctx) => ctx.db.get(approvalId));
+      expect(approval?.translations[0].text.length).toBe(150);
+    });
+
+    it("edits flow into approveCard", async () => {
+      const t = convexTest(schema, modules);
+      await seedCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            custom_sentences: {
+              balance: 5,
+              included: 5,
+              used: 0,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+      });
+      const approvalId = await seedPending(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(
+        api.features.chat.cardApprovals.updateApprovalTranslations,
+        {
+          approvalId,
+          translations: [
+            { language: "en", text: "Edited main" },
+            { language: "es", text: "Principal editado" },
+          ],
+        },
+      );
+      const res = await asUser.mutation(
+        api.features.chat.cardApprovals.approveCard,
+        { approvalId },
+      );
+      const text = await t.run(async (ctx) => ctx.db.get(res.textId!));
+      expect(text?.text).toBe("Edited main");
+    });
+  });
+
   describe("approveCard", () => {
     it("happy path: consumes quota, inserts text + translations, flips approval to approved", async () => {
       const t = convexTest(schema, modules);
