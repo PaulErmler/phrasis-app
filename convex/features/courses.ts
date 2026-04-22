@@ -45,6 +45,7 @@ import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
 import { LEVEL_TO_COLLECTION } from '../lib/collections';
 import { getNextTextsFromRank } from '../db/collections';
 import { createCardsFromTexts, updateCollectionProgress } from './decks';
+import { courseSettingsDocValidator } from '../schema';
 
 async function validateLanguageLimits(
   ctx: MutationCtx,
@@ -817,58 +818,15 @@ export const updateCourseLanguages = mutation({
  */
 export const getActiveCourseSettings = query({
   args: {},
-  returns: v.union(
-    v.object({
-      _id: v.id('courseSettings'),
-      _creationTime: v.number(),
-      courseId: v.id('courses'),
-      initialReviewCount: v.number(),
-      activeCollectionId: v.optional(v.id('collections')),
-      cardsToAddBatchSize: v.optional(v.number()),
-      autoAddCards: v.optional(v.boolean()),
-      // Audio playback settings
-      highlightWords: v.optional(v.boolean()),
-      autoPlayAudio: v.optional(v.boolean()),
-      autoAdvance: v.optional(v.boolean()),
-      languageRepetitions: v.optional(v.record(v.string(), v.number())),
-      languageRepetitionPauses: v.optional(v.record(v.string(), v.number())),
-      pauseBaseToBase: v.optional(v.number()),
-      pauseBaseToTarget: v.optional(v.number()),
-      pauseTargetToTarget: v.optional(v.number()),
-      pauseBeforeAutoAdvance: v.optional(v.number()),
-      showProgressBar: v.optional(v.boolean()),
-      hideTargetLanguages: v.optional(v.boolean()),
-      autoRevealLanguages: v.optional(v.boolean()),
-      showRomanization: v.optional(v.boolean()),
-      baseLanguageOrder: v.optional(v.array(v.string())),
-      targetLanguageOrder: v.optional(v.array(v.string())),
-      instantProceedAudio: v.optional(v.boolean()),
-      instantProceedFull: v.optional(v.boolean()),
-      // Review mode
-      reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))),
-      fullReviewTargetAudioMode: v.optional(
-        v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
-      ),
-      // Scheduling mode
-      schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))),
-      chatCollectionId: v.optional(v.id('collections')),
-      customCollectionId: v.optional(v.id('collections')),
-      activeCustomCollectionIds: v.optional(v.array(v.id('collections'))),
-    }),
-    v.null(),
-  ),
+  returns: v.union(courseSettingsDocValidator, v.null()),
   handler: async (ctx) => {
-    try {
-      const userId = await getAuthUserId(ctx);
-      if (!userId) return null;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
 
-      const active = await getActiveCourseForUser(ctx, userId);
-      if (!active) return null;
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return null;
 
-      return dbGetCourseSettings(ctx, active.course._id);
-    } catch {
-      return null;
-    }
+    return dbGetCourseSettings(ctx, active.course._id);
   },
 });
 

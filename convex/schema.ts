@@ -13,6 +13,56 @@ import {
 } from './types';
 
 
+// Field validators for the `courseSettings` table. Extracted so that queries
+// returning a full `courseSettings` document can share the shape with the
+// schema and avoid drift.
+export const courseSettingsFields = {
+  courseId: v.id('courses'),
+  initialReviewCount: v.number(), // How many times a card is shown before FSRS scheduling
+  activeCollectionId: v.optional(v.id('collections')),
+  cardsToAddBatchSize: v.optional(v.number()), // How many cards to add at once
+  autoAddCards: v.optional(v.boolean()), // Auto-add cards when none are due
+
+  // Audio playback settings
+  highlightWords: v.optional(v.boolean()), // Karaoke-style word highlighting during audio playback (default true)
+  autoPlayAudio: v.optional(v.boolean()), // Auto-play audio when card is shown
+  autoAdvance: v.optional(v.boolean()), // Auto-advance after audio finishes
+  languageRepetitions: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 2, "es": 2 }
+  languageRepetitionPauses: v.optional(v.record(v.string(), v.number())), // per-language pause between repeats (seconds)
+  languagePlaybackSpeeds: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 1.0, "es": 0.9 }; range PLAYBACK_SPEED_MIN-PLAYBACK_SPEED_MAX (see lib/constants/audioPlayback); missing = 1.0. Pitch-preserved via HTMLMediaElement.preservesPitch for single clips and SoundTouchJS for the merged WAV.
+  pauseBaseToBase: v.optional(v.number()), // seconds between different base languages
+  pauseBaseToTarget: v.optional(v.number()), // seconds between base and target sections
+  pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages
+  pauseBeforeAutoAdvance: v.optional(v.number()), // seconds to wait before auto-advancing to next card
+  showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
+  hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
+  autoRevealLanguages: v.optional(v.boolean()), // unblur when audio starts playing
+  showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
+  // Language order overrides
+  baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
+  targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
+  // Instant proceed on rating (per mode)
+  instantProceedAudio: v.optional(v.boolean()), // auto-advance when rating is clicked (audio mode, default false)
+  instantProceedFull: v.optional(v.boolean()), // auto-advance when rating is clicked (full mode, default true)
+  // Review mode
+  reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
+  // Scheduling mode
+  schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))), // 'learnAndReview' (default) or 'learn_new'
+  fullReviewTargetAudioMode: v.optional(
+    v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
+  ), // When to play target audio in full review mode
+  chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
+  customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
+  activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
+} as const;
+
+// Full `courseSettings` document validator (includes system fields).
+export const courseSettingsDocValidator = v.object({
+  _id: v.id('courseSettings'),
+  _creationTime: v.number(),
+  ...courseSettingsFields,
+});
+
 export default defineSchema({
   // Collections table - groups texts by difficulty level or potentially other topics
   collections: defineTable({
@@ -116,45 +166,7 @@ export default defineSchema({
   }).index('by_userId', ['userId']),
 
   // Course settings table — separated so changes don't trigger course re-fetches
-  courseSettings: defineTable({
-    courseId: v.id('courses'),
-    initialReviewCount: v.number(), // How many times a card is shown before FSRS scheduling
-    activeCollectionId: v.optional(v.id('collections')),
-    cardsToAddBatchSize: v.optional(v.number()), // How many cards to add at once
-    autoAddCards: v.optional(v.boolean()), // Auto-add cards when none are due
-
-    // Audio playback settings
-    highlightWords: v.optional(v.boolean()), // Karaoke-style word highlighting during audio playback (default true)
-    autoPlayAudio: v.optional(v.boolean()), // Auto-play audio when card is shown
-    autoAdvance: v.optional(v.boolean()), // Auto-advance after audio finishes
-    languageRepetitions: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 2, "es": 2 }
-    languageRepetitionPauses: v.optional(v.record(v.string(), v.number())), // per-language pause between repeats (seconds)
-    languagePlaybackSpeeds: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 1.0, "es": 0.9 }; range PLAYBACK_SPEED_MIN-PLAYBACK_SPEED_MAX (see lib/constants/audioPlayback); missing = 1.0. Pitch-preserved via HTMLMediaElement.preservesPitch for single clips and SoundTouchJS for the merged WAV.
-    pauseBaseToBase: v.optional(v.number()), // seconds between different base languages
-    pauseBaseToTarget: v.optional(v.number()), // seconds between base and target sections
-    pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages
-    pauseBeforeAutoAdvance: v.optional(v.number()), // seconds to wait before auto-advancing to next card
-    showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
-    hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
-    autoRevealLanguages: v.optional(v.boolean()), // unblur when audio starts playing
-    showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
-    // Language order overrides
-    baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
-    targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
-    // Instant proceed on rating (per mode)
-    instantProceedAudio: v.optional(v.boolean()), // auto-advance when rating is clicked (audio mode, default false)
-    instantProceedFull: v.optional(v.boolean()), // auto-advance when rating is clicked (full mode, default true)
-    // Review mode
-    reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
-    // Scheduling mode
-    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))), // 'learnAndReview' (default) or 'learn_new'
-    fullReviewTargetAudioMode: v.optional(
-      v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
-    ), // When to play target audio in full review mode
-    chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
-    customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
-    activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
-  }).index('by_courseId', ['courseId']),
+  courseSettings: defineTable(courseSettingsFields).index('by_courseId', ['courseId']),
 
   // Decks table - one deck per course, auto-created
   decks: defineTable({
