@@ -7,13 +7,25 @@ import userEvent from '@testing-library/user-event';
 // so each test can drive what the live library result looks like. Each
 // mutation is a fresh vi.fn so we can assert call shape per test.
 // ---------------------------------------------------------------------------
-const masterCardFn = vi.fn().mockResolvedValue(null);
-const unmasterCardFn = vi.fn().mockResolvedValue(null);
-const hideCardFn = vi.fn().mockResolvedValue(null);
-const unhideCardFn = vi.fn().mockResolvedValue(null);
-const toggleFavoriteFn = vi.fn().mockResolvedValue(null);
-const deleteCardFn = vi.fn().mockResolvedValue(null);
-const editCardFn = vi.fn().mockResolvedValue(null);
+// Mutation mocks. Each is callable like the real Convex mutation *and* exposes
+// `.withOptimisticUpdate(fn)` so code that chains it in production (e.g.
+// toggleFavorite) still type-checks and runs. The optimistic callback itself
+// is a no-op in these unit tests — the live query mock drives rendering.
+function makeMutationMock() {
+  const fn = vi.fn().mockResolvedValue(null) as ReturnType<typeof vi.fn> & {
+    withOptimisticUpdate: (cb: unknown) => typeof fn;
+  };
+  fn.withOptimisticUpdate = () => fn;
+  return fn;
+}
+
+const masterCardFn = makeMutationMock();
+const unmasterCardFn = makeMutationMock();
+const hideCardFn = makeMutationMock();
+const unhideCardFn = makeMutationMock();
+const toggleFavoriteFn = makeMutationMock();
+const deleteCardFn = makeMutationMock();
+const editCardFn = makeMutationMock();
 
 const useQueryMock = vi.fn();
 

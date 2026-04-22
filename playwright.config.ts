@@ -79,6 +79,7 @@ export default defineConfig({
         /learning-journey\.spec\.ts/,
         /learning-settings\.spec\.ts/,
         /settings\.spec\.ts/,
+        /add-cards-import-live\.spec\.ts/,
       ],
       dependencies: ["chromium-parallel"],
       fullyParallel: false,

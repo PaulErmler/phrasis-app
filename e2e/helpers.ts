@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { expect } from "@playwright/test";
 
 /**
  * Known tutorial identifiers, matching convex/features/tutorialIds.ts plus
@@ -57,4 +58,28 @@ export async function dismissTour(
   await overlay
     .waitFor({ state: "detached", timeout: 3_000 })
     .catch(nukeOverlays);
+}
+
+/**
+ * Open the card batch-import UI: navigate, dismiss the home tour, switch to
+ * the "import" tab and wait for the paste textarea to render. Shared by the
+ * UI-only and live import specs.
+ */
+export async function openCardImport(page: Page): Promise<void> {
+  await page.goto("/app/content/add-cards");
+  await page.waitForLoadState("domcontentloaded");
+  await dismissTour(page);
+  await page.getByTestId("add-cards-mode-import").click();
+  await expect(page.getByTestId("import-paste")).toBeVisible({ timeout: 20_000 });
+}
+
+/**
+ * Fill the import paste textarea and wait until the controller has parsed
+ * the input (step 1 becomes enabled once at least one row is detected).
+ */
+export async function pasteImport(page: Page, text: string): Promise<void> {
+  await page.getByTestId("import-paste").fill(text);
+  await expect(page.getByTestId("import-step-1")).toBeEnabled({
+    timeout: 10_000,
+  });
 }

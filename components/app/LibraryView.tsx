@@ -74,7 +74,27 @@ export function LibraryView({
   const unmasterCard = useMutation(api.features.scheduling.unmasterCard);
   const hideCard = useMutation(api.features.scheduling.hideCard);
   const unhideCard = useMutation(api.features.scheduling.unhideCard);
-  const toggleFavorite = useMutation(api.features.scheduling.toggleFavoriteCard);
+  const toggleFavorite = useMutation(
+    api.features.scheduling.toggleFavoriteCard,
+  ).withOptimisticUpdate((localStore, args) => {
+    // Flip isFavorite locally on every active getLibraryCards query instance
+    // (search + filter variants) so the star indicator updates without a
+    // server round-trip.
+    for (const q of localStore.getAllQueries(
+      api.features.library.getLibraryCards,
+    )) {
+      if (!q.value) continue;
+      localStore.setQuery(
+        api.features.library.getLibraryCards,
+        q.args,
+        q.value.map((card) =>
+          card._id === args.cardId
+            ? { ...card, isFavorite: !(card.isFavorite ?? false) }
+            : card,
+        ),
+      );
+    }
+  });
   const deleteCard = useMutation(api.features.scheduling.deleteCardPermanently);
 
   const [editingCard, setEditingCard] = useState<{

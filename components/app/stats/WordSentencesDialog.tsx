@@ -109,6 +109,11 @@ export function WordSentencesDialog({
 
   const [pendingMaster, setPendingMaster] = useState<Set<string>>(new Set());
   const [pendingHide, setPendingHide] = useState<Set<string>>(new Set());
+  // Override map for favorite. Unlike master/hide (one-way toggles), favorite
+  // flips both ways, so we track the effective value instead of "is pending".
+  const [favoriteOverride, setFavoriteOverride] = useState<
+    Map<string, boolean>
+  >(new Map());
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const prevResultsLength = useRef(0);
 
@@ -170,6 +175,28 @@ export function WordSentencesDialog({
     }
   };
 
+  const handleToggleFavorite = useCallback(
+    async (cardId: Id<'cards'>, currentlyFavorite: boolean) => {
+      const nextValue = !currentlyFavorite;
+      setFavoriteOverride((prev) => {
+        const next = new Map(prev);
+        next.set(cardId, nextValue);
+        return next;
+      });
+      try {
+        await toggleFavorite({ cardId });
+      } catch (error) {
+        console.error('Failed to toggle favorite:', error);
+        setFavoriteOverride((prev) => {
+          const next = new Map(prev);
+          next.set(cardId, currentlyFavorite);
+          return next;
+        });
+      }
+    },
+    [toggleFavorite],
+  );
+
   const handleConfirmDelete = useCallback(async () => {
     const cardId = deletingCardId;
     if (!cardId) return;
@@ -211,6 +238,9 @@ export function WordSentencesDialog({
               const cardId = sentence.cardId as Id<'cards'> | null;
               const isMastered = sentence.isMastered || (cardId ? pendingMaster.has(cardId) : false);
               const isHidden = sentence.isHidden || (cardId ? pendingHide.has(cardId) : false);
+              const isFavorite = cardId && favoriteOverride.has(cardId)
+                ? (favoriteOverride.get(cardId) as boolean)
+                : (sentence.isFavorite ?? false);
 
               return (
                 <div key={sentence.textId} className="content-box p-4 space-y-2">
@@ -221,10 +251,12 @@ export function WordSentencesDialog({
                         {sentence.reviewCount} Reviews
                       </Badge>
                       <CardActionsMenu
-                        isFavorite={sentence.isFavorite ?? false}
+                        isFavorite={isFavorite}
                         isMastered={isMastered}
                         isHidden={isHidden}
-                        onFavorite={() => toggleFavorite({ cardId })}
+                        onFavorite={() =>
+                          handleToggleFavorite(cardId, isFavorite)
+                        }
                         onMaster={() => handleToggleMaster(cardId, isMastered)}
                         onHide={() => handleToggleHide(cardId, isHidden)}
                         onEdit={() =>
