@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useState } from 'react';
+import { Fragment, useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -41,6 +41,32 @@ function SingleWordCloud({
   onSearchClick: () => void;
   onExpandClick: () => void;
 }) {
+  const candidateWords = words.slice(0, 200);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [visibleCount, setVisibleCount] = useState(candidateWords.length);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const update = () => {
+      const h = container.clientHeight;
+      const buttons = container.querySelectorAll<HTMLElement>('[data-cloud-word]');
+      let firstOverflow = buttons.length;
+      for (let i = 0; i < buttons.length; i++) {
+        const btn = buttons[i];
+        if (btn.offsetTop + btn.offsetHeight > h) {
+          firstOverflow = i;
+          break;
+        }
+      }
+      setVisibleCount(firstOverflow);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [words]);
+
   return (
     <div className="card-surface p-3" data-testid="stats-wordcloud">
       <div className="mb-2 flex items-center justify-between">
@@ -69,16 +95,21 @@ function SingleWordCloud({
         </div>
       </div>
       <div
+        ref={containerRef}
         className="relative w-full aspect-[5/4] sm:aspect-[20/8] overflow-hidden rounded-lg px-1 py-1 leading-5 text-sm"
         style={{ textAlign: 'justify', textAlignLast: 'left' }}
       >
-        {words.slice(0, 50).map((w, i) => (
+        {candidateWords.map((w, i) => (
           <Fragment key={`${i}-${w}`}>
             <button
+              data-cloud-word
               type="button"
               onClick={() => onWordClick(w, language)}
               aria-label={t('viewSentencesForWord', { word: w })}
-              style={{ color: COLORS[i % COLORS.length] }}
+              style={{
+                color: COLORS[i % COLORS.length],
+                visibility: i < visibleCount ? 'visible' : 'hidden',
+              }}
               className="inline-block rounded-md px-0.5 font-bold transition-colors hover:bg-muted active:scale-[0.97]"
             >
               {w}
