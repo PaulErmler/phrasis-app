@@ -156,7 +156,7 @@ export function AudioButton({
           variant="ghost"
           size="icon"
           disabled
-          className="h-8 w-8 text-muted-foreground"
+          className="h-7 w-7 text-muted-foreground"
         >
           <Loader2 className="h-4 w-4 animate-spin" />
         </Button>
@@ -169,7 +169,7 @@ export function AudioButton({
         size="icon"
         onClick={handlePlay}
         disabled={isLoading || stopPlayback}
-        className="h-8 w-8"
+        className="h-7 w-7"
       >
         {isLoading ? (
           <Loader2 className="h-4 w-4 animate-spin" />

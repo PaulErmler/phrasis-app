@@ -619,7 +619,7 @@ function TargetLanguageInput({
             <span className="text-xs font-medium text-muted-foreground uppercase">
               {languageDisplayName}
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center">
               <AudioButton
                 url={audioUrl}
                 language={translation.language}
@@ -639,7 +639,7 @@ function TargetLanguageInput({
           </div>
         ) : (
           <div className="flex justify-end">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center">
               <AudioButton
                 url={audioUrl}
                 language={translation.language}
@@ -718,7 +718,7 @@ function TargetLanguageInput({
             <span className="text-xs font-medium text-muted-foreground uppercase">
               {languageDisplayName}
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center">
               <AudioButton
                 url={audioUrl}
                 language={translation.language}
@@ -738,7 +738,7 @@ function TargetLanguageInput({
           </div>
         ) : (
           <div className="flex justify-end">
-            <div className="flex items-center gap-1">
+            <div className="flex items-center">
               <AudioButton
                 url={audioUrl}
                 language={translation.language}

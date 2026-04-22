@@ -145,7 +145,7 @@ export function CardShell({
                     </p>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center">
                   <AudioButton
                     url={audio?.url ?? null}
                     language={translation.language}

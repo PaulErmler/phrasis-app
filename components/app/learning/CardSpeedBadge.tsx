@@ -66,7 +66,7 @@ export function CardSpeedBadge({
       type="button"
       onClick={handleClick}
       className={[
-        'tabular-nums rounded h-5 px-1.5 text-[11px] leading-none transition-colors',
+        'tabular-nums rounded h-5 px-1 text-[11px] leading-none transition-colors',
         'hover:bg-muted focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
         muted
           ? 'text-muted-foreground/70 italic'
