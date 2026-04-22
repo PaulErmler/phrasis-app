@@ -446,9 +446,9 @@ describe("features/ttsProcessing", () => {
   });
 
   describe("scheduleMissingContent sweep", () => {
-    // Every supported language is currently served by ElevenLabs, so any
-    // legacy row with `ttsProvider: 'google'` should be swept out on first
-    // touch. These tests drive that sweep via `prepareCardContent`.
+    // Swedish is the one language still pinned to ElevenLabs, so a legacy row
+    // stamped `ttsProvider: 'google'` should be swept out on first touch.
+    // These tests drive that sweep via `prepareCardContent`.
     it("deletes a row whose ttsProvider doesn't match the language's current provider", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
@@ -462,8 +462,8 @@ describe("features/ttsProcessing", () => {
       const audioId = await t.run(async (ctx) =>
         ctx.db.insert("audioRecordings", {
           textId,
-          language: "es",
-          voiceName: "es-ES-Chirp3-HD-Leda",
+          language: "sv",
+          voiceName: "sv-SE-Chirp3-HD-Leda",
           storageId,
           ttsQuality: "validated",
           ttsProvider: "google",
@@ -474,8 +474,8 @@ describe("features/ttsProcessing", () => {
 
       await t.mutation(internal.features.decks.prepareCardContent, {
         textId,
-        baseLanguages: ["es"],
-        targetLanguages: ["es"],
+        baseLanguages: ["sv"],
+        targetLanguages: ["sv"],
       });
 
       const left = await t.run(async (ctx) => ctx.db.get(audioId));

@@ -30,9 +30,9 @@ describe('getLanguageByCode', () => {
 });
 
 describe('SUPPORTED_LANGUAGES ttsProvider', () => {
-  // Currently Google is the default. es / es_latam / sv stay on ElevenLabs —
+  // Currently Google is the default. Only Swedish stays on ElevenLabs —
   // this guards against accidental provider flips.
-  const ELEVENLABS_LANGUAGES = new Set(['es', 'es_latam', 'sv']);
+  const ELEVENLABS_LANGUAGES = new Set(['sv']);
 
   it('non-ElevenLabs languages are all routed through Google TTS', () => {
     const offenders = SUPPORTED_LANGUAGES.filter(

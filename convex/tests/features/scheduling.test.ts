@@ -266,7 +266,7 @@ describe("features/scheduling", () => {
         const courseId = await ctx.db.insert("courses", {
           userId: "user_A",
           baseLanguages: ["en"],
-          targetLanguages: ["es"],
+          targetLanguages: ["sv"],
         });
         await ctx.db.insert("userSettings", {
           userId: "user_A",
@@ -280,8 +280,8 @@ describe("features/scheduling", () => {
         });
         // Shared dataset text (NOT user-owned) → editCard takes Path B.
         const textId = await ctx.db.insert("texts", {
-          text: "Hola",
-          language: "es",
+          text: "Hej",
+          language: "sv",
           userCreated: false,
           audioSpeakerGender: "female",
           collectionId,
@@ -297,14 +297,14 @@ describe("features/scheduling", () => {
         );
         const audioId = await ctx.db.insert("audioRecordings", {
           textId,
-          language: "es",
+          language: "sv",
           voiceName: "elevenlabs-voice-abc",
           storageId,
           ttsQuality: "validated",
           ttsProvider: "elevenlabs",
           voiceGender: "female",
           speed: 0.9,
-          wordTimings: [{ word: "Hola", start: 0, end: 0.5 }],
+          wordTimings: [{ word: "Hej", start: 0, end: 0.5 }],
         });
         const cardId = await ctx.db.insert("cards", {
           deckId,
@@ -337,12 +337,12 @@ describe("features/scheduling", () => {
       const { cardId, textId: oldTextId } = await seedSharedCardWithAudio(t);
       const asUser = t.withIdentity({ subject: "user_A" });
 
-      // Change only the English translation. Source "es" is untouched, so its
+      // Change only the English translation. Source "sv" is untouched, so its
       // audio row must be copied onto the new textId with all fields intact.
       await asUser.mutation(api.features.scheduling.editCard, {
         cardId,
         translations: [
-          { language: "es", text: "Hola" },
+          { language: "sv", text: "Hej" },
           { language: "en", text: "Hi there" },
         ],
         timezone: "UTC",
@@ -360,7 +360,7 @@ describe("features/scheduling", () => {
         ctx.db
           .query("audioRecordings")
           .withIndex("by_text_and_language", (q) =>
-            q.eq("textId", newTextId).eq("language", "es"),
+            q.eq("textId", newTextId).eq("language", "sv"),
           )
           .first(),
       );
@@ -371,7 +371,7 @@ describe("features/scheduling", () => {
       expect(audio?.ttsProvider).toBe("elevenlabs");
       expect(audio?.voiceGender).toBe("female");
       expect(audio?.speed).toBe(0.9);
-      expect(audio?.wordTimings).toEqual([{ word: "Hola", start: 0, end: 0.5 }]);
+      expect(audio?.wordTimings).toEqual([{ word: "Hej", start: 0, end: 0.5 }]);
     });
   });
 });

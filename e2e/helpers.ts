@@ -67,8 +67,24 @@ export async function dismissTour(
  */
 export async function openCardImport(page: Page): Promise<void> {
   await page.goto("/app/content/add-cards");
-  await page.waitForLoadState("domcontentloaded");
+  // `domcontentloaded` fires before client-side route resolves in Next dev —
+  // wait for the URL to actually equal the target, then for AddCardsView to
+  // mount. The individual tab is the default mode; its presence proves the
+  // switcher is rendered (i.e. `isAddCardsRoute` is true in MainLayout).
+  await page.waitForURL("**/app/content/add-cards", { timeout: 20_000 });
   await dismissTour(page);
+  const individualTab = page.getByTestId("add-cards-mode-individual");
+  try {
+    await expect(individualTab).toBeVisible({ timeout: 20_000 });
+  } catch (err) {
+    // One retry: in Next dev, the first hit of a route can stall on
+    // on-demand compilation under parallel worker load. A hard reload picks
+    // up the now-compiled bundle instantly.
+    await page.reload();
+    await page.waitForURL("**/app/content/add-cards", { timeout: 20_000 });
+    await dismissTour(page);
+    await expect(individualTab).toBeVisible({ timeout: 20_000 });
+  }
   await page.getByTestId("add-cards-mode-import").click();
   await expect(page.getByTestId("import-paste")).toBeVisible({ timeout: 20_000 });
 }
