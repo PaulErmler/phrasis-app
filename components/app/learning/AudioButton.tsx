@@ -127,9 +127,15 @@ export function AudioButton({
       };
       el.webkitPreservesPitch = true;
       audioRef.current.playbackRate = speed;
+      // Capture the element before awaiting. If another handlePlay swaps
+      // audioRef.current (different URL) while getPeak is in-flight, we'd
+      // otherwise apply this clip's attenuation to the wrong element.
+      const peakTarget = audioRef.current;
       try {
         const peak = await getPeak(url);
-        audioRef.current.volume = computeAttenuation(peak);
+        if (audioRef.current === peakTarget) {
+          peakTarget.volume = computeAttenuation(peak);
+        }
       } catch (peakErr) {
         console.warn('Peak measurement failed; playing at native volume', peakErr);
       }

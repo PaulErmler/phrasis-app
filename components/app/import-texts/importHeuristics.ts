@@ -2,10 +2,11 @@ import { SUPPORTED_LANGUAGES, getLocalizedLanguageNameByCode } from '@/lib/langu
 
 function normalize(s: string): string {
   // NFD strips accents, then we drop combining marks; also lowercases and trims.
+  // Keep Unicode letters/numbers so non-Latin scripts (e.g. 日本語) survive.
   return s
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/gi, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
