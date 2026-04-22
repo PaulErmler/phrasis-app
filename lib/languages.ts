@@ -42,7 +42,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Spanish (Spain)',
     nativeName: 'Español (España)',
     flag: '🇪🇸',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: false,
   },
   {
@@ -51,7 +51,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Spanish (Latin America)',
     nativeName: 'Español (Latinoamérica)',
     flag: '🌎',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'google',
     needsRomanization: false,
   },
   {
