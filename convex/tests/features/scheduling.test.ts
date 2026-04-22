@@ -109,6 +109,33 @@ describe("features/scheduling", () => {
       expect(card?.isMastered).toBe(true);
     });
 
+    it("unmasters a previously mastered card", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.masterCard, { cardId });
+      await asUser.mutation(api.features.scheduling.unmasterCard, { cardId });
+      const card = await t.run(async (ctx) => ctx.db.get(cardId));
+      expect(card?.isMastered).toBe(false);
+    });
+
+    it("rejects unauthenticated unmasterCard", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourse(t);
+      await expect(
+        t.mutation(api.features.scheduling.unmasterCard, { cardId }),
+      ).rejects.toThrow();
+    });
+
+    it("rejects access to another user's card on unmasterCard", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourse(t);
+      const asOther = t.withIdentity({ subject: "user_B" });
+      await expect(
+        asOther.mutation(api.features.scheduling.unmasterCard, { cardId }),
+      ).rejects.toThrow();
+    });
+
     it("hides a card", async () => {
       const t = convexTest(schema, modules);
       const { cardId } = await seedCardWithCourse(t);
@@ -116,6 +143,33 @@ describe("features/scheduling", () => {
       await asUser.mutation(api.features.scheduling.hideCard, { cardId });
       const card = await t.run(async (ctx) => ctx.db.get(cardId));
       expect(card?.isHidden).toBe(true);
+    });
+
+    it("unhides a previously hidden card", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.hideCard, { cardId });
+      await asUser.mutation(api.features.scheduling.unhideCard, { cardId });
+      const card = await t.run(async (ctx) => ctx.db.get(cardId));
+      expect(card?.isHidden).toBe(false);
+    });
+
+    it("rejects unauthenticated unhideCard", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourse(t);
+      await expect(
+        t.mutation(api.features.scheduling.unhideCard, { cardId }),
+      ).rejects.toThrow();
+    });
+
+    it("rejects access to another user's card on unhideCard", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourse(t);
+      const asOther = t.withIdentity({ subject: "user_B" });
+      await expect(
+        asOther.mutation(api.features.scheduling.unhideCard, { cardId }),
+      ).rejects.toThrow();
     });
 
     it("toggles favorite", async () => {
@@ -141,6 +195,58 @@ describe("features/scheduling", () => {
       await expect(
         asOther.mutation(api.features.scheduling.hideCard, { cardId }),
       ).rejects.toThrow();
+    });
+  });
+
+  describe("deleteCardPermanently", () => {
+    it("rejects unauthenticated deleteCardPermanently", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourse(t);
+      await expect(
+        t.mutation(api.features.scheduling.deleteCardPermanently, { cardId }),
+      ).rejects.toThrow();
+    });
+
+    it("rejects access to another user's card on deleteCardPermanently", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourse(t);
+      const asOther = t.withIdentity({ subject: "user_B" });
+      await expect(
+        asOther.mutation(api.features.scheduling.deleteCardPermanently, {
+          cardId,
+        }),
+      ).rejects.toThrow();
+      // Card row survives the rejected attempt.
+      const card = await t.run(async (ctx) => ctx.db.get(cardId));
+      expect(card).not.toBeNull();
+    });
+
+    it("permanently removes the card row", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await seedCardWithCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.deleteCardPermanently, {
+        cardId,
+      });
+      const card = await t.run(async (ctx) => ctx.db.get(cardId));
+      expect(card).toBeNull();
+      // Shared text survives — other cards may reference it.
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(text).not.toBeNull();
+    });
+
+    it("getCardForReview skips a deleted card and returns null when nothing is left", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.deleteCardPermanently, {
+        cardId,
+      });
+      const res = await asUser.query(
+        api.features.scheduling.getCardForReview,
+        {},
+      );
+      expect(res).toBeNull();
     });
   });
 

@@ -3,15 +3,9 @@
 import { type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { CircleCheck, EyeOff, Pencil, Star } from 'lucide-react';
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from '@/components/ui/tooltip';
 import { AudioButton } from './AudioButton';
+import { CardActionsMenu } from './CardActionsMenu';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
 import type { CardTranslation, CardAudioRecording } from './types';
@@ -24,12 +18,15 @@ interface CardShellProps {
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
   isFavorite: boolean;
+  isMastered?: boolean;
+  isHidden?: boolean;
   isPendingMaster: boolean;
   isPendingHide: boolean;
   onMaster: () => void;
   onHide: () => void;
   onFavorite: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
   onAudioPlay?: () => void;
   bare?: boolean;
   showRomanization?: boolean;
@@ -61,12 +58,15 @@ export function CardShell({
   translations,
   audioRecordings,
   isFavorite,
+  isMastered = false,
+  isHidden = false,
   isPendingMaster,
   isPendingHide,
   onMaster,
   onHide,
   onFavorite,
   onEdit,
+  onDelete,
   onAudioPlay,
   bare = false,
   showRomanization = true,
@@ -83,6 +83,8 @@ export function CardShell({
   const t = useTranslations('LearningMode');
   const baseTranslations = translations.filter((tr) => tr.isBaseLanguage);
   const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
+  const masterActive = isMastered || isPendingMaster;
+  const hideActive = isHidden || isPendingHide;
 
   const cardSurface = (
     <div className="card-surface" data-tutorial="card-flashcard">
@@ -93,71 +95,16 @@ export function CardShell({
             {t('reviewCount', { count: reviewCount })}
           </Badge>
         </div>
-        <div className="flex items-center gap-1">
-          {onEdit && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onEdit}
-                  className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
-                  aria-label={t('actions.edit')}
-                >
-                  <Pencil className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                {t('actions.edit')}
-              </TooltipContent>
-            </Tooltip>
-          )}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onFavorite}
-                className={`h-8 w-8 hover:bg-favorite/10 ${isFavorite ? 'text-favorite hover:text-favorite/80' : 'text-muted-foreground hover:text-favorite'}`}
-              >
-                <Star className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {t('actions.favorite')}
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onMaster}
-                className={`h-8 w-8 hover:bg-success/10 ${isPendingMaster ? 'text-success hover:text-success/80' : 'text-muted-foreground hover:text-success'}`}
-              >
-                <CircleCheck className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {t('actions.master')}
-            </TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onHide}
-                className={`h-8 w-8 hover:bg-destructive/10 ${isPendingHide ? 'text-destructive hover:text-destructive/80' : 'text-muted-foreground hover:text-destructive'}`}
-              >
-                <EyeOff className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              {t('actions.hide')}
-            </TooltipContent>
-          </Tooltip>
-        </div>
+        <CardActionsMenu
+          isFavorite={isFavorite}
+          isMastered={masterActive}
+          isHidden={hideActive}
+          onFavorite={onFavorite}
+          onMaster={onMaster}
+          onHide={onHide}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       </div>
 
       {/* Card text content */}

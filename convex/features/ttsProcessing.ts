@@ -261,14 +261,12 @@ export const processTTSForCard = internalAction({
         error: err,
       });
     } finally {
-      // Release slot + wake next queued waiter (if any) in a single mutation
-      // so there's no race between release and pump. releaseTtsClaim is
-      // independent — run it after.
-      await ctx.runMutation(
-        internal.features.ttsProcessing.releaseSlotAndPump,
-        { slotId: args.slotId, provider: args.provider },
-      );
-      await ctx.runMutation(internal.features.ttsProcessing.releaseTtsClaim, {
+      // Release slot + claim + wake next queued waiter in one transaction
+      // so an action retry can't leave slot/claim state drifted from queue
+      // depth.
+      await ctx.runMutation(internal.features.ttsProcessing.finalizeTtsJob, {
+        slotId: args.slotId,
+        provider: args.provider,
         textId: args.textId,
         language: args.language,
       });
@@ -482,10 +480,13 @@ export async function countLiveSlotsAndReclaimStale(
   ctx: MutationCtx,
   provider: TtsProvider,
 ): Promise<number> {
+  // Bounded: legitimate slot count is capped by provider concurrency (tens).
+  // 500 is well above that, so hitting the cap means something upstream is
+  // leaking slots — surface it instead of blowing up the mutation.
   const rows = await ctx.db
     .query('ttsProviderSlots')
     .withIndex('by_provider', (q) => q.eq('provider', provider))
-    .collect();
+    .take(500);
   const now = Date.now();
   let fresh = 0;
   for (const row of rows) {
@@ -593,6 +594,42 @@ export const releaseSlotAndPump = internalMutation({
     const row = await ctx.db.get(args.slotId);
     if (row) {
       await ctx.db.delete(args.slotId);
+    }
+    await ctx.runMutation(internal.features.ttsProcessing.pumpQueue, {
+      provider: args.provider,
+    });
+    return null;
+  },
+});
+
+/**
+ * End-of-job cleanup: drop the provider slot, drop the dedupe claim, and
+ * pump the next queued waiter — all in one transaction. Called from the
+ * `processTTSForCard` action's `finally` block so an action retry can't
+ * commit a partial cleanup that leaves slot/claim state drifted from queue
+ * depth. Idempotent: missing slot or claim rows are silently skipped.
+ */
+export const finalizeTtsJob = internalMutation({
+  args: {
+    slotId: v.id('ttsProviderSlots'),
+    provider: ttsProviderValidator,
+    textId: v.id('texts'),
+    language: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const slot = await ctx.db.get(args.slotId);
+    if (slot) {
+      await ctx.db.delete(args.slotId);
+    }
+    const claim = await ctx.db
+      .query('ttsGenerationClaims')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('language', args.language),
+      )
+      .first();
+    if (claim) {
+      await ctx.db.delete(claim._id);
     }
     await ctx.runMutation(internal.features.ttsProcessing.pumpQueue, {
       provider: args.provider,

@@ -12,8 +12,8 @@ import {
 import { Button } from '@/components/ui/button';
 import {
   alignWordTimings,
+  findCurrentIndex,
   matchRatio,
-  type AlignedWord,
 } from '@/lib/audio/alignTimings';
 import { useLearningChatToggle } from './LearningChatLayout';
 import type { WordTiming } from './types';
@@ -28,17 +28,6 @@ interface Props {
   className?: string;
   /** When false, renders plain text without popovers (e.g. blurred translations). */
   interactive?: boolean;
-}
-
-function findCurrentIndex(words: AlignedWord[], t: number): number {
-  if (words.length === 0) return -1;
-  if (t < words[0].start) return -1;
-  for (let i = 0; i < words.length; i++) {
-    const nextStart =
-      i < words.length - 1 ? words[i + 1].start : words[i].end;
-    if (t >= words[i].start && t < nextStart) return i;
-  }
-  return -1;
 }
 
 /** Strip leading/trailing punctuation/symbols so "Haus," → "Haus". */
@@ -126,6 +115,7 @@ export function ClickableWords({
               <span
                 role="button"
                 tabIndex={0}
+                aria-label={t('askAboutWord', { word: cleanWord(w.display) })}
                 data-testid="clickable-word"
                 className={cn(
                   'cursor-pointer rounded-sm transition-colors duration-200 hover:bg-muted',

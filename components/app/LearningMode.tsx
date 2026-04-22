@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useMutation } from 'convex/react';
+import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import {
@@ -18,6 +19,17 @@ import type { AudioPlayerState } from '@/hooks/use-audio-player';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { buttonVariants } from '@/components/ui/button';
 
 interface LearningModeProps {
   state: LearningState;
@@ -30,8 +42,10 @@ interface LearningModeProps {
  * Does NOT render its own header — the parent layout handles that.
  */
 export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
+  const t = useTranslations('LearningMode');
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
   const [allSubmitted, setAllSubmitted] = useState(false);
   const [fullReviewAccuracy, setFullReviewAccuracy] = useState<number | null>(null);
@@ -116,6 +130,15 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
     audio.pause();
     setEditDialogOpen(true);
   }, [audio]);
+  const handleRequestDelete = useCallback(() => {
+    audio.pause();
+    setDeleteConfirmOpen(true);
+  }, [audio]);
+  const handleConfirmDelete = useCallback(async () => {
+    if (state.status !== 'reviewing') return;
+    setDeleteConfirmOpen(false);
+    await state.handleDelete();
+  }, [state]);
 
   if (state.status === 'loading') {
     return (
@@ -207,6 +230,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         onHide={state.handleHide}
         onFavorite={state.handleFavorite}
         onEdit={handleEdit}
+        onDelete={handleRequestDelete}
         onAudioPlay={audio.stop}
         targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
         allRevealed={fullReviewRevealed}
@@ -241,6 +265,7 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         onHide={state.handleHide}
         onFavorite={state.handleFavorite}
         onEdit={handleEdit}
+        onDelete={handleRequestDelete}
         onAudioPlay={audio.stop}
         hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
         autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? true}
@@ -319,6 +344,30 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         cardId={state.cardId}
         translations={state.translations}
       />
+
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('actions.deleteConfirmTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('actions.deleteConfirmDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {t('actions.deleteConfirmCancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive' })}
+              onClick={handleConfirmDelete}
+            >
+              {t('actions.deleteConfirmConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

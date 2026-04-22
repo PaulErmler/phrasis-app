@@ -1,4 +1,8 @@
 import { v, ConvexError } from 'convex/values';
+import {
+  PLAYBACK_SPEED_MIN,
+  PLAYBACK_SPEED_MAX,
+} from '../../lib/constants/audioPlayback';
 import { mutation, query, MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
@@ -954,7 +958,10 @@ export const updateCourseSettings = mutation({
         const clamped: Record<string, number> = {};
         for (const [lang, speed] of Object.entries(value as Record<string, number>)) {
           if (typeof speed !== 'number' || !Number.isFinite(speed)) continue;
-          clamped[lang] = Math.max(0.7, Math.min(2.0, speed));
+          clamped[lang] = Math.max(
+            PLAYBACK_SPEED_MIN,
+            Math.min(PLAYBACK_SPEED_MAX, speed),
+          );
         }
         value = clamped;
       }

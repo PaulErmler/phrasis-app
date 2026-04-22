@@ -139,3 +139,21 @@ export function matchRatio(aligned: AlignedWord[]): number {
   const matched = aligned.filter((w) => w.matched).length;
   return matched / aligned.length;
 }
+
+/**
+ * Finds the word whose active window contains `t`. For non-last words the
+ * window extends from the word's start to the next word's start (keeps the
+ * highlight steady across any gap Scribe leaves between words). For the LAST
+ * word it stops at the word's own `end` — once the final syllable finishes
+ * the highlight should clear, even if the audio clip has trailing silence.
+ */
+export function findCurrentIndex(words: AlignedWord[], t: number): number {
+  if (words.length === 0) return -1;
+  if (t < words[0].start) return -1;
+  for (let i = 0; i < words.length; i++) {
+    const nextStart =
+      i < words.length - 1 ? words[i + 1].start : words[i].end;
+    if (t >= words[i].start && t < nextStart) return i;
+  }
+  return -1;
+}

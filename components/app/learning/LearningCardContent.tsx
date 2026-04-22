@@ -20,12 +20,15 @@ interface LearningCardContentProps {
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
   isFavorite: boolean;
+  isMastered?: boolean;
+  isHidden?: boolean;
   isPendingMaster: boolean;
   isPendingHide: boolean;
   onMaster: () => void;
   onHide: () => void;
   onFavorite: () => void;
   onEdit?: () => void;
+  onDelete?: () => void;
   onAudioPlay?: () => void;
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
@@ -67,12 +70,15 @@ export function LearningCardContent({
   translations,
   audioRecordings,
   isFavorite,
+  isMastered = false,
+  isHidden = false,
   isPendingMaster,
   isPendingHide,
   onMaster,
   onHide,
   onFavorite,
   onEdit,
+  onDelete,
   onAudioPlay,
   hideTargetLanguages = false,
   autoRevealLanguages = false,
@@ -173,12 +179,15 @@ export function LearningCardContent({
         translations={translations}
         audioRecordings={audioRecordings}
         isFavorite={isFavorite}
+        isMastered={isMastered}
+        isHidden={isHidden}
         isPendingMaster={isPendingMaster}
         isPendingHide={isPendingHide}
         onMaster={onMaster}
         onHide={onHide}
         onFavorite={onFavorite}
         onEdit={onEdit}
+        onDelete={onDelete}
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}

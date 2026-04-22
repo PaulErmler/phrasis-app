@@ -59,6 +59,7 @@ import type * as lib_textComparison from "../lib/textComparison.js";
 import type * as lib_tts_elevenlabs from "../lib/tts/elevenlabs.js";
 import type * as lib_tts_google from "../lib/tts/google.js";
 import type * as lib_tts_index from "../lib/tts/index.js";
+import type * as lib_tts_languageCodes from "../lib/tts/languageCodes.js";
 import type * as lib_tts_types from "../lib/tts/types.js";
 import type * as lib_ttsSemanticValidation from "../lib/ttsSemanticValidation.js";
 import type * as migrations_backfillCardAggregates from "../migrations/backfillCardAggregates.js";
@@ -134,6 +135,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tts/elevenlabs": typeof lib_tts_elevenlabs;
   "lib/tts/google": typeof lib_tts_google;
   "lib/tts/index": typeof lib_tts_index;
+  "lib/tts/languageCodes": typeof lib_tts_languageCodes;
   "lib/tts/types": typeof lib_tts_types;
   "lib/ttsSemanticValidation": typeof lib_ttsSemanticValidation;
   "migrations/backfillCardAggregates": typeof migrations_backfillCardAggregates;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { usePaginatedQuery, useMutation, usePreloadedQuery } from 'convex/react';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
@@ -14,19 +15,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { normalizeLanguageCode } from '@/lib/languages';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from '@/components/ui/tooltip';
 import { AudioButton } from '@/components/app/learning/AudioButton';
+import { CardActionsMenu } from '@/components/app/learning/CardActionsMenu';
 import { CardSpeedBadge } from '@/components/app/learning/CardSpeedBadge';
+import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
+import type { CardTranslation } from '@/components/app/learning/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
-import { CircleCheck, EyeOff, Star, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
 import { highlightWord } from '@/lib/wordCloud';
 
@@ -43,6 +52,7 @@ export function WordSentencesDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useTranslations('LearningMode');
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords !== false;
@@ -85,8 +95,17 @@ export function WordSentencesDialog({
   );
 
   const masterCard = useMutation(api.features.scheduling.masterCard);
+  const unmasterCard = useMutation(api.features.scheduling.unmasterCard);
   const hideCard = useMutation(api.features.scheduling.hideCard);
+  const unhideCard = useMutation(api.features.scheduling.unhideCard);
   const toggleFavorite = useMutation(api.features.scheduling.toggleFavoriteCard);
+  const deleteCard = useMutation(api.features.scheduling.deleteCardPermanently);
+
+  const [editingCard, setEditingCard] = useState<{
+    cardId: Id<'cards'>;
+    translations: CardTranslation[];
+  } | null>(null);
+  const [deletingCardId, setDeletingCardId] = useState<Id<'cards'> | null>(null);
 
   const [pendingMaster, setPendingMaster] = useState<Set<string>>(new Set());
   const [pendingHide, setPendingHide] = useState<Set<string>>(new Set());
@@ -111,10 +130,17 @@ export function WordSentencesDialog({
     loadMore(10);
   }, [loadMore]);
 
-  const handleMaster = async (cardId: Id<'cards'>) => {
+  const handleToggleMaster = async (
+    cardId: Id<'cards'>,
+    currentlyMastered: boolean,
+  ) => {
     setPendingMaster((prev) => new Set(prev).add(cardId));
     try {
-      await masterCard({ cardId });
+      if (currentlyMastered) {
+        await unmasterCard({ cardId });
+      } else {
+        await masterCard({ cardId });
+      }
     } finally {
       setPendingMaster((prev) => {
         const next = new Set(prev);
@@ -124,10 +150,17 @@ export function WordSentencesDialog({
     }
   };
 
-  const handleHide = async (cardId: Id<'cards'>) => {
+  const handleToggleHide = async (
+    cardId: Id<'cards'>,
+    currentlyHidden: boolean,
+  ) => {
     setPendingHide((prev) => new Set(prev).add(cardId));
     try {
-      await hideCard({ cardId });
+      if (currentlyHidden) {
+        await unhideCard({ cardId });
+      } else {
+        await hideCard({ cardId });
+      }
     } finally {
       setPendingHide((prev) => {
         const next = new Set(prev);
@@ -136,6 +169,17 @@ export function WordSentencesDialog({
       });
     }
   };
+
+  const handleConfirmDelete = useCallback(async () => {
+    const cardId = deletingCardId;
+    if (!cardId) return;
+    setDeletingCardId(null);
+    try {
+      await deleteCard({ cardId });
+    } catch (error) {
+      console.error('Failed to delete card:', error);
+    }
+  }, [deletingCardId, deleteCard]);
 
   const normalizedLang = normalizeLanguageCode(language);
 
@@ -176,47 +220,23 @@ export function WordSentencesDialog({
                       <Badge variant="secondary" className="text-xs">
                         {sentence.reviewCount} Reviews
                       </Badge>
-                      <div className="flex items-center">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => toggleFavorite({ cardId })}
-                              className={`h-7 w-7 hover:bg-favorite/10 ${sentence.isFavorite ? 'text-favorite hover:text-favorite/80' : 'text-muted-foreground hover:text-favorite'}`}
-                            >
-                              <Star className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">Favorite</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleMaster(cardId)}
-                              className={`h-7 w-7 hover:bg-success/10 ${isMastered ? 'text-success hover:text-success/80' : 'text-muted-foreground hover:text-success'}`}
-                            >
-                              <CircleCheck className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">Master</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleHide(cardId)}
-                              className={`h-7 w-7 hover:bg-destructive/10 ${isHidden ? 'text-destructive hover:text-destructive/80' : 'text-muted-foreground hover:text-destructive'}`}
-                            >
-                              <EyeOff className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">Hide</TooltipContent>
-                        </Tooltip>
-                      </div>
+                      <CardActionsMenu
+                        isFavorite={sentence.isFavorite ?? false}
+                        isMastered={isMastered}
+                        isHidden={isHidden}
+                        onFavorite={() => toggleFavorite({ cardId })}
+                        onMaster={() => handleToggleMaster(cardId, isMastered)}
+                        onHide={() => handleToggleHide(cardId, isHidden)}
+                        onEdit={() =>
+                          setEditingCard({
+                            cardId,
+                            translations: sentence.translations,
+                          })
+                        }
+                        onDelete={() => setDeletingCardId(cardId)}
+                        triggerClassName="h-7 w-7"
+                        triggerIconClassName="h-3.5 w-3.5"
+                      />
                     </div>
                   )}
 
@@ -371,6 +391,46 @@ export function WordSentencesDialog({
           </div>
         </div>
       </DialogContent>
+
+      {editingCard && (
+        <EditCardDialog
+          open={true}
+          onOpenChange={(next) => {
+            if (!next) setEditingCard(null);
+          }}
+          cardId={editingCard.cardId}
+          translations={editingCard.translations}
+        />
+      )}
+
+      <AlertDialog
+        open={deletingCardId !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeletingCardId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('actions.deleteConfirmTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('actions.deleteConfirmDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {t('actions.deleteConfirmCancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive' })}
+              onClick={handleConfirmDelete}
+            >
+              {t('actions.deleteConfirmConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

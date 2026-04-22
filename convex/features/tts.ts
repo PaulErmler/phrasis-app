@@ -10,25 +10,13 @@
 
 import type { TtsProvider } from '../types';
 import { getTtsProvider } from '../lib/tts';
+import { toElevenLabsLanguageCode } from '../lib/tts/languageCodes';
 
 export { normalizeForComparison, textsMatch } from '../lib/textComparison';
+export { toElevenLabsLanguageCode } from '../lib/tts/languageCodes';
 
 /** Word-level timing returned by Scribe, relative to the audio blob (seconds). */
 export type WordTiming = { word: string; start: number; end: number };
-
-/**
- * Map our internal language codes to ISO 639-1 language codes that ElevenLabs
- * Scribe accepts in the `language_code` parameter. App-internal codes like
- * `es_latam` and `cmn` are not valid ISO 639-1 and must be folded to their
- * base form.
- */
-export function toElevenLabsLanguageCode(internalCode: string): string {
-  const map: Record<string, string> = {
-    es_latam: 'es',
-    cmn: 'zh',
-  };
-  return map[internalCode] ?? internalCode;
-}
 
 /**
  * Provider-agnostic entry point used by ttsProcessing's validation loop.

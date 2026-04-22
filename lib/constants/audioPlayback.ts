@@ -50,7 +50,7 @@ export const DEFAULT_AUTO_ADVANCE = true;
 export const DEFAULT_PLAYBACK_SPEED = 1.0;
 
 /** General per-language speed range exposed in LearningModeSettings */
-export const PLAYBACK_SPEED_MIN = 0.7;
+export const PLAYBACK_SPEED_MIN = 0.6;
 export const PLAYBACK_SPEED_MAX = 2.0;
 export const PLAYBACK_SPEED_STEP = 0.1;
 
@@ -59,8 +59,16 @@ export const PLAYBACK_SPEED_STEP = 0.1;
  * card. `null` = "default" state — clears any stored override so the
  * course-level general speed applies.
  */
-export const CARD_OVERRIDE_CYCLE = [null, 0.7, 0.8, 0.9, 1.0] as const;
+export const CARD_OVERRIDE_CYCLE = [null, 0.6, 0.7, 0.8, 0.9, 1.0] as const;
 export type CardOverrideValue = (typeof CARD_OVERRIDE_CYCLE)[number];
+
+/**
+ * Numeric bounds for a stored per-card override (derived from the cycle above,
+ * excluding the `null` default slot). Shared by the Convex validator and any
+ * client-side clamping.
+ */
+export const CARD_OVERRIDE_SPEED_MIN = 0.6;
+export const CARD_OVERRIDE_SPEED_MAX = 1.0;
 
 /** Advance through CARD_OVERRIDE_CYCLE, wrapping at the end. */
 export function nextCardOverrideValue(
@@ -77,9 +85,9 @@ export function nextCardOverrideValue(
  * speed — the badge is a pure preview control that resets to 1.0 when the
  * view remounts. 1.0 is rendered greyed to signal "no change" (the same way
  * the persistent cycle renders its null default). There is no null slot, so
- * once the user starts cycling they stay inside 0.7–1.0 until unmount.
+ * once the user starts cycling they stay inside 0.6–1.0 until unmount.
  */
-export const CARD_OVERRIDE_CYCLE_EPHEMERAL = [0.7, 0.8, 0.9, 1.0] as const;
+export const CARD_OVERRIDE_CYCLE_EPHEMERAL = [0.6, 0.7, 0.8, 0.9, 1.0] as const;
 
 export function nextEphemeralCardOverrideValue(current: number | null): number {
   const idx =

@@ -129,7 +129,7 @@ export default defineSchema({
     autoAdvance: v.optional(v.boolean()), // Auto-advance after audio finishes
     languageRepetitions: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 2, "es": 2 }
     languageRepetitionPauses: v.optional(v.record(v.string(), v.number())), // per-language pause between repeats (seconds)
-    languagePlaybackSpeeds: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 1.0, "es": 0.9 }; range 0.7-2.0; missing = 1.0. Pitch-preserved via HTMLMediaElement.preservesPitch for single clips and SoundTouchJS for the merged WAV.
+    languagePlaybackSpeeds: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 1.0, "es": 0.9 }; range PLAYBACK_SPEED_MIN-PLAYBACK_SPEED_MAX (see lib/constants/audioPlayback); missing = 1.0. Pitch-preserved via HTMLMediaElement.preservesPitch for single clips and SoundTouchJS for the merged WAV.
     pauseBaseToBase: v.optional(v.number()), // seconds between different base languages
     pauseBaseToTarget: v.optional(v.number()), // seconds between base and target sections
     pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages
@@ -180,7 +180,7 @@ export default defineSchema({
     isGraduated: v.optional(v.boolean()), // One-way flag: true once card graduates from initial learning (FSRS state >= Review)
     lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review and FSRS phases)
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
-    audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range 0.7-1.0). Missing entry = use general courseSettings.languagePlaybackSpeeds.
+    audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
   })
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_dueDate', ['deckId', 'dueDate'])

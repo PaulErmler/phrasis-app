@@ -29,6 +29,10 @@ import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
+import {
+  CARD_OVERRIDE_SPEED_MIN,
+  CARD_OVERRIDE_SPEED_MAX,
+} from '../../lib/constants/audioPlayback';
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
@@ -368,11 +372,53 @@ export const hideCard = mutation({
 });
 
 /**
+ * Permanently delete a card. Unlike `hideCard`, this removes the card row
+ * entirely (and its aggregate entries). Shared text/translations/audio rows
+ * stay because other cards may reference them.
+ */
+export const deleteCardPermanently = mutation({
+  args: {
+    cardId: v.id('cards'),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await authorizeCardAccess(ctx, args.cardId);
+    await deleteCard(ctx, args.cardId);
+    return null;
+  },
+});
+
+export const unmasterCard = mutation({
+  args: {
+    cardId: v.id('cards'),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await authorizeCardAccess(ctx, args.cardId);
+    await patchCard(ctx, args.cardId, { isMastered: false });
+    return null;
+  },
+});
+
+export const unhideCard = mutation({
+  args: {
+    cardId: v.id('cards'),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await authorizeCardAccess(ctx, args.cardId);
+    await patchCard(ctx, args.cardId, { isHidden: false });
+    return null;
+  },
+});
+
+/**
  * Set or clear a per-card, per-language playback-speed override.
  *
  * `speed === null` removes the override for that language so playback falls
- * back to the course-level general speed. Valid override values are 0.7, 0.8,
- * 0.9, or 1.0 (the fixed cycle exposed by the card-speed indicator).
+ * back to the course-level general speed. Valid override values are bounded
+ * by `CARD_OVERRIDE_SPEED_MIN`–`CARD_OVERRIDE_SPEED_MAX` (the fixed cycle
+ * exposed by the card-speed indicator).
  */
 export const setCardAudioSpeedOverride = mutation({
   args: {
@@ -384,8 +430,14 @@ export const setCardAudioSpeedOverride = mutation({
   handler: async (ctx, args) => {
     await authorizeCardAccess(ctx, args.cardId);
     if (args.speed !== null) {
-      if (!Number.isFinite(args.speed) || args.speed < 0.7 || args.speed > 1.0) {
-        throw new ConvexError('audioSpeedOverride must be between 0.7 and 1.0');
+      if (
+        !Number.isFinite(args.speed) ||
+        args.speed < CARD_OVERRIDE_SPEED_MIN ||
+        args.speed > CARD_OVERRIDE_SPEED_MAX
+      ) {
+        throw new ConvexError(
+          `audioSpeedOverride must be between ${CARD_OVERRIDE_SPEED_MIN} and ${CARD_OVERRIDE_SPEED_MAX}`,
+        );
       }
     }
     const card = await ctx.db.get(args.cardId);

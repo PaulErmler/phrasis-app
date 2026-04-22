@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, usePreloadedQuery } from 'convex/react';
+import type { FunctionReturnType } from 'convex/server';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
@@ -10,10 +11,31 @@ import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
 import { Search, Star, EyeOff, CircleCheck, X, Loader2 } from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
+import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { useAppData } from '@/components/app/AppDataProvider';
+import type { CardTranslation } from '@/components/app/learning/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { buttonVariants } from '@/components/ui/button';
 
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
+
+type LibraryCard = FunctionReturnType<typeof api.features.library.getLibraryCards>[number];
+
+type StickyEntry = {
+  card: LibraryCard;
+  isMastered: boolean;
+  isHidden: boolean;
+};
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -32,6 +54,7 @@ export function LibraryView({
   onOpenCourseMenu: () => void;
 }) {
   const t = useTranslations('AppPage.library');
+  const tLearn = useTranslations('LearningMode');
 
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
@@ -48,8 +71,17 @@ export function LibraryView({
   });
 
   const masterCard = useMutation(api.features.scheduling.masterCard);
+  const unmasterCard = useMutation(api.features.scheduling.unmasterCard);
   const hideCard = useMutation(api.features.scheduling.hideCard);
+  const unhideCard = useMutation(api.features.scheduling.unhideCard);
   const toggleFavorite = useMutation(api.features.scheduling.toggleFavoriteCard);
+  const deleteCard = useMutation(api.features.scheduling.deleteCardPermanently);
+
+  const [editingCard, setEditingCard] = useState<{
+    cardId: Id<'cards'>;
+    translations: CardTranslation[];
+  } | null>(null);
+  const [deletingCardId, setDeletingCardId] = useState<Id<'cards'> | null>(null);
 
   // Ephemeral per-card per-language speed overrides — live only for as long
   // as this view is mounted. The library is a preview surface: the user
@@ -75,39 +107,65 @@ export function LibraryView({
 
   useEnsureContent(result);
 
-  const [pendingMaster, setPendingMaster] = useState<Set<string>>(new Set());
-  const [pendingHide, setPendingHide] = useState<Set<string>>(new Set());
+  // Cards the user toggled (master/hide) while in the current view. Kept
+  // visible even after the live query stops returning them, so the user sees
+  // their action took effect without the card vanishing. Cleared whenever the
+  // filter or search changes.
+  const [stickyCards, setStickyCards] = useState<Map<Id<'cards'>, StickyEntry>>(
+    () => new Map(),
+  );
+
+  // Captures the displayed order across renders so cards keep their position
+  // when a toggle removes them from (or returns them to) the live query.
+  const orderRef = useRef<Id<'cards'>[]>([]);
+
+  useEffect(() => {
+    setStickyCards(new Map());
+    orderRef.current = [];
+  }, [activeFilter, debouncedSearch]);
 
   const handleMaster = useCallback(
-    async (cardId: Id<'cards'>) => {
-      setPendingMaster((prev) => new Set(prev).add(cardId));
-      try {
-        await masterCard({ cardId });
-      } finally {
-        setPendingMaster((prev) => {
-          const next = new Set(prev);
-          next.delete(cardId);
-          return next;
+    async (card: LibraryCard, currentlyMastered: boolean) => {
+      const nextMastered = !currentlyMastered;
+      setStickyCards((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(card._id);
+        next.set(card._id, {
+          card,
+          isMastered: nextMastered,
+          isHidden: existing?.isHidden ?? card.isHidden,
         });
+        return next;
+      });
+      if (nextMastered) {
+        await masterCard({ cardId: card._id });
+      } else {
+        await unmasterCard({ cardId: card._id });
       }
     },
-    [masterCard],
+    [masterCard, unmasterCard],
   );
 
   const handleHide = useCallback(
-    async (cardId: Id<'cards'>) => {
-      setPendingHide((prev) => new Set(prev).add(cardId));
-      try {
-        await hideCard({ cardId });
-      } finally {
-        setPendingHide((prev) => {
-          const next = new Set(prev);
-          next.delete(cardId);
-          return next;
+    async (card: LibraryCard, currentlyHidden: boolean) => {
+      const nextHidden = !currentlyHidden;
+      setStickyCards((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(card._id);
+        next.set(card._id, {
+          card,
+          isMastered: existing?.isMastered ?? card.isMastered,
+          isHidden: nextHidden,
         });
+        return next;
+      });
+      if (nextHidden) {
+        await hideCard({ cardId: card._id });
+      } else {
+        await unhideCard({ cardId: card._id });
       }
     },
-    [hideCard],
+    [hideCard, unhideCard],
   );
 
   const handleFavorite = useCallback(
@@ -117,13 +175,66 @@ export function LibraryView({
     [toggleFavorite],
   );
 
+  const handleConfirmDelete = useCallback(async () => {
+    const cardId = deletingCardId;
+    if (!cardId) return;
+    setDeletingCardId(null);
+    setStickyCards((prev) => {
+      if (!prev.has(cardId)) return prev;
+      const next = new Map(prev);
+      next.delete(cardId);
+      return next;
+    });
+    orderRef.current = orderRef.current.filter((id) => id !== cardId);
+    try {
+      await deleteCard({ cardId });
+    } catch (error) {
+      console.error('Failed to delete card:', error);
+    }
+  }, [deletingCardId, deleteCard]);
+
   const toggleFilter = (f: Exclude<ActiveFilter, null>) => {
     setActiveFilter((prev) => (prev === f ? null : f));
   };
 
   const isLoading = result === undefined;
-  const cards = result ?? [];
-  const hasResults = cards.length > 0;
+  const liveCards = useMemo(() => result ?? [], [result]);
+
+  // Merge live results with sticky entries while preserving the prior visual
+  // order. Cards retained from the previous render keep their position so a
+  // user-toggled card doesn't jump to the bottom when the live query drops it.
+  // New live cards (not yet in the order) are appended at the end.
+  const displayCards = useMemo(() => {
+    const liveById = new Map(liveCards.map((c) => [c._id, c]));
+    const newOrder: Id<'cards'>[] = [];
+    const seen = new Set<Id<'cards'>>();
+    for (const id of orderRef.current) {
+      if ((liveById.has(id) || stickyCards.has(id)) && !seen.has(id)) {
+        newOrder.push(id);
+        seen.add(id);
+      }
+    }
+    for (const card of liveCards) {
+      if (!seen.has(card._id)) {
+        newOrder.push(card._id);
+        seen.add(card._id);
+      }
+    }
+    orderRef.current = newOrder;
+
+    return newOrder.map((id) => {
+      const sticky = stickyCards.get(id);
+      const live = liveById.get(id);
+      const card = live ?? sticky!.card;
+      return {
+        card,
+        isMastered: sticky?.isMastered ?? card.isMastered,
+        isHidden: sticky?.isHidden ?? card.isHidden,
+      };
+    });
+  }, [liveCards, stickyCards]);
+
+  const hasResults = displayCards.length > 0;
   const hasActiveFilters = debouncedSearch.length > 0 || activeFilter !== null;
 
   if (!hasActiveCourse) {
@@ -238,7 +349,7 @@ export function LibraryView({
 
         {!isLoading && hasResults && (
           <>
-            {cards.map((card) => (
+            {displayCards.map(({ card, isMastered, isHidden }) => (
               <div key={card._id} data-testid="library-card">
                 <LearningCardContent
                   bare
@@ -249,11 +360,20 @@ export function LibraryView({
                   translations={card.translations}
                   audioRecordings={card.audioRecordings}
                   isFavorite={card.isFavorite ?? false}
-                  isPendingMaster={pendingMaster.has(card._id) || card.isMastered}
-                  isPendingHide={pendingHide.has(card._id) || card.isHidden}
-                  onMaster={() => handleMaster(card._id)}
-                  onHide={() => handleHide(card._id)}
+                  isMastered={isMastered}
+                  isHidden={isHidden}
+                  isPendingMaster={false}
+                  isPendingHide={false}
+                  onMaster={() => handleMaster(card, isMastered)}
+                  onHide={() => handleHide(card, isHidden)}
                   onFavorite={() => handleFavorite(card._id)}
+                  onEdit={() =>
+                    setEditingCard({
+                      cardId: card._id,
+                      translations: card.translations,
+                    })
+                  }
+                  onDelete={() => setDeletingCardId(card._id)}
                   hideTargetLanguages={false}
                   highlightEnabled={highlightEnabled}
                   audioSpeedOverrides={ephemeralOverrides[card._id]}
@@ -267,6 +387,46 @@ export function LibraryView({
           </>
         )}
       </div>
+
+      {editingCard && (
+        <EditCardDialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setEditingCard(null);
+          }}
+          cardId={editingCard.cardId}
+          translations={editingCard.translations}
+        />
+      )}
+
+      <AlertDialog
+        open={deletingCardId !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeletingCardId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {tLearn('actions.deleteConfirmTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {tLearn('actions.deleteConfirmDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {tLearn('actions.deleteConfirmCancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive' })}
+              onClick={handleConfirmDelete}
+            >
+              {tLearn('actions.deleteConfirmConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -6,23 +6,10 @@
  * ../../features/tts.ts — that path is unrelated to this file.
  */
 import type { SpeakInput, SpeakResult, TTSProvider } from './types';
+import { toElevenLabsLanguageCode } from './languageCodes';
 
 const ELEVENLABS_MODEL_ID = 'eleven_flash_v2_5';
 const ELEVENLABS_OUTPUT_FORMAT = 'mp3_44100_128';
-
-/**
- * Map our internal language codes to ISO 639-1. Duplicated from
- * `toElevenLabsLanguageCode` in ../../features/tts.ts — that helper is
- * still used by the Scribe STT path. Kept inline here so this dormant file
- * has zero imports from features/ and can be re-enabled without cycle risk.
- */
-function toIsoLanguageCode(internalCode: string): string {
-  const map: Record<string, string> = {
-    es_latam: 'es',
-    cmn: 'zh',
-  };
-  return map[internalCode] ?? internalCode;
-}
 
 export const elevenLabsTts: TTSProvider = {
   id: 'elevenlabs',
@@ -42,7 +29,7 @@ export const elevenLabsTts: TTSProvider = {
         body: JSON.stringify({
           text: input.text,
           model_id: ELEVENLABS_MODEL_ID,
-          language_code: toIsoLanguageCode(input.language),
+          language_code: toElevenLabsLanguageCode(input.language),
           voice_settings: {
             stability: 0.5,
             similarity_boost: 0.75,

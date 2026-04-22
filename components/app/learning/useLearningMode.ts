@@ -101,6 +101,7 @@ interface ReviewingState extends BaseState {
   handleMaster: () => void;
   handleHide: () => void;
   handleFavorite: () => void;
+  handleDelete: () => Promise<void>;
   handleNext: (ratingOverride?: ReviewRating, accuracy?: number) => void;
   setSelectedRating: (rating: ReviewRating) => void;
   // Status flags
@@ -220,6 +221,9 @@ export function useLearningMode(
 
   const masterCardMutation = useMutation(api.features.scheduling.masterCard);
   const hideCardMutation = useMutation(api.features.scheduling.hideCard);
+  const deleteCardMutation = useMutation(
+    api.features.scheduling.deleteCardPermanently,
+  );
 
   const toggleFavoriteCardMutation = useMutation(
     api.features.scheduling.toggleFavoriteCard,
@@ -414,6 +418,22 @@ export function useLearningMode(
       console.error('Failed to toggle favorite:', error);
     }
   }, [cardForReview, toggleFavoriteCardMutation]);
+
+  const handleDelete = useCallback(async () => {
+    if (!cardForReview || isReviewing) return;
+    reviewInitiatedByThisTabRef.current = true;
+    setCardAnimationKey((k) => k + 1);
+    setIsExiting(true);
+    setIsReviewing(true);
+    try {
+      await deleteCardMutation({ cardId: cardForReview._id });
+    } catch (error) {
+      console.error('Failed to delete card:', error);
+      setIsExiting(false);
+    } finally {
+      setIsReviewing(false);
+    }
+  }, [cardForReview, isReviewing, deleteCardMutation]);
 
   // --------------------------------------------------------------------------
   // Scheduling mode
@@ -635,6 +655,7 @@ export function useLearningMode(
     handleMaster,
     handleHide,
     handleFavorite,
+    handleDelete,
     handleNext,
     setSelectedRating,
     isReviewing,
