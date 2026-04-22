@@ -14,7 +14,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { getLangName } from './WordCloudCard';
+import { useLangName } from './WordCloudCard';
 import { WORD_CLOUD_COLORS as COLORS } from '@/lib/wordCloud';
 
 const PAGE_SIZE = 500;
@@ -32,6 +32,7 @@ export function ExpandedWordsDialog({
   onWordClick: (word: string, language: string) => void;
 }) {
   const t = useTranslations('StatsPage');
+  const langName = useLangName();
   const [limit, setLimit] = useState(PAGE_SIZE);
   const [search, setSearch] = useState('');
   // Accumulated list we actually render. We keep old chips mounted when a
@@ -114,7 +115,7 @@ export function ExpandedWordsDialog({
       <DialogContent className="h-[85vh] flex flex-col sm:max-w-lg p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-4 pt-4 pb-3 text-left">
           <DialogTitle className="text-base">
-            {language ? t('recentWordsTitle', { language: getLangName(language) }) : ''}
+            {language ? t('recentWordsTitle', { language: langName(language) }) : ''}
           </DialogTitle>
         </DialogHeader>
         <Separator />

@@ -1,7 +1,7 @@
 'use client';
 
-import { Fragment, useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { Fragment, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Search, Maximize2 } from 'lucide-react';
@@ -11,17 +11,18 @@ import { WordSearchDialog } from './WordSearchDialog';
 import { ExpandedWordsDialog } from './ExpandedWordsDialog';
 import { WORD_CLOUD_COLORS as COLORS } from '@/lib/wordCloud';
 
-export const LANG_NAMES: Record<string, string> = {
-  en: 'English', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian',
-  pt: 'Portuguese', nl: 'Dutch', ru: 'Russian', ja: 'Japanese', ko: 'Korean',
-  zh: 'Chinese', ar: 'Arabic', hi: 'Hindi', tr: 'Turkish', pl: 'Polish',
-  sv: 'Swedish', da: 'Danish', no: 'Norwegian', fi: 'Finnish', el: 'Greek',
-  cs: 'Czech', ro: 'Romanian', hu: 'Hungarian', uk: 'Ukrainian', th: 'Thai',
-  vi: 'Vietnamese', id: 'Indonesian', ms: 'Malay', he: 'Hebrew', fa: 'Persian',
-};
-
-export function getLangName(code: string): string {
-  return LANG_NAMES[code] ?? code.toUpperCase();
+export function useLangName(): (code: string) => string {
+  const locale = useLocale();
+  return useMemo(() => {
+    const dn = new Intl.DisplayNames([locale], { type: 'language' });
+    return (code: string) => {
+      try {
+        return dn.of(code) ?? code.toUpperCase();
+      } catch {
+        return code.toUpperCase();
+      }
+    };
+  }, [locale]);
 }
 
 function SingleWordCloud({
@@ -29,12 +30,14 @@ function SingleWordCloud({
   words,
   isFirst,
   t,
+  langName,
   onWordClick,
   onSearchClick,
   onExpandClick,
 }: {
   language: string;
   t: ReturnType<typeof useTranslations<'StatsPage'>>;
+  langName: (code: string) => string;
   words: string[];
   isFirst: boolean;
   onWordClick: (word: string, language: string) => void;
@@ -71,7 +74,7 @@ function SingleWordCloud({
     <div className="card-surface p-3" data-testid="stats-wordcloud">
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium text-muted-foreground">
-          {isFirst ? t('recentlyLearnedWords', { language: getLangName(language) }) : getLangName(language)}
+          {isFirst ? t('recentlyLearnedWords', { language: langName(language) }) : langName(language)}
         </span>
         <div className="flex items-center gap-0.5">
           <Button
@@ -124,6 +127,7 @@ function SingleWordCloud({
 
 export function WordCloudSection() {
   const t = useTranslations('StatsPage');
+  const langName = useLangName();
   const data = useQuery(api.features.stats.getRecentWords);
   const [selectedWord, setSelectedWord] = useState<{
     word: string;       // normalized (lowercase NFC) — used for the query
@@ -154,6 +158,7 @@ export function WordCloudSection() {
           words={entry.words}
           isFirst={i === 0}
           t={t}
+          langName={langName}
           onWordClick={handleWordClick}
           onSearchClick={() => setSearchOpen(true)}
           onExpandClick={() => setExpandedLanguage(entry.language)}

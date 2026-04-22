@@ -1,10 +1,3 @@
-/**
- * Dormant — not wired into the provider registry while TTS runs Google-only.
- * Re-enable by uncommenting the `elevenlabs` entry in ./index.ts and flipping
- * the relevant languages' `ttsProvider` to `'elevenlabs'` in lib/languages.ts.
- * ElevenLabs is still used for Scribe STT via `transcribeAudio` in
- * ../../features/tts.ts — that path is unrelated to this file.
- */
 import type { SpeakInput, SpeakResult, TTSProvider } from './types';
 import { toElevenLabsLanguageCode } from './languageCodes';
 

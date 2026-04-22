@@ -580,6 +580,15 @@ function TargetLanguageInput({
     };
   }, [state.submitted, targetAudioMode, audioUrl, translation.language, autoPlayedRef, onButtonTimeUpdate, onButtonStop]);
 
+  // Keep an already-running afterSubmit auto-play element in sync when `speed`
+  // changes mid-playback. Mirrors the pattern in AudioButton; without this the
+  // rate set at element creation is sticky for the life of that clip.
+  useEffect(() => {
+    if (autoPlayAudioRef.current) {
+      autoPlayAudioRef.current.playbackRate = speed;
+    }
+  }, [speed]);
+
   useEffect(() => {
     return () => {
       autoPlayAudioRef.current?.pause();

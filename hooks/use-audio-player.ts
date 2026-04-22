@@ -8,6 +8,10 @@ import {
   type LanguageCue,
 } from '@/lib/audio/mergeAudio';
 import {
+  resolveActiveCuePosition,
+  mergedTimeForCuePosition,
+} from '@/lib/audio/activeClip';
+import {
   setupMediaSession,
   updateMediaSessionPosition,
   setMediaSessionPlaybackState,
@@ -88,6 +92,10 @@ export function useAudioPlayer(
   const mergeAbortRef = useRef<AbortController | null>(null);
   const mediaSessionCleanupRef = useRef<(() => void) | null>(null);
   const languageCuesRef = useRef<LanguageCue[]>([]);
+  // Mirrors the current merged-audio bake-in speeds so the merge effect can
+  // convert a merged-timeline `currentTime` to an (original-frame) cue
+  // position synchronously, without waiting for state updates to flush.
+  const speedByLanguageRef = useRef<Record<string, number>>({});
   const webLockResolveRef = useRef<(() => void) | null>(null);
   const webLockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -190,6 +198,7 @@ export function useAudioPlayer(
     }
 
     languageCuesRef.current = [];
+    speedByLanguageRef.current = {};
     setDurationSec(0);
     setIsPlaying(false);
     setRevealedLanguages(new Set());
@@ -350,6 +359,19 @@ export function useAudioPlayer(
       cardId != null &&
       !isCardChange;
 
+    // Capture the user's structural position BEFORE the remerge so we can seek
+    // the new blob to the equivalent (language, repIndex, localTimeOriginal) —
+    // otherwise `audio.src = newBlob` implicitly resets `currentTime` to 0 and
+    // a mid-playback speed change restarts playback from the top.
+    const resumePos =
+      !isCardChange && audioBefore && languageCuesRef.current.length > 0
+        ? resolveActiveCuePosition(
+          languageCuesRef.current,
+          audioBefore.currentTime,
+          speedByLanguageRef.current,
+        )
+        : null;
+
     if (!cardId) {
       clearCurrentAudio();
       mergeAbortRef.current?.abort();
@@ -413,6 +435,7 @@ export function useAudioPlayer(
 
         blobUrlRef.current = result.blobUrl;
         languageCuesRef.current = result.languageCues;
+        speedByLanguageRef.current = result.speedByLanguage;
         setLanguageCues(result.languageCues);
         setSpeedByLanguage(result.speedByLanguage);
         audio.src = result.blobUrl;
@@ -421,24 +444,57 @@ export function useAudioPlayer(
 
         // Same-card remerge (e.g. settings tweak or client refresh): resume if
         // playback was already running so JWT/query churn does not strand audio.
-        if (wasPlayingSameCard) {
-          audio.play().catch((err) => {
-            if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
-            console.error('Resume playback failed:', err);
-          });
-          return;
-        }
+        const shouldResumePlay = wasPlayingSameCard;
+        const shouldAutoPlay =
+          !wasPlayingSameCard &&
+          !hasAutoPlayedForCardRef.current &&
+          autoPlay &&
+          getReviewInitiatedByThisTab();
 
-        // Auto-play once per card when this tab owns playback.
-        // Uses a ref so late-arriving audio (e.g. after content generation)
-        // still triggers auto-play, while settings-only re-merges stay silent.
-        if (!hasAutoPlayedForCardRef.current && autoPlay && getReviewInitiatedByThisTab()) {
-          hasAutoPlayedForCardRef.current = true;
-          onResetReviewFlagRef.current();
-          audio.play().catch((err) => {
-            if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
-            console.error('Auto-play failed:', err);
-          });
+        // Assigning `audio.src` resets `currentTime` to 0. If the user had a
+        // structural position before this remerge, map it onto the new blob's
+        // timeline and seek there once metadata is loaded — otherwise a speed
+        // change mid-playback would jump back to the top of the merged audio.
+        const doResume = () => {
+          if (resumePos) {
+            const target = mergedTimeForCuePosition(
+              result.languageCues,
+              result.speedByLanguage,
+              resumePos,
+            );
+            if (target != null && Number.isFinite(target)) {
+              const clamped = Math.max(
+                0,
+                Math.min(target, Math.max(0, result.durationSec - 0.05)),
+              );
+              try {
+                audio.currentTime = clamped;
+                setCurrentTime(clamped);
+                updateMediaSessionPosition(result.durationSec, clamped);
+              } catch {
+                // readyState edge — safe to ignore; seek was best-effort.
+              }
+            }
+          }
+          if (shouldResumePlay) {
+            audio.play().catch((err) => {
+              if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
+              console.error('Resume playback failed:', err);
+            });
+          } else if (shouldAutoPlay) {
+            hasAutoPlayedForCardRef.current = true;
+            onResetReviewFlagRef.current();
+            audio.play().catch((err) => {
+              if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
+              console.error('Auto-play failed:', err);
+            });
+          }
+        };
+
+        if (audio.readyState >= 1 /* HAVE_METADATA */) {
+          doResume();
+        } else {
+          audio.addEventListener('loadedmetadata', doResume, { once: true });
         }
       } catch (err) {
         if (!cancelled && !(err instanceof DOMException && err.name === 'AbortError')) {

@@ -5,6 +5,18 @@ import { getDecodeContext } from '@/lib/audio/peakCache';
 const BUFFER_SIZE = 4096;
 
 /**
+ * SoundTouchJS's internal `FilterSupport.fillOutputBuffer` bails out as soon
+ * as its input buffer can't be topped up to `8192 * 2` frames. At end-of-
+ * source that leaves the real tail un-processed — up to ~370 ms of audio
+ * near the clip end is silently dropped. To force a flush we append trailing
+ * silence to the source so the threshold stays met while the real tail is
+ * consumed. We then stop extracting at the intended stretched length, so the
+ * silence never ends up in the output.
+ */
+const SOUNDTOUCH_FILL_THRESHOLD_FRAMES = 8192 * 2;
+const TAIL_PAD_FRAMES = SOUNDTOUCH_FILL_THRESHOLD_FRAMES * 2;
+
+/**
  * Bounded LRU so long sessions (many cards × rates) don't grow the decoded
  * PCM cache without limit. A stretched AudioBuffer for a typical clip is in
  * the hundreds of KB; 32 entries keeps worst-case memory ~10-20 MB.
@@ -59,20 +71,33 @@ export async function timeStretchBuffer(
   const cached = cacheGet(key);
   if (cached) return cached;
 
-  const source = new WebAudioBufferSource(buffer);
+  const ctx = getDecodeContext();
+
+  // Silence-pad the source so SoundTouch's fill threshold stays satisfied
+  // while the real tail is processed (see TAIL_PAD_FRAMES).
+  const padded = ctx.createBuffer(
+    buffer.numberOfChannels,
+    buffer.length + TAIL_PAD_FRAMES,
+    buffer.sampleRate,
+  );
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    padded.getChannelData(ch).set(buffer.getChannelData(ch), 0);
+  }
+
+  const source = new WebAudioBufferSource(padded);
   const st = new SoundTouch();
   st.tempo = rate;
   const filter = new SimpleFilter(source, st);
 
-  const estimatedOutLen = Math.ceil(buffer.length / rate);
-  // Head room for WSOLA boundary effects; trimmed after extraction.
-  const capacity = estimatedOutLen + BUFFER_SIZE * 2;
+  const targetOutLen = Math.ceil(buffer.length / rate);
+  // Head room for WSOLA boundary effects; extraction stops once we hit this
+  // cap so any output generated from the silence tail is naturally discarded.
+  const capacity = targetOutLen + BUFFER_SIZE * 2;
   const left = new Float32Array(capacity);
   const right = new Float32Array(capacity);
 
   const interleaved = new Float32Array(BUFFER_SIZE * 2);
   let written = 0;
-  // Extract in fixed chunks until the filter is drained.
   while (true) {
     const framesExtracted = filter.extract(interleaved, BUFFER_SIZE);
     if (framesExtracted === 0) break;
@@ -86,12 +111,14 @@ export async function timeStretchBuffer(
     if (n < framesExtracted) break;
   }
 
-  const ctx = getDecodeContext();
+  // Hard-cap at the expected stretched length: no silence leakage even if
+  // WSOLA overshoots our estimate on some speeds.
+  const outLen = Math.min(written, targetOutLen);
   const channels = buffer.numberOfChannels > 1 ? 2 : 1;
-  const out = ctx.createBuffer(channels, written, buffer.sampleRate);
-  out.getChannelData(0).set(left.subarray(0, written));
+  const out = ctx.createBuffer(channels, outLen, buffer.sampleRate);
+  out.getChannelData(0).set(left.subarray(0, outLen));
   if (channels === 2) {
-    out.getChannelData(1).set(right.subarray(0, written));
+    out.getChannelData(1).set(right.subarray(0, outLen));
   }
 
   cacheSet(key, out);
