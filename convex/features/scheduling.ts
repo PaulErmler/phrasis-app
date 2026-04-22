@@ -64,27 +64,34 @@ async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<'cards'>) {
  * Returns the card with the earliest dueDate that is <= now and not hidden,
  * joined with its text, translations, and audio recordings.
  */
+const cardResultFields = {
+  _id: v.id('cards'),
+  _creationTime: v.number(),
+  textId: v.id('texts'),
+  sourceText: v.string(),
+  sourceLanguage: v.string(),
+  translations: v.array(translationValidator),
+  audioRecordings: v.array(audioRecordingValidator),
+  dueDate: v.number(),
+  isMastered: v.boolean(),
+  isHidden: v.boolean(),
+  isFavorite: v.optional(v.boolean()),
+  schedulingPhase: schedulingPhaseValidator,
+  preReviewCount: v.number(),
+  initialReviewCount: v.number(),
+  fsrsState: v.union(fsrsStateValidator, v.null()),
+  hasMissingContent: v.boolean(),
+  audioSpeedOverrides: v.optional(v.record(v.string(), v.number())),
+};
+
+const cardResultValidator = v.object(cardResultFields);
+
 export const getCardForReview = query({
   args: {},
   returns: v.union(
     v.object({
-      _id: v.id('cards'),
-      _creationTime: v.number(),
-      textId: v.id('texts'),
-      sourceText: v.string(),
-      sourceLanguage: v.string(),
-      translations: v.array(translationValidator),
-      audioRecordings: v.array(audioRecordingValidator),
-      dueDate: v.number(),
-      isMastered: v.boolean(),
-      isHidden: v.boolean(),
-      isFavorite: v.optional(v.boolean()),
-      schedulingPhase: schedulingPhaseValidator,
-      preReviewCount: v.number(),
-      initialReviewCount: v.number(),
-      fsrsState: v.union(fsrsStateValidator, v.null()),
-      hasMissingContent: v.boolean(),
-      audioSpeedOverrides: v.optional(v.record(v.string(), v.number())),
+      ...cardResultFields,
+      nextCard: v.union(cardResultValidator, v.null()),
     }),
     v.null(),
   ),
@@ -106,11 +113,12 @@ export const getCardForReview = query({
 
     const now = Date.now();
 
-    // Get the next due card based on scheduling mode
-    let card;
+    // Fetch the current + peeked-next due cards so the client can pre-merge
+    // audio for the upcoming card while the user is still on the current one.
+    let dueCards: Doc<'cards'>[];
     if (schedulingMode === 'learn_new') {
       // Learn mode: only cards that haven't graduated (still in initial learning cycle)
-      card = await ctx.db
+      dueCards = await ctx.db
         .query('cards')
         .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
           q
@@ -121,10 +129,10 @@ export const getCardForReview = query({
             .lte('dueDate', now),
         )
         .order('asc')
-        .first();
+        .take(2);
     } else {
       // Learn+Review mode: all due cards (current behavior)
-      card = await ctx.db
+      dueCards = await ctx.db
         .query('cards')
         .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
           q
@@ -134,76 +142,86 @@ export const getCardForReview = query({
             .lte('dueDate', now),
         )
         .order('asc')
-        .first();
+        .take(2);
     }
-    if (!card) return null;
+    if (dueCards.length === 0) return null;
 
-    // Load text
-    const text = await ctx.db.get(card.textId);
-    if (!text) return null;
-
-    const sourceLanguage = text.language;
     const allLanguages = [
       ...new Set([...course.baseLanguages, ...course.targetLanguages]),
     ];
 
-    // Load translations
-    const translations = await Promise.all(
-      allLanguages.map(async (lang) => {
-        if (lang === sourceLanguage) {
+    const buildCardResult = async (card: Doc<'cards'>) => {
+      const text = await ctx.db.get(card.textId);
+      if (!text) return null;
+
+      const sourceLanguage = text.language;
+
+      const translations = await Promise.all(
+        allLanguages.map(async (lang) => {
+          if (lang === sourceLanguage) {
+            return {
+              language: lang,
+              text: text.text,
+              isBaseLanguage: course.baseLanguages.includes(lang),
+              isTargetLanguage: course.targetLanguages.includes(lang),
+              romanization: text.romanizedText ?? undefined,
+            };
+          }
+          const translation = await ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', card.textId).eq('targetLanguage', lang),
+            )
+            .first();
           return {
             language: lang,
-            text: text.text,
+            text: translation?.translatedText || '',
             isBaseLanguage: course.baseLanguages.includes(lang),
             isTargetLanguage: course.targetLanguages.includes(lang),
-            romanization: text.romanizedText ?? undefined,
+            romanization: translation?.romanizedText ?? undefined,
           };
-        }
-        const translation = await ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('targetLanguage', lang),
-          )
-          .first();
-        return {
-          language: lang,
-          text: translation?.translatedText || '',
-          isBaseLanguage: course.baseLanguages.includes(lang),
-          isTargetLanguage: course.targetLanguages.includes(lang),
-          romanization: translation?.romanizedText ?? undefined,
-        };
-      }),
-    );
+        }),
+      );
 
-    const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
+      const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
 
-    const hasMissingTranslation = translations.some(
-      (tr) => tr.language !== sourceLanguage && !tr.text,
-    );
-    const hasMissingAudio = audioRecordings.some((a) => !a.url);
-    const hasMissingRomanization = translations.some(
-      (tr) => ROMANIZATION_LANGUAGES.has(tr.language) && !tr.romanization,
-    );
+      const hasMissingTranslation = translations.some(
+        (tr) => tr.language !== sourceLanguage && !tr.text,
+      );
+      const hasMissingAudio = audioRecordings.some((a) => !a.url);
+      const hasMissingRomanization = translations.some(
+        (tr) => ROMANIZATION_LANGUAGES.has(tr.language) && !tr.romanization,
+      );
 
-    return {
-      _id: card._id,
-      _creationTime: card._creationTime,
-      textId: card.textId,
-      sourceText: text.text,
-      sourceLanguage,
-      translations,
-      audioRecordings,
-      dueDate: card.dueDate,
-      isMastered: card.isMastered,
-      isHidden: card.isHidden,
-      isFavorite: card.isFavorite ?? false,
-      schedulingPhase: card.schedulingPhase,
-      preReviewCount: card.preReviewCount,
-      initialReviewCount,
-      fsrsState: card.fsrsState ?? null,
-      hasMissingContent: hasMissingTranslation || hasMissingAudio || hasMissingRomanization,
-      audioSpeedOverrides: card.audioSpeedOverrides,
+      return {
+        _id: card._id,
+        _creationTime: card._creationTime,
+        textId: card.textId,
+        sourceText: text.text,
+        sourceLanguage,
+        translations,
+        audioRecordings,
+        dueDate: card.dueDate,
+        isMastered: card.isMastered,
+        isHidden: card.isHidden,
+        isFavorite: card.isFavorite ?? false,
+        schedulingPhase: card.schedulingPhase,
+        preReviewCount: card.preReviewCount,
+        initialReviewCount,
+        fsrsState: card.fsrsState ?? null,
+        hasMissingContent: hasMissingTranslation || hasMissingAudio || hasMissingRomanization,
+        audioSpeedOverrides: card.audioSpeedOverrides,
+      };
     };
+
+    const [current, next] = await Promise.all([
+      buildCardResult(dueCards[0]),
+      dueCards[1] ? buildCardResult(dueCards[1]) : Promise.resolve(null),
+    ]);
+
+    if (!current) return null;
+
+    return { ...current, nextCard: next };
   },
 });
 

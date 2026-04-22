@@ -69,6 +69,7 @@ export function useLearningAudio(
   const audio = useAudioPlayer({
     cardId: isReviewing ? state.cardId : null,
     audioRecordings: isReviewing ? state.audioRecordings : [],
+    nextCard: isReviewing ? state.nextCard : null,
     settings: audioSettings,
     orderedBase: isReviewing ? state.baseLanguages : [],
     orderedTarget: isReviewing && includeTargetInMerge ? state.targetLanguages : [],

@@ -74,6 +74,11 @@ interface NoCardsDueState extends BaseState {
   handleSchedulingModeChange: (mode: SchedulingMode) => void;
 }
 
+export interface NextCardPreview {
+  cardId: Id<'cards'>;
+  audioRecordings: CardAudioRecording[];
+}
+
 interface ReviewingState extends BaseState {
   status: 'reviewing';
   courseSettings: CourseSettings;
@@ -88,6 +93,9 @@ interface ReviewingState extends BaseState {
   sourceLanguage: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
+  /** The next due card, populated when one exists. Used by the audio player
+   * to pre-merge upcoming audio so playback starts instantly on card advance. */
+  nextCard: NextCardPreview | null;
   audioSpeedOverrides: Record<string, number> | undefined;
   // Rating data
   validRatings: ReviewRating[];
@@ -645,6 +653,12 @@ export function useLearningMode(
     sourceLanguage: displayCard.sourceLanguage,
     translations: sortedTranslations,
     audioRecordings: displayCard.audioRecordings,
+    nextCard: displayCard.nextCard
+      ? {
+        cardId: displayCard.nextCard._id,
+        audioRecordings: displayCard.nextCard.audioRecordings,
+      }
+      : null,
     audioSpeedOverrides: displayCard.audioSpeedOverrides,
     isFavorite: displayCard.isFavorite ?? false,
     isPendingMaster,

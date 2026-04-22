@@ -35,7 +35,8 @@
       "Bash(curl -sL https://labs.convex.dev/better-auth/framework-guides/next-js)",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(grep -E \"\\\\.ts$\")",
-      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "Bash(xargs basename *)"
     ]
   }
 }

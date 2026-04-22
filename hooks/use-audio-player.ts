@@ -21,6 +21,10 @@ import type { CardAudioRecording } from '@/components/app/learning/types';
 export interface UseAudioPlayerOptions {
   cardId: string | null;
   audioRecordings: CardAudioRecording[];
+  /** Peeked upcoming card, used to pre-merge its audio in the background so
+   * playback starts instantly when the user advances. `null` when there is
+   * no next due card. */
+  nextCard: { cardId: string; audioRecordings: CardAudioRecording[] } | null;
   settings: ResolvedAudioSettings;
   orderedBase: string[];
   orderedTarget: string[];
@@ -67,6 +71,7 @@ export function useAudioPlayer(
   const {
     cardId,
     audioRecordings,
+    nextCard,
     settings,
     orderedBase,
     orderedTarget,
@@ -323,6 +328,34 @@ export function useAudioPlayer(
       .join('|');
   }, [audioRecordings]);
 
+  // Same identity-key formula for the peeked next card. Used to gate prefetching
+  // and to verify cache-hit safety on card advance.
+  const nextAudioIdentityKey = useMemo(() => {
+    if (!nextCard || nextCard.audioRecordings.length === 0) return '';
+    return nextCard.audioRecordings
+      .map((a) => `${a.language}:${a.voiceName ?? 'none'}:${a.url ? '1' : '0'}`)
+      .join('|');
+  }, [nextCard]);
+
+  // Pre-merge cache: keyed by the upcoming card's id. When the current card's
+  // merge finishes and the next card's audio URLs are ready, we run
+  // `mergeCardAudio` in the background and stash the result here. On card
+  // advance, the merge effect below uses the cached blob instead of re-running
+  // the fetch/decode/render pipeline — eliminating the perceptible gap between
+  // "user rated card" and "audio starts playing."
+  const prefetchCacheRef = useRef<
+    Map<
+      string,
+      {
+        blobUrl: string;
+        result: MergeResult;
+        audioIdentityKey: string;
+        settingsKey: string;
+      }
+    >
+  >(new Map());
+  const prefetchAbortRef = useRef<AbortController | null>(null);
+
   // Stable key that changes whenever any playback-affecting setting changes
   const settingsKey = useMemo(
     () =>
@@ -392,6 +425,59 @@ export function useAudioPlayer(
     }
 
     if (isCardChange) clearCurrentAudio();
+
+    // Prefetch cache hit — if we pre-merged this card's audio while the
+    // previous card was playing, adopt the cached blob instead of re-running
+    // the fetch/decode/render pipeline. Only valid on a real card change and
+    // only when the cached audio set and settings exactly match the current
+    // ones (otherwise the merged output would differ).
+    const cached = isCardChange ? prefetchCacheRef.current.get(cardId) : undefined;
+    if (
+      cached &&
+      cached.audioIdentityKey === audioIdentityKey &&
+      cached.settingsKey === settingsKey
+    ) {
+      mergeAbortRef.current?.abort();
+      mergeAbortRef.current = null;
+      prefetchCacheRef.current.delete(cardId);
+
+      // Ownership of the cached blob URL transfers to blobUrlRef. The old blob
+      // was already revoked by clearCurrentAudio() above.
+      blobUrlRef.current = cached.result.blobUrl;
+      languageCuesRef.current = cached.result.languageCues;
+      speedByLanguageRef.current = cached.result.speedByLanguage;
+      setLanguageCues(cached.result.languageCues);
+      setSpeedByLanguage(cached.result.speedByLanguage);
+      setDurationSec(cached.result.durationSec);
+      setIsMerging(false);
+
+      const audio = getAudio();
+      if (!audio.paused) audio.pause();
+      audio.src = cached.result.blobUrl;
+
+      const shouldAutoPlay =
+        !hasAutoPlayedForCardRef.current &&
+        autoPlay &&
+        getReviewInitiatedByThisTab();
+
+      const doStart = () => {
+        if (shouldAutoPlay) {
+          hasAutoPlayedForCardRef.current = true;
+          onResetReviewFlagRef.current();
+          audio.play().catch((err) => {
+            if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
+            console.error('Auto-play failed:', err);
+          });
+        }
+      };
+
+      if (audio.readyState >= 1 /* HAVE_METADATA */) {
+        doStart();
+      } else {
+        audio.addEventListener('loadedmetadata', doStart, { once: true });
+      }
+      return;
+    }
 
     // Cancel any in-flight merge
     mergeAbortRef.current?.abort();
@@ -521,6 +607,103 @@ export function useAudioPlayer(
   ]);
 
   // --------------------------------------------------------------------------
+  // Prefetch/pre-merge the next card's audio once the current card is stable.
+  // Runs on the main thread too, but during playback of the current card so
+  // the cost is hidden. On card advance, the merge effect above uses the
+  // cached result and `audio.src` flips near-instantly instead of waiting for
+  // the fetch/decode/render pipeline.
+  // --------------------------------------------------------------------------
+  useEffect(() => {
+    if (!cardId) return;
+    if (!nextCard) return;
+    // Don't contend with the current card's merge for CPU.
+    if (isMerging) return;
+    // Only prefetch when every clip URL is resolved — otherwise mergeCardAudio
+    // would skip clips and produce a truncated blob we'd have to redo.
+    const allNextUrlsReady =
+      nextCard.audioRecordings.length > 0 &&
+      nextCard.audioRecordings.every((a) => a.url);
+    if (!allNextUrlsReady) return;
+
+    const existing = prefetchCacheRef.current.get(nextCard.cardId);
+    if (
+      existing &&
+      existing.audioIdentityKey === nextAudioIdentityKey &&
+      existing.settingsKey === settingsKey
+    ) {
+      return;
+    }
+
+    prefetchAbortRef.current?.abort();
+    const controller = new AbortController();
+    prefetchAbortRef.current = controller;
+
+    let cancelled = false;
+    const targetCardId = nextCard.cardId;
+    const targetAudioIdentityKey = nextAudioIdentityKey;
+    const targetSettingsKey = settingsKey;
+
+    const doPrefetch = async () => {
+      try {
+        const result = await mergeCardAudio(
+          nextCard.audioRecordings,
+          orderedBase,
+          orderedTarget,
+          settings,
+          controller.signal,
+        );
+        if (cancelled || controller.signal.aborted || !result) {
+          // If mergeCardAudio returned a blob but we got aborted mid-insert,
+          // revoke to avoid leaking. (The merge itself already checks abort
+          // internally and returns null in most cancel paths.)
+          if (result) URL.revokeObjectURL(result.blobUrl);
+          return;
+        }
+
+        // Replace any stale entry for this cardId and insert the fresh one.
+        const prev = prefetchCacheRef.current.get(targetCardId);
+        if (prev) URL.revokeObjectURL(prev.blobUrl);
+        prefetchCacheRef.current.set(targetCardId, {
+          blobUrl: result.blobUrl,
+          result,
+          audioIdentityKey: targetAudioIdentityKey,
+          settingsKey: targetSettingsKey,
+        });
+
+        // Bound the cache to the two most recent entries so stale blobs from
+        // skipped cards or mid-session settings changes don't accumulate.
+        while (prefetchCacheRef.current.size > 2) {
+          const oldestKey = prefetchCacheRef.current.keys().next().value;
+          if (!oldestKey) break;
+          const stale = prefetchCacheRef.current.get(oldestKey);
+          if (stale) URL.revokeObjectURL(stale.blobUrl);
+          prefetchCacheRef.current.delete(oldestKey);
+        }
+      } catch (err) {
+        if (!cancelled && !(err instanceof DOMException && err.name === 'AbortError')) {
+          console.error('Audio prefetch failed:', err);
+        }
+      }
+    };
+
+    doPrefetch();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    cardId,
+    nextCard?.cardId,
+    nextAudioIdentityKey,
+    settingsKey,
+    baseOrderKey,
+    targetOrderKey,
+    isMerging,
+  ]);
+
+  // --------------------------------------------------------------------------
   // Media Session: update on card change
   // --------------------------------------------------------------------------
   useEffect(() => {
@@ -545,8 +728,10 @@ export function useAudioPlayer(
   // Cleanup on unmount
   // --------------------------------------------------------------------------
   useEffect(() => {
+    const cache = prefetchCacheRef.current;
     return () => {
       mergeAbortRef.current?.abort();
+      prefetchAbortRef.current?.abort();
       mediaSessionCleanupRef.current?.();
       if (webLockTimeoutRef.current) clearTimeout(webLockTimeoutRef.current);
       webLockResolveRef.current?.();
@@ -563,6 +748,11 @@ export function useAudioPlayer(
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
       }
+
+      for (const entry of cache.values()) {
+        URL.revokeObjectURL(entry.blobUrl);
+      }
+      cache.clear();
     };
   }, []);
 
