@@ -9,8 +9,16 @@ export const OPENROUTER_MODELS = {
   languageTeacher: 'z-ai/glm-5.1:nitro',
   /** Bulk translation JSON for custom card auto-fill */
   translationAutoFill: 'google/gemini-3-flash-preview',
+  /** Linguistic metadata inference (register, gender, addresseeNumber) for
+   *  newly-created cards. Runs once per row, including during bulk import,
+   *  so we pick the cheaper/faster lite tier. */
+  sentenceMetadata: 'google/gemini-3.1-flash-lite-preview',
   /** Short thread title from first user message */
   threadTitle: 'google/gemini-3.1-flash-lite-preview',
+  /** Lenient TTS validation — decides whether a Scribe transcription is
+   *  semantically equivalent to the original (ignores phonetic name
+   *  spellings, digits-vs-words, punctuation, etc.). */
+  ttsValidation: 'google/gemini-3.1-flash-lite-preview',
 } as const;
 
 /** Provider routing for the chat agent via OpenRouter.
@@ -28,6 +36,3 @@ export const OPENROUTER_CHAT_EXTRA_BODY = {
     preferred_min_throughput: 40,
   },
 } as const;
-
-/** OpenAI Audio API — speech-to-text */
-export const OPENAI_TRANSCRIPTION_MODEL = 'gpt-4o-transcribe';

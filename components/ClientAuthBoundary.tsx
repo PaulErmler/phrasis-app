@@ -1,30 +1,29 @@
 'use client';
 
+import { type PropsWithChildren } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { Authenticated, AuthLoading, Unauthenticated } from 'convex/react';
-import type { PropsWithChildren } from 'react';
+import { AuthBoundary } from '@convex-dev/better-auth/react';
 
-function UnauthRedirect() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace('/auth/sign-in');
-  }, [router]);
-  return null;
-}
+import { authClient } from '@/lib/auth-client';
+import { isAuthError } from '@/lib/utils';
+import { api } from '@/convex/_generated/api';
+import { AppLoadingSplash } from '@/components/LogoSpinner';
 
 export function ClientAuthBoundary({ children }: PropsWithChildren) {
+  const router = useRouter();
   return (
-    <>
-      <AuthLoading>
-        <div className="h-dvh" />
-      </AuthLoading>
-      <Authenticated>
-        {children}
-      </Authenticated>
-      <Unauthenticated>
-        <UnauthRedirect />
-      </Unauthenticated>
-    </>
+    <AuthBoundary
+      authClient={authClient}
+      onUnauth={() => router.replace('/auth/sign-in')}
+      getAuthUserFn={api.auth.getAuthUser}
+      isAuthError={isAuthError}
+      renderFallback={() => (
+        <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+          <AppLoadingSplash />
+        </div>
+      )}
+    >
+      {children}
+    </AuthBoundary>
   );
 }

@@ -3,15 +3,23 @@
 import { ChevronDown, ChevronUp, Minus, Plus } from 'lucide-react';
 import { getLanguageByCode } from '@/lib/languages';
 import { Button } from '@/components/ui/button';
+import {
+  PLAYBACK_SPEED_MIN,
+  PLAYBACK_SPEED_MAX,
+  PLAYBACK_SPEED_STEP,
+} from '@/lib/constants/audioPlayback';
 
 interface TimelineLanguageCardProps {
   code: string;
   type: 'base' | 'target';
   plays: number;
   repPause: number;
+  speed: number;
   onPlaysChange: (value: number) => void;
   onRepPauseChange: (value: number) => void;
+  onSpeedChange: (value: number) => void;
   repPauseLabel: string;
+  speedLabel: string;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: () => void;
@@ -24,9 +32,12 @@ export function TimelineLanguageCard({
   type,
   plays,
   repPause,
+  speed,
   onPlaysChange,
   onRepPauseChange,
+  onSpeedChange,
   repPauseLabel,
+  speedLabel,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -125,6 +136,49 @@ export function TimelineLanguageCard({
                 className="h-6 w-6 rounded-full"
                 onClick={() => onRepPauseChange(Math.min(30, repPause + 1))}
                 disabled={repPause >= 30}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {plays > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{speedLabel}</span>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-6 w-6 rounded-full"
+                onClick={() =>
+                  onSpeedChange(
+                    Math.max(
+                      PLAYBACK_SPEED_MIN,
+                      Math.round((speed - PLAYBACK_SPEED_STEP) * 10) / 10,
+                    ),
+                  )
+                }
+                disabled={speed <= PLAYBACK_SPEED_MIN}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <span className="tabular-nums text-sm font-medium w-10 text-center">
+                {speed.toFixed(1)}x
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-6 w-6 rounded-full"
+                onClick={() =>
+                  onSpeedChange(
+                    Math.min(
+                      PLAYBACK_SPEED_MAX,
+                      Math.round((speed + PLAYBACK_SPEED_STEP) * 10) / 10,
+                    ),
+                  )
+                }
+                disabled={speed >= PLAYBACK_SPEED_MAX}
               >
                 <Plus className="h-3 w-3" />
               </Button>

@@ -12,6 +12,7 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip';
 import { LandingAudioButton } from '@/components/landing/LandingAudioButton';
+import { getLandingAudioUrl } from '@/lib/landing/audio';
 import { getLanguageShortLabel } from '@/lib/languages';
 import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
 
@@ -117,7 +118,10 @@ export function LandingCardShell({
                     </p>
                   )}
                 </div>
-                <LandingAudioButton language={getLanguageShortLabel(translation.language)} />
+                <LandingAudioButton
+                  url={getLandingAudioUrl(translation.text, translation.language)}
+                  language={getLanguageShortLabel(translation.language)}
+                />
               </div>
             );
           })}

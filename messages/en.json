@@ -147,6 +147,11 @@
       }
     },
     "deckCards": {
+      "title": "Your Deck",
+      "loading": "Loading cards...",
+      "emptyState": "No cards in your deck yet. Add some cards from a collection above!",
+      "description": "Cards with translations and audio",
+      "cardCount": "{count, plural, one {# card} other {# cards}}",
       "baseLabel": "Base (You know this)",
       "targetLabel": "Target (Learning this)",
       "translating": "Translating...",
@@ -328,8 +333,17 @@
     "actions": {
       "favorite": "Favorite",
       "master": "Master",
+      "unmaster": "Unmaster",
       "hide": "Hide",
+      "unhide": "Unhide",
       "edit": "Edit",
+      "delete": "Delete",
+      "deleteConfirmTitle": "Delete this card permanently?",
+      "deleteConfirmDescription": "This will remove the card from your deck permanently.",
+      "deleteConfirmConfirm": "Delete permanently",
+      "deleteConfirmCancel": "Cancel",
+      "more": "More",
+      "moreActions": "Actions",
       "next": "Next",
       "reveal": "Reveal",
       "pause": "Pause",
@@ -386,6 +400,8 @@
       "initialReviews": "Initial reviews",
       "initialReviewsDescription": "Number of initial reviews for new sentences",
       "audioPlayback": "Audio Playback",
+      "highlightWords": "Highlight words",
+      "highlightWordsDescription": "Highlight words when playing audio",
       "autoPlay": "Auto-play audio",
       "autoPlayDescription": "Auto-play audio when a sentence is shown",
       "uiSettings": "UI Settings",
@@ -405,6 +421,7 @@
       "plays": "Plays",
       "pause": "Pause",
       "pauseBetweenRepetitions": "Pause between repetitions",
+      "playbackSpeed": "Playback speed",
       "base": "Base",
       "target": "Target",
       "playbackSequence": "Playback Sequence",
@@ -459,6 +476,9 @@
   },
   "Chat": {
     "back": "Back",
+    "askAI": "Ask AI",
+    "explainWord": "Explain me this word: {word}",
+    "askAboutWord": "Ask about {word}",
     "thinking": "Thinking...",
     "emptyTitle": "Your language tutor",
     "aiNotice": "You are chatting with an AI assistant. It can make mistakes — always verify important information.",
@@ -501,6 +521,7 @@
     "cardApproval": {
       "approveButton": "Add Sentence",
       "rejectButton": "Reject",
+      "editButton": "Edit sentence",
       "approved": "Sentence added!",
       "rejected": "Sentence creation cancelled",
       "loading": "Loading...",
@@ -829,6 +850,12 @@
     "save": "Save",
     "saving": "Saving..."
   },
+  "EditCardApproval": {
+    "title": "Edit Sentence",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving..."
+  },
   "EnterTexts": {
     "back": "Back",
     "title": "Enter Your Own Texts",
@@ -843,6 +870,93 @@
     "saveSuccess": "Text added successfully",
     "saveError": "Failed to save text. Please try again.",
     "autoFillError": "Auto-fill failed. Please try again."
+  },
+  "ImportTexts": {
+    "switcher": {
+      "ariaLabel": "Add cards mode"
+    },
+    "toggleIndividual": "Add individual sentences",
+    "toggleImport": "Import sentences",
+    "dropzone": {
+      "title": "Drop a CSV / TSV / TXT file",
+      "subtitle": "…or click to choose one",
+      "orPaste": "Or paste rows below",
+      "info": {
+        "columns": "One column per language ({languages})",
+        "separators": "Separator: comma, semicolon, tab, or pipe",
+        "maxLength": "Up to {max} characters per cell",
+        "maxRows": "Up to {max} rows per import",
+        "headerOptional": "First row can be a header (auto-detected)"
+      }
+    },
+    "pastePlaceholder": "Paste rows here — commas, semicolons, tabs or pipes all work.",
+    "delimiter": {
+      "label": "Separator",
+      "auto": "Auto",
+      "comma": "Comma",
+      "semicolon": "Semicolon",
+      "tab": "Tab",
+      "pipe": "Pipe"
+    },
+    "hasHeader": "First row is a header",
+    "mapping": {
+      "title": "Map columns to your course languages",
+      "notMapped": "— not mapped —",
+      "incomplete": "Map every language to import.",
+      "columnLabel": "Column {index}"
+    },
+    "errors": {
+      "tooLong": "{language}: {length}/{max} characters",
+      "emptyCell": "{language}: empty",
+      "duplicate": "Duplicate of row {row}",
+      "mappingIncomplete": "Missing mapping"
+    },
+    "review": {
+      "editAria": "Edit {language}",
+      "deleteAria": "Remove row",
+      "saveAria": "Save",
+      "cancelAria": "Cancel"
+    },
+    "summary": {
+      "valid": "ready",
+      "warnings": "warnings",
+      "errors": "issues",
+      "quotaRemaining": "custom cards left",
+      "quotaUnlimited": "Unlimited custom cards"
+    },
+    "importButton": "Import {count} cards",
+    "importButtonEmpty": "Import cards",
+    "importing": "Importing…",
+    "quota": {
+      "insufficient": "You have {balance} custom cards left this period but are trying to import {count}.",
+      "insufficientCta": "Get more",
+      "unlimited": "Unlimited plan"
+    },
+    "success": "Imported {count} cards",
+    "partialSuccess": "Imported {count} of {total} cards. {skipped} skipped.",
+    "failure": "Import failed. Please try again.",
+    "file": {
+      "tooLarge": "File is too large. Max {maxMb} MB.",
+      "readError": "Could not read file."
+    },
+    "step": {
+      "input": "1. Input",
+      "map": "2. Map",
+      "review": "3. Review",
+      "next": "Next",
+      "back": "Back",
+      "jumpToError": "Jump to next issue"
+    },
+    "confirmDialog": {
+      "title": "Import {count} cards?",
+      "description": "They'll be added to your custom collection.",
+      "descriptionWithWarnings": "{count} rows will be imported, including {warnings} with warnings. They'll be added to your custom collection.",
+      "cancel": "Cancel",
+      "confirm": "Import"
+    },
+    "preview": {
+      "rowsCounted": "{count} rows detected"
+    }
   },
   "NotFoundPage": {
     "title": "Page not found",

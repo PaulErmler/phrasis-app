@@ -1,4 +1,8 @@
 import { v, ConvexError } from 'convex/values';
+import {
+  PLAYBACK_SPEED_MIN,
+  PLAYBACK_SPEED_MAX,
+} from '../../lib/constants/audioPlayback';
 import { mutation, query, MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
@@ -41,6 +45,7 @@ import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
 import { LEVEL_TO_COLLECTION } from '../lib/collections';
 import { getNextTextsFromRank } from '../db/collections';
 import { createCardsFromTexts, updateCollectionProgress } from './decks';
+import { courseSettingsDocValidator } from '../schema';
 
 async function validateLanguageLimits(
   ctx: MutationCtx,
@@ -813,57 +818,15 @@ export const updateCourseLanguages = mutation({
  */
 export const getActiveCourseSettings = query({
   args: {},
-  returns: v.union(
-    v.object({
-      _id: v.id('courseSettings'),
-      _creationTime: v.number(),
-      courseId: v.id('courses'),
-      initialReviewCount: v.number(),
-      activeCollectionId: v.optional(v.id('collections')),
-      cardsToAddBatchSize: v.optional(v.number()),
-      autoAddCards: v.optional(v.boolean()),
-      // Audio playback settings
-      autoPlayAudio: v.optional(v.boolean()),
-      autoAdvance: v.optional(v.boolean()),
-      languageRepetitions: v.optional(v.record(v.string(), v.number())),
-      languageRepetitionPauses: v.optional(v.record(v.string(), v.number())),
-      pauseBaseToBase: v.optional(v.number()),
-      pauseBaseToTarget: v.optional(v.number()),
-      pauseTargetToTarget: v.optional(v.number()),
-      pauseBeforeAutoAdvance: v.optional(v.number()),
-      showProgressBar: v.optional(v.boolean()),
-      hideTargetLanguages: v.optional(v.boolean()),
-      autoRevealLanguages: v.optional(v.boolean()),
-      showRomanization: v.optional(v.boolean()),
-      baseLanguageOrder: v.optional(v.array(v.string())),
-      targetLanguageOrder: v.optional(v.array(v.string())),
-      instantProceedAudio: v.optional(v.boolean()),
-      instantProceedFull: v.optional(v.boolean()),
-      // Review mode
-      reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))),
-      fullReviewTargetAudioMode: v.optional(
-        v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
-      ),
-      // Scheduling mode
-      schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))),
-      chatCollectionId: v.optional(v.id('collections')),
-      customCollectionId: v.optional(v.id('collections')),
-      activeCustomCollectionIds: v.optional(v.array(v.id('collections'))),
-    }),
-    v.null(),
-  ),
+  returns: v.union(courseSettingsDocValidator, v.null()),
   handler: async (ctx) => {
-    try {
-      const userId = await getAuthUserId(ctx);
-      if (!userId) return null;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
 
-      const active = await getActiveCourseForUser(ctx, userId);
-      if (!active) return null;
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return null;
 
-      return dbGetCourseSettings(ctx, active.course._id);
-    } catch {
-      return null;
-    }
+    return dbGetCourseSettings(ctx, active.course._id);
   },
 });
 
@@ -877,10 +840,12 @@ export const updateCourseSettings = mutation({
     cardsToAddBatchSize: v.optional(v.number()),
     autoAddCards: v.optional(v.boolean()),
     // Audio playback settings
+    highlightWords: v.optional(v.boolean()),
     autoPlayAudio: v.optional(v.boolean()),
     autoAdvance: v.optional(v.boolean()),
     languageRepetitions: v.optional(v.record(v.string(), v.number())),
     languageRepetitionPauses: v.optional(v.record(v.string(), v.number())),
+    languagePlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
     pauseBaseToBase: v.optional(v.number()),
     pauseBaseToTarget: v.optional(v.number()),
     pauseTargetToTarget: v.optional(v.number()),
@@ -917,10 +882,12 @@ export const updateCourseSettings = mutation({
       'initialReviewCount',
       'cardsToAddBatchSize',
       'autoAddCards',
+      'highlightWords',
       'autoPlayAudio',
       'autoAdvance',
       'languageRepetitions',
       'languageRepetitionPauses',
+      'languagePlaybackSpeeds',
       'pauseBaseToBase',
       'pauseBaseToTarget',
       'pauseTargetToTarget',
@@ -945,6 +912,17 @@ export const updateCourseSettings = mutation({
       if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
         value = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(value)));
       }
+      if (key === 'languagePlaybackSpeeds' && value && typeof value === 'object') {
+        const clamped: Record<string, number> = {};
+        for (const [lang, speed] of Object.entries(value as Record<string, number>)) {
+          if (typeof speed !== 'number' || !Number.isFinite(speed)) continue;
+          clamped[lang] = Math.max(
+            PLAYBACK_SPEED_MIN,
+            Math.min(PLAYBACK_SPEED_MAX, speed),
+          );
+        }
+        value = clamped;
+      }
       if (value !== undefined) patch[key] = value;
     }
 
@@ -957,10 +935,12 @@ export const updateCourseSettings = mutation({
           args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
         cardsToAddBatchSize: args.cardsToAddBatchSize,
         autoAddCards: args.autoAddCards,
+        highlightWords: args.highlightWords,
         autoPlayAudio: args.autoPlayAudio,
         autoAdvance: args.autoAdvance,
         languageRepetitions: args.languageRepetitions,
         languageRepetitionPauses: args.languageRepetitionPauses,
+        languagePlaybackSpeeds: (patch.languagePlaybackSpeeds as Record<string, number> | undefined) ?? args.languagePlaybackSpeeds,
         pauseBaseToBase: args.pauseBaseToBase,
         pauseBaseToTarget: args.pauseBaseToTarget,
         pauseTargetToTarget: args.pauseTargetToTarget,

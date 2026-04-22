@@ -1,7 +1,11 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { usePaginatedQuery, useMutation } from 'convex/react';
+import { useTranslations } from 'next-intl';
+import { usePaginatedQuery, useMutation, usePreloadedQuery } from 'convex/react';
+import { useAppData } from '@/components/app/AppDataProvider';
+import { useButtonPlayback } from '@/hooks/use-button-playback';
+import { HighlightedText } from '@/components/app/learning/HighlightedText';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import {
@@ -11,20 +15,28 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { normalizeLanguageCode } from '@/lib/languages';
 import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from '@/components/ui/tooltip';
 import { AudioButton } from '@/components/app/learning/AudioButton';
-import { getLanguageShortLabel } from '@/lib/languages';
-import { CircleCheck, EyeOff, Star, Loader2 } from 'lucide-react';
+import { CardActionsMenu } from '@/components/app/learning/CardActionsMenu';
+import { CardSpeedBadge } from '@/components/app/learning/CardSpeedBadge';
+import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
+import type { CardTranslation } from '@/components/app/learning/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
+import { Loader2 } from 'lucide-react';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
-import { highlightWord } from '@/lib/wordCloud';
 
 export function WordSentencesDialog({
   word,
@@ -39,6 +51,32 @@ export function WordSentencesDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useTranslations('LearningMode');
+  const { preloadedCourseSettings } = useAppData();
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
+  const highlightEnabled = courseSettings?.highlightWords !== false;
+  const buttonPlayback = useButtonPlayback();
+
+  // Ephemeral per-card per-language speed overrides. This dialog is a
+  // preview surface launched from the word cloud, so speed changes are not
+  // persisted: they reset the next time the dialog opens. Keyed by cardId
+  // with a nested language→speed map.
+  const [ephemeralOverrides, setEphemeralOverrides] = useState<
+    Record<string, Record<string, number>>
+  >({});
+
+  const handleSpeedCycle = useCallback(
+    (cardId: Id<'cards'>, lang: string, next: number | null) => {
+      setEphemeralOverrides((prev) => {
+        const cardMap = { ...(prev[cardId] ?? {}) };
+        if (next === null) delete cardMap[lang];
+        else cardMap[lang] = next;
+        return { ...prev, [cardId]: cardMap };
+      });
+    },
+    [],
+  );
+
   const { results, status, loadMore } = usePaginatedQuery(
     api.features.stats.getSentencesForWord,
     open ? { word, language } : 'skip',
@@ -56,11 +94,25 @@ export function WordSentencesDialog({
   );
 
   const masterCard = useMutation(api.features.scheduling.masterCard);
+  const unmasterCard = useMutation(api.features.scheduling.unmasterCard);
   const hideCard = useMutation(api.features.scheduling.hideCard);
+  const unhideCard = useMutation(api.features.scheduling.unhideCard);
   const toggleFavorite = useMutation(api.features.scheduling.toggleFavoriteCard);
+  const deleteCard = useMutation(api.features.scheduling.deleteCardPermanently);
+
+  const [editingCard, setEditingCard] = useState<{
+    cardId: Id<'cards'>;
+    translations: CardTranslation[];
+  } | null>(null);
+  const [deletingCardId, setDeletingCardId] = useState<Id<'cards'> | null>(null);
 
   const [pendingMaster, setPendingMaster] = useState<Set<string>>(new Set());
   const [pendingHide, setPendingHide] = useState<Set<string>>(new Set());
+  // Override map for favorite. Unlike master/hide (one-way toggles), favorite
+  // flips both ways, so we track the effective value instead of "is pending".
+  const [favoriteOverride, setFavoriteOverride] = useState<
+    Map<string, boolean>
+  >(new Map());
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const prevResultsLength = useRef(0);
 
@@ -82,10 +134,17 @@ export function WordSentencesDialog({
     loadMore(10);
   }, [loadMore]);
 
-  const handleMaster = async (cardId: Id<'cards'>) => {
+  const handleToggleMaster = async (
+    cardId: Id<'cards'>,
+    currentlyMastered: boolean,
+  ) => {
     setPendingMaster((prev) => new Set(prev).add(cardId));
     try {
-      await masterCard({ cardId });
+      if (currentlyMastered) {
+        await unmasterCard({ cardId });
+      } else {
+        await masterCard({ cardId });
+      }
     } finally {
       setPendingMaster((prev) => {
         const next = new Set(prev);
@@ -95,10 +154,17 @@ export function WordSentencesDialog({
     }
   };
 
-  const handleHide = async (cardId: Id<'cards'>) => {
+  const handleToggleHide = async (
+    cardId: Id<'cards'>,
+    currentlyHidden: boolean,
+  ) => {
     setPendingHide((prev) => new Set(prev).add(cardId));
     try {
-      await hideCard({ cardId });
+      if (currentlyHidden) {
+        await unhideCard({ cardId });
+      } else {
+        await hideCard({ cardId });
+      }
     } finally {
       setPendingHide((prev) => {
         const next = new Set(prev);
@@ -107,6 +173,39 @@ export function WordSentencesDialog({
       });
     }
   };
+
+  const handleToggleFavorite = useCallback(
+    async (cardId: Id<'cards'>, currentlyFavorite: boolean) => {
+      const nextValue = !currentlyFavorite;
+      setFavoriteOverride((prev) => {
+        const next = new Map(prev);
+        next.set(cardId, nextValue);
+        return next;
+      });
+      try {
+        await toggleFavorite({ cardId });
+      } catch (error) {
+        console.error('Failed to toggle favorite:', error);
+        setFavoriteOverride((prev) => {
+          const next = new Map(prev);
+          next.set(cardId, currentlyFavorite);
+          return next;
+        });
+      }
+    },
+    [toggleFavorite],
+  );
+
+  const handleConfirmDelete = useCallback(async () => {
+    const cardId = deletingCardId;
+    if (!cardId) return;
+    setDeletingCardId(null);
+    try {
+      await deleteCard({ cardId });
+    } catch (error) {
+      console.error('Failed to delete card:', error);
+    }
+  }, [deletingCardId, deleteCard]);
 
   const normalizedLang = normalizeLanguageCode(language);
 
@@ -138,6 +237,9 @@ export function WordSentencesDialog({
               const cardId = sentence.cardId as Id<'cards'> | null;
               const isMastered = sentence.isMastered || (cardId ? pendingMaster.has(cardId) : false);
               const isHidden = sentence.isHidden || (cardId ? pendingHide.has(cardId) : false);
+              const isFavorite = cardId && favoriteOverride.has(cardId)
+                ? (favoriteOverride.get(cardId) as boolean)
+                : (sentence.isFavorite ?? false);
 
               return (
                 <div key={sentence.textId} className="content-box p-4 space-y-2">
@@ -147,47 +249,25 @@ export function WordSentencesDialog({
                       <Badge variant="secondary" className="text-xs">
                         {sentence.reviewCount} Reviews
                       </Badge>
-                      <div className="flex items-center">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => toggleFavorite({ cardId })}
-                              className={`h-7 w-7 hover:bg-favorite/10 ${sentence.isFavorite ? 'text-favorite hover:text-favorite/80' : 'text-muted-foreground hover:text-favorite'}`}
-                            >
-                              <Star className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">Favorite</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleMaster(cardId)}
-                              className={`h-7 w-7 hover:bg-success/10 ${isMastered ? 'text-success hover:text-success/80' : 'text-muted-foreground hover:text-success'}`}
-                            >
-                              <CircleCheck className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">Master</TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleHide(cardId)}
-                              className={`h-7 w-7 hover:bg-destructive/10 ${isHidden ? 'text-destructive hover:text-destructive/80' : 'text-muted-foreground hover:text-destructive'}`}
-                            >
-                              <EyeOff className="h-3.5 w-3.5" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">Hide</TooltipContent>
-                        </Tooltip>
-                      </div>
+                      <CardActionsMenu
+                        isFavorite={isFavorite}
+                        isMastered={isMastered}
+                        isHidden={isHidden}
+                        onFavorite={() =>
+                          handleToggleFavorite(cardId, isFavorite)
+                        }
+                        onMaster={() => handleToggleMaster(cardId, isMastered)}
+                        onHide={() => handleToggleHide(cardId, isHidden)}
+                        onEdit={() =>
+                          setEditingCard({
+                            cardId,
+                            translations: sentence.translations,
+                          })
+                        }
+                        onDelete={() => setDeletingCardId(cardId)}
+                        triggerClassName="h-7 w-7"
+                        triggerIconClassName="h-3.5 w-3.5"
+                      />
                     </div>
                   )}
 
@@ -199,24 +279,50 @@ export function WordSentencesDialog({
                       );
                       const isWordLanguage =
                         normalizeLanguageCode(tr.language) === normalizedLang;
+                      const isActive =
+                        buttonPlayback.active?.language === tr.language;
+                      const override = cardId
+                        ? (ephemeralOverrides[cardId]?.[tr.language] ?? null)
+                        : null;
+                      // Ephemeral surface: ignore the course-level general speed.
+                      const effectiveSpeed = override ?? DEFAULT_PLAYBACK_SPEED;
                       return (
                         <div key={tr.language} className="flex items-start gap-2">
                           <div className="flex-1">
-                            <p className="text-sm font-medium leading-relaxed">
-                              {isWordLanguage
-                                ? highlightWord(tr.text, word)
-                                : tr.text}
-                            </p>
+                            <HighlightedText
+                              text={tr.text}
+                              wordTimings={audio?.wordTimings ?? null}
+                              localTime={buttonPlayback.active?.localTime ?? 0}
+                              isActive={isActive}
+                              enabled={highlightEnabled}
+                              className="text-sm font-medium leading-relaxed"
+                              highlightTerm={isWordLanguage ? word : undefined}
+                            />
                             {tr.romanization && (
                               <p className="text-romanization">
                                 {tr.romanization}
                               </p>
                             )}
                           </div>
-                          <AudioButton
-                            url={audio?.url ?? null}
-                            language={getLanguageShortLabel(tr.language)}
-                          />
+                          <div className="flex items-center">
+                            <AudioButton
+                              url={audio?.url ?? null}
+                              language={tr.language}
+                              onTimeUpdate={buttonPlayback.onTimeUpdate}
+                              onStop={buttonPlayback.onStop}
+                              speed={effectiveSpeed}
+                            />
+                            {cardId && (
+                              <CardSpeedBadge
+                                override={override}
+                                generalSpeed={DEFAULT_PLAYBACK_SPEED}
+                                onCycle={(next) =>
+                                  handleSpeedCycle(cardId, tr.language, next)
+                                }
+                                variant="ephemeral"
+                              />
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -232,24 +338,49 @@ export function WordSentencesDialog({
                       );
                       const isWordLanguage =
                         normalizeLanguageCode(tr.language) === normalizedLang;
+                      const isActive =
+                        buttonPlayback.active?.language === tr.language;
+                      const override = cardId
+                        ? (ephemeralOverrides[cardId]?.[tr.language] ?? null)
+                        : null;
+                      const effectiveSpeed = override ?? DEFAULT_PLAYBACK_SPEED;
                       return (
                         <div key={tr.language} className="flex items-start gap-2">
                           <div className="flex-1">
-                            <p className="text-sm leading-relaxed">
-                              {isWordLanguage
-                                ? highlightWord(tr.text, word)
-                                : tr.text}
-                            </p>
+                            <HighlightedText
+                              text={tr.text}
+                              wordTimings={audio?.wordTimings ?? null}
+                              localTime={buttonPlayback.active?.localTime ?? 0}
+                              isActive={isActive}
+                              enabled={highlightEnabled}
+                              className="text-sm leading-relaxed"
+                              highlightTerm={isWordLanguage ? word : undefined}
+                            />
                             {tr.romanization && (
                               <p className="text-romanization">
                                 {tr.romanization}
                               </p>
                             )}
                           </div>
-                          <AudioButton
-                            url={audio?.url ?? null}
-                            language={getLanguageShortLabel(tr.language)}
-                          />
+                          <div className="flex items-center">
+                            <AudioButton
+                              url={audio?.url ?? null}
+                              language={tr.language}
+                              onTimeUpdate={buttonPlayback.onTimeUpdate}
+                              onStop={buttonPlayback.onStop}
+                              speed={effectiveSpeed}
+                            />
+                            {cardId && (
+                              <CardSpeedBadge
+                                override={override}
+                                generalSpeed={DEFAULT_PLAYBACK_SPEED}
+                                onCycle={(next) =>
+                                  handleSpeedCycle(cardId, tr.language, next)
+                                }
+                                variant="ephemeral"
+                              />
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -283,6 +414,46 @@ export function WordSentencesDialog({
           </div>
         </div>
       </DialogContent>
+
+      {editingCard && (
+        <EditCardDialog
+          open={true}
+          onOpenChange={(next) => {
+            if (!next) setEditingCard(null);
+          }}
+          cardId={editingCard.cardId}
+          translations={editingCard.translations}
+        />
+      )}
+
+      <AlertDialog
+        open={deletingCardId !== null}
+        onOpenChange={(next) => {
+          if (!next) setDeletingCardId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('actions.deleteConfirmTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('actions.deleteConfirmDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {t('actions.deleteConfirmCancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: 'destructive' })}
+              onClick={handleConfirmDelete}
+            >
+              {t('actions.deleteConfirmConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

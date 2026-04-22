@@ -2,113 +2,108 @@
  * Shared TTS helper — used by features/decks.ts and testing/tts.ts.
  * No Convex function exports; just plain async helpers.
  *
- * Text-comparison utilities (normalizeForComparison, textsMatch) live
- * in ../lib/textComparison.ts and are re-exported here for convenience.
+ * Provider-specific synthesis lives behind the `TTSProvider` interface in
+ * ../lib/tts; this module is just the call site + the Scribe STT helper.
+ * Text-comparison utilities live in ../lib/textComparison.ts and are
+ * re-exported here for convenience.
  */
 
-import { OPENAI_TRANSCRIPTION_MODEL } from '../config/aiModels';
+import type { TtsProvider } from '../types';
+import { getTtsProvider } from '../lib/tts';
+import { toElevenLabsLanguageCode } from '../lib/tts/languageCodes';
 
 export { normalizeForComparison, textsMatch } from '../lib/textComparison';
+export { toElevenLabsLanguageCode } from '../lib/tts/languageCodes';
 
-/** Google TTS API response type */
-interface GoogleTTSResponse {
-  audioContent: string; // Base64-encoded audio
-}
-
-/**
- * Extract languageCode from voiceName (e.g., "en-US-Chirp3-HD-Leda" -> "en-US")
- */
-function extractLanguageCode(voiceName: string): string {
-  return voiceName.split('-Chirp3-HD-')[0];
-}
+/** Word-level timing returned by Scribe, relative to the audio blob (seconds). */
+export type WordTiming = { word: string; start: number; end: number };
 
 /**
- * Call the Google Cloud TTS REST API.
- * Returns a Blob of the synthesized MP3 audio. Throws on any error.
+ * Provider-agnostic entry point used by ttsProcessing's validation loop.
+ * Dispatches through the `TTSProvider` registry so adding a new backend is
+ * a new file in ../lib/tts, not another branch in this function.
  */
 export async function synthesizeSpeech(
   text: string,
   voiceName: string,
   speed: number,
+  provider: TtsProvider,
+  language: string,
 ): Promise<Blob> {
-  const apiKey = process.env.GOOGLE_TTS_API_KEY;
-  if (!apiKey) throw new Error('TTS service not configured');
+  const { audio } = await getTtsProvider(provider).speak({
+    text,
+    language,
+    voiceApiCode: voiceName,
+    speed,
+  });
+  return audio;
+}
 
-  const languageCode = extractLanguageCode(voiceName);
+/** Shape of a word returned by Scribe. `start`/`end` are seconds. */
+interface ScribeWord {
+  text: string;
+  start?: number;
+  end?: number;
+  type: 'word' | 'spacing' | 'audio_event';
+}
 
-  const response = await fetch(
-    `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        input: { text },
-        voice: { languageCode, name: voiceName },
-        audioConfig: { audioEncoding: 'MP3', speakingRate: speed },
-      }),
-    },
-  );
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Google TTS API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = (await response.json()) as GoogleTTSResponse;
-  if (!data.audioContent)
-    throw new Error('No audio content returned from Google TTS API');
-
-  return new Blob(
-    [Uint8Array.from(atob(data.audioContent), (c) => c.charCodeAt(0))],
-    { type: 'audio/mp3' },
-  );
+interface ScribeResponse {
+  text: string;
+  words: ScribeWord[];
+  language_code?: string;
 }
 
 /**
- * OpenAI audio transcription expects an ISO-639-1 language code (e.g. `es`).
- * App-internal codes (e.g. `es_latam` for Latin American Spanish) must map to
- * that form — regional Spanish variants still use `es` for the API.
+ * Transcribe an audio Blob via the ElevenLabs Scribe v2 API. Used internally
+ * for TTS validation — no auth or quota checks. Returns the transcribed text
+ * plus word-level timestamps so callers can persist alignment alongside the
+ * audio for later playback highlighting.
  *
- * @see https://platform.openai.com/docs/guides/speech-to-text
- */
-function toOpenAITranscriptionLanguage(internalCode: string): string {
-  const map: Record<string, string> = {
-    es_latam: 'es',
-  };
-  return map[internalCode] ?? internalCode;
-}
-
-/**
- * Transcribe an audio Blob via the OpenAI transcriptions API.
- * Used internally for TTS validation — no auth or quota checks.
+ * `languageCode` is optional: when omitted, Scribe auto-detects. Callers that
+ * know the language (e.g. the TTS validation loop) should pass it for better
+ * accuracy. Uses raw `fetch` (like the TTS call above) so this file stays
+ * V8-runtime-compatible — the ElevenLabs SDK pulls in Node built-ins.
  */
 export async function transcribeAudio(
   blob: Blob,
-  languageCode: string,
-): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
+  languageCode?: string,
+): Promise<{ text: string; wordTimings: WordTiming[] }> {
+  const apiKey = process.env.ELEVENLABS_API_KEY;
+  if (!apiKey) throw new Error('ELEVENLABS_API_KEY is not configured');
 
-  const openAiLang = toOpenAITranscriptionLanguage(languageCode);
-
-  const file = new File([blob], 'audio.mp3', { type: 'audio/mp3' });
   const formData = new FormData();
-  formData.append('file', file);
-  formData.append('model', OPENAI_TRANSCRIPTION_MODEL);
-  formData.append('language', openAiLang);
+  formData.append('file', blob, 'audio.mp3');
+  formData.append('model_id', 'scribe_v2');
+  formData.append('tag_audio_events', 'true');
+  // TTS validation blobs are always single-speaker, so diarization adds cost
+  // and latency without producing useful information.
+  formData.append('diarize', 'false');
+  formData.append('timestamps_granularity', 'word');
+  if (languageCode) {
+    formData.append('language_code', toElevenLabsLanguageCode(languageCode));
+  }
 
-  const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+  const response = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: { 'xi-api-key': apiKey },
     body: formData,
   });
 
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`OpenAI transcription failed (${res.status}): ${body}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `ElevenLabs Scribe API error: ${response.status} - ${errorText}`,
+    );
   }
 
-  const data = (await res.json()) as { text: string };
-  return data.text;
-}
+  const data = (await response.json()) as ScribeResponse;
 
+  const wordTimings: WordTiming[] = [];
+  for (const w of data.words) {
+    if (w.type !== 'word') continue;
+    if (w.start === undefined || w.end === undefined) continue;
+    wordTimings.push({ word: w.text, start: w.start, end: w.end });
+  }
+
+  return { text: data.text, wordTimings };
+}

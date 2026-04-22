@@ -33,6 +33,9 @@ import {
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
+  DEFAULT_PLAYBACK_SPEED,
+  PLAYBACK_SPEED_MIN,
+  PLAYBACK_SPEED_MAX,
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
@@ -115,6 +118,13 @@ export function LearningModeSettings({
     });
   };
 
+  const handleHighlightWordsChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      highlightWords: checked,
+    });
+  };
+
   const handleAutoAdvanceChange = async (checked: boolean) => {
     await updateSettings({
       courseId: courseSettings.courseId,
@@ -169,6 +179,18 @@ export function LearningModeSettings({
     await updateSettings({
       courseId: courseSettings.courseId,
       languageRepetitionPauses: { ...current, [language]: value },
+    });
+  };
+
+  const handleLanguageSpeedChange = async (language: string, value: number) => {
+    const clamped = Math.max(
+      PLAYBACK_SPEED_MIN,
+      Math.min(PLAYBACK_SPEED_MAX, Math.round(value * 10) / 10),
+    );
+    const current = courseSettings.languagePlaybackSpeeds ?? {};
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      languagePlaybackSpeeds: { ...current, [language]: clamped },
     });
   };
 
@@ -243,6 +265,7 @@ export function LearningModeSettings({
     courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit';
   const reps = courseSettings.languageRepetitions ?? {};
   const repPauses = courseSettings.languageRepetitionPauses ?? {};
+  const speeds = courseSettings.languagePlaybackSpeeds ?? {};
   const pauseB2B =
     courseSettings.pauseBaseToBase ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
   const pauseB2T =
@@ -465,6 +488,22 @@ export function LearningModeSettings({
             {t('audioPlayback')}
           </p>
 
+          {/* Highlight words */}
+          <div className="settings-row">
+            <div className="space-y-0.5">
+              <Label htmlFor="highlightWords" className="text-sm font-medium">
+                {t('highlightWords')}
+              </Label>
+              <p className="text-muted-xs">{t('highlightWordsDescription')}</p>
+            </div>
+            <Switch
+              id="highlightWords"
+              checked={courseSettings.highlightWords !== false}
+              onCheckedChange={handleHighlightWordsChange}
+              className="mt-0.5"
+            />
+          </div>
+
           {/* Auto-play audio */}
           <div className="settings-row">
             <div className="space-y-0.5">
@@ -571,11 +610,14 @@ export function LearningModeSettings({
                     type="base"
                     plays={plays}
                     repPause={repPause}
+                    speed={speeds[code] ?? DEFAULT_PLAYBACK_SPEED}
                     onPlaysChange={(v) => handleRepetitionChange(code, v)}
                     onRepPauseChange={(v) =>
                       handleRepetitionPauseChange(code, v)
                     }
+                    onSpeedChange={(v) => handleLanguageSpeedChange(code, v)}
                     repPauseLabel={t('pauseBetweenRepetitions')}
+                    speedLabel={t('playbackSpeed')}
                     showReorderButtons={baseLanguages.length > 1}
                     canMoveUp={idx > 0}
                     canMoveDown={idx < baseLanguages.length - 1}
@@ -630,11 +672,14 @@ export function LearningModeSettings({
                         type="target"
                         plays={plays}
                         repPause={repPause}
+                        speed={speeds[code] ?? DEFAULT_PLAYBACK_SPEED}
                         onPlaysChange={(v) => handleRepetitionChange(code, v)}
                         onRepPauseChange={(v) =>
                           handleRepetitionPauseChange(code, v)
                         }
+                        onSpeedChange={(v) => handleLanguageSpeedChange(code, v)}
                         repPauseLabel={t('pauseBetweenRepetitions')}
+                        speedLabel={t('playbackSpeed')}
                         showReorderButtons={targetLanguages.length > 1}
                         canMoveUp={idx > 0}
                         canMoveDown={idx < targetLanguages.length - 1}

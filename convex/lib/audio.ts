@@ -1,10 +1,17 @@
 import { QueryCtx } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 
+export interface AudioWordTiming {
+  word: string;
+  start: number;
+  end: number;
+}
+
 export interface AudioResult {
   language: string;
   voiceName: string | null;
   url: string | null;
+  wordTimings: AudioWordTiming[] | null;
 }
 
 /**
@@ -37,5 +44,6 @@ export async function getAudioForText(
     language: lang,
     voiceName: records[i]?.voiceName ?? null,
     url: urlEntries[i] ?? null,
+    wordTimings: records[i]?.wordTimings ?? null,
   }));
 }

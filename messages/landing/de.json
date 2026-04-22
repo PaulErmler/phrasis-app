@@ -35,9 +35,9 @@
     "pillar1Title": "Wiederholung, die in den Tag passt",
     "pillar1Body": "Kurze, häufige Kontakte mit denselben Sätzen schlagen seltenes Pauken und Wiederholung ist der Schlüssel, aber konsequent zu bleiben ist schwer. Flexling ermöglicht es dir, die wichtigsten Dinge mit modernster Spaced Repetition zu wiederholen und der Audio-Modus lässt dich flexibel üben, um in deinen vollen Tag zu passen.",
     "pillar2Title": "Personalisierter Input",
-    "pillar2Body": "Anstatt Dinge zu lernen, die dich nicht interessieren, kannst du deinen Lehrplan anpassen. Füge eigene Sätze hinzu oder lass die KI sie für dich erstellen. Jeder lernt anders – dein Lernmaterial sollte das auch.",
+    "pillar2Body": "Anstatt Dinge zu lernen, die dich nicht interessieren, kannst du deinen Lehrplan anpassen. Füge eigene Sätze hinzu, importiere eine CSV Datei, oder lass die KI sie für dich erstellen. Jeder lernt anders – dein Lernmaterial sollte sich anpassen.",
     "pillar3Title": "Motivation und Fortschrittsverfolgung",
-    "pillar3Body": "Eine Sprache zu lernen ist schwer und manchmal ist es auch schwer, motiviert zu bleiben. Flexling verfolgt detaillierte Statistiken über deinen Lernfortschritt, wie viele Wörter du bereits gelernt hast. Das hält dich motiviert."
+    "pillar3Body": "Eine Sprache zu lernen ist schwer und manchmal ist es auch schwer, motiviert zu bleiben. Flexling erstellt detaillierte Statistiken über deinen Lernfortschritt, z.B. wie viele Wörter du bereits gelernt hast. Das hält dich motiviert."
   },
   "reviewModes": {
     "title": "Zwei Wege zum Wiederholen.",
@@ -53,9 +53,9 @@
       "base": "Guten Morgen, wie geht es Ihnen?",
       "hi": "सुप्रभात, आप कैसे हैं?",
       "hiRoman": "suprabhaat, aap kaise hain?",
-      "es": "Buenos días, ¿cómo estás?",
+      "es": "Buenos días ¿cómo está?",
       "fr": "Bonjour, comment allez-vous ?",
-      "typedEs": "Buenos dias, como estas?",
+      "typedEs": "Buenos dias como esta?",
       "typedFr": "Bonjour, comment allez vous?"
     }
   },
@@ -72,23 +72,23 @@
     "replay": "Erneut abspielen",
     "grammar": {
       "userMessage": "Wie konjugiere ich estar für ich und sie (mehrere Personen) auf Spanisch?",
-      "assistantMessage": "Für yo (ich) heißt estar estoy — z. B. Estoy bien. Für ellos oder ellas (sie, Plural) heißt es están; die zweite Karte zeigt das in einer Begrüßung: Buenos días, ¿cómo están? Die erste Karte nutzt está mit usted, der höflichen Einzelperson (gleiche Endung wie él/ella). Tippe auf Karte hinzufügen, wenn du einen der Sätze speichern willst.",
-      "card1Base": "Guten Morgen — formell, eine Person",
-      "card1Target": "Buenos días, ¿cómo está usted?",
-      "card2Base": "Guten Morgen — an mehrere Personen",
-      "card2Target": "Buenos días, ¿cómo están?",
+      "assistantMessage": "Für yo (ich) heißt estar estoy — z. B. Estoy bien. Für ellos oder ellas (sie, Plural) heißt es están; die zweite Karte zeigt das in einer Begrüßung: Buenos días ¿cómo están? Die erste Karte nutzt está mit usted, der höflichen Einzelperson (gleiche Endung wie él/ella). Tippe auf Karte hinzufügen, wenn du einen der Sätze speichern willst.",
+      "card1Base": "Guten Morgen, wie geht es Ihnen?",
+      "card1Target": "Buenos días ¿cómo está usted?",
+      "card2Base": "Guten Morgen zusammen, wie geht es euch?",
+      "card2Target": "Buenos días ¿cómo están?",
       "multiCard1": {
-        "base": "Guten Morgen — formell, eine Person",
-        "hi": "सुप्रभात, आप कैसे हैं? (आप — औपचारिक)",
-        "hiRoman": "suprabhaat, aap kaise hain? (aap — formal)",
-        "es": "Buenos días, ¿cómo está usted?",
+        "base": "Guten Morgen, wie geht es Ihnen?",
+        "hi": "सुप्रभात, आप कैसे हैं?",
+        "hiRoman": "suprabhaat, aap kaise hain?",
+        "es": "Buenos días ¿cómo está usted?",
         "fr": "Bonjour, comment allez-vous ?"
       },
       "multiCard2": {
-        "base": "Guten Morgen — an mehrere Personen",
+        "base": "Guten Morgen zusammen, wie geht es euch?",
         "hi": "सुप्रभात, आप सब कैसे हैं?",
         "hiRoman": "suprabhaat, aap sab kaise hain?",
-        "es": "Buenos días, ¿cómo están?",
+        "es": "Buenos días ¿cómo están?",
         "fr": "Bonjour à tous, comment allez-vous ?"
       }
     },
@@ -129,28 +129,28 @@
       }
     },
     "curiosity": {
-      "userMessage": "Was sind lustige spanische Wörter?",
-      "assistantMessage": "Lernende mögen knackigen Slang und Überraschungen beim Klang. Chiripa ist ein schönes Wort für einen glücklichen Zufall; tocayo heißt jemand mit demselben Namen — perfekt für Witze. Zwei Karten zum Mitnehmen.",
+      "userMessage": "Gibt es spanische Wörter, die im Englischen fehlen?",
+      "assistantMessage": "Eine Menge! Spanisch hat oft ein einziges kompaktes Wort, wo Englisch einen ganzen Satz braucht. Sobremesa ist der gemütliche Plausch nach dem Essen; estrenar bedeutet, etwas zum ersten Mal zu benutzen oder zu tragen. Beides kommt im Alltag oft vor. Tippe auf Karte hinzufügen, wenn du sie behalten willst.",
       "simple": {
-        "card1Base": "Was für ein Glück! (umgangssprachlich)",
-        "card1Target": "¡Qué chiripa!",
-        "card2Base": "Wir haben denselben Vornamen.",
-        "card2Target": "Somos tocayos."
+        "card1Base": "Lass uns nach dem Essen noch ein bisschen quatschen.",
+        "card1Target": "Hagamos sobremesa.",
+        "card2Base": "Ich trage diese Schuhe zum ersten Mal.",
+        "card2Target": "Estoy estrenando estos zapatos."
       },
       "multi": {
         "card1": {
-          "base": "Was für ein Glück! (umgangssprachlich)",
-          "hi": "कितनी अच्छी किस्मत!",
-          "hiRoman": "kitni achhi kismat!",
-          "es": "¡Qué chiripa!",
-          "fr": "Quelle veine !"
+          "base": "Lass uns nach dem Essen noch ein bisschen quatschen.",
+          "hi": "रात के खाने के बाद थोड़ी और बातें करते हैं।",
+          "hiRoman": "raat ke khaane ke baad thodi aur baatein karte hain.",
+          "es": "Hagamos sobremesa.",
+          "fr": "Restons discuter après le dîner."
         },
         "card2": {
-          "base": "Wir haben denselben Vornamen.",
-          "hi": "हमारा नाम एक जैसा है।",
-          "hiRoman": "hamaara naam ek jaisa hai.",
-          "es": "Somos tocayos.",
-          "fr": "Nous sommes homonymes."
+          "base": "Ich trage diese Schuhe zum ersten Mal.",
+          "hi": "मैं पहली बार ये जूते पहन रहा हूँ।",
+          "hiRoman": "main pehli baar ye joote pehen raha hoon.",
+          "es": "Estoy estrenando estos zapatos.",
+          "fr": "J'étrenne ces chaussures."
         }
       }
     }
@@ -191,7 +191,7 @@
       },
       "selfDriven": {
         "title": "Selbstbestimmt und flexibel",
-        "description": "Füge deine eigenen Sätze hinzu oder bitte die KI, sie für dich zu erstellen. Oder nicht. Es gibt auch smarte Voreinstellungen."
+        "description": "Tippe eigene Sätze, importiere sie per CSV oder Tabelle, oder lass die KI welche erstellen. Oder nicht — smarte Voreinstellungen sind bereit, falls du einfach loslegen willst."
       },
       "instantFeedback": {
         "title": "Sofortiges Feedback",
@@ -320,8 +320,9 @@
       {
         "question": "Kann ich eigene Sätze hinzufügen?",
         "answer": [
-          "Absolut! Flexling erstellt automatisch Lernkarten, die du über den Chat anforderst. Weitere Methoden zum Hinzufügen von Karten sind in Arbeit.",
-          "Fehlt uns eine Methode, die du verwenden möchtest? Lass es uns wissen und wir versuchen, sie hinzuzufügen."
+          "Ja, auf drei Wegen: einzeln eintippen, per CSV, TSV oder eingefügter Tabelle (Excel, Numbers, Google Sheets) im Bulk importieren oder die KI im Chat darum bitten.",
+          "Beim Bulk-Import ordnest du einfach die Spalten deiner Datei deinen Kurssprachen zu — Flexling erzeugt Audio und Metadaten automatisch.",
+          "Fehlt dir eine Methode, die du nutzen möchtest? Sag uns Bescheid und wir versuchen, sie hinzuzufügen."
         ]
       },
       {

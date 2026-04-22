@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, type ReactNode } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useMutation, useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -24,9 +24,11 @@ import { useCourseLanguages } from '@/hooks/use-course-languages';
 
 interface EnterTextsViewProps {
   onBack: () => void;
+  hideHeader?: boolean;
+  headerSlot?: ReactNode;
 }
 
-export function EnterTextsView({ onBack }: EnterTextsViewProps) {
+export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: EnterTextsViewProps) {
   const t = useTranslations('EnterTexts');
   const locale = useLocale();
   const { baseLanguages, targetLanguages } = useCourseLanguages();
@@ -204,26 +206,29 @@ export function EnterTextsView({ onBack }: EnterTextsViewProps) {
   return (
     <>
       <div className="flex flex-col h-full">
-        <header className="sticky-header">
-          <div className="container mx-auto px-4 h-14 flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="shrink-0 -ml-2"
-              aria-label={t('back')}
-              onClick={onBack}
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <h1 className="font-semibold text-base truncate flex-1">{t('title')}</h1>
-          </div>
-        </header>
+        {!hideHeader && (
+          <header className="sticky-header">
+            <div className="container mx-auto px-4 h-14 flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="shrink-0 -ml-2"
+                aria-label={t('back')}
+                onClick={onBack}
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <h1 className="font-semibold text-base truncate flex-1">{t('title')}</h1>
+            </div>
+          </header>
+        )}
 
         <div
           className="flex-1 overflow-y-auto px-4 py-4"
           style={{ scrollbarGutter: 'stable' }}
         >
           <div className="app-view space-y-4">
+            {headerSlot}
             <p className="text-muted-sm">
               {hasLanguages ? t('description') : t('noLanguages')}
             </p>

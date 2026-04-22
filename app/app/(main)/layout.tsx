@@ -19,7 +19,7 @@ import { ChevronLeft, MessageSquarePlus, PanelLeft } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { HomeView } from '@/components/app/HomeView';
-import { EnterTextsView } from '@/components/app/EnterTextsView';
+import { AddCardsView } from '@/components/app/AddCardsView';
 import { LibraryView } from '@/components/app/LibraryView';
 import { StatsView } from '@/components/app/stats/StatsView';
 import { SettingsView } from '@/components/app/SettingsView';
@@ -221,32 +221,36 @@ export default function MainLayout({
   }, [refreshPrefetchedThread]);
 
   // Sync state when the user navigates with browser back/forward buttons
+  // (including iOS/Android edge-swipe back gestures).
   useEffect(() => {
     const onPopState = () => {
       const url = window.location.pathname;
       if (url === '/app/learn') {
         setIsLearnOpen(true);
-      } else if (isLearnOpenRef.current) {
-        // Swipe-back or browser back detected while Learn is open.
-        // Re-push the learn URL to prevent accidental closure.
-        history.pushState(null, '', '/app/learn');
-      } else {
-        setIsLearnOpen(false);
-        const parsed = viewFromPathname(url);
-        setActiveView((prev) => {
-          if (parsed.view === 'chat' && prev !== 'chat') {
-            viewBeforeChatRef.current = prev;
-          }
-          return parsed.view;
-        });
-        if (parsed.chatThreadId) {
-          setChatThreadId(parsed.chatThreadId);
+        return;
+      }
+      // Left /app/learn via browser back or swipe-back. Mirror the
+      // programmatic close in handleLearnClose so the return-from-learn
+      // side effects (prefetched thread refresh, one-frame flag) fire.
+      if (isLearnOpenRef.current) {
+        setJustReturnedFromLearn(true);
+        refreshPrefetchedThread();
+      }
+      setIsLearnOpen(false);
+      const parsed = viewFromPathname(url);
+      setActiveView((prev) => {
+        if (parsed.view === 'chat' && prev !== 'chat') {
+          viewBeforeChatRef.current = prev;
         }
+        return parsed.view;
+      });
+      if (parsed.chatThreadId) {
+        setChatThreadId(parsed.chatThreadId);
       }
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [refreshPrefetchedThread]);
 
   const hasActiveCourse = !!activeCourse;
 
@@ -370,7 +374,7 @@ export default function MainLayout({
         </div>
         {isAddCardsRoute && (
           <div style={{ display: !isLearnOpen ? 'contents' : 'none' }}>
-            <EnterTextsView onBack={() => {
+            <AddCardsView onBack={() => {
               setActiveView('home');
               router.push('/app');
             }} />

@@ -153,4 +153,186 @@ describe("features/customTexts", () => {
       expect(call.system).toMatch(/multilingual translator/i);
     });
   });
+
+  describe("createCustomTextsBatch", () => {
+    it("rejects unauthenticated", async () => {
+      const t = convexTest(schema, modules);
+      await expect(
+        t.mutation(api.features.customTexts.createCustomTextsBatch, {
+          items: [{ translations: [{ language: "en", text: "hi" }] }],
+          timezone: "UTC",
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("rejects empty batch", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(api.features.customTexts.createCustomTextsBatch, {
+          items: [],
+          timezone: "UTC",
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("rejects when items exceed MAX_IMPORT_BATCH", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const items = Array.from({ length: 501 }, (_, i) => ({
+        translations: [
+          { language: "en", text: `Hello ${i}` },
+          { language: "es", text: `Hola ${i}` },
+        ],
+      }));
+      await expect(
+        asUser.mutation(api.features.customTexts.createCustomTextsBatch, {
+          items,
+          timezone: "UTC",
+        }),
+      ).rejects.toThrow();
+    });
+
+    it("creates multiple texts, decrements quota, patches collection textCount", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const items = [
+        {
+          translations: [
+            { language: "en", text: "Hello" },
+            { language: "es", text: "Hola" },
+          ],
+        },
+        {
+          translations: [
+            { language: "en", text: "Goodbye" },
+            { language: "es", text: "Adiós" },
+          ],
+        },
+        {
+          translations: [
+            { language: "en", text: "Thanks" },
+            { language: "es", text: "Gracias" },
+          ],
+        },
+      ];
+      const res = await asUser.mutation(
+        api.features.customTexts.createCustomTextsBatch,
+        { items, timezone: "UTC" },
+      );
+      expect(res.createdTextIds).toHaveLength(3);
+      expect(res.skipped).toHaveLength(0);
+
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.custom_sentences.balance).toBe(7);
+      expect(quota?.features.custom_sentences.used).toBe(3);
+
+      const collection = await t.run(async (ctx) =>
+        ctx.db.query("collections").first(),
+      );
+      expect(collection?.textCount).toBe(3);
+    });
+
+    it("returns skipped entries for invalid rows without aborting the batch", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const longText = "x".repeat(200);
+      const items = [
+        {
+          translations: [
+            { language: "en", text: "Hello" },
+            { language: "es", text: "Hola" },
+          ],
+        },
+        // Invalid: en missing
+        {
+          translations: [{ language: "es", text: "Solo español" }],
+        },
+        // Invalid: too long
+        {
+          translations: [
+            { language: "en", text: longText },
+            { language: "es", text: "Demasiado largo" },
+          ],
+        },
+        {
+          translations: [
+            { language: "en", text: "Second valid" },
+            { language: "es", text: "Segundo válido" },
+          ],
+        },
+      ];
+      const res = await asUser.mutation(
+        api.features.customTexts.createCustomTextsBatch,
+        { items, timezone: "UTC" },
+      );
+      expect(res.createdTextIds).toHaveLength(2);
+      expect(res.skipped.map((s) => s.code).sort()).toEqual(
+        ["INVALID_LANGUAGES", "TEXT_TOO_LONG"].sort(),
+      );
+      // Only the 2 valid items should be quota-consumed.
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.custom_sentences.used).toBe(2);
+    });
+
+    it("throws USAGE_LIMIT when valid items exceed quota balance", async () => {
+      const t = convexTest(schema, modules);
+      // Seed with balance=1
+      await t.run(async (ctx) => {
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_B",
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_B",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_B",
+          features: {
+            custom_sentences: { balance: 1, included: 1, used: 0, unlimited: false },
+            card_edits: { balance: 1, included: 1, used: 0, unlimited: false },
+            translation_auto_fill: { balance: 1, included: 1, used: 0, unlimited: false },
+          },
+          lastSyncedAt: Date.now(),
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_B" });
+      await expect(
+        asUser.mutation(api.features.customTexts.createCustomTextsBatch, {
+          items: [
+            {
+              translations: [
+                { language: "en", text: "A" },
+                { language: "es", text: "A" },
+              ],
+            },
+            {
+              translations: [
+                { language: "en", text: "B" },
+                { language: "es", text: "B" },
+              ],
+            },
+          ],
+          timezone: "UTC",
+        }),
+      ).rejects.toThrow();
+    });
+  });
 });

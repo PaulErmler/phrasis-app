@@ -36,9 +36,12 @@ export function createCardToolRenderer({
 
     if (!isLoaded) return <span key={`${messageId}-card-${idx}`} />;
 
+    const stableKey = toolPart.toolCallId
+      ? `card-${toolPart.toolCallId}`
+      : `${messageId}-card-${idx}`;
     return (
       <CardApproval
-        key={`${messageId}-card-${idx}`}
+        key={stableKey}
         toolPart={toolPart}
         approvalsByToolCallId={approvalsByToolCallId}
         onApprove={handleApprove}

@@ -13,7 +13,7 @@ import {
   CommandItem,
 } from '@/components/ui/command';
 import { WordSentencesDialog } from './WordSentencesDialog';
-import { getLangName } from './WordCloudCard';
+import { useLangName } from './WordCloudCard';
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -47,6 +47,7 @@ export function WordSearchDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations('StatsPage');
+  const langName = useLangName();
   const [input, setInput] = useState('');
   const debouncedInput = useDebounce(input, 300);
 
@@ -97,7 +98,7 @@ export function WordSearchDialog({
               : t('searchWordsNoResults')}
           </CommandEmpty>
           {grouped.map(({ language, items }) => (
-            <CommandGroup key={language} heading={getLangName(language)}>
+            <CommandGroup key={language} heading={langName(language)}>
               {items.map((item) => (
                 <CommandItem
                   key={`${item.language}:${item.word}`}

@@ -34,7 +34,7 @@ function WrappedChatPanel({
   cardId?: Id<'cards'>;
   onMessageSent?: () => void;
 }) {
-  const { closeChat } = useLearningChatToggle();
+  const { closeChat, pendingPrompt, claimPrompt } = useLearningChatToggle();
   const {
     approvalsByToolCallId,
     processingApprovals,
@@ -77,6 +77,9 @@ function WrappedChatPanel({
       autoFocus={false}
       approvalsLoading={!approvalsLoaded}
       noBottomPadding
+      initialText={pendingPrompt?.text}
+      initialTextNonce={pendingPrompt?.nonce}
+      claimInitialText={claimPrompt}
       aboveFooterAction={
         <Button
           type="button"

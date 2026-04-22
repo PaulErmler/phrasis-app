@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Lock } from 'lucide-react';
+import { Lock, Pencil } from 'lucide-react';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,8 @@ import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
+import { cn } from '@/lib/utils';
+import { EditApprovalDialog } from './EditApprovalDialog';
 
 const TOOL_SUCCESS = "Card has been created.";
 
@@ -54,6 +56,7 @@ export function CardApproval({
     'approved' | 'rejected' | null
   >(null);
   const [paywallOpen, setPaywallOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const { isAvailable } = useFeatureQuota('custom_sentences');
 
   const toolCallId = toolPart.toolCallId?.trim();
@@ -64,8 +67,11 @@ export function CardApproval({
   };
   const { state: toolState, output: toolOutput } = tool;
 
-  const entries = toolPart.input?.translations ?? [];
   const approval = toolCallId ? approvalsByToolCallId.get(toolCallId) : undefined;
+  const entries =
+    approval?.translations && approval.translations.length > 0
+      ? approval.translations
+      : (toolPart.input?.translations ?? []);
   const approvalId = approval?._id ?? null;
   const approvalState = optimisticState ?? approval?.status ?? 'pending';
   const isToolComplete =
@@ -197,65 +203,94 @@ export function CardApproval({
     </div>
   );
 
-  if (approvalState === 'approved') {
-    return (
-      <Alert data-testid="card-approval" className="my-3 flex flex-col gap-3 border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-        <AlertDescription>{cardContent}</AlertDescription>
-        <div className="flex items-center justify-end gap-2 h-8">
-          <p data-testid="card-approved-indicator" className="text-xs font-medium text-success">{t('approved')}</p>
-        </div>
-      </Alert>
-    );
-  }
-
-  if (approvalState === 'rejected') {
-    return (
-      <Alert data-testid="card-approval" className="my-3 flex flex-col gap-3 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-        <AlertDescription>{cardContent}</AlertDescription>
-        <div className="flex items-center justify-end gap-2 h-8">
-          <p className="text-xs font-medium text-red-700 dark:text-red-300">{t('rejected')}</p>
-        </div>
-      </Alert>
-    );
-  }
+  const isPending = approvalState === 'pending';
+  const isApproved = approvalState === 'approved';
 
   return (
-    <Alert data-testid="card-approval" className="my-3 flex flex-col gap-3">
+    <Alert
+      data-testid="card-approval"
+      className={cn(
+        'my-3 flex flex-col gap-3',
+        isApproved && 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950',
+        approvalState === 'rejected' && 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
+      )}
+    >
       <AlertDescription>{cardContent}</AlertDescription>
-      <div className="flex items-center justify-end gap-2">
-        <FeatureBadge featureId="custom_sentences" />
-        <Button
-          onClick={handleReject}
-          disabled={isProcessing || !approvalId}
-          variant="outline"
-          size="sm"
-          className="h-8 px-3 text-sm"
-          data-testid="card-reject"
-        >
-          {t('rejectButton')}
-        </Button>
-        {!isAvailable ? (
+      <div className="flex w-full items-center gap-2 h-8">
+        {isPending && <FeatureBadge featureId="custom_sentences" />}
+        {isPending && (
           <Button
-            onClick={() => setPaywallOpen(true)}
-            size="sm"
-            className="h-8 px-3 text-sm gap-1.5"
-            data-testid="card-approve"
-          >
-            <Lock className="h-3.5 w-3.5" />
-            Upgrade
-          </Button>
-        ) : (
-          <Button
-            onClick={handleApprove}
+            onClick={handleReject}
             disabled={isProcessing || !approvalId}
+            variant="outline"
             size="sm"
             className="h-8 px-3 text-sm"
-            data-testid="card-approve"
+            data-testid="card-reject"
           >
-            {t('approveButton')}
+            {t('rejectButton')}
+          </Button>
+        )}
+        {isPending ? (
+          !isAvailable ? (
+            <Button
+              key="approve-upgrade"
+              onClick={() => setPaywallOpen(true)}
+              size="sm"
+              className="h-8 px-3 text-sm gap-1.5"
+              data-testid="card-approve"
+            >
+              <Lock className="h-3.5 w-3.5" />
+              Upgrade
+            </Button>
+          ) : (
+            <Button
+              key="approve-action"
+              onClick={handleApprove}
+              disabled={isProcessing || !approvalId}
+              size="sm"
+              className="h-8 px-3 text-sm"
+              data-testid="card-approve"
+            >
+              {t('approveButton')}
+            </Button>
+          )
+        ) : (
+          <Button
+            key="approval-status"
+            disabled
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'h-8 px-3 text-xs font-medium hover:bg-transparent disabled:opacity-100',
+              isApproved ? 'text-success' : 'text-red-700 dark:text-red-300',
+            )}
+            {...(isApproved ? { 'data-testid': 'card-approved-indicator' } : {})}
+          >
+            {isApproved ? t('approved') : t('rejected')}
+          </Button>
+        )}
+        {isPending && approvalId && (
+          <Button
+            onClick={() => setEditOpen(true)}
+            disabled={isProcessing}
+            variant="outline"
+            size="icon"
+            className="ml-auto h-8 w-8"
+            aria-label={t('editButton')}
+            data-testid="card-edit"
+          >
+            <Pencil className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
+      {approvalId && (
+        <EditApprovalDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          approvalId={approvalId}
+          translations={entries}
+        />
+      )}
       {paywallOpen && (
         <PaywallDialog
           open={paywallOpen}

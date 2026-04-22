@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useMutation, usePreloadedQuery, Preloaded } from 'convex/react';
 import { useTranslations } from 'next-intl';
+import { MessageSquare, PenLine } from 'lucide-react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { toast } from 'sonner';
@@ -10,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   CollectionCarouselUI,
+  type CollectionAction,
   type CollectionProgressItem,
 } from './CollectionCarouselUI';
 import { CollectionDetailDialog } from './CollectionDetailDialog';
@@ -74,6 +76,22 @@ export function CustomCollectionCarousel({
       }
     },
     [toggleMutation, t],
+  );
+
+  const collectionActions = useMemo<Record<string, CollectionAction>>(
+    () => ({
+      Custom: {
+        label: tApp('customContent'),
+        icon: <PenLine className="h-3.5 w-3.5" />,
+        onClick: onNavigateToContent,
+      },
+      Chat: {
+        label: tApp('views.chat'),
+        icon: <MessageSquare className="h-3.5 w-3.5" />,
+        onClick: onNavigateToChat,
+      },
+    }),
+    [tApp, onNavigateToContent, onNavigateToChat],
   );
 
   // Empty state: no custom collections yet
@@ -142,6 +160,7 @@ export function CustomCollectionCarousel({
         isLoading={false}
         onReady={() => setCarouselReady(true)}
         showToggleWhenComplete
+        collectionActions={collectionActions}
       />
 
       <CollectionDetailDialog

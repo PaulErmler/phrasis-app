@@ -116,6 +116,88 @@ describe("features/sentenceMetadata", () => {
       // Definitive female speaker fixes audioSpeakerGender to female.
       expect(text?.audioSpeakerGender).toBe("female");
     });
+
+    it("normalizes addresseeNumber 'neutral' to 'not_applicable'", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: JSON.stringify({
+          register: "neutral",
+          addresseeNumber: "neutral",
+          speakerGender: "neutral",
+          addresseeGender: "not_applicable",
+        }),
+      } as any);
+
+      await t.action(internal.features.sentenceMetadata.fetchSentenceMetadata, {
+        textId,
+        translations: [{ language: "es", text: "Está lloviendo" }],
+        schedulePrepareCard: false,
+        baseLanguages: ["en"],
+        targetLanguages: ["es"],
+      });
+
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(text?.addresseeNumber).toBe("not_applicable");
+    });
+
+    it("drops invalid fields and patches the valid ones without throwing", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: JSON.stringify({
+          register: "casual", // invalid — should be dropped
+          addresseeNumber: "singular",
+          speakerGender: "female",
+          addresseeGender: "bogus", // invalid — should be dropped
+        }),
+      } as any);
+
+      await t.action(internal.features.sentenceMetadata.fetchSentenceMetadata, {
+        textId,
+        translations: [{ language: "es", text: "Estoy cansada" }],
+        schedulePrepareCard: false,
+        baseLanguages: ["en"],
+        targetLanguages: ["es"],
+      });
+
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(text?.register).toBeUndefined();
+      expect(text?.addresseeGender).toBeUndefined();
+      expect(text?.addresseeNumber).toBe("singular");
+      expect(text?.speakerGender).toBe("female");
+      // Definitive female speaker still fixes audioSpeakerGender.
+      expect(text?.audioSpeakerGender).toBe("female");
+    });
+
+    it("does not throw on unparseable LLM output", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: "sorry, I cannot produce JSON right now",
+      } as any);
+
+      await expect(
+        t.action(internal.features.sentenceMetadata.fetchSentenceMetadata, {
+          textId,
+          translations: [{ language: "es", text: "Hola" }],
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        }),
+      ).resolves.toBeNull();
+
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      // No metadata fields set, but audioSpeakerGender was still coin-flipped.
+      expect(text?.register).toBeUndefined();
+      expect(text?.addresseeNumber).toBeUndefined();
+      expect(text?.speakerGender).toBeUndefined();
+      expect(text?.addresseeGender).toBeUndefined();
+      expect(
+        text?.audioSpeakerGender === "male" ||
+          text?.audioSpeakerGender === "female",
+      ).toBe(true);
+    });
   });
 
   describe("generateSentenceMetadata", () => {

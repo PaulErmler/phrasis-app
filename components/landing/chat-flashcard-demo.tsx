@@ -17,6 +17,8 @@ import { MessageResponse } from '@/components/ai-elements/message';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { LandingAudioButton } from '@/components/landing/LandingAudioButton';
+import { getLandingAudioUrl } from '@/lib/landing/audio';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { useLandingDemo } from '@/components/landing/landing-demo-context';
 import { MousePointer2 } from 'lucide-react';
@@ -118,13 +120,19 @@ function CourseProposalCard({
   const cardInner = (
     <div className="space-y-1.5 text-sm">
       {lines.map((line, i) => (
-        <div key={`${line.code}-${i}`} className="space-y-0.5">
-          <p className={lineTextClass(line.code)}>
-            <LangChip code={line.code} /> {line.text}
-          </p>
-          {line.romanization ? (
-            <p className="ps-6 text-xs text-muted-foreground">{line.romanization}</p>
-          ) : null}
+        <div key={`${line.code}-${i}`} className="flex items-start gap-2">
+          <div className="flex-1 space-y-0.5">
+            <p className={lineTextClass(line.code)}>
+              <LangChip code={line.code} /> {line.text}
+            </p>
+            {line.romanization ? (
+              <p className="ps-6 text-xs text-muted-foreground">{line.romanization}</p>
+            ) : null}
+          </div>
+          <LandingAudioButton
+            url={getLandingAudioUrl(line.text, line.code)}
+            language={getLanguageShortLabel(line.code)}
+          />
         </div>
       ))}
     </div>

@@ -4,6 +4,11 @@ import { useState, useEffect } from 'react';
 import { LandingAudioButton } from '@/components/landing/LandingAudioButton';
 import { LandingCardShell } from '@/components/landing/LandingCardShell';
 import type { CardTranslation, CardAudioRecording } from '@/components/app/learning/types';
+import {
+  getLandingAudioUrl,
+  playLandingAudio,
+  stopLandingAudio,
+} from '@/lib/landing/audio';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 
@@ -85,9 +90,19 @@ export function LandingLearningCardContent({
     const delaysMs = 720;
     const staggerMs = 640;
     const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    // Audio mode is reached via a tab/replay click (user gesture), so unmuted
+    // autoplay is allowed from this point on. Play base immediately, then
+    // each target as it unblurs. A missing manifest entry just no-ops.
+    const baseTr = translations.find((tr) => tr.isBaseLanguage);
+    const baseUrl = baseTr ? getLandingAudioUrl(baseTr.text, baseTr.language) : null;
+    if (baseUrl) playLandingAudio(baseUrl);
+
     let at = delaysMs;
     for (const lang of targetLanguageCodes) {
       const code = lang;
+      const tr = translations.find((x) => x.language === code);
+      const url = tr ? getLandingAudioUrl(tr.text, tr.language) : null;
       timeouts.push(
         setTimeout(() => {
           setManuallyRevealed((prev) => {
@@ -95,12 +110,22 @@ export function LandingLearningCardContent({
             next.add(code);
             return next;
           });
+          if (url) playLandingAudio(url);
         }, at),
       );
       at += staggerMs;
     }
-    return () => timeouts.forEach(clearTimeout);
-  }, [hideTargetLanguages, audioDemoAutoUnlockSequence, audioDemoSequenceKey, targetLanguagesKey]);
+    return () => {
+      timeouts.forEach(clearTimeout);
+      stopLandingAudio();
+    };
+  }, [
+    hideTargetLanguages,
+    audioDemoAutoUnlockSequence,
+    audioDemoSequenceKey,
+    targetLanguagesKey,
+    translations,
+  ]);
 
   return (
     <div data-tutorial="card-content" className="flex flex-col flex-1 min-h-0">
@@ -168,7 +193,10 @@ export function LandingLearningCardContent({
                       </p>
                     )}
                   </div>
-                  <LandingAudioButton language={getLanguageShortLabel(translation.language)} />
+                  <LandingAudioButton
+                    url={getLandingAudioUrl(translation.text, translation.language)}
+                    language={getLanguageShortLabel(translation.language)}
+                  />
                 </div>
               );
             })}
