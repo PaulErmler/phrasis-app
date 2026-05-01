@@ -305,17 +305,29 @@ export const reviewCard = mutation({
       cached.length !== courseLanguages.length ||
       cached.some((l) => !courseLanguageSet.has(l));
 
+    // Determine whether word tracking will need the text doc (saves us
+    // re-fetching it inside recordReviewStats).
+    const trackedSet = new Set(card.wordsTrackedLanguages ?? []);
+    const allCourseLanguagesUnique = [...new Set(courseLanguages)];
+    const hasUntrackedLanguages = allCourseLanguagesUnique.some(
+      (l) => !trackedSet.has(l),
+    );
+
+    // Fetch the text exactly once if either branch needs it.
+    const text =
+      searchableTextIsStale || hasUntrackedLanguages
+        ? await ctx.db.get(card.textId)
+        : null;
+
     let searchableTextPatch: { searchableText: string; searchableTextLanguages: string[] } | undefined;
-    if (searchableTextIsStale) {
-      const text = await ctx.db.get(card.textId);
-      if (text) {
-        searchableTextPatch = await buildCardSearchableText(
-          ctx,
-          card.textId,
-          text.text,
-          courseLanguages,
-        );
-      }
+    if (searchableTextIsStale && text) {
+      searchableTextPatch = await buildCardSearchableText(
+        ctx,
+        card.textId,
+        text.text,
+        courseLanguages,
+        text,
+      );
     }
 
     // Flip isGraduated once the card reaches FSRS Review state (one-way flag)
@@ -324,19 +336,11 @@ export const reviewCard = mutation({
         ? { isGraduated: true as const }
         : {};
 
-    // Patch the card (via aggregate-aware helper)
-    await patchCard(ctx, args.cardId, {
-      schedulingPhase: result.schedulingPhase,
-      preReviewCount: result.preReviewCount,
-      dueDate: dueDateWithJitter,
-      lastReviewedAt: Date.now(),
-      ...searchableTextPatch,
-      ...(result.fsrsState && { fsrsState: result.fsrsState }),
-      ...isGraduatedPatch,
-    });
-
-    // Record all stats for this review
-    await recordReviewStats(ctx, {
+    // Record stats first so we can fold the new wordsTrackedLanguages stamp
+    // into the single patchCard call below — `recordReviewStats` reads `card`
+    // by value and intentionally uses the pre-patch state for its own
+    // bookkeeping (isFirstReview, fsrsCardState, reviewDepth), so order is safe.
+    const { newWordsTrackedLanguages } = await recordReviewStats(ctx, {
       userId,
       card,
       deck,
@@ -347,7 +351,28 @@ export const reviewCard = mutation({
       rating: args.rating,
       accuracy: args.accuracy,
       wasDefaultRating: args.wasDefaultRating,
+      text,
     });
+
+    // Patch the card (via aggregate-aware helper). We pass `card` as oldDoc so
+    // patchCard can skip both the pre- and post-patch reads.
+    await patchCard(
+      ctx,
+      args.cardId,
+      {
+        schedulingPhase: result.schedulingPhase,
+        preReviewCount: result.preReviewCount,
+        dueDate: dueDateWithJitter,
+        lastReviewedAt: Date.now(),
+        ...searchableTextPatch,
+        ...(result.fsrsState && { fsrsState: result.fsrsState }),
+        ...isGraduatedPatch,
+        ...(newWordsTrackedLanguages
+          ? { wordsTrackedLanguages: newWordsTrackedLanguages }
+          : {}),
+      },
+      card,
+    );
 
     return {
       schedulingPhase: result.schedulingPhase,
@@ -368,8 +393,8 @@ export const masterCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await authorizeCardAccess(ctx, args.cardId);
-    await patchCard(ctx, args.cardId, { isMastered: true });
+    const { card } = await authorizeCardAccess(ctx, args.cardId);
+    await patchCard(ctx, args.cardId, { isMastered: true }, card);
     return null;
   },
 });
@@ -383,8 +408,8 @@ export const hideCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await authorizeCardAccess(ctx, args.cardId);
-    await patchCard(ctx, args.cardId, { isHidden: true });
+    const { card } = await authorizeCardAccess(ctx, args.cardId);
+    await patchCard(ctx, args.cardId, { isHidden: true }, card);
     return null;
   },
 });
@@ -412,8 +437,8 @@ export const unmasterCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await authorizeCardAccess(ctx, args.cardId);
-    await patchCard(ctx, args.cardId, { isMastered: false });
+    const { card } = await authorizeCardAccess(ctx, args.cardId);
+    await patchCard(ctx, args.cardId, { isMastered: false }, card);
     return null;
   },
 });
@@ -424,8 +449,8 @@ export const unhideCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await authorizeCardAccess(ctx, args.cardId);
-    await patchCard(ctx, args.cardId, { isHidden: false });
+    const { card } = await authorizeCardAccess(ctx, args.cardId);
+    await patchCard(ctx, args.cardId, { isHidden: false }, card);
     return null;
   },
 });
@@ -446,7 +471,7 @@ export const setCardAudioSpeedOverride = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await authorizeCardAccess(ctx, args.cardId);
+    const { card } = await authorizeCardAccess(ctx, args.cardId);
     if (args.speed !== null) {
       if (
         !Number.isFinite(args.speed) ||
@@ -458,8 +483,6 @@ export const setCardAudioSpeedOverride = mutation({
         );
       }
     }
-    const card = await ctx.db.get(args.cardId);
-    if (!card) throw new ConvexError('Card not found');
     const current = card.audioSpeedOverrides ?? {};
     const next: Record<string, number> = { ...current };
     if (args.speed === null) {
@@ -467,7 +490,7 @@ export const setCardAudioSpeedOverride = mutation({
     } else {
       next[args.language] = args.speed;
     }
-    await patchCard(ctx, args.cardId, { audioSpeedOverrides: next });
+    await patchCard(ctx, args.cardId, { audioSpeedOverrides: next }, card);
     return null;
   },
 });
@@ -481,12 +504,13 @@ export const toggleFavoriteCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await authorizeCardAccess(ctx, args.cardId);
-    const card = await ctx.db.get(args.cardId);
-    if (!card) throw new Error('Card not found');
-    await patchCard(ctx, args.cardId, {
-      isFavorite: !(card.isFavorite ?? false),
-    });
+    const { card } = await authorizeCardAccess(ctx, args.cardId);
+    await patchCard(
+      ctx,
+      args.cardId,
+      { isFavorite: !(card.isFavorite ?? false) },
+      card,
+    );
     return null;
   },
 });

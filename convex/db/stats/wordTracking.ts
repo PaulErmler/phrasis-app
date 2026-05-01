@@ -112,42 +112,33 @@ export async function trackNewWords(
       // Link this word to the source text (for word → sentence lookup).
       // Runs for every word, not just new ones, since a previously-known
       // word may appear in a new text.
+      //
+      // Single index read serves both the existence check and the cap check:
+      // if the textId is already in the result we skip insert; otherwise we
+      // only insert when length < cap.
       if (args.textId) {
-        // Check if this exact link already exists
-        const existingLink = await ctx.db
+        const existingLinks = await ctx.db
           .query('userWordTexts')
-          .withIndex('by_userId_courseId_language_word_textId', (q) =>
+          .withIndex('by_userId_courseId_language_word', (q) =>
             q
               .eq('userId', args.userId)
               .eq('courseId', args.courseId)
               .eq('language', language)
-              .eq('word', normalized)
-              .eq('textId', args.textId!),
+              .eq('word', normalized),
           )
-          .first();
+          .take(MAX_TEXTS_PER_WORD);
 
-        if (!existingLink) {
-          // Enforce per-word cap to bound storage
-          const existingCount = await ctx.db
-            .query('userWordTexts')
-            .withIndex('by_userId_courseId_language_word', (q) =>
-              q
-                .eq('userId', args.userId)
-                .eq('courseId', args.courseId)
-                .eq('language', language)
-                .eq('word', normalized),
-            )
-            .take(MAX_TEXTS_PER_WORD);
-
-          if (existingCount.length < MAX_TEXTS_PER_WORD) {
-            await ctx.db.insert('userWordTexts', {
-              userId: args.userId,
-              courseId: args.courseId,
-              language,
-              word: normalized,
-              textId: args.textId!,
-            });
-          }
+        const alreadyLinked = existingLinks.some(
+          (link) => link.textId === args.textId,
+        );
+        if (!alreadyLinked && existingLinks.length < MAX_TEXTS_PER_WORD) {
+          await ctx.db.insert('userWordTexts', {
+            userId: args.userId,
+            courseId: args.courseId,
+            language,
+            word: normalized,
+            textId: args.textId!,
+          });
         }
       }
     }
@@ -316,21 +307,9 @@ export async function updateWordTextsForEdit(
       // and doesn't cover writes from a concurrent mutation that may have
       // raced in (Convex OCC will retry, but only on write-set conflicts —
       // this index read guards against the read-stale-then-insert case).
-      const existingLink = await ctx.db
-        .query('userWordTexts')
-        .withIndex('by_userId_courseId_language_word_textId', (q) =>
-          q
-            .eq('userId', args.userId)
-            .eq('courseId', args.courseId)
-            .eq('language', language)
-            .eq('word', normalized)
-            .eq('textId', args.textId),
-        )
-        .first();
-      if (existingLink) continue;
-
-      // Insert userWordTexts link (check cap)
-      const count = await ctx.db
+      //
+      // Single index read serves both the existence check and the cap check.
+      const existingForWord = await ctx.db
         .query('userWordTexts')
         .withIndex('by_userId_courseId_language_word', (q) =>
           q
@@ -341,7 +320,12 @@ export async function updateWordTextsForEdit(
         )
         .take(MAX_TEXTS_PER_WORD);
 
-      if (count.length < MAX_TEXTS_PER_WORD) {
+      const alreadyLinked = existingForWord.some(
+        (link) => link.textId === args.textId,
+      );
+      if (alreadyLinked) continue;
+
+      if (existingForWord.length < MAX_TEXTS_PER_WORD) {
         await ctx.db.insert('userWordTexts', {
           userId: args.userId,
           courseId: args.courseId,

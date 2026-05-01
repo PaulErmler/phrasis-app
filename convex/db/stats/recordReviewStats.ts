@@ -20,6 +20,14 @@ const MAX_TIME_PER_CARD_MS = 180_000; // 3 minutes
 /**
  * Record all statistics for a card review: course stats, daily/weekly/monthly/yearly
  * aggregates, per-language stats, word tracking, accuracy, and collection progress.
+ *
+ * Returns the new `wordsTrackedLanguages` value when word tracking ran for any
+ * previously-untracked languages on this card. The caller is expected to merge
+ * it into the same `patchCard` call that updates scheduling state, so we don't
+ * double-write the card document.
+ *
+ * Pass `text` when the caller already has the card's text doc — avoids a
+ * redundant `ctx.db.get(card.textId)` inside word tracking.
  */
 export async function recordReviewStats(
   ctx: MutationCtx,
@@ -34,8 +42,9 @@ export async function recordReviewStats(
     rating: string;
     accuracy?: number;
     wasDefaultRating?: boolean;
+    text?: Doc<'texts'> | null;
   },
-): Promise<void> {
+): Promise<{ newWordsTrackedLanguages?: string[] }> {
   const { userId, card, deck, course } = args;
   const nonNegativeTime = Math.max(args.timeSpentMs ?? 0, 0);
   const clampedTime = Math.min(nonNegativeTime, MAX_TIME_PER_CARD_MS);
@@ -159,9 +168,11 @@ export async function recordReviewStats(
 
   let newWordCounts: Record<string, number> = {};
   let totalNewWords = 0;
+  let newWordsTrackedLanguages: string[] | undefined;
 
   if (untrackedLanguages.length > 0) {
-    const text = await ctx.db.get(card.textId);
+    const text =
+      args.text !== undefined ? args.text : await ctx.db.get(card.textId);
     if (text) {
       const langTexts: Array<{ language: string; text: string }> = [];
       // Include source text if its language is untracked
@@ -192,9 +203,9 @@ export async function recordReviewStats(
         }
       }
 
-      // Stamp the card so these languages are not re-counted on future reviews
-      const nowTracked = [...trackedSet, ...untrackedLanguages];
-      await ctx.db.patch(card._id, { wordsTrackedLanguages: nowTracked });
+      // Hand the new stamp back to the caller so they can fold it into the
+      // single `patchCard` call that updates scheduling state.
+      newWordsTrackedLanguages = [...trackedSet, ...untrackedLanguages];
     }
   }
 
@@ -250,4 +261,6 @@ export async function recordReviewStats(
       });
     }
   }
+
+  return { newWordsTrackedLanguages };
 }

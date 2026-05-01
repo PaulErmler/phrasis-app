@@ -88,19 +88,26 @@ export async function insertCard(
 
 /**
  * Patch a card and update both aggregates.
+ *
+ * Pass `oldDoc` when the caller has already fetched the card — saves a read
+ * on the hot path. The post-patch doc is computed in memory instead of being
+ * re-read; the aggregates only key on fields that are deterministic from
+ * `oldDoc + patch` (deckId, dueDate, isHidden, isMastered, schedulingPhase,
+ * fsrsState).
  */
 export async function patchCard(
   ctx: MutationCtx,
   cardId: Id<'cards'>,
   patch: Partial<Doc<'cards'>>,
+  oldDoc?: Doc<'cards'>,
 ): Promise<void> {
-  const oldDoc = await ctx.db.get(cardId);
-  if (!oldDoc) return;
+  const resolvedOld = oldDoc ?? (await ctx.db.get(cardId));
+  if (!resolvedOld) return;
   await ctx.db.patch(cardId, patch);
-  const newDoc = (await ctx.db.get(cardId))!;
-  await cardsByState.replaceOrInsert(ctx, oldDoc, newDoc);
-  await cardsByDueDate.replaceOrInsert(ctx, oldDoc, newDoc);
-  await cardsByStateAndDueDate.replaceOrInsert(ctx, oldDoc, newDoc);
+  const newDoc: Doc<'cards'> = { ...resolvedOld, ...patch };
+  await cardsByState.replaceOrInsert(ctx, resolvedOld, newDoc);
+  await cardsByDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+  await cardsByStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
 }
 
 /**

@@ -67,7 +67,7 @@ export const seedMockStats = internalMutation({
       const timeMs = Math.floor((rand() * 15 + 5) * 60000 * base);
       const cardsReviewed = reps;
       const accuracyCount = Math.floor(reps * 0.6);
-      const accuracySum = Math.floor(accuracyCount * (rand() * 20 + 65));
+      const accuracySum = accuracyCount * (rand() * 0.2 + 0.65);
 
       // Hour buckets: morning peak (7-9) + evening peak (19-22)
       const hourBuckets = Array.from({ length: 24 }, () => 0);
