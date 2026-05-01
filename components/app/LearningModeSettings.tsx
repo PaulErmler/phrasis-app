@@ -485,6 +485,27 @@ export function LearningModeSettings({
             />
           </div>
 
+          {/* Show every-N-cards celebration screen */}
+          <div className="settings-row">
+            <div className="space-y-0.5">
+              <Label
+                htmlFor="progressDisplayEnabled"
+                className="text-sm font-medium"
+              >
+                {t('progressDisplayEnabled')}
+              </Label>
+              <p className="text-muted-xs">
+                {t('progressDisplayEnabledDescription')}
+              </p>
+            </div>
+            <Switch
+              id="progressDisplayEnabled"
+              checked={courseSettings.progressDisplayEnabled !== false}
+              onCheckedChange={handleProgressDisplayEnabledChange}
+              className="mt-0.5"
+            />
+          </div>
+
           <Separator />
 
           {/* ================================================================
@@ -845,26 +866,6 @@ export function LearningModeSettings({
             />
           </div>
 
-          {/* Show every-20-cards celebration screen */}
-          <div className="settings-row">
-            <div className="space-y-0.5">
-              <Label
-                htmlFor="progressDisplayEnabled"
-                className="text-sm font-medium"
-              >
-                {t('progressDisplayEnabled')}
-              </Label>
-              <p className="text-muted-xs">
-                {t('progressDisplayEnabledDescription')}
-              </p>
-            </div>
-            <Switch
-              id="progressDisplayEnabled"
-              checked={courseSettings.progressDisplayEnabled !== false}
-              onCheckedChange={handleProgressDisplayEnabledChange}
-              className="mt-0.5"
-            />
-          </div>
         </div>
       </SheetContent>
 

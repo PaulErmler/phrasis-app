@@ -20,6 +20,7 @@ vi.mock("@convex-dev/aggregate", () => {
 
 import schema from "../../schema";
 import { api } from "../../_generated/api";
+import { PROGRESS_DISPLAY_INTERVAL } from "../../../lib/constants/learning";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -446,9 +447,70 @@ describe("features/scheduling", () => {
       expect(result.dailyReviewsToday).toBe(1);
       expect(result.dailyTimeMsToday).toBe(4_000);
       // `dailyNewWordsToday` only counts target-language words — the seed
-      // card has "hola" and "mundo" in `es` (target).
+      // card has "hola" and "mundo" in `es` (target). The base-language
+      // translation ("Hello", "world") tracks userWords but doesn't bump
+      // this count.
       expect(result.dailyNewWordsToday).toBe(2);
-      // INTERVAL is 20; the first review never triggers a celebration.
+      // First review only triggers a celebration if INTERVAL divides 1.
+      expect(result.triggerCelebration).toBe(1 % PROGRESS_DISPLAY_INTERVAL === 0);
+    });
+
+    it("triggers a celebration on the Nth review where N % INTERVAL === 0", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, courseId } = await seedCardWithCourseAndStats(t);
+      // Pre-seed today's reviews so the next one lands exactly on the
+      // milestone boundary. UTC matches the timezone arg below.
+      const today = new Date().toISOString().slice(0, 10);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("dailyStats", {
+          userId: "user_A",
+          courseId,
+          date: today,
+          reps: PROGRESS_DISPLAY_INTERVAL - 1,
+          newCards: 0,
+          timeMs: 0,
+          cardsReviewed: PROGRESS_DISPLAY_INTERVAL - 1,
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const result = await asUser.mutation(api.features.scheduling.reviewCard, {
+        cardId,
+        rating: "understood",
+        timezone: "UTC",
+        sessionId: "session_X",
+      });
+      expect(result.dailyReviewsToday).toBe(PROGRESS_DISPLAY_INTERVAL);
+      expect(result.triggerCelebration).toBe(true);
+    });
+
+    it("does not trigger a celebration when progressDisplayEnabled is false, even on a milestone", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, courseId } = await seedCardWithCourseAndStats(t);
+      const today = new Date().toISOString().slice(0, 10);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("dailyStats", {
+          userId: "user_A",
+          courseId,
+          date: today,
+          reps: PROGRESS_DISPLAY_INTERVAL - 1,
+          newCards: 0,
+          timeMs: 0,
+          cardsReviewed: PROGRESS_DISPLAY_INTERVAL - 1,
+        });
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 3,
+          progressDisplayEnabled: false,
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const result = await asUser.mutation(api.features.scheduling.reviewCard, {
+        cardId,
+        rating: "understood",
+        timezone: "UTC",
+        sessionId: "session_X",
+      });
+      expect(result.dailyReviewsToday).toBe(PROGRESS_DISPLAY_INTERVAL);
       expect(result.triggerCelebration).toBe(false);
     });
 

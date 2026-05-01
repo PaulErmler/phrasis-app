@@ -12,13 +12,14 @@ import { getLanguageByCode } from '@/lib/languages';
 import { getUserTimezone } from '@/lib/timezone';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { PROGRESS_DISPLAY_DURATION_MS } from '@/lib/constants/learning';
+import {
+  PROGRESS_DISPLAY_DURATION_MS,
+  PROGRESS_SOUND_URL,
+} from '@/lib/constants/learning';
 import {
   setupMediaSession,
   setMediaSessionPlaybackState,
 } from '@/lib/audio/mediaSession';
-
-const SOUND_URL = '/sounds/progress-success.mp3';
 
 type CardCounts = { new: number; learning: number; relearning: number; review: number };
 
@@ -31,6 +32,11 @@ interface ProgressDisplayProps {
   dailyNewWordsToday: number;
   practicedWordsThisSession: number;
   schedulingMode: 'learn_new' | 'learnAndReview';
+  /** Auto-advance + auto-advance bar are audio-mode only. */
+  reviewMode: 'audio' | 'full';
+  /** Mirrors `courseSettings.autoAdvance`. Even in audio mode, the
+   * celebration only auto-dismisses when the user has auto-advance on. */
+  autoAdvance: boolean;
   onContinue: () => void;
   /**
    * True once the milestone-triggering mutation has resolved. While false,
@@ -53,12 +59,74 @@ const SUB_COUNTER_DURATION_MS = 1400; // 450 ms shorter so hero finishes last
 // Audio peaks (5 ms RMS-window analysis of progress-success.mp3): the last
 // three "click" peaks land at 1290 ms, 1610 ms, and 1925 ms. The hero
 // counter's final three integer ticks align with these so each click pairs
-// with a visible increment. `HERO_TICK_OFFSET_MS` shifts the alignment a hair
-// later so the visible tick lands just after the click is heard.
+// with a visible increment.
 const AUDIO_PEAK_3RD_LAST_MS = 1290;
 const AUDIO_PEAK_2ND_LAST_MS = 1610;
 const AUDIO_PEAK_LAST_MS = 1925;
-const HERO_TICK_OFFSET_MS = 50;
+
+/**
+ * Builds the hero counter's easing function so the last three integer ticks
+ * land on the last three peaks of the success audio.
+ *
+ *   N≥3 → ticks (N-2)/(N-1)/N land at t3/t2/t1; ticks 1..N-3 ramp in with ease-out cubic.
+ *   N=2 → align last 2 ticks to the later 2 peaks (1610, 1925)
+ *   N=1 → align the single tick to the last peak
+ *   N≤0 → plain ease-out cubic (no ticks happen anyway)
+ */
+function buildHeroEasing(N: number): (t: number) => number {
+  const t3 = (AUDIO_PEAK_3RD_LAST_MS - COUNTER_DELAY_MS) / COUNTER_DURATION_MS;
+  const t2 = (AUDIO_PEAK_2ND_LAST_MS - COUNTER_DELAY_MS) / COUNTER_DURATION_MS;
+  const t1 = (AUDIO_PEAK_LAST_MS - COUNTER_DELAY_MS) / COUNTER_DURATION_MS;
+
+  // Anchor points within the animation must be in (0, 1) and ordered.
+  const anchorsValid = t3 > 0 && t3 < t2 && t2 < t1 && t1 < 1;
+  if (!anchorsValid || N <= 0) {
+    return (t) => 1 - Math.pow(1 - t, 3);
+  }
+
+  if (N >= 3) {
+    // Three-anchor: ticks N-2, N-1, N land at t3, t2, t1.
+    const v3 = (N - 2.5) / N; // first crossing displays N-2
+    const v2 = (N - 1.5) / N; // first crossing displays N-1
+    const v1 = (N - 0.5) / N; // first crossing displays N
+    return (t) => {
+      if (t < t3) {
+        const local = t / t3;
+        const eased = 1 - Math.pow(1 - local, 3);
+        return eased * v3;
+      }
+      if (t < t2) return v3 + ((t - t3) / (t2 - t3)) * (v2 - v3);
+      if (t < t1) return v2 + ((t - t2) / (t1 - t2)) * (v1 - v2);
+      return v1 + ((t - t1) / (1 - t1)) * (1 - v1);
+    };
+  }
+
+  if (N === 2) {
+    // Two-anchor: ticks 1 and 2 land at t2 and t1.
+    const v2 = 0.25; // (N-1.5)/N = 0.25
+    const v1 = 0.75; // (N-0.5)/N = 0.75
+    return (t) => {
+      if (t < t2) {
+        const local = t / t2;
+        const eased = 1 - Math.pow(1 - local, 3);
+        return eased * v2;
+      }
+      if (t < t1) return v2 + ((t - t2) / (t1 - t2)) * (v1 - v2);
+      return v1 + ((t - t1) / (1 - t1)) * (1 - v1);
+    };
+  }
+
+  // N === 1: single tick at the last peak.
+  const v1 = 0.5;
+  return (t) => {
+    if (t < t1) {
+      const local = t / t1;
+      const eased = 1 - Math.pow(1 - local, 3);
+      return eased * v1;
+    }
+    return v1 + ((t - t1) / (1 - t1)) * (1 - v1);
+  };
+}
 
 /**
  * Outer shell: holds an empty placeholder until the milestone mutation has
@@ -105,6 +173,8 @@ function CelebrationContent({
   dailyNewWordsToday,
   practicedWordsThisSession,
   schedulingMode,
+  reviewMode,
+  autoAdvance,
   onContinue,
   cardCounts,
   sessionWordsList,
@@ -151,72 +221,8 @@ function CelebrationContent({
     hero.kind === 'practiced' ? hero.value : Math.min(hero.value, NEW_WORDS_CAP);
   const heroOverflowed = hero.kind !== 'practiced' && hero.value > NEW_WORDS_CAP;
 
-  // Hero easing aligns the last three integer ticks with the last three peaks
-  // of the success audio (1290 / 1610 / 1925 ms). For target N≥3, the
-  // (N-2)/(N-1)/N ticks land at the three peaks; ticks 1..N-3 ramp in with
-  // ease-out cubic. Falls back gracefully:
-  //   N=2  → align last 2 ticks to the later 2 peaks (1610, 1925)
-  //   N=1  → align the single tick to the last peak
-  //   N≤0  → ease-out cubic (no ticks happen anyway)
   // Memoised so the counter doesn't restart on every render.
-  const heroEasing = useMemo(() => {
-    const N = heroAnimTarget;
-    const t3 =
-      (AUDIO_PEAK_3RD_LAST_MS + HERO_TICK_OFFSET_MS - COUNTER_DELAY_MS) / COUNTER_DURATION_MS;
-    const t2 =
-      (AUDIO_PEAK_2ND_LAST_MS + HERO_TICK_OFFSET_MS - COUNTER_DELAY_MS) / COUNTER_DURATION_MS;
-    const t1 =
-      (AUDIO_PEAK_LAST_MS + HERO_TICK_OFFSET_MS - COUNTER_DELAY_MS) / COUNTER_DURATION_MS;
-
-    // Anchor points within the animation must be in (0, 1) and ordered.
-    const anchorsValid = t3 > 0 && t3 < t2 && t2 < t1 && t1 < 1;
-    if (!anchorsValid || N <= 0) {
-      return (t: number) => 1 - Math.pow(1 - t, 3);
-    }
-
-    if (N >= 3) {
-      // Three-anchor: ticks N-2, N-1, N land at t3, t2, t1.
-      const v3 = (N - 2.5) / N; // first crossing displays N-2
-      const v2 = (N - 1.5) / N; // first crossing displays N-1
-      const v1 = (N - 0.5) / N; // first crossing displays N
-      return (t: number) => {
-        if (t < t3) {
-          const local = t / t3;
-          const eased = 1 - Math.pow(1 - local, 3);
-          return eased * v3;
-        }
-        if (t < t2) return v3 + ((t - t3) / (t2 - t3)) * (v2 - v3);
-        if (t < t1) return v2 + ((t - t2) / (t1 - t2)) * (v1 - v2);
-        return v1 + ((t - t1) / (1 - t1)) * (1 - v1);
-      };
-    }
-
-    if (N === 2) {
-      // Two-anchor: ticks 1 and 2 land at t2 and t1.
-      const v2 = 0.25; // (N-1.5)/N = 0.25
-      const v1 = 0.75; // (N-0.5)/N = 0.75
-      return (t: number) => {
-        if (t < t2) {
-          const local = t / t2;
-          const eased = 1 - Math.pow(1 - local, 3);
-          return eased * v2;
-        }
-        if (t < t1) return v2 + ((t - t2) / (t1 - t2)) * (v1 - v2);
-        return v1 + ((t - t1) / (1 - t1)) * (1 - v1);
-      };
-    }
-
-    // N === 1: single tick at the last peak.
-    const v1 = 0.5;
-    return (t: number) => {
-      if (t < t1) {
-        const local = t / t1;
-        const eased = 1 - Math.pow(1 - local, 3);
-        return eased * v1;
-      }
-      return v1 + ((t - t1) / (1 - t1)) * (1 - v1);
-    };
-  }, [heroAnimTarget]);
+  const heroEasing = useMemo(() => buildHeroEasing(heroAnimTarget), [heroAnimTarget]);
 
   const animHero = useAnimatedCounter(heroAnimTarget, 0, COUNTER_DURATION_MS, COUNTER_DELAY_MS, true, heroEasing);
   const animReviews = useAnimatedCounter(dailyReviewsToday, 0, SUB_COUNTER_DURATION_MS, COUNTER_DELAY_MS, true);
@@ -234,7 +240,7 @@ function CelebrationContent({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const mediaSessionTitle = t('mediaSessionTitle');
   useEffect(() => {
-    const audio = new Audio(SOUND_URL);
+    const audio = new Audio(PROGRESS_SOUND_URL);
     audio.preload = 'auto';
     audioRef.current = audio;
     audio.play().catch(() => {
@@ -260,19 +266,24 @@ function CelebrationContent({
     };
   }, [onContinue, mediaSessionTitle]);
 
-  // ----- Auto-advance after 5s -----
+  // ----- Auto-advance (audio mode + auto-advance setting only) -----
+  // The celebration only auto-dismisses if the underlying review flow itself
+  // auto-advances. In full review mode or when the user has auto-advance off,
+  // they're driving the pace by hand and we keep the celebration up until
+  // they tap Continue.
+  const celebrationAutoAdvances = reviewMode === 'audio' && autoAdvance;
   useEffect(() => {
+    if (!celebrationAutoAdvances) return;
     const timer = setTimeout(onContinue, PROGRESS_DISPLAY_DURATION_MS);
     return () => clearTimeout(timer);
-  }, [onContinue]);
+  }, [onContinue, celebrationAutoAdvances]);
 
   // ----- Confetti burst on the final ding -----
   // Fires once at the moment of the last hero integer tick. Aligned to the
   // last audio peak so the burst lands with the click.
   const [confettiBurst, setConfettiBurst] = useState(false);
   useEffect(() => {
-    const fireAt = AUDIO_PEAK_LAST_MS + HERO_TICK_OFFSET_MS;
-    const timer = setTimeout(() => setConfettiBurst(true), fireAt);
+    const timer = setTimeout(() => setConfettiBurst(true), AUDIO_PEAK_LAST_MS);
     return () => clearTimeout(timer);
   }, []);
 
@@ -386,12 +397,7 @@ function CelebrationContent({
             variants={CHILD_VARIANTS}
           >
             <p className="text-muted-xs">{t('comingUp')}</p>
-            <div
-              className={cn(
-                'grid w-full',
-                schedulingMode === 'learn_new' ? 'grid-cols-2' : 'grid-cols-3',
-              )}
-            >
+            <div className="flex justify-center gap-x-24">
               <StatePill
                 label={t('stateNew')}
                 value={cardCounts.new}
@@ -415,7 +421,8 @@ function CelebrationContent({
         )}
       </motion.div>
 
-      {/* Bottom: Continue button + 5s auto-advance bar */}
+      {/* Bottom: Continue button + auto-advance bar (only when the
+          celebration is going to auto-advance). */}
       <motion.div
         className="flex flex-col items-stretch gap-3 max-w-sm w-full mx-auto"
         initial={{ opacity: 0 }}
@@ -425,7 +432,7 @@ function CelebrationContent({
         <Button onClick={onContinue} variant="default" size="lg" className="w-full">
           {t('continue')}
         </Button>
-        <AutoAdvanceBarInner />
+        {celebrationAutoAdvances && <AutoAdvanceBarInner />}
       </motion.div>
     </div>
   );
@@ -612,53 +619,76 @@ function WordsMultilineTicker({ sessionWords, todayWords }: WordVariantProps) {
     <div className="space-y-1.5 w-full">
       {rows.map((row, rowIdx) => {
         const shouldScroll = row.length >= SCROLL_THRESHOLD;
-        const items = shouldScroll ? [...row, ...row] : row;
         // Alternate scroll direction per row so it doesn't look monolithic.
         const direction = rowIdx % 2 === 0 ? -1 : 1;
+
+        const renderItem = (w: typeof row[number], i: number) => (
+          <span
+            key={i}
+            className={cn(
+              'inline-flex items-center gap-1.5 text-sm shrink-0',
+              w.tone === 'session'
+                ? 'text-primary font-medium'
+                : 'text-muted-foreground',
+            )}
+          >
+            {showFlags && (
+              <span aria-hidden className="text-xs">
+                {getLanguageByCode(w.language)?.flag ?? '🌐'}
+              </span>
+            )}
+            <span>{w.display}</span>
+          </span>
+        );
+
         return (
           <div
             key={rowIdx}
             className="relative w-full overflow-hidden rounded-md border bg-muted/20 py-1.5"
           >
-            <motion.div
-              className={cn(
-                'flex gap-3 whitespace-nowrap px-2',
-                !shouldScroll && 'justify-center',
-              )}
-              animate={
-                shouldScroll
-                  ? { x: direction === -1 ? ['0%', '-50%'] : ['-50%', '0%'] }
-                  : undefined
-              }
-              transition={
-                shouldScroll
-                  ? {
-                    duration: 14 + rowIdx * 3,
-                    ease: 'linear',
-                    repeat: Infinity,
-                  }
-                  : undefined
-              }
-            >
-              {items.map((w, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    'inline-flex items-center gap-1.5 text-sm shrink-0',
-                    w.tone === 'session'
-                      ? 'text-primary font-medium'
-                      : 'text-muted-foreground',
-                  )}
-                >
-                  {showFlags && (
-                    <span aria-hidden className="text-xs">
-                      {getLanguageByCode(w.language)?.flag ?? '🌐'}
-                    </span>
-                  )}
-                  <span>{w.display}</span>
-                </span>
-              ))}
-            </motion.div>
+            {shouldScroll ? (
+              // Canonical seamless marquee (Ryan Mulligan technique):
+              // two identical groups laid back-to-back with the inter-item
+              // gap baked into each group's trailing padding. The animated
+              // wrapper has `w-max` so its width = sum of children, and
+              // each group's effective width = `(N items) + (N gaps)`.
+              // Translating by -50% therefore lands the second group's
+              // first item exactly where the first group's first item was,
+              // making the wrap pixel-perfect — no padding on the animated
+              // element to throw off the percentage math.
+              <motion.div
+                className="flex w-max whitespace-nowrap"
+                animate={{
+                  x: direction === -1 ? ['0%', '-50%'] : ['-50%', '0%'],
+                }}
+                transition={{
+                  // Doubled relative to the previous tuning. The old marquee
+                  // animated `-50%` of an `auto`-width container (= parent
+                  // width), so it scrolled roughly half a viewport per cycle.
+                  // With `w-max` the same `-50%` covers a full per-copy
+                  // distance (≈ 2× the viewport for a typical filled row),
+                  // so the duration has to scale up to keep the same on-
+                  // screen px/sec speed.
+                  duration: 28 + rowIdx * 6,
+                  ease: 'linear',
+                  repeat: Infinity,
+                }}
+              >
+                {([0, 1] as const).map((copyIdx) => (
+                  <div
+                    key={copyIdx}
+                    className="flex shrink-0 gap-3 pr-3"
+                    aria-hidden={copyIdx === 1 ? 'true' : undefined}
+                  >
+                    {row.map(renderItem)}
+                  </div>
+                ))}
+              </motion.div>
+            ) : (
+              <div className="flex justify-center gap-3 px-2">
+                {row.map(renderItem)}
+              </div>
+            )}
           </div>
         );
       })}

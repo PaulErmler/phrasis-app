@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
+import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
 
 interface LearningModeProps {
   state: LearningState;
@@ -66,6 +67,16 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
     setFullReviewAccuracy(null);
   }, [cardId]);
 
+  // Warm the celebration sound's HTTP cache at session start so the very
+  // first celebration's animation timeline (hardcoded peaks at 1290/1610/
+  // 1925 ms in ProgressDisplay) isn't ahead of audio playback on mobile
+  // cold-cache loads.
+  useEffect(() => {
+    const audio = new Audio(PROGRESS_SOUND_URL);
+    audio.preload = 'auto';
+    audio.load();
+  }, []);
+
   // Pause card audio while the celebration screen is showing — the success
   // sound and Media Session belong to it, not the underlying card. When the
   // celebration dismisses, resume autoplay for the now-visible card if the
@@ -80,14 +91,16 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
     state.status === 'reviewing'
       ? (state.courseSettings.autoPlayAudio ?? DEFAULT_AUTO_PLAY)
       : false;
-  // Capture audio + setting via refs so the effect depends only on the
-  // celebration flag — `useLearningAudio` returns a fresh object on every
-  // render, which would otherwise cause this effect to re-run (and call
-  // `audio.pause()`) on every parent render.
+  // Capture audio + setting via refs so the celebration-flag effect depends
+  // only on `progressDisplayActive` — `useLearningAudio` returns a fresh
+  // object on every render, which would otherwise cause that effect to
+  // re-run (and call `audio.pause()`) on every parent render.
   const autoPlayAudioRef = useRef(autoPlayAudio);
-  autoPlayAudioRef.current = autoPlayAudio;
   const audioRef = useRef(audio);
-  audioRef.current = audio;
+  useEffect(() => {
+    autoPlayAudioRef.current = autoPlayAudio;
+    audioRef.current = audio;
+  });
   const wasProgressActiveRef = useRef(false);
   useEffect(() => {
     if (progressDisplayActive) {
@@ -196,6 +209,8 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
           dailyNewWordsToday={state.dailyNewWordsToday}
           practicedWordsThisSession={state.practicedWordsThisSession}
           schedulingMode={state.schedulingMode}
+          reviewMode={state.reviewMode}
+          autoAdvance={state.autoAdvance}
           ready={state.progressDisplayReady}
           onContinue={state.dismissProgressDisplay}
         />

@@ -29,4 +29,7 @@ export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
 export const PROGRESS_DISPLAY_INTERVAL = 1;
 
 /** How long the celebration screen stays before auto-advancing (ms). */
-export const PROGRESS_DISPLAY_DURATION_MS = 5000;
+export const PROGRESS_DISPLAY_DURATION_MS = 7000;
+
+/** Path to the celebration success sound (under public/). */
+export const PROGRESS_SOUND_URL = '/sounds/progress-success.mp3';

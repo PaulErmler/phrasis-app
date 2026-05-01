@@ -36,6 +36,7 @@ import {
   PROGRESS_DISPLAY_INTERVAL,
 } from '@/lib/constants/learning';
 import { tokenizeText } from '@/lib/wordTokenize';
+import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
 
 function effectivePhase(
   reviewMode: string,
@@ -68,6 +69,13 @@ interface BaseState {
   dismissProgressDisplay: () => void;
   /** Default `'learnAndReview'` when no active course is loaded yet. */
   schedulingMode: SchedulingMode;
+  /** Default `'audio'` when no active course is loaded yet. Used by the
+   * celebration UI to gate auto-advance + the auto-advance bar. */
+  reviewMode: 'audio' | 'full';
+  /** Mirrors `courseSettings.autoAdvance` (default true). The celebration
+   * uses it together with `reviewMode === 'audio'` to decide whether to
+   * auto-dismiss after a delay and show the auto-advance bar. */
+  autoAdvance: boolean;
 }
 
 interface LoadingState extends BaseState {
@@ -701,6 +709,8 @@ export function useLearningMode(
     progressDisplayReady,
     dismissProgressDisplay,
     schedulingMode: (courseSettings?.schedulingMode ?? 'learnAndReview') as SchedulingMode,
+    reviewMode: (courseSettings?.reviewMode ?? 'audio') as 'audio' | 'full',
+    autoAdvance: courseSettings?.autoAdvance ?? DEFAULT_AUTO_ADVANCE,
   };
 
   // Loading
