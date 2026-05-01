@@ -23,6 +23,7 @@ import {
   audioRecordingValidator,
   schedulingPhaseValidator
 } from '../types';
+import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import { getAudioForText } from '../lib/audio';
 import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
 import { consumeQuota } from '../usage/helpers';
@@ -252,6 +253,7 @@ export const reviewCard = mutation({
     reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))),
     accuracy: v.optional(v.number()),
     wasDefaultRating: v.optional(v.boolean()),
+    sessionId: v.optional(v.string()),
   },
   returns: v.object({
     schedulingPhase: schedulingPhaseValidator,
@@ -259,6 +261,10 @@ export const reviewCard = mutation({
     dueDate: v.number(),
     phaseTransitioned: v.boolean(),
     fsrsState: v.union(fsrsStateValidator, v.null()),
+    dailyReviewsToday: v.number(),
+    dailyTimeMsToday: v.number(),
+    dailyNewWordsToday: v.number(),
+    triggerCelebration: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const { userId, card, deck, course } = await authorizeCardAccess(ctx, args.cardId);
@@ -340,7 +346,12 @@ export const reviewCard = mutation({
     // into the single patchCard call below — `recordReviewStats` reads `card`
     // by value and intentionally uses the pre-patch state for its own
     // bookkeeping (isFirstReview, fsrsCardState, reviewDepth), so order is safe.
-    const { newWordsTrackedLanguages } = await recordReviewStats(ctx, {
+    const {
+      newWordsTrackedLanguages,
+      dailyReviewsToday,
+      dailyTimeMsToday,
+      dailyNewWordsToday,
+    } = await recordReviewStats(ctx, {
       userId,
       card,
       deck,
@@ -352,6 +363,7 @@ export const reviewCard = mutation({
       accuracy: args.accuracy,
       wasDefaultRating: args.wasDefaultRating,
       text,
+      sessionId: args.sessionId,
     });
 
     // Patch the card (via aggregate-aware helper). We pass `card` as oldDoc so
@@ -374,12 +386,25 @@ export const reviewCard = mutation({
       card,
     );
 
+    // Server-side milestone verdict: client just respects this. Opt-out
+    // setting defaults to enabled when undefined (matches the UI check
+    // `progressDisplayEnabled !== false`).
+    const progressDisplayEnabled = reviewSettings?.progressDisplayEnabled !== false;
+    const triggerCelebration =
+      progressDisplayEnabled &&
+      dailyReviewsToday > 0 &&
+      dailyReviewsToday % PROGRESS_DISPLAY_INTERVAL === 0;
+
     return {
       schedulingPhase: result.schedulingPhase,
       preReviewCount: result.preReviewCount,
       dueDate: dueDateWithJitter,
       phaseTransitioned: result.phaseTransitioned,
       fsrsState: result.fsrsState,
+      dailyReviewsToday,
+      dailyTimeMsToday,
+      dailyNewWordsToday,
+      triggerCelebration,
     };
   },
 });

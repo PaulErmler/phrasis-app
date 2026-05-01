@@ -42,7 +42,7 @@ export async function upsertDailyStats(
     hourOfDay?: number;
     cardState?: number; // 0=new, 1=learning, 2=review, 3=relearning
   },
-): Promise<{ isFirstActivityToday: boolean }> {
+): Promise<{ isFirstActivityToday: boolean; repsAfter: number; timeMsAfter: number }> {
   const existing = await ctx.db
     .query('dailyStats')
     .withIndex('by_userId_and_courseId_and_date', (q) =>
@@ -90,9 +90,11 @@ export async function upsertDailyStats(
       reviewsByCardState = { ...prev, [key]: prev[key] + 1 };
     }
 
+    const repsAfter = existing.reps + 1;
+    const timeMsAfter = existing.timeMs + args.timeMs;
     await ctx.db.patch(existing._id, {
-      reps: existing.reps + 1,
-      timeMs: existing.timeMs + args.timeMs,
+      reps: repsAfter,
+      timeMs: timeMsAfter,
       newCards: existing.newCards + (args.isNewCard ? 1 : 0),
       cardsReviewed: existing.cardsReviewed + 1,
       ...(hourBuckets ? { hourBuckets } : {}),
@@ -113,7 +115,7 @@ export async function upsertDailyStats(
         ? { defaultRatingChanged: (existing.defaultRatingChanged ?? 0) + 1 }
         : {}),
     });
-    return { isFirstActivityToday: false };
+    return { isFirstActivityToday: false, repsAfter, timeMsAfter };
   }
 
   // Insert new document
@@ -152,7 +154,7 @@ export async function upsertDailyStats(
     ...(args.wasDefaultRating === true ? { defaultRatingUsed: 1, defaultRatingChanged: 0 } : {}),
     ...(args.wasDefaultRating === false ? { defaultRatingUsed: 0, defaultRatingChanged: 1 } : {}),
   });
-  return { isFirstActivityToday: true };
+  return { isFirstActivityToday: true, repsAfter: 1, timeMsAfter: args.timeMs };
 }
 
 /**

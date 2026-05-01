@@ -35,6 +35,7 @@ export const courseSettingsFields = {
   pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages
   pauseBeforeAutoAdvance: v.optional(v.number()), // seconds to wait before auto-advancing to next card
   showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
+  progressDisplayEnabled: v.optional(v.boolean()), // celebrate every PROGRESS_DISPLAY_INTERVAL reviews (default true)
   hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
   autoRevealLanguages: v.optional(v.boolean()), // unblur when audio starts playing
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
@@ -382,6 +383,11 @@ export default defineSchema({
     // (e.g. German nouns stay capitalized). Optional to accommodate
     // pre-migration rows; new writes always populate it.
     displayWord: v.optional(v.string()),
+    // Client-minted session id stamped on insert so we can partition the
+    // celebration screen's word list into "this session" vs "earlier today".
+    // Read by `getNewWordsForCelebration` via the language index — a session
+    // id only ever matters alongside the auth context that created it.
+    sessionId: v.optional(v.string()),
   })
     .index('by_userId_and_courseId_and_language_and_word',
       ['userId', 'courseId', 'language', 'word'])

@@ -51,6 +51,7 @@ export interface CourseSettings {
   pauseTargetToTarget?: number;
   pauseBeforeAutoAdvance?: number;
   showProgressBar?: boolean;
+  progressDisplayEnabled?: boolean;
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
   showRomanization?: boolean;

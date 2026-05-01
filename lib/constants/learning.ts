@@ -24,3 +24,9 @@ export const MAX_IMPORT_BATCH = 500;
 /** Max file size (bytes) accepted by the bulk-import dropzone. ~5 MB is well above the
  * theoretical worst case of MAX_IMPORT_BATCH * MAX_CARD_TEXT_LENGTH per language. */
 export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+
+/** Interrupt the learning flow with a celebration screen every N reviews (per day). */
+export const PROGRESS_DISPLAY_INTERVAL = 1;
+
+/** How long the celebration screen stays before auto-advancing (ms). */
+export const PROGRESS_DISPLAY_DURATION_MS = 5000;

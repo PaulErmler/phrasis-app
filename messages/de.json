@@ -377,6 +377,21 @@
       "allDone": "Alles erledigt! Füge weitere Sätze hinzu, um weiterzulernen.",
       "noCardsInDeck": "Noch keine Sätze in deinem Deck. Füge Sätze aus einer Sammlung hinzu, um mit dem Lernen zu beginnen."
     },
+    "progressDisplay": {
+      "sessionNewWords": "neue Wörter",
+      "todayNewWords": "neue Wörter heute",
+      "practicedThisSession": "geübte Wörter in dieser Sitzung",
+      "reviewsToday": "Wiederholungen heute",
+      "timeToday": "Zeit heute",
+      "newWordsToday": "neue Wörter heute",
+      "comingUp": "Als Nächstes:",
+      "stateNew": "neu",
+      "stateLearning": "lernend",
+      "stateReview": "Wiederholung",
+      "continue": "Weiter",
+      "progressToNextMilestone": "Fortschritt bis zum nächsten Meilenstein",
+      "mediaSessionTitle": "Lernfortschritt"
+    },
     "settingsPanel": {
       "title": "Lerneinstellungen",
       "iconLegend": "Satzsymbole",
@@ -404,6 +419,8 @@
       "uiSettings": "Anzeigeeinstellungen",
       "showProgressBar": "Fortschrittsbalken",
       "showProgressBarDescription": "Audio-Fortschrittsbalken und Wiedergabesteuerung anzeigen",
+      "progressDisplayEnabled": "Zwischenfortschritt anzeigen",
+      "progressDisplayEnabledDescription": "Hilft dir, motiviert zu bleiben",
       "hideTargetLanguages": "Zielsprachen ausblenden",
       "hideTargetLanguagesDescription": "Text der Zielsprache standardmäßig unscharf anzeigen",
       "autoRevealLanguages": "Automatisch einblenden",

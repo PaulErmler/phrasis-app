@@ -31,7 +31,11 @@ import type { SchedulingMode } from '@/convex/types';
 import { getUserTimezone } from '@/lib/timezone';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
-import { ENSURE_CONTENT_REVIEW_INTERVAL } from '@/lib/constants/learning';
+import {
+  ENSURE_CONTENT_REVIEW_INTERVAL,
+  PROGRESS_DISPLAY_INTERVAL,
+} from '@/lib/constants/learning';
+import { tokenizeText } from '@/lib/wordTokenize';
 
 function effectivePhase(
   reviewMode: string,
@@ -47,6 +51,23 @@ function effectivePhase(
 interface BaseState {
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
+  // Progress display — orthogonal to status. A milestone hit on the very last
+  // card flips `progressDisplayActive` to true while `status` flips to
+  // `noCardsDue` on the next render; LearningMode renders the celebration
+  // first regardless of underlying status, so the user always gets the reward
+  // before the "no cards due" screen takes over.
+  sessionId: string;
+  dailyReviewsToday: number;
+  dailyTimeMsToday: number;
+  dailyNewWordsToday: number;
+  practicedWordsThisSession: number;
+  progressDisplayActive: boolean;
+  /** True once the milestone-triggering mutation has resolved; gates the
+   * celebration audio + counter animations so they fire against fresh data. */
+  progressDisplayReady: boolean;
+  dismissProgressDisplay: () => void;
+  /** Default `'learnAndReview'` when no active course is loaded yet. */
+  schedulingMode: SchedulingMode;
 }
 
 interface LoadingState extends BaseState {
@@ -70,7 +91,6 @@ interface NoCardsDueState extends BaseState {
   batchSize: number;
   sentencesRemaining: number | null;
   remainingInCollection: number | null;
-  schedulingMode: SchedulingMode;
   handleSchedulingModeChange: (mode: SchedulingMode) => void;
 }
 
@@ -120,7 +140,6 @@ interface ReviewingState extends BaseState {
   getReviewInitiatedByThisTab: () => boolean;
   resetReviewFlag: () => void;
   // Scheduling mode
-  schedulingMode: SchedulingMode;
   handleSchedulingModeChange: (mode: SchedulingMode) => void;
 }
 
@@ -150,6 +169,14 @@ export function useLearningMode(
   const cardForReviewQuery = useQuery(api.features.scheduling.getCardForReview, {});
   const courseSettingsQuery = usePreloadedQuery(preloaded.courseSettings);
   const activeCourseQuery = usePreloadedQuery(preloaded.activeCourse);
+
+  // Hydrate today's review count on mount so the in-session progress bar
+  // reflects real progress rather than starting at 0 each page load. After
+  // the first reviewCard mutation we use its return value (no extra query).
+  const todayCountQuery = useQuery(
+    api.features.stats.getTodayReviewCount,
+    isAuthenticated ? { timezone: getUserTimezone() } : 'skip',
+  );
 
   const lastCardRef = useRef<
     Exclude<typeof cardForReviewQuery, undefined> | undefined
@@ -284,6 +311,79 @@ export function useLearningMode(
   const [isExiting, setIsExiting] = useState(false);
   const [cardAnimationKey, setCardAnimationKey] = useState(0);
 
+  // ----- Progress display (every PROGRESS_DISPLAY_INTERVAL reviews per day) -----
+  const sessionIdRef = useRef<string>('');
+  const sessionCourseIdRef = useRef<string | null>(null);
+  // Unique normalized tokens encountered since the last session reset. Used
+  // by the fallback hero metric. Grows for the lifetime of one session — at
+  // ~10–20 unique words per card and a 20-card session, ~200–400 entries
+  // before reset, so memory stays trivially bounded.
+  const practicedWordsRef = useRef<Set<string>>(new Set());
+  // Card-id dedupe so we don't re-tokenize the same card when scheduling
+  // bounces a card back. Reset alongside `practicedWordsRef`.
+  const tokenizedCardsRef = useRef<Set<string>>(new Set());
+  const [practicedWordsThisSession, setPracticedWordsThisSession] = useState(0);
+
+  function mintSessionId(): string {
+    return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+  // Mint a fresh id and clear the per-session tracking sets. Used both on
+  // course change AND after every milestone dismissal — each celebration
+  // shows only words discovered since the previous one.
+  function resetSessionLocalState() {
+    sessionIdRef.current = mintSessionId();
+    practicedWordsRef.current = new Set();
+    tokenizedCardsRef.current = new Set();
+  }
+
+  const activeCourseIdForSession = activeCourseQuery?._id ?? null;
+  const [dailyReviewsToday, setDailyReviewsToday] = useState(0);
+  const [dailyTimeMsToday, setDailyTimeMsToday] = useState(0);
+  const [dailyNewWordsToday, setDailyNewWordsToday] = useState(0);
+  if (
+    !sessionIdRef.current ||
+    sessionCourseIdRef.current !== activeCourseIdForSession
+  ) {
+    resetSessionLocalState();
+    sessionCourseIdRef.current = activeCourseIdForSession;
+    // Setting state during render is the React-recommended pattern for
+    // derived state when a "prop" (here: active course id) changes. Setters
+    // are no-ops if the value is unchanged, so this only re-renders when
+    // there's actually a course switch to clean up after.
+    setPracticedWordsThisSession(0);
+  }
+  // Two flags for the celebration:
+  //  - `active`  flips optimistically *before* the mutation awaits, so the
+  //              audio hook treats `disableAutoPlay=true` and the next card
+  //              never gets a chance to start playing. The shell holds an
+  //              empty placeholder during this window.
+  //  - `ready`   flips *after* the mutation resolves and the server has
+  //              confirmed the milestone via `triggerCelebration`. Audio +
+  //              counter animations gate on this so they always start
+  //              against fresh post-mutation data.
+  const [progressDisplayActive, setProgressDisplayActive] = useState(false);
+  const [progressDisplayReady, setProgressDisplayReady] = useState(false);
+  const hasHydratedDailyCountRef = useRef(false);
+  useEffect(() => {
+    if (hasHydratedDailyCountRef.current) return;
+    if (todayCountQuery === undefined) return;
+    hasHydratedDailyCountRef.current = true;
+    setDailyReviewsToday(todayCountQuery);
+  }, [todayCountQuery]);
+
+  const dismissProgressDisplay = useCallback(() => {
+    setProgressDisplayActive(false);
+    setProgressDisplayReady(false);
+    // Sessions reset on dismissal: the next celebration shows only words
+    // discovered since this point, not the cumulative total. The new id
+    // takes effect from the next review's mutation onward — the celebration
+    // we just dismissed already finished its queries against the old id.
+    resetSessionLocalState();
+    setPracticedWordsThisSession(0);
+  }, []);
+
   // Track when the current card was first shown (for time-spent stats)
   const cardShownAtRef = useRef<number>(Date.now());
 
@@ -374,10 +474,38 @@ export function useLearningMode(
     cardShownAtRef.current = Date.now();
   }, [cardForReview?._id]);
 
+  // Tokenize each card's languages once per session so we can count unique
+  // words practiced. Used as the fallback hero metric on the progress display
+  // when no new words were encountered.
+  useEffect(() => {
+    if (!cardForReview) return;
+    const cardKey = String(cardForReview._id);
+    if (tokenizedCardsRef.current.has(cardKey)) return;
+    tokenizedCardsRef.current.add(cardKey);
+
+    const set = practicedWordsRef.current;
+    const before = set.size;
+    const sourceLang = cardForReview.sourceLanguage;
+    if (sourceLang) {
+      for (const t of tokenizeText(cardForReview.sourceText, sourceLang)) {
+        set.add(`${sourceLang}:${t.normalized}`);
+      }
+    }
+    for (const tr of cardForReview.translations) {
+      for (const t of tokenizeText(tr.text, tr.language)) {
+        set.add(`${tr.language}:${t.normalized}`);
+      }
+    }
+    if (set.size !== before) setPracticedWordsThisSession(set.size);
+  }, [cardForReview]);
+
   // --------------------------------------------------------------------------
   // Review / master / hide
   // --------------------------------------------------------------------------
   const reviewMode = courseSettings?.reviewMode ?? 'audio';
+
+  // Opt-out: undefined (pre-migration rows or unset) defaults to enabled.
+  const progressDisplayEnabled = courseSettings?.progressDisplayEnabled ?? true;
 
   const handleReview = useCallback(
     async (rating: ReviewRating, wasDefaultRating: boolean, accuracy?: number) => {
@@ -386,8 +514,24 @@ export function useLearningMode(
       setCardAnimationKey((k) => k + 1);
       setIsExiting(true);
       setIsReviewing(true);
+
+      // Predict the milestone *before* awaiting the mutation so we can flip
+      // `progressDisplayActive=true` synchronously — by the time the next
+      // card's data lands via Convex reactivity, `disableAutoPlay` is already
+      // true and the audio for the next card never starts. This is best-effort
+      // (the local count can be stale across tabs); the server's
+      // `triggerCelebration` is the authoritative verdict.
+      const predictedCount = dailyReviewsToday + 1;
+      const predictedMilestone =
+        progressDisplayEnabled &&
+        predictedCount > 0 &&
+        predictedCount % PROGRESS_DISPLAY_INTERVAL === 0;
+      if (predictedMilestone) {
+        setProgressDisplayActive(true);
+      }
+
       try {
-        await reviewCardMutation({
+        const result = await reviewCardMutation({
           cardId: cardForReview._id,
           rating,
           timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
@@ -395,17 +539,45 @@ export function useLearningMode(
           ...(reviewMode === 'full' && { forceReviewPhase: true }),
           reviewMode,
           wasDefaultRating,
+          sessionId: sessionIdRef.current,
           ...(accuracy != null && { accuracy: accuracy / 100 }),
         });
+        setDailyReviewsToday(result.dailyReviewsToday);
+        setDailyTimeMsToday(result.dailyTimeMsToday);
+        setDailyNewWordsToday(result.dailyNewWordsToday);
+
+        if (result.triggerCelebration) {
+          setProgressDisplayActive(true);
+          // Mutation has resolved — daily totals are fresh and userWords for
+          // this review are committed, so the celebration's queries will
+          // return post-mutation data on their next refetch. Now safe to
+          // mount CelebrationContent and start audio + animations.
+          setProgressDisplayReady(true);
+        } else {
+          // Server says no celebration — roll back the optimistic flip.
+          setProgressDisplayActive(false);
+          setProgressDisplayReady(false);
+        }
         setSelectedRating(null);
       } catch (error) {
         console.error('Failed to review card:', error);
+        if (predictedMilestone) {
+          setProgressDisplayActive(false);
+          setProgressDisplayReady(false);
+        }
         setIsExiting(false);
       } finally {
         setIsReviewing(false);
       }
     },
-    [cardForReview, isReviewing, reviewCardMutation, reviewMode],
+    [
+      cardForReview,
+      isReviewing,
+      reviewCardMutation,
+      reviewMode,
+      progressDisplayEnabled,
+      dailyReviewsToday,
+    ],
   );
 
   const handleMaster = useCallback(() => {
@@ -514,7 +686,22 @@ export function useLearningMode(
   // Return discriminated states
   // ============================================================================
 
-  const base = { settingsOpen, setSettingsOpen };
+  // Cross-cutting fields shared by every state — including the progress
+  // display (so a milestone hit on the last card survives the transition to
+  // `noCardsDue`) and `schedulingMode` (used by the celebration UI).
+  const base = {
+    settingsOpen,
+    setSettingsOpen,
+    sessionId: sessionIdRef.current,
+    dailyReviewsToday,
+    dailyTimeMsToday,
+    dailyNewWordsToday,
+    practicedWordsThisSession,
+    progressDisplayActive,
+    progressDisplayReady,
+    dismissProgressDisplay,
+    schedulingMode: (courseSettings?.schedulingMode ?? 'learnAndReview') as SchedulingMode,
+  };
 
   // Loading
   if (
@@ -582,7 +769,6 @@ export function useLearningMode(
         batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
         sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
         remainingInCollection,
-        schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
         handleSchedulingModeChange,
       };
     }
@@ -677,7 +863,6 @@ export function useLearningMode(
     animationKey: cardAnimationKey,
     getReviewInitiatedByThisTab,
     resetReviewFlag,
-    schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
     handleSchedulingModeChange,
   };
 }

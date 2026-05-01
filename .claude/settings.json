@@ -36,7 +36,20 @@
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(grep -E \"\\\\.ts$\")",
       "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
-      "Bash(xargs basename *)"
+      "Bash(xargs basename *)",
+      "Bash(curl -s -L \"https://posthog.com/docs/libraries/next-js\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/libraries/react-native\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/session-replay/installation\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/libraries/js/config\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/privacy\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/libraries/js/features\")",
+      "Bash(grep -oE '.{0,200}\\(opt_out|opt_in|disable_session_recording|startSessionRecording|stopSessionRecording|persistence\\).{0,200}')",
+      "WebFetch(domain:pixabay.com)",
+      "Bash(curl -s -L \"https://posthog.com/docs/llm-analytics/installation\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/data/data-retention\")",
+      "WebFetch(domain:posthog.com)",
+      "WebFetch(domain:us.posthog.com)",
+      "Bash(grep -r \"Intl.Segmenter\" /Users/paulermler/Documents/Phrasis/new/phrasis-app --include=\"*.ts\" --include=\"*.tsx\" ! -path \"*/node_modules/*\" ! -path \"*/.git/*\")"
     ]
   }
 }

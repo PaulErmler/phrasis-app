@@ -186,7 +186,7 @@ export function CardShell({
 
   return (
     <main className="flex-1 overflow-y-auto">
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+      <div className="max-w-lg mx-auto px-4 pt-6 pb-16 lg:pb-6 space-y-4">
         {cardSurface}
       </div>
     </main>

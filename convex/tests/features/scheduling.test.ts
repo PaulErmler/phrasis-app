@@ -23,6 +23,62 @@ import { api } from "../../_generated/api";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
+async function seedCardWithCourseAndStats(t: ReturnType<typeof convexTest>) {
+  return t.run(async (ctx) => {
+    const collectionId = await ctx.db.insert("collections", {
+      name: "A1",
+      textCount: 0,
+    });
+    const courseId = await ctx.db.insert("courses", {
+      userId: "user_A",
+      baseLanguages: ["en"],
+      targetLanguages: ["es"],
+    });
+    await ctx.db.insert("userSettings", {
+      userId: "user_A",
+      hasCompletedOnboarding: true,
+      activeCourseId: courseId,
+    });
+    await ctx.db.insert("courseStats", {
+      userId: "user_A",
+      courseId,
+      totalRepetitions: 0,
+      totalTimeMs: 0,
+      totalCards: 0,
+      currentStreak: 0,
+    });
+    const deckId = await ctx.db.insert("decks", {
+      courseId,
+      name: "d",
+      cardCount: 1,
+    });
+    const textId = await ctx.db.insert("texts", {
+      text: "Hola mundo",
+      language: "es",
+      userCreated: true,
+      userId: "user_A",
+      collectionId,
+      collectionRank: 1,
+    });
+    await ctx.db.insert("translations", {
+      textId,
+      targetLanguage: "en",
+      translatedText: "Hello world",
+    });
+    const cardId = await ctx.db.insert("cards", {
+      deckId,
+      textId,
+      collectionId,
+      dueDate: Date.now() - 1000,
+      isMastered: false,
+      isHidden: false,
+      schedulingPhase: "preReview",
+      preReviewCount: 0,
+    });
+    return { cardId, courseId, deckId, textId };
+  });
+}
+
 async function seedCardWithCourse(t: ReturnType<typeof convexTest>) {
   return t.run(async (ctx) => {
     const collectionId = await ctx.db.insert("collections", {
@@ -372,6 +428,128 @@ describe("features/scheduling", () => {
       expect(audio?.voiceGender).toBe("female");
       expect(audio?.speed).toBe(0.9);
       expect(audio?.wordTimings).toEqual([{ word: "Hej", start: 0, end: 0.5 }]);
+    });
+  });
+
+  describe("reviewCard — progress display plumbing", () => {
+    it("returns today's review/time/new-words counts after a review", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourseAndStats(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const result = await asUser.mutation(api.features.scheduling.reviewCard, {
+        cardId,
+        rating: "understood",
+        timezone: "UTC",
+        timeSpentMs: 4_000,
+        sessionId: "session_X",
+      });
+      expect(result.dailyReviewsToday).toBe(1);
+      expect(result.dailyTimeMsToday).toBe(4_000);
+      // `dailyNewWordsToday` only counts target-language words — the seed
+      // card has "hola" and "mundo" in `es` (target).
+      expect(result.dailyNewWordsToday).toBe(2);
+      // INTERVAL is 20; the first review never triggers a celebration.
+      expect(result.triggerCelebration).toBe(false);
+    });
+
+    it("stamps sessionId on userWords inserted during the review", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, courseId } = await seedCardWithCourseAndStats(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.reviewCard, {
+        cardId,
+        rating: "understood",
+        timezone: "UTC",
+        sessionId: "session_X",
+      });
+      const stamped = await t.run(async (ctx) =>
+        ctx.db
+          .query("userWords")
+          .withIndex("by_userId_and_courseId_and_language", (q) =>
+            q.eq("userId", "user_A").eq("courseId", courseId),
+          )
+          .filter((q) => q.eq(q.field("sessionId"), "session_X"))
+          .collect(),
+      );
+      expect(stamped.length).toBeGreaterThan(0);
+      // Every stamped row should carry the session id we passed.
+      for (const row of stamped) {
+        expect(row.sessionId).toBe("session_X");
+      }
+      // The target-language words ("hola", "mundo") should be among them.
+      const esWords = stamped.filter((r) => r.language === "es").map((r) => r.word);
+      expect(esWords.sort()).toEqual(["hola", "mundo"]);
+    });
+
+    it("does not stamp a sessionId when the review is sent without one", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourseAndStats(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.reviewCard, {
+        cardId,
+        rating: "understood",
+        timezone: "UTC",
+      });
+      const allWords = await t.run(async (ctx) =>
+        ctx.db
+          .query("userWords")
+          .withIndex("by_userId_and_courseId_and_language", (q) =>
+            q.eq("userId", "user_A"),
+          )
+          .collect(),
+      );
+      expect(allWords.length).toBeGreaterThan(0);
+      for (const row of allWords) {
+        expect(row.sessionId).toBeUndefined();
+      }
+    });
+
+    it("accumulates dailyReviewsToday across multiple cards reviewed today", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, deckId } = await seedCardWithCourseAndStats(t);
+
+      // Add two more brand-new preReview cards in the same deck so we can
+      // do three reviews without any one card transitioning out of preReview.
+      const moreCardIds = await t.run(async (ctx) => {
+        const collectionId = (await ctx.db.get(cardId))!.collectionId!;
+        const ids: string[] = [];
+        for (const text of ["Adios", "Casa"]) {
+          const newTextId = await ctx.db.insert("texts", {
+            text,
+            language: "es",
+            userCreated: true,
+            userId: "user_A",
+            collectionId,
+            collectionRank: 2,
+          });
+          const id = await ctx.db.insert("cards", {
+            deckId,
+            textId: newTextId,
+            collectionId,
+            dueDate: Date.now() - 1000,
+            isMastered: false,
+            isHidden: false,
+            schedulingPhase: "preReview",
+            preReviewCount: 0,
+          });
+          ids.push(id);
+        }
+        return ids;
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const all = [cardId, ...moreCardIds];
+      const counts: number[] = [];
+      for (const id of all) {
+        const r = await asUser.mutation(api.features.scheduling.reviewCard, {
+          cardId: id as typeof cardId,
+          rating: "understood",
+          timezone: "UTC",
+          sessionId: "session_X",
+        });
+        counts.push(r.dailyReviewsToday);
+      }
+      expect(counts).toEqual([1, 2, 3]);
     });
   });
 });

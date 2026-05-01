@@ -119,9 +119,12 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
     delayMs: 1000,
     enabled: state.status === 'reviewing' && !state.settingsOpen,
   });
+  // `progressDisplayActive` lives on BaseState so it persists across status
+  // transitions (e.g. milestone hit on the last card → noCardsDue mid-cele).
+  const progressDisplayActive = state.progressDisplayActive;
   const { audio, openSettings } = useLearningAudio(state, {
     disableAutoAdvance: reviewMode === 'audio' && isActive,
-    disableAutoPlay: isActive || !isCompleted,
+    disableAutoPlay: isActive || !isCompleted || progressDisplayActive,
   });
 
   const goHome = useCallback(() => {

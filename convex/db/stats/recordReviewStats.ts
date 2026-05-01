@@ -1,5 +1,5 @@
 import { MutationCtx } from '../../_generated/server';
-import { Doc, Id } from '../../_generated/dataModel';
+import { Doc } from '../../_generated/dataModel';
 import { ConvexError } from 'convex/values';
 import {
   getCourseStatsForMutation,
@@ -43,8 +43,14 @@ export async function recordReviewStats(
     accuracy?: number;
     wasDefaultRating?: boolean;
     text?: Doc<'texts'> | null;
+    sessionId?: string;
   },
-): Promise<{ newWordsTrackedLanguages?: string[] }> {
+): Promise<{
+  newWordsTrackedLanguages?: string[];
+  dailyReviewsToday: number;
+  dailyTimeMsToday: number;
+  dailyNewWordsToday: number;
+}> {
   const { userId, card, deck, course } = args;
   const nonNegativeTime = Math.max(args.timeSpentMs ?? 0, 0);
   const clampedTime = Math.min(nonNegativeTime, MAX_TIME_PER_CARD_MS);
@@ -106,7 +112,11 @@ export async function recordReviewStats(
   });
 
   // --- Daily stats ---
-  const { isFirstActivityToday } = await upsertDailyStats(ctx, {
+  const {
+    isFirstActivityToday,
+    repsAfter: dailyReviewsToday,
+    timeMsAfter: dailyTimeMsToday,
+  } = await upsertDailyStats(ctx, {
     userId,
     courseId: deck.courseId,
     date: todayDate,
@@ -197,6 +207,7 @@ export async function recordReviewStats(
           courseId: deck.courseId,
           languages: langTexts,
           textId: card.textId,
+          sessionId: args.sessionId,
         });
         for (const count of Object.values(newWordCounts)) {
           totalNewWords += count;
@@ -209,9 +220,16 @@ export async function recordReviewStats(
     }
   }
 
+  // Sum each TARGET language's post-patch newWordsCount as we go, so we can
+  // return today's total without an extra query at the end. Base languages
+  // (the user's known languages) aren't counted as "new vocabulary" — the
+  // celebration's hero metric is target-only and `dailyNewWordsToday` must
+  // match that definition.
+  const targetLanguageSet = new Set(course.targetLanguages);
+  let dailyNewWordsToday = 0;
   for (const lang of allLanguages) {
     const wordsForLang = newWordCounts[lang] ?? 0;
-    await upsertDailyLanguageStats(ctx, {
+    const { newWordsCountAfter } = await upsertDailyLanguageStats(ctx, {
       userId,
       courseId: deck.courseId,
       date: todayDate,
@@ -220,6 +238,9 @@ export async function recordReviewStats(
       isNewCard: isFirstReview,
       newWordsCount: wordsForLang,
     });
+    if (targetLanguageSet.has(lang)) {
+      dailyNewWordsToday += newWordsCountAfter;
+    }
     await upsertLanguageStats(ctx, {
       userId,
       courseId: deck.courseId,
@@ -262,5 +283,10 @@ export async function recordReviewStats(
     }
   }
 
-  return { newWordsTrackedLanguages };
+  return {
+    newWordsTrackedLanguages,
+    dailyReviewsToday,
+    dailyTimeMsToday,
+    dailyNewWordsToday,
+  };
 }
