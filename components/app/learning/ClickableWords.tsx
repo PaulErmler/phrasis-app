@@ -51,7 +51,7 @@ export function ClickableWords({
   className,
   interactive = true,
 }: Props) {
-  const { openChatWithPrompt } = useLearningChatToggle();
+  const chatContext = useLearningChatToggle();
   const t = useTranslations('Chat');
 
   const aligned = useMemo(
@@ -73,7 +73,7 @@ export function ClickableWords({
 
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
-  if (!interactive || aligned.length === 0) {
+  if (!interactive || aligned.length === 0 || !chatContext) {
     if (!canKaraoke || !isActive) {
       return <p className={className}>{text}</p>;
     }
@@ -98,7 +98,7 @@ export function ClickableWords({
   const handleAsk = (word: string) => {
     const cleaned = cleanWord(word);
     if (!cleaned) return;
-    openChatWithPrompt(t('explainWord', { word: cleaned }));
+    chatContext.openChatWithPrompt(t('explainWord', { word: cleaned }));
     setOpenIndex(null);
   };
 

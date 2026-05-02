@@ -50,7 +50,11 @@ interface LearningModeProps {
  */
 export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   const t = useTranslations('LearningMode');
-  const { openChat } = useLearningChatToggle();
+  const chatContext = useLearningChatToggle();
+  if (!chatContext) {
+    throw new Error('LearningMode must be rendered inside LearningChatLayout');
+  }
+  const { openChat } = chatContext;
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);

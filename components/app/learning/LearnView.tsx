@@ -34,7 +34,11 @@ function WrappedChatPanel({
   cardId?: Id<'cards'>;
   onMessageSent?: () => void;
 }) {
-  const { closeChat, pendingPrompt, claimPrompt } = useLearningChatToggle();
+  const chatContext = useLearningChatToggle();
+  if (!chatContext) {
+    throw new Error('WrappedChatPanel must be rendered inside LearningChatLayout');
+  }
+  const { closeChat, pendingPrompt, claimPrompt } = chatContext;
   const {
     approvalsByToolCallId,
     processingApprovals,

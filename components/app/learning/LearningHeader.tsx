@@ -37,7 +37,11 @@ export function LearningHeader({
   const t = useTranslations('LearningMode');
   const tApp = useTranslations('AppPage');
   const tSettings = useTranslations('LearningMode.settingsPanel');
-  const { isChatOpen, closeChat } = useLearningChatToggle();
+  const chatContext = useLearningChatToggle();
+  if (!chatContext) {
+    throw new Error('LearningHeader must be rendered inside LearningChatLayout');
+  }
+  const { isChatOpen, closeChat } = chatContext;
 
   return (
     <header className="sticky-header">
