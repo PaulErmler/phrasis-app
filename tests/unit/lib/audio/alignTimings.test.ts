@@ -7,12 +7,12 @@ import {
 
 describe('alignWordTimings', () => {
   it('returns empty array for empty text', () => {
-    expect(alignWordTimings('', null)).toEqual([]);
-    expect(alignWordTimings('', [])).toEqual([]);
+    expect(alignWordTimings('', null, 'en')).toEqual([]);
+    expect(alignWordTimings('', [], 'en')).toEqual([]);
   });
 
   it('marks all tokens unmatched when scribe is null/empty', () => {
-    const aligned = alignWordTimings('hola mundo', null);
+    const aligned = alignWordTimings('hola mundo', null, 'es');
     expect(aligned).toHaveLength(2);
     expect(aligned.every((w) => w.matched === false)).toBe(true);
     expect(aligned.every((w) => w.start === 0 && w.end === 0)).toBe(true);
@@ -23,45 +23,49 @@ describe('alignWordTimings', () => {
       { word: 'hola', start: 0, end: 0.5 },
       { word: 'mundo', start: 0.6, end: 1.2 },
     ];
-    const aligned = alignWordTimings('hola mundo', scribe);
+    const aligned = alignWordTimings('hola mundo', scribe, 'es');
     expect(aligned).toEqual([
       { display: 'hola', leading: '', start: 0, end: 0.5, matched: true },
       { display: 'mundo', leading: ' ', start: 0.6, end: 1.2, matched: true },
     ]);
   });
 
-  it('strips surrounding punctuation when matching tokens', () => {
+  it('folds intra-sentence punctuation into leading and matches the bare word', () => {
     const scribe: ScribeWord[] = [
       { word: 'hola', start: 0, end: 0.5 },
       { word: 'mundo', start: 0.6, end: 1.2 },
     ];
-    const aligned = alignWordTimings('¡Hola, mundo!', scribe);
+    const aligned = alignWordTimings('¡Hola, mundo!', scribe, 'es');
+    expect(aligned).toHaveLength(2);
     expect(aligned[0].matched).toBe(true);
     expect(aligned[1].matched).toBe(true);
-    expect(aligned[0].display).toBe('¡Hola,');
+    // Intra-sentence non-word runs go to the next token's `leading`; the
+    // trailing "!" (no token after it) attaches to the last token's display
+    // so the rendered text still includes final punctuation.
+    expect(aligned[0].display).toBe('Hola');
+    expect(aligned[0].leading).toBe('¡');
     expect(aligned[1].display).toBe('mundo!');
+    expect(aligned[1].leading).toBe(', ');
   });
 
-  it('treats pure-punctuation tokens as unmatched and interpolates their timing', () => {
+  it('does not produce tokens for pure-punctuation runs between words', () => {
     const scribe: ScribeWord[] = [
       { word: 'hola', start: 0, end: 0.5 },
       { word: 'mundo', start: 0.8, end: 1.4 },
     ];
-    const aligned = alignWordTimings('hola — mundo', scribe);
-    expect(aligned).toHaveLength(3);
+    const aligned = alignWordTimings('hola — mundo', scribe, 'es');
+    expect(aligned).toHaveLength(2);
     expect(aligned[0].matched).toBe(true);
-    expect(aligned[1].matched).toBe(false);
-    expect(aligned[1].display).toBe('—');
-    expect(aligned[1].start).toBe(0.5);
-    expect(aligned[1].end).toBe(0.8);
-    expect(aligned[2].matched).toBe(true);
+    expect(aligned[1].matched).toBe(true);
+    // The em-dash is non-word and folds into the next token's leading.
+    expect(aligned[1].leading).toContain('—');
   });
 
   it('matches NFC-composed text against decomposed scribe output', () => {
     const composed = 'café'; // single combined codepoint
-    const decomposed = 'cafe\u0301'; // base + combining acute
+    const decomposed = 'café'; // base + combining acute
     const scribe: ScribeWord[] = [{ word: decomposed, start: 0, end: 0.4 }];
-    const aligned = alignWordTimings(composed, scribe);
+    const aligned = alignWordTimings(composed, scribe, 'fr');
     expect(aligned[0].matched).toBe(true);
     expect(aligned[0].start).toBe(0);
     expect(aligned[0].end).toBe(0.4);
@@ -73,7 +77,7 @@ describe('alignWordTimings', () => {
       { word: 'uh', start: 0.5, end: 0.6 }, // filler scribe inserted
       { word: 'mundo', start: 0.7, end: 1.3 },
     ];
-    const aligned = alignWordTimings('hola mundo', scribe);
+    const aligned = alignWordTimings('hola mundo', scribe, 'es');
     expect(aligned[0].matched).toBe(true);
     expect(aligned[1].matched).toBe(true);
     expect(aligned[1].start).toBe(0.7);
@@ -84,7 +88,7 @@ describe('alignWordTimings', () => {
       { word: 'a', start: 0, end: 0.2 },
       { word: 'd', start: 1.0, end: 1.2 },
     ];
-    const aligned = alignWordTimings('a b c d', scribe);
+    const aligned = alignWordTimings('a b c d', scribe, 'en');
     expect(aligned).toHaveLength(4);
     expect(aligned[0].matched).toBe(true);
     expect(aligned[3].matched).toBe(true);
@@ -103,7 +107,7 @@ describe('alignWordTimings', () => {
     const scribe: ScribeWord[] = [
       { word: 'mundo', start: 1.0, end: 1.5 },
     ];
-    const aligned = alignWordTimings('hola querido mundo', scribe);
+    const aligned = alignWordTimings('hola querido mundo', scribe, 'es');
     expect(aligned[0].matched).toBe(false);
     // No prevEnd → start defaults to nextStart (1.0); end is also nextStart.
     expect(aligned[0].start).toBe(1.0);
@@ -116,7 +120,7 @@ describe('alignWordTimings', () => {
 
   it('inherits the previous match boundary for trailing-unmatched runs', () => {
     const scribe: ScribeWord[] = [{ word: 'hola', start: 0, end: 0.5 }];
-    const aligned = alignWordTimings('hola querido mundo', scribe);
+    const aligned = alignWordTimings('hola querido mundo', scribe, 'es');
     expect(aligned[0].matched).toBe(true);
     expect(aligned[1].matched).toBe(false);
     expect(aligned[1].start).toBe(0.5);
@@ -126,20 +130,55 @@ describe('alignWordTimings', () => {
     expect(aligned[2].end).toBe(0.5);
   });
 
-  it('preserves whitespace such that joining leading+display reconstructs the source', () => {
+  it('round-trips arbitrary whitespace and punctuation', () => {
     const text = '  hola,\tmundo!\n  bonito  ';
     const scribe: ScribeWord[] = [
       { word: 'hola', start: 0, end: 0.4 },
       { word: 'mundo', start: 0.5, end: 1.0 },
       { word: 'bonito', start: 1.1, end: 1.6 },
     ];
-    const aligned = alignWordTimings(text, scribe);
+    const aligned = alignWordTimings(text, scribe, 'es');
     const reconstructed = aligned.map((w) => w.leading + w.display).join('');
-    // Trailing whitespace after the last token isn't captured (tokeniser
-    // anchors leading whitespace only); everything up through the last token
-    // must round-trip.
-    expect(text.startsWith(reconstructed)).toBe(true);
-    expect(reconstructed.endsWith('bonito')).toBe(true);
+    // Joining leading+display across all tokens reconstructs the full source —
+    // every codepoint is in either a leading run or the trailing-attached
+    // display of the last token.
+    expect(reconstructed).toBe(text);
+  });
+
+  it('segments Korean by eojeol and matches Scribe per-eojeol output', () => {
+    const text = '제가 당신보다 그를 더 오래전부터 알고 지냈어요.';
+    const scribe: ScribeWord[] = [
+      { word: '제가', start: 0.56, end: 0.899 },
+      { word: '당신보다', start: 1.059, end: 1.74 },
+      { word: '그를', start: 1.799, end: 2.059 },
+      { word: '더', start: 2.139, end: 2.22 },
+      { word: '오래전부터', start: 2.339, end: 2.879 },
+      { word: '알고', start: 3, end: 3.22 },
+      { word: '지냈어요.', start: 3.319, end: 3.819 },
+    ];
+    const aligned = alignWordTimings(text, scribe, 'ko');
+    expect(aligned).toHaveLength(7);
+    expect(aligned.every((w) => w.matched)).toBe(true);
+    expect(matchRatio(aligned)).toBe(1);
+  });
+
+  it('segments Japanese into multiple word tokens, not a single sentence token', () => {
+    const text = 'どうするかはもう決めたわ。';
+    const aligned = alignWordTimings(text, null, 'ja');
+    // Intl.Segmenter "ja" identifies multiple word-like segments — the exact
+    // count depends on the ICU dictionary in the test runtime, but it must be
+    // strictly more than one (otherwise the "whole sentence as one word" bug
+    // is back).
+    expect(aligned.length).toBeGreaterThan(1);
+  });
+
+  it('falls back to whitespace tokenization when the language tag is invalid', () => {
+    const aligned = alignWordTimings('hola mundo', null, '!!!not-a-locale!!!');
+    // Should not throw; fallback regex still produces the two whitespace-
+    // separated tokens.
+    expect(aligned).toHaveLength(2);
+    expect(aligned[0].display).toBe('hola');
+    expect(aligned[1].display).toBe('mundo');
   });
 });
 
@@ -149,22 +188,28 @@ describe('matchRatio', () => {
   });
 
   it('returns 1 when every token matched', () => {
-    const aligned = alignWordTimings('hola mundo', [
-      { word: 'hola', start: 0, end: 0.5 },
-      { word: 'mundo', start: 0.6, end: 1.0 },
-    ]);
+    const aligned = alignWordTimings(
+      'hola mundo',
+      [
+        { word: 'hola', start: 0, end: 0.5 },
+        { word: 'mundo', start: 0.6, end: 1.0 },
+      ],
+      'es',
+    );
     expect(matchRatio(aligned)).toBe(1);
   });
 
   it('returns 0 when no tokens matched', () => {
-    const aligned = alignWordTimings('hola mundo', null);
+    const aligned = alignWordTimings('hola mundo', null, 'es');
     expect(matchRatio(aligned)).toBe(0);
   });
 
   it('returns 0.5 when half the tokens matched', () => {
-    const aligned = alignWordTimings('hola mundo', [
-      { word: 'hola', start: 0, end: 0.5 },
-    ]);
+    const aligned = alignWordTimings(
+      'hola mundo',
+      [{ word: 'hola', start: 0, end: 0.5 }],
+      'es',
+    );
     expect(matchRatio(aligned)).toBe(0.5);
   });
 });

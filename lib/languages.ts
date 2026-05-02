@@ -24,6 +24,14 @@ export interface Language {
   ttsProvider: TtsProvider;
   /** Whether the script requires Latin transliteration for learners. */
   needsRomanization: boolean;
+  /**
+   * Whether per-word karaoke highlighting (the blue current-word colour
+   * during audio playback) makes sense for this language. False for languages
+   * where Intl.Segmenter produces per-morpheme tokens that flicker too fast
+   * to read — currently only Japanese. Click-to-explain popovers are still
+   * rendered regardless.
+   */
+  supportsKaraoke: boolean;
 }
 
 export const SUPPORTED_LANGUAGES: Language[] = [
@@ -35,6 +43,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇬🇧',
     ttsProvider: 'google',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'es',
@@ -44,6 +53,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇪🇸',
     ttsProvider: 'google',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'es_latam',
@@ -53,6 +63,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🌎',
     ttsProvider: 'google',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'fr',
@@ -62,6 +73,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇫🇷',
     ttsProvider: 'google',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'de',
@@ -71,6 +83,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇩🇪',
     ttsProvider: 'google',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'it',
@@ -80,6 +93,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇹',
     ttsProvider: 'google',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'pt',
@@ -89,6 +103,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇧🇷',
     ttsProvider: 'google',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'ru',
@@ -98,6 +113,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇷🇺',
     ttsProvider: 'google',
     needsRomanization: true,
+    supportsKaraoke: true,
   },
   {
     code: 'hi',
@@ -107,6 +123,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇳',
     ttsProvider: 'google',
     needsRomanization: true,
+    supportsKaraoke: true,
   },
   {
     code: 'zh',
@@ -116,6 +133,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇨🇳',
     ttsProvider: 'google',
     needsRomanization: true,
+    supportsKaraoke: true,
   },
   {
     code: 'ja',
@@ -125,6 +143,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇯🇵',
     ttsProvider: 'google',
     needsRomanization: true,
+    // Japanese tokenizes per-morpheme; karaoke flickers too fast to read.
+    // Click-to-explain popovers still work — only the current-word colour
+    // is gated off.
+    supportsKaraoke: false,
   },
   {
     code: 'ko',
@@ -134,6 +156,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇰🇷',
     ttsProvider: 'google',
     needsRomanization: true,
+    supportsKaraoke: true,
   },
   {
     code: 'vi',
@@ -143,6 +166,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇻🇳',
     ttsProvider: 'google',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'sv',
@@ -152,6 +176,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇪',
     ttsProvider: 'elevenlabs',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'fi',
@@ -161,6 +186,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇫🇮',
     ttsProvider: 'google',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'nl',
@@ -170,6 +196,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇳🇱',
     ttsProvider: 'google',
     needsRomanization: false,
+    supportsKaraoke: true,
   },
   {
     code: 'el',
@@ -179,6 +206,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇬🇷',
     ttsProvider: 'google',
     needsRomanization: true,
+    supportsKaraoke: true,
   },
   {
     code: 'ar',
@@ -188,6 +216,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇦',
     ttsProvider: 'google',
     needsRomanization: true,
+    supportsKaraoke: true,
   },
   // Cantonese (Yue Chinese) — disabled until verified Cantonese-capable
   // voices are added to lib/voices.ts. Google Cloud TTS uses "yue-HK".
@@ -306,6 +335,15 @@ export const ROMANIZATION_LANGUAGES = new Set([
 
 export function languageNeedsRomanization(code: string): boolean {
   return ROMANIZATION_LANGUAGES.has(code);
+}
+
+/**
+ * Whether per-word karaoke highlighting is enabled for the given language.
+ * Defaults to true for unknown codes so new languages get karaoke unless
+ * explicitly opted out in `SUPPORTED_LANGUAGES`.
+ */
+export function languageSupportsKaraoke(code: string): boolean {
+  return getLanguageByCode(code)?.supportsKaraoke ?? true;
 }
 
 /**

@@ -14,7 +14,10 @@ export function isAllLowercase(s: string): boolean {
 // Segmenter construction is measurable on hot paths (review writes,
 // migrations, edit flows). Cache per normalized BCP-47 tag.
 const segmenterCache = new Map<string, Intl.Segmenter>();
-function getSegmenter(bcp47: string): Intl.Segmenter {
+export function getWordSegmenter(language: string): Intl.Segmenter {
+  // `es_latam` and similar underscore-separated tags aren't valid BCP-47;
+  // Intl.Segmenter would throw. Normalize to hyphens.
+  const bcp47 = language.replace(/_/g, '-');
   let s = segmenterCache.get(bcp47);
   if (!s) {
     s = new Intl.Segmenter(bcp47, { granularity: 'word' });
@@ -25,11 +28,8 @@ function getSegmenter(bcp47: string): Intl.Segmenter {
 
 export function tokenizeText(text: string, language: string): Token[] {
   const nfc = text.normalize('NFC');
-  // `es_latam` and similar underscore-separated tags aren't valid BCP-47;
-  // Intl.Segmenter would throw. Normalize to hyphens.
-  const bcp47 = language.replace(/_/g, '-');
   try {
-    const segmenter = getSegmenter(bcp47);
+    const segmenter = getWordSegmenter(language);
     return [...segmenter.segment(nfc)]
       .filter((seg) => seg.isWordLike)
       .map((seg) => ({

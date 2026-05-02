@@ -269,6 +269,7 @@ function PreviewTextRow({
               <div className="flex-1">
                 <HighlightedText
                   text={translation.text || '...'}
+                  language={translation.language}
                   wordTimings={audio?.wordTimings ?? null}
                   localTime={buttonPlayback.active?.localTime ?? 0}
                   isActive={isActive}
@@ -310,6 +311,7 @@ function PreviewTextRow({
               <div className="flex-1">
                 <HighlightedText
                   text={translation.text || '...'}
+                  language={translation.language}
                   wordTimings={audio?.wordTimings ?? null}
                   localTime={buttonPlayback.active?.localTime ?? 0}
                   isActive={isActive}

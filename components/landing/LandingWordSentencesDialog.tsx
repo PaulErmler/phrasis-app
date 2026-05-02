@@ -230,7 +230,7 @@ export function LandingWordSentencesDialog({
                   <div className="flex items-start gap-2">
                     <div className="flex-1">
                       <p className="text-sm leading-relaxed">
-                        {highlightWord(sentence.target, word)}
+                        {highlightWord(sentence.target, word, 'es')}
                       </p>
                     </div>
                     <LandingAudioButton language="ES" />

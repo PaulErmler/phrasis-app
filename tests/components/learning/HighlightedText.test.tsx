@@ -15,6 +15,7 @@ describe('HighlightedText', () => {
     const { container } = render(
       <HighlightedText
         text="hola mundo"
+        language="es"
         wordTimings={timings('hola mundo')}
         localTime={0.25}
         isActive={true}
@@ -32,6 +33,7 @@ describe('HighlightedText', () => {
     const { container } = render(
       <HighlightedText
         text="hola mundo"
+        language="es"
         wordTimings={timings('hola mundo')}
         localTime={0.25}
         isActive={false}
@@ -49,6 +51,7 @@ describe('HighlightedText', () => {
     const { container } = render(
       <HighlightedText
         text="hola mundo"
+        language="es"
         wordTimings={null}
         localTime={0.25}
         isActive={true}
@@ -63,6 +66,7 @@ describe('HighlightedText', () => {
     const { container } = render(
       <HighlightedText
         text="hola mundo bonito"
+        language="es"
         wordTimings={timings('hola mundo bonito')}
         localTime={0}
         isActive={true}
@@ -78,6 +82,7 @@ describe('HighlightedText', () => {
     const { container } = render(
       <HighlightedText
         text="hola mundo bonito"
+        language="es"
         wordTimings={timings('hola mundo bonito')}
         localTime={0.7}
         isActive={true}
@@ -98,6 +103,7 @@ describe('HighlightedText', () => {
     // is gated on currentIndex, not localTime, which is the flicker fix.
     const props = {
       text: 'hola mundo bonito',
+      language: 'es',
       wordTimings: timings('hola mundo bonito'),
       isActive: true,
       enabled: true,
@@ -118,6 +124,7 @@ describe('HighlightedText', () => {
   it('renders the same DOM after isActive flips false as before play started', () => {
     const props = {
       text: 'hola mundo bonito',
+      language: 'es',
       wordTimings: timings('hola mundo bonito'),
       enabled: true,
       localTime: 0,
@@ -137,6 +144,7 @@ describe('HighlightedText', () => {
     const { container } = render(
       <HighlightedText
         text="hola mundo"
+        language="es"
         wordTimings={timings('hola mundo')}
         localTime={5}
         isActive={true}
@@ -158,6 +166,7 @@ describe('HighlightedText', () => {
     const { container } = render(
       <HighlightedText
         text="hola mundo"
+        language="es"
         wordTimings={wordTimings}
         localTime={0}
         isActive={true}
@@ -177,6 +186,7 @@ describe('HighlightedText', () => {
     const { container } = render(
       <HighlightedText
         text="alpha beta gamma"
+        language="en"
         wordTimings={[
           { word: 'foo', start: 0, end: 0.5 },
           { word: 'bar', start: 0.5, end: 1.0 },
@@ -199,6 +209,7 @@ describe('HighlightedText', () => {
       const { container } = render(
         <HighlightedText
           text={sentence}
+          language="en"
           wordTimings={sentenceTimings}
           localTime={0}
           isActive={false}
@@ -224,6 +235,7 @@ describe('HighlightedText', () => {
       const { container } = render(
         <HighlightedText
           text={sentence}
+          language="en"
           wordTimings={sentenceTimings}
           localTime={1.7}
           isActive={true}
@@ -244,6 +256,7 @@ describe('HighlightedText', () => {
       const { container } = render(
         <HighlightedText
           text={sentence}
+          language="en"
           wordTimings={sentenceTimings}
           localTime={2.7}
           isActive={true}
@@ -268,6 +281,7 @@ describe('HighlightedText', () => {
       const { container } = render(
         <HighlightedText
           text={text}
+          language="en"
           wordTimings={t}
           localTime={0}
           isActive={false}
@@ -292,6 +306,7 @@ describe('HighlightedText', () => {
       const { container } = render(
         <HighlightedText
           text={text}
+          language="en"
           wordTimings={t}
           localTime={0}
           isActive={false}
@@ -310,6 +325,7 @@ describe('HighlightedText', () => {
       const { container } = render(
         <HighlightedText
           text={sentence}
+          language="en"
           wordTimings={sentenceTimings}
           localTime={0}
           isActive={false}
@@ -330,6 +346,7 @@ describe('HighlightedText', () => {
       // before and after the flip — only their class/style change.
       const props = {
         text: sentence,
+        language: 'en',
         wordTimings: sentenceTimings,
         enabled: true,
         highlightTerm: 'happy',
@@ -355,6 +372,7 @@ describe('HighlightedText', () => {
       const { container } = render(
         <HighlightedText
           text="alpha happy gamma"
+          language="en"
           wordTimings={[
             { word: 'foo', start: 0, end: 0.5 },
             { word: 'bar', start: 0.5, end: 1.0 },

@@ -133,6 +133,7 @@ export function CardShell({
                 <div className="flex-1">
                   <ClickableWords
                     text={translation.text || '...'}
+                    language={translation.language}
                     wordTimings={audio?.wordTimings ?? null}
                     localTime={activeClip?.localTime ?? 0}
                     isActive={!!isActive}

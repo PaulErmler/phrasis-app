@@ -15,11 +15,14 @@ import {
   findCurrentIndex,
   matchRatio,
 } from '@/lib/audio/alignTimings';
+import { languageSupportsKaraoke } from '@/lib/languages';
 import { useLearningChatToggle } from './LearningChatLayout';
 import type { WordTiming } from './types';
 
 interface Props {
   text: string;
+  /** BCP-47 language code of `text`. Drives locale-aware word segmentation. */
+  language: string;
   wordTimings: WordTiming[] | null | undefined;
   localTime: number;
   isActive: boolean;
@@ -44,6 +47,7 @@ const MIN_MATCH_RATIO = 0.5;
  */
 export function ClickableWords({
   text,
+  language,
   wordTimings,
   localTime,
   isActive,
@@ -55,18 +59,19 @@ export function ClickableWords({
   const t = useTranslations('Chat');
 
   const aligned = useMemo(
-    () => alignWordTimings(text, wordTimings),
-    [text, wordTimings],
+    () => alignWordTimings(text, wordTimings, language),
+    [text, wordTimings, language],
   );
 
-  const canKaraoke = useMemo(
-    () =>
+  const canKaraoke = useMemo(() => {
+    if (!languageSupportsKaraoke(language)) return false;
+    return (
       enabled &&
       !!wordTimings &&
       wordTimings.length > 0 &&
-      matchRatio(aligned) >= MIN_MATCH_RATIO,
-    [enabled, wordTimings, aligned],
-  );
+      matchRatio(aligned) >= MIN_MATCH_RATIO
+    );
+  }, [language, enabled, wordTimings, aligned]);
 
   const currentIndex =
     isActive && canKaraoke ? findCurrentIndex(aligned, localTime) : -1;
