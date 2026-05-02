@@ -207,7 +207,6 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
           dailyReviewsToday={state.dailyReviewsToday}
           dailyTimeMsToday={state.dailyTimeMsToday}
           dailyNewWordsToday={state.dailyNewWordsToday}
-          practicedWordsThisSession={state.practicedWordsThisSession}
           schedulingMode={state.schedulingMode}
           reviewMode={state.reviewMode}
           autoAdvance={state.autoAdvance}

@@ -30,7 +30,6 @@ interface ProgressDisplayProps {
   dailyReviewsToday: number;
   dailyTimeMsToday: number;
   dailyNewWordsToday: number;
-  practicedWordsThisSession: number;
   schedulingMode: 'learn_new' | 'learnAndReview';
   /** Auto-advance + auto-advance bar are audio-mode only. */
   reviewMode: 'audio' | 'full';
@@ -171,7 +170,6 @@ function CelebrationContent({
   dailyReviewsToday,
   dailyTimeMsToday,
   dailyNewWordsToday,
-  practicedWordsThisSession,
   schedulingMode,
   reviewMode,
   autoAdvance,
@@ -188,8 +186,7 @@ function CelebrationContent({
 
   // Per-language counts for this session, derived from the celebration word
   // list (every userWords row is unique per (language, normalized word) so
-  // length == count). Sorted desc to match the previous `getNewWordsForSession`
-  // shape.
+  // length == count). Sorted desc.
   const sessionWordCounts = useMemo(() => {
     const perLang = new Map<string, number>();
     for (const w of sessionWordsList) {
@@ -203,7 +200,9 @@ function CelebrationContent({
     };
   }, [sessionWordsList]);
 
-  // Hero metric selection: session new-words → today's new-words → practiced this session.
+  // Hero metric selection: session new-words → today's new-words → today's
+  // review count. The review-count fallback ensures users with no new
+  // vocab still get a positive hero number.
   const hero = useMemo(() => {
     if (sessionWordCounts.total > 0) {
       return { kind: 'sessionNew' as const, value: sessionWordCounts.total };
@@ -211,15 +210,15 @@ function CelebrationContent({
     if (dailyNewWordsToday > 0) {
       return { kind: 'todayNew' as const, value: dailyNewWordsToday };
     }
-    return { kind: 'practiced' as const, value: practicedWordsThisSession };
-  }, [sessionWordCounts.total, dailyNewWordsToday, practicedWordsThisSession]);
+    return { kind: 'reviewsToday' as const, value: dailyReviewsToday };
+  }, [sessionWordCounts.total, dailyNewWordsToday, dailyReviewsToday]);
 
   // For "new words" hero kinds, clamp the animated target so the counter
-  // never ticks past the cap. `practiced` is uncapped — the hero text label
-  // changes, and a high practiced count is fine.
+  // never ticks past the cap. `reviewsToday` is uncapped — review counts
+  // can legitimately reach the hundreds.
   const heroAnimTarget =
-    hero.kind === 'practiced' ? hero.value : Math.min(hero.value, NEW_WORDS_CAP);
-  const heroOverflowed = hero.kind !== 'practiced' && hero.value > NEW_WORDS_CAP;
+    hero.kind === 'reviewsToday' ? hero.value : Math.min(hero.value, NEW_WORDS_CAP);
+  const heroOverflowed = hero.kind !== 'reviewsToday' && hero.value > NEW_WORDS_CAP;
 
   // Memoised so the counter doesn't restart on every render.
   const heroEasing = useMemo(() => buildHeroEasing(heroAnimTarget), [heroAnimTarget]);
@@ -291,8 +290,8 @@ function CelebrationContent({
     hero.kind === 'sessionNew' && sessionWordCounts.perLanguage.length > 1;
 
   const heroDisplay =
-    hero.kind === 'practiced'
-      ? String(animHero)
+    hero.kind === 'reviewsToday'
+      ? animHero.toLocaleString()
       : `+${animHero}${heroOverflowed && animHero >= NEW_WORDS_CAP ? '+' : ''}`;
 
   return (
@@ -324,7 +323,7 @@ function CelebrationContent({
               ? t('sessionNewWords')
               : hero.kind === 'todayNew'
                 ? t('todayNewWords')
-                : t('practicedThisSession')}
+                : t('reviewsTodayHero')}
           </p>
 
           {/* Per-language flags — fixed-height slot keeps layout stable. */}
@@ -397,7 +396,7 @@ function CelebrationContent({
             variants={CHILD_VARIANTS}
           >
             <p className="text-muted-xs">{t('comingUp')}</p>
-            <div className="flex justify-center gap-x-24">
+            <div className="flex justify-center gap-x-4">
               <StatePill
                 label={t('stateNew')}
                 value={cardCounts.new}
@@ -490,8 +489,12 @@ function StatePill({
   cap?: number;
 }) {
   const display = cap != null && value > cap ? `${cap}+` : String(value);
+  // `min-w` enforces label separation — relying on row-level `gap-x-*` alone
+  // is fragile because each pill's intrinsic width tracks its label
+  // ("learning" ≈ 52 px, "new" ≈ 28 px), so the gap is between label edges
+  // not pill centers, and long labels can run together regardless of gap.
   return (
-    <div className="flex flex-col items-center gap-0.5">
+    <div className="flex flex-col items-center gap-0.5 min-w-24">
       <span className={`text-lg font-semibold tabular-nums ${colorClass}`}>{display}</span>
       <span className="text-muted-xs">{label}</span>
     </div>

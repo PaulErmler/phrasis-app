@@ -383,7 +383,7 @@
     "progressDisplay": {
       "sessionNewWords": "new words",
       "todayNewWords": "new words today",
-      "practicedThisSession": "words practiced this session",
+      "reviewsTodayHero": "reviews today",
       "reviewsToday": "reviews today",
       "timeToday": "time today",
       "newWordsToday": "new words today",

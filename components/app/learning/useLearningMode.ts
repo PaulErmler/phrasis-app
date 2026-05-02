@@ -35,7 +35,6 @@ import {
   ENSURE_CONTENT_REVIEW_INTERVAL,
   PROGRESS_DISPLAY_INTERVAL,
 } from '@/lib/constants/learning';
-import { tokenizeText } from '@/lib/wordTokenize';
 import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
 
 function effectivePhase(
@@ -61,7 +60,6 @@ interface BaseState {
   dailyReviewsToday: number;
   dailyTimeMsToday: number;
   dailyNewWordsToday: number;
-  practicedWordsThisSession: number;
   progressDisplayActive: boolean;
   /** True once the milestone-triggering mutation has resolved; gates the
    * celebration audio + counter animations so they fire against fresh data. */
@@ -320,30 +318,19 @@ export function useLearningMode(
   const [cardAnimationKey, setCardAnimationKey] = useState(0);
 
   // ----- Progress display (every PROGRESS_DISPLAY_INTERVAL reviews per day) -----
+  // Session id is rotated on dismiss and on course change so
+  // `getNewWordsForCelebration`'s session bucket only ever contains words
+  // discovered since the last reset. Backend-only — no client tokenization.
   const sessionIdRef = useRef<string>('');
   const sessionCourseIdRef = useRef<string | null>(null);
-  // Unique normalized tokens encountered since the last session reset. Used
-  // by the fallback hero metric. Grows for the lifetime of one session — at
-  // ~10–20 unique words per card and a 20-card session, ~200–400 entries
-  // before reset, so memory stays trivially bounded.
-  const practicedWordsRef = useRef<Set<string>>(new Set());
-  // Card-id dedupe so we don't re-tokenize the same card when scheduling
-  // bounces a card back. Reset alongside `practicedWordsRef`.
-  const tokenizedCardsRef = useRef<Set<string>>(new Set());
-  const [practicedWordsThisSession, setPracticedWordsThisSession] = useState(0);
 
   function mintSessionId(): string {
     return typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
-  // Mint a fresh id and clear the per-session tracking sets. Used both on
-  // course change AND after every milestone dismissal — each celebration
-  // shows only words discovered since the previous one.
   function resetSessionLocalState() {
     sessionIdRef.current = mintSessionId();
-    practicedWordsRef.current = new Set();
-    tokenizedCardsRef.current = new Set();
   }
 
   const activeCourseIdForSession = activeCourseQuery?._id ?? null;
@@ -356,11 +343,6 @@ export function useLearningMode(
   ) {
     resetSessionLocalState();
     sessionCourseIdRef.current = activeCourseIdForSession;
-    // Setting state during render is the React-recommended pattern for
-    // derived state when a "prop" (here: active course id) changes. Setters
-    // are no-ops if the value is unchanged, so this only re-renders when
-    // there's actually a course switch to clean up after.
-    setPracticedWordsThisSession(0);
   }
   // Two flags for the celebration:
   //  - `active`  flips optimistically *before* the mutation awaits, so the
@@ -389,7 +371,6 @@ export function useLearningMode(
     // takes effect from the next review's mutation onward — the celebration
     // we just dismissed already finished its queries against the old id.
     resetSessionLocalState();
-    setPracticedWordsThisSession(0);
   }, []);
 
   // Track when the current card was first shown (for time-spent stats)
@@ -481,31 +462,6 @@ export function useLearningMode(
     setIsExiting(false);
     cardShownAtRef.current = Date.now();
   }, [cardForReview?._id]);
-
-  // Tokenize each card's languages once per session so we can count unique
-  // words practiced. Used as the fallback hero metric on the progress display
-  // when no new words were encountered.
-  useEffect(() => {
-    if (!cardForReview) return;
-    const cardKey = String(cardForReview._id);
-    if (tokenizedCardsRef.current.has(cardKey)) return;
-    tokenizedCardsRef.current.add(cardKey);
-
-    const set = practicedWordsRef.current;
-    const before = set.size;
-    const sourceLang = cardForReview.sourceLanguage;
-    if (sourceLang) {
-      for (const t of tokenizeText(cardForReview.sourceText, sourceLang)) {
-        set.add(`${sourceLang}:${t.normalized}`);
-      }
-    }
-    for (const tr of cardForReview.translations) {
-      for (const t of tokenizeText(tr.text, tr.language)) {
-        set.add(`${tr.language}:${t.normalized}`);
-      }
-    }
-    if (set.size !== before) setPracticedWordsThisSession(set.size);
-  }, [cardForReview]);
 
   // --------------------------------------------------------------------------
   // Review / master / hide
@@ -704,7 +660,6 @@ export function useLearningMode(
     dailyReviewsToday,
     dailyTimeMsToday,
     dailyNewWordsToday,
-    practicedWordsThisSession,
     progressDisplayActive,
     progressDisplayReady,
     dismissProgressDisplay,
