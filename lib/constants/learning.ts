@@ -26,7 +26,7 @@ export const MAX_IMPORT_BATCH = 500;
 export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
 
 /** Interrupt the learning flow with a celebration screen every N reviews (per day). */
-export const PROGRESS_DISPLAY_INTERVAL = 1;
+export const PROGRESS_DISPLAY_INTERVAL = 20;
 
 /** How long the celebration screen stays before auto-advancing (ms). */
 export const PROGRESS_DISPLAY_DURATION_MS = 7000;
