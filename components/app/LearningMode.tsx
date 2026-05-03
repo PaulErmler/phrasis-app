@@ -367,9 +367,11 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
       />
     );
 
+  const isRadio = state.courseSettings.schedulingMode === 'radio';
+
   return (
     <div className="flex flex-col h-full">
-      {state.courseSettings.progressDisplayEnabled !== false && (
+      {!isRadio && state.courseSettings.progressDisplayEnabled !== false && (
         <SessionProgressBar dailyReviewsToday={state.dailyReviewsToday} />
       )}
       <div className="flex-1 min-h-0 relative">

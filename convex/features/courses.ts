@@ -863,7 +863,7 @@ export const updateCourseSettings = mutation({
     fullReviewTargetAudioMode: v.optional(
       v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
     ),
-    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))),
+    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

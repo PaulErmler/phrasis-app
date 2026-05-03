@@ -9,6 +9,7 @@ import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
 import { updateWordTextsForEdit } from '../db/stats/wordTracking';
 import { recordReviewStats } from '../db/stats/recordReviewStats';
+import { recordRadioPlayStats } from '../db/stats/recordRadioPlayStats';
 import { patchCard, insertCard, deleteCard } from '../db/stats/cardAggregates';
 import {
   scheduleCard,
@@ -34,6 +35,20 @@ import {
   CARD_OVERRIDE_SPEED_MIN,
   CARD_OVERRIDE_SPEED_MAX,
 } from '../../lib/constants/audioPlayback';
+
+/**
+ * A fresh, uniform-random integer used as the radio-mode tiebreak. Re-rolled
+ * on every `advanceRadioCard` so each round-robin loop visits cards in a
+ * different order. After the first full loop, the order is also fully
+ * decoupled from review's `dueDate`-driven sequence; for decks that pre-date
+ * this field, every card starts with `radioOrderKey === undefined` and the
+ * very first loop falls back to `_creationTime` order until each card has
+ * been played once. 32-bit space gives collision-free tiebreaking in any
+ * plausible deck size.
+ */
+function randomRadioOrderKey(): number {
+  return Math.floor(Math.random() * 0x7fffffff);
+}
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
@@ -128,6 +143,22 @@ export const getCardForReview = query({
             .eq('isMastered', false)
             .eq('isGraduated', false)
             .lte('dueDate', now),
+        )
+        .order('asc')
+        .take(2);
+    } else if (schedulingMode === 'radio') {
+      // Radio mode: round-robin by radioRoundCounter, ignoring dueDate.
+      // Lowest counter plays next; new cards (counter undefined → 0) jump to
+      // the front. Convex tiebreaks equal index keys by _creationTime, which
+      // is fine here — the play mutation's catch-up logic ensures fresh cards
+      // don't monopolize the queue.
+      dueCards = await ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_isHidden_and_isMastered_and_radioRoundCounter_and_radioOrderKey', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false),
         )
         .order('asc')
         .take(2);
@@ -481,6 +512,120 @@ export const unhideCard = mutation({
 });
 
 /**
+ * Advance to the next card in radio mode.
+ *
+ * Bumps the card's `radioRoundCounter` so the next-lowest counter rises to
+ * the front, re-rolls `radioOrderKey` so the round-robin shuffles every loop
+ * (and stays decoupled from the review/dueDate order), and records radio
+ * playtime in the per-mode stats.
+ *
+ * Catch-up rule: a brand-new card (counter 0) joining a deck whose other
+ * cards are all at e.g. 100 should not replay 99 more times. After playing,
+ * its counter jumps to `max(picked + 1, floorOfOthers)` so it lands beside
+ * the rest of the deck and rejoins the round-robin rotation.
+ *
+ * Stats: writes `dailyStats.reviewsByMode.radio` + `timeMsByMode.radio` and
+ * the equivalent rollups, plus `courseStats.totalReviewsByMode.radio` and
+ * the streak. Word tracking, FSRS state, accuracy, ratings, and collection
+ * progress are explicitly skipped — radio is passive listening.
+ */
+export const advanceRadioCard = mutation({
+  args: {
+    cardId: v.id('cards'),
+    timezone: v.string(),
+    timeSpentMs: v.optional(v.number()),
+  },
+  returns: v.object({
+    nextRadioRoundCounter: v.number(),
+  }),
+  handler: async (ctx, args) => {
+    const { userId, card, deck } = await authorizeCardAccess(ctx, args.cardId);
+
+    // Fetch the two lowest-counter playable cards. The first should be the
+    // card we just played; the second tells us the floor that the played
+    // card needs to catch up to.
+    const lowestTwo = await ctx.db
+      .query('cards')
+      .withIndex('by_deckId_and_isHidden_and_isMastered_and_radioRoundCounter_and_radioOrderKey', (q) =>
+        q
+          .eq('deckId', deck._id)
+          .eq('isHidden', false)
+          .eq('isMastered', false),
+      )
+      .order('asc')
+      .take(2);
+
+    const pickedCounter = card.radioRoundCounter ?? 0;
+    // Identify the floor card — the second-lowest, excluding `card` itself.
+    // If the just-played card is no longer the lowest (e.g. it was favorited
+    // or another tab advanced concurrently), `lowestTwo[0]` may differ from
+    // `card`; in that case the floor is whichever of the two is not `card`.
+    const floorCard = lowestTwo.find((c) => c._id !== card._id) ?? null;
+    const floorCounter = floorCard ? (floorCard.radioRoundCounter ?? 0) : pickedCounter;
+    const newCounter = Math.max(pickedCounter + 1, floorCounter);
+
+    await patchCard(
+      ctx,
+      args.cardId,
+      {
+        radioRoundCounter: newCounter,
+        // Re-roll the random tiebreak each play so the order changes between
+        // loops and never aligns with the review (`dueDate`-driven) order.
+        radioOrderKey: randomRadioOrderKey(),
+        lastReviewedAt: Date.now(),
+      },
+      card,
+    );
+
+    await recordRadioPlayStats(ctx, {
+      userId,
+      courseId: deck.courseId,
+      timezone: args.timezone,
+      timeSpentMs: args.timeSpentMs,
+    });
+
+    return { nextRadioRoundCounter: newCounter };
+  },
+});
+
+/**
+ * Whether the user's active deck has at least one playable card
+ * (non-hidden, non-mastered). Used by the home screen to gate the Radio
+ * mode button — radio is meaningless on an empty deck.
+ *
+ * Uses the minimal `by_deckId_and_isHidden_and_isMastered` index: radio
+ * doesn't care about due-ness, and a trailing field like `dueDate`,
+ * `lastReviewedAt`, or the radio counters would needlessly broaden the
+ * read set and refire the subscription every time those fields change.
+ */
+export const hasPlayableCards = query({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return false;
+
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return false;
+
+    const deck = await getDeckByCourseId(ctx, active.course._id);
+    if (!deck) return false;
+
+    const first = await ctx.db
+      .query('cards')
+      .withIndex('by_deckId_and_isHidden_and_isMastered', (q) =>
+        q
+          .eq('deckId', deck._id)
+          .eq('isHidden', false)
+          .eq('isMastered', false),
+      )
+      .first();
+
+    return first !== null;
+  },
+});
+
+/**
  * Set or clear a per-card, per-language playback-speed override.
  *
  * `speed === null` removes the override for that language so playback falls
@@ -769,6 +914,11 @@ export const editCard = mutation({
       isGraduated: card.isGraduated ?? false,
       schedulingPhase: card.schedulingPhase,
       preReviewCount: card.preReviewCount,
+      radioRoundCounter: card.radioRoundCounter ?? 0,
+      // Preserve the existing tiebreak so the edited card keeps its place in
+      // the radio rotation (or take a fresh random one if the original card
+      // predates this field).
+      radioOrderKey: card.radioOrderKey ?? randomRadioOrderKey(),
       fsrsState: card.fsrsState,
       lastReviewedAt: card.lastReviewedAt,
       wordsTrackedLanguages: card.wordsTrackedLanguages,

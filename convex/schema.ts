@@ -48,7 +48,7 @@ export const courseSettingsFields = {
   // Review mode
   reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
   // Scheduling mode
-  schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))), // 'learnAndReview' (default) or 'learn_new'
+  schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))), // 'learnAndReview' (default), 'learn_new', or 'radio' (round-robin playback, no FSRS)
   fullReviewTargetAudioMode: v.optional(
     v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
   ), // When to play target audio in full review mode
@@ -194,16 +194,26 @@ export default defineSchema({
     lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review and FSRS phases)
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
+    radioRoundCounter: v.optional(v.number()), // Radio mode: # of times this card has been played in radio mode. Lowest counter plays next; new cards default to 0 so they play first. Optional for backward compat — undefined treated as 0.
+    radioOrderKey: v.optional(v.number()), // Radio mode: random tiebreak within equal `radioRoundCounter`. Re-rolled on each play so the round-robin order shuffles every loop and never matches the review (`dueDate`-driven) order. Optional for backward compat.
   })
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_dueDate', ['deckId', 'dueDate'])
     .index('by_deckId_and_textId', ['deckId', 'textId'])
     .index('by_textId', ['textId'])
+    .index('by_deckId_and_isHidden_and_isMastered', ['deckId', 'isHidden', 'isMastered'])
     .index('by_deckId_and_isHidden_and_isMastered_and_dueDate', [
       'deckId',
       'isHidden',
       'isMastered',
       'dueDate',
+    ])
+    .index('by_deckId_and_isHidden_and_isMastered_and_radioRoundCounter_and_radioOrderKey', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'radioRoundCounter',
+      'radioOrderKey',
     ])
     .index('by_deckId_and_lastReviewedAt', ['deckId', 'lastReviewedAt'])
     .index('by_deckId_and_isHidden_and_lastReviewedAt', ['deckId', 'isHidden', 'lastReviewedAt'])
@@ -239,7 +249,7 @@ export default defineSchema({
     totalChatCardsApproved: v.optional(v.number()),
     totalCardsEdited: v.optional(v.number()),
     totalCardsAddedManually: v.optional(v.number()),
-    totalReviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    totalReviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
     totalAccuracySum: v.optional(v.number()),
     totalAccuracyCount: v.optional(v.number()),
   }).index('by_userId_and_courseId', ['userId', 'courseId']),
@@ -254,8 +264,8 @@ export default defineSchema({
     timeMs: v.number(),
     cardsReviewed: v.number(),
     // Review mode breakdown
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
-    timeMsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
+    timeMsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
     // Rating distribution
     ratingCounts: v.optional(v.object({
       stillLearning: v.number(), understood: v.number(),
@@ -436,7 +446,7 @@ export default defineSchema({
     totalNewCards: v.number(),
     totalTimeMs: v.number(),
     activeDays: v.number(),
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
   })
     .index('by_userId_and_courseId_and_week', ['userId', 'courseId', 'week'])
     .index('by_userId_and_courseId', ['userId', 'courseId']),
@@ -451,7 +461,7 @@ export default defineSchema({
     totalTimeMs: v.number(),
     activeDays: v.number(),
     activeWeeks: v.number(),
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
   })
     .index('by_userId_and_courseId_and_month', ['userId', 'courseId', 'month'])
     .index('by_userId_and_courseId', ['userId', 'courseId']),
@@ -467,7 +477,7 @@ export default defineSchema({
     activeDays: v.number(),
     activeWeeks: v.number(),
     activeMonths: v.number(),
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
   })
     .index('by_userId_and_courseId_and_year', ['userId', 'courseId', 'year'])
     .index('by_userId_and_courseId', ['userId', 'courseId']),

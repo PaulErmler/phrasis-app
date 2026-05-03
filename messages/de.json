@@ -292,6 +292,8 @@
     "audioReview": "Audio-Übung",
     "learnNew": "Neues lernen",
     "learnAndReview": "Wiederholen",
+    "radioMode": "Radio",
+    "radioRequiresCards": "Füge zuerst ein paar Karten hinzu, bevor du den Radio-Modus startest.",
     "cardCounts": {
       "new": "N",
       "learning": "L",

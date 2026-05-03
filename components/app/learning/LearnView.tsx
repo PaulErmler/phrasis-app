@@ -118,17 +118,26 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
   });
   useScreenWakeLock(state.status === 'reviewing');
   const reviewMode = state.status !== 'loading' ? (state.courseSettings?.reviewMode ?? 'audio') : 'audio';
+  const schedulingMode = state.status !== 'loading'
+    ? (state.courseSettings?.schedulingMode ?? 'learnAndReview')
+    : 'learnAndReview';
+  const isRadio = schedulingMode === 'radio';
   const tutorialId = reviewMode === 'full' ? TUTORIAL_IDS.FULL_REVIEW_INTRO : TUTORIAL_IDS.AUDIO_REVIEW_INTRO;
   const { isActive, isCompleted, restartTutorial } = useTutorial(tutorialId, {
     delayMs: 1000,
-    enabled: state.status === 'reviewing' && !state.settingsOpen,
+    // Radio mode is its own flow — don't trigger the audio-review tutorial
+    // when the user explicitly chose to listen.
+    enabled: state.status === 'reviewing' && !state.settingsOpen && !isRadio,
   });
   // `progressDisplayActive` lives on BaseState so it persists across status
   // transitions (e.g. milestone hit on the last card → noCardsDue mid-cele).
   const progressDisplayActive = state.progressDisplayActive;
   const { audio, openSettings } = useLearningAudio(state, {
-    disableAutoAdvance: reviewMode === 'audio' && isActive,
-    disableAutoPlay: isActive || !isCompleted || progressDisplayActive,
+    // Radio mode forces autoplay + auto-advance. The tutorial gates and the
+    // celebration pause don't apply (no tutorial in radio, no celebration in
+    // radio).
+    disableAutoAdvance: !isRadio && reviewMode === 'audio' && isActive,
+    disableAutoPlay: !isRadio && (isActive || !isCompleted || progressDisplayActive),
   });
 
   const goHome = useCallback(() => {
@@ -185,10 +194,6 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
       <Loader size={24} />
     </div>
   ) : null;
-
-  const schedulingMode = state.status !== 'loading'
-    ? (state.courseSettings?.schedulingMode ?? 'learnAndReview')
-    : 'learnAndReview';
 
   const header = (
     <LearningHeader

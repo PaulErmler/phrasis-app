@@ -704,6 +704,11 @@ export async function createCardsFromTexts(
         isGraduated: false,
         schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
+        radioRoundCounter: 0,
+        // Random tiebreak so that even brand-new cards inserted in a single
+        // batch (which would otherwise share creation time + counter) end up
+        // in a shuffled radio order rather than insertion order.
+        radioOrderKey: Math.floor(Math.random() * 0x7fffffff),
         searchableText,
         searchableTextLanguages,
       });

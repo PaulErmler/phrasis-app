@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Preloaded, usePreloadedQuery, useMutation } from 'convex/react';
+import { Preloaded, usePreloadedQuery, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { NewChatInput } from '@/components/chat/NewChatInput';
 import { CollectionCarousel } from '@/components/app/CollectionCarousel';
@@ -63,6 +63,15 @@ export function HomeView({
   }, [onTutorialReady, restartTutorial]);
 
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
+  // Drives the disabled state of the Radio button on the home screen — radio
+  // mode is meaningless on an empty deck. Skipped while HomeView is hidden
+  // (e.g. user is mid-LearnView) so the subscription doesn't refire on every
+  // radio-mode card advance. While loading we leave the button enabled so the
+  // click path falls back to the toast.
+  const hasPlayableCards = useQuery(
+    api.features.scheduling.hasPlayableCards,
+    isHidden ? 'skip' : {},
+  );
   const updateCourseSettings = useMutation(
     api.features.courses.updateCourseSettings,
   ).withOptimisticUpdate((localStore, args) => {
@@ -159,6 +168,7 @@ export function HomeView({
           animateEntrance={animateEntrance}
           skipLiveStats={isHidden}
           courseId={courseSettings?.courseId}
+          hasPlayableCards={hasPlayableCards ?? true}
         />
 
         {/* Content actions */}

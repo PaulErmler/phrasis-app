@@ -62,7 +62,7 @@ export interface CourseSettings {
   reviewMode?: 'audio' | 'full';
   fullReviewTargetAudioMode?: 'always' | 'afterSubmit' | 'never';
   // Scheduling mode
-  schedulingMode?: 'learn_new' | 'learnAndReview';
+  schedulingMode?: 'learn_new' | 'learnAndReview' | 'radio';
   // Language order overrides
   baseLanguageOrder?: string[];
   targetLanguageOrder?: string[];

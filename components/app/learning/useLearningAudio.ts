@@ -28,8 +28,16 @@ export function useLearningAudio(
       : null;
 
   const isReviewing = state.status === 'reviewing';
-  const autoPlay =
-    disableAutoPlay ? false : (cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY);
+  // Radio mode is intrinsically a hands-free playback queue, so it forces
+  // autoplay + auto-advance regardless of the user's setting. `disableAutoPlay`
+  // (e.g. while a tutorial is starting) still wins so we don't start audio at
+  // the wrong moment.
+  const isRadio = cs?.schedulingMode === 'radio';
+  const autoPlay = disableAutoPlay
+    ? false
+    : isRadio
+      ? true
+      : (cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY);
   const reviewMode = cs?.reviewMode ?? 'audio';
   const fullReviewTargetAudioMode = cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
 
@@ -44,17 +52,20 @@ export function useLearningAudio(
     if (state.status === 'reviewing') state.handleNext();
   }, [state]);
 
-  // In audio mode, auto-advance after schedule completes; in full mode, never auto-advance
+  // In audio mode, auto-advance after schedule completes; in full mode, never
+  // auto-advance. Radio mode forces auto-advance even if the user has it off
+  // (radio is a continuous-playback queue and stalling on each card defeats
+  // the point).
   const handleScheduleComplete = useCallback(() => {
     if (
       state.status === 'reviewing' &&
       reviewMode === 'audio' &&
-      audioSettings.autoAdvance &&
+      (audioSettings.autoAdvance || isRadio) &&
       !disableAutoAdvance
     ) {
       state.handleNext();
     }
-  }, [state, reviewMode, audioSettings.autoAdvance, disableAutoAdvance]);
+  }, [state, reviewMode, audioSettings.autoAdvance, isRadio, disableAutoAdvance]);
 
   const resetReviewFlag = useCallback(() => {
     if (state.status === 'reviewing') state.resetReviewFlag();

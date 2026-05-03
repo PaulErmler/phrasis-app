@@ -165,40 +165,42 @@ export function LearningControls({
       <div className="border-t lg:border-t-0">
         <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
           {/* Rating buttons */}
-          <div className="flex gap-2" data-tutorial="rating-buttons">
-            {validRatings.map((rating) => (
-              <div
-                key={rating}
-                className="flex-1 flex flex-col items-center gap-1"
-              >
-                <span className="text-[11px] text-muted-foreground">
-                  {ratingIntervals[rating]}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onSelectRating(rating);
-                    if (instantProceed) onNext(rating);
-                  }}
-                  data-testid={
-                    rating === 'stillLearning'
-                      ? 'learn-rating-still-learning'
-                      : rating === 'understood'
-                        ? 'learn-rating-understood'
-                        : `learn-rating-${rating}`
-                  }
-                  className={`w-full ${
-                    activeRating === rating
-                      ? 'ring-2 ring-primary border-primary bg-primary/5'
-                      : ''
-                  }`}
+          {validRatings.length > 0 && (
+            <div className="flex gap-2" data-tutorial="rating-buttons">
+              {validRatings.map((rating) => (
+                <div
+                  key={rating}
+                  className="flex-1 flex flex-col items-center gap-1"
                 >
-                  {t(`ratings.${rating}`)}
-                </Button>
-              </div>
-            ))}
-          </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    {ratingIntervals[rating]}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onSelectRating(rating);
+                      if (instantProceed) onNext(rating);
+                    }}
+                    data-testid={
+                      rating === 'stillLearning'
+                        ? 'learn-rating-still-learning'
+                        : rating === 'understood'
+                          ? 'learn-rating-understood'
+                          : `learn-rating-${rating}`
+                    }
+                    className={`w-full ${
+                      activeRating === rating
+                        ? 'ring-2 ring-primary border-primary bg-primary/5'
+                        : ''
+                    }`}
+                  >
+                    {t(`ratings.${rating}`)}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
 
         
           {showProgressBar && (

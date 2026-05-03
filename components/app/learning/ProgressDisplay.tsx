@@ -30,7 +30,7 @@ interface ProgressDisplayProps {
   dailyReviewsToday: number;
   dailyTimeMsToday: number;
   dailyNewWordsToday: number;
-  schedulingMode: 'learn_new' | 'learnAndReview';
+  schedulingMode: 'learn_new' | 'learnAndReview' | 'radio';
   /** Auto-advance + auto-advance bar are audio-mode only. */
   reviewMode: 'audio' | 'full';
   /** Mirrors `courseSettings.autoAdvance`. Even in audio mode, the

@@ -82,6 +82,7 @@ export function ProgressStatsCard({
   animateEntrance,
   skipLiveStats,
   courseId,
+  hasPlayableCards,
 }: {
   onStartLearn: (schedulingMode: SchedulingMode) => void;
   reviewMode: ReviewMode;
@@ -89,6 +90,7 @@ export function ProgressStatsCard({
   animateEntrance?: boolean;
   skipLiveStats?: boolean;
   courseId?: string;
+  hasPlayableCards?: boolean;
 }) {
   const t = useTranslations('AppPage');
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -261,6 +263,7 @@ export function ProgressStatsCard({
         onStartLearn={onStartLearn}
         reviewMode={reviewMode}
         onReviewModeChange={onReviewModeChange}
+        hasPlayableCards={hasPlayableCards}
       />
     </div>
   );

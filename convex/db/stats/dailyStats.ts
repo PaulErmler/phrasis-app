@@ -24,7 +24,7 @@ const EMPTY_RATING_COUNTS = () => ({
   stillLearning: 0, understood: 0,
   again: 0, hard: 0, good: 0, easy: 0,
 });
-const EMPTY_MODE_COUNTS = () => ({ audio: 0, full: 0 });
+const EMPTY_MODE_COUNTS = () => ({ audio: 0, full: 0, radio: 0 });
 const EMPTY_CARD_STATE = () => ({ new: 0, learning: 0, review: 0, relearning: 0 });
 
 export async function upsertDailyStats(
@@ -35,7 +35,7 @@ export async function upsertDailyStats(
     date: string;
     timeMs: number;
     isNewCard: boolean;
-    reviewMode?: 'audio' | 'full';
+    reviewMode?: 'audio' | 'full' | 'radio';
     rating?: string;
     accuracy?: number;
     wasDefaultRating?: boolean;
@@ -72,13 +72,21 @@ export async function upsertDailyStats(
       }
     }
 
-    // Mode counts
-    let reviewsByMode: { audio: number; full: number } | undefined;
-    let timeMsByMode: { audio: number; full: number } | undefined;
+    // Mode counts. `radio` is optional in the stored shape (added later),
+    // so we coalesce both the merged previous shape and the per-key read.
+    type ModeCounts = { audio: number; full: number; radio: number };
+    let reviewsByMode: ModeCounts | undefined;
+    let timeMsByMode: ModeCounts | undefined;
     if (args.reviewMode) {
-      const prevReviews = existing.reviewsByMode ?? EMPTY_MODE_COUNTS();
+      const prevReviews: ModeCounts = {
+        ...EMPTY_MODE_COUNTS(),
+        ...(existing.reviewsByMode ?? {}),
+      };
       reviewsByMode = { ...prevReviews, [args.reviewMode]: prevReviews[args.reviewMode] + 1 };
-      const prevTime = existing.timeMsByMode ?? EMPTY_MODE_COUNTS();
+      const prevTime: ModeCounts = {
+        ...EMPTY_MODE_COUNTS(),
+        ...(existing.timeMsByMode ?? {}),
+      };
       timeMsByMode = { ...prevTime, [args.reviewMode]: prevTime[args.reviewMode] + args.timeMs };
     }
 
@@ -146,8 +154,16 @@ export async function upsertDailyStats(
     reviewsByCardState: cardState,
     ...(args.reviewMode
       ? {
-        reviewsByMode: { audio: args.reviewMode === 'audio' ? 1 : 0, full: args.reviewMode === 'full' ? 1 : 0 },
-        timeMsByMode: { audio: args.reviewMode === 'audio' ? args.timeMs : 0, full: args.reviewMode === 'full' ? args.timeMs : 0 },
+        reviewsByMode: {
+          audio: args.reviewMode === 'audio' ? 1 : 0,
+          full: args.reviewMode === 'full' ? 1 : 0,
+          radio: args.reviewMode === 'radio' ? 1 : 0,
+        },
+        timeMsByMode: {
+          audio: args.reviewMode === 'audio' ? args.timeMs : 0,
+          full: args.reviewMode === 'full' ? args.timeMs : 0,
+          radio: args.reviewMode === 'radio' ? args.timeMs : 0,
+        },
       }
       : {}),
     ...(args.accuracy != null ? { accuracySum: args.accuracy, accuracyCount: 1 } : {}),

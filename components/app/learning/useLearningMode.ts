@@ -259,6 +259,9 @@ export function useLearningMode(
         : undefined;
 
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
+  const advanceRadioCardMutation = useMutation(
+    api.features.scheduling.advanceRadioCard,
+  );
 
   const masterCardMutation = useMutation(api.features.scheduling.masterCard);
   const hideCardMutation = useMutation(api.features.scheduling.hideCard);
@@ -598,6 +601,10 @@ export function useLearningMode(
   // --------------------------------------------------------------------------
   // Next
   // --------------------------------------------------------------------------
+  const schedulingMode: SchedulingMode =
+    courseSettings?.schedulingMode ?? 'learnAndReview';
+  const isRadio = schedulingMode === 'radio';
+
   const handleNext = useCallback(async (ratingOverride?: ReviewRating, accuracy?: number) => {
     if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
@@ -630,6 +637,28 @@ export function useLearningMode(
       }
       return;
     }
+    if (isRadio) {
+      // Radio mode bypasses FSRS entirely: no rating, no stats, no
+      // celebration. Just bump the play counter so the next-lowest counter
+      // rises to the front of the queue.
+      reviewInitiatedByThisTabRef.current = true;
+      setCardAnimationKey((k) => k + 1);
+      setIsExiting(true);
+      setIsReviewing(true);
+      try {
+        await advanceRadioCardMutation({
+          cardId: cardForReview._id,
+          timezone: getUserTimezone(),
+          timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
+        });
+      } catch (error) {
+        console.error('Failed to advance radio card:', error);
+        setIsExiting(false);
+      } finally {
+        setIsReviewing(false);
+      }
+      return;
+    }
     const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
     const defaultRatingForPhase = getDefaultRating(phase);
     const rating = ratingOverride ?? selectedRating ?? defaultRatingForPhase;
@@ -639,11 +668,13 @@ export function useLearningMode(
     isReviewing,
     isPendingMaster,
     isPendingHide,
+    isRadio,
     selectedRating,
     reviewMode,
     handleReview,
     masterCardMutation,
     hideCardMutation,
+    advanceRadioCardMutation,
   ]);
 
   // ============================================================================
@@ -663,7 +694,7 @@ export function useLearningMode(
     progressDisplayActive,
     progressDisplayReady,
     dismissProgressDisplay,
-    schedulingMode: (courseSettings?.schedulingMode ?? 'learnAndReview') as SchedulingMode,
+    schedulingMode,
     reviewMode: (courseSettings?.reviewMode ?? 'audio') as 'audio' | 'full',
     autoAdvance: courseSettings?.autoAdvance ?? DEFAULT_AUTO_ADVANCE,
   };
@@ -743,34 +774,37 @@ export function useLearningMode(
     return { ...base, status: 'loading' };
   }
 
-  // Reviewing — in full review mode, always use FSRS ratings (skip pre-review)
+  // Reviewing — in full review mode, always use FSRS ratings (skip pre-review).
+  // In radio mode, skip rating UI entirely (no FSRS, no rating buttons).
   const phase = effectivePhase(reviewMode, displayCard.schedulingPhase as SchedulingPhase);
-  const validRatings = getValidRatings(phase);
+  const validRatings = isRadio ? [] : getValidRatings(phase);
   const defaultRating = getDefaultRating(phase);
   const activeRating = selectedRating ?? defaultRating;
 
   // Compute projected next-due interval for each rating
-  const cardState: CardSchedulingState = {
-    schedulingPhase: phase,
-    preReviewCount: displayCard.preReviewCount,
-    dueDate: displayCard.dueDate,
-    fsrsState: displayCard.fsrsState ?? null,
-  };
-  const now = Date.now();
   const ratingIntervals: Record<string, string> = {};
-  for (const rating of validRatings) {
-    try {
-      const result = scheduleCard(
-        cardState,
-        rating,
-        displayCard.initialReviewCount,
-        now,
-      );
-      const diff = result.dueDate - now;
-      ratingIntervals[rating] =
-        diff <= 0 ? t('nextReviewNow') : formatInterval(diff);
-    } catch {
-      ratingIntervals[rating] = '—';
+  if (!isRadio) {
+    const cardState: CardSchedulingState = {
+      schedulingPhase: phase,
+      preReviewCount: displayCard.preReviewCount,
+      dueDate: displayCard.dueDate,
+      fsrsState: displayCard.fsrsState ?? null,
+    };
+    const now = Date.now();
+    for (const rating of validRatings) {
+      try {
+        const result = scheduleCard(
+          cardState,
+          rating,
+          displayCard.initialReviewCount,
+          now,
+        );
+        const diff = result.dueDate - now;
+        ratingIntervals[rating] =
+          diff <= 0 ? t('nextReviewNow') : formatInterval(diff);
+      } catch {
+        ratingIntervals[rating] = '—';
+      }
     }
   }
 

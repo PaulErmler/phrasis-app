@@ -47,6 +47,10 @@
     "audioBody": "Hear the sentence in a language you know, think of the translation — each target line starts blurred and automatically eases into focus, as if audio had just finished. In the app, that happens after playback. Use replay to watch the demo again. Rate how well you recalled it — ideal for commutes and hands-free practice.",
     "fullTitle": "Full review",
     "fullBody": "Type your translation for each target language. After you submit, you see a character-level diff: correct text in green, mistakes highlighted, and anything you skipped in muted text — plus an accuracy score.",
+    "reviewModeTitle": "Review mode",
+    "reviewModeBody": "Use spaced repetition in combination with audio based learning",
+    "radioTitle": "Radio mode",
+    "radioBody": "Listen to sentences all day long with radio mode without influencing the spaced repetition algorithm. Perfect for sharpening your listening skills all day long.",
     "multiLabel": "Multiple Language",
     "replay": "Replay demo",
     "mock": {

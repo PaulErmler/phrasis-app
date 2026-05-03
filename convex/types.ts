@@ -72,6 +72,7 @@ export const reviewModeValidator = v.union(
 export const schedulingModeValidator = v.union(
   v.literal('learn_new'),
   v.literal('learnAndReview'),
+  v.literal('radio'),
 );
 
 export const ttsQualityValidator = v.union(

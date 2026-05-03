@@ -19,7 +19,7 @@ import {
   getLanguageShortLabel,
   getLocalizedLanguageNameByCode,
 } from '@/lib/languages';
-import { Check, MousePointer2 } from 'lucide-react';
+import { Check, MousePointer2, Radio, RefreshCw } from 'lucide-react';
 import { useLandingDemo } from '@/components/landing/landing-demo-context';
 
 function usePrefersReducedMotion() {
@@ -113,7 +113,7 @@ export function ReviewModesDemo() {
   const t = useTranslations('LandingPage.reviewModes');
   const locale = useLocale();
   const { multiCourse: multi, setMultiCourse: setMulti } = useLandingDemo();
-  const [reviewMode, setReviewMode] = useState<ReviewMode>('full');
+  const [reviewMode, setReviewMode] = useState<ReviewMode>('audio');
   const [playKey, setPlayKey] = useState(0);
   const reducedMotion = usePrefersReducedMotion();
 
@@ -273,15 +273,9 @@ export function ReviewModesDemo() {
     return () => clearTimeout(id);
   }, [allSubmitted]);
 
-  useEffect(() => {
-    if (reviewMode !== 'audio' || reducedMotion) return;
-    const targetCount = multi ? 2 : 1;
-    // Tail accounts for the last target audio finishing (~1.5–2.5s mp3) plus
-    // a brief breath before restarting the demo loop.
-    const totalMs = 720 + (targetCount - 1) * 640 + 4000;
-    const id = window.setTimeout(() => setPlayKey((k) => k + 1), totalMs);
-    return () => clearTimeout(id);
-  }, [reviewMode, playKey, multi, reducedMotion]);
+  // Audio review demo plays exactly once per mount (or per Replay click) and
+  // then stops — no auto-loop. The hands-free Radio panel below covers the
+  // continuous-play story; the audio panel demonstrates a single review.
 
   const showLanguageLabel = fullTargets.length > 1;
 
@@ -303,6 +297,24 @@ export function ReviewModesDemo() {
             <>
               <h3 className="text-lg font-semibold">{t('audioTitle')}</h3>
               <p className="text-muted-foreground leading-relaxed">{t('audioBody')}</p>
+              {/* Two callouts framing the in-app scheduling choices that
+                  pair with audio playback: Review mode (FSRS-driven) and
+                  Radio mode (passive, no FSRS). Both live inside the audio
+                  panel because their value prop is audio-specific. */}
+              <p className="text-muted-foreground leading-relaxed border-l-2 border-primary/40 pl-4 mt-4">
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                  <RefreshCw className="h-4 w-4 text-primary" />
+                  {t('reviewModeTitle')}:
+                </span>{' '}
+                {t('reviewModeBody')}
+              </p>
+              <p className="text-muted-foreground leading-relaxed border-l-2 border-primary/40 pl-4">
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                  <Radio className="h-4 w-4 text-primary" />
+                  {t('radioTitle')}:
+                </span>{' '}
+                {t('radioBody')}
+              </p>
             </>
           ) : (
             <>
@@ -312,10 +324,10 @@ export function ReviewModesDemo() {
           )}
         </div>
 
-        <div className="order-2 lg:order-2 w-full max-w-lg mx-auto lg:mx-0 lg:ml-auto flex flex-col min-h-[24rem] overflow-hidden">
-          <div className="py-1 sm:py-2 flex-1 flex flex-col min-h-0">
+        <div className="order-2 lg:order-2 w-full max-w-lg mx-auto lg:mx-0 lg:ml-auto flex flex-col min-h-[24rem]">
+          <div className="py-1 sm:py-2 flex-1 flex flex-col">
             {reviewMode === 'audio' ? (
-              <div className="flex flex-1 min-h-0 flex-col justify-center">
+              <div className="flex flex-1 flex-col justify-center">
                 <LandingLearningCardContent
                   preReviewCount={2}
                   schedulingPhase="review"
@@ -329,8 +341,12 @@ export function ReviewModesDemo() {
                   onMaster={() => {}}
                   onHide={() => {}}
                   onFavorite={() => {}}
-                  hideTargetLanguages={!reducedMotion}
-                  audioDemoAutoUnlockSequence={!reducedMotion}
+                  // No autoplay anywhere on the landing page — audio only
+                  // fires when the visitor clicks an audio button. Targets
+                  // start blurred so the demo still has interaction value
+                  // (click target text to reveal, click audio to listen).
+                  hideTargetLanguages
+                  audioDemoAutoUnlockSequence={false}
                   audioDemoSequenceKey={playKey}
                   autoRevealLanguages={false}
                   bare

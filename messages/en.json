@@ -294,7 +294,9 @@
     "fullReview": "Full Review",
     "audioReview": "Audio Review",
     "learnNew": "Learn New",
-    "learnAndReview": "Review+Learn",
+    "learnAndReview": "Review & Learn",
+    "radioMode": "Radio",
+    "radioRequiresCards": "Add some cards before starting Radio mode.",
     "cardCounts": {
       "new": "N",
       "learning": "L",
