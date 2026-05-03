@@ -22,6 +22,7 @@ import type * as db_stats_dailyLanguageStats from "../db/stats/dailyLanguageStat
 import type * as db_stats_dailyStats from "../db/stats/dailyStats.js";
 import type * as db_stats_languageStats from "../db/stats/languageStats.js";
 import type * as db_stats_monthlyStats from "../db/stats/monthlyStats.js";
+import type * as db_stats_recordRadioPlayStats from "../db/stats/recordRadioPlayStats.js";
 import type * as db_stats_recordReviewStats from "../db/stats/recordReviewStats.js";
 import type * as db_stats_reviewDepthAccuracy from "../db/stats/reviewDepthAccuracy.js";
 import type * as db_stats_weeklyStats from "../db/stats/weeklyStats.js";
@@ -98,6 +99,7 @@ declare const fullApi: ApiFromModules<{
   "db/stats/dailyStats": typeof db_stats_dailyStats;
   "db/stats/languageStats": typeof db_stats_languageStats;
   "db/stats/monthlyStats": typeof db_stats_monthlyStats;
+  "db/stats/recordRadioPlayStats": typeof db_stats_recordRadioPlayStats;
   "db/stats/recordReviewStats": typeof db_stats_recordReviewStats;
   "db/stats/reviewDepthAccuracy": typeof db_stats_reviewDepthAccuracy;
   "db/stats/weeklyStats": typeof db_stats_weeklyStats;
