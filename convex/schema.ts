@@ -208,7 +208,7 @@ export default defineSchema({
       'isMastered',
       'dueDate',
     ])
-    .index('by_deckId_and_isHidden_and_isMastered_and_radioRoundCounter_and_radioOrderKey', [
+    .index('by_deck_hidden_mastered_radioCounter_radioOrder', [
       'deckId',
       'isHidden',
       'isMastered',

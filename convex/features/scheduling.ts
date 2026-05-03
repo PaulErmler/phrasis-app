@@ -154,7 +154,7 @@ export const getCardForReview = query({
       // don't monopolize the queue.
       dueCards = await ctx.db
         .query('cards')
-        .withIndex('by_deckId_and_isHidden_and_isMastered_and_radioRoundCounter_and_radioOrderKey', (q) =>
+        .withIndex('by_deck_hidden_mastered_radioCounter_radioOrder', (q) =>
           q
             .eq('deckId', deck._id)
             .eq('isHidden', false)
@@ -546,7 +546,7 @@ export const advanceRadioCard = mutation({
     // card needs to catch up to.
     const lowestTwo = await ctx.db
       .query('cards')
-      .withIndex('by_deckId_and_isHidden_and_isMastered_and_radioRoundCounter_and_radioOrderKey', (q) =>
+      .withIndex('by_deck_hidden_mastered_radioCounter_radioOrder', (q) =>
         q
           .eq('deckId', deck._id)
           .eq('isHidden', false)
