@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from dataclasses import asdict
@@ -58,13 +59,30 @@ from .helpers import (
 # Anything not removed and not in any arc is kept as a singleton arc in its original position.
 
 
-def _next_added_id(level: int, used: set[str]) -> str:
-    """Allocate a fresh added-sentence id of the form 'x{level}_{n}'."""
-    n = 1
-    while f"x{level}_{n}" in used:
-        n += 1
-    used.add(f"x{level}_{n}")
-    return f"x{level}_{n}"
+def _deterministic_added_id(level: int, text: str, used: set[str]) -> str:
+    """Mint a stable ID for an added (curation-introduced) sentence.
+
+    The ID is `c-<16hex>` where the hex is sha256(text|level)[:16]. This is
+    deterministic from content — regenerating the dataset twice with the same
+    plan produces identical IDs, and downstream consumers (Convex `externalId`)
+    can match sentences across dataset versions.
+
+    Moving a sentence between levels produces a new ID — accepted trade-off
+    given how rare those moves are in the curation pipeline.
+    """
+    key = f"{text}|{level:02d}".encode("utf-8")
+    digest = hashlib.sha256(key).hexdigest()[:16]
+    candidate = f"c-{digest}"
+    if candidate in used:
+        # Astronomically unlikely (64-bit hash collision). Surface loudly
+        # rather than silently re-mint — collisions would indicate a bug or
+        # an intentional duplicate that needs human review.
+        raise ValueError(
+            f"Curation ID collision for L{level} text {text!r}: {candidate} "
+            f"already in use. Inspect the plan for a duplicate sentence."
+        )
+    used.add(candidate)
+    return candidate
 
 
 def apply_plan(level: int, plan: dict, vocab: dict[str, int]) -> tuple[list[Row], dict]:
@@ -128,7 +146,7 @@ def apply_plan(level: int, plan: dict, vocab: dict[str, int]) -> tuple[list[Row]
                 arc_ids_seen.add(item)
                 block.append(by_id[item])
             else:
-                added_id = _next_added_id(level, used_ids)
+                added_id = _deterministic_added_id(level, item["text"], used_ids)
                 row = Row.new_added(
                     level=level,
                     added_id=added_id,

@@ -1,5 +1,9 @@
 {
   "permissions": {
+    "deny": [
+        "Read(.env*)",
+        "Edit(.env*)"
+    ],
     "allow": [
       "Bash(find /Users/paulermler/Documents/Phrasis/new/phrasis-app -name \"*.ts\" -exec grep -l \"ENSURE_CONTENT_LOOKAHEAD\" {} \\\\;)",
       "Bash(grep -r \"export.*Card\\\\|export.*Sentence\\\\|export.*Text\" /Users/paulermler/Documents/Phrasis/new/phrasis-app/components/app/learning/*.ts)",
@@ -62,7 +66,9 @@
       "Bash(python3 /tmp/scan_sexist.py)",
       "Bash(python3 /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/find_near_dups.py)",
       "Bash(awk -F, 'NR<=15 {print $1, $9}' /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/data/output/levels_curated/ogte_10_high_intermediate.csv)",
-      "Bash(awk -F, 'NR<=15 {print $1}' /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/data/output/levels_curated/ogte_10_high_intermediate.csv)"
+      "Bash(awk -F, 'NR<=15 {print $1}' /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/data/output/levels_curated/ogte_10_high_intermediate.csv)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('data_preparation/ogte-dataset/curation/curate.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(npx convex *)"
     ]
   }
 }

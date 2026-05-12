@@ -1,0 +1,165 @@
+id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
+538123,Hi.,10.00,1067,hi,1,hi,direct-address,informal,01,1
+373330,Hello!,10.00,1927,hello,1,hello,direct-address,neutral,01,1
+30316,Hi! How are you?,10.00,1067,hi,4,are|hi|how|you,direct-address,informal,01,1
+x1_1,"Good, thanks!",,354,thanks,2,good,direct-address,informal,01,1
+x1_2,And you?,,11,you,2,and,direct-address,neutral,01,1
+x1_3,"I'm good, too.",,119,too,3,too,descriptive,n/a,01,1
+x1_4,Nice to meet you.,,534,meet,4,nice|meet,direct-address,neutral,01,1
+2057650,Thanks.,10.00,354,thanks,1,thanks,direct-address,neutral,01,2
+x1_5,You're welcome.,,1101,welcome,2,welcome,direct-address,neutral,01,2
+x1_7,Excuse me.,,2656,excuse,2,excuse,direct-address,neutral,01,3
+x1_8,Sorry.,,671,sorry,1,sorry,direct-address,neutral,01,3
+x1_9,No problem.,,382,problem,2,problem,direct-address,informal,01,3
+x1_10,I don't understand.,,418,understand,3,understand,descriptive,n/a,01,4
+x1_11,Can you repeat that?,,3054,repeat,4,repeat,direct-address,neutral,01,4
+x1_12,Please speak slowly.,,2348,slowly,3,slowly,direct-address,neutral,01,4
+x1_13,Do you speak English?,,992,speak,4,speak,direct-address,neutral,01,5
+x1_14,I speak a little English.,,992,speak,5,little,descriptive,n/a,01,5
+x1_15,Where is the toilet?,,4213,toilet,4,toilet,direct-address,neutral,01,6
+x1_16,It's over there.,,88,over,3,over|there,descriptive,n/a,01,6
+x1_17,Can you show me?,,194,show,4,show,direct-address,neutral,01,6
+x1_18,"Sure, follow me.",,736,follow,3,sure|follow,direct-address,informal,01,6
+x1_19,I am tired.,,2004,tired,3,tired,descriptive,n/a,01,7
+x1_20,I am hungry.,,3279,hungry,3,hungry,descriptive,n/a,01,7
+x1_21,What time is it?,,60,time,4,time,direct-address,neutral,01,8
+x1_22,It's three o'clock.,,6521,o'clock,3,three|o'clock,descriptive,n/a,01,8
+x1_23,I think so.,,89,think,3,think,descriptive,n/a,01,8
+x1_24,It doesn't matter.,,406,matter,3,matter,descriptive,n/a,01,8
+x1_25,I am a tourist.,,5075,tourist,4,tourist,descriptive,n/a,01,9
+x1_26,I am a student.,,1019,student,4,student,descriptive,n/a,01,9
+25164,What's up?,10.00,634,what's,2,what's,direct-address,informal,01,10
+x1_6,Not much.,,103,much,2,much,descriptive,n/a,01,10
+516745,Goodbye!,10.00,4241,goodbye,1,goodbye,direct-address,neutral,01,11
+x1_27,See you later.,,297,later,3,later,direct-address,informal,01,11
+x1_28,Bye!,,3636,bye,1,bye,direct-address,informal,01,11
+16492,What are you doing?,9.00,220,doing,4,doing,direct-address,neutral,01,12
+x1_29,I'm playing.,,415,playing,2,i'm|playing,descriptive,n/a,01,12
+1886817,What are we doing?,8.00,220,doing,4,are|doing|we|what,direct-address,neutral,01,12
+x1_30,We're going out.,,385,we're,3,we're|out,descriptive,n/a,01,12
+2405921,I said yes.,9.00,294,yes,3,i|said|yes,descriptive,n/a,01,13
+2243299,They said yes.,8.00,294,yes,3,yes,descriptive,n/a,01,13
+3448814,"Hey, what's that?",9.00,776,hey,3,hey|that|what's,direct-address,informal,01,14
+1299275,Oh no!,9.00,351,oh,2,oh,descriptive,n/a,01,14
+2544489,What's your mother's name?,9.00,3787,mother's,4,mother's,direct-address,neutral,01,15
+6532401,That's my mother.,9.00,566,mother,3,mother,descriptive,n/a,01,15
+1308,I miss you.,9.00,598,miss,3,miss,direct-address,informal,01,16
+1337519,I miss it.,7.00,598,miss,3,i|it|miss,descriptive,n/a,01,16
+2123558,That's okay.,9.00,919,okay,2,okay,descriptive,n/a,01,17
+2123589,It's okay.,9.00,919,okay,2,it's|okay,descriptive,n/a,01,17
+2111563,Say hello.,9.00,1927,hello,2,hello|say,direct-address,informal,01,18
+2111564,Say goodbye.,9.00,4241,goodbye,2,goodbye|say,direct-address,informal,01,18
+x1_34,Where are you from?,,105,where,4,where,direct-address,neutral,01,19
+730626,I am from Brazil.,9.00,2550,brazil,4,brazil,descriptive,n/a,01,19
+456719,She is from France.,8.00,1210,france,4,france,descriptive,n/a,01,19
+253015,I'm from America.,8.00,592,america,3,america|from,descriptive,n/a,01,19
+2248962,It'll be fine.,9.00,2564,it'll,3,it'll,descriptive,n/a,01,20
+3722956,That'd be fine.,8.00,9587,that'd,3,that'd,descriptive,n/a,01,20
+1895638,You'll be fine.,8.00,604,you'll,3,you'll,direct-address,neutral,01,20
+2544490,What's your father's name?,9.00,4526,father's,4,father's,direct-address,neutral,01,21
+x1_31,His name is Tom.,,1568,tom,4,his,descriptive,n/a,01,21
+1495893,How's your father?,7.00,7385,how's,3,father|how's|your,direct-address,neutral,01,21
+x1_32,He's fine.,,576,fine,2,he's,descriptive,n/a,01,21
+2233691,This is his.,8.00,34,his,3,his,descriptive,n/a,01,22
+413066,This is my father's.,8.00,4526,father's,4,father's|is|my|this,descriptive,n/a,01,22
+24867,What for?,8.00,46,what,2,what,direct-address,neutral,01,23
+2254540,What a woman!,4.00,443,woman,3,woman,descriptive,n/a,01,23
+2221070,I like being with you.,8.00,117,being,5,being,direct-address,informal,01,24
+309022,What do you like about her?,7.00,58,her,6,her,direct-address,neutral,01,24
+386704,I am a man.,8.00,156,am,4,am,descriptive,n/a,01,25
+453328,I am a boy.,8.00,677,boy,4,a|am|boy|i,descriptive,n/a,01,25
+2647806,What is this thing?,8.00,179,thing,4,thing,descriptive,n/a,01,26
+619646,What is that thing?,8.00,179,thing,4,is|that|thing|what,descriptive,n/a,01,26
+2646229,What are these things?,8.00,174,things,4,things,descriptive,n/a,01,26
+5852683,I'm at school.,8.00,183,school,3,at,descriptive,n/a,01,27
+1885868,How's school?,8.00,7385,how's,2,how's,direct-address,neutral,01,27
+x1_35,It's good.,,78,good,2,it's|good,descriptive,n/a,01,27
+2011294,I want to play.,8.00,217,play,4,play,descriptive,n/a,01,28
+2050585,What are you playing with?,7.00,415,playing,5,playing,direct-address,neutral,01,28
+2545329,I'm not playing with you.,6.00,415,playing,5,i'm|not|playing|with|you,direct-address,informal,01,28
+2270518,Don't play with me.,4.00,217,play,4,don't|me|play|with,direct-address,informal,01,28
+1174876,I'll go.,8.00,348,i'll,2,i'll,descriptive,n/a,01,29
+2006375,"Hey, don't go.",8.00,776,hey,3,hey,direct-address,informal,01,29
+2203688,We'll go.,7.00,1367,we'll,2,we'll,descriptive,n/a,01,29
+1140042,What are you saying?,8.00,417,saying,4,are|saying|what|you,direct-address,neutral,01,30
+2248241,I'm saying no.,7.00,417,saying,3,saying,descriptive,n/a,01,30
+1855110,I'd like that.,8.00,424,i'd,3,i'd,descriptive,n/a,01,31
+2241532,We'd like that.,8.00,3374,we'd,3,we'd,descriptive,n/a,01,31
+2243533,They'd like that.,7.00,3690,they'd,3,they'd,descriptive,n/a,01,31
+5754207,They're my books.,8.00,719,books,3,books|my|they're,descriptive,n/a,01,32
+2549436,We aren't going.,8.00,930,aren't,3,aren't|going|we,descriptive,n/a,01,33
+2243047,They aren't there.,6.00,930,aren't,3,aren't,descriptive,n/a,01,33
+2647340,What are your names?,8.00,1302,names,4,are|names|what|your,direct-address,neutral,01,34
+x1_33,My name is Tom.,,1568,tom,4,tom,descriptive,n/a,01,34
+4666222,Jackson is my family name.,8.00,2565,jackson,5,jackson,descriptive,n/a,01,34
+1893669,We'll be there.,8.00,1367,we'll,3,be|there|we'll,descriptive,n/a,01,35
+2111215,They've gone.,8.00,1788,they've,2,they've,descriptive,n/a,01,36
+306102,They have gone to Europe.,6.00,956,europe,5,europe,descriptive,n/a,01,36
+2243540,They'll be OK.,8.00,2003,they'll,3,be|ok|they'll,descriptive,n/a,01,37
+2253748,This one's mine.,8.00,3673,one's,3,mine|one's|this,descriptive,n/a,01,38
+1898070,This one's yours.,7.00,3673,one's,3,one's,direct-address,neutral,01,38
+1886819,What are those?,7.00,130,those,3,those,descriptive,n/a,01,39
+1886365,Are those for me?,7.00,130,those,4,are|for|me|those,direct-address,neutral,01,39
+x1_37,"Yes, they're for you.",,313,they're,4,for,direct-address,neutral,01,39
+2647813,What does this say?,7.00,172,does,4,does|say|this|what,descriptive,n/a,01,40
+x1_38,It says 'hello'.,,1927,hello,3,says,descriptive,n/a,01,40
+2646518,These are your things.,7.00,174,things,4,your,direct-address,neutral,01,41
+2647342,What are you having?,7.00,227,having,4,having,direct-address,neutral,01,42
+3408805,There's no one there.,7.00,260,there's,4,there's,descriptive,n/a,01,43
+2091101,No one says that.,6.00,303,says,4,says,descriptive,n/a,01,43
+4751088,There's no one like you.,5.00,260,there's,5,like|no|one|there's|you,direct-address,neutral,01,43
+2276504,It doesn't have a name.,7.00,264,doesn't,5,doesn't,descriptive,n/a,01,44
+4012925,It doesn't have to be like that.,6.00,264,doesn't,7,be|doesn't|have|it|like|that|to,descriptive,n/a,01,44
+2242977,They're family.,7.00,313,they're,2,family|they're,descriptive,n/a,01,45
+2252720,They have families.,6.00,1206,families,3,families,descriptive,n/a,01,45
+67362,"Thanks, but no thanks.",7.00,354,thanks,4,but,direct-address,informal,01,46
+2240583,We're going out.,7.00,385,we're,3,out,descriptive,n/a,01,47
+3821060,"Yeah, that's what I said.",7.00,419,yeah,5,yeah,descriptive,n/a,01,48
+3825299,"Yeah, that's what I'll do.",7.00,419,yeah,5,do|i'll|that's|what|yeah,descriptive,n/a,01,48
+887513,She wants him.,7.00,571,wants,3,wants,descriptive,n/a,01,49
+887271,She likes him.,7.00,1890,likes,3,him|likes|she,descriptive,n/a,01,49
+313002,She goes to school.,7.00,595,goes,4,goes,descriptive,n/a,01,49
+2255351,You'll do fine.,7.00,604,you'll,3,do|fine|you'll,direct-address,neutral,01,50
+x1_43,I hope so.,,338,hope,3,hope,descriptive,n/a,01,50
+1489180,He is English.,7.00,642,english,3,english,descriptive,n/a,01,51
+2744175,It's 8:00 p.m.,7.00,765,p,3,m|p,descriptive,n/a,01,52
+5851859,I like writing.,7.00,909,writing,3,writing,descriptive,n/a,01,53
+1886804,What are you writing?,7.00,909,writing,4,are|what|writing|you,direct-address,neutral,01,53
+x1_36,A book.,,345,book,2,book,descriptive,n/a,01,53
+2111326,They're boys.,7.00,974,boys,2,boys,descriptive,n/a,01,54
+3564116,The boys are fine.,7.00,974,boys,4,the,descriptive,n/a,01,54
+2255333,You'd like it.,7.00,1573,you'd,3,you'd,direct-address,neutral,01,55
+3396603,Is that what you'd like?,7.00,1573,you'd,5,is|like|that|what|you'd,direct-address,neutral,01,55
+4530155,That girl is Mary.,7.00,1715,mary,4,girl,descriptive,n/a,01,56
+1841600,Mary likes you.,7.00,1890,likes,3,likes,direct-address,neutral,01,56
+5434712,That woman's name is Mary.,7.00,5449,woman's,5,woman's,descriptive,n/a,01,56
+2111334,They're Asian.,7.00,2041,asian,2,asian,descriptive,n/a,01,57
+3378906,That's what we'd like to do.,7.00,3374,we'd,6,do|like|that's|to|we'd|what,descriptive,n/a,01,58
+4500147,I like Australia.,6.00,911,australia,3,australia|i|like,descriptive,n/a,01,58
+2549628,That'll be $30.,7.00,7318,that'll,2,be|that'll,direct-address,neutral,01,59
+2111470,That'll do.,6.00,7318,that'll,2,that'll,descriptive,n/a,01,59
+2645643,What's that boy's name?,7.00,9847,boy's,4,boy's,descriptive,n/a,01,60
+x1_39,His name is Sam.,,2293,sam,4,sam,descriptive,n/a,01,60
+x1_40,How old is he?,,169,old,4,old,descriptive,n/a,01,60
+x1_41,He's ten.,,947,ten,2,ten,descriptive,n/a,01,60
+1485272,How'd you do it?,7.00,13560,how'd,4,how'd,direct-address,informal,01,61
+x1_42,It wasn't easy.,,526,wasn't,3,easy,descriptive,n/a,01,61
+1300772,He's not in.,6.00,222,he's,3,he's,descriptive,n/a,01,62
+252995,He wants to go to America.,6.00,592,america,6,america|go|he|to|wants,descriptive,n/a,01,62
+388869,We are men.,6.00,282,men,3,men,descriptive,n/a,01,63
+2648538,Go with these men.,4.00,282,men,4,go|men|these|with,direct-address,neutral,01,63
+2270532,Don't say his name.,4.00,215,name,4,don't|his|name|say,direct-address,informal,01,64
+2396308,"Oh, don't be like that.",6.00,351,oh,5,be|don't|like|oh|that,direct-address,informal,01,64
+3823427,I'd do it.,6.00,424,i'd,3,do|i'd|it,descriptive,n/a,01,65
+495591,This book is about China.,6.00,813,china,5,china,descriptive,n/a,01,66
+1476206,We don't have this in Europe.,6.00,956,europe,6,don't|europe|have|in|this|we,descriptive,n/a,01,67
+2891628,It's one of mine.,6.00,959,mine,4,of,descriptive,n/a,01,68
+2548156,These are the names.,6.00,1302,names,4,names,descriptive,n/a,01,69
+1412495,Japan is in Asia.,6.00,2223,asia,4,asia,descriptive,n/a,01,70
+2765357,I'm up.,5.00,74,i'm,2,i'm|up,descriptive,n/a,01,71
+2111559,School's out.,6.00,8534,school's,2,school's,descriptive,n/a,01,71
+1841498,You're not my mother.,5.00,566,mother,4,mother|my|not|you're,direct-address,neutral,01,72
+1804029,That's my boy.,5.00,677,boy,3,boy,descriptive,n/a,01,72
+70894,Do whatever you want.,5.00,748,whatever,4,do|want|whatever|you,direct-address,informal,01,73
+4494700,This isn't Australia.,5.00,911,australia,3,australia,descriptive,n/a,01,74
+2111665,I'm yours.,4.00,1834,yours,2,yours,direct-address,neutral,01,75

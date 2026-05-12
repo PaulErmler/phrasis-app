@@ -75,6 +75,10 @@ test.describe("chat (live)", { tag: "@live" }, () => {
   test(
     "full chat-to-card flow: send → response → approve → quota decrements → card in library",
     async ({ page }) => {
+      // Live LLM round-trips (assistant reply, card streaming, title gen)
+      // can take 30–60s each — well beyond Playwright's 30s default.
+      test.setTimeout(180_000);
+
       await page.goto("/app");
       await page.waitForLoadState("domcontentloaded");
       await dismissTour(page, "home_tour");
@@ -174,13 +178,16 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       ).toBeVisible({ timeout: 15_000 });
 
       // (9) Thread auto-titles — a sidebar entry with substantive text
-      // appears within TITLE_TIMEOUT.
-      const toggle = page.getByTestId("chat-toggle-conversations").first();
-      if (await toggle.count()) await toggle.click().catch(() => {});
+      // appears within TITLE_TIMEOUT. On desktop the sidebar auto-opens;
+      // on mobile it starts closed. Only toggle if entries aren't yet in
+      // the DOM, otherwise we'd close an already-open desktop sidebar.
+      const entries = page.getByTestId("chat-thread-entry");
+      if ((await entries.count()) === 0) {
+        const toggle = page.getByTestId("chat-toggle-conversations").first();
+        if (await toggle.count()) await toggle.click().catch(() => {});
+      }
       await expect(async () => {
-        const titles = await page
-          .getByTestId("chat-thread-entry")
-          .allInnerTexts();
+        const titles = await entries.allInnerTexts();
         const substantive = titles.some((t) => t.trim().length >= 4);
         expect(substantive).toBe(true);
       }).toPass({ timeout: TITLE_TIMEOUT });

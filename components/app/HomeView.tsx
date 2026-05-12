@@ -5,8 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Preloaded, usePreloadedQuery, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { NewChatInput } from '@/components/chat/NewChatInput';
-import { CollectionCarousel } from '@/components/app/CollectionCarousel';
-import { CustomCollectionCarousel } from '@/components/app/CustomCollectionCarousel';
+import { SegmentedHomeSection } from '@/components/app/segmented/SegmentedHomeSection';
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
@@ -17,9 +16,7 @@ import { toast } from 'sonner';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
 
 export function HomeView({
-  preloadedCollectionProgress,
   preloadedCourseSettings,
-  preloadedCustomCollectionsProgress,
   onLearnOpen,
   onChatOpen,
   onNavigateToContent,
@@ -31,14 +28,8 @@ export function HomeView({
   hasActiveCourse,
   onOpenCourseMenu,
 }: {
-  preloadedCollectionProgress: Preloaded<
-    typeof api.features.decks.getCollectionProgress
-  >;
   preloadedCourseSettings: Preloaded<
     typeof api.features.courses.getActiveCourseSettings
-  >;
-  preloadedCustomCollectionsProgress: Preloaded<
-    typeof api.features.decks.getCustomCollectionsProgress
   >;
   onLearnOpen: () => void;
   onChatOpen: (threadId: string) => void;
@@ -207,22 +198,16 @@ export function HomeView({
           </div>
         </div>
 
-        <div className="space-y-2" data-tutorial="collection-carousel">
+        <div className="space-y-2">
           <h2 className="heading-section">
             {t('collections.carousel.sectionTitle')}
           </h2>
-          <CollectionCarousel
-            preloadedCollectionProgress={preloadedCollectionProgress}
-            preloadedCourseSettings={preloadedCourseSettings}
+          <SegmentedHomeSection
+            activeCourseId={courseSettings?.courseId ?? null}
+            onNavigateToContent={onNavigateToContent}
+            onNavigateToChat={onNavigateToChat}
           />
         </div>
-
-        <CustomCollectionCarousel
-          preloadedCourseSettings={preloadedCourseSettings}
-          preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
-          onNavigateToContent={onNavigateToContent}
-          onNavigateToChat={onNavigateToChat}
-        />
 
       </div>
     </div>

@@ -167,11 +167,23 @@
         "customContentButton": "Eigene Inhalte"
       },
       "carousel": {
-        "sectionTitle": "Schwierigkeitsauswahl",
+        "sectionTitle": "Inhaltsauswahl",
         "title": "Sammlungen",
         "select": "Auswählen",
         "selected": "Ausgewählt",
         "done": "Fertig",
+        "open": "Öffnen",
+        "openWithRemaining": "Öffnen · {count} neu",
+        "tabPremade": "Kurs",
+        "tabCustom": "Eigene Inhalte",
+        "collectionDisplayNames": {
+          "Custom": "Manuell hinzugefügt",
+          "Chat": "Chat"
+        },
+        "noLevels": "Noch keine vorgefertigten Levels verfügbar.",
+        "noCustomCollections": "Noch keine eigenen Sammlungen.",
+        "masteredCount": "{count} gemeistert",
+        "addedProgress": "{added}/{total} hinzugefügt",
         "cards": "{count, plural, one {# Satz} other {# Sätze}}",
         "notStarted": "Nicht begonnen",
         "addCards": "{count, plural, one {# Satz zum Deck hinzufügen} other {# Sätze zum Deck hinzufügen}}",
@@ -187,20 +199,42 @@
         "cardsAdded": "{count, plural, one {# Satz zu deinem Deck hinzugefügt} other {# Sätze zu deinem Deck hinzugefügt}}",
         "noCardsToAdd": "Keine weiteren Sätze aus dieser Sammlung hinzuzufügen",
         "descriptions": {
+          "Pre-A1": "Lerne zuerst die wichtigsten Sätze",
+          "A1_1": "Erstes A1 — einfache Alltagsphrasen",
+          "A1_2": "Weiteres A1 — einfache Fragen und Antworten",
+          "A1_3": "A1-Abschluss — vollständigere Alltagssätze",
+          "A2_1": "Erstes A2 — über die Grundlagen hinaus",
+          "A2_2": "Weiteres A2 — gängige Alltagssituationen",
+          "A2_3": "A2-Abschluss — fließendere A2-Gespräche",
+          "B1_1": "Erstes B1 — Pläne, Meinungen und Alltag",
+          "B1_2": "Weiteres B1 — längere Alltagsgespräche",
+          "B1_3": "B1-Abschluss — sicherer Ausdruck auf B1",
+          "B2_1": "Erstes B2 — komplexere Themen und Diskussionen",
+          "B2_2": "Weiteres B2 — abstrakte Ideen und Nuancen",
+          "B2_3": "B2-Abschluss — fließendes B2-Gespräch",
+          "C1_1": "Erstes C1 — nuancierter und idiomatischer Ausdruck",
+          "C1_2": "Weiteres C1 — anspruchsvolle Ausdrucksweise",
+          "C1_3": "C1-Abschluss — souveräne C1-Fluenz",
+          "C2_1": "Erstes C2 — fast muttersprachliche Feinheiten",
+          "C2_2": "Weiteres C2 — verfeinerte Alltagssprache",
+          "C2_3": "Auf dem Weg zur muttersprachlichen Fluenz",
+          "C2_4": "Muttersprachliches Register — seltene und literarische Wendungen",
           "Essential": "Die wichtigsten Alltags- und Überlebens-Sätze",
-          "A1": "Lerne die 500 häufigsten Wörter",
-          "A2": "Lerne die 500 bis 2.000 häufigsten Wörter",
-          "B1": "Lerne die 2.000 bis 3.500 häufigsten Wörter",
-          "B2": "Lerne die 3.500 bis 5.000 häufigsten Wörter",
-          "C1": "Lerne die 5.000 bis 8.000 häufigsten Wörter",
-          "C2": "Lerne die 8.000+ häufigsten Wörter",
+          "A1": "Alltagsphrasen und einfache Vorstellungen",
+          "A2": "Alltagssituationen — Einkaufen, Arbeit und Persönliches",
+          "B1": "Pläne, Meinungen und die meisten Alltagsthemen",
+          "B2": "Komplexe Gespräche und detaillierte Diskussionen",
+          "C1": "Nuancierte Ausdrucksweise und Redewendungen",
+          "C2": "Fast muttersprachlich, seltene Wörter und feine Unterschiede",
           "Chat": "Phrasen und Vokabular aus dem Chat",
-          "Custom": "Sätze, die du selbst eingegeben hast"
+          "Custom": "Karten, die du manuell hinzugefügt oder importiert hast"
         },
         "inline": {
           "added": "hinzugefügt",
           "remaining": "verbleibend",
-          "preview": "Vorschau"
+          "preview": "Vorschau",
+          "active": "Aktiv",
+          "inactive": "Inaktiv"
         },
         "detail": {
           "totalCards": "{count, plural, one {# Satz} other {# Sätze}}",
@@ -212,6 +246,7 @@
           "nextSentences": "Nächste Sätze",
           "adding": "Wird hinzugefügt...",
           "addN": "{count} hinzufügen",
+          "upgrade": "Upgrade",
           "noMoreCards": "Keine weiteren Sätze hinzuzufügen"
         }
       }

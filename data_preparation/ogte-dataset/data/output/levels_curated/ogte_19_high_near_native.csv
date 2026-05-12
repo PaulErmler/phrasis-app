@@ -1,0 +1,252 @@
+id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
+3731188,Do I detect sarcasm?,,11115,sarcasm,4,detect|sarcasm,direct-address,neutral,19,1
+x19_1,Maybe just a touch.,,1312,touch,4,touch,descriptive,n/a,19,1
+2203313,You're sarcastic.,,11360,sarcastic,2,sarcastic,direct-address,neutral,19,1
+5860767,"You're being sarcastic, I hope.",,11360,sarcastic,5,hope,direct-address,neutral,19,1
+x19_2,Of course — I wouldn't dream of being serious.,,1291,dream,8,dream|serious,direct-address,neutral,19,1
+4501358,Persistence pays off.,,12423,persistence,3,off|pays|persistence,descriptive,n/a,19,2
+4501352,Persistence will pay off.,,12423,persistence,4,pay|will,descriptive,n/a,19,2
+2203176,We're persistent.,,7911,persistent,2,persistent,descriptive,n/a,19,2
+2242992,They're relentless.,,12432,relentless,2,relentless,descriptive,n/a,19,2
+2234122,What's the prognosis?,,14474,prognosis,3,prognosis|what's,direct-address,neutral,19,3
+4494467,The prognosis was dire.,,14474,prognosis,4,dire,descriptive,n/a,19,3
+x19_3,Is there anything we can do?,,247,anything,6,anything,direct-address,neutral,19,3
+3307520,The tumor was benign.,,12364,benign,4,benign|tumor,descriptive,n/a,19,3
+x19_4,That's the first good news all week.,,342,news,7,news|week,descriptive,n/a,19,3
+60134,This house has a solid foundation.,,1902,solid,6,a|foundation|has|house|solid|this,descriptive,n/a,19,4
+1388227,The soldiers are dead.,,2036,soldiers,4,dead,descriptive,n/a,19,5
+4498696,The soldiers opened fire.,,2036,soldiers,4,fire|opened,descriptive,n/a,19,5
+681655,Soldiers must follow orders.,,2036,soldiers,4,follow|must|orders,descriptive,n/a,19,5
+x19_5,How many casualties were there?,,7552,casualties,5,casualties,direct-address,neutral,19,5
+320102,Soldiers are used to danger.,,2506,danger,5,are|danger|to|used,descriptive,n/a,19,5
+4501715,The soldiers remained still.,,2383,remained,4,remained|still,descriptive,n/a,19,5
+3727472,My sons are soldiers.,,3002,sons,4,my|sons,descriptive,n/a,19,5
+72166,What does UN stand for?,,2395,un,5,does|for|stand|un|what,direct-address,neutral,19,6
+415500,UN stands for United Nations.,,2446,stands,5,nations|stands|united,descriptive,n/a,19,6
+928195,Let's talk turkey.,,2686,turkey,3,let's|talk|turkey,direct-address,informal,19,7
+294118,He quit smoking cold turkey.,,2892,smoking,5,cold|he|quit|smoking,descriptive,n/a,19,7
+69241,Have you ever eaten turkey?,,5662,eaten,5,eaten|ever|have,direct-address,neutral,19,7
+x19_6,Only at Thanksgiving.,,6548,thanksgiving,3,thanksgiving,descriptive,n/a,19,7
+1804044,I ate a turkey sandwich.,,5705,sandwich,5,ate|sandwich,descriptive,n/a,19,7
+1804045,I made myself a turkey sandwich.,,5705,sandwich,6,made|myself,descriptive,n/a,19,7
+4502457,The soldiers surrounded the village.,,3865,surrounded,5,surrounded|village,descriptive,n/a,19,8
+5001101,I don't plan to vote in the upcoming elections.,,3999,upcoming,9,don't|elections|i|in|plan|upcoming|vote,descriptive,n/a,19,9
+6096337,Aren't you going to vote in the upcoming election?,,3999,upcoming,9,aren't|election|going,direct-address,neutral,19,9
+681606,The soldiers occupied the building.,,4114,occupied,5,building|occupied,descriptive,n/a,19,10
+4494037,Three soldiers were wounded.,,4142,wounded,4,three|wounded,descriptive,n/a,19,10
+4497277,Three soldiers died protecting us.,,4257,protecting,5,died|protecting|us,descriptive,n/a,19,10
+3728515,I'm practically an adult.,,5153,practically,4,adult,descriptive,n/a,19,11
+474057,Practically every family has a TV.,,5153,practically,6,every|tv,descriptive,n/a,19,11
+4834104,I got it practically for free.,,5153,practically,6,free,descriptive,n/a,19,11
+6059308,Mary put the turkey in the oven.,,6419,oven,7,mary|oven|put,descriptive,n/a,19,12
+3725667,I had a revelation.,,7301,revelation,4,had|revelation,descriptive,n/a,19,13
+1891004,I'm in my underwear.,,7327,underwear,4,i'm|underwear,descriptive,n/a,19,13
+53462,I have a persistent cough.,,7911,persistent,5,cough,descriptive,n/a,19,14
+4501273,The spotlight is on.,,7934,spotlight,4,is|on|spotlight,descriptive,n/a,19,14
+5418388,That's bad karma.,,8108,karma,3,bad|karma|that's,descriptive,n/a,19,15
+4666478,I don't believe in karma.,,8108,karma,5,believe,descriptive,n/a,19,15
+5858395,I rushed upstairs.,,8258,upstairs,3,rushed,descriptive,n/a,19,16
+251206,My study is upstairs.,,8258,upstairs,4,study,descriptive,n/a,19,16
+302442,He carried the box upstairs.,,8258,upstairs,5,box|carried,descriptive,n/a,19,16
+x19_7,Mind the loose step.,,3215,loose,4,loose|step,direct-address,neutral,19,16
+4012209,The children were asleep upstairs.,,8258,upstairs,5,asleep,descriptive,n/a,19,16
+5265823,I heard a noise upstairs.,,8258,upstairs,5,noise,descriptive,n/a,19,16
+72895,Go upstairs and bring down my trunk.,,8258,upstairs,7,bring|trunk,direct-address,informal,19,16
+x19_8,"Sure, give it here.",,197,sure,4,give|here,direct-address,informal,19,16
+1463502,They rented the upstairs room to a student.,,8258,upstairs,8,rented,descriptive,n/a,19,16
+257269,I asked for the key and went upstairs to my room.,,8258,upstairs,11,asked|key|room|went,descriptive,n/a,19,16
+3223405,Some kind of party upstairs kept me up until one last night.,,8258,upstairs,12,kept|last|party|until,descriptive,n/a,19,16
+2240841,We're in sync.,,8362,sync,3,sync,descriptive,n/a,19,17
+2245862,I hate paperwork.,,8522,paperwork,3,hate|paperwork,descriptive,n/a,19,17
+3724516,I'll start the paperwork.,,8522,paperwork,4,i'll|start,descriptive,n/a,19,17
+2358879,I've already done the paperwork.,,8522,paperwork,5,already|done,descriptive,n/a,19,17
+x19_9,Don't burn yourself out.,,2799,burn,4,burn|out,direct-address,informal,19,17
+2882452,I was just catching up on paperwork.,,8522,paperwork,7,catching,descriptive,n/a,19,17
+909561,She spends over a third of her time doing paperwork.,,8522,paperwork,10,spends|third,descriptive,n/a,19,17
+909568,Some healthcare workers spend more time doing paperwork than taking care of patients.,,8522,paperwork,13,care|healthcare|more|patients|spend|taking|workers,descriptive,n/a,19,17
+2647199,Do you have a nickel?,,8762,nickel,5,nickel,direct-address,neutral,19,18
+4823870,I forgot my debit card at home.,,11044,debit,7,card|debit|forgot|home,descriptive,n/a,19,18
+2247803,I'll ride shotgun.,,8892,shotgun,3,ride|shotgun,descriptive,n/a,19,19
+4728075,The city was full of starving soldiers.,,9113,starving,7,city|full|of|starving|was,descriptive,n/a,19,20
+2245000,Beauty is subjective.,,9115,subjective,3,beauty|subjective,descriptive,n/a,19,21
+2249133,It's not subjective.,,9115,subjective,3,it's,descriptive,n/a,19,21
+3821343,Are you really going to ask Mary to the prom?,,9199,prom,10,ask,direct-address,neutral,19,22
+2026771,Would you please do me the favor of going to the prom with me?,,9199,prom,14,favor,direct-address,formal,19,22
+5691920,I won't be able to go to the prom.,,9199,prom,9,able|won't,descriptive,n/a,19,22
+275390,Algebra is a branch of mathematics.,,9240,algebra,6,algebra|branch|mathematics,descriptive,n/a,19,23
+3374196,I hate calculus.,,11285,calculus,3,calculus,descriptive,n/a,19,23
+5418224,Simplicity is a virtue.,,9338,simplicity,4,simplicity|virtue,descriptive,n/a,19,24
+327637,I like the simplicity of her dress.,,9338,simplicity,7,dress,descriptive,n/a,19,24
+2892540,What do you know about zombies?,,9361,zombies,6,know|zombies,direct-address,neutral,19,25
+1841502,You're being paranoid.,,9791,paranoid,3,being|paranoid,direct-address,informal,19,25
+3446854,You're sounding paranoid.,,9791,paranoid,3,sounding,direct-address,informal,19,25
+x19_10,Maybe — or maybe I'm the only one paying attention.,,1819,paying,9,attention,descriptive,n/a,19,25
+65502,We have four bedrooms upstairs.,,9844,bedrooms,5,bedrooms|four|we,descriptive,n/a,19,26
+2821420,You're quite a philosopher.,,9912,philosopher,4,philosopher|quite,direct-address,informal,19,27
+908734,Who's your favorite philosopher?,,9912,philosopher,4,favorite|who's|your,direct-address,neutral,19,27
+2497792,I cut myself with a razor.,,9922,razor,6,cut|razor|with,descriptive,n/a,19,28
+1545119,How often do you change your razor blade?,,9922,razor,8,blade|change|how|often,direct-address,neutral,19,28
+3732074,Are you here voluntarily?,,9961,voluntarily,4,here,direct-address,neutral,19,29
+2545425,I'm doing it voluntarily.,,9961,voluntarily,4,doing|it|voluntarily,descriptive,n/a,19,29
+5290505,It was only meant as a harmless prank.,,10165,prank,8,as|harmless|meant|only|prank,descriptive,n/a,19,30
+4121173,This had better not be some kind of prank.,,10165,prank,9,be|better|kind|some,direct-address,informal,19,30
+3823813,"Unfortunately, it's a hoax.",,12158,hoax,4,unfortunately,descriptive,n/a,19,30
+3823812,It was definitely a hoax.,,12158,hoax,5,definitely,descriptive,n/a,19,30
+4501394,The photo was a hoax.,,12158,hoax,5,photo,descriptive,n/a,19,30
+22026,I hear footsteps outside.,,10244,footsteps,4,hear|outside,descriptive,n/a,19,31
+3130460,I could hear footsteps coming up the stairs.,,10244,footsteps,8,coming|stairs,descriptive,n/a,19,31
+2334784,What's your favorite color of lipstick?,,10262,lipstick,6,color,direct-address,neutral,19,32
+3170707,Mary usually wears bright red lipstick.,,10262,lipstick,6,bright|red|usually|wears,descriptive,n/a,19,32
+887058,She danced with him at the high school prom.,,10341,danced,9,at|danced|high|him|school|she,descriptive,n/a,19,33
+4689839,I'd do it all again in a heartbeat.,,10481,heartbeat,8,again|all|heartbeat|i'd,descriptive,n/a,19,34
+4494752,It was heartbreaking.,,11656,heartbreaking,3,heartbreaking,descriptive,n/a,19,34
+4495360,What a heartbreaking story!,,11656,heartbreaking,4,story,descriptive,n/a,19,34
+3978487,My upstairs neighbors are very noisy.,,10503,noisy,6,neighbors|noisy|very,descriptive,n/a,19,35
+3821622,I just saw a panther.,,10760,panther,5,just|panther|saw,descriptive,n/a,19,36
+62170,May I have a Coca-Cola?,,10819,coca,6,coca|cola|may,direct-address,neutral,19,37
+3329726,Can I have a double espresso?,,13767,espresso,6,double|espresso,direct-address,neutral,19,37
+458955,Is this jasmine tea?,,11197,jasmine,4,jasmine|tea,direct-address,neutral,19,37
+2645090,Do you want some bourbon?,,11279,bourbon,5,bourbon|want,direct-address,neutral,19,37
+2265783,Do you like pineapple drinks?,,11570,pineapple,5,drinks,direct-address,neutral,19,37
+3722976,I'm under quarantine.,,10877,quarantine,3,quarantine|under,descriptive,n/a,19,38
+2335048,Our camp is about 5 miles downstream from here.,,11052,downstream,8,camp|downstream|from|miles|our,descriptive,n/a,19,39
+1689836,I'm allergic to gluten.,,11075,gluten,4,allergic|gluten,descriptive,n/a,19,40
+3670429,That was a vile thing to do.,,11133,vile,7,thing|vile,descriptive,n/a,19,41
+4493942,It was a horrendous experience.,,13337,horrendous,5,experience|horrendous,descriptive,n/a,19,41
+4828286,It was an embarrassing fiasco.,,14721,fiasco,5,embarrassing,descriptive,n/a,19,41
+2254528,What a fiasco!,,14721,fiasco,3,fiasco,descriptive,n/a,19,41
+4789471,There's a lot of traffic on the freeway.,,11183,freeway,8,freeway|lot|there's|traffic,descriptive,n/a,19,42
+682156,There was a terrible accident on the freeway.,,11183,freeway,8,accident|terrible|there,descriptive,n/a,19,42
+4144668,Can I come backstage?,,11272,backstage,4,backstage|can|come,direct-address,neutral,19,43
+4144671,I have backstage passes.,,11272,backstage,4,passes,descriptive,n/a,19,43
+4529722,We weren't allowed backstage.,,11272,backstage,4,allowed|weren't,descriptive,n/a,19,43
+3826026,It's breathtaking.,,11281,breathtaking,2,breathtaking,descriptive,n/a,19,44
+3826025,The scenery was breathtaking.,,11281,breathtaking,4,scenery,descriptive,n/a,19,44
+3820484,Do I look like a sucker?,,11481,sucker,6,like|look|sucker,direct-address,neutral,19,45
+x19_12,Of course not — I'd never insult you like that.,,6979,insult,9,insult,direct-address,neutral,19,45
+2044748,I'm a sucker for happy endings.,,12020,endings,6,endings|happy,descriptive,n/a,19,45
+3736853,I had a blackout.,,11505,blackout,4,blackout,descriptive,n/a,19,46
+4495428,Please accept my condolences.,,11520,condolences,4,accept|condolences|please,direct-address,formal,19,47
+2374087,I just wanted to express my condolences.,,11520,condolences,7,express|wanted,direct-address,formal,19,47
+3821499,It's a pineapple.,,11570,pineapple,3,pineapple,descriptive,n/a,19,48
+42651,It's a sunflower.,,14146,sunflower,3,sunflower,descriptive,n/a,19,48
+4487332,Have you ever studied archaeology?,,11612,archaeology,5,archaeology|studied,direct-address,neutral,19,49
+5006735,This expression is archaic.,,14070,archaic,4,archaic|expression,descriptive,n/a,19,49
+4501380,No autopsy was performed.,,11616,autopsy,4,no|performed,descriptive,n/a,19,50
+3431059,Dr. Jackson is performing an autopsy.,,11616,autopsy,6,dr|jackson|performing,descriptive,n/a,19,50
+2016916,I'd like a copy of the autopsy report.,,11616,autopsy,8,copy|report,descriptive,n/a,19,50
+2203675,Who's fasting?,,11648,fasting,2,fasting|who's,direct-address,neutral,19,51
+2111733,I'm fasting.,,11648,fasting,2,fasting,descriptive,n/a,19,51
+1495897,I have a scooter.,,11700,scooter,4,scooter,descriptive,n/a,19,52
+253209,I was abducted by aliens.,,11729,abducted,5,abducted|aliens|by,descriptive,n/a,19,53
+2640911,I dreamed I had been abducted by aliens.,,11729,abducted,8,been|dreamed,descriptive,n/a,19,53
+x19_13,And what did the aliens want from you?,,6557,aliens,8,want,direct-address,neutral,19,53
+3733522,There's the lighthouse.,,11919,lighthouse,3,lighthouse,descriptive,n/a,19,54
+1483,This is a pun.,,11944,pun,4,pun,descriptive,n/a,19,55
+3825518,It made me cringe.,,12011,cringe,4,cringe|me,descriptive,n/a,19,55
+1775403,You need to reboot your computer.,,12067,reboot,6,computer|need|reboot,direct-address,neutral,19,56
+4496808,Did you hear your computer beep?,,13068,beep,6,did,direct-address,neutral,19,56
+3619085,It's a minor glitch.,,13105,glitch,4,glitch|minor,descriptive,n/a,19,56
+2892409,Was there a malfunction?,,14834,malfunction,4,malfunction,direct-address,neutral,19,56
+4014638,What caused the malfunction?,,14834,malfunction,4,caused,direct-address,neutral,19,56
+2463065,Leave your message after the beep.,,13068,beep,6,after|beep|message,direct-address,neutral,19,56
+4502546,It tastes really yummy.,,12103,yummy,4,really|yummy,descriptive,n/a,19,57
+1334717,I want an English muffin.,,14236,muffin,5,english|muffin,descriptive,n/a,19,57
+1933697,I ate chicken nuggets.,,12538,nuggets,4,chicken|nuggets,descriptive,n/a,19,57
+4817033,What time is brunch?,,12958,brunch,4,brunch|time,direct-address,neutral,19,57
+4394837,It was spooky.,,12206,spooky,3,spooky,descriptive,n/a,19,58
+3618863,It's a little spooky out here.,,12206,spooky,6,little|out,descriptive,n/a,19,58
+273978,When is the pep rally?,,12312,pep,5,pep|rally,direct-address,neutral,19,59
+4494469,The pep rally was loud.,,12312,pep,5,loud,descriptive,n/a,19,59
+4666494,Help me pull these weeds.,,12349,weeds,5,help|pull|these|weeds,direct-address,neutral,19,60
+408289,We have to pull the weeds.,,12349,weeds,6,have|pull|the|to|we|weeds,descriptive,n/a,19,60
+5903791,"I was in the garden all afternoon, pulling weeds.",,12349,weeds,9,pulling,descriptive,n/a,19,60
+2203470,We're trustworthy.,,12447,trustworthy,2,trustworthy,descriptive,n/a,19,61
+301948,I believe that he's trustworthy.,,12447,trustworthy,5,he's,descriptive,n/a,19,61
+280988,I have a hangover.,,12505,hangover,4,hangover,descriptive,n/a,19,62
+2359554,I've got a bad hangover.,,12505,hangover,5,got|i've,descriptive,n/a,19,62
+2493744,I've hit the jackpot.,,12519,jackpot,4,hit|jackpot,descriptive,n/a,19,63
+3312959,We hit the jackpot.,,12519,jackpot,4,hit|jackpot|the|we,descriptive,n/a,19,63
+2275950,I didn't want to brag.,,12601,brag,5,brag,descriptive,n/a,19,64
+3001003,I'm not bragging.,,13178,bragging,3,bragging,descriptive,n/a,19,64
+478383,I'm tired of listening to your bragging.,,13178,bragging,7,listening|tired,direct-address,informal,19,64
+x19_14,Then maybe stop giving me reasons to.,,1240,reasons,7,reasons,direct-address,informal,19,64
+3480066,The baby needs a diaper change.,,12617,diaper,6,baby|diaper|needs,descriptive,n/a,19,65
+1860644,Leave the baby in the crib.,,12745,crib,6,crib|leave,direct-address,neutral,19,65
+4502522,The disease we are talking about is hereditary.,,12648,hereditary,8,disease|hereditary|talking,descriptive,n/a,19,66
+523980,My license was confiscated.,,12739,confiscated,4,license,descriptive,n/a,19,67
+2358635,I confiscated a gun from a student this morning.,,12739,confiscated,9,gun|morning|student,descriptive,n/a,19,67
+327478,"If you leave your textbooks at school during the break, they'll get confiscated.",,12739,confiscated,13,break|textbooks|they'll,direct-address,neutral,19,67
+5358127,Is it hard being a goalie?,,12768,goalie,6,goalie|hard,direct-address,neutral,19,68
+2202921,You're grumpy.,,12878,grumpy,2,grumpy,direct-address,neutral,19,69
+3347141,You sure sound grumpy.,,12878,grumpy,4,sound|sure,direct-address,neutral,19,69
+5840431,I like reggae.,,12911,reggae,3,reggae,descriptive,n/a,19,70
+2050687,I heard some reggae music playing in the distance.,,12911,reggae,9,distance,descriptive,n/a,19,70
+3818753,Where's your magic wand?,,12941,wand,4,magic|wand|where's,direct-address,neutral,19,71
+3825599,Try to be concise.,,12967,concise,4,concise|try,direct-address,neutral,19,72
+3825600,I'll be brief and concise.,,12967,concise,5,and|brief,descriptive,n/a,19,72
+286743,His essay was concise and to the point.,,12967,concise,8,essay|point,descriptive,n/a,19,72
+1347334,Benjamin Franklin was an American statesman and inventor.,,13042,statesman,8,american|benjamin|franklin|inventor|statesman,descriptive,n/a,19,73
+2248674,Isn't that astounding?,,13061,astounding,3,astounding|isn't|that,direct-address,neutral,19,74
+4501811,The results were astounding.,,13061,astounding,4,results,descriptive,n/a,19,74
+3312864,We got a standing ovation.,,14846,ovation,5,ovation|standing,descriptive,n/a,19,74
+2248153,I'm not invincible.,,13222,invincible,3,invincible,descriptive,n/a,19,75
+4499810,I was nearly paralyzed.,,13242,paralyzed,4,nearly,descriptive,n/a,19,75
+5633132,I was a chubby kid.,,13312,chubby,5,kid,descriptive,n/a,19,76
+4494383,Insomnia is very common.,,13346,insomnia,4,common,descriptive,n/a,19,77
+3823546,Do you suffer from insomnia?,,13346,insomnia,5,suffer,direct-address,neutral,19,77
+3821661,Throw them overboard.,,13373,overboard,3,overboard|them|throw,direct-address,informal,19,78
+5859408,I jumped overboard.,,13373,overboard,3,jumped,descriptive,n/a,19,78
+4054885,Be careful not to fall overboard.,,13373,overboard,6,careful|fall,direct-address,neutral,19,78
+1541480,Mary died in childbirth.,,13423,childbirth,4,childbirth,descriptive,n/a,19,79
+2549565,Helium is a gas.,,13457,helium,4,gas|helium,descriptive,n/a,19,80
+2243396,They were persecuted.,,13475,persecuted,3,persecuted,descriptive,n/a,19,81
+5858872,I felt persecuted.,,13475,persecuted,3,felt,descriptive,n/a,19,81
+3824090,I'm heartbroken.,,13556,heartbroken,2,heartbroken,descriptive,n/a,19,82
+1173606,He was heartbroken.,,13556,heartbroken,3,he|heartbroken|was,descriptive,n/a,19,82
+3172340,Are you proactive?,,13591,proactive,3,proactive,direct-address,neutral,19,83
+4495087,We were proactive.,,13591,proactive,3,proactive|we|were,descriptive,n/a,19,83
+2218025,You're a hypocrite.,,13675,hypocrite,3,hypocrite,direct-address,informal,19,84
+2713443,You're such a hypocrite.,,13675,hypocrite,4,such,direct-address,informal,19,84
+2252697,These are counterfeit.,,13756,counterfeit,3,counterfeit,descriptive,n/a,19,85
+4806580,Don't confuse astrology with astronomy.,,13859,astrology,5,astronomy|confuse,direct-address,neutral,19,86
+887451,She told him that she believed in astrology.,,13859,astrology,8,believed|told,descriptive,n/a,19,86
+5858382,I'm your bodyguard.,,13862,bodyguard,3,bodyguard,direct-address,neutral,19,87
+2546713,I'll be your bodyguard.,,13862,bodyguard,4,be|bodyguard|i'll|your,direct-address,neutral,19,87
+2203123,You're obnoxious.,,13916,obnoxious,2,obnoxious,direct-address,informal,19,88
+4494449,This odor is obnoxious.,,13916,obnoxious,4,odor,descriptive,n/a,19,88
+3281680,What a colossal waste of time!,,13974,colossal,6,colossal|waste,descriptive,n/a,19,89
+1587252,This is a serious setback.,,14034,setback,5,serious|setback,descriptive,n/a,19,89
+870646,It's only a minor setback.,,14034,setback,5,a|it's|minor|only|setback,descriptive,n/a,19,89
+323939,Is there a curfew?,,13978,curfew,4,curfew,direct-address,neutral,19,90
+3734413,The curfew begins at 7:00 p.m.,,13978,curfew,6,begins|m|p,descriptive,n/a,19,90
+3164471,Our club has a secret handshake.,,14101,handshake,6,club|handshake|secret,descriptive,n/a,19,91
+3733447,That's pure conjecture.,,14183,conjecture,3,conjecture|pure,descriptive,n/a,19,92
+3331067,You've got my goggles.,,14210,goggles,4,goggles|you've,direct-address,informal,19,93
+3115651,You should be wearing your safety goggles.,,14210,goggles,7,safety|should,direct-address,neutral,19,93
+2245873,I have amnesia.,,14282,amnesia,3,amnesia,descriptive,n/a,19,94
+4495018,Slander is a crime.,,14373,slander,4,crime|slander,descriptive,n/a,19,95
+5858214,I have the measles.,,14460,measles,4,measles,descriptive,n/a,19,96
+2266896,I came down with measles.,,14460,measles,5,came|down,descriptive,n/a,19,96
+320325,I have a migraine.,,14462,migraine,4,migraine,descriptive,n/a,19,96
+2921563,What sound does a giraffe make?,,14540,giraffe,6,make,direct-address,neutral,19,97
+259712,I had never seen a giraffe till I visited the zoo.,,14540,giraffe,11,never|seen|till|visited|zoo,descriptive,n/a,19,97
+1719227,Stop meddling.,,14741,meddling,2,meddling|stop,direct-address,informal,19,98
+482672,I have no intention of meddling in your affairs.,,14741,meddling,9,affairs|intention,direct-address,formal,19,98
+2300058,I called 911 and the paramedics came.,,14746,paramedics,6,called,descriptive,n/a,19,99
+5807351,Paramedics arrived on the scene within minutes.,,14746,paramedics,7,arrived|minutes|scene|within,descriptive,n/a,19,99
+3818453,Did the dishwasher work?,,14810,dishwasher,4,dishwasher|work,direct-address,neutral,19,100
+2323048,I don't see any footprints anywhere.,,14816,footprints,6,anywhere,descriptive,n/a,19,101
+5572831,I wonder whose footprints these are.,,14816,footprints,6,whose,descriptive,n/a,19,101
+22972,We found the footprints in the sand.,,14816,footprints,7,sand,descriptive,n/a,19,101
+x19_11,Could be a deer.,,5740,deer,4,deer,descriptive,n/a,19,101
+5572833,Who left these muddy footprints on the front porch?,,14816,footprints,9,left|muddy|porch,direct-address,neutral,19,101
+2401256,We found one large footprint and a couple of different size smaller footprints.,,14816,footprints,13,couple|different|footprint|found|large|one|size|smaller,descriptive,n/a,19,101
+5572837,I saw three sets of footprints in the snow from the road up to my front door.,,14816,footprints,17,door|front|road|sets|snow,descriptive,n/a,19,101
+5046521,Why do zebras have stripes?,,14877,zebras,5,stripes,descriptive,n/a,19,102
+2250549,My wife is obsessed with cleanliness.,,14877,cleanliness,6,obsessed|wife,descriptive,n/a,19,103
+5916337,I took a swig of whiskey.,,14877,swig,6,whiskey,descriptive,n/a,19,104
+4496722,The soldiers obeyed their commander without question.,,14877,obeyed,7,commander|question|without,descriptive,n/a,19,105
+2342038,They scraped barnacles off the hull of the ship.,,14877,scraped,9,hull,descriptive,n/a,19,106
+4017145,My grandparents have smallpox vaccination scars on their arms.,,14877,smallpox,9,arms|grandparents|scars|vaccination,descriptive,n/a,19,107
+268682,I got a rash on my hands from dishwasher detergent.,,14877,detergent,10,hands|rash,descriptive,n/a,19,108

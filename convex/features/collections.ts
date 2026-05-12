@@ -9,7 +9,11 @@ import {
 import { translationValidator, audioRecordingValidator } from '../types';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 import { scheduleMissingContent } from './decks';
-import { COLLECTION_PREVIEW_SIZE, CONTENT_LOOKAHEAD_SIZE, LEVEL_ORDER } from '../lib/collections';
+import {
+  COLLECTION_PREVIEW_SIZE,
+  CONTENT_LOOKAHEAD_SIZE,
+  isPremadeLevelCollection,
+} from '../lib/collections';
 import { getCourseSettings } from '../db/courseSettings';
 import type { Id } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
@@ -22,7 +26,7 @@ export async function isCollectionAccessible(
   const collection = await ctx.db.get(collectionId);
   if (!collection) return false;
 
-  if ((LEVEL_ORDER as readonly string[]).includes(collection.name)) return true;
+  if (isPremadeLevelCollection(collection)) return true;
 
   const courseSettings = await getCourseSettings(ctx, courseId);
   if (!courseSettings) return false;
@@ -77,7 +81,7 @@ export const getCollectionTextsWithContent = query({
 
     const collection = await ctx.db.get(args.collectionId);
     const isLevelCollection = collection
-      ? (LEVEL_ORDER as readonly string[]).includes(collection.name)
+      ? isPremadeLevelCollection(collection)
       : false;
 
     const progress = await getCollectionProgress(
@@ -158,7 +162,7 @@ export const ensureContentForCollection = mutation({
 
     const collection = await ctx.db.get(args.collectionId);
     const isLevelCollection = collection
-      ? (LEVEL_ORDER as readonly string[]).includes(collection.name)
+      ? isPremadeLevelCollection(collection)
       : false;
 
     const progress = await getCollectionProgress(

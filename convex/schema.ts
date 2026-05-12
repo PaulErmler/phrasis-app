@@ -55,6 +55,7 @@ export const courseSettingsFields = {
   chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
+  reconciledDatasetId: v.optional(v.id('datasets')), // Dataset version this course's progress has been cutover to (idempotency gate for datasetMigration_cutoverUser)
 } as const;
 
 // Full `courseSettings` document validator (includes system fields).
@@ -65,15 +66,45 @@ export const courseSettingsDocValidator = v.object({
 });
 
 export default defineSchema({
-  // Collections table - groups texts by difficulty level or potentially other topics
+  // Datasets table - versioned premade content sets. A dataset is a corpus of
+  // texts (whose own language lives on `texts.language`) fanned out to every
+  // target language via the `translations` table — so at most one dataset is
+  // `isActive: true` at a time, globally. Inactive rows remain in place for
+  // rollback and historical reference.
+  datasets: defineTable({
+    slug: v.string(), // e.g. "ogte-curated"
+    version: v.string(), // e.g. "1.0.0"
+    publishedAt: v.number(),
+    isActive: v.boolean(),
+    manifestStorageId: v.optional(v.id('_storage')),
+    description: v.optional(v.string()),
+  })
+    .index('by_slug_and_version', ['slug', 'version'])
+    .index('by_isActive', ['isActive']),
+
+  // Collections table - groups texts by difficulty level or potentially other topics.
+  // Premade-dataset rows have `datasetId` set and carry the `code`/`cefrTier`/`order`
+  // fields. Custom (user-created) collections leave those optional. Old curriculum
+  // rows ("Essential", "A1"..."C2") are marked `legacy: true` after the OGTE cutover.
   collections: defineTable({
-    name: v.string(), // e.g., "A1", "B2", "Essential"
+    name: v.string(), // e.g., "A1", "B2", "Essential", "L01"
     textCount: v.number(), // Number of texts in this collection
-  }).index('by_name', ['name']),
+    // Premade-dataset fields (populated by uploadDataset; null for custom and legacy)
+    datasetId: v.optional(v.id('datasets')),
+    code: v.optional(v.string()), // "L01" … "L20"
+    cefrTier: v.optional(v.string()), // "Pre-A1" | "A1" | "A2" | "B1" | "B2" | "C1" | "C2"
+    order: v.optional(v.number()), // 1..20 within the dataset
+    displayName: v.optional(v.string()),
+    legacy: v.optional(v.boolean()), // true on old Essential/A1..C2 post-cutover
+  })
+    .index('by_name', ['name'])
+    .index('by_datasetId_and_order', ['datasetId', 'order']),
 
   // Texts table - stores the original texts/sentences
   texts: defineTable({
-    datasetSentenceId: v.optional(v.number()), // Unique ID from the dataset (optional for user-created)
+    datasetSentenceId: v.optional(v.number()), // Legacy numeric Tatoeba ID — retained for back-compat
+    externalId: v.optional(v.string()), // Stable cross-version ID (Tatoeba stringified or "c-<hex>")
+    datasetId: v.optional(v.id('datasets')), // Premade-dataset texts only; null for user-created and legacy
     text: v.string(),
     language: v.string(), // e.g., "en" for English
     romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
@@ -93,6 +124,7 @@ export default defineSchema({
   })
     .index('by_text', ['text'])
     .index('by_datasetSentenceId', ['datasetSentenceId'])
+    .index('by_dataset_and_externalId', ['datasetId', 'externalId'])
     .index('by_collection_and_rank', ['collectionId', 'collectionRank'])
     .index('by_collection_and_userCreated_and_rank', ['collectionId', 'userCreated', 'collectionRank'])
     .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank']),
@@ -289,13 +321,18 @@ export default defineSchema({
     cardsAddedManually: v.optional(v.number()),
   }).index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date']),
 
-  // Collection progress table - tracks cards added per collection/course
+  // Collection progress table - per (user, course, collection) monotonic
+  // counters used by the home view. Counters are strictly monotonic: incremented
+  // on insert / first review / first mastery, NEVER decremented on delete or
+  // demaster. The semantics are "cumulative work the user has done in this
+  // collection," not "current card holdings."
   collectionProgress: defineTable({
     userId: v.string(), // Links to auth user
     courseId: v.id('courses'), // Reference to the course
     collectionId: v.id('collections'), // Reference to the collection
-    cardsAdded: v.number(), // Count of cards added from this collection
-    cardsLearned: v.optional(v.number()), // Count of cards with first review completed
+    cardsAdded: v.number(), // Monotonic — cards ever added from this collection
+    cardsLearned: v.optional(v.number()), // Monotonic — cards ever reviewed at least once
+    cardsMastered: v.optional(v.number()), // Monotonic — cards ever mastered
     lastRankProcessed: v.optional(v.number()), // Last collectionRank processed (for efficient pagination)
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])

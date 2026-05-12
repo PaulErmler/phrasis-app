@@ -12,12 +12,6 @@ export interface AppData {
   preloadedCourseSettings: Preloaded<
     typeof api.features.courses.getActiveCourseSettings
   >;
-  preloadedCollectionProgress: Preloaded<
-    typeof api.features.decks.getCollectionProgress
-  >;
-  preloadedCustomCollectionsProgress: Preloaded<
-    typeof api.features.decks.getCustomCollectionsProgress
-  >;
 }
 
 const AppDataContext = createContext<AppData | null>(null);

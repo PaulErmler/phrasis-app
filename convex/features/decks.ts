@@ -24,7 +24,10 @@ import { getAuthUserId, requireAuthUserId, getUserSettings } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
+  findNextIncompleteCollection,
+  getActiveDataset,
   getCollectionProgress as getCollectionProgressHelper,
+  getNextCollection,
   getNextTextsFromRank,
 } from '../db/collections';
 import { translateText, romanizeText } from './translation';
@@ -39,10 +42,10 @@ import {
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
-  LEVEL_ORDER,
   COLLECTION_PREVIEW_SIZE,
   CONTENT_LOOKAHEAD_SIZE,
-  getNextCollectionName,
+  LEGACY_LEVEL_ORDER,
+  isPremadeLevelCollection,
 } from '../lib/collections';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { consumeQuota, checkQuota } from '../usage/helpers';
@@ -391,6 +394,7 @@ export const getCollectionProgress = query({
       collectionName: v.string(),
       cardsAdded: v.number(),
       totalTexts: v.number(),
+      order: v.optional(v.number()),
     }),
   ),
   handler: async (ctx) => {
@@ -401,13 +405,32 @@ export const getCollectionProgress = query({
     if (!settings?.activeCourseId) return [];
 
     const courseId = settings.activeCourseId;
-    const allCollections = await ctx.db.query('collections').collect();
-    const levelOrder: readonly string[] = LEVEL_ORDER;
 
-    // Only include difficulty-level collections in this query
-    const collections = allCollections.filter((c) =>
-      levelOrder.includes(c.name),
-    );
+    // Fetch only the premade rows actually displayed: the active dataset's ~20
+    // collections (one indexed scan) or the seven legacy CEFR rows by name.
+    // Avoids loading every user's custom/chat collections on this query.
+    const activeDataset = await getActiveDataset(ctx);
+    let collections: Doc<'collections'>[];
+    if (activeDataset) {
+      collections = await ctx.db
+        .query('collections')
+        .withIndex('by_datasetId_and_order', (q) =>
+          q.eq('datasetId', activeDataset._id),
+        )
+        .collect();
+    } else {
+      const legacyDocs = await Promise.all(
+        LEGACY_LEVEL_ORDER.map((name) =>
+          ctx.db
+            .query('collections')
+            .withIndex('by_name', (q) => q.eq('name', name))
+            .first(),
+        ),
+      );
+      collections = legacyDocs.filter(
+        (c): c is Doc<'collections'> => c !== null,
+      );
+    }
 
     const result = await Promise.all(
       collections.map(async (collection) => {
@@ -423,79 +446,26 @@ export const getCollectionProgress = query({
           collectionName: collection.name,
           cardsAdded: progress?.cardsAdded ?? 0,
           totalTexts: collection.textCount,
+          order: collection.order,
         };
       }),
     );
 
+    // Sort by `order` when present (new dataset), else by legacy CEFR position.
+    // Items with `order` set always sort before legacy items to keep new
+    // dataset on top once it's loaded.
+    const legacyPosition = (name: string) => {
+      const idx = LEGACY_LEVEL_ORDER.indexOf(name as (typeof LEGACY_LEVEL_ORDER)[number]);
+      return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+    };
     result.sort((a, b) => {
-      const aIndex = levelOrder.indexOf(a.collectionName);
-      const bIndex = levelOrder.indexOf(b.collectionName);
-      return aIndex - bIndex;
+      if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+      if (a.order !== undefined) return -1;
+      if (b.order !== undefined) return 1;
+      return legacyPosition(a.collectionName) - legacyPosition(b.collectionName);
     });
 
     return result;
-  },
-});
-
-export const getCustomCollectionsProgress = query({
-  args: {},
-  returns: v.array(
-    v.object({
-      collectionId: v.id('collections'),
-      collectionName: v.string(),
-      cardsAdded: v.number(),
-      totalTexts: v.number(),
-    }),
-  ),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-
-    const settings = await getUserSettings(ctx, userId);
-    if (!settings?.activeCourseId) return [];
-
-    const courseId = settings.activeCourseId;
-    const courseSettings = await getCourseSettings(ctx, courseId);
-
-    // Collect course-specific custom collection IDs (chat-approved + manually entered)
-    const customCollectionIds: Id<'collections'>[] = [];
-    const seen = new Set<string>();
-    for (const id of [
-      courseSettings?.chatCollectionId,
-      courseSettings?.customCollectionId,
-    ]) {
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        customCollectionIds.push(id);
-      }
-    }
-
-    if (customCollectionIds.length === 0) return [];
-
-    const result = await Promise.all(
-      customCollectionIds.map(async (collectionId) => {
-        const collection = await ctx.db.get(collectionId);
-        if (!collection) return null;
-
-        const progress = await getCollectionProgressHelper(
-          ctx,
-          userId,
-          courseId,
-          collectionId,
-        );
-
-        return {
-          collectionId: collection._id,
-          collectionName: collection.name,
-          cardsAdded: progress?.cardsAdded ?? 0,
-          totalTexts: collection.textCount,
-        };
-      }),
-    );
-
-    return result.filter(
-      (item): item is NonNullable<typeof item> => item !== null,
-    );
   },
 });
 
@@ -540,7 +510,7 @@ export const getNextTextsFromCollection = query({
 
     const collection = await ctx.db.get(args.collectionId);
     const isLevelCollection = collection
-      ? (LEVEL_ORDER as readonly string[]).includes(collection.name)
+      ? isPremadeLevelCollection(collection)
       : false;
 
     const texts = await getNextTextsFromRank(
@@ -578,7 +548,7 @@ export const setActiveCollection = mutation({
     const collection = await ctx.db.get(args.collectionId);
     if (!collection) throw new ConvexError('Collection not found');
 
-    const isLevelCollection = (LEVEL_ORDER as readonly string[]).includes(collection.name);
+    const isLevelCollection = isPremadeLevelCollection(collection);
     if (!isLevelCollection) {
       const courseSettings = await getCourseSettings(ctx, courseId);
       const isChatCollection =
@@ -624,7 +594,7 @@ export const toggleCustomCollection = mutation({
     const collection = await ctx.db.get(args.collectionId);
     if (!collection) throw new ConvexError('Collection not found');
 
-    const isLevelCollection = (LEVEL_ORDER as readonly string[]).includes(collection.name);
+    const isLevelCollection = isPremadeLevelCollection(collection);
     if (isLevelCollection) {
       throw new ConvexError('Cannot toggle a level collection');
     }
@@ -798,7 +768,7 @@ export const addCardsFromCollection = mutation({
     const courseSettings = await getCourseSettings(ctx, courseId);
     const requestedCollection = await ctx.db.get(args.collectionId);
     const isLevelCollection = requestedCollection
-      ? (LEVEL_ORDER as readonly string[]).includes(requestedCollection.name)
+      ? isPremadeLevelCollection(requestedCollection)
       : false;
 
     const customCollectionIdsToProcess: Id<'collections'>[] = args.exclusive
@@ -991,6 +961,9 @@ export const addCardsFromCollection = mutation({
 
         // Auto-advance: if the collection is now complete and is the active one,
         // move to the next incomplete collection (or clear if last).
+        // Walks forward within the same collection generation — new-dataset
+        // collections advance by `order + 1`, legacy collections walk
+        // LEGACY_LEVEL_ORDER. See findNextIncompleteCollection / getNextCollection.
         const newCardsAdded = cardsAlreadyAdded + textsToAdd.length;
         const collection = await ctx.db.get(args.collectionId);
         if (collection && newCardsAdded >= collection.textCount) {
@@ -999,33 +972,18 @@ export const addCardsFromCollection = mutation({
             latestSettings?.activeCollectionId?.toString() ===
             args.collectionId.toString()
           ) {
-            let nextCollectionId: Id<'collections'> | undefined;
-            const nextName = getNextCollectionName(collection.name);
-
-            if (nextName) {
-              const allCollections = await ctx.db.query('collections').collect();
-              const orderedNames: readonly string[] = LEVEL_ORDER;
-              const startIdx = orderedNames.indexOf(nextName);
-
-              for (let i = startIdx; i < orderedNames.length; i++) {
-                const coll = allCollections.find((c) => c.name === orderedNames[i]);
-                if (!coll) continue;
-
-                const prog = await getCollectionProgressHelper(
-                  ctx,
-                  userId,
-                  courseId,
-                  coll._id,
-                );
-
-                if (!prog || prog.cardsAdded < coll.textCount) {
-                  nextCollectionId = coll._id;
-                  break;
-                }
-              }
-            }
-
-            await setActiveCollectionOnSettings(ctx, courseId, nextCollectionId);
+            // Start the search at the collection AFTER the one we just
+            // completed, so a partially-filled current row can't be picked.
+            const startCollection = await getNextCollection(ctx, collection);
+            const next = startCollection
+              ? await findNextIncompleteCollection(
+                ctx,
+                startCollection,
+                userId,
+                courseId,
+              )
+              : null;
+            await setActiveCollectionOnSettings(ctx, courseId, next?._id);
           }
         }
       }

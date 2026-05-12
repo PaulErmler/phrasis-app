@@ -8,6 +8,9 @@
  * @module
  */
 
+import type * as admin_activateDataset from "../admin/activateDataset.js";
+import type * as admin_diagCutoverState from "../admin/diagCutoverState.js";
+import type * as admin_uploadDataset from "../admin/uploadDataset.js";
 import type * as auth from "../auth.js";
 import type * as autumn from "../autumn.js";
 import type * as config_aiModels from "../config/aiModels.js";
@@ -41,6 +44,7 @@ import type * as features_courses from "../features/courses.js";
 import type * as features_customTexts from "../features/customTexts.js";
 import type * as features_decks from "../features/decks.js";
 import type * as features_featureIds from "../features/featureIds.js";
+import type * as features_home from "../features/home.js";
 import type * as features_library from "../features/library.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_sentenceMetadata from "../features/sentenceMetadata.js";
@@ -69,6 +73,8 @@ import type * as migrations_backfillDisplayWord from "../migrations/backfillDisp
 import type * as migrations_backfillIsGraduated from "../migrations/backfillIsGraduated.js";
 import type * as migrations_backfillUserStats from "../migrations/backfillUserStats.js";
 import type * as migrations_backfillWordTexts from "../migrations/backfillWordTexts.js";
+import type * as migrations_datasetMigration_backfillCardsMastered from "../migrations/datasetMigration_backfillCardsMastered.js";
+import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
 import type * as migrations_retokenizeAllWords from "../migrations/retokenizeAllWords.js";
 import type * as migrations_seedMockStats from "../migrations/seedMockStats.js";
 import type * as retrier from "../retrier.js";
@@ -85,6 +91,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "admin/activateDataset": typeof admin_activateDataset;
+  "admin/diagCutoverState": typeof admin_diagCutoverState;
+  "admin/uploadDataset": typeof admin_uploadDataset;
   auth: typeof auth;
   autumn: typeof autumn;
   "config/aiModels": typeof config_aiModels;
@@ -118,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   "features/customTexts": typeof features_customTexts;
   "features/decks": typeof features_decks;
   "features/featureIds": typeof features_featureIds;
+  "features/home": typeof features_home;
   "features/library": typeof features_library;
   "features/scheduling": typeof features_scheduling;
   "features/sentenceMetadata": typeof features_sentenceMetadata;
@@ -146,6 +156,8 @@ declare const fullApi: ApiFromModules<{
   "migrations/backfillIsGraduated": typeof migrations_backfillIsGraduated;
   "migrations/backfillUserStats": typeof migrations_backfillUserStats;
   "migrations/backfillWordTexts": typeof migrations_backfillWordTexts;
+  "migrations/datasetMigration_backfillCardsMastered": typeof migrations_datasetMigration_backfillCardsMastered;
+  "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;
   "migrations/retokenizeAllWords": typeof migrations_retokenizeAllWords;
   "migrations/seedMockStats": typeof migrations_seedMockStats;
   retrier: typeof retrier;
