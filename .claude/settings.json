@@ -49,7 +49,20 @@
       "Bash(curl -s -L \"https://posthog.com/docs/data/data-retention\")",
       "WebFetch(domain:posthog.com)",
       "WebFetch(domain:us.posthog.com)",
-      "Bash(grep -r \"Intl.Segmenter\" /Users/paulermler/Documents/Phrasis/new/phrasis-app --include=\"*.ts\" --include=\"*.tsx\" ! -path \"*/node_modules/*\" ! -path \"*/.git/*\")"
+      "Bash(grep -r \"Intl.Segmenter\" /Users/paulermler/Documents/Phrasis/new/phrasis-app --include=\"*.ts\" --include=\"*.tsx\" ! -path \"*/node_modules/*\" ! -path \"*/.git/*\")",
+      "Bash(python3 -c \"import wordfreq; print\\('wordfreq', wordfreq.__version__\\)\")",
+      "Bash(python3 -c \"import better_profanity; print\\('better_profanity OK'\\)\")",
+      "Bash(python3 -c \"import requests; print\\('requests OK'\\)\")",
+      "Bash(/Users/paulermler/miniconda3/envs/language-dataset/bin/python -m data_filtering.utils.read_tatoeba_dataset)",
+      "Bash(/Users/paulermler/miniconda3/envs/language-dataset/bin/python data_preparation/ogte-dataset/scripts/1_build_vocab.py)",
+      "Bash(/Users/paulermler/miniconda3/envs/language-dataset/bin/python data_preparation/ogte-dataset/scripts/2_download_lists_export.py)",
+      "Bash(/Users/paulermler/miniconda3/envs/language-dataset/bin/python data_preparation/ogte-dataset/scripts/3_extract_ogte_sentences.py)",
+      "Bash(/Users/paulermler/miniconda3/envs/language-dataset/bin/python data_preparation/ogte-dataset/scripts/4_filter_sentences.py)",
+      "Bash(python3)",
+      "Bash(python3 /tmp/scan_sexist.py)",
+      "Bash(python3 /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/find_near_dups.py)",
+      "Bash(awk -F, 'NR<=15 {print $1, $9}' /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/data/output/levels_curated/ogte_10_high_intermediate.csv)",
+      "Bash(awk -F, 'NR<=15 {print $1}' /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/data/output/levels_curated/ogte_10_high_intermediate.csv)"
     ]
   }
 }
