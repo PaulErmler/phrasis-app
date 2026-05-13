@@ -9,6 +9,7 @@
  */
 
 import type * as admin_activateDataset from "../admin/activateDataset.js";
+import type * as admin_backfillCollectionOrigin from "../admin/backfillCollectionOrigin.js";
 import type * as admin_backfillTextMetadata from "../admin/backfillTextMetadata.js";
 import type * as admin_diagCutoverState from "../admin/diagCutoverState.js";
 import type * as admin_uploadDataset from "../admin/uploadDataset.js";
@@ -95,6 +96,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "admin/activateDataset": typeof admin_activateDataset;
+  "admin/backfillCollectionOrigin": typeof admin_backfillCollectionOrigin;
   "admin/backfillTextMetadata": typeof admin_backfillTextMetadata;
   "admin/diagCutoverState": typeof admin_diagCutoverState;
   "admin/uploadDataset": typeof admin_uploadDataset;

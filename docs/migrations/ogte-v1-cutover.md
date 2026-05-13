@@ -37,8 +37,9 @@ new home view.
 | Dataset activation + cutover trigger | `convex/admin/activateDataset.ts` |
 | Per-user cutover migration | `convex/migrations/datasetMigration_cutoverUser.ts` |
 | `cardsMastered` backfill (one-time) | `convex/migrations/datasetMigration_backfillCardsMastered.ts` |
+| `collections.origin` + `cards.collectionOrigin` backfill (one-time) | `convex/admin/backfillCollectionOrigin.ts` |
 | Home view query | `convex/features/home.ts` (filters to active dataset) |
-| Schema | `convex/schema.ts` (`datasets`, `collections.datasetId`, `courseSettings.reconciledDatasetId`) |
+| Schema | `convex/schema.ts` (`datasets`, `collections.datasetId`, `collections.origin`, `cards.collectionOrigin`, `courseSettings.reconciledDatasetId`, `courseSettings.studyContentFilter`) |
 | Upload CLI | `scripts/uploadOgteV1.mjs` |
 | Source CSVs | `data_preparation/ogte-dataset/data/output/levels_curated/ogte_*.csv` |
 
@@ -68,6 +69,67 @@ Convex dashboard for `processBatch` invocations.
 
 If the database has zero `collectionProgress` rows (fresh staging), the
 backfill finishes in one batch with `processed: 0`.
+
+## Step 1b — One-time content-origin backfill
+
+Also required *once per environment*, alongside Step 1. Powers the
+content-source filter feature (`courseSettings.studyContentFilter`) by
+stamping every existing `collection` with an explicit `origin` and every
+existing `card` with its denormalized `collectionOrigin` + `collectionId`.
+
+Going forward, all new collection/card inserts already write these fields
+directly (see `convex/db/collections.ts`, `convex/admin/uploadDataset.ts`,
+`convex/features/decks.ts:createCardsFromTexts`), so the backfill only
+touches rows that pre-date the deploy. Both phases are idempotent on the
+field-undefined check — re-runs are free.
+
+### Phase A — collections
+
+Small one-pass mutation (tens to low hundreds of rows). Classifies each
+collection:
+
+- `datasetId !== undefined` OR `legacy === true` → `'premade'`
+- `_id` matches some `courseSettings.chatCollectionId` → `'chat'`
+- otherwise → `'custom'`
+
+```bash
+npx convex run admin/backfillCollectionOrigin:runCollectionsOriginBackfill
+```
+
+Returns `{ processed, updated, classified: { premade, custom, chat } }`.
+Verify `updated > 0` on first run, `updated === 0` on the second.
+
+### Phase B — cards
+
+Paginated batch processor (`CARDS_BATCH_SIZE = 200`, self-schedules until
+done). For each card missing `collectionId` or `collectionOrigin`, reads
+the source text → collection and patches both fields. A per-batch cache
+keys on `collectionId` so cards from the same OGTE level only require one
+collection read across the whole batch.
+
+```bash
+npx convex run admin/backfillCollectionOrigin:runCardsBackfill
+```
+
+The action returns `{ status: 'started' }`. Watch the **Functions** tab
+for `processCardsBatch` invocations until they stop firing. For ~100k
+cards expect a few minutes total.
+
+**Must run Phase A before Phase B** — Phase B reads `collection.origin`
+from Phase A's output.
+
+### Tightening the schema (separate follow-up PR)
+
+After both phases have run cleanly and the dashboard confirms zero
+undefined values (check `collections` filtered by `origin === undefined`
+and `cards` filtered by `collectionOrigin === undefined`), drop the
+`v.optional()` wrappers in `convex/schema.ts`:
+
+- `collections.origin`
+- `cards.collectionId`
+- `cards.collectionOrigin`
+
+This ships as its own deploy so a stuck backfill can't break writes.
 
 ## Step 2 — Upload the OGTE dataset (inactive)
 

@@ -78,6 +78,7 @@ export const upsertDatasetCollection = internalMutation({
       cefrTier: args.cefrTier,
       order: args.order,
       displayName: args.displayName,
+      origin: 'premade',
     });
     return id;
   },

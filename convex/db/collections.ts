@@ -208,6 +208,7 @@ export async function getOrCreateChatCollection(
   const collectionId = await ctx.db.insert('collections', {
     name: 'Chat',
     textCount: 0,
+    origin: 'chat',
   });
 
   if (settings) {
@@ -247,6 +248,7 @@ export async function getOrCreateCustomCollection(
   const collectionId = await ctx.db.insert('collections', {
     name: 'Custom',
     textCount: 0,
+    origin: 'custom',
   });
 
   if (settings) {

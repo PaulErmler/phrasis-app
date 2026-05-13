@@ -909,6 +909,7 @@ export const editCard = mutation({
       deckId: card.deckId,
       textId: resolvedTextId,
       collectionId: card.collectionId,
+      collectionOrigin: card.collectionOrigin,
       dueDate: card.dueDate - 1,
       isMastered: card.isMastered,
       isHidden: card.isHidden,

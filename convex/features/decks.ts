@@ -677,6 +677,11 @@ export async function createCardsFromTexts(
   let cardsInserted = 0;
   let newLastRank = 0;
 
+  // Look up the source collection's origin once per batch so each inserted
+  // card carries the denormalized field for the content-source filter.
+  const collection = await ctx.db.get(collectionId);
+  const collectionOrigin = collection?.origin;
+
   for (const text of texts) {
     if (text.collectionRank > newLastRank) {
       newLastRank = text.collectionRank;
@@ -693,6 +698,7 @@ export async function createCardsFromTexts(
         deckId: deck._id,
         textId: text._id,
         collectionId,
+        collectionOrigin,
         dueDate: now + cardsInserted,
         isMastered: false,
         isHidden: false,

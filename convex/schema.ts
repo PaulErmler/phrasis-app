@@ -56,6 +56,12 @@ export const courseSettingsFields = {
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
   reconciledDatasetId: v.optional(v.id('datasets')), // Dataset version this course's progress has been cutover to (idempotency gate for datasetMigration_cutoverUser)
+  // Source-of-content filter. `undefined` and 'both' behave identically (no filter).
+  // 'custom' = study/auto-add only cards from collections with origin !== 'premade' (custom + chat).
+  // 'course' = study/auto-add only cards from collections with origin === 'premade'.
+  studyContentFilter: v.optional(
+    v.union(v.literal('custom'), v.literal('course'), v.literal('both')),
+  ),
 } as const;
 
 // Full `courseSettings` document validator (includes system fields).
@@ -96,6 +102,12 @@ export default defineSchema({
     order: v.optional(v.number()), // 1..20 within the dataset
     displayName: v.optional(v.string()),
     legacy: v.optional(v.boolean()), // true on old Essential/A1..C2 post-cutover
+    // Explicit origin tag — source of truth for the content-source filter.
+    // 'premade' = dataset-uploaded; 'custom' = user-typed; 'chat' = chat-approved.
+    // Optional during backfill; required after `runCollectionsOriginBackfill` completes.
+    origin: v.optional(
+      v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
+    ),
   })
     .index('by_name', ['name'])
     .index('by_datasetId_and_order', ['datasetId', 'order']),
@@ -214,7 +226,12 @@ export default defineSchema({
   cards: defineTable({
     deckId: v.id('decks'), // Reference to the deck
     textId: v.id('texts'), // Reference to the text/sentence
-    collectionId: v.optional(v.id('collections')), // Reference to the source collection (absent for user-created cards)
+    collectionId: v.optional(v.id('collections')), // Reference to the source collection. Backfilled for all cards by runCardsCollectionBackfill; required after.
+    // Denormalized from collections.origin at insert time. Powers the content-source filter
+    // index lookups in getCardForReview. Optional during backfill; required after.
+    collectionOrigin: v.optional(
+      v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
+    ),
     dueDate: v.number(), // Timestamp for spaced repetition scheduling (driven by scheduler)
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
@@ -258,6 +275,30 @@ export default defineSchema({
       'isMastered',
       'isGraduated',
       'dueDate',
+    ])
+    // Content-source filter variants — used when courseSettings.studyContentFilter is 'custom' or 'course'.
+    .index('by_deck_hidden_mastered_origin_dueDate', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'dueDate',
+    ])
+    .index('by_deck_hidden_mastered_origin_graduated_due', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'isGraduated',
+      'dueDate',
+    ])
+    .index('by_deck_hidden_mastered_origin_radioCounter_radioOrder', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'radioRoundCounter',
+      'radioOrderKey',
     ])
     .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
     .searchIndex('search_text', {
