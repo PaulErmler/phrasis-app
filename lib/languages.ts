@@ -58,6 +58,19 @@ export interface Language {
    */
   supportsKaraoke: boolean;
   /**
+   * Whether our STT backend (Azure Fast Transcription, api-version
+   * 2024-11-15) can transcribe audio in this language. Gates two downstream
+   * features: TTS validation roundtrips (synthesize → transcribe → compare)
+   * and per-word audio timings. Karaoke highlighting depends on timings, so
+   * `supportsKaraoke: true` only takes effect when this is also true.
+   *
+   * Currently false only for Greek (`el`): the locale `el-GR` is absent from
+   * Azure Fast Transcription's supported list, so calls return 400 InvalidLocale.
+   * If you add a language, check the "Fast transcription support" column at
+   * https://learn.microsoft.com/azure/ai-services/speech-service/language-support?tabs=stt
+   */
+  supportsStt: boolean;
+  /**
    * Which backend translates English → this language. Omit to take the
    * default: 'openrouter' for every non-English language, 'google' for English
    * (which is source-only and never translated by the system).
@@ -90,6 +103,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'es',
@@ -100,6 +114,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'es_latam',
@@ -110,6 +125,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'fr',
@@ -120,6 +136,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'de',
@@ -130,6 +147,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'it',
@@ -140,6 +158,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'pt',
@@ -150,6 +169,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'ru',
@@ -160,6 +180,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: true,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'hi',
@@ -170,6 +191,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: true,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'zh',
@@ -180,6 +202,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: true,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'ja',
@@ -193,6 +216,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Click-to-explain popovers still work — only the current-word colour
     // is gated off.
     supportsKaraoke: false,
+    supportsStt: true,
   },
   {
     code: 'ko',
@@ -203,6 +227,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: true,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'vi',
@@ -213,6 +238,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'sv',
@@ -223,6 +249,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'azure',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'fi',
@@ -233,6 +260,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'nl',
@@ -243,6 +271,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'el',
@@ -252,7 +281,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇬🇷',
     ttsProvider: 'google',
     needsRomanization: true,
-    supportsKaraoke: true,
+    supportsKaraoke: false,
+    // Azure Fast Transcription doesn't support el-GR; without STT we can't
+    // produce per-word timings, so karaoke highlighting will no-op for Greek.
+    supportsStt: false,
   },
   {
     code: 'ar',
@@ -263,6 +295,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'google',
     needsRomanization: true,
     supportsKaraoke: true,
+    supportsStt: true,
   },
   // Cantonese (Yue Chinese) — disabled until verified Cantonese-capable
   // voices are added to lib/voices.ts. Google Cloud TTS uses "yue-HK".
@@ -437,11 +470,26 @@ export function languageNeedsRomanization(code: string): boolean {
 
 /**
  * Whether per-word karaoke highlighting is enabled for the given language.
- * Defaults to true for unknown codes so new languages get karaoke unless
- * explicitly opted out in `SUPPORTED_LANGUAGES`.
+ * Karaoke requires word timings, so any language without STT support gets
+ * `false` regardless of its declared `supportsKaraoke` — the field is a UX
+ * preference that's only meaningful when timings exist.
+ *
+ * Defaults to true for unknown codes (so new languages get karaoke unless
+ * explicitly opted out), but still gated by `languageSupportsStt`.
  */
 export function languageSupportsKaraoke(code: string): boolean {
+  if (!languageSupportsStt(code)) return false;
   return getLanguageByCode(code)?.supportsKaraoke ?? true;
+}
+
+/**
+ * Whether our STT backend can transcribe audio in this language. Single
+ * source of truth gating both TTS validation roundtrips and per-word
+ * timings. Defaults to false for unknown codes — Azure Fast Transcription
+ * rejects unsupported locales with a 400, so not-trying is the safe default.
+ */
+export function languageSupportsStt(code: string): boolean {
+  return getLanguageByCode(code)?.supportsStt ?? false;
 }
 
 /**
