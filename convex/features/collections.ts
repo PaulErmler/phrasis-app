@@ -3,6 +3,7 @@ import { query, mutation } from '../_generated/server';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import {
+  getActiveDataset,
   getCollectionProgress,
   getNextTextsFromRank,
 } from '../db/collections';
@@ -12,10 +13,11 @@ import { scheduleMissingContent } from './decks';
 import {
   COLLECTION_PREVIEW_SIZE,
   CONTENT_LOOKAHEAD_SIZE,
+  LEGACY_LEVEL_ORDER,
   isPremadeLevelCollection,
 } from '../lib/collections';
 import { getCourseSettings } from '../db/courseSettings';
-import type { Id } from '../_generated/dataModel';
+import type { Doc, Id } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
 
 export async function isCollectionAccessible(
@@ -195,6 +197,87 @@ export const ensureContentForCollection = mutation({
         );
       totalTranslationsScheduled += translationsScheduled;
       totalAudioScheduled += audioScheduled;
+    }
+
+
+    return { totalTranslationsScheduled, totalAudioScheduled };
+  },
+});
+
+/**
+ * Ensure translations and audio exist for the FIRST 5 sentences of every
+ * premade level collection accessible in the user's active course. Called
+ * fire-and-forget from the home view on mount so when a user drills into any
+ * level the preview is already populated.
+ *
+ * Independent of user progress (unlike `ensureContentForCollection` which
+ * paginates from `lastRankProcessed`) — always starts at collectionRank 1.
+ *
+ * Idempotent: `scheduleMissingContent` skips any (textId, language) that's
+ * already translated, so on re-entry this is ~35 DB lookups and zero writes.
+ */
+export const ensureFirstSentencesAcrossLevelCollections = mutation({
+  args: {},
+  returns: v.object({
+    totalTranslationsScheduled: v.number(),
+    totalAudioScheduled: v.number(),
+  }),
+  handler: async (ctx) => {
+    const { course } = await requireActiveCourse(ctx);
+
+    // Load only the ~20 premade level collections via indexed lookups so this
+    // doesn't scan every user's custom/chat collections (which share the table).
+    // Custom collections have no `datasetId` and don't share names with
+    // LEGACY_LEVEL_ORDER, so both branches naturally exclude them.
+    const activeDataset = await getActiveDataset(ctx);
+    let levelCollections: Doc<'collections'>[];
+    if (activeDataset) {
+      levelCollections = await ctx.db
+        .query('collections')
+        .withIndex('by_datasetId_and_order', (q) =>
+          q.eq('datasetId', activeDataset._id),
+        )
+        .collect();
+    } else {
+      const legacyDocs = await Promise.all(
+        LEGACY_LEVEL_ORDER.map((name) =>
+          ctx.db
+            .query('collections')
+            .withIndex('by_name', (q) => q.eq('name', name))
+            .first(),
+        ),
+      );
+      levelCollections = legacyDocs.filter(
+        (c): c is Doc<'collections'> => c !== null,
+      );
+    }
+
+    let totalTranslationsScheduled = 0;
+    let totalAudioScheduled = 0;
+
+    for (const collection of levelCollections) {
+      // First COLLECTION_PREVIEW_SIZE (5) texts by rank — independent of
+      // user progress so the home preview always shows translated content.
+      const texts = await ctx.db
+        .query('texts')
+        .withIndex('by_collection_and_rank', (q) =>
+          q.eq('collectionId', collection._id),
+        )
+        .order('asc')
+        .take(COLLECTION_PREVIEW_SIZE);
+
+      for (const text of texts) {
+        const { translationsScheduled, audioScheduled } =
+          await scheduleMissingContent(
+            ctx,
+            text._id,
+            text,
+            course.baseLanguages,
+            course.targetLanguages,
+          );
+        totalTranslationsScheduled += translationsScheduled;
+        totalAudioScheduled += audioScheduled;
+      }
     }
 
     return { totalTranslationsScheduled, totalAudioScheduled };

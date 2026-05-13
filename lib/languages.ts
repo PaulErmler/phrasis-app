@@ -14,6 +14,31 @@
 /** Identifier for which TTS backend a language currently uses. */
 export type TtsProvider = 'google' | 'elevenlabs';
 
+/** Identifier for which translation backend a target language currently uses. */
+export type TranslationProvider = 'google' | 'openrouter';
+
+/**
+ * BCP-47-ish region label used in the LLM translation prompt's <context>.
+ * Tells the model whether to lean Spanish-Spain vs Spanish-LatAm,
+ * Portuguese-Brazil vs Portuguese-Portugal, etc.
+ */
+function regionLabelFromDisplayCode(displayCode: string): string {
+  const REGION_MAP: Record<string, string> = {
+    'es-ES': 'Spain',
+    'es-419': 'Latin America',
+    'pt-BR': 'Brazil',
+    'pt-PT': 'Portugal',
+    'zh-CN': 'Mainland China',
+    'zh-TW': 'Taiwan',
+    'en-US': 'United States',
+    'en-GB': 'United Kingdom',
+  };
+  if (REGION_MAP[displayCode]) return REGION_MAP[displayCode];
+  // Fall through: take the region segment after the dash, or the language tag if there isn't one.
+  const dash = displayCode.indexOf('-');
+  return dash >= 0 ? displayCode.slice(dash + 1) : displayCode;
+}
+
 export interface Language {
   code: string; // Internal language code (e.g. "en", "es_latam", "zh")
   displayCode: string; // BCP 47 tag for display (e.g. "es-MX", "zh-CN")
@@ -32,6 +57,27 @@ export interface Language {
    * rendered regardless.
    */
   supportsKaraoke: boolean;
+  /**
+   * Which backend translates English → this language. Omit to take the
+   * default: 'openrouter' for every non-English language, 'google' for English
+   * (which is source-only and never translated by the system).
+   * Set to 'google' explicitly to keep a language on the legacy Google
+   * Translate path (e.g. if a particular language regresses on LLM translation).
+   */
+  translationProvider?: TranslationProvider;
+  /**
+   * OpenRouter slug when translationProvider === 'openrouter'.
+   * Default: 'google/gemini-3.1-flash-lite-preview' (decided in the
+   * translation_eval Phase-1 + Phase-2 cost-validation runs).
+   */
+  translationModel?: string;
+  /**
+   * Override the hybrid length-based reasoning rule with a fixed effort level.
+   * When unset, translationLLM.ts picks: no reasoning for src_len < 30 chars,
+   * 'low' effort otherwise. Set 'medium' or 'high' on a language only if eval
+   * data shows a meaningful quality win that justifies the cost.
+   */
+  translationReasoning?: 'low' | 'medium' | 'high';
 }
 
 export const SUPPORTED_LANGUAGES: Language[] = [
@@ -247,6 +293,58 @@ export function getLanguageByCode(code: string): Language | undefined {
  */
 export function getTtsProviderForLanguage(code: string): TtsProvider {
   return getLanguageByCode(code)?.ttsProvider ?? 'google';
+}
+
+/** Default OpenRouter model when a language has translationProvider='openrouter' but no model override. */
+export const DEFAULT_LLM_TRANSLATION_MODEL = 'google/gemini-3.1-flash-lite-preview';
+
+/**
+ * Resolved translation config for one target language. Encapsulates the
+ * defaulting rule so callers (translation worker, dataset upload, eval harness)
+ * don't have to know that "unset translationProvider" means "openrouter for
+ * non-English, google for English (source-only)".
+ *
+ * `reasoning === undefined` means the translation worker should apply the
+ * hybrid length-based rule (no reasoning for short sentences, 'low' otherwise).
+ * Set `translationReasoning` on a Language entry to force a fixed effort level.
+ */
+export type ResolvedTranslationConfig = {
+  provider: TranslationProvider;
+  model?: string;                            // present iff provider === 'openrouter'
+  reasoning?: 'low' | 'medium' | 'high';     // undefined → apply hybrid rule
+  targetRegion: string;                      // for the LLM prompt's <context>
+  targetLangName: string;                    // English language name for the prompt
+};
+
+export function getTranslationConfigForLanguage(
+  code: string,
+): ResolvedTranslationConfig {
+  const lang = getLanguageByCode(code);
+  // Unknown / English → Google. English is source-only and never translated by
+  // the system, but defaulting unknowns to Google is also the safe behavior.
+  if (!lang || lang.code === 'en') {
+    return {
+      provider: lang?.translationProvider ?? 'google',
+      targetRegion: lang ? regionLabelFromDisplayCode(lang.displayCode) : code,
+      targetLangName: lang?.name ?? code,
+    };
+  }
+  // Non-English: default to openrouter unless the language explicitly opts back to google.
+  const provider: TranslationProvider = lang.translationProvider ?? 'openrouter';
+  if (provider === 'google') {
+    return {
+      provider: 'google',
+      targetRegion: regionLabelFromDisplayCode(lang.displayCode),
+      targetLangName: lang.name,
+    };
+  }
+  return {
+    provider: 'openrouter',
+    model: lang.translationModel ?? DEFAULT_LLM_TRANSLATION_MODEL,
+    reasoning: lang.translationReasoning,
+    targetRegion: regionLabelFromDisplayCode(lang.displayCode),
+    targetLangName: lang.name,
+  };
 }
 
 /**

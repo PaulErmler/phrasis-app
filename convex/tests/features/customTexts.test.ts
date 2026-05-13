@@ -84,6 +84,7 @@ describe("features/customTexts", () => {
             addresseeNumber: "singular",
             speakerGender: "neutral",
             addresseeGender: "neutral",
+            addressesSomeone: true,
           },
         },
       );
@@ -132,6 +133,7 @@ describe("features/customTexts", () => {
             addresseeNumber: "singular",
             speakerGender: "neutral",
             addresseeGender: "neutral",
+            addressesSomeone: true,
           },
         }),
       } as any);

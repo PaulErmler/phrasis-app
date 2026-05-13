@@ -239,15 +239,32 @@ test.describe("chat (live)", { tag: "@live" }, () => {
   }) => {
     test.skip(!threadUrl, "Prior test did not create a thread.");
 
-    // Navigate away and back — this exercises getThread without burning
-    // any LLM quota (no new messages sent).
-    await page.goto("/app/library");
-    await page.waitForLoadState("domcontentloaded");
-    await dismissTour(page, undefined, 250);
-
+    // Cold-load the chat URL on this test's fresh page — exercises
+    // getThread without burning any LLM quota (no new messages sent).
+    // (main)/layout.tsx derives activeView from pathname only inside its
+    // useState initializer, so a direct goto on a fresh mount is what
+    // actually drives SimplifiedChatView; an intermediate goto away
+    // would leave that initializer stuck on the prior view.
     await page.goto(threadUrl!);
     await page.waitForLoadState("domcontentloaded");
     await dismissTour(page, "chat", 500);
+
+    // Wait for the chat surface to mount before asserting on its
+    // contents. chat-input only renders inside SimplifiedChatView, so
+    // its presence proves activeView === 'chat' and the layout settled
+    // on the chat view. A reload forces a fresh layout mount in the
+    // rare case the first navigation didn't.
+    const chatInput = page.getByTestId("chat-input").first();
+    const chatMounted = await chatInput
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!chatMounted) {
+      await page.reload();
+      await page.waitForLoadState("domcontentloaded");
+      await dismissTour(page, "chat", 500);
+      await chatInput.waitFor({ state: "visible", timeout: 10_000 });
+    }
 
     // getThread — the user's original message comes back.
     await expect(page.getByTestId("chat-user-message").first()).toBeVisible({

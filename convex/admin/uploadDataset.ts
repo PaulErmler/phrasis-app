@@ -112,6 +112,11 @@ export const batchUpsertDatasetTexts = internalMutation({
         // translations), `null` for direct-address (singular/plural unknown
         // — the LLM classifier fills that in later).
         addresseeNumber: v.union(v.string(), v.null()),
+        // Translation-metadata fields populated from the OGTE curation pipeline
+        // (helpers.py Row.compute_translation_metadata). `null` clears.
+        addressesSomeone: v.union(v.boolean(), v.null()),
+        addresseeGender: v.union(v.string(), v.null()), // '' for descriptive; else 'male'|'female'
+        referentGender: v.union(v.string(), v.null()), // always 'male'|'female' for sentences with a human referent; '' if upload omits
       }),
     ),
   },
@@ -148,6 +153,13 @@ export const batchUpsertDatasetTexts = internalMutation({
       const register = t.register === null ? undefined : t.register;
       const addresseeNumber =
         t.addresseeNumber === null ? undefined : t.addresseeNumber;
+      const addressesSomeone =
+        t.addressesSomeone === null ? undefined : t.addressesSomeone;
+      // Treat empty string as "clear" so descriptive rows don't carry a stale addressee_gender.
+      const addresseeGender =
+        t.addresseeGender === null || t.addresseeGender === '' ? undefined : t.addresseeGender;
+      const referentGender =
+        t.referentGender === null || t.referentGender === '' ? undefined : t.referentGender;
       const existing = existingByExternalId.get(t.externalId);
       if (existing) {
         await ctx.db.patch(existing._id, {
@@ -156,6 +168,9 @@ export const batchUpsertDatasetTexts = internalMutation({
           collectionRank: t.collectionRank,
           register,
           addresseeNumber,
+          addressesSomeone,
+          addresseeGender,
+          referentGender,
         });
         updated++;
       } else {
@@ -169,6 +184,9 @@ export const batchUpsertDatasetTexts = internalMutation({
           collectionRank: t.collectionRank,
           register,
           addresseeNumber,
+          addressesSomeone,
+          addresseeGender,
+          referentGender,
         });
         inserted++;
         textCountDelta++;

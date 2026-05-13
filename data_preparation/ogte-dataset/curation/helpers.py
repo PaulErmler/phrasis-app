@@ -41,8 +41,20 @@ LEVEL_FILES = {
 CSV_FIELDS = [
     "id", "text", "pedagogy", "max_wfs", "rarest_word",
     "word_count", "added_for", "register", "formality", "ogte_level",
+    # Translation-metadata fields. Populated by helpers.Row from the existing
+    # `register` column ('direct-address' → addresses_someone=True) plus a
+    # deterministic coin-flip on `text` so re-runs are stable.
+    "addresses_someone",  # 'true' | 'false'
+    "addressee_gender",   # '' if addresses_someone is false; else 'male' | 'female'
+    "referent_gender",    # always 'male' | 'female' — gendered-noun agreement for third-party referents
 ]
 CURATED_FIELDS = CSV_FIELDS + ["arc_id"]
+
+
+def _stable_coin_flip(text: str, salt: str) -> str:
+    """Deterministic male/female pick from (text, salt). Same input → same output across runs."""
+    h = hashlib.sha256(f"{salt}|{text}".encode("utf-8")).digest()
+    return "male" if (h[0] & 1) == 0 else "female"
 
 REORDER_BUDGET = 300  # max |new_index - original_index|
 
@@ -120,12 +132,34 @@ class Row:
     ogte_level: str
     register: str = "direct-address"  # default for new/added rows
     formality: str = ""  # default for new/added rows
+    # Translation-metadata fields, derived from `register` + deterministic coin-flips on `text`.
+    # Computed lazily via `compute_translation_metadata()` after construction so the values
+    # always match the current text/register even if the row was loaded from an older CSV.
+    addresses_someone: str = ""     # 'true' | 'false'
+    addressee_gender: str = ""      # '' if not addresses_someone; else 'male' | 'female'
+    referent_gender: str = ""       # always 'male' | 'female'
     arc_id: int = 0
     original_index: int | None = None  # 0-based position in original CSV; None for added
 
+    def compute_translation_metadata(self) -> None:
+        """Populate addresses_someone / addressee_gender / referent_gender from `register` + `text`.
+
+        Idempotent: existing non-empty values are preserved so re-runs don't churn the assignments.
+        The two gender coin-flips use independent salts so they're uncorrelated.
+        """
+        if not self.addresses_someone:
+            self.addresses_someone = "true" if self.register == "direct-address" else "false"
+        if self.addresses_someone == "true":
+            if self.addressee_gender not in ("male", "female"):
+                self.addressee_gender = _stable_coin_flip(self.text, "addressee")
+        else:
+            self.addressee_gender = ""
+        if self.referent_gender not in ("male", "female"):
+            self.referent_gender = _stable_coin_flip(self.text, "referent")
+
     @classmethod
     def from_csv(cls, raw: dict[str, str], original_index: int) -> "Row":
-        return cls(
+        row = cls(
             id=raw["id"],
             text=raw["text"],
             pedagogy=raw.get("pedagogy", ""),
@@ -136,8 +170,13 @@ class Row:
             register=raw.get("register", "direct-address"),
             formality=raw.get("formality", ""),
             ogte_level=raw.get("ogte_level", ""),
+            addresses_someone=raw.get("addresses_someone", ""),
+            addressee_gender=raw.get("addressee_gender", ""),
+            referent_gender=raw.get("referent_gender", ""),
             original_index=original_index,
         )
+        row.compute_translation_metadata()
+        return row
 
     @classmethod
     def new_added(
@@ -151,7 +190,7 @@ class Row:
         formality: str = "",
     ) -> "Row":
         wc, rw, mw = compute_metadata(text, vocab)
-        return cls(
+        row = cls(
             id=added_id,
             text=text,
             pedagogy="",
@@ -164,6 +203,8 @@ class Row:
             ogte_level=f"{level:02d}",
             original_index=None,
         )
+        row.compute_translation_metadata()
+        return row
 
     def as_csv_dict(self) -> dict[str, str]:
         return {
@@ -175,7 +216,11 @@ class Row:
             "word_count": self.word_count,
             "added_for": self.added_for,
             "register": self.register,
+            "formality": self.formality,
             "ogte_level": self.ogte_level,
+            "addresses_someone": self.addresses_someone,
+            "addressee_gender": self.addressee_gender,
+            "referent_gender": self.referent_gender,
             "arc_id": str(self.arc_id),
         }
 
@@ -207,9 +252,14 @@ def read_curated_level(level: int) -> list[Row]:
                 word_count=raw.get("word_count", ""),
                 added_for=raw.get("added_for", ""),
                 register=raw.get("register", "direct-address"),
+                formality=raw.get("formality", ""),
                 ogte_level=raw.get("ogte_level", ""),
+                addresses_someone=raw.get("addresses_someone", ""),
+                addressee_gender=raw.get("addressee_gender", ""),
+                referent_gender=raw.get("referent_gender", ""),
                 arc_id=int(raw.get("arc_id", "0") or 0),
             )
+            row.compute_translation_metadata()
             rows.append(row)
     # Backfill original_index by id from the originals file
     originals = {r.id: r.original_index for r in read_original_level(level)}

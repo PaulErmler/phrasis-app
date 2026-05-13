@@ -6,8 +6,11 @@
 /** Maximum number of cards that can be added per batch (settings and backend clamp). */
 export const MAX_CARDS_PER_BATCH = 15;
 
-/** How many upcoming due cards to pre-generate content for during review. */
-export const ENSURE_CONTENT_LOOKAHEAD = 5;
+/** How many upcoming due cards to pre-generate content for during review.
+ * Sized to stay ahead of LLM translation latency (queued OpenRouter call per
+ * non-source language) — matches MAX_CARDS_PER_BATCH so a fresh add-batch is
+ * fully primed before the learner can outrun it. */
+export const ENSURE_CONTENT_LOOKAHEAD = 15;
 
 /** Re-trigger content pre-generation every N reviews. */
 export const ENSURE_CONTENT_REVIEW_INTERVAL = 4;

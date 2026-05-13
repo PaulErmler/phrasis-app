@@ -9,6 +9,7 @@
  */
 
 import type * as admin_activateDataset from "../admin/activateDataset.js";
+import type * as admin_backfillTextMetadata from "../admin/backfillTextMetadata.js";
 import type * as admin_diagCutoverState from "../admin/diagCutoverState.js";
 import type * as admin_uploadDataset from "../admin/uploadDataset.js";
 import type * as auth from "../auth.js";
@@ -46,10 +47,12 @@ import type * as features_decks from "../features/decks.js";
 import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_home from "../features/home.js";
 import type * as features_library from "../features/library.js";
+import type * as features_llmTranslationQueue from "../features/llmTranslationQueue.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_sentenceMetadata from "../features/sentenceMetadata.js";
 import type * as features_stats from "../features/stats.js";
 import type * as features_translation from "../features/translation.js";
+import type * as features_translationLLM from "../features/translationLLM.js";
 import type * as features_tts from "../features/tts.js";
 import type * as features_ttsProcessing from "../features/ttsProcessing.js";
 import type * as features_tutorialIds from "../features/tutorialIds.js";
@@ -92,6 +95,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   "admin/activateDataset": typeof admin_activateDataset;
+  "admin/backfillTextMetadata": typeof admin_backfillTextMetadata;
   "admin/diagCutoverState": typeof admin_diagCutoverState;
   "admin/uploadDataset": typeof admin_uploadDataset;
   auth: typeof auth;
@@ -129,10 +133,12 @@ declare const fullApi: ApiFromModules<{
   "features/featureIds": typeof features_featureIds;
   "features/home": typeof features_home;
   "features/library": typeof features_library;
+  "features/llmTranslationQueue": typeof features_llmTranslationQueue;
   "features/scheduling": typeof features_scheduling;
   "features/sentenceMetadata": typeof features_sentenceMetadata;
   "features/stats": typeof features_stats;
   "features/translation": typeof features_translation;
+  "features/translationLLM": typeof features_translationLLM;
   "features/tts": typeof features_tts;
   "features/ttsProcessing": typeof features_ttsProcessing;
   "features/tutorialIds": typeof features_tutorialIds;

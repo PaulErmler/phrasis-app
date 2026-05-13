@@ -135,6 +135,19 @@ function mapAddresseeNumber(register) {
   return undefined;
 }
 
+function mapAddressesSomeone(addressesSomeone) {
+  // CSV string → boolean | undefined. Empty/missing → undefined.
+  if (addressesSomeone === 'true') return true;
+  if (addressesSomeone === 'false') return false;
+  return undefined;
+}
+
+function mapGenderField(value) {
+  // 'male' / 'female' pass through; anything else → undefined (cleared).
+  if (value === 'male' || value === 'female') return value;
+  return undefined;
+}
+
 async function main() {
   const args = parseArgs();
   console.log(`Uploading OGTE dataset: slug=${args.slug} version=${args.version}`);
@@ -204,6 +217,9 @@ async function main() {
         // (Convex strips `undefined` over the wire, so we can't use that here).
         register: mapRegister(row.formality) ?? null,
         addresseeNumber: mapAddresseeNumber(row.register) ?? null,
+        addressesSomeone: mapAddressesSomeone(row.addresses_someone) ?? null,
+        addresseeGender: mapGenderField(row.addressee_gender) ?? null,
+        referentGender: mapGenderField(row.referent_gender) ?? null,
       });
     }
     console.log(`  parsed ${validTexts.length} rows (skipped ${skippedCount})`);

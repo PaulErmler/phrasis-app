@@ -11,13 +11,14 @@ const METADATA_SYSTEM_PROMPT = `You analyze a sentence and return strict linguis
 
 You will receive one or more renderings of the SAME sentence in different languages. Use cross-lingual signals — gendered morphology in any one of the supplied translations is enough to fix the sentence's gender. Treat the renderings as semantically identical: do not invent extra meaning that no rendering supports.
 
-Return ONLY a valid JSON object with EXACTLY these four keys and no others, no markdown, no explanation:
+Return ONLY a valid JSON object with EXACTLY these five keys and no others, no markdown, no explanation:
 
 {
   "register": "formal" | "informal" | "neutral",
   "addresseeNumber": "singular" | "plural" | "not_applicable",
   "speakerGender": "male" | "female" | "neutral",
-  "addresseeGender": "male" | "female" | "neutral" | "not_applicable"
+  "addresseeGender": "male" | "female" | "neutral" | "not_applicable",
+  "addressesSomeone": true | false
 }
 
 FIELD DEFINITIONS:
@@ -36,6 +37,8 @@ FIELD DEFINITIONS:
   Otherwise return "neutral". Do NOT guess based on topic or stereotype.
 
 - addresseeGender: Same rule, but for the person being addressed. "not_applicable" if there is no addressee. "neutral" if there is an addressee but no rendering grammatically marks their gender.
+
+- addressesSomeone: Boolean. true if the sentence speaks to a 2nd-person addressee (imperatives, direct questions, vocatives, sentences containing "you"/"your", commands, requests, greetings). false otherwise (descriptive/narrative sentences like "It is raining.", "The Pacific Ocean is the largest body of water on Earth.", first-person statements with no second-person reference). When addressesSomeone is false, addresseeNumber should be "not_applicable" and addresseeGender should be "not_applicable".
 
 Be strict: if no rendering forces a value, return "neutral" / "not_applicable". Do not invent gender information.`;
 
@@ -58,6 +61,7 @@ export type Metadata = {
   addresseeNumber: (typeof ALLOWED_ADDRESSEE_NUMBER)[number];
   speakerGender: (typeof ALLOWED_SPEAKER_GENDER)[number];
   addresseeGender: (typeof ALLOWED_ADDRESSEE_GENDER)[number];
+  addressesSomeone: boolean;
 };
 
 function validateField<T extends string>(
@@ -85,6 +89,12 @@ export function validateSentenceMetadata(input: unknown): Metadata {
     throw new Error('Metadata response is not an object');
   }
   const obj = input as Record<string, unknown>;
+  const addressesSomeone = obj.addressesSomeone;
+  if (typeof addressesSomeone !== 'boolean') {
+    throw new Error(
+      `Metadata field addressesSomeone is missing or not a boolean: ${JSON.stringify(addressesSomeone)}`,
+    );
+  }
   return {
     register: validateField(obj, 'register', ALLOWED_REGISTER),
     addresseeNumber: validateField(
@@ -98,6 +108,7 @@ export function validateSentenceMetadata(input: unknown): Metadata {
       'addresseeGender',
       ALLOWED_ADDRESSEE_GENDER,
     ),
+    addressesSomeone,
   };
 }
 
@@ -148,12 +159,22 @@ function safeExtractMetadata(raw: string): Partial<Metadata> {
   // other three fields use "neutral" — so the LLM sometimes emits "neutral"
   // here. Coerce that single known confusion so the value survives validation.
   if (obj.addresseeNumber === 'neutral') obj.addresseeNumber = 'not_applicable';
-  const out: Record<string, string> = {};
-  pickField(out, obj, 'register', ALLOWED_REGISTER);
-  pickField(out, obj, 'addresseeNumber', ALLOWED_ADDRESSEE_NUMBER);
-  pickField(out, obj, 'speakerGender', ALLOWED_SPEAKER_GENDER);
-  pickField(out, obj, 'addresseeGender', ALLOWED_ADDRESSEE_GENDER);
-  return out as Partial<Metadata>;
+  const out: Partial<Metadata> = {};
+  const stringOut: Record<string, string> = {};
+  pickField(stringOut, obj, 'register', ALLOWED_REGISTER);
+  pickField(stringOut, obj, 'addresseeNumber', ALLOWED_ADDRESSEE_NUMBER);
+  pickField(stringOut, obj, 'speakerGender', ALLOWED_SPEAKER_GENDER);
+  pickField(stringOut, obj, 'addresseeGender', ALLOWED_ADDRESSEE_GENDER);
+  Object.assign(out, stringOut);
+  // addressesSomeone is the only boolean field — handle separately.
+  if (typeof obj.addressesSomeone === 'boolean') {
+    out.addressesSomeone = obj.addressesSomeone;
+  } else if (obj.addressesSomeone !== undefined) {
+    console.warn(
+      `sentenceMetadata: dropping invalid addressesSomeone: ${JSON.stringify(obj.addressesSomeone)}`,
+    );
+  }
+  return out;
 }
 
 /**
@@ -291,6 +312,7 @@ export const applyMetadataAndPrepareCard = internalMutation({
         addresseeNumber: v.optional(v.string()),
         speakerGender: v.optional(v.string()),
         addresseeGender: v.optional(v.string()),
+        addressesSomeone: v.optional(v.boolean()),
       }),
     ),
     schedulePrepareCard: v.boolean(),
@@ -322,7 +344,8 @@ export const applyMetadataAndPrepareCard = internalMutation({
       audioSpeakerGender = resolveAudioSpeakerGender(incomingGender);
     }
 
-    const metadataPatch: Record<string, string> = {};
+    // Build the metadata patch from whatever the LLM committed to.
+    const metadataPatch: Record<string, string | boolean> = {};
     if (args.metadata?.register !== undefined) {
       metadataPatch.register = args.metadata.register;
     }
@@ -334,6 +357,44 @@ export const applyMetadataAndPrepareCard = internalMutation({
     }
     if (args.metadata?.addresseeGender !== undefined) {
       metadataPatch.addresseeGender = args.metadata.addresseeGender;
+    }
+    if (args.metadata?.addressesSomeone !== undefined) {
+      metadataPatch.addressesSomeone = args.metadata.addressesSomeone;
+    }
+
+    // ── addresseeGender coin-flip ──
+    // When the sentence addresses someone but the LLM didn't commit to a
+    // gender (or said neutral/not_applicable), pick male/female 50/50 so
+    // gendered target languages don't default masculine. Once set, never
+    // re-roll (so the second call from the retrier doesn't pointlessly
+    // invalidate translations that already used the first pick).
+    const effectiveAddressesSomeone =
+      args.metadata?.addressesSomeone ?? text.addressesSomeone ?? false;
+    if (effectiveAddressesSomeone) {
+      const proposedAddressee =
+        (metadataPatch.addresseeGender as string | undefined) ?? text.addresseeGender;
+      const needsCoinFlip =
+        proposedAddressee === undefined ||
+        proposedAddressee === 'neutral' ||
+        proposedAddressee === 'not_applicable' ||
+        proposedAddressee === '';
+      const alreadyCommitted =
+        text.addresseeGender === 'male' || text.addresseeGender === 'female';
+      if (needsCoinFlip && !alreadyCommitted) {
+        metadataPatch.addresseeGender =
+          Math.random() < 0.5 ? 'male' : 'female';
+      } else if (needsCoinFlip && alreadyCommitted) {
+        // Preserve the prior commit even if the LLM tried to write neutral.
+        metadataPatch.addresseeGender = text.addresseeGender as string;
+      }
+    }
+
+    // ── referentGender coin-flip ──
+    // Always pick a gender for the third-party referent, so gendered nouns
+    // (translator → Übersetzer/-in, doctor → Arzt/Ärztin) get a consistent
+    // assignment that's stable across target languages. Once set, never re-roll.
+    if (text.referentGender !== 'male' && text.referentGender !== 'female') {
+      metadataPatch.referentGender = Math.random() < 0.5 ? 'male' : 'female';
     }
 
     await ctx.db.patch(args.textId, {

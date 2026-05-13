@@ -15,6 +15,7 @@ import {
   getVoiceGenderByApiCode,
   resolveAudioSpeakerGender,
   getTtsProviderForLanguage,
+  getTranslationConfigForLanguage,
 } from '../../lib/languages';
 import {
   getCourseSettings,
@@ -40,6 +41,7 @@ import {
   voiceGenderValidator,
 } from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
+import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
   COLLECTION_PREVIEW_SIZE,
@@ -225,19 +227,43 @@ export async function scheduleMissingContent(
       // Different language — need translation
       const translation = translationMap.get(lang);
       if (!translation) {
-        // Schedule translation (which also triggers TTS and romanization after completion)
-        await ctx.scheduler.runAfter(
-          0,
-          internal.features.decks.processTranslationForCard,
-          {
-            textId,
-            sourceLanguage,
-            targetLanguage: lang,
-            text: text.text,
-            audioSpeakerGender,
-          },
-        );
-        translationsScheduled++;
+        // Route to either the LLM queue or the legacy Google path based on
+        // the per-language config in lib/languages.ts. Both paths terminate
+        // by writing the `translations` row via storeTranslationAndScheduleTTS,
+        // so downstream (romanization, TTS) doesn't care which provider ran.
+        const tCfg = getTranslationConfigForLanguage(lang);
+        if (tCfg.provider === 'openrouter') {
+          const claimed = await claimLlmTranslationIfAvailable(ctx, textId, lang);
+          if (claimed) {
+            await ctx.runMutation(
+              internal.features.llmTranslationQueue.enqueueLlmTranslation,
+              {
+                args: {
+                  textId,
+                  sourceLanguage,
+                  targetLanguage: lang,
+                  text: text.text,
+                  audioSpeakerGender,
+                },
+              },
+            );
+            translationsScheduled++;
+          }
+        } else {
+          // Legacy Google Translate path — unchanged.
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.decks.processTranslationForCard,
+            {
+              textId,
+              sourceLanguage,
+              targetLanguage: lang,
+              text: text.text,
+              audioSpeakerGender,
+            },
+          );
+          translationsScheduled++;
+        }
       } else {
         // Translation exists — backfill romanization if missing
         if (ROMANIZATION_LANGUAGES.has(lang) && !translation.romanizedText) {
@@ -1267,6 +1293,21 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       });
     } else if (args.romanizedText && !existing.romanizedText) {
       await ctx.db.patch(existing._id, { romanizedText: args.romanizedText });
+    }
+
+    // Release any LLM translation claim now that the translation row exists.
+    // The LLM worker keeps the claim alive across a Google fallback so a
+    // concurrent scheduleMissingContent can't re-route the same (textId, lang)
+    // through the LLM mid-fallback. Calls from the pure-Google path (which
+    // never held a claim) see no row and no-op.
+    const llmClaim = await ctx.db
+      .query('llmTranslationClaims')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
+      )
+      .first();
+    if (llmClaim) {
+      await ctx.db.delete(llmClaim._id);
     }
 
     const existingAudioForVoice = await ctx.db

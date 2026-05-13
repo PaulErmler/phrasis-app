@@ -22,7 +22,7 @@ PROMPT_A_PURE_PROSE = """You are a professional translator translating from Engl
 Context:
 - The speaker is {speaker_gender}.
 - The text is addressed to a {addressee_gender} addressee.
-- Use a {formality} register (the language's standard polite register if formal; the language's casual register if informal; the default register if neutral).
+- Use a {formality} register. 'informal' and 'neutral' both mean the casual T-form (du/tú/tu); only 'formal' means the polite V-form or honorific (Sie/usted/vous/敬語 ます-form). DO NOT default to the polite form when the register is neutral.
 - If the target language does not grammatically encode any of these features, translate naturally and ignore them.
 
 Text to translate: {src}
@@ -40,7 +40,7 @@ PROMPT_B_XML_STRUCTURED = """You are a professional English-to-{tgt_lang_name} t
 </context>
 
 <instructions>
-Use the supplied speaker and addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice) the target language requires. Use the requested register: 'informal' = the language's casual T-form (du/tú/tu); 'formal' = the language's standard polite V-form or honorific (Sie/usted/vous/敬語 ます-form); 'neutral' = the language's default register for written prose. If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word.
+Use the supplied speaker and addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice) the target language requires. Use the requested register: 'informal' = the language's casual T-form (du/tú/tu/おまえ); 'neutral' = also use the casual T-form (treat as informal) — DO NOT default to the polite/honorific form; 'formal' = only then use the language's polite V-form or honorific (Sie/usted/vous/敬語 ます-form). If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word.
 </instructions>
 
 <source>{src}</source>

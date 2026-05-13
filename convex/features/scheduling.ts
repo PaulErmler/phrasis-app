@@ -844,6 +844,8 @@ export const editCard = mutation({
         register: text.register,
         addresseeNumber: text.addresseeNumber,
         addresseeGender: text.addresseeGender,
+        addressesSomeone: text.addressesSomeone,
+        referentGender: text.referentGender,
         tenseAspect: text.tenseAspect,
         sentenceType: text.sentenceType,
         literalFigurative: text.literalFigurative,

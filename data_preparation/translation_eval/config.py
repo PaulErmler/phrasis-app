@@ -54,6 +54,9 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     "gemini-3.1-flash-lite-med-think":    {"input_per_m": 0.25, "output_per_m": 1.50},
     "gemini-3.1-flash-lite-high-think":   {"input_per_m": 0.25, "output_per_m": 1.50},
     "gemini-2.5-flash-lite-baseline":     {"input_per_m": 0.10, "output_per_m": 0.40},
+    # DeepSeek V4 Flash — verified on OpenRouter 2026-05-12.
+    "deepseek-v4-flash-low-think":        {"input_per_m": 0.14, "output_per_m": 0.28},
+    "deepseek-v4-flash-max-think":        {"input_per_m": 0.14, "output_per_m": 0.28},
 }
 
 
@@ -161,6 +164,17 @@ MODELS: list[dict] = [
         "id":        "gemini-2.5-flash-lite-baseline",
         "model":     "google/gemini-2.5-flash-lite",
         "reasoning": None,
+    },
+    {
+        # DeepSeek V4 Flash — MoE reasoning model from DeepSeek. Significantly
+        # cheaper than Gemini 3.1 Flash Lite ($0.14 in / $0.28 out vs $0.25/$1.50).
+        # OpenRouter passes `effort` through; DeepSeek accepts 'low'/'high'/'xhigh'.
+        # NB: max-think (reasoning='xhigh') was tested and removed — averaged
+        # ~1100 output tokens per call (vs 305 for low-think) on OGTE, pushing
+        # $/M src chars to $13 with negligible quality lift. See history.
+        "id":        "deepseek-v4-flash-low-think",
+        "model":     "deepseek/deepseek-v4-flash",
+        "reasoning": "low",
     },
 ]
 

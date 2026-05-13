@@ -118,6 +118,8 @@ export default defineSchema({
     speakerGender: v.optional(v.string()), // male / female / neutral
     audioSpeakerGender: v.optional(v.string()), // male / female — resolved voice gender after coin-flip; mirrors speakerGender when male/female
     addresseeGender: v.optional(v.string()), // male / female / neutral / not_applicable
+    addressesSomeone: v.optional(v.boolean()), // true if the sentence speaks to a 2nd-person addressee. Gates whether register/addresseeGender are emitted in the translation prompt. Legacy rows: undefined falls back to addresseeNumber === 'not_applicable' as the proxy.
+    referentGender: v.optional(v.string()), // 'male' | 'female' — coin-flipped per-text, constant across all target-language translations. Drives gendered-noun agreement (e.g. de Übersetzer/-in, fr traducteur/-rice).
     tenseAspect: v.optional(v.string()), // simple_present / past_continuous / etc.
     sentenceType: v.optional(v.string()), // declarative / interrogative / imperative / exclamatory
     literalFigurative: v.optional(v.string()), // literal / figurative
@@ -402,6 +404,37 @@ export default defineSchema({
     }),
     queuedAt: v.number(),
   }).index('by_provider_and_queuedAt', ['provider', 'queuedAt']),
+
+  // ── LLM translation queue (mirrors the TTS queue structure) ──────────────
+  // OpenRouter rate-limits aggressively, so concurrent LLM translation calls
+  // are capped at MAX_LLM_CONCURRENCY (100; active from day one, unlike the
+  // dormant TTS gate). Same three-table pattern: queue + slots + claims.
+
+  // FIFO queue of pending LLM translation jobs. Drained by `pumpLlmQueue`.
+  llmTranslationQueue: defineTable({
+    args: v.object({
+      textId: v.id('texts'),
+      sourceLanguage: v.string(),
+      targetLanguage: v.string(),
+      text: v.string(),
+      audioSpeakerGender: v.optional(v.string()),
+    }),
+    queuedAt: v.number(),
+  }).index('by_queuedAt', ['queuedAt']),
+
+  // Global concurrency slots — one row per in-flight LLM API call. Stale rows
+  // are reclaimed after SLOT_STALE_MS so a crashed action doesn't leak slots.
+  llmTranslationSlots: defineTable({
+    claimedAt: v.number(),
+  }),
+
+  // Per-(textId, language) dedup claim. Atomically check-and-insert before
+  // scheduling so two mutations can't enqueue the same translation twice.
+  llmTranslationClaims: defineTable({
+    textId: v.id('texts'),
+    targetLanguage: v.string(),
+    claimedAt: v.number(),
+  }).index('by_text_and_language', ['textId', 'targetLanguage']),
 
   // Daily per-language stats
   dailyLanguageStats: defineTable({
