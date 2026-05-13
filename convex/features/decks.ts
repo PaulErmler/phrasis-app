@@ -33,6 +33,7 @@ import {
 } from '../db/collections';
 import { translateText, romanizeText } from './translation';
 import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
+import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   translationValidator,
   audioRecordingValidator,
@@ -152,8 +153,14 @@ export async function scheduleMissingContent(
             storedGender !== audioSpeakerGender);
         // Rows predating this field are legacy Google audio; treat as 'google'.
         const existingProvider = audio.ttsProvider ?? 'google';
-        const providerMismatch =
-          existingProvider !== getTtsProviderForLanguage(lang);
+        const currentProvider = getTtsProviderForLanguage(lang);
+        // Provider regen is now gated by lib/ttsPrecedence.ts — only the
+        // matchups listed there force a delete + re-synth. Unlisted pairs
+        // keep the existing audio (e.g. Google rows are never overwritten).
+        const providerMismatch = shouldOverwriteProvider(
+          currentProvider,
+          existingProvider,
+        );
         if (genderMismatch || providerMismatch) {
           await ctx.storage.delete(audio.storageId);
           await ctx.db.delete(audio._id);

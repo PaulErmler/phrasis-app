@@ -196,13 +196,25 @@ describe("features/decks", () => {
       vi.stubEnv("GOOGLE_TTS_API_KEY", "dummy");
       vi.stubEnv("GOOGLE_TRANSLATE_API_KEY", "dummy");
       vi.stubEnv("ELEVENLABS_API_KEY", "dummy");
+      vi.stubEnv("AZURE_SPEECH_API_KEY", "dummy");
+      vi.stubEnv("AZURE_SPEECH_REGION", "westeurope");
 
       const translateBody = JSON.stringify({
         data: { translations: [{ translatedText: "translated" }] },
       });
-      const scribeBody = JSON.stringify({
-        text: "translated",
-        words: [{ text: "translated", start: 0, end: 0.5, type: "word" }],
+      const azureSttBody = JSON.stringify({
+        combinedPhrases: [{ text: "translated" }],
+        phrases: [
+          {
+            offsetMilliseconds: 0,
+            durationMilliseconds: 500,
+            text: "translated",
+            locale: "en-US",
+            words: [
+              { text: "translated", offsetMilliseconds: 0, durationMilliseconds: 500 },
+            ],
+          },
+        ],
       });
       const elevenTtsBytes = new Uint8Array([0, 1, 2, 3]);
       const googleTtsBody = JSON.stringify({
@@ -217,8 +229,8 @@ describe("features/decks", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
-        if (u.includes("api.elevenlabs.io/v1/speech-to-text")) {
-          return new Response(scribeBody, {
+        if (u.includes("speechtotext/transcriptions:transcribe")) {
+          return new Response(azureSttBody, {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });

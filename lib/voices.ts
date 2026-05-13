@@ -74,6 +74,27 @@ function createElevenLabsVoice(
 }
 
 /**
+ * Azure Speech (Cognitive Services) voices. apiCode is the Azure voice
+ * short name, e.g. "sv-SE-SofieNeural" — the provider extracts the locale
+ * from the prefix at synthesis time. Defaults to dormant; pools wrap with
+ * `activate(...)` when their language is currently routed through Azure.
+ */
+function createAzureVoice(
+  name: string,
+  gender: 'female' | 'male',
+  voiceShortName: string,
+): Voice {
+  return {
+    provider: 'azure',
+    name,
+    displayName: `${name} (${gender === 'female' ? 'Female' : 'Male'}) - Azure`,
+    apiCode: voiceShortName,
+    gender,
+    active: false,
+  };
+}
+
+/**
  * Mark a voice list as selectable. Used by pools for languages whose
  * `ttsProvider` is currently `'elevenlabs'` — wraps the list so every
  * entry becomes `active: true` without touching the per-voice definitions.
@@ -235,9 +256,17 @@ const ELEVENLABS_VOICES_VI: Voice[] = [
 // Swedish — Jane + native Sanna/Louise (F); native Peter/Martin (M).
 const ELEVENLABS_VOICES_SV: Voice[] = [
   createElevenLabsVoice('Jane', 'female', 'RILOU7YmBhvwJGDGjNmP'),
-  createElevenLabsVoice('Louise', 'female', 'QLfvbukvQvrPOx9HXQ3x'), 
+  createElevenLabsVoice('Louise', 'female', 'QLfvbukvQvrPOx9HXQ3x'),
   createElevenLabsVoice('Martin', 'male', 'CuaAIFbkzX2kaNH5EtHZ'),
   createElevenLabsVoice('Andres', 'male', 'hMTrLL2ZiyJiyKrdg2z4'),
+];
+
+// Swedish — native sv-SE Azure Neural voices. Catalog only ships 1 male
+// (Mattias) and 2 female (Sofie, Hillevi) at the time of this change.
+const AZURE_VOICES_SV: Voice[] = [
+  createAzureVoice('Sofie', 'female', 'sv-SE-SofieNeural'),
+  createAzureVoice('Hillevi', 'female', 'sv-SE-HilleviNeural'),
+  createAzureVoice('Mattias', 'male', 'sv-SE-MattiasNeural'),
 ];
 
 // Finnish — 4 native speakers.
@@ -298,7 +327,11 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   ja: [...buildChirp3Pool('ja-JP', 'Japan'), ...ELEVENLABS_VOICES_JA],
   ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...ELEVENLABS_VOICES_KO],
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...ELEVENLABS_VOICES_VI],
-  sv: [...buildChirp3Pool('sv-SE', 'Sweden'), ...activate(ELEVENLABS_VOICES_SV)],
+  sv: [
+    ...buildChirp3Pool('sv-SE', 'Sweden'),
+    ...ELEVENLABS_VOICES_SV,
+    ...activate(AZURE_VOICES_SV),
+  ],
   fi: [...buildChirp3Pool('fi-FI', 'Finland'), ...ELEVENLABS_VOICES_FI],
   nl: [...buildChirp3Pool('nl-NL', 'Netherlands'), ...ELEVENLABS_VOICES_NL],
   el: [...buildChirp3Pool('el-GR', 'Greece'), ...ELEVENLABS_VOICES_EL],

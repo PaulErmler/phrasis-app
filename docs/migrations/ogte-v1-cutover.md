@@ -22,7 +22,11 @@ new home view.
 - **Cutover roll-forward**: when a dataset activates, each user's legacy CEFR
   collection counters are *added* into the first level of the matching new
   CEFR tier (`Essential` → `L01`, `A1` → `L02`, `A2` → `L05`, `B1` → `L08`,
-  `B2` → `L11`, `C1` → `L14`, `C2` → `L17`).
+  `B2` → `L11`, `C1` → `L14`, `C2` → `L17`). The rolled-forward `cardsAdded`
+  is *also* stored separately as `collectionProgress.legacyCarryAdded` so the
+  home view can widen the denominator (`textCount + legacyCarryAdded`) and the
+  displayed ratio stays coherent — a user with legacy `100/295` on `A1` lands
+  on L02 as `100/(L02.textCount + 100)`, not `100/L02.textCount`.
 - **`courseSettings.reconciledDatasetId`** acts as the idempotency gate.
   `cutoverUser` no-ops if it already matches the target dataset.
 - **`FF_NEW_COURSE_CUTOVER` env var** must be `true` for the activation
@@ -37,9 +41,10 @@ new home view.
 | Dataset activation + cutover trigger | `convex/admin/activateDataset.ts` |
 | Per-user cutover migration | `convex/migrations/datasetMigration_cutoverUser.ts` |
 | `cardsMastered` backfill (one-time) | `convex/migrations/datasetMigration_backfillCardsMastered.ts` |
+| `legacyCarryAdded` backfill (one-time, only for users cut over before the field existed) | `convex/migrations/datasetMigration_backfillLegacyCarry.ts` |
 | `collections.origin` + `cards.collectionOrigin` backfill (one-time) | `convex/admin/backfillCollectionOrigin.ts` |
-| Home view query | `convex/features/home.ts` (filters to active dataset) |
-| Schema | `convex/schema.ts` (`datasets`, `collections.datasetId`, `collections.origin`, `cards.collectionOrigin`, `courseSettings.reconciledDatasetId`, `courseSettings.studyContentFilter`) |
+| Home view query | `convex/features/home.ts` (filters to active dataset, widens denominator by `legacyCarryAdded`) |
+| Schema | `convex/schema.ts` (`datasets`, `collections.datasetId`, `collections.origin`, `cards.collectionOrigin`, `collectionProgress.legacyCarryAdded`, `courseSettings.reconciledDatasetId`, `courseSettings.studyContentFilter`) |
 | Upload CLI | `scripts/uploadOgteV1.mjs` |
 | Source CSVs | `data_preparation/ogte-dataset/data/output/levels_curated/ogte_*.csv` |
 
@@ -198,7 +203,10 @@ What happens server-side:
    - Walks the 7 legacy CEFR collections, reads each `collectionProgress`
      row for this user/course, and **adds** the counters into the new
      first-of-tier collection's row (Essential→L01, A1→L02, A2→L05, B1→L08,
-     B2→L11, C1→L14, C2→L17). Get-or-create per destination row.
+     B2→L11, C1→L14, C2→L17). Get-or-create per destination row. The
+     rolled-forward `cardsAdded` is *also* mirrored into the destination
+     row's `legacyCarryAdded` so the home view denominator can grow to match
+     the inflated numerator.
    - Remaps `courses.currentLevel` if it points at a legacy CEFR string.
    - Remaps `courseSettings.activeCollectionId` if it points at a legacy
      collection.
@@ -223,6 +231,32 @@ For a representative user with prior legacy progress:
    focused-level detail card should reflect the per-tier blurb.
 4. FSRS state on cards (`dueDate`, `fsrsState`) should be **byte-identical**
    pre/post cutover — we don't touch any `cards` row.
+
+## Retroactive `legacyCarryAdded` backfill
+
+Only required for environments that ran **Step 4** before the
+`legacyCarryAdded` field existed on `collectionProgress`. The original cutover
+folded the rolled-forward `cardsAdded` into the destination row's `cardsAdded`
+without preserving the rolled amount separately, so the home view couldn't
+widen the denominator and users saw e.g. `100/300` instead of `100/400`.
+
+The legacy `collectionProgress` rows are monotonic and never modified by
+cutover, so their `cardsAdded` snapshot is still the carry-forward amount.
+The backfill simply re-reads them and patches the destination rows:
+
+```bash
+npx convex run migrations/datasetMigration_backfillLegacyCarry:backfillAllUsers \
+  '{"datasetId":"p975fw3b4gvdc143j1fex2tv9d86mc0h"}'
+```
+
+The mutation paginates over `courses` (25 per page) and schedules
+`backfillUser` for each non-archived course with a 50ms stagger. Each
+`backfillUser` no-ops if `courseSettings.reconciledDatasetId !== datasetId`
+(only already-cutover users are touched) and overwrites `legacyCarryAdded`
+on each destination row with the legacy snapshot — idempotent on re-run.
+
+Skip this step entirely in environments that have not yet run Step 4;
+`cutoverUser` writes `legacyCarryAdded` directly on first cutover.
 
 ## Re-running cutover for a single user
 
@@ -274,13 +308,14 @@ No data is destroyed at any step — the migration is purely additive.
 
 ## Known edge cases
 
-- **Counter overflow (> 100%)**: legacy `A1` had ~295 sentences and rolls
-  into `L02`, which has ~1k texts of its own. Some users may have
-  `cardsAdded > totalTexts` on the destination level if they had a lot of
-  legacy progress on a smaller-mapped CEFR collection. The home view clamps
-  display percentages to 100%, but the underlying counter is not clamped on
-  write (we want to preserve the full historical credit for future
-  re-rolls).
+- **Carry-forward credit on the displayed ratio**: legacy `A1` had ~295
+  sentences and rolls into `L02` (~1k texts). The cutover adds the legacy
+  `cardsAdded` to the destination row's `cardsAdded` AND mirrors it into
+  `legacyCarryAdded`, and the home view computes
+  `totalTexts = collection.textCount + legacyCarryAdded`. So a user who had
+  `100/295` on legacy A1 displays as `100/(L02.textCount + 100)` on L02 —
+  numerator and denominator both reflect the prior work, the user doesn't
+  feel like they're starting from scratch, and the ratio can't exceed 100%.
 - **Users mid-review during activation**: `cards` are never touched; FSRS
   scheduling continues uninterrupted. The user's `activeCollectionId` may
   remap from a legacy collection to its new first-of-tier collection between

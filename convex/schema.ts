@@ -163,8 +163,9 @@ export default defineSchema({
     ttsProvider: v.optional(ttsProviderValidator), // TTS provider used (missing = legacy google)
     voiceGender: v.optional(voiceGenderValidator), // Gender of the synthesized voice (missing = legacy row; falls back to curated-list lookup on read)
     speed: v.optional(v.number()), // Playback speed used at synthesis time (missing = legacy row, assume 0.9)
-    // Word-level timestamps from ElevenLabs Scribe, captured during TTS validation.
-    // Seconds relative to the audio blob. Only populated when validation succeeded.
+    // Word-level timestamps from Azure Fast Transcription, captured during TTS
+    // validation. Seconds relative to the audio blob. Only populated when
+    // validation succeeded.
     wordTimings: v.optional(
       v.array(
         v.object({
@@ -376,6 +377,11 @@ export default defineSchema({
     cardsAdded: v.number(), // Monotonic — cards ever added from this collection
     cardsLearned: v.optional(v.number()), // Monotonic — cards ever reviewed at least once
     cardsMastered: v.optional(v.number()), // Monotonic — cards ever mastered
+    // Credit rolled forward at OGTE cutover (legacy `cardsAdded` from the
+    // mapped legacy CEFR collection). Widens the home-view denominator so the
+    // user sees `X/(textCount + legacyCarryAdded)` and doesn't feel like
+    // they're starting from scratch on the first level of each new tier.
+    legacyCarryAdded: v.optional(v.number()),
     lastRankProcessed: v.optional(v.number()), // Last collectionRank processed (for efficient pagination)
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])

@@ -306,7 +306,13 @@ export const getCourseStats = query({
       totalChatCardsApproved: v.optional(v.number()),
       totalCardsEdited: v.optional(v.number()),
       totalCardsAddedManually: v.optional(v.number()),
-      totalReviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+      totalReviewsByMode: v.optional(
+        v.object({
+          audio: v.number(),
+          full: v.number(),
+          radio: v.optional(v.number()),
+        }),
+      ),
       totalAccuracySum: v.optional(v.number()),
       totalAccuracyCount: v.optional(v.number()),
     }),

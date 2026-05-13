@@ -12,7 +12,7 @@
  */
 
 /** Identifier for which TTS backend a language currently uses. */
-export type TtsProvider = 'google' | 'elevenlabs';
+export type TtsProvider = 'google' | 'elevenlabs' | 'azure';
 
 /** Identifier for which translation backend a target language currently uses. */
 export type TranslationProvider = 'google' | 'openrouter';
@@ -220,7 +220,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Swedish',
     nativeName: 'Svenska',
     flag: '🇸🇪',
-    ttsProvider: 'elevenlabs',
+    ttsProvider: 'azure',
     needsRomanization: false,
     supportsKaraoke: true,
   },

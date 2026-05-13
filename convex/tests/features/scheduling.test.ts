@@ -355,10 +355,13 @@ describe("features/scheduling", () => {
         const audioId = await ctx.db.insert("audioRecordings", {
           textId,
           language: "sv",
-          voiceName: "elevenlabs-voice-abc",
+          // Use the current Swedish provider so the row survives the
+          // precedence sweep on the copied textId. The test's intent is to
+          // verify copy preserves all fields, not the regen logic.
+          voiceName: "sv-SE-SofieNeural",
           storageId,
           ttsQuality: "validated",
-          ttsProvider: "elevenlabs",
+          ttsProvider: "azure",
           voiceGender: "female",
           speed: 0.9,
           wordTimings: [{ word: "Hej", start: 0, end: 0.5 }],
@@ -423,9 +426,9 @@ describe("features/scheduling", () => {
       );
       // Every field from the source row must be preserved on the copy.
       expect(audio, "audio row was not copied for unchanged language").toBeTruthy();
-      expect(audio?.voiceName).toBe("elevenlabs-voice-abc");
+      expect(audio?.voiceName).toBe("sv-SE-SofieNeural");
       expect(audio?.ttsQuality).toBe("validated");
-      expect(audio?.ttsProvider).toBe("elevenlabs");
+      expect(audio?.ttsProvider).toBe("azure");
       expect(audio?.voiceGender).toBe("female");
       expect(audio?.speed).toBe(0.9);
       expect(audio?.wordTimings).toEqual([{ word: "Hej", start: 0, end: 0.5 }]);

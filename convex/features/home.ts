@@ -121,6 +121,12 @@ export const getHomeSummary = query({
 
     const levels = levelCollections.map((collection) => {
       const progress = progressByCollection.get(collection._id);
+      // `legacyCarryAdded` is the cardsAdded amount rolled forward from the
+      // mapped legacy CEFR collection at cutover. It's already baked into
+      // `progress.cardsAdded` (numerator); widening `totalTexts` keeps the
+      // displayed ratio coherent — e.g. legacy 100/295 lands on L02 as
+      // 100/(L02.textCount + 100), not 100/L02.textCount.
+      const carry = progress?.legacyCarryAdded ?? 0;
       return {
         collectionId: collection._id,
         code: collection.code ?? collection.name,
@@ -130,7 +136,7 @@ export const getHomeSummary = query({
         cefrTier: collection.cefrTier ?? deriveLegacyCefrTier(collection.name),
         order: collection.order ?? 0,
         displayName: collection.displayName ?? collection.name,
-        totalTexts: collection.textCount,
+        totalTexts: collection.textCount + carry,
         cardsAdded: progress?.cardsAdded ?? 0,
         cardsLearned: progress?.cardsLearned ?? 0,
         cardsMastered: progress?.cardsMastered ?? 0,

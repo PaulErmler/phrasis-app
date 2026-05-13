@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
-import { query, mutation } from '../_generated/server';
+import { query, mutation, internalMutation } from '../_generated/server';
+import { internal } from '../_generated/api';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import {
@@ -183,22 +184,28 @@ export const ensureContentForCollection = mutation({
       isLevelCollection ? { onlyCurriculum: true } : { forUserId: userId },
     );
 
-    let totalTranslationsScheduled = 0;
-    let totalAudioScheduled = 0;
-
-    for (const text of texts) {
-      const { translationsScheduled, audioScheduled } =
-        await scheduleMissingContent(
+    // Parallel over texts — each text writes only to its own (textId, language)
+    // keyed rows, so no cross-text contention within this transaction.
+    const results = await Promise.all(
+      texts.map((text) =>
+        scheduleMissingContent(
           ctx,
           text._id,
           text,
           course.baseLanguages,
           course.targetLanguages,
-        );
-      totalTranslationsScheduled += translationsScheduled;
-      totalAudioScheduled += audioScheduled;
-    }
+        ),
+      ),
+    );
 
+    const totalTranslationsScheduled = results.reduce(
+      (sum, r) => sum + r.translationsScheduled,
+      0,
+    );
+    const totalAudioScheduled = results.reduce(
+      (sum, r) => sum + r.audioScheduled,
+      0,
+    );
 
     return { totalTranslationsScheduled, totalAudioScheduled };
   },
@@ -213,14 +220,15 @@ export const ensureContentForCollection = mutation({
  * Independent of user progress (unlike `ensureContentForCollection` which
  * paginates from `lastRankProcessed`) — always starts at collectionRank 1.
  *
- * Idempotent: `scheduleMissingContent` skips any (textId, language) that's
- * already translated, so on re-entry this is ~35 DB lookups and zero writes.
+ * Fans out one scheduled `ensureFirstSentencesForCollection` mutation per
+ * level collection so each child runs in its own transaction; the inline
+ * version exceeded Convex's per-mutation wallclock limit (~15s) once the
+ * dataset grew to ~20 levels × 5 texts × multi-language storage.getUrl checks.
  */
 export const ensureFirstSentencesAcrossLevelCollections = mutation({
   args: {},
   returns: v.object({
-    totalTranslationsScheduled: v.number(),
-    totalAudioScheduled: v.number(),
+    scheduledCollections: v.number(),
   }),
   handler: async (ctx) => {
     const { course } = await requireActiveCourse(ctx);
@@ -252,34 +260,60 @@ export const ensureFirstSentencesAcrossLevelCollections = mutation({
       );
     }
 
-    let totalTranslationsScheduled = 0;
-    let totalAudioScheduled = 0;
+    await Promise.all(
+      levelCollections.map((collection) =>
+        ctx.scheduler.runAfter(
+          0,
+          internal.features.collections.ensureFirstSentencesForCollection,
+          {
+            collectionId: collection._id,
+            baseLanguages: course.baseLanguages,
+            targetLanguages: course.targetLanguages,
+          },
+        ),
+      ),
+    );
 
-    for (const collection of levelCollections) {
-      // First COLLECTION_PREVIEW_SIZE (5) texts by rank — independent of
-      // user progress so the home preview always shows translated content.
-      const texts = await ctx.db
-        .query('texts')
-        .withIndex('by_collection_and_rank', (q) =>
-          q.eq('collectionId', collection._id),
-        )
-        .order('asc')
-        .take(COLLECTION_PREVIEW_SIZE);
+    return { scheduledCollections: levelCollections.length };
+  },
+});
 
-      for (const text of texts) {
-        const { translationsScheduled, audioScheduled } =
-          await scheduleMissingContent(
-            ctx,
-            text._id,
-            text,
-            course.baseLanguages,
-            course.targetLanguages,
-          );
-        totalTranslationsScheduled += translationsScheduled;
-        totalAudioScheduled += audioScheduled;
-      }
-    }
+/**
+ * Per-collection child of `ensureFirstSentencesAcrossLevelCollections`.
+ *
+ * Idempotent — `scheduleMissingContent` skips any (textId, language) already
+ * covered, so re-entries do reads only and write nothing. Processes the 5
+ * texts in parallel; safe because each text writes only to its own
+ * (textId, language)-keyed rows (audio patches, claim inserts, per-text
+ * scheduler calls).
+ */
+export const ensureFirstSentencesForCollection = internalMutation({
+  args: {
+    collectionId: v.id('collections'),
+    baseLanguages: v.array(v.string()),
+    targetLanguages: v.array(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const texts = await ctx.db
+      .query('texts')
+      .withIndex('by_collection_and_rank', (q) =>
+        q.eq('collectionId', args.collectionId),
+      )
+      .order('asc')
+      .take(COLLECTION_PREVIEW_SIZE);
 
-    return { totalTranslationsScheduled, totalAudioScheduled };
+    await Promise.all(
+      texts.map((text) =>
+        scheduleMissingContent(
+          ctx,
+          text._id,
+          text,
+          args.baseLanguages,
+          args.targetLanguages,
+        ),
+      ),
+    );
+    return null;
   },
 });
