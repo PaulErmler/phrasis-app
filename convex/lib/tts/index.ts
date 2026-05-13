@@ -7,10 +7,12 @@ import type { TtsProvider } from '../../types';
 import type { TTSProvider } from './types';
 import { googleTts } from './google';
 import { elevenLabsTts } from './elevenlabs';
+import { azureTts } from './azure';
 
 const providers: Partial<Record<TtsProvider, TTSProvider>> = {
   google: googleTts,
   elevenlabs: elevenLabsTts,
+  azure: azureTts,
 };
 
 export function getTtsProvider(id: TtsProvider): TTSProvider {

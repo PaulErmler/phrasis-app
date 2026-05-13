@@ -446,13 +446,45 @@ describe("features/ttsProcessing", () => {
   });
 
   describe("scheduleMissingContent sweep", () => {
-    // Swedish is the one language still pinned to ElevenLabs, so a legacy row
-    // stamped `ttsProvider: 'google'` should be swept out on first touch.
-    // These tests drive that sweep via `prepareCardContent`.
-    it("deletes a row whose ttsProvider doesn't match the language's current provider", async () => {
+    // Swedish currently runs on Azure. Per lib/ttsPrecedence.ts, Azure
+    // overrides ElevenLabs rows but leaves Google rows untouched. These tests
+    // drive both branches via `prepareCardContent`.
+    it("deletes a row whose ttsProvider is in the current provider's override list", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       // Force a stable audioSpeakerGender so the sweep compares like-for-like.
+      await t.run(async (ctx) =>
+        ctx.db.patch(textId, { audioSpeakerGender: "female" }),
+      );
+      const storageId = await t.run(async (ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
+      );
+      const audioId = await t.run(async (ctx) =>
+        ctx.db.insert("audioRecordings", {
+          textId,
+          language: "sv",
+          voiceName: "RILOU7YmBhvwJGDGjNmP", // ElevenLabs voice id (Jane)
+          storageId,
+          ttsQuality: "validated",
+          ttsProvider: "elevenlabs",
+          voiceGender: "female",
+          speed: 0.9,
+        }),
+      );
+
+      await t.mutation(internal.features.decks.prepareCardContent, {
+        textId,
+        baseLanguages: ["sv"],
+        targetLanguages: ["sv"],
+      });
+
+      const left = await t.run(async (ctx) => ctx.db.get(audioId));
+      expect(left).toBeNull();
+    });
+
+    it("keeps a Google row when the language switches to a provider that doesn't override Google", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
       await t.run(async (ctx) =>
         ctx.db.patch(textId, { audioSpeakerGender: "female" }),
       );
@@ -479,7 +511,7 @@ describe("features/ttsProcessing", () => {
       });
 
       const left = await t.run(async (ctx) => ctx.db.get(audioId));
-      expect(left).toBeNull();
+      expect(left).not.toBeNull();
     });
 
     it("deletes a legacy row whose gender can't be determined (no voiceGender + voice not in curated list)", async () => {

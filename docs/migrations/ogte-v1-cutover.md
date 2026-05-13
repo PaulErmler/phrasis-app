@@ -242,7 +242,7 @@ The backfill simply re-reads them and patches the destination rows:
 
 ```bash
 npx convex run migrations/datasetMigration_backfillLegacyCarry:backfillAllUsers \
-  '{"datasetId":"<active dataset id>"}'
+  '{"datasetId":"p975fw3b4gvdc143j1fex2tv9d86mc0h"}'
 ```
 
 The mutation paginates over `courses` (25 per page) and schedules

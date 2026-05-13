@@ -65,6 +65,7 @@ import type * as lib_dateUtils from "../lib/dateUtils.js";
 import type * as lib_fsrsStates from "../lib/fsrsStates.js";
 import type * as lib_localRomanization from "../lib/localRomanization.js";
 import type * as lib_textComparison from "../lib/textComparison.js";
+import type * as lib_tts_azure from "../lib/tts/azure.js";
 import type * as lib_tts_elevenlabs from "../lib/tts/elevenlabs.js";
 import type * as lib_tts_google from "../lib/tts/google.js";
 import type * as lib_tts_index from "../lib/tts/index.js";
@@ -153,6 +154,7 @@ declare const fullApi: ApiFromModules<{
   "lib/fsrsStates": typeof lib_fsrsStates;
   "lib/localRomanization": typeof lib_localRomanization;
   "lib/textComparison": typeof lib_textComparison;
+  "lib/tts/azure": typeof lib_tts_azure;
   "lib/tts/elevenlabs": typeof lib_tts_elevenlabs;
   "lib/tts/google": typeof lib_tts_google;
   "lib/tts/index": typeof lib_tts_index;

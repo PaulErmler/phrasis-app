@@ -84,6 +84,7 @@ export const ttsQualityValidator = v.union(
 export const ttsProviderValidator = v.union(
   v.literal('google'),
   v.literal('elevenlabs'),
+  v.literal('azure'),
 );
 
 export const voiceGenderValidator = v.union(
