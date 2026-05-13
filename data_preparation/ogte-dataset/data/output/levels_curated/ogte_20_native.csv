@@ -1,7 +1,6 @@
 id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
 270545,Life is full of ups and downs.,,7571,downs,7,full|life,descriptive,n/a,20,1
 1443601,We all have our ups and downs.,,7571,downs,7,all|and|downs|our|ups,descriptive,n/a,20,1
-x20_1,Tell me about it.,,270,tell,4,tell|about,direct-address,informal,20,1
 281980,"Perseverance, it is often said, is the key to success.",,14353,perseverance,10,key|said|success,descriptive,n/a,20,1
 2291586,I admire your perseverance and determination.,,14353,perseverance,6,admire|determination|perseverance,direct-address,formal,20,1
 x20_2,That means more than you know.,,341,means,6,means,direct-address,neutral,20,1
@@ -10,7 +9,6 @@ x20_2,That means more than you know.,,341,means,6,means,direct-address,neutral,2
 4494253,The others are skeptical.,,10400,skeptical,4,others,descriptive,n/a,20,2
 2301409,I can understand your skepticism.,,13714,skepticism,5,skepticism,direct-address,formal,20,2
 1230620,I'm skeptical when I hear someone claim to speak more than five languages fluently.,,14877,fluently,14,claim|five|hear|languages|more|someone|speak|than,descriptive,n/a,20,2
-x20_3,Fair enough.,,1092,fair,2,fair|enough,descriptive,n/a,20,2
 1961604,I thought you didn't know anything about lacrosse.,,13679,lacrosse,8,about|anything|didn't|thought,direct-address,neutral,20,2
 x20_4,"Yeah, well, I picked some things up.",,1939,picked,7,picked|things,descriptive,n/a,20,2
 2007742,Let's not get cocky.,,13749,cocky,4,cocky|get,direct-address,informal,99,3
@@ -162,7 +160,6 @@ x20_19,Big talk for a beginner.,,12235,beginner,5,big|beginner,direct-address,in
 41220,It's almost six o'clock.,,6521,o'clock,4,almost,descriptive,n/a,99,33
 73434,It's ten o'clock sharp.,,6521,o'clock,4,sharp,descriptive,n/a,99,33
 31736,It's already past ten o'clock.,,6521,o'clock,5,past,descriptive,n/a,99,33
-x20_7,Where did the day go?,,118,day,5,day|where,descriptive,n/a,20,33
 72417,Let's wait until six o'clock.,,6521,o'clock,5,wait,direct-address,informal,99,33
 323808,I'll set the alarm for seven o'clock.,,6521,o'clock,7,alarm|i'll|set,descriptive,n/a,99,33
 18433,Banks open at nine o'clock.,,6521,o'clock,5,banks,descriptive,n/a,99,34

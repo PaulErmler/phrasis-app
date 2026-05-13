@@ -58,7 +58,6 @@ x17_18,I left mine in the car.,,959,mine,6,car,descriptive,n/a,17,9
 2951634,Do you have identification?,,5233,identification,4,identification,direct-address,neutral,17,9
 2539753,I'm not carrying any identification.,,5233,identification,5,carrying,descriptive,n/a,17,9
 6126559,Where did you get this info?,,2469,info,6,get|where,direct-address,neutral,17,10
-x17_19,I'd rather not say.,,469,rather,4,rather,descriptive,n/a,17,10
 1886284,Can anyone verify that?,,8157,verify,4,anyone|verify,direct-address,neutral,17,10
 3469016,Let me verify that.,,8157,verify,4,let,direct-address,neutral,17,10
 2951605,Could you verify that your computer is plugged in?,,13249,plugged,9,computer|plugged,direct-address,formal,17,10
@@ -590,7 +589,6 @@ x17_37,I'll do it in a minute.,,1112,minute,6,minute,descriptive,n/a,17,109
 2123551,That's treason.,,8558,treason,2,treason,descriptive,n/a,17,115
 4495490,We admire your loyalty.,,7131,admire,4,admire,direct-address,neutral,17,115
 3142954,Are you questioning my loyalty?,,6530,questioning,5,questioning,direct-address,neutral,17,115
-x17_30,Of course not.,,335,course,3,course,direct-address,neutral,17,115
 906724,What's your favorite cocktail?,,7970,cocktail,4,cocktail,direct-address,neutral,17,116
 x17_41,An old-fashioned.,,7461,fashioned,3,fashioned,descriptive,n/a,17,116
 1892665,I didn't see you at my cocktail party last weekend.,,7970,cocktail,10,weekend,direct-address,neutral,17,116
@@ -783,7 +781,6 @@ x17_24,Take it as a compliment.,,7747,compliment,5,take,direct-address,neutral,1
 4904861,The hostages are facing death.,,10853,hostages,5,death|facing,descriptive,n/a,17,169
 681885,The terrorists released the hostages.,,10853,hostages,5,released|terrorists,descriptive,n/a,17,169
 4529749,The hostages appear to be OK.,,10853,hostages,6,appear|ok,descriptive,n/a,17,169
-x17_29,That's a relief.,,2733,relief,3,relief,descriptive,n/a,17,169
 1316522,He tried to be brave while he was being held hostage.,,7890,hostage,11,brave|tried,descriptive,n/a,17,170
 260495,I called him a coward to his face.,,10451,coward,8,face,descriptive,n/a,17,170
 409202,The coward is the first to raise his fist.,,10451,coward,9,raise,descriptive,n/a,17,170

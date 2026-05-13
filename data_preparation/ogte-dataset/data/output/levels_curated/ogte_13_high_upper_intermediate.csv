@@ -14,7 +14,6 @@ x13_3,When can we expect your decision?,,1038,expect,6,decision,direct-address,f
 633543,I'm proud that my father is a good cook.,,2228,cook,9,cook|father|good,descriptive,n/a,13,2
 4529590,We're proud of our achievement.,,3812,achievement,5,achievement|our,descriptive,n/a,13,2
 3831404,Your parents would've been proud of you.,,3871,would've,7,parents|would've,direct-address,neutral,13,2
-x13_4,That means a lot to me.,,341,means,6,means,descriptive,n/a,13,2
 2645060,I'm proud to be Canadian.,,2013,canadian,5,canadian,descriptive,n/a,13,2
 3016610,I'm not proud of my behavior.,,2044,behavior,6,behavior,descriptive,n/a,13,2
 2538384,I'm proud of the way you handled yourself.,,4600,handled,8,handled,direct-address,neutral,13,2
@@ -111,7 +110,6 @@ x13_9,We all do things we regret.,,3794,regret,6,things,descriptive,n/a,13,16
 5165772,I feel slightly sick.,,1824,slightly,4,feel|sick,descriptive,n/a,13,18
 3211810,I was slightly surprised.,,2117,surprised,4,surprised,descriptive,n/a,13,18
 3920551,I'm slightly worried about you.,,2356,worried,5,about|worried,direct-address,neutral,13,18
-x13_12,Is everything okay?,,919,okay,3,okay,direct-address,neutral,13,18
 5332947,Three people were slightly injured.,,2922,injured,5,injured|people,descriptive,n/a,13,18
 4850015,Three cyclists were slightly injured.,,10229,cyclists,5,cyclists,descriptive,n/a,13,18
 807110,The violence lasted three days.,,6008,lasted,5,days|lasted,descriptive,n/a,13,19
@@ -219,7 +217,6 @@ x13_13,More serious than we thought.,,825,serious,5,serious,descriptive,n/a,13,2
 250883,I am not accountable to you for my actions.,,7829,accountable,9,actions,direct-address,formal,13,45
 4529914,Stop acting like a victim.,,2688,victim,5,acting|stop,direct-address,informal,13,45
 1168410,Several thousand people became victims of this disease.,,2689,victims,8,disease|thousand,descriptive,n/a,13,46
-1140058,That's a relief.,,2733,relief,3,relief,descriptive,n/a,13,47
 2245436,Everyone's relieved.,,7412,relieved,2,everyone's|relieved,descriptive,n/a,13,47
 251223,I felt relieved when my plane landed safely.,,7412,relieved,8,landed|plane|safely,descriptive,n/a,13,47
 953262,Everybody in the room let out a sigh of relief.,,7423,sigh,10,room|sigh,descriptive,n/a,13,47
@@ -388,7 +385,6 @@ x13_20,"Thank you, it means a lot.",,341,means,6,means,direct-address,neutral,13
 4497899,I don't have a mortgage.,,3667,mortgage,5,a|don't|have|i|mortgage,descriptive,n/a,13,82
 4500129,I signed a lease.,,5325,lease,4,lease|signed,descriptive,n/a,13,82
 2275786,Didn't you sign a lease?,,5325,lease,5,sign,direct-address,neutral,13,82
-x13_32,"Yes, last week.",,294,yes,3,last,direct-address,neutral,13,82
 2241411,We must withdraw.,,6459,withdraw,3,must|withdraw,direct-address,neutral,13,82
 18453,I have to withdraw some cash from the bank.,,6459,withdraw,9,bank|cash,descriptive,n/a,13,82
 2544929,I withdrew my application.,,9962,withdrew,4,application|withdrew,descriptive,n/a,13,82
@@ -661,7 +657,6 @@ x13_39,Never — too risky.,,7507,risky,3,risky,direct-address,informal,13,134
 30114,Where is the United Airlines check-in counter?,,5089,airlines,8,united,direct-address,neutral,13,138
 5850854,I brought a pie.,,5148,pie,4,brought,descriptive,n/a,13,139
 1140015,Would you mind if I ate a piece of this pie?,,5148,pie,11,ate|mind|piece,direct-address,formal,13,139
-x13_24,Help yourself.,,486,yourself,2,yourself,direct-address,informal,13,139
 2546115,I'd love a slice of pie.,,6923,slice,6,slice,descriptive,n/a,13,139
 3821501,Who wants a slice of pie?,,6923,slice,6,a|of|pie|slice|wants|who,direct-address,neutral,13,139
 2549331,I'm baking a pie.,,7645,baking,4,baking,descriptive,n/a,13,139
@@ -772,7 +767,6 @@ x13_38,"No, none of it.",,1239,none,4,none,descriptive,n/a,13,159
 3636497,Is it OK to hug you?,,5997,hug,6,ok,direct-address,neutral,13,163
 3818239,I can't wait to hug you.,,5997,hug,6,wait,direct-address,informal,13,163
 3152511,Would you mind giving me a hug?,,5997,hug,7,giving,direct-address,formal,13,163
-x13_36,Not at all.,,32,all,3,all,direct-address,neutral,13,163
 2243337,They stopped hugging.,,12773,hugging,3,hugging,descriptive,n/a,13,163
 2470488,We hugged each other.,,13341,hugged,4,each,descriptive,n/a,13,163
 1898338,Mary hugged her doll.,,13341,hugged,4,doll,descriptive,n/a,13,163
@@ -910,7 +904,6 @@ x13_27,"Of course, take it.",,335,course,4,take,direct-address,informal,13,193
 298753,He came down the hill on his bicycle.,,7047,bicycle,8,hill,descriptive,n/a,13,194
 259605,I rode my bicycle to the store.,,7800,rode,7,rode|store,descriptive,n/a,13,194
 4369144,When was the last time you rode a bicycle?,,7800,rode,9,a|bicycle|last|rode|the|time|was|when|you,direct-address,neutral,13,194
-x13_28,It's been ages.,,2794,ages,3,ages,direct-address,neutral,13,194
 307317,They accused him of stealing the bicycle.,,7047,bicycle,7,accused|stealing,descriptive,n/a,13,195
 2543251,All my friends have bicycles.,,13637,bicycles,5,bicycles|friends,descriptive,n/a,13,195
 27753,Will you lend me your bicycle for an hour?,,7684,lend,9,hour,direct-address,neutral,13,195
@@ -1011,7 +1004,6 @@ x13_52,Just a few more blocks.,,3381,blocks,5,blocks,descriptive,n/a,13,216
 306239,They are used to the humid climate of the summer.,,12512,humid,10,climate|summer,descriptive,n/a,13,219
 2111396,That's thoughtful.,,8676,thoughtful,2,thoughtful,descriptive,n/a,13,220
 2021169,That's very thoughtful.,,8676,thoughtful,3,that's|thoughtful|very,descriptive,n/a,13,220
-x13_57,I'm glad you noticed.,,2339,noticed,4,noticed,direct-address,neutral,13,220
 3671647,Are you intentionally trying to confuse me?,,10447,confuse,7,confuse,direct-address,neutral,13,221
 2248919,It wasn't intentional.,,9886,intentional,3,intentional|wasn't,descriptive,n/a,13,221
 5398612,Was that intentional?,,9886,intentional,3,intentional|that|was,direct-address,neutral,13,221
@@ -1026,12 +1018,10 @@ x13_53,"No, it just happened.",,623,happened,4,happened,descriptive,n/a,13,221
 5825284,I'm sorry I lost my temper and said rude things.,,8904,temper,10,rude,direct-address,neutral,13,223
 262253,"I tried to be calm, but finally I lost my temper.",,8904,temper,11,calm|finally|tried,descriptive,n/a,13,223
 5826396,I hope you'll try to control your temper better next time.,,8904,temper,11,control|try,direct-address,neutral,13,223
-x13_34,I'll do my best.,,348,i'll,4,best,descriptive,n/a,13,223
 324956,I weighed myself on the bathroom scales.,,8907,weighed,7,scales|weighed,descriptive,n/a,13,224
 4285627,I wonder how sausage is made.,,8993,sausage,6,sausage|wonder,descriptive,n/a,13,225
 x13_25,You probably don't want to know.,,416,probably,6,know,direct-address,informal,13,225
 2545676,Would you pass the peas?,,10762,peas,5,pass|peas,direct-address,neutral,13,225
-x13_26,"Sure, here you go.",,197,sure,4,here,direct-address,informal,13,225
 4502165,It was a sticky situation indeed.,,8997,sticky,6,indeed|situation,descriptive,n/a,13,226
 735354,This tape isn't sticky.,,8997,sticky,4,tape,descriptive,n/a,13,226
 5858753,I was the pitcher.,,9089,pitcher,4,pitcher,descriptive,n/a,13,227

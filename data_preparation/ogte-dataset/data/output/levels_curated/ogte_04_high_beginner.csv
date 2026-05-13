@@ -1,6 +1,4 @@
 id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
-1841588,See you later.,10.00,297,later,3,later,direct-address,informal,04,1
-333156,Good evening.,10.00,1440,evening,2,evening,direct-address,neutral,04,1
 1188743,I'm learning English.,10.00,1264,learning,3,learning,descriptive,n/a,04,2
 2247880,I'm a beginner.,10.00,12235,beginner,3,beginner,descriptive,n/a,04,2
 1468392,"I'm a beginner, too.",10.00,12235,beginner,4,a|beginner|i'm|too,descriptive,n/a,04,2
@@ -31,7 +29,6 @@ x4_3,Slow down.,,1492,slow,2,slow|down,direct-address,informal,04,3
 x4_41,That's not polite.,,7699,polite,3,polite,descriptive,n/a,04,12
 25700,Please say hello to your wife.,9.00,1927,hello,6,hello|please|say|to|wife|your,direct-address,neutral,04,13
 2545682,What's your wife's name?,9.00,8160,wife's,4,name|what's|wife's|your,direct-address,neutral,04,13
-x4_1,Her name is Mary.,,1715,mary,4,her|name,descriptive,n/a,04,13
 2260610,What's your wife's job?,8.00,8160,wife's,4,wife's,direct-address,neutral,04,13
 x4_2,She's a teacher.,,1399,teacher,3,she's|teacher,descriptive,n/a,04,13
 2779966,I can't find the restaurant.,9.00,2107,restaurant,5,can't|find|i|restaurant|the,descriptive,n/a,04,14

@@ -62,12 +62,10 @@ x6_34,"Yes, I have to go.",,294,yes,5,have|go,descriptive,n/a,06,9
 x6_35,"Yes, very much.",,294,yes,3,much,descriptive,n/a,06,10
 3358932,You should visit more often.,7.00,968,visit,5,more|often|should|visit|you,direct-address,neutral,06,10
 2245563,Here's the key.,9.00,1295,here's,3,here's,direct-address,neutral,06,11
-x6_8,Thanks.,,354,thanks,1,thanks,direct-address,neutral,06,11
 3738464,Where should I put my bags?,9.00,3378,bags,6,bags|i|my|put|should|where,direct-address,neutral,06,11
 x6_9,Right over there.,,113,right,3,over|there,descriptive,n/a,06,11
 2250007,Stay in touch.,9.00,1312,touch,3,touch,direct-address,neutral,06,12
 3390736,"Could you carry this box for me, please?",9.00,1348,carry,8,carry,direct-address,formal,06,13
-x6_14,Of course.,,335,course,2,course,direct-address,neutral,06,13
 1138298,This box is too heavy for me to carry.,7.00,1348,carry,9,box|carry|for|heavy|is|me|this|to|too,descriptive,n/a,06,13
 6025434,I need a bigger box.,8.00,1837,bigger,5,bigger,descriptive,n/a,06,13
 1852281,Enjoy your evening.,9.00,1440,evening,3,evening,direct-address,neutral,06,14
@@ -132,15 +130,12 @@ x6_22,It's pretty hot today.,,700,hot,4,today,descriptive,n/a,06,23
 2645638,What's your son's name?,9.00,8144,son's,4,son's,direct-address,neutral,06,25
 x6_39,His name is John.,,405,john,4,john|his,descriptive,n/a,06,25
 2543901,What's your husband's name?,9.00,8423,husband's,4,husband's,direct-address,neutral,06,25
-x6_40,His name is Tom.,,1568,tom,4,tom,descriptive,n/a,06,25
 5545133,What's your father's full name?,8.00,4526,father's,5,father's|full|name|what's|your,direct-address,neutral,06,25
 1898238,Something's wrong.,9.00,13833,something's,2,something's,descriptive,n/a,06,26
 264343,When should I come again?,8.00,184,again,5,when,direct-address,neutral,06,27
 x6_28,Come back tomorrow.,,1020,tomorrow,3,back|tomorrow,direct-address,neutral,06,27
 3374692,I'm still not sure.,8.00,197,sure,4,sure,descriptive,n/a,06,28
 4014041,Do you still have my number?,8.00,211,number,6,number,direct-address,neutral,06,29
-x6_91,"Yes, I do.",,294,yes,3,yes|do,descriptive,n/a,06,29
-x6_92,Call me anytime.,,5093,anytime,3,anytime|call,direct-address,neutral,06,29
 51899,I already told you.,8.00,261,told,4,told,direct-address,neutral,06,30
 2770698,We should tell him.,8.00,270,tell,4,him|tell,descriptive,n/a,06,31
 1276148,We have enough water.,8.00,277,water,4,water,descriptive,n/a,06,32
@@ -190,7 +185,6 @@ x6_20,"Sorry, I'll move it.",,671,sorry,4,move,direct-address,neutral,06,45
 1396333,It's already eleven.,6.00,5747,eleven,3,eleven,descriptive,n/a,06,48
 5825535,It's past eight.,7.00,1004,eight,3,eight,descriptive,n/a,06,48
 3417570,Is it morning already?,7.00,461,morning,4,morning,descriptive,n/a,06,48
-x6_29,"Yes, it is.",,294,yes,3,yes,descriptive,n/a,06,48
 2249180,It's pretty simple.,8.00,875,simple,3,simple,descriptive,n/a,06,49
 2591261,That's pretty normal.,6.00,1042,normal,3,normal|pretty|that's,descriptive,n/a,06,49
 2249032,It's already happening.,7.00,1646,happening,3,happening,descriptive,n/a,06,49
@@ -267,7 +261,6 @@ x6_15,I'll be right there.,,348,i'll,4,right|there,descriptive,n/a,06,50
 3688378,Staying home is boring.,6.00,3382,boring,4,boring,descriptive,n/a,06,62
 2250926,That sounds serious.,8.00,1139,sounds,3,serious|sounds|that,descriptive,n/a,06,63
 2021196,Are you still interested?,8.00,1180,interested,4,interested,direct-address,neutral,06,64
-x6_56,"Yes, very much.",,294,yes,3,very|much,descriptive,n/a,06,64
 249146,We will stay here until Sunday.,8.00,1275,sunday,6,sunday,descriptive,n/a,06,65
 2249292,It's still closed.,8.00,1315,closed,3,closed,descriptive,n/a,06,66
 4530071,I fully agree with you.,8.00,1354,fully,5,agree|fully|i|with|you,direct-address,neutral,06,67
@@ -327,7 +320,6 @@ x6_41,When did they arrive?,,3700,arrive,4,arrive,descriptive,n/a,06,77
 1827906,My parents know my girlfriend.,7.00,2095,girlfriend,5,girlfriend,descriptive,n/a,06,77
 2193833,I moved back with my parents.,6.00,1041,moved,6,back|i|moved|my|parents|with,descriptive,n/a,06,77
 1886846,Should I open the windows?,8.00,1960,windows,5,windows,direct-address,neutral,06,78
-x6_32,"Yes, please.",,294,yes,2,please,direct-address,neutral,06,78
 3185155,Stay away from the windows.,6.00,1960,windows,5,away|from|stay|the|windows,direct-address,neutral,06,78
 3185051,Stay away from the window.,6.00,1665,window,5,window,direct-address,neutral,06,78
 4665994,The window is still broken.,6.00,1665,window,5,broken|is|still|the|window,descriptive,n/a,06,78
@@ -582,7 +574,6 @@ x6_11,"Yes, that's fine.",,576,fine,3,fine,descriptive,n/a,06,116
 2884150,I should be thanking you.,8.00,12334,thanking,5,thanking,direct-address,neutral,06,119
 2954737,You should be thanking me.,8.00,12334,thanking,5,be|me|should|thanking|you,direct-address,neutral,06,119
 3824934,I haven't yet thanked you enough.,7.00,10897,thanked,6,thanked,direct-address,neutral,06,119
-2111573,Nothing's wrong.,8.00,14742,nothing's,2,nothing's,descriptive,n/a,06,120
 1897745,It won't matter.,7.00,453,won't,3,won't,descriptive,n/a,06,121
 3147938,The price doesn't matter.,7.00,582,price,4,price,descriptive,n/a,06,121
 2396245,It matters.,5.00,1937,matters,2,it|matters,descriptive,n/a,06,121
@@ -692,7 +683,6 @@ x6_119,"No, thanks. I'm done.",,354,thanks,4,done|thanks,direct-address,neutral,
 313417,She ended up getting married to him.,5.00,1257,ended,7,ended|getting|him|married|she|to|up,descriptive,n/a,06,150
 19451,My sister married a high school teacher last June.,5.00,1399,teacher,9,a|high|june|last|married|my|school|sister|teacher,descriptive,n/a,06,150
 2144674,Do you still love your wife?,7.00,591,wife,6,wife,direct-address,neutral,06,150
-x6_42,"Yes, very much.",,294,yes,3,yes|much,descriptive,n/a,06,150
 1853690,He's married to an American woman.,6.00,982,married,6,american|woman,descriptive,n/a,06,150
 388374,She hated her husband.,4.00,5042,hated,4,hated,descriptive,n/a,06,150
 67608,I want to stay in America for a few years.,7.00,592,america,10,america|years,descriptive,n/a,06,151
@@ -994,7 +984,6 @@ x6_23,Take an umbrella.,,8059,umbrella,3,umbrella,direct-address,neutral,06,234
 280659,"Suddenly, it became noisy.",5.00,10503,noisy,4,became|it|noisy|suddenly,descriptive,n/a,06,237
 292140,He spoke very loudly.,6.00,9079,loudly,4,loudly,descriptive,n/a,06,237
 64758,Would you care for drinks?,7.00,3395,drinks,5,drinks,direct-address,neutral,06,238
-x6_12,"Yes, please.",,294,yes,2,please,direct-address,neutral,06,238
 2546666,I'll prepare some food.,7.00,2732,prepare,4,food|i'll|prepare|some,descriptive,n/a,06,238
 3635945,I checked the date.,7.00,2758,checked,4,checked|date|i|the,descriptive,n/a,06,239
 2249745,Open the doors.,7.00,2765,doors,3,doors,direct-address,neutral,06,240
@@ -1114,7 +1103,6 @@ x6_104,That's pretty early.,,407,pretty,3,early,descriptive,n/a,06,289
 1079110,My wife cooks well.,7.00,10696,cooks,4,cooks,descriptive,n/a,06,290
 4081905,I miss my mom's cooking.,6.00,8865,mom's,5,mom's,descriptive,n/a,06,290
 2742533,Do you often watch cooking shows?,6.00,3259,cooking,6,shows,direct-address,neutral,06,290
-x6_27,"Yes, all the time.",,294,yes,4,time,descriptive,n/a,06,290
 2648844,Everybody's busy.,7.00,11060,everybody's,2,busy|everybody's,descriptive,n/a,06,291
 2111585,Nobody's there.,7.00,11208,nobody's,2,nobody's|there,descriptive,n/a,06,292
 2111843,Everything's wrong.,7.00,11777,everything's,2,everything's,descriptive,n/a,06,293
@@ -1134,7 +1122,6 @@ x6_27,"Yes, all the time.",,294,yes,4,time,descriptive,n/a,06,290
 4499441,That must've hurt.,7.00,12671,must've,3,must've,descriptive,n/a,06,297
 2064787,I must've missed something.,7.00,12671,must've,4,i|missed|must've|something,descriptive,n/a,06,298
 2012614,Do you want that warmed up?,7.00,12942,warmed,6,warmed,direct-address,neutral,06,299
-x6_71,"Yes, please.",,294,yes,2,yes|please,direct-address,neutral,06,299
 2203844,Who swam?,7.00,14379,swam,2,swam|who,descriptive,n/a,06,300
 395397,This annoys me.,7.00,14510,annoys,3,annoys,descriptive,n/a,06,301
 3820114,Who'll believe that?,7.00,14594,who'll,3,who'll,descriptive,n/a,06,302
@@ -1199,7 +1186,6 @@ x6_114,I'll think about it.,,348,i'll,4,think|about,descriptive,n/a,06,332
 2647597,The concert is over.,6.00,2700,concert,4,concert,descriptive,n/a,06,337
 50367,When will the concert be held?,6.00,2700,concert,6,be|concert|held|the|when|will,direct-address,neutral,06,337
 3403352,What's behind the wall?,6.00,969,wall,4,wall,direct-address,neutral,06,338
-x6_74,I don't know.,,84,know,3,know,descriptive,n/a,06,338
 x6_75,Let's go and see.,,701,let's,4,see,direct-address,informal,06,338
 2954143,What kind of games do you create?,6.00,1002,create,7,games,direct-address,neutral,06,339
 x6_76,Mostly puzzle games.,,7296,puzzle,3,mostly,descriptive,n/a,06,339
@@ -1342,7 +1328,6 @@ x6_110,Mostly vegetables.,,5525,vegetables,2,mostly|vegetables,descriptive,n/a,0
 2245575,Hide the money.,6.00,2773,hide,3,hide|money|the,direct-address,informal,06,400
 2241595,We'll hide it.,5.00,2773,hide,3,hide,descriptive,n/a,06,400
 2731666,Have you hidden anything?,6.00,2814,hidden,4,hidden,direct-address,neutral,06,400
-x6_50,"No, I haven't.",,797,haven't,3,haven't,descriptive,n/a,06,400
 2731710,I hid it somewhere.,6.00,9066,hid,4,hid,descriptive,n/a,06,400
 2360845,I hid behind a tree.,5.00,9066,hid,5,a|behind|hid|i|tree,descriptive,n/a,06,400
 2111280,They're hiding.,6.00,4100,hiding,2,hiding,descriptive,n/a,06,400
@@ -1441,7 +1426,6 @@ x6_81,For concert tickets.,,2700,concert,3,tickets,descriptive,n/a,06,459
 5621891,We're not the only ones who've made mistakes.,6.00,10203,who've,8,ones|who've,descriptive,n/a,06,471
 3091108,My ears are ringing.,6.00,10394,ringing,4,ringing,descriptive,n/a,06,472
 953185,Do you feel birthdays are important?,6.00,12729,birthdays,6,birthdays,direct-address,neutral,06,473
-x6_82,"Yes, I do.",,294,yes,3,yes|do,direct-address,neutral,06,473
 2643698,They were all good swimmers.,6.00,13161,swimmers,5,swimmers,descriptive,n/a,06,474
 2538937,I'm going to miss our lunches together.,6.00,13574,lunches,7,lunches,descriptive,n/a,06,475
 321456,Where's my box of chocolates?,6.00,13646,chocolates,5,chocolates,descriptive,n/a,06,476
@@ -1648,7 +1632,6 @@ x6_117,Really? Are you sure?,,197,sure,4,sure|really,direct-address,neutral,06,6
 53666,We flew from New York to St. Louis by way of Chicago.,4.00,5388,flew,12,chicago|louis|st,descriptive,n/a,06,650
 239302,Seeing is believing.,4.00,5459,believing,3,believing,descriptive,n/a,06,651
 2890922,Are we going in circles?,4.00,5645,circles,5,circles,direct-address,neutral,06,652
-x6_87,I'm afraid so.,,2009,afraid,3,afraid|so,descriptive,n/a,06,652
 4496314,Who would've cared?,4.00,5804,cared,3,cared|who|would've,descriptive,n/a,06,653
 4502837,It was heart-warming.,4.00,6456,warming,4,heart|it|warming|was,descriptive,n/a,06,654
 44448,Take care not to turn the box upside down.,4.00,6832,upside,9,upside,direct-address,neutral,06,655

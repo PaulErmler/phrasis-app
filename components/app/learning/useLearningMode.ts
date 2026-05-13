@@ -394,6 +394,7 @@ export function useLearningMode(
   const prevCardIdForEnsureRef = useRef<string | null>(null);
   const reviewsSinceEnsureRef = useRef(ENSURE_CONTENT_REVIEW_INTERVAL);
   const ensureInFlightRef = useRef(false);
+  const hasEnsuredForEmptyDeckRef = useRef(false);
 
   useEffect(() => {
     if (!cardForReview || ensureInFlightRef.current) return;
@@ -420,6 +421,28 @@ export function useLearningMode(
         ensureInFlightRef.current = false;
       });
   }, [cardForReview?._id, cardForReview?.hasMissingContent, ensureUpcomingContentMutation]);
+
+  // When the deck has no due cards, the per-card effect above never fires,
+  // so the next "Add cards" click would pull texts whose content prep has not
+  // been scheduled. Pre-warm the active collection's upcoming texts here so
+  // TTS / translation is in flight by the time the user clicks Add.
+  useEffect(() => {
+    if (cardForReview !== null) return;
+    if (cardForReview === undefined) return; // query still loading
+    if (!courseSettings?.activeCollectionId) return;
+    if (hasEnsuredForEmptyDeckRef.current) return;
+    if (ensureInFlightRef.current) return;
+
+    hasEnsuredForEmptyDeckRef.current = true;
+    ensureInFlightRef.current = true;
+    ensureUpcomingContentMutation()
+      .catch((err) => {
+        console.error('Failed to ensure upcoming cards content:', err);
+      })
+      .finally(() => {
+        ensureInFlightRef.current = false;
+      });
+  }, [cardForReview, courseSettings?.activeCollectionId, ensureUpcomingContentMutation]);
 
   // --------------------------------------------------------------------------
   // Add cards

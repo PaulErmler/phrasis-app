@@ -248,7 +248,6 @@ x7_45,Thanks. There's always next time.,,354,thanks,5,next|time,direct-address,n
 x7_78,"Yes, but no flash, please.",,3271,flash,5,flash,direct-address,neutral,07,44
 64373,What size do you wear?,8.00,1277,wear,5,do|size|wear|what|you,direct-address,neutral,07,45
 30401,Do you have a larger size?,8.00,1591,larger,6,larger,direct-address,neutral,07,45
-30436,Do you have a smaller size?,8.00,1659,smaller,6,smaller,direct-address,neutral,07,45
 30434,Do you have any smaller sizes?,8.00,5262,sizes,6,sizes,direct-address,neutral,07,45
 60784,This dress comes in three sizes.,7.00,5262,sizes,6,comes,descriptive,n/a,07,45
 2537096,Would you mind explaining that once more in a little more detail?,8.00,4772,explaining,12,explaining,direct-address,formal,07,46
@@ -274,7 +273,6 @@ x7_10,I don't enjoy this kind of work.,,837,enjoy,7,enjoy|work,descriptive,n/a,0
 x7_11,These items are dangerous.,,1711,items,4,items|dangerous,descriptive,n/a,07,48
 x7_12,I can't believe people pay for this.,,381,pay,7,believe|pay,descriptive,n/a,07,48
 3550491,What exactly are you planning to do?,8.00,1337,planning,7,planning,direct-address,neutral,07,49
-x7_29,I haven't decided yet.,,835,decided,4,decided|yet,descriptive,n/a,07,49
 3738310,What else are you planning to do?,8.00,1337,planning,7,are|do|else|planning|to|what|you,direct-address,neutral,07,50
 3730642,Did you meet someone else?,7.00,534,meet,5,meet,direct-address,neutral,07,51
 3325667,Who else would you like to meet?,7.00,534,meet,7,else|like|meet|to|who|would|you,direct-address,neutral,07,51
@@ -1093,7 +1091,6 @@ x7_62,That depends on your terms.,,2806,depends,5,depends|terms,direct-address,n
 327627,"From what I've seen of the product so far, it's pretty good.",6.00,1192,product,12,far,descriptive,n/a,07,241
 x7_15,"I agree, it works well.",,1121,agree,5,works,descriptive,n/a,07,241
 3820914,You need a secretary.,6.00,1194,secretary,4,a|need|secretary|you,direct-address,neutral,07,242
-x7_7,I'll think about it.,,348,i'll,4,think,descriptive,n/a,07,242
 3022572,I need a secretary.,6.00,1194,secretary,4,secretary,descriptive,n/a,07,242
 5193557,I want to be in a rock band.,6.00,1250,band,8,band,descriptive,n/a,07,243
 x7_61,Then start learning an instrument.,,4532,instrument,5,instrument|learning,direct-address,informal,07,243
@@ -1126,7 +1123,6 @@ x7_65,Understood. I'll stand by.,,2583,understood,4,understood|stand,direct-addr
 5168849,I wish I'd bought a size larger.,6.00,1591,larger,7,a|bought|i|i'd|larger|size|wish,descriptive,n/a,07,259
 2255144,You may enter.,6.00,1618,enter,3,enter|may,direct-address,formal,07,260
 5333586,Please put your bag under your seat.,6.00,1668,bag,7,under,direct-address,formal,07,261
-x7_16,Thank you.,,309,thank,2,thank,direct-address,neutral,07,261
 2591012,"If you want more details about that, you'll have to ask my boss.",6.00,1770,boss,13,if,direct-address,neutral,07,262
 1845491,Raise your hands.,6.00,1821,raise,3,raise,direct-address,neutral,07,263
 1937617,She raised her hands.,5.00,1521,raised,4,hands|her,descriptive,n/a,07,263
@@ -1183,7 +1179,6 @@ x7_66,Only if you hurry.,,5567,hurry,4,hurry|only,direct-address,neutral,07,281
 1180905,Don't copy my answers.,6.00,2453,answers,4,answers,direct-address,informal,07,283
 x7_67,I wasn't even looking.,,526,wasn't,4,looking|even,descriptive,n/a,07,283
 2248958,It'll be cool.,6.00,2564,it'll,3,it'll,descriptive,n/a,07,284
-x7_68,I hope so.,,338,hope,3,hope|so,descriptive,n/a,07,284
 3619157,I remember every detail.,6.00,2601,detail,4,detail,descriptive,n/a,07,285
 1103213,Was anybody else hurt?,6.00,2635,anybody,4,anybody,direct-address,neutral,07,286
 x7_33,"No, thankfully.",,9000,thankfully,2,thankfully,descriptive,n/a,07,286

@@ -1,8 +1,6 @@
 id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
 x11_1,What do you think?,,89,think,4,think,direct-address,neutral,11,1
 x11_2,It's complicated.,,3129,complicated,2,complicated,descriptive,n/a,11,1
-x11_3,Let me think about it.,,223,let,5,let|think,direct-address,neutral,11,1
-x11_4,Fair enough.,,1092,fair,2,fair|enough,descriptive,n/a,11,1
 5020130,You have a valid point.,,3750,valid,5,point,direct-address,neutral,11,2
 3109565,You make many valid points.,,3750,valid,5,many|points|valid,direct-address,neutral,11,2
 x11_5,I suppose you're right.,,2683,suppose,4,suppose|right,direct-address,neutral,11,2
@@ -1342,7 +1340,6 @@ x11_28,It's exhausting work.,,11313,exhausting,3,exhausting,descriptive,n/a,11,3
 2248744,It isn't optional.,,7787,optional,3,isn't|it|optional,descriptive,n/a,11,393
 314579,She got on her bike and rode away.,,7800,rode,8,rode,descriptive,n/a,11,394
 23256,We use gestures as well as words to communicate with others.,,11426,gestures,11,gestures|words,descriptive,n/a,11,395
-2291880,I appreciate the gesture.,,7883,gesture,4,gesture,descriptive,n/a,11,395
 5666380,I just wanted to make a gesture.,,7883,gesture,7,a|gesture|i|just|make|to|wanted,descriptive,n/a,11,395
 2766914,Fry me an egg.,,7997,fry,4,egg|fry,direct-address,informal,11,396
 2766916,Fry me some eggs.,,7997,fry,4,eggs|fry|me|some,direct-address,informal,11,396
