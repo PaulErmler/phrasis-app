@@ -1,5 +1,4 @@
 id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
-x12_1,What do you think?,,89,think,4,think,direct-address,neutral,12,1
 x12_2,"Honestly, I'm not sure.",,2057,honestly,4,honestly|sure,descriptive,n/a,12,1
 x12_3,It depends.,,2806,depends,2,depends,descriptive,n/a,12,1
 x12_4,"To a certain extent, yes.",,3136,extent,5,extent,descriptive,n/a,12,1
@@ -143,7 +142,6 @@ x12_25,Failing those who depend on me.,,5028,depend,6,failing|depend,descriptive
 2042850,Maybe eventually you'll decide you don't want to live here anymore.,,1700,decide,11,decide|here|live|maybe,direct-address,informal,12,50
 3610556,Thank you for helping me keep out of trouble.,,1707,helping,9,helping|out|thank,direct-address,neutral,12,51
 4012269,Have you been staying out of trouble?,,2743,staying,7,been|staying,direct-address,neutral,12,51
-x12_26,"Most of the time, yes.",,294,yes,5,most|yes,descriptive,n/a,12,51
 3264719,That's hardly a new concept.,,2811,hardly,5,hardly,descriptive,n/a,12,52
 4495593,The concept is amazing.,,1736,concept,4,amazing,descriptive,n/a,12,52
 2293249,I assume you're familiar with this concept.,,2591,assume,7,assume|familiar,direct-address,neutral,12,52
@@ -301,7 +299,6 @@ x12_41,Are you sure that's what you want?,,197,sure,7,sure|want,direct-address,n
 6098516,My worst nightmare is coming true.,,5143,nightmare,6,true|worst,descriptive,n/a,12,103
 4500094,I have nightmares.,,9783,nightmares,3,nightmares,descriptive,n/a,12,103
 1449175,Do you have nightmares?,,9783,nightmares,4,do|have|nightmares|you,direct-address,neutral,12,103
-x12_30,"Sometimes, yes.",,523,sometimes,2,sometimes,descriptive,n/a,12,103
 5618992,We have nobody to blame but ourselves.,,2381,ourselves,7,nobody|ourselves,descriptive,n/a,12,104
 530769,He sat next to the stream.,,2387,stream,6,next|sat|stream,descriptive,n/a,12,105
 300675,He sat at the edge of the stream.,,2387,stream,8,edge,descriptive,n/a,12,105
@@ -527,7 +524,6 @@ x12_37,I started doing open mics in college.,,528,college,7,started|college,desc
 790046,I'm studying art history.,,3496,studying,4,art|history|i'm|studying,descriptive,n/a,12,198
 4016579,Is that the remote control?,,3546,remote,5,control,direct-address,neutral,12,199
 1744277,Give the television remote control back to me.,,3546,remote,8,television,direct-address,informal,12,200
-1437,Congratulations!,,3572,congratulations,1,congratulations,direct-address,neutral,12,201
 5137565,Congratulations are definitely in order.,,3572,congratulations,5,definitely|order,descriptive,n/a,12,201
 x12_36,Thanks — I really appreciate that.,,1836,appreciate,5,appreciate|that,direct-address,neutral,12,201
 5496631,I hate the desert.,,3582,desert,4,desert,descriptive,n/a,12,202

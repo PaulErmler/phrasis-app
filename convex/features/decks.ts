@@ -1199,6 +1199,40 @@ export const ensureUpcomingCardsContent = mutation({
       );
       processed++;
     }
+
+    // Pre-prep the next batch of upcoming texts in the active premade
+    // collection — the ones a future addCardsFromCollection call would pull
+    // in. Without this, a user who exhausts due cards and clicks "Add" has
+    // to wait on TTS + translation for the freshly added cards.
+    if (activeCollectionId) {
+      const collection = await ctx.db.get(activeCollectionId);
+      if (collection && isPremadeLevelCollection(collection)) {
+        const progress = await getCollectionProgressHelper(
+          ctx,
+          userId,
+          active.course._id,
+          activeCollectionId,
+        );
+        const lastRank = progress?.lastRankProcessed ?? 0;
+        const upcomingTexts = await getNextTextsFromRank(
+          ctx,
+          activeCollectionId,
+          lastRank,
+          CONTENT_LOOKAHEAD_SIZE,
+          { onlyCurriculum: true },
+        );
+        for (const text of upcomingTexts) {
+          await scheduleMissingContent(
+            ctx,
+            text._id,
+            text,
+            active.course.baseLanguages,
+            active.course.targetLanguages,
+          );
+        }
+      }
+    }
+
     return processed;
   },
 });

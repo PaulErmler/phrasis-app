@@ -1,6 +1,5 @@
 id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
 5191997,Are you enjoying your weekend?,8.00,3455,enjoying,5,are|enjoying|weekend|you|your,direct-address,neutral,08,1
-x8_1,"Yes, very much.",,294,yes,3,yes|much,descriptive,n/a,08,1
 387445,What are your weekend plans?,9.00,1245,weekend,5,plans,direct-address,neutral,08,1
 x8_2,Nothing special — just relaxing.,,7921,relaxing,4,special|relaxing,descriptive,n/a,08,1
 3094519,Did you go anywhere last weekend?,8.00,1965,anywhere,6,anywhere,direct-address,neutral,08,1

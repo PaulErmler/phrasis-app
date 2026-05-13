@@ -1,7 +1,6 @@
 id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
 3826754,What's your analysis?,,1280,analysis,3,what's,direct-address,neutral,14,1
 x14_1,"Honestly, I'm still weighing my options.",,8563,weighing,6,options|weighing,descriptive,n/a,14,1
-x14_2,Could you elaborate on that?,,6294,elaborate,5,elaborate,direct-address,formal,14,1
 4529773,I agree with your assessment.,,3179,assessment,5,agree|assessment,direct-address,neutral,14,1
 4529843,Was that a fair assessment?,,3179,assessment,5,fair,direct-address,neutral,14,1
 x14_3,"I think it was reasonable, all things considered.",,2531,reasonable,8,reasonable|considered,descriptive,n/a,14,1
@@ -180,7 +179,6 @@ x14_15,I'd appreciate that.,,1836,appreciate,3,appreciate,direct-address,formal,
 22213,I work for a shipping company.,,2890,shipping,6,company,descriptive,n/a,14,44
 2007328,Let's talk about your childhood.,,2905,childhood,5,childhood|let's|talk,direct-address,neutral,14,45
 2331593,I had a horrible childhood.,,3340,horrible,5,had|horrible,descriptive,n/a,14,45
-x14_37,I'm sorry to hear that.,,671,sorry,5,sorry|hear,direct-address,neutral,14,45
 500477,This picture reminds me of my childhood.,,4889,reminds,7,picture,descriptive,n/a,14,45
 60090,This song reminds me of my childhood.,,4889,reminds,7,song,descriptive,n/a,14,45
 909588,What you spend time doing in your childhood affects the rest of your life.,,5363,affects,14,affects|spend|time,descriptive,n/a,14,45
@@ -686,7 +684,6 @@ x14_40,"Surprisingly, it's just called 'horn'.",,6034,surprisingly,5,surprisingl
 273374,The water in the basin has frozen solid.,,6056,basin,8,basin|frozen|solid|water,descriptive,n/a,14,150
 2016897,I want to lodge a formal complaint.,,6107,lodge,7,formal|lodge,descriptive,n/a,14,151
 4499553,I lodged a complaint with the police.,,12662,lodged,7,lodged,descriptive,n/a,14,151
-x14_35,What was the outcome?,,3914,outcome,4,outcome,direct-address,neutral,14,151
 x14_36,Still pending.,,6723,pending,2,pending,descriptive,n/a,14,151
 388845,As soon as it stopped raining a beautiful rainbow appeared.,,9920,raining,10,appeared|raining|stopped,descriptive,n/a,14,152
 29540,How long is the Rainbow Bridge?,,6238,rainbow,6,bridge|long,descriptive,n/a,14,152
@@ -815,7 +812,6 @@ x14_46,I'll make another piece.,,963,piece,4,another|piece,descriptive,n/a,14,17
 35243,What's the bus fare?,,7460,fare,4,fare,direct-address,neutral,14,179
 5850236,I paid the fare.,,7460,fare,4,paid,descriptive,n/a,14,180
 1384376,My girlfriend dumped me.,,7873,dumped,4,girlfriend,descriptive,n/a,14,181
-x14_50,I'm sorry to hear that.,,671,sorry,5,sorry|hear,direct-address,neutral,14,181
 42113,It was a one-sided love affair.,,7512,sided,7,affair|sided,descriptive,n/a,14,181
 4017364,Who doesn't want love and affection?,,7639,affection,6,affection|doesn't,descriptive,n/a,14,181
 2006437,It looks like you've hooked a big one.,,7674,hooked,8,big|hooked|looks,direct-address,neutral,14,182
@@ -914,7 +910,6 @@ x14_51,Something must be going right.,,193,must,5,right|going,descriptive,n/a,14
 3184877,Stay for supper.,,9699,supper,3,stay,direct-address,neutral,14,216
 1072639,Have you already eaten supper?,,9699,supper,5,eaten,direct-address,neutral,14,216
 1439844,My mother is preparing supper.,,9699,supper,5,preparing,descriptive,n/a,14,216
-x14_47,It smells delicious.,,6540,smells,3,smells|delicious,descriptive,n/a,14,216
 45169,The news filled her with sorrow.,,9815,sorrow,6,news|sorrow,descriptive,n/a,14,217
 2245572,Here's your mug.,,10029,mug,3,mug,direct-address,neutral,14,218
 3327120,Hand me my mug.,,10029,mug,4,hand,direct-address,informal,14,219

@@ -97,7 +97,6 @@ x2_21,Why are you happy?,,434,happy,4,why,direct-address,neutral,02,39
 314454,She knows me.,8.00,895,knows,3,knows,descriptive,n/a,02,46
 449023,No one knows.,7.00,895,knows,3,knows|no|one,descriptive,n/a,02,46
 64428,Thank you for writing.,8.00,909,writing,4,for|thank|writing|you,direct-address,formal,02,47
-x2_22,You're welcome.,,1101,welcome,2,welcome,direct-address,neutral,02,47
 1358780,How about Friday?,8.00,1155,friday,3,friday,direct-address,neutral,02,48
 x2_12,Friday is good for me.,,1155,friday,5,good,descriptive,n/a,02,48
 469126,She's my sister.,8.00,1195,sister,3,my|she's|sister,descriptive,n/a,02,49
@@ -246,7 +245,6 @@ x2_5,"No, she's at work.",,542,she's,4,work,descriptive,n/a,02,94
 281844,What do you do on Sundays?,7.00,9582,sundays,6,do|on|sundays|what|you,direct-address,neutral,02,119
 278535,It's my brother's.,7.00,9730,brother's,3,brother's,descriptive,n/a,02,120
 4135274,What's the new boy's name?,7.00,9847,boy's,5,boy's,direct-address,neutral,02,121
-x2_14,His name is Tom.,,1568,tom,4,his,descriptive,n/a,02,121
 5125414,I'm going to my sister's.,7.00,11474,sister's,5,going|i'm|my|sister's|to,descriptive,n/a,02,122
 2245939,I like Saturdays.,7.00,11833,saturdays,3,saturdays,descriptive,n/a,02,123
 279528,Do you have school on Saturdays?,7.00,11833,saturdays,6,do|have|on|saturdays|school|you,direct-address,neutral,02,123

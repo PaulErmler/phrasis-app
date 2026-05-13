@@ -113,7 +113,6 @@ x3_6,"Yes, it is.",,294,yes,3,yes,descriptive,n/a,03,56
 3201573,Can you tell me that man's name?,8.00,3974,man's,7,man's,direct-address,neutral,03,59
 242943,It's Saturday today.,8.00,1426,saturday,3,it's|saturday|today,descriptive,n/a,03,60
 1163476,Is tomorrow Saturday?,8.00,1426,saturday,3,saturday,direct-address,neutral,03,60
-x3_7,"No, it isn't.",,367,isn't,3,no,descriptive,n/a,03,60
 2123499,Who's first?,8.00,1499,who's,2,who's,direct-address,neutral,03,61
 2203622,Who's coming?,8.00,1499,who's,2,coming|who's,direct-address,neutral,03,61
 1079123,Here's your bag.,8.00,1668,bag,3,bag,direct-address,neutral,03,62
@@ -172,7 +171,6 @@ x3_8,I don't know.,,84,know,3,know,descriptive,n/a,03,90
 245394,How's work?,8.00,7385,how's,2,how's,direct-address,informal,03,92
 5335500,I'm at a friend's house.,8.00,7380,friend's,5,a|at|friend's|house|i'm,descriptive,n/a,03,93
 1002808,How's the dog?,8.00,7385,how's,3,dog|how's|the,direct-address,informal,03,94
-x3_11,He's fine.,,576,fine,2,fine,descriptive,n/a,03,94
 1495845,Do you work on Sundays?,8.00,9582,sundays,5,sundays,direct-address,neutral,03,95
 2209145,I don't work on Sundays.,8.00,9582,sundays,5,don't|i|on|sundays|work,descriptive,n/a,03,95
 3731911,How'd it work out?,8.00,13560,how'd,4,how'd,direct-address,informal,03,96
