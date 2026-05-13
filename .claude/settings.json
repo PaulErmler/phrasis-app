@@ -1,9 +1,5 @@
 {
   "permissions": {
-    "deny": [
-        "Read(.env*)",
-        "Edit(.env*)"
-    ],
     "allow": [
       "Bash(find /Users/paulermler/Documents/Phrasis/new/phrasis-app -name \"*.ts\" -exec grep -l \"ENSURE_CONTENT_LOOKAHEAD\" {} \\\\;)",
       "Bash(grep -r \"export.*Card\\\\|export.*Sentence\\\\|export.*Text\" /Users/paulermler/Documents/Phrasis/new/phrasis-app/components/app/learning/*.ts)",
@@ -68,7 +64,16 @@
       "Bash(awk -F, 'NR<=15 {print $1, $9}' /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/data/output/levels_curated/ogte_10_high_intermediate.csv)",
       "Bash(awk -F, 'NR<=15 {print $1}' /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/data/output/levels_curated/ogte_10_high_intermediate.csv)",
       "Bash(python3 -c \"import ast; ast.parse\\(open\\('data_preparation/ogte-dataset/curation/curate.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
-      "Bash(npx convex *)"
+      "Bash(npx convex *)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app log --oneline --all)",
+      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app log --all --oneline)",
+      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app log -1 --format=\"%H %s\" 9ed67b0)",
+      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app log -1 --format=\"%H %s %b\" d4c0933)"
+    ],
+    "deny": [
+      "Read(.env*)",
+      "Edit(.env*)"
     ]
   }
 }

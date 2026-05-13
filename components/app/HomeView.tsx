@@ -85,20 +85,6 @@ export function HomeView({
   );
   const [isChatNavigating, setIsChatNavigating] = useState(false);
 
-  // Fire-and-forget: ensure the first 5 sentences of every level collection
-  // have translations + audio queued so when the user drills into a level
-  // they don't see a loading spinner. Idempotent — `scheduleMissingContent`
-  // skips any (text, language) that's already covered, so re-entries are cheap.
-  const ensureFirstSentences = useMutation(
-    api.features.collections.ensureFirstSentencesAcrossLevelCollections,
-  );
-  useEffect(() => {
-    if (!hasActiveCourse || isHidden) return;
-    ensureFirstSentences({}).catch((err) => {
-      console.error('[home] ensureFirstSentences failed', err);
-    });
-  }, [hasActiveCourse, isHidden, ensureFirstSentences]);
-
   const handleGoToChat = useCallback(async () => {
     setIsChatNavigating(true);
     try {
@@ -118,12 +104,19 @@ export function HomeView({
 
       const currentMode = courseSettings.schedulingMode ?? 'learnAndReview';
       if (currentMode !== schedulingMode) {
-        void updateCourseSettings({
-          courseId: courseSettings.courseId,
-          schedulingMode,
-        }).catch((error) => {
+        // Await the mutation so Convex has committed the new schedulingMode
+        // (and the local cardForReview cache is updated) before LearnView
+        // mounts. Otherwise the previous mode's cached card flashes briefly,
+        // its audio auto-plays, and the consumed tab-init flag prevents the
+        // new card from auto-playing once it arrives.
+        try {
+          await updateCourseSettings({
+            courseId: courseSettings.courseId,
+            schedulingMode,
+          });
+        } catch (error) {
           console.error('Failed to update scheduling mode:', error);
-        });
+        }
       }
 
       onLearnOpen();
