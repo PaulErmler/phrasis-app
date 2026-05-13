@@ -47,7 +47,7 @@ export const audioRecordingValidator = v.object({
   language: v.string(),
   voiceName: v.union(v.string(), v.null()),
   url: v.union(v.string(), v.null()),
-  // Word-level timings from Scribe, captured during TTS validation.
+  // Word-level timings from Azure Fast Transcription, captured during TTS validation.
   // The schema field is `v.optional(v.array(...))` so DB rows can be `undefined`,
   // but this validator is stricter — `null | array` only. Callers building a
   // response from a raw audioRecordings row MUST coerce `undefined → null`

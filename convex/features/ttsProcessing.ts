@@ -155,7 +155,7 @@ async function synthesizeAndValidate(
       );
 
       // Cheap strict check first. For Chinese/Korean this compares
-      // pinyin/hangul-romanized strings so Scribe's homophone-character
+      // pinyin/hangul-romanized strings so the STT model's homophone-character
       // substitutions pass at edit distance 0. If strict still fails, ask
       // Gemini — which also tolerates phonetic names, digits-vs-words,
       // abbreviations, diacritic drift, and single-char noise. Only
@@ -348,11 +348,11 @@ export const storeTtsMismatch = internalMutation({
 
 /**
  * Backfill word-level timestamps for an existing audio recording that was
- * generated before the Scribe integration (no `wordTimings` field). Called
+ * generated before timings were captured (no `wordTimings` field). Called
  * from `scheduleMissingContent` after acquiring a TTS claim on (textId, lang).
  *
- * Re-downloads the stored audio blob, runs it through Scribe, and persists
- * the resulting timings — but only if the storageId still matches, so a
+ * Re-downloads the stored audio blob, runs it through STT, and persists the
+ * resulting timings — but only if the storageId still matches, so a
  * concurrent voice swap doesn't get clobbered with stale alignment.
  */
 export const backfillWordTimings = internalAction({

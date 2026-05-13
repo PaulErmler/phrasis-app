@@ -145,14 +145,25 @@ describe("features/ttsProcessing", () => {
       const { textId } = await seedText(t);
 
       vi.stubEnv("GOOGLE_TTS_API_KEY", "dummy");
-      vi.stubEnv("ELEVENLABS_API_KEY", "dummy");
+      vi.stubEnv("AZURE_SPEECH_API_KEY", "dummy");
+      vi.stubEnv("AZURE_SPEECH_REGION", "westeurope");
 
       const googleBody = JSON.stringify({
         audioContent: Buffer.from("fake-mp3-bytes").toString("base64"),
       });
-      const scribeBody = JSON.stringify({
-        text: "Hola",
-        words: [{ text: "Hola", start: 0, end: 0.5, type: "word" }],
+      const azureSttBody = JSON.stringify({
+        combinedPhrases: [{ text: "Hola" }],
+        phrases: [
+          {
+            offsetMilliseconds: 0,
+            durationMilliseconds: 500,
+            text: "Hola",
+            locale: "es-ES",
+            words: [
+              { text: "Hola", offsetMilliseconds: 0, durationMilliseconds: 500 },
+            ],
+          },
+        ],
       });
 
       const fetchMock = vi.fn(async (url: string | URL | Request) => {
@@ -163,8 +174,8 @@ describe("features/ttsProcessing", () => {
             headers: { "Content-Type": "application/json" },
           });
         }
-        if (u.includes("api.elevenlabs.io/v1/speech-to-text")) {
-          return new Response(scribeBody, {
+        if (u.includes("speechtotext/transcriptions:transcribe")) {
+          return new Response(azureSttBody, {
             status: 200,
             headers: { "Content-Type": "application/json" },
           });
@@ -212,14 +223,16 @@ describe("features/ttsProcessing", () => {
       expect(audio?.speed).toBe(1);
       const calls = fetchMock.mock.calls.map((c) => String(c[0]));
       expect(calls.some((c) => c.includes("texttospeech"))).toBe(true);
-      expect(calls.some((c) => c.includes("api.elevenlabs.io"))).toBe(true);
+      expect(
+        calls.some((c) => c.includes("speechtotext/transcriptions:transcribe")),
+      ).toBe(true);
     });
 
     describe("validation retries", () => {
       /**
-       * Seed + run the pipeline with a Scribe transcription that may or may
-       * not match the original. Any retries call `textsMatchSemantic`, which
-       * is mocked at the module boundary.
+       * Seed + run the pipeline with an Azure STT transcription that may or
+       * may not match the original. Any retries call `textsMatchSemantic`,
+       * which is mocked at the module boundary.
        */
       async function runPipeline(
         t: ReturnType<typeof convexTest>,
@@ -227,14 +240,29 @@ describe("features/ttsProcessing", () => {
         transcribedText: string,
       ) {
         vi.stubEnv("GOOGLE_TTS_API_KEY", "dummy");
-        vi.stubEnv("ELEVENLABS_API_KEY", "dummy");
+        vi.stubEnv("AZURE_SPEECH_API_KEY", "dummy");
+        vi.stubEnv("AZURE_SPEECH_REGION", "westeurope");
 
         const googleBody = JSON.stringify({
           audioContent: Buffer.from("fake-mp3").toString("base64"),
         });
-        const scribeBody = JSON.stringify({
-          text: transcribedText,
-          words: [{ text: transcribedText, start: 0, end: 0.5, type: "word" }],
+        const azureSttBody = JSON.stringify({
+          combinedPhrases: [{ text: transcribedText }],
+          phrases: [
+            {
+              offsetMilliseconds: 0,
+              durationMilliseconds: 500,
+              text: transcribedText,
+              locale: "es-ES",
+              words: [
+                {
+                  text: transcribedText,
+                  offsetMilliseconds: 0,
+                  durationMilliseconds: 500,
+                },
+              ],
+            },
+          ],
         });
         const fetchMock = vi.fn(async (url: string | URL | Request) => {
           const u = typeof url === "string" ? url : url.toString();
@@ -244,8 +272,8 @@ describe("features/ttsProcessing", () => {
               headers: { "Content-Type": "application/json" },
             });
           }
-          if (u.includes("api.elevenlabs.io/v1/speech-to-text")) {
-            return new Response(scribeBody, {
+          if (u.includes("speechtotext/transcriptions:transcribe")) {
+            return new Response(azureSttBody, {
               status: 200,
               headers: { "Content-Type": "application/json" },
             });
@@ -383,26 +411,41 @@ describe("features/ttsProcessing", () => {
         mockSemantic.mockReset();
 
         vi.stubEnv("GOOGLE_TTS_API_KEY", "dummy");
-        vi.stubEnv("ELEVENLABS_API_KEY", "dummy");
+        vi.stubEnv("AZURE_SPEECH_API_KEY", "dummy");
+        vi.stubEnv("AZURE_SPEECH_REGION", "westeurope");
         const googleBody = JSON.stringify({
           audioContent: Buffer.from("fake").toString("base64"),
         });
-        // Scribe transcription swaps 他 → 她 (same pinyin: "tā"). Strict
+        // STT transcription swaps 他 → 她 (same pinyin: "tā"). Strict
         // on hanzi would fail (edit distance 1 is the limit — but the
         // normalized hanzi are clearly different characters). Pinyin of
         // both is "tā zài jiā" — identical, so strict passes at
         // distance 0.
-        const scribeBody = JSON.stringify({
-          text: "她在家",
-          words: [{ text: "她在家", start: 0, end: 0.5, type: "word" }],
+        const azureSttBody = JSON.stringify({
+          combinedPhrases: [{ text: "她在家" }],
+          phrases: [
+            {
+              offsetMilliseconds: 0,
+              durationMilliseconds: 500,
+              text: "她在家",
+              locale: "zh-CN",
+              words: [
+                {
+                  text: "她在家",
+                  offsetMilliseconds: 0,
+                  durationMilliseconds: 500,
+                },
+              ],
+            },
+          ],
         });
         const fetchMock = vi.fn(async (url: string | URL | Request) => {
           const u = typeof url === "string" ? url : url.toString();
           if (u.includes("texttospeech.googleapis.com")) {
             return new Response(googleBody, { status: 200 });
           }
-          if (u.includes("api.elevenlabs.io/v1/speech-to-text")) {
-            return new Response(scribeBody, { status: 200 });
+          if (u.includes("speechtotext/transcriptions:transcribe")) {
+            return new Response(azureSttBody, { status: 200 });
           }
           throw new Error(`Unexpected fetch to ${u}`);
         });
@@ -700,19 +743,27 @@ describe("features/ttsProcessing", () => {
       const t = convexTest(schema, modules);
       const { textId, storageId } = await seedAudioAndClaim(t);
 
-      vi.stubEnv('ELEVENLABS_API_KEY', 'dummy');
-      const scribeBody = JSON.stringify({
-        text: 'Hola mundo',
-        words: [
-          { text: 'Hola', start: 0, end: 0.4, type: 'word' },
-          { text: ' ', start: 0.4, end: 0.5, type: 'spacing' },
-          { text: 'mundo', start: 0.5, end: 1.0, type: 'word' },
+      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
+      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
+      const azureSttBody = JSON.stringify({
+        combinedPhrases: [{ text: 'Hola mundo' }],
+        phrases: [
+          {
+            offsetMilliseconds: 0,
+            durationMilliseconds: 1000,
+            text: 'Hola mundo',
+            locale: 'es-ES',
+            words: [
+              { text: 'Hola', offsetMilliseconds: 0, durationMilliseconds: 400 },
+              { text: 'mundo', offsetMilliseconds: 500, durationMilliseconds: 500 },
+            ],
+          },
         ],
       });
       const fetchMock = vi.fn(async (url: string | URL | Request) => {
         const u = typeof url === 'string' ? url : url.toString();
-        if (u.includes('api.elevenlabs.io')) {
-          return new Response(scribeBody, {
+        if (u.includes('speechtotext/transcriptions:transcribe')) {
+          return new Response(azureSttBody, {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
           });
@@ -733,7 +784,6 @@ describe("features/ttsProcessing", () => {
       }
 
       const after = await getAudio(t, textId);
-      // Spacing entries are filtered out by transcribeAudio; only words land.
       expect(after?.wordTimings).toEqual([
         { word: 'Hola', start: 0, end: 0.4 },
         { word: 'mundo', start: 0.5, end: 1.0 },
@@ -745,13 +795,17 @@ describe("features/ttsProcessing", () => {
       const t = convexTest(schema, modules);
       const { textId, storageId } = await seedAudioAndClaim(t);
 
-      vi.stubEnv('ELEVENLABS_API_KEY', 'dummy');
+      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
+      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
       const fetchMock = vi.fn(
         async () =>
-          new Response(JSON.stringify({ text: '', words: [] }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' },
-          }),
+          new Response(
+            JSON.stringify({ combinedPhrases: [{ text: '' }], phrases: [] }),
+            {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            },
+          ),
       );
       vi.stubGlobal('fetch', fetchMock);
 
@@ -771,7 +825,7 @@ describe("features/ttsProcessing", () => {
       expect(await getClaim(t, textId)).toBeNull();
     });
 
-    it('returns early without calling Scribe when the storage blob is missing, but still releases the claim', async () => {
+    it('returns early without calling STT when the storage blob is missing, but still releases the claim', async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       const storageId = await t.run(async (ctx) =>
@@ -787,10 +841,11 @@ describe("features/ttsProcessing", () => {
       });
 
       const fetchMock = vi.fn(async () => {
-        throw new Error('Scribe should not be called when blob is missing');
+        throw new Error('STT should not be called when blob is missing');
       });
       vi.stubGlobal('fetch', fetchMock);
-      vi.stubEnv('ELEVENLABS_API_KEY', 'dummy');
+      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
+      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
 
       try {
         await t.action(internal.features.ttsProcessing.backfillWordTimings, {
@@ -811,7 +866,8 @@ describe("features/ttsProcessing", () => {
       const t = convexTest(schema, modules);
       const { textId, storageId } = await seedAudioAndClaim(t);
 
-      vi.stubEnv('ELEVENLABS_API_KEY', 'dummy');
+      vi.stubEnv('AZURE_SPEECH_API_KEY', 'dummy');
+      vi.stubEnv('AZURE_SPEECH_REGION', 'westeurope');
       const fetchMock = vi.fn(
         async () =>
           new Response('boom', {

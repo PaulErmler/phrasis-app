@@ -4,7 +4,7 @@ import { internal } from '../../_generated/api';
 import { requireAuthUserId } from '../../db/users';
 import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
-import { transcribeAudio as transcribeWithScribe } from '../tts';
+import { transcribeAudio as runStt } from '../../lib/stt';
 
 export const consumeTranscriptionQuota = internalMutation({
   args: { userId: v.string() },
@@ -16,9 +16,9 @@ export const consumeTranscriptionQuota = internalMutation({
 });
 
 /**
- * Transcribe audio via ElevenLabs Scribe v2. Shared helper lives in
- * `../tts.ts`; this action wraps it with auth + quota for chat voice input.
- * Language is auto-detected (chat UI doesn't track source language).
+ * Transcribe audio for chat voice input. Wraps the shared STT helper in
+ * `../../lib/stt` with auth + quota. Language is auto-detected — chat UI
+ * doesn't track source language.
  */
 export const transcribeAudio = action({
   args: {
@@ -37,7 +37,7 @@ export const transcribeAudio = action({
     try {
       const baseMime = (args.mimeType ?? 'audio/webm').split(';')[0].trim();
       const blob = new Blob([args.audio], { type: baseMime });
-      const { text } = await transcribeWithScribe(blob);
+      const { text } = await runStt(blob);
       return text;
     } catch (error) {
       console.error('Transcription error:', error);

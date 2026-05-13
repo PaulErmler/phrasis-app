@@ -163,8 +163,9 @@ export default defineSchema({
     ttsProvider: v.optional(ttsProviderValidator), // TTS provider used (missing = legacy google)
     voiceGender: v.optional(voiceGenderValidator), // Gender of the synthesized voice (missing = legacy row; falls back to curated-list lookup on read)
     speed: v.optional(v.number()), // Playback speed used at synthesis time (missing = legacy row, assume 0.9)
-    // Word-level timestamps from ElevenLabs Scribe, captured during TTS validation.
-    // Seconds relative to the audio blob. Only populated when validation succeeded.
+    // Word-level timestamps from Azure Fast Transcription, captured during TTS
+    // validation. Seconds relative to the audio blob. Only populated when
+    // validation succeeded.
     wordTimings: v.optional(
       v.array(
         v.object({

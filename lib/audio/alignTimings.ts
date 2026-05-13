@@ -1,10 +1,10 @@
 /**
- * Aligns ElevenLabs Scribe word timings onto the canonical source text.
+ * Aligns STT word timings onto the canonical source text.
  *
- * Scribe's transcription may differ from the original text (punctuation,
+ * The transcription may differ from the original text (punctuation,
  * capitalization, word splits). The UI should always display the real text —
- * this helper maps the timings Scribe produced onto the words the user sees,
- * so karaoke highlighting lights up the canonical tokens, not the transcribed
+ * this helper maps the STT-produced timings onto the words the user sees, so
+ * karaoke highlighting lights up the canonical tokens, not the transcribed
  * ones.
  */
 import { getWordSegmenter } from '@/lib/wordTokenize';

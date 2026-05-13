@@ -8,9 +8,10 @@
  * up at render time.
  *
  * Each generated mp3 is also validated round-trip: the audio is transcribed
- * with ElevenLabs Scribe and the transcription is compared (normalized,
- * Levenshtein ≤ 1) to the original text. On mismatch the script retries up
- * to 3 times, then surfaces the failure in the summary so a human can listen.
+ * with Azure Fast Transcription and the transcription is compared
+ * (normalized, Levenshtein ≤ 1) to the original text. On mismatch the script
+ * retries up to 3 times, then surfaces the failure in the summary so a human
+ * can listen.
  *
  * Usage:
  *   pnpm landing:audio               # generate + validate missing files only
@@ -181,30 +182,57 @@ async function synthesize(text: string, voiceId: string, apiKey: string): Promis
 }
 
 // ---------------------------------------------------------------------------
-// Scribe transcription + comparison (mirrors convex/features/tts.ts:181-223
-// and convex/lib/textComparison.ts — kept inline so the script has no
-// runtime dependency on Convex code)
+// Azure Fast Transcription + comparison (mirrors convex/lib/stt/azure.ts and
+// convex/lib/textComparison.ts — kept inline so the script has no runtime
+// dependency on Convex code)
 // ---------------------------------------------------------------------------
 
-async function transcribe(buf: Buffer, languageCode: string, apiKey: string): Promise<string> {
-  const fd = new FormData();
-  fd.append('file', new Blob([new Uint8Array(buf)], { type: 'audio/mpeg' }), 'audio.mp3');
-  fd.append('model_id', 'scribe_v2');
-  fd.append('tag_audio_events', 'false');
-  fd.append('diarize', 'false');
-  fd.append('language_code', languageCode);
+const STT_LOCALE_MAP: Record<string, string> = {
+  en: 'en-US',
+  de: 'de-DE',
+  es: 'es-ES',
+  fr: 'fr-FR',
+  hi: 'hi-IN',
+};
 
-  const res = await fetch('https://api.elevenlabs.io/v1/speech-to-text', {
-    method: 'POST',
-    headers: { 'xi-api-key': apiKey },
-    body: fd,
+interface AzureStt {
+  apiKey: string;
+  region: string;
+}
+
+async function transcribe(
+  buf: Buffer,
+  languageCode: string,
+  stt: AzureStt,
+): Promise<string> {
+  const locale = STT_LOCALE_MAP[languageCode] ?? languageCode;
+  const definition = JSON.stringify({
+    locales: [locale],
+    diarization: { enabled: false },
+    profanityFilterMode: 'None',
   });
+  const fd = new FormData();
+  fd.append('definition', definition);
+  fd.append(
+    'audio',
+    new Blob([new Uint8Array(buf)], { type: 'audio/mp3' }),
+    'audio.mp3',
+  );
+
+  const res = await fetch(
+    `https://${stt.region}.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe?api-version=2024-11-15`,
+    {
+      method: 'POST',
+      headers: { 'Ocp-Apim-Subscription-Key': stt.apiKey },
+      body: fd,
+    },
+  );
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Scribe ${res.status}: ${body.slice(0, 300)}`);
+    throw new Error(`Azure STT ${res.status}: ${body.slice(0, 300)}`);
   }
-  const data = (await res.json()) as { text: string };
-  return data.text;
+  const data = (await res.json()) as { combinedPhrases?: { text: string }[] };
+  return data.combinedPhrases?.[0]?.text ?? '';
 }
 
 function normalize(s: string): string {
@@ -297,6 +325,15 @@ async function main() {
     console.error('ELEVENLABS_API_KEY is required (load via --env-file=.env.local)');
     process.exit(1);
   }
+  const azureKey = process.env.AZURE_SPEECH_API_KEY;
+  const azureRegion = process.env.AZURE_SPEECH_REGION;
+  if (!azureKey || !azureRegion) {
+    console.error(
+      'AZURE_SPEECH_API_KEY and AZURE_SPEECH_REGION are required for STT validation',
+    );
+    process.exit(1);
+  }
+  const stt: AzureStt = { apiKey: azureKey, region: azureRegion };
 
   const prune = process.argv.includes('--prune');
   const revalidate = process.argv.includes('--revalidate');
@@ -369,7 +406,7 @@ async function main() {
       try {
         const buf = await readFile(absFile);
         await new Promise((r) => setTimeout(r, 80));
-        const heard = await transcribe(buf, lang, apiKey);
+        const heard = await transcribe(buf, lang, stt);
         if (acceptTranscription(heard)) {
           console.log(allowedAlt && !transcriptionMatches(text, heard) ? 'OK (allowlisted)' : 'OK');
           skipped++;
@@ -380,12 +417,12 @@ async function main() {
         await rm(absFile);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.log(`READ/SCRIBE ERROR — ${msg} — regenerating`);
+        console.log(`READ/STT ERROR — ${msg} — regenerating`);
         try { await rm(absFile); } catch { /* file went away on its own */ }
       }
     }
 
-    // Generate + validate with retry. On a Scribe mismatch the most likely
+    // Generate + validate with retry. On an STT mismatch the most likely
     // cause is a one-off TTS hallucination (especially on flash_v2_5), so
     // re-rolling usually succeeds.
     let lastTranscribed = '';
@@ -400,7 +437,7 @@ async function main() {
         process.stdout.write(`${buf.length}b  validating … `);
         // Stay polite to ElevenLabs between calls.
         await new Promise((r) => setTimeout(r, 80));
-        lastTranscribed = await transcribe(buf, lang, apiKey);
+        lastTranscribed = await transcribe(buf, lang, stt);
         if (acceptTranscription(lastTranscribed)) {
           console.log(
             allowedAlt && !transcriptionMatches(text, lastTranscribed)
