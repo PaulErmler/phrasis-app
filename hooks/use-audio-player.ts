@@ -479,6 +479,15 @@ export function useAudioPlayer(
       return;
     }
 
+    // Same-card remerge (e.g. review-mode flip changes `orderedTarget`, which
+    // changes the merged composition): pause immediately so the stale blob
+    // doesn't keep playing for the few hundred ms while mergeCardAudio is in
+    // flight. The post-merge logic still resumes from `resumePos` because
+    // `wasPlayingSameCard` was captured above before this pause.
+    if (!isCardChange && audioBefore && !audioBefore.paused) {
+      audioBefore.pause();
+    }
+
     // Cancel any in-flight merge
     mergeAbortRef.current?.abort();
     const controller = new AbortController();

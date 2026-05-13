@@ -213,9 +213,13 @@ export const ensureContentForCollection = mutation({
 
 /**
  * Ensure translations and audio exist for the FIRST 5 sentences of every
- * premade level collection accessible in the user's active course. Called
- * fire-and-forget from the home view on mount so when a user drills into any
- * level the preview is already populated.
+ * premade level collection in the active dataset (or legacy CEFR set) for
+ * the given language pair. Scheduled from course creation
+ * (`createCourse` / `completeOnboarding`) so that drilling into any level
+ * later doesn't show a loading spinner.
+ *
+ * Internal because the only callers are the two course-creation paths,
+ * which already know the course's language arrays — no auth lookup needed.
  *
  * Independent of user progress (unlike `ensureContentForCollection` which
  * paginates from `lastRankProcessed`) — always starts at collectionRank 1.
@@ -225,14 +229,15 @@ export const ensureContentForCollection = mutation({
  * version exceeded Convex's per-mutation wallclock limit (~15s) once the
  * dataset grew to ~20 levels × 5 texts × multi-language storage.getUrl checks.
  */
-export const ensureFirstSentencesAcrossLevelCollections = mutation({
-  args: {},
+export const ensureFirstSentencesAcrossLevelCollections = internalMutation({
+  args: {
+    baseLanguages: v.array(v.string()),
+    targetLanguages: v.array(v.string()),
+  },
   returns: v.object({
     scheduledCollections: v.number(),
   }),
-  handler: async (ctx) => {
-    const { course } = await requireActiveCourse(ctx);
-
+  handler: async (ctx, args) => {
     // Load only the ~20 premade level collections via indexed lookups so this
     // doesn't scan every user's custom/chat collections (which share the table).
     // Custom collections have no `datasetId` and don't share names with
@@ -267,8 +272,8 @@ export const ensureFirstSentencesAcrossLevelCollections = mutation({
           internal.features.collections.ensureFirstSentencesForCollection,
           {
             collectionId: collection._id,
-            baseLanguages: course.baseLanguages,
-            targetLanguages: course.targetLanguages,
+            baseLanguages: args.baseLanguages,
+            targetLanguages: args.targetLanguages,
           },
         ),
       ),

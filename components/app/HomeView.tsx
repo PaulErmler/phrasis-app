@@ -85,20 +85,6 @@ export function HomeView({
   );
   const [isChatNavigating, setIsChatNavigating] = useState(false);
 
-  // Fire-and-forget: ensure the first 5 sentences of every level collection
-  // have translations + audio queued so when the user drills into a level
-  // they don't see a loading spinner. Idempotent — `scheduleMissingContent`
-  // skips any (text, language) that's already covered, so re-entries are cheap.
-  const ensureFirstSentences = useMutation(
-    api.features.collections.ensureFirstSentencesAcrossLevelCollections,
-  );
-  useEffect(() => {
-    if (!hasActiveCourse || isHidden) return;
-    ensureFirstSentences({}).catch((err) => {
-      console.error('[home] ensureFirstSentences failed', err);
-    });
-  }, [hasActiveCourse, isHidden, ensureFirstSentences]);
-
   const handleGoToChat = useCallback(async () => {
     setIsChatNavigating(true);
     try {
