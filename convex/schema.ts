@@ -35,6 +35,7 @@ export const courseSettingsFields = {
   pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages
   pauseBeforeAutoAdvance: v.optional(v.number()), // seconds to wait before auto-advancing to next card
   showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
+  progressDisplayEnabled: v.optional(v.boolean()), // celebrate every PROGRESS_DISPLAY_INTERVAL reviews (default true)
   hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
   autoRevealLanguages: v.optional(v.boolean()), // unblur when audio starts playing
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
@@ -47,13 +48,20 @@ export const courseSettingsFields = {
   // Review mode
   reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
   // Scheduling mode
-  schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))), // 'learnAndReview' (default) or 'learn_new'
+  schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))), // 'learnAndReview' (default), 'learn_new', or 'radio' (round-robin playback, no FSRS)
   fullReviewTargetAudioMode: v.optional(
     v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
   ), // When to play target audio in full review mode
   chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
+  reconciledDatasetId: v.optional(v.id('datasets')), // Dataset version this course's progress has been cutover to (idempotency gate for datasetMigration_cutoverUser)
+  // Source-of-content filter. `undefined` and 'both' behave identically (no filter).
+  // 'custom' = study/auto-add only cards from collections with origin !== 'premade' (custom + chat).
+  // 'course' = study/auto-add only cards from collections with origin === 'premade'.
+  studyContentFilter: v.optional(
+    v.union(v.literal('custom'), v.literal('course'), v.literal('both')),
+  ),
 } as const;
 
 // Full `courseSettings` document validator (includes system fields).
@@ -64,15 +72,51 @@ export const courseSettingsDocValidator = v.object({
 });
 
 export default defineSchema({
-  // Collections table - groups texts by difficulty level or potentially other topics
+  // Datasets table - versioned premade content sets. A dataset is a corpus of
+  // texts (whose own language lives on `texts.language`) fanned out to every
+  // target language via the `translations` table — so at most one dataset is
+  // `isActive: true` at a time, globally. Inactive rows remain in place for
+  // rollback and historical reference.
+  datasets: defineTable({
+    slug: v.string(), // e.g. "ogte-curated"
+    version: v.string(), // e.g. "1.0.0"
+    publishedAt: v.number(),
+    isActive: v.boolean(),
+    manifestStorageId: v.optional(v.id('_storage')),
+    description: v.optional(v.string()),
+  })
+    .index('by_slug_and_version', ['slug', 'version'])
+    .index('by_isActive', ['isActive']),
+
+  // Collections table - groups texts by difficulty level or potentially other topics.
+  // Premade-dataset rows have `datasetId` set and carry the `code`/`cefrTier`/`order`
+  // fields. Custom (user-created) collections leave those optional. Old curriculum
+  // rows ("Essential", "A1"..."C2") are marked `legacy: true` after the OGTE cutover.
   collections: defineTable({
-    name: v.string(), // e.g., "A1", "B2", "Essential"
+    name: v.string(), // e.g., "A1", "B2", "Essential", "L01"
     textCount: v.number(), // Number of texts in this collection
-  }).index('by_name', ['name']),
+    // Premade-dataset fields (populated by uploadDataset; null for custom and legacy)
+    datasetId: v.optional(v.id('datasets')),
+    code: v.optional(v.string()), // "L01" … "L20"
+    cefrTier: v.optional(v.string()), // "Pre-A1" | "A1" | "A2" | "B1" | "B2" | "C1" | "C2"
+    order: v.optional(v.number()), // 1..20 within the dataset
+    displayName: v.optional(v.string()),
+    legacy: v.optional(v.boolean()), // true on old Essential/A1..C2 post-cutover
+    // Explicit origin tag — source of truth for the content-source filter.
+    // 'premade' = dataset-uploaded; 'custom' = user-typed; 'chat' = chat-approved.
+    // Optional during backfill; required after `runCollectionsOriginBackfill` completes.
+    origin: v.optional(
+      v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
+    ),
+  })
+    .index('by_name', ['name'])
+    .index('by_datasetId_and_order', ['datasetId', 'order']),
 
   // Texts table - stores the original texts/sentences
   texts: defineTable({
-    datasetSentenceId: v.optional(v.number()), // Unique ID from the dataset (optional for user-created)
+    datasetSentenceId: v.optional(v.number()), // Legacy numeric Tatoeba ID — retained for back-compat
+    externalId: v.optional(v.string()), // Stable cross-version ID (Tatoeba stringified or "c-<hex>")
+    datasetId: v.optional(v.id('datasets')), // Premade-dataset texts only; null for user-created and legacy
     text: v.string(),
     language: v.string(), // e.g., "en" for English
     romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
@@ -86,12 +130,15 @@ export default defineSchema({
     speakerGender: v.optional(v.string()), // male / female / neutral
     audioSpeakerGender: v.optional(v.string()), // male / female — resolved voice gender after coin-flip; mirrors speakerGender when male/female
     addresseeGender: v.optional(v.string()), // male / female / neutral / not_applicable
+    addressesSomeone: v.optional(v.boolean()), // true if the sentence speaks to a 2nd-person addressee. Gates whether register/addresseeGender are emitted in the translation prompt. Legacy rows: undefined falls back to addresseeNumber === 'not_applicable' as the proxy.
+    referentGender: v.optional(v.string()), // 'male' | 'female' — coin-flipped per-text, constant across all target-language translations. Drives gendered-noun agreement (e.g. de Übersetzer/-in, fr traducteur/-rice).
     tenseAspect: v.optional(v.string()), // simple_present / past_continuous / etc.
     sentenceType: v.optional(v.string()), // declarative / interrogative / imperative / exclamatory
     literalFigurative: v.optional(v.string()), // literal / figurative
   })
     .index('by_text', ['text'])
     .index('by_datasetSentenceId', ['datasetSentenceId'])
+    .index('by_dataset_and_externalId', ['datasetId', 'externalId'])
     .index('by_collection_and_rank', ['collectionId', 'collectionRank'])
     .index('by_collection_and_userCreated_and_rank', ['collectionId', 'userCreated', 'collectionRank'])
     .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank']),
@@ -116,8 +163,9 @@ export default defineSchema({
     ttsProvider: v.optional(ttsProviderValidator), // TTS provider used (missing = legacy google)
     voiceGender: v.optional(voiceGenderValidator), // Gender of the synthesized voice (missing = legacy row; falls back to curated-list lookup on read)
     speed: v.optional(v.number()), // Playback speed used at synthesis time (missing = legacy row, assume 0.9)
-    // Word-level timestamps from ElevenLabs Scribe, captured during TTS validation.
-    // Seconds relative to the audio blob. Only populated when validation succeeded.
+    // Word-level timestamps from Azure Fast Transcription, captured during TTS
+    // validation. Seconds relative to the audio blob. Only populated when
+    // validation succeeded.
     wordTimings: v.optional(
       v.array(
         v.object({
@@ -179,7 +227,12 @@ export default defineSchema({
   cards: defineTable({
     deckId: v.id('decks'), // Reference to the deck
     textId: v.id('texts'), // Reference to the text/sentence
-    collectionId: v.optional(v.id('collections')), // Reference to the source collection (absent for user-created cards)
+    collectionId: v.optional(v.id('collections')), // Reference to the source collection. Backfilled for all cards by runCardsCollectionBackfill; required after.
+    // Denormalized from collections.origin at insert time. Powers the content-source filter
+    // index lookups in getCardForReview. Optional during backfill; required after.
+    collectionOrigin: v.optional(
+      v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
+    ),
     dueDate: v.number(), // Timestamp for spaced repetition scheduling (driven by scheduler)
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
@@ -193,16 +246,26 @@ export default defineSchema({
     lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review and FSRS phases)
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
+    radioRoundCounter: v.optional(v.number()), // Radio mode: # of times this card has been played in radio mode. Lowest counter plays next; new cards default to 0 so they play first. Optional for backward compat — undefined treated as 0.
+    radioOrderKey: v.optional(v.number()), // Radio mode: random tiebreak within equal `radioRoundCounter`. Re-rolled on each play so the round-robin order shuffles every loop and never matches the review (`dueDate`-driven) order. Optional for backward compat.
   })
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_dueDate', ['deckId', 'dueDate'])
     .index('by_deckId_and_textId', ['deckId', 'textId'])
     .index('by_textId', ['textId'])
+    .index('by_deckId_and_isHidden_and_isMastered', ['deckId', 'isHidden', 'isMastered'])
     .index('by_deckId_and_isHidden_and_isMastered_and_dueDate', [
       'deckId',
       'isHidden',
       'isMastered',
       'dueDate',
+    ])
+    .index('by_deck_hidden_mastered_radioCounter_radioOrder', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'radioRoundCounter',
+      'radioOrderKey',
     ])
     .index('by_deckId_and_lastReviewedAt', ['deckId', 'lastReviewedAt'])
     .index('by_deckId_and_isHidden_and_lastReviewedAt', ['deckId', 'isHidden', 'lastReviewedAt'])
@@ -213,6 +276,30 @@ export default defineSchema({
       'isMastered',
       'isGraduated',
       'dueDate',
+    ])
+    // Content-source filter variants — used when courseSettings.studyContentFilter is 'custom' or 'course'.
+    .index('by_deck_hidden_mastered_origin_dueDate', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'dueDate',
+    ])
+    .index('by_deck_hidden_mastered_origin_graduated_due', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'isGraduated',
+      'dueDate',
+    ])
+    .index('by_deck_hidden_mastered_origin_radioCounter_radioOrder', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'radioRoundCounter',
+      'radioOrderKey',
     ])
     .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
     .searchIndex('search_text', {
@@ -238,7 +325,7 @@ export default defineSchema({
     totalChatCardsApproved: v.optional(v.number()),
     totalCardsEdited: v.optional(v.number()),
     totalCardsAddedManually: v.optional(v.number()),
-    totalReviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    totalReviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
     totalAccuracySum: v.optional(v.number()),
     totalAccuracyCount: v.optional(v.number()),
   }).index('by_userId_and_courseId', ['userId', 'courseId']),
@@ -253,8 +340,8 @@ export default defineSchema({
     timeMs: v.number(),
     cardsReviewed: v.number(),
     // Review mode breakdown
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
-    timeMsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
+    timeMsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
     // Rating distribution
     ratingCounts: v.optional(v.object({
       stillLearning: v.number(), understood: v.number(),
@@ -278,13 +365,23 @@ export default defineSchema({
     cardsAddedManually: v.optional(v.number()),
   }).index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date']),
 
-  // Collection progress table - tracks cards added per collection/course
+  // Collection progress table - per (user, course, collection) monotonic
+  // counters used by the home view. Counters are strictly monotonic: incremented
+  // on insert / first review / first mastery, NEVER decremented on delete or
+  // demaster. The semantics are "cumulative work the user has done in this
+  // collection," not "current card holdings."
   collectionProgress: defineTable({
     userId: v.string(), // Links to auth user
     courseId: v.id('courses'), // Reference to the course
     collectionId: v.id('collections'), // Reference to the collection
-    cardsAdded: v.number(), // Count of cards added from this collection
-    cardsLearned: v.optional(v.number()), // Count of cards with first review completed
+    cardsAdded: v.number(), // Monotonic — cards ever added from this collection
+    cardsLearned: v.optional(v.number()), // Monotonic — cards ever reviewed at least once
+    cardsMastered: v.optional(v.number()), // Monotonic — cards ever mastered
+    // Credit rolled forward at OGTE cutover (legacy `cardsAdded` from the
+    // mapped legacy CEFR collection). Widens the home-view denominator so the
+    // user sees `X/(textCount + legacyCarryAdded)` and doesn't feel like
+    // they're starting from scratch on the first level of each new tier.
+    legacyCarryAdded: v.optional(v.number()),
     lastRankProcessed: v.optional(v.number()), // Last collectionRank processed (for efficient pagination)
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])
@@ -355,6 +452,37 @@ export default defineSchema({
     queuedAt: v.number(),
   }).index('by_provider_and_queuedAt', ['provider', 'queuedAt']),
 
+  // ── LLM translation queue (mirrors the TTS queue structure) ──────────────
+  // OpenRouter rate-limits aggressively, so concurrent LLM translation calls
+  // are capped at MAX_LLM_CONCURRENCY (100; active from day one, unlike the
+  // dormant TTS gate). Same three-table pattern: queue + slots + claims.
+
+  // FIFO queue of pending LLM translation jobs. Drained by `pumpLlmQueue`.
+  llmTranslationQueue: defineTable({
+    args: v.object({
+      textId: v.id('texts'),
+      sourceLanguage: v.string(),
+      targetLanguage: v.string(),
+      text: v.string(),
+      audioSpeakerGender: v.optional(v.string()),
+    }),
+    queuedAt: v.number(),
+  }).index('by_queuedAt', ['queuedAt']),
+
+  // Global concurrency slots — one row per in-flight LLM API call. Stale rows
+  // are reclaimed after SLOT_STALE_MS so a crashed action doesn't leak slots.
+  llmTranslationSlots: defineTable({
+    claimedAt: v.number(),
+  }),
+
+  // Per-(textId, language) dedup claim. Atomically check-and-insert before
+  // scheduling so two mutations can't enqueue the same translation twice.
+  llmTranslationClaims: defineTable({
+    textId: v.id('texts'),
+    targetLanguage: v.string(),
+    claimedAt: v.number(),
+  }).index('by_text_and_language', ['textId', 'targetLanguage']),
+
   // Daily per-language stats
   dailyLanguageStats: defineTable({
     userId: v.string(),
@@ -382,6 +510,11 @@ export default defineSchema({
     // (e.g. German nouns stay capitalized). Optional to accommodate
     // pre-migration rows; new writes always populate it.
     displayWord: v.optional(v.string()),
+    // Client-minted session id stamped on insert so we can partition the
+    // celebration screen's word list into "this session" vs "earlier today".
+    // Read by `getNewWordsForCelebration` via the language index — a session
+    // id only ever matters alongside the auth context that created it.
+    sessionId: v.optional(v.string()),
   })
     .index('by_userId_and_courseId_and_language_and_word',
       ['userId', 'courseId', 'language', 'word'])
@@ -430,7 +563,7 @@ export default defineSchema({
     totalNewCards: v.number(),
     totalTimeMs: v.number(),
     activeDays: v.number(),
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
   })
     .index('by_userId_and_courseId_and_week', ['userId', 'courseId', 'week'])
     .index('by_userId_and_courseId', ['userId', 'courseId']),
@@ -445,7 +578,7 @@ export default defineSchema({
     totalTimeMs: v.number(),
     activeDays: v.number(),
     activeWeeks: v.number(),
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
   })
     .index('by_userId_and_courseId_and_month', ['userId', 'courseId', 'month'])
     .index('by_userId_and_courseId', ['userId', 'courseId']),
@@ -461,7 +594,7 @@ export default defineSchema({
     activeDays: v.number(),
     activeWeeks: v.number(),
     activeMonths: v.number(),
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
   })
     .index('by_userId_and_courseId_and_year', ['userId', 'courseId', 'year'])
     .index('by_userId_and_courseId', ['userId', 'courseId']),

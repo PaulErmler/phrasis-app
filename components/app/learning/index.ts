@@ -8,6 +8,8 @@ export { DiffDisplay } from './DiffDisplay';
 export { WordDiff } from './WordDiff';
 export { ReviewModeSwitcher } from './ReviewModeSwitcher';
 export { NoCollectionState, NoCardsDueState } from './LearningEmptyStates';
+export { ProgressDisplay } from './ProgressDisplay';
+export { SessionProgressBar } from './SessionProgressBar';
 export { useLearningMode } from './useLearningMode';
 export { useLearningAudio } from './useLearningAudio';
 export type { LearningState } from './useLearningMode';

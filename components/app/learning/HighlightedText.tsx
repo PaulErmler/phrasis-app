@@ -9,11 +9,14 @@ import {
   normalise,
 } from '@/lib/audio/alignTimings';
 import { highlightWord } from '@/lib/wordCloud';
+import { languageSupportsKaraoke } from '@/lib/languages';
 import type { WordTiming } from './types';
 
 interface Props {
   /** Canonical source text — this is what the user always sees. */
   text: string;
+  /** BCP-47 language code of `text`. Drives locale-aware word segmentation. */
+  language: string;
   /** Per-word timings from Scribe's transcription. Null/empty → plain text. */
   wordTimings: WordTiming[] | null | undefined;
   /** Time in seconds within THIS clip (already offset by the clip's cue start). */
@@ -51,6 +54,7 @@ const MIN_MATCH_RATIO = 0.5;
  */
 export function HighlightedText({
   text,
+  language,
   wordTimings,
   localTime,
   isActive,
@@ -59,16 +63,17 @@ export function HighlightedText({
   highlightTerm,
 }: Props) {
   const aligned = useMemo(
-    () => alignWordTimings(text, wordTimings),
-    [text, wordTimings],
+    () => alignWordTimings(text, wordTimings, language),
+    [text, wordTimings, language],
   );
-  const canHighlight = useMemo(
-    () =>
+  const canHighlight = useMemo(() => {
+    if (!languageSupportsKaraoke(language)) return false;
+    return (
       !!wordTimings &&
       wordTimings.length > 0 &&
-      matchRatio(aligned) >= MIN_MATCH_RATIO,
-    [wordTimings, aligned],
-  );
+      matchRatio(aligned) >= MIN_MATCH_RATIO
+    );
+  }, [language, wordTimings, aligned]);
 
   const currentIndex = useMemo(
     () => (isActive && canHighlight ? findCurrentIndex(aligned, localTime) : -1),
@@ -123,7 +128,7 @@ export function HighlightedText({
   if (!enabled || !canHighlight) {
     return (
       <p className={className}>
-        {highlightTerm ? highlightWord(text, highlightTerm) : text}
+        {highlightTerm ? highlightWord(text, highlightTerm, language) : text}
       </p>
     );
   }

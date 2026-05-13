@@ -1,0 +1,1023 @@
+id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
+22127,"Good morning, everyone.",10.00,461,morning,3,morning,direct-address,neutral,05,1
+2094776,"Good evening, everyone.",10.00,1440,evening,3,evening,direct-address,neutral,05,1
+2561375,"Hi, guys.",10.00,1067,hi,2,hi,direct-address,informal,05,1
+2185188,"Hey, guys. What's up?",10.00,776,hey,4,guys|hey|up|what's,direct-address,informal,05,1
+x5_1,Not much. You?,,103,much,3,much,direct-address,informal,05,1
+953853,I'm so sorry.,9.00,671,sorry,3,i'm|so|sorry,direct-address,neutral,05,2
+2240721,We're so sorry.,9.00,671,sorry,3,sorry,direct-address,neutral,05,2
+x5_2,"It's okay, don't worry.",,1535,worry,4,worry,direct-address,informal,05,2
+688006,You're very kind.,9.00,329,kind,3,very,direct-address,neutral,05,2
+2649220,Hold on a sec.,9.00,4205,sec,4,sec,direct-address,informal,05,3
+12621,Just a minute.,9.00,1112,minute,3,minute,direct-address,informal,05,3
+1839429,Hold on a minute.,9.00,1112,minute,4,a|hold|minute|on,direct-address,informal,05,3
+2372808,I just need a second.,9.00,207,second,5,second,descriptive,n/a,05,3
+1830543,Let's eat.,10.00,754,eat,2,eat,direct-address,informal,05,4
+2007861,Let's get coffee.,9.00,1436,coffee,3,coffee,direct-address,informal,05,4
+3732191,Let's have tea.,8.00,1908,tea,3,tea,direct-address,neutral,05,4
+2111621,Let's drink.,7.00,1322,drink,2,drink,direct-address,neutral,05,4
+1852296,Please smile.,10.00,2296,smile,2,please|smile,direct-address,formal,05,5
+2764108,Smile.,8.00,2296,smile,1,smile,direct-address,informal,05,5
+2111243,They're smiling.,6.00,5509,smiling,2,smiling,descriptive,n/a,05,5
+2111637,Keep smiling.,6.00,5509,smiling,2,keep|smiling,direct-address,informal,05,5
+2548236,I'm just a beginner.,10.00,12235,beginner,4,beginner,descriptive,n/a,05,6
+3736674,I'm also a student.,9.00,1019,student,4,student,descriptive,n/a,05,6
+2240601,We're just students.,8.00,555,students,3,students,descriptive,n/a,05,6
+1813372,You’re just a student.,7.00,1019,student,5,re,direct-address,neutral,05,6
+499998,I'm just looking.,9.00,236,looking,3,i'm|just|looking,descriptive,n/a,05,7
+25216,Show me some others.,8.00,358,others,4,others,direct-address,informal,05,7
+31264,Would you like some more?,9.00,69,some,5,more,direct-address,neutral,05,7
+242492,Which would you like?,8.00,63,would,4,which,direct-address,neutral,05,7
+5944716,Just put it here.,9.00,204,put,4,put,direct-address,neutral,05,8
+51954,What have you been doing?,9.00,220,doing,5,doing,direct-address,neutral,05,9
+x5_7,Nothing much.,,249,nothing,2,nothing,descriptive,n/a,05,9
+2647169,Have you been eating?,7.00,1468,eating,4,eating,direct-address,neutral,05,9
+2951871,Have you been studying?,7.00,3496,studying,4,been|have|studying|you,direct-address,neutral,05,9
+276330,Has anyone asked for me?,8.00,489,asked,5,asked,direct-address,neutral,05,10
+2269274,Didn't you bring anything?,7.00,527,bring,4,bring,direct-address,neutral,05,10
+2092622,Are you bringing anyone?,7.00,1970,bringing,4,bringing,direct-address,neutral,05,10
+25313,Anything new?,9.00,247,anything,2,anything|new,direct-address,informal,05,10
+1308427,Is it far?,9.00,288,far,3,far,direct-address,neutral,05,11
+3071668,Is it far to town?,8.00,570,town,5,far|is|it|to|town,direct-address,neutral,05,11
+x5_4,"No, it's close.",,422,close,3,close,descriptive,n/a,05,11
+1554612,Let me try.,9.00,292,try,3,try,direct-address,neutral,05,12
+1302459,Let me pay.,9.00,381,pay,3,pay,direct-address,neutral,05,12
+2249524,Let me speak.,8.00,992,speak,3,speak,direct-address,informal,05,12
+3822996,Let me live.,5.00,256,live,3,live,direct-address,informal,05,12
+749266,Could you call me later?,9.00,297,later,5,call|could|later|me|you,direct-address,formal,05,13
+x5_3,"Sure, I'll call you tonight.",,995,tonight,5,tonight,direct-address,informal,05,13
+2107842,Thank you for everything.,9.00,309,thank,4,everything|for|thank|you,direct-address,neutral,05,14
+4502071,Thanks for sharing.,9.00,2211,sharing,3,sharing,direct-address,neutral,05,14
+1860405,Don't thank me yet.,7.00,309,thank,4,thank,direct-address,informal,05,14
+2548841,I was just reading.,7.00,742,reading,4,reading,descriptive,n/a,05,15
+57110,I would like this book.,9.00,345,book,5,book,descriptive,n/a,05,15
+6033406,I just wrote a book.,6.00,972,wrote,5,wrote,descriptive,n/a,05,15
+1286502,Let's begin on page 30.,5.00,1506,begin,4,page,direct-address,neutral,05,15
+276017,Let's begin with Lesson 3.,5.00,3150,lesson,4,lesson,direct-address,neutral,05,15
+1898253,See you guys later.,9.00,364,guys,4,guys,direct-address,informal,05,16
+3820731,I thought so.,8.00,229,thought,3,thought,descriptive,n/a,05,17
+65359,"Yeah. I think so, too.",9.00,419,yeah,5,yeah,descriptive,n/a,05,17
+3820733,I guess so.,8.00,683,guess,3,guess|i|so,descriptive,n/a,05,17
+1887358,I have another question.,9.00,439,question,4,question,descriptive,n/a,05,18
+3568444,I'm calling the police.,7.00,1147,calling,4,calling,descriptive,n/a,05,19
+4016037,Thanks for calling everyone.,7.00,1147,calling,4,calling|everyone|for|thanks,direct-address,neutral,05,19
+2549484,The police came.,7.00,462,police,3,came|police|the,descriptive,n/a,05,19
+1718,Call the police!,9.00,462,police,3,police,direct-address,neutral,05,19
+2245577,Hold my calls.,3.00,1283,calls,3,calls,direct-address,neutral,05,19
+2248430,Is anything broken?,7.00,1375,broken,3,broken,direct-address,neutral,05,20
+2248431,Is anything happening?,7.00,1646,happening,3,anything|happening|is,direct-address,neutral,05,20
+2234067,What's been happening?,8.00,1646,happening,3,happening,direct-address,neutral,05,20
+2248757,It just happens.,7.00,1157,happens,3,happens,descriptive,n/a,05,20
+1628159,What just happened?,9.00,623,happened,3,happened,descriptive,n/a,05,20
+1886839,So what happened?,9.00,623,happened,3,happened|so|what,direct-address,neutral,05,20
+2007659,Let's make this quick.,7.00,1115,quick,4,make|quick,direct-address,neutral,05,21
+1176908,Let's try!,9.00,701,let's,2,let's,direct-address,informal,05,21
+1345555,Let's party!,7.00,701,let's,2,let's|party,direct-address,informal,05,21
+4397597,Let's end this.,6.00,701,let's,3,end,direct-address,neutral,05,21
+28370,Haven't we met before?,9.00,842,met,4,before,direct-address,neutral,05,22
+2241120,We haven't met.,8.00,842,met,3,met,descriptive,n/a,05,22
+x5_6,I don't think so.,,89,think,4,think,descriptive,n/a,05,22
+273689,Is everything okay?,9.00,919,okay,3,everything|is|okay,direct-address,neutral,05,23
+x5_34,"Yes, everything's fine.",,11777,everything's,3,fine,descriptive,n/a,05,23
+2358595,You're gonna love this.,8.00,502,gonna,4,gonna,direct-address,informal,05,24
+1839561,That sounds great.,9.00,1139,sounds,3,great|sounds|that,descriptive,n/a,05,24
+4500790,Everyone looks great.,7.00,427,looks,3,looks,descriptive,n/a,05,24
+1553387,That sounds fair.,8.00,1139,sounds,3,sounds,descriptive,n/a,05,24
+2250908,That sounded good.,7.00,5781,sounded,3,sounded,descriptive,n/a,05,24
+2007635,Let's go and say hello.,9.00,1927,hello,5,hello,direct-address,informal,05,25
+2007923,Let's be safe.,6.00,903,safe,3,safe,direct-address,neutral,05,25
+2007908,Let's be frank.,6.00,1813,frank,3,frank,direct-address,neutral,05,25
+28397,Where's the information desk?,9.00,6046,where's,4,information,direct-address,neutral,05,26
+1604928,Everything's fine.,9.00,11777,everything's,2,everything's,descriptive,n/a,05,27
+39488,I wish I could.,8.00,674,wish,4,wish,descriptive,n/a,05,28
+3374787,Why would that be?,8.00,123,why,4,why,direct-address,neutral,05,28
+2891945,That would be best.,7.00,142,best,4,be|best|that|would,descriptive,n/a,05,28
+2522530,I would do the same.,7.00,152,same,5,same|the,descriptive,n/a,05,28
+4499324,Maybe this would help.,8.00,330,maybe,4,help|maybe|this|would,descriptive,n/a,05,28
+1638668,Just do your best.,8.00,142,best,4,best|your,direct-address,informal,05,29
+1887434,I just found it.,8.00,192,found,4,found,descriptive,n/a,05,30
+3312971,We just can't find it.,8.00,165,find,5,find,descriptive,n/a,05,30
+4949588,It's all I could find.,7.00,165,find,5,all,descriptive,n/a,05,30
+255497,I found the building.,7.00,500,building,4,building,descriptive,n/a,05,30
+25539,Keep away from me.,8.00,209,away,4,from,direct-address,informal,05,31
+2713688,I'm free until 2:30.,8.00,218,until,3,free|until,descriptive,n/a,05,32
+4502125,The show starts at 2:30.,7.00,1565,starts,4,starts,descriptive,n/a,05,32
+4666627,The game begins at 2:30.,7.00,2360,begins,4,begins,descriptive,n/a,05,32
+63132,How was today's game?,7.00,2844,today's,4,game|how|today's|was,direct-address,neutral,05,32
+3959835,I'm just making sure.,8.00,257,making,4,making,descriptive,n/a,05,33
+254069,I said so.,6.00,100,said,3,said,descriptive,n/a,05,34
+2372886,I just said that.,6.00,100,said,4,i|just|said|that,descriptive,n/a,05,34
+1953138,I told you so.,8.00,261,told,4,i|so|told|you,direct-address,informal,05,34
+41186,Most people think so.,6.00,102,most,4,most|people,descriptive,n/a,05,34
+51060,Few people think so.,6.00,221,few,4,few,descriptive,n/a,05,34
+276233,Who thinks so?,8.00,1726,thinks,3,so|thinks|who,direct-address,neutral,05,35
+2884776,What took so long?,8.00,285,took,4,took,direct-address,neutral,05,35
+2249501,Keep looking around.,6.00,236,looking,3,looking,direct-address,informal,05,35
+2387480,I need another job.,8.00,289,job,4,another|i|job|need,descriptive,n/a,05,36
+2549760,Just say yes.,8.00,294,yes,3,yes,direct-address,informal,05,37
+66672,Just say yes or no.,8.00,294,yes,5,or,direct-address,informal,05,37
+1860706,Just answer the question.,6.00,676,answer,4,answer,direct-address,informal,05,37
+38758,What makes you think so?,8.00,322,makes,5,makes,direct-address,neutral,05,38
+x5_31,Just a feeling.,,758,feeling,3,feeling,descriptive,n/a,05,38
+3824080,Maybe I could help.,8.00,330,maybe,4,maybe,descriptive,n/a,05,39
+2245234,Could it work?,7.00,114,work,3,work,descriptive,n/a,05,39
+2248720,It could happen.,7.00,643,happen,3,could|happen|it,descriptive,n/a,05,39
+1346016,Anything could happen.,6.00,643,happen,3,happen,descriptive,n/a,05,39
+1869756,We're just friends.,8.00,385,we're,3,we're,descriptive,n/a,05,40
+2549066,I'm just a friend.,7.00,411,friend,4,friend,descriptive,n/a,05,40
+1898393,Everyone needs friends.,7.00,413,needs,3,needs,descriptive,n/a,05,40
+2545374,I'm just getting started.,8.00,396,started,4,getting|i'm|just|started,descriptive,n/a,05,41
+2240758,We're just starting.,7.00,904,starting,3,starting,descriptive,n/a,05,41
+2007835,Let's begin again.,8.00,1506,begin,3,again|begin|let's,direct-address,informal,05,41
+2249470,Just start again.,6.00,242,start,3,start,direct-address,informal,05,41
+1495905,How's everybody?,8.00,7385,how's,2,how's,direct-address,neutral,05,42
+1886603,Where's everyone?,8.00,6046,where's,2,where's,descriptive,n/a,05,42
+1452758,Anybody home?,8.00,2635,anybody,2,anybody,direct-address,informal,05,42
+2092558,Anyone home?,8.00,402,anyone,2,anyone,direct-address,neutral,05,42
+x5_25,"Yes, I'm here.",,294,yes,3,here,descriptive,n/a,05,42
+1887983,I won't say anything.,8.00,453,won't,4,anything|i|say|won't,descriptive,n/a,05,43
+2361892,I'm not saying anything.,8.00,417,saying,4,saying,descriptive,n/a,05,43
+1527937,I won't tell anyone.,8.00,453,won't,4,won't,descriptive,n/a,05,43
+2092626,Are you seeing anyone?,8.00,966,seeing,4,seeing,direct-address,neutral,05,43
+1886043,Do you understand everything?,8.00,418,understand,4,understand,direct-address,neutral,05,44
+1553132,I understood almost everything.,7.00,2583,understood,4,understood,descriptive,n/a,05,44
+4503013,Write everything down.,7.00,996,write,3,write,direct-address,informal,05,44
+1513128,You didn't write anything.,7.00,996,write,4,anything|didn't|write|you,direct-address,neutral,05,44
+2547668,I'm three hours away.,6.00,379,hours,4,hours,descriptive,n/a,05,45
+2645214,We're five minutes away.,8.00,483,minutes,4,five|minutes,descriptive,n/a,05,45
+2247912,I'm almost through.,6.00,386,almost,3,through,descriptive,n/a,05,45
+2247907,I'm almost broke.,7.00,1465,broke,3,broke,descriptive,n/a,05,45
+619834,It's quite possible.,8.00,508,quite,3,it's|possible|quite,descriptive,n/a,05,46
+2272040,It doesn't seem possible.,7.00,872,seem,4,doesn't|it|possible|seem,descriptive,n/a,05,46
+x5_26,Maybe it can work.,,330,maybe,4,maybe,descriptive,n/a,05,46
+5588264,That's simply not possible.,6.00,876,simply,4,simply,descriptive,n/a,05,46
+1839604,We're just talking.,8.00,510,talking,3,talking,descriptive,n/a,05,47
+2248051,I'm just thinking.,8.00,569,thinking,3,thinking,descriptive,n/a,05,47
+2248043,I'm just asking.,8.00,1146,asking,3,asking,descriptive,n/a,05,47
+3822999,I'm just listening.,8.00,2199,listening,3,listening,descriptive,n/a,05,47
+2218178,You're just different.,7.00,226,different,3,different,direct-address,neutral,05,48
+2547966,You're so different.,7.00,226,different,3,different|so|you're,direct-address,neutral,05,48
+2111421,That's normal.,8.00,1042,normal,2,normal,descriptive,n/a,05,48
+2251058,That's another thing.,7.00,179,thing,3,thing,descriptive,n/a,05,48
+2686431,That's the main thing.,8.00,564,main,4,main,descriptive,n/a,05,48
+2012100,Everyone wants something.,8.00,571,wants,3,wants,descriptive,n/a,05,49
+3333868,Have you seen my wife?,8.00,591,wife,5,have|my|seen|wife|you,direct-address,neutral,05,50
+2360304,I've seen you somewhere.,7.00,1862,somewhere,4,i've|seen|somewhere|you,direct-address,neutral,05,50
+3333865,Have you sold it yet?,7.00,1138,sold,5,have|it|sold|yet|you,direct-address,neutral,05,50
+2891620,It's not so little.,5.00,168,little,4,little,descriptive,n/a,05,51
+2249325,It's too heavy.,8.00,1158,heavy,3,heavy,descriptive,n/a,05,51
+1047699,Your bag looks heavy.,7.00,1668,bag,4,bag,direct-address,neutral,05,51
+3374194,It's so clean.,8.00,1123,clean,3,clean,descriptive,n/a,05,51
+1894562,It's so beautiful.,8.00,593,beautiful,3,beautiful,descriptive,n/a,05,51
+1895571,You're so beautiful.,8.00,593,beautiful,3,beautiful|so|you're,direct-address,neutral,05,51
+1624930,What's so important?,8.00,634,what's,3,what's,descriptive,n/a,05,52
+x5_35,It's about my family.,,200,family,4,family,descriptive,n/a,05,52
+2234091,What's so hard?,8.00,634,what's,3,hard|so|what's,descriptive,n/a,05,53
+x5_36,I don't understand it.,,418,understand,4,understand,descriptive,n/a,05,53
+2249521,Let me guess.,8.00,683,guess,3,guess,direct-address,informal,05,54
+1891008,I'm just guessing.,7.00,7468,guessing,3,guessing,descriptive,n/a,05,54
+2218179,You're just guessing.,7.00,7468,guessing,3,guessing|just|you're,direct-address,neutral,05,54
+3422496,I never would've guessed.,6.00,9874,guessed,4,guessed|i|never|would've,descriptive,n/a,05,54
+5126498,We close at 7 p.m.,8.00,765,p,5,m|p,descriptive,n/a,05,55
+18432,Is the bank open?,8.00,694,bank,4,bank,descriptive,n/a,05,55
+2549518,I'm at the bank.,8.00,694,bank,4,at|bank|i'm|the,descriptive,n/a,05,55
+x5_5,"Yes, it's open.",,306,open,3,open,descriptive,n/a,05,55
+240202,Let's help each other.,8.00,701,let's,4,each|other,direct-address,informal,05,56
+2713596,Let's travel together.,7.00,1088,travel,3,travel,direct-address,neutral,05,56
+5178379,Let's take turns.,6.00,1789,turns,3,turns,direct-address,neutral,05,56
+3392571,Let's take turns driving.,6.00,1789,turns,4,driving|let's|take|turns,direct-address,neutral,05,56
+1617818,Let's go to bed.,8.00,882,bed,4,bed,direct-address,informal,05,57
+2007780,Let's move the bed.,5.00,882,bed,4,bed|let's|move|the,direct-address,informal,05,57
+4667036,Let's go to the park.,8.00,706,park,5,go|let's|park|the|to,direct-address,informal,05,57
+3733390,Let's park over there.,6.00,706,park,4,park,direct-address,neutral,05,57
+2807552,Everything seemed normal.,6.00,1602,seemed,3,seemed,descriptive,n/a,05,58
+3374715,Everything seemed OK.,7.00,1602,seemed,3,everything|ok|seemed,descriptive,n/a,05,58
+2245480,Everything seems OK.,8.00,739,ok,3,ok,descriptive,n/a,05,58
+2549165,Everyone was okay.,7.00,919,okay,3,okay,descriptive,n/a,05,58
+2007527,Let's play some football.,8.00,795,football,4,football,direct-address,informal,05,59
+3555139,Let's play football today.,8.00,795,football,4,football|let's|play|today,direct-address,informal,05,59
+2953185,Let's sing.,6.00,2788,sing,2,let's|sing,direct-address,neutral,05,59
+2451676,Let's study French.,8.00,839,french,3,french,direct-address,informal,05,60
+2329573,I get up around seven.,8.00,873,seven,5,seven,descriptive,n/a,05,61
+519311,It's almost six.,7.00,509,six,3,six,descriptive,n/a,05,61
+72306,Is it just eight-thirty?,6.00,3749,thirty,5,eight,direct-address,neutral,05,61
+2007935,Let's walk.,8.00,880,walk,2,walk,direct-address,informal,05,62
+2007891,Let's sit down.,8.00,1343,sit,3,sit,direct-address,informal,05,62
+2245235,Could we sit?,8.00,1343,sit,3,could|sit|we,direct-address,neutral,05,62
+280435,Let's cross the street.,7.00,1061,cross,4,street,direct-address,neutral,05,62
+5521184,Everyone knows.,8.00,895,knows,2,knows,descriptive,n/a,05,63
+2245440,Everyone knew that.,7.00,624,knew,3,knew,descriptive,n/a,05,63
+2546212,I thought everyone knew.,7.00,624,knew,4,everyone|i|knew|thought,descriptive,n/a,05,63
+2891177,Everyone knows our names.,5.00,1302,names,4,names,descriptive,n/a,05,63
+319617,Could I change rooms?,8.00,2680,rooms,4,rooms,direct-address,formal,05,64
+2648760,Show us the room.,7.00,394,room,4,room,direct-address,neutral,05,64
+1886556,Whose office is this?,8.00,908,whose,4,office,descriptive,n/a,05,64
+x5_20,It's my office.,,380,office,3,office,descriptive,n/a,05,64
+2355813,Let's listen.,8.00,918,listen,2,listen,direct-address,informal,05,65
+2249488,Just take mine.,8.00,959,mine,3,mine,direct-address,informal,05,66
+2247874,I'll visit soon.,8.00,968,visit,3,visit,descriptive,n/a,05,67
+1938033,Visit us tomorrow.,8.00,1020,tomorrow,3,tomorrow,direct-address,neutral,05,67
+5007747,We'll visit you sometime.,7.00,5437,sometime,4,sometime,direct-address,neutral,05,67
+5852481,Come visit us sometime.,7.00,5437,sometime,4,come|sometime|us|visit,direct-address,informal,05,67
+2243349,They visited us.,7.00,3007,visited,3,visited,descriptive,n/a,05,67
+2007733,Let's start tonight.,8.00,995,tonight,3,tonight,direct-address,informal,05,68
+281815,Let's meet on Sunday.,8.00,1275,sunday,4,sunday,direct-address,informal,05,68
+961663,Let's meet on Tuesday.,8.00,2353,tuesday,4,tuesday,direct-address,neutral,05,68
+2007566,Let's wait until Monday.,7.00,1651,monday,4,monday,direct-address,neutral,05,68
+1130652,What's the next station?,8.00,1049,station,4,station,direct-address,neutral,05,69
+1495884,What station is it?,8.00,1049,station,4,is|it|station|what,direct-address,neutral,05,69
+x5_21,It's the central station.,,1049,station,4,central,descriptive,n/a,05,69
+906722,What's your favorite city?,8.00,1127,favorite,4,city,direct-address,neutral,05,70
+x5_14,My favorite city is Paris.,,1595,paris,5,paris,descriptive,n/a,05,70
+906723,What's your favorite class?,8.00,1127,favorite,4,class,direct-address,neutral,05,70
+x5_15,I like English class.,,642,english,4,english,descriptive,n/a,05,70
+244129,My wife works part time.,7.00,591,wife,5,wife,descriptive,n/a,05,71
+249858,I have another sister.,8.00,1195,sister,4,sister,descriptive,n/a,05,71
+3528372,My dad just called.,7.00,1170,dad,4,dad,descriptive,n/a,05,71
+1754396,It's boring.,8.00,3382,boring,2,boring,descriptive,n/a,05,72
+2111327,They're boring.,8.00,3382,boring,2,boring|they're,descriptive,n/a,05,72
+431539,I'm bored.,7.00,5012,bored,2,bored|i'm,descriptive,n/a,05,72
+2107333,We're bored.,7.00,5012,bored,2,bored,descriptive,n/a,05,72
+2111271,They're interested.,7.00,1180,interested,2,interested,descriptive,n/a,05,72
+6569050,Are you interested in sports?,8.00,1224,sports,5,sports,direct-address,neutral,05,72
+3150760,I just bought this.,8.00,1282,bought,4,bought,descriptive,n/a,05,73
+1887443,I just opened it.,7.00,1478,opened,4,opened,descriptive,n/a,05,73
+2372872,I just picked it up.,7.00,1939,picked,5,i|it|just|picked|up,descriptive,n/a,05,73
+906731,What's your favorite color?,8.00,1286,color,4,color,direct-address,neutral,05,74
+x5_16,My favorite color is blue.,,1286,color,5,blue,descriptive,n/a,05,74
+906765,What's your favorite fruit?,8.00,2605,fruit,4,fruit,direct-address,neutral,05,74
+x5_17,I like apples.,,7229,apples,3,apples,descriptive,n/a,05,74
+1409539,Schools are closed.,6.00,1315,closed,3,schools,descriptive,n/a,05,75
+3635827,The banks are closed.,7.00,2043,banks,4,banks,descriptive,n/a,05,75
+3822326,We're closed on Mondays.,8.00,13912,mondays,4,closed|mondays|on|we're,descriptive,n/a,05,75
+44880,The shop is closed today.,8.00,1396,shop,5,closed|is|shop|the|today,descriptive,n/a,05,75
+3732436,The shop was closed.,7.00,1396,shop,4,shop,descriptive,n/a,05,75
+4496620,The shops are closed.,7.00,3993,shops,4,shops,descriptive,n/a,05,75
+2548707,I'm just a teacher.,8.00,1399,teacher,4,teacher,descriptive,n/a,05,76
+272832,Let's ask the teacher.,7.00,1399,teacher,4,ask|let's|teacher|the,direct-address,neutral,05,76
+6101258,I've spoken to your teachers.,5.00,3308,spoken,5,teachers,direct-address,neutral,05,76
+2249277,It's so slow.,8.00,1492,slow,3,slow,descriptive,n/a,05,77
+2249458,Just slow down.,8.00,1492,slow,3,down|just|slow,direct-address,informal,05,77
+1886551,Who's this guy?,8.00,1499,who's,3,guy|this|who's,direct-address,neutral,05,78
+4135272,What's that guy's name?,8.00,8418,guy's,4,guy's|name|that|what's,descriptive,n/a,05,78
+2253721,This guy's good.,7.00,8418,guy's,3,guy's,descriptive,n/a,05,78
+1987835,They're nice guys.,6.00,414,nice,3,nice,descriptive,n/a,05,78
+2218221,You're nice guys.,6.00,414,nice,3,guys|nice|you're,direct-address,neutral,05,78
+35385,Let's take a bus.,8.00,1540,bus,4,a|bus|let's|take,direct-address,informal,05,79
+1357020,Let's take the bus.,8.00,1540,bus,4,bus,direct-address,neutral,05,79
+279178,Let's take a train.,7.00,1164,train,4,a|let's|take|train,direct-address,neutral,05,79
+2706680,Let's go by train.,7.00,1164,train,4,train,direct-address,neutral,05,79
+274210,Open the window.,8.00,1665,window,3,window,direct-address,neutral,05,80
+274237,Close the window.,8.00,1665,window,3,close|the|window,direct-address,neutral,05,80
+2249750,Open the windows.,6.00,1960,windows,3,windows,direct-address,neutral,05,80
+5924129,Clean the windows.,6.00,1960,windows,3,clean|the|windows,direct-address,neutral,05,80
+1860474,Don't forget your bag.,8.00,1668,bag,4,bag|don't|forget|your,direct-address,informal,05,81
+2062507,You're forgetting something.,7.00,7667,forgetting,3,forgetting,direct-address,neutral,05,81
+2240571,We're forgetting something.,7.00,7667,forgetting,3,forgetting|something|we're,descriptive,n/a,05,81
+2245995,I must've forgotten.,7.00,12671,must've,3,must've,descriptive,n/a,05,81
+521655,I like movies.,8.00,1684,movies,3,movies,descriptive,n/a,05,82
+253011,I love American movies.,7.00,1684,movies,4,american,descriptive,n/a,05,82
+2436417,We watched a movie.,8.00,1958,watched,4,watched,descriptive,n/a,05,82
+3207501,I watched the movie.,8.00,1958,watched,4,i|movie|the|watched,descriptive,n/a,05,82
+4499259,I hated that movie.,6.00,5042,hated,4,hated,descriptive,n/a,05,82
+3150503,We're not buying anything.,8.00,1798,buying,4,anything|buying|not|we're,descriptive,n/a,05,83
+2545964,I'm not buying anything.,7.00,1798,buying,4,buying,descriptive,n/a,05,83
+3310924,We're not taking anything.,7.00,397,taking,4,taking,descriptive,n/a,05,83
+3310923,We're not breaking anything.,6.00,1838,breaking,4,anything|breaking|not|we're,descriptive,n/a,05,83
+2545325,I'm not selling anything.,6.00,1631,selling,4,selling,descriptive,n/a,05,83
+55516,Whose dictionary is this?,7.00,6677,dictionary,4,dictionary,direct-address,neutral,05,84
+1174870,Whose clock is it?,6.00,3385,clock,4,clock,direct-address,neutral,05,84
+1764980,Whose tea is this?,7.00,1908,tea,4,is|tea|this|whose,direct-address,neutral,05,84
+6114010,Are these children yours?,8.00,1834,yours,4,these|yours,direct-address,neutral,05,84
+1886543,Whose side are you on?,7.00,908,whose,5,side,direct-address,neutral,05,84
+2273815,We didn't order anything.,7.00,300,order,4,order,descriptive,n/a,05,85
+2114574,Who ordered that?,8.00,1856,ordered,3,ordered,direct-address,neutral,05,85
+318331,Would you like ice?,7.00,1069,ice,4,ice,direct-address,neutral,05,85
+x5_13,"Yes, please.",,294,yes,2,please,direct-address,neutral,05,85
+2007826,Let's go shopping.,8.00,2111,shopping,3,shopping,direct-address,neutral,05,86
+2007790,Let's go somewhere.,8.00,1862,somewhere,3,somewhere,direct-address,neutral,05,86
+1907151,Let's go tomorrow afternoon.,7.00,1910,afternoon,4,afternoon,direct-address,neutral,05,86
+406626,What's your favorite sport?,8.00,1904,sport,4,sport,direct-address,neutral,05,87
+x5_18,I like football.,,795,football,3,football,descriptive,n/a,05,87
+906929,What's your favorite vegetable?,8.00,7531,vegetable,4,vegetable,direct-address,neutral,05,87
+245254,I'm afraid so.,8.00,2009,afraid,3,afraid,descriptive,n/a,05,88
+5355759,The children look afraid.,5.00,2009,afraid,4,afraid|children|look|the,descriptive,n/a,05,88
+24900,I sort of understand.,7.00,1086,sort,4,sort,descriptive,n/a,05,88
+2549042,I'm sort of happy.,7.00,1086,sort,4,happy|i'm|of|sort,descriptive,n/a,05,88
+2280368,It's kind of hot.,7.00,700,hot,4,hot|it's|kind|of,descriptive,n/a,05,88
+1229332,Would you teach me?,8.00,2164,teach,4,teach,direct-address,formal,05,89
+6438681,Let me teach you how to drive.,7.00,2164,teach,7,drive|how|let|me|teach|to|you,direct-address,neutral,05,89
+2177702,I'll let you study.,6.00,544,study,4,study,direct-address,neutral,05,89
+6343027,Let me show you an easier way to do that.,6.00,1775,easier,10,an|do|easier|let|me|show|that|to|way|you,direct-address,neutral,05,89
+2007817,Let's just listen.,7.00,918,listen,3,just|let's|listen,direct-address,neutral,05,90
+4500691,Is everybody listening?,8.00,2199,listening,3,everybody|is|listening,direct-address,neutral,05,90
+3095224,I just ate.,8.00,3944,ate,3,ate,descriptive,n/a,05,91
+273828,Eat everything.,7.00,754,eat,2,eat|everything,direct-address,informal,05,91
+5167613,I've eaten.,7.00,5662,eaten,2,eaten,descriptive,n/a,05,91
+2249401,Just cook it.,7.00,2228,cook,3,cook,direct-address,informal,05,91
+2354544,I also love to cook.,8.00,2228,cook,5,also|cook|i|love|to,descriptive,n/a,05,91
+556616,I want to visit Korea.,8.00,2238,korea,5,korea,descriptive,n/a,05,92
+5085924,I've been to Australia.,6.00,911,australia,4,australia,descriptive,n/a,05,92
+4502649,Is time travel possible?,3.00,1088,travel,4,is|possible|time|travel,descriptive,n/a,05,92
+2245448,Everyone sat down.,8.00,2294,sat,3,sat,descriptive,n/a,05,93
+3222944,Everybody sat down.,8.00,2294,sat,3,down|everybody|sat,descriptive,n/a,05,93
+263815,Nothing really stands out.,5.00,2446,stands,4,really|stands,descriptive,n/a,05,93
+2241131,We just talked.,8.00,2390,talked,3,talked,descriptive,n/a,05,94
+3727496,I just want answers.,8.00,2453,answers,4,answers,descriptive,n/a,05,95
+3053032,I'm just being me.,6.00,117,being,4,being,descriptive,n/a,05,96
+1674345,That's just how I am.,6.00,156,am,5,am,descriptive,n/a,05,96
+2280308,I just realized something.,8.00,2530,realized,4,realized,descriptive,n/a,05,96
+3143497,We're doctors.,8.00,2707,doctors,2,doctors,descriptive,n/a,05,97
+3143502,They're doctors.,8.00,2707,doctors,2,doctors|they're,descriptive,n/a,05,97
+974169,My father's a doctor.,8.00,4526,father's,4,father's,descriptive,n/a,05,97
+2218223,You're no doctor.,4.00,1320,doctor,3,doctor,direct-address,neutral,05,97
+2711778,Who's your favorite singer?,8.00,2891,singer,4,singer,direct-address,neutral,05,98
+906942,What's your favorite website?,7.00,1127,favorite,4,website,direct-address,neutral,05,98
+3168170,That one's my favorite.,8.00,3673,one's,4,favorite|my|one's|that,descriptive,n/a,05,98
+4499791,These are my favorites.,7.00,6687,favorites,4,favorites,descriptive,n/a,05,98
+687834,Would you like bread?,8.00,2955,bread,4,bread,direct-address,formal,05,99
+5916888,I forgot to buy bread.,7.00,2955,bread,5,bread|buy|forgot|i|to,descriptive,n/a,05,99
+3825841,I also like cats.,8.00,3187,cats,4,also|cats|i|like,descriptive,n/a,05,100
+1907947,Do cats dream?,4.00,3187,cats,3,cats,descriptive,n/a,05,100
+1526199,Who let the dogs out?,3.00,1739,dogs,5,dogs,direct-address,informal,05,100
+464330,Wash your hands.,8.00,3243,wash,3,hands|wash|your,direct-address,informal,05,101
+2206395,I washed my hands.,7.00,5961,washed,4,washed,descriptive,n/a,05,101
+268620,Hands off.,5.00,699,hands,2,hands,direct-address,informal,05,101
+x5_10,They held each other tightly.,,9459,tightly,5,tight,descriptive,n/a,05,101
+314874,She held out her hand.,6.00,562,held,5,held|out|she,descriptive,n/a,05,101
+23668,Could I check my bags?,8.00,3378,bags,5,bags,direct-address,formal,05,102
+5239289,Let me get your bags.,8.00,3378,bags,5,bags|get|let|me|your,direct-address,neutral,05,103
+251793,I'll show you my room.,7.00,394,room,5,i'll|my|room|show|you,direct-address,neutral,05,103
+1553416,Let me carry it.,7.00,1348,carry,4,carry,direct-address,neutral,05,103
+3392990,Let me carry that.,7.00,1348,carry,4,carry|let|me|that,direct-address,neutral,05,103
+2359211,I've been out of town.,7.00,570,town,5,town,descriptive,n/a,05,104
+2359248,I've been studying French.,8.00,3496,studying,4,studying,descriptive,n/a,05,104
+252122,I've been there twice.,7.00,1533,twice,4,twice,descriptive,n/a,05,104
+2359542,I haven't given up.,7.00,797,haven't,4,given,descriptive,n/a,05,104
+4950124,Someone has been here.,7.00,208,someone,4,been|has|here|someone,descriptive,n/a,05,104
+2891861,Someone's been here recently.,6.00,4127,someone's,4,someone's,descriptive,n/a,05,104
+66016,When will they arrive?,8.00,3700,arrive,4,when|will,descriptive,n/a,05,105
+278457,Are we arriving on time?,8.00,5368,arriving,5,arriving,direct-address,neutral,05,105
+5860708,I'll arrive soon.,8.00,3700,arrive,3,arrive|i'll|soon,descriptive,n/a,05,105
+22965,We arrived first.,6.00,1667,arrived,3,first,descriptive,n/a,05,105
+1051716,He's just arrived.,6.00,1667,arrived,3,he's,descriptive,n/a,05,105
+303987,He arrived safely.,7.00,4892,safely,3,arrived|he|safely,descriptive,n/a,05,105
+2262791,We've arrived safely.,7.00,4892,safely,3,safely,descriptive,n/a,05,105
+2489576,I forgot my password.,8.00,6326,password,4,password,descriptive,n/a,05,106
+2707963,I've forgotten my password.,8.00,6326,password,4,forgotten|i've|my|password,descriptive,n/a,05,106
+1890953,I'm a musician.,8.00,6792,musician,3,musician,descriptive,n/a,05,107
+3006751,Are you a musician?,8.00,6792,musician,4,a|are|musician|you,direct-address,neutral,05,107
+3822156,Are you two musicians?,6.00,6017,musicians,4,musicians,direct-address,neutral,05,107
+6094423,Aren't you two musicians?,6.00,6017,musicians,4,aren't|musicians|two|you,direct-address,neutral,05,107
+5579577,I bought 24 pencils.,4.00,13805,pencils,3,pencils,descriptive,n/a,05,108
+1196221,That's my pencil.,8.00,7402,pencil,3,pencil,descriptive,n/a,05,108
+55024,These are my pencils.,8.00,13805,pencils,4,are|my|pencils|these,descriptive,n/a,05,108
+1764748,My pencil is red.,7.00,7402,pencil,4,is|my|pencil|red,descriptive,n/a,05,108
+5055324,What's my doctor's name?,8.00,9998,doctor's,4,doctor's,direct-address,neutral,05,109
+1664988,So where were you?,7.00,105,where,4,where,direct-address,neutral,05,110
+x5_30,I was at home.,,146,home,4,home,descriptive,n/a,05,110
+3518554,It's been three days.,7.00,213,days,4,three,descriptive,n/a,05,111
+2549286,It's been a week.,7.00,245,week,4,week,descriptive,n/a,05,111
+5006432,It's been a good year.,7.00,115,year,5,a|year,descriptive,n/a,05,111
+480367,It's been a long night.,6.00,216,night,5,a|been|it's|long|night,descriptive,n/a,05,111
+3006681,It's been a long week.,6.00,245,week,5,a|been|it's|long|week,descriptive,n/a,05,111
+4493690,Things have been good.,7.00,174,things,4,things,descriptive,n/a,05,112
+x5_61,How about you?,,67,how,3,how,direct-address,neutral,05,112
+2996313,Someone might see us.,7.00,208,someone,4,someone,descriptive,n/a,05,113
+1500104,I've been there a lot.,7.00,214,lot,5,lot,descriptive,n/a,05,114
+1891175,I've been working.,7.00,334,working,3,working,descriptive,n/a,05,114
+2359048,I've been asking questions.,6.00,1146,asking,4,asking|been|i've|questions,descriptive,n/a,05,114
+1891193,I've looked everywhere.,6.00,2182,everywhere,3,everywhere|i've|looked,descriptive,n/a,05,114
+2248367,I've checked everywhere.,7.00,2758,checked,3,checked|everywhere|i've,descriptive,n/a,05,114
+2245653,I checked everywhere.,7.00,2758,checked,3,checked,descriptive,n/a,05,114
+40407,Everybody loves music.,7.00,2201,loves,3,everybody|loves|music,descriptive,n/a,05,115
+33399,I like pop music.,6.00,1423,pop,4,music|pop,descriptive,n/a,05,115
+5157789,I love this group.,7.00,235,group,4,group,descriptive,n/a,05,115
+615162,I remember everything.,7.00,408,remember,3,everything|i|remember,descriptive,n/a,05,116
+2249450,Just remember that.,7.00,408,remember,3,remember,direct-address,informal,05,116
+1123112,I've told you everything.,7.00,261,told,4,told,direct-address,neutral,05,116
+1887640,I saw everything.,7.00,450,saw,3,saw,descriptive,n/a,05,116
+2241437,We saw everything.,7.00,450,saw,3,everything|saw|we,descriptive,n/a,05,116
+2270327,Don't break anything.,6.00,659,break,3,break,direct-address,informal,05,117
+1230472,You're so bad.,7.00,263,bad,3,bad,direct-address,informal,05,117
+2191840,You're so mean.,7.00,267,mean,3,mean,direct-address,informal,05,117
+2251082,That's just mean.,7.00,267,mean,3,just|mean|that's,descriptive,n/a,05,118
+2953327,That's just as bad.,7.00,263,bad,4,as,descriptive,n/a,05,118
+2251084,That's just sick.,3.00,1398,sick,3,just|sick|that's,descriptive,n/a,05,118
+1690496,I need more power.,7.00,273,power,4,i|more|need|power,descriptive,n/a,05,119
+2249093,It's just coffee.,7.00,1436,coffee,3,coffee|it's|just,descriptive,n/a,05,120
+3367216,This is just water.,7.00,277,water,4,is|just|this|water,descriptive,n/a,05,120
+2953075,It was just water.,6.00,277,water,4,water,descriptive,n/a,05,120
+2953103,It's just a cat.,6.00,1698,cat,4,a|cat|it's|just,descriptive,n/a,05,120
+1555406,It's just a bird.,6.00,2309,bird,4,a|bird|it's|just,descriptive,n/a,05,120
+3130447,Something just came up.,7.00,287,came,4,came,descriptive,n/a,05,121
+2362216,I just got the news.,7.00,342,news,5,got|i|just|news|the,descriptive,n/a,05,121
+2259239,That news got around.,5.00,342,news,4,news,descriptive,n/a,05,121
+4500400,Just keep trying.,7.00,314,trying,3,trying,direct-address,informal,05,122
+1850255,Just keep moving.,7.00,1010,moving,3,just|keep|moving,direct-address,informal,05,122
+2249443,Just keep walking.,7.00,1460,walking,3,walking,direct-address,informal,05,122
+2249437,Just keep driving.,5.00,1323,driving,3,driving,direct-address,informal,05,122
+2245474,Everything is gone.,7.00,682,gone,3,gone,descriptive,n/a,05,123
+4499046,Everything was gone.,7.00,682,gone,3,everything|gone|was,descriptive,n/a,05,123
+1734762,Everything's done.,7.00,11777,everything's,2,done|everything's,descriptive,n/a,05,123
+2111855,Everything stopped.,6.00,1529,stopped,2,stopped,descriptive,n/a,05,123
+2245477,Everything is working.,7.00,334,working,3,everything|is|working,descriptive,n/a,05,123
+299599,He left a while ago.,7.00,357,ago,5,ago|he,descriptive,n/a,05,124
+x5_53,Where did he go?,,112,did,4,go,descriptive,n/a,05,124
+3392912,Why would I mind?,7.00,369,mind,4,mind,descriptive,n/a,05,125
+1259947,I couldn't answer.,7.00,833,couldn't,3,couldn't,descriptive,n/a,05,125
+2308126,I could have used that.,6.00,153,used,5,used,descriptive,n/a,05,125
+2308114,I could have helped.,5.00,1383,helped,4,helped,descriptive,n/a,05,125
+2308170,I could sell this.,6.00,1116,sell,4,sell,descriptive,n/a,05,125
+2308272,I couldn't say goodbye.,6.00,4241,goodbye,4,goodbye,descriptive,n/a,05,125
+70573,Let me know your address.,7.00,1279,address,5,address,direct-address,neutral,05,126
+6093021,Let me know if you change your mind.,7.00,369,mind,8,if,direct-address,neutral,05,126
+461167,I'm coming right away.,7.00,374,coming,4,coming,descriptive,n/a,05,127
+x5_52,"Thanks, see you soon.",,473,soon,4,soon,direct-address,informal,05,127
+2645223,We have bigger problems.,7.00,1837,bigger,4,bigger,descriptive,n/a,05,128
+2663476,There's one small problem.,7.00,382,problem,4,small,descriptive,n/a,05,128
+2997367,I've got bigger problems.,7.00,1837,bigger,4,bigger|got|i've|problems,descriptive,n/a,05,128
+2359975,I have my own problems.,7.00,651,problems,5,own,descriptive,n/a,05,128
+2577181,I need air.,7.00,409,air,3,air,descriptive,n/a,05,129
+2372855,I just needed some air.,6.00,668,needed,5,air|i|just|needed|some,descriptive,n/a,05,129
+x5_48,Open a window.,,1665,window,3,window,direct-address,neutral,05,129
+2050561,Stop playing around.,6.00,415,playing,3,playing,direct-address,informal,05,130
+2243288,They played games.,7.00,580,played,3,played,descriptive,n/a,05,130
+2646785,We were just playing.,7.00,415,playing,4,just|playing|we|were,descriptive,n/a,05,130
+3737224,I'd better go away.,7.00,424,i'd,4,away|better|go|i'd,descriptive,n/a,05,131
+1887357,I have another idea.,7.00,425,idea,4,idea,descriptive,n/a,05,132
+2953114,It's just an idea.,7.00,425,idea,4,an,descriptive,n/a,05,132
+2249276,It's so simple.,7.00,875,simple,3,simple,descriptive,n/a,05,132
+2953139,It's just that simple.,7.00,875,simple,4,it's|just|simple|that,descriptive,n/a,05,132
+2218052,You're actually late.,7.00,447,late,3,late,direct-address,neutral,05,133
+2649061,You're so late.,7.00,447,late,3,late|so|you're,direct-address,neutral,05,133
+2218051,You're actually early.,6.00,346,early,3,early,direct-address,informal,05,133
+2247767,I'll just leave.,7.00,448,leave,3,i'll|just|leave,descriptive,n/a,05,134
+2248046,I'm just leaving.,7.00,1111,leaving,3,leaving,descriptive,n/a,05,134
+2548843,I was just leaving.,7.00,1111,leaving,4,i|just|leaving|was,descriptive,n/a,05,134
+1191962,She's not a child.,7.00,542,she's,4,she's,descriptive,n/a,05,135
+2549406,You're my child.,7.00,490,child,3,child,direct-address,neutral,05,135
+x5_56,I'll always be your child.,,490,child,5,always,direct-address,informal,05,135
+2245628,I built it.,7.00,884,built,3,built,descriptive,n/a,05,136
+2252716,They built it.,7.00,884,built,3,built|it|they,descriptive,n/a,05,136
+2713415,They're building a house.,7.00,500,building,4,house,descriptive,n/a,05,136
+5851852,I lit the fire.,5.00,5135,lit,4,lit,descriptive,n/a,05,137
+594937,Don't go near the fire.,7.00,504,near,5,near,direct-address,informal,05,137
+x5_57,It's very hot.,,700,hot,3,hot,descriptive,n/a,05,137
+4494730,That wasn't possible.,7.00,526,wasn't,3,wasn't,descriptive,n/a,05,138
+2713357,That's no longer possible.,6.00,702,longer,4,longer,descriptive,n/a,05,138
+x5_27,It's probably true.,,416,probably,3,probably,descriptive,n/a,05,138
+x5_28,There's no way it'll work.,,2564,it'll,5,way,descriptive,n/a,05,138
+593246,She's a kind person.,7.00,542,she's,4,person,descriptive,n/a,05,139
+300013,He seems kind.,7.00,568,seems,3,seems,descriptive,n/a,05,139
+939849,Be kind to others.,6.00,358,others,4,be|kind|others|to,direct-address,neutral,05,139
+x5_55,That's good advice.,,1370,advice,3,advice,descriptive,n/a,05,139
+2329334,I gave it away.,7.00,549,gave,4,gave,descriptive,n/a,05,140
+3151348,Just give the order.,5.00,300,order,4,give|just|order|the,direct-address,neutral,05,140
+3151565,Give it another hour.,5.00,664,hour,4,hour,direct-address,neutral,05,140
+3147963,Just name your price.,5.00,582,price,4,name|price,direct-address,neutral,05,140
+2218396,You're so strong.,7.00,603,strong,3,strong,direct-address,neutral,05,141
+2547858,I'll become stronger.,5.00,2744,stronger,3,stronger,descriptive,n/a,05,141
+295301,He has a strong body.,5.00,603,strong,5,body,descriptive,n/a,05,141
+455491,There'll be a problem.,6.00,13494,there'll,4,there'll,descriptive,n/a,05,142
+2546247,You'll have no problem.,7.00,604,you'll,4,have|no|problem|you'll,direct-address,neutral,05,142
+2255008,You just won.,5.00,635,won,3,just|won|you,direct-address,neutral,05,142
+2245600,I almost won.,5.00,635,won,3,won,descriptive,n/a,05,142
+2359646,I've got half an hour.,7.00,664,hour,5,an|got|half|hour|i've,descriptive,n/a,05,143
+x5_51,Let's get a quick coffee.,,1436,coffee,5,quick,direct-address,informal,05,143
+4502507,It just takes time.,7.00,672,takes,4,takes,descriptive,n/a,05,144
+x5_45,I'll be patient.,,1754,patient,3,patient,descriptive,n/a,05,144
+2060045,I didn't learn anything.,7.00,687,learn,4,anything|didn't|i|learn,descriptive,n/a,05,145
+3826647,They haven't learned anything.,6.00,1474,learned,4,learned,descriptive,n/a,05,145
+2544714,I'm not learning anything.,7.00,1264,learning,4,learning,descriptive,n/a,05,145
+4976805,I've learned so much.,7.00,1474,learned,4,i've|learned|much|so,descriptive,n/a,05,145
+2184098,I tried everything.,7.00,713,tried,3,everything|i|tried,descriptive,n/a,05,146
+x5_47,What should I do now?,,107,should,5,should,direct-address,neutral,05,146
+2077881,Everything worked fine.,7.00,714,worked,3,everything|fine|worked,descriptive,n/a,05,147
+1966528,It almost worked.,6.00,714,worked,3,worked,descriptive,n/a,05,147
+3735924,This almost works.,6.00,512,works,3,works,descriptive,n/a,05,147
+2646581,I'm not giving up yet.,7.00,723,giving,5,giving,descriptive,n/a,05,148
+x5_46,Good. Keep going.,,201,keep,3,keep,direct-address,informal,05,148
+5178616,Let's talk about Australia.,7.00,911,australia,4,about,direct-address,neutral,05,149
+3238935,Let's talk about safety.,6.00,1135,safety,4,safety,direct-address,neutral,05,149
+2007610,Let's set up a meeting.,7.00,725,meeting,5,meeting,direct-address,neutral,05,149
+2360310,I've set up a meeting.,7.00,725,meeting,5,a|i've|meeting|set|up,descriptive,n/a,05,149
+287682,His eyes are blue.,7.00,750,blue,4,his,descriptive,n/a,05,150
+5856396,I have green eyes.,7.00,760,green,4,green,descriptive,n/a,05,150
+315797,She has brown eyes.,6.00,1031,brown,4,brown,descriptive,n/a,05,150
+x5_9,Close your eyelids.,,422,close,3,eyelid,direct-address,neutral,05,150
+2692270,I have a black eye.,5.00,1006,eye,5,a|black|eye|have|i,descriptive,n/a,05,150
+1476856,Can anyone drive?,7.00,753,drive,3,drive,direct-address,neutral,05,151
+2243107,They drove away.,6.00,3829,drove,3,drove,descriptive,n/a,05,151
+2869913,Just get in the car.,6.00,326,car,5,car,direct-address,informal,05,151
+2647736,Your car's on fire.,5.00,12604,car's,4,car's,direct-address,neutral,05,151
+2250058,Take my picture.,7.00,766,picture,3,picture,direct-address,informal,05,152
+2250060,Take our picture.,7.00,766,picture,3,our,direct-address,informal,05,152
+2241111,We have pictures.,6.00,1270,pictures,3,pictures,descriptive,n/a,05,152
+2243692,They're taking pictures.,6.00,1270,pictures,3,pictures|taking|they're,descriptive,n/a,05,152
+3431045,"Hey, turn around.",7.00,776,hey,3,hey,direct-address,informal,05,153
+2253820,Turn around slowly.,7.00,2348,slowly,3,slowly,direct-address,neutral,05,153
+316042,She turned around suddenly.,4.00,2071,suddenly,4,suddenly,descriptive,n/a,05,153
+2243347,They turned around.,5.00,848,turned,3,turned,descriptive,n/a,05,153
+3347145,You sound like my mom.,7.00,778,mom,5,mom,direct-address,informal,05,154
+310059,She has ten children.,5.00,947,ten,4,ten,descriptive,n/a,05,154
+3825760,Look after your children.,6.00,310,children,4,after,direct-address,neutral,05,154
+3821849,I'll wait until October.,7.00,803,october,4,i'll|october|until|wait,descriptive,n/a,05,155
+5853080,I'm happier now.,7.00,6306,happier,3,happier,descriptive,n/a,05,156
+2044484,I couldn't be happier.,7.00,6306,happier,4,be|couldn't|happier|i,descriptive,n/a,05,156
+2044441,They seem so happy.,7.00,872,seem,4,seem,descriptive,n/a,05,156
+1545447,Everybody's happy.,6.00,11060,everybody's,2,everybody's,descriptive,n/a,05,156
+2241064,We could walk.,7.00,880,walk,3,could|walk|we,descriptive,n/a,05,157
+1137292,I walked about 1 mile.,6.00,2524,mile,4,mile,descriptive,n/a,05,157
+262022,I walked about a mile.,6.00,2524,mile,5,a|about|i|mile|walked,descriptive,n/a,05,157
+3591278,That makes everything simpler.,6.00,8665,simpler,4,simpler,descriptive,n/a,05,158
+5617908,Everything was simpler then.,5.00,8665,simpler,4,then,descriptive,n/a,05,158
+5374820,It's so difficult.,7.00,892,difficult,3,difficult|it's|so,descriptive,n/a,05,158
+3731485,What could be easier?,5.00,1775,easier,4,easier,direct-address,neutral,05,158
+42237,Anyone can do it easily.,5.00,1292,easily,5,easily,descriptive,n/a,05,158
+1556502,I'm so worn out.,7.00,4567,worn,4,worn,descriptive,n/a,05,159
+2245904,I haven't slept.,7.00,5263,slept,3,slept,descriptive,n/a,05,159
+2234203,I slept just two hours.,7.00,5263,slept,5,hours|i|just|slept|two,descriptive,n/a,05,159
+322736,I couldn't sleep.,7.00,945,sleep,3,sleep,descriptive,n/a,05,159
+x5_8,You should rest.,,584,rest,3,rest,direct-address,neutral,05,159
+39623,It's under the table.,7.00,946,table,4,it's|table|the|under,descriptive,n/a,05,160
+1871551,It's on the table.,8.00,946,table,4,it's|on|table|the,descriptive,n/a,05,160
+2252640,There's a table.,6.00,946,table,3,table,descriptive,n/a,05,160
+3286806,Let's build something.,7.00,951,build,3,build,direct-address,neutral,05,161
+2273832,We didn't build it.,7.00,951,build,4,build|didn't|it|we,descriptive,n/a,05,161
+3824947,Let's see how it ends.,7.00,1807,ends,5,ends,direct-address,neutral,05,161
+2218378,You're so hot!,6.00,700,hot,3,hot,direct-address,informal,05,162
+1869533,Your hands are cold.,7.00,1001,cold,4,are|cold|hands|your,direct-address,neutral,05,162
+2218366,You're so cold.,6.00,1001,cold,3,cold,direct-address,neutral,05,162
+1669965,Let's get moving.,7.00,1010,moving,3,moving,direct-address,neutral,05,163
+5852157,I have brown eyes.,7.00,1031,brown,4,brown|eyes|have|i,descriptive,n/a,05,164
+256121,I just moved.,7.00,1041,moved,3,moved,descriptive,n/a,05,165
+x5_54,Where do you live now?,,256,live,5,live,direct-address,neutral,05,165
+2094828,Everybody likes you.,7.00,1890,likes,3,likes,direct-address,neutral,05,166
+3912772,Everyone liked you.,6.00,1780,liked,3,liked,direct-address,neutral,05,166
+3912778,Everybody liked you.,6.00,1780,liked,3,everybody|liked|you,direct-address,neutral,05,166
+4500891,Everyone loved it.,7.00,1076,loved,3,loved,descriptive,n/a,05,166
+3831748,I loved that show.,7.00,1076,loved,4,i|loved|show|that,descriptive,n/a,05,167
+3735653,The show's almost over.,7.00,9211,show's,4,show's,descriptive,n/a,05,167
+1638597,The game's almost over.,7.00,8608,game's,4,game's,descriptive,n/a,05,167
+5951527,I love watching talk shows.,5.00,1023,watching,5,shows,descriptive,n/a,05,167
+2245431,Everyone got sick.,6.00,1398,sick,3,sick,descriptive,n/a,05,168
+4401090,Everyone agreed.,6.00,1502,agreed,2,agreed,descriptive,n/a,05,168
+3826842,Did everyone agree?,7.00,1121,agree,3,agree|did|everyone,descriptive,n/a,05,168
+2507938,Everybody agrees.,6.00,6051,agrees,2,agrees,descriptive,n/a,05,168
+1761831,Is this your letter?,7.00,1184,letter,4,letter,direct-address,neutral,05,169
+3738527,Who wrote these letters?,5.00,2197,letters,4,letters,direct-address,neutral,05,169
+3823059,There were three letters.,5.00,2197,letters,4,letters|there|three|were,descriptive,n/a,05,169
+309911,She addressed the letter to John.,5.00,4496,addressed,6,addressed|john,descriptive,n/a,05,169
+3315269,You're getting so big.,6.00,232,getting,4,getting,direct-address,informal,05,170
+2547944,How big is your yard?,7.00,2634,yard,5,big|how|is|yard|your,direct-address,neutral,05,170
+4597060,I like your yard.,6.00,2634,yard,4,yard,direct-address,neutral,05,170
+2663531,It's my biggest problem.,7.00,1231,biggest,4,biggest,descriptive,n/a,05,170
+1173313,Don't touch me!,7.00,1312,touch,3,touch,direct-address,informal,05,171
+1256932,Stop touching me.,6.00,4903,touching,3,me|stop|touching,direct-address,informal,05,171
+2111675,I'm touched.,5.00,4276,touched,2,touched,descriptive,n/a,05,171
+2111812,How touching!,4.00,4903,touching,2,touching,descriptive,n/a,05,171
+2249650,Nothing's been touched.,4.00,14742,nothing's,3,nothing's,descriptive,n/a,05,171
+2245542,Have another drink.,7.00,1322,drink,3,another|drink|have,direct-address,informal,05,172
+2270378,Don't forget the drinks.,7.00,3395,drinks,4,drinks,direct-address,informal,05,172
+2248340,I've been drinking.,6.00,1976,drinking,3,drinking,descriptive,n/a,05,172
+2547418,Everyone was drinking.,5.00,1976,drinking,3,drinking|everyone|was,descriptive,n/a,05,172
+2107680,We'll share.,7.00,1367,we'll,2,we'll,descriptive,n/a,05,173
+2203811,Who's standing?,7.00,1499,who's,2,who's,direct-address,neutral,05,174
+2203812,I'm standing.,7.00,1458,standing,2,standing,descriptive,n/a,05,174
+2646715,Who are they sending?,7.00,2443,sending,4,are|sending|they|who,direct-address,neutral,05,174
+2252748,They're sending help.,7.00,2443,sending,3,sending,descriptive,n/a,05,174
+2111476,Tell everybody.,7.00,1512,everybody,2,everybody,direct-address,neutral,05,175
+2246048,I realize that.,7.00,1559,realize,3,realize,descriptive,n/a,05,176
+4501635,We realize that.,7.00,1559,realize,3,realize|that|we,descriptive,n/a,05,176
+4501634,We realized that today.,7.00,2530,realized,4,realized|that|today|we,descriptive,n/a,05,176
+2095482,Somebody just called.,7.00,1660,somebody,3,somebody,descriptive,n/a,05,177
+2547731,I'm just helping out.,7.00,1707,helping,4,helping,descriptive,n/a,05,178
+3356403,You guys aren't helping.,7.00,1707,helping,4,aren't|guys|helping|you,direct-address,informal,05,178
+x5_44,Let's all calm down.,,2756,calm,4,calm,direct-address,informal,05,178
+1848862,The party's over.,7.00,7601,party's,3,party's,descriptive,n/a,05,179
+5506406,The party's Monday.,7.00,7601,party's,3,monday|party's|the,descriptive,n/a,05,179
+2249387,It's your party.,5.00,301,party,3,party,direct-address,neutral,05,179
+435747,I love parties.,6.00,1361,parties,3,i|love|parties,descriptive,n/a,05,179
+2334085,I hate birthday parties.,7.00,1768,birthday,4,birthday,descriptive,n/a,05,179
+1887550,I love that dress.,7.00,1774,dress,4,dress,descriptive,n/a,05,180
+5423329,Mary wore a red dress.,6.00,4356,wore,5,a|dress|mary|red|wore,descriptive,n/a,05,180
+315375,She likes blue dresses.,6.00,6387,dresses,4,dresses,descriptive,n/a,05,180
+319829,Change your clothes.,6.00,1915,clothes,3,clothes,direct-address,neutral,05,180
+4823583,I've changed clothes.,6.00,1915,clothes,3,changed|clothes|i've,descriptive,n/a,05,180
+2111832,Get dressed.,7.00,3450,dressed,2,dressed,direct-address,informal,05,180
+1495879,Get dressed quickly.,6.00,3450,dressed,3,dressed|get|quickly,direct-address,neutral,05,180
+283292,He hasn't come yet.,7.00,1982,hasn't,4,come|hasn't|he|yet,descriptive,n/a,05,181
+2243725,They've just left.,7.00,1788,they've,3,just|left|they've,descriptive,n/a,05,181
+2544689,I'm paying for everything.,7.00,1819,paying,4,paying,descriptive,n/a,05,182
+2254996,You have mail.,7.00,1935,mail,3,mail,direct-address,neutral,05,183
+1431949,I sent you an e-mail.,7.00,1935,mail,6,e,direct-address,neutral,05,183
+1431957,I sent you an email.,7.00,2089,email,5,email,direct-address,neutral,05,183
+1887437,I just got your email.,7.00,2089,email,5,email|got|i|just|your,direct-address,neutral,05,183
+2362156,I just emailed you.,7.00,12393,emailed,4,emailed,direct-address,neutral,05,183
+5839982,I'm a writer.,7.00,2078,writer,3,writer,descriptive,n/a,05,184
+2240795,We're both writers.,7.00,2748,writers,3,writers,descriptive,n/a,05,184
+3818419,You're a great writer.,6.00,2078,writer,4,a|great|writer|you're,direct-address,neutral,05,184
+4496613,The restaurant is closed.,7.00,2107,restaurant,4,restaurant,descriptive,n/a,05,185
+5786097,We closed the restaurant.,6.00,2107,restaurant,4,closed|restaurant|the|we,descriptive,n/a,05,185
+4502073,We shared ideas.,6.00,2110,shared,3,ideas|shared|we,descriptive,n/a,05,186
+4502049,Send us your ideas.,6.00,1514,ideas,4,ideas,direct-address,neutral,05,186
+4502072,We shared everything.,7.00,2110,shared,3,shared,descriptive,n/a,05,186
+5382412,Sharing is important.,6.00,2211,sharing,3,important|is|sharing,descriptive,n/a,05,186
+567463,She traveled around Japan.,6.00,6360,traveled,4,japan,descriptive,n/a,05,187
+1445403,I traveled around Europe.,6.00,6360,traveled,4,europe|traveled,descriptive,n/a,05,187
+371414,I have been to Rome.,7.00,3304,rome,5,rome,descriptive,n/a,05,187
+32654,I've never been to Paris.,6.00,1595,paris,5,paris,descriptive,n/a,05,187
+2247437,I visited Boston.,7.00,3007,visited,3,boston|i|visited,descriptive,n/a,05,187
+6560951,I've been in Boston for less than a month.,7.00,2129,boston,9,less,descriptive,n/a,05,187
+2111336,They're angry.,7.00,2172,angry,2,angry,descriptive,n/a,05,188
+2240980,We're angry.,7.00,2172,angry,2,angry|we're,descriptive,n/a,05,188
+2111292,They're fighting.,6.00,1259,fighting,2,fighting,descriptive,n/a,05,188
+2241517,We weren't fighting.,5.00,2120,weren't,3,weren't,descriptive,n/a,05,188
+5504579,We fought hard.,5.00,3034,fought,3,fought|hard|we,descriptive,n/a,05,188
+2245779,I fought back.,4.00,3034,fought,3,fought,descriptive,n/a,05,188
+259242,I broke my leg.,7.00,2196,leg,4,leg,descriptive,n/a,05,189
+287067,He has long legs.,5.00,2144,legs,4,legs,descriptive,n/a,05,189
+239195,A dog has four legs.,6.00,2144,legs,5,four,descriptive,n/a,05,189
+5036359,It might snow tonight.,7.00,2212,snow,4,it|might|snow|tonight,descriptive,n/a,05,190
+5744612,There's snow everywhere.,6.00,2212,snow,3,snow,descriptive,n/a,05,190
+288254,He acts quickly.,7.00,2256,acts,3,acts,descriptive,n/a,05,191
+3178486,We must act quickly.,5.00,1082,quickly,4,act|must|quickly|we,descriptive,n/a,05,191
+2241164,We must act.,5.00,487,act,3,act,descriptive,n/a,05,191
+2260355,I acted without thinking.,5.00,4359,acted,4,acted|without,descriptive,n/a,05,191
+311189,She acted in the play.,5.00,4359,acted,5,acted|in|play|she|the,descriptive,n/a,05,191
+59507,This play has three acts.,5.00,2256,acts,5,acts|has|play|this|three,descriptive,n/a,05,191
+2984196,Hand me those papers.,7.00,2437,papers,4,those,direct-address,neutral,05,192
+280067,Hand in your papers.,5.00,2437,papers,4,papers,direct-address,neutral,05,192
+953247,Don't cry.,7.00,2505,cry,2,cry|don't,direct-address,informal,05,193
+313205,She began crying.,5.00,2646,crying,3,began,descriptive,n/a,05,193
+2271931,I don't usually cry.,6.00,2505,cry,4,usually,descriptive,n/a,05,193
+378512,My sister often cries.,5.00,7559,cries,4,cries|often,descriptive,n/a,05,193
+1815753,My girlfriend was crying.,5.00,2646,crying,4,girlfriend,descriptive,n/a,05,193
+3724080,The girls were crying.,5.00,2646,crying,4,girls,descriptive,n/a,05,193
+1898396,Everybody's crying.,5.00,11060,everybody's,2,crying|everybody's,descriptive,n/a,05,193
+2251022,That'll be interesting.,6.00,7318,that'll,3,that'll,descriptive,n/a,05,194
+4500333,It'll be interesting.,7.00,2564,it'll,3,it'll,descriptive,n/a,05,194
+2064778,Here's something interesting.,6.00,1295,here's,3,here's,descriptive,n/a,05,194
+4500320,These are interesting times.,4.00,1071,interesting,4,times,descriptive,n/a,05,194
+1886640,Where are you headed?,7.00,2715,headed,4,headed,direct-address,neutral,05,195
+2548246,I'm headed that way.,7.00,2715,headed,4,headed|i'm|that|way,descriptive,n/a,05,195
+2248022,I'm heading out.,7.00,3081,heading,3,heading|i'm|out,descriptive,n/a,05,195
+2240763,We're heading out.,7.00,3081,heading,3,heading,descriptive,n/a,05,195
+5859000,I'm wearing a hat.,7.00,2812,hat,4,wearing,descriptive,n/a,05,196
+5839944,I wore a hat.,6.00,4356,wore,4,wore,descriptive,n/a,05,196
+1205593,Bring me my hat.,6.00,2812,hat,4,bring|hat|me|my,direct-address,neutral,05,196
+x5_11,Those are nice caps.,,5463,caps,4,cap,descriptive,n/a,05,196
+2218400,You're so tall.,7.00,2896,tall,3,tall,direct-address,neutral,05,197
+5858352,I'm kind of tall.,7.00,2896,tall,4,i'm|kind|of|tall,descriptive,n/a,05,197
+2203443,You're thin.,5.00,3173,thin,2,thin,direct-address,neutral,05,197
+2203445,I'm thin.,5.00,3173,thin,2,i'm|thin,descriptive,n/a,05,197
+1626137,You look younger.,5.00,2080,younger,3,younger,direct-address,neutral,05,197
+290024,He plays soccer.,7.00,3111,soccer,3,plays,descriptive,n/a,05,198
+2136093,He loves soccer.,7.00,3111,soccer,3,he|loves|soccer,descriptive,n/a,05,198
+247990,We are soccer players.,7.00,3111,soccer,4,players,descriptive,n/a,05,198
+290027,He is a soccer player.,7.00,3111,soccer,5,player,descriptive,n/a,05,198
+2245569,Here's your desk.,7.00,3394,desk,3,desk,direct-address,neutral,05,199
+1898225,That belongs to me.,7.00,4658,belongs,4,belongs|me|that|to,descriptive,n/a,05,200
+4496060,It belongs there.,6.00,4658,belongs,3,belongs,descriptive,n/a,05,200
+2245618,I belong here.,7.00,3701,belong,3,belong|here|i,descriptive,n/a,05,200
+2241028,We belong together.,5.00,3701,belong,3,belong,descriptive,n/a,05,200
+2925252,I like these hats.,7.00,6782,hats,4,hats,descriptive,n/a,05,201
+4497300,My brother has died.,6.00,790,brother,4,brother,descriptive,n/a,05,202
+x5_19,I'm so sorry to hear that.,,671,sorry,6,hear,direct-address,neutral,05,202
+2358735,I have a half brother.,6.00,790,brother,5,a|brother|half|have|i,descriptive,n/a,05,202
+593229,It's my younger brother's.,7.00,9730,brother's,4,brother's,descriptive,n/a,05,202
+2245921,I just guessed.,7.00,9874,guessed,3,guessed,descriptive,n/a,05,203
+24953,What made her do so?,6.00,124,made,5,do|her|made|so|what,descriptive,n/a,05,204
+3403237,It could take weeks.,6.00,658,weeks,4,weeks,descriptive,n/a,05,205
+3403238,That could take weeks.,6.00,658,weeks,4,could|take|that|weeks,descriptive,n/a,05,205
+3374780,That could take days.,6.00,213,days,4,days,descriptive,n/a,05,205
+3727432,That could take years.,6.00,126,take,4,years,descriptive,n/a,05,205
+5386959,It's taken a while.,6.00,465,taken,4,a|it's|taken|while,descriptive,n/a,05,205
+2548856,I used to think so.,6.00,153,used,5,i|so|think|to|used,descriptive,n/a,05,206
+41729,Have you been here since?,6.00,170,since,5,since,direct-address,neutral,05,207
+x5_40,"Yes, since this morning.",,461,morning,4,since,direct-address,neutral,05,207
+1112294,It's only a game.,6.00,177,game,4,only,descriptive,n/a,05,208
+x5_60,Don't be sad.,,1523,sad,3,sad,direct-address,informal,05,208
+1850258,Just do your job.,6.00,289,job,4,job,direct-address,informal,05,209
+x5_64,"Okay, I will.",,919,okay,3,will,direct-address,informal,05,209
+2246045,I ran away.,5.00,1425,ran,3,ran,descriptive,n/a,05,210
+2372878,I just ran three miles.,5.00,1425,ran,5,miles,descriptive,n/a,05,210
+2270527,Don't run away.,6.00,302,run,3,away|don't|run,direct-address,informal,05,210
+848754,I've been running.,5.00,586,running,3,been|i've|running,descriptive,n/a,05,210
+2240662,We're running away.,4.00,586,running,3,running,descriptive,n/a,05,210
+2396288,May I be of service?,6.00,304,service,5,be|i|may|of|service,direct-address,formal,05,211
+2267196,I'm at your service.,4.00,304,service,4,service,direct-address,formal,05,211
+3722261,My services are free.,5.00,485,services,4,services,descriptive,n/a,05,211
+3348047,You're just not trying.,6.00,314,trying,4,just|not|trying|you're,direct-address,informal,05,212
+2249001,It's a fact.,6.00,362,fact,3,a|fact|it's,descriptive,n/a,05,213
+1756836,That's a fact.,6.00,362,fact,3,fact,descriptive,n/a,05,213
+2549482,These are facts.,5.00,1921,facts,3,are|facts|these,descriptive,n/a,05,213
+2011275,I want facts.,5.00,1921,facts,3,facts,descriptive,n/a,05,213
+2247796,I'll pay anything.,6.00,381,pay,3,anything|i'll|pay,descriptive,n/a,05,214
+x5_66,You don't have to pay.,,381,pay,5,have,direct-address,neutral,05,214
+2255154,You might win.,6.00,399,win,3,win,direct-address,informal,05,215
+5828952,I might win.,6.00,399,win,3,i|might|win,descriptive,n/a,05,215
+2255378,You'll miss everything.,5.00,604,you'll,3,you'll,direct-address,neutral,05,215
+1728527,This might interest you.,5.00,684,interest,4,interest,direct-address,neutral,05,215
+2272089,That doesn't interest me.,5.00,684,interest,4,doesn't|interest|me|that,descriptive,n/a,05,215
+3331015,You almost hit me.,6.00,412,hit,4,almost|hit|me|you,direct-address,informal,05,216
+2248344,I've been hit.,5.00,412,hit,3,hit,descriptive,n/a,05,216
+3446946,It looks so real.,6.00,427,looks,4,it|looks|real|so,descriptive,n/a,05,217
+2358958,I've always wanted children.,6.00,430,wanted,4,always|children|i've|wanted,descriptive,n/a,05,218
+2249449,Just move back.,6.00,438,move,3,move,direct-address,informal,05,219
+3330906,You're a kind woman.,6.00,443,woman,4,woman,direct-address,informal,05,220
+4502503,Everything was taken.,6.00,465,taken,3,taken,descriptive,n/a,05,221
+2111923,Control yourself.,5.00,486,yourself,2,control|yourself,direct-address,informal,05,222
+2111922,Control yourselves.,4.00,8371,yourselves,2,yourselves,direct-address,neutral,05,222
+1841224,I can't control myself.,6.00,484,myself,4,myself,descriptive,n/a,05,222
+2254709,Who controls it?,6.00,3514,controls,3,controls,direct-address,neutral,05,222
+2250038,Take a chance.,6.00,538,chance,3,chance,direct-address,informal,05,223
+x5_67,I'm a little scared.,,2480,scared,4,scared,descriptive,n/a,05,223
+5859774,I like word games.,6.00,545,word,4,games|i|like|word,descriptive,n/a,05,224
+2243622,They're just words.,6.00,556,words,3,words,descriptive,n/a,05,224
+2260372,Don't say another word.,5.00,545,word,4,word,direct-address,informal,05,224
+2548769,I'll miss everyone.,6.00,598,miss,3,miss,descriptive,n/a,05,225
+2360299,I've seen you on TV.,6.00,633,tv,5,tv,direct-address,neutral,05,226
+1879725,I'm just watching television.,6.00,1690,television,4,television,descriptive,n/a,05,226
+2243532,They wouldn't stop.,6.00,675,wouldn't,3,wouldn't,descriptive,n/a,05,227
+2248952,It wouldn't last.,6.00,675,wouldn't,3,last,descriptive,n/a,05,227
+2701912,Close your books.,6.00,719,books,3,books,direct-address,neutral,05,228
+322116,Put your books away.,6.00,719,books,4,away|books|put|your,direct-address,neutral,05,228
+530083,He lives above me.,6.00,737,lives,4,lives,descriptive,n/a,05,229
+2094800,Everyone changes.,6.00,772,changes,2,changes,descriptive,n/a,05,230
+2111856,Everything changes.,6.00,772,changes,2,changes|everything,descriptive,n/a,05,230
+2111852,Everything's changing.,6.00,11777,everything's,2,changing,descriptive,n/a,05,230
+1894596,It's been tried.,5.00,713,tried,3,tried,descriptive,n/a,05,231
+2249063,It's been done.,5.00,230,done,3,done,descriptive,n/a,05,231
+2648486,It's been cleaned.,5.00,6668,cleaned,3,cleaned,descriptive,n/a,05,231
+4494895,It's been difficult.,6.00,892,difficult,3,difficult,descriptive,n/a,05,231
+5469229,It's almost October.,6.00,803,october,3,october,descriptive,n/a,05,231
+2249060,It's been ages.,6.00,2794,ages,3,ages,descriptive,n/a,05,231
+3334035,Send me a bill.,6.00,806,send,4,bill,direct-address,neutral,05,232
+x5_49,"Of course, sir.",,923,sir,3,sir,direct-address,formal,05,232
+2249761,Pick a number.,6.00,870,pick,3,number|pick,direct-address,neutral,05,233
+x5_50,I'll pick seven.,,873,seven,3,seven,descriptive,n/a,05,233
+1789294,The children are safe.,6.00,903,safe,4,are|children|safe|the,descriptive,n/a,05,234
+3405235,"Children have rights, too.",5.00,653,rights,4,rights,descriptive,n/a,05,234
+245897,Children need loving.,3.00,3152,loving,3,loving,descriptive,n/a,05,234
+1806245,We've got company.,6.00,971,we've,3,company|got|we've,descriptive,n/a,05,235
+3826045,They're just young boys.,6.00,974,boys,4,boys,descriptive,n/a,05,236
+257506,I'm just beginning.,6.00,1054,beginning,3,beginning|i'm|just,descriptive,n/a,05,237
+2240760,We're just beginning.,6.00,1054,beginning,3,beginning,descriptive,n/a,05,237
+5495441,They just want jobs.,6.00,1110,jobs,4,jobs,descriptive,n/a,05,238
+2243261,They might agree.,6.00,1121,agree,3,agree,descriptive,n/a,05,239
+4494210,Another problem is safety.,6.00,1135,safety,4,another|is|problem|safety,descriptive,n/a,05,240
+2548199,I'm the leader here.,6.00,1183,leader,4,here|i'm|leader|the,descriptive,n/a,05,241
+2218429,You're the leader.,6.00,1183,leader,3,leader,direct-address,neutral,05,241
+5499274,They're our leaders.,5.00,1625,leaders,3,leaders,descriptive,n/a,05,241
+2647275,Who would wear that?,6.00,1277,wear,4,wear,direct-address,neutral,05,242
+3392976,What would I wear?,6.00,1277,wear,4,i|wear|what|would,descriptive,n/a,05,242
+2245580,Hold onto something.,6.00,1753,onto,3,onto,direct-address,informal,05,243
+2248026,I'm holding it.,6.00,1356,holding,3,holding,descriptive,n/a,05,243
+2245590,Hold your questions.,5.00,728,questions,3,questions,direct-address,neutral,05,243
+303803,He showed what he meant.,6.00,1456,showed,5,meant,descriptive,n/a,05,244
+2111883,Everybody paid.,6.00,1512,everybody,2,everybody|paid,descriptive,n/a,05,245
+2111910,Don't push.,6.00,1598,push,2,push,direct-address,informal,05,246
+1844226,Don't push me.,6.00,1598,push,3,don't|me|push,direct-address,informal,05,246
+3412993,Could you pull over?,6.00,1597,pull,4,pull,direct-address,neutral,05,246
+2663480,That's becoming a problem.,6.00,1613,becoming,4,becoming,descriptive,n/a,05,247
+2248020,I'm half Japanese.,6.00,1624,japanese,3,japanese,descriptive,n/a,05,248
+2241617,We'll send somebody.,6.00,1660,somebody,3,send|somebody|we'll,descriptive,n/a,05,249
+55484,This is a road map.,6.00,1783,map,5,a|is|map|road|this,descriptive,n/a,05,250
+4014632,Do you sell road maps?,6.00,3475,maps,5,maps,direct-address,neutral,05,250
+2648046,Stop picking on me.,6.00,3354,picking,4,picking,direct-address,informal,05,251
+1886328,Are you picking on me?,6.00,3354,picking,5,are|me|on|picking|you,direct-address,neutral,05,251
+238447,I'm being picked up.,6.00,1939,picked,4,picked,descriptive,n/a,05,251
+2245344,Don't go anywhere.,6.00,1965,anywhere,3,anywhere,direct-address,neutral,05,252
+1230486,It might rain.,6.00,1995,rain,3,rain,descriptive,n/a,05,253
+1495875,It might rain today.,6.00,1995,rain,4,it|might|rain|today,descriptive,n/a,05,253
+1369154,It's raining everywhere.,6.00,9920,raining,3,raining,descriptive,n/a,05,253
+3402500,It's not raining yet.,6.00,9920,raining,4,it's|not|raining|yet,descriptive,n/a,05,253
+263527,The game was rained out.,5.00,14652,rained,5,rained,descriptive,n/a,05,253
+3824780,You weren't fair.,6.00,2120,weren't,3,fair|weren't|you,direct-address,neutral,05,254
+2644217,What were their interests?,6.00,2189,interests,4,interests,direct-address,neutral,05,255
+x5_43,Music and sports.,,1224,sports,3,music,descriptive,n/a,05,255
+3594039,That's what interests me.,6.00,2189,interests,4,interests|me|that's|what,descriptive,n/a,05,255
+64877,You're fired.,6.00,2326,fired,2,fired,direct-address,neutral,05,256
+1140531,I was fired.,6.00,2326,fired,3,fired|i|was,descriptive,n/a,05,256
+1851346,I'm firing you.,4.00,4454,firing,3,firing,direct-address,formal,05,256
+2255443,You've gotten better.,6.00,3141,gotten,3,better|gotten|you've,direct-address,neutral,05,257
+2255414,You've been trained.,5.00,2582,trained,3,trained,direct-address,neutral,05,257
+3360199,You've been so understanding.,5.00,1606,understanding,4,understanding,direct-address,neutral,05,257
+3818609,You've chosen well.,6.00,2411,chosen,3,chosen,direct-address,neutral,05,257
+5902883,I've been chosen.,6.00,2411,chosen,3,been|chosen|i've,descriptive,n/a,05,257
+4713661,Did you see any birds?,6.00,2454,birds,5,any,direct-address,neutral,05,258
+x5_39,"Yes, I saw two.",,450,saw,4,two,direct-address,neutral,05,258
+1897748,It'll be our secret.,6.00,2564,it'll,4,be|it'll|our|secret,direct-address,neutral,05,259
+502219,She keeps secrets.,5.00,4206,secrets,3,keeps,descriptive,n/a,05,259
+1334621,Everyone has secrets.,5.00,4206,secrets,3,everyone|has|secrets,descriptive,n/a,05,259
+2722374,It's a family secret.,6.00,1272,secret,4,family,descriptive,n/a,05,259
+3164398,What's your real secret?,6.00,1272,secret,4,real,direct-address,neutral,05,259
+1989670,It's top secret.,4.00,1272,secret,3,top,descriptive,n/a,05,259
+45261,The man stood up.,6.00,2625,stood,4,man,descriptive,n/a,05,260
+2111360,They stood.,5.00,2625,stood,2,stood|they,descriptive,n/a,05,260
+2846449,He stood by himself.,5.00,2625,stood,4,himself,descriptive,n/a,05,260
+4002669,Everybody is sleeping.,6.00,2682,sleeping,3,sleeping,descriptive,n/a,05,261
+6524757,Everyone is sleeping.,6.00,2682,sleeping,3,everyone|is|sleeping,descriptive,n/a,05,261
+1557007,I can sleep anywhere.,5.00,1965,anywhere,4,anywhere|can|i|sleep,descriptive,n/a,05,261
+2717855,Children love cake.,6.00,2800,cake,3,cake,descriptive,n/a,05,262
+5224444,Children like cake.,6.00,2800,cake,3,cake|children|like,descriptive,n/a,05,262
+265962,Watch your fingers!,5.00,2969,fingers,3,fingers|watch|your,direct-address,informal,05,263
+2245247,Cross your fingers.,3.00,2969,fingers,3,fingers,direct-address,neutral,05,263
+1836278,That was my finger.,4.00,3078,finger,4,finger,descriptive,n/a,05,263
+246248,Don't cut your finger.,6.00,3078,finger,4,cut|don't|finger|your,direct-address,neutral,05,263
+2291610,I almost cut myself.,5.00,559,cut,4,cut,descriptive,n/a,05,263
+2240560,We're closing early.,6.00,3190,closing,3,closing,descriptive,n/a,05,264
+2249067,It's closing time.,6.00,3190,closing,3,closing|it's|time,descriptive,n/a,05,265
+3733786,Wash everything.,6.00,3243,wash,2,wash,direct-address,neutral,05,266
+3824873,English is spoken everywhere.,6.00,3308,spoken,4,english|spoken,descriptive,n/a,05,267
+321826,I'm left-handed.,6.00,3464,handed,3,handed|i'm|left,descriptive,n/a,05,268
+2713762,I'm right-handed.,6.00,3464,handed,3,handed,descriptive,n/a,05,268
+261322,I took her arm.,4.00,1870,arm,4,arm|her|i|took,descriptive,n/a,05,268
+4499100,Pull your hand out.,4.00,1597,pull,4,hand|out|pull|your,direct-address,informal,05,268
+2249606,No one's around.,6.00,3673,one's,3,one's,descriptive,n/a,05,269
+1830532,No one ate anything.,6.00,3944,ate,4,anything|ate|no|one,descriptive,n/a,05,270
+3822604,No one ever visits me.,6.00,4278,visits,5,ever|visits,descriptive,n/a,05,271
+2094852,Everyone's watching.,6.00,4452,everyone's,2,everyone's,descriptive,n/a,05,272
+2111858,Everyone's waiting.,6.00,4452,everyone's,2,everyone's|waiting,descriptive,n/a,05,272
+2094851,Everyone waited.,6.00,4566,waited,2,waited,descriptive,n/a,05,272
+2111879,Everybody waited.,6.00,4566,waited,2,everybody|waited,descriptive,n/a,05,272
+5850459,I just listened.,6.00,4970,listened,3,listened,descriptive,n/a,05,273
+x5_65,What did they say?,,132,say,4,say,direct-address,neutral,05,273
+2663549,The problem isn't ours.,6.00,5414,ours,4,ours,descriptive,n/a,05,274
+3135733,Don't touch my sandwich.,6.00,5705,sandwich,4,sandwich,direct-address,informal,05,275
+5743901,I've eaten my sandwich.,6.00,5705,sandwich,4,eaten|i've|my|sandwich,descriptive,n/a,05,275
+x5_12,Can I have a bite?,,4150,bite,5,bite,direct-address,neutral,05,275
+441961,Please read the meter.,6.00,6015,meter,4,meter|please|read|the,direct-address,formal,05,276
+3590847,I just cleaned this.,6.00,6668,cleaned,4,cleaned|i|just|this,descriptive,n/a,05,277
+6091584,My father builds bridges.,6.00,7348,builds,4,bridges|builds|father,descriptive,n/a,05,278
+4494130,Fathers aren't the problem.,4.00,6087,fathers,4,fathers,descriptive,n/a,05,278
+1681379,How's your arm?,6.00,7385,how's,3,arm|how's|your,direct-address,neutral,05,279
+x5_37,It still hurts a little.,,4245,hurts,5,hurt,descriptive,n/a,05,279
+x5_38,I hope you feel better soon.,,473,soon,6,better,direct-address,neutral,05,279
+2546786,I was just remembering.,6.00,7505,remembering,4,remembering,descriptive,n/a,05,280
+2218387,You're so old.,4.00,169,old,3,old,direct-address,informal,05,281
+288618,He is close to sixty.,6.00,7619,sixty,5,sixty,descriptive,n/a,05,281
+2245420,Everybody gets old.,5.00,1512,everybody,3,gets,descriptive,n/a,05,281
+5859392,I'm half your age.,5.00,466,age,4,age,direct-address,neutral,05,281
+282154,Act your age.,4.00,487,act,3,act|age|your,direct-address,neutral,05,281
+4968959,My life's been good.,6.00,8017,life's,4,been|good|life's|my,descriptive,n/a,05,282
+x5_62,I'm happy for you.,,434,happy,4,happy,direct-address,neutral,05,282
+2111361,They smiled.,6.00,8351,smiled,2,smiled|they,descriptive,n/a,05,283
+5265304,I'm heavier than you.,6.00,8421,heavier,4,heavier,direct-address,neutral,05,284
+x5_23,He weighs more than me.,,10318,weighs,5,weigh,descriptive,n/a,05,284
+3374672,I've dreamed about this.,6.00,9506,dreamed,4,dreamed,descriptive,n/a,05,285
+2063034,You must've seen something.,6.00,12671,must've,4,must've|seen|something|you,direct-address,neutral,05,286
+2232856,I can't stand Mondays.,6.00,13912,mondays,4,mondays,descriptive,n/a,05,287
+x5_33,I love Mondays.,,13912,mondays,3,monday,descriptive,n/a,05,287
+2953246,Now just do it.,5.00,72,now,4,now,direct-address,informal,05,288
+2450065,You may also come.,5.00,157,come,4,also|come,direct-address,formal,05,289
+3728915,I could be next.,5.00,185,next,4,next,descriptive,n/a,05,290
+2253781,Tomorrow's another day.,5.00,11489,tomorrow's,3,tomorrow's,descriptive,n/a,05,291
+2249079,It's game night.,5.00,216,night,3,night,descriptive,n/a,05,291
+2253840,Use your head.,5.00,281,head,3,head,direct-address,informal,05,292
+280160,Keep your head down.,4.00,281,head,4,down|head|keep|your,direct-address,neutral,05,292
+2253841,Use your brain.,5.00,1203,brain,3,brain,direct-address,informal,05,292
+301985,He has a good brain.,5.00,1203,brain,5,a|brain|good|has|he,descriptive,n/a,05,292
+3312922,We changed our minds.,5.00,3287,minds,4,changed|minds|our|we,descriptive,n/a,05,292
+2301292,I can read minds.,3.00,3287,minds,4,minds,descriptive,n/a,05,292
+3733564,Everything is white.,5.00,286,white,3,white,descriptive,n/a,05,293
+321552,Everything went black.,4.00,318,black,3,black,descriptive,n/a,05,293
+2254961,You could run.,5.00,302,run,3,run,direct-address,neutral,05,294
+3736882,They're just using you.,5.00,316,using,4,using,direct-address,informal,05,295
+2240765,We're having company.,5.00,385,we're,3,having,descriptive,n/a,05,296
+301400,He is known to everyone.,5.00,389,known,5,known,descriptive,n/a,05,297
+2111627,Leave everything.,5.00,448,leave,2,leave,direct-address,informal,05,298
+3732049,What gave me away?,5.00,549,gave,4,away|gave|me|what,direct-address,neutral,05,299
+x5_41,Your smile gave you away.,,2296,smile,5,smile,direct-address,neutral,05,299
+73238,Come back within a month.,5.00,552,month,5,month,direct-address,neutral,05,300
+1108662,How many died?,5.00,621,died,3,many,descriptive,n/a,05,301
+313816,She died yesterday afternoon.,5.00,1910,afternoon,4,afternoon|died|she|yesterday,descriptive,n/a,05,301
+4497303,Three workers died.,4.00,1198,workers,3,workers,descriptive,n/a,05,301
+4497284,Your mother died yesterday.,4.00,1313,yesterday,4,mother,direct-address,neutral,05,301
+2163460,Did your cat die?,4.00,1698,cat,4,cat,direct-address,neutral,05,301
+1453856,Lead the way.,5.00,625,lead,3,lead,direct-address,neutral,05,302
+5840445,I led the way.,5.00,799,led,4,led,descriptive,n/a,05,302
+2254958,You could lead.,5.00,625,lead,3,could|lead|you,direct-address,neutral,05,302
+2645442,They needed one another.,5.00,668,needed,4,needed,descriptive,n/a,05,303
+2549826,Let it dry.,5.00,1840,dry,3,dry,direct-address,informal,05,304
+1898345,Let the boy go.,5.00,677,boy,4,boy,direct-address,neutral,05,304
+1844177,Let them do their jobs.,5.00,1110,jobs,5,their,descriptive,n/a,05,304
+2852140,Let go of my hair.,5.00,865,hair,5,hair,direct-address,informal,05,304
+2852139,Let go of my arms.,4.00,1577,arms,5,arms,direct-address,informal,05,304
+2060036,Just watch and learn.,5.00,687,learn,4,learn,direct-address,informal,05,305
+2243152,They held hands.,5.00,699,hands,3,hands|held|they,descriptive,n/a,05,306
+2111871,Everyone looked.,5.00,800,looked,2,looked,descriptive,n/a,05,307
+48214,The dog went away.,5.00,815,dog,4,away|dog|the|went,descriptive,n/a,05,308
+x5_58,I hope it comes back.,,423,comes,5,back,descriptive,n/a,05,308
+2245188,Close your mouth.,4.00,1555,mouth,3,mouth,direct-address,informal,05,309
+2253885,Watch your mouth.,4.00,1555,mouth,3,mouth|watch|your,direct-address,informal,05,309
+1860649,Keep your voice down.,5.00,907,voice,4,voice,direct-address,informal,05,309
+2119591,It's become dark.,5.00,954,dark,3,become|dark,descriptive,n/a,05,310
+2119590,It's gotten dark.,5.00,3141,gotten,3,gotten,descriptive,n/a,05,310
+268067,All the boys went away.,5.00,974,boys,5,all|away|boys|the|went,descriptive,n/a,05,311
+x5_59,Where did they go?,,112,did,4,they,descriptive,n/a,05,311
+993268,He died recently.,5.00,1014,recently,3,died|he|recently,descriptive,n/a,05,312
+2245439,Everyone kept talking.,5.00,1074,kept,3,kept,descriptive,n/a,05,313
+4502045,Both companies were sold.,5.00,1138,sold,4,companies|sold,descriptive,n/a,05,314
+2243166,They just ended.,5.00,1257,ended,3,ended,descriptive,n/a,05,315
+441998,Choose one person.,5.00,1284,choose,3,choose|one|person,direct-address,neutral,05,316
+57563,Choose between these two.,5.00,1284,choose,4,between,direct-address,neutral,05,316
+4496547,Who chose those colors?,5.00,3193,colors,4,colors,direct-address,neutral,05,316
+5859788,I chose the colors.,5.00,3193,colors,4,chose|colors|i|the,descriptive,n/a,05,316
+1826216,I caught two fish.,5.00,1327,fish,4,two,descriptive,n/a,05,317
+449029,Catch him.,5.00,1406,catch,2,catch,direct-address,informal,05,317
+2439688,I opened one eye.,5.00,1478,opened,4,eye|i|one|opened,descriptive,n/a,05,318
+2394485,The story appears true.,5.00,1505,appears,4,appears,descriptive,n/a,05,319
+299153,He appeared young.,5.00,1537,appeared,3,appeared,descriptive,n/a,05,320
+3347138,You'd better stand back.,5.00,1573,you'd,4,you'd,direct-address,informal,05,321
+6560541,I've been going out with Mary for months.,5.00,1715,mary,8,months,descriptive,n/a,05,322
+3741123,"Possibly, it's true.",5.00,1755,possibly,3,possibly,descriptive,n/a,05,323
+1768926,It can't possibly work.,5.00,1755,possibly,4,can't|it|possibly|work,descriptive,n/a,05,324
+2243717,They've been caught.,5.00,1788,they've,3,they've,descriptive,n/a,05,325
+2243548,They'll catch us.,5.00,2003,they'll,3,catch|they'll|us,descriptive,n/a,05,325
+2545047,You're breaking my heart.,5.00,1838,breaking,4,breaking,direct-address,informal,05,326
+1249413,Don't break my heart.,4.00,659,break,4,break|don't|heart|my,direct-address,neutral,05,326
+4496166,I'm broken-hearted.,5.00,9288,hearted,3,hearted,descriptive,n/a,05,326
+2646175,Who hasn't been there?,5.00,1982,hasn't,4,hasn't,direct-address,neutral,05,327
+x5_42,I haven't been there yet.,,797,haven't,5,yet,descriptive,n/a,05,327
+410747,That's my favorite chair.,5.00,2049,chair,4,chair,descriptive,n/a,05,328
+2022,I dreamt about you.,5.00,14427,dreamt,4,dreamt,direct-address,neutral,05,329
+2045334,Everyone dreams.,5.00,2512,dreams,2,dreams,descriptive,n/a,05,329
+322757,Dreams come true.,5.00,2512,dreams,3,come|dreams|true,descriptive,n/a,05,329
+1780075,I'm wet.,5.00,2791,wet,2,wet,descriptive,n/a,05,330
+x5_63,Here's a towel.,,7526,towel,3,towel,direct-address,neutral,05,330
+1851343,I'm letting you go.,5.00,2817,letting,4,letting,direct-address,neutral,05,331
+2546551,I'm not letting you go.,5.00,2817,letting,5,go|i'm|letting|not|you,direct-address,neutral,05,331
+242601,Show me today's paper.,5.00,2844,today's,4,today's,direct-address,neutral,05,332
+5792480,I've sung all my life.,5.00,7814,sung,5,sung,descriptive,n/a,05,333
+312898,She became a singer.,5.00,2891,singer,4,a|became|she|singer,descriptive,n/a,05,333
+5853290,Everybody sang.,4.00,5948,sang,2,sang,descriptive,n/a,05,333
+278174,Birds sing.,4.00,2788,sing,2,sing,descriptive,n/a,05,333
+3819652,What's our arrival time?,5.00,3319,arrival,4,arrival,direct-address,neutral,05,334
+2240825,We're all ears.,5.00,3830,ears,3,all|ears|we're,direct-address,neutral,05,335
+2247641,I would've paid.,5.00,3871,would've,3,would've,descriptive,n/a,05,336
+2546225,Ask me anything anytime.,5.00,5093,anytime,4,anytime,direct-address,informal,05,336
+5168493,I wish I hadn't cried.,5.00,5112,cried,5,hadn't,descriptive,n/a,05,337
+2388164,I never pick fights.,5.00,5125,fights,4,fights,descriptive,n/a,05,338
+2648472,Look at the meter.,5.00,6015,meter,4,meter,direct-address,informal,05,339
+19567,I could've cried.,5.00,6286,could've,3,could've,descriptive,n/a,05,340
+4494595,The problem is theirs.,5.00,7319,theirs,4,theirs,descriptive,n/a,05,341
+2389853,I parked around back.,5.00,7789,parked,4,parked,descriptive,n/a,05,342
+2094844,Everyone smiled.,5.00,8351,smiled,2,smiled,descriptive,n/a,05,343
+2996321,It could be anyone's.,5.00,9607,anyone's,4,anyone's,descriptive,n/a,05,344
+1849365,Show yourself.,4.00,486,yourself,2,yourself,direct-address,neutral,05,345
+456317,Look into my eyes.,4.00,608,eyes,4,into,direct-address,neutral,05,346
+2947139,You're no longer children.,4.00,702,longer,4,children|longer|no|you're,direct-address,neutral,05,347
+4964949,Cut the paper in half.,4.00,899,paper,5,paper,direct-address,neutral,05,348
+3096262,I've been seeing things.,4.00,966,seeing,4,been|i've|seeing|things,descriptive,n/a,05,349
+2254916,Winning isn't everything.,4.00,1120,winning,3,winning,descriptive,n/a,05,350
+1895621,You're dreaming.,4.00,7457,dreaming,2,dreaming,direct-address,neutral,05,351
+3733813,Stop dreaming.,4.00,7457,dreaming,2,dreaming|stop,direct-address,informal,05,351
+x5_29,I had a strange dream last night.,,2297,strange,7,strange,descriptive,n/a,05,351
+2939908,I don't dream.,4.00,1291,dream,3,dream,descriptive,n/a,05,351
+18526,He became rich.,4.00,1306,rich,3,rich,descriptive,n/a,05,352
+2245616,I became rich.,4.00,1306,rich,3,became|i|rich,descriptive,n/a,05,352
+885696,I know a guy named Smith.,4.00,1364,smith,6,named|smith,descriptive,n/a,05,353
+x5_22,His brother lives in Boston too.,,2129,boston,6,brother,descriptive,n/a,05,353
+245478,That couldn't be helped.,4.00,1383,helped,4,be|couldn't|helped|that,descriptive,n/a,05,354
+2143118,"There's another meaning, too.",4.00,1417,meaning,4,meaning,descriptive,n/a,05,355
+3721791,You never showed.,4.00,1456,showed,3,showed,direct-address,informal,05,356
+276302,Who runs the show?,4.00,1522,runs,4,runs,direct-address,neutral,05,357
+2270382,Don't get carried away.,4.00,1732,carried,4,carried,direct-address,informal,05,358
+4496322,I got carried away.,4.00,1732,carried,4,away|carried|got|i,descriptive,n/a,05,358
+323782,Dry your eyes.,4.00,1840,dry,3,dry|eyes|your,direct-address,informal,05,359
+2243546,They'll buy anything.,4.00,2003,they'll,3,they'll,descriptive,n/a,05,360
+628617,We're almost like brothers.,4.00,2047,brothers,4,almost|brothers|like|we're,descriptive,n/a,05,361
+4502216,The sound suddenly stopped.,4.00,2071,suddenly,4,sound|stopped|suddenly|the,descriptive,n/a,05,362
+32083,Everybody puts me down.,4.00,2829,puts,4,puts,descriptive,n/a,05,363
+3346359,You've got sharp eyes.,4.00,3109,sharp,4,sharp,direct-address,neutral,05,364
+3726955,I'm waiting tables.,4.00,4349,tables,3,tables,descriptive,n/a,05,365
+2218125,You're catching on.,4.00,5016,catching,3,catching,direct-address,neutral,05,366
+28197,I'm catching on.,4.00,5016,catching,3,catching|i'm|on,descriptive,n/a,05,366
+303486,He understands physics.,4.00,5715,understands,3,understands,descriptive,n/a,05,367
+x5_24,She studies chemistry too.,,3880,chemistry,4,chemistry,descriptive,n/a,05,367
+2784326,Stop ordering me around.,4.00,6720,ordering,4,ordering,direct-address,informal,05,368
+325981,My eyes are watering.,4.00,11723,watering,4,watering,descriptive,n/a,05,369
+4500160,My eyes watered.,4.00,14391,watered,3,watered,descriptive,n/a,05,370
+29653,Lincoln died in 1865.,3.00,4186,lincoln,3,lincoln,descriptive,n/a,05,371
+6532466,Mozart died in 1791.,3.00,13468,mozart,3,mozart,descriptive,n/a,05,371
+17016,Your voice carries well.,3.00,4747,carries,4,carries,direct-address,neutral,05,372
+3824121,Hold onto your hats.,3.00,6782,hats,4,hats|hold|onto|your,direct-address,informal,05,373
+2251030,That'll show them.,3.00,7318,that'll,3,show|that'll|them,descriptive,n/a,05,374
+2203681,Who'll fight?,3.00,14594,who'll,2,who'll,direct-address,neutral,05,375
+254946,I was just making sure.,8.00,257,making,5,i|just|making|sure|was,descriptive,n/a,05,376
+2713593,That's quite possible.,8.00,508,quite,3,quite,descriptive,n/a,05,377
+3737293,Everyone wants money.,8.00,571,wants,3,everyone|money|wants,descriptive,n/a,05,378
+2092543,Anybody here?,8.00,2635,anybody,2,anybody|here,direct-address,neutral,05,379
+5852941,I've just moved.,7.00,1041,moved,3,i've|just|moved,descriptive,n/a,05,380
+2249472,Just start walking.,7.00,1460,walking,3,just|start|walking,direct-address,neutral,05,381
+2980843,We washed our hands.,7.00,5961,washed,4,hands|our|washed|we,descriptive,n/a,05,382
+1779932,Everything's under control.,7.00,11777,everything's,3,under,descriptive,n/a,05,383
+3374673,I've dreamed of this.,6.00,9506,dreamed,4,dreamed|i've|of|this,descriptive,n/a,05,384
+6532456,That's wet.,5.00,2791,wet,2,that's|wet,descriptive,n/a,05,385
+2546531,I'm parked around back.,5.00,7789,parked,4,around|back|i'm|parked,descriptive,n/a,05,386
+2784041,There's also another meaning.,4.00,1417,meaning,4,also|another|meaning|there's,descriptive,n/a,05,387
+5512944,We've become like brothers.,4.00,2047,brothers,4,brothers,descriptive,n/a,05,388
+2250059,Take no chances.,4.00,2904,chances,3,chances|no|take,direct-address,neutral,05,389

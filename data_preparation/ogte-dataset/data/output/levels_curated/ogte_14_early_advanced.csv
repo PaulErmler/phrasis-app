@@ -1,0 +1,969 @@
+id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
+3826754,What's your analysis?,,1280,analysis,3,what's,direct-address,neutral,14,1
+x14_1,"Honestly, I'm still weighing my options.",,8563,weighing,6,options|weighing,descriptive,n/a,14,1
+4529773,I agree with your assessment.,,3179,assessment,5,agree|assessment,direct-address,neutral,14,1
+4529843,Was that a fair assessment?,,3179,assessment,5,fair,direct-address,neutral,14,1
+x14_3,"I think it was reasonable, all things considered.",,2531,reasonable,8,reasonable|considered,descriptive,n/a,14,1
+2953879,We'll start an investigation immediately.,,1816,investigation,5,immediately,descriptive,n/a,14,2
+4664309,The investigation could take weeks.,,1816,investigation,5,weeks,descriptive,n/a,14,2
+x14_4,What's the official position?,,738,official,4,official|position,direct-address,neutral,14,2
+x14_5,They haven't decided yet.,,835,decided,4,decided,descriptive,n/a,14,2
+5870002,We need an independent investigation.,,1816,investigation,5,independent,descriptive,n/a,14,2
+3513490,How's your investigation going?,,7385,how's,4,how's,direct-address,neutral,14,2
+2406807,I strongly advise you to reconsider.,,10988,reconsider,6,advise|strongly,direct-address,formal,14,3
+3127858,I suggest you reconsider your decision.,,10988,reconsider,6,decision,direct-address,formal,14,3
+x14_6,Have you given it more thought?,,363,given,6,thought,direct-address,neutral,14,3
+x14_7,I'm still weighing my options.,,8563,weighing,5,weighing,descriptive,n/a,14,3
+4529079,"Under normal circumstances, I'd agree to do that.",,2500,circumstances,8,normal,descriptive,n/a,14,3
+5916579,You must've been tired.,,12671,must've,4,must've,direct-address,neutral,14,3
+682348,I didn't vote in the last election.,,859,election,7,vote,descriptive,n/a,14,4
+283969,There is little hope of his winning the election.,,1120,winning,9,his|hope|is|little|of|there|winning,descriptive,n/a,14,4
+273532,The result of the election will be announced tomorrow.,,1145,announced,9,announced|be|result|tomorrow|will,descriptive,n/a,14,4
+31909,Mary felt happy when she learned the results of the election.,,1715,mary,11,felt|happy|learned|results|she|when,descriptive,n/a,14,4
+1315808,There's a good chance that he'll be elected.,,2771,he'll,8,chance|he'll|there's,descriptive,n/a,14,4
+457538,His chances of being elected are good.,,2904,chances,7,chances,descriptive,n/a,14,4
+283968,Is there any possibility that he'll win the election?,,2771,he'll,9,any|possibility,direct-address,neutral,14,4
+x14_10,It's too close to call.,,422,close,5,close|call,descriptive,n/a,14,4
+1899412,Don't take it too literally.,,1299,literally,5,don't|it|literally|take|too,direct-address,informal,14,5
+2291175,I didn't mean that literally.,,1299,literally,5,didn't|mean|that,descriptive,n/a,14,6
+500548,Are you involved in politics?,,1422,politics,5,involved,direct-address,neutral,14,7
+5676704,I hate talking about politics.,,1422,politics,5,talking,descriptive,n/a,14,7
+5932957,I find politics very interesting.,,1422,politics,5,interesting,descriptive,n/a,14,7
+x14_8,Why do you find it interesting?,,1071,interesting,6,interesting,direct-address,neutral,14,7
+2539701,I'm thinking of going into politics.,,1422,politics,6,thinking,descriptive,n/a,14,7
+241757,"If students today had more free time, they might show more interest in politics.",,1422,politics,14,if|interest|might|students,descriptive,n/a,14,7
+2270336,Don't change the channel.,,1466,channel,4,change|channel,direct-address,informal,14,8
+73467,What is on Channel 10?,,1466,channel,4,on|what,direct-address,neutral,14,9
+31763,Mary is interested in politics.,,1715,mary,5,in|interested|mary,descriptive,n/a,14,10
+2374673,I keep a journal.,,1747,journal,4,a|journal|keep,descriptive,n/a,14,11
+4500549,We need leadership.,,1749,leadership,3,leadership|need,descriptive,n/a,14,12
+2207452,Get your priorities straight.,,6331,priorities,4,priorities|straight,direct-address,informal,14,12
+2360197,I have other priorities.,,6331,priorities,4,have|i|other|priorities,descriptive,n/a,14,12
+4500975,Pain management is the priority.,,3542,priority,5,management,descriptive,n/a,14,12
+5363898,Storage space isn't a priority.,,3542,priority,5,space|storage,descriptive,n/a,14,12
+2892038,That's not exactly a top priority.,,3542,priority,6,exactly,descriptive,n/a,14,12
+2218469,You're under investigation.,,1816,investigation,3,investigation|under|you're,direct-address,neutral,14,13
+5136940,An investigation has been ordered.,,1856,ordered,5,an|been|has|ordered,descriptive,n/a,14,13
+4664800,The investigation is continuing.,,3075,continuing,4,continuing,descriptive,n/a,14,13
+4663464,Police are continuing their investigation.,,3075,continuing,5,police|their,descriptive,n/a,14,13
+4500348,An investigation was launched.,,2333,launched,4,launched|was,descriptive,n/a,14,13
+4496763,The investigation was incomplete.,,8424,incomplete,4,incomplete,descriptive,n/a,14,13
+2358998,I have an investigation to conduct.,,2861,conduct,6,conduct,descriptive,n/a,14,13
+5784185,We often discuss politics.,,2178,discuss,4,discuss|often,descriptive,n/a,14,14
+22866,We argued politics.,,3814,argued,3,argued,descriptive,n/a,14,14
+5320503,I don't like to argue about politics.,,3178,argue,7,about|argue|don't|i|like|politics|to,descriptive,n/a,14,14
+x14_9,Then let's change the subject.,,1163,subject,5,subject|change,direct-address,informal,14,14
+27292,We would often sit up all night discussing politics.,,4764,discussing,9,discussing|night|sit,descriptive,n/a,14,14
+248939,We must separate politics from religion.,,1860,religion,6,from|must|religion|separate,descriptive,n/a,14,14
+2542973,I'm just a concerned citizen.,,3638,citizen,5,concerned,descriptive,n/a,14,15
+4666071,Are you a Canadian citizen?,,3638,citizen,5,canadian,direct-address,neutral,14,15
+1293129,You must respect senior citizens.,,1913,citizens,5,citizens|respect|senior,direct-address,neutral,14,15
+1699402,It's popular among senior citizens.,,1913,citizens,5,among|it's|popular,descriptive,n/a,14,15
+4493767,"Tickets are $5 for adults, and $2 for senior citizens and children.",,2489,adults,10,adults|and|children|tickets,descriptive,n/a,14,15
+273660,A good citizen obeys the laws.,,14877,obeys,6,laws,descriptive,n/a,14,15
+909571,Spending time with your family should be your priority.,,3542,priority,9,family|spending,direct-address,neutral,14,16
+909572,Spending time with your significant other should be high on your priority list.,,3542,priority,13,significant,direct-address,neutral,14,16
+5205490,I just want a little more freedom to make my own decisions.,,1916,decisions,12,decisions|just|make|more|my|own|to,descriptive,n/a,14,16
+x14_30,That's perfectly reasonable.,,2531,reasonable,3,perfectly|reasonable,descriptive,n/a,14,16
+302948,He seems tired.,,2004,tired,3,seems,descriptive,n/a,14,17
+3347156,You look rather tired.,,2004,tired,4,rather,direct-address,neutral,14,17
+3095216,Weren't you tired?,,2120,weren't,3,weren't,direct-address,neutral,14,17
+x14_16,"I'm exhausted, actually.",,6083,exhausted,3,exhausted|actually,descriptive,n/a,14,17
+2952864,I'm starting to feel tired.,,2004,tired,5,starting,descriptive,n/a,14,17
+24996,I'm sort of tired.,,2004,tired,4,sort,descriptive,n/a,14,17
+3721655,My arms are tired.,,2004,tired,4,arms,descriptive,n/a,14,18
+2648469,My legs are tired.,,2144,legs,4,legs,descriptive,n/a,14,18
+x14_18,Sit down for a while.,,1343,sit,5,sit|while,direct-address,neutral,14,18
+4523302,"Sooner or later, I'll probably get tired of doing this.",,4637,sooner,10,doing|get|later|sooner,descriptive,n/a,14,18
+5853192,I tire easily.,,6746,tire,3,easily|tire,descriptive,n/a,14,18
+6105945,Doing that was tiring.,,14048,tiring,4,tiring,descriptive,n/a,14,18
+1701458,Today was a tiring day.,,14048,tiring,5,a|day|tiring|today|was,descriptive,n/a,14,18
+73072,I got tired of lying in bed all day.,,2145,lying,9,bed|day|got|lying,descriptive,n/a,14,19
+255482,I am so tired that I can hardly walk.,,2811,hardly,9,hardly|so|walk,descriptive,n/a,14,19
+307461,He was so tired that he could hardly stand.,,2811,hardly,9,could|stand,descriptive,n/a,14,19
+2537610,I'm tired of just sitting here and doing nothing.,,2004,tired,9,sitting,descriptive,n/a,14,19
+261504,I'm tired of working a nine-to-five job.,,2004,tired,9,five|nine,descriptive,n/a,14,19
+x14_20,Maybe it's time for a change.,,330,maybe,6,time|change,descriptive,n/a,14,19
+3824984,You weren't elected.,,2321,elected,3,elected|weren't|you,direct-address,neutral,14,20
+4831739,Did you watch the presidential debate?,,2881,presidential,6,debate|did|presidential|watch,direct-address,neutral,14,20
+x14_11,Most of it. I muted the rest.,,13469,muted,7,muted|most,descriptive,n/a,14,20
+4494781,Are you a Republican?,,2035,republican,4,are|republican,direct-address,neutral,14,20
+2644661,Why are you a Republican?,,2035,republican,5,why,direct-address,neutral,14,20
+x14_12,I'd rather not discuss party politics.,,2178,discuss,6,party|discuss,descriptive,n/a,14,20
+1356015,Lincoln was elected President of the United States in 1860.,,4186,lincoln,9,lincoln|president|states|united,descriptive,n/a,14,20
+43912,You'll find that book in the historical section of the library.,,2055,historical,11,book|find|historical|library|section|you'll,direct-address,neutral,14,21
+2249504,Keep me updated.,,2747,updated,3,me|updated,direct-address,neutral,14,22
+5851609,I want updates.,,4217,updates,3,updates,direct-address,informal,14,22
+4495696,I appreciate the updates.,,4217,updates,4,appreciate,direct-address,neutral,14,22
+2646530,Thanks for the update.,,2076,update,4,for|thanks,direct-address,neutral,14,22
+4498331,I've updated the blog entry.,,2747,updated,5,blog|entry,descriptive,n/a,14,22
+x14_33,Looks great.,,427,looks,2,looks|great,descriptive,n/a,14,22
+5786451,We're updating the site.,,10315,updating,4,site|updating,descriptive,n/a,14,22
+903713,There is an urgent need for them to update their system.,,5524,urgent,11,system|urgent,descriptive,n/a,14,22
+3818654,Why don't you update your website?,,2076,update,6,website,direct-address,neutral,14,23
+4187426,How can I update this software?,,2076,update,6,software,direct-address,neutral,14,23
+x14_34,There's a tutorial online.,,9004,tutorial,4,tutorial|online,descriptive,n/a,14,23
+71195,I look forward to corresponding with you.,,5653,corresponding,7,corresponding|forward,direct-address,formal,14,23
+2418527,Thank you for your prompt reply.,,8342,prompt,6,prompt|reply|thank,direct-address,formal,14,23
+2254914,Who's your lawyer?,,2143,lawyer,3,who's,direct-address,neutral,14,24
+2547227,I'm calling my lawyer.,,2143,lawyer,4,calling,descriptive,n/a,14,24
+1403176,I demand to speak with my lawyer.,,2143,lawyer,7,demand|speak,descriptive,n/a,14,24
+x14_13,We'll arrange that immediately.,,6847,arrange,4,arrange|immediately,direct-address,formal,14,24
+2254642,Where's my lawyer?,,6046,where's,3,where's,direct-address,neutral,14,24
+1555874,My father-in-law is a lawyer.,,2143,lawyer,7,law,descriptive,n/a,14,25
+250006,I have a cousin who is a lawyer.,,3515,cousin,8,cousin,descriptive,n/a,14,25
+253298,I know a girl whose father is a lawyer.,,2143,lawyer,9,whose,descriptive,n/a,14,25
+261715,I intend to become a lawyer.,,6002,intend,6,become|intend,descriptive,n/a,14,25
+5226708,I haven't yet talked to my lawyer about this.,,2390,talked,9,haven't|this|yet,descriptive,n/a,14,25
+2953954,We've already hired a lawyer.,,3527,hired,5,already|hired|we've,descriptive,n/a,14,26
+5850396,I've hired a new lawyer.,,3527,hired,5,i've|new,descriptive,n/a,14,26
+4529068,The defense lawyer didn't ask the right questions.,,2143,lawyer,8,ask|defense,descriptive,n/a,14,26
+2452037,The lawyer decided to appeal the case.,,2143,lawyer,7,appeal|case,descriptive,n/a,14,26
+886911,She advised him to see a lawyer.,,5190,advised,7,advised,descriptive,n/a,14,26
+320436,Why don't you consult a lawyer?,,8180,consult,6,consult,direct-address,neutral,14,26
+4015717,How did your meeting with your lawyer go?,,2143,lawyer,8,meeting,direct-address,neutral,14,27
+x14_14,"It went well, considering.",,2266,considering,4,considering,descriptive,n/a,14,27
+4262926,I have an appointment with my lawyer today.,,3013,appointment,8,appointment|today,descriptive,n/a,14,27
+3921626,My lawyers said I should meet with you.,,3662,lawyers,8,meet,direct-address,neutral,14,27
+3921176,My lawyer has advised me to cooperate.,,9037,cooperate,7,cooperate,descriptive,n/a,14,27
+2111296,They're fake.,,2231,fake,2,fake|they're,descriptive,n/a,14,28
+4826252,It's obviously fake.,,2231,fake,3,obviously,descriptive,n/a,14,28
+4015979,Perhaps it's a fake.,,2231,fake,4,perhaps,descriptive,n/a,14,28
+4494722,The message was fake.,,2231,fake,4,message,descriptive,n/a,14,28
+2566220,This diamond is fake.,,3448,diamond,4,diamond,descriptive,n/a,14,28
+3162950,"That's a fake beard, isn't it?",,6174,beard,6,beard|isn't,direct-address,neutral,14,28
+4013572,It's barely recognizable.,,13140,recognizable,3,barely|recognizable,descriptive,n/a,14,28
+3171871,It's awkward.,,4284,awkward,2,awkward,descriptive,n/a,14,29
+4495051,Is that deliberate?,,8716,deliberate,3,deliberate|is|that,direct-address,neutral,14,29
+2648491,It was deliberate.,,8716,deliberate,3,deliberate,descriptive,n/a,14,29
+5136926,It's only a minor misunderstanding.,,10154,misunderstanding,5,misunderstanding,descriptive,n/a,14,29
+3605287,Don't worry about the minor details.,,2377,minor,6,details|worry,direct-address,informal,14,29
+1832194,"Since you're a minor, you aren't allowed to enter.",,2377,minor,9,allowed|aren't|enter|since,direct-address,neutral,14,29
+4016418,There are minor differences.,,2865,differences,4,differences,descriptive,n/a,14,29
+3528441,That's a minor detail.,,2601,detail,4,detail|that's,descriptive,n/a,14,29
+2387645,I need to hire a lawyer.,,3590,hire,6,a|hire|i|lawyer|need|to,descriptive,n/a,14,30
+2953791,We should hire a lawyer.,,3590,hire,5,hire|should,descriptive,n/a,14,30
+2301299,I can recommend a good lawyer.,,2439,recommend,6,can|good|recommend,descriptive,n/a,14,30
+x14_15,I'd appreciate that.,,1836,appreciate,3,appreciate,direct-address,formal,14,30
+2451143,Can you introduce me to a lawyer who speaks French?,,3778,introduce,10,french|introduce|speaks,direct-address,neutral,14,30
+3826939,We'll get you the best lawyer we can afford.,,2589,afford,9,best,direct-address,neutral,14,30
+953161,Circumstances have changed.,,2500,circumstances,3,changed|circumstances,descriptive,n/a,14,31
+3126597,These are special circumstances.,,2500,circumstances,4,special|these,descriptive,n/a,14,32
+4493841,The circumstances were different then.,,2500,circumstances,5,different|then,descriptive,n/a,14,33
+4756799,I admit that I'm tired.,,2547,admit,5,admit,descriptive,n/a,14,34
+2271899,I don't normally lie.,,2613,normally,4,lie|normally,descriptive,n/a,14,35
+4013607,Are you normally this quiet?,,2613,normally,5,quiet,direct-address,neutral,14,36
+4890524,Let's hit the slopes.,,9108,slopes,4,hit|slopes,direct-address,informal,14,37
+248631,We climbed up the steep mountain.,,8394,climbed,6,climbed|steep,descriptive,n/a,14,37
+262725,We went up the mountain by cable car.,,2755,cable,8,by|cable|car|mountain|up,descriptive,n/a,14,37
+275352,I want to charter a bus.,,4750,charter,6,bus|charter,descriptive,n/a,14,37
+3825513,We met on a cruise.,,4848,cruise,5,cruise|met,descriptive,n/a,14,37
+4663752,There's no cruise control on this car.,,4848,cruise,7,control,descriptive,n/a,14,37
+3825819,We won the championship.,,2757,championship,4,championship,descriptive,n/a,14,38
+4499393,We hope to win the championship.,,2757,championship,6,win,descriptive,n/a,14,39
+284244,He is likely to win the championship.,,2757,championship,7,likely,descriptive,n/a,14,40
+6003721,We won the national championship last year.,,2757,championship,7,national,descriptive,n/a,14,41
+3735770,It depends on the circumstances.,,2806,depends,5,depends,descriptive,n/a,14,42
+2308144,I could lose my license.,,2877,license,5,lose,descriptive,n/a,14,43
+4014039,What's your license plate number?,,2877,license,5,number|plate,direct-address,neutral,14,43
+4495526,Did you read the license agreement?,,2877,license,6,agreement,direct-address,neutral,14,43
+4384264,Do you have a license to operate a motor boat?,,2987,operate,10,boat|motor|operate,direct-address,neutral,14,43
+2359732,I've got to get my license renewed.,,6532,renewed,7,get|got|i've|license|my|renewed|to,descriptive,n/a,14,43
+2640010,My driver's license is valid for three more years.,,9156,driver's,9,valid,descriptive,n/a,14,43
+18564,It's money down the drain.,,6192,drain,5,drain|money,descriptive,n/a,14,44
+1390605,I must repay my debts.,,10649,repay,5,debts,descriptive,n/a,14,44
+258421,I must repay the debt.,,10649,repay,5,debt,descriptive,n/a,14,44
+4368156,Debts must be repaid.,,14859,repaid,4,repaid,descriptive,n/a,14,44
+258342,I have a lot of money at my disposal.,,6871,disposal,9,disposal,descriptive,n/a,14,44
+5293170,We offer free shipping.,,2890,shipping,4,free|offer|shipping,descriptive,n/a,14,44
+22213,I work for a shipping company.,,2890,shipping,6,company,descriptive,n/a,14,44
+2007328,Let's talk about your childhood.,,2905,childhood,5,childhood|let's|talk,direct-address,neutral,14,45
+2331593,I had a horrible childhood.,,3340,horrible,5,had|horrible,descriptive,n/a,14,45
+500477,This picture reminds me of my childhood.,,4889,reminds,7,picture,descriptive,n/a,14,45
+60090,This song reminds me of my childhood.,,4889,reminds,7,song,descriptive,n/a,14,45
+909588,What you spend time doing in your childhood affects the rest of your life.,,5363,affects,14,affects|spend|time,descriptive,n/a,14,45
+4665283,That would defeat the purpose.,,2913,defeat,5,purpose,descriptive,n/a,14,46
+1449619,It's a curse.,,6190,curse,3,curse,descriptive,n/a,14,47
+3422020,The curse was broken.,,6190,curse,4,broken,descriptive,n/a,14,47
+4397560,They cursed us.,,9260,cursed,3,cursed,descriptive,n/a,14,47
+240479,Don't swear in public.,,2942,swear,4,public,direct-address,neutral,14,47
+2407146,I swear I'm telling the truth.,,2942,swear,6,telling|truth,descriptive,n/a,14,47
+2407150,I swear it wasn't my fault.,,2942,swear,6,fault|wasn't,descriptive,n/a,14,47
+2652921,I swear I'll always protect you.,,2942,swear,6,protect,direct-address,informal,14,47
+5860557,I started swearing.,,12211,swearing,3,swearing,descriptive,n/a,14,47
+5828620,I swore.,,12212,swore,2,swore,descriptive,n/a,14,47
+5857211,"A few years ago, I swore never to fall in love again.",,12212,swore,12,ago|fall,descriptive,n/a,14,47
+3446987,Mary is wearing a very valuable ring.,,2947,valuable,7,ring,descriptive,n/a,14,48
+387421,He's the most valuable player on our team.,,2947,valuable,8,he's|player|team,descriptive,n/a,14,49
+1846787,I have a lot of old books. A couple of them are quite valuable.,,2947,valuable,14,books|couple,descriptive,n/a,14,50
+2407143,I swear I never showed anyone that document.,,2961,document,8,anyone|document|showed,descriptive,n/a,14,51
+266259,The prisoner was given his freedom.,,5061,prisoner,6,given|prisoner,descriptive,n/a,14,52
+317705,They fought for freedom.,,3034,fought,4,fought|they,descriptive,n/a,14,52
+239796,Freedom of speech is restricted in some countries.,,5163,restricted,8,countries|restricted|speech,descriptive,n/a,14,52
+28768,We defeated the enemy.,,5308,defeated,4,enemy,descriptive,n/a,14,52
+1293181,He admitted his defeat.,,3012,admitted,4,admitted,descriptive,n/a,14,52
+2255419,You've defeated me.,,5308,defeated,3,defeated,direct-address,neutral,14,52
+1895541,Your pants are dirty.,,3092,pants,4,dirty|pants,direct-address,neutral,14,53
+4501580,Pull your pants up.,,3092,pants,4,pull,direct-address,informal,14,53
+2771735,How much do these pants cost?,,3092,pants,6,cost,direct-address,neutral,14,53
+3822618,These pants are too small for me.,,3092,pants,7,small,descriptive,n/a,14,53
+569076,Those pants are a little too tight in the waist.,,7330,waist,10,those|tight|waist,descriptive,n/a,14,53
+1422128,I bought two pairs of pants.,,5852,pairs,6,bought|pairs,descriptive,n/a,14,53
+2796772,I bought a suit with two pairs of pants.,,5852,pairs,9,suit,descriptive,n/a,14,53
+44314,The initial symptoms of the disease are fever and sore throat.,,7023,sore,11,disease|initial|sore|throat,descriptive,n/a,14,54
+4014153,What symptoms have you noticed?,,3115,symptoms,5,noticed,direct-address,neutral,14,54
+x14_41,A persistent cough and fatigue.,,8299,fatigue,5,persistent|cough,descriptive,n/a,14,54
+29986,Do you have this symptom often?,,10896,symptom,6,symptom,direct-address,neutral,14,54
+268190,You should consult a doctor if the symptoms get worse.,,8180,consult,10,worse,direct-address,neutral,14,54
+2234107,What's the diagnosis?,,5030,diagnosis,3,diagnosis,descriptive,n/a,14,54
+4140577,What's your diagnosis?,,5030,diagnosis,3,diagnosis|what's|your,direct-address,neutral,14,54
+2234138,What's this chart?,,3125,chart,3,chart,direct-address,neutral,14,55
+1936412,I'd like to look at that chart.,,3125,chart,7,i'd|look,descriptive,n/a,14,56
+2396113,I learned a valuable lesson.,,3150,lesson,5,lesson,descriptive,n/a,14,57
+2377270,I learned a valuable lesson today.,,3150,lesson,6,a|i|learned|lesson|today|valuable,descriptive,n/a,14,58
+245037,There's no membership fee for joining.,,3155,membership,6,fee|joining|membership|no,descriptive,n/a,14,59
+4664621,That concern has been eliminated.,,6389,eliminated,5,concern|eliminated,descriptive,n/a,14,59
+2953953,We've already eliminated half the possibilities.,,6389,eliminated,6,half|possibilities,descriptive,n/a,14,59
+4664029,It's difficult to eliminate cheating.,,5477,eliminate,5,cheating|difficult|eliminate,descriptive,n/a,14,59
+4664894,An injustice has been corrected.,,8851,injustice,5,corrected|injustice,descriptive,n/a,14,59
+4880010,That sounds like discrimination to me.,,4162,discrimination,6,discrimination|sounds,descriptive,n/a,14,59
+2245719,I don't discriminate.,,12389,discriminate,3,discriminate,descriptive,n/a,14,59
+4494613,Poverty is everywhere.,,3223,poverty,3,poverty,descriptive,n/a,14,60
+680376,Some people blame poverty for crime.,,3223,poverty,6,blame|crime|people|some,descriptive,n/a,14,60
+263021,We live in the suburbs.,,7313,suburbs,5,suburbs,descriptive,n/a,14,60
+250551,My house is in the suburbs.,,7313,suburbs,6,house|in|is|my|suburbs|the,descriptive,n/a,14,60
+277586,There are some people who sleep in the daytime and work at night.,,10582,daytime,13,daytime|sleep,descriptive,n/a,14,60
+2252578,The soldier ran.,,3234,soldier,3,ran|soldier,descriptive,n/a,14,61
+5852740,I'm a soldier.,,3234,soldier,3,a|i'm|soldier,descriptive,n/a,14,61
+2111714,I'm loyal.,,5049,loyal,2,loyal,descriptive,n/a,14,61
+5618996,We have really loyal repeat customers.,,5049,loyal,6,customers|repeat,descriptive,n/a,14,61
+573742,The bulb has burned out.,,10570,bulb,5,bulb,descriptive,n/a,14,62
+2259727,Three bulbs have burned out.,,11878,bulbs,5,bulbs,descriptive,n/a,14,62
+1950174,These light bulbs can't all be bad.,,11878,bulbs,7,bad,descriptive,n/a,14,62
+4015923,Why is that light flashing?,,10356,flashing,5,flashing|light,descriptive,n/a,14,62
+4135029,Why's the yellow light flashing?,,14877,why's,5,yellow,direct-address,neutral,14,62
+2649718,Did you see that flash of lightning?,,4874,lightning,7,lightning,direct-address,neutral,14,62
+4014755,Did you flash your lights?,,3271,flash,5,flash|lights,direct-address,neutral,14,62
+4482379,There were some burned-out structures along the road.,,4153,burned,9,burned|out|road|structures,descriptive,n/a,14,62
+5904691,I normally don't make these kinds of mistakes.,,3288,mistakes,8,kinds|mistakes,descriptive,n/a,14,63
+25649,The royal palace was built on a hill.,,3292,palace,8,built|hill|palace|royal,descriptive,n/a,14,64
+327479,The palace was heavily guarded.,,10961,guarded,5,guarded|heavily,descriptive,n/a,14,64
+4497104,The statue was damaged.,,6033,statue,4,damaged,descriptive,n/a,14,64
+248861,We must move this statue very carefully.,,6033,statue,7,carefully|move,direct-address,neutral,14,64
+882758,There are statues in the park.,,10780,statues,6,statues,descriptive,n/a,14,64
+682072,I have several statues in my garden.,,10780,statues,7,garden|several,descriptive,n/a,14,64
+522633,The Queen's crown was made of gold.,,9324,queen's,7,crown|gold|queen's,descriptive,n/a,14,64
+3722602,I won't blow the whistle.,,8159,whistle,5,blow,descriptive,n/a,14,65
+1174145,The police officer blew his whistle.,,8159,whistle,6,blew|officer,descriptive,n/a,14,65
+1977737,Mary played the tin whistle when she was young.,,8159,whistle,9,played|tin|young,descriptive,n/a,14,65
+3409275,The crowd was silent.,,3307,silent,4,crowd,descriptive,n/a,14,65
+5069821,Just be silent and listen.,,3307,silent,5,listen,direct-address,informal,14,65
+1312933,"When he spoke, everyone became silent.",,3307,silent,6,became|spoke,descriptive,n/a,14,65
+3719392,Everyone was silent for a minute.,,3307,silent,6,minute,descriptive,n/a,14,65
+1317088,"When he finished speaking, everyone was silent.",,3307,silent,7,speaking,descriptive,n/a,14,65
+24770,"Not knowing what to say, I remained silent.",,3307,silent,8,knowing|remained|say,descriptive,n/a,14,65
+283587,There was an awkward silence when he appeared.,,4284,awkward,8,silence,descriptive,n/a,14,65
+2243280,They nodded silently.,,13581,nodded,3,nodded|silently,descriptive,n/a,14,65
+2665328,I hate silent movies.,,3307,silent,4,movies,descriptive,n/a,14,65
+2731662,Let's wait till high tide.,,6453,tide,5,high|tide|till|wait,direct-address,informal,14,66
+277845,The tide is rising fast.,,6453,tide,5,fast|rising,descriptive,n/a,14,66
+325455,The stream is not very swift.,,5516,swift,6,stream|swift,descriptive,n/a,14,66
+3045737,Let's go for a spin around the park.,,3744,spin,8,around|park|spin,direct-address,informal,14,66
+3724616,I'll take this trail.,,3313,trail,4,trail,descriptive,n/a,14,66
+4665726,The trail is clearly marked.,,3313,trail,5,clearly|marked,descriptive,n/a,14,66
+267981,The boy captured the bird with a net.,,3325,captured,8,bird|boy|net,descriptive,n/a,14,67
+4496285,We'll capture them.,,3441,capture,3,capture|them|we'll,direct-address,neutral,14,67
+2953585,We captured some of the terrorists.,,5073,terrorists,6,terrorists,descriptive,n/a,14,67
+2757597,The police captured the escaped criminal.,,5224,escaped,6,criminal|escaped,descriptive,n/a,14,67
+4496284,Have the escaped prisoners been captured?,,5224,escaped,6,prisoners,direct-address,neutral,14,67
+2643362,One of the lions has escaped.,,5236,lions,6,lions,descriptive,n/a,14,67
+23176,We captured the thief.,,8153,thief,4,thief,descriptive,n/a,14,67
+2249286,It's standard procedure.,,3356,procedure,3,procedure|standard,descriptive,n/a,14,68
+2249413,Just follow procedure.,,3356,procedure,3,follow,direct-address,informal,14,68
+2280393,Please explain the procedure.,,3356,procedure,4,explain,direct-address,formal,14,68
+x14_29,Let me give you an example.,,530,example,6,example,direct-address,neutral,14,68
+2290334,I didn't know the exact procedure.,,3356,procedure,6,exact,descriptive,n/a,14,68
+1415954,I explained the procedures to him.,,3852,procedures,6,explained|him|procedures,descriptive,n/a,14,68
+2953732,We need to start emergency procedures.,,3852,procedures,6,emergency|start,descriptive,n/a,14,68
+3199914,Tell us a ghost story.,,3462,ghost,5,story,direct-address,neutral,14,69
+4829422,Do you know any ghost stories?,,3462,ghost,6,stories,direct-address,neutral,14,69
+4663646,I'm not convinced ghosts actually exist.,,8093,ghosts,6,actually|convinced,descriptive,n/a,14,69
+243823,Nowadays nobody believes in ghosts.,,8093,ghosts,5,believes,descriptive,n/a,14,69
+2314965,I didn't know you believed in ghosts.,,8093,ghosts,7,believed,direct-address,neutral,14,69
+x14_43,I'm not sure I do either.,,455,either,6,sure|either,descriptive,n/a,14,69
+3178626,It's probably a virus.,,3502,virus,4,probably|virus,descriptive,n/a,14,70
+3818792,It's not a virus.,,3502,virus,4,a|it's|not|virus,descriptive,n/a,14,70
+2941435,The hard disk was completely destroyed.,,6775,disk,6,completely|destroyed|disk,descriptive,n/a,14,70
+953175,Did you give a copy of the disk to anyone?,,6775,disk,10,copy,direct-address,neutral,14,70
+5397183,I'm on the deck.,,3517,deck,4,deck,descriptive,n/a,14,71
+265900,Hold on to the rail.,,3544,rail,5,hold|rail,direct-address,neutral,14,72
+60705,Hold this ladder steady.,,6597,ladder,4,steady,direct-address,neutral,14,72
+2538416,I wonder if they have a rope ladder.,,6597,ladder,8,rope|wonder,descriptive,n/a,14,72
+299702,He hung his coat on a hook.,,4962,hung,7,coat|hung,descriptive,n/a,14,72
+321125,Hang your hat on the hook.,,3773,hook,6,hang|hat,direct-address,informal,14,72
+294974,He balanced himself on a log.,,5194,balanced,6,balanced|himself,descriptive,n/a,14,72
+1062338,It's a vicious circle.,,8680,vicious,4,circle|vicious,descriptive,n/a,14,72
+3820590,My journal was stolen.,,3551,stolen,4,stolen,descriptive,n/a,14,73
+1970208,I value our friendship.,,3656,friendship,4,friendship|value,descriptive,n/a,14,74
+2948913,Your friendship is important.,,3656,friendship,4,important,direct-address,neutral,14,74
+503856,Your friendship means a lot to me.,,3656,friendship,7,means,direct-address,neutral,14,74
+x14_22,Likewise.,,6512,likewise,1,likewise,direct-address,neutral,14,74
+1970213,I don't deserve your friendship.,,3656,friendship,5,deserve,descriptive,n/a,14,74
+4665347,How did your friendship begin?,,3656,friendship,5,begin,direct-address,neutral,14,74
+4529634,It might affect our friendship.,,3656,friendship,5,affect,descriptive,n/a,14,75
+4891505,Don't let this ruin your friendship.,,4202,ruin,6,let|ruin,direct-address,informal,14,75
+1954555,We can't let this ruin our friendship.,,4202,ruin,7,can't|friendship|let|our|ruin|this|we,descriptive,n/a,14,75
+905092,Friendship lasts longer than memories.,,7895,lasts,5,lasts|memories,descriptive,n/a,14,75
+269568,True friendship is priceless.,,11575,priceless,4,priceless|true,descriptive,n/a,14,75
+2663215,This is potentially your problem.,,3677,potentially,5,potentially,direct-address,neutral,14,76
+2663266,That is potentially our problem.,,3677,potentially,5,is|our|potentially|problem|that,descriptive,n/a,14,77
+1765159,Please stop changing channels.,,3704,channels,4,changing|channels|please|stop,direct-address,neutral,14,78
+33613,Can I see what's on the other channels?,,3704,channels,8,other|see,direct-address,neutral,14,79
+1538694,I keep receiving unwanted emails.,,9227,unwanted,5,emails|receiving|unwanted,descriptive,n/a,14,80
+4499683,Someone deleted my comment.,,5218,deleted,4,comment|someone,descriptive,n/a,14,80
+3824902,I accidentally deleted everything.,,5218,deleted,4,accidentally|deleted|everything,descriptive,n/a,14,80
+681423,I have to delete many files from my computer.,,4850,delete,9,computer|files|many,descriptive,n/a,14,80
+953384,I can't figure out how to delete what I just posted.,,4850,delete,11,posted,descriptive,n/a,14,80
+2662781,I'm having a problem deleting one of my files.,,12382,deleting,9,deleting,descriptive,n/a,14,80
+4500722,Click here to log in.,,3783,log,5,click|here|log,direct-address,neutral,14,80
+2249236,It's routine procedure.,,3800,routine,3,routine,descriptive,n/a,14,81
+6550160,It's a routine procedure.,,3800,routine,4,a|it's|procedure|routine,descriptive,n/a,14,81
+2892424,We want a complete evaluation.,,4944,evaluation,5,complete|evaluation,descriptive,n/a,14,81
+4664611,The evaluation could take months.,,4944,evaluation,5,months,descriptive,n/a,14,81
+1882,I slept a little during lunch break because I was so tired.,,5263,slept,12,break|during|lunch,descriptive,n/a,14,82
+255255,I fell sound asleep because I was very tired.,,3815,asleep,9,asleep|because|fell|sound|very,descriptive,n/a,14,82
+284491,"When I talked with him on the phone, he sounded tired.",,5781,sounded,11,phone,descriptive,n/a,14,82
+2406525,I slept like a log.,,5263,slept,5,slept,descriptive,n/a,14,82
+3131757,Something extraordinary happened.,,3832,extraordinary,3,happened,descriptive,n/a,14,83
+2954923,You're an extraordinary woman.,,3832,extraordinary,4,woman,direct-address,informal,14,83
+5613787,We have an extraordinary design team.,,3832,extraordinary,6,design,descriptive,n/a,14,83
+3142733,That's a fascinating question.,,5665,fascinating,4,question,descriptive,n/a,14,83
+5888160,I find languages fascinating.,,5665,fascinating,4,languages,descriptive,n/a,14,83
+4017139,This is a fascinating article.,,5665,fascinating,5,article,descriptive,n/a,14,83
+5933750,This biography is fascinating.,,7965,biography,4,biography,descriptive,n/a,14,84
+6102206,I'm reading a biography.,,7965,biography,4,reading,descriptive,n/a,14,84
+3735743,I've never read any of the classics.,,7858,classics,7,classics|read,descriptive,n/a,14,84
+34550,Bill is still a legendary figure in this company.,,4785,legendary,9,bill|figure|legendary,descriptive,n/a,14,84
+295180,He writes scripts.,,10059,scripts,3,scripts|writes,descriptive,n/a,14,84
+4494719,The script was awful.,,3861,script,4,awful|script,descriptive,n/a,14,84
+3736684,The cabin was absolutely silent.,,5641,cabin,5,absolutely,descriptive,n/a,14,85
+2335213,The cabin had no water or electricity.,,5641,cabin,7,electricity,descriptive,n/a,14,85
+294686,He walked along the shore.,,4062,shore,5,along|shore|walked,descriptive,n/a,14,85
+22181,I saw a fishing boat about a mile off the shore.,,4062,shore,11,mile,descriptive,n/a,14,85
+5207756,I swam toward the shore.,,14379,swam,5,swam|toward,descriptive,n/a,14,85
+2640936,We're about three kilometers off shore.,,8746,kilometers,6,kilometers,descriptive,n/a,14,85
+3733441,There's no known cure.,,4088,cure,4,known,descriptive,n/a,14,86
+63426,We can cure some types of cancer.,,4088,cure,7,types,descriptive,n/a,14,86
+682514,Scientists haven't found a cure for cancer yet.,,4088,cure,8,cancer|found|scientists,descriptive,n/a,14,86
+6108339,I think doctors will eventually find a cure for cancer.,,4088,cure,10,doctors|eventually,descriptive,n/a,14,86
+4850038,Maybe they can help us find a cure.,,4088,cure,8,help|maybe,descriptive,n/a,14,86
+297977,He cured my illness.,,9634,cured,4,illness,descriptive,n/a,14,86
+20801,Cancer can be cured if discovered in time.,,9634,cured,8,discovered,descriptive,n/a,14,86
+5175121,I didn't punch anybody.,,4120,punch,4,anybody|punch,descriptive,n/a,14,87
+2026920,I want to know who threw the first punch.,,4120,punch,9,threw,descriptive,n/a,14,87
+4015983,Have you ever been punched in the face?,,8652,punched,8,face,direct-address,neutral,14,87
+2254874,Who punched you?,,8652,punched,3,punched,direct-address,informal,14,87
+2890330,Would you care for a drink of punch?,,4120,punch,8,care|drink,direct-address,formal,14,87
+2361662,I ought to punch you for saying that.,,4120,punch,8,saying,direct-address,informal,14,87
+4501675,Registration starts at 2:30.,,4123,registration,3,registration|starts,descriptive,n/a,14,88
+4501693,No registration is required.,,4123,registration,4,required,descriptive,n/a,14,88
+4305624,Fill out the registration form.,,4123,registration,5,form,direct-address,neutral,14,88
+4305622,Fill out the questionnaire.,,13255,questionnaire,4,fill|questionnaire,direct-address,neutral,14,88
+4495994,Registration began October 20th.,,5074,th,4,began|october|th,descriptive,n/a,14,88
+4501674,Registration starts October 20th.,,5074,th,4,october|registration|starts|th,descriptive,n/a,14,88
+5656507,I'm tired of keeping secrets.,,4206,secrets,5,keeping|secrets,descriptive,n/a,14,89
+2450019,I'm tired of altering my plans every time you change your mind.,,11378,altering,12,altering|mind|plans,direct-address,neutral,14,89
+x14_19,Then tell me what you really want.,,270,tell,7,really|want,direct-address,informal,14,89
+16921,I'm tired of your complaints.,,4757,complaints,5,complaints,direct-address,informal,14,89
+2539444,I'm really tired of your complaining.,,5735,complaining,6,complaining|really,direct-address,informal,14,89
+2249860,Seal the room.,,4266,seal,3,room|seal,direct-address,neutral,14,90
+309366,Her car has a nice polish.,,4333,polish,6,her|nice|polish,descriptive,n/a,14,91
+35680,You should polish your shoes before you go to the party.,,4333,polish,11,before|party|shoes,direct-address,neutral,14,91
+3820864,I polished my shoes.,,9429,polished,4,polished,descriptive,n/a,14,91
+3079086,I had my shoes polished.,,9429,polished,5,had|i|my|polished|shoes,descriptive,n/a,14,91
+5850577,Mary seldom uses nail polish.,,10995,seldom,5,nail|seldom|uses,descriptive,n/a,14,91
+5109244,Sacrifice is sometimes necessary.,,4343,sacrifice,4,necessary|sometimes,descriptive,n/a,14,92
+1954600,I can't let you sacrifice yourself.,,4343,sacrifice,6,yourself,direct-address,neutral,14,92
+4500955,We made sacrifices.,,9928,sacrifices,3,sacrifices,descriptive,n/a,14,92
+3310036,We've both made sacrifices.,,9928,sacrifices,4,both,descriptive,n/a,14,92
+2247394,I sacrificed everything.,,10530,sacrificed,3,sacrificed,descriptive,n/a,14,92
+x14_25,Was it worth it?,,715,worth,4,worth,direct-address,neutral,14,92
+3831387,Your sacrifice won't go unnoticed.,,13503,unnoticed,5,unnoticed,direct-address,neutral,14,92
+483681,He wore a mask so no one would recognize him.,,4356,wore,10,one|recognize,descriptive,n/a,14,93
+3312125,We'll be wearing gas masks.,,8117,masks,5,gas|masks|wearing,descriptive,n/a,14,93
+681958,Two men wearing masks robbed the bank.,,8137,robbed,7,bank|men|robbed,descriptive,n/a,14,93
+2539684,The bank robbers were wearing masks.,,13603,robbers,6,robbers,descriptive,n/a,14,93
+2953639,We have captured one of their spies.,,10180,spies,7,spies,descriptive,n/a,14,93
+2244921,Are those explosives?,,9055,explosives,3,explosives,direct-address,neutral,14,93
+2253692,They've got explosives.,,9055,explosives,3,they've,descriptive,n/a,14,93
+2463825,I broke the clutch.,,8076,clutch,4,broke|clutch,descriptive,n/a,14,94
+5751377,The clutch isn't working right.,,8076,clutch,5,working,descriptive,n/a,14,94
+2541154,Who's going to pay the mechanic?,,9081,mechanic,6,pay,direct-address,neutral,14,94
+2073712,The pump didn't work properly.,,4412,pump,5,properly|pump,descriptive,n/a,14,94
+2275775,Didn't you fix the pump?,,4412,pump,5,fix,direct-address,neutral,14,94
+269002,The function of the heart is to pump blood.,,4412,pump,9,function|heart,descriptive,n/a,14,94
+5827341,The eagle flew away.,,5661,eagle,4,eagle|flew,descriptive,n/a,14,95
+5688287,There's an alley behind my house.,,8166,alley,6,behind,descriptive,n/a,14,95
+60323,This is a dead-end alley.,,8166,alley,6,end,descriptive,n/a,14,95
+3417552,My car is parked in the alley.,,8166,alley,7,parked,descriptive,n/a,14,95
+290638,He jumped over the hedge.,,9654,hedge,5,hedge|jumped,descriptive,n/a,14,95
+5938987,I'm watering the lawn.,,11723,watering,4,watering,descriptive,n/a,14,95
+3022192,When did you seed the lawn?,,7084,lawn,6,seed,direct-address,neutral,14,95
+310901,She hurried across the lawn.,,14877,hurried,5,across,descriptive,n/a,14,95
+29625,I didn't know apple trees grow from seeds.,,4418,seeds,8,apple|grow|know|seeds|trees,descriptive,n/a,14,95
+4495335,It'll be chaos.,,4439,chaos,3,chaos|it'll,descriptive,n/a,14,96
+5370760,It was pure chaos.,,4439,chaos,4,pure,descriptive,n/a,14,96
+4493650,Traffic has been halted.,,12279,halted,4,halted|traffic,descriptive,n/a,14,96
+2663231,Many problems resolve themselves.,,5342,resolve,4,problems|resolve|themselves,descriptive,n/a,14,96
+2663445,We've resolved the problem.,,5946,resolved,4,resolved,descriptive,n/a,14,96
+3821181,The matter has been resolved.,,5946,resolved,5,matter,descriptive,n/a,14,96
+5301576,I take partial responsibility.,,5335,partial,4,partial|responsibility,descriptive,n/a,14,96
+5853228,Everyone's tired.,,4452,everyone's,2,everyone's,descriptive,n/a,14,97
+2094850,Everybody's tired.,,11060,everybody's,2,everybody's,descriptive,n/a,14,97
+x14_17,Let's call it a day.,,701,let's,5,call|day,direct-address,informal,14,97
+2362099,I feel tired and exhausted.,,6083,exhausted,5,exhausted,descriptive,n/a,14,97
+1890965,I'm awfully tired.,,13513,awfully,3,awfully,descriptive,n/a,14,97
+2546627,I'm feeling very shaky.,,13148,shaky,4,shaky,descriptive,n/a,14,97
+3300983,Do you believe in angels?,,4499,angels,5,angels|believe,direct-address,neutral,14,98
+2951593,Chill out.,,5206,chill,2,chill,direct-address,informal,14,99
+3731912,Would you chill out?,,5206,chill,4,chill|out|would|you,direct-address,neutral,14,99
+1832117,Proceed with caution.,,7142,caution,3,caution|proceed,direct-address,formal,14,99
+2246050,I recommend caution.,,7142,caution,3,caution|i|recommend,descriptive,n/a,14,99
+2247436,I urge caution.,,7142,caution,3,urge,descriptive,n/a,14,99
+2549401,Breathe normally.,,4507,breathe,2,breathe,direct-address,neutral,14,99
+2249397,Just breathe normally.,,4507,breathe,3,breathe|just|normally,direct-address,neutral,14,99
+1544368,What caused the explosion?,,4859,explosion,4,caused|explosion,descriptive,n/a,14,100
+2314888,I didn't cause the explosion.,,4859,explosion,5,cause,descriptive,n/a,14,100
+4015985,There was a loud explosion.,,4859,explosion,5,loud,descriptive,n/a,14,100
+4500640,That sounded like an explosion.,,5781,sounded,5,sounded,descriptive,n/a,14,100
+829541,It was such a powerful explosion that the roof was blown off.,,4920,blown,12,blown|powerful|roof|such,descriptive,n/a,14,100
+3824803,I heard the explosions.,,10236,explosions,4,explosions|heard|i|the,descriptive,n/a,14,100
+23835,The fire caused a panic in the theater.,,4545,panic,8,fire|theater,descriptive,n/a,14,100
+4013866,There's no reason for panic.,,4545,panic,5,reason,descriptive,n/a,14,100
+6033393,I had a panic attack.,,4545,panic,5,attack,descriptive,n/a,14,100
+3821624,We can't risk causing a panic.,,4545,panic,6,causing|risk,descriptive,n/a,14,100
+41552,There's no need to panic. There's plenty of time.,,4545,panic,9,plenty,direct-address,neutral,14,100
+2111801,I panicked.,,13694,panicked,2,panicked,descriptive,n/a,14,100
+2111882,Everybody panicked.,,13694,panicked,2,everybody,descriptive,n/a,14,100
+29847,The lion struggled to get out of his cage.,,6822,struggled,9,cage|struggled,descriptive,n/a,14,101
+29834,We've got to catch the lion alive.,,4609,lion,7,alive,direct-address,neutral,14,101
+4493789,Tickets are available from Lions Club members.,,5236,lions,7,available|club|members,descriptive,n/a,14,101
+563720,He likes tigers.,,5518,tigers,3,likes|tigers,descriptive,n/a,14,101
+1870095,What do tigers eat?,,5518,tigers,4,eat,direct-address,neutral,14,101
+257317,"I aimed at the tiger and fired, but missed him.",,4573,aimed,10,aimed|fired|missed,descriptive,n/a,14,101
+2483121,It's a popular tourist destination.,,5075,tourist,5,tourist,descriptive,n/a,14,102
+3636399,What's your final destination?,,4671,destination,4,final,direct-address,neutral,14,102
+4016456,How far is it to our destination?,,4671,destination,7,far,descriptive,n/a,14,102
+299401,He got ready for departure.,,4852,departure,5,departure|ready,descriptive,n/a,14,102
+275806,The heavy snow made them put off their departure.,,4852,departure,9,heavy|made|snow,descriptive,n/a,14,102
+4664525,We've been cleared for departure.,,5020,cleared,5,cleared,descriptive,n/a,14,102
+70418,What time does your plane depart?,,10453,depart,6,depart|plane,direct-address,neutral,14,102
+5155360,I'm departing this evening.,,11767,departing,4,departing|evening,descriptive,n/a,14,102
+400148,The group departed as soon as he arrived.,,9150,departed,8,arrived|departed|group,descriptive,n/a,14,102
+326178,The train's departure will be delayed.,,14877,train's,6,delayed,descriptive,n/a,14,102
+2548640,They are outsiders.,,11813,outsiders,3,outsiders,descriptive,n/a,14,103
+5853121,I'm an outsider.,,11932,outsider,3,outsider,descriptive,n/a,14,103
+261576,I was an outsider.,,11932,outsider,4,an|i|outsider|was,descriptive,n/a,14,103
+1487699,I felt isolated.,,4687,isolated,3,isolated,descriptive,n/a,14,103
+4499802,I was totally isolated.,,4687,isolated,4,totally,descriptive,n/a,14,103
+1311271,I have cabin fever.,,5641,cabin,4,cabin|fever,descriptive,n/a,14,103
+1895749,You have my blessing.,,6274,blessing,4,blessing,direct-address,neutral,14,104
+3151447,Give me your blessing.,,6274,blessing,4,give,direct-address,neutral,14,104
+2245242,Count your blessings.,,9491,blessings,3,blessings|count,direct-address,neutral,14,104
+5945304,You should count your blessings.,,9491,blessings,5,blessings|count|should|you|your,direct-address,neutral,14,104
+2283724,I'm blessed.,,4743,blessed,2,blessed,descriptive,n/a,14,104
+3374199,I feel blessed.,,4743,blessed,3,blessed|feel|i,descriptive,n/a,14,104
+2111946,Bless you.,,5290,bless,2,bless,direct-address,neutral,14,104
+1114890,Write a short essay.,,4770,essay,4,essay|short|write,direct-address,neutral,14,105
+323345,I have a few essays to write by tomorrow.,,6082,essays,9,essays,descriptive,n/a,14,105
+1300501,"When I was in school, I really hated writing essays.",,6082,essays,10,hated|school|writing,descriptive,n/a,14,105
+x14_38,Same here. I dreaded them.,,14191,dreaded,5,dreaded|same,descriptive,n/a,14,105
+909564,She spent a lot of time writing her essay.,,4770,essay,9,spent,descriptive,n/a,14,105
+3162046,Thank you for helping me with my essay.,,4770,essay,8,helping,direct-address,neutral,14,105
+4497907,Does faith healing work?,,4776,healing,4,faith|healing,descriptive,n/a,14,106
+5203261,Do you smell rubber burning?,,4806,rubber,5,burning|rubber|smell,direct-address,neutral,14,107
+4474981,I have lots of rubber bands.,,4806,rubber,6,bands|lots,descriptive,n/a,14,108
+2245414,Duck your head!,,4942,duck,3,duck|head,direct-address,informal,14,109
+3724386,I suggest you duck.,,4942,duck,4,suggest,direct-address,neutral,14,109
+401429,It's similar to a duck.,,4942,duck,5,similar,descriptive,n/a,14,109
+4497987,Don't feed the ducks.,,7872,ducks,4,ducks|feed,direct-address,neutral,14,109
+2541893,I'm going to go feed the ducks.,,7872,ducks,7,ducks|feed|go|going|i'm|the|to,descriptive,n/a,14,109
+3130327,We could see some ducks on the lake.,,7872,ducks,8,lake,descriptive,n/a,14,109
+5154731,I hate it when people try to duck their responsibilities.,,5504,responsibilities,10,responsibilities|try,descriptive,n/a,14,109
+2245229,Continue your investigations.,,4965,investigations,3,investigations,direct-address,neutral,14,110
+x14_24,We will. Thank you.,,309,thank,4,thank,direct-address,neutral,14,110
+2247469,I was convicted.,,5022,convicted,3,convicted,descriptive,n/a,14,111
+1933585,I appreciate your conviction.,,5546,conviction,4,conviction,direct-address,formal,14,111
+3825595,You signed a confession.,,8079,confession,4,signed,direct-address,neutral,14,111
+4016591,Why did you sign the confession?,,8079,confession,6,sign,direct-address,neutral,14,111
+x14_32,I had no choice.,,851,choice,4,choice,descriptive,n/a,14,111
+2252584,The suspect confessed.,,9738,confessed,3,suspect,descriptive,n/a,14,111
+296839,He confessed his guilt.,,9738,confessed,4,guilt,descriptive,n/a,14,111
+2011368,I want to confess.,,8707,confess,4,confess,descriptive,n/a,14,111
+2308011,I confess I'm afraid to go by myself.,,8707,confess,8,afraid|myself,descriptive,n/a,14,111
+2245406,Double the dose.,,5033,dose,3,dose|double,direct-address,neutral,14,112
+5909323,The doctor said that I'm unfit for duty.,,12345,unfit,8,doctor|duty|said,descriptive,n/a,14,112
+1362096,She's unfit for the job.,,12345,unfit,5,unfit,descriptive,n/a,14,112
+303088,He regained consciousness in the hospital.,,12686,regained,6,consciousness|hospital|regained,descriptive,n/a,14,112
+5853063,I don't want to discourage you from trying to do that.,,11639,discourage,11,trying,direct-address,neutral,14,112
+296386,He has quite a few valuable paintings.,,5055,paintings,7,few|paintings|quite,descriptive,n/a,14,113
+2548628,This corn is fresh.,,5111,corn,4,corn|fresh,descriptive,n/a,14,114
+2539001,I used to work in an electronics store.,,5118,electronics,8,electronics|store|used,descriptive,n/a,14,115
+2646002,Thanks for the insight.,,5131,insight,4,insight,direct-address,neutral,14,116
+1933577,I appreciate your insights.,,8311,insights,4,insights,direct-address,formal,14,116
+3831452,Your generosity is appreciated.,,11074,generosity,4,appreciated|generosity,direct-address,formal,14,116
+5558865,We thank you for your generosity.,,11074,generosity,6,for|generosity|thank|we|you|your,direct-address,formal,14,116
+2251188,That's partially correct.,,5146,partially,3,correct|partially,descriptive,n/a,14,117
+4666285,You're partially correct.,,5146,partially,3,correct|partially|you're,direct-address,neutral,14,117
+42122,It was a partial success.,,5335,partial,5,success,descriptive,n/a,14,117
+2796750,I can only afford to make a partial payment.,,5335,partial,9,payment,descriptive,n/a,14,117
+38941,The toilet doesn't flush.,,8949,flush,4,flush|toilet,descriptive,n/a,14,118
+3819480,Remember to flush the toilet.,,8949,flush,5,remember,direct-address,neutral,14,118
+5874650,We need to reinforce the roof.,,10390,reinforce,6,reinforce,descriptive,n/a,14,118
+4850023,There was no structural damage.,,5268,structural,5,structural,descriptive,n/a,14,118
+4496196,Many buildings sustained substantial damage.,,5174,sustained,5,buildings|damage|substantial|sustained,descriptive,n/a,14,118
+4174314,The bridge collapsed when one of the cables snapped.,,8894,snapped,9,cables|collapsed|snapped,descriptive,n/a,14,118
+4494206,Boredom is a huge problem.,,12956,boredom,5,boredom|huge,descriptive,n/a,14,119
+2042768,I really do want to devote some more time to studying French.,,12137,devote,12,devote,descriptive,n/a,14,119
+293739,He devoted his life to his study.,,5219,devoted,7,life,descriptive,n/a,14,119
+887067,She devoted herself to him.,,5219,devoted,5,devoted|herself,descriptive,n/a,14,119
+4498456,Experimentation can be good.,,12871,experimentation,4,experimentation,descriptive,n/a,14,119
+56406,Put the garbage outside.,,5227,garbage,4,outside,direct-address,neutral,14,120
+1290715,Don't throw garbage away here.,,5227,garbage,5,throw,direct-address,neutral,14,120
+1290714,Don't dump garbage here.,,6078,dump,4,don't|dump|garbage|here,direct-address,neutral,14,120
+1951610,I can't find any garbage bags.,,5227,garbage,6,bags,descriptive,n/a,14,120
+322359,They collect our garbage every Monday.,,5227,garbage,6,collect|monday,descriptive,n/a,14,120
+4772242,Have you taken out the garbage?,,5227,garbage,6,taken,direct-address,neutral,14,120
+56405,The garbage collector comes three times a week.,,7746,collector,8,collector|week,descriptive,n/a,14,120
+434662,Don't litter!,,10025,litter,2,litter,direct-address,informal,14,120
+3399654,What a dump.,,6078,dump,3,dump,descriptive,n/a,14,120
+2271873,I don't like bugs.,,6473,bugs,4,bugs,descriptive,n/a,14,121
+2407140,I swallowed a bug.,,10894,swallowed,4,swallowed,descriptive,n/a,14,121
+23597,A mosquito just bit me.,,11205,mosquito,5,bit|mosquito,descriptive,n/a,14,121
+6140,I've got mosquito bites all over my arm.,,11205,mosquito,8,arm|bites,descriptive,n/a,14,121
+256554,I got bitten by mosquitoes.,,13365,mosquitoes,5,bitten|by|got|i|mosquitoes,descriptive,n/a,14,121
+4794027,I was bitten by a mosquito.,,12596,bitten,6,bitten,descriptive,n/a,14,121
+4662700,Mosquitoes seem to be more attracted to people wearing dark clothes.,,13365,mosquitoes,11,attracted|clothes|dark|seem,descriptive,n/a,14,121
+4662664,Someone told me that people with type O blood attract more mosquitoes than people with any other blood type.,,13365,mosquitoes,19,attract|blood|o|type,descriptive,n/a,14,121
+4496177,Don't forget to bring bug spray.,,5265,spray,6,bring|forget|spray,direct-address,neutral,14,121
+963350,Let's unfold the map on the table and discuss it.,,13167,unfold,10,map|unfold,direct-address,neutral,14,122
+2909062,I teach geography.,,7071,geography,3,geography|teach,descriptive,n/a,14,122
+259416,I like geography and history.,,7071,geography,5,history,descriptive,n/a,14,122
+2389840,I own 30 acres of land about 3 miles out of town.,,5278,acres,10,acres|land|miles|town,descriptive,n/a,14,122
+259309,I bought an eight-acre farm for my retirement.,,7539,acre,9,acre|eight|farm|retirement,descriptive,n/a,14,122
+3542628,My vocabulary is limited.,,8804,vocabulary,4,limited|vocabulary,descriptive,n/a,14,123
+2540991,I'll show you my vocabulary list.,,8804,vocabulary,6,list|show,direct-address,neutral,14,123
+681201,I want to increase my vocabulary.,,8804,vocabulary,6,increase,descriptive,n/a,14,123
+909593,You should spend a little time each day reviewing vocabulary.,,8804,vocabulary,10,reviewing,direct-address,neutral,14,123
+2698760,I'm struggling with French grammar.,,5316,grammar,5,struggling,descriptive,n/a,14,123
+1894029,I'm having a hard time with German grammar.,,5316,grammar,8,german,descriptive,n/a,14,123
+3932725,Grammar is confusing.,,6670,confusing,3,confusing,descriptive,n/a,14,123
+4663466,Mastering a foreign language is difficult.,,13359,mastering,6,foreign|language|mastering,descriptive,n/a,14,123
+71250,You're such a pack rat.,,5339,rat,5,pack|rat,direct-address,informal,14,124
+2543034,I'm beginning to smell a rat.,,5339,rat,6,beginning,descriptive,n/a,14,124
+2249622,Nobody likes rats.,,6428,rats,3,nobody,descriptive,n/a,14,124
+4013699,I think that's rat poison.,,6125,poison,5,poison|think,descriptive,n/a,14,124
+3068959,I need to buy some rat poison.,,6125,poison,7,buy,descriptive,n/a,14,124
+4529557,That's a very unfair assessment.,,5357,unfair,5,unfair,descriptive,n/a,14,125
+4829006,Sometimes even minor errors can lead to serious accidents.,,5362,accidents,9,accidents|errors|even|lead|serious,descriptive,n/a,14,126
+3117282,Get a hammer and nails.,,6516,nails,5,nails,direct-address,neutral,14,127
+2711727,Could I borrow a hammer?,,6851,borrow,5,borrow,direct-address,neutral,14,127
+x14_48,"Sure, it's in the garage.",,4597,garage,5,garage,descriptive,n/a,14,127
+4076838,Where's the hammer?,,6046,where's,3,hammer|the|where's,direct-address,neutral,14,127
+2541762,I'm using the hammer right now.,,5391,hammer,6,using,descriptive,n/a,14,127
+549901,I borrowed my father's hammer to build a dog house.,,7740,borrowed,10,borrowed|build|dog|father's,descriptive,n/a,14,127
+2202926,We're hammered.,,13333,hammered,2,hammered,descriptive,n/a,14,127
+1205633,I want to scratch my nose.,,5432,scratch,6,nose,descriptive,n/a,14,128
+3387155,Scratch my back and I'll scratch yours.,,5432,scratch,7,yours,direct-address,informal,14,128
+526888,My cat likes it when I scratch her behind the ears.,,5432,scratch,11,ears,descriptive,n/a,14,128
+4710275,Why is my dog always scratching himself?,,11837,scratching,7,scratching,direct-address,neutral,14,128
+282011,I can hear a cat scratching at the window.,,11837,scratching,9,cat,descriptive,n/a,14,128
+1096363,Someone scratched my car.,,12692,scratched,4,scratched,descriptive,n/a,14,128
+2721215,My cat scratched me.,,12692,scratched,4,cat|me|my|scratched,descriptive,n/a,14,128
+2953112,"It's just a scratch, OK?",,5432,scratch,5,ok,direct-address,informal,14,128
+997243,Did you accomplish your goals?,,6364,accomplish,5,goals,direct-address,neutral,14,129
+3396795,What were you hoping to accomplish?,,6364,accomplish,6,hoping,direct-address,neutral,14,129
+4013067,How did you manage to accomplish that?,,6364,accomplish,7,manage,direct-address,neutral,14,129
+x14_31,It took years of work.,,285,took,5,years|work,descriptive,n/a,14,129
+5046399,We're very proud of what we've been able to accomplish.,,6364,accomplish,10,able|proud,descriptive,n/a,14,129
+302296,He accomplished his mission.,,5452,accomplished,4,mission,descriptive,n/a,14,129
+4495446,We've accomplished that goal.,,5452,accomplished,4,goal,descriptive,n/a,14,130
+4529331,What has violence ever accomplished?,,5452,accomplished,5,violence,descriptive,n/a,14,130
+2953533,We accomplished everything we wanted to.,,5452,accomplished,6,wanted,descriptive,n/a,14,130
+4495442,We've accomplished almost everything we set out to do.,,5452,accomplished,9,almost,descriptive,n/a,14,130
+4529026,The first stage of the operation has been accomplished.,,5452,accomplished,9,first|operation|stage,descriptive,n/a,14,130
+2011623,Who wants more bacon?,,5456,bacon,4,wants,direct-address,neutral,14,131
+34033,Would you like bacon or sausage?,,8993,sausage,6,sausage,direct-address,neutral,14,131
+1961265,I thought I smelled bacon.,,12568,smelled,5,bacon|i|smelled|thought,descriptive,n/a,14,131
+3374203,I smelled bacon.,,12568,smelled,3,smelled,descriptive,n/a,14,131
+3831266,My reputation is at stake.,,5512,stake,5,reputation,descriptive,n/a,14,132
+2542471,I'm aware of what is at stake.,,5512,stake,7,aware,descriptive,n/a,14,132
+1315801,He translated the verse into English.,,5521,translated,6,english|into|translated|verse,descriptive,n/a,14,133
+3122191,Do you know what they call a French horn in French?,,5566,horn,11,call|horn,direct-address,neutral,14,133
+x14_40,"Surprisingly, it's just called 'horn'.",,6034,surprisingly,5,surprisingly|called,descriptive,n/a,14,133
+5726372,I think Australia is fascinating.,,5665,fascinating,5,australia,descriptive,n/a,14,134
+953456,I found the subject fascinating.,,5665,fascinating,5,subject,descriptive,n/a,14,134
+4663776,I think that would've been fascinating.,,5665,fascinating,6,would've,descriptive,n/a,14,134
+2111734,I'm fascinated.,,11315,fascinated,2,fascinated,descriptive,n/a,14,134
+2202847,We're fascinated.,,11315,fascinated,2,fascinated|we're,descriptive,n/a,14,134
+2202586,You're athletic.,,5723,athletic,2,athletic,direct-address,neutral,14,135
+2249072,It's deer season.,,5740,deer,3,deer|season,descriptive,n/a,14,136
+4494065,Deer are fairly intelligent.,,5740,deer,4,fairly|intelligent,descriptive,n/a,14,136
+269480,We didn't see many deer in the forest.,,5740,deer,8,forest,descriptive,n/a,14,136
+290950,He couldn't bring himself to shoot the deer.,,5740,deer,8,shoot,descriptive,n/a,14,136
+53504,A baby deer can stand as soon as it's born.,,5740,deer,10,baby|born,descriptive,n/a,14,136
+4499272,Some wounds never heal.,,6262,wounds,4,wounds,descriptive,n/a,14,137
+2268668,The wound healed.,,10609,healed,3,healed|wound,descriptive,n/a,14,137
+46574,The wound has not healed yet.,,10609,healed,6,has|healed|not|the|wound|yet,descriptive,n/a,14,137
+681149,It takes time to heal from a divorce.,,5754,heal,8,divorce,descriptive,n/a,14,137
+274956,There may be some scars.,,9443,scars,5,may|scars,descriptive,n/a,14,137
+1886689,What's that scar from?,,9333,scar,4,scar,direct-address,neutral,14,137
+2406634,I still have a scar on my left leg from a car accident I was in when I was thirteen years old.,,9333,scar,22,accident|left|leg|old|thirteen,descriptive,n/a,14,137
+3824884,Time heals everything.,,14544,heals,3,heals,descriptive,n/a,14,137
+263894,Time heals all wounds.,,14544,heals,4,all|heals|time|wounds,descriptive,n/a,14,137
+239710,My lips are sealed.,,5780,sealed,4,lips|sealed,descriptive,n/a,14,138
+2011894,I want this room sealed.,,5780,sealed,5,i|room|sealed|this|want,direct-address,neutral,14,139
+2528234,I have the ace of clubs.,,5793,ace,6,clubs,descriptive,n/a,14,140
+2267002,I have the ace of hearts.,,5793,ace,6,ace|hearts,descriptive,n/a,14,140
+2528238,I have the ace of diamonds.,,6675,diamonds,6,diamonds,descriptive,n/a,14,140
+5850597,I had four aces.,,13735,aces,4,aces|four,descriptive,n/a,14,140
+744529,I can trace my ancestors back 200 years.,,7043,ancestors,7,ancestors|back|trace,descriptive,n/a,14,141
+248821,We must learn to live in harmony with nature.,,5831,harmony,9,harmony|learn|live|nature,descriptive,n/a,14,141
+2294789,This is a triangle.,,7630,triangle,4,triangle,descriptive,n/a,14,141
+1454067,A leap year has three hundred and sixty-six days.,,7619,sixty,10,days|hundred|six|sixty|year,descriptive,n/a,14,141
+2483429,"Except for leap years, February has only 28 days.",,7477,leap,8,except|february,descriptive,n/a,14,141
+3124023,We're wasting valuable time here.,,5877,wasting,5,wasting,descriptive,n/a,14,142
+4124544,Are dragons real?,,5902,dragons,3,dragons|real,direct-address,neutral,14,143
+499590,Dragons are imaginary animals.,,9073,imaginary,4,animals|imaginary,descriptive,n/a,14,143
+325503,The dragon is an imaginary creature.,,9073,imaginary,6,creature|dragon,descriptive,n/a,14,143
+2050649,The Giants play the Dragons tomorrow.,,5902,dragons,6,giants|play,descriptive,n/a,14,143
+25616,The prince was changed into a frog.,,7996,frog,7,frog|prince,descriptive,n/a,14,143
+291663,He gave up cigarettes.,,5971,cigarettes,4,cigarettes|gave,descriptive,n/a,14,144
+3738458,Where did you hide my cigarettes?,,5971,cigarettes,6,hide,direct-address,neutral,14,144
+319077,My father smokes a pack of cigarettes a day.,,13153,smokes,9,father|smokes,descriptive,n/a,14,144
+3826953,I think I'm seriously addicted.,,8689,addicted,5,seriously,descriptive,n/a,14,144
+2547175,I'm not a drug addict.,,10320,addict,5,drug,descriptive,n/a,14,144
+2247917,I'm an addict.,,10320,addict,3,addict,descriptive,n/a,14,144
+4497081,Crack is very addictive.,,11141,addictive,4,addictive|crack,descriptive,n/a,14,144
+4497541,Do you think video games are addictive?,,11141,addictive,7,games|video,direct-address,neutral,14,144
+278919,The weather forecast is not necessarily reliable.,,5993,forecast,7,necessarily|reliable|weather,descriptive,n/a,14,145
+278905,"According to the weather forecast, it will clear up tomorrow.",,5993,forecast,10,according|clear,descriptive,n/a,14,145
+2229293,"Because of the dense fog, nobody could be seen.",,7881,fog,9,dense,descriptive,n/a,14,145
+2761700,The fog lifted quickly.,,7881,fog,4,fog|lifted|quickly,descriptive,n/a,14,145
+6115708,The mist is clearing.,,10496,mist,4,clearing|mist,descriptive,n/a,14,145
+322862,A boat suddenly appeared out of the mist.,,10496,mist,8,a|appeared|boat|mist|of|out|suddenly|the,descriptive,n/a,14,145
+4493783,The flight was canceled because of the thick fog.,,7881,fog,9,canceled|flight|thick,descriptive,n/a,14,145
+2359093,I've been flying commercial jets for 13 years.,,6005,jets,7,commercial|flying|jets|years,descriptive,n/a,14,146
+3728074,I chartered a jet.,,14877,chartered,4,jet,descriptive,n/a,14,146
+2734388,Don't exceed the speed limit.,,7663,exceed,5,exceed|limit|speed,direct-address,neutral,14,146
+2954532,You've exceeded your authority.,,9396,exceeded,4,authority|exceeded,direct-address,neutral,14,146
+2954941,You're exceeding your authority.,,11171,exceeding,4,exceeding,direct-address,neutral,14,146
+2243691,They're surprisingly good.,,6034,surprisingly,3,surprisingly,descriptive,n/a,14,147
+2111951,Be thorough.,,7221,thorough,2,thorough,direct-address,neutral,14,148
+4869814,Thank you for your thorough explanation.,,7221,thorough,6,explanation,direct-address,formal,14,148
+254836,I studied it thoroughly.,,6040,thoroughly,4,studied|thoroughly,descriptive,n/a,14,148
+2643467,We've studied it thoroughly.,,6040,thoroughly,4,it|studied|thoroughly|we've,descriptive,n/a,14,148
+4498297,I thoroughly enjoyed the movie.,,6040,thoroughly,5,movie,descriptive,n/a,14,148
+61538,We thoroughly enjoyed the delicious meal.,,6040,thoroughly,6,meal,descriptive,n/a,14,148
+4663788,Everything has been thoroughly cleaned.,,6668,cleaned,5,cleaned,descriptive,n/a,14,148
+5404506,Every room was searched thoroughly.,,7208,searched,5,every|searched,descriptive,n/a,14,148
+5811737,It took a great deal of time to analyze the data.,,8474,analyze,11,deal|great|took,descriptive,n/a,14,148
+2359005,I've analyzed the data.,,7832,analyzed,4,analyzed|data,descriptive,n/a,14,148
+2359006,I've analyzed the liquid.,,7832,analyzed,4,liquid,descriptive,n/a,14,148
+2359007,I've analyzed the recording.,,7832,analyzed,4,recording,descriptive,n/a,14,148
+5631653,You over-analyze everything.,,8474,analyze,4,analyze|over,direct-address,informal,14,148
+2402265,You're over-analyzing.,,9969,analyzing,3,analyzing,direct-address,informal,14,148
+4494596,The premise was wrong.,,8774,premise,4,premise|wrong,descriptive,n/a,14,149
+4499733,I understand the premise.,,8774,premise,4,i|premise|the|understand,descriptive,n/a,14,149
+2187216,It's inadequate.,,8742,inadequate,2,inadequate,descriptive,n/a,14,149
+4664801,The funding could be inadequate.,,8742,inadequate,5,funding,descriptive,n/a,14,149
+2187231,It's redundant.,,11464,redundant,2,redundant,descriptive,n/a,14,149
+3731866,Wouldn't that be redundant?,,11464,redundant,4,wouldn't,direct-address,neutral,14,149
+2123549,That's unrelated.,,9007,unrelated,2,unrelated,descriptive,n/a,14,149
+4666237,I was thoroughly confused.,,6040,thoroughly,4,confused,descriptive,n/a,14,149
+273374,The water in the basin has frozen solid.,,6056,basin,8,basin|frozen|solid|water,descriptive,n/a,14,150
+2016897,I want to lodge a formal complaint.,,6107,lodge,7,formal|lodge,descriptive,n/a,14,151
+4499553,I lodged a complaint with the police.,,12662,lodged,7,lodged,descriptive,n/a,14,151
+x14_36,Still pending.,,6723,pending,2,pending,descriptive,n/a,14,151
+388845,As soon as it stopped raining a beautiful rainbow appeared.,,9920,raining,10,appeared|raining|stopped,descriptive,n/a,14,152
+29540,How long is the Rainbow Bridge?,,6238,rainbow,6,bridge|long,descriptive,n/a,14,152
+2350812,It rained continuously for three days.,,14652,rained,6,continuously|rained,descriptive,n/a,14,152
+1074387,We came dangerously close to freezing to death.,,12866,dangerously,8,came|dangerously|death|freezing,descriptive,n/a,14,152
+241517,I was chilled to the bone.,,12608,chilled,6,bone|chilled,descriptive,n/a,14,152
+31798,It has become noticeably colder.,,14122,noticeably,5,colder|noticeably,descriptive,n/a,14,152
+1190450,My toe started bleeding.,,6258,toe,4,bleeding|toe,descriptive,n/a,14,153
+274478,I have a pain in my little toe.,,6258,toe,8,pain,descriptive,n/a,14,153
+4311147,The big toe on my right foot hurts.,,6258,toe,8,foot|hurts,descriptive,n/a,14,153
+274479,Watch your toes.,,7321,toes,3,toes,direct-address,neutral,14,153
+3071602,My toes are frozen.,,7321,toes,4,are|frozen|my|toes,descriptive,n/a,14,153
+1951595,I can't feel my fingers or my toes.,,7321,toes,8,fingers,descriptive,n/a,14,153
+2206678,Don't step on my toes.,,7321,toes,5,step,direct-address,neutral,14,153
+1985914,It keeps you on your toes.,,7321,toes,6,keeps,direct-address,neutral,14,153
+1534328,Can you touch your toes without bending your legs?,,10327,bending,9,bending|touch|without,direct-address,neutral,14,153
+267594,I'd like to rent a compact car.,,6281,compact,7,compact|rent,descriptive,n/a,14,154
+2404163,I ripped my pants.,,6344,ripped,4,ripped,descriptive,n/a,14,155
+2549555,I tore my pants.,,10081,tore,4,tore,descriptive,n/a,14,155
+3342801,You tore your pants.,,10081,tore,4,pants|tore|you|your,direct-address,neutral,14,155
+2889142,I wiped the dirt off my pants.,,8369,wiped,7,dirt|wiped,descriptive,n/a,14,155
+x14_21,Did you fall?,,755,fall,3,fall,direct-address,neutral,14,155
+42723,That's a splendid idea.,,9578,splendid,4,idea|splendid,descriptive,n/a,14,156
+2954465,You did a splendid job.,,9578,splendid,5,job,direct-address,neutral,14,156
+325446,It's magnificent.,,6513,magnificent,2,it's|magnificent,descriptive,n/a,14,156
+36055,This scenery is magnificent.,,10396,scenery,4,scenery,descriptive,n/a,14,156
+2954648,You never cease to impress me.,,7582,impress,6,cease|impress,direct-address,neutral,14,156
+6003787,My contract probably won't be renewed.,,6532,renewed,6,contract|renewed|won't,descriptive,n/a,14,157
+x14_52,What's the reason?,,634,what's,3,reason,direct-address,neutral,14,157
+x14_53,"Budget cuts, apparently.",,3446,cuts,3,budget|apparently,descriptive,n/a,14,157
+3142792,It's a questionable policy.,,9202,questionable,4,policy|questionable,descriptive,n/a,14,157
+1989669,It's confidential.,,7862,confidential,2,confidential,descriptive,n/a,14,157
+2248811,It was confidential.,,7862,confidential,3,confidential|it|was,descriptive,n/a,14,157
+4980195,I was sworn to secrecy.,,11702,secrecy,5,secrecy,descriptive,n/a,14,157
+2111797,I resigned.,,6533,resigned,2,resigned,descriptive,n/a,14,158
+2203778,Who resigned?,,6533,resigned,2,resigned|who,direct-address,neutral,14,158
+5858703,I chose to resign.,,7199,resign,4,chose,descriptive,n/a,14,158
+3129787,"If that happens, I'll resign.",,7199,resign,5,happens,descriptive,n/a,14,158
+251220,My boss was forced to resign.,,7199,resign,6,boss|forced,descriptive,n/a,14,158
+3127898,No one's suggesting that you should resign.,,7199,resign,7,one's|suggesting,direct-address,neutral,14,158
+258352,He handed in his resignation.,,6732,resignation,5,handed|resignation,descriptive,n/a,14,158
+4496530,Check your tire pressure.,,6746,tire,4,check|pressure,direct-address,neutral,14,159
+3467971,My bike has a flat tire.,,6746,tire,6,bike,descriptive,n/a,14,159
+4014655,The left front tire looks low.,,6746,tire,6,front|low,descriptive,n/a,14,159
+2627924,The rear tire of my bicycle is flat.,,7047,bicycle,8,rear,descriptive,n/a,14,159
+41126,I had to push my bicycle because I had a flat tire.,,7047,bicycle,12,push,descriptive,n/a,14,159
+2078108,How much do you charge to fix a flat tire?,,6746,tire,10,charge,direct-address,neutral,14,159
+2406862,I suppose I could change a tire if I had to.,,6746,tire,11,suppose,descriptive,n/a,14,159
+41121,I pumped up the tire.,,9099,pumped,5,pumped,descriptive,n/a,14,159
+2510810,This car needs new tires.,,6637,tires,5,needs,descriptive,n/a,14,159
+2042779,You might want to consider buying some new tires for your car.,,6637,tires,12,buying|consider,direct-address,neutral,14,159
+5536715,We don't have much flexibility.,,6689,flexibility,5,flexibility|much,descriptive,n/a,14,160
+2953826,We'd be happy to accommodate you.,,6646,accommodate,6,we'd,direct-address,formal,14,160
+3824334,The changes have been gradual.,,10476,gradual,5,changes|gradual,descriptive,n/a,14,160
+4530702,I'm contemplating this option.,,12247,contemplating,4,option,descriptive,n/a,14,160
+317419,She is contemplating a trip.,,12247,contemplating,5,trip,descriptive,n/a,14,160
+4500310,We intend to persist.,,12180,persist,4,persist,descriptive,n/a,14,160
+55597,This is homemade jam.,,8847,homemade,4,jam,descriptive,n/a,14,161
+3287432,There's nothing like a dish of homemade ice cream.,,8847,homemade,9,cream|dish|ice,descriptive,n/a,14,161
+4121174,The lamb was cooked perfectly.,,6710,lamb,5,cooked|lamb|perfectly,descriptive,n/a,14,161
+2283608,I don't like powdered sugar.,,14647,powdered,5,powdered|sugar,descriptive,n/a,14,161
+852616,Please peel the potatoes.,,8973,peel,4,peel|potatoes,direct-address,neutral,14,161
+1744804,I have to peel the apples.,,8973,peel,6,apples,descriptive,n/a,14,161
+5859308,I peeled the apple.,,14352,peeled,4,apple|i|peeled|the,descriptive,n/a,14,161
+3635821,Keep our eyes peeled.,,14352,peeled,4,peeled,direct-address,informal,14,161
+4998383,This is my letter of resignation.,,6732,resignation,6,letter,descriptive,n/a,14,162
+790326,He decided to submit his resignation.,,6732,resignation,6,submit,descriptive,n/a,14,162
+2294000,I beg you to reconsider.,,10988,reconsider,5,beg,direct-address,formal,14,162
+3395531,I'm asking you to reconsider.,,10988,reconsider,5,asking,direct-address,neutral,14,162
+x14_28,I've made up my mind.,,369,mind,5,mind|made,descriptive,n/a,14,162
+2548868,How was the ballet?,,7343,ballet,4,ballet,direct-address,neutral,14,163
+3310845,We're going to the ballet.,,7343,ballet,5,ballet|going|the|to|we're,descriptive,n/a,14,163
+4665727,The orchestra began to play.,,6796,orchestra,5,orchestra,descriptive,n/a,14,163
+21577,I'm going to join the school orchestra.,,6796,orchestra,7,join,descriptive,n/a,14,163
+362737,I play the violin.,,9714,violin,4,i|play|the|violin,descriptive,n/a,14,163
+2519929,I need a writing pad.,,6799,pad,5,pad,descriptive,n/a,14,164
+2635014,I need a mouse pad.,,6799,pad,5,mouse,descriptive,n/a,14,165
+1580295,Your English has improved considerably.,,6860,considerably,5,considerably|improved,direct-address,neutral,14,166
+1845492,Loosen up.,,14009,loosen,2,loosen,direct-address,informal,14,167
+2249569,Loosen your tie.,,14009,loosen,3,tie,direct-address,informal,14,167
+2245302,Don't be hasty.,,14822,hasty,3,hasty,direct-address,informal,14,167
+2007779,Let's not be hasty.,,14822,hasty,4,be|hasty|let's|not,direct-address,informal,14,167
+1359485,That's the last straw.,,7027,straw,4,last|straw,descriptive,n/a,14,167
+282376,Don't put the cart before the horse.,,7050,cart,7,cart|horse,direct-address,informal,14,168
+5181122,Let's not put the cart before the horse.,,7050,cart,8,before|cart|horse|let's|not|put|the,direct-address,informal,14,169
+316871,She is sewing a dress.,,10291,sewing,5,dress,descriptive,n/a,14,170
+3361137,"I have a sewing machine, but I rarely use it.",,10291,sewing,10,machine|rarely,descriptive,n/a,14,170
+313794,She can sew very well.,,13147,sew,5,well,descriptive,n/a,14,170
+3022458,Please sew these buttons on.,,13147,sew,5,buttons|sew,direct-address,neutral,14,170
+29235,Would you sew a button on my shirt?,,13147,sew,8,button|shirt,direct-address,neutral,14,170
+644637,My hands were shaking too much to thread the needle.,,7091,needle,10,hands|needle|shaking|thread,descriptive,n/a,14,170
+62960,Spiders spin webs.,,14877,webs,3,spiders,descriptive,n/a,14,171
+2793914,The spider is spinning a web.,,7119,spinning,6,spider|web,descriptive,n/a,14,171
+62968,Have you ever seen a spider spinning its web?,,7119,spinning,9,its,direct-address,neutral,14,171
+280114,My head is spinning.,,7119,spinning,4,spinning,descriptive,n/a,14,171
+3353685,What do you think would happen if the earth stopped spinning?,,7119,spinning,11,earth|happen,direct-address,neutral,14,171
+953562,I never thought this rubber band would come in handy when I put it in my pocket this morning.,,7169,handy,19,band|come|handy|morning|pocket|thought,descriptive,n/a,14,172
+2439722,Can you rub my shoulders?,,7203,rub,5,shoulders,direct-address,informal,14,173
+x14_42,"Sure, sit down.",,1343,sit,3,sit,direct-address,informal,14,173
+2404167,I rubbed my feet.,,11697,rubbed,4,feet|rubbed,descriptive,n/a,14,173
+317196,She rubbed her eyes.,,11697,rubbed,4,eyes,descriptive,n/a,14,173
+325642,"The faster we rub our hands together, the warmer they get.",,9477,warmer,11,faster|warmer,descriptive,n/a,14,173
+4907416,Don't make me slap you.,,7211,slap,5,slap,direct-address,informal,14,174
+5856486,Why did you slap me?,,7211,slap,5,did|me|slap|why|you,direct-address,neutral,14,174
+302884,He slapped her.,,10535,slapped,3,slapped,descriptive,n/a,14,174
+25687,I got slapped on both cheeks.,,10535,slapped,6,cheeks,descriptive,n/a,14,174
+4016634,What an amazing coincidence!,,7247,coincidence,4,amazing,descriptive,n/a,14,175
+5090017,This is no mere coincidence.,,7247,coincidence,5,mere,descriptive,n/a,14,175
+2330095,I guess this is a coincidence.,,7247,coincidence,6,guess,descriptive,n/a,14,175
+3396668,I doubt that's just a coincidence.,,7247,coincidence,6,doubt,descriptive,n/a,14,175
+2538942,I'm assuming it was just a coincidence.,,7247,coincidence,7,assuming,descriptive,n/a,14,175
+2111354,They vanished.,,9957,vanished,2,vanished,descriptive,n/a,14,176
+2203878,Who vanished?,,9957,vanished,2,vanished|who,direct-address,neutral,14,176
+x14_55,We're not sure.,,385,we're,3,sure,descriptive,n/a,14,176
+2240993,We're historians.,,8740,historians,2,historians,descriptive,n/a,14,176
+4011729,What kind of historian are you?,,7887,historian,6,are|historian|kind|of|what|you,direct-address,neutral,14,176
+4846759,Countless lives have been lost.,,7253,countless,5,countless|lives|lost,descriptive,n/a,14,176
+2011837,Who wants french toast?,,7320,toast,4,toast,direct-address,neutral,14,177
+3563957,The toast is cold.,,7320,toast,4,cold,descriptive,n/a,14,177
+38294,I've burnt the toast.,,7320,toast,4,burnt,descriptive,n/a,14,177
+x14_46,I'll make another piece.,,963,piece,4,another|piece,descriptive,n/a,14,177
+1936393,I'd like to propose a toast.,,7320,toast,6,propose,descriptive,n/a,14,177
+3819591,The bread is stuck in the toaster.,,14492,toaster,7,bread|stuck,descriptive,n/a,14,177
+2358835,I have a toaster.,,14492,toaster,4,toaster,descriptive,n/a,14,177
+2953210,Mary reached inside her purse and pulled out her license.,,7409,purse,10,inside|pulled|purse|reached,descriptive,n/a,14,178
+35243,What's the bus fare?,,7460,fare,4,fare,direct-address,neutral,14,179
+5850236,I paid the fare.,,7460,fare,4,paid,descriptive,n/a,14,180
+1384376,My girlfriend dumped me.,,7873,dumped,4,girlfriend,descriptive,n/a,14,181
+42113,It was a one-sided love affair.,,7512,sided,7,affair|sided,descriptive,n/a,14,181
+4017364,Who doesn't want love and affection?,,7639,affection,6,affection|doesn't,descriptive,n/a,14,181
+2006437,It looks like you've hooked a big one.,,7674,hooked,8,big|hooked|looks,direct-address,neutral,14,182
+2046903,Can you squeeze me into your busy schedule?,,7516,squeeze,8,busy|schedule,direct-address,formal,14,182
+x14_54,I'll try my best.,,348,i'll,4,best|try,descriptive,n/a,14,182
+410513,She tried to squeeze the juice from the orange.,,7516,squeeze,9,juice|orange|tried,descriptive,n/a,14,182
+2243326,They squeezed together.,,12207,squeezed,3,squeezed,descriptive,n/a,14,182
+261436,I caught a beautiful butterfly.,,7550,butterfly,5,beautiful|butterfly|caught,descriptive,n/a,14,183
+4536145,How long does a butterfly live?,,7550,butterfly,6,a|butterfly|does|how|live|long,direct-address,neutral,14,183
+3170739,Have you ever seen a purple butterfly?,,7550,butterfly,7,purple,direct-address,neutral,14,183
+18954,I have butterflies in my stomach.,,10221,butterflies,6,stomach,descriptive,n/a,14,183
+4198353,I like writing with a fountain pen.,,7759,fountain,7,fountain|pen,descriptive,n/a,14,184
+322624,Do you have a fountain pen with you?,,7759,fountain,8,a|do|fountain|have|pen|with|you,direct-address,neutral,14,185
+5640419,I don't feel like a pioneer.,,7791,pioneer,6,pioneer,descriptive,n/a,14,186
+1602245,I can't lift the sack either.,,7802,sack,6,either|lift,descriptive,n/a,14,187
+2541383,I'm going to hit the sack early.,,7802,sack,7,early,descriptive,n/a,14,188
+2638772,I want the red balloon.,,7838,balloon,5,balloon|red,descriptive,n/a,14,189
+3312267,We'll get you another balloon.,,7838,balloon,5,another,direct-address,neutral,14,190
+2007322,Let's have a water balloon fight.,,7838,balloon,6,fight,direct-address,informal,14,191
+2063338,I could've sworn I heard something.,,7941,sworn,6,could've|something|sworn,descriptive,n/a,14,192
+5254795,Frogs eat flies.,,11785,frogs,3,frogs,descriptive,n/a,14,193
+953487,I hear that he eats frogs.,,11785,frogs,6,eats|hear,descriptive,n/a,14,193
+57893,There used to be a lot of frogs in this pond.,,11785,frogs,11,pond,descriptive,n/a,14,193
+265649,The snake swallowed a frog.,,10894,swallowed,5,snake,descriptive,n/a,14,193
+4198288,"The only word written on the page was the word ""frog.""",,7996,frog,11,page|word|written,descriptive,n/a,14,193
+2271874,I don't like confrontation.,,9858,confrontation,4,confrontation,descriptive,n/a,14,194
+903825,I think it's time for me to confront that problem.,,8931,confront,10,confront,descriptive,n/a,14,194
+269923,Don't interfere in other people's affairs.,,8104,interfere,6,affairs|people's,direct-address,informal,14,194
+2241174,We must intervene.,,10733,intervene,3,intervene,descriptive,n/a,14,194
+2111547,Somebody intervened.,,14226,intervened,2,intervened|somebody,descriptive,n/a,14,194
+2203713,Who intervened?,,14226,intervened,2,intervened|who,direct-address,neutral,14,194
+2203709,I'm interfering.,,12161,interfering,2,interfering,descriptive,n/a,14,194
+2203710,We're interfering.,,12161,interfering,2,interfering|we're,descriptive,n/a,14,194
+3821452,We realized it was pointless.,,8127,pointless,5,realized,descriptive,n/a,14,195
+258704,I addressed the envelope containing the invitation.,,8296,envelope,7,addressed|containing|invitation,descriptive,n/a,14,196
+682501,I wrote the wrong address on the envelope.,,8296,envelope,8,address|wrote,descriptive,n/a,14,197
+317054,She's acting on instinct.,,8312,instinct,4,acting,descriptive,n/a,14,198
+3736372,I acted on instinct.,,8312,instinct,4,acted,descriptive,n/a,14,198
+2245501,Follow your instincts.,,10969,instincts,3,instincts,direct-address,neutral,14,198
+x14_44,What does your gut tell you?,,6697,gut,6,gut,direct-address,neutral,14,198
+5126566,That sounds vaguely familiar.,,12938,vaguely,4,familiar|vaguely,descriptive,n/a,14,198
+5306656,That man looks vaguely familiar.,,12938,vaguely,5,familiar|looks|man|that|vaguely,descriptive,n/a,14,198
+476463,He has a maid.,,8322,maid,4,a|has|he|maid,descriptive,n/a,14,199
+4798964,The maid will clean the guest room.,,8322,maid,7,clean|guest,descriptive,n/a,14,199
+3735586,I'm the gardener.,,12640,gardener,3,gardener,descriptive,n/a,14,199
+268581,I had the gardener plant some trees.,,12640,gardener,7,plant,descriptive,n/a,14,199
+3150791,I bought that from a street vendor.,,9124,vendor,7,street|vendor,descriptive,n/a,14,199
+4135117,Would you teach me to surf?,,8360,surf,6,me|surf|teach|to|would|you,direct-address,neutral,14,200
+4134512,Who taught you to surf so well?,,8360,surf,7,taught,direct-address,neutral,14,200
+4135116,I've started teaching my kids to surf.,,8360,surf,7,teaching,descriptive,n/a,14,200
+4397581,Surfing looks like fun.,,9941,surfing,4,fun,descriptive,n/a,14,200
+5850201,I went surfing yesterday.,,9941,surfing,4,yesterday,descriptive,n/a,14,200
+5839978,I'm a surfer.,,14768,surfer,3,surfer,descriptive,n/a,14,200
+909563,She spends way too much time surfing the web.,,9941,surfing,9,spends|way,descriptive,n/a,14,200
+2011950,I'd like to make amends.,,14509,amends,5,amends,descriptive,n/a,14,201
+4402015,We're not trying to make amends.,,14509,amends,6,amends|make|not|to|trying|we're,descriptive,n/a,14,201
+887040,She confronted him and demanded an apology.,,8486,confronted,7,apology|confronted|demanded,descriptive,n/a,14,201
+x14_26,Did he apologize?,,5365,apologize,3,apologize,descriptive,n/a,14,201
+x14_27,"Eventually, yes.",,1382,eventually,2,eventually,descriptive,n/a,14,201
+2013572,I want to convey my sympathy.,,8584,convey,6,convey|sympathy,descriptive,n/a,14,202
+1723,Merry Christmas!,,8630,merry,2,merry,direct-address,neutral,14,203
+62819,I wish you a Merry Christmas.,,8630,merry,6,a|christmas|i|merry|wish|you,direct-address,neutral,14,203
+x14_56,Same to you and your family.,,200,family,6,same|family,direct-address,neutral,14,203
+2644119,Here's my driver's license.,,9156,driver's,4,driver's|here's,direct-address,neutral,14,204
+2668180,Someone stole my driver's license.,,9156,driver's,5,stole,descriptive,n/a,14,204
+1445461,I finally got a driver's license.,,9156,driver's,6,finally,descriptive,n/a,14,204
+16302,I think you'll have very little difficulty in getting a driver's license.,,9156,driver's,12,difficulty,direct-address,neutral,14,204
+4497082,The guy driving the truck that crashed into our car didn't have a driver's license.,,9156,driver's,15,crashed|driving|guy|truck,descriptive,n/a,14,204
+887011,"She bought him a car, but he didn't have a driver's license so he couldn't drive it anywhere.",,9156,driver's,18,anywhere|drive,descriptive,n/a,14,204
+1221409,You can get a car license after you turn eighteen.,,8836,eighteen,10,after|eighteen|turn,direct-address,neutral,14,204
+2631795,I need glue.,,8951,glue,3,glue,descriptive,n/a,14,205
+5255771,It'll be difficult to glue the two pieces together.,,8951,glue,9,pieces|together,descriptive,n/a,14,206
+4877369,I love the view from my balcony.,,9134,balcony,7,view,descriptive,n/a,14,207
+2245182,Close that drawer.,,9155,drawer,3,close|drawer,direct-address,informal,14,208
+2280434,This drawer won't open.,,9155,drawer,4,open,descriptive,n/a,14,208
+2389574,I opened the drawer to get a pencil.,,9155,drawer,8,opened|pencil,descriptive,n/a,14,208
+3426208,Why is this knife not in the drawer?,,9155,drawer,8,knife,direct-address,neutral,14,208
+3738418,Have you looked in the bottom drawer?,,9155,drawer,7,bottom|looked,direct-address,neutral,14,208
+625192,Every successful writer has a drawer full of rejection letters.,,9155,drawer,10,letters|rejection|successful|writer,descriptive,n/a,14,208
+48840,The desk has three drawers.,,13438,drawers,5,desk|drawers,descriptive,n/a,14,208
+4016141,Did you go through my drawers?,,13438,drawers,6,through,direct-address,neutral,14,208
+4498247,What an embarrassment!,,9271,embarrassment,3,embarrassment,descriptive,n/a,14,209
+2249127,It's not predictable.,,9431,predictable,3,it's|not|predictable,descriptive,n/a,14,210
+3821410,You're predictable.,,9431,predictable,2,predictable,direct-address,neutral,14,210
+2713424,It's not that noticeable.,,9550,noticeable,4,noticeable,descriptive,n/a,14,210
+325629,There are noticeable differences between the two.,,9550,noticeable,7,between,descriptive,n/a,14,210
+261578,I forgot to attach a stamp to the envelope.,,9488,attach,9,attach|forgot|stamp,descriptive,n/a,14,211
+5906408,This used to be a butcher shop.,,9496,butcher,7,butcher|shop,descriptive,n/a,14,212
+2218330,You're positively glowing.,,9519,glowing,3,glowing|positively,direct-address,neutral,14,213
+2249584,Mary is glowing.,,9519,glowing,3,glowing|is|mary,descriptive,n/a,14,213
+x14_51,Something must be going right.,,193,must,5,right|going,descriptive,n/a,14,213
+3737630,Mary is extraordinarily pretty.,,13443,extraordinarily,4,pretty,descriptive,n/a,14,213
+3736644,It was extraordinarily difficult.,,13443,extraordinarily,4,extraordinarily,descriptive,n/a,14,213
+4117147,Where should I put the tray?,,9591,tray,6,tray,direct-address,neutral,14,214
+2406307,I set the tray down on the table.,,9591,tray,8,set|table,descriptive,n/a,14,215
+3184877,Stay for supper.,,9699,supper,3,stay,direct-address,neutral,14,216
+1072639,Have you already eaten supper?,,9699,supper,5,eaten,direct-address,neutral,14,216
+1439844,My mother is preparing supper.,,9699,supper,5,preparing,descriptive,n/a,14,216
+45169,The news filled her with sorrow.,,9815,sorrow,6,news|sorrow,descriptive,n/a,14,217
+2245572,Here's your mug.,,10029,mug,3,mug,direct-address,neutral,14,218
+3327120,Hand me my mug.,,10029,mug,4,hand,direct-address,informal,14,219
+3822089,I hate needles.,,10156,needles,3,needles,descriptive,n/a,14,220
+3726958,I don't like needles.,,10156,needles,4,don't|i|like|needles,descriptive,n/a,14,220
+x14_49,Most people don't.,,102,most,3,most,descriptive,n/a,14,220
+37985,Take whichever you like.,,10201,whichever,4,whichever,direct-address,neutral,14,221
+37995,You can choose whichever color you like.,,10201,whichever,7,choose|color,direct-address,neutral,14,221
+2275350,Don't try to manipulate me.,,10263,manipulate,5,manipulate,direct-address,informal,14,222
+2954568,You know how to manipulate me.,,10263,manipulate,6,how|know|manipulate|me|to|you,direct-address,neutral,14,222
+5859792,I felt manipulated.,,11339,manipulated,3,manipulated,descriptive,n/a,14,222
+3311060,We're all being manipulated.,,11339,manipulated,4,all|being|manipulated|we're,descriptive,n/a,14,222
+2218206,You're mocking me.,,11926,mocking,3,mocking,direct-address,neutral,14,222
+2648163,Are you mocking me?,,11926,mocking,4,are|me|mocking|you,direct-address,neutral,14,222
+x14_45,Not at all. I'm serious.,,825,serious,5,serious,direct-address,neutral,14,222
+4663372,Maintaining friendships can be challenging.,,10468,friendships,5,challenging|friendships|maintaining,descriptive,n/a,14,223
+4664353,Friendships tend to be challenging.,,10468,friendships,5,tend,descriptive,n/a,14,223
+x14_23,"Worth the effort, though.",,1256,effort,4,effort|worth,descriptive,n/a,14,223
+2248415,I've sacrificed everything.,,10530,sacrificed,3,everything|i've|sacrificed,descriptive,n/a,14,224
+4493676,Some kids had balloons.,,10566,balloons,4,balloons|kids,descriptive,n/a,14,225
+61015,This beer mug holds one pint.,,10637,pint,6,beer|holds|pint,descriptive,n/a,14,226
+1370104,There's no cure for stupidity.,,10668,stupidity,5,stupidity,descriptive,n/a,14,227
+252121,I have seen a panda once.,,10759,panda,6,once|panda,descriptive,n/a,14,228
+34950,Have you ever seen a panda?,,10759,panda,6,a|ever|have|panda|seen|you,direct-address,neutral,14,229
+3316606,We don't use our coal cellar anymore.,,11288,cellar,7,anymore|cellar|coal|use,descriptive,n/a,14,230
+5102449,We went back down into the cellar.,,11288,cellar,7,back|cellar|down|into|the|we|went,descriptive,n/a,14,230
+2362168,I just finished cleaning the attic.,,10917,attic,6,cleaning|finished,descriptive,n/a,14,230
+2291864,I always wondered what was in your attic.,,10917,attic,8,wondered,direct-address,neutral,14,230
+2674223,Who knows what we'll find up in the attic?,,10917,attic,9,knows,direct-address,neutral,14,230
+4059009,I think we have some mice in the attic.,,10917,attic,9,mice,descriptive,n/a,14,230
+3311898,They've been chanting for thirty minutes.,,11038,chanting,6,chanting|minutes|thirty,descriptive,n/a,14,231
+3727912,I don't want to discourage you from doing that.,,11639,discourage,9,discourage,direct-address,neutral,14,232
+3341855,My parents discouraged me from traveling alone.,,11048,discouraged,7,alone|parents|traveling,descriptive,n/a,14,232
+1426484,Don't be discouraged just because you're not all that talented.,,11048,discouraged,10,talented,direct-address,informal,14,232
+3737685,Is everybody's mug filled?,,11060,everybody's,4,everybody's|filled|is|mug,direct-address,neutral,14,233
+282121,Have you ever ridden in a hot air balloon?,,11113,ridden,9,air|hot|ridden,direct-address,neutral,14,234
+3738351,What's your golf handicap?,,11187,handicap,4,golf|handicap,direct-address,neutral,14,235
+3733729,You've omitted something.,,12176,omitted,3,omitted,direct-address,neutral,14,236
+4529457,My name was omitted from the list.,,12176,omitted,7,name,descriptive,n/a,14,237
+2953237,My teacher asked me to rewrite my essay.,,12914,rewrite,8,asked|rewrite,descriptive,n/a,14,238
+3325880,My French teacher told to rewrite my essay.,,12914,rewrite,8,told,descriptive,n/a,14,238
+x14_39,What did they want changed?,,886,changed,5,changed|want,descriptive,n/a,14,238
+2267417,It'll have to be done forcibly.,,12984,forcibly,6,done|forcibly,descriptive,n/a,14,239
+3824254,Are you handicapped?,,13455,handicapped,3,handicapped,direct-address,neutral,14,240
+4501332,Handicapped parking is available.,,13455,handicapped,4,parking,descriptive,n/a,14,241
+4644995,The air conditioner is broken.,,13752,conditioner,5,conditioner,descriptive,n/a,14,242
+5179250,Let's turn on the air conditioner.,,13752,conditioner,6,air|conditioner|let's|on|the|turn,direct-address,neutral,14,242
+256462,I can't do without an air conditioner in the summer.,,13752,conditioner,10,summer,descriptive,n/a,14,242
+908916,Which air conditioner do you think is the most efficient?,,13752,conditioner,10,efficient,direct-address,neutral,14,242
+3160467,May I have another brochure?,,13961,brochure,5,another|brochure|have|i|may,direct-address,formal,14,243
+271507,Let's get some brochures from the travel bureau.,,14877,brochures,8,bureau|travel,direct-address,informal,14,243
+2631787,I need envelopes.,,14430,envelopes,3,envelopes,descriptive,n/a,14,244
+1806392,Where can I buy envelopes?,,14430,envelopes,5,buy|can|envelopes|i|where,direct-address,neutral,14,245
+4495620,What unanswered questions remain?,,14675,unanswered,4,remain|unanswered,direct-address,neutral,14,246
+4495621,Many questions remain unanswered.,,14675,unanswered,4,many|questions|remain|unanswered,descriptive,n/a,14,247
+953542,I never for a moment imagined that I'd be singled out for a full body search.,,14763,singled,16,body|full|imagined|moment|search|singled,descriptive,n/a,14,248
+4529253,Names are listed in alphabetical order.,,14877,alphabetical,6,listed|names,descriptive,n/a,14,249

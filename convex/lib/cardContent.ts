@@ -1,4 +1,4 @@
-import { Id } from '../_generated/dataModel';
+import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
 
@@ -180,15 +180,19 @@ export async function buildTextContentBatchForLanguages(
  * Only languages for which a translation actually exists are included in
  * `searchableTextLanguages`, so callers can later detect staleness by comparing
  * this array against the current course language list.
+ *
+ * Pass `text` when the caller already has the doc — avoids a redundant
+ * `ctx.db.get` on the review hot path.
  */
 export async function buildCardSearchableText(
   ctx: ContentCtx,
   textId: Id<'texts'>,
   sourceText: string,
   courseLanguages: string[],
+  text?: Doc<'texts'> | null,
 ): Promise<{ searchableText: string; searchableTextLanguages: string[] }> {
-  const [text, translationResults] = await Promise.all([
-    ctx.db.get(textId),
+  const [resolvedText, translationResults] = await Promise.all([
+    text !== undefined ? Promise.resolve(text) : ctx.db.get(textId),
     Promise.all(
       courseLanguages.map(async (lang) => {
         const translation = await ctx.db
@@ -210,7 +214,7 @@ export async function buildCardSearchableText(
 
   const parts = [
     sourceText,
-    text?.romanizedText,
+    resolvedText?.romanizedText,
     ...foundTranslations.map((t) => t.text),
     ...foundTranslations.map((t) => t.romanization),
   ];

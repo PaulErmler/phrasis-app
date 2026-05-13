@@ -1,54 +1,8 @@
 import { MutationCtx } from '../../_generated/server';
 import { Id } from '../../_generated/dataModel';
+import { tokenizeText, isAllLowercase, type Token } from '../../../lib/wordTokenize';
 
-export type Token = { normalized: string; original: string };
-
-/**
- * A word is "all lowercase" if lowercasing it is a no-op. Used to decide
- * which casing variant to keep as the display form: if we've ever seen
- * the word in all-lowercase form, prefer that (covers English "the" at
- * sentence start being downgraded from "The"). Words that never appear
- * lowercase — German nouns, proper nouns — keep their capitalized form.
- */
-export function isAllLowercase(s: string): boolean {
-  return s === s.toLowerCase();
-}
-
-// Segmenter construction is measurable on hot paths (review writes,
-// migrations, edit flows). Cache per normalized BCP-47 tag.
-const segmenterCache = new Map<string, Intl.Segmenter>();
-function getSegmenter(bcp47: string): Intl.Segmenter {
-  let s = segmenterCache.get(bcp47);
-  if (!s) {
-    s = new Intl.Segmenter(bcp47, { granularity: 'word' });
-    segmenterCache.set(bcp47, s);
-  }
-  return s;
-}
-
-export function tokenizeText(text: string, language: string): Token[] {
-  const nfc = text.normalize('NFC');
-  // `es_latam` and similar underscore-separated tags aren't valid BCP-47;
-  // Intl.Segmenter would throw. Normalize to hyphens.
-  const bcp47 = language.replace(/_/g, '-');
-  try {
-    const segmenter = getSegmenter(bcp47);
-    return [...segmenter.segment(nfc)]
-      .filter((seg) => seg.isWordLike)
-      .map((seg) => ({
-        original: seg.segment,
-        normalized: seg.segment.toLowerCase().normalize('NFC'),
-      }));
-  } catch {
-    // Unknown/invalid BCP-47 tag — fall back to a Unicode-letter split so a
-    // bad language code never crashes a deck save. Behaviour is correct for
-    // Latin-script languages; imperfect but non-fatal for others.
-    return [...nfc.matchAll(/\p{L}[\p{L}\p{M}\p{N}'’-]*/gu)].map((m) => ({
-      original: m[0],
-      normalized: m[0].toLowerCase().normalize('NFC'),
-    }));
-  }
-}
+export { tokenizeText, isAllLowercase, type Token };
 
 const MAX_TEXTS_PER_WORD = 30;
 
@@ -59,6 +13,7 @@ export async function trackNewWords(
     courseId: Id<'courses'>;
     languages: Array<{ language: string; text: string }>;
     textId?: Id<'texts'>;
+    sessionId?: string;
   },
 ): Promise<Record<string, number>> {
   const result: Record<string, number> = {};
@@ -97,6 +52,7 @@ export async function trackNewWords(
           language,
           word: normalized,
           displayWord: original,
+          ...(args.sessionId && { sessionId: args.sessionId }),
         });
         newCount++;
       } else if (
@@ -112,42 +68,33 @@ export async function trackNewWords(
       // Link this word to the source text (for word → sentence lookup).
       // Runs for every word, not just new ones, since a previously-known
       // word may appear in a new text.
+      //
+      // Single index read serves both the existence check and the cap check:
+      // if the textId is already in the result we skip insert; otherwise we
+      // only insert when length < cap.
       if (args.textId) {
-        // Check if this exact link already exists
-        const existingLink = await ctx.db
+        const existingLinks = await ctx.db
           .query('userWordTexts')
-          .withIndex('by_userId_courseId_language_word_textId', (q) =>
+          .withIndex('by_userId_courseId_language_word', (q) =>
             q
               .eq('userId', args.userId)
               .eq('courseId', args.courseId)
               .eq('language', language)
-              .eq('word', normalized)
-              .eq('textId', args.textId!),
+              .eq('word', normalized),
           )
-          .first();
+          .take(MAX_TEXTS_PER_WORD);
 
-        if (!existingLink) {
-          // Enforce per-word cap to bound storage
-          const existingCount = await ctx.db
-            .query('userWordTexts')
-            .withIndex('by_userId_courseId_language_word', (q) =>
-              q
-                .eq('userId', args.userId)
-                .eq('courseId', args.courseId)
-                .eq('language', language)
-                .eq('word', normalized),
-            )
-            .take(MAX_TEXTS_PER_WORD);
-
-          if (existingCount.length < MAX_TEXTS_PER_WORD) {
-            await ctx.db.insert('userWordTexts', {
-              userId: args.userId,
-              courseId: args.courseId,
-              language,
-              word: normalized,
-              textId: args.textId!,
-            });
-          }
+        const alreadyLinked = existingLinks.some(
+          (link) => link.textId === args.textId,
+        );
+        if (!alreadyLinked && existingLinks.length < MAX_TEXTS_PER_WORD) {
+          await ctx.db.insert('userWordTexts', {
+            userId: args.userId,
+            courseId: args.courseId,
+            language,
+            word: normalized,
+            textId: args.textId!,
+          });
         }
       }
     }
@@ -316,21 +263,9 @@ export async function updateWordTextsForEdit(
       // and doesn't cover writes from a concurrent mutation that may have
       // raced in (Convex OCC will retry, but only on write-set conflicts —
       // this index read guards against the read-stale-then-insert case).
-      const existingLink = await ctx.db
-        .query('userWordTexts')
-        .withIndex('by_userId_courseId_language_word_textId', (q) =>
-          q
-            .eq('userId', args.userId)
-            .eq('courseId', args.courseId)
-            .eq('language', language)
-            .eq('word', normalized)
-            .eq('textId', args.textId),
-        )
-        .first();
-      if (existingLink) continue;
-
-      // Insert userWordTexts link (check cap)
-      const count = await ctx.db
+      //
+      // Single index read serves both the existence check and the cap check.
+      const existingForWord = await ctx.db
         .query('userWordTexts')
         .withIndex('by_userId_courseId_language_word', (q) =>
           q
@@ -341,7 +276,12 @@ export async function updateWordTextsForEdit(
         )
         .take(MAX_TEXTS_PER_WORD);
 
-      if (count.length < MAX_TEXTS_PER_WORD) {
+      const alreadyLinked = existingForWord.some(
+        (link) => link.textId === args.textId,
+      );
+      if (alreadyLinked) continue;
+
+      if (existingForWord.length < MAX_TEXTS_PER_WORD) {
         await ctx.db.insert('userWordTexts', {
           userId: args.userId,
           courseId: args.courseId,

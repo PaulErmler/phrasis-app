@@ -12,7 +12,7 @@ export async function upsertDailyLanguageStats(
     isNewCard: boolean;
     newWordsCount: number;
   },
-): Promise<void> {
+): Promise<{ newWordsCountAfter: number; previousNewWordsCount: number }> {
   const existing = await ctx.db
     .query('dailyLanguageStats')
     .withIndex('by_userId_and_courseId_and_language_and_date', (q) =>
@@ -25,13 +25,14 @@ export async function upsertDailyLanguageStats(
     .first();
 
   if (existing) {
+    const newWordsCountAfter = existing.newWordsCount + args.newWordsCount;
     await ctx.db.patch(existing._id, {
       reps: existing.reps + 1,
       newCards: existing.newCards + (args.isNewCard ? 1 : 0),
       timeMs: existing.timeMs + args.timeMs,
-      newWordsCount: existing.newWordsCount + args.newWordsCount,
+      newWordsCount: newWordsCountAfter,
     });
-    return;
+    return { newWordsCountAfter, previousNewWordsCount: existing.newWordsCount };
   }
 
   await ctx.db.insert('dailyLanguageStats', {
@@ -44,4 +45,5 @@ export async function upsertDailyLanguageStats(
     timeMs: args.timeMs,
     newWordsCount: args.newWordsCount,
   });
+  return { newWordsCountAfter: args.newWordsCount, previousNewWordsCount: 0 };
 }

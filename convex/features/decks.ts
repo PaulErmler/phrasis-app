@@ -15,6 +15,7 @@ import {
   getVoiceGenderByApiCode,
   resolveAudioSpeakerGender,
   getTtsProviderForLanguage,
+  getTranslationConfigForLanguage,
 } from '../../lib/languages';
 import {
   getCourseSettings,
@@ -24,11 +25,15 @@ import { getAuthUserId, requireAuthUserId, getUserSettings } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
+  findNextIncompleteCollection,
+  getActiveDataset,
   getCollectionProgress as getCollectionProgressHelper,
+  getNextCollection,
   getNextTextsFromRank,
 } from '../db/collections';
 import { translateText, romanizeText } from './translation';
 import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
+import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   translationValidator,
   audioRecordingValidator,
@@ -37,12 +42,13 @@ import {
   voiceGenderValidator,
 } from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
+import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
-  LEVEL_ORDER,
   COLLECTION_PREVIEW_SIZE,
   CONTENT_LOOKAHEAD_SIZE,
-  getNextCollectionName,
+  LEGACY_LEVEL_ORDER,
+  isPremadeLevelCollection,
 } from '../lib/collections';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { consumeQuota, checkQuota } from '../usage/helpers';
@@ -147,8 +153,14 @@ export async function scheduleMissingContent(
             storedGender !== audioSpeakerGender);
         // Rows predating this field are legacy Google audio; treat as 'google'.
         const existingProvider = audio.ttsProvider ?? 'google';
-        const providerMismatch =
-          existingProvider !== getTtsProviderForLanguage(lang);
+        const currentProvider = getTtsProviderForLanguage(lang);
+        // Provider regen is now gated by lib/ttsPrecedence.ts — only the
+        // matchups listed there force a delete + re-synth. Unlisted pairs
+        // keep the existing audio (e.g. Google rows are never overwritten).
+        const providerMismatch = shouldOverwriteProvider(
+          currentProvider,
+          existingProvider,
+        );
         if (genderMismatch || providerMismatch) {
           await ctx.storage.delete(audio.storageId);
           await ctx.db.delete(audio._id);
@@ -222,19 +234,43 @@ export async function scheduleMissingContent(
       // Different language — need translation
       const translation = translationMap.get(lang);
       if (!translation) {
-        // Schedule translation (which also triggers TTS and romanization after completion)
-        await ctx.scheduler.runAfter(
-          0,
-          internal.features.decks.processTranslationForCard,
-          {
-            textId,
-            sourceLanguage,
-            targetLanguage: lang,
-            text: text.text,
-            audioSpeakerGender,
-          },
-        );
-        translationsScheduled++;
+        // Route to either the LLM queue or the legacy Google path based on
+        // the per-language config in lib/languages.ts. Both paths terminate
+        // by writing the `translations` row via storeTranslationAndScheduleTTS,
+        // so downstream (romanization, TTS) doesn't care which provider ran.
+        const tCfg = getTranslationConfigForLanguage(lang);
+        if (tCfg.provider === 'openrouter') {
+          const claimed = await claimLlmTranslationIfAvailable(ctx, textId, lang);
+          if (claimed) {
+            await ctx.runMutation(
+              internal.features.llmTranslationQueue.enqueueLlmTranslation,
+              {
+                args: {
+                  textId,
+                  sourceLanguage,
+                  targetLanguage: lang,
+                  text: text.text,
+                  audioSpeakerGender,
+                },
+              },
+            );
+            translationsScheduled++;
+          }
+        } else {
+          // Legacy Google Translate path — unchanged.
+          await ctx.scheduler.runAfter(
+            0,
+            internal.features.decks.processTranslationForCard,
+            {
+              textId,
+              sourceLanguage,
+              targetLanguage: lang,
+              text: text.text,
+              audioSpeakerGender,
+            },
+          );
+          translationsScheduled++;
+        }
       } else {
         // Translation exists — backfill romanization if missing
         if (ROMANIZATION_LANGUAGES.has(lang) && !translation.romanizedText) {
@@ -391,6 +427,7 @@ export const getCollectionProgress = query({
       collectionName: v.string(),
       cardsAdded: v.number(),
       totalTexts: v.number(),
+      order: v.optional(v.number()),
     }),
   ),
   handler: async (ctx) => {
@@ -401,13 +438,32 @@ export const getCollectionProgress = query({
     if (!settings?.activeCourseId) return [];
 
     const courseId = settings.activeCourseId;
-    const allCollections = await ctx.db.query('collections').collect();
-    const levelOrder: readonly string[] = LEVEL_ORDER;
 
-    // Only include difficulty-level collections in this query
-    const collections = allCollections.filter((c) =>
-      levelOrder.includes(c.name),
-    );
+    // Fetch only the premade rows actually displayed: the active dataset's ~20
+    // collections (one indexed scan) or the seven legacy CEFR rows by name.
+    // Avoids loading every user's custom/chat collections on this query.
+    const activeDataset = await getActiveDataset(ctx);
+    let collections: Doc<'collections'>[];
+    if (activeDataset) {
+      collections = await ctx.db
+        .query('collections')
+        .withIndex('by_datasetId_and_order', (q) =>
+          q.eq('datasetId', activeDataset._id),
+        )
+        .collect();
+    } else {
+      const legacyDocs = await Promise.all(
+        LEGACY_LEVEL_ORDER.map((name) =>
+          ctx.db
+            .query('collections')
+            .withIndex('by_name', (q) => q.eq('name', name))
+            .first(),
+        ),
+      );
+      collections = legacyDocs.filter(
+        (c): c is Doc<'collections'> => c !== null,
+      );
+    }
 
     const result = await Promise.all(
       collections.map(async (collection) => {
@@ -423,79 +479,26 @@ export const getCollectionProgress = query({
           collectionName: collection.name,
           cardsAdded: progress?.cardsAdded ?? 0,
           totalTexts: collection.textCount,
+          order: collection.order,
         };
       }),
     );
 
+    // Sort by `order` when present (new dataset), else by legacy CEFR position.
+    // Items with `order` set always sort before legacy items to keep new
+    // dataset on top once it's loaded.
+    const legacyPosition = (name: string) => {
+      const idx = LEGACY_LEVEL_ORDER.indexOf(name as (typeof LEGACY_LEVEL_ORDER)[number]);
+      return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+    };
     result.sort((a, b) => {
-      const aIndex = levelOrder.indexOf(a.collectionName);
-      const bIndex = levelOrder.indexOf(b.collectionName);
-      return aIndex - bIndex;
+      if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+      if (a.order !== undefined) return -1;
+      if (b.order !== undefined) return 1;
+      return legacyPosition(a.collectionName) - legacyPosition(b.collectionName);
     });
 
     return result;
-  },
-});
-
-export const getCustomCollectionsProgress = query({
-  args: {},
-  returns: v.array(
-    v.object({
-      collectionId: v.id('collections'),
-      collectionName: v.string(),
-      cardsAdded: v.number(),
-      totalTexts: v.number(),
-    }),
-  ),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-
-    const settings = await getUserSettings(ctx, userId);
-    if (!settings?.activeCourseId) return [];
-
-    const courseId = settings.activeCourseId;
-    const courseSettings = await getCourseSettings(ctx, courseId);
-
-    // Collect course-specific custom collection IDs (chat-approved + manually entered)
-    const customCollectionIds: Id<'collections'>[] = [];
-    const seen = new Set<string>();
-    for (const id of [
-      courseSettings?.chatCollectionId,
-      courseSettings?.customCollectionId,
-    ]) {
-      if (id && !seen.has(id)) {
-        seen.add(id);
-        customCollectionIds.push(id);
-      }
-    }
-
-    if (customCollectionIds.length === 0) return [];
-
-    const result = await Promise.all(
-      customCollectionIds.map(async (collectionId) => {
-        const collection = await ctx.db.get(collectionId);
-        if (!collection) return null;
-
-        const progress = await getCollectionProgressHelper(
-          ctx,
-          userId,
-          courseId,
-          collectionId,
-        );
-
-        return {
-          collectionId: collection._id,
-          collectionName: collection.name,
-          cardsAdded: progress?.cardsAdded ?? 0,
-          totalTexts: collection.textCount,
-        };
-      }),
-    );
-
-    return result.filter(
-      (item): item is NonNullable<typeof item> => item !== null,
-    );
   },
 });
 
@@ -540,7 +543,7 @@ export const getNextTextsFromCollection = query({
 
     const collection = await ctx.db.get(args.collectionId);
     const isLevelCollection = collection
-      ? (LEVEL_ORDER as readonly string[]).includes(collection.name)
+      ? isPremadeLevelCollection(collection)
       : false;
 
     const texts = await getNextTextsFromRank(
@@ -578,7 +581,7 @@ export const setActiveCollection = mutation({
     const collection = await ctx.db.get(args.collectionId);
     if (!collection) throw new ConvexError('Collection not found');
 
-    const isLevelCollection = (LEVEL_ORDER as readonly string[]).includes(collection.name);
+    const isLevelCollection = isPremadeLevelCollection(collection);
     if (!isLevelCollection) {
       const courseSettings = await getCourseSettings(ctx, courseId);
       const isChatCollection =
@@ -624,7 +627,7 @@ export const toggleCustomCollection = mutation({
     const collection = await ctx.db.get(args.collectionId);
     if (!collection) throw new ConvexError('Collection not found');
 
-    const isLevelCollection = (LEVEL_ORDER as readonly string[]).includes(collection.name);
+    const isLevelCollection = isPremadeLevelCollection(collection);
     if (isLevelCollection) {
       throw new ConvexError('Cannot toggle a level collection');
     }
@@ -681,6 +684,11 @@ export async function createCardsFromTexts(
   let cardsInserted = 0;
   let newLastRank = 0;
 
+  // Look up the source collection's origin once per batch so each inserted
+  // card carries the denormalized field for the content-source filter.
+  const collection = await ctx.db.get(collectionId);
+  const collectionOrigin = collection?.origin;
+
   for (const text of texts) {
     if (text.collectionRank > newLastRank) {
       newLastRank = text.collectionRank;
@@ -697,6 +705,7 @@ export async function createCardsFromTexts(
         deckId: deck._id,
         textId: text._id,
         collectionId,
+        collectionOrigin,
         dueDate: now + cardsInserted,
         isMastered: false,
         isHidden: false,
@@ -704,6 +713,11 @@ export async function createCardsFromTexts(
         isGraduated: false,
         schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
+        radioRoundCounter: 0,
+        // Random tiebreak so that even brand-new cards inserted in a single
+        // batch (which would otherwise share creation time + counter) end up
+        // in a shuffled radio order rather than insertion order.
+        radioOrderKey: Math.floor(Math.random() * 0x7fffffff),
         searchableText,
         searchableTextLanguages,
       });
@@ -793,7 +807,7 @@ export const addCardsFromCollection = mutation({
     const courseSettings = await getCourseSettings(ctx, courseId);
     const requestedCollection = await ctx.db.get(args.collectionId);
     const isLevelCollection = requestedCollection
-      ? (LEVEL_ORDER as readonly string[]).includes(requestedCollection.name)
+      ? isPremadeLevelCollection(requestedCollection)
       : false;
 
     const customCollectionIdsToProcess: Id<'collections'>[] = args.exclusive
@@ -986,6 +1000,9 @@ export const addCardsFromCollection = mutation({
 
         // Auto-advance: if the collection is now complete and is the active one,
         // move to the next incomplete collection (or clear if last).
+        // Walks forward within the same collection generation — new-dataset
+        // collections advance by `order + 1`, legacy collections walk
+        // LEGACY_LEVEL_ORDER. See findNextIncompleteCollection / getNextCollection.
         const newCardsAdded = cardsAlreadyAdded + textsToAdd.length;
         const collection = await ctx.db.get(args.collectionId);
         if (collection && newCardsAdded >= collection.textCount) {
@@ -994,33 +1011,18 @@ export const addCardsFromCollection = mutation({
             latestSettings?.activeCollectionId?.toString() ===
             args.collectionId.toString()
           ) {
-            let nextCollectionId: Id<'collections'> | undefined;
-            const nextName = getNextCollectionName(collection.name);
-
-            if (nextName) {
-              const allCollections = await ctx.db.query('collections').collect();
-              const orderedNames: readonly string[] = LEVEL_ORDER;
-              const startIdx = orderedNames.indexOf(nextName);
-
-              for (let i = startIdx; i < orderedNames.length; i++) {
-                const coll = allCollections.find((c) => c.name === orderedNames[i]);
-                if (!coll) continue;
-
-                const prog = await getCollectionProgressHelper(
-                  ctx,
-                  userId,
-                  courseId,
-                  coll._id,
-                );
-
-                if (!prog || prog.cardsAdded < coll.textCount) {
-                  nextCollectionId = coll._id;
-                  break;
-                }
-              }
-            }
-
-            await setActiveCollectionOnSettings(ctx, courseId, nextCollectionId);
+            // Start the search at the collection AFTER the one we just
+            // completed, so a partially-filled current row can't be picked.
+            const startCollection = await getNextCollection(ctx, collection);
+            const next = startCollection
+              ? await findNextIncompleteCollection(
+                ctx,
+                startCollection,
+                userId,
+                courseId,
+              )
+              : null;
+            await setActiveCollectionOnSettings(ctx, courseId, next?._id);
           }
         }
       }
@@ -1093,6 +1095,7 @@ export const ensureUpcomingCardsContent = mutation({
 
     const settings = await getCourseSettings(ctx, active.course._id);
     const schedulingMode = settings?.schedulingMode ?? 'learnAndReview';
+    const activeCollectionId = settings?.activeCollectionId;
 
     const now = Date.now();
     let cards;
@@ -1136,6 +1139,40 @@ export const ensureUpcomingCardsContent = mutation({
       );
       processed++;
     }
+
+    // Pre-prep the next batch of upcoming texts in the active premade
+    // collection — the ones a future addCardsFromCollection call would pull
+    // in. Without this, a user who exhausts due cards and clicks "Add" has
+    // to wait on TTS + translation for the freshly added cards.
+    if (activeCollectionId) {
+      const collection = await ctx.db.get(activeCollectionId);
+      if (collection && isPremadeLevelCollection(collection)) {
+        const progress = await getCollectionProgressHelper(
+          ctx,
+          userId,
+          active.course._id,
+          activeCollectionId,
+        );
+        const lastRank = progress?.lastRankProcessed ?? 0;
+        const upcomingTexts = await getNextTextsFromRank(
+          ctx,
+          activeCollectionId,
+          lastRank,
+          CONTENT_LOOKAHEAD_SIZE,
+          { onlyCurriculum: true },
+        );
+        for (const text of upcomingTexts) {
+          await scheduleMissingContent(
+            ctx,
+            text._id,
+            text,
+            active.course.baseLanguages,
+            active.course.targetLanguages,
+          );
+        }
+      }
+    }
+
     return processed;
   },
 });
@@ -1304,6 +1341,21 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       });
     } else if (args.romanizedText && !existing.romanizedText) {
       await ctx.db.patch(existing._id, { romanizedText: args.romanizedText });
+    }
+
+    // Release any LLM translation claim now that the translation row exists.
+    // The LLM worker keeps the claim alive across a Google fallback so a
+    // concurrent scheduleMissingContent can't re-route the same (textId, lang)
+    // through the LLM mid-fallback. Calls from the pure-Google path (which
+    // never held a claim) see no row and no-op.
+    const llmClaim = await ctx.db
+      .query('llmTranslationClaims')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
+      )
+      .first();
+    if (llmClaim) {
+      await ctx.db.delete(llmClaim._id);
     }
 
     const existingAudioForVoice = await ctx.db

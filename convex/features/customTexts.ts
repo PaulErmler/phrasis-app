@@ -77,6 +77,7 @@ After producing the translations, infer linguistic metadata from the source AND 
 - addresseeNumber: "singular" | "plural" | "not_applicable" — how many people the sentence speaks to. "not_applicable" if the sentence has no addressee (e.g. "It is raining.").
 - speakerGender: "male" | "female" | "neutral" — return "male" or "female" ONLY when at least one rendering grammatically marks the speaker's gender (Spanish/Italian/French/Portuguese past participles or adjectives, Russian/Polish/Czech past tense, Arabic/Hebrew/Hindi verb agreement, etc.). Otherwise return "neutral". Never guess from topic or stereotype.
 - addresseeGender: "male" | "female" | "neutral" | "not_applicable" — same rule, for the addressee. "not_applicable" if there is no addressee.
+- addressesSomeone: true | false — true if the sentence speaks to a 2nd-person addressee (imperatives, direct questions, vocatives, sentences containing "you"/"your", commands, requests, greetings). false otherwise (descriptive/narrative sentences like "It is raining.", first-person statements with no second-person reference). When addressesSomeone is false, addresseeNumber should be "not_applicable" and addresseeGender should be "not_applicable".
 
 OUTPUT FORMAT:
 
@@ -88,7 +89,8 @@ Return ONLY a valid JSON object with EXACTLY this shape, no markdown, no explana
     "register": "...",
     "addresseeNumber": "...",
     "speakerGender": "...",
-    "addresseeGender": "..."
+    "addresseeGender": "...",
+    "addressesSomeone": true
   }
 }
 
@@ -119,6 +121,7 @@ const sentenceMetadataValidator = v.object({
     v.literal('neutral'),
     v.literal('not_applicable'),
   ),
+  addressesSomeone: v.boolean(),
 });
 
 export const autoFillTranslations = action({
@@ -337,6 +340,11 @@ export const createCustomText = mutation({
           addresseeNumber: args.metadata.addresseeNumber,
           speakerGender: args.metadata.speakerGender,
           addresseeGender: args.metadata.addresseeGender,
+          addressesSomeone: args.metadata.addressesSomeone,
+          // Coin-flip at insert time so gendered-noun agreement is stable
+          // across all target-language translations of this row. Mirrors the
+          // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
+          referentGender: Math.random() < 0.5 ? 'male' : 'female',
           audioSpeakerGender: resolveAudioSpeakerGender(args.metadata.speakerGender),
         }
         : {}),

@@ -834,6 +834,7 @@ export const getCardCounts = query({
     v.object({
       new: v.number(),
       learning: v.number(),
+      relearning: v.number(),
       review: v.number(),
     }),
     v.null(),
@@ -858,8 +859,135 @@ export const getCardCounts = query({
 
     return {
       new: newCount,
-      learning: learningCount + relearningCount,
+      learning: learningCount,
+      relearning: relearningCount,
       review: reviewCount,
     };
+  },
+});
+
+/**
+ * Today's review count for the active course, so the in-learn progress bar can
+ * reflect actual progress on page load rather than waiting for the first
+ * mutation response.
+ */
+export const getTodayReviewCount = query({
+  args: { timezone: v.string() },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return 0;
+
+    const today = getTodayInTimezone(args.timezone);
+    const stats = await ctx.db
+      .query('dailyStats')
+      .withIndex('by_userId_and_courseId_and_date', (q) =>
+        q.eq('userId', userId).eq('courseId', active.course._id).eq('date', today),
+      )
+      .unique();
+    return stats?.reps ?? 0;
+  },
+});
+
+// `Intl.DateTimeFormat` construction is non-trivial (~100 µs); cache one
+// instance per timezone for the celebration query, which runs on a hot path
+// during the milestone burst.
+const dateFormatterCache = new Map<string, Intl.DateTimeFormat>();
+function getDateFormatter(timeZone: string): Intl.DateTimeFormat {
+  let f = dateFormatterCache.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-CA', { timeZone });
+    dateFormatterCache.set(timeZone, f);
+  }
+  return f;
+}
+
+/**
+ * Returns the actual word lists for the celebration screen, partitioned into
+ * "this session" (highlighted) and "earlier today" (subdued). Words are
+ * filtered to the active course's target languages — base languages are the
+ * user's known languages, so they aren't celebrated as new vocabulary.
+ *
+ * Deduplication: a word is identified by (language, normalized form). If the
+ * same word appears multiple times across rows, only the first occurrence is
+ * kept. If it appears in both the current session and earlier today, the
+ * session bucket wins — earlier-today only ever shows words the session does
+ * not also contain.
+ *
+ * Bounded scan: we walk the most-recent userWords for the active course in
+ * descending creation-time order, capped at 500 rows. That covers a day's
+ * worth of new words at any realistic study pace; older rows are skipped
+ * since they can't belong to today regardless of timezone.
+ */
+export const getNewWordsForCelebration = query({
+  args: { sessionId: v.string(), timezone: v.string() },
+  returns: v.object({
+    session: v.array(v.object({ language: v.string(), display: v.string() })),
+    today: v.array(v.object({ language: v.string(), display: v.string() })),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { session: [], today: [] };
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return { session: [], today: [] };
+    const targetLanguages = new Set(active.course.targetLanguages);
+    const todayStr = getTodayInTimezone(args.timezone);
+
+    // userWords' only userId+courseId-scoped indexes also key on language, so
+    // iterate the target languages explicitly. Each per-language scan is
+    // bounded — far more than enough to cover a single day at any realistic
+    // pace, with rows older than today being skipped in the dedup loop below.
+    const PER_LANG_CAP = 250;
+    const perLangRows = await Promise.all(
+      [...targetLanguages].map((lang) =>
+        ctx.db
+          .query('userWords')
+          .withIndex('by_userId_and_courseId_and_language', (q) =>
+            q
+              .eq('userId', userId)
+              .eq('courseId', active.course._id)
+              .eq('language', lang),
+          )
+          .order('desc')
+          .take(PER_LANG_CAP),
+      ),
+    );
+    const rows = perLangRows.flat();
+
+    const dtf = getDateFormatter(args.timezone);
+
+    type Entry = { language: string; display: string; bucket: 'session' | 'today' };
+    const seen = new Map<string, Entry>();
+    for (const row of rows) {
+      if (!targetLanguages.has(row.language)) continue;
+      // Drop anything not from "today" in the user's timezone. Rows are in
+      // desc creation order, but we don't break early — DST edge-cases mean a
+      // few stragglers can sit between today and yesterday in row order.
+      if (dtf.format(new Date(row._creationTime)) !== todayStr) continue;
+      const key = `${row.language}:${row.word}`;
+      const isSession = row.sessionId === args.sessionId;
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, {
+          language: row.language,
+          display: row.displayWord ?? row.word,
+          bucket: isSession ? 'session' : 'today',
+        });
+      } else if (existing.bucket === 'today' && isSession) {
+        // Same word seen later as a session row — promote to session bucket.
+        existing.bucket = 'session';
+      }
+    }
+
+    const session: Array<{ language: string; display: string }> = [];
+    const today: Array<{ language: string; display: string }> = [];
+    for (const e of seen.values()) {
+      const item = { language: e.language, display: e.display };
+      if (e.bucket === 'session') session.push(item);
+      else today.push(item);
+    }
+    return { session, today };
   },
 });

@@ -37,12 +37,14 @@ describe("features/sentenceMetadata", () => {
         addresseeNumber: "singular",
         speakerGender: "female",
         addresseeGender: "male",
+        addressesSomeone: true,
       });
       expect(result).toEqual({
         register: "formal",
         addresseeNumber: "singular",
         speakerGender: "female",
         addresseeGender: "male",
+        addressesSomeone: true,
       });
     });
 
@@ -58,6 +60,7 @@ describe("features/sentenceMetadata", () => {
           addresseeNumber: "singular",
           speakerGender: "neutral",
           addresseeGender: "neutral",
+          addressesSomeone: true,
         }),
       ).toThrow();
     });
@@ -66,6 +69,18 @@ describe("features/sentenceMetadata", () => {
       expect(() =>
         validateSentenceMetadata({
           register: "formal",
+        }),
+      ).toThrow();
+    });
+
+    it("rejects non-boolean addressesSomeone", () => {
+      expect(() =>
+        validateSentenceMetadata({
+          register: "neutral",
+          addresseeNumber: "not_applicable",
+          speakerGender: "neutral",
+          addresseeGender: "not_applicable",
+          addressesSomeone: "true",
         }),
       ).toThrow();
     });
@@ -256,6 +271,149 @@ describe("features/sentenceMetadata", () => {
       expect(text?.audioSpeakerGender).toBe("male");
       expect(text?.register).toBe("formal");
       expect(text?.speakerGender).toBe("male");
+    });
+
+    it("coin-flips referentGender on every call when missing", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: undefined,
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(["male", "female"]).toContain(text?.referentGender);
+    });
+
+    it("does not re-roll referentGender once committed", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      // First call commits a value.
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: undefined,
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+      const after1 = await t.run(async (ctx) => ctx.db.get(textId));
+      const firstReferent = after1?.referentGender;
+      // Run again — must not change.
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: undefined,
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+      const after2 = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(after2?.referentGender).toBe(firstReferent);
+    });
+
+    it("coin-flips addresseeGender when addressesSomeone=true and LLM says neutral", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: {
+            register: "informal",
+            addresseeNumber: "singular",
+            speakerGender: "neutral",
+            addresseeGender: "neutral",
+            addressesSomeone: true,
+          },
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(text?.addressesSomeone).toBe(true);
+      expect(["male", "female"]).toContain(text?.addresseeGender);
+    });
+
+    it("does NOT coin-flip addresseeGender when addressesSomeone=false", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: {
+            register: "neutral",
+            addresseeNumber: "not_applicable",
+            speakerGender: "neutral",
+            addresseeGender: "not_applicable",
+            addressesSomeone: false,
+          },
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(text?.addressesSomeone).toBe(false);
+      // Descriptive sentences: addresseeGender retains the LLM's literal value;
+      // no coin-flip happens.
+      expect(text?.addresseeGender).toBe("not_applicable");
+    });
+
+    it("preserves a previously-committed addresseeGender on second call", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      // First call commits male/female via coin-flip.
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: {
+            register: "informal",
+            addresseeNumber: "singular",
+            speakerGender: "neutral",
+            addresseeGender: "neutral",
+            addressesSomeone: true,
+          },
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+      const after1 = await t.run(async (ctx) => ctx.db.get(textId));
+      const first = after1?.addresseeGender;
+      expect(["male", "female"]).toContain(first);
+
+      // Second call with the same neutral incoming value — must NOT re-roll.
+      await t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: {
+            register: "informal",
+            addresseeNumber: "singular",
+            speakerGender: "neutral",
+            addresseeGender: "neutral",
+            addressesSomeone: true,
+          },
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        },
+      );
+      const after2 = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(after2?.addresseeGender).toBe(first);
     });
   });
 });

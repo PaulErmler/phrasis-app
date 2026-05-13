@@ -31,7 +31,11 @@ import type { SchedulingMode } from '@/convex/types';
 import { getUserTimezone } from '@/lib/timezone';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
-import { ENSURE_CONTENT_REVIEW_INTERVAL } from '@/lib/constants/learning';
+import {
+  ENSURE_CONTENT_REVIEW_INTERVAL,
+  PROGRESS_DISPLAY_INTERVAL,
+} from '@/lib/constants/learning';
+import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
 
 function effectivePhase(
   reviewMode: string,
@@ -47,6 +51,29 @@ function effectivePhase(
 interface BaseState {
   settingsOpen: boolean;
   setSettingsOpen: (open: boolean) => void;
+  // Progress display — orthogonal to status. A milestone hit on the very last
+  // card flips `progressDisplayActive` to true while `status` flips to
+  // `noCardsDue` on the next render; LearningMode renders the celebration
+  // first regardless of underlying status, so the user always gets the reward
+  // before the "no cards due" screen takes over.
+  sessionId: string;
+  dailyReviewsToday: number;
+  dailyTimeMsToday: number;
+  dailyNewWordsToday: number;
+  progressDisplayActive: boolean;
+  /** True once the milestone-triggering mutation has resolved; gates the
+   * celebration audio + counter animations so they fire against fresh data. */
+  progressDisplayReady: boolean;
+  dismissProgressDisplay: () => void;
+  /** Default `'learnAndReview'` when no active course is loaded yet. */
+  schedulingMode: SchedulingMode;
+  /** Default `'audio'` when no active course is loaded yet. Used by the
+   * celebration UI to gate auto-advance + the auto-advance bar. */
+  reviewMode: 'audio' | 'full';
+  /** Mirrors `courseSettings.autoAdvance` (default true). The celebration
+   * uses it together with `reviewMode === 'audio'` to decide whether to
+   * auto-dismiss after a delay and show the auto-advance bar. */
+  autoAdvance: boolean;
 }
 
 interface LoadingState extends BaseState {
@@ -70,8 +97,12 @@ interface NoCardsDueState extends BaseState {
   batchSize: number;
   sentencesRemaining: number | null;
   remainingInCollection: number | null;
-  schedulingMode: SchedulingMode;
   handleSchedulingModeChange: (mode: SchedulingMode) => void;
+}
+
+export interface NextCardPreview {
+  cardId: Id<'cards'>;
+  audioRecordings: CardAudioRecording[];
 }
 
 interface ReviewingState extends BaseState {
@@ -88,6 +119,9 @@ interface ReviewingState extends BaseState {
   sourceLanguage: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
+  /** The next due card, populated when one exists. Used by the audio player
+   * to pre-merge upcoming audio so playback starts instantly on card advance. */
+  nextCard: NextCardPreview | null;
   audioSpeedOverrides: Record<string, number> | undefined;
   // Rating data
   validRatings: ReviewRating[];
@@ -112,7 +146,6 @@ interface ReviewingState extends BaseState {
   getReviewInitiatedByThisTab: () => boolean;
   resetReviewFlag: () => void;
   // Scheduling mode
-  schedulingMode: SchedulingMode;
   handleSchedulingModeChange: (mode: SchedulingMode) => void;
 }
 
@@ -142,6 +175,14 @@ export function useLearningMode(
   const cardForReviewQuery = useQuery(api.features.scheduling.getCardForReview, {});
   const courseSettingsQuery = usePreloadedQuery(preloaded.courseSettings);
   const activeCourseQuery = usePreloadedQuery(preloaded.activeCourse);
+
+  // Hydrate today's review count on mount so the in-session progress bar
+  // reflects real progress rather than starting at 0 each page load. After
+  // the first reviewCard mutation we use its return value (no extra query).
+  const todayCountQuery = useQuery(
+    api.features.stats.getTodayReviewCount,
+    isAuthenticated ? { timezone: getUserTimezone() } : 'skip',
+  );
 
   const lastCardRef = useRef<
     Exclude<typeof cardForReviewQuery, undefined> | undefined
@@ -218,6 +259,9 @@ export function useLearningMode(
         : undefined;
 
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
+  const advanceRadioCardMutation = useMutation(
+    api.features.scheduling.advanceRadioCard,
+  );
 
   const masterCardMutation = useMutation(api.features.scheduling.masterCard);
   const hideCardMutation = useMutation(api.features.scheduling.hideCard);
@@ -276,6 +320,62 @@ export function useLearningMode(
   const [isExiting, setIsExiting] = useState(false);
   const [cardAnimationKey, setCardAnimationKey] = useState(0);
 
+  // ----- Progress display (every PROGRESS_DISPLAY_INTERVAL reviews per day) -----
+  // Session id is rotated on dismiss and on course change so
+  // `getNewWordsForCelebration`'s session bucket only ever contains words
+  // discovered since the last reset. Backend-only — no client tokenization.
+  const sessionIdRef = useRef<string>('');
+  const sessionCourseIdRef = useRef<string | null>(null);
+
+  function mintSessionId(): string {
+    return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+  function resetSessionLocalState() {
+    sessionIdRef.current = mintSessionId();
+  }
+
+  const activeCourseIdForSession = activeCourseQuery?._id ?? null;
+  const [dailyReviewsToday, setDailyReviewsToday] = useState(0);
+  const [dailyTimeMsToday, setDailyTimeMsToday] = useState(0);
+  const [dailyNewWordsToday, setDailyNewWordsToday] = useState(0);
+  if (
+    !sessionIdRef.current ||
+    sessionCourseIdRef.current !== activeCourseIdForSession
+  ) {
+    resetSessionLocalState();
+    sessionCourseIdRef.current = activeCourseIdForSession;
+  }
+  // Two flags for the celebration:
+  //  - `active`  flips optimistically *before* the mutation awaits, so the
+  //              audio hook treats `disableAutoPlay=true` and the next card
+  //              never gets a chance to start playing. The shell holds an
+  //              empty placeholder during this window.
+  //  - `ready`   flips *after* the mutation resolves and the server has
+  //              confirmed the milestone via `triggerCelebration`. Audio +
+  //              counter animations gate on this so they always start
+  //              against fresh post-mutation data.
+  const [progressDisplayActive, setProgressDisplayActive] = useState(false);
+  const [progressDisplayReady, setProgressDisplayReady] = useState(false);
+  const hasHydratedDailyCountRef = useRef(false);
+  useEffect(() => {
+    if (hasHydratedDailyCountRef.current) return;
+    if (todayCountQuery === undefined) return;
+    hasHydratedDailyCountRef.current = true;
+    setDailyReviewsToday(todayCountQuery);
+  }, [todayCountQuery]);
+
+  const dismissProgressDisplay = useCallback(() => {
+    setProgressDisplayActive(false);
+    setProgressDisplayReady(false);
+    // Sessions reset on dismissal: the next celebration shows only words
+    // discovered since this point, not the cumulative total. The new id
+    // takes effect from the next review's mutation onward — the celebration
+    // we just dismissed already finished its queries against the old id.
+    resetSessionLocalState();
+  }, []);
+
   // Track when the current card was first shown (for time-spent stats)
   const cardShownAtRef = useRef<number>(Date.now());
 
@@ -294,6 +394,7 @@ export function useLearningMode(
   const prevCardIdForEnsureRef = useRef<string | null>(null);
   const reviewsSinceEnsureRef = useRef(ENSURE_CONTENT_REVIEW_INTERVAL);
   const ensureInFlightRef = useRef(false);
+  const hasEnsuredForEmptyDeckRef = useRef(false);
 
   useEffect(() => {
     if (!cardForReview || ensureInFlightRef.current) return;
@@ -320,6 +421,28 @@ export function useLearningMode(
         ensureInFlightRef.current = false;
       });
   }, [cardForReview?._id, cardForReview?.hasMissingContent, ensureUpcomingContentMutation]);
+
+  // When the deck has no due cards, the per-card effect above never fires,
+  // so the next "Add cards" click would pull texts whose content prep has not
+  // been scheduled. Pre-warm the active collection's upcoming texts here so
+  // TTS / translation is in flight by the time the user clicks Add.
+  useEffect(() => {
+    if (cardForReview !== null) return;
+    if (cardForReview === undefined) return; // query still loading
+    if (!courseSettings?.activeCollectionId) return;
+    if (hasEnsuredForEmptyDeckRef.current) return;
+    if (ensureInFlightRef.current) return;
+
+    hasEnsuredForEmptyDeckRef.current = true;
+    ensureInFlightRef.current = true;
+    ensureUpcomingContentMutation()
+      .catch((err) => {
+        console.error('Failed to ensure upcoming cards content:', err);
+      })
+      .finally(() => {
+        ensureInFlightRef.current = false;
+      });
+  }, [cardForReview, courseSettings?.activeCollectionId, ensureUpcomingContentMutation]);
 
   // --------------------------------------------------------------------------
   // Add cards
@@ -371,6 +494,9 @@ export function useLearningMode(
   // --------------------------------------------------------------------------
   const reviewMode = courseSettings?.reviewMode ?? 'audio';
 
+  // Opt-out: undefined (pre-migration rows or unset) defaults to enabled.
+  const progressDisplayEnabled = courseSettings?.progressDisplayEnabled ?? true;
+
   const handleReview = useCallback(
     async (rating: ReviewRating, wasDefaultRating: boolean, accuracy?: number) => {
       if (!cardForReview || isReviewing) return;
@@ -378,8 +504,24 @@ export function useLearningMode(
       setCardAnimationKey((k) => k + 1);
       setIsExiting(true);
       setIsReviewing(true);
+
+      // Predict the milestone *before* awaiting the mutation so we can flip
+      // `progressDisplayActive=true` synchronously — by the time the next
+      // card's data lands via Convex reactivity, `disableAutoPlay` is already
+      // true and the audio for the next card never starts. This is best-effort
+      // (the local count can be stale across tabs); the server's
+      // `triggerCelebration` is the authoritative verdict.
+      const predictedCount = dailyReviewsToday + 1;
+      const predictedMilestone =
+        progressDisplayEnabled &&
+        predictedCount > 0 &&
+        predictedCount % PROGRESS_DISPLAY_INTERVAL === 0;
+      if (predictedMilestone) {
+        setProgressDisplayActive(true);
+      }
+
       try {
-        await reviewCardMutation({
+        const result = await reviewCardMutation({
           cardId: cardForReview._id,
           rating,
           timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
@@ -387,17 +529,45 @@ export function useLearningMode(
           ...(reviewMode === 'full' && { forceReviewPhase: true }),
           reviewMode,
           wasDefaultRating,
+          sessionId: sessionIdRef.current,
           ...(accuracy != null && { accuracy: accuracy / 100 }),
         });
+        setDailyReviewsToday(result.dailyReviewsToday);
+        setDailyTimeMsToday(result.dailyTimeMsToday);
+        setDailyNewWordsToday(result.dailyNewWordsToday);
+
+        if (result.triggerCelebration) {
+          setProgressDisplayActive(true);
+          // Mutation has resolved — daily totals are fresh and userWords for
+          // this review are committed, so the celebration's queries will
+          // return post-mutation data on their next refetch. Now safe to
+          // mount CelebrationContent and start audio + animations.
+          setProgressDisplayReady(true);
+        } else {
+          // Server says no celebration — roll back the optimistic flip.
+          setProgressDisplayActive(false);
+          setProgressDisplayReady(false);
+        }
         setSelectedRating(null);
       } catch (error) {
         console.error('Failed to review card:', error);
+        if (predictedMilestone) {
+          setProgressDisplayActive(false);
+          setProgressDisplayReady(false);
+        }
         setIsExiting(false);
       } finally {
         setIsReviewing(false);
       }
     },
-    [cardForReview, isReviewing, reviewCardMutation, reviewMode],
+    [
+      cardForReview,
+      isReviewing,
+      reviewCardMutation,
+      reviewMode,
+      progressDisplayEnabled,
+      dailyReviewsToday,
+    ],
   );
 
   const handleMaster = useCallback(() => {
@@ -454,6 +624,10 @@ export function useLearningMode(
   // --------------------------------------------------------------------------
   // Next
   // --------------------------------------------------------------------------
+  const schedulingMode: SchedulingMode =
+    courseSettings?.schedulingMode ?? 'learnAndReview';
+  const isRadio = schedulingMode === 'radio';
+
   const handleNext = useCallback(async (ratingOverride?: ReviewRating, accuracy?: number) => {
     if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
@@ -486,6 +660,28 @@ export function useLearningMode(
       }
       return;
     }
+    if (isRadio) {
+      // Radio mode bypasses FSRS entirely: no rating, no stats, no
+      // celebration. Just bump the play counter so the next-lowest counter
+      // rises to the front of the queue.
+      reviewInitiatedByThisTabRef.current = true;
+      setCardAnimationKey((k) => k + 1);
+      setIsExiting(true);
+      setIsReviewing(true);
+      try {
+        await advanceRadioCardMutation({
+          cardId: cardForReview._id,
+          timezone: getUserTimezone(),
+          timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
+        });
+      } catch (error) {
+        console.error('Failed to advance radio card:', error);
+        setIsExiting(false);
+      } finally {
+        setIsReviewing(false);
+      }
+      return;
+    }
     const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
     const defaultRatingForPhase = getDefaultRating(phase);
     const rating = ratingOverride ?? selectedRating ?? defaultRatingForPhase;
@@ -495,18 +691,36 @@ export function useLearningMode(
     isReviewing,
     isPendingMaster,
     isPendingHide,
+    isRadio,
     selectedRating,
     reviewMode,
     handleReview,
     masterCardMutation,
     hideCardMutation,
+    advanceRadioCardMutation,
   ]);
 
   // ============================================================================
   // Return discriminated states
   // ============================================================================
 
-  const base = { settingsOpen, setSettingsOpen };
+  // Cross-cutting fields shared by every state — including the progress
+  // display (so a milestone hit on the last card survives the transition to
+  // `noCardsDue`) and `schedulingMode` (used by the celebration UI).
+  const base = {
+    settingsOpen,
+    setSettingsOpen,
+    sessionId: sessionIdRef.current,
+    dailyReviewsToday,
+    dailyTimeMsToday,
+    dailyNewWordsToday,
+    progressDisplayActive,
+    progressDisplayReady,
+    dismissProgressDisplay,
+    schedulingMode,
+    reviewMode: (courseSettings?.reviewMode ?? 'audio') as 'audio' | 'full',
+    autoAdvance: courseSettings?.autoAdvance ?? DEFAULT_AUTO_ADVANCE,
+  };
 
   // Loading
   if (
@@ -574,7 +788,6 @@ export function useLearningMode(
         batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
         sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
         remainingInCollection,
-        schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
         handleSchedulingModeChange,
       };
     }
@@ -584,34 +797,37 @@ export function useLearningMode(
     return { ...base, status: 'loading' };
   }
 
-  // Reviewing — in full review mode, always use FSRS ratings (skip pre-review)
+  // Reviewing — in full review mode, always use FSRS ratings (skip pre-review).
+  // In radio mode, skip rating UI entirely (no FSRS, no rating buttons).
   const phase = effectivePhase(reviewMode, displayCard.schedulingPhase as SchedulingPhase);
-  const validRatings = getValidRatings(phase);
+  const validRatings = isRadio ? [] : getValidRatings(phase);
   const defaultRating = getDefaultRating(phase);
   const activeRating = selectedRating ?? defaultRating;
 
   // Compute projected next-due interval for each rating
-  const cardState: CardSchedulingState = {
-    schedulingPhase: phase,
-    preReviewCount: displayCard.preReviewCount,
-    dueDate: displayCard.dueDate,
-    fsrsState: displayCard.fsrsState ?? null,
-  };
-  const now = Date.now();
   const ratingIntervals: Record<string, string> = {};
-  for (const rating of validRatings) {
-    try {
-      const result = scheduleCard(
-        cardState,
-        rating,
-        displayCard.initialReviewCount,
-        now,
-      );
-      const diff = result.dueDate - now;
-      ratingIntervals[rating] =
-        diff <= 0 ? t('nextReviewNow') : formatInterval(diff);
-    } catch {
-      ratingIntervals[rating] = '—';
+  if (!isRadio) {
+    const cardState: CardSchedulingState = {
+      schedulingPhase: phase,
+      preReviewCount: displayCard.preReviewCount,
+      dueDate: displayCard.dueDate,
+      fsrsState: displayCard.fsrsState ?? null,
+    };
+    const now = Date.now();
+    for (const rating of validRatings) {
+      try {
+        const result = scheduleCard(
+          cardState,
+          rating,
+          displayCard.initialReviewCount,
+          now,
+        );
+        const diff = result.dueDate - now;
+        ratingIntervals[rating] =
+          diff <= 0 ? t('nextReviewNow') : formatInterval(diff);
+      } catch {
+        ratingIntervals[rating] = '—';
+      }
     }
   }
 
@@ -645,6 +861,12 @@ export function useLearningMode(
     sourceLanguage: displayCard.sourceLanguage,
     translations: sortedTranslations,
     audioRecordings: displayCard.audioRecordings,
+    nextCard: displayCard.nextCard
+      ? {
+        cardId: displayCard.nextCard._id,
+        audioRecordings: displayCard.nextCard.audioRecordings,
+      }
+      : null,
     audioSpeedOverrides: displayCard.audioSpeedOverrides,
     isFavorite: displayCard.isFavorite ?? false,
     isPendingMaster,
@@ -663,7 +885,6 @@ export function useLearningMode(
     animationKey: cardAnimationKey,
     getReviewInitiatedByThisTab,
     resetReviewFlag,
-    schedulingMode: (courseSettings.schedulingMode ?? 'learnAndReview') as SchedulingMode,
     handleSchedulingModeChange,
   };
 }

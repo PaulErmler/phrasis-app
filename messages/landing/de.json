@@ -47,6 +47,10 @@
     "audioBody": "Hör den Satz in einer Sprache, die du schon verstehst, denk an die Übersetzung — jede Zielzeile startet unscharf und wird nach und nach scharf, so als wäre das Audio gerade zu Ende. In der App passiert das nach dem Abspielen. Mit Wiederholen siehst du die Demo erneut. Bewerte, wie gut du dich erinnerst — ideal für Pendeln und freihändiges Üben.",
     "fullTitle": "Vollständige Wiederholung",
     "fullBody": "Tippe die Übersetzung für jede Zielsprache. Nach dem Absenden siehst du einen Zeichen-für-Zeichen-Vergleich: Richtiges in Grün, Fehler markiert, Ausgelassenes gedämpft — plus eine Genauigkeit in Prozent.",
+    "reviewModeTitle": "Wiederholungsmodus",
+    "reviewModeBody": "Nutze Spaced Repetition in Kombination mit audio-basiertem Lernen",
+    "radioTitle": "Radio-Modus",
+    "radioBody": "Hör den ganzen Tag Sätze mit dem Radio-Modus, ohne den Spaced-Repetition-Algorithmus zu beeinflussen. Perfekt, um dein Hörverständnis den ganzen Tag über zu schärfen.",
     "multiLabel": "Mehrere Sprachen",
     "replay": "Demo erneut abspielen",
     "mock": {

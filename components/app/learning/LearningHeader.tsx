@@ -10,6 +10,7 @@ import {
   CircleCheck,
   EyeOff,
   Pencil,
+  Radio,
   RefreshCw,
   Settings,
   Star,
@@ -23,7 +24,7 @@ interface LearningHeaderProps {
   onHelpOpen?: () => void;
   /** When `'full'`, the help dialog lists full-review-only shortcuts */
   reviewMode?: 'audio' | 'full';
-  schedulingMode?: 'learn_new' | 'learnAndReview';
+  schedulingMode?: 'learn_new' | 'learnAndReview' | 'radio';
 }
 
 export function LearningHeader({
@@ -37,7 +38,11 @@ export function LearningHeader({
   const t = useTranslations('LearningMode');
   const tApp = useTranslations('AppPage');
   const tSettings = useTranslations('LearningMode.settingsPanel');
-  const { isChatOpen, closeChat } = useLearningChatToggle();
+  const chatContext = useLearningChatToggle();
+  if (!chatContext) {
+    throw new Error('LearningHeader must be rendered inside LearningChatLayout');
+  }
+  const { isChatOpen, closeChat } = chatContext;
 
   return (
     <header className="sticky-header">
@@ -62,12 +67,20 @@ export function LearningHeader({
             <span className="heading-section lg:hidden">{t('chat')}</span>
           ) : (
             <span className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium text-muted-foreground">
-              {schedulingMode === 'learn_new' ? (
+              {schedulingMode === 'radio' ? (
+                <Radio className="h-3.5 w-3.5" />
+              ) : schedulingMode === 'learn_new' ? (
                 <BookOpen className="h-3.5 w-3.5" />
               ) : (
                 <RefreshCw className="h-3.5 w-3.5" />
               )}
-              {tApp(schedulingMode === 'learn_new' ? 'learnNew' : 'learnAndReview')}
+              {tApp(
+                schedulingMode === 'radio'
+                  ? 'radioMode'
+                  : schedulingMode === 'learn_new'
+                    ? 'learnNew'
+                    : 'learnAndReview',
+              )}
             </span>
           )}
         </div>

@@ -1,0 +1,4 @@
+wordfreq>=3.0
+better-profanity>=0.7
+requests>=2.28
+pandas>=2.0

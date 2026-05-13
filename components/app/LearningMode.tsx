@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useMutation } from 'convex/react';
 import { useTranslations } from 'next-intl';
@@ -12,7 +12,12 @@ import {
   LearningControls,
   NoCollectionState,
   NoCardsDueState,
+  ProgressDisplay,
+  SessionProgressBar,
 } from '@/components/app/learning';
+import { useLearningChatToggle } from '@/components/app/learning/LearningChatLayout';
+import { Button } from '@/components/ui/button';
+import { MessageCircle } from 'lucide-react';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
 import type { ReviewRating } from '@/lib/scheduling';
 import type { AudioPlayerState } from '@/hooks/use-audio-player';
@@ -30,6 +35,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { buttonVariants } from '@/components/ui/button';
+import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
+import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
 
 interface LearningModeProps {
   state: LearningState;
@@ -43,6 +50,11 @@ interface LearningModeProps {
  */
 export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   const t = useTranslations('LearningMode');
+  const chatContext = useLearningChatToggle();
+  if (!chatContext) {
+    throw new Error('LearningMode must be rendered inside LearningChatLayout');
+  }
+  const { openChat } = chatContext;
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -58,6 +70,53 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
     setAllSubmitted(false);
     setFullReviewAccuracy(null);
   }, [cardId]);
+
+  // Warm the celebration sound's HTTP cache at session start so the very
+  // first celebration's animation timeline (hardcoded peaks at 1290/1610/
+  // 1925 ms in ProgressDisplay) isn't ahead of audio playback on mobile
+  // cold-cache loads.
+  useEffect(() => {
+    const audio = new Audio(PROGRESS_SOUND_URL);
+    audio.preload = 'auto';
+    audio.load();
+  }, []);
+
+  // Pause card audio while the celebration screen is showing — the success
+  // sound and Media Session belong to it, not the underlying card. When the
+  // celebration dismisses, resume autoplay for the now-visible card if the
+  // user has it enabled (the audio hook only auto-plays on cardId change, so
+  // we trigger it explicitly here on the celebration → card handoff).
+  // The celebration is now lifted to BaseState so it survives a transition
+  // from `reviewing` to `noCardsDue` (milestone hit on the very last card).
+  const progressDisplayActive = state.progressDisplayActive;
+  // Mirror useLearningAudio's default exactly — `autoPlayAudio` is opt-out
+  // (DEFAULT_AUTO_PLAY = true), not opt-in.
+  const autoPlayAudio =
+    state.status === 'reviewing'
+      ? (state.courseSettings.autoPlayAudio ?? DEFAULT_AUTO_PLAY)
+      : false;
+  // Capture audio + setting via refs so the celebration-flag effect depends
+  // only on `progressDisplayActive` — `useLearningAudio` returns a fresh
+  // object on every render, which would otherwise cause that effect to
+  // re-run (and call `audio.pause()`) on every parent render.
+  const autoPlayAudioRef = useRef(autoPlayAudio);
+  const audioRef = useRef(audio);
+  useEffect(() => {
+    autoPlayAudioRef.current = autoPlayAudio;
+    audioRef.current = audio;
+  });
+  const wasProgressActiveRef = useRef(false);
+  useEffect(() => {
+    if (progressDisplayActive) {
+      audioRef.current.pause();
+      wasProgressActiveRef.current = true;
+      return;
+    }
+    if (wasProgressActiveRef.current) {
+      wasProgressActiveRef.current = false;
+      if (autoPlayAudioRef.current) audioRef.current.play();
+    }
+  }, [progressDisplayActive]);
 
   const reviewingReviewMode =
     state.status === 'reviewing'
@@ -139,6 +198,28 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
     setDeleteConfirmOpen(false);
     await state.handleDelete();
   }, [state]);
+
+  // Top-level celebration: shown across every underlying status so a milestone
+  // hit on the very last card still gets celebrated before "no cards due"
+  // takes over. Render before any status switch so it never gets unmounted by
+  // a state transition mid-celebration.
+  if (state.progressDisplayActive) {
+    return (
+      <div className="flex flex-col h-full">
+        <ProgressDisplay
+          sessionId={state.sessionId}
+          dailyReviewsToday={state.dailyReviewsToday}
+          dailyTimeMsToday={state.dailyTimeMsToday}
+          dailyNewWordsToday={state.dailyNewWordsToday}
+          schedulingMode={state.schedulingMode}
+          reviewMode={state.reviewMode}
+          autoAdvance={state.autoAdvance}
+          ready={state.progressDisplayReady}
+          onContinue={state.dismissProgressDisplay}
+        />
+      </div>
+    );
+  }
 
   if (state.status === 'loading') {
     return (
@@ -286,9 +367,14 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
       />
     );
 
+  const isRadio = state.courseSettings.schedulingMode === 'radio';
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 min-h-0">
+      {!isRadio && state.courseSettings.progressDisplayEnabled !== false && (
+        <SessionProgressBar dailyReviewsToday={state.dailyReviewsToday} />
+      )}
+      <div className="flex-1 min-h-0 relative">
         <AnimatePresence mode="wait" initial={false}>
           {!state.isExiting && (
             <motion.div
@@ -303,6 +389,20 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
             </motion.div>
           )}
         </AnimatePresence>
+        {/* Transparent overlay above the footer border so long card content
+            stays visible behind the chat button on small screens. */}
+        <div className="lg:hidden absolute inset-x-0 bottom-0 max-w-lg mx-auto flex justify-end px-4 pb-3 pointer-events-none">
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={openChat}
+            className="h-9 w-9 shrink-0 pointer-events-auto"
+            aria-label="Open chat"
+            data-tutorial="chat-button"
+          >
+            <MessageCircle className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       <LearningControls

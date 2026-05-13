@@ -11,7 +11,7 @@ export async function upsertYearlyStats(
     year: string;
     timeMs: number;
     isNewCard: boolean;
-    reviewMode?: 'audio' | 'full';
+    reviewMode?: 'audio' | 'full' | 'radio';
     isFirstActivityToday: boolean;
     isFirstActivityThisWeek: boolean;
     isFirstActivityThisMonth: boolean;
@@ -25,7 +25,12 @@ export async function upsertYearlyStats(
     .first();
 
   if (existing) {
-    const prevMode = existing.reviewsByMode ?? { audio: 0, full: 0 };
+    const prevMode: { audio: number; full: number; radio: number } = {
+      audio: 0,
+      full: 0,
+      radio: 0,
+      ...(existing.reviewsByMode ?? {}),
+    };
     await ctx.db.patch(existing._id, {
       totalRepetitions: existing.totalRepetitions + 1,
       totalNewCards: existing.totalNewCards + (args.isNewCard ? 1 : 0),
@@ -51,7 +56,13 @@ export async function upsertYearlyStats(
     activeWeeks: 1,
     activeMonths: 1,
     ...(args.reviewMode
-      ? { reviewsByMode: { audio: args.reviewMode === 'audio' ? 1 : 0, full: args.reviewMode === 'full' ? 1 : 0 } }
+      ? {
+        reviewsByMode: {
+          audio: args.reviewMode === 'audio' ? 1 : 0,
+          full: args.reviewMode === 'full' ? 1 : 0,
+          radio: args.reviewMode === 'radio' ? 1 : 0,
+        },
+      }
       : {}),
   });
 }

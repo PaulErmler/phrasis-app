@@ -291,6 +291,7 @@ export function WordSentencesDialog({
                           <div className="flex-1">
                             <HighlightedText
                               text={tr.text}
+                              language={tr.language}
                               wordTimings={audio?.wordTimings ?? null}
                               localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}
@@ -349,6 +350,7 @@ export function WordSentencesDialog({
                           <div className="flex-1">
                             <HighlightedText
                               text={tr.text}
+                              language={tr.language}
                               wordTimings={audio?.wordTimings ?? null}
                               localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}

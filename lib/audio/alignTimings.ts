@@ -1,12 +1,13 @@
 /**
- * Aligns ElevenLabs Scribe word timings onto the canonical source text.
+ * Aligns STT word timings onto the canonical source text.
  *
- * Scribe's transcription may differ from the original text (punctuation,
+ * The transcription may differ from the original text (punctuation,
  * capitalization, word splits). The UI should always display the real text —
- * this helper maps the timings Scribe produced onto the words the user sees,
- * so karaoke highlighting lights up the canonical tokens, not the transcribed
+ * this helper maps the STT-produced timings onto the words the user sees, so
+ * karaoke highlighting lights up the canonical tokens, not the transcribed
  * ones.
  */
+import { getWordSegmenter } from '@/lib/wordTokenize';
 
 export interface ScribeWord {
   word: string;
@@ -34,15 +35,48 @@ export function normalise(s: string): string {
     .replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, '');
 }
 
-/** Split text into tokens of non-whitespace preceded by their whitespace. */
-function tokenise(text: string): { display: string; leading: string }[] {
-  const tokens: { display: string; leading: string }[] = [];
-  const regex = /(\s*)(\S+)/g;
-  let m: RegExpExecArray | null;
-  while ((m = regex.exec(text)) !== null) {
-    tokens.push({ leading: m[1], display: m[2] });
+/**
+ * Split text into word-like tokens, each preceded by any non-word run that
+ * came before it (whitespace, punctuation). Uses Intl.Segmenter so non-
+ * whitespace-delimited scripts (Chinese, Japanese, Thai) get one token per
+ * linguistic word instead of collapsing into a single sentence-token. Falls
+ * back to a whitespace split if Segmenter throws on an invalid locale.
+ *
+ * Trailing punctuation that follows the LAST word is appended to that word's
+ * `display` so the rendered output still includes the final period/quote.
+ */
+function tokenise(
+  text: string,
+  language: string,
+): { display: string; leading: string }[] {
+  try {
+    const segmenter = getWordSegmenter(language);
+    const tokens: { display: string; leading: string }[] = [];
+    let pendingLeading = '';
+    for (const seg of segmenter.segment(text)) {
+      if (seg.isWordLike) {
+        tokens.push({ leading: pendingLeading, display: seg.segment });
+        pendingLeading = '';
+      } else {
+        pendingLeading += seg.segment;
+      }
+    }
+    // Any trailing non-word run (e.g. final period) attaches to the last word
+    // so we preserve the rendered punctuation. `normalise()` strips it before
+    // matching against Scribe.
+    if (pendingLeading && tokens.length > 0) {
+      tokens[tokens.length - 1].display += pendingLeading;
+    }
+    return tokens;
+  } catch {
+    const tokens: { display: string; leading: string }[] = [];
+    const regex = /(\s*)(\S+)/g;
+    let m: RegExpExecArray | null;
+    while ((m = regex.exec(text)) !== null) {
+      tokens.push({ leading: m[1], display: m[2] });
+    }
+    return tokens;
   }
-  return tokens;
 }
 
 /**
@@ -57,8 +91,9 @@ const LOOKAHEAD = 2;
 export function alignWordTimings(
   text: string,
   scribe: ScribeWord[] | null | undefined,
+  language: string,
 ): AlignedWord[] {
-  const tokens = tokenise(text);
+  const tokens = tokenise(text, language);
   if (tokens.length === 0) return [];
 
   type Partial = {

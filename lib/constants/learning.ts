@@ -6,8 +6,11 @@
 /** Maximum number of cards that can be added per batch (settings and backend clamp). */
 export const MAX_CARDS_PER_BATCH = 15;
 
-/** How many upcoming due cards to pre-generate content for during review. */
-export const ENSURE_CONTENT_LOOKAHEAD = 5;
+/** How many upcoming due cards to pre-generate content for during review.
+ * Sized to stay ahead of LLM translation latency (queued OpenRouter call per
+ * non-source language) — matches MAX_CARDS_PER_BATCH so a fresh add-batch is
+ * fully primed before the learner can outrun it. */
+export const ENSURE_CONTENT_LOOKAHEAD = 15;
 
 /** Re-trigger content pre-generation every N reviews. */
 export const ENSURE_CONTENT_REVIEW_INTERVAL = 4;
@@ -24,3 +27,12 @@ export const MAX_IMPORT_BATCH = 500;
 /** Max file size (bytes) accepted by the bulk-import dropzone. ~5 MB is well above the
  * theoretical worst case of MAX_IMPORT_BATCH * MAX_CARD_TEXT_LENGTH per language. */
 export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
+
+/** Interrupt the learning flow with a celebration screen every N reviews (per day). */
+export const PROGRESS_DISPLAY_INTERVAL = 20;
+
+/** How long the celebration screen stays before auto-advancing (ms). */
+export const PROGRESS_DISPLAY_DURATION_MS = 7000;
+
+/** Path to the celebration success sound (under public/). */
+export const PROGRESS_SOUND_URL = '/sounds/progress-success.mp3';

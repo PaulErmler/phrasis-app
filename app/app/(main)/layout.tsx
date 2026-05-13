@@ -59,8 +59,6 @@ export default function MainLayout({
     preloadedSettings,
     preloadedActiveCourse,
     preloadedCourseSettings,
-    preloadedCollectionProgress,
-    preloadedCustomCollectionsProgress,
   } = useAppData();
 
   const [justReturnedFromLearn, setJustReturnedFromLearn] = useState(false);
@@ -201,6 +199,10 @@ export default function MainLayout({
     }
   }, [prefetchedThreadId, handleOpenChat, handleNewChat]);
 
+  const handleNavigateToAddCards = useCallback(() => {
+    router.push('/app/content/add-cards');
+  }, [router]);
+
   // Learn overlay — pushState so the browser back button can close it
   const handleLearnOpen = useCallback(() => {
     setIsLearnOpen(true);
@@ -251,6 +253,7 @@ export default function MainLayout({
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, [refreshPrefetchedThread]);
+
 
   const hasActiveCourse = !!activeCourse;
 
@@ -355,16 +358,12 @@ export default function MainLayout({
           }}
         >
           <HomeView
-            preloadedCollectionProgress={preloadedCollectionProgress}
             preloadedCourseSettings={preloadedCourseSettings}
-            preloadedCustomCollectionsProgress={
-              preloadedCustomCollectionsProgress
-            }
             onLearnOpen={handleLearnOpen}
             onChatOpen={handleOpenChat}
-            onNavigateToContent={() => router.push('/app/content/add-cards')}
+            onNavigateToContent={handleNavigateToAddCards}
             onNavigateToChat={handleNavigateToChat}
-            onEnterTexts={() => router.push('/app/content/add-cards')}
+            onEnterTexts={handleNavigateToAddCards}
             onTutorialReady={handleTutorialReady}
             animateEntrance={justReturnedFromLearn}
             isHidden={isLearnOpen || activeView !== 'home' || isAddCardsRoute}
