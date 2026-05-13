@@ -14,7 +14,29 @@
  *   - cheaper than batch, faster than the SDK path
  */
 
-import { AUTO_DETECT_LOCALES, toAzureSttLocale } from './languageCodes';
+import { buildAutoDetectLocales, toAzureSttLocales } from './languageCodes';
+
+/**
+ * Optional knobs for `transcribeAudio`. Either branch hands off to
+ * `toAzureSttLocales` / `buildAutoDetectLocales` so the locale-resolution
+ * logic stays in `languageCodes.ts`.
+ */
+export interface TranscribeOptions {
+  /**
+   * Known regional variant (Azure locale, e.g. `"es-MX"`). When set together
+   * with `internalLanguageCode`, the array of locales sent to Azure is a
+   * single-element `[regionVariant]` — used for TTS validation, where the
+   * synthesized voice's locale is already known so we skip language-ID.
+   */
+  regionVariant?: string;
+  /**
+   * Course languages (internal codes) used when auto-detecting. Appended to
+   * the 8 most-common base locales, deduped, capped at Azure's 10-locale
+   * limit. Pass the active course's base ∪ target codes; `es_mixed` is
+   * automatically expanded to `es-ES` + `es-MX`.
+   */
+  autoDetectCourseLanguages?: readonly string[];
+}
 
 const API_VERSION = '2024-11-15';
 
@@ -53,6 +75,7 @@ interface AzureTranscriptionResponse {
 export async function transcribeAudio(
   blob: Blob,
   internalLanguageCode?: string,
+  opts: TranscribeOptions = {},
 ): Promise<{ text: string; wordTimings: WordTiming[] }> {
   const apiKey = process.env.AZURE_SPEECH_API_KEY;
   const region = process.env.AZURE_SPEECH_REGION;
@@ -60,8 +83,8 @@ export async function transcribeAudio(
   if (!region) throw new Error('AZURE_SPEECH_REGION is not configured');
 
   const locales = internalLanguageCode
-    ? [toAzureSttLocale(internalLanguageCode)]
-    : [...AUTO_DETECT_LOCALES];
+    ? toAzureSttLocales(internalLanguageCode, opts.regionVariant)
+    : buildAutoDetectLocales(opts.autoDetectCourseLanguages);
 
   const definition = JSON.stringify({
     locales,

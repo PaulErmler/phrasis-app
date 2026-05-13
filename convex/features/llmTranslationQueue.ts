@@ -12,6 +12,9 @@ import { translateTextWithLLM, type ReasoningEffort } from './translationLLM';
 import {
   getTranslationConfigForLanguage,
   getVoiceForLanguage,
+  getVoiceForLanguageVariant,
+  resolveMixedVariant,
+  resolveTranslationStages,
   ROMANIZATION_LANGUAGES,
 } from '../../lib/languages';
 import { romanizeText } from './translation';
@@ -288,12 +291,24 @@ export const processLlmTranslationForCard = internalAction({
         return null;
       }
 
-      const cfg = getTranslationConfigForLanguage(args.targetLanguage);
-      if (cfg.provider !== 'openrouter' || !cfg.model) {
+      // Mixed-dialect targets (today: es_mixed) resolve to a concrete sub-
+      // variant per text. The LLM prompt is built using the sub-variant's
+      // config so the model gets accurate region instructions, and the
+      // persisted regionVariant lets the audio player synthesize with the
+      // matching accent.
+      const mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
+      const cfgLanguageCode = mixed ? mixed.subCode : args.targetLanguage;
+      const regionVariant = mixed?.regionVariant;
+
+      const cfg = getTranslationConfigForLanguage(cfgLanguageCode);
+      const stages = resolveTranslationStages(cfgLanguageCode, text.text.length);
+      if (cfg.provider !== 'openrouter' || stages.length === 0) {
         // Misrouted: the queue worker should only ever receive openrouter
         // languages. Fall back to Google so the row still gets translated.
         console.warn('[llmTranslationQueue] non-openrouter language reached worker — falling back', {
           targetLanguage: args.targetLanguage,
+          resolvedSubCode: cfgLanguageCode,
+          stageCount: stages.length,
         });
         await scheduleGoogleFallback(ctx, args);
         scheduledFallback = true;
@@ -337,20 +352,53 @@ export const processLlmTranslationForCard = internalAction({
           ? (text.register as 'formal' | 'informal' | 'neutral')
           : undefined;
 
-      const result = await translateTextWithLLM({
+      const promptArgs = {
         text: text.text,
         sourceLang: args.sourceLanguage,
-        targetLang: args.targetLanguage,
+        // For mixed languages, expose the resolved sub-code to the LLM (e.g.
+        // 'es' or 'es_latam' rather than 'es_mixed'). The persisted row still
+        // uses the mixed code as targetLanguage; only the prompt's region
+        // context comes from the sub-variant.
+        targetLang: cfgLanguageCode,
         targetLangName: cfg.targetLangName,
+        targetLangNativeName: cfg.targetLangNativeName,
         targetRegion: cfg.targetRegion,
         addressesSomeone,
         referentGender,
         speakerGender,
         addresseeGender,
         formality,
-        model: cfg.model,
-        reasoning: cfg.reasoning as ReasoningEffort | undefined,
-      });
+      } as const;
+
+      // Run each stage of the resolved translation rule in order. The first
+      // success wins; on truncated / empty / HTTP error we try the next
+      // fallback. After the chain exhausts the worker schedules Google
+      // Translate as the final safety net.
+      let result: Awaited<ReturnType<typeof translateTextWithLLM>> | null = null;
+      for (let i = 0; i < stages.length; i++) {
+        const stage = stages[i];
+        result = await translateTextWithLLM({
+          ...promptArgs,
+          model: stage.model,
+          reasoning: stage.reasoning as ReasoningEffort | undefined,
+          maxOutputTokens: stage.maxOutputTokens,
+        });
+        if (result.ok) break;
+        if (i < stages.length - 1) {
+          const next = stages[i + 1];
+          console.warn('[llmTranslationQueue] stage failed — retrying with next stage', {
+            textId: args.textId,
+            targetLanguage: args.targetLanguage,
+            stageIndex: i,
+            stageModel: stage.model,
+            stageReasoning: stage.reasoning,
+            reason: result.reason,
+            nextStageModel: next.model,
+            nextStageReasoning: next.reasoning,
+          });
+        }
+      }
+      if (!result) throw new Error('Unreachable: stages.length >= 1');
 
       if (!result.ok) {
         // Truncation / empty / HTTP error — fall back to Google for this row.
@@ -375,10 +423,16 @@ export const processLlmTranslationForCard = internalAction({
         }
       }
 
-      const voiceName = getVoiceForLanguage(
-        args.targetLanguage,
-        args.audioSpeakerGender,
-      );
+      // For mixed languages, pick a voice matching the resolved regional
+      // variant so the synthesized audio agrees with the persisted
+      // `regionVariant`. Non-mixed languages fall through to the simple picker.
+      const voiceName = regionVariant
+        ? getVoiceForLanguageVariant(
+            args.targetLanguage,
+            regionVariant,
+            args.audioSpeakerGender,
+          )
+        : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
 
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,
@@ -388,6 +442,7 @@ export const processLlmTranslationForCard = internalAction({
           translatedText: result.text,
           voiceName,
           romanizedText,
+          regionVariant,
           priority: args.priority,
         },
       );

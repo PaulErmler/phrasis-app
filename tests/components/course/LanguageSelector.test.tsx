@@ -1,6 +1,29 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeAll } from "vitest";
+import { render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NextIntlClientProvider } from "next-intl";
+
+// cmdk uses ResizeObserver and Element.scrollIntoView; jsdom ships neither.
+// Polyfill before any component renders so the Command palette can mount.
+beforeAll(() => {
+  if (typeof globalThis.ResizeObserver === "undefined") {
+    class StubResizeObserver {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).ResizeObserver = StubResizeObserver;
+  }
+  if (
+    typeof window !== "undefined" &&
+    !(Element.prototype as unknown as { scrollIntoView?: unknown })
+      .scrollIntoView
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (Element.prototype as any).scrollIntoView = function () {};
+  }
+});
 
 vi.mock("@/components/ui/checkbox", () => ({
   Checkbox: ({ checked }: { checked?: boolean }) => (
@@ -11,43 +34,63 @@ vi.mock("@/components/ui/checkbox", () => ({
 import { LanguageSelector } from "@/components/course/LanguageSelector";
 import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 
-describe("LanguageSelector", () => {
-  it("renders a row per supported language", () => {
-    const { container } = render(
+const messages = {
+  LanguageSelector: {
+    searchPlaceholder: "Search languages…",
+    noResults: "No languages match.",
+    tierBadge: "Experimental",
+    tierBadgeTooltip: "Newly added — quality is still being tuned.",
+    categories: {
+      germanic: "Germanic & Nordic",
+      romance: "Romance",
+      slavic: "Slavic",
+      "asian-east": "East Asian",
+      "asian-southeast": "Southeast Asian",
+      semitic: "Semitic & Middle Eastern",
+      african: "African",
+      other: "Other",
+    },
+  },
+};
+
+function renderSelector(
+  props: Partial<React.ComponentProps<typeof LanguageSelector>> = {},
+) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={messages}>
       <LanguageSelector
         selectedLanguages={[]}
         onToggleLanguage={() => {}}
-      />,
-    );
-    const rows = container.querySelectorAll('[role="button"]');
+        {...props}
+      />
+    </NextIntlClientProvider>,
+  );
+}
+
+describe("LanguageSelector", () => {
+  it("renders one CommandItem per supported language", () => {
+    const { container } = renderSelector();
+    // cmdk uses role="option" for items.
+    const rows = container.querySelectorAll('[cmdk-item=""]');
     expect(rows.length).toBe(SUPPORTED_LANGUAGES.length);
   });
 
-  it("calls onToggleLanguage on click", async () => {
+  it("calls onToggleLanguage with the matching code when an item is clicked", async () => {
     const user = userEvent.setup();
     const onToggle = vi.fn();
-    const { container } = render(
-      <LanguageSelector
-        selectedLanguages={[]}
-        onToggleLanguage={onToggle}
-      />,
-    );
-    const first = SUPPORTED_LANGUAGES[0];
-    const rows = container.querySelectorAll('[role="button"]');
-    await user.click(rows[0] as HTMLElement);
-    expect(onToggle).toHaveBeenCalledWith(first.code);
+    const { getByText } = renderSelector({ onToggleLanguage: onToggle });
+    // Pick French by its native name "Français" — unique across rows (the
+    // English variants all share the word "English"). Specific assertion
+    // catches "wrong code emitted" bugs the previous "any code" check missed.
+    await user.click(getByText("Français"));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledWith("fr");
   });
 
   it("filters out excluded languages", () => {
     const [a] = SUPPORTED_LANGUAGES;
-    const { container } = render(
-      <LanguageSelector
-        selectedLanguages={[]}
-        excludeLanguages={[a.code]}
-        onToggleLanguage={() => {}}
-      />,
-    );
-    const rows = container.querySelectorAll('[role="button"]');
+    const { container } = renderSelector({ excludeLanguages: [a.code] });
+    const rows = container.querySelectorAll('[cmdk-item=""]');
     expect(rows.length).toBe(SUPPORTED_LANGUAGES.length - 1);
   });
 });

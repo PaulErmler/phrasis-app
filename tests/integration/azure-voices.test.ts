@@ -94,11 +94,16 @@ describe('Azure voice config shape', () => {
   });
 
   it('every Azure voice apiCode looks like a {locale}-{Name}Neural short name', () => {
+    // Two valid shapes:
+    //   - {locale}-{Name}Neural                          (standard Neural)
+    //   - {locale}-{Name}:DragonHDLatestNeural           (Microsoft Dragon HD)
+    const shape =
+      /^[a-z]{2,3}-[A-Za-z0-9]+-[A-Za-z0-9]+(?::DragonHDLatest)?Neural$/;
     for (const voice of voices) {
       expect(
         voice.apiCode,
         `${voice.name} apiCode should match Azure short-name format`,
-      ).toMatch(/^[a-z]{2,3}-[A-Za-z0-9]+-[A-Za-z0-9]+Neural$/);
+      ).toMatch(shape);
     }
   });
 });

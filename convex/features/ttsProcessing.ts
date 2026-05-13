@@ -106,6 +106,14 @@ async function synthesizeAndValidate(
     provider: TtsProvider;
     voiceGender: VoiceGender;
     speed: number;
+    /**
+     * Azure STT locale (e.g. `'es-US'`) when the row's language is a
+     * mixed-dialect code whose concrete variant was chosen at translation
+     * time. Forwarded to `transcribeAudio` so language-ID is skipped and STT
+     * runs against the same locale the voice was synthesized in. Undefined
+     * for non-mixed languages.
+     */
+    regionVariant?: string;
   },
   maxAttempts: number,
 ): Promise<{
@@ -163,6 +171,7 @@ async function synthesizeAndValidate(
       const { text: transcribed, wordTimings } = await transcribeAudio(
         blob,
         args.language,
+        { regionVariant: args.regionVariant },
       );
 
       // Cheap strict check first. For Chinese/Korean this compares
@@ -228,6 +237,12 @@ export const processTTSForCard = internalAction({
     // Slot ID pre-assigned by pumpQueue. The action always holds a slot for
     // the full duration of its API work; it never self-schedules or polls.
     slotId: v.id('ttsProviderSlots'),
+    // Azure STT locale persisted on the translation row for mixed-dialect
+    // languages (today: es_mixed → `es-ES` or `es-US`). Plumbed end-to-end
+    // so the validation roundtrip transcribes against the same locale the
+    // voice was synthesized in instead of falling back to the mixed code's
+    // default Azure locale.
+    regionVariant: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -371,6 +386,10 @@ export const backfillWordTimings = internalAction({
     textId: v.id('texts'),
     language: v.string(),
     storageId: v.id('_storage'),
+    // Same purpose as on `processTTSForCard` — the row's persisted Azure STT
+    // locale for mixed-dialect languages. Supplied by `scheduleMissingContent`
+    // from the translation row when the language is mixed.
+    regionVariant: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -389,7 +408,9 @@ export const backfillWordTimings = internalAction({
         });
         return null;
       }
-      const { wordTimings } = await transcribeAudio(blob, args.language);
+      const { wordTimings } = await transcribeAudio(blob, args.language, {
+        regionVariant: args.regionVariant,
+      });
       if (wordTimings.length === 0) return null;
       await ctx.runMutation(
         internal.features.ttsProcessing.persistBackfilledWordTimings,
@@ -483,6 +504,10 @@ const ttsJobArgsValidator = v.object({
   voiceName: v.string(),
   voiceGender: voiceGenderValidator,
   speed: v.number(),
+  // Forwarded to `processTTSForCard` for mixed-dialect rows so the validation
+  // STT call uses the same locale the voice was synthesized in. Plumbed
+  // through enqueueTtsJob from `storeTranslationAndScheduleTTS`.
+  regionVariant: v.optional(v.string()),
 });
 
 /**

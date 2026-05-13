@@ -73,6 +73,28 @@ describe("features/translation helpers", () => {
       expect(fetchMock).toHaveBeenCalled();
     });
 
+    it("throws cleanly (without hitting the network) for languages outside GOOGLE_V3_ROMANIZE_SUPPORTED", async () => {
+      // Polish has no local romanizer and is not in Google v3's supported list,
+      // so romanizeText should throw via the hard gate before any HTTP call.
+      // We stub fetch with a "must not be called" assertion so a regression
+      // that bypassed the gate would surface as a clear failure.
+      const fetchMock = vi.fn(async () => {
+        throw new Error(
+          "romanizeText hit the network for an unsupported language — the hard gate regressed",
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      try {
+        await expect(romanizeText("dzień dobry", "pl")).rejects.toThrow(
+          /Romanization not configured/i,
+        );
+      } finally {
+        vi.unstubAllGlobals();
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
     it("romanizes Arabic via Google v3 passing bare 'ar'", async () => {
       // Asserts the wire format we send for Arabic. Google's v3 romanizeText
       // wants bare `ar` (not `ar-SA` or any region tag) — guard so we don't

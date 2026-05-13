@@ -122,6 +122,32 @@ describe("features/customTexts", () => {
       ).rejects.toThrow();
     });
 
+    it("throws INVALID_LANGUAGES when a source language is not in the active course", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      // Active course is en→es; fr is not in the course.
+      await expect(
+        asUser.action(api.features.customTexts.autoFillTranslations, {
+          texts: [{ language: "fr", text: "Bonjour" }],
+          targetLanguages: ["es"],
+        }),
+      ).rejects.toThrow(/fr/);
+    });
+
+    it("throws INVALID_LANGUAGES when a target language is not in the active course", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      // Active course is en→es; de is not in the course.
+      await expect(
+        asUser.action(api.features.customTexts.autoFillTranslations, {
+          texts: [{ language: "en", text: "Hello" }],
+          targetLanguages: ["de"],
+        }),
+      ).rejects.toThrow(/de/);
+    });
+
     it("calls OpenRouter with the system prompt", async () => {
       const t = convexTest(schema, modules);
       await seedActiveCourseWithQuota(t);

@@ -269,6 +269,97 @@ const AZURE_VOICES_SV: Voice[] = [
   createAzureVoice('Mattias', 'male', 'sv-SE-MattiasNeural'),
 ];
 
+// Arabic dialects — Azure Neural M+F per dialect. Microsoft has no Dragon-tier
+// voices for Arabic yet (May 2026); these are the highest-quality voices
+// available. Romanization for all three dialects falls back to Google's `ar`
+// transliteration per the existing translation.ts path.
+const AZURE_VOICES_AR_SA: Voice[] = [
+  createAzureVoice('Zariyah', 'female', 'ar-SA-ZariyahNeural'),
+  createAzureVoice('Hamed', 'male', 'ar-SA-HamedNeural'),
+];
+
+const AZURE_VOICES_AR_EG: Voice[] = [
+  createAzureVoice('Salma', 'female', 'ar-EG-SalmaNeural'),
+  createAzureVoice('Shakir', 'male', 'ar-EG-ShakirNeural'),
+];
+
+const AZURE_VOICES_AR_IQ: Voice[] = [
+  createAzureVoice('Rana', 'female', 'ar-IQ-RanaNeural'),
+  createAzureVoice('Bassel', 'male', 'ar-IQ-BasselNeural'),
+];
+
+// Thai — Azure Neural M+F. No Dragon HD voices for Thai (May 2026).
+const AZURE_VOICES_TH: Voice[] = [
+  createAzureVoice('Premwadee', 'female', 'th-TH-PremwadeeNeural'),
+  createAzureVoice('Niwat', 'male', 'th-TH-NiwatNeural'),
+];
+
+// Hebrew — Azure Neural fallback (Google Chirp3-HD he-IL is primary).
+const AZURE_VOICES_HE: Voice[] = [
+  createAzureVoice('Hila', 'female', 'he-IL-HilaNeural'),
+  createAzureVoice('Avri', 'male', 'he-IL-AvriNeural'),
+];
+
+// Slovak — Azure Neural fallback (Google Chirp3-HD sk-SK is primary).
+const AZURE_VOICES_SK: Voice[] = [
+  createAzureVoice('Viktoria', 'female', 'sk-SK-ViktoriaNeural'),
+  createAzureVoice('Lukas', 'male', 'sk-SK-LukasNeural'),
+];
+
+// Swahili (Kenya) — Azure Neural M+F. Google has no Chirp3-HD sw-KE voices
+// at the time of this change, so Azure is the active provider.
+const AZURE_VOICES_SW_KE: Voice[] = [
+  createAzureVoice('Zuri', 'female', 'sw-KE-ZuriNeural'),
+  createAzureVoice('Rafiki', 'male', 'sw-KE-RafikiNeural'),
+];
+
+// Swahili (Tanzania) — Azure Neural M+F. Fast Transcription rejects sw-TZ,
+// so the language is configured with supportsStt: false (Greek pattern).
+const AZURE_VOICES_SW_TZ: Voice[] = [
+  createAzureVoice('Rehema', 'female', 'sw-TZ-RehemaNeural'),
+  createAzureVoice('Daudi', 'male', 'sw-TZ-DaudiNeural'),
+];
+
+// Turkish — Azure Neural fallback (Google Chirp3-HD tr-TR is primary).
+const AZURE_VOICES_TR: Voice[] = [
+  createAzureVoice('Emel', 'female', 'tr-TR-EmelNeural'),
+  createAzureVoice('Ahmet', 'male', 'tr-TR-AhmetNeural'),
+];
+
+// Romanian — Azure Neural fallback.
+const AZURE_VOICES_RO: Voice[] = [
+  createAzureVoice('Alina', 'female', 'ro-RO-AlinaNeural'),
+  createAzureVoice('Emil', 'male', 'ro-RO-EmilNeural'),
+];
+
+// Czech — Azure Neural fallback.
+const AZURE_VOICES_CS: Voice[] = [
+  createAzureVoice('Vlasta', 'female', 'cs-CZ-VlastaNeural'),
+  createAzureVoice('Antonin', 'male', 'cs-CZ-AntoninNeural'),
+];
+
+// Hungarian — Azure Neural fallback.
+const AZURE_VOICES_HU: Voice[] = [
+  createAzureVoice('Noemi', 'female', 'hu-HU-NoemiNeural'),
+  createAzureVoice('Tamas', 'male', 'hu-HU-TamasNeural'),
+];
+
+// Bengali (India) — Azure Neural fallback.
+const AZURE_VOICES_BN: Voice[] = [
+  createAzureVoice('Tanishaa', 'female', 'bn-IN-TanishaaNeural'),
+  createAzureVoice('Bashkar', 'male', 'bn-IN-BashkarNeural'),
+];
+
+// Mandarin zh-CN — Microsoft DragonHDLatestNeural voices. Highest-tier
+// Microsoft voices among the catalog at the time of this change. Stored
+// dormant (active: false) so they don't affect existing zh courses; activate
+// by switching the language's ttsProvider to 'azure' or by surfacing them
+// through a per-course voice-set switch (TBD).
+const AZURE_DRAGON_HD_VOICES_ZH: Voice[] = [
+  createAzureVoice('Xiaochen', 'female', 'zh-CN-Xiaochen:DragonHDLatestNeural'),
+  createAzureVoice('Yunfan', 'male', 'zh-CN-Yunfan:DragonHDLatestNeural'),
+];
+
 // Finnish — 4 native speakers.
 const ELEVENLABS_VOICES_FI: Voice[] = [
   createElevenLabsVoice('Aurora', 'female', 'YSabzCJMvEHDduIDMdwV'),
@@ -306,36 +397,75 @@ const ELEVENLABS_VOICES_AR: Voice[] = [
 // voice config), then the ElevenLabs pool.
 // ---------------------------------------------------------------------------
 
+// English "Mixed" pool — pooled US + GB + AU Chirp3 voices.
+const CHIRP3_EN_MIXED: Voice[] = [
+  ...buildChirp3Pool('en-US', 'US'),
+  ...buildChirp3Pool('en-GB', 'UK'),
+  ...buildChirp3Pool('en-AU', 'Australia'),
+];
+
 export const VOICE_POOLS: Record<string, Voice[]> = {
-  en: [
-    ...buildChirp3Pool('en-US', 'US'),
-    ...buildChirp3Pool('en-GB', 'UK'),
-    ...ELEVENLABS_VOICES_EN,
-  ],
+  en: [...CHIRP3_EN_MIXED, ...ELEVENLABS_VOICES_EN],
+  en_gb: [...buildChirp3Pool('en-GB', 'UK')],
+  en_us: [...buildChirp3Pool('en-US', 'US')],
+  en_au: [...buildChirp3Pool('en-AU', 'Australia')],
   es: [...buildChirp3Pool('es-ES', 'Spain'), ...activate(ELEVENLABS_VOICES_ES)],
   es_latam: [
     ...buildChirp3Pool('es-US', 'Latin America'),
     ...activate(ELEVENLABS_VOICES_ES_LATAM),
+  ],
+  // Spanish Mixed — union of Spain + LatAm Google voice pools. The audio-player
+  // picks by the persisted translation `regionVariant` (see
+  // `getVoiceForLanguageVariant` below); ElevenLabs voices stay out of the
+  // mixed pool because they aren't tagged with a Spanish region prefix.
+  es_mixed: [
+    ...buildChirp3Pool('es-ES', 'Spain'),
+    ...buildChirp3Pool('es-US', 'Latin America'),
   ],
   fr: [...buildChirp3Pool('fr-FR', 'France'), ...ELEVENLABS_VOICES_FR],
   de: [...buildChirp3Pool('de-DE', 'Germany'), ...ELEVENLABS_VOICES_DE],
   it: [...buildChirp3Pool('it-IT', 'Italy'), ...ELEVENLABS_VOICES_IT],
   pt: [...buildChirp3Pool('pt-BR', 'Brazil'), ...ELEVENLABS_VOICES_PT],
   ru: [...buildChirp3Pool('ru-RU', 'Russia', 'core'), ...ELEVENLABS_VOICES_RU],
+  pl: [...buildChirp3Pool('pl-PL', 'Poland')],
+  sk: [...buildChirp3Pool('sk-SK', 'Slovakia'), ...AZURE_VOICES_SK],
   hi: [...buildChirp3Pool('hi-IN', 'India'), ...ELEVENLABS_VOICES_HI],
-  zh: [...buildChirp3Pool('cmn-CN', 'Mandarin'), ...ELEVENLABS_VOICES_ZH],
+  bn: [...buildChirp3Pool('bn-IN', 'Bengali'), ...AZURE_VOICES_BN],
+  tr: [...buildChirp3Pool('tr-TR', 'Türkiye'), ...AZURE_VOICES_TR],
+  hu: [...buildChirp3Pool('hu-HU', 'Hungary'), ...AZURE_VOICES_HU],
+  ro: [...buildChirp3Pool('ro-RO', 'Romania'), ...AZURE_VOICES_RO],
+  cs: [...buildChirp3Pool('cs-CZ', 'Czechia'), ...AZURE_VOICES_CS],
+  zh: [
+    ...buildChirp3Pool('cmn-CN', 'Mandarin'),
+    ...ELEVENLABS_VOICES_ZH,
+    // Dormant Dragon HD pool — activate by switching the language to Azure.
+    ...AZURE_DRAGON_HD_VOICES_ZH,
+  ],
+  zh_traditional: [...buildChirp3Pool('cmn-TW', 'Taiwan')],
+  yue: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
+  yue_traditional: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
   ja: [...buildChirp3Pool('ja-JP', 'Japan'), ...ELEVENLABS_VOICES_JA],
   ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...ELEVENLABS_VOICES_KO],
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...ELEVENLABS_VOICES_VI],
+  th: [...buildChirp3Pool('th-TH', 'Thailand'), ...activate(AZURE_VOICES_TH)],
+  id: [...buildChirp3Pool('id-ID', 'Indonesia')],
   sv: [
     ...buildChirp3Pool('sv-SE', 'Sweden'),
     ...ELEVENLABS_VOICES_SV,
     ...activate(AZURE_VOICES_SV),
   ],
+  nb: [...buildChirp3Pool('nb-NO', 'Norway')],
+  da: [...buildChirp3Pool('da-DK', 'Denmark')],
   fi: [...buildChirp3Pool('fi-FI', 'Finland'), ...ELEVENLABS_VOICES_FI],
   nl: [...buildChirp3Pool('nl-NL', 'Netherlands'), ...ELEVENLABS_VOICES_NL],
   el: [...buildChirp3Pool('el-GR', 'Greece'), ...ELEVENLABS_VOICES_EL],
+  he: [...buildChirp3Pool('he-IL', 'Israel'), ...AZURE_VOICES_HE],
   ar: [...buildChirp3Pool('ar-XA', 'MSA'), ...ELEVENLABS_VOICES_AR],
+  ar_sa: [...activate(AZURE_VOICES_AR_SA)],
+  ar_eg: [...activate(AZURE_VOICES_AR_EG)],
+  ar_iq: [...activate(AZURE_VOICES_AR_IQ)],
+  sw: [...activate(AZURE_VOICES_SW_KE)],
+  sw_tz: [...activate(AZURE_VOICES_SW_TZ)],
 };
 
 // ---------------------------------------------------------------------------
@@ -429,6 +559,41 @@ export function getVoiceForLanguage(
     }
   }
   return voices[Math.floor(Math.random() * voices.length)].apiCode;
+}
+
+/**
+ * Variant-aware voice picker. Used for languages whose pool spans multiple
+ * regional accents (today: `es_mixed`). Filters the active-provider pool to
+ * voices whose apiCode starts with `regionVariant` before applying the same
+ * gender preference logic as `getVoiceForLanguage`. Falls back to the full
+ * pool when no voice matches the variant prefix.
+ *
+ * `regionVariant` is a Google locale prefix such as `"es-ES"` or `"es-US"`
+ * (the prefix matches the leading segment of the Chirp3 apiCode, e.g.
+ * `es-ES-Chirp3-HD-Leda`). Pass it through verbatim from the persisted
+ * translation `regionVariant` column.
+ */
+export function getVoiceForLanguageVariant(
+  code: string,
+  regionVariant: string | undefined,
+  speakerGender?: string,
+): string {
+  if (!regionVariant) return getVoiceForLanguage(code, speakerGender);
+  const all = getVoicesByLanguageCode(code);
+  if (all.length === 0) {
+    throw new Error(
+      `No voices available for language "${code}" with active provider. Add voices in lib/voices.ts.`,
+    );
+  }
+  const variantPool = all.filter((v) => v.apiCode.startsWith(`${regionVariant}-`));
+  const pool = variantPool.length > 0 ? variantPool : all;
+  if (speakerGender === 'male' || speakerGender === 'female') {
+    const matching = pool.filter((v) => v.gender === speakerGender);
+    if (matching.length > 0) {
+      return matching[Math.floor(Math.random() * matching.length)].apiCode;
+    }
+  }
+  return pool[Math.floor(Math.random() * pool.length)].apiCode;
 }
 
 /**

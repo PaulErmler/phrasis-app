@@ -21,7 +21,6 @@ export function BaseLanguagesStep({
       selectedLanguages={selectedLanguages}
       excludeLanguages={excludeLanguages}
       onToggleLanguage={onToggleLanguage}
-      multiSelect={false}
     />
   );
 }

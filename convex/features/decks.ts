@@ -12,10 +12,12 @@ import { Id, Doc } from '../_generated/dataModel';
 import { insertCard } from '../db/stats/cardAggregates';
 import {
   getVoiceForLanguage,
+  getVoiceForLanguageVariant,
   getVoiceGenderByApiCode,
   resolveAudioSpeakerGender,
   getTtsProviderForLanguage,
   getTranslationConfigForLanguage,
+  resolveMixedVariant,
 } from '../../lib/languages';
 import {
   getCourseSettings,
@@ -189,10 +191,14 @@ export async function scheduleMissingContent(
     if (!languageSupportsStt(lang)) return;
     const claimed = await claimTtsIfAvailable(ctx, textId, lang);
     if (!claimed) return;
+    // Forward the persisted regionVariant for mixed-dialect rows so STT runs
+    // against the same locale the voice was synthesized in. Undefined for
+    // non-mixed languages and for the source-language (no translations row).
+    const regionVariant = translationMap.get(lang)?.regionVariant;
     await ctx.scheduler.runAfter(
       0,
       internal.features.ttsProcessing.backfillWordTimings,
-      { textId, language: lang, storageId: audio.storageId },
+      { textId, language: lang, storageId: audio.storageId, regionVariant },
     );
   };
 
@@ -297,7 +303,13 @@ export async function scheduleMissingContent(
         if (!hasAudio) {
           const claimed = await claimTtsIfAvailable(ctx, textId, lang);
           if (claimed) {
-            const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
+            // For mixed-dialect rows, prefer a voice in the same locale that
+            // was picked at translation time and forward the variant to TTS
+            // so the validation roundtrip uses the matching STT locale.
+            const regionVariant = translation.regionVariant;
+            const voiceName = regionVariant
+              ? getVoiceForLanguageVariant(lang, regionVariant, audioSpeakerGender)
+              : getVoiceForLanguage(lang, audioSpeakerGender);
             const voiceGender = getVoiceGenderByApiCode(voiceName);
             if (voiceGender === undefined) {
               throw new Error(
@@ -315,6 +327,7 @@ export async function scheduleMissingContent(
                   voiceName,
                   voiceGender,
                   speed: 1,
+                  regionVariant,
                 },
                 priority,
               },
@@ -1338,14 +1351,22 @@ export const processTranslationForCard = internalAction({
         },
       );
 
+      // Mixed-dialect targets (today: es_mixed) pick a deterministic
+      // sub-variant per text. The Google translate target is the sub-code so
+      // we get regional spelling/vocab; the persisted row keeps the mixed
+      // code as `targetLanguage` and records the chosen variant.
+      const mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
+      const translateTarget = mixed ? mixed.subCode : args.targetLanguage;
+      const regionVariant = mixed?.regionVariant;
+
       let translation: string;
       let romanizedText: string | undefined;
 
       if (existingRow) {
         translation = existingRow.translatedText;
-        if (ROMANIZATION_LANGUAGES.has(args.targetLanguage) && !existingRow.romanizedText) {
+        if (ROMANIZATION_LANGUAGES.has(translateTarget) && !existingRow.romanizedText) {
           try {
-            romanizedText = await romanizeText(translation, args.targetLanguage);
+            romanizedText = await romanizeText(translation, translateTarget);
           } catch {
             // Romanization is non-fatal; skip silently
           }
@@ -1356,11 +1377,11 @@ export const processTranslationForCard = internalAction({
         translation = await translateText(
           args.text,
           args.sourceLanguage,
-          args.targetLanguage,
+          translateTarget,
         );
-        if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
+        if (ROMANIZATION_LANGUAGES.has(translateTarget)) {
           try {
-            romanizedText = await romanizeText(translation, args.targetLanguage);
+            romanizedText = await romanizeText(translation, translateTarget);
           } catch (err) {
             // Romanization is non-fatal — the translation still lands without
             // it — but we log so the next time a new locale silently fails to
@@ -1374,7 +1395,13 @@ export const processTranslationForCard = internalAction({
         }
       }
 
-      const voiceName = getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
+      const voiceName = regionVariant
+        ? getVoiceForLanguageVariant(
+            args.targetLanguage,
+            regionVariant,
+            args.audioSpeakerGender,
+          )
+        : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
 
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,
@@ -1384,6 +1411,7 @@ export const processTranslationForCard = internalAction({
           translatedText: translation,
           voiceName,
           romanizedText,
+          regionVariant,
           priority: args.priority,
         },
       );
@@ -1410,6 +1438,12 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     translatedText: v.string(),
     voiceName: v.string(),
     romanizedText: v.optional(v.string()),
+    /**
+     * Concrete regional variant chosen when `targetLanguage` is a mixed code
+     * (today: `es_mixed`). Stored on the translation row so the audio player
+     * can pick a voice in the matching locale.
+     */
+    regionVariant: v.optional(v.string()),
     priority: v.optional(v.number()),
   },
   returns: v.null(),
@@ -1427,9 +1461,19 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         targetLanguage: args.targetLanguage,
         translatedText: args.translatedText,
         ...(args.romanizedText ? { romanizedText: args.romanizedText } : {}),
+        ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
       });
-    } else if (args.romanizedText && !existing.romanizedText) {
-      await ctx.db.patch(existing._id, { romanizedText: args.romanizedText });
+    } else {
+      const patch: Partial<{ romanizedText: string; regionVariant: string }> = {};
+      if (args.romanizedText && !existing.romanizedText) {
+        patch.romanizedText = args.romanizedText;
+      }
+      if (args.regionVariant && !existing.regionVariant) {
+        patch.regionVariant = args.regionVariant;
+      }
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.patch(existing._id, patch);
+      }
     }
 
     // Release any LLM translation claim now that the translation row exists.
@@ -1477,6 +1521,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
               voiceName: args.voiceName,
               voiceGender,
               speed: 1,
+              regionVariant: args.regionVariant,
             },
             priority: args.priority,
           },

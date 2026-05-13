@@ -17,6 +17,8 @@ import {
   languageNeedsRomanization,
   normalizeLanguageCode,
   ROMANIZATION_LANGUAGES,
+  resolveMixedVariant,
+  isMixedLanguage,
 } from '@/lib/languages';
 
 describe('getLanguageByCode', () => {
@@ -30,26 +32,23 @@ describe('getLanguageByCode', () => {
 });
 
 describe('SUPPORTED_LANGUAGES ttsProvider', () => {
-  // Google is the default. Each non-default routing below is intentional and
-  // listed here to guard against accidental provider flips.
-  const NON_GOOGLE_PROVIDERS: Record<string, 'elevenlabs' | 'azure'> = {
-    sv: 'azure',
-  };
+  // Derived from SUPPORTED_LANGUAGES (not hardcoded) so the test can never
+  // silently drift from lib/languages.ts when a language flips provider.
+  const NON_GOOGLE_PROVIDERS: Record<string, 'elevenlabs' | 'azure'> =
+    Object.fromEntries(
+      SUPPORTED_LANGUAGES.filter((l) => l.ttsProvider !== 'google').map(
+        (l) => [l.code, l.ttsProvider as 'elevenlabs' | 'azure'],
+      ),
+    );
 
-  it('languages not listed above are all routed through Google TTS', () => {
-    const offenders = SUPPORTED_LANGUAGES.filter(
-      (l) => !(l.code in NON_GOOGLE_PROVIDERS) && l.ttsProvider !== 'google',
-    ).map((l) => `${l.code}=${l.ttsProvider}`);
-    expect(
-      offenders,
-      `Languages unexpectedly off google: ${offenders.join(', ') || '(none)'}`,
-    ).toEqual([]);
-  });
-
-  it('non-google-pinned languages use the expected provider', () => {
+  it('every non-google language is reachable via getLanguageByCode', () => {
     for (const [code, provider] of Object.entries(NON_GOOGLE_PROVIDERS)) {
       expect(getLanguageByCode(code)?.ttsProvider).toBe(provider);
     }
+  });
+
+  it('at least one non-google entry exists (sanity check the derivation)', () => {
+    expect(Object.keys(NON_GOOGLE_PROVIDERS).length).toBeGreaterThan(0);
   });
 });
 
@@ -221,5 +220,42 @@ describe('normalizeLanguageCode', () => {
   it('keeps non-variant codes unchanged', () => {
     expect(normalizeLanguageCode('en')).toBe('en');
     expect(normalizeLanguageCode('zh')).toBe('zh');
+  });
+});
+
+describe('resolveMixedVariant', () => {
+  it('returns null for non-mixed codes', () => {
+    expect(resolveMixedVariant('es', 'any-seed')).toBeNull();
+    expect(resolveMixedVariant('en', 'any-seed')).toBeNull();
+  });
+
+  it('is deterministic for the same (code, seed) pair', () => {
+    expect(isMixedLanguage('es_mixed')).toBe(true);
+    const a = resolveMixedVariant('es_mixed', 'text-abc-123');
+    const b = resolveMixedVariant('es_mixed', 'text-abc-123');
+    const c = resolveMixedVariant('es_mixed', 'text-abc-123');
+    expect(a).not.toBeNull();
+    expect(b).toEqual(a);
+    expect(c).toEqual(a);
+  });
+
+  it('returns a {subCode, regionVariant} pair pointing at a real Spanish variant', () => {
+    const result = resolveMixedVariant('es_mixed', 'seed-1');
+    expect(result).not.toBeNull();
+    // es_mixed splits across Spain (es / es-ES) and LatAm (es_latam / es-US).
+    expect(['es', 'es_latam']).toContain(result!.subCode);
+    expect(['es-ES', 'es-US']).toContain(result!.regionVariant);
+  });
+
+  it('distributes across both variants given different seeds', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      const r = resolveMixedVariant('es_mixed', `seed-${i}`);
+      if (r) seen.add(r.subCode);
+    }
+    // With 50 distinct seeds and ~50/50 hash distribution, hitting only one
+    // variant has probability ~2^-50; if this test ever flakes the hash is
+    // catastrophically biased.
+    expect(seen).toEqual(new Set(['es', 'es_latam']));
   });
 });

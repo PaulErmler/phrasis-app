@@ -16,11 +16,41 @@ import { SignJWT, importPKCS8 } from 'jose';
  * Map internal language codes to Google Translate / romanization API codes.
  * Codes not listed here are passed through as-is. Most ISO 639-1 codes work
  * unmapped against both the v2 translate and v3 romanizeText endpoints —
- * only the Spanish variants need a regional tag.
+ * only regional variants and our internal dialect codes need an override.
+ *
+ * For Arabic dialects we deliberately collapse to plain `ar` (MSA) because
+ * Google has no per-dialect romanization model — the user requested this
+ * fallback explicitly. Cantonese variants collapse to `yue`; Chinese
+ * Traditional uses local pinyin (see localRomanization.ts) so its entry here
+ * only matters when translating away from `zh_traditional`.
  */
 const GOOGLE_TRANSLATE_CODE_MAP: Record<string, string> = {
   es: 'es-ES',
   es_latam: 'es-US',
+  // English variants map to en-* (Google Translate accepts the locale form,
+  // not just the bare ISO code, so target='en-GB' triggers British spelling).
+  en_gb: 'en-GB',
+  en_us: 'en-US',
+  en_au: 'en-AU',
+  // Spanish Mixed gets a default — callers that need a specific regional
+  // sub-prompt should resolve it themselves (see translationLLM's per-sentence
+  // variant picker) and not rely on this map.
+  es_mixed: 'es-ES',
+  // Chinese Traditional: Google accepts `zh-TW`.
+  zh_traditional: 'zh-TW',
+  // Cantonese: Google romanization v3 supports `yue`.
+  yue: 'yue',
+  yue_traditional: 'yue',
+  // Arabic dialects → plain `ar` for romanization (Google has no per-dialect
+  // model). The same code is fine for translate v2 — the LLM/Azure handle
+  // dialect-specific output via voice + prompt, not translate API.
+  ar_sa: 'ar',
+  ar_eg: 'ar',
+  ar_iq: 'ar',
+  // Swahili: Google's translate codes are `sw`; pass the bare code for both
+  // regional variants (the regional difference matters for voices, not text).
+  sw: 'sw',
+  sw_tz: 'sw',
 };
 
 function toGoogleTranslateCode(code: string): string {
@@ -163,11 +193,33 @@ export async function translateText(
 }
 
 /**
+ * Source-language codes that Google Cloud Translation v3 romanizeText
+ * actually supports (as of May 2026). The endpoint 400s with
+ * "Source language is unsupported" for anything outside this set —
+ * we used to discover that the hard way (he, th, yue all crashed in prod).
+ *
+ * Keep this list in sync with
+ * https://docs.cloud.google.com/translate/docs/advanced/romanize-text
+ * Map our internal codes via GOOGLE_TRANSLATE_CODE_MAP first, then check
+ * membership.
+ */
+const GOOGLE_V3_ROMANIZE_SUPPORTED = new Set([
+  'am', 'ar', 'be', 'bn', 'gu', 'hi', 'ja',
+  'kn', 'my', 'ru', 'sr', 'ta', 'te', 'uk',
+]);
+
+/**
  * Romanize non-Latin script text.
  * Chinese uses the local chinese-to-pinyin library;
  * Greek uses greek-utils phonetic Latin;
  * Korean uses hangul-romanization (Revised Romanization);
- * other languages use the Google Cloud Translation v3 romanizeText endpoint.
+ * other languages use the Google Cloud Translation v3 romanizeText endpoint
+ * (provided Google supports them — see GOOGLE_V3_ROMANIZE_SUPPORTED).
+ *
+ * Throws when a language reaches this path with no working romanizer.
+ * Callers gate on `ROMANIZATION_LANGUAGES` in lib/languages.ts, which is
+ * maintained to only include codes with WORKING coverage, so unsupported
+ * codes shouldn't reach this function in practice.
  */
 export async function romanizeText(
   text: string,
@@ -175,6 +227,16 @@ export async function romanizeText(
 ): Promise<string> {
   const local = romanizeLocal(text, sourceLanguage);
   if (local !== null) return local;
+
+  // Hard gate: bail out cleanly before issuing a guaranteed-400 request.
+  // The mapped (Google-facing) code is what determines support, since
+  // dialect codes like ar_eg collapse to `ar` via GOOGLE_TRANSLATE_CODE_MAP.
+  const googleLangPreflight = toGoogleTranslateCode(sourceLanguage);
+  if (!GOOGLE_V3_ROMANIZE_SUPPORTED.has(googleLangPreflight)) {
+    throw new Error(
+      `Romanization not configured for language "${sourceLanguage}" (Google v3 doesn't support "${googleLangPreflight}" and no local romanizer is registered). Update ROMANIZATION_LANGUAGES in lib/languages.ts or wire a local romanizer.`,
+    );
+  }
 
   const { token, projectId } = await getGoogleAccessToken();
   const url = `https://translation.googleapis.com/v3/projects/${projectId}/locations/global:romanizeText`;

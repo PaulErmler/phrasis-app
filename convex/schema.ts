@@ -149,6 +149,12 @@ export default defineSchema({
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
     romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Concrete regional variant chosen for this row when `targetLanguage` is a
+    // mixed/aggregate code (today: "es_mixed"). Stored as a Google voice-locale
+    // prefix such as "es-ES" or "es-US" so the audio player can call
+    // `getVoiceForLanguageVariant` and synthesize with the matching accent.
+    // Undefined for non-mixed languages.
+    regionVariant: v.optional(v.string()),
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),

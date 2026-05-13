@@ -201,7 +201,6 @@ export function CreateCourseDialog({
               subtitle={t('step1.subtitle')}
               selectedLanguages={targetLanguage ? [targetLanguage] : []}
               onToggleLanguage={handleTargetLanguageToggle}
-              multiSelect={false}
             />
           )}
 
@@ -212,7 +211,6 @@ export function CreateCourseDialog({
               selectedLanguages={baseLanguage ? [baseLanguage] : []}
               excludeLanguages={targetLanguage ? [targetLanguage] : []}
               onToggleLanguage={handleBaseLanguageToggle}
-              multiSelect={false}
             />
           )}
 

@@ -15,31 +15,69 @@ vi.mock("@openrouter/ai-sdk-provider", () => ({
 import { generateText } from "ai";
 import {
   buildPrompt,
-  pickReasoning,
-  HYBRID_LENGTH_THRESHOLD,
   MAX_OUTPUT_TOKENS,
   translateTextWithLLM,
 } from "../../features/translationLLM";
+import {
+  HYBRID_LENGTH_THRESHOLD,
+  resolveTranslationStages,
+  TRANSLATION_RULES,
+} from "../../../lib/languages";
 
 describe("features/translationLLM", () => {
-  describe("pickReasoning (hybrid length rule)", () => {
-    it("returns undefined (minimal) for sentences shorter than the threshold", () => {
-      expect(pickReasoning("Hi.")).toBeUndefined();
-      expect(pickReasoning("a".repeat(HYBRID_LENGTH_THRESHOLD - 1))).toBeUndefined();
+  describe("translation rules (length-hybrid)", () => {
+    it("default_hybrid: short sentences resolve to Flash Lite with no reasoning", () => {
+      // 'de' has no `translationRule` set → defaults to `default_hybrid`.
+      const stages = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD - 1);
+      expect(stages.length).toBe(1);
+      expect(stages[0].model).toBe("google/gemini-3.1-flash-lite-preview");
+      expect(stages[0].reasoning).toBeUndefined();
     });
 
-    it("returns 'low' for sentences at or above the threshold", () => {
-      expect(pickReasoning("a".repeat(HYBRID_LENGTH_THRESHOLD))).toBe("low");
-      expect(pickReasoning("a".repeat(HYBRID_LENGTH_THRESHOLD + 50))).toBe("low");
+    it("default_hybrid: longer sentences resolve to Flash Lite with 'low' reasoning", () => {
+      const stages = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD);
+      expect(stages.length).toBe(1);
+      expect(stages[0].model).toBe("google/gemini-3.1-flash-lite-preview");
+      expect(stages[0].reasoning).toBe("low");
     });
 
-    it("respects an explicit override regardless of length", () => {
-      // Short text + medium override → medium.
-      expect(pickReasoning("Hi.", "medium")).toBe("medium");
-      // Long text + medium override → medium (not 'low').
-      expect(pickReasoning("a".repeat(200), "medium")).toBe("medium");
-      // Short text + high override → high.
-      expect(pickReasoning("Hi.", "high")).toBe("high");
+    it("asian_deepseek rule definition still exposes DeepSeek high → Gemini fallback", () => {
+      // Currently no language uses this rule (Asian languages reverted to
+      // default_hybrid pending a quality eval). The rule itself is preserved
+      // so we can re-enable it without re-deriving the shape. The per-stage
+      // maxOutputTokens caps (DeepSeek 8K for the high-reasoning trace,
+      // Gemini 5K for the no-reasoning fallback) are part of the rule shape
+      // and pinned here.
+      const rule = TRANSLATION_RULES.asian_deepseek;
+      expect(rule.branches.length).toBe(1);
+      const onlyBranch = rule.branches[0];
+      expect(onlyBranch.primary).toEqual({
+        model: "deepseek/deepseek-v4-flash",
+        reasoning: "high",
+        maxOutputTokens: 8_000,
+      });
+      expect(onlyBranch.fallbacks).toEqual([
+        {
+          model: "google/gemini-3.1-flash-lite-preview",
+          maxOutputTokens: 5_000,
+        },
+      ]);
+    });
+
+    it("zh now resolves through default_hybrid (Asian languages reverted)", () => {
+      const stages = resolveTranslationStages("zh", 12);
+      expect(stages.length).toBe(1);
+      expect(stages[0]).toEqual({
+        model: "google/gemini-3.1-flash-lite-preview",
+        maxOutputTokens: 5_000,
+      });
+    });
+
+    it("unknown language code falls through to default_hybrid", () => {
+      const stages = resolveTranslationStages("zz", 100);
+      expect(stages.length).toBe(1);
+      expect(stages[0].model).toBe("google/gemini-3.1-flash-lite-preview");
+      expect(stages[0].reasoning).toBe("low");
     });
   });
 
@@ -49,6 +87,7 @@ describe("features/translationLLM", () => {
       sourceLang: "en",
       targetLang: "de",
       targetLangName: "German",
+      targetLangNativeName: "Deutsch",
       targetRegion: "Germany",
       referentGender: "male" as const,
     };
@@ -107,6 +146,29 @@ describe("features/translationLLM", () => {
       const p = buildPrompt({ ...baseArgs, addressesSomeone: false });
       expect(p).toMatch(/referent_gender drives third-party noun forms/);
     });
+
+    it("emits 'English (native) (parens)' when native name differs from English name", () => {
+      const p = buildPrompt({ ...baseArgs, addressesSomeone: false });
+      // baseArgs has targetLangName='German', targetLangNativeName='Deutsch'.
+      expect(p).toContain("German (Deutsch)");
+      // Should appear in the opening role line and the closing instruction.
+      expect(p).toMatch(/English-to-German \(Deutsch\) translator/);
+      expect(p).toMatch(/Output only the German \(Deutsch\) translation/);
+    });
+
+    it("does NOT emit redundant parens when native name matches the English name", () => {
+      // English variants share the script — `en_us` has name=English,
+      // nativeName=English. The prompt should say "English", not "English (English)".
+      const p = buildPrompt({
+        ...baseArgs,
+        targetLang: "en_us",
+        targetLangName: "English",
+        targetLangNativeName: "English",
+        addressesSomeone: false,
+      });
+      expect(p).not.toContain("English (English)");
+      expect(p).toMatch(/English-to-English translator/);
+    });
   });
 
   describe("translateTextWithLLM", () => {
@@ -129,6 +191,7 @@ describe("features/translationLLM", () => {
       sourceLang: "en",
       targetLang: "de",
       targetLangName: "German",
+      targetLangNativeName: "Deutsch",
       targetRegion: "Germany",
       addressesSomeone: true,
       referentGender: "female" as const,
@@ -217,18 +280,22 @@ describe("features/translationLLM", () => {
       expect(callArg.temperature).toBe(0);
     });
 
-    it("omits providerOptions.openrouter.reasoning for short sentences (hybrid rule)", async () => {
+    it("omits providerOptions.openrouter.reasoning when caller doesn't pass reasoning", async () => {
+      // translateTextWithLLM no longer applies a length-hybrid default —
+      // the translation rule decides reasoning upstream. When the caller
+      // passes no `reasoning`, no providerOptions are sent.
       mockOpenRouterOk("Hallo.");
-      await translateTextWithLLM(callArgs); // text='Hi.' → len < 30 → no reasoning
+      await translateTextWithLLM(callArgs);
       const callArg = vi.mocked(generateText).mock.calls[0][0];
       expect(callArg.providerOptions).toBeUndefined();
     });
 
-    it("sends reasoning effort=low for sentences at/above the threshold", async () => {
+    it("sends reasoning effort verbatim when caller passes it", async () => {
       mockOpenRouterOk("...");
       await translateTextWithLLM({
         ...callArgs,
         text: "a".repeat(HYBRID_LENGTH_THRESHOLD + 5),
+        reasoning: "low",
       });
       const callArg = vi.mocked(generateText).mock.calls[0][0];
       expect(callArg.providerOptions).toEqual({
@@ -236,7 +303,7 @@ describe("features/translationLLM", () => {
       });
     });
 
-    it("uses the explicit reasoning override regardless of length", async () => {
+    it("sends reasoning effort='high' for explicit overrides too", async () => {
       mockOpenRouterOk("Hallo.");
       await translateTextWithLLM({
         ...callArgs,

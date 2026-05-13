@@ -552,6 +552,22 @@
   "Language": {
     "title": "Sprache"
   },
+  "LanguageSelector": {
+    "searchPlaceholder": "Sprachen suchen…",
+    "noResults": "Keine Sprache passt.",
+    "tierBadge": "Experimentell",
+    "tierBadgeTooltip": "Neu hinzugefügt – Übersetzungs- und Stimmqualität werden noch optimiert. Bitte melde Probleme.",
+    "categories": {
+      "germanic": "Germanisch & Nordisch",
+      "romance": "Romanisch",
+      "slavic": "Slawisch",
+      "asian-east": "Ostasien",
+      "asian-southeast": "Südostasien",
+      "semitic": "Semitisch & Naher Osten",
+      "african": "Afrikanisch",
+      "other": "Sonstige"
+    }
+  },
   "Chat": {
     "back": "Zurück",
     "askAI": "KI fragen",

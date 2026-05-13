@@ -555,6 +555,22 @@
   "Language": {
     "title": "Language"
   },
+  "LanguageSelector": {
+    "searchPlaceholder": "Search languages…",
+    "noResults": "No languages match.",
+    "tierBadge": "Experimental",
+    "tierBadgeTooltip": "Newly added — translation and voice quality are still being tuned. Please report issues.",
+    "categories": {
+      "germanic": "Germanic & Nordic",
+      "romance": "Romance",
+      "slavic": "Slavic",
+      "asian-east": "East Asian",
+      "asian-southeast": "Southeast Asian",
+      "semitic": "Semitic & Middle Eastern",
+      "african": "African",
+      "other": "Other"
+    }
+  },
   "Chat": {
     "back": "Back",
     "askAI": "Ask AI",

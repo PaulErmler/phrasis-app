@@ -49,6 +49,13 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [userEditedLangs, setUserEditedLangs] = useState<Set<string>>(new Set());
   const [autoFillMetadata, setAutoFillMetadata] = useState<SentenceMetadata | null>(null);
+  // Region variants returned by the autofill action for mixed-dialect targets
+  // (today: `es_mixed` → e.g. `'es-US'`). Kept in lockstep with `texts`: when
+  // a user manually edits a row we drop its variant so we don't persist a
+  // stale dialect choice against text the LLM didn't produce.
+  const [regionVariants, setRegionVariants] = useState<Record<string, string>>(
+    {},
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -94,6 +101,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
     setTexts({});
     setUserEditedLangs(new Set());
     setAutoFillMetadata(null);
+    setRegionVariants({});
     firstInputRef.current?.focus();
   }, []);
 
@@ -130,6 +138,21 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
             (prev[r.language] ?? '').trim().length > 0;
           if (manualBlock) continue;
           next[r.language] = r.text;
+        }
+        return next;
+      });
+      setRegionVariants((prev) => {
+        const next = { ...prev };
+        for (const r of results) {
+          const manualBlock =
+            editedSnapshot.has(r.language) &&
+            (prev[r.language] ?? '').trim().length > 0;
+          if (manualBlock) continue;
+          if (r.regionVariant) {
+            next[r.language] = r.regionVariant;
+          } else {
+            delete next[r.language];
+          }
         }
         return next;
       });
@@ -170,10 +193,14 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
 
     setIsSaving(true);
     try {
-      const translations = orderedLanguages.map((lang) => ({
-        language: lang,
-        text: texts[lang].trim(),
-      }));
+      const translations = orderedLanguages.map((lang) => {
+        const regionVariant = regionVariants[lang];
+        return {
+          language: lang,
+          text: texts[lang].trim(),
+          ...(regionVariant ? { regionVariant } : {}),
+        };
+      });
       await createCustomText({
         translations,
         timezone: getUserTimezone(),
@@ -183,6 +210,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
       setTexts({});
       setUserEditedLangs(new Set());
       setAutoFillMetadata(null);
+      setRegionVariants({});
       firstInputRef.current?.focus();
     } catch (err) {
       if (
@@ -202,7 +230,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
     } finally {
       setIsSaving(false);
     }
-  }, [saveQuota.isAvailable, orderedLanguages, texts, createCustomText, t, autoFillMetadata]);
+  }, [saveQuota.isAvailable, orderedLanguages, texts, regionVariants, createCustomText, t, autoFillMetadata]);
 
   return (
     <>
@@ -272,6 +300,15 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
                           if (prev.has(lang)) return prev;
                           const next = new Set(prev);
                           next.add(lang);
+                          return next;
+                        });
+                        // User-edited rows discard the autofill's regional
+                        // variant so we don't persist a stale dialect choice
+                        // against text the LLM didn't produce.
+                        setRegionVariants((prev) => {
+                          if (!(lang in prev)) return prev;
+                          const next = { ...prev };
+                          delete next[lang];
                           return next;
                         });
                         // Any edit invalidates auto-fill metadata; the server will regenerate it.

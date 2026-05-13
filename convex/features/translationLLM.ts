@@ -26,22 +26,19 @@
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
-/** Hard cap on tokens per response. Anything more is a bug. */
+/**
+ * Default cap on tokens per response when the caller doesn't supply a
+ * per-stage override. Sized to comfortably accommodate Gemini Flash Lite at
+ * `reasoning: 'low'` translation output. Reasoning-heavy stages (e.g.
+ * DeepSeek V4 Flash with `high` effort) declare their own larger cap via
+ * `ModelStage.maxOutputTokens` in `lib/languages.ts`. On
+ * `finishReason === 'length'` the queue advances to the next fallback stage
+ * of the rule (see `llmTranslationQueue.processLlmTranslationForCard` and
+ * `lib/languages.ts → TRANSLATION_RULES`).
+ */
 export const MAX_OUTPUT_TOKENS = 5_000;
 
-/** Source-length threshold for the hybrid reasoning rule. */
-export const HYBRID_LENGTH_THRESHOLD = 30;
-
 export type ReasoningEffort = 'low' | 'medium' | 'high';
-
-/** Pick the reasoning effort: explicit override wins, else hybrid length-based default. */
-export function pickReasoning(
-  text: string,
-  override?: ReasoningEffort,
-): ReasoningEffort | undefined {
-  if (override) return override;
-  return text.length < HYBRID_LENGTH_THRESHOLD ? undefined : 'low';
-}
 
 export type LlmTranslationFailure =
   | { ok: false; reason: 'truncated'; detail?: string }
@@ -70,7 +67,16 @@ export type TranslationPromptArgs = {
   text: string;
   sourceLang: string;        // 'en'
   targetLang: string;        // internal code, e.g. 'de'
-  targetLangName: string;    // English language name for the prompt, e.g. 'German'
+  targetLangName: string;    // English language name, e.g. 'German'
+  /**
+   * Native-script language name (e.g. 'Deutsch', '中文（简体）', 'العربية').
+   * Always emitted alongside `targetLangName` in the prompt so the model gets
+   * the canonical name in the script it's being asked to produce, which
+   * measurably reduces wrong-language outputs on tier-2 dialects. Falls back
+   * to `targetLangName` when a language has no separate native form (e.g.
+   * English variants share the script).
+   */
+  targetLangNativeName: string;
   targetRegion: string;      // region label for the prompt, e.g. 'Germany'
   addressesSomeone: boolean;
   speakerGender?: 'male' | 'female' | 'neutral';
@@ -92,8 +98,15 @@ export function buildPrompt(args: TranslationPromptArgs): string {
       `  <register>${args.formality ?? 'neutral'}</register>`,
     );
   }
+  // If the native name matches the English name (English variants, romance
+  // languages already in Latin script with same spelling), drop the parens to
+  // avoid a redundant "German (German)".
+  const fullName =
+    args.targetLangNativeName && args.targetLangNativeName !== args.targetLangName
+      ? `${args.targetLangName} (${args.targetLangNativeName})`
+      : args.targetLangName;
   return [
-    `You are a professional English-to-${args.targetLangName} translator. Translate the text inside <source> tags into ${args.targetLangName} (${args.targetLang}), suitable for ${args.targetRegion}.`,
+    `You are a professional English-to-${fullName} translator. Translate the text inside <source> tags into ${fullName} (${args.targetLang}), suitable for ${args.targetRegion}.`,
     ``,
     `<context>`,
     ...contextLines,
@@ -105,7 +118,7 @@ export function buildPrompt(args: TranslationPromptArgs): string {
     ``,
     `<source>${args.text}</source>`,
     ``,
-    `Output only the ${args.targetLangName} translation of the text inside <source>. No commentary, no tags, no quotation marks, no alternatives.`,
+    `Output only the ${fullName} translation of the text inside <source>. No commentary, no tags, no quotation marks, no alternatives.`,
   ].join('\n');
 }
 
@@ -128,6 +141,13 @@ export async function translateTextWithLLM(
   args: TranslationPromptArgs & {
     model: string;
     reasoning?: ReasoningEffort;
+    /**
+     * Per-call cap on response tokens. Set by the queue worker from the
+     * matching `ModelStage.maxOutputTokens` so reasoning-heavy stages get the
+     * extra headroom their thinking trace needs. Falls back to
+     * `MAX_OUTPUT_TOKENS` when omitted.
+     */
+    maxOutputTokens?: number;
   },
 ): Promise<LlmTranslationResult> {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -140,7 +160,10 @@ export async function translateTextWithLLM(
   }
 
   const prompt = buildPrompt(args);
-  const effort = pickReasoning(args.text, args.reasoning);
+  // Reasoning is decided by the caller (translation rule). Pass through
+  // verbatim — no length-based hybrid in this layer.
+  const effort = args.reasoning;
+  const maxOutputTokens = args.maxOutputTokens ?? MAX_OUTPUT_TOKENS;
 
   const openrouter = createOpenRouter({ apiKey });
 
@@ -151,7 +174,7 @@ export async function translateTextWithLLM(
       model: openrouter(args.model),
       prompt,
       temperature: 0,
-      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      maxOutputTokens,
       ...(effort
         ? { providerOptions: { openrouter: { reasoning: { effort } } } }
         : {}),
