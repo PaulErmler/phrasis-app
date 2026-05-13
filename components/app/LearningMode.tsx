@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
+import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import {
   LearningCardContent,
@@ -42,13 +44,23 @@ interface LearningModeProps {
   state: LearningState;
   audio: AudioPlayerState;
   onGoHome: () => void;
+  /** Navigate to chat (filter-blocked empty state when filter=custom). */
+  onNavigateToChat: () => void;
+  /** Navigate to the custom-card creation page (same condition). */
+  onNavigateToAddCustomCards: () => void;
 }
 
 /**
  * Learning mode body content (card, controls, settings).
  * Does NOT render its own header — the parent layout handles that.
  */
-export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
+export function LearningMode({
+  state,
+  audio,
+  onGoHome,
+  onNavigateToChat,
+  onNavigateToAddCustomCards,
+}: LearningModeProps) {
   const t = useTranslations('LearningMode');
   const chatContext = useLearningChatToggle();
   if (!chatContext) {
@@ -264,13 +276,16 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
   if (state.status === 'noCardsDue') {
     return (
       <div className="flex flex-col h-full">
-        <NoCardsDueState
-          onAddCards={state.handleAddCards}
+        <NoCardsDueWithFilter
+          handleAddCards={state.handleAddCards}
           isAddingCards={state.isAddingCards}
           batchSize={state.batchSize}
           sentencesRemaining={state.sentencesRemaining}
           remainingInCollection={state.remainingInCollection}
+          courseId={state.courseSettings.courseId}
           onUpgrade={() => setPaywallOpen(true)}
+          onNavigateToChat={onNavigateToChat}
+          onNavigateToAddCustomCards={onNavigateToAddCustomCards}
         />
         <LearningModeSettings
           open={state.settingsOpen}
@@ -469,5 +484,87 @@ export function LearningMode({ state, audio, onGoHome }: LearningModeProps) {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/**
+ * Wraps NoCardsDueState with the filter-aware empty-reason query so that
+ * "no card returned" is correctly attributed to the content-source filter
+ * when applicable. When the filter is hiding cards AND flipping to the
+ * other source would surface some, the UI offers a one-tap unblock CTA.
+ *
+ * `customCardsPendingAdd` mirrors the `addCardsFromCollection` Phase 1
+ * branch: any text in `activeCustomCollectionIds` that hasn't been pulled
+ * yet is free to add (custom cards don't consume the `SENTENCES` quota —
+ * see decks.ts). The upgrade button is gated on this so a user with custom
+ * cards still queued never gets a misleading paywall.
+ */
+function NoCardsDueWithFilter({
+  handleAddCards,
+  isAddingCards,
+  batchSize,
+  sentencesRemaining,
+  remainingInCollection,
+  courseId,
+  onUpgrade,
+  onNavigateToChat,
+  onNavigateToAddCustomCards,
+}: {
+  handleAddCards: () => void;
+  isAddingCards: boolean;
+  batchSize: number;
+  sentencesRemaining?: number | null;
+  remainingInCollection?: number | null;
+  courseId: Id<'courses'>;
+  onUpgrade: () => void;
+  onNavigateToChat: () => void;
+  onNavigateToAddCustomCards: () => void;
+}) {
+  const emptyReason = useQuery(
+    api.features.scheduling.getCardForReviewEmptyReason,
+    {},
+  );
+  const updateSettings = useUpdateStudyContentFilter();
+
+  const isFilteredOut = emptyReason?.reason === 'filtered_out';
+  const isDeckEmpty = emptyReason?.reason === 'no_cards';
+  const activeFilter = emptyReason?.reason === 'filtered_out'
+    ? emptyReason.activeFilter
+    : null;
+  const filterUnblockAvailable = emptyReason?.reason === 'filtered_out'
+    ? emptyReason.availableInOtherSource
+    : false;
+  const currentSourceHasAnyCards = emptyReason?.reason === 'filtered_out'
+    ? emptyReason.currentSourceHasAnyCards
+    : true;
+  // Only the filtered_out and all_caught_up variants carry this field; for
+  // no_cards / no_session / undefined, default to false (no custom queue).
+  const customCardsPendingAdd =
+    emptyReason?.reason === 'filtered_out' ||
+    emptyReason?.reason === 'all_caught_up'
+      ? emptyReason.customCardsPendingAdd
+      : false;
+
+  const handleIncludeOtherSource = useCallback(() => {
+    updateSettings({ courseId, studyContentFilter: 'both' });
+  }, [updateSettings, courseId]);
+
+  return (
+    <NoCardsDueState
+      onAddCards={handleAddCards}
+      isAddingCards={isAddingCards}
+      batchSize={batchSize}
+      sentencesRemaining={sentencesRemaining}
+      remainingInCollection={remainingInCollection}
+      onUpgrade={onUpgrade}
+      isDeckEmpty={isDeckEmpty}
+      activeFilter={activeFilter}
+      currentSourceHasAnyCards={currentSourceHasAnyCards}
+      filterUnblockAvailable={filterUnblockAvailable}
+      customCardsPendingAdd={customCardsPendingAdd}
+      onIncludeOtherSource={handleIncludeOtherSource}
+      onCreateChatCards={onNavigateToChat}
+      onCreateCustomCards={onNavigateToAddCustomCards}
+    />
   );
 }

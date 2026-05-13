@@ -859,6 +859,7 @@ export const updateCourseSettings = mutation({
       v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
     ),
     schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))),
+    studyContentFilter: v.optional(v.union(v.literal('custom'), v.literal('course'), v.literal('both'))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -900,6 +901,7 @@ export const updateCourseSettings = mutation({
       'reviewMode',
       'fullReviewTargetAudioMode',
       'schedulingMode',
+      'studyContentFilter',
     ] as const;
 
     const existing = await dbGetCourseSettings(ctx, args.courseId);
@@ -953,6 +955,7 @@ export const updateCourseSettings = mutation({
         reviewMode: args.reviewMode,
         fullReviewTargetAudioMode: args.fullReviewTargetAudioMode,
         schedulingMode: args.schedulingMode,
+        studyContentFilter: args.studyContentFilter,
       });
     }
 

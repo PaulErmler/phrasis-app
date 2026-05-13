@@ -3,12 +3,19 @@
 import * as React from 'react';
 import { Check, MessageSquare, PenLine } from 'lucide-react';
 import { useMutation, useQuery } from 'convex/react';
+import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { CollectionDetailDialog } from '@/components/app/CollectionDetailDialog';
 import {
@@ -39,7 +46,10 @@ export function SegmentedHomeSection({
   onNavigateToChat,
 }: SegmentedHomeSectionProps) {
   const summary = useQuery(api.features.home.getHomeSummary, {});
+  const settings = useQuery(api.features.courses.getActiveCourseSettings, {});
+  const updateSettings = useUpdateStudyContentFilter();
   const t = useTranslations('AppPage.collections.carousel');
+  const [currentTab, setCurrentTab] = React.useState<'premade' | 'custom'>('premade');
 
   if (summary === undefined) {
     return <SegmentedSkeleton />;
@@ -48,14 +58,53 @@ export function SegmentedHomeSection({
     return null;
   }
 
+  // Filter-driven badges: only the *excluded* source gets an "Off" pill.
+  // The badge is purely informational — the user is still free to browse
+  // either tab regardless of filter.
+  const filter = settings?.studyContentFilter ?? 'both';
+  const courseOff = filter === 'custom'; // course tab is off when filter='custom'
+  const customOff = filter === 'course'; // custom tab is off when filter='course'
+
+  const reenable = async (target: 'premade' | 'custom') => {
+    if (!settings) return;
+    // Re-enabling either side means we no longer filter to only one source.
+    await updateSettings({
+      courseId: settings.courseId,
+      studyContentFilter: 'both',
+    });
+    setCurrentTab(target);
+  };
+
   return (
-    <Tabs defaultValue="premade" className="flex flex-col gap-3">
+    <Tabs
+      value={currentTab}
+      onValueChange={(v) => setCurrentTab(v as 'premade' | 'custom')}
+      className="flex flex-col gap-3"
+    >
       <TabsList className="w-full">
         <TabsTrigger value="premade" className="flex-1">
+          {/* Invisible mirror on the left so the label stays exactly centered
+              within the trigger; the real badge sits to the right of the text. */}
+          {courseOff && <OffBadgeSpacer label={t('sourceBadgeOff')} />}
           {t('tabPremade')}
+          {courseOff && (
+            <OffBadge
+              isCurrent={currentTab === 'premade'}
+              onReenable={() => reenable('premade')}
+              sourceLabel={t('tabPremade')}
+            />
+          )}
         </TabsTrigger>
         <TabsTrigger value="custom" className="flex-1">
+          {customOff && <OffBadgeSpacer label={t('sourceBadgeOff')} />}
           {t('tabCustom')}
+          {customOff && (
+            <OffBadge
+              isCurrent={currentTab === 'custom'}
+              onReenable={() => reenable('custom')}
+              sourceLabel={t('tabCustom')}
+            />
+          )}
         </TabsTrigger>
       </TabsList>
 
@@ -696,6 +745,116 @@ function CustomChip({
 // ============================================================================
 // Skeleton
 // ============================================================================
+
+/**
+ * Invisible duplicate of the OffBadge used purely as a layout spacer on
+ * the left side of the trigger so that the centered text label doesn't
+ * shift when the real badge appears on the right. `aria-hidden` keeps it
+ * out of the accessibility tree, `invisible` keeps it out of the paint.
+ * Class list mirrors the real badge so widths match exactly.
+ */
+function OffBadgeSpacer({ label }: { label: string }) {
+  return (
+    <Badge
+      aria-hidden
+      variant="outline"
+      className="invisible h-4 px-1.5 text-[10px] font-medium"
+    >
+      {label}
+    </Badge>
+  );
+}
+
+/**
+ * "Off" pill rendered inside a switcher tab whose source is currently
+ * excluded by the content-source filter. Clicking behavior is gated by
+ * whether the parent tab is selected:
+ *
+ *   - Tab NOT selected: pill click bubbles → Tabs swaps to this tab.
+ *     We do nothing in the handler so the click bubbles naturally to
+ *     TabsTrigger.
+ *   - Tab IS selected: pill click opens a popover with a one-tap
+ *     re-enable CTA. We stopPropagation so Tabs doesn't see the click.
+ *
+ * The popover is anchored (not triggered) by the badge — using
+ * PopoverTrigger here would intercept every click and either fight with
+ * the tab-switch (preventDefault skips Radix's TabsTrigger composeHandler)
+ * or open the popover when the user just meant to switch tabs.
+ */
+function OffBadge({
+  isCurrent,
+  onReenable,
+  sourceLabel,
+}: {
+  isCurrent: boolean;
+  onReenable: () => void;
+  sourceLabel: string;
+}) {
+  const t = useTranslations('AppPage.collections.carousel');
+  const [open, setOpen] = React.useState(false);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (!isCurrent) {
+      // Let the click bubble untouched so TabsTrigger switches tabs.
+      return;
+    }
+    e.stopPropagation();
+    setOpen(true);
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
+        <Badge
+          variant="outline"
+          // role+tabIndex make the badge keyboard-focusable so screen
+          // readers can announce the reactivate affordance.
+          role="button"
+          tabIndex={0}
+          onClick={handleClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              handleClick(e as unknown as React.MouseEvent);
+            }
+          }}
+          className="h-4 cursor-pointer px-1.5 text-[10px] font-medium text-muted-foreground"
+          data-testid="source-badge-off"
+        >
+          {t('sourceBadgeOff')}
+        </Badge>
+      </PopoverAnchor>
+      <PopoverContent className="w-64 space-y-3" align="start">
+        <div className="space-y-1">
+          <p className="text-sm font-medium">
+            {t('reenablePopover.title', { source: sourceLabel })}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t('reenablePopover.description')}
+          </p>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setOpen(false)}
+          >
+            {t('reenablePopover.cancel')}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setOpen(false);
+              onReenable();
+            }}
+            data-testid="source-badge-reenable"
+          >
+            {t('reenablePopover.confirm')}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 function SegmentedSkeleton() {
   return (

@@ -446,6 +446,8 @@ export default function MainLayout({
           <LearnView
             onBack={handleLearnClose}
             prefetchedThreadId={prefetchedThreadId ?? undefined}
+            onNavigateToChat={handleNavigateToChat}
+            onNavigateToAddCustomCards={handleNavigateToAddCards}
           />
         </div>
       )}

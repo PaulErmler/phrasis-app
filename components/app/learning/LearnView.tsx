@@ -103,13 +103,34 @@ function WrappedChatPanel({
 interface LearnViewProps {
   onBack: () => void;
   prefetchedThreadId?: string;
+  /** Navigate to the chat. Surfaces in the filter-blocked empty state. */
+  onNavigateToChat: () => void;
+  /** Navigate to the custom-card creation page. Same condition. */
+  onNavigateToAddCustomCards: () => void;
 }
 
-export function LearnView({ onBack, prefetchedThreadId }: LearnViewProps) {
-  return <LearnViewInner onBack={onBack} prefetchedThreadId={prefetchedThreadId} />;
+export function LearnView({
+  onBack,
+  prefetchedThreadId,
+  onNavigateToChat,
+  onNavigateToAddCustomCards,
+}: LearnViewProps) {
+  return (
+    <LearnViewInner
+      onBack={onBack}
+      prefetchedThreadId={prefetchedThreadId}
+      onNavigateToChat={onNavigateToChat}
+      onNavigateToAddCustomCards={onNavigateToAddCustomCards}
+    />
+  );
 }
 
-function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
+function LearnViewInner({
+  onBack,
+  prefetchedThreadId,
+  onNavigateToChat,
+  onNavigateToAddCustomCards,
+}: LearnViewProps) {
   const { preloadedCourseSettings, preloadedActiveCourse } = useAppData();
 
   const state = useLearningMode({
@@ -212,7 +233,13 @@ function LearnViewInner({ onBack, prefetchedThreadId }: LearnViewProps) {
       chatPanel={chatPanel}
       onChatOpen={handleChatOpen}
     >
-      <LearningMode state={state} audio={audio} onGoHome={goHome} />
+      <LearningMode
+        state={state}
+        audio={audio}
+        onGoHome={goHome}
+        onNavigateToChat={onNavigateToChat}
+        onNavigateToAddCustomCards={onNavigateToAddCustomCards}
+      />
     </LearningChatLayout>
   );
 }

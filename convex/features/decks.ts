@@ -803,7 +803,16 @@ export const addCardsFromCollection = mutation({
       ? isPremadeLevelCollection(requestedCollection)
       : false;
 
-    const customCollectionIdsToProcess: Id<'collections'>[] = args.exclusive
+    // Content-source filter: when set to 'course', skip custom/chat collections
+    // entirely; when set to 'custom', skip the premade level collection (Phase 2).
+    // Default ('both' / undefined) is unchanged.
+    const studyContentFilter = courseSettings?.studyContentFilter ?? 'both';
+    const skipCustomSources = studyContentFilter === 'course';
+    const skipPremadeSource = studyContentFilter === 'custom';
+
+    const customCollectionIdsToProcess: Id<'collections'>[] = skipCustomSources
+      ? []
+      : args.exclusive
       ? (isLevelCollection
         ? []
         : [args.collectionId])
@@ -898,7 +907,7 @@ export const addCardsFromCollection = mutation({
     }
 
     // --- Phase 2: Fill remaining batch from the difficulty collection (only for level collections) ---
-    if (isLevelCollection && remainingBatch > 0) {
+    if (isLevelCollection && remainingBatch > 0 && !skipPremadeSource) {
       // Deduct sentences quota for difficulty-collection cards
       const quota = await checkQuota(ctx, userId, FEATURE_IDS.SENTENCES, remainingBatch);
       if (quota.synced && !quota.allowed) {
