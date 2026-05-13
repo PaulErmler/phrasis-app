@@ -8,6 +8,7 @@ import {
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import { synthesizeSpeech, transcribeAudio, type WordTiming } from './tts';
+import { languageSupportsStt } from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
 import { textsMatchSemantic } from '../lib/ttsSemanticValidation';
 import {
@@ -112,6 +113,12 @@ async function synthesizeAndValidate(
   lastStorageId: Id<'_storage'> | null;
   wordTimings: WordTiming[] | null;
 }> {
+  // Azure Fast Transcription is the only STT backend; if it doesn't speak
+  // this language, the validation loop is pure waste (every attempt 400s,
+  // every retry re-synthesizes). Synthesize once, accept it, and skip
+  // straight to unvalidated — wordTimings are unavailable here too.
+  const canValidate = languageSupportsStt(args.language);
+
   let lastStorageId: Id<'_storage'> | null = null;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const blob = await synthesizeSpeech(
@@ -146,6 +153,10 @@ async function synthesizeAndValidate(
           preserveOldStorage: true,
         },
       );
+    }
+
+    if (!canValidate) {
+      return { validated: false, lastStorageId, wordTimings: null };
     }
 
     try {
@@ -364,6 +375,12 @@ export const backfillWordTimings = internalAction({
   returns: v.null(),
   handler: async (ctx, args) => {
     try {
+      // Azure Fast Transcription is the gate on word timings; if it can't
+      // process this locale, the scheduler shouldn't have been called, but
+      // guard the action too so a stale scheduler call from before the
+      // language was filtered doesn't 400 against Azure.
+      if (!languageSupportsStt(args.language)) return null;
+
       const blob = await ctx.storage.get(args.storageId);
       if (!blob) {
         console.warn('[backfillWordTimings] audio blob missing', {

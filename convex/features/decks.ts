@@ -42,6 +42,7 @@ import {
   voiceGenderValidator,
 } from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
+import { languageSupportsStt } from '../../lib/languages';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
@@ -177,6 +178,10 @@ export async function scheduleMissingContent(
   const scheduleTimingsBackfillIfNeeded = async (lang: string) => {
     const audio = audioMap.get(lang);
     if (!audio || !audio.storageId || audio.wordTimings) return;
+    // Languages without STT support (e.g. `el` — Azure Fast Transcription
+    // can't transcribe `el-GR`) will never get word timings, so don't waste
+    // a claim on a backfill that's guaranteed to no-op.
+    if (!languageSupportsStt(lang)) return;
     const claimed = await claimTtsIfAvailable(ctx, textId, lang);
     if (!claimed) return;
     await ctx.scheduler.runAfter(
