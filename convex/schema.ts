@@ -376,6 +376,11 @@ export default defineSchema({
     cardsAdded: v.number(), // Monotonic — cards ever added from this collection
     cardsLearned: v.optional(v.number()), // Monotonic — cards ever reviewed at least once
     cardsMastered: v.optional(v.number()), // Monotonic — cards ever mastered
+    // Credit rolled forward at OGTE cutover (legacy `cardsAdded` from the
+    // mapped legacy CEFR collection). Widens the home-view denominator so the
+    // user sees `X/(textCount + legacyCarryAdded)` and doesn't feel like
+    // they're starting from scratch on the first level of each new tier.
+    legacyCarryAdded: v.optional(v.number()),
     lastRankProcessed: v.optional(v.number()), // Last collectionRank processed (for efficient pagination)
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])

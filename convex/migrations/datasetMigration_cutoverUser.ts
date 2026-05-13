@@ -193,21 +193,24 @@ export const cutoverUser = internalMutation({
             .eq('collectionId', targetId),
         )
         .first();
+      const legacyAdded = legacyProgress.cardsAdded ?? 0;
       if (destProgress) {
         await ctx.db.patch(destProgress._id, {
-          cardsAdded: destProgress.cardsAdded + (legacyProgress.cardsAdded ?? 0),
+          cardsAdded: destProgress.cardsAdded + legacyAdded,
           cardsLearned:
             (destProgress.cardsLearned ?? 0) + (legacyProgress.cardsLearned ?? 0),
           cardsMastered: (destProgress.cardsMastered ?? 0) + legacyMastered,
+          legacyCarryAdded: (destProgress.legacyCarryAdded ?? 0) + legacyAdded,
         });
       } else {
         await ctx.db.insert('collectionProgress', {
           userId: args.userId,
           courseId: args.courseId,
           collectionId: targetId,
-          cardsAdded: legacyProgress.cardsAdded ?? 0,
+          cardsAdded: legacyAdded,
           cardsLearned: legacyProgress.cardsLearned ?? 0,
           cardsMastered: legacyMastered,
+          legacyCarryAdded: legacyAdded,
         });
       }
       rolled++;

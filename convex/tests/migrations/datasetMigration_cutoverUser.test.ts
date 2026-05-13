@@ -387,6 +387,25 @@ describe("datasetMigration_cutoverUser", () => {
     expect(destAfter?.cardsMastered).toBe(999);
   });
 
+  it("mirrors legacy cardsAdded into legacyCarryAdded so the home view can widen the denominator", async () => {
+    // The destination row's `cardsAdded` numerator inflates by the rolled
+    // amount; `legacyCarryAdded` lets the home view inflate the denominator
+    // by the same amount so the displayed ratio doesn't appear collapsed.
+    const t = convexTest(schema, modules);
+    const { courseId, newL02, datasetId } = await seedCourseWithLegacyA1(t, {
+      cardsAdded: 100,
+    });
+
+    await t.mutation(
+      internal.migrations.datasetMigration_cutoverUser.cutoverUser,
+      { userId: "user_A", courseId, datasetId },
+    );
+
+    const dest = await readDestProgress(t, "user_A", courseId, newL02);
+    expect(dest?.cardsAdded).toBe(100);
+    expect(dest?.legacyCarryAdded).toBe(100);
+  });
+
   it("skips a legacy collection whose counters are all zero", async () => {
     const t = convexTest(schema, modules);
     const { courseId, newL02, datasetId } = await seedCourseWithLegacyA1(t, {

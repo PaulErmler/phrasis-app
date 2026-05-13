@@ -78,6 +78,7 @@ import type * as migrations_backfillIsGraduated from "../migrations/backfillIsGr
 import type * as migrations_backfillUserStats from "../migrations/backfillUserStats.js";
 import type * as migrations_backfillWordTexts from "../migrations/backfillWordTexts.js";
 import type * as migrations_datasetMigration_backfillCardsMastered from "../migrations/datasetMigration_backfillCardsMastered.js";
+import type * as migrations_datasetMigration_backfillLegacyCarry from "../migrations/datasetMigration_backfillLegacyCarry.js";
 import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
 import type * as migrations_retokenizeAllWords from "../migrations/retokenizeAllWords.js";
 import type * as migrations_seedMockStats from "../migrations/seedMockStats.js";
@@ -165,6 +166,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/backfillUserStats": typeof migrations_backfillUserStats;
   "migrations/backfillWordTexts": typeof migrations_backfillWordTexts;
   "migrations/datasetMigration_backfillCardsMastered": typeof migrations_datasetMigration_backfillCardsMastered;
+  "migrations/datasetMigration_backfillLegacyCarry": typeof migrations_datasetMigration_backfillLegacyCarry;
   "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;
   "migrations/retokenizeAllWords": typeof migrations_retokenizeAllWords;
   "migrations/seedMockStats": typeof migrations_seedMockStats;
