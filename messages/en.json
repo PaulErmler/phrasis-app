@@ -179,7 +179,7 @@
         "sourceBadgeOff": "Off",
         "reenablePopover": {
           "title": "Re-enable {source}?",
-          "description": "This source is currently excluded from study and new-card additions. Switch back to studying both sources?",
+          "description": "This source is currently excluded from study and new-card additions. Switch back to studying course material as well?",
           "cancel": "Cancel",
           "confirm": "Re-enable"
         },

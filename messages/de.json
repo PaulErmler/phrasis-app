@@ -179,7 +179,7 @@
         "sourceBadgeOff": "Aus",
         "reenablePopover": {
           "title": "{source} wieder aktivieren?",
-          "description": "Diese Quelle ist derzeit vom Lernen und neuen Karten ausgeschlossen. Beide Quellen wieder verwenden?",
+          "description": "Diese Quelle ist derzeit vom Lernen und neuen Karten ausgeschlossen. Auch Kursinhalte wieder lernen?",
           "cancel": "Abbrechen",
           "confirm": "Aktivieren"
         },

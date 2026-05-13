@@ -343,6 +343,12 @@ export function useAudioPlayer(
   // advance, the merge effect below uses the cached blob instead of re-running
   // the fetch/decode/render pipeline — eliminating the perceptible gap between
   // "user rated card" and "audio starts playing."
+  //
+  // `compositionKey` is part of the validated keys because the baked-in blob
+  // is composition-specific — a prefetch made while review mode was 'audio'
+  // (target merged in) is the wrong blob to serve under 'full' (target stripped).
+  // Without this check, a mode flip between prefetch and consume would auto-
+  // play the previous mode's composition for the new card.
   const prefetchCacheRef = useRef<
     Map<
       string,
@@ -351,6 +357,7 @@ export function useAudioPlayer(
         result: MergeResult;
         audioIdentityKey: string;
         settingsKey: string;
+        compositionKey: string;
       }
     >
   >(new Map());
@@ -373,15 +380,31 @@ export function useAudioPlayer(
   );
   const baseOrderKey = orderedBase.join(',');
   const targetOrderKey = orderedTarget.join(',');
+  // The composition baked into the merged blob. Different review modes flip
+  // target-language inclusion, which changes this string and is the signal
+  // for "user just asked to hear this card under a new audio layout."
+  const compositionKey = `${baseOrderKey}|${targetOrderKey}`;
 
   const prevCardIdRef = useRef<string | null>(null);
+  const prevCompositionKeyRef = useRef<string | null>(null);
   const hasAutoPlayedForCardRef = useRef(false);
 
   useEffect(() => {
     const isCardChange = prevCardIdRef.current !== cardId;
     prevCardIdRef.current = cardId;
 
-    if (isCardChange) {
+    // Composition change = the languages baked into the merged blob differ
+    // from the prior merge (e.g. switching review mode flips target-language
+    // inclusion). Treat it like a fresh auto-play opportunity so that
+    // entering audio mode after the card already played in full mode (or
+    // vice versa) still starts playback. Settings tweaks alone (speed,
+    // reps) don't trigger this — they bump `settingsKey`, not the order
+    // keys, so they correctly remain auto-play-suppressed.
+    const isCompositionChange =
+      !isCardChange && prevCompositionKeyRef.current !== compositionKey;
+    prevCompositionKeyRef.current = compositionKey;
+
+    if (isCardChange || isCompositionChange) {
       hasAutoPlayedForCardRef.current = false;
     }
 
@@ -435,7 +458,8 @@ export function useAudioPlayer(
     if (
       cached &&
       cached.audioIdentityKey === audioIdentityKey &&
-      cached.settingsKey === settingsKey
+      cached.settingsKey === settingsKey &&
+      cached.compositionKey === compositionKey
     ) {
       mergeAbortRef.current?.abort();
       mergeAbortRef.current = null;
@@ -540,11 +564,18 @@ export function useAudioPlayer(
         // Same-card remerge (e.g. settings tweak or client refresh): resume if
         // playback was already running so JWT/query churn does not strand audio.
         const shouldResumePlay = wasPlayingSameCard;
+        // Composition change is, by definition, a user-initiated mode toggle
+        // in this tab — bypass the `hasAutoPlayed` and `reviewInitiatedByThisTab`
+        // gates. Those gates exist to stop spurious auto-plays from URL refreshes
+        // and to coordinate across tabs on the initial card load; once the user
+        // explicitly flips review modes neither concern applies, and the
+        // tab-flag is otherwise stuck at false (it's only re-set by handleReview/
+        // handleNext/handleDelete, not by settings updates).
         const shouldAutoPlay =
           !wasPlayingSameCard &&
-          !hasAutoPlayedForCardRef.current &&
           autoPlay &&
-          getReviewInitiatedByThisTab();
+          (isCompositionChange ||
+            (!hasAutoPlayedForCardRef.current && getReviewInitiatedByThisTab()));
 
         // Assigning `audio.src` resets `currentTime` to 0. If the user had a
         // structural position before this remerge, map it onto the new blob's
@@ -638,7 +669,8 @@ export function useAudioPlayer(
     if (
       existing &&
       existing.audioIdentityKey === nextAudioIdentityKey &&
-      existing.settingsKey === settingsKey
+      existing.settingsKey === settingsKey &&
+      existing.compositionKey === compositionKey
     ) {
       return;
     }
@@ -651,6 +683,7 @@ export function useAudioPlayer(
     const targetCardId = nextCard.cardId;
     const targetAudioIdentityKey = nextAudioIdentityKey;
     const targetSettingsKey = settingsKey;
+    const targetCompositionKey = compositionKey;
 
     const doPrefetch = async () => {
       try {
@@ -677,6 +710,7 @@ export function useAudioPlayer(
           result,
           audioIdentityKey: targetAudioIdentityKey,
           settingsKey: targetSettingsKey,
+          compositionKey: targetCompositionKey,
         });
 
         // Bound the cache to the two most recent entries so stale blobs from

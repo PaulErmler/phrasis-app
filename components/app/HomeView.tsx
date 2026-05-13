@@ -104,12 +104,19 @@ export function HomeView({
 
       const currentMode = courseSettings.schedulingMode ?? 'learnAndReview';
       if (currentMode !== schedulingMode) {
-        void updateCourseSettings({
-          courseId: courseSettings.courseId,
-          schedulingMode,
-        }).catch((error) => {
+        // Await the mutation so Convex has committed the new schedulingMode
+        // (and the local cardForReview cache is updated) before LearnView
+        // mounts. Otherwise the previous mode's cached card flashes briefly,
+        // its audio auto-plays, and the consumed tab-init flag prevents the
+        // new card from auto-playing once it arrives.
+        try {
+          await updateCourseSettings({
+            courseId: courseSettings.courseId,
+            schedulingMode,
+          });
+        } catch (error) {
           console.error('Failed to update scheduling mode:', error);
-        });
+        }
       }
 
       onLearnOpen();

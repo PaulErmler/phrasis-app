@@ -701,8 +701,15 @@ export async function createCardsFromTexts(
 
   // Look up the source collection's origin once per batch so each inserted
   // card carries the denormalized field for the content-source filter.
+  // Fall back to `isPremadeLevelCollection` for legacy CEFR collections
+  // (pre-OGTE-cutover rows that have neither a `datasetId` nor an explicit
+  // `legacy: true` flag and never got their `origin` backfilled) — otherwise
+  // cards inserted from them get `collectionOrigin: undefined` and never
+  // match the 'course' filter even though the UI treats them as course content.
   const collection = await ctx.db.get(collectionId);
-  const collectionOrigin = collection?.origin;
+  const collectionOrigin: 'premade' | 'custom' | 'chat' | undefined =
+    collection?.origin
+    ?? (collection && isPremadeLevelCollection(collection) ? 'premade' : undefined);
 
   for (const text of texts) {
     if (text.collectionRank > newLastRank) {
