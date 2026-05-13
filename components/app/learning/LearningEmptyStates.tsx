@@ -20,7 +20,7 @@ export function NoCollectionState({ onGoHome }: NoCollectionStateProps) {
   return (
     <main className="flex-1 flex flex-col items-center justify-center gap-4 px-4">
       <div className="space-y-2 text-center">
-        <p className="body-large font-medium">{t('empty.noCollection')}</p>
+        <h2 className="body-large font-medium">{t('empty.noCollection')}</h2>
         <p className="text-muted-sm">{t('empty.noCollectionDescription')}</p>
       </div>
       <Button onClick={onGoHome}>{t('empty.goHome')}</Button>
@@ -177,7 +177,7 @@ export function NoCardsDueState({
         {isFilterBlocked && (
           <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
         )}
-        <p className="body-large font-medium">{t(titleKey)}</p>
+        <h2 className="body-large font-medium">{t(titleKey)}</h2>
         <p className="text-muted-sm">{t(subtitleKey)}</p>
       </div>
       <div className="flex flex-col items-center gap-2">

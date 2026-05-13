@@ -179,7 +179,11 @@ npx convex env set FF_NEW_COURSE_CUTOVER true
 # Flip isActive AND schedule cutoverAllUsers in one call.
 npx convex run admin/activateDataset:activateDataset \
   '{"datasetId":"<id from step 2>","runCutover":true}'
+
+  npx convex run admin/activateDataset:activateDataset \
+  '{"datasetId":"p975fw3b4gvdc143j1fex2tv9d86mc0h","runCutover":true}'
 ```
+
 
 What happens server-side:
 
