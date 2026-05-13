@@ -436,9 +436,12 @@ export default defineSchema({
     claimedAt: v.number(),
   }).index('by_provider', ['provider']),
 
-  // FIFO queue of pending TTS jobs. Enqueued by scheduling mutations; drained
-  // by `pumpQueue` which dispatches oldest-first whenever a provider slot is
-  // free. Rows are deleted at dispatch time.
+  // Priority/FIFO queue of pending TTS jobs. Enqueued by scheduling mutations;
+  // drained by `pumpQueue` which dispatches the highest `priority` first,
+  // FIFO within each level. Rows are deleted at dispatch time.
+  // `priority` is optional only so a deploy can land without a one-shot
+  // backfill of in-flight rows; new enqueues always set it (0 = normal,
+  // 1 = active collection for the requesting user — see scheduleMissingContent).
   ttsQueue: defineTable({
     provider: ttsProviderValidator,
     args: v.object({
@@ -450,14 +453,23 @@ export default defineSchema({
       speed: v.number(),
     }),
     queuedAt: v.number(),
-  }).index('by_provider_and_queuedAt', ['provider', 'queuedAt']),
+    priority: v.optional(v.number()),
+  })
+    .index('by_provider_and_queuedAt', ['provider', 'queuedAt'])
+    .index('by_provider_priority_and_queuedAt', [
+      'provider',
+      'priority',
+      'queuedAt',
+    ]),
 
   // ── LLM translation queue (mirrors the TTS queue structure) ──────────────
   // OpenRouter rate-limits aggressively, so concurrent LLM translation calls
   // are capped at MAX_LLM_CONCURRENCY (100; active from day one, unlike the
   // dormant TTS gate). Same three-table pattern: queue + slots + claims.
 
-  // FIFO queue of pending LLM translation jobs. Drained by `pumpLlmQueue`.
+  // Priority/FIFO queue of pending LLM translation jobs. Drained by
+  // `pumpLlmQueue` highest-priority first, FIFO within each level. See the
+  // ttsQueue comment above for the `priority` field semantics.
   llmTranslationQueue: defineTable({
     args: v.object({
       textId: v.id('texts'),
@@ -467,7 +479,10 @@ export default defineSchema({
       audioSpeakerGender: v.optional(v.string()),
     }),
     queuedAt: v.number(),
-  }).index('by_queuedAt', ['queuedAt']),
+    priority: v.optional(v.number()),
+  })
+    .index('by_queuedAt', ['queuedAt'])
+    .index('by_priority_and_queuedAt', ['priority', 'queuedAt']),
 
   // Global concurrency slots — one row per in-flight LLM API call. Stale rows
   // are reclaimed after SLOT_STALE_MS so a crashed action doesn't leak slots.

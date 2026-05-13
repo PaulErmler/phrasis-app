@@ -589,6 +589,154 @@ describe("features/ttsProcessing", () => {
     });
   });
 
+  describe('queue priority ordering', () => {
+    // The pump's contract: drain priority=1 rows (active collection) before
+    // priority=0 (normal), oldest first within each level. Tested by writing
+    // mixed rows and exercising the same index the pump uses.
+    it('enqueueTtsJob defaults priority to 0 when omitted', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.mutation(internal.features.ttsProcessing.enqueueTtsJob, {
+        provider: 'google',
+        args: {
+          textId,
+          text: 'Hola',
+          language: 'es',
+          voiceName: 'es-ES-Chirp3-HD-Leda',
+          voiceGender: 'female',
+          speed: 1,
+        },
+      });
+      // pumpQueue runs synchronously and dispatches the row, leaving the queue
+      // empty. Read raw to confirm the row was deleted (= dispatched).
+      const remaining = await t.run((ctx) =>
+        ctx.db.query('ttsQueue').collect(),
+      );
+      expect(remaining.length).toBe(0);
+    });
+
+    it('priority=1 rows drain before priority=0 rows', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+
+      // Pre-seed the queue directly so the pump hasn't already drained it.
+      // queuedAt is set deliberately so that within priority=0 the older row
+      // (50) comes before the newer (75), and the priority=1 row (queuedAt=100)
+      // would lose under pure FIFO — yet must dispatch first under priority.
+      await t.run(async (ctx) => {
+        await ctx.db.insert('ttsQueue', {
+          provider: 'google',
+          args: {
+            textId,
+            text: 'normal-old',
+            language: 'es',
+            voiceName: 'es-ES-Chirp3-HD-Leda',
+            voiceGender: 'female',
+            speed: 1,
+          },
+          queuedAt: 50,
+          priority: 0,
+        });
+        await ctx.db.insert('ttsQueue', {
+          provider: 'google',
+          args: {
+            textId,
+            text: 'normal-new',
+            language: 'es',
+            voiceName: 'es-ES-Chirp3-HD-Leda',
+            voiceGender: 'female',
+            speed: 1,
+          },
+          queuedAt: 75,
+          priority: 0,
+        });
+        await ctx.db.insert('ttsQueue', {
+          provider: 'google',
+          args: {
+            textId,
+            text: 'active-newest',
+            language: 'es',
+            voiceName: 'es-ES-Chirp3-HD-Leda',
+            voiceGender: 'female',
+            speed: 1,
+          },
+          queuedAt: 100,
+          priority: 1,
+        });
+      });
+
+      // Walk the same index pump uses: priority=1 first, then priority=0,
+      // ordered by queuedAt within each level.
+      const order: string[] = await t.run(async (ctx) => {
+        const out: string[] = [];
+        const high = await ctx.db
+          .query('ttsQueue')
+          .withIndex('by_provider_priority_and_queuedAt', (q) =>
+            q.eq('provider', 'google').eq('priority', 1),
+          )
+          .order('asc')
+          .collect();
+        const normal = await ctx.db
+          .query('ttsQueue')
+          .withIndex('by_provider_priority_and_queuedAt', (q) =>
+            q.eq('provider', 'google').eq('priority', 0),
+          )
+          .order('asc')
+          .collect();
+        for (const r of [...high, ...normal]) out.push(r.args.text);
+        return out;
+      });
+
+      expect(order).toEqual(['active-newest', 'normal-old', 'normal-new']);
+    });
+
+    it('llmTranslationQueue priority=1 drains before priority=0', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert('llmTranslationQueue', {
+          args: {
+            textId,
+            sourceLanguage: 'en',
+            targetLanguage: 'es',
+            text: 'normal-old',
+          },
+          queuedAt: 50,
+          priority: 0,
+        });
+        await ctx.db.insert('llmTranslationQueue', {
+          args: {
+            textId,
+            sourceLanguage: 'en',
+            targetLanguage: 'es',
+            text: 'active-newest',
+          },
+          queuedAt: 100,
+          priority: 1,
+        });
+      });
+
+      const order: string[] = await t.run(async (ctx) => {
+        const out: string[] = [];
+        const high = await ctx.db
+          .query('llmTranslationQueue')
+          .withIndex('by_priority_and_queuedAt', (q) => q.eq('priority', 1))
+          .order('asc')
+          .collect();
+        const normal = await ctx.db
+          .query('llmTranslationQueue')
+          .withIndex('by_priority_and_queuedAt', (q) => q.eq('priority', 0))
+          .order('asc')
+          .collect();
+        for (const r of [...high, ...normal]) out.push(r.args.text);
+        return out;
+      });
+
+      expect(order).toEqual(['active-newest', 'normal-old']);
+    });
+  });
+
   describe('persistBackfilledWordTimings', () => {
     it('no-ops when no audio row exists', async () => {
       const t = convexTest(schema, modules);

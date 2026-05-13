@@ -72,5 +72,61 @@ describe("features/translation helpers", () => {
 
       expect(fetchMock).toHaveBeenCalled();
     });
+
+    it("romanizes Arabic via Google v3 passing bare 'ar'", async () => {
+      // Asserts the wire format we send for Arabic. Google's v3 romanizeText
+      // wants bare `ar` (not `ar-SA` or any region tag) — guard so we don't
+      // regress by adding a regional mapping that Google rejects.
+      const { privateKey } = generateKeyPairSync("rsa", {
+        modulusLength: 2048,
+        privateKeyEncoding: { type: "pkcs8", format: "pem" },
+        publicKeyEncoding: { type: "spki", format: "pem" },
+      });
+      const serviceAccount = {
+        client_email: "tester@example.iam.gserviceaccount.com",
+        private_key: privateKey as unknown as string,
+        project_id: "test-project",
+      };
+      vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_KEY", JSON.stringify(serviceAccount));
+
+      let romanizeBody: unknown = null;
+      const fetchMock = vi.fn(
+        async (url: string | URL | Request, init?: RequestInit) => {
+          const u = typeof url === "string" ? url : url.toString();
+          if (u.includes("oauth2.googleapis.com")) {
+            return new Response(
+              JSON.stringify({ access_token: "fake-token" }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
+          }
+          if (u.includes("translation.googleapis.com")) {
+            romanizeBody = init?.body
+              ? JSON.parse(init.body as string)
+              : null;
+            return new Response(
+              JSON.stringify({
+                romanizations: [{ romanizedText: "marhaba" }],
+              }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
+          }
+          throw new Error(`Unexpected fetch to ${u}`);
+        },
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      try {
+        const out = await romanizeText("مرحبا", "ar");
+        expect(out).toBe("marhaba");
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+
+      expect(
+        (romanizeBody as { source_language_code?: string } | null)
+          ?.source_language_code,
+      ).toBe("ar");
+    });
   });
 });

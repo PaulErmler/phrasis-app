@@ -525,13 +525,31 @@ export const pumpQueue = internalMutation({
     // );
 
     while (true) {
-      const next = await ctx.db
-        .query('ttsQueue')
-        .withIndex('by_provider_and_queuedAt', (q) =>
-          q.eq('provider', args.provider),
-        )
-        .order('asc')
-        .first();
+      // Priority drain: high-priority (1, active collection) first, then
+      // normal (0), then any pre-priority rows (undefined) left over from a
+      // deploy. FIFO within each level via the queuedAt suffix in the index.
+      const next =
+        (await ctx.db
+          .query('ttsQueue')
+          .withIndex('by_provider_priority_and_queuedAt', (q) =>
+            q.eq('provider', args.provider).eq('priority', 1),
+          )
+          .order('asc')
+          .first()) ??
+        (await ctx.db
+          .query('ttsQueue')
+          .withIndex('by_provider_priority_and_queuedAt', (q) =>
+            q.eq('provider', args.provider).eq('priority', 0),
+          )
+          .order('asc')
+          .first()) ??
+        (await ctx.db
+          .query('ttsQueue')
+          .withIndex('by_provider_priority_and_queuedAt', (q) =>
+            q.eq('provider', args.provider).eq('priority', undefined),
+          )
+          .order('asc')
+          .first());
       if (!next) break;
 
       const slotId = await ctx.db.insert('ttsProviderSlots', {
@@ -555,14 +573,16 @@ export const pumpQueue = internalMutation({
 });
 
 /**
- * Insert a TTS job into the FIFO queue and immediately try to dispatch it.
- * If a slot is free the action will start on the next scheduler tick; if
- * not, the job waits until a slot release fires `pumpQueue` again.
+ * Insert a TTS job into the priority queue and immediately try to dispatch.
+ * Higher-priority jobs jump in front of lower ones; same priority is FIFO.
+ * `priority` defaults to 0 (normal). Callers scheduling for the requesting
+ * user's currently-active collection should pass 1.
  */
 export const enqueueTtsJob = internalMutation({
   args: {
     provider: ttsProviderValidator,
     args: ttsJobArgsValidator,
+    priority: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -570,6 +590,7 @@ export const enqueueTtsJob = internalMutation({
       provider: args.provider,
       args: args.args,
       queuedAt: Date.now(),
+      priority: args.priority ?? 0,
     });
     await ctx.runMutation(internal.features.ttsProcessing.pumpQueue, {
       provider: args.provider,

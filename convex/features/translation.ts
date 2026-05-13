@@ -14,7 +14,9 @@ import { SignJWT, importPKCS8 } from 'jose';
 
 /**
  * Map internal language codes to Google Translate / romanization API codes.
- * Codes not listed here are passed through as-is.
+ * Codes not listed here are passed through as-is. Most ISO 639-1 codes work
+ * unmapped against both the v2 translate and v3 romanizeText endpoints —
+ * only the Spanish variants need a regional tag.
  */
 const GOOGLE_TRANSLATE_CODE_MAP: Record<string, string> = {
   es: 'es-ES',
@@ -207,6 +209,10 @@ export async function romanizeText(
       status: response.status,
       elapsedMs,
       sourceLanguage,
+      // Include `googleLang` so a glance at the error tells you what code we
+      // actually sent — `sourceLanguage` alone is the internal code, which
+      // hides any mapping bugs.
+      googleLang,
       bodyPreview: errorText.slice(0, 500),
     });
     throw new Error(`Google romanize API error: ${response.status} - ${errorText}`);

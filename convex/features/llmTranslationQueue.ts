@@ -112,6 +112,11 @@ const llmJobArgsValidator = v.object({
   targetLanguage: v.string(),
   text: v.string(),
   audioSpeakerGender: v.optional(v.string()),
+  // Active-collection priority forwarded by the originating scheduling
+  // mutation. Used to keep prioritization intact when the worker hands off
+  // to storeTranslationAndScheduleTTS (downstream TTS) or to the Google
+  // fallback path. Defaults to 0 (normal) when missing.
+  priority: v.optional(v.number()),
 });
 
 /**
@@ -126,11 +131,31 @@ export const pumpLlmQueue = internalMutation({
   handler: async (ctx) => {
     let used = await countLiveSlotsAndReclaimStale(ctx);
     while (used < MAX_LLM_CONCURRENCY) {
-      const next = await ctx.db
-        .query('llmTranslationQueue')
-        .withIndex('by_queuedAt')
-        .order('asc')
-        .first();
+      // Priority drain: high-priority (1, active collection) first, then
+      // normal (0), then any pre-priority rows (undefined) left over from a
+      // deploy. FIFO within each level via the queuedAt suffix in the index.
+      const next =
+        (await ctx.db
+          .query('llmTranslationQueue')
+          .withIndex('by_priority_and_queuedAt', (q) =>
+            q.eq('priority', 1),
+          )
+          .order('asc')
+          .first()) ??
+        (await ctx.db
+          .query('llmTranslationQueue')
+          .withIndex('by_priority_and_queuedAt', (q) =>
+            q.eq('priority', 0),
+          )
+          .order('asc')
+          .first()) ??
+        (await ctx.db
+          .query('llmTranslationQueue')
+          .withIndex('by_priority_and_queuedAt', (q) =>
+            q.eq('priority', undefined),
+          )
+          .order('asc')
+          .first());
       if (!next) break;
 
       await ctx.db.insert('llmTranslationSlots', {
@@ -161,12 +186,14 @@ export const pumpLlmQueue = internalMutation({
 export const enqueueLlmTranslation = internalMutation({
   args: {
     args: llmJobArgsValidator,
+    priority: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     await ctx.db.insert('llmTranslationQueue', {
       args: args.args,
       queuedAt: Date.now(),
+      priority: args.priority ?? 0,
     });
     await ctx.scheduler.runAfter(
       0,
@@ -361,6 +388,7 @@ export const processLlmTranslationForCard = internalAction({
           translatedText: result.text,
           voiceName,
           romanizedText,
+          priority: args.priority,
         },
       );
     } catch (err) {
@@ -403,6 +431,7 @@ async function scheduleGoogleFallback(
     targetLanguage: string;
     text: string;
     audioSpeakerGender?: string;
+    priority?: number;
   },
 ): Promise<void> {
   await ctx.scheduler.runAfter(
@@ -414,6 +443,7 @@ async function scheduleGoogleFallback(
       targetLanguage: args.targetLanguage,
       text: args.text,
       audioSpeakerGender: args.audioSpeakerGender,
+      priority: args.priority,
     },
   );
 }

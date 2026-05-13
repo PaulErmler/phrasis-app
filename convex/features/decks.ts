@@ -72,7 +72,12 @@ export async function scheduleMissingContent(
   text: Doc<'texts'>,
   baseLanguages: string[],
   targetLanguages: string[],
+  options?: { priority?: number },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
+  // Default to 0 (normal). Callers schedule with priority 1 when this text
+  // belongs to the requesting user's currently-active collection — see
+  // ensureCardContent / ensureUpcomingCardsContent / addCardsFromCollection.
+  const priority = options?.priority ?? 0;
   const sourceLanguage = text.language;
 
   // Resolve audioSpeakerGender: prefer existing valid value, fall back to speakerGender,
@@ -223,6 +228,7 @@ export async function scheduleMissingContent(
                 voiceGender,
                 speed: 1,
               },
+              priority,
             },
           );
           audioScheduled++;
@@ -252,12 +258,14 @@ export async function scheduleMissingContent(
                   text: text.text,
                   audioSpeakerGender,
                 },
+                priority,
               },
             );
             translationsScheduled++;
           }
         } else {
-          // Legacy Google Translate path — unchanged.
+          // Legacy Google Translate path — priority carries through to the
+          // downstream TTS enqueue via storeTranslationAndScheduleTTS.
           await ctx.scheduler.runAfter(
             0,
             internal.features.decks.processTranslationForCard,
@@ -267,6 +275,7 @@ export async function scheduleMissingContent(
               targetLanguage: lang,
               text: text.text,
               audioSpeakerGender,
+              priority,
             },
           );
           translationsScheduled++;
@@ -302,6 +311,7 @@ export async function scheduleMissingContent(
                   voiceGender,
                   speed: 1,
                 },
+                priority,
               },
             );
             audioScheduled++;
@@ -805,6 +815,12 @@ export const addCardsFromCollection = mutation({
     // When the requested collection is a custom collection (collection detail "add" button),
     // only add from that specific collection.
     const courseSettings = await getCourseSettings(ctx, courseId);
+    const activeCollectionId = courseSettings?.activeCollectionId;
+    // Snapshot whether each prepareCardContent we schedule below should be
+    // marked high-priority. Comparing by `===` is enough since both sides are
+    // Convex Id strings (or undefined).
+    const priorityForCollection = (collectionId: Id<'collections'>): number =>
+      activeCollectionId && activeCollectionId === collectionId ? 1 : 0;
     const requestedCollection = await ctx.db.get(args.collectionId);
     const isLevelCollection = requestedCollection
       ? isPremadeLevelCollection(requestedCollection)
@@ -820,18 +836,18 @@ export const addCardsFromCollection = mutation({
     const customCollectionIdsToProcess: Id<'collections'>[] = skipCustomSources
       ? []
       : args.exclusive
-      ? (isLevelCollection
-        ? []
-        : [args.collectionId])
-      : isLevelCollection
-        ? (courseSettings?.activeCustomCollectionIds ?? [])
-        : [args.collectionId].filter((id) =>
-          courseSettings?.chatCollectionId?.toString() === id.toString() ||
+        ? (isLevelCollection
+          ? []
+          : [args.collectionId])
+        : isLevelCollection
+          ? (courseSettings?.activeCustomCollectionIds ?? [])
+          : [args.collectionId].filter((id) =>
+            courseSettings?.chatCollectionId?.toString() === id.toString() ||
             courseSettings?.customCollectionId?.toString() === id.toString() ||
             (courseSettings?.activeCustomCollectionIds ?? []).some(
               (cid) => cid.toString() === id.toString(),
             ),
-        );
+          );
 
     if (customCollectionIdsToProcess.length > 0 && remainingBatch > 0) {
       const collectionsWithPending: {
@@ -892,10 +908,16 @@ export const addCardsFromCollection = mutation({
             ctx, userId, courseId, entry.id, texts.length, newLastRank,
           );
 
+          const phase1Priority = priorityForCollection(entry.id);
           for (const text of texts) {
             await ctx.scheduler.runAfter(
               0, internal.features.decks.prepareCardContent,
-              { textId: text._id, baseLanguages: course.baseLanguages, targetLanguages: course.targetLanguages },
+              {
+                textId: text._id,
+                baseLanguages: course.baseLanguages,
+                targetLanguages: course.targetLanguages,
+                priority: phase1Priority,
+              },
             );
           }
 
@@ -906,7 +928,12 @@ export const addCardsFromCollection = mutation({
           for (const text of upcomingCustomTexts) {
             await ctx.scheduler.runAfter(
               0, internal.features.decks.prepareCardContent,
-              { textId: text._id, baseLanguages: course.baseLanguages, targetLanguages: course.targetLanguages },
+              {
+                textId: text._id,
+                baseLanguages: course.baseLanguages,
+                targetLanguages: course.targetLanguages,
+                priority: phase1Priority,
+              },
             );
           }
         }
@@ -974,6 +1001,7 @@ export const addCardsFromCollection = mutation({
           newLastRank,
         );
 
+        const phase2Priority = priorityForCollection(args.collectionId);
         for (const text of textsToAdd) {
           await ctx.scheduler.runAfter(
             0,
@@ -982,6 +1010,7 @@ export const addCardsFromCollection = mutation({
               textId: text._id,
               baseLanguages: course.baseLanguages,
               targetLanguages: course.targetLanguages,
+              priority: phase2Priority,
             },
           );
         }
@@ -1003,6 +1032,7 @@ export const addCardsFromCollection = mutation({
               textId: text._id,
               baseLanguages: course.baseLanguages,
               targetLanguages: course.targetLanguages,
+              priority: phase2Priority,
             },
           );
         }
@@ -1077,12 +1107,24 @@ export const ensureCardContent = mutation({
     const text = await ctx.db.get(args.textId);
     if (!text) return { translationsScheduled: 0, audioScheduled: 0 };
 
+    // Prioritize when this card is from the user's currently-active
+    // collection. Comparing IDs by string keeps the check resilient if either
+    // field is undefined.
+    const settings = await getCourseSettings(ctx, active.course._id);
+    const priority =
+      settings?.activeCollectionId &&
+      card.collectionId &&
+      settings.activeCollectionId === card.collectionId
+        ? 1
+        : 0;
+
     return scheduleMissingContent(
       ctx,
       args.textId,
       text,
       active.course.baseLanguages,
       active.course.targetLanguages,
+      { priority },
     );
   },
 });
@@ -1104,6 +1146,7 @@ export const ensureUpcomingCardsContent = mutation({
 
     const settings = await getCourseSettings(ctx, active.course._id);
     const schedulingMode = settings?.schedulingMode ?? 'learnAndReview';
+    const activeCollectionId = settings?.activeCollectionId;
 
     const now = Date.now();
     let cards;
@@ -1138,12 +1181,21 @@ export const ensureUpcomingCardsContent = mutation({
     for (const card of cards) {
       const text = await ctx.db.get(card.textId);
       if (!text) continue;
+      // Bump priority for cards in the user's currently-active collection
+      // so their content jumps to the front of the TTS / LLM queues.
+      const priority =
+        activeCollectionId &&
+        card.collectionId &&
+        activeCollectionId === card.collectionId
+          ? 1
+          : 0;
       await scheduleMissingContent(
         ctx,
         card.textId,
         text,
         active.course.baseLanguages,
         active.course.targetLanguages,
+        { priority },
       );
       processed++;
     }
@@ -1163,6 +1215,12 @@ export const prepareCardContent = internalMutation({
     textId: v.id('texts'),
     baseLanguages: v.array(v.string()),
     targetLanguages: v.array(v.string()),
+    // Priority is set by the caller at enqueue time — typically by
+    // `addCardsFromCollection` which compares the target collection against
+    // the user's `activeCollectionId`. We snapshot intent here instead of
+    // re-reading the active collection at run time so a user switching
+    // collections mid-batch doesn't reshuffle work that's already queued.
+    priority: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1175,6 +1233,7 @@ export const prepareCardContent = internalMutation({
       text,
       args.baseLanguages,
       args.targetLanguages,
+      { priority: args.priority },
     );
     return null;
   },
@@ -1220,6 +1279,7 @@ export const processTranslationForCard = internalAction({
     targetLanguage: v.string(),
     text: v.string(),
     audioSpeakerGender: v.optional(v.string()),
+    priority: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1255,8 +1315,15 @@ export const processTranslationForCard = internalAction({
         if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
           try {
             romanizedText = await romanizeText(translation, args.targetLanguage);
-          } catch {
-            // Romanization is non-fatal; skip silently
+          } catch (err) {
+            // Romanization is non-fatal — the translation still lands without
+            // it — but we log so the next time a new locale silently fails to
+            // romanize, we notice (the Arabic bug went unnoticed because of
+            // an empty `catch`).
+            console.error(
+              `Romanization failed for ${args.targetLanguage}:`,
+              err instanceof Error ? err.message : err,
+            );
           }
         }
       }
@@ -1271,6 +1338,7 @@ export const processTranslationForCard = internalAction({
           translatedText: translation,
           voiceName,
           romanizedText,
+          priority: args.priority,
         },
       );
     } catch (err) {
@@ -1296,6 +1364,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     translatedText: v.string(),
     voiceName: v.string(),
     romanizedText: v.optional(v.string()),
+    priority: v.optional(v.number()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1363,6 +1432,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
               voiceGender,
               speed: 1,
             },
+            priority: args.priority,
           },
         );
       }
