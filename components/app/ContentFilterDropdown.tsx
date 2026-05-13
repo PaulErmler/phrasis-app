@@ -2,10 +2,11 @@
 
 import * as React from 'react';
 import { Settings2 } from 'lucide-react';
-import { useMutation, useQuery } from 'convex/react';
+import { useQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 
 import { api } from '@/convex/_generated/api';
+import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
 import {
   Select,
   SelectContent,
@@ -29,21 +30,7 @@ const FIXED_TRIGGER_WIDTH = { width: '140px' } as const;
  */
 export function ContentFilterDropdown() {
   const settings = useQuery(api.features.courses.getActiveCourseSettings, {});
-  const updateSettings = useMutation(
-    api.features.courses.updateCourseSettings,
-  ).withOptimisticUpdate((localStore, args) => {
-    const current = localStore.getQuery(
-      api.features.courses.getActiveCourseSettings,
-      {},
-    );
-    if (current && args.studyContentFilter !== undefined) {
-      localStore.setQuery(
-        api.features.courses.getActiveCourseSettings,
-        {},
-        { ...current, studyContentFilter: args.studyContentFilter },
-      );
-    }
-  });
+  const updateSettings = useUpdateStudyContentFilter();
   const t = useTranslations('AppPage.contentFilter');
 
   if (!settings) {

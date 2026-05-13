@@ -73,7 +73,7 @@ export async function scheduleMissingContent(
   text: Doc<'texts'>,
   baseLanguages: string[],
   targetLanguages: string[],
-  options?: { priority?: number },
+  options?: { priority?: 0 | 1 },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   // Default to 0 (normal). Callers schedule with priority 1 when this text
   // belongs to the requesting user's currently-active collection — see
@@ -831,7 +831,7 @@ export const addCardsFromCollection = mutation({
     // Snapshot whether each prepareCardContent we schedule below should be
     // marked high-priority. Comparing by `===` is enough since both sides are
     // Convex Id strings (or undefined).
-    const priorityForCollection = (collectionId: Id<'collections'>): number =>
+    const priorityForCollection = (collectionId: Id<'collections'>): 0 | 1 =>
       activeCollectionId && activeCollectionId === collectionId ? 1 : 0;
     const requestedCollection = await ctx.db.get(args.collectionId);
     const isLevelCollection = requestedCollection
@@ -1266,7 +1266,7 @@ export const prepareCardContent = internalMutation({
     // the user's `activeCollectionId`. We snapshot intent here instead of
     // re-reading the active collection at run time so a user switching
     // collections mid-batch doesn't reshuffle work that's already queued.
-    priority: v.optional(v.number()),
+    priority: v.optional(v.union(v.literal(0), v.literal(1))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1325,7 +1325,7 @@ export const processTranslationForCard = internalAction({
     targetLanguage: v.string(),
     text: v.string(),
     audioSpeakerGender: v.optional(v.string()),
-    priority: v.optional(v.number()),
+    priority: v.optional(v.union(v.literal(0), v.literal(1))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1410,7 +1410,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     translatedText: v.string(),
     voiceName: v.string(),
     romanizedText: v.optional(v.string()),
-    priority: v.optional(v.number()),
+    priority: v.optional(v.union(v.literal(0), v.literal(1))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

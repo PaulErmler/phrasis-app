@@ -814,7 +814,10 @@ function OffBadge({
           onClick={handleClick}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
-              handleClick(e as unknown as React.MouseEvent);
+              e.preventDefault();
+              if (!isCurrent) return;
+              e.stopPropagation();
+              setOpen(true);
             }
           }}
           className="h-4 cursor-pointer px-1.5 text-[10px] font-medium text-muted-foreground"

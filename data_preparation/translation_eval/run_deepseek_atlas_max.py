@@ -198,7 +198,7 @@ def summarize(df: pd.DataFrame) -> None:
     avg_latency = valid["latency_ms"].mean() if len(valid) else 0
 
     print("\n" + "=" * 80)
-    print(f"DeepSeek V4 Flash MAX-thinking (effort=xhigh), provider preference: {PROVIDER_PREF}")
+    print(f"Model: {MODEL_ID} (reasoning={REASONING}), provider preference: {PROVIDER_PREF}")
     print(f"max_tokens override: {MAX_OUTPUT_TOKENS_OVERRIDE} (vs standard 5k cap)")
     print("=" * 80)
     print(f"  calls (successful)            : {len(valid)} / {len(df)}")
