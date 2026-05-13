@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Doc, Id } from '../_generated/dataModel';
+import { isPremadeLevelCollection } from '../lib/collections';
 
 /**
  * Two-phase backfill for the content-source filter:
@@ -29,7 +30,8 @@ const CARDS_BATCH_SIZE = 200;
  *
  * Classification rules:
  *   - datasetId !== undefined  → 'premade'  (uploaded curriculum)
- *   - legacy === true          → 'premade'  (pre-OGTE A1..C2/Essential)
+ *   - legacy === true          → 'premade'  (pre-OGTE A1..C2/Essential, explicitly flagged)
+ *   - name in LEGACY_LEVEL_ORDER → 'premade' (pre-cutover rows that never got `legacy:true`)
  *   - id is some courseSettings.chatCollectionId → 'chat'
  *   - id is some courseSettings.customCollectionId OR otherwise → 'custom'
  *
@@ -67,7 +69,11 @@ export const runCollectionsOriginBackfill = internalMutation({
       }
 
       let origin: 'premade' | 'custom' | 'chat';
-      if (coll.datasetId !== undefined || coll.legacy === true) {
+      if (
+        coll.datasetId !== undefined ||
+        coll.legacy === true ||
+        isPremadeLevelCollection(coll)
+      ) {
         origin = 'premade';
       } else if (chatCollectionIds.has(coll._id.toString())) {
         origin = 'chat';

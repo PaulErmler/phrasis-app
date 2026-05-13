@@ -56,6 +56,7 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     "gemini-2.5-flash-lite-baseline":     {"input_per_m": 0.10, "output_per_m": 0.40},
     # DeepSeek V4 Flash — verified on OpenRouter 2026-05-12.
     "deepseek-v4-flash-low-think":        {"input_per_m": 0.14, "output_per_m": 0.28},
+    "deepseek-v4-flash-high-think":       {"input_per_m": 0.14, "output_per_m": 0.28},
     "deepseek-v4-flash-max-think":        {"input_per_m": 0.14, "output_per_m": 0.28},
 }
 

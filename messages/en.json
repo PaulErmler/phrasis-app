@@ -176,6 +176,13 @@
         "openWithRemaining": "Open · {count} new",
         "tabPremade": "Course",
         "tabCustom": "Custom Content",
+        "sourceBadgeOff": "Off",
+        "reenablePopover": {
+          "title": "Re-enable {source}?",
+          "description": "This source is currently excluded from study and new-card additions. Switch back to studying course material as well?",
+          "cancel": "Cancel",
+          "confirm": "Re-enable"
+        },
         "collectionDisplayNames": {
           "Custom": "Manually Added",
           "Chat": "Chat"
@@ -332,6 +339,12 @@
     "learnAndReview": "Review & Learn",
     "radioMode": "Radio",
     "radioRequiresCards": "Add some cards before starting Radio mode.",
+    "contentFilter": {
+      "label": "Source:",
+      "valueBoth": "All content",
+      "valueCustom": "Custom only",
+      "valueCourse": "Course only"
+    },
     "cardCounts": {
       "new": "N",
       "learning": "L",
@@ -410,12 +423,26 @@
     "typeTranslation": "Type the translation...",
     "empty": {
       "noCardsDue": "No sentences due for review",
+      "deckEmptyTitle": "No sentences in your deck yet",
       "addCards": "{count, plural, one {Add # sentence} other {Add # sentences}}",
       "adding": "Adding...",
       "noCollection": "No collection selected",
+      "noCollectionDescription": "You need to select a collection to learn content from.",
       "goHome": "Go to Home",
       "allDone": "All caught up! Add more sentences to continue learning.",
-      "noCardsInDeck": "No sentences in your deck yet. Add sentences from a collection to start learning."
+      "noCardsInDeck": "Add sentences from a collection to start learning.",
+      "filterBlocked": {
+        "titleCustom": "No custom cards to study right now",
+        "titleCourse": "No course cards to study right now",
+        "subtitleCanUnblockCustom": "Your filter is set to custom only. Course cards are available — enable them to keep going.",
+        "subtitleCanUnblockCourse": "Your filter is set to course only. Custom cards are available — enable them to keep going.",
+        "subtitleMustAddCustom": "You don't have any custom cards yet. Add some, or switch your filter to include course content.",
+        "subtitleMustAddCourse": "You don't have any course cards yet. Add some, or switch your filter to include custom content.",
+        "includeCourse": "Include course content",
+        "includeCustom": "Include custom content",
+        "createChatCards": "Create in chat",
+        "createCustomCards": "Add custom cards"
+      }
     },
     "progressDisplay": {
       "sessionNewWords": "new words",
