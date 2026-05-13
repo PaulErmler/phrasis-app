@@ -1,5 +1,9 @@
 {
   "permissions": {
+    "deny": [
+        "Read(.env*)",
+        "Edit(.env*)"
+    ],
     "allow": [
       "Bash(find /Users/paulermler/Documents/Phrasis/new/phrasis-app -name \"*.ts\" -exec grep -l \"ENSURE_CONTENT_LOOKAHEAD\" {} \\\\;)",
       "Bash(grep -r \"export.*Card\\\\|export.*Sentence\\\\|export.*Text\" /Users/paulermler/Documents/Phrasis/new/phrasis-app/components/app/learning/*.ts)",
@@ -35,7 +39,36 @@
       "Bash(curl -sL https://labs.convex.dev/better-auth/framework-guides/next-js)",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(grep -E \"\\\\.ts$\")",
-      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "Bash(xargs basename *)",
+      "Bash(curl -s -L \"https://posthog.com/docs/libraries/next-js\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/libraries/react-native\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/session-replay/installation\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/libraries/js/config\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/privacy\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/libraries/js/features\")",
+      "Bash(grep -oE '.{0,200}\\(opt_out|opt_in|disable_session_recording|startSessionRecording|stopSessionRecording|persistence\\).{0,200}')",
+      "WebFetch(domain:pixabay.com)",
+      "Bash(curl -s -L \"https://posthog.com/docs/llm-analytics/installation\")",
+      "Bash(curl -s -L \"https://posthog.com/docs/data/data-retention\")",
+      "WebFetch(domain:posthog.com)",
+      "WebFetch(domain:us.posthog.com)",
+      "Bash(grep -r \"Intl.Segmenter\" /Users/paulermler/Documents/Phrasis/new/phrasis-app --include=\"*.ts\" --include=\"*.tsx\" ! -path \"*/node_modules/*\" ! -path \"*/.git/*\")",
+      "Bash(python3 -c \"import wordfreq; print\\('wordfreq', wordfreq.__version__\\)\")",
+      "Bash(python3 -c \"import better_profanity; print\\('better_profanity OK'\\)\")",
+      "Bash(python3 -c \"import requests; print\\('requests OK'\\)\")",
+      "Bash(/Users/paulermler/miniconda3/envs/language-dataset/bin/python -m data_filtering.utils.read_tatoeba_dataset)",
+      "Bash(/Users/paulermler/miniconda3/envs/language-dataset/bin/python data_preparation/ogte-dataset/scripts/1_build_vocab.py)",
+      "Bash(/Users/paulermler/miniconda3/envs/language-dataset/bin/python data_preparation/ogte-dataset/scripts/2_download_lists_export.py)",
+      "Bash(/Users/paulermler/miniconda3/envs/language-dataset/bin/python data_preparation/ogte-dataset/scripts/3_extract_ogte_sentences.py)",
+      "Bash(/Users/paulermler/miniconda3/envs/language-dataset/bin/python data_preparation/ogte-dataset/scripts/4_filter_sentences.py)",
+      "Bash(python3)",
+      "Bash(python3 /tmp/scan_sexist.py)",
+      "Bash(python3 /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/find_near_dups.py)",
+      "Bash(awk -F, 'NR<=15 {print $1, $9}' /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/data/output/levels_curated/ogte_10_high_intermediate.csv)",
+      "Bash(awk -F, 'NR<=15 {print $1}' /Users/paulermler/Documents/Phrasis/new/phrasis-app/data_preparation/ogte-dataset/data/output/levels_curated/ogte_10_high_intermediate.csv)",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('data_preparation/ogte-dataset/curation/curate.py'\\).read\\(\\)\\); print\\('OK'\\)\")",
+      "Bash(npx convex *)"
     ]
   }
 }

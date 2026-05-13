@@ -1,0 +1,722 @@
+'use client';
+
+import * as React from 'react';
+import { Check, MessageSquare, PenLine } from 'lucide-react';
+import { useMutation, useQuery } from 'convex/react';
+import { toast } from 'sonner';
+import { useTranslations } from 'next-intl';
+import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { CollectionDetailDialog } from '@/components/app/CollectionDetailDialog';
+import {
+  InlineCollectionDetail,
+  type CollectionAction,
+  type CollectionProgressItem,
+} from '@/components/app/CollectionCarouselUI';
+import { useCollectionDetail } from '@/components/app/useCollectionDetail';
+import PaywallDialog from '@/components/autumn/paywall-dialog';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
+import { CEFR_COLORS, CEFR_ORDER, isCefr, type Cefr } from './cefr';
+
+type HomeSummary = NonNullable<
+  ReturnType<typeof useQuery<typeof api.features.home.getHomeSummary>>
+>;
+type Level = HomeSummary['levels'][number];
+type CustomCollectionSummary = HomeSummary['customCollections'][number];
+
+interface SegmentedHomeSectionProps {
+  activeCourseId: Id<'courses'> | null;
+  onNavigateToContent: () => void;
+  onNavigateToChat: () => void;
+}
+
+export function SegmentedHomeSection({
+  activeCourseId,
+  onNavigateToContent,
+  onNavigateToChat,
+}: SegmentedHomeSectionProps) {
+  const summary = useQuery(api.features.home.getHomeSummary, {});
+  const t = useTranslations('AppPage.collections.carousel');
+
+  if (summary === undefined) {
+    return <SegmentedSkeleton />;
+  }
+  if (summary === null) {
+    return null;
+  }
+
+  return (
+    <Tabs defaultValue="premade" className="flex flex-col gap-3">
+      <TabsList className="w-full">
+        <TabsTrigger value="premade" className="flex-1">
+          {t('tabPremade')}
+        </TabsTrigger>
+        <TabsTrigger value="custom" className="flex-1">
+          {t('tabCustom')}
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="premade" className="flex flex-col gap-3">
+        <PremadeTab summary={summary} activeCourseId={activeCourseId} />
+      </TabsContent>
+
+      <TabsContent value="custom" className="flex flex-col gap-3">
+        <CustomTab
+          customCollections={summary.customCollections}
+          activeCourseId={activeCourseId}
+          onNavigateToContent={onNavigateToContent}
+          onNavigateToChat={onNavigateToChat}
+        />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+// ============================================================================
+// Premade tab — CEFR-grouped rail + inline detail card (original preview)
+// ============================================================================
+
+function PremadeTab({
+  summary,
+  activeCourseId,
+}: {
+  summary: HomeSummary;
+  activeCourseId: Id<'courses'> | null;
+}) {
+  const t = useTranslations('AppPage.collections.carousel');
+  const setActiveCollection = useMutation(api.features.decks.setActiveCollection);
+  const [optimisticActiveId, setOptimisticActiveId] = React.useState<Id<'collections'> | null>(null);
+  const [paywallOpen, setPaywallOpen] = React.useState(false);
+
+  const activeCollectionId = optimisticActiveId ?? summary.activeCollectionId;
+
+  // Focus = active collection if it's in this dataset; else the first level.
+  const initialFocusId =
+    summary.levels.find((l) => l.collectionId === activeCollectionId)?.collectionId ??
+    summary.levels[0]?.collectionId ??
+    null;
+  const [focusedId, setFocusedId] = React.useState<Id<'collections'> | null>(initialFocusId);
+
+  React.useEffect(() => {
+    if (focusedId && summary.levels.some((l) => l.collectionId === focusedId)) return;
+    setFocusedId(initialFocusId);
+  }, [initialFocusId, summary.levels, focusedId]);
+
+  const groups = React.useMemo(() => groupLevelsByCefr(summary.levels), [summary.levels]);
+
+  // Items shape consumed by useCollectionDetail and InlineCollectionDetail.
+  const items: CollectionProgressItem[] = React.useMemo(
+    () =>
+      summary.levels.map((l) => ({
+        collectionId: l.collectionId,
+        collectionName: l.displayName ?? l.code,
+        cardsAdded: l.cardsAdded,
+        totalTexts: l.totalTexts,
+      })),
+    [summary.levels],
+  );
+
+  const {
+    openCollectionId,
+    setOpenCollectionId,
+    openedCollection,
+    isOpenedComplete,
+    contentData,
+    isAdding,
+    handleAddCards,
+    sentencesRemaining,
+  } = useCollectionDetail({ collections: items, activeCourseId });
+
+  const handleSelect = React.useCallback(
+    async (collectionId: Id<'collections'>) => {
+      if (collectionId === activeCollectionId) return;
+      setOptimisticActiveId(collectionId);
+      try {
+        await setActiveCollection({ collectionId });
+      } catch (error) {
+        console.error('Error setting active collection:', error);
+        toast.error(error instanceof Error ? error.message : t('failedToSelect'));
+      } finally {
+        setOptimisticActiveId(null);
+      }
+    },
+    [activeCollectionId, setActiveCollection, t],
+  );
+
+  if (summary.levels.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground py-4 text-center">{t('noLevels')}</p>
+    );
+  }
+
+  const focusedLevel = summary.levels.find((l) => l.collectionId === focusedId) ?? null;
+  const focusedItem = focusedLevel
+    ? items.find((c) => c.collectionId === focusedLevel.collectionId) ?? null
+    : null;
+
+  return (
+    <div className="flex flex-col gap-3" data-tutorial="collection-carousel">
+      <GroupedLevelRail
+        groups={groups}
+        activeCollectionId={activeCollectionId}
+        focusedId={focusedId}
+        onFocus={setFocusedId}
+      />
+
+      {focusedItem && (
+        <InlineCollectionDetail
+          collection={focusedItem}
+          isActive={focusedItem.collectionId === activeCollectionId}
+          onSelect={() => handleSelect(focusedItem.collectionId as Id<'collections'>)}
+          onOpenDetail={() => setOpenCollectionId(focusedItem.collectionId)}
+          onAddCards={() => handleAddCards(focusedItem.collectionId)}
+          isAdding={isAdding}
+          t={t}
+          sentencesRemaining={sentencesRemaining}
+          onUpgrade={() => setPaywallOpen(true)}
+        />
+      )}
+
+      <CollectionDetailDialog
+        open={openCollectionId !== null}
+        onOpenChange={(open) => {
+          if (!open) setOpenCollectionId(null);
+        }}
+        collectionName={openedCollection?.collectionName ?? null}
+        totalTexts={openedCollection?.totalTexts ?? 0}
+        cardsAdded={openedCollection?.cardsAdded ?? 0}
+        isActive={activeCollectionId === openCollectionId}
+        isComplete={isOpenedComplete}
+        texts={contentData?.texts ?? []}
+        isLoadingTexts={contentData === undefined && !isOpenedComplete}
+        isAdding={isAdding}
+        onSelect={() => {
+          if (openCollectionId) handleSelect(openCollectionId as Id<'collections'>);
+        }}
+        onAddCards={() => handleAddCards()}
+        sentencesRemaining={sentencesRemaining}
+        onUpgrade={() => setPaywallOpen(true)}
+      />
+
+      {paywallOpen && (
+        <PaywallDialog open={paywallOpen} setOpen={setPaywallOpen} featureId={FEATURE_IDS.SENTENCES} />
+      )}
+    </div>
+  );
+}
+
+function groupLevelsByCefr(levels: Level[]): { cefr: Cefr; levels: Level[] }[] {
+  const byCefr = new Map<Cefr, Level[]>();
+  for (const cefr of CEFR_ORDER) byCefr.set(cefr, []);
+  for (const lvl of levels) {
+    const tier: Cefr = isCefr(lvl.cefrTier) ? lvl.cefrTier : 'A1';
+    byCefr.get(tier)?.push(lvl);
+  }
+  return CEFR_ORDER.map((cefr) => ({
+    cefr,
+    levels: (byCefr.get(cefr) ?? []).sort((a, b) => a.order - b.order),
+  })).filter((g) => g.levels.length > 0);
+}
+
+function GroupedLevelRail({
+  groups,
+  activeCollectionId,
+  focusedId,
+  onFocus,
+}: {
+  groups: { cefr: Cefr; levels: Level[] }[];
+  activeCollectionId: Id<'collections'> | null;
+  focusedId: Id<'collections'> | null;
+  onFocus: (id: Id<'collections'>) => void;
+}) {
+  const railRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const el = railRef.current?.querySelector(`[data-focused="true"]`) as HTMLElement | null;
+    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [focusedId]);
+
+  return (
+    <div
+      ref={railRef}
+      // pt-2 keeps the focused chip's outset ring from getting cropped at
+      // the top (overflow-x-auto clips vertically too). pb-5 gives breathing
+      // room between the chips and the horizontal scrollbar on platforms
+      // where the scrollbar is rendered despite our hide hints (Safari, some
+      // touch surfaces). -mx-4 + px-4 lets the rail bleed to viewport edges.
+      className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      {groups.map((g) => {
+        const total = g.levels.reduce((acc, l) => acc + l.totalTexts, 0);
+        const added = g.levels.reduce((acc, l) => acc + l.cardsAdded, 0);
+        // Match the per-chip progress fill (`cardsAdded / totalTexts`). Clamp
+        // to 100% because cutover roll-forward credits can briefly push a
+        // tier's added-count above its texts-count (legacy A1's 295 cards land
+        // entirely on L02 even though L02 has only ~1k texts of its own — but
+        // the user could still hold credit above 100% if they over-progressed
+        // on legacy before cutover).
+        const groupPct = total > 0 ? Math.min(1, added / total) : 0;
+        const color = CEFR_COLORS[g.cefr];
+        return (
+          <div key={g.cefr} className="flex shrink-0 flex-col gap-1.5">
+            <div className="flex items-center gap-1.5 px-0.5">
+              <span
+                className="size-2 rounded-full"
+                style={{ backgroundColor: color }}
+                aria-hidden
+              />
+              <span className="font-mono text-[10px] font-bold tracking-widest text-foreground">
+                {g.cefr}
+              </span>
+              <span className="font-mono text-[10px] tabular-nums text-muted-foreground">
+                {Math.round(groupPct * 100)}%
+              </span>
+            </div>
+            <div className="flex gap-1">
+              {g.levels.map((lvl) => (
+                <LevelChip
+                  key={lvl.collectionId}
+                  level={lvl}
+                  isActive={lvl.collectionId === activeCollectionId}
+                  isFocused={lvl.collectionId === focusedId}
+                  themeColor={color}
+                  onClick={() => onFocus(lvl.collectionId)}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function LevelChip({
+  level,
+  isActive,
+  isFocused,
+  themeColor,
+  onClick,
+}: {
+  level: Level;
+  isActive: boolean;
+  isFocused: boolean;
+  themeColor: string;
+  onClick: () => void;
+}) {
+  const pct = level.totalTexts > 0 ? Math.min(1, level.cardsAdded / level.totalTexts) : 0;
+  const isComplete = pct >= 1;
+  return (
+    <button
+      type="button"
+      data-focused={isFocused}
+      onClick={onClick}
+      className={cn(
+        'relative flex h-14 w-14 flex-col items-center justify-center overflow-hidden rounded-lg border transition-all',
+        isFocused
+          ? 'border-primary bg-primary/5 shadow-sm ring-2 ring-primary'
+          : 'border-border bg-card hover:bg-muted',
+      )}
+      aria-pressed={isFocused}
+      title={level.displayName}
+    >
+      <div
+        className="absolute bottom-0 left-0 right-0 transition-all"
+        style={{
+          height: `${pct * 100}%`,
+          backgroundColor: isComplete
+            ? 'color-mix(in oklch, var(--success) 22%, transparent)'
+            : `color-mix(in oklch, ${themeColor} 22%, transparent)`,
+        }}
+      />
+      <span
+        className={cn(
+          'relative z-10 font-mono text-[10px] font-bold tabular-nums tracking-tight',
+          isFocused ? 'text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        {level.displayName}
+      </span>
+      <div className="relative z-10 flex h-3 items-center">
+        {isActive ? (
+          <span
+            style={{
+              display: 'block',
+              width: '6px',
+              height: '6px',
+              borderRadius: '9999px',
+              backgroundColor: 'var(--primary)',
+              boxShadow:
+                '0 0 0 1.5px color-mix(in oklch, var(--primary) 25%, transparent)',
+            }}
+            aria-hidden
+          />
+        ) : isComplete ? (
+          <Check className="size-3 text-[color:var(--success)]" strokeWidth={3} />
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
+// ============================================================================
+// Custom tab — 2-chip scrollable rail (Manually Added + Chat), no tiering.
+// Same chip + inline-detail pattern as the premade tab.
+// ============================================================================
+
+function CustomTab({
+  customCollections,
+  activeCourseId,
+  onNavigateToContent,
+  onNavigateToChat,
+}: {
+  customCollections: CustomCollectionSummary[];
+  activeCourseId: Id<'courses'> | null;
+  onNavigateToContent: () => void;
+  onNavigateToChat: () => void;
+}) {
+  const t = useTranslations('AppPage.collections');
+  const tCarousel = useTranslations('AppPage.collections.carousel');
+  const tApp = useTranslations('AppPage');
+  const toggleMutation = useMutation(api.features.decks.toggleCustomCollection);
+
+  // The custom tab uses the user's `activeCustomCollectionIds` for the
+  // active-set indicator (Select toggles inclusion in the auto-add pool).
+  const courseSettings = useQuery(api.features.courses.getActiveCourseSettings, {});
+  // Stored as Set<string> so the branded `Id<'collections'>` values match the
+  // `string`-typed `CollectionProgressItem.collectionId` on lookup. Convex Ids
+  // are strings at runtime so iterating works directly.
+  const selectedIds = React.useMemo<Set<string>>(
+    () => new Set(courseSettings?.activeCustomCollectionIds ?? []),
+    [courseSettings?.activeCustomCollectionIds],
+  );
+
+  // Localized display name: legacy "Custom" → "Manually Added", "Chat" stays
+  // "Chat" but goes through i18n for German etc.
+  const localizedName = React.useCallback(
+    (c: CustomCollectionSummary): string => {
+      if (
+        (c.isCustom || c.isChat) &&
+        tCarousel.has(`collectionDisplayNames.${c.name}`)
+      ) {
+        return tCarousel(`collectionDisplayNames.${c.name}`);
+      }
+      return c.name;
+    },
+    [tCarousel],
+  );
+
+  // `collectionName` stays as the raw key (e.g. "Custom", "Chat") so it can
+  // index into `descriptions.*` and the per-collection action map. The
+  // localized label (e.g. "Manually Added") lives on `displayName` and is used
+  // for rendering titles only.
+  const items: CollectionProgressItem[] = customCollections.map((c) => ({
+    collectionId: c.collectionId,
+    collectionName: c.name,
+    displayName: localizedName(c),
+    cardsAdded: c.cardsAdded,
+    totalTexts: c.totalTexts,
+  }));
+
+  const [focusedId, setFocusedId] = React.useState<Id<'collections'> | null>(
+    customCollections[0]?.collectionId ?? null,
+  );
+  React.useEffect(() => {
+    if (focusedId && customCollections.some((c) => c.collectionId === focusedId)) return;
+    setFocusedId(customCollections[0]?.collectionId ?? null);
+  }, [customCollections, focusedId]);
+
+  const {
+    openCollectionId,
+    setOpenCollectionId,
+    openedCollection,
+    isOpenedComplete,
+    contentData,
+    isAdding,
+    handleAddCards,
+  } = useCollectionDetail({ collections: items, activeCourseId });
+
+  const handleToggleCollection = React.useCallback(
+    async (collectionId: string) => {
+      try {
+        await toggleMutation({ collectionId: collectionId as Id<'collections'> });
+      } catch {
+        toast.error(t('carousel.failedToSelect'));
+      }
+    },
+    [toggleMutation, t],
+  );
+
+  // Keyed by the raw `collectionName` (e.g. "Custom"/"Chat") to match the
+  // lookup in CollectionCarouselUI (`collectionActions?.[collection.collectionName]`).
+  const collectionActions = React.useMemo<Record<string, CollectionAction>>(() => {
+    const actions: Record<string, CollectionAction> = {};
+    for (const c of customCollections) {
+      if (c.isCustom) {
+        actions[c.name] = {
+          label: tApp('customContent'),
+          icon: <PenLine className="h-3.5 w-3.5" />,
+          onClick: onNavigateToContent,
+        };
+      } else if (c.isChat) {
+        actions[c.name] = {
+          label: tApp('views.chat'),
+          icon: <MessageSquare className="h-3.5 w-3.5" />,
+          onClick: onNavigateToChat,
+        };
+      }
+    }
+    return actions;
+  }, [customCollections, tApp, onNavigateToContent, onNavigateToChat]);
+
+  // Empty state — keep the original 2-button card so users can navigate to
+  // chat or the custom-content page to seed the collections.
+  if (customCollections.length === 0) {
+    const emptyStateDescription = t('customCarousel.emptyState', {
+      content: tApp('views.content'),
+      chat: tApp('views.chat'),
+    });
+    return (
+      <div className="rounded-xl border border-dashed border-border bg-card p-4 sm:p-6">
+        <div className="flex flex-col md:flex-row md:items-stretch gap-4 md:gap-0">
+          <div className="flex-[2] min-w-0 md:pr-6 flex items-center">
+            <p className="text-muted-sm text-left">{emptyStateDescription}</p>
+          </div>
+          <div className="md:hidden h-px w-full shrink-0 bg-border" aria-hidden />
+          <div
+            className="hidden md:block w-px shrink-0 bg-border self-stretch min-h-[4.5rem]"
+            aria-hidden
+          />
+          <div className="flex-1 min-w-0 md:pl-6 flex flex-col gap-2 justify-center">
+            <Button type="button" variant="secondary" className="w-full" onClick={onNavigateToContent}>
+              {t('customCarousel.customContentButton')}
+            </Button>
+            <Button type="button" variant="secondary" className="w-full" onClick={onNavigateToChat}>
+              {tApp('views.chat')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const focusedItem = focusedId
+    ? items.find((c) => c.collectionId === focusedId) ?? null
+    : null;
+  const focusedCustom = focusedId
+    ? customCollections.find((c) => c.collectionId === focusedId) ?? null
+    : null;
+  const focusedActionOverride = focusedItem
+    ? collectionActions[focusedItem.collectionName]
+    : undefined;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <CustomChipRail
+        items={customCollections.map((c) => ({
+          collectionId: c.collectionId,
+          displayName: localizedName(c),
+          cardsAdded: c.cardsAdded,
+          totalTexts: c.totalTexts,
+          isActive: selectedIds.has(c.collectionId),
+        }))}
+        focusedId={focusedId}
+        onFocus={setFocusedId}
+      />
+
+      {focusedItem && focusedCustom && (
+        <InlineCollectionDetail
+          collection={focusedItem}
+          isActive={selectedIds.has(focusedItem.collectionId)}
+          onSelect={() => handleToggleCollection(focusedItem.collectionId)}
+          onOpenDetail={() => setOpenCollectionId(focusedItem.collectionId)}
+          onAddCards={() => handleAddCards(focusedItem.collectionId)}
+          isAdding={isAdding}
+          t={tCarousel}
+          showToggleWhenComplete
+          actionOverride={focusedActionOverride}
+        />
+      )}
+
+      <CollectionDetailDialog
+        open={openCollectionId !== null}
+        onOpenChange={(open) => {
+          if (!open) setOpenCollectionId(null);
+        }}
+        collectionName={openedCollection?.collectionName ?? null}
+        displayName={openedCollection?.displayName ?? null}
+        totalTexts={openedCollection?.totalTexts ?? 0}
+        cardsAdded={openedCollection?.cardsAdded ?? 0}
+        isActive={
+          openCollectionId !== null && selectedIds.has(openCollectionId)
+        }
+        isComplete={isOpenedComplete}
+        texts={contentData?.texts ?? []}
+        isLoadingTexts={contentData === undefined && !isOpenedComplete}
+        isAdding={isAdding}
+        onSelect={() => {
+          if (openCollectionId) handleToggleCollection(openCollectionId);
+        }}
+        onAddCards={() => handleAddCards()}
+        showToggleWhenComplete
+      />
+    </div>
+  );
+}
+
+interface CustomChipItem {
+  collectionId: Id<'collections'>;
+  displayName: string;
+  cardsAdded: number;
+  totalTexts: number;
+  isActive: boolean;
+}
+
+function CustomChipRail({
+  items,
+  focusedId,
+  onFocus,
+}: {
+  items: CustomChipItem[];
+  focusedId: Id<'collections'> | null;
+  onFocus: (id: Id<'collections'>) => void;
+}) {
+  const railRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const el = railRef.current?.querySelector(`[data-focused="true"]`) as HTMLElement | null;
+    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+  }, [focusedId]);
+
+  return (
+    <div
+      ref={railRef}
+      // Same headroom math as GroupedLevelRail so the focused ring isn't
+      // clipped by overflow-x-auto.
+      className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
+      <div className="flex shrink-0 flex-col gap-1.5">
+        {/* Invisible spacer — mirrors the band-header row in
+            GroupedLevelRail so the Course and Custom Content tabs render at
+            the same height and switching between them doesn't shift layout. */}
+        <div
+          className="invisible flex items-center gap-1.5 px-0.5"
+          aria-hidden
+        >
+          <span className="size-2 rounded-full" />
+          <span className="font-mono text-[10px] font-bold tracking-widest">
+            A1
+          </span>
+          <span className="font-mono text-[10px] tabular-nums">0%</span>
+        </div>
+        <div className="flex gap-3">
+          {items.map((c) => (
+            <CustomChip
+              key={c.collectionId}
+              item={c}
+              isFocused={c.collectionId === focusedId}
+              onClick={() => onFocus(c.collectionId)}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CustomChip({
+  item,
+  isFocused,
+  onClick,
+}: {
+  item: CustomChipItem;
+  isFocused: boolean;
+  onClick: () => void;
+}) {
+  const pct = item.totalTexts > 0 ? Math.min(1, item.cardsAdded / item.totalTexts) : 0;
+  const isComplete = pct >= 1;
+  return (
+    <button
+      type="button"
+      data-focused={isFocused}
+      onClick={onClick}
+      // Double the width of a level chip (28 vs 14 in tailwind units = 112px
+      // vs 56px) so collection names like "Manually Added" fit comfortably.
+      className={cn(
+        'relative flex h-14 w-28 flex-col items-center justify-center overflow-hidden rounded-lg border px-2 transition-all',
+        isFocused
+          ? 'border-primary bg-primary/5 shadow-sm ring-2 ring-primary'
+          : 'border-border bg-card hover:bg-muted',
+      )}
+      aria-pressed={isFocused}
+      title={item.displayName}
+    >
+      <div
+        className="absolute bottom-0 left-0 right-0 transition-all"
+        style={{
+          height: `${pct * 100}%`,
+          backgroundColor: isComplete
+            ? 'color-mix(in oklch, var(--success) 22%, transparent)'
+            : 'color-mix(in oklch, var(--primary) 18%, transparent)',
+        }}
+        aria-hidden
+      />
+      <span
+        className={cn(
+          'relative z-10 truncate text-center text-[11px] font-semibold tabular-nums',
+          isFocused ? 'text-foreground' : 'text-muted-foreground',
+        )}
+      >
+        {item.displayName}
+      </span>
+      <div className="relative z-10 flex h-3 items-center">
+        {item.isActive ? (
+          <span
+            style={{
+              display: 'block',
+              width: '6px',
+              height: '6px',
+              borderRadius: '9999px',
+              backgroundColor: 'var(--primary)',
+              boxShadow:
+                '0 0 0 1.5px color-mix(in oklch, var(--primary) 25%, transparent)',
+            }}
+            aria-hidden
+          />
+        ) : isComplete ? (
+          <Check className="size-3 text-[color:var(--success)]" strokeWidth={3} />
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
+// ============================================================================
+// Skeleton
+// ============================================================================
+
+function SegmentedSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-2">
+        <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
+        <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
+      </div>
+      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-5">
+        {Array.from({ length: 7 }).map((_, i) => (
+          <div key={i} className="flex shrink-0 flex-col gap-1.5">
+            <div className="h-3 w-16 animate-pulse rounded bg-muted" />
+            <div className="flex gap-1">
+              {Array.from({ length: 3 }).map((__, j) => (
+                <div key={j} className="h-14 w-14 animate-pulse rounded-lg bg-muted" />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="h-32 animate-pulse rounded-xl bg-muted" />
+    </div>
+  );
+}

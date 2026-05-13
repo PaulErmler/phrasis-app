@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Preloaded, usePreloadedQuery, useMutation } from 'convex/react';
+import { Preloaded, usePreloadedQuery, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { NewChatInput } from '@/components/chat/NewChatInput';
-import { CollectionCarousel } from '@/components/app/CollectionCarousel';
-import { CustomCollectionCarousel } from '@/components/app/CustomCollectionCarousel';
+import { SegmentedHomeSection } from '@/components/app/segmented/SegmentedHomeSection';
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
@@ -17,9 +16,7 @@ import { toast } from 'sonner';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
 
 export function HomeView({
-  preloadedCollectionProgress,
   preloadedCourseSettings,
-  preloadedCustomCollectionsProgress,
   onLearnOpen,
   onChatOpen,
   onNavigateToContent,
@@ -31,14 +28,8 @@ export function HomeView({
   hasActiveCourse,
   onOpenCourseMenu,
 }: {
-  preloadedCollectionProgress: Preloaded<
-    typeof api.features.decks.getCollectionProgress
-  >;
   preloadedCourseSettings: Preloaded<
     typeof api.features.courses.getActiveCourseSettings
-  >;
-  preloadedCustomCollectionsProgress: Preloaded<
-    typeof api.features.decks.getCustomCollectionsProgress
   >;
   onLearnOpen: () => void;
   onChatOpen: (threadId: string) => void;
@@ -63,6 +54,15 @@ export function HomeView({
   }, [onTutorialReady, restartTutorial]);
 
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
+  // Drives the disabled state of the Radio button on the home screen — radio
+  // mode is meaningless on an empty deck. Skipped while HomeView is hidden
+  // (e.g. user is mid-LearnView) so the subscription doesn't refire on every
+  // radio-mode card advance. While loading we leave the button enabled so the
+  // click path falls back to the toast.
+  const hasPlayableCards = useQuery(
+    api.features.scheduling.hasPlayableCards,
+    isHidden ? 'skip' : {},
+  );
   const updateCourseSettings = useMutation(
     api.features.courses.updateCourseSettings,
   ).withOptimisticUpdate((localStore, args) => {
@@ -84,6 +84,20 @@ export function HomeView({
     api.features.chat.threads.getOrCreateEmptyThread,
   );
   const [isChatNavigating, setIsChatNavigating] = useState(false);
+
+  // Fire-and-forget: ensure the first 5 sentences of every level collection
+  // have translations + audio queued so when the user drills into a level
+  // they don't see a loading spinner. Idempotent — `scheduleMissingContent`
+  // skips any (text, language) that's already covered, so re-entries are cheap.
+  const ensureFirstSentences = useMutation(
+    api.features.collections.ensureFirstSentencesAcrossLevelCollections,
+  );
+  useEffect(() => {
+    if (!hasActiveCourse || isHidden) return;
+    ensureFirstSentences({}).catch((err) => {
+      console.error('[home] ensureFirstSentences failed', err);
+    });
+  }, [hasActiveCourse, isHidden, ensureFirstSentences]);
 
   const handleGoToChat = useCallback(async () => {
     setIsChatNavigating(true);
@@ -159,6 +173,7 @@ export function HomeView({
           animateEntrance={animateEntrance}
           skipLiveStats={isHidden}
           courseId={courseSettings?.courseId}
+          hasPlayableCards={hasPlayableCards ?? true}
         />
 
         {/* Content actions */}
@@ -197,22 +212,16 @@ export function HomeView({
           </div>
         </div>
 
-        <div className="space-y-2" data-tutorial="collection-carousel">
+        <div className="space-y-2">
           <h2 className="heading-section">
             {t('collections.carousel.sectionTitle')}
           </h2>
-          <CollectionCarousel
-            preloadedCollectionProgress={preloadedCollectionProgress}
-            preloadedCourseSettings={preloadedCourseSettings}
+          <SegmentedHomeSection
+            activeCourseId={courseSettings?.courseId ?? null}
+            onNavigateToContent={onNavigateToContent}
+            onNavigateToChat={onNavigateToChat}
           />
         </div>
-
-        <CustomCollectionCarousel
-          preloadedCourseSettings={preloadedCourseSettings}
-          preloadedCustomCollectionsProgress={preloadedCustomCollectionsProgress}
-          onNavigateToContent={onNavigateToContent}
-          onNavigateToChat={onNavigateToChat}
-        />
 
       </div>
     </div>

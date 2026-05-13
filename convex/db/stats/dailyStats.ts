@@ -24,7 +24,7 @@ const EMPTY_RATING_COUNTS = () => ({
   stillLearning: 0, understood: 0,
   again: 0, hard: 0, good: 0, easy: 0,
 });
-const EMPTY_MODE_COUNTS = () => ({ audio: 0, full: 0 });
+const EMPTY_MODE_COUNTS = () => ({ audio: 0, full: 0, radio: 0 });
 const EMPTY_CARD_STATE = () => ({ new: 0, learning: 0, review: 0, relearning: 0 });
 
 export async function upsertDailyStats(
@@ -35,14 +35,14 @@ export async function upsertDailyStats(
     date: string;
     timeMs: number;
     isNewCard: boolean;
-    reviewMode?: 'audio' | 'full';
+    reviewMode?: 'audio' | 'full' | 'radio';
     rating?: string;
     accuracy?: number;
     wasDefaultRating?: boolean;
     hourOfDay?: number;
     cardState?: number; // 0=new, 1=learning, 2=review, 3=relearning
   },
-): Promise<{ isFirstActivityToday: boolean }> {
+): Promise<{ isFirstActivityToday: boolean; repsAfter: number; timeMsAfter: number }> {
   const existing = await ctx.db
     .query('dailyStats')
     .withIndex('by_userId_and_courseId_and_date', (q) =>
@@ -72,13 +72,21 @@ export async function upsertDailyStats(
       }
     }
 
-    // Mode counts
-    let reviewsByMode: { audio: number; full: number } | undefined;
-    let timeMsByMode: { audio: number; full: number } | undefined;
+    // Mode counts. `radio` is optional in the stored shape (added later),
+    // so we coalesce both the merged previous shape and the per-key read.
+    type ModeCounts = { audio: number; full: number; radio: number };
+    let reviewsByMode: ModeCounts | undefined;
+    let timeMsByMode: ModeCounts | undefined;
     if (args.reviewMode) {
-      const prevReviews = existing.reviewsByMode ?? EMPTY_MODE_COUNTS();
+      const prevReviews: ModeCounts = {
+        ...EMPTY_MODE_COUNTS(),
+        ...(existing.reviewsByMode ?? {}),
+      };
       reviewsByMode = { ...prevReviews, [args.reviewMode]: prevReviews[args.reviewMode] + 1 };
-      const prevTime = existing.timeMsByMode ?? EMPTY_MODE_COUNTS();
+      const prevTime: ModeCounts = {
+        ...EMPTY_MODE_COUNTS(),
+        ...(existing.timeMsByMode ?? {}),
+      };
       timeMsByMode = { ...prevTime, [args.reviewMode]: prevTime[args.reviewMode] + args.timeMs };
     }
 
@@ -90,9 +98,11 @@ export async function upsertDailyStats(
       reviewsByCardState = { ...prev, [key]: prev[key] + 1 };
     }
 
+    const repsAfter = existing.reps + 1;
+    const timeMsAfter = existing.timeMs + args.timeMs;
     await ctx.db.patch(existing._id, {
-      reps: existing.reps + 1,
-      timeMs: existing.timeMs + args.timeMs,
+      reps: repsAfter,
+      timeMs: timeMsAfter,
       newCards: existing.newCards + (args.isNewCard ? 1 : 0),
       cardsReviewed: existing.cardsReviewed + 1,
       ...(hourBuckets ? { hourBuckets } : {}),
@@ -113,7 +123,7 @@ export async function upsertDailyStats(
         ? { defaultRatingChanged: (existing.defaultRatingChanged ?? 0) + 1 }
         : {}),
     });
-    return { isFirstActivityToday: false };
+    return { isFirstActivityToday: false, repsAfter, timeMsAfter };
   }
 
   // Insert new document
@@ -144,15 +154,23 @@ export async function upsertDailyStats(
     reviewsByCardState: cardState,
     ...(args.reviewMode
       ? {
-        reviewsByMode: { audio: args.reviewMode === 'audio' ? 1 : 0, full: args.reviewMode === 'full' ? 1 : 0 },
-        timeMsByMode: { audio: args.reviewMode === 'audio' ? args.timeMs : 0, full: args.reviewMode === 'full' ? args.timeMs : 0 },
+        reviewsByMode: {
+          audio: args.reviewMode === 'audio' ? 1 : 0,
+          full: args.reviewMode === 'full' ? 1 : 0,
+          radio: args.reviewMode === 'radio' ? 1 : 0,
+        },
+        timeMsByMode: {
+          audio: args.reviewMode === 'audio' ? args.timeMs : 0,
+          full: args.reviewMode === 'full' ? args.timeMs : 0,
+          radio: args.reviewMode === 'radio' ? args.timeMs : 0,
+        },
       }
       : {}),
     ...(args.accuracy != null ? { accuracySum: args.accuracy, accuracyCount: 1 } : {}),
     ...(args.wasDefaultRating === true ? { defaultRatingUsed: 1, defaultRatingChanged: 0 } : {}),
     ...(args.wasDefaultRating === false ? { defaultRatingUsed: 0, defaultRatingChanged: 1 } : {}),
   });
-  return { isFirstActivityToday: true };
+  return { isFirstActivityToday: true, repsAfter: 1, timeMsAfter: args.timeMs };
 }
 
 /**

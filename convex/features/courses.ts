@@ -42,8 +42,10 @@ import {
   validateInitialReviewCount,
 } from '../../lib/scheduling';
 import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
-import { LEVEL_TO_COLLECTION } from '../lib/collections';
-import { getNextTextsFromRank } from '../db/collections';
+import {
+  getNextTextsFromRank,
+  resolveStartingCollection,
+} from '../db/collections';
 import { createCardsFromTexts, updateCollectionProgress } from './decks';
 import { courseSettingsDocValidator } from '../schema';
 
@@ -304,7 +306,13 @@ export const getCourseStats = query({
       totalChatCardsApproved: v.optional(v.number()),
       totalCardsEdited: v.optional(v.number()),
       totalCardsAddedManually: v.optional(v.number()),
-      totalReviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+      totalReviewsByMode: v.optional(
+        v.object({
+          audio: v.number(),
+          full: v.number(),
+          radio: v.optional(v.number()),
+        }),
+      ),
       totalAccuracySum: v.optional(v.number()),
       totalAccuracyCount: v.optional(v.number()),
     }),
@@ -367,7 +375,9 @@ export const getTodayStats = query({
       reps: v.number(),
       newCards: v.number(),
       timeMs: v.number(),
-      reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number() })),
+      reviewsByMode: v.optional(
+        v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) }),
+      ),
       accuracyAvg: v.optional(v.number()),
       chatMessagesSent: v.optional(v.number()),
       chatCardsApproved: v.optional(v.number()),
@@ -632,12 +642,7 @@ export const createCourse = mutation({
 
     let activeCollectionId: Id<'collections'> | undefined;
     if (args.currentLevel) {
-      const collectionName =
-        LEVEL_TO_COLLECTION[args.currentLevel] ?? 'Essential';
-      const collection = await ctx.db
-        .query('collections')
-        .withIndex('by_name', (q) => q.eq('name', collectionName))
-        .first();
+      const collection = await resolveStartingCollection(ctx, args.currentLevel);
       activeCollectionId = collection?._id;
     }
 
@@ -689,13 +694,9 @@ export const completeOnboarding = mutation({
     });
     await createCourseStats(ctx, userId, courseId);
 
-    // Map the user's level to a starting collection
-    const collectionName =
-      LEVEL_TO_COLLECTION[progress.currentLevel ?? 'beginner'] ?? 'Essential';
-    const collection = await ctx.db
-      .query('collections')
-      .withIndex('by_name', (q) => q.eq('name', collectionName))
-      .first();
+    // Map the user's level to a starting collection (prefers the active OGTE
+    // dataset collection by code, falls back to the legacy CEFR row).
+    const collection = await resolveStartingCollection(ctx, progress.currentLevel ?? 'beginner');
 
     // Create course settings in a separate table (with preselected collection and review mode)
     await upsertCourseSettings(ctx, courseId, {
@@ -851,6 +852,7 @@ export const updateCourseSettings = mutation({
     pauseTargetToTarget: v.optional(v.number()),
     pauseBeforeAutoAdvance: v.optional(v.number()),
     showProgressBar: v.optional(v.boolean()),
+    progressDisplayEnabled: v.optional(v.boolean()),
     hideTargetLanguages: v.optional(v.boolean()),
     autoRevealLanguages: v.optional(v.boolean()),
     showRomanization: v.optional(v.boolean()),
@@ -862,7 +864,7 @@ export const updateCourseSettings = mutation({
     fullReviewTargetAudioMode: v.optional(
       v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
     ),
-    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'))),
+    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -893,6 +895,7 @@ export const updateCourseSettings = mutation({
       'pauseTargetToTarget',
       'pauseBeforeAutoAdvance',
       'showProgressBar',
+      'progressDisplayEnabled',
       'hideTargetLanguages',
       'autoRevealLanguages',
       'showRomanization',
@@ -946,6 +949,7 @@ export const updateCourseSettings = mutation({
         pauseTargetToTarget: args.pauseTargetToTarget,
         pauseBeforeAutoAdvance: args.pauseBeforeAutoAdvance,
         showProgressBar: args.showProgressBar,
+        progressDisplayEnabled: args.progressDisplayEnabled,
         hideTargetLanguages: args.hideTargetLanguages,
         autoRevealLanguages: args.autoRevealLanguages,
         baseLanguageOrder: args.baseLanguageOrder,

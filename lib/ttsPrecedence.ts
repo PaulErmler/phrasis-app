@@ -1,0 +1,28 @@
+/**
+ * Declarative rules for when a language's NEW active TTS provider should
+ * overwrite existing audio rows produced by an OLD provider.
+ *
+ * For each provider key, the value is the list of other providers whose
+ * existing `audioRecordings` rows should be deleted + re-synthesized when
+ * the language is switched to this provider. Providers not listed are kept
+ * as-is (existing audio still plays; no regen).
+ *
+ * Read by `scheduleMissingContent` in convex/features/decks.ts. Legacy rows
+ * with no `ttsProvider` field are treated as 'google' there before this
+ * function sees them.
+ */
+import type { TtsProvider } from './languages';
+
+export const TTS_PROVIDER_OVERRIDES: Record<TtsProvider, readonly TtsProvider[]> = {
+  google: [],
+  elevenlabs: [],
+  azure: ['elevenlabs'],
+};
+
+export function shouldOverwriteProvider(
+  current: TtsProvider,
+  existing: TtsProvider,
+): boolean {
+  if (current === existing) return false;
+  return TTS_PROVIDER_OVERRIDES[current].includes(existing);
+}

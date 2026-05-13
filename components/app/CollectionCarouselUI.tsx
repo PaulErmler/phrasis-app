@@ -17,7 +17,17 @@ import { useTranslations } from 'next-intl';
 
 export interface CollectionProgressItem {
   collectionId: string;
+  /**
+   * Stable identifier used for description-i18n lookup (e.g. "Custom", "A1.1").
+   * Always the raw collection name — never localized — so callers can rely on
+   * it as a key into `descriptions.*` and other lookup maps.
+   */
   collectionName: string;
+  /**
+   * Optional localized display title. Falls back to `collectionName` when
+   * absent. Used for rendering only; never for lookups.
+   */
+  displayName?: string;
   cardsAdded: number;
   totalTexts: number;
 }
@@ -29,12 +39,26 @@ export interface CollectionAction {
   isLoading?: boolean;
 }
 
-/** Generate a human-readable CEFR description using i18n, with fallback. */
+/** Generate a human-readable CEFR description using i18n.
+ *
+ * Each sublevel ("A1.1", "C2.4", ...) has its own translation entry, so the
+ * primary path is an exact lookup. The display name has a dot ("A1.1") but
+ * next-intl treats dots as namespace separators in keys — so we normalize
+ * dots to underscores at lookup time ("A1.1" → "A1_1"). The sublevel-to-tier
+ * fallback exists only as a defensive net — if a new dataset display name is
+ * added without a matching i18n key, we fall back to the parent CEFR band's
+ * description rather than throwing MISSING_MESSAGE in the UI.
+ */
 export function getCollectionDescription(
   name: string,
   t: (key: string) => string,
+  has?: (key: string) => boolean,
 ): string {
-  return t(name);
+  const key = name.replace(/\./g, '_');
+  if (!has || has(key)) return t(key);
+  const sublevel = /^([A-C][12])\.\d+$/.exec(name);
+  if (sublevel && has(sublevel[1])) return t(sublevel[1]);
+  return name;
 }
 
 interface CollectionCarouselUIProps {
@@ -155,7 +179,7 @@ export function CollectionCarouselUI({
                     !isFocused && 'text-muted-foreground',
                   )}
                 >
-                  {collection.collectionName}
+                  {collection.displayName ?? collection.collectionName}
                 </span>
                 {/* Fixed-height indicator area */}
                 <div className="h-3 flex items-center justify-center">
@@ -197,7 +221,7 @@ export function CollectionCarouselUI({
 // INLINE DETAIL CARD (Split style)
 // ============================================================================
 
-function InlineCollectionDetail({
+export function InlineCollectionDetail({
   collection,
   isActive,
   onSelect,
@@ -253,16 +277,30 @@ function InlineCollectionDetail({
       <div className="p-3 space-y-2.5">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-sm">
-            {collection.collectionName}
+            {collection.displayName ?? collection.collectionName}
           </h3>
-          <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
-            {Math.round(progress)}%
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={cn(
+                'text-[10px] font-medium px-2.5 py-0.5 rounded-full',
+                isActive
+                  ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
+                  : 'bg-muted text-muted-foreground',
+              )}
+            >
+              {isActive ? t('inline.active') : t('inline.inactive')}
+            </span>
+            <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
+              {Math.round(progress)}%
+            </span>
+          </div>
         </div>
 
         <p className="text-xs text-muted-foreground leading-relaxed">
-          {getCollectionDescription(collection.collectionName, (key) =>
-            t(`descriptions.${key}`),
+          {getCollectionDescription(
+            collection.collectionName,
+            (key) => t(`descriptions.${key}`),
+            (key) => t.has(`descriptions.${key}`),
           )}
         </p>
 
@@ -342,7 +380,7 @@ function InlineCollectionDetail({
                 className="text-xs"
               >
                 <Lock className="h-3.5 w-3.5 mr-1" />
-                Upgrade
+                {t('detail.upgrade')}
               </Button>
             ) : (
               <Button

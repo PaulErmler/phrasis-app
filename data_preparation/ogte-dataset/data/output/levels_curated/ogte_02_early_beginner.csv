@@ -1,0 +1,348 @@
+id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
+505870,After you.,10.00,80,after,2,after,direct-address,neutral,02,1
+x2_1,Thank you.,,309,thank,2,thank,direct-address,neutral,02,1
+1579,"Oh, I'm sorry.",10.00,671,sorry,3,oh,direct-address,neutral,02,2
+x2_2,It's all right.,,113,right,3,right,descriptive,n/a,02,2
+3130463,"Hey, come here.",10.00,776,hey,3,hey,direct-address,informal,02,3
+3130462,"Hi, come on in.",10.00,1067,hi,4,hi,direct-address,informal,02,3
+567368,I'm a student.,10.00,1019,student,3,student,descriptive,n/a,02,4
+707431,We're students.,9.00,555,students,2,students|we're,descriptive,n/a,02,4
+2111238,They're students.,8.00,555,students,2,students,descriptive,n/a,02,4
+2300258,I came to say hi.,10.00,1067,hi,5,came|hi|i|say|to,descriptive,n/a,02,5
+1898375,Hey. I know you.,9.00,776,hey,4,hey|i|know|you,direct-address,informal,02,5
+3269279,"How do you say ""hello"" in French?",10.00,1927,hello,7,do|french|hello|how|in|say|you,direct-address,neutral,02,6
+1649,How do you say that in Italian?,9.00,2192,italian,7,italian,direct-address,neutral,02,6
+3593993,That's a good thing.,9.00,179,thing,4,a|good|that's|thing,descriptive,n/a,02,7
+1808247,This looks good.,9.00,427,looks,3,looks,descriptive,n/a,02,7
+1054512,Where is the school?,9.00,183,school,4,school|the,descriptive,n/a,02,8
+3010582,Where have they gone?,8.00,682,gone,4,gone,descriptive,n/a,02,8
+3123662,Where are the women?,7.00,239,women,4,are|the|where|women,descriptive,n/a,02,8
+2218133,You're doing great.,9.00,220,doing,3,doing,direct-address,neutral,02,9
+2645593,"Yeah, isn't that great?",8.00,419,yeah,4,yeah,direct-address,informal,02,9
+35504,"Yes, I know.",9.00,294,yes,3,yes,descriptive,n/a,02,10
+433589,"Yes, I know it.",9.00,294,yes,4,i|it|know|yes,descriptive,n/a,02,10
+305484,Are they American?,9.00,296,american,3,american|are|they,descriptive,n/a,02,11
+287965,Is he American?,8.00,296,american,3,american,descriptive,n/a,02,11
+x2_8,"Yes, he is.",,294,yes,3,yes,descriptive,n/a,02,11
+2241438,We saw it.,9.00,450,saw,3,saw,descriptive,n/a,02,12
+2241441,We saw you.,9.00,450,saw,3,saw|we|you,direct-address,neutral,02,12
+24426,What is the price?,9.00,582,price,4,is|price|the|what,descriptive,n/a,02,13
+x2_9,It's ten dollars.,,1702,dollars,3,dollars,descriptive,n/a,02,13
+3109222,"I'll miss you, too.",9.00,598,miss,4,miss,direct-address,neutral,02,14
+423405,It's hot.,9.00,700,hot,2,hot,descriptive,n/a,02,15
+455953,I'm hot.,8.00,700,hot,2,hot|i'm,descriptive,n/a,02,15
+x2_3,Where do you come from?,,157,come,5,come,direct-address,neutral,02,16
+253219,I come from Australia.,9.00,911,australia,4,australia|come|from|i,descriptive,n/a,02,16
+255520,I come from Brazil.,9.00,2550,brazil,4,brazil,descriptive,n/a,02,16
+288977,He comes from England.,8.00,773,england,4,england,descriptive,n/a,02,16
+1913088,Listen.,9.00,918,listen,1,listen,direct-address,informal,02,17
+3096280,Thanks for seeing me.,9.00,966,seeing,4,for|me|seeing|thanks,direct-address,neutral,02,18
+2250082,Thanks for asking.,9.00,1146,asking,3,asking,direct-address,neutral,02,18
+2250087,Thanks for understanding.,8.00,1606,understanding,3,for|thanks|understanding,direct-address,formal,02,18
+1123762,Is he Japanese?,8.00,1624,japanese,3,japanese,descriptive,n/a,02,19
+x2_15,"No, he's Chinese.",,1033,chinese,3,he's,descriptive,n/a,02,19
+335138,I am Chinese.,9.00,1033,chinese,3,chinese,descriptive,n/a,02,19
+4397567,That's my dad.,9.00,1170,dad,3,dad,descriptive,n/a,02,20
+2645642,What's your dad's name?,8.00,8934,dad's,4,dad's,direct-address,neutral,02,20
+5374921,My dad's not here.,8.00,8934,dad's,4,dad's|here|my|not,descriptive,n/a,02,20
+1046142,I think my German isn't very good.,9.00,1175,german,7,german|good|i|isn't|my|think|very,descriptive,n/a,02,21
+1784,I don't understand German.,8.00,1175,german,4,german,descriptive,n/a,02,21
+259803,I live in Japan.,9.00,1357,japan,4,i|in|japan|live,descriptive,n/a,02,22
+456735,She lives in New York.,8.00,737,lives,5,york,descriptive,n/a,02,22
+4012786,How long have you lived there?,9.00,1386,lived,6,have|how|lived|long|there|you,direct-address,neutral,02,23
+3343227,Have you lived here long?,8.00,1386,lived,5,lived,direct-address,neutral,02,23
+3442128,How long have you known?,8.00,389,known,5,known,direct-address,neutral,02,23
+472091,I study Korean.,9.00,3046,korean,3,korean,descriptive,n/a,02,24
+2300257,I came to say goodbye.,9.00,4241,goodbye,5,came|goodbye|i|say|to,descriptive,n/a,02,25
+1126721,Why are you saying goodbye?,7.00,4241,goodbye,5,goodbye,direct-address,neutral,02,25
+5042310,Do you like it or not?,8.00,50,do,6,do|it|like|not|or|you,direct-address,neutral,02,26
+x2_19,"Yes, I like it.",,294,yes,4,like,descriptive,n/a,02,26
+2252700,These are good.,8.00,94,these,3,these,descriptive,n/a,02,27
+2544716,I'm not having a good day.,8.00,227,having,6,having,descriptive,n/a,02,27
+1689909,I do it because I have to.,8.00,97,because,7,because,descriptive,n/a,02,28
+2163138,May I go?,8.00,108,may,3,may,direct-address,formal,02,29
+2083032,I'll go on Sunday.,8.00,1275,sunday,4,sunday,descriptive,n/a,02,29
+3738218,Do you know that man?,8.00,145,man,5,do|know|man|that|you,direct-address,neutral,02,30
+2891092,Do you know what it says?,8.00,303,says,6,says,direct-address,neutral,02,30
+1885906,How does this look?,8.00,172,does,4,does,direct-address,neutral,02,31
+2272034,It doesn't look good.,8.00,264,doesn't,4,doesn't,descriptive,n/a,02,31
+2245527,Give me those.,8.00,180,give,3,give|me|those,direct-address,informal,02,32
+2111934,Come again.,8.00,184,again,2,again|come,direct-address,neutral,02,33
+998503,He wants to come with us.,8.00,571,wants,6,wants|with,descriptive,n/a,02,33
+2546200,I thought you said 2:30.,8.00,229,thought,4,i|said|thought|you,direct-address,neutral,02,34
+2647341,What are you making?,8.00,257,making,4,making,direct-address,neutral,02,35
+511884,What do you make?,5.00,87,make,4,make,direct-address,neutral,02,35
+237944,How are you making out?,4.00,257,making,5,are|how|making|out|you,direct-address,informal,02,35
+1349059,I'm reading.,8.00,742,reading,2,reading,descriptive,n/a,02,36
+1098659,Read this.,8.00,259,read,2,read,direct-address,informal,02,36
+6029197,"Do you have this in black, too?",8.00,318,black,7,black|do|have|in|this|too|you,direct-address,neutral,02,37
+x2_10,"Yes, we do.",,294,yes,3,we,descriptive,n/a,02,37
+2880322,What makes you think that?,8.00,322,makes,5,makes,direct-address,neutral,02,38
+1872056,I'm happy.,8.00,434,happy,2,happy,descriptive,n/a,02,39
+x2_21,Why are you happy?,,434,happy,4,why,direct-address,neutral,02,39
+320080,Don't ask.,8.00,444,ask,2,ask,direct-address,informal,02,40
+1841646,I'll ask him.,8.00,444,ask,3,him,descriptive,n/a,02,40
+1886532,Why are you asking?,7.00,1146,asking,4,are|asking|why|you,direct-address,neutral,02,40
+1954282,Watch me.,8.00,452,watch,2,watch,direct-address,informal,02,41
+1954283,Watch us.,8.00,452,watch,2,us|watch,direct-address,informal,02,41
+1050988,I like living here.,8.00,493,living,4,living,descriptive,n/a,02,42
+1125674,Where are you living?,8.00,493,living,4,are|living|where|you,direct-address,neutral,02,42
+2240787,We're fine here.,8.00,576,fine,3,fine|here|we're,descriptive,n/a,02,43
+1885871,How'd you get here?,8.00,13560,how'd,4,how'd,direct-address,informal,02,43
+1495883,Where are my books?,8.00,719,books,4,are|books|my|where,descriptive,n/a,02,44
+671434,Where are the boys?,7.00,974,boys,4,boys,descriptive,n/a,02,44
+267239,Where are the girls?,7.00,680,girls,4,girls,descriptive,n/a,02,44
+4501970,See you in October.,8.00,803,october,4,october,direct-address,informal,02,45
+2203796,We'll see.,8.00,1367,we'll,2,we'll,descriptive,n/a,02,45
+314454,She knows me.,8.00,895,knows,3,knows,descriptive,n/a,02,46
+449023,No one knows.,7.00,895,knows,3,knows|no|one,descriptive,n/a,02,46
+64428,Thank you for writing.,8.00,909,writing,4,for|thank|writing|you,direct-address,formal,02,47
+1358780,How about Friday?,8.00,1155,friday,3,friday,direct-address,neutral,02,48
+x2_12,Friday is good for me.,,1155,friday,5,good,descriptive,n/a,02,48
+469126,She's my sister.,8.00,1195,sister,3,my|she's|sister,descriptive,n/a,02,49
+245559,Say hello to your sister for me.,8.00,1927,hello,7,hello,direct-address,neutral,02,49
+1495807,What's your sister's name?,8.00,11474,sister's,4,sister's,direct-address,neutral,02,49
+x2_4,Her name is Mary.,,1715,mary,4,her,descriptive,n/a,02,49
+2545954,I'm not good with names.,8.00,1302,names,5,good|i'm|names|not|with,descriptive,n/a,02,50
+2248965,It'll be good.,8.00,2564,it'll,3,be|good|it'll,descriptive,n/a,02,50
+1920819,I don't drink.,8.00,1322,drink,3,don't|drink|i,descriptive,n/a,02,51
+2244942,Are you drinking?,7.00,1976,drinking,3,drinking,direct-address,informal,02,51
+2254568,What're you drinking?,8.00,14877,what're,3,drinking|you,direct-address,informal,02,51
+18547,I'm broke.,8.00,1465,broke,2,broke,descriptive,n/a,02,52
+2107334,We're broke.,7.00,1465,broke,2,broke|we're,descriptive,n/a,02,52
+2111751,I'm Canadian.,8.00,2013,canadian,2,canadian,descriptive,n/a,02,53
+247877,We are not Americans.,8.00,1536,americans,4,americans,descriptive,n/a,02,53
+238862,It's Monday.,8.00,1651,monday,2,monday,descriptive,n/a,02,54
+2187246,It's Wednesday.,7.00,2546,wednesday,2,wednesday,descriptive,n/a,02,54
+2123580,It's Saturday.,7.00,1426,saturday,2,saturday,descriptive,n/a,02,54
+1673290,Is this car yours?,8.00,1834,yours,4,yours,direct-address,neutral,02,55
+x2_6,"Yes, it's mine.",,959,mine,3,mine,descriptive,n/a,02,55
+2760951,Is that car yours?,7.00,1834,yours,4,car|is|that|yours,direct-address,neutral,02,55
+x2_7,"No, it isn't.",,367,isn't,3,isn't,descriptive,n/a,02,55
+2107335,We're brothers.,8.00,2047,brothers,2,brothers,descriptive,n/a,02,56
+2549265,They're brothers.,7.00,2047,brothers,2,brothers|they're,descriptive,n/a,02,56
+1977902,I'm your brother.,7.00,790,brother,3,brother,direct-address,neutral,02,56
+1891022,I'm listening.,8.00,2199,listening,2,listening,descriptive,n/a,02,57
+1893640,We're listening.,7.00,2199,listening,2,listening|we're,descriptive,n/a,02,57
+394633,He loves her.,8.00,2201,loves,3,he|her|loves,descriptive,n/a,02,58
+2648845,Drinks are on me.,5.00,3395,drinks,4,drinks,descriptive,n/a,02,59
+2645020,Thank you for the drinks.,8.00,3395,drinks,5,drinks|for|thank|the|you,direct-address,neutral,02,59
+5840018,I'm studying.,8.00,3496,studying,2,studying,descriptive,n/a,02,60
+593281,He's studying.,7.00,3496,studying,2,he's|studying,descriptive,n/a,02,60
+312694,She studies English.,7.00,1118,studies,3,studies,descriptive,n/a,02,60
+255449,I'm a baker.,8.00,4741,baker,3,baker,descriptive,n/a,02,61
+x2_17,Where do you work?,,114,work,4,work,direct-address,neutral,02,61
+x2_18,I work in a bakery.,,10432,bakery,5,bakery,descriptive,n/a,02,61
+2251019,That'll be great.,8.00,7318,that'll,3,that'll,descriptive,n/a,02,62
+1495887,How's your brother?,8.00,7385,how's,3,how's,direct-address,neutral,02,63
+x2_11,"He's fine, thanks.",,576,fine,3,fine,descriptive,n/a,02,63
+5769807,I'm a carpenter.,8.00,8825,carpenter,3,carpenter,descriptive,n/a,02,64
+2360439,I have to be up by 6:30.,7.00,44,up,6,be|by|have|i|to|up,descriptive,n/a,02,65
+x2_16,What time do you wake up?,,1792,wake,6,wake,direct-address,neutral,02,65
+1977679,I like it when you do that.,7.00,50,do,7,that|when,direct-address,informal,02,66
+2359400,I've come to see you.,7.00,178,i've,5,come|i've|see|to|you,direct-address,neutral,02,67
+241719,You'll see.,7.00,604,you'll,2,you'll,direct-address,neutral,02,67
+1983980,It's a good thing.,7.00,179,thing,4,thing,descriptive,n/a,02,68
+260561,I know his family.,7.00,200,family,4,his,descriptive,n/a,02,69
+3832028,My family thinks I'm rich.,7.00,1726,thinks,5,thinks,descriptive,n/a,02,69
+3675788,My family's not rich.,7.00,6583,family's,4,family's,descriptive,n/a,02,69
+2368,He's a good person.,7.00,250,person,4,he's,descriptive,n/a,02,70
+593241,She's a good person.,7.00,542,she's,4,a|good|person|she's,descriptive,n/a,02,70
+5828682,I took it.,7.00,285,took,3,took,descriptive,n/a,02,71
+3822323,I took the money.,7.00,285,took,4,i|money|the|took,descriptive,n/a,02,71
+1860571,Take whatever you want.,7.00,748,whatever,4,whatever,direct-address,informal,02,71
+2111483,Take mine.,7.00,959,mine,2,mine,direct-address,informal,02,71
+42189,It's white.,7.00,286,white,2,white,descriptive,n/a,02,72
+2892547,What do you think it says?,7.00,303,says,6,do|it|says|think|what|you,direct-address,neutral,02,73
+1120794,You are big.,6.00,195,big,3,are|big|you,direct-address,neutral,02,74
+2111244,They're small.,7.00,313,they're,2,they're,descriptive,n/a,02,74
+3727148,I'm using this.,7.00,316,using,3,i'm|this|using,descriptive,n/a,02,75
+3044158,They're using you.,4.00,316,using,3,using,direct-address,informal,02,75
+2245509,Get the book.,7.00,345,book,3,book,direct-address,informal,02,76
+1048420,This isn't money.,7.00,367,isn't,3,isn't,descriptive,n/a,02,77
+64716,Here is your bill.,7.00,718,bill,4,bill|here|is|your,direct-address,neutral,02,77
+3568461,How long have you known me?,7.00,389,known,6,have|how|known|long|me|you,direct-address,neutral,02,78
+x2_20,For two years.,,116,years,3,years,descriptive,n/a,02,78
+254495,I know the girl.,7.00,404,girl,4,girl,descriptive,n/a,02,79
+254503,I know the boy.,7.00,677,boy,4,boy,descriptive,n/a,02,79
+395051,I know those girls.,7.00,680,girls,4,girls|i|know|those,descriptive,n/a,02,79
+289834,He is playing here.,7.00,415,playing,4,he|here|is|playing,descriptive,n/a,02,80
+3730601,What goes on in here?,7.00,595,goes,5,goes|here|in|on|what,descriptive,n/a,02,80
+1280399,My father isn't home.,7.00,539,father,4,father,descriptive,n/a,02,81
+706999,Dad isn't home.,7.00,1170,dad,3,dad|home|isn't,descriptive,n/a,02,81
+2243127,They gave up.,7.00,549,gave,3,gave,descriptive,n/a,02,82
+5852641,I'm giving up.,7.00,723,giving,3,giving|i'm|up,descriptive,n/a,02,82
+1931872,Does your mother know?,7.00,566,mother,4,does|know|mother|your,direct-address,neutral,02,83
+1345510,He doesn't know English.,7.00,642,english,4,doesn't|english|he|know,descriptive,n/a,02,83
+2283731,I'm thinking.,7.00,569,thinking,2,thinking,descriptive,n/a,02,84
+2218194,You're looking down.,5.00,236,looking,3,down|looking|you're,direct-address,neutral,02,85
+1876996,You look fine.,7.00,576,fine,3,fine,direct-address,neutral,02,85
+954759,You look European.,5.00,860,european,3,european,direct-address,neutral,02,85
+3368737,You look good in black.,5.00,318,black,5,black,direct-address,neutral,02,85
+2111614,Look again.,6.00,184,again,2,again,direct-address,informal,02,85
+1905871,Are you looking?,6.00,236,looking,3,looking,direct-address,neutral,02,85
+1444911,I like running.,7.00,586,running,3,running,descriptive,n/a,02,86
+2248017,I'm going running.,6.00,586,running,3,going|i'm|running,descriptive,n/a,02,86
+2044403,You'll be happy.,7.00,604,you'll,3,be|happy|you'll,direct-address,neutral,02,87
+1209117,I knew it.,7.00,624,knew,3,knew,descriptive,n/a,02,88
+2891440,Is that what it takes?,7.00,672,takes,5,takes,descriptive,n/a,02,89
+311725,Where has she gone?,7.00,682,gone,4,has,descriptive,n/a,02,90
+x2_13,She's gone home.,,682,gone,3,home,descriptive,n/a,02,90
+2883884,I love books.,7.00,719,books,3,books,descriptive,n/a,02,91
+2245957,I love Australia.,7.00,911,australia,3,australia,descriptive,n/a,02,91
+2091109,No one lives here.,7.00,737,lives,4,lives,descriptive,n/a,02,92
+2249608,No one's here.,7.00,3673,one's,3,here|no|one's,descriptive,n/a,02,92
+1389443,"OK, I'll order it.",7.00,739,ok,4,ok,descriptive,n/a,02,93
+2158897,I miss my mom.,7.00,778,mom,4,mom,descriptive,n/a,02,94
+2369536,Is your mom home?,7.00,778,mom,4,home|is|mom|your,direct-address,neutral,02,94
+x2_5,"No, she's at work.",,542,she's,4,work,descriptive,n/a,02,94
+2241668,We've come home.,7.00,971,we've,3,we've,descriptive,n/a,02,95
+2359394,I've come to get you.,6.00,178,i've,5,i've,direct-address,neutral,02,95
+2111324,They're brown.,6.00,1031,brown,2,brown,descriptive,n/a,02,96
+67945,"That brown one is mine, too.",7.00,1031,brown,6,brown|is|mine|one|that|too,descriptive,n/a,02,96
+3311133,We're going out for Chinese.,7.00,1033,chinese,5,chinese|for|going|out|we're,descriptive,n/a,02,97
+3831744,My family's going to love you.,7.00,6583,family's,6,family's|going|love|my|to|you,direct-address,neutral,02,97
+1789234,I loved you.,7.00,1076,loved,3,loved,direct-address,informal,02,98
+2243248,They loved it.,7.00,1076,loved,3,it|loved|they,descriptive,n/a,02,98
+2255334,You'd love it.,7.00,1573,you'd,3,it|love|you'd,direct-address,informal,02,98
+263185,We play on Sunday.,7.00,1275,sunday,4,on|play|sunday|we,descriptive,n/a,02,99
+1578738,I know your names.,7.00,1302,names,4,names,direct-address,neutral,02,100
+1860492,Don't drink that.,7.00,1322,drink,3,drink,direct-address,informal,02,101
+2187199,It's broken.,7.00,1375,broken,2,broken|it's,descriptive,n/a,02,102
+1761,I'd like to study in Paris.,7.00,1595,paris,6,i'd|in|like|paris|study|to,descriptive,n/a,02,103
+4397587,People like me.,6.00,66,people,3,me|people,descriptive,n/a,02,103
+4397544,This one is bigger.,7.00,1837,bigger,4,bigger,descriptive,n/a,02,104
+2013046,They want to make it bigger.,7.00,1837,bigger,6,bigger|it|make|they|to|want,descriptive,n/a,02,104
+2218422,You're the biggest.,6.00,1231,biggest,3,biggest,direct-address,neutral,02,104
+4014431,Are you breaking up with me?,7.00,1838,breaking,6,breaking,direct-address,informal,02,105
+456733,She likes to run.,7.00,1890,likes,4,likes,descriptive,n/a,02,106
+630421,He likes to run.,7.00,1890,likes,4,he|likes|run|to,descriptive,n/a,02,106
+2111342,They'll understand.,7.00,2003,they'll,2,they'll,descriptive,n/a,02,107
+304557,I think he'll come.,7.00,2771,he'll,4,he'll,descriptive,n/a,02,108
+418625,I don't think he'll come.,7.00,2771,he'll,5,come|don't|he'll|i|think,descriptive,n/a,02,108
+2111348,They'll come.,7.00,2003,they'll,2,come|they'll,descriptive,n/a,02,108
+2111783,I'll cook.,7.00,2228,cook,2,cook,descriptive,n/a,02,109
+2203631,We'll cook.,6.00,2228,cook,2,cook|we'll,descriptive,n/a,02,109
+2241435,We sat down.,7.00,2294,sat,3,sat,descriptive,n/a,02,110
+2241436,We sat there.,7.00,2294,sat,3,sat|there|we,descriptive,n/a,02,110
+2807658,I like rice.,7.00,2737,rice,3,rice,descriptive,n/a,02,111
+5828951,I made rice.,6.00,2737,rice,3,i|made|rice,descriptive,n/a,02,111
+622193,They come from Sweden.,7.00,3622,sweden,4,sweden,descriptive,n/a,02,112
+3168488,Is that why you've come?,6.00,770,you've,5,come|is|that|why|you've,direct-address,neutral,02,112
+71929,"I'm sorry, my mother's not at home.",7.00,3787,mother's,7,mother's,direct-address,neutral,02,113
+4500888,We love our parks.,7.00,4042,parks,4,our|parks,descriptive,n/a,02,114
+3354142,You're the woman I love.,6.00,443,woman,5,i|love|the|woman|you're,direct-address,informal,02,114
+58719,This car is my father's.,7.00,4526,father's,5,car|father's|is|my|this,descriptive,n/a,02,115
+318891,My father's car is new.,7.00,4526,father's,5,father's,descriptive,n/a,02,115
+292605,He understands French.,7.00,5715,understands,3,understands,descriptive,n/a,02,116
+887480,She understands him.,7.00,5715,understands,3,him|she|understands,descriptive,n/a,02,116
+887273,She listens to him.,7.00,11336,listens,4,listens,descriptive,n/a,02,116
+4495305,That'll be good.,7.00,7318,that'll,3,be|good|that'll,descriptive,n/a,02,117
+2548892,You're a good boy.,6.00,677,boy,4,a|boy|good|you're,direct-address,informal,02,117
+3735936,They're Canadians.,6.00,8275,canadians,2,canadians|they're,descriptive,n/a,02,118
+2202636,We're Canadians.,7.00,8275,canadians,2,canadians,descriptive,n/a,02,118
+969137,I'm not home on Sundays.,7.00,9582,sundays,5,sundays,descriptive,n/a,02,119
+281844,What do you do on Sundays?,7.00,9582,sundays,6,do|on|sundays|what|you,direct-address,neutral,02,119
+278535,It's my brother's.,7.00,9730,brother's,3,brother's,descriptive,n/a,02,120
+4135274,What's the new boy's name?,7.00,9847,boy's,5,boy's,direct-address,neutral,02,121
+5125414,I'm going to my sister's.,7.00,11474,sister's,5,going|i'm|my|sister's|to,descriptive,n/a,02,122
+2245939,I like Saturdays.,7.00,11833,saturdays,3,saturdays,descriptive,n/a,02,123
+279528,Do you have school on Saturdays?,7.00,11833,saturdays,6,do|have|on|saturdays|school|you,direct-address,neutral,02,123
+2255461,Your car's here.,7.00,12604,car's,3,car's,direct-address,neutral,02,124
+61858,Don't play here.,6.00,217,play,3,don't|here|play,direct-address,informal,02,124
+388616,I do it because I want to.,6.00,97,because,7,because|do|i|it|to|want,descriptive,n/a,02,125
+1895635,You're a good man.,6.00,145,man,4,man,direct-address,neutral,02,126
+2548447,You're a good girl.,6.00,404,girl,4,a|girl|good|you're,direct-address,informal,02,126
+6532429,I'm getting by.,5.00,232,getting,3,getting,descriptive,n/a,02,127
+2548694,I'm not getting up.,6.00,232,getting,4,getting|i'm|not|up,descriptive,n/a,02,127
+1675334,We get on OK.,6.00,739,ok,4,get|ok|on|we,descriptive,n/a,02,127
+2886992,What makes people do that?,6.00,322,makes,5,do|makes|people|that|what,descriptive,n/a,02,128
+2240670,We're taking off.,6.00,397,taking,3,taking,descriptive,n/a,02,129
+2248270,I'm taking off.,6.00,397,taking,3,i'm|off|taking,descriptive,n/a,02,129
+2240776,We're going west.,5.00,511,west,3,west,descriptive,n/a,02,129
+1624893,Don't stop playing.,6.00,415,playing,3,playing,direct-address,informal,02,130
+41575,Stop saying that!,6.00,417,saying,3,saying,direct-address,informal,02,130
+1738962,Stop reading.,5.00,742,reading,2,reading|stop,direct-address,informal,02,130
+2647325,What have you taken?,6.00,465,taken,4,taken,direct-address,neutral,02,131
+2245522,Get your mother.,6.00,566,mother,3,mother,direct-address,informal,02,132
+2405916,I said we'd get one.,6.00,3374,we'd,5,we'd,descriptive,n/a,02,132
+2375928,I know how that goes.,6.00,595,goes,5,goes,descriptive,n/a,02,133
+3733321,Don't park here.,6.00,706,park,3,park,direct-address,neutral,02,134
+240431,Go to the park.,6.00,706,park,4,go|park|the|to,direct-address,neutral,02,134
+2111282,They're green.,6.00,760,green,2,green,descriptive,n/a,02,135
+2187213,It's green.,6.00,760,green,2,green|it's,descriptive,n/a,02,135
+1722021,You've made my day.,6.00,770,you've,4,you've,direct-address,neutral,02,136
+2254493,We've made it.,6.00,971,we've,3,it|made|we've,descriptive,n/a,02,136
+2270135,What page are you on?,6.00,780,page,5,are|on|page|what|you,direct-address,neutral,02,137
+4017456,It's on page 3.,5.00,780,page,3,page,descriptive,n/a,02,137
+4635276,I'll be 30 this October.,6.00,803,october,4,be|i'll|october|this,descriptive,n/a,02,138
+2547659,I'm writing about us.,6.00,909,writing,4,writing,descriptive,n/a,02,139
+255860,I'm thinking of going to Europe.,6.00,956,europe,6,europe|of,descriptive,n/a,02,140
+2652927,I'd like to live in Europe.,6.00,956,europe,6,europe|i'd|in|like|live|to,descriptive,n/a,02,140
+2111223,They're watching.,6.00,1023,watching,2,watching,descriptive,n/a,02,141
+1111708,I'm being watched.,5.00,1958,watched,3,watched,descriptive,n/a,02,141
+2091113,No one's watching.,6.00,3673,one's,3,one's,descriptive,n/a,02,141
+6221344,No one I know studies French.,6.00,1118,studies,6,french|i|know|no|one|studies,descriptive,n/a,02,142
+261005,I know that she is Spanish.,6.00,1903,spanish,6,spanish,descriptive,n/a,02,142
+310672,She came from Canada to see me.,6.00,1122,canada,7,canada,descriptive,n/a,02,143
+72539,Here's $5.,6.00,1295,here's,1,here's,descriptive,n/a,02,144
+55193,These cars are made in Japan.,6.00,1357,japan,6,cars,descriptive,n/a,02,145
+2123540,They're broken.,6.00,1375,broken,2,broken,descriptive,n/a,02,146
+672254,He runs.,6.00,1522,runs,2,runs,descriptive,n/a,02,147
+3736204,This car runs great.,6.00,1522,runs,4,car|great|runs|this,descriptive,n/a,02,147
+1345046,I have faith in you.,6.00,1583,faith,5,faith|have|i|in|you,direct-address,neutral,02,148
+6480956,Have faith.,4.00,1583,faith,2,faith,direct-address,neutral,02,148
+2742058,Where's Boston?,6.00,6046,where's,2,where's,direct-address,neutral,02,149
+35029,Where is Paris?,6.00,1595,paris,3,paris,descriptive,n/a,02,149
+2245272,Do it Monday.,6.00,1651,monday,3,do|it|monday,direct-address,neutral,02,150
+3619533,Mary thinks I'm in love with her.,6.00,1726,thinks,7,her,descriptive,n/a,02,151
+5839326,I think that girl's name is Mary.,6.00,7270,girl's,7,girl's,descriptive,n/a,02,151
+2543687,I'll be very frank with you.,6.00,1813,frank,6,frank,direct-address,formal,02,152
+4829411,Do you want me to be frank?,5.00,1813,frank,7,be|do|frank|me|to|want|you,direct-address,neutral,02,152
+2218233,You're not Canadian.,6.00,2013,canadian,3,canadian|not|you're,direct-address,neutral,02,153
+272548,It may snow.,6.00,2212,snow,3,it|may|snow,descriptive,n/a,02,154
+27824,We have snow in January.,6.00,2212,snow,5,january,descriptive,n/a,02,154
+5418382,It'll break.,6.00,2564,it'll,2,it'll,descriptive,n/a,02,155
+2111212,Things break.,5.00,659,break,2,break,descriptive,n/a,02,155
+3151202,We'd given up on you.,6.00,3374,we'd,5,given|on|up|we'd|you,direct-address,neutral,02,156
+2240581,We're giving up.,5.00,723,giving,3,giving,descriptive,n/a,02,156
+3396868,How do you think they'd do it?,6.00,3690,they'd,7,they'd,direct-address,neutral,02,157
+2234093,What's stopping you?,6.00,4346,stopping,3,stopping,direct-address,neutral,02,158
+2248183,I'm not stopping.,6.00,4346,stopping,3,i'm|not|stopping,descriptive,n/a,02,158
+2454251,Mary and Alice are sisters.,6.00,4498,alice,5,alice|and,descriptive,n/a,02,159
+2953194,Mary and Alice aren't sisters.,6.00,4498,alice,5,alice|and|aren't|mary|sisters,descriptive,n/a,02,159
+2123588,It's ours.,6.00,5414,ours,2,ours,descriptive,n/a,02,160
+2248696,Isn't that ours?,6.00,5414,ours,3,isn't|ours|that,direct-address,neutral,02,160
+5003799,Your book is upside down.,5.00,6832,upside,5,book|down|is|upside|your,direct-address,neutral,02,161
+2882494,Why is it upside down?,6.00,6832,upside,5,upside,direct-address,neutral,02,161
+1885869,How's it coming?,6.00,7385,how's,3,coming|how's|it,direct-address,neutral,02,162
+5102491,A car's coming.,6.00,12604,car's,3,a|car's|coming,descriptive,n/a,02,162
+301279,He is a good carpenter.,6.00,8825,carpenter,5,a|carpenter|good|he|is,descriptive,n/a,02,163
+2111393,That's understandable.,6.00,9709,understandable,2,understandable,descriptive,n/a,02,164
+2091141,No one listens to me.,6.00,11336,listens,5,listens|me|no|one|to,descriptive,n/a,02,165
+61790,There's no one but me here.,5.00,260,there's,6,but,descriptive,n/a,02,165
+2203368,You're small.,5.00,284,small,2,small,direct-address,neutral,02,166
+2011974,We want to see the king.,5.00,686,king,6,king,descriptive,n/a,02,167
+240694,Read whatever you like.,5.00,748,whatever,4,like|read|whatever|you,direct-address,informal,02,168
+1324404,Am I seeing things?,5.00,966,seeing,4,seeing,descriptive,n/a,02,169
+4015399,What are you boys doing out here?,5.00,974,boys,7,are|boys|doing|here|out|what|you,direct-address,informal,02,170
+3024101,It's 300 miles from here to Boston.,5.00,2129,boston,6,miles,descriptive,n/a,02,170
+2251262,That's the biggest.,5.00,1231,biggest,3,biggest|that's|the,descriptive,n/a,02,171
+35590,Here's $10.00.,5.00,1295,here's,1,here's,direct-address,neutral,02,172
+2255331,You'd give up.,5.00,1573,you'd,3,you'd,direct-address,neutral,02,173
+2764277,He gave up.,4.00,549,gave,3,gave|he|up,descriptive,n/a,02,173
+23282,We ran down the hill.,5.00,1589,hill,5,hill,descriptive,n/a,02,174
+5858336,I ran up the hill.,5.00,1589,hill,5,hill|i|ran|the|up,descriptive,n/a,02,174
+319908,The price rose.,5.00,1600,rose,3,rose,descriptive,n/a,02,175
+2218503,You're very understanding.,5.00,1606,understanding,3,understanding,direct-address,neutral,02,176
+2245892,I have orders.,5.00,1895,orders,3,orders,descriptive,n/a,02,177
+1911855,That's an order.,4.00,300,order,3,an|order,direct-address,formal,02,177
+1886803,What are your orders?,4.00,1895,orders,4,are|orders|what|your,direct-address,formal,02,177
+2203340,You're sharp.,5.00,3109,sharp,2,sharp,direct-address,informal,02,178
+2254537,What a thought!,4.00,229,thought,3,thought,descriptive,n/a,02,179
+2256874,That's a given.,4.00,363,given,3,given,descriptive,n/a,02,180
+2251287,That's the word.,4.00,545,word,3,word,descriptive,n/a,02,181
+303368,He takes after his father.,4.00,672,takes,5,after|father|he|his|takes,descriptive,n/a,02,182
+53463,No one stops to listen to him.,4.00,3619,stops,7,stops,descriptive,n/a,02,183
+259442,I came to Japan from China.,7.00,1357,japan,6,china,descriptive,n/a,02,184
+2123627,I'll live.,5.00,348,i'll,2,i'll,descriptive,n/a,02,185

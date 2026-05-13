@@ -228,6 +228,7 @@ export function LearningCardContent({
                   >
                     <ClickableWords
                       text={translation.text || '...'}
+                      language={translation.language}
                       wordTimings={audio?.wordTimings ?? null}
                       localTime={activeClip?.localTime ?? 0}
                       isActive={!!isActive}

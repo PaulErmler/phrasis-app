@@ -2,6 +2,98 @@ import { QueryCtx, MutationCtx } from '../_generated/server';
 import { Id, Doc } from '../_generated/dataModel';
 import { getCourseSettings } from './courseSettings';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
+import { LEGACY_LEVEL_ORDER, LEVEL_TO_COLLECTION } from '../lib/collections';
+
+/**
+ * Get the globally active dataset, or null if none is active (i.e. before the
+ * OGTE V1 cutover). The dataset is language-agnostic at the query level — its
+ * source texts are translated into all target languages via the `translations`
+ * table, so a single active row serves every learner regardless of target
+ * language.
+ */
+export async function getActiveDataset(
+  ctx: QueryCtx,
+): Promise<Doc<'datasets'> | null> {
+  return ctx.db
+    .query('datasets')
+    .withIndex('by_isActive', (q) => q.eq('isActive', true))
+    .first();
+}
+
+/**
+ * Resolve the starting collection for a user's `currentLevel`, preferring the
+ * active dataset's level. Falls back to the legacy collection if no active
+ * dataset is found.
+ */
+export async function resolveStartingCollection(
+  ctx: QueryCtx,
+  currentLevel: string | undefined,
+): Promise<Doc<'collections'> | null> {
+  const mapping = LEVEL_TO_COLLECTION[currentLevel ?? 'beginner'] ?? LEVEL_TO_COLLECTION.beginner;
+  const activeDataset = await getActiveDataset(ctx);
+  if (activeDataset) {
+    const byCode = await ctx.db
+      .query('collections')
+      .withIndex('by_datasetId_and_order', (q) => q.eq('datasetId', activeDataset._id))
+      .filter((q) => q.eq(q.field('code'), mapping.code))
+      .first();
+    if (byCode) return byCode;
+  }
+  return ctx.db
+    .query('collections')
+    .withIndex('by_name', (q) => q.eq('name', mapping.legacyName))
+    .first();
+}
+
+/**
+ * Next collection after `current` in pedagogical order. Walks within the
+ * collection's own generation: new-dataset collections walk by `order + 1`
+ * within the same dataset; legacy collections walk via `LEGACY_LEVEL_ORDER`.
+ */
+export async function getNextCollection(
+  ctx: QueryCtx,
+  current: Doc<'collections'>,
+): Promise<Doc<'collections'> | null> {
+  if (current.datasetId && current.order !== undefined) {
+    return ctx.db
+      .query('collections')
+      .withIndex('by_datasetId_and_order', (q) =>
+        q.eq('datasetId', current.datasetId).eq('order', (current.order ?? 0) + 1),
+      )
+      .first();
+  }
+  const idx = LEGACY_LEVEL_ORDER.indexOf(current.name as (typeof LEGACY_LEVEL_ORDER)[number]);
+  if (idx === -1 || idx >= LEGACY_LEVEL_ORDER.length - 1) return null;
+  return ctx.db
+    .query('collections')
+    .withIndex('by_name', (q) => q.eq('name', LEGACY_LEVEL_ORDER[idx + 1]))
+    .first();
+}
+
+/**
+ * Walk forward from `current` (inclusive) and return the first collection
+ * with `cardsAdded < textCount` for the given user/course. Used by auto-advance
+ * to pick the next incomplete level after the active one is finished.
+ */
+export async function findNextIncompleteCollection(
+  ctx: QueryCtx,
+  current: Doc<'collections'>,
+  userId: string,
+  courseId: Id<'courses'>,
+): Promise<Doc<'collections'> | null> {
+  let cursor: Doc<'collections'> | null = current;
+  while (cursor) {
+    const progress = await ctx.db
+      .query('collectionProgress')
+      .withIndex('by_userId_and_courseId_and_collectionId', (q) =>
+        q.eq('userId', userId).eq('courseId', courseId).eq('collectionId', cursor!._id),
+      )
+      .first();
+    if ((progress?.cardsAdded ?? 0) < cursor.textCount) return cursor;
+    cursor = await getNextCollection(ctx, cursor);
+  }
+  return null;
+}
 
 /**
  * Get the collection progress for a user/course/collection combo.
@@ -21,6 +113,24 @@ export async function getCollectionProgress(
         .eq('collectionId', collectionId),
     )
     .first();
+}
+
+/**
+ * Get every collectionProgress row for a user/course in one indexed scan.
+ * Used by the home view to render all 20 premade levels + custom collections
+ * with monotonic progress counters.
+ */
+export async function getCollectionProgressForCourse(
+  ctx: QueryCtx,
+  userId: string,
+  courseId: Id<'courses'>,
+): Promise<Doc<'collectionProgress'>[]> {
+  return ctx.db
+    .query('collectionProgress')
+    .withIndex('by_userId_and_courseId', (q) =>
+      q.eq('userId', userId).eq('courseId', courseId),
+    )
+    .collect();
 }
 
 /**
@@ -98,6 +208,7 @@ export async function getOrCreateChatCollection(
   const collectionId = await ctx.db.insert('collections', {
     name: 'Chat',
     textCount: 0,
+    origin: 'chat',
   });
 
   if (settings) {
@@ -137,6 +248,7 @@ export async function getOrCreateCustomCollection(
   const collectionId = await ctx.db.insert('collections', {
     name: 'Custom',
     textCount: 0,
+    origin: 'custom',
   });
 
   if (settings) {

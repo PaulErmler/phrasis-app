@@ -1,17 +1,24 @@
 import { v } from 'convex/values';
-import { query, mutation } from '../_generated/server';
+import { query, mutation, internalMutation } from '../_generated/server';
+import { internal } from '../_generated/api';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import {
+  getActiveDataset,
   getCollectionProgress,
   getNextTextsFromRank,
 } from '../db/collections';
 import { translationValidator, audioRecordingValidator } from '../types';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 import { scheduleMissingContent } from './decks';
-import { COLLECTION_PREVIEW_SIZE, CONTENT_LOOKAHEAD_SIZE, LEVEL_ORDER } from '../lib/collections';
+import {
+  COLLECTION_PREVIEW_SIZE,
+  CONTENT_LOOKAHEAD_SIZE,
+  LEGACY_LEVEL_ORDER,
+  isPremadeLevelCollection,
+} from '../lib/collections';
 import { getCourseSettings } from '../db/courseSettings';
-import type { Id } from '../_generated/dataModel';
+import type { Doc, Id } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
 
 export async function isCollectionAccessible(
@@ -22,7 +29,7 @@ export async function isCollectionAccessible(
   const collection = await ctx.db.get(collectionId);
   if (!collection) return false;
 
-  if ((LEVEL_ORDER as readonly string[]).includes(collection.name)) return true;
+  if (isPremadeLevelCollection(collection)) return true;
 
   const courseSettings = await getCourseSettings(ctx, courseId);
   if (!courseSettings) return false;
@@ -77,7 +84,7 @@ export const getCollectionTextsWithContent = query({
 
     const collection = await ctx.db.get(args.collectionId);
     const isLevelCollection = collection
-      ? (LEVEL_ORDER as readonly string[]).includes(collection.name)
+      ? isPremadeLevelCollection(collection)
       : false;
 
     const progress = await getCollectionProgress(
@@ -158,7 +165,7 @@ export const ensureContentForCollection = mutation({
 
     const collection = await ctx.db.get(args.collectionId);
     const isLevelCollection = collection
-      ? (LEVEL_ORDER as readonly string[]).includes(collection.name)
+      ? isPremadeLevelCollection(collection)
       : false;
 
     const progress = await getCollectionProgress(
@@ -177,22 +184,136 @@ export const ensureContentForCollection = mutation({
       isLevelCollection ? { onlyCurriculum: true } : { forUserId: userId },
     );
 
-    let totalTranslationsScheduled = 0;
-    let totalAudioScheduled = 0;
-
-    for (const text of texts) {
-      const { translationsScheduled, audioScheduled } =
-        await scheduleMissingContent(
+    // Parallel over texts — each text writes only to its own (textId, language)
+    // keyed rows, so no cross-text contention within this transaction.
+    const results = await Promise.all(
+      texts.map((text) =>
+        scheduleMissingContent(
           ctx,
           text._id,
           text,
           course.baseLanguages,
           course.targetLanguages,
-        );
-      totalTranslationsScheduled += translationsScheduled;
-      totalAudioScheduled += audioScheduled;
-    }
+        ),
+      ),
+    );
+
+    const totalTranslationsScheduled = results.reduce(
+      (sum, r) => sum + r.translationsScheduled,
+      0,
+    );
+    const totalAudioScheduled = results.reduce(
+      (sum, r) => sum + r.audioScheduled,
+      0,
+    );
 
     return { totalTranslationsScheduled, totalAudioScheduled };
+  },
+});
+
+/**
+ * Ensure translations and audio exist for the FIRST 5 sentences of every
+ * premade level collection accessible in the user's active course. Called
+ * fire-and-forget from the home view on mount so when a user drills into any
+ * level the preview is already populated.
+ *
+ * Independent of user progress (unlike `ensureContentForCollection` which
+ * paginates from `lastRankProcessed`) — always starts at collectionRank 1.
+ *
+ * Fans out one scheduled `ensureFirstSentencesForCollection` mutation per
+ * level collection so each child runs in its own transaction; the inline
+ * version exceeded Convex's per-mutation wallclock limit (~15s) once the
+ * dataset grew to ~20 levels × 5 texts × multi-language storage.getUrl checks.
+ */
+export const ensureFirstSentencesAcrossLevelCollections = mutation({
+  args: {},
+  returns: v.object({
+    scheduledCollections: v.number(),
+  }),
+  handler: async (ctx) => {
+    const { course } = await requireActiveCourse(ctx);
+
+    // Load only the ~20 premade level collections via indexed lookups so this
+    // doesn't scan every user's custom/chat collections (which share the table).
+    // Custom collections have no `datasetId` and don't share names with
+    // LEGACY_LEVEL_ORDER, so both branches naturally exclude them.
+    const activeDataset = await getActiveDataset(ctx);
+    let levelCollections: Doc<'collections'>[];
+    if (activeDataset) {
+      levelCollections = await ctx.db
+        .query('collections')
+        .withIndex('by_datasetId_and_order', (q) =>
+          q.eq('datasetId', activeDataset._id),
+        )
+        .collect();
+    } else {
+      const legacyDocs = await Promise.all(
+        LEGACY_LEVEL_ORDER.map((name) =>
+          ctx.db
+            .query('collections')
+            .withIndex('by_name', (q) => q.eq('name', name))
+            .first(),
+        ),
+      );
+      levelCollections = legacyDocs.filter(
+        (c): c is Doc<'collections'> => c !== null,
+      );
+    }
+
+    await Promise.all(
+      levelCollections.map((collection) =>
+        ctx.scheduler.runAfter(
+          0,
+          internal.features.collections.ensureFirstSentencesForCollection,
+          {
+            collectionId: collection._id,
+            baseLanguages: course.baseLanguages,
+            targetLanguages: course.targetLanguages,
+          },
+        ),
+      ),
+    );
+
+    return { scheduledCollections: levelCollections.length };
+  },
+});
+
+/**
+ * Per-collection child of `ensureFirstSentencesAcrossLevelCollections`.
+ *
+ * Idempotent — `scheduleMissingContent` skips any (textId, language) already
+ * covered, so re-entries do reads only and write nothing. Processes the 5
+ * texts in parallel; safe because each text writes only to its own
+ * (textId, language)-keyed rows (audio patches, claim inserts, per-text
+ * scheduler calls).
+ */
+export const ensureFirstSentencesForCollection = internalMutation({
+  args: {
+    collectionId: v.id('collections'),
+    baseLanguages: v.array(v.string()),
+    targetLanguages: v.array(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const texts = await ctx.db
+      .query('texts')
+      .withIndex('by_collection_and_rank', (q) =>
+        q.eq('collectionId', args.collectionId),
+      )
+      .order('asc')
+      .take(COLLECTION_PREVIEW_SIZE);
+
+    await Promise.all(
+      texts.map((text) =>
+        scheduleMissingContent(
+          ctx,
+          text._id,
+          text,
+          args.baseLanguages,
+          args.targetLanguages,
+        ),
+      ),
+    );
+    return null;
   },
 });

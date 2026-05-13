@@ -3,9 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, ChevronsLeft, ChevronRight, Eye, MessageCircle, Loader2 } from 'lucide-react';
+import { Play, Pause, ChevronsLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
 import { AudioProgressBar } from './AudioProgressBar';
-import { useLearningChatToggle } from './LearningChatLayout';
 import type { ReviewRating } from '@/lib/scheduling';
 
 interface LearningControlsProps {
@@ -62,7 +61,6 @@ export function LearningControls({
   onRevealAllAudioTargets,
 }: LearningControlsProps) {
   const t = useTranslations('LearningMode');
-  const { openChat } = useLearningChatToggle();
 
   const [showSpinner, setShowSpinner] = useState(false);
   useEffect(() => {
@@ -161,59 +159,48 @@ export function LearningControls({
   ]);
 
   return (
-    <div className="relative bg-background pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="relative pb-[max(1rem,env(safe-area-inset-bottom))]">
       <div className="hidden lg:block pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] border-t border-border" />
-      {/* Open chat button - above bordered area (mobile only) */}
-      <div className="max-w-lg mx-auto flex justify-end px-4 pt-4 pb-3 lg:hidden">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={openChat}
-          className="h-9 w-9 shrink-0"
-          aria-label="Open chat"
-          data-tutorial="chat-button"
-        >
-          <MessageCircle className="h-5 w-5" />
-        </Button>
-      </div>
 
       <div className="border-t lg:border-t-0">
         <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
           {/* Rating buttons */}
-          <div className="flex gap-2" data-tutorial="rating-buttons">
-            {validRatings.map((rating) => (
-              <div
-                key={rating}
-                className="flex-1 flex flex-col items-center gap-1"
-              >
-                <span className="text-[11px] text-muted-foreground">
-                  {ratingIntervals[rating]}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onSelectRating(rating);
-                    if (instantProceed) onNext(rating);
-                  }}
-                  data-testid={
-                    rating === 'stillLearning'
-                      ? 'learn-rating-still-learning'
-                      : rating === 'understood'
-                        ? 'learn-rating-understood'
-                        : `learn-rating-${rating}`
-                  }
-                  className={`w-full ${
-                    activeRating === rating
-                      ? 'ring-2 ring-primary border-primary bg-primary/5'
-                      : ''
-                  }`}
+          {validRatings.length > 0 && (
+            <div className="flex gap-2" data-tutorial="rating-buttons">
+              {validRatings.map((rating) => (
+                <div
+                  key={rating}
+                  className="flex-1 flex flex-col items-center gap-1"
                 >
-                  {t(`ratings.${rating}`)}
-                </Button>
-              </div>
-            ))}
-          </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    {ratingIntervals[rating]}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onSelectRating(rating);
+                      if (instantProceed) onNext(rating);
+                    }}
+                    data-testid={
+                      rating === 'stillLearning'
+                        ? 'learn-rating-still-learning'
+                        : rating === 'understood'
+                          ? 'learn-rating-understood'
+                          : `learn-rating-${rating}`
+                    }
+                    className={`w-full ${
+                      activeRating === rating
+                        ? 'ring-2 ring-primary border-primary bg-primary/5'
+                        : ''
+                    }`}
+                  >
+                    {t(`ratings.${rating}`)}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
 
         
           {showProgressBar && (

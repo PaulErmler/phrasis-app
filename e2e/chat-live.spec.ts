@@ -75,6 +75,10 @@ test.describe("chat (live)", { tag: "@live" }, () => {
   test(
     "full chat-to-card flow: send → response → approve → quota decrements → card in library",
     async ({ page }) => {
+      // Live LLM round-trips (assistant reply, card streaming, title gen)
+      // can take 30–60s each — well beyond Playwright's 30s default.
+      test.setTimeout(180_000);
+
       await page.goto("/app");
       await page.waitForLoadState("domcontentloaded");
       await dismissTour(page, "home_tour");
@@ -174,13 +178,16 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       ).toBeVisible({ timeout: 15_000 });
 
       // (9) Thread auto-titles — a sidebar entry with substantive text
-      // appears within TITLE_TIMEOUT.
-      const toggle = page.getByTestId("chat-toggle-conversations").first();
-      if (await toggle.count()) await toggle.click().catch(() => {});
+      // appears within TITLE_TIMEOUT. On desktop the sidebar auto-opens;
+      // on mobile it starts closed. Only toggle if entries aren't yet in
+      // the DOM, otherwise we'd close an already-open desktop sidebar.
+      const entries = page.getByTestId("chat-thread-entry");
+      if ((await entries.count()) === 0) {
+        const toggle = page.getByTestId("chat-toggle-conversations").first();
+        if (await toggle.count()) await toggle.click().catch(() => {});
+      }
       await expect(async () => {
-        const titles = await page
-          .getByTestId("chat-thread-entry")
-          .allInnerTexts();
+        const titles = await entries.allInnerTexts();
         const substantive = titles.some((t) => t.trim().length >= 4);
         expect(substantive).toBe(true);
       }).toPass({ timeout: TITLE_TIMEOUT });
@@ -232,15 +239,32 @@ test.describe("chat (live)", { tag: "@live" }, () => {
   }) => {
     test.skip(!threadUrl, "Prior test did not create a thread.");
 
-    // Navigate away and back — this exercises getThread without burning
-    // any LLM quota (no new messages sent).
-    await page.goto("/app/library");
-    await page.waitForLoadState("domcontentloaded");
-    await dismissTour(page, undefined, 250);
-
+    // Cold-load the chat URL on this test's fresh page — exercises
+    // getThread without burning any LLM quota (no new messages sent).
+    // (main)/layout.tsx derives activeView from pathname only inside its
+    // useState initializer, so a direct goto on a fresh mount is what
+    // actually drives SimplifiedChatView; an intermediate goto away
+    // would leave that initializer stuck on the prior view.
     await page.goto(threadUrl!);
     await page.waitForLoadState("domcontentloaded");
     await dismissTour(page, "chat", 500);
+
+    // Wait for the chat surface to mount before asserting on its
+    // contents. chat-input only renders inside SimplifiedChatView, so
+    // its presence proves activeView === 'chat' and the layout settled
+    // on the chat view. A reload forces a fresh layout mount in the
+    // rare case the first navigation didn't.
+    const chatInput = page.getByTestId("chat-input").first();
+    const chatMounted = await chatInput
+      .waitFor({ state: "visible", timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!chatMounted) {
+      await page.reload();
+      await page.waitForLoadState("domcontentloaded");
+      await dismissTour(page, "chat", 500);
+      await chatInput.waitFor({ state: "visible", timeout: 10_000 });
+    }
 
     // getThread — the user's original message comes back.
     await expect(page.getByTestId("chat-user-message").first()).toBeVisible({

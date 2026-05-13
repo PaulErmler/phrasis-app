@@ -204,6 +204,7 @@ export function DeckCardsView() {
                           return (
                             <HighlightedText
                               text={baseTranslation?.text || card.sourceText}
+                              language={lang}
                               wordTimings={baseAudio?.wordTimings ?? null}
                               localTime={buttonPlayback.active?.localTime ?? 0}
                               isActive={isActive}
@@ -278,6 +279,7 @@ export function DeckCardsView() {
                               return (
                                 <HighlightedText
                                   text={targetTranslation.text}
+                                  language={targetTranslation.language}
                                   wordTimings={targetAudio?.wordTimings ?? null}
                                   localTime={buttonPlayback.active?.localTime ?? 0}
                                   isActive={isActive}

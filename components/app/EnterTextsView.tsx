@@ -43,6 +43,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
     addresseeNumber: 'singular' | 'plural' | 'not_applicable';
     speakerGender: 'male' | 'female' | 'neutral';
     addresseeGender: 'male' | 'female' | 'neutral' | 'not_applicable';
+    addressesSomeone: boolean;
   };
 
   const [texts, setTexts] = useState<Record<string, string>>({});

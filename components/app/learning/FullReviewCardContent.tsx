@@ -691,6 +691,7 @@ function TargetLanguageInput({
         ) : (
           <HighlightedText
             text={translation.text || '...'}
+            language={translation.language}
             wordTimings={wordTimings}
             localTime={activeClip?.localTime ?? 0}
             isActive={isActive}
@@ -770,6 +771,7 @@ function TargetLanguageInput({
             ) : (
               <HighlightedText
                 text={translation.text || '...'}
+                language={translation.language}
                 wordTimings={wordTimings}
                 localTime={activeClip?.localTime ?? 0}
                 isActive={isActive}

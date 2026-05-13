@@ -87,7 +87,10 @@ export function LandingLearningCardContent({
     if (!hideTargetLanguages || !audioDemoAutoUnlockSequence) return;
 
     setManuallyRevealed(new Set());
-    const delaysMs = 720;
+    // Long pause between the base ("Good morning…") and the first target
+    // ("Buenos días…") so visitors have a beat to mentally translate before
+    // the answer arrives.
+    const delaysMs = 5000;
     const staggerMs = 640;
     const timeouts: ReturnType<typeof setTimeout>[] = [];
 

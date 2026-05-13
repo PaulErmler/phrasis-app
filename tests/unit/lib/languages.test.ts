@@ -30,13 +30,15 @@ describe('getLanguageByCode', () => {
 });
 
 describe('SUPPORTED_LANGUAGES ttsProvider', () => {
-  // Currently Google is the default. Only Swedish stays on ElevenLabs —
-  // this guards against accidental provider flips.
-  const ELEVENLABS_LANGUAGES = new Set(['sv']);
+  // Google is the default. Each non-default routing below is intentional and
+  // listed here to guard against accidental provider flips.
+  const NON_GOOGLE_PROVIDERS: Record<string, 'elevenlabs' | 'azure'> = {
+    sv: 'azure',
+  };
 
-  it('non-ElevenLabs languages are all routed through Google TTS', () => {
+  it('languages not listed above are all routed through Google TTS', () => {
     const offenders = SUPPORTED_LANGUAGES.filter(
-      (l) => !ELEVENLABS_LANGUAGES.has(l.code) && l.ttsProvider !== 'google',
+      (l) => !(l.code in NON_GOOGLE_PROVIDERS) && l.ttsProvider !== 'google',
     ).map((l) => `${l.code}=${l.ttsProvider}`);
     expect(
       offenders,
@@ -44,9 +46,9 @@ describe('SUPPORTED_LANGUAGES ttsProvider', () => {
     ).toEqual([]);
   });
 
-  it('ElevenLabs-pinned languages stay on ElevenLabs', () => {
-    for (const code of ELEVENLABS_LANGUAGES) {
-      expect(getLanguageByCode(code)?.ttsProvider).toBe('elevenlabs');
+  it('non-google-pinned languages use the expected provider', () => {
+    for (const [code, provider] of Object.entries(NON_GOOGLE_PROVIDERS)) {
+      expect(getLanguageByCode(code)?.ttsProvider).toBe(provider);
     }
   });
 });

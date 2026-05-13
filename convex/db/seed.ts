@@ -39,6 +39,7 @@ export const upsertCollection = internalMutation({
     const id: Id<'collections'> = await ctx.db.insert('collections', {
       name: args.name,
       textCount: 0,
+      origin: 'premade',
     });
     return id;
   },

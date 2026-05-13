@@ -8,6 +8,11 @@
  * @module
  */
 
+import type * as admin_activateDataset from "../admin/activateDataset.js";
+import type * as admin_backfillCollectionOrigin from "../admin/backfillCollectionOrigin.js";
+import type * as admin_backfillTextMetadata from "../admin/backfillTextMetadata.js";
+import type * as admin_diagCutoverState from "../admin/diagCutoverState.js";
+import type * as admin_uploadDataset from "../admin/uploadDataset.js";
 import type * as auth from "../auth.js";
 import type * as autumn from "../autumn.js";
 import type * as config_aiModels from "../config/aiModels.js";
@@ -22,6 +27,7 @@ import type * as db_stats_dailyLanguageStats from "../db/stats/dailyLanguageStat
 import type * as db_stats_dailyStats from "../db/stats/dailyStats.js";
 import type * as db_stats_languageStats from "../db/stats/languageStats.js";
 import type * as db_stats_monthlyStats from "../db/stats/monthlyStats.js";
+import type * as db_stats_recordRadioPlayStats from "../db/stats/recordRadioPlayStats.js";
 import type * as db_stats_recordReviewStats from "../db/stats/recordReviewStats.js";
 import type * as db_stats_reviewDepthAccuracy from "../db/stats/reviewDepthAccuracy.js";
 import type * as db_stats_weeklyStats from "../db/stats/weeklyStats.js";
@@ -40,11 +46,14 @@ import type * as features_courses from "../features/courses.js";
 import type * as features_customTexts from "../features/customTexts.js";
 import type * as features_decks from "../features/decks.js";
 import type * as features_featureIds from "../features/featureIds.js";
+import type * as features_home from "../features/home.js";
 import type * as features_library from "../features/library.js";
+import type * as features_llmTranslationQueue from "../features/llmTranslationQueue.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_sentenceMetadata from "../features/sentenceMetadata.js";
 import type * as features_stats from "../features/stats.js";
 import type * as features_translation from "../features/translation.js";
+import type * as features_translationLLM from "../features/translationLLM.js";
 import type * as features_tts from "../features/tts.js";
 import type * as features_ttsProcessing from "../features/ttsProcessing.js";
 import type * as features_tutorialIds from "../features/tutorialIds.js";
@@ -55,7 +64,11 @@ import type * as lib_collections from "../lib/collections.js";
 import type * as lib_dateUtils from "../lib/dateUtils.js";
 import type * as lib_fsrsStates from "../lib/fsrsStates.js";
 import type * as lib_localRomanization from "../lib/localRomanization.js";
+import type * as lib_stt_azure from "../lib/stt/azure.js";
+import type * as lib_stt_index from "../lib/stt/index.js";
+import type * as lib_stt_languageCodes from "../lib/stt/languageCodes.js";
 import type * as lib_textComparison from "../lib/textComparison.js";
+import type * as lib_tts_azure from "../lib/tts/azure.js";
 import type * as lib_tts_elevenlabs from "../lib/tts/elevenlabs.js";
 import type * as lib_tts_google from "../lib/tts/google.js";
 import type * as lib_tts_index from "../lib/tts/index.js";
@@ -68,6 +81,9 @@ import type * as migrations_backfillDisplayWord from "../migrations/backfillDisp
 import type * as migrations_backfillIsGraduated from "../migrations/backfillIsGraduated.js";
 import type * as migrations_backfillUserStats from "../migrations/backfillUserStats.js";
 import type * as migrations_backfillWordTexts from "../migrations/backfillWordTexts.js";
+import type * as migrations_datasetMigration_backfillCardsMastered from "../migrations/datasetMigration_backfillCardsMastered.js";
+import type * as migrations_datasetMigration_backfillLegacyCarry from "../migrations/datasetMigration_backfillLegacyCarry.js";
+import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
 import type * as migrations_retokenizeAllWords from "../migrations/retokenizeAllWords.js";
 import type * as migrations_seedMockStats from "../migrations/seedMockStats.js";
 import type * as retrier from "../retrier.js";
@@ -84,6 +100,11 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  "admin/activateDataset": typeof admin_activateDataset;
+  "admin/backfillCollectionOrigin": typeof admin_backfillCollectionOrigin;
+  "admin/backfillTextMetadata": typeof admin_backfillTextMetadata;
+  "admin/diagCutoverState": typeof admin_diagCutoverState;
+  "admin/uploadDataset": typeof admin_uploadDataset;
   auth: typeof auth;
   autumn: typeof autumn;
   "config/aiModels": typeof config_aiModels;
@@ -98,6 +119,7 @@ declare const fullApi: ApiFromModules<{
   "db/stats/dailyStats": typeof db_stats_dailyStats;
   "db/stats/languageStats": typeof db_stats_languageStats;
   "db/stats/monthlyStats": typeof db_stats_monthlyStats;
+  "db/stats/recordRadioPlayStats": typeof db_stats_recordRadioPlayStats;
   "db/stats/recordReviewStats": typeof db_stats_recordReviewStats;
   "db/stats/reviewDepthAccuracy": typeof db_stats_reviewDepthAccuracy;
   "db/stats/weeklyStats": typeof db_stats_weeklyStats;
@@ -116,11 +138,14 @@ declare const fullApi: ApiFromModules<{
   "features/customTexts": typeof features_customTexts;
   "features/decks": typeof features_decks;
   "features/featureIds": typeof features_featureIds;
+  "features/home": typeof features_home;
   "features/library": typeof features_library;
+  "features/llmTranslationQueue": typeof features_llmTranslationQueue;
   "features/scheduling": typeof features_scheduling;
   "features/sentenceMetadata": typeof features_sentenceMetadata;
   "features/stats": typeof features_stats;
   "features/translation": typeof features_translation;
+  "features/translationLLM": typeof features_translationLLM;
   "features/tts": typeof features_tts;
   "features/ttsProcessing": typeof features_ttsProcessing;
   "features/tutorialIds": typeof features_tutorialIds;
@@ -131,7 +156,11 @@ declare const fullApi: ApiFromModules<{
   "lib/dateUtils": typeof lib_dateUtils;
   "lib/fsrsStates": typeof lib_fsrsStates;
   "lib/localRomanization": typeof lib_localRomanization;
+  "lib/stt/azure": typeof lib_stt_azure;
+  "lib/stt/index": typeof lib_stt_index;
+  "lib/stt/languageCodes": typeof lib_stt_languageCodes;
   "lib/textComparison": typeof lib_textComparison;
+  "lib/tts/azure": typeof lib_tts_azure;
   "lib/tts/elevenlabs": typeof lib_tts_elevenlabs;
   "lib/tts/google": typeof lib_tts_google;
   "lib/tts/index": typeof lib_tts_index;
@@ -144,6 +173,9 @@ declare const fullApi: ApiFromModules<{
   "migrations/backfillIsGraduated": typeof migrations_backfillIsGraduated;
   "migrations/backfillUserStats": typeof migrations_backfillUserStats;
   "migrations/backfillWordTexts": typeof migrations_backfillWordTexts;
+  "migrations/datasetMigration_backfillCardsMastered": typeof migrations_datasetMigration_backfillCardsMastered;
+  "migrations/datasetMigration_backfillLegacyCarry": typeof migrations_datasetMigration_backfillLegacyCarry;
+  "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;
   "migrations/retokenizeAllWords": typeof migrations_retokenizeAllWords;
   "migrations/seedMockStats": typeof migrations_seedMockStats;
   retrier: typeof retrier;

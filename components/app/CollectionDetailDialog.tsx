@@ -47,7 +47,10 @@ export interface PreviewText {
 interface CollectionDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Raw collection name — used as the description-lookup key. */
   collectionName: string | null;
+  /** Localized title to render. Defaults to `collectionName` when omitted. */
+  displayName?: string | null;
   totalTexts: number;
   cardsAdded: number;
   isActive: boolean;
@@ -71,6 +74,7 @@ export function CollectionDetailDialog({
   open,
   onOpenChange,
   collectionName,
+  displayName,
   totalTexts,
   cardsAdded,
   isActive,
@@ -94,11 +98,16 @@ export function CollectionDetailDialog({
 
   if (!collectionName) return null;
 
+  const titleText = displayName ?? collectionName;
   const progress = totalTexts > 0 ? (cardsAdded / totalTexts) * 100 : 0;
   const remaining = totalTexts - cardsAdded;
   const isCompleteProgress = cardsAdded >= totalTexts && totalTexts > 0;
-  const description = getCollectionDescription(collectionName, (key) =>
-    tDesc(key),
+  // Description is keyed by the raw collection name; the localized display
+  // title (e.g. "Manually Added") is for rendering only.
+  const description = getCollectionDescription(
+    collectionName,
+    (key) => tDesc(key),
+    (key) => tDesc.has(key),
   );
 
   return (
@@ -119,7 +128,7 @@ export function CollectionDetailDialog({
         <div className="flex-shrink-0 p-6 pb-4 space-y-4">
           <DialogHeader>
             <div className="flex items-center justify-between">
-              <DialogTitle className="heading-dialog">{collectionName}</DialogTitle>
+              <DialogTitle className="heading-dialog">{titleText}</DialogTitle>
               <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                 {cardsAdded} / {totalTexts} {t('sentences')}
               </span>
@@ -269,6 +278,7 @@ function PreviewTextRow({
               <div className="flex-1">
                 <HighlightedText
                   text={translation.text || '...'}
+                  language={translation.language}
                   wordTimings={audio?.wordTimings ?? null}
                   localTime={buttonPlayback.active?.localTime ?? 0}
                   isActive={isActive}
@@ -310,6 +320,7 @@ function PreviewTextRow({
               <div className="flex-1">
                 <HighlightedText
                   text={translation.text || '...'}
+                  language={translation.language}
                   wordTimings={audio?.wordTimings ?? null}
                   localTime={buttonPlayback.active?.localTime ?? 0}
                   isActive={isActive}
