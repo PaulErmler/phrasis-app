@@ -1,10 +1,11 @@
 import { v, ConvexError } from 'convex/values';
-import { mutation, query, MutationCtx } from '../_generated/server';
+import { mutation, query, MutationCtx, QueryCtx } from '../_generated/server';
 import { buildCardSearchableText } from '../lib/cardContent';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getCourseSettings } from '../db/courseSettings';
+import { getCollectionProgress } from '../db/collections';
 import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
 import { updateWordTextsForEdit } from '../db/stats/wordTracking';
@@ -102,6 +103,135 @@ const cardResultFields = {
 
 const cardResultValidator = v.object(cardResultFields);
 
+type SchedulingMode = 'learn_new' | 'learnAndReview' | 'radio';
+type StudyContentFilter = 'custom' | 'course' | 'both';
+
+/**
+ * Fetch the top-K due cards for a scheduling mode, honoring the
+ * content-source filter. Filter semantics:
+ *   - 'both' / undefined : existing indexes, no origin filtering.
+ *   - 'course'           : single origin-keyed query with origin='premade'.
+ *   - 'custom'           : two origin-keyed queries (origin='custom' and
+ *                          origin='chat') merged by the mode's sort key.
+ *
+ * Cards inserted before the origin backfill won't match the new indexes;
+ * they're handled by the fallback unfiltered query in the 'both' branch.
+ */
+async function fetchDueCardsWithFilter(
+  ctx: QueryCtx,
+  deckId: Id<'decks'>,
+  schedulingMode: SchedulingMode,
+  filter: StudyContentFilter,
+  now: number,
+  take: number,
+): Promise<Doc<'cards'>[]> {
+  if (filter === 'both') {
+    if (schedulingMode === 'learn_new') {
+      return ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
+          q
+            .eq('deckId', deckId)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .eq('isGraduated', false)
+            .lte('dueDate', now),
+        )
+        .order('asc')
+        .take(take);
+    }
+    if (schedulingMode === 'radio') {
+      return ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_radioCounter_radioOrder', (q) =>
+          q.eq('deckId', deckId).eq('isHidden', false).eq('isMastered', false),
+        )
+        .order('asc')
+        .take(take);
+    }
+    return ctx.db
+      .query('cards')
+      .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
+        q
+          .eq('deckId', deckId)
+          .eq('isHidden', false)
+          .eq('isMastered', false)
+          .lte('dueDate', now),
+      )
+      .order('asc')
+      .take(take);
+  }
+
+  // Filtered path: run one query per allowed origin and merge results.
+  const allowedOrigins: Array<'premade' | 'custom' | 'chat'> =
+    filter === 'course' ? ['premade'] : ['custom', 'chat'];
+  const perOriginResults = await Promise.all(
+    allowedOrigins.map((origin) => {
+      if (schedulingMode === 'learn_new') {
+        return ctx.db
+          .query('cards')
+          .withIndex('by_deck_hidden_mastered_origin_graduated_due', (q) =>
+            q
+              .eq('deckId', deckId)
+              .eq('isHidden', false)
+              .eq('isMastered', false)
+              .eq('collectionOrigin', origin)
+              .eq('isGraduated', false)
+              .lte('dueDate', now),
+          )
+          .order('asc')
+          .take(take);
+      }
+      if (schedulingMode === 'radio') {
+        return ctx.db
+          .query('cards')
+          .withIndex('by_deck_hidden_mastered_origin_radioCounter_radioOrder', (q) =>
+            q
+              .eq('deckId', deckId)
+              .eq('isHidden', false)
+              .eq('isMastered', false)
+              .eq('collectionOrigin', origin),
+          )
+          .order('asc')
+          .take(take);
+      }
+      return ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_origin_dueDate', (q) =>
+          q
+            .eq('deckId', deckId)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .eq('collectionOrigin', origin)
+            .lte('dueDate', now),
+        )
+        .order('asc')
+        .take(take);
+    }),
+  );
+
+  // Merge by the mode's sort key (radio: counter+order; else: dueDate),
+  // tiebreak by _creationTime to mirror Convex's default index ordering.
+  const merged = perOriginResults.flat();
+  if (schedulingMode === 'radio') {
+    merged.sort((a, b) => {
+      const ca = a.radioRoundCounter ?? 0;
+      const cb = b.radioRoundCounter ?? 0;
+      if (ca !== cb) return ca - cb;
+      const oa = a.radioOrderKey ?? Number.POSITIVE_INFINITY;
+      const ob = b.radioOrderKey ?? Number.POSITIVE_INFINITY;
+      if (oa !== ob) return oa - ob;
+      return a._creationTime - b._creationTime;
+    });
+  } else {
+    merged.sort((a, b) => {
+      if (a.dueDate !== b.dueDate) return a.dueDate - b.dueDate;
+      return a._creationTime - b._creationTime;
+    });
+  }
+  return merged.slice(0, take);
+}
+
 export const getCardForReview = query({
   args: {},
   returns: v.union(
@@ -122,60 +252,24 @@ export const getCardForReview = query({
     const deck = await getDeckByCourseId(ctx, course._id);
     if (!deck) return null;
 
-    // Load settings (initialReviewCount + schedulingMode) from the courseSettings table
+    // Load settings (initialReviewCount + schedulingMode + studyContentFilter) from the courseSettings table
     const settings = await getCourseSettings(ctx, course._id);
     const initialReviewCount = settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
-    const schedulingMode = settings?.schedulingMode ?? 'learnAndReview';
+    const schedulingMode: SchedulingMode = settings?.schedulingMode ?? 'learnAndReview';
+    const studyContentFilter: StudyContentFilter = settings?.studyContentFilter ?? 'both';
 
     const now = Date.now();
 
     // Fetch the current + peeked-next due cards so the client can pre-merge
     // audio for the upcoming card while the user is still on the current one.
-    let dueCards: Doc<'cards'>[];
-    if (schedulingMode === 'learn_new') {
-      // Learn mode: only cards that haven't graduated (still in initial learning cycle)
-      dueCards = await ctx.db
-        .query('cards')
-        .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
-          q
-            .eq('deckId', deck._id)
-            .eq('isHidden', false)
-            .eq('isMastered', false)
-            .eq('isGraduated', false)
-            .lte('dueDate', now),
-        )
-        .order('asc')
-        .take(2);
-    } else if (schedulingMode === 'radio') {
-      // Radio mode: round-robin by radioRoundCounter, ignoring dueDate.
-      // Lowest counter plays next; new cards (counter undefined → 0) jump to
-      // the front. Convex tiebreaks equal index keys by _creationTime, which
-      // is fine here — the play mutation's catch-up logic ensures fresh cards
-      // don't monopolize the queue.
-      dueCards = await ctx.db
-        .query('cards')
-        .withIndex('by_deck_hidden_mastered_radioCounter_radioOrder', (q) =>
-          q
-            .eq('deckId', deck._id)
-            .eq('isHidden', false)
-            .eq('isMastered', false),
-        )
-        .order('asc')
-        .take(2);
-    } else {
-      // Learn+Review mode: all due cards (current behavior)
-      dueCards = await ctx.db
-        .query('cards')
-        .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
-          q
-            .eq('deckId', deck._id)
-            .eq('isHidden', false)
-            .eq('isMastered', false)
-            .lte('dueDate', now),
-        )
-        .order('asc')
-        .take(2);
-    }
+    const dueCards = await fetchDueCardsWithFilter(
+      ctx,
+      deck._id,
+      schedulingMode,
+      studyContentFilter,
+      now,
+      2,
+    );
     if (dueCards.length === 0) return null;
 
     const allLanguages = [
@@ -254,6 +348,155 @@ export const getCardForReview = query({
     if (!current) return null;
 
     return { ...current, nextCard: next };
+  },
+});
+
+/**
+ * Reports WHY `getCardForReview` returned null, so the UI can choose between
+ * a generic "all caught up" empty state and a filter-aware CTA.
+ *
+ *   - 'no_session'     : not signed in / no active course / no deck.
+ *   - 'no_cards'       : deck has zero cards from any source (new user).
+ *   - 'filtered_out'   : the content filter is hiding cards. The shape of
+ *                        the unblock CTA depends on TWO signals:
+ *                          • `currentSourceHasAnyCards` — does the user have
+ *                            ANY cards in the source they're filtering to?
+ *                            (false ⇒ they need to add cards, not just
+ *                            wait for them to come due).
+ *                          • `availableInOtherSource`  — does the OTHER
+ *                            source have at least one due card right now?
+ *   - 'all_caught_up'  : the deck has cards but none are due right now
+ *                        (filter not the cause).
+ */
+/**
+ * True iff any of the user's active custom collections has at least one text
+ * the deck hasn't pulled in yet. The auto-add Phase 1 (custom/chat) consumes
+ * no `SENTENCES` quota, so when this returns `true` the user can still get
+ * more cards without paying — the UI must NOT show the upgrade button in
+ * that case (see decks.ts:`addCardsFromCollection`).
+ *
+ * `activeCustomCollectionIds` is the canonical source-of-truth: when the
+ * user creates a chat or custom collection it's appended here (see
+ * collections.ts:`getOrCreateChatCollection` / `getOrCreateCustomCollection`).
+ */
+async function hasPendingCustomCardsToAdd(
+  ctx: QueryCtx,
+  userId: string,
+  courseId: Id<'courses'>,
+  activeCustomCollectionIds: Id<'collections'>[] | undefined,
+): Promise<boolean> {
+  if (!activeCustomCollectionIds || activeCustomCollectionIds.length === 0) {
+    return false;
+  }
+  for (const collId of activeCustomCollectionIds) {
+    const coll = await ctx.db.get(collId);
+    if (!coll) continue;
+    const prog = await getCollectionProgress(ctx, userId, courseId, collId);
+    const cardsAdded = prog?.cardsAdded ?? 0;
+    if (coll.textCount > cardsAdded) return true;
+  }
+  return false;
+}
+
+export const getCardForReviewEmptyReason = query({
+  args: {},
+  returns: v.union(
+    v.object({ reason: v.literal('no_session') }),
+    v.object({ reason: v.literal('no_cards') }),
+    v.object({
+      reason: v.literal('filtered_out'),
+      activeFilter: v.union(v.literal('custom'), v.literal('course')),
+      currentSourceHasAnyCards: v.boolean(),
+      availableInOtherSource: v.boolean(),
+      customCardsPendingAdd: v.boolean(),
+    }),
+    v.object({
+      reason: v.literal('all_caught_up'),
+      customCardsPendingAdd: v.boolean(),
+    }),
+  ),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { reason: 'no_session' as const };
+
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return { reason: 'no_session' as const };
+
+    const deck = await getDeckByCourseId(ctx, active.course._id);
+    if (!deck) return { reason: 'no_session' as const };
+
+    const settings = await getCourseSettings(ctx, active.course._id);
+    const schedulingMode: SchedulingMode = settings?.schedulingMode ?? 'learnAndReview';
+    const studyContentFilter: StudyContentFilter = settings?.studyContentFilter ?? 'both';
+    const now = Date.now();
+
+    // Cheap probe: any usable (non-hidden, non-mastered) card in the deck?
+    // Using the (deckId, isHidden, isMastered) index so a deck of all-hidden
+    // or all-mastered cards correctly resolves to 'no_cards' instead of
+    // falling through to 'all_caught_up' / 'filtered_out'.
+    const anyCard = await ctx.db
+      .query('cards')
+      .withIndex('by_deckId_and_isHidden_and_isMastered', (q) =>
+        q.eq('deckId', deck._id).eq('isHidden', false).eq('isMastered', false),
+      )
+      .first();
+    if (!anyCard) return { reason: 'no_cards' as const };
+
+    const customCardsPendingAdd = await hasPendingCustomCardsToAdd(
+      ctx,
+      userId,
+      active.course._id,
+      settings?.activeCustomCollectionIds,
+    );
+
+    if (studyContentFilter === 'both') {
+      return { reason: 'all_caught_up' as const, customCardsPendingAdd };
+    }
+
+    // Filter is active. Two probes:
+    //   1. Does the current (filtered-to) source have ANY card at all? If
+    //      not, the user must add — flipping the filter alone won't help in
+    //      the long run.
+    //   2. Does the OTHER source have any DUE card right now? If yes, we
+    //      can offer the one-tap unblock.
+    const currentOrigins = studyContentFilter === 'custom'
+      ? (['custom', 'chat'] as const)
+      : (['premade'] as const);
+    let currentSourceHasAnyCards = false;
+    for (const origin of currentOrigins) {
+      const probe = await ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_origin_dueDate', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .eq('collectionOrigin', origin),
+        )
+        .first();
+      if (probe) {
+        currentSourceHasAnyCards = true;
+        break;
+      }
+    }
+
+    const otherFilter: StudyContentFilter = studyContentFilter === 'custom' ? 'course' : 'custom';
+    const otherCards = await fetchDueCardsWithFilter(
+      ctx,
+      deck._id,
+      schedulingMode,
+      otherFilter,
+      now,
+      1,
+    );
+
+    return {
+      reason: 'filtered_out' as const,
+      activeFilter: studyContentFilter,
+      currentSourceHasAnyCards,
+      availableInOtherSource: otherCards.length > 0,
+      customCardsPendingAdd,
+    };
   },
 });
 

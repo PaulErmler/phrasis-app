@@ -6,6 +6,7 @@ import { BookOpen, RefreshCw, Headphones, PenLine, Radio } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
+import { ContentFilterDropdown } from '@/components/app/ContentFilterDropdown';
 
 interface StartLearningButtonProps {
   onStartLearn: (schedulingMode: SchedulingMode) => void;
@@ -93,6 +94,8 @@ export function StartLearningButton({
           </button>
         ))}
       </div>
+
+      <ContentFilterDropdown />
     </div>
   );
 }

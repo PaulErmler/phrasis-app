@@ -176,6 +176,13 @@
         "openWithRemaining": "Öffnen · {count} neu",
         "tabPremade": "Kurs",
         "tabCustom": "Eigene Inhalte",
+        "sourceBadgeOff": "Aus",
+        "reenablePopover": {
+          "title": "{source} wieder aktivieren?",
+          "description": "Diese Quelle ist derzeit vom Lernen und neuen Karten ausgeschlossen. Auch Kursinhalte wieder lernen?",
+          "cancel": "Abbrechen",
+          "confirm": "Aktivieren"
+        },
         "collectionDisplayNames": {
           "Custom": "Manuell hinzugefügt",
           "Chat": "Chat"
@@ -329,6 +336,12 @@
     "learnAndReview": "Wiederholen",
     "radioMode": "Radio",
     "radioRequiresCards": "Füge zuerst ein paar Karten hinzu, bevor du den Radio-Modus startest.",
+    "contentFilter": {
+      "label": "Quelle:",
+      "valueBoth": "Alle Inhalte",
+      "valueCustom": "Nur eigene",
+      "valueCourse": "Nur Kurs"
+    },
     "cardCounts": {
       "new": "N",
       "learning": "L",
@@ -407,12 +420,26 @@
     "typeTranslation": "Übersetzung eingeben...",
     "empty": {
       "noCardsDue": "Keine Sätze zur Wiederholung fällig",
+      "deckEmptyTitle": "Noch keine Sätze in deinem Deck",
       "addCards": "{count, plural, one {# Satz hinzufügen} other {# Sätze hinzufügen}}",
       "adding": "Wird hinzugefügt...",
       "noCollection": "Keine Sammlung ausgewählt",
+      "noCollectionDescription": "Du musst eine Sammlung auswählen, um Inhalte zu lernen.",
       "goHome": "Zur Startseite",
       "allDone": "Alles erledigt! Füge weitere Sätze hinzu, um weiterzulernen.",
-      "noCardsInDeck": "Noch keine Sätze in deinem Deck. Füge Sätze aus einer Sammlung hinzu, um mit dem Lernen zu beginnen."
+      "noCardsInDeck": "Füge Sätze aus einer Sammlung hinzu, um mit dem Lernen zu beginnen.",
+      "filterBlocked": {
+        "titleCustom": "Gerade keine eigenen Karten zum Lernen",
+        "titleCourse": "Gerade keine Kurs-Karten zum Lernen",
+        "subtitleCanUnblockCustom": "Dein Filter steht auf nur eigene Karten. Es sind Kurs-Karten verfügbar — aktiviere sie, um weiterzulernen.",
+        "subtitleCanUnblockCourse": "Dein Filter steht auf nur Kurs-Karten. Es sind eigene Karten verfügbar — aktiviere sie, um weiterzulernen.",
+        "subtitleMustAddCustom": "Du hast noch keine eigenen Karten. Füge welche hinzu oder erweitere deinen Filter um Kurs-Inhalte.",
+        "subtitleMustAddCourse": "Du hast noch keine Kurs-Karten. Füge welche hinzu oder erweitere deinen Filter um eigene Inhalte.",
+        "includeCourse": "Kurs-Inhalte einbeziehen",
+        "includeCustom": "Eigene Inhalte einbeziehen",
+        "createChatCards": "Im Chat erstellen",
+        "createCustomCards": "Eigene Karten hinzufügen"
+      }
     },
     "progressDisplay": {
       "sessionNewWords": "neue Wörter",
