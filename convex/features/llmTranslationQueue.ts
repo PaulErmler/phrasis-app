@@ -18,6 +18,7 @@ import {
   ROMANIZATION_LANGUAGES,
 } from '../../lib/languages';
 import { romanizeText } from './translation';
+import { getRomanizationSource } from '../lib/localRomanization';
 
 /**
  * LLM translation queue. Mirrors the TTS queue pattern in `ttsProcessing.ts`
@@ -413,13 +414,20 @@ export const processLlmTranslationForCard = internalAction({
         return null;
       }
 
-      // Success: optionally romanize the translation (non-fatal), then write.
+      // Success: optionally romanize the translation, then write.
+      // `romanizeText` already retries up to 3 times internally; on full
+      // exhaustion we persist an empty-string sentinel so ensureContent
+      // doesn't reschedule another burst on every call.
       let romanizedText: string | undefined;
       if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
         try {
           romanizedText = await romanizeText(result.text, args.targetLanguage);
-        } catch {
-          // Non-fatal; downstream backfill action will retry on demand.
+        } catch (err) {
+          console.error(
+            `[llmTranslationQueue] Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
+            err instanceof Error ? err.message : err,
+          );
+          romanizedText = '';
         }
       }
 
@@ -434,6 +442,13 @@ export const processLlmTranslationForCard = internalAction({
           )
         : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
 
+      // Source resolved from `cfgLanguageCode` (the sub-code for mixed
+      // dialects) so the recorded source matches what `romanizeText` ran on.
+      const romanizationSource =
+        romanizedText !== undefined
+          ? getRomanizationSource(cfgLanguageCode)
+          : undefined;
+
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,
         {
@@ -442,6 +457,7 @@ export const processLlmTranslationForCard = internalAction({
           translatedText: result.text,
           voiceName,
           romanizedText,
+          romanizationSource,
           regionVariant,
           priority: args.priority,
         },

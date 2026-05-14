@@ -120,6 +120,14 @@ export default defineSchema({
     text: v.string(),
     language: v.string(), // e.g., "en" for English
     romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Identifier of which romanizer produced `romanizedText` (e.g.
+    // "arabic-transliterate-v1", "google-v3"). Stored so a future strategy
+    // swap can find + invalidate rows produced by the old method via a
+    // simple `romanizationSource != currentSource` migration. Also set when
+    // `romanizedText` is the empty-string "tried, failed, leave empty"
+    // sentinel — bumping the source identifier on the failing method is
+    // how you re-attempt those rows.
+    romanizationSource: v.optional(v.string()),
     userCreated: v.boolean(), // false for uploaded data, true for user-created
     userId: v.optional(v.string()), // User who created (for user-created texts)
     collectionId: v.id('collections'), // Reference to collection (required for all texts)
@@ -149,6 +157,10 @@ export default defineSchema({
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
     romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Same purpose as on `texts` — identifier of the romanizer that produced
+    // `romanizedText` (or attempted to and persisted the empty-string
+    // sentinel). See the texts table for the migration pattern.
+    romanizationSource: v.optional(v.string()),
     // Concrete regional variant chosen for this row when `targetLanguage` is a
     // mixed/aggregate code (today: "es_mixed"). Stored as a Google voice-locale
     // prefix such as "es-ES" or "es-US" so the audio player can call

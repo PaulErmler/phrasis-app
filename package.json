@@ -79,6 +79,7 @@
     "@useautumn/convex": "^0.0.23",
     "@xyflow/react": "^12.10.1",
     "ai": "^5.0.157",
+    "arabic-transliterate": "^1.0.1",
     "atmn": "^1.1.5",
     "audiobuffer-to-wav": "^1.0.0",
     "autumn-js": "^0.1.85",

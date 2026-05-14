@@ -201,6 +201,9 @@ importers:
       ai:
         specifier: ^5.0.157
         version: 5.0.157(zod@4.3.6)
+      arabic-transliterate:
+        specifier: ^1.0.1
+        version: 1.0.1
       atmn:
         specifier: ^1.1.5
         version: 1.1.5(@types/node@20.19.37)(@types/react@19.2.14)(typescript@5.9.3)
@@ -4229,6 +4232,9 @@ packages:
   app-root-path@3.1.0:
     resolution: {integrity: sha512-biN3PwB2gUtjaYy/isrU3aNWI5w+fAfvHkSvCKeQGxhmYpwKFUxudR3Yya+KqVRHBmEDYh+/lTozYCFbmzX4nA==}
     engines: {node: '>= 6.0.0'}
+
+  arabic-transliterate@1.0.1:
+    resolution: {integrity: sha512-8OQm5HQazZ8Ifp4MiZ2J3WmpCAzXHi+rVYk4dUDYs1iYeLbiiMJ2ksLAzKLTJ19rw7I5yRQjP99A5wpVhCKTZw==}
 
   arctic@3.7.0:
     resolution: {integrity: sha512-ZMQ+f6VazDgUJOd+qNV+H7GohNSYal1mVjm5kEaZfE2Ifb7Ss70w+Q7xpJC87qZDkMZIXYf0pTIYZA0OPasSbw==}
@@ -12377,6 +12383,8 @@ snapshots:
   ansis@4.2.0: {}
 
   app-root-path@3.1.0: {}
+
+  arabic-transliterate@1.0.1: {}
 
   arctic@3.7.0:
     dependencies:

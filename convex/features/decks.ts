@@ -34,6 +34,7 @@ import {
   getNextTextsFromRank,
 } from '../db/collections';
 import { translateText, romanizeText } from './translation';
+import { getRomanizationSource } from '../lib/localRomanization';
 import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
@@ -202,8 +203,15 @@ export async function scheduleMissingContent(
     );
   };
 
-  // Schedule romanization for source text if needed and missing
-  if (ROMANIZATION_LANGUAGES.has(sourceLanguage) && !text.romanizedText) {
+  // Schedule romanization for source text if needed and missing.
+  // `=== undefined` (not `!x`) so the empty-string sentinel that
+  // `processRomanizationForSourceText` writes after 3 failed retries is
+  // honored — without that distinction every ensureContent call would burn
+  // another 3 retries against the same failing input.
+  if (
+    ROMANIZATION_LANGUAGES.has(sourceLanguage) &&
+    text.romanizedText === undefined
+  ) {
     await ctx.scheduler.runAfter(
       0,
       internal.features.decks.processRomanizationForSourceText,
@@ -293,7 +301,13 @@ export async function scheduleMissingContent(
         }
       } else {
         // Translation exists — backfill romanization if missing
-        if (ROMANIZATION_LANGUAGES.has(lang) && !translation.romanizedText) {
+        // `=== undefined` (not `!x`) so the empty-string "tried, failed,
+        // leave empty" sentinel persisted by `processRomanizationForTranslation`
+        // is respected on subsequent ensureContent runs.
+        if (
+          ROMANIZATION_LANGUAGES.has(lang) &&
+          translation.romanizedText === undefined
+        ) {
           await ctx.scheduler.runAfter(
             0,
             internal.features.decks.processRomanizationForTranslation,
@@ -1364,11 +1378,18 @@ export const processTranslationForCard = internalAction({
 
       if (existingRow) {
         translation = existingRow.translatedText;
-        if (ROMANIZATION_LANGUAGES.has(translateTarget) && !existingRow.romanizedText) {
+        // `=== undefined`: respect the empty-string sentinel from a prior
+        // failed attempt so we don't keep re-running the 3-retry burst.
+        if (
+          ROMANIZATION_LANGUAGES.has(translateTarget) &&
+          existingRow.romanizedText === undefined
+        ) {
           try {
             romanizedText = await romanizeText(translation, translateTarget);
           } catch {
-            // Romanization is non-fatal; skip silently
+            // 3 retries already exhausted — persist sentinel so subsequent
+            // ensureContent runs see "tried" and skip rescheduling.
+            romanizedText = '';
           }
         } else {
           romanizedText = existingRow.romanizedText;
@@ -1383,14 +1404,13 @@ export const processTranslationForCard = internalAction({
           try {
             romanizedText = await romanizeText(translation, translateTarget);
           } catch (err) {
-            // Romanization is non-fatal — the translation still lands without
-            // it — but we log so the next time a new locale silently fails to
-            // romanize, we notice (the Arabic bug went unnoticed because of
-            // an empty `catch`).
+            // 3 retries already exhausted — persist the empty-string
+            // sentinel so ensureContent doesn't reschedule another burst.
             console.error(
-              `Romanization failed for ${args.targetLanguage}:`,
+              `Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
               err instanceof Error ? err.message : err,
             );
+            romanizedText = '';
           }
         }
       }
@@ -1403,6 +1423,15 @@ export const processTranslationForCard = internalAction({
           )
         : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
 
+      // Source travels with the romanization value (real or sentinel) so a
+      // future strategy swap can target rows produced by the old method.
+      // Resolved from `translateTarget` (the actual code romanizeText was
+      // given) so mixed dialects record the sub-code's source.
+      const romanizationSource =
+        romanizedText !== undefined
+          ? getRomanizationSource(translateTarget)
+          : undefined;
+
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,
         {
@@ -1411,6 +1440,7 @@ export const processTranslationForCard = internalAction({
           translatedText: translation,
           voiceName,
           romanizedText,
+          romanizationSource,
           regionVariant,
           priority: args.priority,
         },
@@ -1439,6 +1469,13 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     voiceName: v.string(),
     romanizedText: v.optional(v.string()),
     /**
+     * Identifier of the romanizer that produced `romanizedText` (or
+     * attempted to and emitted the empty-string sentinel). Required when
+     * `romanizedText` is supplied, omitted otherwise. Persisted alongside
+     * the text so a future strategy swap can target rows by source.
+     */
+    romanizationSource: v.optional(v.string()),
+    /**
      * Concrete regional variant chosen when `targetLanguage` is a mixed code
      * (today: `es_mixed`). Stored on the translation row so the audio player
      * can pick a voice in the matching locale.
@@ -1460,13 +1497,37 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         textId: args.textId,
         targetLanguage: args.targetLanguage,
         translatedText: args.translatedText,
-        ...(args.romanizedText ? { romanizedText: args.romanizedText } : {}),
+        // `!== undefined` so the empty-string sentinel ("tried, failed,
+        // leave empty") persists on the new row and ensureContent stops
+        // rescheduling — otherwise `args.romanizedText === ''` would be
+        // dropped by the truthy spread and look like "never attempted".
+        ...(args.romanizedText !== undefined
+          ? {
+              romanizedText: args.romanizedText,
+              ...(args.romanizationSource
+                ? { romanizationSource: args.romanizationSource }
+                : {}),
+            }
+          : {}),
         ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
       });
     } else {
-      const patch: Partial<{ romanizedText: string; regionVariant: string }> = {};
-      if (args.romanizedText && !existing.romanizedText) {
+      const patch: Partial<{
+        romanizedText: string;
+        romanizationSource: string;
+        regionVariant: string;
+      }> = {};
+      // Same `!== undefined` reasoning: persist the sentinel on first write
+      // but never overwrite a previously-stored real value. Source travels
+      // with the value — they're written/cleared as a unit.
+      if (
+        args.romanizedText !== undefined &&
+        existing.romanizedText === undefined
+      ) {
         patch.romanizedText = args.romanizedText;
+        if (args.romanizationSource) {
+          patch.romanizationSource = args.romanizationSource;
+        }
       }
       if (args.regionVariant && !existing.regionVariant) {
         patch.regionVariant = args.regionVariant;
@@ -1544,32 +1605,54 @@ export const processRomanizationForSourceText = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    let romanized: string;
     try {
-      const romanized = await romanizeText(args.text, args.language);
-      await ctx.runMutation(
-        internal.features.decks.storeSourceRomanization,
-        { textId: args.textId, romanizedText: romanized },
-      );
+      romanized = await romanizeText(args.text, args.language);
     } catch (err) {
-      console.error('Source romanization error:', err);
+      // `romanizeText` already retried up to 3 times before throwing.
+      // Persist an empty-string sentinel so `scheduleMissingContent` doesn't
+      // reschedule another 3-retry burst on every ensureContent call.
+      console.error('Source romanization error (persisting sentinel):', err);
+      romanized = '';
     }
+    // Source recorded even on failure: lets a strategy swap target failed
+    // rows by the source that produced the sentinel.
+    const romanizationSource = getRomanizationSource(args.language);
+    await ctx.runMutation(
+      internal.features.decks.storeSourceRomanization,
+      {
+        textId: args.textId,
+        romanizedText: romanized,
+        romanizationSource,
+      },
+    );
     return null;
   },
 });
 
 /**
  * Internal mutation to store romanized text on a source text document.
+ *
+ * Idempotent against a real-value race: only patches when the row hasn't
+ * been written yet (`romanizedText === undefined`). The empty-string
+ * sentinel for "tried and failed" also wins on first write but never
+ * overwrites a previously-stored real value. `romanizationSource` is
+ * recorded so a future strategy swap can find + invalidate the row.
  */
 export const storeSourceRomanization = internalMutation({
   args: {
     textId: v.id('texts'),
     romanizedText: v.string(),
+    romanizationSource: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const text = await ctx.db.get(args.textId);
-    if (text && !text.romanizedText) {
-      await ctx.db.patch(args.textId, { romanizedText: args.romanizedText });
+    if (text && text.romanizedText === undefined) {
+      await ctx.db.patch(args.textId, {
+        romanizedText: args.romanizedText,
+        romanizationSource: args.romanizationSource,
+      });
     }
     return null;
   },
@@ -1586,27 +1669,50 @@ export const processRomanizationForTranslation = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    let romanized: string;
     try {
-      const romanized = await romanizeText(args.translatedText, args.language);
-      await ctx.runMutation(
-        internal.features.decks.storeTranslationRomanization,
-        { textId: args.textId, language: args.language, romanizedText: romanized },
-      );
+      romanized = await romanizeText(args.translatedText, args.language);
     } catch (err) {
-      console.error('Translation romanization error:', err);
+      // `romanizeText` already retried up to 3 times before throwing.
+      // Persist an empty-string sentinel so `scheduleMissingContent` doesn't
+      // reschedule another 3-retry burst on every ensureContent call.
+      console.error(
+        'Translation romanization error (persisting sentinel):',
+        err,
+      );
+      romanized = '';
     }
+    // Source recorded even on failure: lets a strategy swap target failed
+    // rows by the source that produced the sentinel.
+    const romanizationSource = getRomanizationSource(args.language);
+    await ctx.runMutation(
+      internal.features.decks.storeTranslationRomanization,
+      {
+        textId: args.textId,
+        language: args.language,
+        romanizedText: romanized,
+        romanizationSource,
+      },
+    );
     return null;
   },
 });
 
 /**
  * Internal mutation to store romanized text on a translation document.
+ *
+ * Idempotent against a real-value race: only patches when the field hasn't
+ * been written yet. The empty-string sentinel for "tried and failed" wins
+ * on first write but never overwrites a previously-stored real value.
+ * `romanizationSource` is recorded so a future strategy swap can find +
+ * invalidate the row.
  */
 export const storeTranslationRomanization = internalMutation({
   args: {
     textId: v.id('texts'),
     language: v.string(),
     romanizedText: v.string(),
+    romanizationSource: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1616,8 +1722,11 @@ export const storeTranslationRomanization = internalMutation({
         q.eq('textId', args.textId).eq('targetLanguage', args.language),
       )
       .first();
-    if (translation && !translation.romanizedText) {
-      await ctx.db.patch(translation._id, { romanizedText: args.romanizedText });
+    if (translation && translation.romanizedText === undefined) {
+      await ctx.db.patch(translation._id, {
+        romanizedText: args.romanizedText,
+        romanizationSource: args.romanizationSource,
+      });
     }
     return null;
   },

@@ -95,10 +95,53 @@ describe("features/translation helpers", () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("romanizes Arabic via Google v3 passing bare 'ar'", async () => {
-      // Asserts the wire format we send for Arabic. Google's v3 romanizeText
-      // wants bare `ar` (not `ar-SA` or any region tag) — guard so we don't
-      // regress by adding a regional mapping that Google rejects.
+    it("romanizes Arabic locally via arabic-transliterate (no network call)", async () => {
+      // Arabic was moved OFF Google v3 after a production regression where
+      // the endpoint started returning `{"romanizations":[{}]}` for short
+      // Arabic strings. arabic-transliterate is now the local source of
+      // truth — guard against accidentally re-routing `ar*` back to Google.
+      const fetchMock = vi.fn(async () => {
+        throw new Error(
+          "romanizeText hit the network for Arabic — local path regressed",
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      try {
+        const out = await romanizeText("مرحبا", "ar");
+        // Library output is deterministic IJMES; assert non-empty + Latin.
+        expect(out.length).toBeGreaterThan(0);
+        expect(/[A-Za-zāēīōū]/.test(out)).toBe(true);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("Arabic dialect codes (ar_sa / ar_eg / ar_iq) also use the local path", async () => {
+      const fetchMock = vi.fn(async () => {
+        throw new Error(
+          "Arabic dialect romanization hit the network — local path regressed",
+        );
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      try {
+        for (const code of ["ar_sa", "ar_eg", "ar_iq"] as const) {
+          const out = await romanizeText("هلو", code);
+          expect(out.length).toBeGreaterThan(0);
+        }
+      } finally {
+        vi.unstubAllGlobals();
+      }
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("Google v3 callers (Russian) get retried up to 3 times before failing", async () => {
+      // The 3-retry wrapper applies to every language still routed through
+      // Google v3. We exercise it with Russian since `ar` no longer reaches
+      // this path. The mock returns `{romanizations:[{}]}` every time —
+      // simulating the Google flake that prompted the retry — and we assert
+      // the fetch was attempted exactly ROMANIZE_MAX_ATTEMPTS times before
+      // the final throw.
       const { privateKey } = generateKeyPairSync("rsa", {
         modulusLength: 2048,
         privateKeyEncoding: { type: "pkcs8", format: "pem" },
@@ -111,6 +154,7 @@ describe("features/translation helpers", () => {
       };
       vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_KEY", JSON.stringify(serviceAccount));
 
+      let romanizeCalls = 0;
       let romanizeBody: unknown = null;
       const fetchMock = vi.fn(
         async (url: string | URL | Request, init?: RequestInit) => {
@@ -122,12 +166,78 @@ describe("features/translation helpers", () => {
             );
           }
           if (u.includes("translation.googleapis.com")) {
+            romanizeCalls++;
             romanizeBody = init?.body
               ? JSON.parse(init.body as string)
               : null;
+            // Always-empty response — same shape we saw from production.
+            return new Response(
+              JSON.stringify({ romanizations: [{}] }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
+          }
+          throw new Error(`Unexpected fetch to ${u}`);
+        },
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      try {
+        await expect(romanizeText("привет", "ru")).rejects.toThrow(
+          /No romanization returned/i,
+        );
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+      expect(romanizeCalls).toBe(3);
+      // Wire format guard — keep on a still-Google-routed language now that
+      // Arabic no longer covers it.
+      expect(
+        (romanizeBody as { source_language_code?: string } | null)
+          ?.source_language_code,
+      ).toBe("ru");
+    });
+
+    it("Google v3 succeeds on a later retry attempt (recovery path)", async () => {
+      // The whole point of the retry: a transient empty response on attempt
+      // 1 shouldn't doom the row. Mock returns empty once, then a real
+      // romanization on attempt 2 — the function should return the latter.
+      const { privateKey } = generateKeyPairSync("rsa", {
+        modulusLength: 2048,
+        privateKeyEncoding: { type: "pkcs8", format: "pem" },
+        publicKeyEncoding: { type: "spki", format: "pem" },
+      });
+      const serviceAccount = {
+        client_email: "tester@example.iam.gserviceaccount.com",
+        private_key: privateKey as unknown as string,
+        project_id: "test-project",
+      };
+      vi.stubEnv("GOOGLE_SERVICE_ACCOUNT_KEY", JSON.stringify(serviceAccount));
+
+      let romanizeCalls = 0;
+      const fetchMock = vi.fn(
+        async (url: string | URL | Request) => {
+          const u = typeof url === "string" ? url : url.toString();
+          if (u.includes("oauth2.googleapis.com")) {
+            return new Response(
+              JSON.stringify({ access_token: "fake-token" }),
+              { status: 200, headers: { "Content-Type": "application/json" } },
+            );
+          }
+          if (u.includes("translation.googleapis.com")) {
+            romanizeCalls++;
+            if (romanizeCalls === 1) {
+              return new Response(
+                JSON.stringify({ romanizations: [{}] }),
+                {
+                  status: 200,
+                  headers: { "Content-Type": "application/json" },
+                },
+              );
+            }
             return new Response(
               JSON.stringify({
-                romanizations: [{ romanizedText: "marhaba" }],
+                romanizations: [{ romanizedText: "privet" }],
               }),
               { status: 200, headers: { "Content-Type": "application/json" } },
             );
@@ -138,17 +248,13 @@ describe("features/translation helpers", () => {
       vi.stubGlobal("fetch", fetchMock);
 
       try {
-        const out = await romanizeText("مرحبا", "ar");
-        expect(out).toBe("marhaba");
+        const out = await romanizeText("привет", "ru");
+        expect(out).toBe("privet");
       } finally {
         vi.unstubAllGlobals();
         vi.unstubAllEnvs();
       }
-
-      expect(
-        (romanizeBody as { source_language_code?: string } | null)
-          ?.source_language_code,
-      ).toBe("ar");
+      expect(romanizeCalls).toBe(2);
     });
   });
 });

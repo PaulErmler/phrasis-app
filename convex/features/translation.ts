@@ -208,45 +208,32 @@ const GOOGLE_V3_ROMANIZE_SUPPORTED = new Set([
   'kn', 'my', 'ru', 'sr', 'ta', 'te', 'uk',
 ]);
 
-/**
- * Romanize non-Latin script text.
- * Chinese uses the local chinese-to-pinyin library;
- * Greek uses greek-utils phonetic Latin;
- * Korean uses hangul-romanization (Revised Romanization);
- * other languages use the Google Cloud Translation v3 romanizeText endpoint
- * (provided Google supports them — see GOOGLE_V3_ROMANIZE_SUPPORTED).
- *
- * Throws when a language reaches this path with no working romanizer.
- * Callers gate on `ROMANIZATION_LANGUAGES` in lib/languages.ts, which is
- * maintained to only include codes with WORKING coverage, so unsupported
- * codes shouldn't reach this function in practice.
- */
-export async function romanizeText(
+/** Max attempts when calling Google v3 romanizeText. The endpoint
+ * occasionally returns `200 {"romanizations":[{}]}` for short inputs
+ * (observed on Arabic before it moved to the local path); a quick retry
+ * sometimes lands on a working backend instance. Callers that don't want a
+ * hard failure already `try/catch` and leave `romanizedText` empty, so on
+ * full exhaustion we just throw and let the caller skip persisting. */
+const ROMANIZE_MAX_ATTEMPTS = 3;
+
+/** One call to Google v3 romanizeText. Returns the romanized string or
+ * throws — wrapped by `romanizeText` in a retry loop. */
+async function romanizeViaGoogleV3Once(
   text: string,
   sourceLanguage: string,
+  googleLang: string,
+  attempt: number,
 ): Promise<string> {
-  const local = romanizeLocal(text, sourceLanguage);
-  if (local !== null) return local;
-
-  // Hard gate: bail out cleanly before issuing a guaranteed-400 request.
-  // The mapped (Google-facing) code is what determines support, since
-  // dialect codes like ar_eg collapse to `ar` via GOOGLE_TRANSLATE_CODE_MAP.
-  const googleLangPreflight = toGoogleTranslateCode(sourceLanguage);
-  if (!GOOGLE_V3_ROMANIZE_SUPPORTED.has(googleLangPreflight)) {
-    throw new Error(
-      `Romanization not configured for language "${sourceLanguage}" (Google v3 doesn't support "${googleLangPreflight}" and no local romanizer is registered). Update ROMANIZATION_LANGUAGES in lib/languages.ts or wire a local romanizer.`,
-    );
-  }
-
   const { token, projectId } = await getGoogleAccessToken();
   const url = `https://translation.googleapis.com/v3/projects/${projectId}/locations/global:romanizeText`;
-  const googleLang = toGoogleTranslateCode(sourceLanguage);
   const startedAt = Date.now();
 
   console.log('[translation] Google romanizeText v3 request', {
     sourceLanguage,
     googleLang,
     textCharCount: text.length,
+    attempt,
+    maxAttempts: ROMANIZE_MAX_ATTEMPTS,
     api: 'v3/.../romanizeText',
     projectId,
   });
@@ -271,27 +258,27 @@ export async function romanizeText(
       status: response.status,
       elapsedMs,
       sourceLanguage,
-      // Include `googleLang` so a glance at the error tells you what code we
-      // actually sent — `sourceLanguage` alone is the internal code, which
-      // hides any mapping bugs.
       googleLang,
+      attempt,
       bodyPreview: errorText.slice(0, 500),
     });
-    throw new Error(`Google romanize API error: ${response.status} - ${errorText}`);
+    throw new Error(
+      `Google romanize API error: ${response.status} - ${errorText}`,
+    );
   }
 
   const data = (await response.json()) as GoogleRomanizeResponse;
   const romanized = data.romanizations?.[0]?.romanizedText;
   if (!romanized) {
-    // Diagnostic dump for the production "all Arabic romanizations fail" bug
-    // (200 OK, empty/missing romanizedText). Captures whether Google returned
-    // `romanizations: []`, `[{}]`, or `[{romanizedText: ''}]`, plus the raw
-    // shape in case the API contract drifted. Remove once the root cause is
-    // identified.
+    // Diagnostic dump for the empty-result case (200 OK, empty/missing
+    // romanizedText). Kept after the Arabic root-cause investigation
+    // because the bug appears to be a Google-side flake that retries can
+    // sometimes paper over.
     console.error('[translation] Google romanizeText v3 empty result', {
       sourceLanguage,
       googleLang,
       elapsedMs,
+      attempt,
       textCharCount: text.length,
       textPreview: text.slice(0, 80),
       romanizationsLength: Array.isArray(data.romanizations)
@@ -301,8 +288,6 @@ export async function romanizeText(
         data.romanizations && data.romanizations[0]
           ? Object.keys(data.romanizations[0])
           : null,
-      // Stringified body capped at 2K so a wide unexpected response (e.g. a
-      // wrapped error envelope) still shows up in the log.
       bodyPreview: JSON.stringify(data).slice(0, 2000),
     });
     throw new Error('No romanization returned from Google API');
@@ -311,8 +296,70 @@ export async function romanizeText(
   console.log('[translation] Google romanizeText v3 ok', {
     sourceLanguage,
     elapsedMs,
+    attempt,
     resultCharCount: romanized.length,
   });
 
   return romanized;
+}
+
+/**
+ * Romanize non-Latin script text.
+ *
+ *   - Chinese / Cantonese: local chinese-to-pinyin + cantonese-romanisation
+ *   - Greek: greek-utils phonetic Latin
+ *   - Korean: hangul-romanization (Revised Romanization)
+ *   - Hebrew: hebrew-transliteration (SBL Academic)
+ *   - Arabic (incl. ar_sa / ar_eg / ar_iq): arabic-transliterate (IJMES)
+ *   - everything else in `ROMANIZATION_LANGUAGES`: Google Cloud Translation
+ *     v3 romanizeText, retried up to `ROMANIZE_MAX_ATTEMPTS` times.
+ *
+ * Throws when a language reaches this path with no working romanizer or
+ * when all Google attempts fail. Every caller already wraps this in a
+ * `try/catch` that leaves `romanizedText` empty on failure, so a hard
+ * throw here means the row lands without romanization rather than the
+ * whole translation pipeline failing.
+ */
+export async function romanizeText(
+  text: string,
+  sourceLanguage: string,
+): Promise<string> {
+  const local = romanizeLocal(text, sourceLanguage);
+  if (local !== null) return local;
+
+  // Hard gate: bail out cleanly before issuing a guaranteed-400 request.
+  // The mapped (Google-facing) code is what determines support, since
+  // dialect codes like ar_eg collapse to `ar` via GOOGLE_TRANSLATE_CODE_MAP.
+  const googleLang = toGoogleTranslateCode(sourceLanguage);
+  if (!GOOGLE_V3_ROMANIZE_SUPPORTED.has(googleLang)) {
+    throw new Error(
+      `Romanization not configured for language "${sourceLanguage}" (Google v3 doesn't support "${googleLang}" and no local romanizer is registered). Update ROMANIZATION_LANGUAGES in lib/languages.ts or wire a local romanizer.`,
+    );
+  }
+
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= ROMANIZE_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await romanizeViaGoogleV3Once(
+        text,
+        sourceLanguage,
+        googleLang,
+        attempt,
+      );
+    } catch (err) {
+      lastError = err;
+      if (attempt < ROMANIZE_MAX_ATTEMPTS) {
+        console.warn('[translation] romanizeText retrying', {
+          sourceLanguage,
+          googleLang,
+          attempt,
+          maxAttempts: ROMANIZE_MAX_ATTEMPTS,
+          detail: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  }
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(String(lastError));
 }

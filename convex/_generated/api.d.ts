@@ -80,6 +80,7 @@ import type * as migrations_backfillCardAggregates from "../migrations/backfillC
 import type * as migrations_backfillCustomSentenceMetadata from "../migrations/backfillCustomSentenceMetadata.js";
 import type * as migrations_backfillDisplayWord from "../migrations/backfillDisplayWord.js";
 import type * as migrations_backfillIsGraduated from "../migrations/backfillIsGraduated.js";
+import type * as migrations_backfillRomanizationSource from "../migrations/backfillRomanizationSource.js";
 import type * as migrations_backfillUserStats from "../migrations/backfillUserStats.js";
 import type * as migrations_backfillWordTexts from "../migrations/backfillWordTexts.js";
 import type * as migrations_datasetMigration_backfillCardsMastered from "../migrations/datasetMigration_backfillCardsMastered.js";
@@ -173,6 +174,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/backfillCustomSentenceMetadata": typeof migrations_backfillCustomSentenceMetadata;
   "migrations/backfillDisplayWord": typeof migrations_backfillDisplayWord;
   "migrations/backfillIsGraduated": typeof migrations_backfillIsGraduated;
+  "migrations/backfillRomanizationSource": typeof migrations_backfillRomanizationSource;
   "migrations/backfillUserStats": typeof migrations_backfillUserStats;
   "migrations/backfillWordTexts": typeof migrations_backfillWordTexts;
   "migrations/datasetMigration_backfillCardsMastered": typeof migrations_datasetMigration_backfillCardsMastered;
