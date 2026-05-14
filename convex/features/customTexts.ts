@@ -10,8 +10,10 @@ import { FEATURE_IDS } from './featureIds';
 import { MAX_CARD_TEXT_LENGTH, MAX_IMPORT_BATCH } from '../../lib/constants/learning';
 import {
   getLanguageByCode,
+  getTranslationSource,
   isMixedLanguage,
   resolveMixedVariant,
+  USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../lib/languages';
 import { trackEvent } from '../db/stats/dailyStats';
 import { isValidTimezone } from '../lib/dateUtils';
@@ -159,6 +161,11 @@ export const autoFillTranslations = action({
         // on the translations table records the variant the LLM saw,
         // matching the deck-card path in `processLlmTranslationForCard`.
         regionVariant: v.optional(v.string()),
+        // Identifier of the LLM that produced this translation (the autofill
+        // model, no reasoning). Plumbed back to `createCustomText` so a
+        // future strategy swap can target rows by source. Same format as
+        // the `translationSource` on deck-card rows.
+        translationSource: v.optional(v.string()),
       }),
     ),
     metadata: sentenceMetadataValidator,
@@ -300,10 +307,17 @@ export const autoFillTranslations = action({
       throw new ConvexError('Translation response missing "metadata" object');
     }
 
+    // Source identifier for every translation in this batch — single LLM
+    // call, no reasoning, so every row gets the same tag.
+    const translationSource = getTranslationSource(
+      OPENROUTER_MODELS.translationAutoFill,
+    );
+
     const results: {
       language: string;
       text: string;
       regionVariant?: string;
+      translationSource?: string;
     }[] = [];
     for (const lang of targetLanguages) {
       const { resolved, regionVariant } = resolutionByRequested.get(lang)!;
@@ -319,6 +333,7 @@ export const autoFillTranslations = action({
         language: lang,
         text: translation.trim(),
         ...(regionVariant ? { regionVariant } : {}),
+        translationSource,
       });
     }
 
@@ -351,6 +366,11 @@ export const createCustomText = mutation({
         // translations row so audio synthesis and STT validation downstream
         // honor the variant the LLM actually produced.
         regionVariant: v.optional(v.string()),
+        // Forwarded from `autoFillTranslations` (the autofill model id) for
+        // autofilled entries; the frontend uses `'user-provided'` for
+        // manually-typed entries. Persisted on the translations row so a
+        // future strategy swap can target rows by source.
+        translationSource: v.optional(v.string()),
       }),
     ),
     timezone: v.string(),
@@ -447,6 +467,9 @@ export const createCustomText = mutation({
         targetLanguage: entry.language,
         translatedText: entry.text,
         ...(entry.regionVariant ? { regionVariant: entry.regionVariant } : {}),
+        ...(entry.translationSource
+          ? { translationSource: entry.translationSource }
+          : {}),
       });
     }
 
@@ -628,6 +651,10 @@ export const createCustomTextsBatch = mutation({
           textId,
           targetLanguage: entry.language,
           translatedText: entry.text,
+          // Bulk-import is exclusively manual — no autofill path here, so
+          // every inserted translation is user-typed. Tag it explicitly so
+          // a future strategy swap doesn't regenerate text the user wrote.
+          translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
         });
       }
 

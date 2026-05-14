@@ -35,7 +35,10 @@ import {
 } from '../db/collections';
 import { translateText, romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
-import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
+import {
+  GOOGLE_TRANSLATE_SOURCE,
+  ROMANIZATION_LANGUAGES,
+} from '../../lib/languages';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   translationValidator,
@@ -1441,6 +1444,10 @@ export const processTranslationForCard = internalAction({
           voiceName,
           romanizedText,
           romanizationSource,
+          // Legacy Google Translate path (used as the fallback when the LLM
+          // queue's stage chain exhausts, or for languages explicitly pinned
+          // to `translationProvider: 'google'`).
+          translationSource: GOOGLE_TRANSLATE_SOURCE,
           regionVariant,
           priority: args.priority,
         },
@@ -1476,6 +1483,14 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      */
     romanizationSource: v.optional(v.string()),
     /**
+     * Identifier of the translation method (model + reasoning, or
+     * `google-translate-v2` for the legacy path). Persisted on the
+     * translation row so a future strategy swap can target rows produced
+     * by the old method. Optional during rollout so old call sites that
+     * haven't been threaded yet still compile.
+     */
+    translationSource: v.optional(v.string()),
+    /**
      * Concrete regional variant chosen when `targetLanguage` is a mixed code
      * (today: `es_mixed`). Stored on the translation row so the audio player
      * can pick a voice in the matching locale.
@@ -1509,12 +1524,16 @@ export const storeTranslationAndScheduleTTS = internalMutation({
                 : {}),
             }
           : {}),
+        ...(args.translationSource
+          ? { translationSource: args.translationSource }
+          : {}),
         ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
       });
     } else {
       const patch: Partial<{
         romanizedText: string;
         romanizationSource: string;
+        translationSource: string;
         regionVariant: string;
       }> = {};
       // Same `!== undefined` reasoning: persist the sentinel on first write
@@ -1528,6 +1547,14 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         if (args.romanizationSource) {
           patch.romanizationSource = args.romanizationSource;
         }
+      }
+      // Translation source is set on first-write of `translatedText` (which
+      // happened upstream when the row was inserted). For existing rows we
+      // only fill it in if it's missing — the legacy-backfill migration
+      // handles older rows, but a concurrent regenerate against an existing
+      // row should keep the original source as the canonical record.
+      if (args.translationSource && existing.translationSource === undefined) {
+        patch.translationSource = args.translationSource;
       }
       if (args.regionVariant && !existing.regionVariant) {
         patch.regionVariant = args.regionVariant;

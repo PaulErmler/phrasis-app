@@ -745,6 +745,45 @@ export type ModelStage = {
   maxOutputTokens?: number;
 };
 
+/**
+ * Stable identifier for the legacy Google Translate v2 path. Used as the
+ * `translationSource` on rows produced by `processTranslationForCard` —
+ * the fallback path the LLM queue schedules when every model stage fails.
+ */
+export const GOOGLE_TRANSLATE_SOURCE = 'google-translate-v2';
+
+/**
+ * Stable identifier for translations the user typed manually (no model
+ * involved). Used on `createCustomText` insertions when the corresponding
+ * entry didn't come from autofill.
+ */
+export const USER_PROVIDED_TRANSLATION_SOURCE = 'user-provided';
+
+/**
+ * Build the `translationSource` string for an LLM translation from the
+ * model slug and reasoning level. Persisted on each translation row so a
+ * future strategy swap can find + regenerate rows produced by the old
+ * method via `translationSource != currentSource`.
+ *
+ * Format: `<model-slug>-<reasoning|none>`. The bare-`none` suffix keeps
+ * the two no-reasoning vs low-reasoning Gemini variants distinct as
+ * separate strings, so the character-rule split is reflected in the tag.
+ */
+export function getTranslationSource(
+  model: string,
+  reasoning?: 'low' | 'medium' | 'high',
+): string {
+  return `${model}-${reasoning ?? 'none'}`;
+}
+
+/**
+ * Same as `getTranslationSource` but accepts a `ModelStage`. Convenience
+ * for the LLM queue worker, which already carries the stage object.
+ */
+export function getTranslationSourceFromStage(stage: ModelStage): string {
+  return getTranslationSource(stage.model, stage.reasoning);
+}
+
 type LengthBranch = {
   /**
    * Maximum source-text character length for this branch (inclusive). Use

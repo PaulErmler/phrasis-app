@@ -27,7 +27,10 @@ import {
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import { getAudioForText } from '../lib/audio';
-import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
+import {
+  ROMANIZATION_LANGUAGES,
+  USER_PROVIDED_TRANSLATION_SOURCE,
+} from '../../lib/languages';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
@@ -1039,15 +1042,22 @@ export const editCard = mutation({
         if (!changedLanguages.has(lang)) continue;
         const existing = existingTranslationMap.get(lang);
         if (existing) {
+          // User edited an existing translation — drop the romanization (it
+          // doesn't match the new text), drop the old romanization source,
+          // and re-tag as user-provided so a future strategy swap doesn't
+          // overwrite the user's edit.
           await ctx.db.patch(existing._id, {
             translatedText: submittedMap.get(lang)!,
             romanizedText: undefined,
+            romanizationSource: undefined,
+            translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
           });
         } else {
           await ctx.db.insert('translations', {
             textId: card.textId,
             targetLanguage: lang,
             translatedText: submittedMap.get(lang)!,
+            translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
           });
         }
       }
@@ -1072,6 +1082,10 @@ export const editCard = mutation({
         text: sourceChanged && submittedSource ? submittedSource : text.text,
         language: text.language,
         romanizedText: sourceChanged ? undefined : text.romanizedText,
+        // Source travels with the value: copy when unchanged (so we keep
+        // pointing at whichever romanizer produced the carried-over text);
+        // drop when changed (next ensureContent will re-romanize and tag).
+        romanizationSource: sourceChanged ? undefined : text.romanizationSource,
         userCreated: true,
         userId,
         collectionId: text.collectionId,
@@ -1095,7 +1109,12 @@ export const editCard = mutation({
       });
       resolvedTextId = newTextId;
 
-      // Create translations rows for all non-source languages
+      // Create translations rows for all non-source languages.
+      // Sources travel with their values:
+      //   - User-edited rows: tag as `'user-provided'`; carry no romanization.
+      //   - Unchanged rows: copy `translatedText` + `translationSource` + (if
+      //     present) `romanizedText` + `romanizationSource` so we don't lose
+      //     the original tags on the logical-copy operation.
       for (const lang of allLanguages) {
         if (lang === sourceLanguage) continue;
         const existing = existingTranslationMap.get(lang);
@@ -1106,7 +1125,21 @@ export const editCard = mutation({
           translatedText: changed
             ? (submittedMap.get(lang) ?? '')
             : (existing?.translatedText ?? ''),
-          ...(changed ? {} : existing?.romanizedText ? { romanizedText: existing.romanizedText } : {}),
+          ...(changed
+            ? { translationSource: USER_PROVIDED_TRANSLATION_SOURCE }
+            : existing?.translationSource
+              ? { translationSource: existing.translationSource }
+              : {}),
+          ...(changed
+            ? {}
+            : existing?.romanizedText !== undefined
+              ? {
+                  romanizedText: existing.romanizedText,
+                  ...(existing.romanizationSource
+                    ? { romanizationSource: existing.romanizationSource }
+                    : {}),
+                }
+              : {}),
         });
       }
 

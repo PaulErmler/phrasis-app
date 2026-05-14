@@ -161,6 +161,17 @@ export default defineSchema({
     // `romanizedText` (or attempted to and persisted the empty-string
     // sentinel). See the texts table for the migration pattern.
     romanizationSource: v.optional(v.string()),
+    // Identifier of the translation method that produced `translatedText`.
+    // Format: "<model-slug>-<reasoning|none>" for LLM translations (e.g.
+    // "google/gemini-3.1-flash-lite-preview-none"), "google-translate-v2"
+    // for the legacy Google Translate path, "user-provided" for
+    // manually-typed custom-text translations. Persisted so a future
+    // strategy swap (new dataset version, new model, new prompt) can find
+    // and regenerate rows produced by the prior method via a simple
+    // `translationSource != currentSource` migration. Optional for
+    // backward-compat with rows that landed before this field existed —
+    // see `convex/migrations/backfillTranslationSource.ts`.
+    translationSource: v.optional(v.string()),
     // Concrete regional variant chosen for this row when `targetLanguage` is a
     // mixed/aggregate code (today: "es_mixed"). Stored as a Google voice-locale
     // prefix such as "es-ES" or "es-US" so the audio player can call

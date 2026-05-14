@@ -11,6 +11,7 @@ import { Doc, Id } from '../_generated/dataModel';
 import { translateTextWithLLM, type ReasoningEffort } from './translationLLM';
 import {
   getTranslationConfigForLanguage,
+  getTranslationSourceFromStage,
   getVoiceForLanguage,
   getVoiceForLanguageVariant,
   resolveMixedVariant,
@@ -374,8 +375,10 @@ export const processLlmTranslationForCard = internalAction({
       // Run each stage of the resolved translation rule in order. The first
       // success wins; on truncated / empty / HTTP error we try the next
       // fallback. After the chain exhausts the worker schedules Google
-      // Translate as the final safety net.
+      // Translate as the final safety net. Track which stage produced the
+      // winning result so it can be persisted as `translationSource`.
       let result: Awaited<ReturnType<typeof translateTextWithLLM>> | null = null;
+      let winningStage: (typeof stages)[number] | null = null;
       for (let i = 0; i < stages.length; i++) {
         const stage = stages[i];
         result = await translateTextWithLLM({
@@ -384,7 +387,10 @@ export const processLlmTranslationForCard = internalAction({
           reasoning: stage.reasoning as ReasoningEffort | undefined,
           maxOutputTokens: stage.maxOutputTokens,
         });
-        if (result.ok) break;
+        if (result.ok) {
+          winningStage = stage;
+          break;
+        }
         if (i < stages.length - 1) {
           const next = stages[i + 1];
           console.warn('[llmTranslationQueue] stage failed — retrying with next stage', {
@@ -449,6 +455,13 @@ export const processLlmTranslationForCard = internalAction({
           ? getRomanizationSource(cfgLanguageCode)
           : undefined;
 
+      // Translation source: derived from the stage that actually produced
+      // the result (not the primary), so a row that succeeded on a fallback
+      // is tagged with the fallback's model/reasoning.
+      const translationSource = winningStage
+        ? getTranslationSourceFromStage(winningStage)
+        : undefined;
+
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,
         {
@@ -458,6 +471,7 @@ export const processLlmTranslationForCard = internalAction({
           voiceName,
           romanizedText,
           romanizationSource,
+          translationSource,
           regionVariant,
           priority: args.priority,
         },
