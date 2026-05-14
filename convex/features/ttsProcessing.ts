@@ -624,7 +624,7 @@ export const enqueueTtsJob = internalMutation({
   args: {
     provider: ttsProviderValidator,
     args: ttsJobArgsValidator,
-    priority: v.optional(v.number()),
+    priority: v.optional(v.union(v.literal(0), v.literal(1))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {

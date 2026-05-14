@@ -282,7 +282,31 @@ export async function romanizeText(
 
   const data = (await response.json()) as GoogleRomanizeResponse;
   const romanized = data.romanizations?.[0]?.romanizedText;
-  if (!romanized) throw new Error('No romanization returned from Google API');
+  if (!romanized) {
+    // Diagnostic dump for the production "all Arabic romanizations fail" bug
+    // (200 OK, empty/missing romanizedText). Captures whether Google returned
+    // `romanizations: []`, `[{}]`, or `[{romanizedText: ''}]`, plus the raw
+    // shape in case the API contract drifted. Remove once the root cause is
+    // identified.
+    console.error('[translation] Google romanizeText v3 empty result', {
+      sourceLanguage,
+      googleLang,
+      elapsedMs,
+      textCharCount: text.length,
+      textPreview: text.slice(0, 80),
+      romanizationsLength: Array.isArray(data.romanizations)
+        ? data.romanizations.length
+        : 'not-an-array',
+      firstEntryKeys:
+        data.romanizations && data.romanizations[0]
+          ? Object.keys(data.romanizations[0])
+          : null,
+      // Stringified body capped at 2K so a wide unexpected response (e.g. a
+      // wrapped error envelope) still shows up in the log.
+      bodyPreview: JSON.stringify(data).slice(0, 2000),
+    });
+    throw new Error('No romanization returned from Google API');
+  }
 
   console.log('[translation] Google romanizeText v3 ok', {
     sourceLanguage,

@@ -119,7 +119,7 @@ const llmJobArgsValidator = v.object({
   // mutation. Used to keep prioritization intact when the worker hands off
   // to storeTranslationAndScheduleTTS (downstream TTS) or to the Google
   // fallback path. Defaults to 0 (normal) when missing.
-  priority: v.optional(v.number()),
+  priority: v.optional(v.union(v.literal(0), v.literal(1))),
 });
 
 /**
@@ -189,7 +189,7 @@ export const pumpLlmQueue = internalMutation({
 export const enqueueLlmTranslation = internalMutation({
   args: {
     args: llmJobArgsValidator,
-    priority: v.optional(v.number()),
+    priority: v.optional(v.union(v.literal(0), v.literal(1))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -486,7 +486,7 @@ async function scheduleGoogleFallback(
     targetLanguage: string;
     text: string;
     audioSpeakerGender?: string;
-    priority?: number;
+    priority?: 0 | 1;
   },
 ): Promise<void> {
   await ctx.scheduler.runAfter(
