@@ -69,7 +69,16 @@
       "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app log --oneline --all)",
       "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app log --all --oneline)",
       "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app log -1 --format=\"%H %s\" 9ed67b0)",
-      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app log -1 --format=\"%H %s %b\" d4c0933)"
+      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app log -1 --format=\"%H %s %b\" d4c0933)",
+      "Bash(python3 /tmp/curate_placement.py)",
+      "Bash(awk '/^  \"Onboarding\": {/{start=NR} /^  },$/&&start{print start\"-\"NR; exit}' /Users/paulermler/Documents/Phrasis/new/phrasis-app/messages/de.json)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts|jsx\\)$\")",
+      "Bash(grep -nA1 \"outline:\" /Users/paulermler/Documents/Phrasis/new/phrasis-app/components/ui/button.tsx)",
+      "Read(//Users/paulermler/Documents/Phrasis/new/phrasis-app-small-fixes/components/app/**)",
+      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app/.claude/worktrees/small-fixes status --short)",
+      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app/.claude/worktrees/small-fixes log -3 --oneline)",
+      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app/.claude/worktrees/small-fixes diff --stat)",
+      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app/.claude/worktrees/small-fixes diff)"
     ],
     "deny": [
       "Read(.env*)",

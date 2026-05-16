@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   CircleCheck,
@@ -59,6 +59,60 @@ export function CardActionsMenu({
   // open. Suppressing pointerdown and toggling via click avoids that.
   const [open, setOpen] = useState(false);
 
+  // Imperative open/close path used by the onboarding tutorial. We can't
+  // reliably drive Radix's controlled state from the outside by clicking
+  // the trigger button — the trigger has both an `onPointerDown` that
+  // preventDefaults Radix's own open path AND an `onClick` that toggles
+  // our `setOpen`, and event composition through `DropdownMenuTrigger`'s
+  // `asChild` clone is fragile (programmatic `.click()` doesn't always
+  // produce a state flip). Listening for explicit window events from the
+  // tutorial gives us a deterministic channel that doesn't depend on any
+  // of that.
+  //
+  // Visibility guard: more than one CardActionsMenu can be mounted at the
+  // same time (e.g. during a card-advance slide where the previous card is
+  // still in the DOM during its exit animation). Each instance listens on
+  // window, so without a guard ALL of them would `setOpen(true)` — the
+  // offscreen one would then render its dropdown at the default origin
+  // (top-left of the viewport) because Radix anchors positioning to a
+  // trigger that's no longer in flow.
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isTriggerVisible = () => {
+      const el = triggerRef.current;
+      if (!el) return false;
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return false;
+      // A previous card sliding out of view still has non-zero rect width
+      // and height — it's just translated off-viewport. Require the
+      // trigger to actually overlap the viewport so we only open the
+      // on-screen instance.
+      if (typeof window === 'undefined') return true;
+      return (
+        rect.right > 0 &&
+        rect.left < window.innerWidth &&
+        rect.bottom > 0 &&
+        rect.top < window.innerHeight
+      );
+    };
+    const onOpen = () => {
+      if (!isTriggerVisible()) return;
+      setOpen(true);
+    };
+    const onClose = () => {
+      // Always honor close; pinning the guard to the visible instance
+      // would leave the offscreen one stuck open if it had somehow opened.
+      setOpen(false);
+    };
+    window.addEventListener('phrasis-onboarding-open-card-actions', onOpen);
+    window.addEventListener('phrasis-onboarding-close-card-actions', onClose);
+    return () => {
+      window.removeEventListener('phrasis-onboarding-open-card-actions', onOpen);
+      window.removeEventListener('phrasis-onboarding-close-card-actions', onClose);
+    };
+  }, []);
+
   return (
     <div className="flex items-center">
       {isFavorite && (
@@ -112,12 +166,15 @@ export function CardActionsMenu({
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
           <Button
+            ref={triggerRef}
             variant="ghost"
             size="icon"
             aria-label={t('actions.more')}
             className={`${triggerClassName} text-muted-foreground hover:text-foreground hover:bg-muted`}
             onPointerDown={(e) => e.preventDefault()}
             onClick={() => setOpen((v) => !v)}
+            data-coachmark-anchor="card-actions"
+            data-tutorial="card-actions"
           >
             <MoreHorizontal className={triggerIconClassName} />
           </Button>

@@ -21,6 +21,7 @@ import { useLearningChatToggle } from '@/components/app/learning/LearningChatLay
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
+import { buildSessionSnapshot } from '@/components/app/learning/sessionSnapshot';
 import type { ReviewRating } from '@/lib/scheduling';
 import type { AudioPlayerState } from '@/hooks/use-audio-player';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
@@ -48,6 +49,27 @@ interface LearningModeProps {
   onNavigateToChat: () => void;
   /** Navigate to the custom-card creation page (same condition). */
   onNavigateToAddCustomCards: () => void;
+  /**
+   * Render mode. In `'onboarding'`, the LearningModeSettings sheet is
+   * suppressed so the user can't slip into deep settings during their guided
+   * first lesson. Other behaviour (chat, FSRS, audio) is unchanged.
+   */
+  mode?: 'normal' | 'onboarding';
+  /**
+   * Fires after the user rates a card and the FSRS update is in flight.
+   * Receives the rating + a snapshot of the session counters so the
+   * onboarding wizard can advance / surface stats without spinning up its
+   * own counter logic.
+   */
+  onCardRated?: (
+    rating: ReviewRating | undefined,
+    snapshot: {
+      sessionId: string;
+      dailyReviewsToday: number;
+      dailyTimeMsToday: number;
+      dailyNewWordsToday: number;
+    },
+  ) => void;
 }
 
 /**
@@ -60,6 +82,8 @@ export function LearningMode({
   onGoHome,
   onNavigateToChat,
   onNavigateToAddCustomCards,
+  mode = 'normal',
+  onCardRated,
 }: LearningModeProps) {
   const t = useTranslations('LearningMode');
   const chatContext = useLearningChatToggle();
@@ -186,13 +210,16 @@ export function LearningMode({
     [reviewingCardId, setCardAudioSpeedOverrideMutation],
   );
 
-  // Wrap handleNext to include accuracy from full review mode
+  // Wrap handleNext to include accuracy from full review mode + notify the
+  // onboarding container (if any) that a card was just rated, along with a
+  // session-state snapshot so the wizard can show the celebration screen.
   const handleNextWithAccuracy = useCallback(
     (ratingOverride?: ReviewRating) => {
       if (state.status !== 'reviewing') return;
       state.handleNext(ratingOverride, fullReviewAccuracy ?? undefined);
+      onCardRated?.(ratingOverride, buildSessionSnapshot(state));
     },
-    [state, fullReviewAccuracy],
+    [state, fullReviewAccuracy, onCardRated],
   );
   const handleRevealAllAudioTargets = useCallback(() => {
     setAudioRevealNonce((n) => n + 1);
@@ -262,13 +289,15 @@ export function LearningMode({
     return (
       <div className="flex flex-col h-full">
         <NoCollectionState onGoHome={onGoHome} />
-        <LearningModeSettings
-          open={state.settingsOpen}
-          onOpenChange={state.setSettingsOpen}
-          courseSettings={state.courseSettings}
-          baseLanguages={state.baseLanguages}
-          targetLanguages={state.targetLanguages}
-        />
+        {mode === 'onboarding' ? null : (
+          <LearningModeSettings
+            open={state.settingsOpen}
+            onOpenChange={state.setSettingsOpen}
+            courseSettings={state.courseSettings}
+            baseLanguages={state.baseLanguages}
+            targetLanguages={state.targetLanguages}
+          />
+        )}
       </div>
     );
   }
@@ -287,13 +316,15 @@ export function LearningMode({
           onNavigateToChat={onNavigateToChat}
           onNavigateToAddCustomCards={onNavigateToAddCustomCards}
         />
-        <LearningModeSettings
-          open={state.settingsOpen}
-          onOpenChange={state.setSettingsOpen}
-          courseSettings={state.courseSettings}
-          baseLanguages={state.baseLanguages}
-          targetLanguages={state.targetLanguages}
-        />
+        {mode === 'onboarding' ? null : (
+          <LearningModeSettings
+            open={state.settingsOpen}
+            onOpenChange={state.setSettingsOpen}
+            courseSettings={state.courseSettings}
+            baseLanguages={state.baseLanguages}
+            targetLanguages={state.targetLanguages}
+          />
+        )}
         {paywallOpen && (
           <PaywallDialog
             open={paywallOpen}
@@ -386,8 +417,15 @@ export function LearningMode({
 
   return (
     <div className="flex flex-col h-full">
-      {!isRadio && state.courseSettings.progressDisplayEnabled !== false && (
-        <SessionProgressBar dailyReviewsToday={state.dailyReviewsToday} />
+      {/* Session progress bar fills as the user reviews cards within the
+          current session (resets each new session). Max is 10 in onboarding
+          (10-card lesson = 100%), PROGRESS_DISPLAY_INTERVAL elsewhere. */}
+      {!isRadio &&
+        state.courseSettings.progressDisplayEnabled !== false && (
+        <SessionProgressBar
+          sessionCardCount={state.sessionCardCount}
+          maxReviews={mode === 'onboarding' ? 10 : undefined}
+        />
       )}
       <div className="flex-1 min-h-0 relative">
         <AnimatePresence mode="wait" initial={false}>
@@ -414,6 +452,7 @@ export function LearningMode({
             className="h-9 w-9 shrink-0 pointer-events-auto"
             aria-label="Open chat"
             data-tutorial="chat-button"
+            data-coachmark-anchor="chat-button"
           >
             <MessageCircle className="h-5 w-5" />
           </Button>
@@ -445,13 +484,15 @@ export function LearningMode({
         onRevealAllAudioTargets={handleRevealAllAudioTargets}
       />
 
-      <LearningModeSettings
-        open={state.settingsOpen}
-        onOpenChange={state.setSettingsOpen}
-        courseSettings={state.courseSettings}
-        baseLanguages={state.baseLanguages}
-        targetLanguages={state.targetLanguages}
-      />
+      {mode === 'onboarding' ? null : (
+        <LearningModeSettings
+          open={state.settingsOpen}
+          onOpenChange={state.setSettingsOpen}
+          courseSettings={state.courseSettings}
+          baseLanguages={state.baseLanguages}
+          targetLanguages={state.targetLanguages}
+        />
+      )}
 
       <EditCardDialog
         open={editDialogOpen}

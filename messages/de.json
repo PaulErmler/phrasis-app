@@ -240,7 +240,8 @@
           "added": "hinzugefügt",
           "remaining": "verbleibend",
           "preview": "Vorschau",
-          "active": "Aktiv",
+          "active": "Lerne ich gerade",
+          "activeTooltip": "Aus dieser Sammlung werden automatisch neue Karten hinzugefügt.",
           "inactive": "Inaktiv"
         },
         "detail": {
@@ -570,7 +571,7 @@
   },
   "Chat": {
     "back": "Zurück",
-    "askAI": "KI fragen",
+    "askAI": "Dieses Wort erklären",
     "explainWord": "Erkläre mir dieses Wort: {word}",
     "askAboutWord": "Zu {word} fragen",
     "thinking": "Denkt nach...",
@@ -782,56 +783,257 @@
     "changeMessage": "Du bist dabei, dein Abonnement zu ändern."
   },
   "Onboarding": {
-    "welcome": {
-      "title": "Willkommen bei Flexling!",
-      "subtitle": "Lass uns deine Lernerfahrung in nur wenigen Schritten anpassen",
-      "description": "Das dauert nur eine Minute, und du kannst diese Einstellungen jederzeit später ändern.",
-      "feature1": {
-        "title": "Personalisierte Inhalte",
-        "description": "Erhalte Lernmaterialien, die auf dein Niveau und deine Ziele zugeschnitten sind"
-      },
-      "feature2": {
-        "title": "Dein Tempo",
-        "description": "Lerne in einem Tempo, das für dich funktioniert"
-      },
-      "feature3": {
-        "title": "Mehrere Sprachen",
-        "description": "Wähle aus vielen beliebten Sprachen zum Lernen"
+    "wizard": {
+      "back": "Zurück",
+      "continue": "Weiter",
+      "pickThisLevel": "Dieses Level wählen",
+      "loading": "Lädt…",
+      "errors": {
+        "completeFailed": "Einrichtung konnte nicht abgeschlossen werden. Bitte versuche es erneut."
       }
     },
-    "step1": {
-      "title": "Was für ein Sprachlerner bist du?",
-      "casual": {
-        "title": "Einfach",
-        "description": "Ich halte es gerne einfach"
+    "languagePair": {
+      "title": "Wähle dein Sprachenpaar",
+      "subtitle": "Was du sprichst und was du lernen möchtest.",
+      "iSpeak": "Ich spreche…",
+      "iWantToLearn": "Ich möchte lernen…",
+      "readyTitle": "Bereit, wenn du es bist.",
+      "readyHint": "Tippe auf Weiter, oder tippe oben auf eine Sprache, um sie zu ändern.",
+      "fromPlaceholder": "Von",
+      "toPlaceholder": "Nach"
+    },
+    "acquisition": {
+      "title": "Wo hast du von uns gehört?",
+      "subtitle": "Eine schnelle Antwort — hilft uns zu verstehen, wie Menschen zu uns finden.",
+      "options": {
+        "reddit": "Reddit",
+        "chatgpt": "ChatGPT",
+        "gemini": "Gemini",
+        "claude": "Claude",
+        "google": "Google-Suche",
+        "friend": "Über Freunde",
+        "appstore": "App Store / Play Store",
+        "other": "Sonstiges"
       },
-      "focused": {
-        "title": "Fokussiert",
-        "description": "Ich passe gerne einzelne Inhalte und Einstellungen auf mich an"
+      "otherLabel": "Sag uns, wo (optional)",
+      "otherPlaceholder": "z.B. TikTok, Podcast, Sprachlehrer..."
+    },
+    "goal": {
+      "title": "Warum lernst du diese Sprache?",
+      "subtitle": "Wähl alles, was passt — so viel du möchtest.",
+      "options": {
+        "travel": {
+          "label": "Reisen & Kultur",
+          "description": "Dich vor Ort zurechtfinden, Einheimische verstehen, Filme und Bücher im Original genießen."
+        },
+        "family": {
+          "label": "Familie & Wurzeln",
+          "description": "Mit Verwandten sprechen oder dich mit einer Sprache verbinden, die zu deiner Herkunft gehört."
+        },
+        "work": {
+          "label": "Beruf",
+          "description": "Die Sprache mit Kolleg*innen, Kund*innen oder für deine Karriere nutzen."
+        },
+        "curiosity": {
+          "label": "Einfach so",
+          "description": "Persönliche Weiterentwicklung, Gehirntraining oder weil es dir Spaß macht."
+        },
+        "exam": {
+          "label": "Test oder Prüfung",
+          "description": "Vorbereitung auf eine Einstufung, ein Zertifikat oder eine Sprachprüfung."
+        },
+        "other": {
+          "label": "Etwas anderes",
+          "description": "Wähle das und sag uns, was dich antreibt."
+        }
       },
-      "advanced": {
-        "title": "Experte",
-        "description": "Ich möchte meine Inhalte und Einstellungen individuell anpassen"
+      "otherLabel": "Was ist dein Grund? (optional)",
+      "otherPlaceholder": "z.B. die Partnerin, ein Umzug, ein Songtext..."
+    },
+    "dailyTime": {
+      "title": "Tägliches Zeitziel",
+      "subtitle": "Wähle etwas, das du wirklich durchhalten kannst. <strong>Beständigkeit ist wichtiger als Minuten</strong> — 5 Minuten jeden Tag schlagen 30 Minuten einmal pro Woche, denn Spaced Repetition funktioniert nur, wenn du dranbleibst.",
+      "options": {
+        "5": { "label": "5 Min./Tag", "description": "Kurze Gewohnheit" },
+        "10": { "label": "10 Min./Tag", "description": "Stetiger Fortschritt" },
+        "20": { "label": "20 Min./Tag", "description": "Ernsthaftes Tempo" },
+        "30": { "label": "30 Min./Tag", "description": "Voller Einsatz" },
+        "60": { "label": "1 Std./Tag", "description": "Marathon-Modus" },
+        "custom": { "label": "Eigene", "description": "Setze dein eigenes Ziel" }
+      },
+      "customLabel": "Setze dein eigenes Tagesziel ({min}–{max} Minuten)",
+      "customPlaceholder": "z.B. 15",
+      "minutesUnit": "Min./Tag"
+    },
+    "proficiency": {
+      "title": "Wie gut kannst du diese Sprache schon?",
+      "subtitle": "Wir passen an, wo du startest.",
+      "branches": {
+        "new": {
+          "title": "Ich bin völlig neu",
+          "description": "Starte mit den wichtigsten Alltagssätzen."
+        },
+        "selfPick": {
+          "title": "Ich weiß ungefähr, wo ich stehe",
+          "description": "Wähle dein Niveau selbst — mit einer Vorschau der Sätze auf diesem Niveau."
+        },
+        "test": {
+          "title": "Teste mich — find mein Niveau",
+          "description": "Kurzer adaptiver Test, etwa 5–20 Fragen. Am genauesten."
+        }
+      },
+      "recommended": "Empfohlen"
+    },
+    "cefrPick": {
+      "title": "Finde dein Niveau",
+      "subtitle": "Schiebe den Regler, um dein passendes Niveau zu finden. Die Beispielsätze zeigen dir, welche Art von Sätzen du auf diesem Niveau verstehen solltest. Kannst du alle Sätze schon in deiner Zielsprache sagen? Dann ist das Niveau wahrscheinlich zu leicht für dich. Hast du bei einigen Mühe? Dann ist es vermutlich ein guter Ausgangspunkt.",
+      "levelLabel": "Level",
+      "levelsTotal": "20 Levels insgesamt",
+      "levelsRange": "Pre-A1 → C2",
+      "ariaLabel": "Sprachniveau",
+      "samplesHeading": "Sätze auf Level {level}",
+      "sampleLoading": "Lädt…",
+      "sampleEmpty": "Auf diesem Level ist noch kein Beispiel verfügbar."
+    },
+    "cefrConfirm": {
+      "title": "Auf Level {level} starten?",
+      "description": "Wir starten deinen Kurs bei <badge></badge>. Du kannst auch einen kurzen Test ab diesem Level machen — das ist der genaueste Weg, dein exaktes Niveau zu finden.",
+      "startHere": "Ja, hier starten",
+      "takeQuickTest": "Stattdessen einen Kurztest machen"
+    },
+    "placementTest": {
+      "questionLabel": "Frage {n}",
+      "prompt": "Weißt du, wie man das übersetzt?",
+      "sourceLabel": "Englisch",
+      "translationLabel": "Übersetzung",
+      "loading": "Lädt…",
+      "noSentence": "Auf diesem Level gibt es keinen Satz.",
+      "translationNotReady": "Die Übersetzung für diese Sprache ist noch nicht bereit. Versuche es trotzdem.",
+      "tapReveal": "Tippe unten auf Aufdecken, um die Übersetzung zu sehen.",
+      "reveal": "Übersetzung aufdecken",
+      "iDidntKnow": "Ich wusste es nicht",
+      "iKnewIt": "Ich wusste es",
+      "playSourceAudio": "Englisches Audio abspielen",
+      "playTranslationAudio": "Übersetzungsaudio abspielen",
+      "result": {
+        "title": "Alles klar",
+        "subtitle": "Basierend auf deinen Antworten starten wir dich bei",
+        "levelLabel": "Level",
+        "questionsAnswered": "{count, plural, =1 {1 Frage beantwortet} other {# Fragen beantwortet}}",
+        "easier": "Leichter",
+        "harder": "Schwerer",
+        "samplesHeading": "Sätze auf diesem Level",
+        "continue": "Weiter"
       }
     },
-    "baseLanguage": {
-      "title": "Von welcher Sprache aus möchtest du lernen?",
-      "subtitle": "Wähle deine Ausgangssprache"
-    },
-    "targetLanguage": {
-      "title": "Welche Sprache möchtest du lernen?",
-      "subtitle": "Wähle eine Sprache"
-    },
-    "reviewMode": {
-      "title": "Wie möchtest du üben?",
-      "full": {
-        "title": "Voll-Übung",
-        "description": "Übe das Schreiben, indem du Übersetzungen eintippst. Ideal für aktives Üben am Bildschirm."
-      },
-      "audio": {
-        "title": "Audio-Übung",
-        "description": "Übe Hören und Sprechen mit Audio-Wiedergabe. Kein Blick auf den Bildschirm nötig. Ideal für unterwegs — beim Spazieren, Pendeln oder Entspannen."
+    "customizing": {
+      "title": "Wir richten deine erste Lektion ein…",
+      "beats": {
+        "0": "Wir passen deinen Kurs an…",
+        "1": "Wir schneiden Inhalte auf dein Niveau zu…",
+        "2": "Wir wählen deine ersten Sätze aus…",
+        "3": "Wir personalisieren deine Lektion…",
+        "4": "Fast fertig…"
       }
+    },
+    "firstLesson": {
+      "intro": {
+        "title": "Deine erste Lektion ist bereit!",
+        "subtitle": "Wähle einen Modus und wir zeigen dir, wie alles funktioniert."
+      },
+      "modes": {
+        "audio": {
+          "title": "Audio-Review",
+          "description": "Höre den Satz, versuche ihn zu übersetzen und höre dann die richtige Übersetzung.",
+          "footnote": "Am besten mit Kopfhörern · Empfohlen"
+        },
+        "full": {
+          "title": "Full-Review",
+          "description": "Übersetze Sätze und erhalte sofortiges, detailliertes Feedback zur Rechtschreibung."
+        }
+      },
+      "duration": "Etwa 10 Minuten",
+      "start": "Lektion starten",
+      "skip": "Erstmal überspringen",
+      "abort": "Lektion abbrechen",
+      "abortAria": "Lektion abbrechen",
+      "errorBoundary": {
+        "message": "Es gab ein Problem beim Vorbereiten deiner ersten Lektion. Du kannst sie überspringen und auf deinem Startbildschirm weitermachen.",
+        "skip": "Lektion überspringen"
+      }
+    },
+    "statsRecap": {
+      "heroLabel": "neue Wörter in dieser Sitzung",
+      "stats": {
+        "reviews": "Reviews",
+        "time": "Zeit",
+        "new": "neu"
+      },
+      "wordsHeading": "Wörter, die du gerade gelernt hast",
+      "projection": {
+        "title": "In diesem Tempo wirst du können",
+        "subtitle": "{minutes} Min./Tag · lineare Prognose",
+        "milestones": {
+          "1mo": "1 Monat",
+          "6mo": "6 Monate",
+          "1y": "1 Jahr"
+        },
+        "wordsUnit": "Wörter"
+      },
+      "ready": {
+        "title": "Tag 1 geschafft",
+        "subtitle": "Halte deine Serie am Leben — komm morgen für weitere {minutes} Minuten zurück."
+      },
+      "back": "Zurück",
+      "next": "Weiter",
+      "continue": "Weiter"
+    },
+    "wordProjection": {
+      "summary": "Du hast gerade {words, plural, =1 {1 Wort} other {# Wörter}} in {minutes, plural, =1 {1 Minute} other {# Minuten}} gelernt.",
+      "headline": "In diesem Tempo wirst du können",
+      "perDay": "{minutes} Min./Tag",
+      "adjustLabel": "Tägliches Ziel anpassen",
+      "milestones": {
+        "1mo": "1 Monat",
+        "6mo": "6 Monate",
+        "1y": "1 Jahr"
+      },
+      "wordsUnit": "Wörter",
+      "continue": "Weiter"
+    },
+    "featureTour": {
+      "title": "Noch ein paar Dinge",
+      "subtitle": "Eine kurze Tour durch Funktionen, die du kennen solltest.",
+      "slides": {
+        "custom": {
+          "title": "Eigene Karten hinzufügen",
+          "body": "Du kannst eigene Sätze hinzufügen, die du lernen möchtest. Audio und Übersetzung werden in Sekunden automatisch erzeugt."
+        },
+        "import": {
+          "title": "Massenimport aus CSV",
+          "body": "Zieh eine Liste von Sätzen rein und wir erzeugen Übersetzungen + Audio für jede Sprache in deinem Kurs."
+        },
+        "radio": {
+          "title": "Radio-Modus zum passiven Hören",
+          "body": "Einmal aktivieren und vergessen — deine Karten laufen im Hintergrund in Schleife, ohne deinen Spaced-Repetition-Plan zu stören."
+        },
+        "stats": {
+          "title": "Detaillierte Statistiken behalten alles im Blick",
+          "body": "Serie, gelernte Wörter, verbrachte Zeit und eine Kalender-Heatmap — du siehst, wie deine Gewohnheit wächst."
+        },
+        "multilang": {
+          "title": "Mehrere Sprachen",
+          "body": "Mit Pro kannst du eine dritte Sprache zu deinen Karteikarten hinzufügen — praktisch, wenn du mehrere Sprachen gleichzeitig lernen möchtest oder zwei Sprachen, die du schon kennst, parallel frisch halten willst."
+        }
+      },
+      "back": "Zurück",
+      "next": "Weiter",
+      "done": "Fertig"
+    },
+    "planPick": {
+      "title": "Danke, dass du dabei bist",
+      "subtitle": "Probiere Basic oder Pro 21 Tage kostenlos — ohne Verpflichtung. Du kannst jederzeit wechseln oder kündigen.",
+      "skip": "Vielleicht später — weiter testen"
     },
     "difficulty": {
       "title": "Wie viel kannst du schon?",
@@ -865,89 +1067,101 @@
         "description": "Ich habe einen großen Wortschatz",
         "wordCount": "8.000+ Wörter"
       }
-    },
-    "step2": {
-      "title": "Welche Sprache möchtest du lernen?",
-      "titleMulti": "Welche Sprachen möchtest du lernen?",
-      "subtitle": "Wähle eine Sprache",
-      "subtitleMulti": "Wähle bis zu {max} Zielsprachen ({count}/{max})",
-      "addAnother": "Weitere Sprache hinzufügen",
-      "primaryHint": "Die erste Sprache ist deine Hauptlernsprache",
-      "primary": "Primär"
-    },
-    "step3": {
-      "title": "Von welcher Sprache aus möchtest du lernen?",
-      "titleMulti": "Von welchen Sprachen aus möchtest du lernen?",
-      "subtitle": "Wähle deine Ausgangssprache",
-      "subtitleMulti": "Wähle bis zu {max} Basissprachen ({count}/{max})"
-    },
-    "step4": {
-      "title": "Was ist dein aktuelles Niveau?",
-      "beginner": {
-        "title": "Anfänger",
-        "description": "Ich fange gerade erst mit {language} an"
+    }
+  },
+  "OnboardingTutorial": {
+    "core": {
+      "welcomeAudio": {
+        "title": "Willkommen beim Audio-Review",
+        "description": "In diesem Modus kannst du Sätze ohne Bildschirmkontakt wiederholen. Die Texte werden automatisch vorgelesen. Lass uns durchgehen, wie es funktioniert."
       },
-      "elementary": {
-        "title": "Grundkenntnisse",
-        "description": "Ich kenne einige gebräuchliche Wörter"
+      "welcomeFull": {
+        "title": "Willkommen beim Full-Review",
+        "description": "In diesem Modus übst du aktiv das Schreiben und bekommst sofortiges Feedback. Lass uns durchgehen, wie es funktioniert."
       },
-      "intermediate": {
-        "title": "Mittelstufe",
-        "description": "Ich kann einfache Gespräche führen"
+      "card": {
+        "title": "Die Karte",
+        "descriptionAudio": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Die Zielsprache ist verdeckt, bis du sie aufdeckst.",
+        "descriptionFull": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Du tippst die Übersetzung ein und kontrollierst dich selbst."
       },
-      "upper_intermediate": {
-        "title": "Obere Mittelstufe",
-        "description": "Ich kann über verschiedene Themen sprechen"
+      "reveal": {
+        "title": "Übersetzung aufdecken",
+        "description": "Die Übersetzung ist standardmäßig verdeckt. Tippe darauf, um sie aufzudecken, oder höre einfach das Audio — nach einer kurzen Pause wird sie automatisch aufgedeckt. Versuch zuerst, aus dem Gedächtnis zu antworten."
       },
-      "advanced": {
-        "title": "Fortgeschritten",
-        "description": "Ich kann die meisten Themen ausführlich diskutieren"
+      "input": {
+        "title": "Übersetzung eintippen",
+        "description": "Tippe die Übersetzung in der Zielsprache hier ein und drücke Senden. Du bekommst sofortiges Feedback zu jedem Wort."
+      },
+      "audioControls": {
+        "title": "Audio läuft automatisch",
+        "description": "Audio spielt zuerst die Basissprache ab, pausiert zum Nachdenken und spielt dann die Zielsprache. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen."
+      },
+      "audioPlay": {
+        "title": "Drücke Play zum Starten",
+        "description": "Audio ist gerade pausiert, während wir dich durch die Lektion führen. Drücke Play, sobald du bereit bist, den ersten Satz zu hören."
+      },
+      "rating": {
+        "title": "Bewerte, wie gut du es wusstest",
+        "descriptionAudio": "Jede Karte wird ein paar Mal wiederholt, bevor sie in den Spaced-Repetition-Plan kommt. <strong>Noch am Lernen</strong> behält sie in der Aufwärmrotation. <strong>Verstanden</strong> heißt, du kennst sie — überspringe die Aufwärmphase und starte sofort mit Spaced Repetition. Nach ein paar Reviews siehst du Erneut / Schwer / Gut / Leicht.",
+        "descriptionFull": "Nach jeder Antwort bewertest du, wie gut du es wusstest. <strong>Erneut</strong> heißt: du wusstest es nicht — die Karte kommt schnell zurück. <strong>Schwer</strong>, <strong>Gut</strong> und <strong>Leicht</strong> verschieben die nächste Wiederholung weiter nach hinten. Sei ehrlich — wenn du eine Karte zu hoch bewertest, wirst du sie später spüren."
+      },
+      "autoAdd": {
+        "title": "Neue Karten",
+        "description": "Standardmäßig werden neue Karten automatisch hinzugefügt, sobald deine ausgehen — alles ist mit Spaced Repetition für dich optimiert. So vermeidest du Bulimie-Lernen, und die Geschwindigkeit passt sich an. Du musst dich nicht darum kümmern, wann neue Karten dazukommen."
       }
     },
-    "feedback": {
-      "languageSelected": "Tolle Wahl!",
-      "difficultySelected": "Perfekt, wir passen deine Inhalte an!",
-      "reviewModeSelected": "Du bist bereit!",
-      "difficulty": {
-        "beginner": "Wir fangen mit den Grundlagen an!",
-        "elementary": "Super, du kennst schon das Wichtigste!",
-        "intermediate": "Toll, du hast eine solide Grundlage!",
-        "upper_intermediate": "Beeindruckend, du bist auf einem guten Weg!",
-        "advanced": "Ausgezeichnet, du bist fast fließend!",
-        "proficient": "Erstaunlich, lass uns deine Kenntnisse verfeinern!"
+    "modeSwitch": {
+      "audio": {
+        "welcome": {
+          "title": "Zu Audio-Review gewechselt",
+          "description": "Du hörst zuerst und deckst die Übersetzung danach auf. Das ändert sich:"
+        }
       },
-      "reviewMode": {
-        "full": "Ideal für aktives Üben!",
-        "audio": "Perfekt für unterwegs!"
+      "full": {
+        "welcome": {
+          "title": "Zu Full-Review gewechselt",
+          "description": "Du tippst die Übersetzung selbst ein und bekommst sofortiges Feedback. Das ändert sich:"
+        }
       }
     },
-    "errors": {
-      "completeFailed": "Onboarding konnte nicht abgeschlossen werden",
-      "tryAgain": "Bitte versuche es erneut."
+    "cardActions": {
+      "title": "Kartenoptionen",
+      "description": "Markiere eine Karte als Favorit, setze sie auf gemeistert (sie erscheint nicht mehr im Review), blende sie aus oder bearbeite/lösche sie. Nutze diese Optionen, wenn eine Karte zu leicht, zu schwer oder einfach nicht passend ist."
     },
-    "continue": "Weiter",
-    "back": "Zurück",
-    "getStarted": "Jetzt starten",
-    "finish": "Abschließen",
-    "loading": {
-      "title": "Wir passen deine Lernreise an",
-      "subtitle": "Wir bereiten alles speziell für dich vor..."
+    "wordTap": {
+      "title": "Tippe ein beliebiges Wort an",
+      "description": "Tippe in der Zielsatz auf ein Wort, um den Chat zu fragen, was es bedeutet. Der Chat kann dafür auch sofort eine neue Karteikarte anlegen."
     },
-    "finished": {
-      "title": "Du bist bereit!",
-      "subtitle": "Deine personalisierte Lernerfahrung ist nun vorbereitet.",
-      "button": "Jetzt lernen"
+    "chat": {
+      "title": "Dein KI-Sprachtutor",
+      "description": "Der Chat ist ein Tutor, der die Sprache kennt, die du lernst. Frag, warum ein Satz so formuliert ist, lass dir Grammatik auf deinem Niveau erklären, fordere Beispiele an oder lass aus einer Idee eine neue Karteikarte machen — Übersetzung und Audio werden automatisch erzeugt, damit die Karte direkt lernbereit ist."
     }
   },
   "Tutorial": {
     "home": {
       "welcome": {
-        "title": "Willkommen bei Flexling!",
-        "description": "Wir geben dir einen kurzen Überblick, damit du direkt loslegen kannst. Du kannst dies jederzeit schließen."
+        "title": "Willkommen in deinem Dashboard!",
+        "description": ""
       },
-      "learningModes": {
-        "title": "Statistiken & Lernmodi",
-        "description": "Dieser Bereich zeigt deine Lernstatistiken — Serie, Wiederholungen, Sätze und Zeit — die sich beim Lernen aktualisieren. Darunter findest du 2 Buttons: Neues lernen konzentriert sich auf neue Sätze, die du noch nicht gelernt hast. Wiederholen umfasst sowohl neue als auch bereits gelernte Sätze für die verteilte Wiederholung. Mit dem Schalter darunter wechselst du zwischen Audio-Modus (freihändiges Zuhören) und Voll-Modus (Übersetzungen eintippen)."
+      "learnNew": {
+        "title": "Neues lernen",
+        "description": "Wählt frische Sätze aus, die du noch nicht gesehen hast – ideal, wenn du deinen Wortschatz erweitern willst."
+      },
+      "learnAndReview": {
+        "title": "Wiederholen + Lernen",
+        "description": "Mischt neue Sätze mit fälligen Wiederholungen, damit du Gelerntes behältst und gleichzeitig Neues dazulernst."
+      },
+      "radioMode": {
+        "title": "Radio",
+        "description": "Audio-only Hintergrund-Wiedergabe – deine Karten laufen freihändig in Schleife und beeinflussen den Wiederholungsplan nicht. Nur im Audio-Modus verfügbar."
+      },
+      "reviewModeToggle": {
+        "title": "Audio vs. Voll-Review",
+        "description": "Wechsle zwischen Audio (Satz hören und im Kopf übersetzen) und Voll (Übersetzung eintippen und direkt Rückmeldung erhalten)."
+      },
+      "contentSource": {
+        "title": "Wähle deine Quelle",
+        "description": "Lege fest, ob du nur vorgefertigte Sätze, nur deine eigenen Karten oder beides gleichzeitig üben willst."
       },
       "difficultySelection": {
         "title": "Schwierigkeitsauswahl",

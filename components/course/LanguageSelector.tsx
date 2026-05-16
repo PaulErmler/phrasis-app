@@ -143,6 +143,7 @@ export function LanguageSelector({
                     key={language.code}
                     value={haystack}
                     onSelect={() => onToggleLanguage(language.code)}
+                    data-testid={`language-option-${language.code}`}
                     className={cn(
                       'flex items-center gap-3 p-3 my-1 rounded-xl border-2 transition-all cursor-pointer',
                       isSelected
@@ -165,9 +166,11 @@ export function LanguageSelector({
                           </span>
                         )}
                       </div>
-                      <p className="text-muted-xs break-words">
-                        {language.nativeName}
-                      </p>
+                      {language.nativeName.toLowerCase() !== localizedName.toLowerCase() ? (
+                        <p className="text-muted-xs break-words">
+                          {language.nativeName}
+                        </p>
+                      ) : null}
                     </div>
                     <Checkbox
                       checked={isSelected}

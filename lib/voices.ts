@@ -527,14 +527,36 @@ export function getProviderByApiCode(apiCode: string): TtsProvider | undefined {
 }
 
 /**
- * Coin-flip an audio-voice gender when the linguistic speaker gender is
+ * Resolve an audio-voice gender when the linguistic speaker gender is
  * missing/neutral. Sentences of one card end up with a consistent gender
  * across languages because callers pass the same resolved value per card.
+ *
+ * Pass `seed` (typically the text's `_id`) to make the resolution
+ * **deterministic** — two concurrent callers for the same text will produce
+ * the same gender. Without a seed the function falls back to `Math.random()`,
+ * which is fine for one-shot creation paths (where the result is stored on
+ * insert and never re-flipped) but causes a race for paths that may run
+ * multiple times against an already-inserted text (e.g. `scheduleMissingContent`
+ * for a text whose `audioSpeakerGender` field hasn't been written yet) —
+ * two racing jobs would each flip independently and produce inconsistent
+ * audio rows, triggering an audio-regeneration loop the next time the
+ * stored gender is reconciled.
  */
 export function resolveAudioSpeakerGender(
   speakerGender?: string,
+  seed?: string,
 ): 'male' | 'female' {
   if (speakerGender === 'male' || speakerGender === 'female') return speakerGender;
+  if (seed && seed.length > 0) {
+    // FNV-1a — fast and well-distributed for short identifiers like a
+    // Convex `_id`. Last bit picks the gender deterministically.
+    let h = 0x811c9dc5;
+    for (let i = 0; i < seed.length; i++) {
+      h ^= seed.charCodeAt(i);
+      h = Math.imul(h, 0x01000193);
+    }
+    return ((h >>> 0) & 1) === 0 ? 'male' : 'female';
+  }
   return Math.random() < 0.5 ? 'male' : 'female';
 }
 

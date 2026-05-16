@@ -243,6 +243,7 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
                     <div
                       key={course._id}
                       data-testid="course-menu-entry"
+                      data-target-language={course.targetLanguages?.[0] ?? ''}
                       className={cn(
                         'w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left',
                         isActive

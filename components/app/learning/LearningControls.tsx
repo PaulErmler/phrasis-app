@@ -166,7 +166,11 @@ export function LearningControls({
         <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
           {/* Rating buttons */}
           {validRatings.length > 0 && (
-            <div className="flex gap-2" data-tutorial="rating-buttons">
+            <div
+              className="flex gap-2"
+              data-tutorial="rating-buttons"
+              data-coachmark-anchor="rating-buttons"
+            >
               {validRatings.map((rating) => (
                 <div
                   key={rating}
@@ -230,6 +234,7 @@ export function LearningControls({
               onClick={isPlaying ? onPause : onPlay}
               disabled={isMerging || durationSec === 0}
               className="h-9 flex-[2] min-w-0"
+              data-tutorial="audio-play"
             >
               {isPlaying ? (
                 <Pause className="h-4 w-4" />

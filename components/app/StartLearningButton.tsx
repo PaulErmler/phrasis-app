@@ -43,6 +43,7 @@ export function StartLearningButton({
           size="lg"
           className="h-auto min-h-10 w-full flex-col gap-1 whitespace-normal py-2.5 sm:flex-row sm:gap-2"
           onClick={() => onStartLearn('learn_new')}
+          data-tutorial="learn-new"
         >
           <BookOpen className="h-5 w-5 shrink-0" />
           <span className="min-w-0 break-words leading-snug">{t('learnNew')}</span>
@@ -51,6 +52,7 @@ export function StartLearningButton({
           size="lg"
           className="h-auto min-h-10 w-full flex-col gap-1 whitespace-normal py-2.5 sm:flex-row sm:gap-2"
           onClick={() => onStartLearn('learnAndReview')}
+          data-tutorial="learn-and-review"
         >
           <RefreshCw className="h-5 w-5 shrink-0" />
           <span className="min-w-0 break-words leading-snug">{t('learnAndReview')}</span>
@@ -65,6 +67,7 @@ export function StartLearningButton({
               !hasPlayableCards && 'opacity-50',
             )}
             onClick={handleRadioClick}
+            data-tutorial="radio-mode"
           >
             <Radio className="h-5 w-5 shrink-0" />
             <span className="min-w-0 break-words leading-snug">{t('radioMode')}</span>
@@ -73,7 +76,10 @@ export function StartLearningButton({
       </div>
 
       {/* Review mode toggle - full width */}
-      <div className="flex w-full rounded-lg border bg-muted/50 p-0.5">
+      <div
+        className="flex w-full rounded-lg border bg-muted/50 p-0.5"
+        data-tutorial="review-mode-toggle"
+      >
         {([
           { mode: 'audio' as const, icon: Headphones, label: t('audioReview') },
           { mode: 'full' as const, icon: PenLine, label: t('fullReview') },

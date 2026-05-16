@@ -445,7 +445,7 @@ export function LearningModeSettings({
             </div>
             <Switch
               id="autoAdd"
-              checked={courseSettings.autoAddCards ?? false}
+              checked={courseSettings.autoAddCards !== false}
               onCheckedChange={handleAutoAddChange}
               className="mt-0.5"
             />

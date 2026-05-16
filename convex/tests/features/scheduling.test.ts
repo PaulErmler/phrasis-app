@@ -844,10 +844,13 @@ describe("features/scheduling", () => {
         expect(result.nextRadioRoundCounter).toBe(6);
       });
 
-      it("catches a fresh card up to the floor instead of incrementing by 1", async () => {
+      it("catches a fresh card up to one past the floor instead of incrementing by 1", async () => {
         // Headline catch-up rule: picked card at 0, floor at 100.
-        // newCounter = max(0+1, 100) = 100. The picked card lands beside the
-        // rest of the deck so it doesn't replay 99 more times in a row.
+        // newCounter = max(0, 100) + 1 = 101. The picked card lands one step
+        // PAST the rest of the deck — strictly above every other playable
+        // card — so it doesn't replay 99 more times in a row AND so it cannot
+        // be immediately re-picked when the random `radioOrderKey` tiebreak
+        // would otherwise put it first within a tie.
         const t = convexTest(schema, modules);
         const { cardIds } = await seedRadioDeck(t, [
           { counter: 100, text: "old-A" },
@@ -859,9 +862,9 @@ describe("features/scheduling", () => {
           api.features.scheduling.advanceRadioCard,
           { cardId: cardIds[2], timezone: "UTC" },
         );
-        expect(result.nextRadioRoundCounter).toBe(100);
+        expect(result.nextRadioRoundCounter).toBe(101);
         const card = await t.run(async (ctx) => ctx.db.get(cardIds[2]));
-        expect(card?.radioRoundCounter).toBe(100);
+        expect(card?.radioRoundCounter).toBe(101);
       });
 
       it("does not modify FSRS state, dueDate, schedulingPhase, or preReviewCount", async () => {

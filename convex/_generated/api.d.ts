@@ -50,6 +50,8 @@ import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_home from "../features/home.js";
 import type * as features_library from "../features/library.js";
 import type * as features_llmTranslationQueue from "../features/llmTranslationQueue.js";
+import type * as features_onboarding from "../features/onboarding.js";
+import type * as features_placementTest from "../features/placementTest.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_sentenceMetadata from "../features/sentenceMetadata.js";
 import type * as features_stats from "../features/stats.js";
@@ -89,6 +91,7 @@ import type * as migrations_datasetMigration_backfillLegacyCarry from "../migrat
 import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
 import type * as migrations_retokenizeAllWords from "../migrations/retokenizeAllWords.js";
 import type * as migrations_seedMockStats from "../migrations/seedMockStats.js";
+import type * as migrations_seedPlacementTestSentences from "../migrations/seedPlacementTestSentences.js";
 import type * as retrier from "../retrier.js";
 import type * as types from "../types.js";
 import type * as usage_actions from "../usage/actions.js";
@@ -145,6 +148,8 @@ declare const fullApi: ApiFromModules<{
   "features/home": typeof features_home;
   "features/library": typeof features_library;
   "features/llmTranslationQueue": typeof features_llmTranslationQueue;
+  "features/onboarding": typeof features_onboarding;
+  "features/placementTest": typeof features_placementTest;
   "features/scheduling": typeof features_scheduling;
   "features/sentenceMetadata": typeof features_sentenceMetadata;
   "features/stats": typeof features_stats;
@@ -184,6 +189,7 @@ declare const fullApi: ApiFromModules<{
   "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;
   "migrations/retokenizeAllWords": typeof migrations_retokenizeAllWords;
   "migrations/seedMockStats": typeof migrations_seedMockStats;
+  "migrations/seedPlacementTestSentences": typeof migrations_seedPlacementTestSentences;
   retrier: typeof retrier;
   types: typeof types;
   "usage/actions": typeof usage_actions;

@@ -235,6 +235,9 @@ export function LearningCardContent({
                       enabled={highlightEnabled}
                       interactive={!isBlurred}
                       className={`body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                      // Onboarding's word-tap tutorial targets the longest
+                      // target-language word via this data attribute.
+                      coachmarkAnchorForLongestWord={index === 0 ? 'word-tap' : undefined}
                     />
                     {showRomanization && translation.romanization && (
                       <p

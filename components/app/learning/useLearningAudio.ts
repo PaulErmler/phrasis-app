@@ -13,13 +13,20 @@ export interface UseLearningAudioOptions {
   disableAutoAdvance?: boolean;
   /** When true, audio does not start automatically (e.g. when the audio tutorial is about to start or is running). */
   disableAutoPlay?: boolean;
+  /** Fires synchronously right before audio-mode auto-advance proceeds to
+   *  the next card. The onboarding wrapper uses this to bump its
+   *  `cardsRated` counter (which is what triggers staged coachmarks +
+   *  lesson completion) on auto-advanced cards — without it those cards
+   *  silently slip past the wizard's threshold and the tutorial stops
+   *  firing past the first manual rating. */
+  onAutoNext?: () => void;
 }
 
 export function useLearningAudio(
   state: LearningState,
   options: UseLearningAudioOptions = {},
 ) {
-  const { disableAutoAdvance = false, disableAutoPlay = false } = options;
+  const { disableAutoAdvance = false, disableAutoPlay = false, onAutoNext } = options;
   const cs =
     state.status === 'reviewing' ||
     state.status === 'noCardsDue' ||
@@ -63,9 +70,13 @@ export function useLearningAudio(
       (audioSettings.autoAdvance || isRadio) &&
       !disableAutoAdvance
     ) {
+      // Notify the auto-next consumer (e.g. onboarding wrapper's
+      // `onCardRated`) BEFORE advancing so the snapshot is captured
+      // against the just-completed card, not the next one.
+      onAutoNext?.();
       state.handleNext();
     }
-  }, [state, reviewMode, audioSettings.autoAdvance, isRadio, disableAutoAdvance]);
+  }, [state, reviewMode, audioSettings.autoAdvance, isRadio, disableAutoAdvance, onAutoNext]);
 
   const resetReviewFlag = useCallback(() => {
     if (state.status === 'reviewing') state.resetReviewFlag();

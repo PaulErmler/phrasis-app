@@ -43,6 +43,11 @@ import {
 } from '../../lib/scheduling';
 import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
 import {
+  ONBOARDING_INITIAL_SEED_CARDS,
+  ONBOARDING_CARDS_BATCH_SIZE,
+  MAX_ONBOARDING_FREE_TEXT_LENGTH,
+} from '../../lib/constants/onboarding';
+import {
   getNextTextsFromRank,
   resolveStartingCollection,
 } from '../db/collections';
@@ -274,6 +279,32 @@ export const getOnboardingProgress = query({
       currentLevel: v.optional(currentLevelValidator),
       targetLanguages: v.optional(v.array(v.string())),
       baseLanguages: v.optional(v.array(v.string())),
+      acquisitionSource: v.optional(v.string()),
+      acquisitionSourceFreeText: v.optional(v.string()),
+      learningGoals: v.optional(v.array(v.string())),
+      learningGoalFreeText: v.optional(v.string()),
+      dailyTimeGoalMinutes: v.optional(v.number()),
+      firstLessonCardsRated: v.optional(v.number()),
+      firstLessonSessionId: v.optional(v.string()),
+      firstLessonSummary: v.optional(
+        v.object({
+          cardsRated: v.number(),
+          sessionId: v.string(),
+          dailyReviewsToday: v.number(),
+          dailyTimeMsToday: v.number(),
+          dailyNewWordsToday: v.number(),
+        }),
+      ),
+      placementTest: v.optional(
+        v.object({
+          strategyVersion: v.optional(v.number()),
+          strategy: v.string(),
+          history: v.array(
+            v.object({ level: v.number(), knew: v.boolean() }),
+          ),
+          finalLevel: v.optional(v.number()),
+        }),
+      ),
     }),
     v.null(),
   ),
@@ -559,26 +590,74 @@ export const unarchiveCourse = mutation({
 /**
  * Save onboarding progress.
  */
+// Field list reused for arg and return validators on the onboarding-progress
+// mutation. Extending this list is the single point where new wizard fields
+// get plumbed through (schema → mutation → page).
+const onboardingProgressFields = {
+  step: v.number(),
+  reviewMode: v.optional(reviewModeValidator),
+  targetLanguages: v.optional(v.array(v.string())),
+  currentLevel: v.optional(currentLevelValidator),
+  baseLanguages: v.optional(v.array(v.string())),
+  acquisitionSource: v.optional(v.string()),
+  acquisitionSourceFreeText: v.optional(v.string()),
+  learningGoals: v.optional(v.array(v.string())),
+  learningGoalFreeText: v.optional(v.string()),
+  dailyTimeGoalMinutes: v.optional(v.number()),
+  placementTest: v.optional(
+    v.object({
+      // See convex/schema.ts for the rationale on this version field.
+      strategyVersion: v.optional(v.number()),
+      strategy: v.string(),
+      history: v.array(
+        v.object({ level: v.number(), knew: v.boolean() }),
+      ),
+      finalLevel: v.optional(v.number()),
+    }),
+  ),
+  firstLessonCardsRated: v.optional(v.number()),
+  firstLessonSessionId: v.optional(v.string()),
+  firstLessonSummary: v.optional(
+    v.object({
+      cardsRated: v.number(),
+      sessionId: v.string(),
+      dailyReviewsToday: v.number(),
+      dailyTimeMsToday: v.number(),
+      dailyNewWordsToday: v.number(),
+    }),
+  ),
+};
+
 export const saveOnboardingProgress = mutation({
-  args: {
-    step: v.number(),
-    reviewMode: v.optional(reviewModeValidator),
-    targetLanguages: v.optional(v.array(v.string())),
-    currentLevel: v.optional(currentLevelValidator),
-    baseLanguages: v.optional(v.array(v.string())),
-  },
+  args: onboardingProgressFields,
   returns: v.object({
     _id: v.id('onboardingProgress'),
     _creationTime: v.number(),
     userId: v.string(),
-    step: v.number(),
-    reviewMode: v.optional(reviewModeValidator),
-    currentLevel: v.optional(currentLevelValidator),
-    targetLanguages: v.optional(v.array(v.string())),
-    baseLanguages: v.optional(v.array(v.string())),
+    ...onboardingProgressFields,
   }),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
+
+    // Server-side length guard for the two free-text answers. The wizard UI
+    // also caps these via `maxLength`, but defend at the boundary so a
+    // hand-crafted call can't bypass it.
+    if (
+      args.acquisitionSourceFreeText &&
+      args.acquisitionSourceFreeText.length > MAX_ONBOARDING_FREE_TEXT_LENGTH
+    ) {
+      throw new ConvexError(
+        `acquisitionSourceFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
+      );
+    }
+    if (
+      args.learningGoalFreeText &&
+      args.learningGoalFreeText.length > MAX_ONBOARDING_FREE_TEXT_LENGTH
+    ) {
+      throw new ConvexError(
+        `learningGoalFreeText exceeds ${MAX_ONBOARDING_FREE_TEXT_LENGTH} characters`,
+      );
+    }
 
     const existingProgress = await dbGetOnboardingProgress(ctx, userId);
     let progressId;
@@ -689,9 +768,32 @@ export const completeOnboarding = mutation({
     const userId = await requireAuthUserId(ctx);
 
     const progress = await dbGetOnboardingProgress(ctx, userId);
-    if (!progress) throw new ConvexError('Onboarding progress not found');
-
     const existingSettings = await dbGetUserSettings(ctx, userId);
+
+    // Idempotency: if a course was already created in a prior run of this
+    // mutation (page reload mid-flow / back-nav into customizing again),
+    // return the existing IDs without consuming the courses quota again.
+    if (existingSettings?.activeCourseId) {
+      const course = await ctx.db.get(existingSettings.activeCourseId);
+      if (course) {
+        const deck = await ctx.db
+          .query('decks')
+          .withIndex('by_courseId', (q) => q.eq('courseId', course._id))
+          .first();
+        if (deck) {
+          return {
+            settingsId: existingSettings._id,
+            courseId: course._id,
+            deckId: deck._id,
+          };
+        }
+      }
+    }
+
+    if (!progress) {
+      throw new ConvexError('Onboarding progress not found');
+    }
+
     const targetLanguages = progress.targetLanguages || [];
     const baseLanguages = progress.baseLanguages || [];
     await validateLanguageLimits(ctx, userId, baseLanguages, targetLanguages);
@@ -711,11 +813,21 @@ export const completeOnboarding = mutation({
     // dataset collection by code, falls back to the legacy CEFR row).
     const collection = await resolveStartingCollection(ctx, progress.currentLevel ?? 'beginner');
 
-    // Create course settings in a separate table (with preselected collection and review mode)
+    // Create course settings in a separate table (with preselected collection and review mode).
+    // `autoAddCards: true` is explicit so the default behaviour ships with the
+    // new course rather than relying on the legacy `!== false` read-side
+    // convention — keeps the underlying flag visible in admin tooling and
+    // means future schema changes won't accidentally flip the default off.
     await upsertCourseSettings(ctx, courseId, {
       initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
       activeCollectionId: collection?._id,
       reviewMode: progress.reviewMode,
+      autoAddCards: true,
+      // Match the onboarding seed batch so the auto-add fired mid-first-lesson
+      // pulls the same number of cards the initial seed did. See
+      // ONBOARDING_INITIAL_SEED_CARDS / ONBOARDING_FIRST_LESSON_CARDS in
+      // lib/constants/onboarding.ts for the rationale.
+      cardsToAddBatchSize: ONBOARDING_CARDS_BATCH_SIZE,
     });
 
     // Auto-create a deck
@@ -726,10 +838,13 @@ export const completeOnboarding = mutation({
       cardCount: 0,
     });
 
-    // Auto-add first 5 cards from the selected difficulty collection
-    const INITIAL_CARDS = 5;
+    // Seed `ONBOARDING_INITIAL_SEED_CARDS` cards upfront. The first lesson
+    // completes at `ONBOARDING_FIRST_LESSON_CARDS` reviews — the gap is
+    // filled by the regular auto-add path (`autoAddCards: true` +
+    // `cardsToAddBatchSize` set above) firing mid-lesson when the deck
+    // empties.
     if (collection) {
-      const textsToAdd = await getNextTextsFromRank(ctx, collection._id, 0, INITIAL_CARDS, { onlyCurriculum: true });
+      const textsToAdd = await getNextTextsFromRank(ctx, collection._id, 0, ONBOARDING_INITIAL_SEED_CARDS, { onlyCurriculum: true });
 
       if (textsToAdd.length > 0) {
         const deck = await ctx.db.get(deckId);
@@ -759,22 +874,27 @@ export const completeOnboarding = mutation({
       }
     }
 
+    // Pin the active course on userSettings. Onboarding answers (acquisition,
+    // goals, daily-time, placement level) live ONLY on `onboardingProgress`
+    // and are discarded with that row on `finalizeOnboarding` — we don't
+    // mirror them here. `hasCompletedOnboarding` stays whatever it was
+    // (only `finalizeOnboarding` is allowed to flip it true, so mid-flow
+    // reload/back-nav stays in the wizard).
+    const settingsPatch = {
+      hasCompletedOnboarding: existingSettings?.hasCompletedOnboarding ?? false,
+      activeCourseId: courseId,
+    };
+
     let settingsId;
     if (!existingSettings) {
       settingsId = await ctx.db.insert('userSettings', {
         userId,
-        hasCompletedOnboarding: true,
-        activeCourseId: courseId,
+        ...settingsPatch,
       });
     } else {
-      await ctx.db.patch(existingSettings._id, {
-        hasCompletedOnboarding: true,
-        activeCourseId: courseId,
-      });
+      await ctx.db.patch(existingSettings._id, settingsPatch);
       settingsId = existingSettings._id;
     }
-
-    await ctx.db.delete(progress._id);
 
     // Same level-collection content warmup as `createCourse` — see comment there.
     await ctx.scheduler.runAfter(

@@ -1,0 +1,1002 @@
+[
+  {
+    "level": 1,
+    "position": 0,
+    "text": "Hi.",
+    "ogteId": "538123",
+    "rarestWord": "hi",
+    "wordCount": 1,
+    "register": "direct-address",
+    "formality": "informal"
+  },
+  {
+    "level": 1,
+    "position": 1,
+    "text": "Hi! How are you?",
+    "ogteId": "30316",
+    "rarestWord": "hi",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "informal"
+  },
+  {
+    "level": 1,
+    "position": 2,
+    "text": "Good, thanks!",
+    "ogteId": "x1_1",
+    "rarestWord": "thanks",
+    "wordCount": 2,
+    "register": "direct-address",
+    "formality": "informal"
+  },
+  {
+    "level": 1,
+    "position": 3,
+    "text": "And you?",
+    "ogteId": "x1_2",
+    "rarestWord": "you",
+    "wordCount": 2,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 1,
+    "position": 4,
+    "text": "I'm good, too.",
+    "ogteId": "x1_3",
+    "rarestWord": "too",
+    "wordCount": 3,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 2,
+    "position": 0,
+    "text": "What do you make?",
+    "ogteId": "511884",
+    "rarestWord": "make",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 2,
+    "position": 1,
+    "text": "Where do you work?",
+    "ogteId": "x2_17",
+    "rarestWord": "work",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 2,
+    "position": 2,
+    "text": "I do it because I have to.",
+    "ogteId": "1689909",
+    "rarestWord": "because",
+    "wordCount": 7,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 2,
+    "position": 3,
+    "text": "Do you know that man?",
+    "ogteId": "3738218",
+    "rarestWord": "man",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 2,
+    "position": 4,
+    "text": "I've come to see you.",
+    "ogteId": "2359400",
+    "rarestWord": "i've",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 3,
+    "position": 0,
+    "text": "How old are you?",
+    "ogteId": "x3_5",
+    "rarestWord": "old",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 3,
+    "position": 1,
+    "text": "Every family has one.",
+    "ogteId": "2891168",
+    "rarestWord": "family",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 3,
+    "position": 2,
+    "text": "What are you making now?",
+    "ogteId": "2871750",
+    "rarestWord": "making",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 3,
+    "position": 3,
+    "text": "I know a few things.",
+    "ogteId": "2375825",
+    "rarestWord": "few",
+    "wordCount": 5,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 3,
+    "position": 4,
+    "text": "There are four people in my family.",
+    "ogteId": "250572",
+    "rarestWord": "four",
+    "wordCount": 7,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 4,
+    "position": 0,
+    "text": "Did you order something?",
+    "ogteId": "2064655",
+    "rarestWord": "order",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 4,
+    "position": 1,
+    "text": "Did you say yes?",
+    "ogteId": "1745699",
+    "rarestWord": "yes",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 4,
+    "position": 2,
+    "text": "Which side are you on?",
+    "ogteId": "5075031",
+    "rarestWord": "side",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 4,
+    "position": 3,
+    "text": "I have less money than you.",
+    "ogteId": "770023",
+    "rarestWord": "less",
+    "wordCount": 6,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 4,
+    "position": 4,
+    "text": "I didn't say you took it.",
+    "ogteId": "3498637",
+    "rarestWord": "took",
+    "wordCount": 6,
+    "register": "direct-address",
+    "formality": "informal"
+  },
+  {
+    "level": 5,
+    "position": 0,
+    "text": "Do you understand everything?",
+    "ogteId": "1886043",
+    "rarestWord": "understand",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 5,
+    "position": 1,
+    "text": "Why would I mind?",
+    "ogteId": "3392912",
+    "rarestWord": "mind",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 5,
+    "position": 2,
+    "text": "I'll show you my room.",
+    "ogteId": "251793",
+    "rarestWord": "room",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 5,
+    "position": 3,
+    "text": "He is known to everyone.",
+    "ogteId": "301400",
+    "rarestWord": "known",
+    "wordCount": 5,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 5,
+    "position": 4,
+    "text": "I hope you feel better soon.",
+    "ogteId": "x5_38",
+    "rarestWord": "soon",
+    "wordCount": 6,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 6,
+    "position": 0,
+    "text": "What are your strong points?",
+    "ogteId": "70461",
+    "rarestWord": "strong",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 6,
+    "position": 1,
+    "text": "Do you still love your wife?",
+    "ogteId": "2144674",
+    "rarestWord": "wife",
+    "wordCount": 6,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 6,
+    "position": 2,
+    "text": "What would you like instead?",
+    "ogteId": "x6_112",
+    "rarestWord": "instead",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 6,
+    "position": 3,
+    "text": "Sometimes everything goes wrong.",
+    "ogteId": "24827",
+    "rarestWord": "goes",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 6,
+    "position": 4,
+    "text": "You have pretty eyes.",
+    "ogteId": "3342864",
+    "rarestWord": "eyes",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 7,
+    "position": 0,
+    "text": "Hey, what's the deal?",
+    "ogteId": "3575480",
+    "rarestWord": "hey",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "informal"
+  },
+  {
+    "level": 7,
+    "position": 1,
+    "text": "What's this green stuff?",
+    "ogteId": "3170528",
+    "rarestWord": "green",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 7,
+    "position": 2,
+    "text": "I hate doing this stuff.",
+    "ogteId": "4666659",
+    "rarestWord": "hate",
+    "wordCount": 5,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 7,
+    "position": 3,
+    "text": "What is the total amount?",
+    "ogteId": "241305",
+    "rarestWord": "amount",
+    "wordCount": 5,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 7,
+    "position": 4,
+    "text": "I've decided to go a little further.",
+    "ogteId": "4915367",
+    "rarestWord": "decided",
+    "wordCount": 7,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 8,
+    "position": 0,
+    "text": "I've been put in charge of this project.",
+    "ogteId": "3596725",
+    "rarestWord": "charge",
+    "wordCount": 8,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 8,
+    "position": 1,
+    "text": "I'll write it down.",
+    "ogteId": "x8_83",
+    "rarestWord": "write",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 8,
+    "position": 2,
+    "text": "What's the population of Australia?",
+    "ogteId": "2712819",
+    "rarestWord": "population",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 8,
+    "position": 3,
+    "text": "I won't be able to sleep tonight.",
+    "ogteId": "2541042",
+    "rarestWord": "tonight",
+    "wordCount": 7,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 8,
+    "position": 4,
+    "text": "Were you able to pass the test?",
+    "ogteId": "69993",
+    "rarestWord": "pass",
+    "wordCount": 7,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 9,
+    "position": 0,
+    "text": "Do you seriously want to race me?",
+    "ogteId": "2015119",
+    "rarestWord": "seriously",
+    "wordCount": 7,
+    "register": "direct-address",
+    "formality": "informal"
+  },
+  {
+    "level": 9,
+    "position": 1,
+    "text": "Do you have an opinion on this issue?",
+    "ogteId": "6098709",
+    "rarestWord": "opinion",
+    "wordCount": 8,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 9,
+    "position": 2,
+    "text": "What's your favorite Christmas song?",
+    "ogteId": "906719",
+    "rarestWord": "christmas",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 9,
+    "position": 3,
+    "text": "No cash was missing.",
+    "ogteId": "4501038",
+    "rarestWord": "cash",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 9,
+    "position": 4,
+    "text": "I had an amazing date last weekend.",
+    "ogteId": "2331641",
+    "rarestWord": "weekend",
+    "wordCount": 7,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 10,
+    "position": 0,
+    "text": "What's the bottom line?",
+    "ogteId": "3730568",
+    "rarestWord": "bottom",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 10,
+    "position": 1,
+    "text": "What a wonderful town!",
+    "ogteId": "5463188",
+    "rarestWord": "wonderful",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 10,
+    "position": 2,
+    "text": "Are you an exchange student?",
+    "ogteId": "2412268",
+    "rarestWord": "exchange",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 10,
+    "position": 3,
+    "text": "Have you been eating well?",
+    "ogteId": "x10_16",
+    "rarestWord": "eating",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 10,
+    "position": 4,
+    "text": "I'm glad you agreed to see me.",
+    "ogteId": "2542456",
+    "rarestWord": "agreed",
+    "wordCount": 7,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 11,
+    "position": 0,
+    "text": "Can you suggest another solution?",
+    "ogteId": "3127919",
+    "rarestWord": "suggest",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 11,
+    "position": 1,
+    "text": "Do you get your boss a Christmas gift?",
+    "ogteId": "5679126",
+    "rarestWord": "boss",
+    "wordCount": 8,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 11,
+    "position": 2,
+    "text": "How tough is that to handle?",
+    "ogteId": "5845885",
+    "rarestWord": "tough",
+    "wordCount": 6,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 11,
+    "position": 3,
+    "text": "I'm very concerned about it.",
+    "ogteId": "x11_33",
+    "rarestWord": "concerned",
+    "wordCount": 5,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 11,
+    "position": 4,
+    "text": "I was thinking about buying a new camera.",
+    "ogteId": "1140132",
+    "rarestWord": "buying",
+    "wordCount": 8,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 12,
+    "position": 0,
+    "text": "Can we save the planet?",
+    "ogteId": "1808129",
+    "rarestWord": "planet",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 12,
+    "position": 1,
+    "text": "Do you like ancient history?",
+    "ogteId": "680196",
+    "rarestWord": "ancient",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 12,
+    "position": 2,
+    "text": "What's the golden rule?",
+    "ogteId": "3737808",
+    "rarestWord": "golden",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 12,
+    "position": 3,
+    "text": "Human relationships are complex.",
+    "ogteId": "5288611",
+    "rarestWord": "relationships",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 12,
+    "position": 4,
+    "text": "He stuck with his own theory.",
+    "ogteId": "1293182",
+    "rarestWord": "stuck",
+    "wordCount": 6,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 13,
+    "position": 0,
+    "text": "Are you planning on voting?",
+    "ogteId": "5069027",
+    "rarestWord": "voting",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 13,
+    "position": 1,
+    "text": "How serious is the crisis?",
+    "ogteId": "5066389",
+    "rarestWord": "crisis",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 13,
+    "position": 2,
+    "text": "I don't drink alcohol.",
+    "ogteId": "258477",
+    "rarestWord": "alcohol",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 13,
+    "position": 3,
+    "text": "He was chosen captain.",
+    "ogteId": "299172",
+    "rarestWord": "chosen",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 13,
+    "position": 4,
+    "text": "I'm unable to answer that question.",
+    "ogteId": "2540041",
+    "rarestWord": "unable",
+    "wordCount": 6,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 14,
+    "position": 0,
+    "text": "He admitted his defeat.",
+    "ogteId": "1293181",
+    "rarestWord": "admitted",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 14,
+    "position": 1,
+    "text": "I have an appointment with my lawyer today.",
+    "ogteId": "4262926",
+    "rarestWord": "appointment",
+    "wordCount": 8,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 14,
+    "position": 2,
+    "text": "They fought for freedom.",
+    "ogteId": "317705",
+    "rarestWord": "fought",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 14,
+    "position": 3,
+    "text": "How much do these pants cost?",
+    "ogteId": "2771735",
+    "rarestWord": "pants",
+    "wordCount": 6,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 14,
+    "position": 4,
+    "text": "Do you have a license to operate a motor boat?",
+    "ogteId": "4384264",
+    "rarestWord": "operate",
+    "wordCount": 10,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 15,
+    "position": 0,
+    "text": "All participants must be registered.",
+    "ogteId": "5137600",
+    "rarestWord": "participants",
+    "wordCount": 5,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 15,
+    "position": 1,
+    "text": "Congratulations to the family!",
+    "ogteId": "x15_31",
+    "rarestWord": "congratulations",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 15,
+    "position": 2,
+    "text": "I want to buy a decent guitar.",
+    "ogteId": "3150733",
+    "rarestWord": "decent",
+    "wordCount": 7,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 15,
+    "position": 3,
+    "text": "A true friendship will last forever.",
+    "ogteId": "2487177",
+    "rarestWord": "friendship",
+    "wordCount": 6,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 15,
+    "position": 4,
+    "text": "Why are you so defensive?",
+    "ogteId": "2892904",
+    "rarestWord": "defensive",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 16,
+    "position": 0,
+    "text": "Tickets are $30 per person and $13 for designated drivers.",
+    "ogteId": "4498179",
+    "rarestWord": "designated",
+    "wordCount": 8,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 16,
+    "position": 1,
+    "text": "What's stopping you now?",
+    "ogteId": "x16_4",
+    "rarestWord": "stopping",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 16,
+    "position": 2,
+    "text": "He's studying hard so he can pass the entrance exam.",
+    "ogteId": "661135",
+    "rarestWord": "exam",
+    "wordCount": 10,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 16,
+    "position": 3,
+    "text": "I want the two of you to quit arguing.",
+    "ogteId": "2025885",
+    "rarestWord": "arguing",
+    "wordCount": 9,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 16,
+    "position": 4,
+    "text": "On what basis are you refusing?",
+    "ogteId": "x16_21",
+    "rarestWord": "refusing",
+    "wordCount": 6,
+    "register": "direct-address",
+    "formality": "formal"
+  },
+  {
+    "level": 17,
+    "position": 0,
+    "text": "Where's the ticket booth?",
+    "ogteId": "272493",
+    "rarestWord": "where's",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 17,
+    "position": 1,
+    "text": "Is this cage shark-proof?",
+    "ogteId": "896806",
+    "rarestWord": "shark",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 17,
+    "position": 2,
+    "text": "Are these allegations true?",
+    "ogteId": "4495576",
+    "rarestWord": "allegations",
+    "wordCount": 4,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 17,
+    "position": 3,
+    "text": "I disagree with that comment.",
+    "ogteId": "4529770",
+    "rarestWord": "disagree",
+    "wordCount": 5,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 17,
+    "position": 4,
+    "text": "I haven't eaten dairy products for a while.",
+    "ogteId": "4135290",
+    "rarestWord": "dairy",
+    "wordCount": 8,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 18,
+    "position": 0,
+    "text": "Children hate cod liver oil.",
+    "ogteId": "3734310",
+    "rarestWord": "cod",
+    "wordCount": 5,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 18,
+    "position": 1,
+    "text": "I want to drink coconut milk.",
+    "ogteId": "1487415",
+    "rarestWord": "coconut",
+    "wordCount": 6,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 18,
+    "position": 2,
+    "text": "Don't get distracted by it.",
+    "ogteId": "x18_6",
+    "rarestWord": "distracted",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "informal"
+  },
+  {
+    "level": 18,
+    "position": 3,
+    "text": "Have you ever tried feeding your dog peanut butter?",
+    "ogteId": "898560",
+    "rarestWord": "peanut",
+    "wordCount": 9,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 18,
+    "position": 4,
+    "text": "Have they given you a nickname yet?",
+    "ogteId": "3152300",
+    "rarestWord": "nickname",
+    "wordCount": 7,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 19,
+    "position": 0,
+    "text": "It made me cringe.",
+    "ogteId": "3825518",
+    "rarestWord": "cringe",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 19,
+    "position": 1,
+    "text": "I'm a sucker for happy endings.",
+    "ogteId": "2044748",
+    "rarestWord": "endings",
+    "wordCount": 6,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 19,
+    "position": 2,
+    "text": "This is a pun.",
+    "ogteId": "1483",
+    "rarestWord": "pun",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 19,
+    "position": 3,
+    "text": "When is the pep rally?",
+    "ogteId": "273978",
+    "rarestWord": "pep",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 19,
+    "position": 4,
+    "text": "Have you ever studied archaeology?",
+    "ogteId": "4487332",
+    "rarestWord": "archaeology",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 20,
+    "position": 0,
+    "text": "Does fracking really cause earthquakes?",
+    "ogteId": "4496344",
+    "rarestWord": "fracking",
+    "wordCount": 5,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 20,
+    "position": 1,
+    "text": "Are polar bears bigger than grizzlies?",
+    "ogteId": "5919505",
+    "rarestWord": "grizzlies",
+    "wordCount": 6,
+    "register": "direct-address",
+    "formality": "neutral"
+  },
+  {
+    "level": 20,
+    "position": 2,
+    "text": "Exports have been sluggish.",
+    "ogteId": "4498469",
+    "rarestWord": "sluggish",
+    "wordCount": 4,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 20,
+    "position": 3,
+    "text": "The first baseman tagged the runner out.",
+    "ogteId": "27181",
+    "rarestWord": "baseman",
+    "wordCount": 7,
+    "register": "descriptive",
+    "formality": "n/a"
+  },
+  {
+    "level": 20,
+    "position": 4,
+    "text": "We have a doghouse in our backyard.",
+    "ogteId": "2510201",
+    "rarestWord": "doghouse",
+    "wordCount": 7,
+    "register": "descriptive",
+    "formality": "n/a"
+  }
+]

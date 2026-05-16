@@ -90,10 +90,14 @@ export async function scheduleMissingContent(
   // Resolve audioSpeakerGender: prefer existing valid value, fall back to speakerGender,
   // then coin-flip via resolveAudioSpeakerGender. Patch the text to make it durable.
   const storedGender = text.audioSpeakerGender;
+  // Seed the coin-flip with the textId so two concurrent invocations against
+  // the same text resolve to the same gender — prevents two racing audio
+  // jobs from writing rows in different genders, which would otherwise
+  // trigger a regeneration loop the next time `genderMismatch` is checked.
   const audioSpeakerGender: 'male' | 'female' =
     storedGender === 'male' || storedGender === 'female'
       ? storedGender
-      : resolveAudioSpeakerGender(text.speakerGender);
+      : resolveAudioSpeakerGender(text.speakerGender, textId);
   if (storedGender !== audioSpeakerGender) {
     await ctx.db.patch(textId, { audioSpeakerGender });
   }
@@ -1420,10 +1424,10 @@ export const processTranslationForCard = internalAction({
 
       const voiceName = regionVariant
         ? getVoiceForLanguageVariant(
-            args.targetLanguage,
-            regionVariant,
-            args.audioSpeakerGender,
-          )
+          args.targetLanguage,
+          regionVariant,
+          args.audioSpeakerGender,
+        )
         : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
 
       // Source travels with the romanization value (real or sentinel) so a
@@ -1518,11 +1522,11 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         // dropped by the truthy spread and look like "never attempted".
         ...(args.romanizedText !== undefined
           ? {
-              romanizedText: args.romanizedText,
-              ...(args.romanizationSource
-                ? { romanizationSource: args.romanizationSource }
-                : {}),
-            }
+            romanizedText: args.romanizedText,
+            ...(args.romanizationSource
+              ? { romanizationSource: args.romanizationSource }
+              : {}),
+          }
           : {}),
         ...(args.translationSource
           ? { translationSource: args.translationSource }

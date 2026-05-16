@@ -240,7 +240,8 @@
           "added": "added",
           "remaining": "remaining",
           "preview": "Preview",
-          "active": "Active",
+          "active": "Currently Learning",
+          "activeTooltip": "New cards will automatically be added from this collection.",
           "inactive": "Inactive"
         },
         "detail": {
@@ -573,7 +574,7 @@
   },
   "Chat": {
     "back": "Back",
-    "askAI": "Ask AI",
+    "askAI": "Explain this word",
     "explainWord": "Explain me this word: {word}",
     "askAboutWord": "Ask about {word}",
     "thinking": "Thinking...",
@@ -785,24 +786,257 @@
     "changeMessage": "You are about to change your subscription."
   },
   "Onboarding": {
-    "reviewMode": {
-      "title": "How do you want to review?",
-      "full": {
-        "title": "Full Review",
-        "description": "Practice writing by typing translations. Best for active practice while looking at the screen."
-      },
-      "audio": {
-        "title": "Audio Review",
-        "description": "Practice listening and speaking with audio playback. There is no need to look at the screen. Ideal for learning on the go — while walking, commuting, or relaxing."
+    "wizard": {
+      "back": "Back",
+      "continue": "Continue",
+      "pickThisLevel": "Pick this level",
+      "loading": "Loading…",
+      "errors": {
+        "completeFailed": "Could not finish setup. Please try again."
       }
     },
-    "baseLanguage": {
-      "title": "What language will you learn from?",
-      "subtitle": "Select your base language"
+    "languagePair": {
+      "title": "Pick your language pair",
+      "subtitle": "What you speak, and what you want to learn.",
+      "iSpeak": "I speak…",
+      "iWantToLearn": "I want to learn…",
+      "readyTitle": "Ready when you are.",
+      "readyHint": "Tap Continue, or tap a language above to change it.",
+      "fromPlaceholder": "From",
+      "toPlaceholder": "To"
     },
-    "targetLanguage": {
-      "title": "What language do you want to learn?",
-      "subtitle": "Select a language"
+    "acquisition": {
+      "title": "Where did you hear about us?",
+      "subtitle": "One-tap answer — helps us understand who finds us how.",
+      "options": {
+        "reddit": "Reddit",
+        "chatgpt": "ChatGPT",
+        "gemini": "Gemini",
+        "claude": "Claude",
+        "google": "Google search",
+        "friend": "A friend",
+        "appstore": "App / Play Store",
+        "other": "Other"
+      },
+      "otherLabel": "Tell us where (optional)",
+      "otherPlaceholder": "e.g. TikTok, podcast, language teacher..."
+    },
+    "goal": {
+      "title": "Why are you learning this language?",
+      "subtitle": "Pick any that fit — choose as many as you'd like.",
+      "options": {
+        "travel": {
+          "label": "Travel & culture",
+          "description": "Get around, understand locals, enjoy films and books in the original."
+        },
+        "family": {
+          "label": "Family & heritage",
+          "description": "Talk with relatives, reconnect with a language tied to where you're from."
+        },
+        "work": {
+          "label": "Work or business",
+          "description": "Use the language with colleagues, clients, or for your career."
+        },
+        "curiosity": {
+          "label": "Just curious",
+          "description": "Personal growth, brain training, or simply because you find it fun."
+        },
+        "exam": {
+          "label": "Test or exam",
+          "description": "Preparing for a school placement, certificate, or proficiency exam."
+        },
+        "other": {
+          "label": "Something else",
+          "description": "Pick this and tell us what's driving you."
+        }
+      },
+      "otherLabel": "What's your reason? (optional)",
+      "otherPlaceholder": "e.g. a partner, a move abroad, a song lyric..."
+    },
+    "dailyTime": {
+      "title": "Daily time goal",
+      "subtitle": "Pick something you can actually stick to. <strong>Consistency matters more than minutes</strong> — 5 minutes every day beats 30 minutes once a week, because spaced repetition only works if you show up.",
+      "options": {
+        "5": { "label": "5 min/day", "description": "Quick daily habit" },
+        "10": { "label": "10 min/day", "description": "Steady progress" },
+        "20": { "label": "20 min/day", "description": "Serious pace" },
+        "30": { "label": "30 min/day", "description": "All-in" },
+        "60": { "label": "1 hour/day", "description": "Marathon mode" },
+        "custom": { "label": "Custom", "description": "Pick your own amount" }
+      },
+      "customLabel": "Set your own daily target ({min}–{max} minutes)",
+      "customPlaceholder": "e.g. 15",
+      "minutesUnit": "min/day"
+    },
+    "proficiency": {
+      "title": "How well do you know this language?",
+      "subtitle": "We'll customize where you start.",
+      "branches": {
+        "new": {
+          "title": "I'm completely new",
+          "description": "Start with the most essential everyday sentences."
+        },
+        "selfPick": {
+          "title": "I know roughly where I am",
+          "description": "Choose your level yourself with a preview of sentences at that level."
+        },
+        "test": {
+          "title": "Test me — find my level",
+          "description": "Short adaptive test, about 5–20 questions. Most accurate."
+        }
+      },
+      "recommended": "Recommended"
+    },
+    "cefrPick": {
+      "title": "Find your level",
+      "subtitle": "Drag the slider to find your right level. The sample sentences show you what kind of sentences you are expected to understand at this level. Already know how to say all sentences in your target language? That level is likely too easy for you. Are there some you are struggling with? Then it is likely a good place to start.",
+      "levelLabel": "Level",
+      "levelsTotal": "20 levels total",
+      "levelsRange": "Pre-A1 → C2",
+      "ariaLabel": "Proficiency level",
+      "samplesHeading": "Sentences at level {level}",
+      "sampleLoading": "Loading…",
+      "sampleEmpty": "No sample available at this level yet."
+    },
+    "cefrConfirm": {
+      "title": "Start at level {level}?",
+      "description": "We'll begin your course at <badge></badge>. You can also take a quick test starting from this level — that's the most accurate way to find your exact spot.",
+      "startHere": "Yes, start here",
+      "takeQuickTest": "Take a quick test instead"
+    },
+    "placementTest": {
+      "questionLabel": "Question {n}",
+      "prompt": "Do you know how to translate this?",
+      "sourceLabel": "English",
+      "translationLabel": "Translation",
+      "loading": "Loading…",
+      "noSentence": "No sentence at this level.",
+      "translationNotReady": "Translation not ready yet for this language. Try answering anyway.",
+      "tapReveal": "Tap reveal below to see the translation.",
+      "reveal": "Reveal translation",
+      "iDidntKnow": "I didn't know",
+      "iKnewIt": "I knew it",
+      "playSourceAudio": "Play English audio",
+      "playTranslationAudio": "Play translation audio",
+      "result": {
+        "title": "Got it",
+        "subtitle": "Based on your answers, we'll start you at",
+        "levelLabel": "Level",
+        "questionsAnswered": "{count, plural, =1 {1 question answered} other {# questions answered}}",
+        "easier": "Easier",
+        "harder": "Harder",
+        "samplesHeading": "Sentences at this level",
+        "continue": "Continue"
+      }
+    },
+    "customizing": {
+      "title": "Customizing your first lesson…",
+      "beats": {
+        "0": "Customizing your course…",
+        "1": "Tailoring content to your level…",
+        "2": "Picking your first sentences…",
+        "3": "Personalizing your lesson…",
+        "4": "Almost ready…"
+      }
+    },
+    "firstLesson": {
+      "intro": {
+        "title": "Your first lesson is ready!",
+        "subtitle": "Pick a mode and we'll walk you through how everything works."
+      },
+      "modes": {
+        "audio": {
+          "title": "Audio Review",
+          "description": "Hear the sentence, try to translate it and then hear the correct translation.",
+          "footnote": "Best with headphones · Recommended"
+        },
+        "full": {
+          "title": "Full Review",
+          "description": "Translate sentences and get instant and detailed spelling feedback."
+        }
+      },
+      "duration": "About 10 minutes",
+      "start": "Start lesson",
+      "skip": "Skip for now",
+      "abort": "Abort lesson",
+      "abortAria": "Abort lesson",
+      "errorBoundary": {
+        "message": "We hit a snag preparing your first lesson. You can skip it for now and pick up from your home screen.",
+        "skip": "Skip lesson"
+      }
+    },
+    "statsRecap": {
+      "heroLabel": "new words this session",
+      "stats": {
+        "reviews": "reviews",
+        "time": "time",
+        "new": "new"
+      },
+      "wordsHeading": "Words you just learned",
+      "projection": {
+        "title": "At this pace, you'll know",
+        "subtitle": "{minutes} min/day · linear projection",
+        "milestones": {
+          "1mo": "1 month",
+          "6mo": "6 months",
+          "1y": "1 year"
+        },
+        "wordsUnit": "words"
+      },
+      "ready": {
+        "title": "Day 1 done",
+        "subtitle": "Keep this streak alive — come back tomorrow for {minutes} more minutes."
+      },
+      "back": "Back",
+      "next": "Next",
+      "continue": "Continue"
+    },
+    "wordProjection": {
+      "summary": "Right now you learned {words, plural, =1 {1 word} other {# words}} in {minutes, plural, =1 {1 minute} other {# minutes}}.",
+      "headline": "At this pace, you'll know",
+      "perDay": "{minutes} min/day",
+      "adjustLabel": "Tune your daily goal",
+      "milestones": {
+        "1mo": "1 month",
+        "6mo": "6 months",
+        "1y": "1 year"
+      },
+      "wordsUnit": "words",
+      "continue": "Continue"
+    },
+    "featureTour": {
+      "title": "A few more things",
+      "subtitle": "Quick tour of features you'll want to know about.",
+      "slides": {
+        "custom": {
+          "title": "Add custom cards",
+          "body": "You have the option to add custom sentences you want to learn. You can also auto generate audio and translation in seconds."
+        },
+        "import": {
+          "title": "Bulk import from CSV",
+          "body": "Drag in a list of sentences and we'll fan them out into translations + audio for every language in your course."
+        },
+        "radio": {
+          "title": "Radio mode for passive listening",
+          "body": "Set it and forget it — your cards play on loop in the background, without affecting your spaced-repetition schedule."
+        },
+        "stats": {
+          "title": "Detailed stats track everything",
+          "body": "Streak, words learned, time spent, and a calendar heatmap so you can see your habit forming."
+        },
+        "multilang": {
+          "title": "Multiple languages",
+          "body": "On Pro you can also add a third language to your flashcards — handy if you want to learn multiple languages at once, or keep refreshing two languages you already know at the same time."
+        }
+      },
+      "back": "Back",
+      "next": "Next",
+      "done": "Done"
+    },
+    "planPick": {
+      "title": "Thank you for joining",
+      "subtitle": "Try Basic or Pro free for 21 days — no commitment. You can change or cancel anytime.",
+      "skip": "Maybe later — continue testing"
     },
     "difficulty": {
       "title": "How much do you already know?",
@@ -836,47 +1070,101 @@
         "description": "I have a broad vocabulary",
         "wordCount": "8,000+ words"
       }
-    },
-    "feedback": {
-      "languageSelected": "Great choice!",
-      "difficultySelected": "Perfect, we'll tailor your content!",
-      "reviewModeSelected": "You're all set!",
-      "difficulty": {
-        "beginner": "We'll start with the basics!",
-        "elementary": "Great, you already know the essentials!",
-        "intermediate": "Nice, you have a solid foundation!",
-        "upper_intermediate": "Impressive, you're well on your way!",
-        "advanced": "Excellent, you're nearly fluent!",
-        "proficient": "Amazing, let's refine your mastery!"
+    }
+  },
+  "OnboardingTutorial": {
+    "core": {
+      "welcomeAudio": {
+        "title": "Welcome to Audio Review",
+        "description": "In this mode you can review sentences hands-off. The texts are read aloud automatically. Let's walk through how it works."
       },
-      "reviewMode": {
-        "full": "Great for active practice!",
-        "audio": "Perfect for learning on the go!"
+      "welcomeFull": {
+        "title": "Welcome to Full Review",
+        "description": "In this mode you actively practise writing and get instant feedback. Let's walk through how it works."
+      },
+      "card": {
+        "title": "The card",
+        "descriptionAudio": "Each card shows a sentence in the languages you're learning. The target language is hidden until you reveal it.",
+        "descriptionFull": "Each card shows a sentence in the languages you're learning. You'll type the translation and check yourself."
+      },
+      "reveal": {
+        "title": "Reveal the translation",
+        "description": "The target translation is hidden by default. Tap it to reveal, or just listen to the audio — after a short pause it reveals automatically. Try answering from memory first."
+      },
+      "input": {
+        "title": "Type your translation",
+        "description": "Type the target-language translation here and hit submit. You'll get instant feedback on each word."
+      },
+      "audioControls": {
+        "title": "Audio plays automatically",
+        "description": "Audio plays the base language first, pauses for you to think, then plays the target. Restart, play / pause, or skip to the next card here."
+      },
+      "audioPlay": {
+        "title": "Press play to start",
+        "description": "Audio is paused right now while we walk you through the lesson. Press play whenever you're ready to hear the first sentence."
+      },
+      "rating": {
+        "title": "Rate how well you knew it",
+        "descriptionAudio": "Each card is repeated a few times before it enters spaced repetition. <strong>Still learning</strong> keeps it in the warm-up rotation. <strong>Understood</strong> means you know it — skip the warm-up and start spaced repetition right away. After a few reviews you'll see Again / Hard / Good / Easy.",
+        "descriptionFull": "After every answer, rate how well you knew it. <strong>Again</strong> means you didn't know it — the card comes back quickly. <strong>Hard</strong>, <strong>Good</strong>, and <strong>Easy</strong> push the next review further out. Be honest — over-rating a card you didn't really know will haunt you later."
+      },
+      "autoAdd": {
+        "title": "Adding cards",
+        "description": "By default new cards are added automatically as the ones you have run out — everything is optimised for you using spaced repetition. This avoids cramming and takes care of pacing for you. You do not need to worry about when to add new cards."
       }
     },
-    "errors": {
-      "completeFailed": "Failed to complete onboarding",
-      "tryAgain": "Please try again."
+    "modeSwitch": {
+      "audio": {
+        "welcome": {
+          "title": "Switched to Audio Review",
+          "description": "You'll listen first and reveal the translation after. Here's what changes."
+        }
+      },
+      "full": {
+        "welcome": {
+          "title": "Switched to Full Review",
+          "description": "You'll type the translation yourself and get instant feedback. Here's what changes."
+        }
+      }
     },
-    "continue": "Continue",
-    "back": "Back",
-    "getStarted": "Get Started",
-    "finish": "Finish",
-    "finished": {
-      "title": "You're all set!",
-      "subtitle": "Your personalized learning experience is ready.",
-      "button": "Start Learning"
+    "cardActions": {
+      "title": "Card options",
+      "description": "Star a card to favourite it, mark it as mastered (it stops appearing in review), hide it from your deck, or edit/delete it. Use these whenever a card is too easy, too hard, or just wrong for you."
+    },
+    "wordTap": {
+      "title": "Tap any word",
+      "description": "Tap a word in the target sentence to ask the chat what it means. The chat can also create a new flashcard for it on the spot."
+    },
+    "chat": {
+      "title": "Your AI language tutor",
+      "description": "The chat is a tutor that knows the language you're learning. Ask why a sentence is phrased a certain way, get grammar explained at your level, request examples, or have the chat turn an idea into a new flashcard — translation and audio are generated automatically so the card is ready to study."
     }
   },
   "Tutorial": {
     "home": {
       "welcome": {
-        "title": "Welcome to Flexling!",
-        "description": "We'll give you a quick overview to help you get started. You can dismiss this at any time."
+        "title": "Welcome to your dashboard!",
+        "description": ""
       },
-      "learningModes": {
-        "title": "Stats & Learning Modes",
-        "description": "This area shows your learning stats — streak, reps, sentences and time — which update as you study. Below are 2 buttons: Learn New focuses on new sentences you haven't learned yet. Review+Learn includes both new and previously learned sentences for spaced repetition. Use the toggle below to switch between Audio mode (hands-free listening) and Full mode (type translations)."
+      "learnNew": {
+        "title": "Learn New",
+        "description": "Picks fresh sentences you haven't seen yet — perfect when you want to grow your vocabulary."
+      },
+      "learnAndReview": {
+        "title": "Review + Learn",
+        "description": "Mixes new sentences with cards due for spaced repetition, so you keep what you've learned while picking up more."
+      },
+      "radioMode": {
+        "title": "Radio",
+        "description": "Audio-only background playback — your cards loop hands-free without affecting their spaced-repetition schedule. Only available in audio mode."
+      },
+      "reviewModeToggle": {
+        "title": "Audio vs Full Review",
+        "description": "Switch between Audio (hear the sentence and translate in your head) and Full (type the translation and get instant feedback)."
+      },
+      "contentSource": {
+        "title": "Pick your source",
+        "description": "Choose whether to study only premade sentences, only your own custom cards, or both at once."
       },
       "difficultySelection": {
         "title": "Difficulty Selection",

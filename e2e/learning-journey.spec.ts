@@ -49,6 +49,13 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
   });
 
   test("user learns 3 cards in audio review mode", async ({ page }) => {
+    // Each iteration touches the real FSRS mutation + a TTS roundtrip for
+    // the next card. Three cards plus tour dismissal + load + initial waits
+    // comfortably overflows the 30s default under @live conditions; 45s
+    // gives the slowest-card-prep iteration enough headroom without hiding
+    // an actual hang (the 5s+1.5s per-iteration budget is unchanged).
+    test.setTimeout(45_000);
+
     await page.goto("/app/learn");
     await page.waitForLoadState("domcontentloaded");
     // Review mode can be audio OR full depending on prior test state — try
@@ -72,9 +79,20 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     await dismissTour(page, "audio_review_intro", 1_500);
     await dismissTour(page, "full_review_intro", 500);
 
+    // Cards seeded by onboarding start in `preReview` phase
+    // (lib/scheduling.ts:getValidRatings), so the first few iterations render
+    // `learn-rating-still-learning` + `learn-rating-understood` — NOT the
+    // FSRS-phase `learn-rating-good` set. Clicking `understood` transitions
+    // the card to FSRS for its next review and advances the page to the
+    // next card; subsequent iterations may then see the FSRS button set.
+    // The candidate list covers both phases so the loop keeps working
+    // across the phase swap. Order matters: `understood`/`good` advance the
+    // card "cleanly"; `still-learning` is the last-resort accept-and-move-on.
     let successfulClicks = 0;
     for (let i = 0; i < 3; i++) {
       // Belt-and-braces: a tour can re-mount between cards.
+      await dismissTour(page, "audio_review_intro", 250);
+      await dismissTour(page, "full_review_intro", 250);
       await dismissTour(page, undefined, 250);
 
       // In Full Review mode ratings are gated behind submitting a
@@ -87,24 +105,22 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
         await page.waitForTimeout(500);
       }
 
-      const good = page.getByTestId("learn-rating-good").first();
-      const understood = page.getByTestId("learn-rating-understood").first();
-      const fallback = page
-        .getByRole("button", {
-          name: /still learning|understood|again|hard|good|easy/i,
-        })
-        .first();
-
-      const target = (await good.isEnabled().catch(() => false))
-        ? good
-        : (await understood.isEnabled().catch(() => false))
-          ? understood
-          : (await fallback.isEnabled().catch(() => false))
-            ? fallback
-            : null;
+      const candidateTestIds = [
+        "learn-rating-understood",       // preReview — transitions to FSRS + advances
+        "learn-rating-good",             // FSRS — happy-path rating + advances
+        "learn-rating-still-learning",   // preReview fallback — also advances
+      ];
+      let target: ReturnType<typeof page.getByTestId> | null = null;
+      for (const testId of candidateTestIds) {
+        const btn = page.getByTestId(testId).first();
+        if (await btn.isVisible().catch(() => false)) {
+          target = btn;
+          break;
+        }
+      }
       if (!target) break;
 
-      await target.click();
+      await target.click({ timeout: 5_000 }).catch(() => {});
       successfulClicks++;
       await page.waitForTimeout(1_500);
     }

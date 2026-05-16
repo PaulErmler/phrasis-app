@@ -4,10 +4,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import {
-  usePreloadedQuery,
   useQuery,
   useMutation,
-  Preloaded,
   useConvexAuth,
 } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -36,6 +34,18 @@ import {
   PROGRESS_DISPLAY_INTERVAL,
 } from '@/lib/constants/learning';
 import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
+import { useCelebration } from './useCelebration';
+
+/**
+ * Pure helper: cryptographically-random session ID with a non-crypto
+ * fallback for environments without `crypto.randomUUID`. Module-scope so
+ * tests can mock or reuse it without instantiating the hook.
+ */
+function mintSessionId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
 
 function effectivePhase(
   reviewMode: string,
@@ -60,6 +70,9 @@ interface BaseState {
   dailyReviewsToday: number;
   dailyTimeMsToday: number;
   dailyNewWordsToday: number;
+  /** Cards rated since this learning session started — drives the per-session
+   *  progress bar so it always starts fresh at 0 on a new session. */
+  sessionCardCount: number;
   progressDisplayActive: boolean;
   /** True once the milestone-triggering mutation has resolved; gates the
    * celebration audio + counter animations so they fire against fresh data. */
@@ -155,26 +168,46 @@ export type LearningState =
   | NoCardsDueState
   | ReviewingState;
 
-export interface PreloadedLearningData {
-  courseSettings: Preloaded<
-    typeof api.features.courses.getActiveCourseSettings
-  >;
-  activeCourse: Preloaded<typeof api.features.courses.getActiveCourse>;
-}
-
 // ============================================================================
 // Hook
 // ============================================================================
 
-export function useLearningMode(
-  preloaded: PreloadedLearningData,
-): LearningState {
+// TODO: This hook is ~900 lines and three concerns are tangled inside it:
+//   1. Card-scheduling state machine (loading / noCardsDue / addingCards /
+//      reviewing + the FSRS mutations).
+//   2. Session counters (dailyReviewsToday, sessionCardCount, sessionId
+//      lifecycle) — partially extracted via `mintSessionId` at module
+//      scope; the rest remains coupled to `handleNext` / `handleReview`.
+//   3. Celebration / progress-display — extracted to `useCelebration` in
+//      this PR; still triggered from inside `handleReview`.
+// A full split into `useSessionCounters` / `useCardScheduling` /
+// `useCelebration` is its own PR with proper QA: the milestone-trigger
+// math, optimistic-flip ordering, and `dailyReviewsToday` hydration timing
+// all need to be preserved bit-for-bit. Don't attempt incrementally —
+// either land the full refactor with end-to-end coverage in one go, or
+// leave the current shape alone.
+export interface UseLearningModeOptions {
+  /** Seed the session id instead of minting fresh — used by onboarding
+   *  to keep the same session across a mid-lesson reload so
+   *  `getNewWordsForCelebration` returns the same hero number. */
+  initialSessionId?: string;
+  /** Seed the in-session card counter — used by onboarding so the
+   *  X/N progress bar resumes at the right value after a reload. */
+  initialSessionCardCount?: number;
+}
+
+export function useLearningMode(options: UseLearningModeOptions = {}): LearningState {
   const t = useTranslations('LearningMode');
   const { isAuthenticated } = useConvexAuth();
+  const { initialSessionId, initialSessionCardCount } = options;
 
   const cardForReviewQuery = useQuery(api.features.scheduling.getCardForReview, {});
-  const courseSettingsQuery = usePreloadedQuery(preloaded.courseSettings);
-  const activeCourseQuery = usePreloadedQuery(preloaded.activeCourse);
+  // Direct queries (was previously fed via SSR-preloaded data through
+  // AppDataProvider). The downstream logic already treats both as nullable,
+  // so the loading flash on first render is handled by the hook's existing
+  // `loading` status branch.
+  const courseSettingsQuery = useQuery(api.features.courses.getActiveCourseSettings, {});
+  const activeCourseQuery = useQuery(api.features.courses.getActiveCourse, {});
 
   // Hydrate today's review count on mount so the in-session progress bar
   // reflects real progress rather than starting at 0 each page load. After
@@ -321,43 +354,57 @@ export function useLearningMode(
   const [cardAnimationKey, setCardAnimationKey] = useState(0);
 
   // ----- Progress display (every PROGRESS_DISPLAY_INTERVAL reviews per day) -----
+  // ─── Session counters + session-id lifecycle ──────────────────────────
   // Session id is rotated on dismiss and on course change so
   // `getNewWordsForCelebration`'s session bucket only ever contains words
   // discovered since the last reset. Backend-only — no client tokenization.
   const sessionIdRef = useRef<string>('');
   const sessionCourseIdRef = useRef<string | null>(null);
-
-  function mintSessionId(): string {
-    return typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  }
-  function resetSessionLocalState() {
+  // Track whether we've consumed the caller-supplied seeds so a later
+  // session reset (course change / celebration dismiss) still mints fresh.
+  const consumedInitialSessionRef = useRef(false);
+  const resetSessionLocalState = useCallback(() => {
     sessionIdRef.current = mintSessionId();
-  }
+  }, []);
 
   const activeCourseIdForSession = activeCourseQuery?._id ?? null;
   const [dailyReviewsToday, setDailyReviewsToday] = useState(0);
   const [dailyTimeMsToday, setDailyTimeMsToday] = useState(0);
   const [dailyNewWordsToday, setDailyNewWordsToday] = useState(0);
+  // Per-session card counter — drives the session progress bar so it always
+  // starts at 0 on a fresh session (instead of carrying over from the daily
+  // cumulative count). Reset alongside the session id below.
+  const [sessionCardCount, setSessionCardCount] = useState(initialSessionCardCount ?? 0);
   if (
     !sessionIdRef.current ||
     sessionCourseIdRef.current !== activeCourseIdForSession
   ) {
-    resetSessionLocalState();
+    if (!consumedInitialSessionRef.current && initialSessionId) {
+      // First mount with a persisted session id — adopt it instead of
+      // minting fresh so post-reload reviews land in the same bucket.
+      sessionIdRef.current = initialSessionId;
+    } else {
+      resetSessionLocalState();
+    }
+    consumedInitialSessionRef.current = true;
     sessionCourseIdRef.current = activeCourseIdForSession;
+    setSessionCardCount(initialSessionCardCount ?? 0);
   }
-  // Two flags for the celebration:
-  //  - `active`  flips optimistically *before* the mutation awaits, so the
-  //              audio hook treats `disableAutoPlay=true` and the next card
-  //              never gets a chance to start playing. The shell holds an
-  //              empty placeholder during this window.
-  //  - `ready`   flips *after* the mutation resolves and the server has
-  //              confirmed the milestone via `triggerCelebration`. Audio +
-  //              counter animations gate on this so they always start
-  //              against fresh post-mutation data.
-  const [progressDisplayActive, setProgressDisplayActive] = useState(false);
-  const [progressDisplayReady, setProgressDisplayReady] = useState(false);
+
+  // ─── Celebration / progress display ───────────────────────────────────
+  // Sessions reset on dismissal: the next celebration shows only words
+  // discovered since this point, not the cumulative total. The new id
+  // takes effect from the next review's mutation onward — the celebration
+  // we just dismissed already finished its queries against the old id.
+  const celebration = useCelebration(resetSessionLocalState);
+  const {
+    active: progressDisplayActive,
+    ready: progressDisplayReady,
+    setActive: setProgressDisplayActive,
+    setReady: setProgressDisplayReady,
+    dismiss: dismissProgressDisplay,
+  } = celebration;
+
   const hasHydratedDailyCountRef = useRef(false);
   useEffect(() => {
     if (hasHydratedDailyCountRef.current) return;
@@ -365,16 +412,6 @@ export function useLearningMode(
     hasHydratedDailyCountRef.current = true;
     setDailyReviewsToday(todayCountQuery);
   }, [todayCountQuery]);
-
-  const dismissProgressDisplay = useCallback(() => {
-    setProgressDisplayActive(false);
-    setProgressDisplayReady(false);
-    // Sessions reset on dismissal: the next celebration shows only words
-    // discovered since this point, not the cumulative total. The new id
-    // takes effect from the next review's mutation onward — the celebration
-    // we just dismissed already finished its queries against the old id.
-    resetSessionLocalState();
-  }, []);
 
   // Track when the current card was first shown (for time-spent stats)
   const cardShownAtRef = useRef<number>(Date.now());
@@ -468,9 +505,11 @@ export function useLearningMode(
 
   // Auto-add cards when enabled and no cards due
   useEffect(() => {
+    // Auto-add default is `true` — only opt out when explicitly false.
+    const autoAddEnabled = courseSettings?.autoAddCards !== false;
     if (
       cardForReview === null &&
-      courseSettings?.autoAddCards &&
+      autoAddEnabled &&
       courseSettings?.activeCollectionId &&
       !isAddingCards &&
       !settingsOpen
@@ -535,6 +574,7 @@ export function useLearningMode(
         setDailyReviewsToday(result.dailyReviewsToday);
         setDailyTimeMsToday(result.dailyTimeMsToday);
         setDailyNewWordsToday(result.dailyNewWordsToday);
+        setSessionCardCount((n) => n + 1);
 
         if (result.triggerCelebration) {
           setProgressDisplayActive(true);
@@ -676,9 +716,12 @@ export function useLearningMode(
         });
       } catch (error) {
         console.error('Failed to advance radio card:', error);
-        setIsExiting(false);
       } finally {
         setIsReviewing(false);
+        // Always clear `isExiting` in radio. The shared reset effect only
+        // fires when `cardForReview._id` changes, so on a same-id re-render
+        // (single-card decks) it would otherwise leave the card pane blank.
+        setIsExiting(false);
       }
       return;
     }
@@ -714,6 +757,7 @@ export function useLearningMode(
     dailyReviewsToday,
     dailyTimeMsToday,
     dailyNewWordsToday,
+    sessionCardCount,
     progressDisplayActive,
     progressDisplayReady,
     dismissProgressDisplay,
@@ -764,8 +808,10 @@ export function useLearningMode(
 
     // When auto-add is enabled and will actually add cards, suppress the
     // noCardsDue screen so the transition to the next batch is seamless.
+    // Auto-add defaults to true; only opt out when explicitly false.
+    const autoAddEnabled = courseSettings.autoAddCards !== false;
     const autoAddWillRun =
-      !!courseSettings.autoAddCards &&
+      autoAddEnabled &&
       !settingsOpen &&
       (sentencesQuota.unlimited || sentencesQuota.balance > 0) &&
       (remainingInCollection === null || remainingInCollection > 0);

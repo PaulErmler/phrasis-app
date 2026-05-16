@@ -120,6 +120,7 @@ export function LearningChatLayout({
           <div
             className="hidden lg:flex flex-col justify-center items-center w-8 shrink-0 border-l bg-muted/10 hover:bg-muted/30 cursor-pointer transition-colors z-20"
             onClick={toggleChat}
+            data-coachmark-anchor="chat-button-desktop"
             {...(!isChatOpen ? { 'data-tutorial': 'chat-button' } : {})}
           >
             {isChatOpen ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <MessageCircle className="h-4 w-4 text-muted-foreground" />}

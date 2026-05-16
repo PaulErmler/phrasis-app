@@ -180,7 +180,7 @@ export const pro = plan({
   items: [
     item({
       featureId: card_edits.id,
-      included: 300,
+      included: 500,
       reset: {
         interval: 'month',
       },
@@ -229,4 +229,5 @@ export const pro = plan({
       included: 0,
     }),
   ],
+  freeTrial: { durationLength: 21, durationType: 'day', cardRequired: true },
 });

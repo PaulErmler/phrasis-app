@@ -767,8 +767,12 @@ export const unhideCard = mutation({
  *
  * Catch-up rule: a brand-new card (counter 0) joining a deck whose other
  * cards are all at e.g. 100 should not replay 99 more times. After playing,
- * its counter jumps to `max(picked + 1, floorOfOthers)` so it lands beside
- * the rest of the deck and rejoins the round-robin rotation.
+ * its counter jumps to `max(picked, floorOfOthers) + 1` so it lands one
+ * step past the rest of the deck — strictly above every other playable
+ * card. This guarantees the just-played card is never re-picked as the
+ * next card while any other playable card exists (the random `radioOrderKey`
+ * tiebreak only kicks in at equal counters, which can no longer include
+ * the played card).
  *
  * Stats: writes `dailyStats.reviewsByMode.radio` + `timeMsByMode.radio` and
  * the equivalent rollups, plus `courseStats.totalReviewsByMode.radio` and
@@ -808,7 +812,10 @@ export const advanceRadioCard = mutation({
     // `card`; in that case the floor is whichever of the two is not `card`.
     const floorCard = lowestTwo.find((c) => c._id !== card._id) ?? null;
     const floorCounter = floorCard ? (floorCard.radioRoundCounter ?? 0) : pickedCounter;
-    const newCounter = Math.max(pickedCounter + 1, floorCounter);
+    // Land strictly above the floor so the played card cannot tie with the
+    // rest of the round; combined with ascending counter ordering this rules
+    // out an immediate repeat as long as ≥1 other playable card exists.
+    const newCounter = Math.max(pickedCounter, floorCounter) + 1;
 
     await patchCard(
       ctx,
@@ -1134,11 +1141,11 @@ export const editCard = mutation({
             ? {}
             : existing?.romanizedText !== undefined
               ? {
-                  romanizedText: existing.romanizedText,
-                  ...(existing.romanizationSource
-                    ? { romanizationSource: existing.romanizationSource }
-                    : {}),
-                }
+                romanizedText: existing.romanizedText,
+                ...(existing.romanizationSource
+                  ? { romanizationSource: existing.romanizationSource }
+                  : {}),
+              }
               : {}),
         });
       }

@@ -442,10 +442,10 @@ export const processLlmTranslationForCard = internalAction({
       // `regionVariant`. Non-mixed languages fall through to the simple picker.
       const voiceName = regionVariant
         ? getVoiceForLanguageVariant(
-            args.targetLanguage,
-            regionVariant,
-            args.audioSpeakerGender,
-          )
+          args.targetLanguage,
+          regionVariant,
+          args.audioSpeakerGender,
+        )
         : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
 
       // Source resolved from `cfgLanguageCode` (the sub-code for mixed

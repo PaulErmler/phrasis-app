@@ -61,6 +61,7 @@ export function ContentFilterDropdown() {
     <div
       className="flex items-center justify-end gap-2 pt-1"
       data-testid="content-filter-dropdown"
+      data-tutorial="content-source-filter"
     >
       <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
       <span className="text-xs text-muted-foreground">{t('label')}</span>

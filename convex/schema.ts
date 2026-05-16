@@ -213,6 +213,26 @@ export default defineSchema({
       'voiceName',
     ]),
 
+  // Placement-test sentence index. The actual English source text lives in
+  // `texts` (so it gets translations/audio from the standard pipelines); this
+  // side table just records *which* texts belong to the placement test, at
+  // which OGTE level and position. Seeded by
+  // `convex/migrations/seedPlacementTestSentences.ts` from
+  // `data/placement-test/english.json`.
+  //
+  // Per OGTE level (1..20) there are 5 positions (0..4). `level + position`
+  // therefore uniquely identifies a sentence; the unique-pair guarantee is
+  // enforced by the seed mutation (idempotent upsert).
+  placementTestSentences: defineTable({
+    level: v.number(),               // 1..20 (OGTE level)
+    position: v.number(),            // 0..4 within the level
+    textId: v.id('texts'),           // English source — translations + audio live here
+    rarestWord: v.optional(v.string()),
+    ogteId: v.optional(v.string()),  // Traceability back to the source OGTE row
+  })
+    .index('by_level_and_position', ['level', 'position'])
+    .index('by_textId', ['textId']),
+
   // User settings table - stores user preferences and onboarding status
   userSettings: defineTable({
     userId: v.string(), // Links to auth user
@@ -225,11 +245,58 @@ export default defineSchema({
   // Onboarding progress table - stores temporary onboarding data until completion
   onboardingProgress: defineTable({
     userId: v.string(), // Links to auth user
-    step: v.number(), // Current step in onboarding (1-5)
+    step: v.number(), // Current step number in the new flow
     reviewMode: v.optional(reviewModeValidator),
     currentLevel: v.optional(currentLevelValidator),
     targetLanguages: v.optional(v.array(v.string())),
     baseLanguages: v.optional(v.array(v.string())),
+    // New onboarding-flow fields (mirrored to `userSettings` on completion).
+    acquisitionSource: v.optional(v.string()),
+    acquisitionSourceFreeText: v.optional(v.string()),
+    learningGoals: v.optional(v.array(v.string())),
+    learningGoalFreeText: v.optional(v.string()),
+    dailyTimeGoalMinutes: v.optional(v.number()),
+    // Placement-test working state. `history` accumulates as the user answers;
+    // `finalLevel` is set when the strategy reports `nextQuestionLevel() === null`.
+    placementTest: v.optional(
+      v.object({
+        // Schema-version of the placement state. Bump
+        // CURRENT_PLACEMENT_STRATEGY_VERSION in
+        // app/app/onboarding/lib/placementStrategies.ts whenever the shape
+        // of `history`/`strategy`/`finalLevel` changes — readers discard
+        // rows whose version doesn't match (kill-switch for resuming
+        // incompatible state). Optional so historical rows (written before
+        // this field existed) still validate; treat missing as version 0
+        // and discard on read.
+        strategyVersion: v.optional(v.number()),
+        strategy: v.string(), // 'bayesian' | 'binary' | 'staircase'
+        history: v.array(
+          v.object({ level: v.number(), knew: v.boolean() }),
+        ),
+        finalLevel: v.optional(v.number()),
+      }),
+    ),
+    // Number of cards the user has rated inside the embedded first lesson.
+    // Persisted so a reload mid-lesson resumes at the right card count and
+    // re-seeds which staged tutorials have already fired.
+    firstLessonCardsRated: v.optional(v.number()),
+    // Underlying `studySessions` row id for the embedded first lesson —
+    // captured on the first rated card and replayed into `useLearningMode`
+    // on the next mount so X/N progress and the +N new-words hero stay
+    // continuous across a mid-flow reload.
+    firstLessonSessionId: v.optional(v.string()),
+    // Snapshot of the embedded first-lesson session — written when the
+    // lesson completes (or skipped). Keeps the stats-recap +
+    // word-projection screens alive across a mid-flow reload.
+    firstLessonSummary: v.optional(
+      v.object({
+        cardsRated: v.number(),
+        sessionId: v.string(),
+        dailyReviewsToday: v.number(),
+        dailyTimeMsToday: v.number(),
+        dailyNewWordsToday: v.number(),
+      }),
+    ),
   }).index('by_userId', ['userId']),
 
   // Courses table - stores user language learning courses

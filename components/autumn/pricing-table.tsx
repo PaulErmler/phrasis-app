@@ -21,14 +21,21 @@ import { CarouselDots } from "@/components/ui/carousel-dots";
 
 export default function PricingTable({
   productDetails,
+  excludeFreePlan = false,
 }: {
   productDetails?: ProductDetails[];
+  /** When true, drop products whose `properties.is_free` is set. Used by the
+   *  onboarding flow where the user must commit to a paid tier to finish. */
+  excludeFreePlan?: boolean;
 }) {
   const t = useTranslations("Pricing");
   const { customer, checkout, isLoading: isCustomerLoading } = useCustomer({ errorOnNotFound: false });
 
   const [isAnnual, setIsAnnual] = useState(false);
-  const { products, isLoading: isProductsLoading, error, refetch } = usePricingTable({ productDetails });
+  const { products: rawProducts, isLoading: isProductsLoading, error, refetch } = usePricingTable({ productDetails });
+  const products = excludeFreePlan
+    ? rawProducts?.filter((p) => !p.properties?.is_free)
+    : rawProducts;
 
   const hasRefetchedRef = useRef(false);
   const [isRefetching, setIsRefetching] = useState(false);
@@ -326,6 +333,13 @@ export const PricingCard = ({
                 </div>
               </h3>
             </div>
+            {!product.properties?.is_free && (
+              <div className="px-6 mb-4">
+                <div className="rounded-md bg-primary/10 text-primary border border-primary/20 px-3 py-2 text-sm font-semibold text-center">
+                  21-day free trial
+                </div>
+              </div>
+            )}
           </div>
           {showFeatures && featureItems.length > 0 && (
             <div className="flex-grow px-6 mb-6">

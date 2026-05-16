@@ -3,6 +3,12 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Check,
   Eye,
   CheckCircle2,
@@ -280,16 +286,27 @@ export function InlineCollectionDetail({
             {collection.displayName ?? collection.collectionName}
           </h3>
           <div className="flex items-center gap-1.5">
-            <span
-              className={cn(
-                'text-[10px] font-medium px-2.5 py-0.5 rounded-full',
-                isActive
-                  ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
-                  : 'bg-muted text-muted-foreground',
-              )}
-            >
-              {isActive ? t('inline.active') : t('inline.inactive')}
-            </span>
+            {isActive ? (
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-primary/15 text-primary ring-1 ring-primary/30 cursor-help focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {t('inline.active')}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs">
+                    {t('inline.activeTooltip')}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <span className="text-[10px] font-medium px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                {t('inline.inactive')}
+              </span>
+            )}
             <span className="text-[10px] font-medium bg-primary/10 text-primary px-2 py-0.5 rounded-full tabular-nums">
               {Math.round(progress)}%
             </span>
