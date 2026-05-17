@@ -238,15 +238,12 @@ export function LearningMode({
     setDeleteConfirmOpen(false);
     await state.handleDelete();
   }, [state]);
-  // Picks the same primary target language as the surface handler — duplicated
-  // here because this callback lives above the early returns (hook order)
-  // where `primaryTargetLanguage` isn't in scope yet.
+  // Card-level flag — the mutation flags every non-source-language
+  // translation on the card at once, so no per-language pick here.
   const handleConfirmFlag = useCallback(async () => {
     if (state.status !== 'reviewing') return;
-    const lang = state.translations.find((tr) => tr.isTargetLanguage)?.language;
-    if (!lang) return;
     setFlagConfirmOpen(false);
-    await state.handleFlag(lang);
+    await state.handleFlag();
   }, [state]);
   // Declared up here (above the early returns) so its `useCallback` keeps a
   // stable position in the hook list across loading → reviewing transitions.
@@ -360,19 +357,19 @@ export function LearningMode({
     ? (state.courseSettings.instantProceedFull ?? true)
     : (state.courseSettings.instantProceedAudio ?? false);
 
-  // The flag action targets a specific translation row. When a card has
-  // multiple target languages, default to the first one in the user's
-  // configured target-language order — same row the learner is primarily
-  // reviewing. Without a target translation, the flag action is hidden.
-  const primaryTargetLanguage = state.translations.find(
+  // Flagging acts at the card level — the mutation retranslates every
+  // non-source-language translation on the card. We hide the button when
+  // there's no target translation to display since "flag" makes little
+  // sense to the learner on a card they can't actually review.
+  const hasTargetTranslation = state.translations.some(
     (tr) => tr.isTargetLanguage,
-  )?.language;
+  );
   // Flag opens a confirmation dialog instead of firing immediately: the
   // action triggers a background retranslation that overwrites the
   // currently-displayed text, so we want an explicit confirm step. The
   // actual flag fires in `handleConfirmFlag` below; the card itself is
   // not deleted.
-  const handleFlagPrimary = primaryTargetLanguage
+  const handleFlagPrimary = hasTargetTranslation
     ? () => {
         audio.pause();
         setFlagConfirmOpen(true);

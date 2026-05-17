@@ -276,13 +276,10 @@ export function LibraryView({
   );
 
   // Flag opens a confirm dialog identical to LearningMode's: on confirm we
-  // fire the retranslation in the background. The card stays in the
-  // library — the new translation will land in-place when the worker
-  // finishes.
-  const [flagConfirmCard, setFlagConfirmCard] = useState<{
-    cardId: Id<'cards'>;
-    language: string;
-  } | null>(null);
+  // fire the retranslation in the background for every non-source-language
+  // translation on the card at once. The card stays in the library — the
+  // new translations land in-place when the worker finishes.
+  const [flagConfirmCardId, setFlagConfirmCardId] = useState<Id<'cards'> | null>(null);
   // Client-only session record of cards the viewer has flagged. Drives the
   // "Flagged" pill on each card row — purely local, never persisted, so it
   // doesn't leak to other users that someone flagged a row.
@@ -290,23 +287,21 @@ export function LibraryView({
     () => new Set(),
   );
   const handleConfirmFlag = useCallback(async () => {
-    const target = flagConfirmCard;
-    if (!target) return;
-    setFlagConfirmCard(null);
-    // Only mark the card as session-flagged when the mutation reports it
-    // did NOT trigger a retranslation. With a retranslation in flight, the
-    // server-driven "Retranslating" pill is the right signal — and once
-    // it lands, no pill (the flag has been acted on, nothing lingering).
-    flagTranslation({
-      cardId: target.cardId,
-      language: target.language,
-    })
+    const cardId = flagConfirmCardId;
+    if (!cardId) return;
+    setFlagConfirmCardId(null);
+    // Only mark the card as session-flagged when the mutation reports no
+    // retranslation was triggered (all non-source languages over-cap or
+    // claim-contested). With a retranslation in flight, the server-driven
+    // "Retranslating" pill is the right signal — and once it lands, no
+    // pill (the flag has been acted on, nothing lingering).
+    flagTranslation({ cardId })
       .then((result) => {
         if (result && result.retranslated === false) {
           setFlaggedCardIds((prev) => {
-            if (prev.has(target.cardId)) return prev;
+            if (prev.has(cardId)) return prev;
             const next = new Set(prev);
-            next.add(target.cardId);
+            next.add(cardId);
             return next;
           });
         }
@@ -314,7 +309,7 @@ export function LibraryView({
       .catch((error) =>
         console.error('Failed to flag translation:', error),
       );
-  }, [flagConfirmCard, flagTranslation]);
+  }, [flagConfirmCardId, flagTranslation]);
 
   const handleConfirmDelete = useCallback(async () => {
     const cardId = deletingCardId;
@@ -567,12 +562,15 @@ export function LibraryView({
                   onDelete={() => setDeletingCardId(card._id)}
                   onRegenerateAudio={() => handleRegenerateAudio(card._id)}
                   onFlag={(() => {
-                    const lang = card.translations.find(
+                    // Hide the flag affordance only when the card has no
+                    // target translation to display; the mutation itself
+                    // flags every non-source-language translation, so we
+                    // don't pick a specific language here.
+                    const hasTarget = card.translations.some(
                       (tr) => tr.isTargetLanguage,
-                    )?.language;
-                    if (!lang) return undefined;
-                    return () =>
-                      setFlagConfirmCard({ cardId: card._id, language: lang });
+                    );
+                    if (!hasTarget) return undefined;
+                    return () => setFlagConfirmCardId(card._id);
                   })()}
                   pinnedActions={pinnedCardActions}
                   onUpdatePinnedActions={
@@ -637,9 +635,9 @@ export function LibraryView({
       </AlertDialog>
 
       <AlertDialog
-        open={flagConfirmCard !== null}
+        open={flagConfirmCardId !== null}
         onOpenChange={(open) => {
-          if (!open) setFlagConfirmCard(null);
+          if (!open) setFlagConfirmCardId(null);
         }}
       >
         <AlertDialogContent>

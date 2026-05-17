@@ -116,6 +116,9 @@ export default function PricingTable({
       {products && (
         <PricingTableContainer
           products={products}
+          customerProducts={
+            (customer?.products ?? []) as CustomerProductLite[]
+          }
           isAnnualToggle={isAnnual}
           setIsAnnualToggle={setIsAnnual}
           multiInterval={multiInterval}
@@ -149,15 +152,30 @@ export default function PricingTable({
   );
 }
 
+// Minimal subset of Autumn's CustomerProduct that the badge-gating logic
+// needs. Avoids depending on the (non-exported) full CustomerProduct type;
+// the fields here match what `useCustomer().customer.products[number]` ships.
+// `is_default` marks Autumn's auto-assigned free plan that every customer
+// has — we need to ignore it when asking "has the user subscribed to
+// anything?".
+type CustomerProductLite = {
+  id: string;
+  status: string;
+  is_default: boolean;
+  is_add_on: boolean;
+};
+
 const PricingTableContext = createContext<{
   isAnnualToggle: boolean;
   setIsAnnualToggle: (isAnnual: boolean) => void;
   products: Product[];
+  customerProducts: CustomerProductLite[];
   showFeatures: boolean;
     }>({
       isAnnualToggle: false,
       setIsAnnualToggle: () => {},
       products: [],
+      customerProducts: [],
       showFeatures: true,
     });
 
@@ -174,6 +192,7 @@ export const usePricingTableContext = (componentName: string) => {
 export const PricingTableContainer = ({
   children,
   products,
+  customerProducts = [],
   showFeatures = true,
   className,
   isAnnualToggle,
@@ -182,6 +201,7 @@ export const PricingTableContainer = ({
 }: {
   children?: React.ReactNode;
   products?: Product[];
+  customerProducts?: CustomerProductLite[];
   showFeatures?: boolean;
   className?: string;
   isAnnualToggle: boolean;
@@ -201,7 +221,13 @@ export const PricingTableContainer = ({
   const hasRecommended = products?.some((p) => p.display?.recommend_text);
   return (
     <PricingTableContext.Provider
-      value={{ isAnnualToggle, setIsAnnualToggle, products, showFeatures }}
+      value={{
+        isAnnualToggle,
+        setIsAnnualToggle,
+        products,
+        customerProducts,
+        showFeatures,
+      }}
     >
       <div
         className={cn(
@@ -258,9 +284,21 @@ export const PricingCard = ({
 }: PricingCardProps) => {
   const t = useTranslations("Pricing");
   const tFeatures = useTranslations("Features");
-  const { products, showFeatures } = usePricingTableContext("PricingCard");
+  const { products, showFeatures, customerProducts } =
+    usePricingTableContext("PricingCard");
 
   const product = products.find((p) => p.id === productId);
+
+  // Trial badge gating: hide once the user has a real paid relationship,
+  // but keep showing it to trialing users so e.g. a Basic-trial customer
+  // can still start a Pro trial. `is_default: true` is Autumn's auto-
+  // assigned free plan, `is_add_on: true` is a bolt-on usage product —
+  // neither counts as a subscription. Trial entries (`status:
+  // "trialing"`) are skipped on purpose so trial-stacking stays open.
+  const userHasNonTrialSubscription = customerProducts.some(
+    (cp) =>
+      !cp.is_default && !cp.is_add_on && cp.status !== "trialing",
+  );
 
   if (!product) {
     throw new Error(`Product with id ${productId} not found`);
@@ -333,7 +371,22 @@ export const PricingCard = ({
                 </div>
               </h3>
             </div>
-            {!product.properties?.is_free && (
+            {/* Trial badge only when:
+                 - the product itself offers a trial,
+                 - this card is one the viewer can fresh-subscribe to
+                   (`scenario === "new"` — hides the badge on the card
+                   the viewer is already trialing or subscribed to), AND
+                 - the viewer has no committed paid plan (trials don't
+                   count, so a Basic-trial user can still see the Pro
+                   trial badge).
+                The extra `userHasNonTrialSubscription` guard is the
+                safety net: Autumn occasionally returns
+                `scenario === "new"` on the *other* card for paid users
+                (e.g. paid-Pro viewing Basic), which would otherwise
+                leak the trial promo. */}
+            {product.properties?.has_trial &&
+              product.scenario === "new" &&
+              !userHasNonTrialSubscription && (
               <div className="px-6 mb-4">
                 <div className="rounded-md bg-primary/10 text-primary border border-primary/20 px-3 py-2 text-sm font-semibold text-center">
                   21-day free trial

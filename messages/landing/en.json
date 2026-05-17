@@ -252,6 +252,7 @@
         "description": "Everything you need to learn one language.",
         "price": "€8",
         "period": "per month",
+        "trial": "21-day free trial",
         "cta": "Get Started",
         "features": {
           "sentences": "Unlimited ready-made sentences",
@@ -266,6 +267,7 @@
         "description": "For maximum flexibility and polyglots.",
         "price": "€16",
         "period": "per month",
+        "trial": "21-day free trial",
         "cta": "Get Started",
         "features": {
           "sentences": "Unlimited ready-made sentences",

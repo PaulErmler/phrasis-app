@@ -637,7 +637,6 @@ describe('LibraryView flag flow', () => {
 
     expect(flagTranslationFn).toHaveBeenCalledWith({
       cardId: 'c1',
-      language: 'en',
     });
     // The flag flow no longer deletes the user's card — the new translation
     // lands in-place when the worker finishes, so the row stays visible.

@@ -69,16 +69,11 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
       return { translations, audioRecordings, fullTargets, showRomanization: false };
     }
 
+    // Multi-language demo: 1 base + 2 targets, matching the Pro plan's
+    // "up to 3 languages per course" cap.
     const basePrimaryForMulti: CardTranslation = {
       language: primaryBaseLang,
       text: t('mock.base'),
-      isBaseLanguage: true,
-      isTargetLanguage: false,
-    };
-    const baseHindi: CardTranslation = {
-      language: 'hi',
-      text: t('mock.hi'),
-      romanization: t('mock.hiRoman'),
       isBaseLanguage: true,
       isTargetLanguage: false,
     };
@@ -95,7 +90,7 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
       isTargetLanguage: true,
     };
 
-    const translations = [basePrimaryForMulti, baseHindi, targetEs, targetFr];
+    const translations = [basePrimaryForMulti, targetEs, targetFr];
     const audioRecordings: CardAudioRecording[] = translations.map((tr) => ({
       language: tr.language,
       voiceName: null,
@@ -107,7 +102,7 @@ function useMockCard(t: ReturnType<typeof useTranslations>, multi: boolean) {
       { code: 'es', expected: t('mock.es'), typed: t('mock.typedEs') },
       { code: 'fr', expected: t('mock.fr'), typed: t('mock.typedFr') },
     ];
-    return { translations, audioRecordings, fullTargets, showRomanization: true };
+    return { translations, audioRecordings, fullTargets, showRomanization: false };
   }, [t, multi, primaryBaseLang]);
 }
 

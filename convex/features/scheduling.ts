@@ -1007,28 +1007,32 @@ export const toggleFavoriteCard = mutation({
 const FLAG_RETRANSLATION_MAX = FLAG_AUTO_RETRANSLATION_MAX;
 
 /**
- * Flag a card's translation in a specific target language as bad. Increments
- * `translations.flagCount` for the matching row. On flag counts 1 and 2 the
- * mutation enqueues a retranslation (`retranslation_high` for curriculum
- * texts, `retranslation_custom` for user-created texts) and deletes the
- * stale audio so a fresh TTS pass runs after the new text lands. Counts
- * 3+ still increment the counter (for later admin triage) but skip the
- * retranslation to bound cost — Pro-medium isn't cheap, and a row flagged
- * three times almost certainly needs human review rather than another
- * model retry.
+ * Flag a card as having bad translation content. The user sees a single
+ * "Flag" affordance on the card; we then increment `flagCount` on every
+ * non-source-language `translations` row for that card's text, and enqueue
+ * a retranslation for each one whose post-increment count is within
+ * `FLAG_RETRANSLATION_MAX` AND whose language is part of the user's
+ * course. Counts past the cap still increment the counter (for later
+ * admin triage) but skip the retranslation work to bound cost.
  *
- * Quota: one `translation_flags` unit is consumed only when the call
- * actually triggers a retranslation (claim acquired + count ≤ cap). Flags
- * that just bump the counter — out-of-cap retries and dedup-skipped claims
- * — are free.
+ * Routing per text: curriculum (premade-dataset) texts use
+ * `retranslation_high` (Pro-medium); user-created custom texts use
+ * `retranslation_custom` (Flash-Lite-high). All languages of the same
+ * text share the same rule because the rule depends on `text.userCreated`,
+ * which is a property of the text, not the translation.
+ *
+ * Quota: one `translation_flags` unit total per flag click, regardless of
+ * how many languages were retranslated. Charged on the first language
+ * that successfully claims a slot; not charged at all if every language
+ * was over-cap or claim-contested. If `consumeQuota` throws USAGE_LIMIT,
+ * the whole mutation rolls back — counters and any prior claim/audio
+ * deletion are reverted.
  */
 export const flagTranslation = mutation({
   args: {
     cardId: v.id('cards'),
-    language: v.string(),
   },
   returns: v.object({
-    flagCount: v.number(),
     retranslated: v.boolean(),
   }),
   handler: async (ctx, args) => {
@@ -1037,113 +1041,132 @@ export const flagTranslation = mutation({
     const text = await ctx.db.get(card.textId);
     if (!text) throw new ConvexError('Text not found');
 
-    if (args.language === text.language) {
-      // Source-language flagging would need a separate counter on `texts`;
-      // out of scope for this iteration.
-      throw new ConvexError({
-        code: 'SOURCE_LANGUAGE_NOT_FLAGGABLE',
-        message: 'Flagging the source language is not supported.',
-      });
+    // Languages we need translations for: every base + target language in
+    // the user's course except the source. Dedupe in case a language is
+    // both base and target (unusual but possible). Fetching this exact
+    // set via the `by_text_and_language` index lets us skip orphan
+    // translation rows that may exist for languages the user has since
+    // removed from their course — we shouldn't bump flagCount on those.
+    const cardLanguages = Array.from(
+      new Set([...course.baseLanguages, ...course.targetLanguages]),
+    ).filter((lang) => lang !== text.language);
+
+    if (cardLanguages.length === 0) {
+      return { retranslated: false };
     }
 
-    // Flagging is a per-course user action — refuse languages that aren't
-    // part of the active course so quota can't be spent on translation rows
-    // the user doesn't actually study.
-    if (
-      !course.targetLanguages.includes(args.language) &&
-      !course.baseLanguages.includes(args.language)
-    ) {
-      throw new ConvexError({
-        code: 'LANGUAGE_NOT_IN_COURSE',
-        message: `Language "${args.language}" is not part of the active course.`,
-      });
-    }
-
-    const row = await ctx.db
-      .query('translations')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', card.textId).eq('targetLanguage', args.language),
-      )
-      .first();
-    if (!row) {
-      throw new ConvexError({
-        code: 'TRANSLATION_NOT_FOUND',
-        message: `No translation exists for language "${args.language}".`,
-      });
-    }
-
-    const nextCount = (row.flagCount ?? 0) + 1;
-    await ctx.db.patch(row._id, { flagCount: nextCount });
-
-    // Flag counts past the cap are still recorded (for admin triage) but
-    // don't trigger any backend work — no retranslation, no quota charge.
-    if (nextCount > FLAG_RETRANSLATION_MAX) {
-      return { flagCount: nextCount, retranslated: false };
-    }
-
-    // Claim the (textId, language) slot atomically. If another retranslation
-    // (or scheduleMissingContent) is already in flight for this row, skip
-    // enqueueing — the counter still reflects the flag, and we don't bill
-    // the user for a no-op.
-    const claimed = await claimLlmTranslationIfAvailable(
-      ctx,
-      card.textId,
-      args.language,
+    // Parallel indexed reads — one per language, each O(1) via the
+    // composite index. Faster than a single `by_textId` collect + JS
+    // filter when only a subset of the text's translations matter.
+    const fetched = await Promise.all(
+      cardLanguages.map((lang) =>
+        ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', card.textId).eq('targetLanguage', lang),
+          )
+          .first(),
+      ),
     );
-    if (!claimed) {
-      return { flagCount: nextCount, retranslated: false };
+
+    // Drop languages with no translation row (the card simply doesn't
+    // have a translation in that language yet — nothing to flag).
+    const nonSourceTranslations = fetched.filter(
+      (tr): tr is NonNullable<typeof tr> => tr !== null,
+    );
+
+    if (nonSourceTranslations.length === 0) {
+      return { retranslated: false };
     }
 
-    // Only bill the quota once we know the call will actually enqueue a
-    // retranslation. If `consumeQuota` throws USAGE_LIMIT, the surrounding
-    // Convex transaction rolls back the flagCount patch and the claim
-    // insert — so the user neither pays nor moves the counter.
-    await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
-
-    // The new translation will likely differ from the current text, so any
-    // existing audio for this language is stale. Drop it now and let the
-    // worker's storeTranslationAndScheduleTTS path regenerate it on success.
-    // Mirrors the edit-card audio cleanup at the bottom of `editCard`.
-    const audioRows = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', card.textId).eq('language', args.language),
-      )
-      .take(10);
-    for (const audioRow of audioRows) {
-      await ctx.db.delete(audioRow._id);
+    // 1) Increment flagCount on every non-source translation. Done up front
+    // so a quota failure later in the mutation cleanly rolls back every
+    // counter via the surrounding transaction.
+    for (const tr of nonSourceTranslations) {
+      await ctx.db.patch(tr._id, {
+        flagCount: (tr.flagCount ?? 0) + 1,
+      });
     }
 
-    // Curriculum (premade-dataset) texts route to Pro-medium for a
-    // cross-model second opinion; user-created custom texts route to
-    // Flash-Lite-high (cheaper, since the heavyweight Pro adds less value
-    // on user-generated content). Both rules share the same worker
-    // semantics — `replaceExisting` + `<previous_translation>` prompt block.
+    // 2) Filter to the rows that are still under-cap post-increment.
+    // Over-cap rows already had their counter bumped above but skip the
+    // enqueue + quota path. All rows are guaranteed in-course because we
+    // fetched from the course's language set above.
+    const enqueueable = nonSourceTranslations.filter((tr) => {
+      const nextCount = (tr.flagCount ?? 0) + 1; // pre-patch + 1 = post-patch
+      return nextCount <= FLAG_RETRANSLATION_MAX;
+    });
+
+    if (enqueueable.length === 0) {
+      // Everything was over-cap or out-of-course. Counters incremented, no
+      // quota charge, no retranslations.
+      return { retranslated: false };
+    }
+
+    // Curriculum vs custom routing — depends on `text.userCreated`, not
+    // on the target language, so the rule is fixed for the whole card.
     const ruleOverride = text.userCreated
       ? 'retranslation_custom'
       : 'retranslation_high';
 
-    await ctx.runMutation(
-      internal.features.llmTranslationQueue.enqueueLlmTranslation,
-      {
-        args: {
-          textId: card.textId,
-          sourceLanguage: text.language,
-          targetLanguage: args.language,
-          text: text.text,
-          audioSpeakerGender: text.audioSpeakerGender,
-          ruleOverride,
-          // Deliberate retranslation — overwrite the existing translation
-          // row (and its romanization). Without this, the worker would
-          // regenerate audio against the new translation but the displayed
-          // text would stay on the old translation.
-          replaceExisting: true,
-        },
-        priority: 1,
-      },
-    );
+    // 3) Per-language: claim slot, charge quota on first success only,
+    // delete stale audio, enqueue retranslation. Claim-contested rows
+    // skip silently (something else is already retranslating them).
+    let anyEnqueued = false;
+    let quotaCharged = false;
 
-    return { flagCount: nextCount, retranslated: true };
+    for (const tr of enqueueable) {
+      const lang = tr.targetLanguage;
+
+      const claimed = await claimLlmTranslationIfAvailable(
+        ctx,
+        card.textId,
+        lang,
+      );
+      if (!claimed) continue;
+
+      // Charge quota once total — on the first successful claim. If the
+      // user is depleted, this throws USAGE_LIMIT and the whole mutation
+      // rolls back (counters, claim row, audio deletes).
+      if (!quotaCharged) {
+        await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
+        quotaCharged = true;
+      }
+
+      // The new translation will likely differ from the current text, so
+      // existing audio for this language is stale. Drop it; the worker's
+      // storeTranslationAndScheduleTTS path regenerates after the LLM lands.
+      const audioRows = await ctx.db
+        .query('audioRecordings')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', card.textId).eq('language', lang),
+        )
+        .take(10);
+      for (const audioRow of audioRows) {
+        await ctx.db.delete(audioRow._id);
+      }
+
+      await ctx.runMutation(
+        internal.features.llmTranslationQueue.enqueueLlmTranslation,
+        {
+          args: {
+            textId: card.textId,
+            sourceLanguage: text.language,
+            targetLanguage: lang,
+            text: text.text,
+            audioSpeakerGender: text.audioSpeakerGender,
+            ruleOverride,
+            // Deliberate retranslation — overwrite the existing translation
+            // row (and its romanization) once the LLM lands.
+            replaceExisting: true,
+          },
+          priority: 1,
+        },
+      );
+      anyEnqueued = true;
+    }
+
+    return { retranslated: anyEnqueued };
   },
 });
 

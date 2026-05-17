@@ -1649,9 +1649,8 @@ describe("features/scheduling", () => {
 
       const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
-        language: "en",
       });
-      expect(res).toEqual({ flagCount: 1, retranslated: true });
+      expect(res).toEqual({ retranslated: true });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(1);
@@ -1668,10 +1667,8 @@ describe("features/scheduling", () => {
       expect(audioRows).toHaveLength(0);
 
       // Queue row inserted with the retranslation_high override + priority 1.
-      // `replaceExisting: true` is the bug-fix bit: without it,
-      // storeTranslationAndScheduleTTS would only patch metadata on the
-      // existing row, so the audio would regenerate against the new
-      // translation but the displayed text would stay on the old one.
+      // `replaceExisting: true` ensures storeTranslationAndScheduleTTS will
+      // overwrite the existing translatedText when the LLM lands.
       const queueRows = await t.run(async (ctx) =>
         ctx.db.query("llmTranslationQueue").collect(),
       );
@@ -1681,7 +1678,8 @@ describe("features/scheduling", () => {
       expect(queueRows[0].args.targetLanguage).toBe("en");
       expect(queueRows[0].priority).toBe(1);
 
-      // Quota debited by exactly 1.
+      // Quota debited by exactly 1 — single charge per flag click,
+      // regardless of how many languages got retranslated.
       const quota = await t.run(async (ctx) =>
         ctx.db
           .query("usageQuotas")
@@ -1701,9 +1699,8 @@ describe("features/scheduling", () => {
 
       const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
-        language: "en",
       });
-      expect(res).toEqual({ flagCount: 1, retranslated: true });
+      expect(res).toEqual({ retranslated: true });
 
       const queueRows = await t.run(async (ctx) =>
         ctx.db.query("llmTranslationQueue").collect(),
@@ -1712,6 +1709,110 @@ describe("features/scheduling", () => {
       expect(queueRows[0].args.ruleOverride).toBe("retranslation_custom");
       expect(queueRows[0].args.replaceExisting).toBe(true);
       expect(queueRows[0].args.targetLanguage).toBe("en");
+    });
+
+    it("flags every non-source-language translation at once, single quota charge", async () => {
+      // Card with translations in two non-source languages. The mutation
+      // should retranslate BOTH but only charge quota once.
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en", "fr"],
+          targetLanguages: ["es"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const deckId = await ctx.db.insert("decks", {
+          courseId,
+          name: "d",
+          cardCount: 1,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hola mundo",
+          language: "es",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "en",
+          translatedText: "Hello world",
+        });
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "fr",
+          translatedText: "Bonjour le monde",
+        });
+        const cardId = await ctx.db.insert("cards", {
+          deckId,
+          textId,
+          collectionId,
+          dueDate: Date.now() - 1000,
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            translation_flags: {
+              balance: 10,
+              included: 10,
+              used: 0,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+        return { cardId, textId };
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
+      expect(res).toEqual({ retranslated: true });
+
+      // Both translation rows got their flagCount bumped.
+      const translations = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_textId", (q) => q.eq("textId", textId))
+          .collect(),
+      );
+      expect(translations).toHaveLength(2);
+      for (const tr of translations) {
+        expect(tr.flagCount).toBe(1);
+      }
+
+      // Both languages got a queue row.
+      const queueRows = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationQueue").collect(),
+      );
+      expect(queueRows).toHaveLength(2);
+      const enqueuedLangs = queueRows
+        .map((r) => r.args.targetLanguage)
+        .sort();
+      expect(enqueuedLangs).toEqual(["en", "fr"]);
+
+      // Single quota charge regardless of language count.
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.translation_flags.balance).toBe(9);
     });
 
     it("over-cap flag only increments counter — no enqueue, no charge", async () => {
@@ -1726,9 +1827,8 @@ describe("features/scheduling", () => {
 
       const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
-        language: "en",
       });
-      expect(res).toEqual({ flagCount: 3, retranslated: false });
+      expect(res).toEqual({ retranslated: false });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(3);
@@ -1748,31 +1848,6 @@ describe("features/scheduling", () => {
       expect(quota?.features.translation_flags.balance).toBe(10);
     });
 
-    it("refuses to flag the source language", async () => {
-      const t = convexTest(schema, modules);
-      const { cardId } = await seedFlaggableCard(t);
-      const asUser = t.withIdentity({ subject: "user_A" });
-      // The seeded text has `language: 'es'` — flagging "es" must reject.
-      await expect(
-        asUser.mutation(api.features.scheduling.flagTranslation, {
-          cardId,
-          language: "es",
-        }),
-      ).rejects.toThrow(/source language/i);
-    });
-
-    it("refuses to flag a language that isn't in the course", async () => {
-      const t = convexTest(schema, modules);
-      const { cardId } = await seedFlaggableCard(t);
-      const asUser = t.withIdentity({ subject: "user_A" });
-      await expect(
-        asUser.mutation(api.features.scheduling.flagTranslation, {
-          cardId,
-          language: "fr",
-        }),
-      ).rejects.toThrow(/not part of the active course/i);
-    });
-
     it("when claim is already held, increments counter but skips enqueue and charge", async () => {
       const t = convexTest(schema, modules);
       const { cardId, textId, translationId } = await seedFlaggableCard(t);
@@ -1789,9 +1864,8 @@ describe("features/scheduling", () => {
 
       const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
-        language: "en",
       });
-      expect(res).toEqual({ flagCount: 1, retranslated: false });
+      expect(res).toEqual({ retranslated: false });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(1);
@@ -1820,7 +1894,6 @@ describe("features/scheduling", () => {
       await expect(
         asUser.mutation(api.features.scheduling.flagTranslation, {
           cardId,
-          language: "en",
         }),
       ).rejects.toThrow();
 

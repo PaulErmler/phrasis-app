@@ -9,7 +9,13 @@ export const getPricingTableContent = (
   const { scenario, properties } = product;
   const { is_one_off, updateable, has_trial } = properties;
 
-  if (has_trial) {
+  // "Start free trial" applies only when the user can fresh-subscribe to
+  // this product (`scenario === 'new'`). Without this scenario check, a
+  // user already on Basic or Pro would see "Start free trial" on the card
+  // for their (or any) plan; Autumn instead surfaces a scenario like
+  // "active" / "upgrade" / "downgrade" in those cases, which the switch
+  // below maps to the correct CTA.
+  if (has_trial && scenario === "new") {
     return {
       buttonText: t("startFreeTrial"),
     };

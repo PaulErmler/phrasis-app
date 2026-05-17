@@ -252,6 +252,7 @@
         "description": "Alles was du brauchst, um eine Sprache zu lernen.",
         "price": "8€",
         "period": "pro Monat",
+        "trial": "21 Tage kostenlos testen",
         "cta": "Jetzt starten",
         "features": {
           "sentences": "Unbegrenzt viele vorgefertigte Sätze",
@@ -266,6 +267,7 @@
         "description": "Für maximale Flexibilität und Polyglotte.",
         "price": "16€",
         "period": "pro Monat",
+        "trial": "21 Tage kostenlos testen",
         "cta": "Jetzt starten",
         "features": {
           "sentences": "Unbegrenzt viele vorgefertigte Sätze",

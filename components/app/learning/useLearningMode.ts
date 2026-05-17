@@ -176,13 +176,13 @@ interface ReviewingState extends BaseState {
   handleFavorite: () => void;
   handleDelete: () => Promise<void>;
   /**
-   * Flag a translation as bad. Fires the `flagTranslation` mutation
-   * (which increments `flagCount` and enqueues the background retranslation)
-   * and otherwise leaves the card alone — no deletion, no exit animation,
-   * no advance to the next card. The user stays on the card; they can
-   * press next themselves when ready.
+   * Flag the card. Fires the `flagTranslation` mutation, which increments
+   * `flagCount` and enqueues a background retranslation for EVERY
+   * non-source-language translation on the card at once (base + target).
+   * The card itself isn't deleted, animated out, or advanced — the user
+   * stays put and can press next when ready.
    */
-  handleFlag: (language: string) => Promise<void>;
+  handleFlag: () => Promise<void>;
   handleRegenerateAudio: () => Promise<void>;
   handleUpdatePinnedActions: (actions: readonly string[]) => Promise<void>;
   handleNext: (ratingOverride?: ReviewRating, accuracy?: number) => void;
@@ -809,36 +809,32 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // otherwise leaves the card alone — no deletion, no exit animation, no
   // automatic advance. The user stays on the card and can press next when
   // they're ready; the new translation may arrive in-place as it lands.
-  const handleFlag = useCallback(
-    async (language: string) => {
-      if (!cardForReview || isReviewing) return;
-      const flaggedCardId = cardForReview._id;
-      // Fire-and-forget. Mark the card as session-flagged ONLY when the
-      // mutation reports it didn't trigger a retranslation — i.e. an
-      // over-cap flag or a claim-contested call. When a retranslation IS
-      // in flight, the server-driven `retranslating` pill handles the
-      // signal, and once it lands we want NO pill (don't lingeringly
-      // tag a card as "Flagged" after the system actually fixed it).
-      flagTranslationMutation({
-        cardId: cardForReview._id,
-        language,
+  const handleFlag = useCallback(async () => {
+    if (!cardForReview || isReviewing) return;
+    const flaggedCardId = cardForReview._id;
+    // Fire-and-forget. Mark the card as session-flagged ONLY when the
+    // mutation reports it didn't trigger ANY retranslation — i.e. all
+    // non-source languages were either over-cap or claim-contested. When
+    // a retranslation IS in flight, the server-driven `retranslating`
+    // pill handles the signal, and once it lands we want NO pill (don't
+    // lingeringly tag a card as "Flagged" after the system fixed it).
+    flagTranslationMutation({
+      cardId: cardForReview._id,
+    })
+      .then((result) => {
+        if (result && result.retranslated === false) {
+          setFlaggedCardIds((prev) => {
+            if (prev.has(flaggedCardId)) return prev;
+            const next = new Set(prev);
+            next.add(flaggedCardId);
+            return next;
+          });
+        }
       })
-        .then((result) => {
-          if (result && result.retranslated === false) {
-            setFlaggedCardIds((prev) => {
-              if (prev.has(flaggedCardId)) return prev;
-              const next = new Set(prev);
-              next.add(flaggedCardId);
-              return next;
-            });
-          }
-        })
-        .catch((error) => {
-          console.error('Failed to flag translation:', error);
-        });
-    },
-    [cardForReview, isReviewing, flagTranslationMutation],
-  );
+      .catch((error) => {
+        console.error('Failed to flag translation:', error);
+      });
+  }, [cardForReview, isReviewing, flagTranslationMutation]);
 
   const handleRegenerateAudio = useCallback(async () => {
     if (!cardForReview) return;
