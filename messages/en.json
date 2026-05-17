@@ -120,6 +120,9 @@
       "filterHidden": "Hidden",
       "filterFavorites": "Favorites",
       "filtersLabel": "Filters",
+      "sourceLabel": "Source",
+      "filterCustom": "Custom",
+      "filterPremade": "Premade",
       "emptyTitle": "No sentences yet",
       "emptyDescription": "Add sentences from a collection to start building your library.",
       "emptySearchTitle": "No results",
@@ -337,7 +340,7 @@
     "fullReview": "Full Review",
     "audioReview": "Audio Review",
     "learnNew": "Learn New",
-    "learnAndReview": "Review & Learn",
+    "learnAndReview": "Learn & Review",
     "radioMode": "Radio",
     "radioRequiresCards": "Add some cards before starting Radio mode.",
     "contentFilter": {
@@ -356,6 +359,7 @@
       "streak": "Streak",
       "reps": "Reps",
       "sentences": "Sentences",
+      "words": "Words",
       "time": "Time",
       "today": "today",
       "new": "new"
@@ -389,6 +393,19 @@
       "unhide": "Unhide",
       "edit": "Edit",
       "delete": "Delete",
+      "flag": "Flag translation",
+      "flagConfirmTitle": "Flag this translation?",
+      "flagConfirmDescription": "We will review this translation. The card will be excluded from your study.",
+      "flagConfirmConfirm": "Flag and remove",
+      "flagConfirmCancel": "Cancel",
+      "regenerateAudio": "Regenerate audio",
+      "pinToCard": "Pin {label} to card",
+      "unpinFromCard": "Unpin {label} from card",
+      "pinMaxReached": "You can pin up to {max} actions — unpin one first",
+      "quotaExhausted": "{label} — monthly limit reached",
+      "quotaLow": "{label} — {count} left this month",
+      "quotaBadgeZero": "0 left",
+      "quotaBadgeLeft": "{count} left",
       "deleteConfirmTitle": "Delete this card permanently?",
       "deleteConfirmDescription": "This will remove the card from your deck permanently.",
       "deleteConfirmConfirm": "Delete permanently",
@@ -679,6 +696,12 @@
     },
     "translationAutoFill": {
       "name": "translation auto-fill"
+    },
+    "audioRegenerations": {
+      "name": "audio regenerations"
+    },
+    "translationFlags": {
+      "name": "translation flags"
     },
     "detailedStatistics": {
       "name": "detailed statistics",
@@ -1151,7 +1174,7 @@
         "description": "Picks fresh sentences you haven't seen yet — perfect when you want to grow your vocabulary."
       },
       "learnAndReview": {
-        "title": "Review + Learn",
+        "title": "Learn + Review",
         "description": "Mixes new sentences with cards due for spaced repetition, so you keep what you've learned while picking up more."
       },
       "radioMode": {

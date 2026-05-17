@@ -112,9 +112,16 @@ export async function recordReviewStats(
   });
 
   // --- Daily stats ---
+  // `dailyReviewsToday` here is the non-radio review count (audio + full) so
+  // that radio plays don't inflate the celebration milestone or the in-learn
+  // progress bar. `repsAfter` (total reps incl. radio) is intentionally unused.
+  // Default to 'audio' when the caller omits a mode — this path is the
+  // active-review path (radio uses `recordRadioPlayStats`), so the review
+  // must count toward `reviewsByMode.audio`/`full` for the milestone math.
+  const reviewModeForStats = args.reviewMode ?? 'audio';
   const {
     isFirstActivityToday,
-    repsAfter: dailyReviewsToday,
+    activeReviewsAfter: dailyReviewsToday,
     timeMsAfter: dailyTimeMsToday,
   } = await upsertDailyStats(ctx, {
     userId,
@@ -122,7 +129,7 @@ export async function recordReviewStats(
     date: todayDate,
     timeMs: clampedTime,
     isNewCard: isFirstReview,
-    reviewMode: args.reviewMode,
+    reviewMode: reviewModeForStats,
     rating: args.rating,
     accuracy: args.accuracy,
     wasDefaultRating: args.wasDefaultRating,

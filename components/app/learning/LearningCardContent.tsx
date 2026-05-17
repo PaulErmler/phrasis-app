@@ -10,6 +10,7 @@ import { useButtonPlayback } from '@/hooks/use-button-playback';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import type { CardTranslation, CardAudioRecording } from './types';
+import type { PinnableCardAction } from '@/lib/cardActions';
 
 interface LearningCardContentProps {
   preReviewCount: number;
@@ -29,6 +30,12 @@ interface LearningCardContentProps {
   onFavorite: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onFlag?: () => void;
+  onRegenerateAudio?: () => void;
+  pinnedActions?: readonly string[];
+  onUpdatePinnedActions?: (actions: PinnableCardAction[]) => void;
+  /** Per-action quota state forwarded to CardActionsMenu. */
+  quotaState?: import('./CardActionsMenu').CardActionsMenuProps['quotaState'];
   onAudioPlay?: () => void;
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
@@ -79,6 +86,11 @@ export function LearningCardContent({
   onFavorite,
   onEdit,
   onDelete,
+  onFlag,
+  onRegenerateAudio,
+  pinnedActions,
+  onUpdatePinnedActions,
+  quotaState,
   onAudioPlay,
   hideTargetLanguages = false,
   autoRevealLanguages = false,
@@ -188,6 +200,11 @@ export function LearningCardContent({
         onFavorite={onFavorite}
         onEdit={onEdit}
         onDelete={onDelete}
+        onFlag={onFlag}
+        onRegenerateAudio={onRegenerateAudio}
+        pinnedActions={pinnedActions}
+        onUpdatePinnedActions={onUpdatePinnedActions}
+        quotaState={quotaState}
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}

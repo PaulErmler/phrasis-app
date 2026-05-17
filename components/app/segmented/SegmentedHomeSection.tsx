@@ -295,8 +295,9 @@ function GroupedLevelRail({
       // the top (overflow-x-auto clips vertically too). pb-5 gives breathing
       // room between the chips and the horizontal scrollbar on platforms
       // where the scrollbar is rendered despite our hide hints (Safari, some
-      // touch surfaces). -mx-4 + px-4 lets the rail bleed to viewport edges.
-      className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // touch surfaces). -mx-3 + px-3 lets the rail bleed to the edges of the
+      // wrapping collections card (which has p-3).
+      className="-mx-3 flex gap-3 overflow-x-auto px-3 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {groups.map((g) => {
         const total = g.levels.reduce((acc, l) => acc + l.totalTexts, 0);
@@ -643,8 +644,9 @@ function CustomChipRail({
     <div
       ref={railRef}
       // Same headroom math as GroupedLevelRail so the focused ring isn't
-      // clipped by overflow-x-auto.
-      className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // clipped by overflow-x-auto. -mx-3 + px-3 bleeds to the wrapping
+      // collections-card edges (p-3 in HomeView).
+      className="-mx-3 flex gap-3 overflow-x-auto px-3 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <div className="flex shrink-0 flex-col gap-1.5">
         {/* Invisible spacer — mirrors the band-header row in
@@ -866,7 +868,7 @@ function SegmentedSkeleton() {
         <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
         <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
       </div>
-      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-5">
+      <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pt-2 pb-5">
         {Array.from({ length: 7 }).map((_, i) => (
           <div key={i} className="flex shrink-0 flex-col gap-1.5">
             <div className="h-3 w-16 animate-pulse rounded bg-muted" />

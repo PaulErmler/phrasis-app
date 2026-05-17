@@ -23,6 +23,7 @@ import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
 import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { Id } from '@/convex/_generated/dataModel';
+import type { PinnableCardAction } from '@/lib/cardActions';
 
 type TargetAudioMode = 'always' | 'afterSubmit' | 'never';
 
@@ -47,6 +48,12 @@ interface FullReviewCardContentProps {
   onFavorite: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onFlag?: () => void;
+  onRegenerateAudio?: () => void;
+  pinnedActions?: readonly string[];
+  onUpdatePinnedActions?: (actions: PinnableCardAction[]) => void;
+  /** Per-action quota state forwarded to CardActionsMenu. */
+  quotaState?: import('./CardActionsMenu').CardActionsMenuProps['quotaState'];
   onAudioPlay?: () => void;
   targetAudioMode: TargetAudioMode;
   allRevealed?: boolean;
@@ -91,6 +98,11 @@ export function FullReviewCardContent({
   onFavorite,
   onEdit,
   onDelete,
+  onFlag,
+  onRegenerateAudio,
+  pinnedActions,
+  onUpdatePinnedActions,
+  quotaState,
   onAudioPlay,
   targetAudioMode,
   allRevealed = false,
@@ -379,6 +391,11 @@ export function FullReviewCardContent({
         onFavorite={onFavorite}
         onEdit={onEdit}
         onDelete={onDelete}
+        onFlag={onFlag}
+        onRegenerateAudio={onRegenerateAudio}
+        pinnedActions={pinnedActions}
+        onUpdatePinnedActions={onUpdatePinnedActions}
+        quotaState={quotaState}
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}

@@ -5,12 +5,13 @@ import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AudioButton } from './AudioButton';
-import { CardActionsMenu } from './CardActionsMenu';
+import { CardActionsMenu, type CardActionsMenuProps } from './CardActionsMenu';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
+import type { PinnableCardAction } from '@/lib/cardActions';
 
 interface CardShellProps {
   reviewCount: number;
@@ -27,6 +28,12 @@ interface CardShellProps {
   onFavorite: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onFlag?: () => void;
+  onRegenerateAudio?: () => void;
+  pinnedActions?: readonly string[];
+  onUpdatePinnedActions?: (actions: PinnableCardAction[]) => void;
+  /** Per-action quota state for the action menu (Edit / Regenerate / Flag). */
+  quotaState?: CardActionsMenuProps['quotaState'];
   onAudioPlay?: () => void;
   bare?: boolean;
   showRomanization?: boolean;
@@ -67,6 +74,11 @@ export function CardShell({
   onFavorite,
   onEdit,
   onDelete,
+  onFlag,
+  onRegenerateAudio,
+  pinnedActions,
+  onUpdatePinnedActions,
+  quotaState,
   onAudioPlay,
   bare = false,
   showRomanization = true,
@@ -104,6 +116,11 @@ export function CardShell({
           onHide={onHide}
           onEdit={onEdit}
           onDelete={onDelete}
+          onFlag={onFlag}
+          onRegenerateAudio={onRegenerateAudio}
+          pinnedActions={pinnedActions}
+          onUpdatePinnedActions={onUpdatePinnedActions}
+          quotaState={quotaState}
         />
       </div>
 

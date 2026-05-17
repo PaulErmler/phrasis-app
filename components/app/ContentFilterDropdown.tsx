@@ -37,7 +37,7 @@ export function ContentFilterDropdown() {
     // Same-width placeholder so the surrounding flex row doesn't jump when
     // the query resolves.
     return (
-      <div className="flex items-center justify-end gap-2 pt-1">
+      <div className="flex items-center justify-end gap-2">
         <div
           className="h-7 animate-pulse rounded-md bg-muted"
           style={FIXED_TRIGGER_WIDTH}
@@ -59,7 +59,7 @@ export function ContentFilterDropdown() {
 
   return (
     <div
-      className="flex items-center justify-end gap-2 pt-1"
+      className="flex items-center justify-end gap-2"
       data-testid="content-filter-dropdown"
       data-tutorial="content-source-filter"
     >

@@ -177,7 +177,7 @@
 @layer components {
   /* Layout */
   .sticky-header {
-    @apply sticky top-0 z-10 border-b bg-background;
+    @apply sticky top-0 z-10 border-b bg-background pt-[env(safe-area-inset-top)];
   }
   .header-bar {
     @apply container mx-auto px-4 h-14 flex items-center justify-between;
@@ -232,7 +232,7 @@
 
   /* Sheet / panel layout */
   .sheet-header {
-    @apply sticky top-0 z-10 border-b bg-background px-4 h-14 flex items-center justify-between;
+    @apply sticky top-0 z-10 border-b bg-background px-4 min-h-14 flex items-center justify-between pt-[env(safe-area-inset-top)];
   }
   .sheet-body {
     @apply flex-1 overflow-y-auto px-4 py-6;

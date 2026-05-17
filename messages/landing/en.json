@@ -272,7 +272,7 @@
           "customSentences": "1,000 custom sentences per month",
           "courses": "Up to 10 courses",
           "chatMessages": "400 chat messages per month",
-          "multipleLanguages": "Up to 5 languages per course",
+          "multipleLanguages": "Up to 3 languages per course",
           "detailedStatistics": "Detailed statistics"
         }
       }
@@ -340,7 +340,7 @@
       {
         "question": "What languages does Flexling support?",
         "answer": [
-          "You can learn the following languages in Flexling: English (with UK, US, Australian, and mixed-accent variants), Spanish (Spain, Latin America, and a mixed Spain + LatAm variant), French, German, Italian, Romanian, Portuguese (Brazil), Dutch, Swedish, Norwegian (Bokmål), Danish, Finnish, Greek, Polish, Czech, Slovak, Hungarian, Russian, Hindi, Bengali, Hebrew, Turkish, Arabic (Modern Standard plus Saudi, Egyptian, and Iraqi dialects), Chinese (Simplified and Traditional), Cantonese (simplified and traditional script), Japanese, Korean, Vietnamese, Thai, Indonesian, and Swahili (Kenya and Tanzania) — with more languages being added regularly.",
+          "You can learn the following languages in Flexling: English (with UK, US, Australian, and mixed-accent variants), Spanish (Spain, Latin America, and a mixed Spain + Latin America variant), French, German, Italian, Romanian, Portuguese (Brazil), Dutch, Swedish, Norwegian (Bokmål), Danish, Finnish, Greek, Polish, Czech, Slovak, Hungarian, Russian, Hindi, Bengali, Hebrew, Turkish, Arabic (Modern Standard plus Saudi, Egyptian, and Iraqi dialects), Chinese (Simplified and Traditional), Cantonese (Simplified and Traditional), Japanese, Korean, Vietnamese, Thai, Indonesian, and Swahili (Kenya and Tanzania) — with more languages being added regularly.",
           "Is your language not supported? Let us know and we will try to prioritize it."
         ]
       },

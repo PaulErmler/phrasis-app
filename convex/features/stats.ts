@@ -866,31 +866,6 @@ export const getCardCounts = query({
   },
 });
 
-/**
- * Today's review count for the active course, so the in-learn progress bar can
- * reflect actual progress on page load rather than waiting for the first
- * mutation response.
- */
-export const getTodayReviewCount = query({
-  args: { timezone: v.string() },
-  returns: v.number(),
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return 0;
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return 0;
-
-    const today = getTodayInTimezone(args.timezone);
-    const stats = await ctx.db
-      .query('dailyStats')
-      .withIndex('by_userId_and_courseId_and_date', (q) =>
-        q.eq('userId', userId).eq('courseId', active.course._id).eq('date', today),
-      )
-      .unique();
-    return stats?.reps ?? 0;
-  },
-});
-
 // `Intl.DateTimeFormat` construction is non-trivial (~100 µs); cache one
 // instance per timezone for the celebration query, which runs on a hot path
 // during the milestone burst.

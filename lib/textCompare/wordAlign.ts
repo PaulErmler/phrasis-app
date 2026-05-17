@@ -4,8 +4,13 @@ import { damerauLevenshtein } from './editDistance';
 
 export type WordTag = 'equal' | 'typo' | 'wrong' | 'missing' | 'extra';
 
+export type AlignedKind = 'word' | 'punct';
+
 export interface AlignedWord {
   tag: WordTag;
+  /** Whether this entry represents a word token or a punctuation token.
+   * Punctuation is shown in the diff but excluded from accuracy scoring. */
+  kind: AlignedKind;
   /** The expected word (or '' for `extra`). Original surface form. */
   expected: string;
   /** The user's word (or '' for `missing`). Original surface form. */
@@ -26,24 +31,42 @@ const COST_EQUAL = 0;
 const COST_TYPO = 0.4;
 const COST_DIFF = 1; // substitute
 const COST_GAP = 1; // insert/delete
+// Prohibitive cost forces the DP to gap rather than pair a word with a
+// punctuation mark — otherwise we'd get nonsensical alignments like "Test" ↔ ".".
+const COST_CROSS_KIND = 1000;
 
 interface WordToken {
   raw: string;
   norm: string;
   graphemes: string[];
+  isPunct: boolean;
 }
 
 function tokenize(input: string, opts: WordAlignOptions): WordToken[] {
   const locale = opts.locale ?? 'en';
   const tokens: WordToken[] = [];
   for (const seg of segmentWords(input, locale)) {
-    if (!seg.isWord) continue;
-    const norm = normalize(seg.text, opts);
-    if (!norm) continue;
+    if (seg.isWord) {
+      const norm = normalize(seg.text, opts);
+      if (!norm) continue;
+      tokens.push({
+        raw: seg.text,
+        norm,
+        graphemes: segmentGraphemes(norm, locale),
+        isPunct: false,
+      });
+      continue;
+    }
+    // Skip pure whitespace; keep punctuation/symbols as their own tokens.
+    if (!seg.text.trim()) continue;
+    // For punctuation we only NFC-normalize. Case folding / diacritic stripping
+    // are meaningless for marks like ¿ or „ and would muddy comparisons.
+    const norm = seg.text.normalize('NFC');
     tokens.push({
       raw: seg.text,
       norm,
       graphemes: segmentGraphemes(norm, locale),
+      isPunct: true,
     });
   }
   return tokens;
@@ -53,6 +76,13 @@ function classify(
   a: WordToken,
   b: WordToken,
 ): { tag: 'equal' | 'typo' | 'wrong'; cost: number } {
+  if (a.isPunct !== b.isPunct) {
+    return { tag: 'wrong', cost: COST_CROSS_KIND };
+  }
+  if (a.isPunct) {
+    if (a.norm === b.norm) return { tag: 'equal', cost: COST_EQUAL };
+    return { tag: 'wrong', cost: COST_DIFF };
+  }
   if (a.norm === b.norm) return { tag: 'equal', cost: COST_EQUAL };
   const dist = damerauLevenshtein(a.graphemes, b.graphemes);
   const len = Math.max(a.graphemes.length, b.graphemes.length);
@@ -142,16 +172,33 @@ export function alignWords(
     if (i > 0 && j > 0 && back[i][j] === 'match') {
       const m_ = matchOf(i - 1, j - 1);
       const tag: WordTag = m_.tag;
-      trace.push({ tag, expected: exp[i - 1].raw, actual: act[j - 1].raw });
+      const kind: AlignedKind =
+        exp[i - 1].isPunct || act[j - 1].isPunct ? 'punct' : 'word';
+      trace.push({
+        tag,
+        kind,
+        expected: exp[i - 1].raw,
+        actual: act[j - 1].raw,
+      });
       counts[tag]++;
       i--;
       j--;
     } else if (i > 0 && back[i][j] === 'gap-act') {
-      trace.push({ tag: 'missing', expected: exp[i - 1].raw, actual: '' });
+      trace.push({
+        tag: 'missing',
+        kind: exp[i - 1].isPunct ? 'punct' : 'word',
+        expected: exp[i - 1].raw,
+        actual: '',
+      });
       counts.missing++;
       i--;
     } else {
-      trace.push({ tag: 'extra', expected: '', actual: act[j - 1].raw });
+      trace.push({
+        tag: 'extra',
+        kind: act[j - 1].isPunct ? 'punct' : 'word',
+        expected: '',
+        actual: act[j - 1].raw,
+      });
       counts.extra++;
       j--;
     }

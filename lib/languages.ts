@@ -809,15 +809,27 @@ export type TranslationRule = {
 // --- Shared model stages (referenced by multiple rules) --------------------
 
 // Gemini Flash Lite never approaches the 5K token mark on translation output —
-// the cap is mainly a runaway safeguard.
+// the cap is mainly a runaway safeguard. Retained as a low-cost truncation
+// fallback for `asian_deepseek` (kept dormant pending re-eval).
 const GEMINI_FLASH_LITE: ModelStage = {
   model: 'google/gemini-3.1-flash-lite-preview',
   maxOutputTokens: 5_000,
 };
-const GEMINI_FLASH_LITE_LOW: ModelStage = {
+// Gemini Flash Lite with high thinking — the default-rule primary. Cheaper
+// than full Flash but still high reasoning, so it's the floor for every
+// default translation.
+const GEMINI_FLASH_LITE_HIGH: ModelStage = {
   model: 'google/gemini-3.1-flash-lite-preview',
-  reasoning: 'low',
-  maxOutputTokens: 5_000,
+  reasoning: 'high',
+  maxOutputTokens: 6_000,
+};
+// Full Gemini Flash (non-lite) with high thinking — primary for
+// `retranslation_high` (triggered by user-flagged rows). Heavier than the
+// default Lite tier so a flagged row gets a cross-model second opinion.
+const GEMINI_FLASH_HIGH: ModelStage = {
+  model: 'google/gemini-3-flash-preview',
+  reasoning: 'high',
+  maxOutputTokens: 6_000,
 };
 // DeepSeek V4 Flash at `high` reasoning emits 3–6K tokens of thinking before
 // the visible translation. The wider 8K cap gives the thinking trace room
@@ -829,26 +841,39 @@ const DEEPSEEK_V4_FLASH_HIGH: ModelStage = {
 };
 
 /**
- * Source-length threshold (characters) used by length-hybrid rules.
- * Sentences strictly below this are considered "short" and routed to the
- * no-thinking branch in `default_hybrid`. Eval data in
- * `data_preparation/translation_eval/` justified 30 chars as the breakpoint
- * where reasoning starts to pay off.
+ * Historical length threshold used by the previous length-hybrid default
+ * rule. The active rule no longer branches on length, but the backfill
+ * migration in `convex/migrations/backfillTranslationSource.ts` still uses
+ * this constant to compute the pre-tagging `translationSource` for legacy
+ * rows produced under the old policy.
  */
 export const HYBRID_LENGTH_THRESHOLD = 30;
 
 export const TRANSLATION_RULES = {
   /**
-   * Default for every language without an explicit `translationRule`.
-   * Short sentences run Gemini Flash Lite with no reasoning (fast + cheap);
-   * longer ones get `reasoning: 'low'` for better idiom + grammar handling.
+   * Default for every language without an explicit `translationRule`. Every
+   * sentence — regardless of length — runs Gemini Flash Lite with high
+   * reasoning. Length-hybrid branching was retired so the quality floor
+   * matches across all input sizes.
    */
   default_hybrid: {
     id: 'default_hybrid',
-    label: 'Gemini Flash Lite — length-hybrid reasoning',
+    label: 'Gemini Flash Lite — high reasoning',
     branches: [
-      { maxChars: HYBRID_LENGTH_THRESHOLD - 1, primary: GEMINI_FLASH_LITE },
-      { maxChars: Infinity, primary: GEMINI_FLASH_LITE_LOW },
+      { maxChars: Infinity, primary: GEMINI_FLASH_LITE_HIGH },
+    ],
+  },
+  /**
+   * Triggered by `flagTranslation` on the 1st and 2nd flag of a given
+   * translation row. Routes through full Gemini Flash (high) — a heavier
+   * *different* model than the default Lite tier, so a flagged row gets a
+   * genuine cross-model second opinion.
+   */
+  retranslation_high: {
+    id: 'retranslation_high',
+    label: 'Gemini Flash (high) second opinion',
+    branches: [
+      { maxChars: Infinity, primary: GEMINI_FLASH_HIGH },
     ],
   },
   /**
@@ -879,13 +904,19 @@ export type TranslationRuleId = keyof typeof TRANSLATION_RULES;
  * (language, source-text-length) pair. Returns `[primary, ...fallbacks]` from
  * the matching branch of the language's rule (or `default_hybrid` when the
  * language doesn't set one).
+ *
+ * `opts.ruleOverride` bypasses the per-language rule lookup — used by
+ * `flagTranslation` to force the `retranslation_high` chain regardless of the
+ * language's normal routing.
  */
 export function resolveTranslationStages(
   code: string,
   sourceTextLength: number,
+  opts?: { ruleOverride?: TranslationRuleId },
 ): ModelStage[] {
   const lang = getLanguageByCode(code);
-  const ruleId: TranslationRuleId = lang?.translationRule ?? 'default_hybrid';
+  const ruleId: TranslationRuleId =
+    opts?.ruleOverride ?? lang?.translationRule ?? 'default_hybrid';
   // Cast through `TranslationRule` so each branch is typed as the union with
   // optional `fallbacks`. `satisfies` above narrows literals (some branches
   // don't declare `fallbacks`), which would otherwise drop that property

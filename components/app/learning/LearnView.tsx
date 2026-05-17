@@ -223,13 +223,20 @@ function LearnViewInner({
     onCardRated(undefined, buildSessionSnapshot(state));
   }, [state, onCardRated]);
 
+  const hasInflightCardAction =
+    state.status === 'reviewing' && state.hasInflightCardAction;
   const { audio, openSettings } = useLearningAudio(state, {
     // Radio mode forces autoplay + auto-advance. The tutorial gates and the
     // celebration pause don't apply (no tutorial in radio, no celebration in
     // radio). In onboarding mode, the in-app `useTutorial` is suppressed so
     // `isCompleted` would stay false forever and block every card's autoplay
     // — gate the tutorial-completion check on `mode !== 'onboarding'`.
-    disableAutoAdvance: !isRadio && reviewMode === 'audio' && isActive,
+    // `hasInflightCardAction` keeps the user on the current card while a
+    // flag retranslation or audio regenerate is mid-flight — auto-advancing
+    // before the new content lands would skip past the very thing they
+    // asked for.
+    disableAutoAdvance:
+      (!isRadio && reviewMode === 'audio' && isActive) || hasInflightCardAction,
     disableAutoPlay:
       !isRadio &&
       (isActive ||

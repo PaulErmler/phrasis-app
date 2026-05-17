@@ -3,14 +3,16 @@
 
 declare module '@useautumn/sdk' {
   // Features
-  export const chat_messages: Feature;
-  export const courses: Feature;
   export const sentences: Feature;
-  export const custom_sentences: Feature;
-  export const transcriptions: Feature;
-  export const multiple_languages: Feature;
+  export const audio_regenerations: Feature;
   export const card_edits: Feature;
+  export const chat_messages: Feature;
+  export const custom_sentences: Feature;
+  export const multiple_languages: Feature;
   export const translation_auto_fill: Feature;
+  export const transcriptions: Feature;
+  export const translation_flags: Feature;
+  export const courses: Feature;
 
   // Plans
   export const free: Plan;

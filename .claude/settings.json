@@ -78,7 +78,10 @@
       "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app/.claude/worktrees/small-fixes status --short)",
       "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app/.claude/worktrees/small-fixes log -3 --oneline)",
       "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app/.claude/worktrees/small-fixes diff --stat)",
-      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app/.claude/worktrees/small-fixes diff)"
+      "Bash(git -C /Users/paulermler/Documents/Phrasis/new/phrasis-app/.claude/worktrees/small-fixes diff)",
+      "Bash(echo \"EXIT $?\")",
+      "Bash(grep -nB2 -A5 \"courses.*targetLang\\\\|targetLanguages.*v\\\\.\" convex/schema.ts)",
+      "Bash(grep -nB1 -A6 \"export const getCourseStats\\\\s*=\" convex/features/courses.ts)"
     ],
     "deny": [
       "Read(.env*)",

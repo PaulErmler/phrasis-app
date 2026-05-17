@@ -120,6 +120,9 @@
       "filterHidden": "Ausgeblendet",
       "filterFavorites": "Favoriten",
       "filtersLabel": "Filter",
+      "sourceLabel": "Quelle",
+      "filterCustom": "Eigene",
+      "filterPremade": "Vorgefertigt",
       "emptyTitle": "Noch keine Sätze",
       "emptyDescription": "Füge Sätze aus einer Sammlung hinzu, um deine Bibliothek aufzubauen.",
       "emptySearchTitle": "Keine Ergebnisse",
@@ -353,6 +356,7 @@
       "streak": "Serie",
       "reps": "Wiederholungen",
       "sentences": "Sätze",
+      "words": "Wörter",
       "time": "Zeit",
       "today": "heute",
       "new": "neu"
@@ -386,6 +390,19 @@
       "unhide": "Einblenden",
       "edit": "Bearbeiten",
       "delete": "Löschen",
+      "flag": "Übersetzung melden",
+      "flagConfirmTitle": "Diese Übersetzung melden?",
+      "flagConfirmDescription": "Wir überprüfen diese Übersetzung. Die Karte wird aus deinem Lernen entfernt.",
+      "flagConfirmConfirm": "Melden und entfernen",
+      "flagConfirmCancel": "Abbrechen",
+      "regenerateAudio": "Audio neu generieren",
+      "pinToCard": "{label} an Karte anheften",
+      "unpinFromCard": "{label} von Karte lösen",
+      "pinMaxReached": "Du kannst maximal {max} Aktionen anheften – löse zuerst eine",
+      "quotaExhausted": "{label} — Monatslimit erreicht",
+      "quotaLow": "{label} — {count} übrig in diesem Monat",
+      "quotaBadgeZero": "0 übrig",
+      "quotaBadgeLeft": "{count} übrig",
       "deleteConfirmTitle": "Diese Karte endgültig löschen?",
       "deleteConfirmDescription": "Dadurch wird die Karte permanent aus deinem Stapel entfernt.",
       "deleteConfirmConfirm": "Endgültig löschen",
@@ -664,7 +681,7 @@
       "pricingLabelUnlimited": "Unbegrenzt viele eigene Sätze pro Monat"
     },
     "multipleLanguages": {
-      "name": "Bis zu 5 Sprachen pro Kurs",
+      "name": "Bis zu 3 Sprachen pro Kurs",
       "pricingLabel": "Bis zu {count} Sprachen pro Kurs",
       "pricingLabelUnlimited": "Unbegrenzte Sprachen pro Kurs"
     },
@@ -676,6 +693,12 @@
     },
     "translationAutoFill": {
       "name": "Automatische Übersetzung"
+    },
+    "audioRegenerations": {
+      "name": "Audio-Neugenerierungen"
+    },
+    "translationFlags": {
+      "name": "Übersetzungs-Meldungen"
     },
     "detailedStatistics": {
       "name": "Detaillierte Statistiken",

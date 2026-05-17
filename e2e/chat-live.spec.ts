@@ -351,16 +351,43 @@ test.describe("chat (live)", { tag: "@live" }, () => {
         "Clickable word should have a non-empty display after stripping punctuation.",
       ).toBeGreaterThan(0);
 
-      // (5) Open the popover and confirm the Ask AI action.
+      // (5) Pause audio if it's playing. In audio review mode, karaoke
+      // re-renders the ClickableWords parent on every `localTime` tick and
+      // the audio-mode auto-advance fires when the schedule completes —
+      // both can detach the Ask AI button from the DOM between
+      // `expect(...).toBeVisible()` and `askBtn.click()`. Pausing
+      // stabilizes the popover for the duration of the click.
+      //
+      // The play/pause button is the same physical element regardless of
+      // state — only the inner Lucide icon swaps (`lucide-pause` vs
+      // `lucide-play`). Click ONLY if the Pause icon is showing, so we
+      // don't accidentally start playback on a paused card.
+      const playPauseBtn = page.locator('[data-tutorial="audio-play"]').first();
+      const pauseIconVisible = await playPauseBtn
+        .locator("svg.lucide-pause")
+        .isVisible()
+        .catch(() => false);
+      if (pauseIconVisible) {
+        await playPauseBtn.click().catch(() => {});
+        // Give React one tick to settle so the karaoke render loop stops
+        // before we open the popover.
+        await page.waitForTimeout(150);
+      }
+
+      // (6) Open the popover and confirm the Ask AI action. Use a forced
+      // click on the Ask AI button as a belt-and-suspenders measure — even
+      // with audio paused the popover can re-position briefly when first
+      // appearing; force skips the stability poll once we've confirmed the
+      // button is rendered.
       await firstWord.click();
       const askBtn = page.getByTestId("ask-ai-button").first();
       await expect(
         askBtn,
         "Ask AI button should appear inside the word popover after clicking a clickable-word",
       ).toBeVisible({ timeout: 5_000 });
-      await askBtn.click();
+      await askBtn.click({ force: true });
 
-      // (6) Auto-submit fires from ChatPanel's initialTextNonce effect —
+      // (7) Auto-submit fires from ChatPanel's initialTextNonce effect —
       // no user send-press involved. The user bubble should contain the
       // templated prompt. Escape cleanedWord for safe regex embedding.
       const escaped = cleanedWord.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -373,7 +400,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
         'User bubble should show "Explain me this word: <word>" after Ask AI is clicked',
       ).toBeVisible({ timeout: 15_000 });
 
-      // (7) Assistant reply arrives in the in-learn chat. Use .first()
+      // (8) Assistant reply arrives in the in-learn chat. Use .first()
       // because LearningChatLayout renders the chat panel in two sibling
       // slots (desktop + mobile) — on a desktop viewport the mobile copy
       // is display:none, so .last() would target the hidden one and never
@@ -382,7 +409,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       await expect(assistant).toBeVisible({ timeout: ASSISTANT_TIMEOUT });
       await expect(assistant).not.toBeEmpty();
 
-      // (8) Quota drops by one — a fresh message was sent via the
+      // (9) Quota drops by one — a fresh message was sent via the
       // learning-mode chat panel. Poll because the Convex mutation is
       // asynchronous. Assert strict decrement rather than exact count to
       // tolerate races with unrelated usage refreshes.

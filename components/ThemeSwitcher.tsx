@@ -42,7 +42,13 @@ export function ThemeSwitcher({ className }: { className?: string }) {
   }
 
   return (
-    <DropdownMenu>
+    // `modal={false}` keeps radix from locking body scroll while the menu is
+    // open. The default `modal={true}` removes the scrollbar via
+    // `react-remove-scroll-bar` and compensates the body with `padding-right`,
+    // which shifts every non-fixed element by ~15px on every open/close (and
+    // shifts a fixed header by the same amount because it isn't compensated).
+    // A theme picker doesn't need focus-trap or scroll-lock semantics.
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"

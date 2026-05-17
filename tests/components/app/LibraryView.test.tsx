@@ -26,8 +26,21 @@ const unhideCardFn = makeMutationMock();
 const toggleFavoriteFn = makeMutationMock();
 const deleteCardFn = makeMutationMock();
 const editCardFn = makeMutationMock();
+const regenerateCardAudioFn = makeMutationMock();
+const flagTranslationFn = makeMutationMock();
+const updatePinnedActionsFn = makeMutationMock();
 
 const useQueryMock = vi.fn();
+
+// `usePreloadedQuery` is called twice in LibraryView — once for course
+// settings, once for the user-settings row that carries `pinnedCardActions`.
+// Tag the preloaded handles so the mock can dispatch by which one we got.
+const PRELOADED_COURSE_SETTINGS = { __preloadKey: 'courseSettings' as const };
+const PRELOADED_SETTINGS = { __preloadKey: 'userSettings' as const };
+
+// Test-controlled state for the second preloaded query (user settings).
+// Mutate this in a test before render to seed `pinnedCardActions`.
+let userSettingsValue: { pinnedCardActions?: readonly string[] } | null = null;
 
 vi.mock('convex/react', () => ({
   useQuery: (...args: unknown[]) => useQueryMock(...args),
@@ -47,11 +60,21 @@ vi.mock('convex/react', () => ({
       return deleteCardFn;
     case 'editCard':
       return editCardFn;
+    case 'regenerateCardAudio':
+      return regenerateCardAudioFn;
+    case 'flagTranslation':
+      return flagTranslationFn;
+    case 'updatePinnedCardActions':
+      return updatePinnedActionsFn;
     default:
       return vi.fn();
     }
   },
-  usePreloadedQuery: () => ({ highlightWords: true }),
+  usePreloadedQuery: (handle: { __preloadKey?: string }) => {
+    if (handle?.__preloadKey === 'userSettings') return userSettingsValue;
+    // Default — course settings.
+    return { highlightWords: true };
+  },
 }));
 
 vi.mock('@/convex/_generated/api', () => ({
@@ -66,6 +89,12 @@ vi.mock('@/convex/_generated/api', () => ({
         toggleFavoriteCard: { __mockKey: 'toggleFavoriteCard' },
         deleteCardPermanently: { __mockKey: 'deleteCardPermanently' },
         editCard: { __mockKey: 'editCard' },
+        regenerateCardAudio: { __mockKey: 'regenerateCardAudio' },
+        flagTranslation: { __mockKey: 'flagTranslation' },
+      },
+      courses: {
+        updatePinnedCardActions: { __mockKey: 'updatePinnedCardActions' },
+        getUserSettings: { __mockKey: 'getUserSettings' },
       },
       usage: {
         helpers: { getFeatureUsage: { __mockKey: 'getFeatureUsage' } },
@@ -74,12 +103,29 @@ vi.mock('@/convex/_generated/api', () => ({
   },
 }));
 
+// Bypass the real Convex-backed quota hook — its `useQuery(api.usage.queries.getMyQuotas)`
+// would need a separate mock branch. The card-action surface just needs a
+// "quota available, not loading" shape so the rendered buttons stay enabled.
+vi.mock('@/components/feature_tracking/useFeatureQuota', () => ({
+  useFeatureQuota: () => ({
+    balance: 5,
+    included: 5,
+    used: 0,
+    unlimited: false,
+    isAvailable: true,
+    isLoading: false,
+  }),
+}));
+
 vi.mock('@/hooks/use-ensure-content', () => ({
   useEnsureContent: () => undefined,
 }));
 
 vi.mock('@/components/app/AppDataProvider', () => ({
-  useAppData: () => ({ preloadedCourseSettings: {} }),
+  useAppData: () => ({
+    preloadedCourseSettings: PRELOADED_COURSE_SETTINGS,
+    preloadedSettings: PRELOADED_SETTINGS,
+  }),
 }));
 
 vi.mock('@/components/app/NoCourseEmptyState', () => ({
@@ -88,7 +134,10 @@ vi.mock('@/components/app/NoCourseEmptyState', () => ({
 
 // Stub LearningCardContent with a thin shell that exposes the toggle state and
 // dispatches the parent callbacks. We don't care about audio/translation
-// rendering here — only that the sticky/toggle wiring is correct.
+// rendering here — only that the sticky/toggle wiring and the new card-action
+// pin surface are correct. Every action callback is rendered as a testable
+// button regardless of pin state; the stub also surfaces `pinnedActions` via a
+// `data-pinned` attribute so tests can assert what was pinned.
 vi.mock('@/components/app/learning/LearningCardContent', () => ({
   LearningCardContent: (props: {
     sourceText: string;
@@ -98,11 +147,16 @@ vi.mock('@/components/app/learning/LearningCardContent', () => ({
     onHide: () => void;
     onEdit?: () => void;
     onDelete?: () => void;
+    onFlag?: () => void;
+    onRegenerateAudio?: () => void;
+    onUpdatePinnedActions?: (actions: string[]) => void;
+    pinnedActions?: readonly string[];
   }) => (
     <div
       data-testid={`card-${props.sourceText}`}
       data-mastered={String(props.isMastered ?? false)}
       data-hidden={String(props.isHidden ?? false)}
+      data-pinned={(props.pinnedActions ?? []).join(',')}
     >
       <button
         data-testid={`master-${props.sourceText}`}
@@ -132,6 +186,35 @@ vi.mock('@/components/app/learning/LearningCardContent', () => ({
           delete
         </button>
       )}
+      {props.onFlag && (
+        <button
+          data-testid={`flag-${props.sourceText}`}
+          onClick={props.onFlag}
+        >
+          flag
+        </button>
+      )}
+      {props.onRegenerateAudio && (
+        <button
+          data-testid={`regen-${props.sourceText}`}
+          onClick={props.onRegenerateAudio}
+        >
+          regen
+        </button>
+      )}
+      {props.onUpdatePinnedActions && (
+        <button
+          data-testid={`pin-flag-${props.sourceText}`}
+          onClick={() =>
+            props.onUpdatePinnedActions?.([
+              ...(props.pinnedActions ?? []),
+              'flag',
+            ])
+          }
+        >
+          pin flag
+        </button>
+      )}
     </div>
   ),
 }));
@@ -159,13 +242,20 @@ vi.mock('@/components/app/learning/EditCardDialog', () => ({
 
 import { LibraryView } from '@/components/app/LibraryView';
 
+type Translation = {
+  language: string;
+  text: string;
+  isTargetLanguage?: boolean;
+  isBaseLanguage?: boolean;
+};
+
 type Card = {
   _id: string;
   _creationTime: number;
   textId: string;
   sourceText: string;
   sourceLanguage: string;
-  translations: never[];
+  translations: Translation[];
   audioRecordings: never[];
   dueDate: number;
   isMastered: boolean;
@@ -195,6 +285,21 @@ function makeCard(overrides: Partial<Card> & { _id: string; sourceText: string }
   };
 }
 
+// Card factory that includes a target-language translation — `onFlag` is only
+// wired when `card.translations` has at least one `isTargetLanguage: true`
+// entry, so flag-flow tests must use this helper (or pass translations
+// explicitly into `makeCard`).
+function makeFlaggableCard(
+  overrides: Partial<Card> & { _id: string; sourceText: string },
+): Card {
+  return makeCard({
+    translations: [
+      { language: 'en', text: 'hello', isTargetLanguage: true },
+    ],
+    ...overrides,
+  });
+}
+
 beforeEach(() => {
   masterCardFn.mockClear();
   unmasterCardFn.mockClear();
@@ -203,6 +308,10 @@ beforeEach(() => {
   toggleFavoriteFn.mockClear();
   deleteCardFn.mockClear();
   editCardFn.mockClear();
+  regenerateCardAudioFn.mockClear();
+  flagTranslationFn.mockClear();
+  updatePinnedActionsFn.mockClear();
+  userSettingsValue = null;
   useQueryMock.mockReset();
 });
 
@@ -452,5 +561,140 @@ describe('LibraryView delete flow', () => {
 
     expect(screen.queryByTestId('card-hola')).not.toBeInTheDocument();
     expect(screen.getByTestId('card-mundo')).toBeInTheDocument();
+  });
+});
+
+describe('LibraryView pinned card actions', () => {
+  it('forwards the preloaded pinnedCardActions array down to LearningCardContent', async () => {
+    userSettingsValue = {
+      pinnedCardActions: ['flag', 'regenerateAudio', 'edit'],
+    };
+    useQueryMock.mockReturnValue([
+      makeFlaggableCard({ _id: 'c1', sourceText: 'hola' }),
+    ]);
+
+    render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
+
+    // The stub exposes the array verbatim so we can assert it lands on the
+    // card without depending on the real CardActionsMenu's normalize/clamp.
+    expect(screen.getByTestId('card-hola').dataset.pinned).toBe(
+      'flag,regenerateAudio,edit',
+    );
+  });
+
+  it('passes an empty pin list when userSettings has no pinnedCardActions', async () => {
+    userSettingsValue = null;
+    useQueryMock.mockReturnValue([
+      makeFlaggableCard({ _id: 'c1', sourceText: 'hola' }),
+    ]);
+
+    render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
+
+    expect(screen.getByTestId('card-hola').dataset.pinned).toBe('');
+  });
+
+  it('calls updatePinnedCardActions when the pin handler runs', async () => {
+    const user = userEvent.setup();
+    userSettingsValue = { pinnedCardActions: ['edit'] };
+    useQueryMock.mockReturnValue([
+      makeFlaggableCard({ _id: 'c1', sourceText: 'hola' }),
+    ]);
+
+    render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
+
+    // The stub's "pin flag" button appends 'flag' to the current pin list and
+    // hands it to the parent's update handler — same shape the real
+    // CardActionsMenu produces from its in-menu Pin button.
+    await user.click(screen.getByTestId('pin-flag-hola'));
+    expect(updatePinnedActionsFn).toHaveBeenCalledWith({
+      actions: ['edit', 'flag'],
+    });
+  });
+});
+
+describe('LibraryView flag flow', () => {
+  it('opens a confirm dialog and fires flagTranslation + deleteCard on confirm', async () => {
+    const user = userEvent.setup();
+    userSettingsValue = { pinnedCardActions: ['flag'] };
+    useQueryMock.mockReturnValue([
+      makeFlaggableCard({ _id: 'c1', sourceText: 'hola' }),
+    ]);
+
+    render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
+
+    // Confirm dialog isn't mounted until the action fires.
+    expect(
+      screen.queryByRole('button', { name: 'actions.flagConfirmConfirm' }),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('flag-hola'));
+    // Confirm dialog appears with the localized buttons (next-intl stub
+    // returns the keys verbatim).
+    const confirmBtn = await screen.findByRole('button', {
+      name: 'actions.flagConfirmConfirm',
+    });
+    await user.click(confirmBtn);
+
+    expect(flagTranslationFn).toHaveBeenCalledWith({
+      cardId: 'c1',
+      language: 'en',
+    });
+    // handleConfirmFlag awaits deleteCard so the row stops appearing in the
+    // library after the flag.
+    expect(deleteCardFn).toHaveBeenCalledWith({ cardId: 'c1' });
+  });
+
+  it('does not fire flagTranslation when the confirm dialog is cancelled', async () => {
+    const user = userEvent.setup();
+    userSettingsValue = { pinnedCardActions: ['flag'] };
+    useQueryMock.mockReturnValue([
+      makeFlaggableCard({ _id: 'c1', sourceText: 'hola' }),
+    ]);
+
+    render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
+
+    await user.click(screen.getByTestId('flag-hola'));
+    await user.click(
+      screen.getByRole('button', { name: 'actions.flagConfirmCancel' }),
+    );
+
+    expect(flagTranslationFn).not.toHaveBeenCalled();
+    expect(deleteCardFn).not.toHaveBeenCalled();
+    // Card still visible — cancel is a no-op on the visible list.
+    expect(screen.getByTestId('card-hola')).toBeInTheDocument();
+  });
+
+  it('omits the flag action when the card has no target translation', async () => {
+    // Without a target-language translation row LibraryView returns
+    // `onFlag: undefined`, so the stub must not render the flag button.
+    useQueryMock.mockReturnValue([
+      makeCard({ _id: 'c1', sourceText: 'hola', translations: [] }),
+    ]);
+
+    render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
+
+    expect(screen.queryByTestId('flag-hola')).not.toBeInTheDocument();
+  });
+});
+
+describe('LibraryView regenerate-audio flow', () => {
+  it('calls regenerateCardAudio with a timezone argument', async () => {
+    const user = userEvent.setup();
+    userSettingsValue = { pinnedCardActions: ['regenerateAudio'] };
+    useQueryMock.mockReturnValue([
+      makeFlaggableCard({ _id: 'c1', sourceText: 'hola' }),
+    ]);
+
+    render(<LibraryView hasActiveCourse onOpenCourseMenu={() => {}} />);
+
+    await user.click(screen.getByTestId('regen-hola'));
+
+    expect(regenerateCardAudioFn).toHaveBeenCalledTimes(1);
+    const [callArgs] = regenerateCardAudioFn.mock.calls[0];
+    expect(callArgs.cardId).toBe('c1');
+    // `getUserTimezone()` resolves to a non-empty IANA name in JSDOM (or
+    // falls back to 'UTC') — just assert it's a non-empty string.
+    expect(typeof callArgs.timezone).toBe('string');
+    expect(callArgs.timezone.length).toBeGreaterThan(0);
   });
 });

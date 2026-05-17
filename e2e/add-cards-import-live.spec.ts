@@ -57,6 +57,11 @@ test.describe("add cards — import (live)", { tag: "@live" }, () => {
     // (sonner auto-dismisses inside a few seconds, flaky to catch).
     await expect(dialog).toBeHidden({ timeout: 30_000 });
 
+    // The post-import flow can bounce through /app (the content hub) before
+    // settling; if it does, the home_tour driver overlay can mount and stick
+    // around. Strip any popover before the next click.
+    await dismissTour(page).catch(() => {});
+
     // Verify the 3 cards show up in the library via the unique marker.
     await page.goto("/app/library");
     await page.waitForLoadState("domcontentloaded");

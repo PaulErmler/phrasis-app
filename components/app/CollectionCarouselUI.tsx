@@ -402,6 +402,7 @@ export function InlineCollectionDetail({
             ) : (
               <Button
                 size="sm"
+                variant="outline"
                 disabled={isAdding}
                 onClick={onAddCards}
                 className="text-xs"

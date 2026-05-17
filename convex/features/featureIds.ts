@@ -11,6 +11,8 @@ export const FEATURE_IDS = {
   TRANSCRIPTIONS: 'transcriptions',
   CARD_EDITS: 'card_edits',
   TRANSLATION_AUTO_FILL: 'translation_auto_fill',
+  AUDIO_REGENERATIONS: 'audio_regenerations',
+  TRANSLATION_FLAGS: 'translation_flags',
 } as const;
 
 export type FeatureId = (typeof FEATURE_IDS)[keyof typeof FEATURE_IDS];

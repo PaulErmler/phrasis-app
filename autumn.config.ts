@@ -4,230 +4,291 @@ import { FEATURE_IDS } from './convex/features/featureIds';
 
 // Features
 export const multiple_languages = feature({
-  id: 'multiple_languages',
-  name: 'Up To 5 Languages per Course',
-  type: 'boolean',
+	id: 'multiple_languages',
+	name: 'Up To 3 Languages per Course',
+	type: 'boolean',
 });
 
 export const chat_messages = feature({
-  id: 'chat_messages',
-  name: 'Chat Messages',
-  type: 'metered',
-  consumable: true,
+	id: 'chat_messages',
+	name: 'Chat Messages',
+	type: 'metered',
+	consumable: true,
 });
 
 export const courses = feature({
-  id: 'courses',
-  name: 'Courses',
-  type: 'metered',
-  consumable: false,
+	id: 'courses',
+	name: 'Courses',
+	type: 'metered',
+	consumable: false,
 });
 
 export const sentences = feature({
-  id: 'sentences',
-  name: 'Sentences',
-  type: 'metered',
-  consumable: true,
+	id: 'sentences',
+	name: 'Sentences',
+	type: 'metered',
+	consumable: true,
 });
 
 export const custom_sentences = feature({
-  id: 'custom_sentences',
-  name: 'Custom Sentences',
-  type: 'metered',
-  consumable: true,
+	id: 'custom_sentences',
+	name: 'Custom Sentences',
+	type: 'metered',
+	consumable: true,
 });
 
 export const transcriptions = feature({
-  id: 'transcriptions',
-  name: 'Transcriptions',
-  type: 'metered',
-  consumable: true,
+	id: 'transcriptions',
+	name: 'Transcriptions',
+	type: 'metered',
+	consumable: true,
 });
 
 export const card_edits = feature({
-  id: 'card_edits',
-  name: 'Card Edits',
-  type: 'metered',
-  consumable: true,
+	id: 'card_edits',
+	name: 'Card Edits',
+	type: 'metered',
+	consumable: true,
 });
 
 export const translation_auto_fill = feature({
-  id: 'translation_auto_fill',
-  name: 'Translation Auto Fill',
-  type: 'metered',
-  consumable: true,
+	id: 'translation_auto_fill',
+	name: 'Translation Auto Fill',
+	type: 'metered',
+	consumable: true,
+});
+
+// Internal-only meters: hidden from the pricing table (gated client-side
+
+// via `isFeatureHidden` in `lib/features/feature-meta.ts`) but enforced by
+
+// `consumeQuota` in the corresponding card-action mutations.
+export const audio_regenerations = feature({
+	id: 'audio_regenerations',
+	name: 'Audio Regenerations',
+	type: 'metered',
+	consumable: true,
+});
+
+export const translation_flags = feature({
+	id: 'translation_flags',
+	name: 'Translation Flags',
+	type: 'metered',
+	consumable: true,
 });
 
 // Plans
 export const free = plan({
-  id: 'free',
-  name: 'Free',
-  autoEnable: true,
-  items: [
-    item({
-      featureId: card_edits.id,
-      included: 50,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: chat_messages.id,
-      included: 5,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: courses.id,
-      included: 1,
-    }),
-    item({
-      featureId: custom_sentences.id,
-      included: 10,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: sentences.id,
-      included: 150,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: transcriptions.id,
-      included: 10,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: translation_auto_fill.id,
-      included: 50,
-      reset: {
-        interval: 'month',
-      },
-    }),
-  ],
+	id: 'free',
+	name: 'Free',
+	autoEnable: true,
+	items: [
+		item({
+			featureId: audio_regenerations.id,
+			included: 20,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: card_edits.id,
+			included: 50,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: chat_messages.id,
+			included: 5,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: courses.id,
+			included: 1,
+		}),
+		item({
+			featureId: custom_sentences.id,
+			included: 10,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: sentences.id,
+			included: 150,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: transcriptions.id,
+			included: 10,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: translation_auto_fill.id,
+			included: 50,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: translation_flags.id,
+			included: 20,
+			reset: {
+				interval: 'month',
+			},
+		}),
+	],
 });
 
 export const basic = plan({
-  id: 'basic',
-  name: 'Basic',
-  price: {
-    amount: 8,
-    interval: 'month',
-  },
-  items: [
-    item({
-      featureId: card_edits.id,
-      included: 200,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: chat_messages.id,
-      included: 100,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: courses.id,
-      included: 1,
-    }),
-    item({
-      featureId: custom_sentences.id,
-      included: 300,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: sentences.id,
-      included: 20000,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: transcriptions.id,
-      included: 100,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: translation_auto_fill.id,
-      included: 350,
-      reset: {
-        interval: 'month',
-      },
-    }),
-  ],
+	id: 'basic',
+	name: 'Basic',
+	price: {
+		amount: 8,
+		interval: 'month',
+	},
+	items: [
+		item({
+			featureId: audio_regenerations.id,
+			included: 500,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: card_edits.id,
+			included: 500,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: chat_messages.id,
+			included: 100,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: courses.id,
+			included: 1,
+		}),
+		item({
+			featureId: custom_sentences.id,
+			included: 300,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: sentences.id,
+			included: 20000,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: transcriptions.id,
+			included: 100,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: translation_auto_fill.id,
+			included: 350,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: translation_flags.id,
+			included: 500,
+			reset: {
+				interval: 'month',
+			},
+		}),
+	],
 });
 
 export const pro = plan({
-  id: 'pro',
-  name: 'Pro',
-  price: {
-    amount: 16,
-    interval: 'month',
-  },
-  items: [
-    item({
-      featureId: card_edits.id,
-      included: 500,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: chat_messages.id,
-      included: 400,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: courses.id,
-      included: 10,
-    }),
-    item({
-      featureId: custom_sentences.id,
-      included: 1000,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: sentences.id,
-      included: 20000,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: transcriptions.id,
-      included: 400,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: translation_auto_fill.id,
-      included: 1100,
-      reset: {
-        interval: 'month',
-      },
-    }),
-    item({
-      featureId: multiple_languages.id,
-      included: 0,
-    }),
-  ],
-  freeTrial: { durationLength: 21, durationType: 'day', cardRequired: true },
+	id: 'pro',
+	name: 'Pro',
+	price: {
+		amount: 16,
+		interval: 'month',
+	},
+	items: [
+		item({
+			featureId: audio_regenerations.id,
+			included: 800,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: card_edits.id,
+			included: 800,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: chat_messages.id,
+			included: 400,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: courses.id,
+			included: 10,
+		}),
+		item({
+			featureId: custom_sentences.id,
+			included: 1000,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: sentences.id,
+			included: 20000,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: transcriptions.id,
+			included: 400,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: translation_auto_fill.id,
+			included: 1100,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: translation_flags.id,
+			included: 800,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: multiple_languages.id,
+			included: 0,
+		}),
+	],
+	freeTrial: { durationLength: 21, durationType: 'day', cardRequired: true },
 });

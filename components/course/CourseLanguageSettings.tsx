@@ -64,8 +64,21 @@ export function CourseLanguageSettings({
   const { isAvailable: hasMultipleLanguages } = useFeatureQuota(FEATURE_IDS.MULTIPLE_LANGUAGES);
   const [paywallOpen, setPaywallOpen] = useState(false);
 
-  const maxTotal = hasMultipleLanguages ? 5 : 2;
-  const maxPerGroup = hasMultipleLanguages ? 3 : 1;
+  const planMaxTotal = hasMultipleLanguages ? 3 : 2;
+  const planMaxPerGroup = hasMultipleLanguages ? 2 : 1;
+
+  // Grandfather: if the saved course is already over the current plan cap
+  // (legacy Pro courses created when the limit was 5), keep the editor at the
+  // current size and just disable adding more. DualLanguageEditor already
+  // disables its add button at the cap.
+  const existingBaseCount = course?.baseLanguages.length ?? 0;
+  const existingTargetCount = course?.targetLanguages.length ?? 0;
+  const maxTotal = Math.max(planMaxTotal, existingBaseCount + existingTargetCount);
+  const maxPerGroup = Math.max(
+    planMaxPerGroup,
+    existingBaseCount,
+    existingTargetCount,
+  );
 
   const archiveCourse = useMutation(api.features.courses.archiveCourse);
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);

@@ -25,29 +25,41 @@ import {
 } from "../../../lib/languages";
 
 describe("features/translationLLM", () => {
-  describe("translation rules (length-hybrid)", () => {
-    it("default_hybrid: short sentences resolve to Flash Lite with no reasoning", () => {
+  describe("translation rules", () => {
+    it("default_hybrid: every sentence resolves to Gemini Flash Lite with high reasoning", () => {
       // 'de' has no `translationRule` set → defaults to `default_hybrid`.
-      const stages = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD - 1);
-      expect(stages.length).toBe(1);
-      expect(stages[0].model).toBe("google/gemini-3.1-flash-lite-preview");
-      expect(stages[0].reasoning).toBeUndefined();
+      // Length-hybrid branching was retired; high reasoning is the floor
+      // regardless of source length.
+      const short = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD - 1);
+      const long = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD);
+      for (const stages of [short, long]) {
+        expect(stages.length).toBe(1);
+        expect(stages[0]).toEqual({
+          model: "google/gemini-3.1-flash-lite-preview",
+          reasoning: "high",
+          maxOutputTokens: 6_000,
+        });
+      }
     });
 
-    it("default_hybrid: longer sentences resolve to Flash Lite with 'low' reasoning", () => {
-      const stages = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD);
+    it("retranslation_high: forced via ruleOverride uses full Gemini Flash (high) as a second opinion", () => {
+      const stages = resolveTranslationStages("de", 100, {
+        ruleOverride: "retranslation_high",
+      });
+      // Different model than the default (Lite) so flagged rows get an
+      // actual cross-model retry rather than re-sampling Lite.
       expect(stages.length).toBe(1);
-      expect(stages[0].model).toBe("google/gemini-3.1-flash-lite-preview");
-      expect(stages[0].reasoning).toBe("low");
+      expect(stages[0]).toEqual({
+        model: "google/gemini-3-flash-preview",
+        reasoning: "high",
+        maxOutputTokens: 6_000,
+      });
     });
 
     it("asian_deepseek rule definition still exposes DeepSeek high → Gemini fallback", () => {
       // Currently no language uses this rule (Asian languages reverted to
       // default_hybrid pending a quality eval). The rule itself is preserved
-      // so we can re-enable it without re-deriving the shape. The per-stage
-      // maxOutputTokens caps (DeepSeek 8K for the high-reasoning trace,
-      // Gemini 5K for the no-reasoning fallback) are part of the rule shape
-      // and pinned here.
+      // so we can re-enable it without re-deriving the shape.
       const rule = TRANSLATION_RULES.asian_deepseek;
       expect(rule.branches.length).toBe(1);
       const onlyBranch = rule.branches[0];
@@ -69,7 +81,8 @@ describe("features/translationLLM", () => {
       expect(stages.length).toBe(1);
       expect(stages[0]).toEqual({
         model: "google/gemini-3.1-flash-lite-preview",
-        maxOutputTokens: 5_000,
+        reasoning: "high",
+        maxOutputTokens: 6_000,
       });
     });
 
@@ -77,7 +90,7 @@ describe("features/translationLLM", () => {
       const stages = resolveTranslationStages("zz", 100);
       expect(stages.length).toBe(1);
       expect(stages[0].model).toBe("google/gemini-3.1-flash-lite-preview");
-      expect(stages[0].reasoning).toBe("low");
+      expect(stages[0].reasoning).toBe("high");
     });
   });
 

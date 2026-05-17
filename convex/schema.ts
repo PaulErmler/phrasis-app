@@ -62,6 +62,12 @@ export const courseSettingsFields = {
   studyContentFilter: v.optional(
     v.union(v.literal('custom'), v.literal('course'), v.literal('both')),
   ),
+  // Current "between celebrations" bucket id. Rotated by the client on
+  // celebration dismiss (via `setCurrentSessionId`). Stored server-side so
+  // the bucket survives the user closing the learn view OR moving to a
+  // different device — `getNewWordsForCelebration` then keeps counting words
+  // toward the same milestone instead of restarting from zero on each remount.
+  currentSessionId: v.optional(v.string()),
 } as const;
 
 // Full `courseSettings` document validator (includes system fields).
@@ -178,6 +184,11 @@ export default defineSchema({
     // `getVoiceForLanguageVariant` and synthesize with the matching accent.
     // Undefined for non-mixed languages.
     regionVariant: v.optional(v.string()),
+    // Number of times a user has flagged this translation as bad. Drives the
+    // automatic retranslation policy in `flagTranslation` — flags 1 and 2
+    // enqueue a stronger model; flags 3+ only increment the counter for
+    // later admin triage. Undefined treated as 0 for back-compat.
+    flagCount: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),
@@ -240,6 +251,10 @@ export default defineSchema({
     learningStyle: v.optional(learningStyleValidator),
     activeCourseId: v.optional(v.id('courses')), // Active course for the user
     completedTutorials: v.optional(v.array(v.string())), // IDs of completed tutorials (e.g. "home_tour", "audio_review_intro")
+    // Ordered list of card-action keys the user has surfaced on the card.
+    // Whitelist + max enforced by `normalizePinnedCardActions` in
+    // `lib/cardActions.ts`. Empty or undefined = use DEFAULT_PINNED_CARD_ACTIONS.
+    pinnedCardActions: v.optional(v.array(v.string())),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table - stores temporary onboarding data until completion
@@ -398,9 +413,34 @@ export default defineSchema({
       'radioOrderKey',
     ])
     .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
+    // Library source-filter variants — origin appended to each state-aware
+    // library index so every (state × origin) combo resolves via a pure index
+    // query (no post-filter). For 'custom' (= origin ∈ {'custom','chat'}) the
+    // query runs twice, once per non-premade origin, and the results are
+    // merged on the server.
+    .index('by_deckId_isHidden_origin_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'collectionOrigin',
+      'lastReviewedAt',
+    ])
+    .index('by_deckId_isHidden_mastered_origin_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'lastReviewedAt',
+    ])
+    .index('by_deckId_isHidden_favorite_origin_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'isFavorite',
+      'collectionOrigin',
+      'lastReviewedAt',
+    ])
     .searchIndex('search_text', {
       searchField: 'searchableText',
-      filterFields: ['deckId', 'isHidden', 'isMastered', 'isFavorite'],
+      filterFields: ['deckId', 'isHidden', 'isMastered', 'isFavorite', 'collectionOrigin'],
     }),
 
   // Course stats table - tracks learning statistics per course
@@ -573,6 +613,13 @@ export default defineSchema({
       targetLanguage: v.string(),
       text: v.string(),
       audioSpeakerGender: v.optional(v.string()),
+      // Optional translation-rule override forwarded by `flagTranslation` to
+      // force the `retranslation_high` chain. Worker validates the string
+      // against `TRANSLATION_RULES` and falls back to the language's normal
+      // rule on unknown values. Must be optional so existing queue rows
+      // (and the standard `scheduleMissingContent` enqueue path) keep
+      // validating.
+      ruleOverride: v.optional(v.string()),
     }),
     queuedAt: v.number(),
     priority: v.optional(v.number()),

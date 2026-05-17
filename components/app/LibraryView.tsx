@@ -9,11 +9,15 @@ import { Id } from '@/convex/_generated/dataModel';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
 import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
-import { Search, Star, EyeOff, CircleCheck, X, Loader2 } from 'lucide-react';
+import { Search, Star, EyeOff, CircleCheck, X, Loader2, PenLine, BookOpen } from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { useAppData } from '@/components/app/AppDataProvider';
+import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { FEATURE_IDS } from '@/convex/features/featureIds';
+import { getUserTimezone } from '@/lib/timezone';
+import type { PinnableCardAction } from '@/lib/cardActions';
 import type { CardTranslation } from '@/components/app/learning/types';
 import {
   AlertDialog,
@@ -28,6 +32,7 @@ import {
 import { buttonVariants } from '@/components/ui/button';
 
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
+type SourceFilter = 'custom' | 'premade' | null;
 
 type LibraryCard = FunctionReturnType<typeof api.features.library.getLibraryCards>[number];
 
@@ -56,18 +61,52 @@ export function LibraryView({
   const t = useTranslations('AppPage.library');
   const tLearn = useTranslations('LearningMode');
 
-  const { preloadedCourseSettings } = useAppData();
+  const { preloadedCourseSettings, preloadedSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
+  const userSettings = usePreloadedQuery(preloadedSettings);
   const highlightEnabled = courseSettings?.highlightWords !== false;
+  const pinnedCardActions = userSettings?.pinnedCardActions ?? [];
+
+  const cardEditsQuota = useFeatureQuota(FEATURE_IDS.CARD_EDITS);
+  const audioRegenerationsQuota = useFeatureQuota(
+    FEATURE_IDS.AUDIO_REGENERATIONS,
+  );
+  const translationFlagsQuota = useFeatureQuota(FEATURE_IDS.TRANSLATION_FLAGS);
+  const cardActionQuotas = useMemo(
+    () => ({
+      edit: {
+        balance: cardEditsQuota.balance,
+        unlimited: cardEditsQuota.unlimited,
+      },
+      regenerateAudio: {
+        balance: audioRegenerationsQuota.balance,
+        unlimited: audioRegenerationsQuota.unlimited,
+      },
+      flag: {
+        balance: translationFlagsQuota.balance,
+        unlimited: translationFlagsQuota.unlimited,
+      },
+    }),
+    [
+      cardEditsQuota.balance,
+      cardEditsQuota.unlimited,
+      audioRegenerationsQuota.balance,
+      audioRegenerationsQuota.unlimited,
+      translationFlagsQuota.balance,
+      translationFlagsQuota.unlimited,
+    ],
+  );
 
   const [searchInput, setSearchInput] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>(null);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(null);
 
   const debouncedSearch = useDebounce(searchInput, 300);
 
   const result = useQuery(api.features.library.getLibraryCards, {
     searchQuery: debouncedSearch || undefined,
     activeFilter: activeFilter ?? undefined,
+    sourceFilter: sourceFilter ?? undefined,
   });
 
   const masterCard = useMutation(api.features.scheduling.masterCard);
@@ -96,6 +135,25 @@ export function LibraryView({
     }
   });
   const deleteCard = useMutation(api.features.scheduling.deleteCardPermanently);
+  const regenerateCardAudio = useMutation(
+    api.features.scheduling.regenerateCardAudio,
+  );
+  const flagTranslation = useMutation(api.features.scheduling.flagTranslation);
+  const updatePinnedCardActionsMutation = useMutation(
+    api.features.courses.updatePinnedCardActions,
+  ).withOptimisticUpdate((localStore, args) => {
+    const current = localStore.getQuery(
+      api.features.courses.getUserSettings,
+      {},
+    );
+    if (current != null) {
+      localStore.setQuery(
+        api.features.courses.getUserSettings,
+        {},
+        { ...current, pinnedCardActions: [...args.actions] },
+      );
+    }
+  });
 
   const [editingCard, setEditingCard] = useState<{
     cardId: Id<'cards'>;
@@ -142,7 +200,7 @@ export function LibraryView({
   useEffect(() => {
     setStickyCards(new Map());
     setOrderIds([]);
-  }, [activeFilter, debouncedSearch]);
+  }, [activeFilter, sourceFilter, debouncedSearch]);
 
   const handleMaster = useCallback(
     async (card: LibraryCard, currentlyMastered: boolean) => {
@@ -195,6 +253,52 @@ export function LibraryView({
     [toggleFavorite],
   );
 
+  const handleUpdatePinnedActions = useCallback(
+    async (actions: readonly string[]) => {
+      try {
+        await updatePinnedCardActionsMutation({ actions: [...actions] });
+      } catch (error) {
+        console.error('Failed to update pinned card actions:', error);
+      }
+    },
+    [updatePinnedCardActionsMutation],
+  );
+
+  const handleRegenerateAudio = useCallback(
+    async (cardId: Id<'cards'>) => {
+      try {
+        await regenerateCardAudio({ cardId, timezone: getUserTimezone() });
+      } catch (error) {
+        console.error('Failed to regenerate audio:', error);
+      }
+    },
+    [regenerateCardAudio],
+  );
+
+  // Flag opens a confirm dialog identical to LearningMode's: on confirm we
+  // fire the retranslation in the background and delete the card so it stops
+  // appearing in the library too.
+  const [flagConfirmCard, setFlagConfirmCard] = useState<{
+    cardId: Id<'cards'>;
+    language: string;
+  } | null>(null);
+  const handleConfirmFlag = useCallback(async () => {
+    const target = flagConfirmCard;
+    if (!target) return;
+    setFlagConfirmCard(null);
+    flagTranslation({
+      cardId: target.cardId,
+      language: target.language,
+    }).catch((error) =>
+      console.error('Failed to flag translation:', error),
+    );
+    try {
+      await deleteCard({ cardId: target.cardId });
+    } catch (error) {
+      console.error('Failed to delete card after flag:', error);
+    }
+  }, [flagConfirmCard, flagTranslation, deleteCard]);
+
   const handleConfirmDelete = useCallback(async () => {
     const cardId = deletingCardId;
     if (!cardId) return;
@@ -215,6 +319,10 @@ export function LibraryView({
 
   const toggleFilter = (f: Exclude<ActiveFilter, null>) => {
     setActiveFilter((prev) => (prev === f ? null : f));
+  };
+
+  const toggleSource = (s: Exclude<SourceFilter, null>) => {
+    setSourceFilter((prev) => (prev === s ? null : s));
   };
 
   const isLoading = result === undefined;
@@ -270,7 +378,8 @@ export function LibraryView({
   }, [displayCards]);
 
   const hasResults = displayCards.length > 0;
-  const hasActiveFilters = debouncedSearch.length > 0 || activeFilter !== null;
+  const hasActiveFilters =
+    debouncedSearch.length > 0 || activeFilter !== null || sourceFilter !== null;
 
   if (!hasActiveCourse) {
     return (
@@ -349,6 +458,36 @@ export function LibraryView({
                 </Toggle>
               </div>
             </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-muted-foreground shrink-0">
+                {t('sourceLabel')}
+              </span>
+              <div className="flex flex-wrap gap-2 justify-end">
+                <Toggle
+                  pressed={sourceFilter === 'custom'}
+                  onPressedChange={() => toggleSource('custom')}
+                  variant="outline"
+                  size="sm"
+                  aria-label={t('filterCustom')}
+                  data-testid="library-source-custom"
+                >
+                  <PenLine className="h-3.5 w-3.5" />
+                  {t('filterCustom')}
+                </Toggle>
+                <Toggle
+                  pressed={sourceFilter === 'premade'}
+                  onPressedChange={() => toggleSource('premade')}
+                  variant="outline"
+                  size="sm"
+                  aria-label={t('filterPremade')}
+                  data-testid="library-source-premade"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  {t('filterPremade')}
+                </Toggle>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -409,6 +548,22 @@ export function LibraryView({
                     })
                   }
                   onDelete={() => setDeletingCardId(card._id)}
+                  onRegenerateAudio={() => handleRegenerateAudio(card._id)}
+                  onFlag={(() => {
+                    const lang = card.translations.find(
+                      (tr) => tr.isTargetLanguage,
+                    )?.language;
+                    if (!lang) return undefined;
+                    return () =>
+                      setFlagConfirmCard({ cardId: card._id, language: lang });
+                  })()}
+                  pinnedActions={pinnedCardActions}
+                  onUpdatePinnedActions={
+                    handleUpdatePinnedActions as (
+                      actions: PinnableCardAction[],
+                    ) => void
+                  }
+                  quotaState={cardActionQuotas}
                   hideTargetLanguages={false}
                   highlightEnabled={highlightEnabled}
                   audioSpeedOverrides={ephemeralOverrides[card._id]}
@@ -458,6 +613,32 @@ export function LibraryView({
               onClick={handleConfirmDelete}
             >
               {tLearn('actions.deleteConfirmConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={flagConfirmCard !== null}
+        onOpenChange={(open) => {
+          if (!open) setFlagConfirmCard(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {tLearn('actions.flagConfirmTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {tLearn('actions.flagConfirmDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {tLearn('actions.flagConfirmCancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmFlag}>
+              {tLearn('actions.flagConfirmConfirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

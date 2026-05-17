@@ -94,6 +94,7 @@ export function LearningMode({
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [flagConfirmOpen, setFlagConfirmOpen] = useState(false);
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
   const [allSubmitted, setAllSubmitted] = useState(false);
   const [fullReviewAccuracy, setFullReviewAccuracy] = useState<number | null>(null);
@@ -237,6 +238,24 @@ export function LearningMode({
     setDeleteConfirmOpen(false);
     await state.handleDelete();
   }, [state]);
+  // Picks the same primary target language as the surface handler — duplicated
+  // here because this callback lives above the early returns (hook order)
+  // where `primaryTargetLanguage` isn't in scope yet.
+  const handleConfirmFlag = useCallback(async () => {
+    if (state.status !== 'reviewing') return;
+    const lang = state.translations.find((tr) => tr.isTargetLanguage)?.language;
+    if (!lang) return;
+    setFlagConfirmOpen(false);
+    await state.handleFlagAndDelete(lang);
+  }, [state]);
+  // Declared up here (above the early returns) so its `useCallback` keeps a
+  // stable position in the hook list across loading → reviewing transitions.
+  // Gates on status internally — non-reviewing states get a no-op.
+  const handleRegenerateAudioWithPause = useCallback(() => {
+    if (state.status !== 'reviewing') return;
+    audio.pause();
+    void state.handleRegenerateAudio();
+  }, [audio, state]);
 
   // Top-level celebration: shown across every underlying status so a milestone
   // hit on the very last card still gets celebrated before "no cards due"
@@ -341,6 +360,24 @@ export function LearningMode({
     ? (state.courseSettings.instantProceedFull ?? true)
     : (state.courseSettings.instantProceedAudio ?? false);
 
+  // The flag action targets a specific translation row. When a card has
+  // multiple target languages, default to the first one in the user's
+  // configured target-language order — same row the learner is primarily
+  // reviewing. Without a target translation, the flag action is hidden.
+  const primaryTargetLanguage = state.translations.find(
+    (tr) => tr.isTargetLanguage,
+  )?.language;
+  // Flag opens a confirmation dialog instead of firing immediately: the
+  // action permanently deletes the card and triggers a background
+  // retranslation, which is destructive enough to warrant a confirm step.
+  // The actual flag + delete happens in `handleConfirmFlag` below.
+  const handleFlagPrimary = primaryTargetLanguage
+    ? () => {
+        audio.pause();
+        setFlagConfirmOpen(true);
+      }
+    : undefined;
+
   const cardContent =
     reviewMode === 'full' ? (
       <FullReviewCardContent
@@ -358,6 +395,11 @@ export function LearningMode({
         onFavorite={state.handleFavorite}
         onEdit={handleEdit}
         onDelete={handleRequestDelete}
+        onFlag={handleFlagPrimary}
+        onRegenerateAudio={handleRegenerateAudioWithPause}
+        pinnedActions={state.pinnedCardActions}
+        onUpdatePinnedActions={state.handleUpdatePinnedActions}
+        quotaState={state.cardActionQuotas}
         onAudioPlay={audio.stop}
         targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
         allRevealed={fullReviewRevealed}
@@ -393,6 +435,11 @@ export function LearningMode({
         onFavorite={state.handleFavorite}
         onEdit={handleEdit}
         onDelete={handleRequestDelete}
+        onFlag={handleFlagPrimary}
+        onRegenerateAudio={handleRegenerateAudioWithPause}
+        pinnedActions={state.pinnedCardActions}
+        onUpdatePinnedActions={state.handleUpdatePinnedActions}
+        quotaState={state.cardActionQuotas}
         onAudioPlay={audio.stop}
         hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
         autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? true}
@@ -417,14 +464,17 @@ export function LearningMode({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Session progress bar fills as the user reviews cards within the
-          current session (resets each new session). Max is 10 in onboarding
-          (10-card lesson = 100%), PROGRESS_DISPLAY_INTERVAL elsewhere. */}
+      {/* Normal mode: bar tracks `dailyReviewsToday` (audio + full, server-
+          persisted, hydrated on mount) so the fill level always matches when
+          the milestone celebration will fire, even after a reload or a break
+          mid-day. Onboarding keeps its in-memory session counter (0/10 lesson
+          progress). Radio mode never shows the bar since plays don't count
+          toward the milestone. */}
       {!isRadio &&
         state.courseSettings.progressDisplayEnabled !== false && (
         <SessionProgressBar
-          sessionCardCount={state.sessionCardCount}
-          maxReviews={mode === 'onboarding' ? 10 : undefined}
+          current={mode === 'onboarding' ? state.sessionCardCount : state.dailyReviewsToday}
+          max={mode === 'onboarding' ? 10 : undefined}
         />
       )}
       <div className="flex-1 min-h-0 relative">
@@ -520,6 +570,27 @@ export function LearningMode({
               onClick={handleConfirmDelete}
             >
               {t('actions.deleteConfirmConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={flagConfirmOpen} onOpenChange={setFlagConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('actions.flagConfirmTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('actions.flagConfirmDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {t('actions.flagConfirmCancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmFlag}>
+              {t('actions.flagConfirmConfirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

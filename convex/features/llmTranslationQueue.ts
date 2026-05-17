@@ -17,6 +17,8 @@ import {
   resolveMixedVariant,
   resolveTranslationStages,
   ROMANIZATION_LANGUAGES,
+  TRANSLATION_RULES,
+  type TranslationRuleId,
 } from '../../lib/languages';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
@@ -122,6 +124,11 @@ const llmJobArgsValidator = v.object({
   // to storeTranslationAndScheduleTTS (downstream TTS) or to the Google
   // fallback path. Defaults to 0 (normal) when missing.
   priority: v.optional(v.union(v.literal(0), v.literal(1))),
+  // Optional rule override forwarded to `resolveTranslationStages`. Used by
+  // `flagTranslation` to force the `retranslation_high` chain regardless of
+  // the language's normal routing. Worker validates against TRANSLATION_RULES
+  // and silently falls back to the language's rule on unknown values.
+  ruleOverride: v.optional(v.string()),
 });
 
 /**
@@ -303,7 +310,18 @@ export const processLlmTranslationForCard = internalAction({
       const regionVariant = mixed?.regionVariant;
 
       const cfg = getTranslationConfigForLanguage(cfgLanguageCode);
-      const stages = resolveTranslationStages(cfgLanguageCode, text.text.length);
+      // Validate the rule override before passing it through — an unknown
+      // string would crash `resolveTranslationStages`. Unknown values silently
+      // fall back to the language's normal routing.
+      const ruleOverride =
+        args.ruleOverride && args.ruleOverride in TRANSLATION_RULES
+          ? (args.ruleOverride as TranslationRuleId)
+          : undefined;
+      const stages = resolveTranslationStages(
+        cfgLanguageCode,
+        text.text.length,
+        ruleOverride ? { ruleOverride } : undefined,
+      );
       if (cfg.provider !== 'openrouter' || stages.length === 0) {
         // Misrouted: the queue worker should only ever receive openrouter
         // languages. Fall back to Google so the row still gets translated.

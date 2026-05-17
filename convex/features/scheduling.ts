@@ -1,5 +1,6 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query, MutationCtx, QueryCtx } from '../_generated/server';
+import { internal } from '../_generated/api';
 import { buildCardSearchableText } from '../lib/cardContent';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
@@ -26,6 +27,7 @@ import {
   schedulingPhaseValidator
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
+import { getTodayInTimezone } from '../lib/dateUtils';
 import { getAudioForText } from '../lib/audio';
 import {
   ROMANIZATION_LANGUAGES,
@@ -34,6 +36,7 @@ import {
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
+import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 import {
   CARD_OVERRIDE_SPEED_MIN,
@@ -236,15 +239,25 @@ async function fetchDueCardsWithFilter(
 }
 
 export const getCardForReview = query({
-  args: {},
+  // `timezone` is optional so callers that don't care about the daily-count
+  // side-channel (tests, the layout warm-up) can still call `{}`. The learn
+  // view always supplies it so the in-learn progress bar can subscribe to
+  // today's active review count via this single query — no separate
+  // `getTodayReviewCount` subscription, and updates flow in live whether they
+  // come from a local mutation or another device.
+  args: { timezone: v.optional(v.string()) },
   returns: v.union(
     v.object({
       ...cardResultFields,
       nextCard: v.union(cardResultValidator, v.null()),
+      /** Today's non-radio review count (audio + full) for the active course,
+       * mirroring what drives `triggerCelebration` in `reviewCard`. 0 when
+       * `timezone` is omitted (caller opted out of the side-channel). */
+      dailyReviewsToday: v.number(),
     }),
     v.null(),
   ),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
@@ -350,7 +363,25 @@ export const getCardForReview = query({
 
     if (!current) return null;
 
-    return { ...current, nextCard: next };
+    // Today's active (non-radio) review count — same audio+full sum used by
+    // `triggerCelebration` in `reviewCard`. Folding it into this query means
+    // the bar updates live across devices via the same subscription, and we
+    // avoid a second `getTodayReviewCount` subscription on the hot path.
+    let dailyReviewsToday = 0;
+    if (args.timezone) {
+      const today = getTodayInTimezone(args.timezone);
+      const todayStats = await ctx.db
+        .query('dailyStats')
+        .withIndex('by_userId_and_courseId_and_date', (q) =>
+          q.eq('userId', userId).eq('courseId', course._id).eq('date', today),
+        )
+        .unique();
+      dailyReviewsToday =
+        (todayStats?.reviewsByMode?.audio ?? 0) +
+        (todayStats?.reviewsByMode?.full ?? 0);
+    }
+
+    return { ...current, nextCard: next, dailyReviewsToday };
   },
 });
 
@@ -934,6 +965,189 @@ export const toggleFavoriteCard = mutation({
       { isFavorite: !(card.isFavorite ?? false) },
       card,
     );
+    return null;
+  },
+});
+
+/** Maximum auto-retranslations triggered by flagging a single translation row. */
+const FLAG_RETRANSLATION_MAX = 2;
+
+/**
+ * Flag a card's translation in a specific target language as bad. Increments
+ * `translations.flagCount` for the matching row. On flag counts 1 and 2 the
+ * mutation enqueues a retranslation with the `retranslation_high` rule
+ * (full Gemini Flash with high reasoning, Lite-high fallback) and deletes the
+ * stale audio so a fresh TTS pass runs after the new text lands. Counts 3+
+ * still increment the counter (for later admin triage) but skip the
+ * retranslation to bound cost.
+ *
+ * Quota: one `translation_flags` unit is consumed only when the call
+ * actually triggers a retranslation (claim acquired + count ≤ cap). Flags
+ * that just bump the counter — out-of-cap retries and dedup-skipped claims
+ * — are free.
+ */
+export const flagTranslation = mutation({
+  args: {
+    cardId: v.id('cards'),
+    language: v.string(),
+  },
+  returns: v.object({
+    flagCount: v.number(),
+    retranslated: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
+
+    const text = await ctx.db.get(card.textId);
+    if (!text) throw new ConvexError('Text not found');
+
+    if (args.language === text.language) {
+      // Source-language flagging would need a separate counter on `texts`;
+      // out of scope for this iteration.
+      throw new ConvexError({
+        code: 'SOURCE_LANGUAGE_NOT_FLAGGABLE',
+        message: 'Flagging the source language is not supported.',
+      });
+    }
+
+    // Flagging is a per-course user action — refuse languages that aren't
+    // part of the active course so quota can't be spent on translation rows
+    // the user doesn't actually study.
+    if (
+      !course.targetLanguages.includes(args.language) &&
+      !course.baseLanguages.includes(args.language)
+    ) {
+      throw new ConvexError({
+        code: 'LANGUAGE_NOT_IN_COURSE',
+        message: `Language "${args.language}" is not part of the active course.`,
+      });
+    }
+
+    const row = await ctx.db
+      .query('translations')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', card.textId).eq('targetLanguage', args.language),
+      )
+      .first();
+    if (!row) {
+      throw new ConvexError({
+        code: 'TRANSLATION_NOT_FOUND',
+        message: `No translation exists for language "${args.language}".`,
+      });
+    }
+
+    const nextCount = (row.flagCount ?? 0) + 1;
+    await ctx.db.patch(row._id, { flagCount: nextCount });
+
+    // Flag counts past the cap are still recorded (for admin triage) but
+    // don't trigger any backend work — no retranslation, no quota charge.
+    if (nextCount > FLAG_RETRANSLATION_MAX) {
+      return { flagCount: nextCount, retranslated: false };
+    }
+
+    // Claim the (textId, language) slot atomically. If another retranslation
+    // (or scheduleMissingContent) is already in flight for this row, skip
+    // enqueueing — the counter still reflects the flag, and we don't bill
+    // the user for a no-op.
+    const claimed = await claimLlmTranslationIfAvailable(
+      ctx,
+      card.textId,
+      args.language,
+    );
+    if (!claimed) {
+      return { flagCount: nextCount, retranslated: false };
+    }
+
+    // Only bill the quota once we know the call will actually enqueue a
+    // retranslation. If `consumeQuota` throws USAGE_LIMIT, the surrounding
+    // Convex transaction rolls back the flagCount patch and the claim
+    // insert — so the user neither pays nor moves the counter.
+    await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
+
+    // The new translation will likely differ from the current text, so any
+    // existing audio for this language is stale. Drop it now and let the
+    // worker's storeTranslationAndScheduleTTS path regenerate it on success.
+    // Mirrors the edit-card audio cleanup at the bottom of `editCard`.
+    const audioRows = await ctx.db
+      .query('audioRecordings')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', card.textId).eq('language', args.language),
+      )
+      .take(10);
+    for (const audioRow of audioRows) {
+      await ctx.db.delete(audioRow._id);
+    }
+
+    await ctx.runMutation(
+      internal.features.llmTranslationQueue.enqueueLlmTranslation,
+      {
+        args: {
+          textId: card.textId,
+          sourceLanguage: text.language,
+          targetLanguage: args.language,
+          text: text.text,
+          audioSpeakerGender: text.audioSpeakerGender,
+          ruleOverride: 'retranslation_high',
+        },
+        priority: 1,
+      },
+    );
+
+    return { flagCount: nextCount, retranslated: true };
+  },
+});
+
+/**
+ * Regenerate audio for every language on the card. Consumes one
+ * `audio_regenerations` quota unit per call regardless of language count.
+ * Deletes all `audioRecordings` rows for the card's text and re-invokes
+ * `scheduleMissingContent`, which only schedules audio jobs for languages
+ * that already have translations (no re-translation here).
+ */
+export const regenerateCardAudio = mutation({
+  args: {
+    cardId: v.id('cards'),
+    timezone: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
+
+    const text = await ctx.db.get(card.textId);
+    if (!text) throw new ConvexError('Text not found');
+
+    await consumeQuota(ctx, userId, FEATURE_IDS.AUDIO_REGENERATIONS);
+    await trackEvent(ctx, {
+      userId,
+      courseId: course._id,
+      timezone: args.timezone,
+      field: 'cardsEdited',
+    });
+
+    const allLanguages = [
+      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
+    ];
+    for (const lang of allLanguages) {
+      const audioRows = await ctx.db
+        .query('audioRecordings')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', card.textId).eq('language', lang),
+        )
+        .take(10);
+      for (const row of audioRows) {
+        await ctx.db.delete(row._id);
+      }
+    }
+
+    await scheduleMissingContent(
+      ctx,
+      card.textId,
+      text,
+      course.baseLanguages,
+      course.targetLanguages,
+      { priority: 1 },
+    );
+
     return null;
   },
 });
