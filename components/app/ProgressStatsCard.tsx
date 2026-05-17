@@ -153,9 +153,9 @@ export function ProgressStatsCard({
   // back to the raw level code if none of the codes resolve to a Language
   // (e.g. during loading or in misconfigured tests).
   const targetLanguageNames =
-    stats?.targetLanguages
+    (stats?.targetLanguages ?? [])
       .map((code) => getLanguageByCode(code)?.name)
-      .filter((n): n is string => !!n) ?? [];
+      .filter((n): n is string => !!n);
   const levelLabel = activeLevel
     ? targetLanguageNames.length > 0
       ? `${targetLanguageNames.join(' · ')} ${activeLevel.code}`

@@ -22,18 +22,25 @@ export function OnboardingGuard({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const hasCompletedOnboarding = settings?.hasCompletedOnboarding ?? false;
+  // Strict tri-state: only redirect when we KNOW the user is not onboarded
+  // (`hasCompletedOnboarding === false`). When `settings` is `null` /
+  // `undefined` — pre-hydration, briefly mid-soft-nav, or no `userSettings`
+  // row yet — leave children mounted. With the previous `?? false` default,
+  // a null reading bounced the user to `/app/onboarding`, where the live
+  // query (or its optimistic update) said "completed", which pushed them
+  // back to `/app` — a navigation ping-pong across the (main)/onboarding
+  // layout boundary. Each cycle unmounted+remounted (main)/layout and
+  // refired every "once per mount" effect (syncQuotas, ensureContent,
+  // tutorial timers, etc.) — the actual flood you were seeing.
+  const hasCompletedOnboarding = settings?.hasCompletedOnboarding;
   const isOnOnboarding = pathname.startsWith('/app/onboarding');
+  const needsOnboarding = hasCompletedOnboarding === false && !isOnOnboarding;
 
   useEffect(() => {
-    if (!hasCompletedOnboarding && !isOnOnboarding) {
-      router.replace('/app/onboarding');
-    }
-  }, [hasCompletedOnboarding, isOnOnboarding, router]);
+    if (needsOnboarding) router.replace('/app/onboarding');
+  }, [needsOnboarding, router]);
 
-  if (!hasCompletedOnboarding && !isOnOnboarding) {
-    return null;
-  }
+  if (needsOnboarding) return null;
 
   return <>{children}</>;
 }
