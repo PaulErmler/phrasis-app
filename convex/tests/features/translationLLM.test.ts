@@ -26,7 +26,7 @@ import {
 
 describe("features/translationLLM", () => {
   describe("translation rules", () => {
-    it("default_hybrid: every sentence resolves to Gemini Flash Lite with high reasoning", () => {
+    it("default_hybrid: every sentence resolves to full Gemini 3 Flash with high reasoning", () => {
       // 'de' has no `translationRule` set → defaults to `default_hybrid`.
       // Length-hybrid branching was retired; high reasoning is the floor
       // regardless of source length.
@@ -35,23 +35,23 @@ describe("features/translationLLM", () => {
       for (const stages of [short, long]) {
         expect(stages.length).toBe(1);
         expect(stages[0]).toEqual({
-          model: "google/gemini-3.1-flash-lite-preview",
+          model: "google/gemini-3-flash-preview",
           reasoning: "high",
           maxOutputTokens: 6_000,
         });
       }
     });
 
-    it("retranslation_high: forced via ruleOverride uses full Gemini Flash (high) as a second opinion", () => {
+    it("retranslation_high: forced via ruleOverride uses Gemini 3.1 Pro (medium) as a second opinion", () => {
       const stages = resolveTranslationStages("de", 100, {
         ruleOverride: "retranslation_high",
       });
-      // Different model than the default (Lite) so flagged rows get an
-      // actual cross-model retry rather than re-sampling Lite.
+      // Different model than the default (Flash) so flagged rows get an
+      // actual cross-model retry rather than re-sampling Flash.
       expect(stages.length).toBe(1);
       expect(stages[0]).toEqual({
-        model: "google/gemini-3-flash-preview",
-        reasoning: "high",
+        model: "google/gemini-3.1-pro-preview",
+        reasoning: "medium",
         maxOutputTokens: 6_000,
       });
     });
@@ -80,7 +80,7 @@ describe("features/translationLLM", () => {
       const stages = resolveTranslationStages("zh", 12);
       expect(stages.length).toBe(1);
       expect(stages[0]).toEqual({
-        model: "google/gemini-3.1-flash-lite-preview",
+        model: "google/gemini-3-flash-preview",
         reasoning: "high",
         maxOutputTokens: 6_000,
       });
@@ -89,7 +89,7 @@ describe("features/translationLLM", () => {
     it("unknown language code falls through to default_hybrid", () => {
       const stages = resolveTranslationStages("zz", 100);
       expect(stages.length).toBe(1);
-      expect(stages[0].model).toBe("google/gemini-3.1-flash-lite-preview");
+      expect(stages[0].model).toBe("google/gemini-3-flash-preview");
       expect(stages[0].reasoning).toBe("high");
     });
   });

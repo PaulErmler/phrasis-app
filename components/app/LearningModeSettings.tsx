@@ -526,7 +526,7 @@ export function LearningModeSettings({
             </div>
             <Switch
               id="highlightWords"
-              checked={courseSettings.highlightWords !== false}
+              checked={courseSettings.highlightWords === true}
               onCheckedChange={handleHighlightWordsChange}
               className="mt-0.5"
             />

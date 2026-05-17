@@ -146,6 +146,13 @@ interface ReviewingState extends BaseState {
   isPendingMaster: boolean;
   isPendingHide: boolean;
   /**
+   * Client-only session signal: did the viewer click the flag action on
+   * this card during the current session? Drives the "Flagged" pill in
+   * the card header — purely local state, never persisted, never leaked
+   * to other users viewing the same row.
+   */
+  flaggedInSession: boolean;
+  /**
    * True while a card audio regeneration is still in flight. LearnView uses
    * it to gate auto-advance so the user isn't bounced to the next card
    * before the regenerated audio lands. Flag actions don't contribute —
@@ -169,13 +176,13 @@ interface ReviewingState extends BaseState {
   handleFavorite: () => void;
   handleDelete: () => Promise<void>;
   /**
-   * Combined flag + delete: enqueues the retranslation in the background
-   * and immediately calls `deleteCardPermanently` so the card animates out
-   * and the user moves on. The retranslation worker still runs server-side
-   * (the flag mutation incremented `flagCount` before the card was deleted)
-   * so admins can triage from there.
+   * Flag a translation as bad. Fires the `flagTranslation` mutation
+   * (which increments `flagCount` and enqueues the background retranslation)
+   * and otherwise leaves the card alone — no deletion, no exit animation,
+   * no advance to the next card. The user stays on the card; they can
+   * press next themselves when ready.
    */
-  handleFlagAndDelete: (language: string) => Promise<void>;
+  handleFlag: (language: string) => Promise<void>;
   handleRegenerateAudio: () => Promise<void>;
   handleUpdatePinnedActions: (actions: readonly string[]) => Promise<void>;
   handleNext: (ratingOverride?: ReviewRating, accuracy?: number) => void;
@@ -223,12 +230,18 @@ export interface UseLearningModeOptions {
   /** Seed the in-session card counter — used by onboarding so the
    *  X/N progress bar resumes at the right value after a reload. */
   initialSessionCardCount?: number;
+  /** Override the auto-add batch size, taking precedence over the
+   *  per-course `cardsToAddBatchSize`. Used by the onboarding wrapper to
+   *  add fewer cards at once during the first lesson WITHOUT mutating
+   *  the persisted setting — the user resumes the regular default the
+   *  moment they leave onboarding. */
+  batchSizeOverride?: number;
 }
 
 export function useLearningMode(options: UseLearningModeOptions = {}): LearningState {
   const t = useTranslations('LearningMode');
   const { isAuthenticated } = useConvexAuth();
-  const { initialSessionId, initialSessionCardCount } = options;
+  const { initialSessionId, initialSessionCardCount, batchSizeOverride } = options;
 
   // `timezone` lets this query also return today's active review count, which
   // drives the in-learn progress bar. Reusing this subscription means the bar
@@ -415,6 +428,16 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const [isExiting, setIsExiting] = useState(false);
   const [cardAnimationKey, setCardAnimationKey] = useState(0);
 
+  // Client-only session record of cards the viewer has flagged this session.
+  // Drives the "Flagged" pill in the card header. Set on click, cleared on
+  // full reload — explicitly NOT persisted server-side, so it doesn't leak
+  // the flag to other users viewing the same row. Set is keyed by cardId
+  // so the pill survives next/previous navigation within the session if
+  // the user happens to return to a flagged card.
+  const [flaggedCardIds, setFlaggedCardIds] = useState<Set<Id<'cards'>>>(
+    () => new Set(),
+  );
+
   // Whole-card audio regenerate state. Mirrors the flag flow but tracks all
   // course languages at once — `regenerateCardAudio` deletes audio for every
   // language and re-enqueues TTS, so completion = every initially-present
@@ -461,10 +484,17 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     });
   });
 
-  // The server-backed id; falls back to the caller-supplied `initialSessionId`
-  // (onboarding) on the very first render before courseSettings has loaded.
-  const sessionId =
-    courseSettingsQuery?.currentSessionId ?? initialSessionId ?? '';
+  // Locally-minted id, stable from the very first render so any review that
+  // fires before the server seed lands still carries a real sessionId. Used
+  // both as the read fallback below and as the seed payload in the effect.
+  // Without this, the first render computed `sessionId = ''`, the empty
+  // string flowed into `trackNewWords`, and `wordTracking.ts` silently
+  // dropped the sessionId field — orphaning that row from its session bucket.
+  const [localSessionId] = useState(() => initialSessionId ?? mintSessionId());
+
+  // The server-backed id; falls back to `localSessionId` until the seed
+  // mutation's optimistic update lands, so the fallback is never empty.
+  const sessionId = courseSettingsQuery?.currentSessionId ?? localSessionId;
 
   // Track which course we've already seeded so a course switch (or a brand-new
   // user's first course) gets one — and only one — mint + persist call.
@@ -483,8 +513,9 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   };
 
   // Seed the server id when courseSettings loads with no `currentSessionId`.
-  // Honors a caller-supplied `initialSessionId` (onboarding) so the wizard's
-  // pre-minted id ends up persisted server-side too.
+  // The seed payload is `localSessionId` — the same id the first review
+  // already used as its fallback — so client-side and server-side agree on
+  // a single value from the very first review onward.
   useEffect(() => {
     if (!courseSettingsQuery) return;
     const { courseId, currentSessionId } = courseSettingsQuery;
@@ -495,11 +526,10 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     }
     if (seededCourseIdRef.current === courseId) return;
     seededCourseIdRef.current = courseId;
-    const seed = initialSessionId ?? mintSessionId();
-    setCurrentSessionIdMutation({ courseId, sessionId: seed });
+    setCurrentSessionIdMutation({ courseId, sessionId: localSessionId });
   }, [
     courseSettingsQuery,
-    initialSessionId,
+    localSessionId,
     setCurrentSessionIdMutation,
   ]);
 
@@ -623,7 +653,10 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // --------------------------------------------------------------------------
   const handleAddCards = useCallback(async () => {
     if (!courseSettings?.activeCollectionId || isAddingCards) return;
-    const configuredBatch = courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE;
+    const configuredBatch =
+      batchSizeOverride ??
+      courseSettings.cardsToAddBatchSize ??
+      DEFAULT_BATCH_SIZE;
     const effectiveBatch = sentencesQuota.unlimited
       ? configuredBatch
       : Math.min(configuredBatch, Math.max(1, sentencesQuota.balance));
@@ -638,7 +671,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     } finally {
       setIsAddingCards(false);
     }
-  }, [courseSettings, isAddingCards, addCardsMutation, sentencesQuota]);
+  }, [courseSettings, isAddingCards, addCardsMutation, sentencesQuota, batchSizeOverride]);
 
   // Auto-add cards when enabled and no cards due
   useEffect(() => {
@@ -772,38 +805,39 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     }
   }, [cardForReview, toggleFavoriteCardMutation]);
 
-  // Flag + delete combo. Fires the retranslation mutation in the background
-  // (no await — the worker continues server-side regardless of what the
-  // user does on the client) and immediately animates the card out via
-  // `deleteCardPermanently`. The user is moved on to the next card; the
-  // flagged translation row remains in the DB with an incremented flagCount
-  // so admins can triage it later.
-  const handleFlagAndDelete = useCallback(
+  // Flag-only. Fires the retranslation mutation in the background and
+  // otherwise leaves the card alone — no deletion, no exit animation, no
+  // automatic advance. The user stays on the card and can press next when
+  // they're ready; the new translation may arrive in-place as it lands.
+  const handleFlag = useCallback(
     async (language: string) => {
       if (!cardForReview || isReviewing) return;
-      // Fire-and-forget retranslation. We deliberately don't surface its
-      // errors to the user — the card is going away regardless, and the
-      // flag-counter increment isn't load-bearing for the user's flow.
+      const flaggedCardId = cardForReview._id;
+      // Fire-and-forget. Mark the card as session-flagged ONLY when the
+      // mutation reports it didn't trigger a retranslation — i.e. an
+      // over-cap flag or a claim-contested call. When a retranslation IS
+      // in flight, the server-driven `retranslating` pill handles the
+      // signal, and once it lands we want NO pill (don't lingeringly
+      // tag a card as "Flagged" after the system actually fixed it).
       flagTranslationMutation({
         cardId: cardForReview._id,
         language,
-      }).catch((error) => {
-        console.error('Failed to flag translation:', error);
-      });
-      reviewInitiatedByThisTabRef.current = true;
-      setCardAnimationKey((k) => k + 1);
-      setIsExiting(true);
-      setIsReviewing(true);
-      try {
-        await deleteCardMutation({ cardId: cardForReview._id });
-      } catch (error) {
-        console.error('Failed to delete card after flag:', error);
-        setIsExiting(false);
-      } finally {
-        setIsReviewing(false);
-      }
+      })
+        .then((result) => {
+          if (result && result.retranslated === false) {
+            setFlaggedCardIds((prev) => {
+              if (prev.has(flaggedCardId)) return prev;
+              const next = new Set(prev);
+              next.add(flaggedCardId);
+              return next;
+            });
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to flag translation:', error);
+        });
     },
-    [cardForReview, isReviewing, flagTranslationMutation, deleteCardMutation],
+    [cardForReview, isReviewing, flagTranslationMutation],
   );
 
   const handleRegenerateAudio = useCallback(async () => {
@@ -1136,7 +1170,10 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
         targetLanguages,
         handleAddCards,
         isAddingCards,
-        batchSize: courseSettings.cardsToAddBatchSize ?? DEFAULT_BATCH_SIZE,
+        batchSize:
+          batchSizeOverride ??
+          courseSettings.cardsToAddBatchSize ??
+          DEFAULT_BATCH_SIZE,
         sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
         remainingInCollection,
         handleSchedulingModeChange,
@@ -1222,6 +1259,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     isFavorite: displayCard.isFavorite ?? false,
     isPendingMaster,
     isPendingHide,
+    flaggedInSession: flaggedCardIds.has(displayCard._id),
     hasInflightCardAction: regenerateAudioStatus?.state === 'pending',
     pinnedCardActions: userSettingsQuery?.pinnedCardActions ?? [],
     cardActionQuotas: {
@@ -1245,7 +1283,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     handleHide,
     handleFavorite,
     handleDelete,
-    handleFlagAndDelete,
+    handleFlag,
     handleRegenerateAudio,
     handleUpdatePinnedActions,
     handleNext,

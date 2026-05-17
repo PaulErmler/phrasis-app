@@ -67,6 +67,8 @@ interface LearningCardContentProps {
   onSpeedCycle?: (language: string, next: number | null) => void;
   /** Badge behavior — `ephemeral` hides the null/default slot and greys 1.0. */
   speedBadgeVariant?: 'persistent' | 'ephemeral';
+  /** Client-only session flag: did the viewer click flag on this card? */
+  flaggedInSession?: boolean;
 }
 
 export function LearningCardContent({
@@ -105,6 +107,7 @@ export function LearningCardContent({
   audioSpeedOverrides,
   onSpeedCycle,
   speedBadgeVariant,
+  flaggedInSession = false,
 }: LearningCardContentProps) {
   const buttonPlayback = useButtonPlayback();
 
@@ -216,6 +219,7 @@ export function LearningCardContent({
         audioSpeedOverrides={audioSpeedOverrides}
         onSpeedCycle={onSpeedCycle}
         speedBadgeVariant={speedBadgeVariant}
+        flaggedInSession={flaggedInSession}
       >
         {({ targetTranslations }) => (
           <div className="space-y-2">

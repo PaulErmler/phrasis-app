@@ -350,6 +350,16 @@ const AZURE_VOICES_BN: Voice[] = [
   createAzureVoice('Bashkar', 'male', 'bn-IN-BashkarNeural'),
 ];
 
+// Mandarin Traditional (zh-TW) — Azure Neural M+F. Google ships no Chirp3-HD
+// voices for cmn-TW (only legacy Standard/WaveNet), so Azure is the active
+// provider for the `zh_traditional` language. Catalog: 2F (HsiaoChen, HsiaoYu)
+// and 1M (YunJhe).
+const AZURE_VOICES_ZH_TW: Voice[] = [
+  createAzureVoice('HsiaoChen', 'female', 'zh-TW-HsiaoChenNeural'),
+  createAzureVoice('HsiaoYu', 'female', 'zh-TW-HsiaoYuNeural'),
+  createAzureVoice('YunJhe', 'male', 'zh-TW-YunJheNeural'),
+];
+
 // Mandarin zh-CN — Microsoft DragonHDLatestNeural voices. Highest-tier
 // Microsoft voices among the catalog at the time of this change. Stored
 // dormant (active: false) so they don't affect existing zh courses; activate
@@ -441,20 +451,21 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
     // Dormant Dragon HD pool — activate by switching the language to Azure.
     ...AZURE_DRAGON_HD_VOICES_ZH,
   ],
-  zh_traditional: [...buildChirp3Pool('cmn-TW', 'Taiwan')],
+  // No Google Chirp3-HD voices for cmn-TW — use Azure Neural zh-TW instead.
+  zh_traditional: [...activate(AZURE_VOICES_ZH_TW)],
   yue: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
   yue_traditional: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
   ja: [...buildChirp3Pool('ja-JP', 'Japan'), ...ELEVENLABS_VOICES_JA],
   ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...ELEVENLABS_VOICES_KO],
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...ELEVENLABS_VOICES_VI],
-  th: [...buildChirp3Pool('th-TH', 'Thailand'), ...activate(AZURE_VOICES_TH)],
+  th: [...buildChirp3Pool('th-TH', 'Thailand'), ...AZURE_VOICES_TH],
   id: [...buildChirp3Pool('id-ID', 'Indonesia')],
   sv: [
     ...buildChirp3Pool('sv-SE', 'Sweden'),
     ...ELEVENLABS_VOICES_SV,
-    ...activate(AZURE_VOICES_SV),
+    ...AZURE_VOICES_SV,
   ],
-  nb: [...buildChirp3Pool('nb-NO', 'Norway')],
+  // nb: [...buildChirp3Pool('nb-NO', 'Norway')], // disabled — see SUPPORTED_LANGUAGES
   da: [...buildChirp3Pool('da-DK', 'Denmark')],
   fi: [...buildChirp3Pool('fi-FI', 'Finland'), ...ELEVENLABS_VOICES_FI],
   nl: [...buildChirp3Pool('nl-NL', 'Netherlands'), ...ELEVENLABS_VOICES_NL],

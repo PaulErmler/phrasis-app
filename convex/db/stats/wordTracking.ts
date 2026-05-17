@@ -46,13 +46,19 @@ export async function trackNewWords(
         .first();
 
       if (!existing) {
+        // Persist sessionId whenever it's defined — including the empty
+        // string. A client that hands us `""` is buggy; orphaning the row
+        // (the prior `args.sessionId &&` guard did) silently shifts it to
+        // the celebration screen's "earlier today" bucket and breaks the
+        // hero/cell match. Migrations intentionally pass `undefined` and
+        // remain unaffected.
         await ctx.db.insert('userWords', {
           userId: args.userId,
           courseId: args.courseId,
           language,
           word: normalized,
           displayWord: original,
-          ...(args.sessionId && { sessionId: args.sessionId }),
+          ...(args.sessionId !== undefined && { sessionId: args.sessionId }),
         });
         newCount++;
       } else if (

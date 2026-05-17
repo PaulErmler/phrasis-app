@@ -246,7 +246,7 @@ export function LearningMode({
     const lang = state.translations.find((tr) => tr.isTargetLanguage)?.language;
     if (!lang) return;
     setFlagConfirmOpen(false);
-    await state.handleFlagAndDelete(lang);
+    await state.handleFlag(lang);
   }, [state]);
   // Declared up here (above the early returns) so its `useCallback` keeps a
   // stable position in the hook list across loading → reviewing transitions.
@@ -368,9 +368,10 @@ export function LearningMode({
     (tr) => tr.isTargetLanguage,
   )?.language;
   // Flag opens a confirmation dialog instead of firing immediately: the
-  // action permanently deletes the card and triggers a background
-  // retranslation, which is destructive enough to warrant a confirm step.
-  // The actual flag + delete happens in `handleConfirmFlag` below.
+  // action triggers a background retranslation that overwrites the
+  // currently-displayed text, so we want an explicit confirm step. The
+  // actual flag fires in `handleConfirmFlag` below; the card itself is
+  // not deleted.
   const handleFlagPrimary = primaryTargetLanguage
     ? () => {
         audio.pause();
@@ -408,7 +409,8 @@ export function LearningMode({
         showRomanization={state.courseSettings.showRomanization ?? true}
         cardId={state.cardId}
         shortcutsDisabled={state.settingsOpen || editDialogOpen}
-        highlightEnabled={state.courseSettings.highlightWords !== false}
+        highlightEnabled={state.courseSettings.highlightWords === true}
+        flaggedInSession={state.flaggedInSession}
         mergedPlayback={{
           isPlaying: audio.isPlaying,
           currentTime: audio.currentTime,
@@ -447,7 +449,8 @@ export function LearningMode({
         showRomanization={state.courseSettings.showRomanization ?? true}
         revealAllSignal={audioRevealNonce}
         onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
-        highlightEnabled={state.courseSettings.highlightWords !== false}
+        highlightEnabled={state.courseSettings.highlightWords === true}
+        flaggedInSession={state.flaggedInSession}
         mergedPlayback={{
           isPlaying: audio.isPlaying,
           currentTime: audio.currentTime,

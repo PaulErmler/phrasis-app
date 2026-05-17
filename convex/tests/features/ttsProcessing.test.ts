@@ -489,7 +489,7 @@ describe("features/ttsProcessing", () => {
   });
 
   describe("scheduleMissingContent sweep", () => {
-    // Swedish currently runs on Azure. Per lib/ttsPrecedence.ts, Azure
+    // Swahili (Kenya) currently runs on Azure. Per lib/ttsPrecedence.ts, Azure
     // overrides ElevenLabs rows but leaves Google rows untouched. These tests
     // drive both branches via `prepareCardContent`.
     it("deletes a row whose ttsProvider is in the current provider's override list", async () => {
@@ -505,7 +505,7 @@ describe("features/ttsProcessing", () => {
       const audioId = await t.run(async (ctx) =>
         ctx.db.insert("audioRecordings", {
           textId,
-          language: "sv",
+          language: "sw",
           voiceName: "RILOU7YmBhvwJGDGjNmP", // ElevenLabs voice id (Jane)
           storageId,
           ttsQuality: "validated",
@@ -517,15 +517,15 @@ describe("features/ttsProcessing", () => {
 
       await t.mutation(internal.features.decks.prepareCardContent, {
         textId,
-        baseLanguages: ["sv"],
-        targetLanguages: ["sv"],
+        baseLanguages: ["sw"],
+        targetLanguages: ["sw"],
       });
 
       const left = await t.run(async (ctx) => ctx.db.get(audioId));
       expect(left).toBeNull();
     });
 
-    it("keeps a Google row when the language switches to a provider that doesn't override Google", async () => {
+    it("keeps a Google row when the language's active provider doesn't override Google", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       await t.run(async (ctx) =>
@@ -537,8 +537,8 @@ describe("features/ttsProcessing", () => {
       const audioId = await t.run(async (ctx) =>
         ctx.db.insert("audioRecordings", {
           textId,
-          language: "sv",
-          voiceName: "sv-SE-Chirp3-HD-Leda",
+          language: "sw",
+          voiceName: "sw-KE-Chirp3-HD-Leda",
           storageId,
           ttsQuality: "validated",
           ttsProvider: "google",
@@ -549,8 +549,8 @@ describe("features/ttsProcessing", () => {
 
       await t.mutation(internal.features.decks.prepareCardContent, {
         textId,
-        baseLanguages: ["sv"],
-        targetLanguages: ["sv"],
+        baseLanguages: ["sw"],
+        targetLanguages: ["sw"],
       });
 
       const left = await t.run(async (ctx) => ctx.db.get(audioId));

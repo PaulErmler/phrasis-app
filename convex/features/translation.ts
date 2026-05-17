@@ -25,22 +25,30 @@ import { SignJWT, importPKCS8 } from 'jose';
  * only matters when translating away from `zh_traditional`.
  */
 const GOOGLE_TRANSLATE_CODE_MAP: Record<string, string> = {
-  es: 'es-ES',
-  es_latam: 'es-US',
-  // English variants map to en-* (Google Translate accepts the locale form,
-  // not just the bare ISO code, so target='en-GB' triggers British spelling).
-  en_gb: 'en-GB',
-  en_us: 'en-US',
-  en_au: 'en-AU',
-  // Spanish Mixed gets a default — callers that need a specific regional
-  // sub-prompt should resolve it themselves (see translationLLM's per-sentence
-  // variant picker) and not rely on this map.
-  es_mixed: 'es-ES',
-  // Chinese Traditional: Google accepts `zh-TW`.
+  // Spanish variants collapse to plain `es`. Google Translate v2 does NOT
+  // accept locale tags like `es-ES` / `es-US` (verified against /v2/languages)
+  // — only `zh-CN`, `zh-TW`, `pt-PT`, `fr-CA` and a few script-tagged codes
+  // are locale-aware. Regional flavor only matters for LLM/voice paths; v2
+  // is the legacy fallback and degrading to base Spanish is acceptable when
+  // it fires.
+  es: 'es',
+  es_latam: 'es',
+  es_mixed: 'es',
+  // English variants collapse to plain `en` for the same reason (v2 rejects
+  // `en-GB` / `en-US` / `en-AU`). English is source-only in normal flows, so
+  // this only matters if a non-English course translates *into* an English
+  // variant via the fallback.
+  en_gb: 'en',
+  en_us: 'en',
+  en_au: 'en',
+  // Chinese Traditional: Google accepts `zh-TW` (one of the few locale-tagged
+  // codes the v2 catalog actually exposes).
   zh_traditional: 'zh-TW',
   // Cantonese: Google romanization v3 supports `yue`.
   yue: 'yue',
   yue_traditional: 'yue',
+  // Norwegian Bokmål: v2 lists `no` (generic Norwegian), not `nb`.
+  nb: 'no',
   // Arabic dialects → plain `ar` for romanization (Google has no per-dialect
   // model). The same code is fine for translate v2 — the LLM/Azure handle
   // dialect-specific output via voice + prompt, not translate API.
@@ -53,7 +61,7 @@ const GOOGLE_TRANSLATE_CODE_MAP: Record<string, string> = {
   sw_tz: 'sw',
 };
 
-function toGoogleTranslateCode(code: string): string {
+export function toGoogleTranslateCode(code: string): string {
   return GOOGLE_TRANSLATE_CODE_MAP[code] ?? code;
 }
 

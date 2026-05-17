@@ -190,7 +190,16 @@ function LearnViewInner({
   initialSessionId,
   initialSessionCardCount,
 }: LearnViewProps) {
-  const state = useLearningMode({ initialSessionId, initialSessionCardCount });
+  const state = useLearningMode({
+    initialSessionId,
+    initialSessionCardCount,
+    // Onboarding adds 2 cards at a time (smaller batches keep the first
+    // lesson feeling brisk and unblocked). In-memory override only — the
+    // persisted `cardsToAddBatchSize` written by `completeOnboarding`
+    // stays at `ONBOARDING_CARDS_BATCH_SIZE`, so regular learning after
+    // onboarding resumes the normal batch.
+    batchSizeOverride: mode === 'onboarding' ? 2 : undefined,
+  });
   useScreenWakeLock(state.status === 'reviewing');
   const reviewMode = state.status !== 'loading' ? (state.courseSettings?.reviewMode ?? 'audio') : 'audio';
   const schedulingMode = state.status !== 'loading'

@@ -1,6 +1,7 @@
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
+import { CLAIM_STALE_MS as LLM_CLAIM_STALE_MS } from '../features/llmTranslationQueue';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -10,6 +11,13 @@ export interface CardTranslationContent {
   isBaseLanguage: boolean;
   isTargetLanguage: boolean;
   romanization?: string;
+  /**
+   * True iff an LLM retranslation is currently in flight for this language
+   * AND an existing `translatedText` is on file. Keyed off the LLM claim
+   * so it does NOT fire during a "regenerate audio" action (no LLM phase).
+   * Drives the warning-color "Retranslating" pill in the card header.
+   */
+  retranslating?: boolean;
 }
 
 export interface CardAudioContent {
@@ -17,6 +25,14 @@ export interface CardAudioContent {
   voiceName: string | null;
   url: string | null;
   wordTimings: { word: string; start: number; end: number }[] | null;
+  /**
+   * TTS validation state — see AudioResult in convex/lib/audio.ts. Surfaced
+   * here so the retranslating-pill computation can distinguish "audio row
+   * exists and points at the final blob" (validated/unvalidated) from "audio
+   * row exists but the blob behind it may still be replaced by the
+   * synthesize-and-validate loop" (`unknown`).
+   */
+  ttsQuality: string | null;
 }
 
 export interface TextContentResult {
@@ -59,7 +75,7 @@ export async function buildTextContentBatchForLanguages(
     }
   }
 
-  const [translationResults, audioResults] = await Promise.all([
+  const [translationResults, audioResults, claimResults] = await Promise.all([
     Promise.all(
       translationFetches.map((item) =>
         ctx.db
@@ -80,14 +96,33 @@ export async function buildTextContentBatchForLanguages(
           .first(),
       ),
     ),
+    // LLM claim per non-source-language translation slot. A non-stale claim
+    // means a `flagTranslation`-driven LLM retranslation is in flight; the
+    // "Retranslating" pill keys off this so it doesn't fire when the user
+    // clicks "regenerate audio" (no LLM phase, no claim).
+    Promise.all(
+      translationFetches.map((item) =>
+        ctx.db
+          .query('llmTranslationClaims')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', item.textId).eq('targetLanguage', item.lang),
+          )
+          .first(),
+      ),
+    ),
   ]);
 
-  const translationMap = new Map<string, { text: string; romanization?: string }>();
+  const translationMap = new Map<
+    string,
+    { text: string; romanization?: string; llmClaimedAt: number | null }
+  >();
   translationFetches.forEach((item, idx) => {
     const row = translationResults[idx];
+    const claim = claimResults[idx];
     translationMap.set(`${item.key}:${item.lang}`, {
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
+      llmClaimedAt: claim?.claimedAt ?? null,
     });
   });
 
@@ -115,6 +150,17 @@ export async function buildTextContentBatchForLanguages(
 
   const result = new Map<string, TextContentResult>();
   for (const input of inputs) {
+    const audioRecordings = allLanguages.map((lang) => {
+      const audio = audioByKeyAndLang.get(`${input.key}:${lang}`);
+      return {
+        language: lang,
+        voiceName: audio?.voiceName ?? null,
+        url: urlMap.get(`${input.key}:${lang}`) ?? null,
+        wordTimings: audio?.wordTimings ?? null,
+        ttsQuality: audio?.ttsQuality ?? null,
+      };
+    });
+
     const translations = allLanguages.map((lang) => {
       if (lang === input.sourceLanguage) {
         return {
@@ -123,25 +169,24 @@ export async function buildTextContentBatchForLanguages(
           isBaseLanguage: baseLanguages.includes(lang),
           isTargetLanguage: targetLanguages.includes(lang),
           romanization: input.sourceRomanization,
+          retranslating: false,
         };
       }
       const entry = translationMap.get(`${input.key}:${lang}`);
+      const translatedText = entry?.text ?? '';
+      const claimedAt = entry?.llmClaimedAt ?? null;
+      const llmClaimHeld =
+        claimedAt !== null && Date.now() - claimedAt < LLM_CLAIM_STALE_MS;
       return {
         language: lang,
-        text: entry?.text ?? '',
+        text: translatedText,
         isBaseLanguage: baseLanguages.includes(lang),
         isTargetLanguage: targetLanguages.includes(lang),
         romanization: entry?.romanization,
-      };
-    });
-
-    const audioRecordings = allLanguages.map((lang) => {
-      const audio = audioByKeyAndLang.get(`${input.key}:${lang}`);
-      return {
-        language: lang,
-        voiceName: audio?.voiceName ?? null,
-        url: urlMap.get(`${input.key}:${lang}`) ?? null,
-        wordTimings: audio?.wordTimings ?? null,
+        // Show the pill only when an LLM retranslation is in flight AND a
+        // prior translatedText exists (i.e. this is a *re*translation, not
+        // the first-time translation of a new card).
+        retranslating: llmClaimHeld && translatedText.length > 0,
       };
     });
 

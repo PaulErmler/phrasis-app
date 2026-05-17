@@ -613,7 +613,7 @@ describe('LibraryView pinned card actions', () => {
 });
 
 describe('LibraryView flag flow', () => {
-  it('opens a confirm dialog and fires flagTranslation + deleteCard on confirm', async () => {
+  it('opens a confirm dialog and fires flagTranslation on confirm without deleting the card', async () => {
     const user = userEvent.setup();
     userSettingsValue = { pinnedCardActions: ['flag'] };
     useQueryMock.mockReturnValue([
@@ -639,9 +639,10 @@ describe('LibraryView flag flow', () => {
       cardId: 'c1',
       language: 'en',
     });
-    // handleConfirmFlag awaits deleteCard so the row stops appearing in the
-    // library after the flag.
-    expect(deleteCardFn).toHaveBeenCalledWith({ cardId: 'c1' });
+    // The flag flow no longer deletes the user's card — the new translation
+    // lands in-place when the worker finishes, so the row stays visible.
+    expect(deleteCardFn).not.toHaveBeenCalled();
+    expect(screen.getByTestId('card-hola')).toBeInTheDocument();
   });
 
   it('does not fire flagTranslation when the confirm dialog is cancelled', async () => {

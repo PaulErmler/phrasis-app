@@ -32,11 +32,15 @@ import { getAudioForText } from '../lib/audio';
 import {
   ROMANIZATION_LANGUAGES,
   USER_PROVIDED_TRANSLATION_SOURCE,
+  FLAG_AUTO_RETRANSLATION_MAX,
 } from '../../lib/languages';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
-import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
+import {
+  claimLlmTranslationIfAvailable,
+  CLAIM_STALE_MS as LLM_CLAIM_STALE_MS,
+} from './llmTranslationQueue';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 import {
   CARD_OVERRIDE_SPEED_MIN,
@@ -298,6 +302,26 @@ export const getCardForReview = query({
 
       const sourceLanguage = text.language;
 
+      const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
+
+      // Per-language LLM-claim lookup. A non-stale row in
+      // `llmTranslationClaims` means a `flagTranslation`-triggered LLM
+      // retranslation is currently in flight; the "Retranslating" pill
+      // keys off this rather than "audio is missing" so it doesn't fire
+      // when the user clicks "regenerate audio" (no LLM phase).
+      const claimsByLang = new Map<string, number | null>();
+      await Promise.all(
+        allLanguages.map(async (lang) => {
+          const claim = await ctx.db
+            .query('llmTranslationClaims')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', card.textId).eq('targetLanguage', lang),
+            )
+            .first();
+          claimsByLang.set(lang, claim?.claimedAt ?? null);
+        }),
+      );
+
       const translations = await Promise.all(
         allLanguages.map(async (lang) => {
           if (lang === sourceLanguage) {
@@ -307,6 +331,7 @@ export const getCardForReview = query({
               isBaseLanguage: course.baseLanguages.includes(lang),
               isTargetLanguage: course.targetLanguages.includes(lang),
               romanization: text.romanizedText ?? undefined,
+              retranslating: false,
             };
           }
           const translation = await ctx.db
@@ -315,17 +340,25 @@ export const getCardForReview = query({
               q.eq('textId', card.textId).eq('targetLanguage', lang),
             )
             .first();
+          const translatedText = translation?.translatedText || '';
+          const claimedAt = claimsByLang.get(lang) ?? null;
+          const llmClaimHeld =
+            claimedAt !== null &&
+            Date.now() - claimedAt < LLM_CLAIM_STALE_MS;
+          // Show the pill only for *re*translations — first-time
+          // translations of new cards also hold a claim, but there's no
+          // prior text to retranslate from, so the pill would be confusing
+          // pre-translation. Gate on `translatedText` being non-empty.
           return {
             language: lang,
-            text: translation?.translatedText || '',
+            text: translatedText,
             isBaseLanguage: course.baseLanguages.includes(lang),
             isTargetLanguage: course.targetLanguages.includes(lang),
             romanization: translation?.romanizedText ?? undefined,
+            retranslating: llmClaimHeld && translatedText.length > 0,
           };
         }),
       );
-
-      const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
 
       const hasMissingTranslation = translations.some(
         (tr) => tr.language !== sourceLanguage && !tr.text,
@@ -969,17 +1002,20 @@ export const toggleFavoriteCard = mutation({
   },
 });
 
-/** Maximum auto-retranslations triggered by flagging a single translation row. */
-const FLAG_RETRANSLATION_MAX = 2;
+/** Maximum auto-retranslations per flagged row. Shared with the card queries
+ * (which use it to decide between "Retranslating" vs "Flagged" pill state). */
+const FLAG_RETRANSLATION_MAX = FLAG_AUTO_RETRANSLATION_MAX;
 
 /**
  * Flag a card's translation in a specific target language as bad. Increments
  * `translations.flagCount` for the matching row. On flag counts 1 and 2 the
- * mutation enqueues a retranslation with the `retranslation_high` rule
- * (full Gemini Flash with high reasoning, Lite-high fallback) and deletes the
- * stale audio so a fresh TTS pass runs after the new text lands. Counts 3+
- * still increment the counter (for later admin triage) but skip the
- * retranslation to bound cost.
+ * mutation enqueues a retranslation (`retranslation_high` for curriculum
+ * texts, `retranslation_custom` for user-created texts) and deletes the
+ * stale audio so a fresh TTS pass runs after the new text lands. Counts
+ * 3+ still increment the counter (for later admin triage) but skip the
+ * retranslation to bound cost — Pro-medium isn't cheap, and a row flagged
+ * three times almost certainly needs human review rather than another
+ * model retry.
  *
  * Quota: one `translation_flags` unit is consumed only when the call
  * actually triggers a retranslation (claim acquired + count ≤ cap). Flags
@@ -1078,6 +1114,15 @@ export const flagTranslation = mutation({
       await ctx.db.delete(audioRow._id);
     }
 
+    // Curriculum (premade-dataset) texts route to Pro-medium for a
+    // cross-model second opinion; user-created custom texts route to
+    // Flash-Lite-high (cheaper, since the heavyweight Pro adds less value
+    // on user-generated content). Both rules share the same worker
+    // semantics — `replaceExisting` + `<previous_translation>` prompt block.
+    const ruleOverride = text.userCreated
+      ? 'retranslation_custom'
+      : 'retranslation_high';
+
     await ctx.runMutation(
       internal.features.llmTranslationQueue.enqueueLlmTranslation,
       {
@@ -1087,7 +1132,12 @@ export const flagTranslation = mutation({
           targetLanguage: args.language,
           text: text.text,
           audioSpeakerGender: text.audioSpeakerGender,
-          ruleOverride: 'retranslation_high',
+          ruleOverride,
+          // Deliberate retranslation — overwrite the existing translation
+          // row (and its romanization). Without this, the worker would
+          // regenerate audio against the new translation but the displayed
+          // text would stay on the old translation.
+          replaceExisting: true,
         },
         priority: 1,
       },

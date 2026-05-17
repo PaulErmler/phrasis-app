@@ -53,6 +53,15 @@ interface CardShellProps {
   onSpeedCycle?: (language: string, next: number | null) => void;
   /** Badge behavior — `ephemeral` hides the null/default slot and greys 1.0. */
   speedBadgeVariant?: 'persistent' | 'ephemeral';
+  /**
+   * Client-only session state: did the viewer click the flag action on this
+   * card during the current view? Set on click, cleared when navigating
+   * away. Drives the warning-color "Flagged" pill — a per-session signal
+   * scoped to the flagger, NOT a global server-derived state (which would
+   * leak the flag to other users). Wins visually over the server-driven
+   * "Retranslating" pill when both apply.
+   */
+  flaggedInSession?: boolean;
   children: (ctx: {
     baseTranslations: CardTranslation[];
     targetTranslations: CardTranslation[];
@@ -90,6 +99,7 @@ export function CardShell({
   audioSpeedOverrides,
   onSpeedCycle,
   speedBadgeVariant,
+  flaggedInSession = false,
   children,
 }: CardShellProps) {
   const t = useTranslations('LearningMode');
@@ -97,6 +107,26 @@ export function CardShell({
   const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
   const masterActive = isMastered || isPendingMaster;
   const hideActive = isHidden || isPendingHide;
+
+  // Translation-state pill, single source for the card header.
+  // - "Retranslating" (server-driven, global): an LLM retranslation is in
+  //   flight for at least one target language. Doesn't fire on "regenerate
+  //   audio" (no LLM phase, no claim). Shown to everyone, including the
+  //   flagger, so they get the live "in progress" signal.
+  // - "Flagged" (client-only, session-scoped): the viewer clicked the flag
+  //   action on this card. Persists after the LLM lands (or shows
+  //   immediately for over-cap flags that don't enqueue an LLM job),
+  //   purely client state — NOT leaked to other users.
+  // Retranslating wins while the work is actively happening; Flagged
+  // takes over once the retranslation finishes (or never started).
+  const anyTargetRetranslating = targetTranslations.some(
+    (tr) => tr.retranslating === true,
+  );
+  const translationStatePill = anyTargetRetranslating
+    ? { key: 'retranslating' as const, label: t('retranslating') }
+    : flaggedInSession
+      ? { key: 'flagged' as const, label: t('flagged') }
+      : null;
 
   const cardSurface = (
     <div className="card-surface" data-tutorial="card-flashcard">
@@ -106,6 +136,17 @@ export function CardShell({
           <Badge variant="secondary" className="text-xs">
             {t('reviewCount', { count: reviewCount })}
           </Badge>
+          {translationStatePill && (
+            <Badge
+              // Transparent warning fill (15% alpha of theme's --color-warning).
+              // aria-live announces transitions (retranslating → flagged, or
+              // cleared) without grabbing focus.
+              className="border-transparent bg-warning/15 text-warning text-xs"
+              aria-live="polite"
+            >
+              {translationStatePill.label}
+            </Badge>
+          )}
         </div>
         <CardActionsMenu
           isFavorite={isFavorite}

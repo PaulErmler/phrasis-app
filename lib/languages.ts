@@ -40,10 +40,37 @@ function regionLabelFromDisplayCode(displayCode: string): string {
     'yue-Hant-HK': 'Hong Kong (traditional script)',
     'sw-KE': 'Kenya',
     'sw-TZ': 'Tanzania',
-    'nb-NO': 'Norway',
-    'sv-SE': 'Sweden',
-    'da-DK': 'Denmark',
-    'fi-FI': 'Finland',
+    // Bare-code entries. Most Language records use a 2-letter displayCode
+    // (e.g. 'de', 'fr', 'he') with no region suffix. Without these, the
+    // prompt's "suitable for X" clause renders the raw code ("suitable for
+    // he"), which is meaningless to the model.
+    fr: 'France',
+    de: 'Germany',
+    it: 'Italy',
+    pt: 'Brazil',
+    ro: 'Romania',
+    ru: 'Russia',
+    pl: 'Poland',
+    sk: 'Slovakia',
+    cs: 'Czechia',
+    nl: 'Netherlands',
+    sv: 'Sweden',
+    nb: 'Norway',
+    da: 'Denmark',
+    fi: 'Finland',
+    el: 'Greece',
+    hi: 'India',
+    bn: 'Bangladesh',
+    tr: 'Turkey',
+    hu: 'Hungary',
+    ja: 'Japan',
+    ko: 'South Korea',
+    vi: 'Vietnam',
+    th: 'Thailand',
+    id: 'Indonesia',
+    // MSA is supra-regional; describe the readership rather than a country.
+    ar: 'the Arab world',
+    he: 'Israel',
   };
   if (REGION_MAP[displayCode]) return REGION_MAP[displayCode];
   // Fall through: take the region segment after the dash, or the language tag if there isn't one.
@@ -115,6 +142,16 @@ export interface Language {
    * (Gemini Flash Lite with length-based reasoning, no fallback).
    */
   translationRule?: TranslationRuleId;
+  /**
+   * Override for the language name that appears in the LLM translation
+   * prompt's "English-to-X" line. Falls back to `name` when unset.
+   *
+   * Used today only for Hebrew (`'Modern Hebrew'`) — the bare "Hebrew" label
+   * is ambiguous between Modern and Biblical Hebrew, so the prompt pins the
+   * register explicitly. The UI continues to use `name` ("Hebrew") because
+   * "Modern" is implicit in a contemporary language-learning context.
+   */
+  translationName?: string;
 }
 
 export const SUPPORTED_LANGUAGES: Language[] = [
@@ -287,7 +324,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'google',
     needsRomanization: true,
-    supportsKaraoke: true,
+    // Cyrillic — karaoke off (non-Latin script policy).
+    supportsKaraoke: false,
     supportsStt: true,
   },
   {
@@ -350,24 +388,27 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇪',
     category: 'germanic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'azure',
-    needsRomanization: false,
-    supportsKaraoke: true,
-    supportsStt: true,
-  },
-  {
-    code: 'nb',
-    displayCode: 'nb',
-    name: 'Norwegian (Bokmål)',
-    nativeName: 'Norsk bokmål',
-    flag: '🇳🇴',
-    category: 'germanic',
-    llmSupportTier: 'tier2',
     ttsProvider: 'google',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
   },
+  // Norwegian (Bokmål) — disabled for now. Aux configs (voice pool, STT/textCompare
+  // maps, REGION_MAP entry, translation `nb→no` collapse) are left in place so
+  // re-enabling is a one-line uncomment.
+  // {
+  //   code: 'nb',
+  //   displayCode: 'nb',
+  //   name: 'Norwegian (Bokmål)',
+  //   nativeName: 'Norsk bokmål',
+  //   flag: '🇳🇴',
+  //   category: 'germanic',
+  //   llmSupportTier: 'tier2',
+  //   ttsProvider: 'google',
+  //   needsRomanization: false,
+  //   supportsKaraoke: true,
+  //   supportsStt: true,
+  // },
   {
     code: 'da',
     displayCode: 'da',
@@ -421,7 +462,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'google',
     needsRomanization: true,
-    supportsKaraoke: true,
+    // Devanagari — karaoke off (non-Latin script policy).
+    supportsKaraoke: false,
     supportsStt: true,
   },
   {
@@ -429,12 +471,15 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'bn',
     name: 'Bengali',
     nativeName: 'বাংলা',
-    flag: '🇧🇩',
+    // Flag is India, not Bangladesh: voice + STT infra is bn-IN (Google
+    // Chirp3-HD and Azure Fast Transcription only support bn-IN, not bn-BD).
+    flag: '🇮🇳',
     category: 'other',
     llmSupportTier: 'tier2',
     ttsProvider: 'google',
     needsRomanization: true,
-    supportsKaraoke: true,
+    // Bengali script — karaoke off (non-Latin script policy).
+    supportsKaraoke: false,
     supportsStt: true,
   },
   {
@@ -489,7 +534,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇹🇼',
     category: 'asian-east',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    // Google has no Chirp3-HD voices for cmn-TW (only legacy Standard/WaveNet),
+    // so we use Azure Neural for Mandarin-Traditional courses.
+    ttsProvider: 'azure',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
@@ -549,7 +596,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'google',
     needsRomanization: true,
-    supportsKaraoke: true,
+    // Hangul — karaoke off (non-Latin script policy).
+    supportsKaraoke: false,
     supportsStt: true,
   },
   {
@@ -573,7 +621,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇹🇭',
     category: 'asian-southeast',
     llmSupportTier: 'tier2',
-    ttsProvider: 'azure',
+    ttsProvider: 'google',
     // Romanization disabled — Google v3 doesn't support Thai, and the
     // available pure-JS Thai libraries have not yet been evaluated for
     // learner-grade quality. Re-enable once a good lib is wired up.
@@ -606,7 +654,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'google',
     needsRomanization: true,
-    supportsKaraoke: true,
+    // Karaoke disabled for Arabic: ligatures + clitics don't align to STT
+    // word timings, producing flickery/mis-positioned per-word highlights.
+    supportsKaraoke: false,
     supportsStt: true,
   },
   {
@@ -619,7 +669,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'azure',
     needsRomanization: true,
-    supportsKaraoke: true,
+    supportsKaraoke: false,
     supportsStt: true,
   },
   {
@@ -632,7 +682,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'azure',
     needsRomanization: true,
-    supportsKaraoke: true,
+    supportsKaraoke: false,
     supportsStt: true,
   },
   {
@@ -645,7 +695,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier2',
     ttsProvider: 'azure',
     needsRomanization: true,
-    supportsKaraoke: true,
+    supportsKaraoke: false,
     supportsStt: true,
   },
   {
@@ -653,15 +703,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'he',
     name: 'Hebrew',
     nativeName: 'עברית',
-    flag: '🇮🇱',
+    flag: '🌎',
     category: 'semitic',
     llmSupportTier: 'tier2',
     ttsProvider: 'google',
     // Romanization via the `hebrew-transliteration` package (SBL Academic
     // style), wired in convex/lib/localRomanization.ts.
     needsRomanization: true,
-    supportsKaraoke: true,
+    // Hebrew script — karaoke off (non-Latin script policy).
+    supportsKaraoke: false,
     supportsStt: true,
+    // Disambiguates from Biblical Hebrew in the translation prompt.
+    translationName: 'Modern Hebrew',
   },
   {
     code: 'sw',
@@ -815,20 +868,31 @@ const GEMINI_FLASH_LITE: ModelStage = {
   model: 'google/gemini-3.1-flash-lite-preview',
   maxOutputTokens: 5_000,
 };
-// Gemini Flash Lite with high thinking — the default-rule primary. Cheaper
-// than full Flash but still high reasoning, so it's the floor for every
-// default translation.
+// Gemini Flash Lite with high reasoning — primary for `retranslation_custom`
+// (flagged retranslations of user-created texts). Cheaper than the curriculum
+// retranslation rule on the assumption that custom texts are mostly the
+// user's own content where a heavyweight cross-model second opinion adds
+// less value than on curated material.
 const GEMINI_FLASH_LITE_HIGH: ModelStage = {
   model: 'google/gemini-3.1-flash-lite-preview',
   reasoning: 'high',
   maxOutputTokens: 6_000,
 };
-// Full Gemini Flash (non-lite) with high thinking — primary for
-// `retranslation_high` (triggered by user-flagged rows). Heavier than the
-// default Lite tier so a flagged row gets a cross-model second opinion.
+// Full Gemini 3 Flash with high reasoning — primary for `default_hybrid`
+// (the rule every language without an explicit override falls through to).
 const GEMINI_FLASH_HIGH: ModelStage = {
   model: 'google/gemini-3-flash-preview',
   reasoning: 'high',
+  maxOutputTokens: 6_000,
+};
+// Gemini 3.1 Pro with medium reasoning — primary for `retranslation_high`
+// (flagged retranslations of curriculum / premade-dataset texts). A heavier
+// *different* model than the default Flash tier, so a flagged curriculum
+// row gets a genuine cross-model second opinion. Medium reasoning keeps
+// cost in check while still benefiting from Pro's larger base capacity.
+const GEMINI_PRO_MEDIUM: ModelStage = {
+  model: 'google/gemini-3.1-pro-preview',
+  reasoning: 'medium',
   maxOutputTokens: 6_000,
 };
 // DeepSeek V4 Flash at `high` reasoning emits 3–6K tokens of thinking before
@@ -849,31 +913,62 @@ const DEEPSEEK_V4_FLASH_HIGH: ModelStage = {
  */
 export const HYBRID_LENGTH_THRESHOLD = 30;
 
+/**
+ * Maximum number of auto-retranslations triggered by user flags on a single
+ * translation row. Flags 1..MAX each enqueue a retranslation via
+ * `retranslation_high` / `retranslation_custom`; flag (MAX+1) and beyond
+ * only increment `flagCount` for admin triage. Surfaced here (rather than
+ * inline in `flagTranslation`) so the card queries can also use it to
+ * decide between the "Retranslating" pill (under-cap, in flight) and the
+ * "Flagged" pill (over-cap, no auto-retranslation will happen).
+ */
+export const FLAG_AUTO_RETRANSLATION_MAX = 2;
+
 export const TRANSLATION_RULES = {
   /**
    * Default for every language without an explicit `translationRule`. Every
-   * sentence — regardless of length — runs Gemini Flash Lite with high
+   * sentence — regardless of length — runs full Gemini 3 Flash with high
    * reasoning. Length-hybrid branching was retired so the quality floor
    * matches across all input sizes.
    */
   default_hybrid: {
     id: 'default_hybrid',
-    label: 'Gemini Flash Lite — high reasoning',
+    label: 'Gemini 3 Flash — high reasoning',
     branches: [
-      { maxChars: Infinity, primary: GEMINI_FLASH_LITE_HIGH },
+      { maxChars: Infinity, primary: GEMINI_FLASH_HIGH },
     ],
   },
   /**
-   * Triggered by `flagTranslation` on the 1st and 2nd flag of a given
-   * translation row. Routes through full Gemini Flash (high) — a heavier
-   * *different* model than the default Lite tier, so a flagged row gets a
-   * genuine cross-model second opinion.
+   * Triggered by `flagTranslation` for flagged retranslations of CURRICULUM
+   * (premade-dataset) texts, on flag counts 1 through
+   * FLAG_RETRANSLATION_MAX. Routes through Gemini 3.1 Pro with medium
+   * reasoning — a different (heavier) model than the default Flash tier,
+   * so a flagged curriculum row genuinely gets a cross-model second
+   * opinion. The worker also threads the previously-flagged translation
+   * into the prompt as `<previous_translation>` context. Custom (user-
+   * created) texts use `retranslation_custom` instead.
    */
   retranslation_high: {
     id: 'retranslation_high',
-    label: 'Gemini Flash (high) second opinion',
+    label: 'Gemini 3.1 Pro (medium) — flagged curriculum retranslation',
     branches: [
-      { maxChars: Infinity, primary: GEMINI_FLASH_HIGH },
+      { maxChars: Infinity, primary: GEMINI_PRO_MEDIUM },
+    ],
+  },
+  /**
+   * Triggered by `flagTranslation` for flagged retranslations of CUSTOM
+   * (user-created) texts. Routes through Gemini Flash Lite with high
+   * reasoning — same model as the legacy default, used here because
+   * custom texts are user-generated content where a heavyweight Pro
+   * second opinion adds less value than on curated curriculum material.
+   * Worker behavior (previous-translation prompt block, replaceExisting
+   * write semantics) matches `retranslation_high`.
+   */
+  retranslation_custom: {
+    id: 'retranslation_custom',
+    label: 'Gemini Flash Lite (high) — flagged custom retranslation',
+    branches: [
+      { maxChars: Infinity, primary: GEMINI_FLASH_LITE_HIGH },
     ],
   },
   /**
@@ -965,7 +1060,7 @@ export function getTranslationConfigForLanguage(
   return {
     provider,
     targetRegion: regionLabelFromDisplayCode(lang.displayCode),
-    targetLangName: lang.name,
+    targetLangName: lang.translationName ?? lang.name,
     targetLangNativeName: lang.nativeName,
   };
 }

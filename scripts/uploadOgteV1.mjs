@@ -208,6 +208,7 @@ async function main() {
         skippedCount++;
         continue;
       }
+      const arcIdRaw = typeof row.arc_id === 'string' ? row.arc_id.trim() : '';
       validTexts.push({
         externalId,
         text,
@@ -220,6 +221,9 @@ async function main() {
         addressesSomeone: mapAddressesSomeone(row.addresses_someone) ?? null,
         addresseeGender: mapGenderField(row.addressee_gender) ?? null,
         referentGender: mapGenderField(row.referent_gender) ?? null,
+        // OGTE arc grouping from the curation manifest. Empty string → null
+        // so the mutation clears the field for rows without an arc.
+        arcId: arcIdRaw === '' ? null : arcIdRaw,
       });
     }
     console.log(`  parsed ${validTexts.length} rows (skipped ${skippedCount})`);

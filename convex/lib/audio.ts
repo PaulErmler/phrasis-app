@@ -12,6 +12,14 @@ export interface AudioResult {
   voiceName: string | null;
   url: string | null;
   wordTimings: AudioWordTiming[] | null;
+  /**
+   * TTS validation state — 'unknown' while a synthesis attempt is still in
+   * flight (the row is inserted at attempt 0 before validation), 'validated'
+   * after STT roundtrip matched, 'unvalidated' for languages without STT
+   * support or when all retries mismatched. Used by callers to decide
+   * whether the audio currently behind `url` is the final one.
+   */
+  ttsQuality: string | null;
 }
 
 /**
@@ -45,5 +53,6 @@ export async function getAudioForText(
     voiceName: records[i]?.voiceName ?? null,
     url: urlEntries[i] ?? null,
     wordTimings: records[i]?.wordTimings ?? null,
+    ttsQuality: records[i]?.ttsQuality ?? null,
   }));
 }

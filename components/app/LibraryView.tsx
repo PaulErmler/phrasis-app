@@ -64,7 +64,7 @@ export function LibraryView({
   const { preloadedCourseSettings, preloadedSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const userSettings = usePreloadedQuery(preloadedSettings);
-  const highlightEnabled = courseSettings?.highlightWords !== false;
+  const highlightEnabled = courseSettings?.highlightWords === true;
   const pinnedCardActions = userSettings?.pinnedCardActions ?? [];
 
   const cardEditsQuota = useFeatureQuota(FEATURE_IDS.CARD_EDITS);
@@ -276,28 +276,45 @@ export function LibraryView({
   );
 
   // Flag opens a confirm dialog identical to LearningMode's: on confirm we
-  // fire the retranslation in the background and delete the card so it stops
-  // appearing in the library too.
+  // fire the retranslation in the background. The card stays in the
+  // library — the new translation will land in-place when the worker
+  // finishes.
   const [flagConfirmCard, setFlagConfirmCard] = useState<{
     cardId: Id<'cards'>;
     language: string;
   } | null>(null);
+  // Client-only session record of cards the viewer has flagged. Drives the
+  // "Flagged" pill on each card row — purely local, never persisted, so it
+  // doesn't leak to other users that someone flagged a row.
+  const [flaggedCardIds, setFlaggedCardIds] = useState<Set<Id<'cards'>>>(
+    () => new Set(),
+  );
   const handleConfirmFlag = useCallback(async () => {
     const target = flagConfirmCard;
     if (!target) return;
     setFlagConfirmCard(null);
+    // Only mark the card as session-flagged when the mutation reports it
+    // did NOT trigger a retranslation. With a retranslation in flight, the
+    // server-driven "Retranslating" pill is the right signal — and once
+    // it lands, no pill (the flag has been acted on, nothing lingering).
     flagTranslation({
       cardId: target.cardId,
       language: target.language,
-    }).catch((error) =>
-      console.error('Failed to flag translation:', error),
-    );
-    try {
-      await deleteCard({ cardId: target.cardId });
-    } catch (error) {
-      console.error('Failed to delete card after flag:', error);
-    }
-  }, [flagConfirmCard, flagTranslation, deleteCard]);
+    })
+      .then((result) => {
+        if (result && result.retranslated === false) {
+          setFlaggedCardIds((prev) => {
+            if (prev.has(target.cardId)) return prev;
+            const next = new Set(prev);
+            next.add(target.cardId);
+            return next;
+          });
+        }
+      })
+      .catch((error) =>
+        console.error('Failed to flag translation:', error),
+      );
+  }, [flagConfirmCard, flagTranslation]);
 
   const handleConfirmDelete = useCallback(async () => {
     const cardId = deletingCardId;
@@ -566,6 +583,7 @@ export function LibraryView({
                   quotaState={cardActionQuotas}
                   hideTargetLanguages={false}
                   highlightEnabled={highlightEnabled}
+                  flaggedInSession={flaggedCardIds.has(card._id)}
                   audioSpeedOverrides={ephemeralOverrides[card._id]}
                   onSpeedCycle={(language, next) =>
                     handleSpeedCycle(card._id, language, next)

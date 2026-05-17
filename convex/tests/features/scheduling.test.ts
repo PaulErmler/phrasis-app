@@ -1564,7 +1564,11 @@ describe("features/scheduling", () => {
     // for `en`; usage quota with translation_flags balance > 0.
     async function seedFlaggableCard(
       t: ReturnType<typeof convexTest>,
-      opts: { flagsBalance?: number; flagCount?: number } = {},
+      opts: {
+        flagsBalance?: number;
+        flagCount?: number;
+        userCreated?: boolean;
+      } = {},
     ) {
       return t.run(async (ctx) => {
         const collectionId = await ctx.db.insert("collections", {
@@ -1589,7 +1593,7 @@ describe("features/scheduling", () => {
         const textId = await ctx.db.insert("texts", {
           text: "Hola mundo",
           language: "es",
-          userCreated: false,
+          userCreated: opts.userCreated ?? false,
           collectionId,
           collectionRank: 1,
         });
@@ -1664,11 +1668,16 @@ describe("features/scheduling", () => {
       expect(audioRows).toHaveLength(0);
 
       // Queue row inserted with the retranslation_high override + priority 1.
+      // `replaceExisting: true` is the bug-fix bit: without it,
+      // storeTranslationAndScheduleTTS would only patch metadata on the
+      // existing row, so the audio would regenerate against the new
+      // translation but the displayed text would stay on the old one.
       const queueRows = await t.run(async (ctx) =>
         ctx.db.query("llmTranslationQueue").collect(),
       );
       expect(queueRows).toHaveLength(1);
       expect(queueRows[0].args.ruleOverride).toBe("retranslation_high");
+      expect(queueRows[0].args.replaceExisting).toBe(true);
       expect(queueRows[0].args.targetLanguage).toBe("en");
       expect(queueRows[0].priority).toBe(1);
 
@@ -1680,6 +1689,29 @@ describe("features/scheduling", () => {
           .first(),
       );
       expect(quota?.features.translation_flags.balance).toBe(9);
+    });
+
+    it("flagging a custom (user-created) text routes to retranslation_custom rule", async () => {
+      // Curriculum texts (userCreated: false) get Pro-medium via
+      // `retranslation_high`; custom texts (userCreated: true) get
+      // Flash-Lite-high via `retranslation_custom`. Verify the dispatch.
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedFlaggableCard(t, { userCreated: true });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+        language: "en",
+      });
+      expect(res).toEqual({ flagCount: 1, retranslated: true });
+
+      const queueRows = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationQueue").collect(),
+      );
+      expect(queueRows).toHaveLength(1);
+      expect(queueRows[0].args.ruleOverride).toBe("retranslation_custom");
+      expect(queueRows[0].args.replaceExisting).toBe(true);
+      expect(queueRows[0].args.targetLanguage).toBe("en");
     });
 
     it("over-cap flag only increments counter — no enqueue, no charge", async () => {

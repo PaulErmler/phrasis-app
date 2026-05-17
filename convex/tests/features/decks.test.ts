@@ -391,5 +391,136 @@ describe("features/decks", () => {
       const row = await t.run(async (ctx) => ctx.db.get(legacyId));
       expect(row?.translationSource).toBe("google-translate-v2");
     });
+
+    /**
+     * Regression guard for the bug where flag-triggered retranslations
+     * regenerated audio against the new translation but left the existing
+     * `translatedText` (and its romanization tagged to the OLD translation)
+     * untouched. With `replaceExisting: true` the existing-row branch must
+     * overwrite text + romanization + source as a unit.
+     */
+    it("with replaceExisting=true overwrites translatedText, romanization, and translationSource on an existing row", async () => {
+      const t = convexTest(schema, modules);
+      // Seed an existing row with old text + old romanization + old source.
+      const { textId, translationId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "She's over there",
+          language: "en",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        const translationId = await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "de",
+          translatedText: "Sie ist dort drüben",
+          romanizedText: "Sie ist dort drüben",
+          romanizationSource: "old-romanizer",
+          translationSource: "google/gemini-3.1-flash-lite-preview-high",
+        });
+        // Pre-seed audio so the TTS-enqueue branch short-circuits.
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        await ctx.db.insert("audioRecordings", {
+          textId,
+          language: "de",
+          voiceName: TEST_VOICE,
+          storageId,
+          ttsQuality: "validated",
+          ttsProvider: "google",
+          voiceGender: "female",
+        });
+        return { textId, translationId };
+      });
+
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "de",
+          translatedText: "Sie ist dadrüben",
+          voiceName: TEST_VOICE,
+          romanizedText: "Sie ist dadrüben",
+          romanizationSource: "new-romanizer",
+          translationSource: "google/gemini-3-flash-preview-high",
+          replaceExisting: true,
+        },
+      );
+
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.translatedText).toBe("Sie ist dadrüben");
+      expect(row?.romanizedText).toBe("Sie ist dadrüben");
+      expect(row?.romanizationSource).toBe("new-romanizer");
+      expect(row?.translationSource).toBe(
+        "google/gemini-3-flash-preview-high",
+      );
+    });
+
+    it("with replaceExisting=true clears romanizedText when caller didn't supply one", async () => {
+      // For non-romanized languages the worker passes `romanizedText:
+      // undefined`. On replace, the old romanization (which referred to the
+      // OLD translatedText) must be cleared so a later ensureContent pass
+      // can recompute it against the new text — otherwise we'd display a
+      // romanization that doesn't match the displayed translation.
+      const t = convexTest(schema, modules);
+      const { textId, translationId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        const translationId = await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "es",
+          translatedText: "Hola old",
+          romanizedText: "Hola old",
+          romanizationSource: "stale-romanizer",
+          translationSource: "old-source",
+        });
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        await ctx.db.insert("audioRecordings", {
+          textId,
+          language: "es",
+          voiceName: TEST_VOICE,
+          storageId,
+          ttsQuality: "validated",
+          ttsProvider: "google",
+          voiceGender: "female",
+        });
+        return { textId, translationId };
+      });
+
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "es",
+          translatedText: "Hola new",
+          voiceName: TEST_VOICE,
+          // No romanizedText — caller didn't compute one for this language.
+          translationSource: "new-source",
+          replaceExisting: true,
+        },
+      );
+
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.translatedText).toBe("Hola new");
+      expect(row?.romanizedText).toBeUndefined();
+      expect(row?.romanizationSource).toBeUndefined();
+      expect(row?.translationSource).toBe("new-source");
+    });
   });
 });

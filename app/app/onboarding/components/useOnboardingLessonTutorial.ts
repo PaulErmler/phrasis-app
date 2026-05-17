@@ -75,14 +75,6 @@ export function useOnboardingLessonTutorial({
   const activeDriverRef = useRef<Driver | null>(null);
   const firedStagesRef = useRef<Set<Stage>>(new Set());
   const coreCompleteFiredRef = useRef(false);
-  // Re-entry guard for the card-actions delayed destroy: when the user
-  // closes the popover we want the dropdown's exit animation (~150ms) to
-  // finish *under* the still-visible overlay before tearing the overlay
-  // down. We do that by closing the menu, then scheduling `d.destroy()`
-  // ~180ms later — but `d.destroy()` itself re-enters `onDestroyStarted`,
-  // and the lesson-cleanup path can also call `d.destroy()` directly. The
-  // flag tells the re-entrant call to skip the delay and just complete.
-  const cardActionsDestroyInFlightRef = useRef(false);
   // Modes whose core/mode-switch driver has actually mounted. Used to gate
   // the core effect on mode changes: the first time a mode is taught, run
   // the full `buildCoreSteps` walkthrough; on a subsequent switch to the
@@ -173,21 +165,6 @@ export function useOnboardingLessonTutorial({
         onStepShowRef.current?.();
       },
       onDestroyStarted: () => {
-        // Card-actions: close the auto-opened dropdown FIRST and let its
-        // exit animation finish under the still-visible overlay; only
-        // then tear the overlay down. Otherwise the overlay disappears
-        // while the menu is mid-close, briefly showing the menu without
-        // any tutorial chrome.
-        if (stage === 'card-actions' && !cardActionsDestroyInFlightRef.current) {
-          cardActionsDestroyInFlightRef.current = true;
-          closeCardActions();
-          setTimeout(() => {
-            activeDriverRef.current = null;
-            onActiveChangeRef.current?.(false);
-            d.destroy();
-          }, 180);
-          return; // defer the actual destroy
-        }
         if (stage === 'core' && !coreCompleteFiredRef.current) {
           coreCompleteFiredRef.current = true;
           onCoreCompleteRef.current?.();
@@ -269,15 +246,12 @@ export function useOnboardingLessonTutorial({
       // during that window because the gate is still open.
       onActiveChangeRef.current?.(true);
       pauseAllAudioNow();
-      cardActionsDestroyInFlightRef.current = false;
       setTimeout(() => {
-        // Mount the driver FIRST (overlay + popover up), then open the
-        // dropdown so its open animation runs *under* the overlay. We
-        // used to open the menu 350ms earlier than mounting the driver,
-        // which left a window where the menu was fully visible with no
-        // tutorial chrome.
+        // Highlight the kebab button only — the popover points at it but
+        // does NOT auto-open the dropdown menu. Previously we opened it
+        // automatically; that surprised users who wanted to read the
+        // explanation, then tap the kebab themselves.
         runStage('card-actions', buildCardActionsSteps(tRef.current), { animate: false });
-        autoOpenCardActions();
       }, 350);
     }
     if (cardsRated >= CARDS_FOR_WORD_TAP && !firedStagesRef.current.has('word-tap')) {
@@ -528,23 +502,3 @@ export function buildChatSteps(t: TranslateFn): DriveStep[] {
   ];
 }
 
-// ─── Card-actions menu helpers ──────────────────────────────────────────────
-//
-// Drive the `CardActionsMenu` open/closed via window events instead of
-// `trigger.click()`. The menu's trigger is wrapped by Radix's
-// `DropdownMenuTrigger` (`asChild`) and composes our own `onPointerDown`
-// (preventDefault) + `onClick` (setOpen toggle) handlers. Programmatic
-// `.click()` through that stack proved unreliable — Radix's clone +
-// composed events would sometimes leave the menu open after dismissal.
-// The component listens for these two window events and calls `setOpen`
-// directly, sidestepping the whole composition path.
-
-function autoOpenCardActions() {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new Event('phrasis-onboarding-open-card-actions'));
-}
-
-function closeCardActions() {
-  if (typeof window === 'undefined') return;
-  window.dispatchEvent(new Event('phrasis-onboarding-close-card-actions'));
-}

@@ -4,16 +4,17 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ChevronLeft, ChevronRight, Pencil, FileUp, Radio, BarChart3, Globe } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Footprints, Pencil, FileUp, Radio, BarChart3, Globe } from 'lucide-react';
 
 /**
- * 5-slide feature tour. Each slide highlights a feature the user will find
- * useful but won't discover unprompted: chat-driven flashcards, custom
- * cards, CSV import, radio mode, and the Pro-tier multi-language flow.
+ * Feature tour. Each slide highlights something the user will find useful
+ * but won't discover unprompted. Slide 1 frames the "audio mode anywhere"
+ * usage pattern; the rest are concrete feature shortcuts.
  */
 
-const SLIDE_KEYS = ['custom', 'import', 'radio', 'stats', 'multilang'] as const;
+const SLIDE_KEYS = ['custom', 'import', 'radio', 'stats', 'multilang', 'audioMode'] as const;
 const SLIDE_ICONS: Record<typeof SLIDE_KEYS[number], React.ComponentType<{ className?: string }>> = {
+  audioMode: Footprints,
   custom: Pencil,
   import: FileUp,
   radio: Radio,

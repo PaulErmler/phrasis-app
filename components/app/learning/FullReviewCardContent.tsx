@@ -67,6 +67,8 @@ interface FullReviewCardContentProps {
   shortcutsDisabled?: boolean;
   /** Karaoke word highlighting toggle (defaults true). */
   highlightEnabled?: boolean;
+  /** Client-only session flag: did the viewer click flag on this card? */
+  flaggedInSession?: boolean;
   /** Merged-audio state from useAudioPlayer; used when merged playback is active. */
   mergedPlayback?: {
     isPlaying: boolean;
@@ -113,6 +115,7 @@ export function FullReviewCardContent({
   cardId,
   shortcutsDisabled = false,
   highlightEnabled = true,
+  flaggedInSession = false,
   mergedPlayback,
   languagePlaybackSpeeds,
   audioSpeedOverrides,
@@ -400,6 +403,7 @@ export function FullReviewCardContent({
         bare={bare}
         showRomanization={showRomanization}
         highlightEnabled={highlightEnabled}
+        flaggedInSession={flaggedInSession}
         activeClip={activeClip}
         onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
         onButtonStop={buttonPlayback.onStop}

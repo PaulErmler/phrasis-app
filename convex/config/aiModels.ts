@@ -6,7 +6,7 @@
 /** OpenRouter model IDs by agent or task */
 export const OPENROUTER_MODELS = {
   /** Main language-tutor chat (tools, streaming) */
-  languageTeacher: 'z-ai/glm-5.1:nitro',
+  languageTeacher: 'moonshotai/kimi-k2.6:nitro',
   /** Bulk translation JSON for custom card auto-fill */
   translationAutoFill: 'google/gemini-3-flash-preview',
   /** Linguistic metadata inference (register, gender, addresseeNumber) for
@@ -22,15 +22,11 @@ export const OPENROUTER_MODELS = {
 } as const;
 
 /** Provider routing for the chat agent via OpenRouter.
- *  `order` soft-forces io-net fp8 first, then together. `allow_fallbacks`
- *  is false because io-net/together don't expose tool-calling endpoints
- *  for GLM, and the chat agent needs the createCard tool — letting
- *  OpenRouter silently fall back to a non-tool provider would break
- *  createCard. preferred_* deprioritize endpoints slower than 2s p50 /
- *  under 50 tok/s p50. */
+ *  `order` soft-forces wandb fp4 first. preferred_* deprioritize endpoints
+ *  slower than 2s p50 / under 40 tok/s p50. */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
   provider: {
-    order: ['io-net/fp8', 'io-net', 'together'],
+    order: ['wandb/fp4'],
     allow_fallbacks: true,
     preferred_max_latency: 2,
     preferred_min_throughput: 40,

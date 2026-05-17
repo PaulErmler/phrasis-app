@@ -369,6 +369,8 @@
     "settings": "Einstellungen",
     "tutorial": "Tutorial wiederholen",
     "loading": "Lädt...",
+    "retranslating": "Wird neu übersetzt",
+    "flagged": "Gemeldet",
     "baseLanguage": "Ausgangssprache",
     "targetLanguage": "Zielsprache",
     "reviewCount": "{count, plural, =0 {Neu} one {{count} Wiederholung} other {{count} Wiederholungen}}",
@@ -392,8 +394,8 @@
       "delete": "Löschen",
       "flag": "Übersetzung melden",
       "flagConfirmTitle": "Diese Übersetzung melden?",
-      "flagConfirmDescription": "Wir überprüfen diese Übersetzung. Die Karte wird aus deinem Lernen entfernt.",
-      "flagConfirmConfirm": "Melden und entfernen",
+      "flagConfirmDescription": "Wir generieren vorerst eine neue Übersetzung und planen die Karte zur Wiederholung ein. Wenn die Übersetzung weiterhin falsch ist, kannst du die Karte ausblenden, bearbeiten oder löschen.",
+      "flagConfirmConfirm": "Melden",
       "flagConfirmCancel": "Abbrechen",
       "regenerateAudio": "Audio neu generieren",
       "pinToCard": "{label} an Karte anheften",
@@ -1028,6 +1030,10 @@
       "title": "Noch ein paar Dinge",
       "subtitle": "Eine kurze Tour durch Funktionen, die du kennen solltest.",
       "slides": {
+        "audioMode": {
+          "title": "Wie du Flexling nutzt",
+          "body": "Flexlings Audio-Modus wurde entwickelt, damit du Sprachen flexibel im Alltag lernen kannst. Viele Nutzer:innen lernen in kurzen Pausen, beim Kochen oder bei einem Spaziergang. Gerade ein Spaziergang in der Natur ohne Bildschirm hilft dir, dich zu konzentrieren, und macht das Sprachenlernen mehr Spaß. Probier es einfach mal aus!"
+        },
         "custom": {
           "title": "Eigene Karten hinzufügen",
           "body": "Du kannst eigene Sätze hinzufügen, die du lernen möchtest. Audio und Übersetzung werden in Sekunden automatisch erzeugt."

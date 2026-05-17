@@ -83,6 +83,26 @@ export type TranslationPromptArgs = {
   addresseeGender?: 'male' | 'female';
   formality?: 'formal' | 'informal' | 'neutral';
   referentGender: 'male' | 'female';
+  /**
+   * OGTE arc sliding-window context: up to 5 sentences immediately preceding
+   * `text` in the same thematic arc, and up to 3 immediately following.
+   * Emitted as an `<arc_context>` block before `<source>` so the model can
+   * use the surrounding discourse for pronoun/gender/register consistency
+   * without translating anything but the `<source>` payload. Undefined for
+   * single-sentence arcs, custom/chat texts, and legacy rows without arcId.
+   */
+  arcContext?: {
+    preceding: string[];
+    following: string[];
+  };
+  /**
+   * Previous (flagged) translation, when this call is a retranslation
+   * triggered by `flagTranslation`. Surfaced to the model so it can see
+   * what the user rejected. The prompt is careful to note the previous
+   * translation might still be correct — we want the model to reconsider
+   * rather than feel pressured to differ.
+   */
+  previousTranslation?: string;
 };
 
 /** Build the user-message string for one translation call. */
@@ -105,12 +125,45 @@ export function buildPrompt(args: TranslationPromptArgs): string {
     args.targetLangNativeName && args.targetLangNativeName !== args.targetLangName
       ? `${args.targetLangName} (${args.targetLangNativeName})`
       : args.targetLangName;
+
+  // Optional arc-context block. Only emitted when at least one neighbor was
+  // returned by the worker's sliding-window query; the model still translates
+  // only the `<source>` payload (see the closing instruction).
+  const arc = args.arcContext;
+  const arcBlock =
+    arc && (arc.preceding.length > 0 || arc.following.length > 0)
+      ? [
+          ``,
+          `<arc_context>`,
+          `  The sentence to translate appears in this sequence of related sentences (up to 5 immediately preceding it and up to 3 immediately following it within the same thematic arc). Use the surrounding sentences only to inform consistency of register, pronouns, gender agreement, and discourse flow. Translate ONLY the sentence wrapped in <target>.`,
+          ...arc.preceding.map((s) => `  <sentence>${s}</sentence>`),
+          `  <target>${args.text}</target>`,
+          ...arc.following.map((s) => `  <sentence>${s}</sentence>`),
+          `</arc_context>`,
+        ]
+      : [];
+
+  // Optional previous-translation block. Surfaces what the user flagged so
+  // the model can reconsider — explicitly leaving open that the prior was
+  // correct, so the model isn't forced to change its answer just to look
+  // different from a translation that might already be right.
+  const prevBlock = args.previousTranslation
+    ? [
+        ``,
+        `<previous_translation>`,
+        `  This sentence was previously translated as <prior>${args.previousTranslation}</prior>. The user flagged that translation as wrong, but there is a chance it was correct anyway. Reconsider it: if you genuinely agree the prior is the best rendering, you may produce the same translation; otherwise output the translation you actually stand behind.`,
+        `</previous_translation>`,
+      ]
+    : [];
+
   return [
     `You are a professional English-to-${fullName} translator. Translate the text inside <source> tags into ${fullName} (${args.targetLang}), suitable for ${args.targetRegion}.`,
     ``,
     `<context>`,
     ...contextLines,
     `</context>`,
+    ...arcBlock,
+    ...prevBlock,
     ``,
     `<instructions>`,
     PROMPT_B_INSTRUCTIONS,

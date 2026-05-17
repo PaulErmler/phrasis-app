@@ -24,7 +24,7 @@ export const courseSettingsFields = {
   autoAddCards: v.optional(v.boolean()), // Auto-add cards when none are due
 
   // Audio playback settings
-  highlightWords: v.optional(v.boolean()), // Karaoke-style word highlighting during audio playback (default true)
+  highlightWords: v.optional(v.boolean()), // Karaoke-style word highlighting during audio playback. Default OFF — only `=== true` enables it. Most languages now have `supportsKaraoke: false` in lib/languages.ts; this user-level switch is the secondary opt-in for the ones that do support it.
   autoPlayAudio: v.optional(v.boolean()), // Auto-play audio when card is shown
   autoAdvance: v.optional(v.boolean()), // Auto-advance after audio finishes
   languageRepetitions: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 2, "es": 2 }
@@ -149,13 +149,24 @@ export default defineSchema({
     tenseAspect: v.optional(v.string()), // simple_present / past_continuous / etc.
     sentenceType: v.optional(v.string()), // declarative / interrogative / imperative / exclamatory
     literalFigurative: v.optional(v.string()), // literal / figurative
+    // OGTE arc grouping (curation manifest). Sentences sharing the same
+    // (collectionId, arcId) form a thematic sequence; the translation worker
+    // pulls a sliding window of arc siblings into the LLM prompt so pronouns,
+    // gender agreement, and discourse register stay consistent across the
+    // arc. Undefined for legacy rows and user-created texts (custom/chat).
+    arcId: v.optional(v.string()),
   })
     .index('by_text', ['text'])
     .index('by_datasetSentenceId', ['datasetSentenceId'])
     .index('by_dataset_and_externalId', ['datasetId', 'externalId'])
     .index('by_collection_and_rank', ['collectionId', 'collectionRank'])
     .index('by_collection_and_userCreated_and_rank', ['collectionId', 'userCreated', 'collectionRank'])
-    .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank']),
+    .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank'])
+    // Sliding-window arc-context lookup: equality on (collectionId, arcId)
+    // followed by `.lt('collectionRank', X).order('desc').take(5)` for the
+    // preceding window and `.gt('collectionRank', X).order('asc').take(3)` for
+    // the following window. Constant-cost (≤ 8 reads) regardless of arc size.
+    .index('by_collection_arcId_and_rank', ['collectionId', 'arcId', 'collectionRank']),
 
   // Translations table - stores translations of texts
   translations: defineTable({
@@ -600,8 +611,9 @@ export default defineSchema({
 
   // ── LLM translation queue (mirrors the TTS queue structure) ──────────────
   // OpenRouter rate-limits aggressively, so concurrent LLM translation calls
-  // are capped at MAX_LLM_CONCURRENCY (100; active from day one, unlike the
-  // dormant TTS gate). Same three-table pattern: queue + slots + claims.
+  // are capped at MAX_LLM_CONCURRENCY (currently 500; see lib constant in
+  // convex/features/llmTranslationQueue.ts). Active from day one, unlike the
+  // dormant TTS gate. Same three-table pattern: queue + slots + claims.
 
   // Priority/FIFO queue of pending LLM translation jobs. Drained by
   // `pumpLlmQueue` highest-priority first, FIFO within each level. See the
@@ -620,6 +632,10 @@ export default defineSchema({
       // (and the standard `scheduleMissingContent` enqueue path) keep
       // validating.
       ruleOverride: v.optional(v.string()),
+      // Retranslation flag for deliberate overwrites. See the
+      // storeTranslationAndScheduleTTS docstring for replacement semantics.
+      // Optional so pre-flag queue rows still validate.
+      replaceExisting: v.optional(v.boolean()),
     }),
     queuedAt: v.number(),
     priority: v.optional(v.number()),

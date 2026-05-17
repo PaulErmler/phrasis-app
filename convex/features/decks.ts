@@ -49,7 +49,10 @@ import {
 } from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
 import { languageSupportsStt } from '../../lib/languages';
-import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
+import {
+  claimLlmTranslationIfAvailable,
+  CLAIM_STALE_MS as LLM_CLAIM_STALE_MS,
+} from './llmTranslationQueue';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
   COLLECTION_PREVIEW_SIZE,
@@ -111,29 +114,47 @@ export async function scheduleMissingContent(
     (l) => l !== sourceLanguage,
   );
 
-  // Batch load existing translations and audio for only the needed languages
-  const [existingTranslations, existingAudio] = await Promise.all([
-    Promise.all(
-      langsNeedingTranslation.map((lang) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', lang),
-          )
-          .first(),
+  // Batch load existing translations, audio, AND LLM claims for the
+  // needed languages — all three sets in one Promise.all so the read
+  // round-trips run in parallel rather than serially inside the loop
+  // below. The claim lookup gates whether `scheduleMissingContent`
+  // should defer a TTS enqueue while an LLM retranslation is in flight;
+  // doing it per-language inline turned a fast O(languages) read into
+  // a serial chain that pushed the mutation past Convex's 1s budget
+  // when called from a batched caller like `ensureContentForCollection`.
+  const [existingTranslations, existingAudio, existingLlmClaims] =
+    await Promise.all([
+      Promise.all(
+        langsNeedingTranslation.map((lang) =>
+          ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', textId).eq('targetLanguage', lang),
+            )
+            .first(),
+        ),
       ),
-    ),
-    Promise.all(
-      allRequiredLanguages.map((lang) =>
-        ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('language', lang),
-          )
-          .first(),
+      Promise.all(
+        allRequiredLanguages.map((lang) =>
+          ctx.db
+            .query('audioRecordings')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', textId).eq('language', lang),
+            )
+            .first(),
+        ),
       ),
-    ),
-  ]);
+      Promise.all(
+        langsNeedingTranslation.map((lang) =>
+          ctx.db
+            .query('llmTranslationClaims')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', textId).eq('targetLanguage', lang),
+            )
+            .first(),
+        ),
+      ),
+    ]);
 
   // Build lookup maps
   const translationMap = new Map(
@@ -141,6 +162,9 @@ export async function scheduleMissingContent(
   );
   const audioMap = new Map(
     allRequiredLanguages.map((lang, i) => [lang, existingAudio[i]]),
+  );
+  const llmClaimMap = new Map(
+    langsNeedingTranslation.map((lang, i) => [lang, existingLlmClaims[i]]),
   );
 
   // Validate storage files — delete stale rows where the file was removed.
@@ -322,38 +346,56 @@ export async function scheduleMissingContent(
           );
         }
         if (!hasAudio) {
-          const claimed = await claimTtsIfAvailable(ctx, textId, lang);
-          if (claimed) {
-            // For mixed-dialect rows, prefer a voice in the same locale that
-            // was picked at translation time and forward the variant to TTS
-            // so the validation roundtrip uses the matching STT locale.
-            const regionVariant = translation.regionVariant;
-            const voiceName = regionVariant
-              ? getVoiceForLanguageVariant(lang, regionVariant, audioSpeakerGender)
-              : getVoiceForLanguage(lang, audioSpeakerGender);
-            const voiceGender = getVoiceGenderByApiCode(voiceName);
-            if (voiceGender === undefined) {
-              throw new Error(
-                `Cannot enqueue TTS: voice "${voiceName}" for language "${lang}" is not in the curated voice list.`,
-              );
-            }
-            await ctx.runMutation(
-              internal.features.ttsProcessing.enqueueTtsJob,
-              {
-                provider: getTtsProviderForLanguage(lang),
-                args: {
-                  textId,
-                  text: translation.translatedText,
-                  language: lang,
-                  voiceName,
-                  voiceGender,
-                  speed: 1,
-                  regionVariant,
+          // Defer TTS while an LLM retranslation is in flight for this
+          // (textId, lang). Without this guard, `flagTranslation` (which
+          // deletes audio + enqueues an LLM retranslation) races with a
+          // concurrent `scheduleMissingContent` that would otherwise see
+          // "translation exists, audio missing" and enqueue TTS against
+          // the OLD `translation.translatedText` — producing stale audio
+          // just before the new translation lands. The LLM worker's
+          // `storeTranslationAndScheduleTTS` will enqueue TTS for the new
+          // text once the LLM completes. The claim was pre-fetched in
+          // the batched Promise.all above; no per-iteration DB read here.
+          const existingLlmClaim = llmClaimMap.get(lang) ?? null;
+          const llmRetranslationInFlight =
+            existingLlmClaim !== null &&
+            Date.now() - existingLlmClaim.claimedAt < LLM_CLAIM_STALE_MS;
+          if (llmRetranslationInFlight) {
+            // Skip — the LLM worker owns the next TTS enqueue for this row.
+          } else {
+            const claimed = await claimTtsIfAvailable(ctx, textId, lang);
+            if (claimed) {
+              // For mixed-dialect rows, prefer a voice in the same locale that
+              // was picked at translation time and forward the variant to TTS
+              // so the validation roundtrip uses the matching STT locale.
+              const regionVariant = translation.regionVariant;
+              const voiceName = regionVariant
+                ? getVoiceForLanguageVariant(lang, regionVariant, audioSpeakerGender)
+                : getVoiceForLanguage(lang, audioSpeakerGender);
+              const voiceGender = getVoiceGenderByApiCode(voiceName);
+              if (voiceGender === undefined) {
+                throw new Error(
+                  `Cannot enqueue TTS: voice "${voiceName}" for language "${lang}" is not in the curated voice list.`,
+                );
+              }
+              await ctx.runMutation(
+                internal.features.ttsProcessing.enqueueTtsJob,
+                {
+                  provider: getTtsProviderForLanguage(lang),
+                  args: {
+                    textId,
+                    text: translation.translatedText,
+                    language: lang,
+                    voiceName,
+                    voiceGender,
+                    speed: 1,
+                    regionVariant,
+                  },
+                  priority,
                 },
-                priority,
-              },
-            );
-            audioScheduled++;
+              );
+              audioScheduled++;
+            }
           }
         } else {
           await scheduleTimingsBackfillIfNeeded(lang);
@@ -1360,6 +1402,16 @@ export const processTranslationForCard = internalAction({
     text: v.string(),
     audioSpeakerGender: v.optional(v.string()),
     priority: v.optional(v.union(v.literal(0), v.literal(1))),
+    /**
+     * Retranslation flag. Set when this action is dispatched as the
+     * Google fallback for a deliberate LLM retranslation (flagTranslation
+     * or the model-swap migration). When true, the action skips the
+     * "reuse existing translatedText" shortcut and Google-translates fresh,
+     * then forwards the flag to `storeTranslationAndScheduleTTS` so the
+     * existing row is actually overwritten. False/absent → historical
+     * behavior (reuse existing translation if present).
+     */
+    replaceExisting: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1383,13 +1435,18 @@ export const processTranslationForCard = internalAction({
       let translation: string;
       let romanizedText: string | undefined;
 
-      if (existingRow) {
-        translation = existingRow.translatedText;
+      // Honor `replaceExisting`: a retranslation that fell back to Google
+      // must Google-translate fresh rather than reuse the stale existing
+      // translatedText — otherwise the audio would be regenerated against
+      // an unchanged translation and we'd write the same row back.
+      const reuseExisting = !args.replaceExisting && existingRow !== null;
+      if (reuseExisting) {
+        translation = existingRow!.translatedText;
         // `=== undefined`: respect the empty-string sentinel from a prior
         // failed attempt so we don't keep re-running the 3-retry burst.
         if (
           ROMANIZATION_LANGUAGES.has(translateTarget) &&
-          existingRow.romanizedText === undefined
+          existingRow!.romanizedText === undefined
         ) {
           try {
             romanizedText = await romanizeText(translation, translateTarget);
@@ -1399,7 +1456,7 @@ export const processTranslationForCard = internalAction({
             romanizedText = '';
           }
         } else {
-          romanizedText = existingRow.romanizedText;
+          romanizedText = existingRow!.romanizedText;
         }
       } else {
         translation = await translateText(
@@ -1454,6 +1511,7 @@ export const processTranslationForCard = internalAction({
           translationSource: GOOGLE_TRANSLATE_SOURCE,
           regionVariant,
           priority: args.priority,
+          replaceExisting: args.replaceExisting,
         },
       );
     } catch (err) {
@@ -1501,6 +1559,26 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      */
     regionVariant: v.optional(v.string()),
     priority: v.optional(v.union(v.literal(0), v.literal(1))),
+    /**
+     * Retranslation flag. Set by callers that deliberately want to overwrite
+     * an existing translation — today only `flagTranslation` (the user
+     * reported a bad translation and we want the new LLM output to replace
+     * the displayed text).
+     *
+     * When `true` AND a translation row already exists, the mutation
+     * replaces `translatedText`, `romanizedText` (matched with its source),
+     * `translationSource`, and `regionVariant`. `flagCount` is preserved —
+     * it tracks user dissatisfaction history. Audio rows for the language
+     * are not touched here; retranslation callers delete them before
+     * enqueueing so the no-audio guard below schedules a fresh TTS.
+     *
+     * When `false`/absent, the historical concurrent-write protection
+     * stays in place: existing `translatedText` is never overwritten and
+     * metadata is patched only when missing. This is the safe default for
+     * the normal new-card insertion path and for any Google-fallback that
+     * fires after another write already landed.
+     */
+    replaceExisting: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1533,6 +1611,37 @@ export const storeTranslationAndScheduleTTS = internalMutation({
           : {}),
         ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
       });
+    } else if (args.replaceExisting) {
+      // Deliberate retranslation: overwrite the translation and its matched
+      // metadata. romanizedText and romanizationSource travel as a unit —
+      // both replaced together, including the empty-string sentinel. If the
+      // caller didn't compute a new romanization (`romanizedText` undefined),
+      // clear both fields so the next ensureContent pass regenerates them
+      // against the new translatedText.
+      const patch: Partial<{
+        translatedText: string;
+        romanizedText: string | undefined;
+        romanizationSource: string | undefined;
+        translationSource: string | undefined;
+        regionVariant: string | undefined;
+      }> = {
+        translatedText: args.translatedText,
+      };
+      if (args.romanizedText !== undefined) {
+        patch.romanizedText = args.romanizedText;
+        patch.romanizationSource = args.romanizationSource;
+      } else {
+        // Convex `patch` semantics: `undefined` clears the field.
+        patch.romanizedText = undefined;
+        patch.romanizationSource = undefined;
+      }
+      if (args.translationSource) {
+        patch.translationSource = args.translationSource;
+      }
+      if (args.regionVariant) {
+        patch.regionVariant = args.regionVariant;
+      }
+      await ctx.db.patch(existing._id, patch);
     } else {
       const patch: Partial<{
         romanizedText: string;

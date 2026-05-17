@@ -45,7 +45,14 @@ import { getRomanizationSource } from '../lib/localRomanization';
 
 const MAX_LLM_CONCURRENCY = 200;
 const SLOT_STALE_MS = 60 * 1000; // 1 minute — longer than the longest API call
-const CLAIM_STALE_MS = 30 * 1000;
+/**
+ * Per-(textId, language) LLM claim freshness window. Claims older than this
+ * are treated as stale and reclaimable. Exported so callers like
+ * `scheduleMissingContent` can decide whether to defer a TTS enqueue while
+ * an LLM retranslation is in flight for the same row (a stale claim still
+ * holds the slot from this caller's perspective — pump will reclaim it).
+ */
+export const CLAIM_STALE_MS = 30 * 1000;
 
 // Slot bookkeeping bounds for `countLiveSlotsAndReclaimStale`. At steady-state
 // peak we can see up to MAX_LLM_CONCURRENCY fresh slots plus a backlog of
@@ -124,6 +131,12 @@ const llmJobArgsValidator = v.object({
   // to storeTranslationAndScheduleTTS (downstream TTS) or to the Google
   // fallback path. Defaults to 0 (normal) when missing.
   priority: v.optional(v.union(v.literal(0), v.literal(1))),
+  // Retranslation flag forwarded to `storeTranslationAndScheduleTTS` (and
+  // through `scheduleGoogleFallback` to `processTranslationForCard`). Set
+  // by `flagTranslation` so the new LLM output overwrites the displayed
+  // text. See the storeTranslationAndScheduleTTS docstring for replacement
+  // semantics.
+  replaceExisting: v.optional(v.boolean()),
   // Optional rule override forwarded to `resolveTranslationStages`. Used by
   // `flagTranslation` to force the `retranslation_high` chain regardless of
   // the language's normal routing. Worker validates against TRANSLATION_RULES
@@ -237,8 +250,8 @@ export const finalizeLlmTranslationJob = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Release one slot — pick the oldest. With 200 in-flight calls this is
-    // bounded reading, so `.first()` is fine.
+    // Release one slot — pick the oldest. With MAX_LLM_CONCURRENCY in-flight
+    // calls this is bounded reading, so `.first()` is fine.
     const slot = await ctx.db.query('llmTranslationSlots').first();
     if (slot) {
       await ctx.db.delete(slot._id);
@@ -372,6 +385,59 @@ export const processLlmTranslationForCard = internalAction({
           ? (text.register as 'formal' | 'informal' | 'neutral')
           : undefined;
 
+      // Fetch the sliding window of arc siblings (≤ 5 preceding + ≤ 3
+      // following), but only when this text has an arcId. Custom/chat and
+      // legacy rows skip the lookup entirely, so they pay no extra cost.
+      let arcContext:
+        | { preceding: string[]; following: string[] }
+        | undefined;
+      if (text.arcId && text.arcId.length > 0) {
+        arcContext = await ctx.runQuery(
+          internal.features.llmTranslationQueue.getArcWindowForText,
+          {
+            collectionId: text.collectionId,
+            arcId: text.arcId,
+            targetRank: text.collectionRank,
+          },
+        );
+        if (
+          arcContext.preceding.length === 0 &&
+          arcContext.following.length === 0
+        ) {
+          arcContext = undefined;
+        }
+      }
+
+      // Gate the "previous translation" prompt block to flag-triggered
+      // retranslations only. `flagTranslation` is the unique caller that
+      // sets BOTH `replaceExisting: true` (the storage-overwrite semantic)
+      // AND a flag-specific `ruleOverride` ('retranslation_high' for
+      // curriculum texts, 'retranslation_custom' for user-created texts).
+      // A future caller that sets `replaceExisting` for some other reason
+      // — e.g. a model-swap migration — must NOT see the "the user flagged
+      // this as wrong" framing, which would be a lie.
+      const FLAG_TRIGGERED_RULES = new Set<string>([
+        'retranslation_high',
+        'retranslation_custom',
+      ]);
+      let previousTranslation: string | undefined;
+      if (
+        args.replaceExisting &&
+        args.ruleOverride &&
+        FLAG_TRIGGERED_RULES.has(args.ruleOverride)
+      ) {
+        const existing = await ctx.runQuery(
+          internal.features.decks.getTranslationForTextLanguage,
+          {
+            textId: args.textId,
+            targetLanguage: args.targetLanguage,
+          },
+        );
+        if (existing && existing.translatedText.length > 0) {
+          previousTranslation = existing.translatedText;
+        }
+      }
+
       const promptArgs = {
         text: text.text,
         sourceLang: args.sourceLanguage,
@@ -388,6 +454,8 @@ export const processLlmTranslationForCard = internalAction({
         speakerGender,
         addresseeGender,
         formality,
+        arcContext,
+        previousTranslation,
       } as const;
 
       // Run each stage of the resolved translation rule in order. The first
@@ -492,6 +560,7 @@ export const processLlmTranslationForCard = internalAction({
           translationSource,
           regionVariant,
           priority: args.priority,
+          replaceExisting: args.replaceExisting,
         },
       );
     } catch (err) {
@@ -535,6 +604,7 @@ async function scheduleGoogleFallback(
     text: string;
     audioSpeakerGender?: string;
     priority?: 0 | 1;
+    replaceExisting?: boolean;
   },
 ): Promise<void> {
   await ctx.scheduler.runAfter(
@@ -547,6 +617,7 @@ async function scheduleGoogleFallback(
       text: args.text,
       audioSpeakerGender: args.audioSpeakerGender,
       priority: args.priority,
+      replaceExisting: args.replaceExisting,
     },
   );
 }
@@ -589,6 +660,12 @@ export const getTextRowForTranslation = internalQuery({
       addresseeGender: v.optional(v.string()),
       register: v.optional(v.string()),
       referentGender: v.optional(v.string()),
+      // Arc-context plumbing fields. Present for premade-dataset texts that
+      // carry an arcId; undefined for legacy or user-created rows (which the
+      // worker then skips the arc-window lookup for).
+      collectionId: v.id('collections'),
+      collectionRank: v.number(),
+      arcId: v.optional(v.string()),
     }),
   ),
   handler: async (ctx, args) => {
@@ -604,6 +681,60 @@ export const getTextRowForTranslation = internalQuery({
       addresseeGender: row.addresseeGender,
       register: row.register,
       referentGender: row.referentGender,
+      collectionId: row.collectionId,
+      collectionRank: row.collectionRank,
+      arcId: row.arcId,
+    };
+  },
+});
+
+const ARC_WINDOW_PRECEDING = 5;
+const ARC_WINDOW_FOLLOWING = 3;
+
+/**
+ * Sliding-window arc context. Two bounded indexed range scans (≤ 5 + ≤ 3
+ * documents) against `by_collection_arcId_and_rank`. Returns sentences in
+ * chronological (collectionRank ASC) order — the target's neighbors but not
+ * the target itself, which the caller wraps with `<target>` in the prompt.
+ */
+export const getArcWindowForText = internalQuery({
+  args: {
+    collectionId: v.id('collections'),
+    arcId: v.string(),
+    targetRank: v.number(),
+  },
+  returns: v.object({
+    preceding: v.array(v.string()),
+    following: v.array(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const precedingDesc = await ctx.db
+      .query('texts')
+      .withIndex('by_collection_arcId_and_rank', (q) =>
+        q
+          .eq('collectionId', args.collectionId)
+          .eq('arcId', args.arcId)
+          .lt('collectionRank', args.targetRank),
+      )
+      .order('desc')
+      .take(ARC_WINDOW_PRECEDING);
+
+    const following = await ctx.db
+      .query('texts')
+      .withIndex('by_collection_arcId_and_rank', (q) =>
+        q
+          .eq('collectionId', args.collectionId)
+          .eq('arcId', args.arcId)
+          .gt('collectionRank', args.targetRank),
+      )
+      .order('asc')
+      .take(ARC_WINDOW_FOLLOWING);
+
+    // `precedingDesc` came back in descending rank order; reverse so the
+    // prompt window reads chronologically (oldest → target → newest).
+    return {
+      preceding: precedingDesc.reverse().map((t) => t.text),
+      following: following.map((t) => t.text),
     };
   },
 });

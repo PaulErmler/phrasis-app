@@ -372,6 +372,8 @@
     "settings": "Settings",
     "tutorial": "Replay Tutorial",
     "loading": "Loading...",
+    "retranslating": "Retranslating",
+    "flagged": "Flagged",
     "baseLanguage": "Base Language",
     "targetLanguage": "Target Language",
     "reviewCount": "{count, plural, =0 {New} one {{count} review} other {{count} reviews}}",
@@ -395,8 +397,8 @@
       "delete": "Delete",
       "flag": "Flag translation",
       "flagConfirmTitle": "Flag this translation?",
-      "flagConfirmDescription": "We will review this translation. The card will be excluded from your study.",
-      "flagConfirmConfirm": "Flag and remove",
+      "flagConfirmDescription": "We will generate a new translation for now and schedule the card for review. You can also hide, edit or delete the card if the translation is still wrong.",
+      "flagConfirmConfirm": "Flag",
       "flagConfirmCancel": "Cancel",
       "regenerateAudio": "Regenerate audio",
       "pinToCard": "Pin {label} to card",
@@ -1031,6 +1033,10 @@
       "title": "A few more things",
       "subtitle": "Quick tour of features you'll want to know about.",
       "slides": {
+        "audioMode": {
+          "title": "How to use Flexling",
+          "body": "Flexling's audio mode is designed to help you learn languages flexibly throughout your day. A lot of users learn during short breaks, while cooking, or when taking a walk. Walking through nature without a screen can help you focus and make learning a language more fun. Try it sometime!"
+        },
         "custom": {
           "title": "Add custom cards",
           "body": "You have the option to add custom sentences you want to learn. You can also auto generate audio and translation in seconds."
