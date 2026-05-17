@@ -2,10 +2,10 @@
 
 import * as React from 'react';
 import { Settings2 } from 'lucide-react';
-import { useQuery } from 'convex/react';
+import { usePreloadedQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 
-import { api } from '@/convex/_generated/api';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
 import {
   Select,
@@ -29,22 +29,15 @@ const FIXED_TRIGGER_WIDTH = { width: '140px' } as const;
  * both sources" is implicit — Select can't pick a no-op value.
  */
 export function ContentFilterDropdown() {
-  const settings = useQuery(api.features.courses.getActiveCourseSettings, {});
+  // `getActiveCourseSettings` is preloaded server-side in app/app/layout.tsx,
+  // so the dropdown renders with real data on first paint — no width jitter
+  // when the row appears.
+  const { preloadedCourseSettings } = useAppData();
+  const settings = usePreloadedQuery(preloadedCourseSettings);
   const updateSettings = useUpdateStudyContentFilter();
   const t = useTranslations('AppPage.contentFilter');
 
-  if (!settings) {
-    // Same-width placeholder so the surrounding flex row doesn't jump when
-    // the query resolves.
-    return (
-      <div className="flex items-center justify-end gap-2">
-        <div
-          className="h-7 animate-pulse rounded-md bg-muted"
-          style={FIXED_TRIGGER_WIDTH}
-        />
-      </div>
-    );
-  }
+  if (!settings) return null;
 
   const value: FilterValue = settings.studyContentFilter ?? 'both';
 

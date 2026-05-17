@@ -1,8 +1,9 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useQuery } from 'convex/react';
+import { usePreloadedQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { useCachedQuery } from '@/hooks/use-cached-query';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
 import { useStatsSnapshot } from '@/hooks/use-stats-snapshot';
@@ -133,12 +134,11 @@ export function ProgressStatsCard({
   const words = stats?.totalWordCount ?? 0;
   const time = formatTimeMs(stats?.totalTimeMs ?? 0);
 
-  // Home summary powers the "current level" header strip — Convex dedupes
-  // this subscription with SegmentedHomeSection so no extra round-trip.
-  const homeSummary = useQuery(
-    api.features.home.getHomeSummary,
-    skipLiveStats ? 'skip' : {},
-  );
+  // Home summary powers the "current level" header strip — preloaded
+  // server-side in app/app/layout.tsx so the level header is available on
+  // the first paint and the card height doesn't grow when the data arrives.
+  const { preloadedHomeSummary } = useAppData();
+  const homeSummary = usePreloadedQuery(preloadedHomeSummary);
 
   // Only render the level header when a *premade* CEFR level is active.
   // Custom and chat collections live in `customCollections` and don't carry
@@ -221,7 +221,9 @@ export function ProgressStatsCard({
 
         <div className="space-y-3 p-4">
           {/* Level header row — inline CEFR badge + label + count + % pill.
-           * Hidden when the active collection is custom/chat. */}
+           * Hidden when the active collection is custom/chat. `homeSummary`
+           * is preloaded server-side so this either renders on the first
+           * paint or never; no two-step layout. */}
           {activeLevel && (
             <>
               <div className="flex items-center justify-between gap-2">

@@ -139,7 +139,31 @@ function OnboardingContent() {
   const onboardingProgress = useQuery(api.features.courses.getOnboardingProgress);
   const saveProgress = useMutation(api.features.courses.saveOnboardingProgress);
   const completeOnboarding = useMutation(api.features.courses.completeOnboarding);
-  const finalizeOnboarding = useMutation(api.features.onboarding.finalizeOnboarding);
+  // `withOptimisticUpdate` flips `hasCompletedOnboarding` to `true` in the
+  // local Convex cache the moment the user clicks Finish — before the
+  // server roundtrip and before `router.push('/app')`. Without it, the
+  // `OnboardingGuard` on `/app` would briefly see the still-`false`
+  // preloaded value (Next.js doesn't re-execute server preloads on soft
+  // navigation within the same `/app/*` segment) and bounce the user
+  // back to `/app/onboarding` until the live subscription delivered the
+  // true value — a visible flicker. The optimistic update makes the
+  // post-finalize value visible synchronously to every consumer of
+  // `getUserSettings`, including the layout-preloaded query.
+  const finalizeOnboarding = useMutation(
+    api.features.onboarding.finalizeOnboarding,
+  ).withOptimisticUpdate((localStore) => {
+    const current = localStore.getQuery(
+      api.features.courses.getUserSettings,
+      {},
+    );
+    if (current) {
+      localStore.setQuery(
+        api.features.courses.getUserSettings,
+        {},
+        { ...current, hasCompletedOnboarding: true },
+      );
+    }
+  });
   const prepareLanguagePair = useMutation(api.features.onboarding.prepareLanguagePair);
   const syncQuotas = useAction(api.usage.actions.syncQuotas);
   const { isAuthenticated } = useConvexAuth();

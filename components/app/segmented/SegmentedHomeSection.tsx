@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { Check, MessageSquare, PenLine } from 'lucide-react';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation, usePreloadedQuery, useQuery } from 'convex/react';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
@@ -45,7 +46,11 @@ export function SegmentedHomeSection({
   onNavigateToContent,
   onNavigateToChat,
 }: SegmentedHomeSectionProps) {
-  const summary = useQuery(api.features.home.getHomeSummary, {});
+  // Preloaded server-side in app/app/layout.tsx so the section renders with
+  // real data on the first paint; usePreloadedQuery still subscribes to live
+  // updates after hydration.
+  const { preloadedHomeSummary } = useAppData();
+  const summary = usePreloadedQuery(preloadedHomeSummary);
   const settings = useQuery(api.features.courses.getActiveCourseSettings, {});
   const updateSettings = useUpdateStudyContentFilter();
   const t = useTranslations('AppPage.collections.carousel');
@@ -284,19 +289,31 @@ function GroupedLevelRail({
   const railRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    // Horizontal-only autocenter. `Element.scrollIntoView({ block: 'nearest' })`
-    // still nudges the PAGE on mobile when the chip is partially clipped by
-    // the OS chrome (URL bar, safe-area inset), which surfaces as the home
-    // view "scrolling down a little" on mount. Scrolling the rail directly
-    // via `scrollTo` is purely horizontal and never touches window scroll.
+    // Horizontal-only "scroll into view if needed" — equivalent to
+    // `scrollIntoView({ block: 'nearest', inline: 'nearest' })` but
+    // operating only on the rail's scrollLeft, so the page is never
+    // nudged vertically (the mobile OS-chrome jog bug). If the focused
+    // chip is already fully visible we leave the rail where it is —
+    // the previous "always center" behavior shifted the rail on every
+    // selection, which surprised users who'd manually scrolled it.
     const rail = railRef.current;
     const el = rail?.querySelector(
       `[data-focused="true"]`,
     ) as HTMLElement | null;
     if (!rail || !el) return;
-    const targetLeft =
-      el.offsetLeft - rail.clientWidth / 2 + el.offsetWidth / 2;
-    rail.scrollTo({ left: targetLeft, behavior: 'smooth' });
+    const railRect = rail.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    if (elRect.left < railRect.left) {
+      rail.scrollTo({
+        left: rail.scrollLeft + (elRect.left - railRect.left),
+        behavior: 'smooth',
+      });
+    } else if (elRect.right > railRect.right) {
+      rail.scrollTo({
+        left: rail.scrollLeft + (elRect.right - railRect.right),
+        behavior: 'smooth',
+      });
+    }
   }, [focusedId]);
 
   return (
@@ -647,17 +664,26 @@ function CustomChipRail({
 }) {
   const railRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    // Horizontal-only autocenter. See the matching comment on
-    // `GroupedLevelRail` — `scrollIntoView` jogs the page vertically on
-    // mobile when the chip is partially clipped by OS chrome.
+    // Horizontal-only "scroll into view if needed". See the matching
+    // comment on `GroupedLevelRail` for the mobile OS-chrome rationale.
     const rail = railRef.current;
     const el = rail?.querySelector(
       `[data-focused="true"]`,
     ) as HTMLElement | null;
     if (!rail || !el) return;
-    const targetLeft =
-      el.offsetLeft - rail.clientWidth / 2 + el.offsetWidth / 2;
-    rail.scrollTo({ left: targetLeft, behavior: 'smooth' });
+    const railRect = rail.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    if (elRect.left < railRect.left) {
+      rail.scrollTo({
+        left: rail.scrollLeft + (elRect.left - railRect.left),
+        behavior: 'smooth',
+      });
+    } else if (elRect.right > railRect.right) {
+      rail.scrollTo({
+        left: rail.scrollLeft + (elRect.right - railRect.right),
+        behavior: 'smooth',
+      });
+    }
   }, [focusedId]);
 
   return (

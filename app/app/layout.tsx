@@ -13,10 +13,12 @@ export default async function AppLayout({
     preloadedSettings,
     preloadedActiveCourse,
     preloadedCourseSettings,
+    preloadedHomeSummary,
   ] = await Promise.all([
     preloadAuthQuery(api.features.courses.getUserSettings),
     preloadAuthQuery(api.features.courses.getActiveCourse),
     preloadAuthQuery(api.features.courses.getActiveCourseSettings),
+    preloadAuthQuery(api.features.home.getHomeSummary),
   ]);
 
   return (
@@ -24,6 +26,7 @@ export default async function AppLayout({
       preloadedSettings={preloadedSettings}
       preloadedActiveCourse={preloadedActiveCourse}
       preloadedCourseSettings={preloadedCourseSettings}
+      preloadedHomeSummary={preloadedHomeSummary}
     >
       <ClientAuthBoundary>
         <OnboardingGuard>
