@@ -284,8 +284,19 @@ function GroupedLevelRail({
   const railRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    const el = railRef.current?.querySelector(`[data-focused="true"]`) as HTMLElement | null;
-    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    // Horizontal-only autocenter. `Element.scrollIntoView({ block: 'nearest' })`
+    // still nudges the PAGE on mobile when the chip is partially clipped by
+    // the OS chrome (URL bar, safe-area inset), which surfaces as the home
+    // view "scrolling down a little" on mount. Scrolling the rail directly
+    // via `scrollTo` is purely horizontal and never touches window scroll.
+    const rail = railRef.current;
+    const el = rail?.querySelector(
+      `[data-focused="true"]`,
+    ) as HTMLElement | null;
+    if (!rail || !el) return;
+    const targetLeft =
+      el.offsetLeft - rail.clientWidth / 2 + el.offsetWidth / 2;
+    rail.scrollTo({ left: targetLeft, behavior: 'smooth' });
   }, [focusedId]);
 
   return (
@@ -636,8 +647,17 @@ function CustomChipRail({
 }) {
   const railRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    const el = railRef.current?.querySelector(`[data-focused="true"]`) as HTMLElement | null;
-    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    // Horizontal-only autocenter. See the matching comment on
+    // `GroupedLevelRail` — `scrollIntoView` jogs the page vertically on
+    // mobile when the chip is partially clipped by OS chrome.
+    const rail = railRef.current;
+    const el = rail?.querySelector(
+      `[data-focused="true"]`,
+    ) as HTMLElement | null;
+    if (!rail || !el) return;
+    const targetLeft =
+      el.offsetLeft - rail.clientWidth / 2 + el.offsetWidth / 2;
+    rail.scrollTo({ left: targetLeft, behavior: 'smooth' });
   }, [focusedId]);
 
   return (
