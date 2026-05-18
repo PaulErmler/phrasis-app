@@ -48,10 +48,12 @@ export function SegmentedHomeSection({
 }: SegmentedHomeSectionProps) {
   // Preloaded server-side in app/app/layout.tsx so the section renders with
   // real data on the first paint; usePreloadedQuery still subscribes to live
-  // updates after hydration.
-  const { preloadedHomeSummary } = useAppData();
+  // updates after hydration. Using the preloaded course settings (instead of
+  // a fresh useQuery) avoids a flash where the "Off" pill on the excluded
+  // source tab only appears after a brief delay.
+  const { preloadedHomeSummary, preloadedCourseSettings } = useAppData();
   const summary = usePreloadedQuery(preloadedHomeSummary);
-  const settings = useQuery(api.features.courses.getActiveCourseSettings, {});
+  const settings = usePreloadedQuery(preloadedCourseSettings);
   const updateSettings = useUpdateStudyContentFilter();
   const t = useTranslations('AppPage.collections.carousel');
   const [currentTab, setCurrentTab] = React.useState<'premade' | 'custom'>('premade');
@@ -463,7 +465,10 @@ function CustomTab({
 
   // The custom tab uses the user's `activeCustomCollectionIds` for the
   // active-set indicator (Select toggles inclusion in the auto-add pool).
-  const courseSettings = useQuery(api.features.courses.getActiveCourseSettings, {});
+  // Use the preloaded query so the selected-set dot is correct on the first
+  // paint instead of flickering on after hydration.
+  const { preloadedCourseSettings } = useAppData();
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   // Stored as Set<string> so the branded `Id<'collections'>` values match the
   // `string`-typed `CollectionProgressItem.collectionId` on lookup. Convex Ids
   // are strings at runtime so iterating works directly.

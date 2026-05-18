@@ -123,7 +123,14 @@ export function useCollectionDetail({
     contentData,
     isAdding,
     handleAddCards,
-    sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
+    // While the quota query is loading, treat as unlimited so the inline
+    // detail renders "+Add" by default instead of flashing the locked
+    // Upgrade button before the real balance arrives. The server mutation
+    // is still the authoritative gate if the user actually has 0 quota.
+    sentencesRemaining:
+      sentencesQuota.isLoading || sentencesQuota.unlimited
+        ? null
+        : sentencesQuota.balance,
     sentencesQuota,
     usageLimitHit,
   };
