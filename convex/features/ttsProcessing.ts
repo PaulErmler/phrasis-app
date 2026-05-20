@@ -11,6 +11,7 @@ import { synthesizeSpeech, transcribeAudio, type WordTiming } from './tts';
 import { languageSupportsStt } from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
 import { textsMatchSemantic } from '../lib/ttsSemanticValidation';
+import { rateLimiter, TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import {
   ttsQualityValidator,
   ttsProviderValidator,
@@ -28,7 +29,7 @@ const TTS_CLAIM_STALE_MS = 30 * 1000; // 30 seconds
  * helper below to gate dispatch.
  */
 const PROVIDER_MAX_CONCURRENCY: Record<TtsProvider, number> = {
-  google: 32,
+  google: 64,
   elevenlabs: 3,
   azure: 8,
 };
@@ -660,13 +661,37 @@ export const pumpQueue = internalMutation({
           .first());
       if (!next) break;
 
+      // Reserve one provider request from the per-minute budget. `reserve:
+      // true` lets the limiter schedule us into a future slot when the
+      // bucket is empty rather than failing; `retryAfter` is the delay
+      // (in ms) before the HTTP call may fire. With our concurrency cap
+      // of `cap` jobs per pump and Google's 190/min budget, the worst-case
+      // reservation is ~10s — comfortably inside `TTS_CLAIM_STALE_MS`.
+      const limit = await rateLimiter.limit(
+        ctx,
+        TTS_RATE_LIMIT_BY_PROVIDER[args.provider as TtsProvider],
+        { reserve: true },
+      );
+      if (!limit.ok) {
+        // Reservation pool is full (only reachable if a future `maxReserved`
+        // gets configured). Stop dispatching this tick and wake the pump
+        // when capacity is expected to free up.
+        await ctx.scheduler.runAfter(
+          Math.max(0, limit.retryAfter ?? 0),
+          internal.features.ttsProcessing.pumpQueue,
+          { provider: args.provider },
+        );
+        break;
+      }
+      const dispatchDelayMs = Math.max(0, limit.retryAfter ?? 0);
+
       const slotId = await ctx.db.insert('ttsProviderSlots', {
         provider: args.provider,
         claimedAt: Date.now(),
       });
       await ctx.db.delete(next._id);
       await ctx.scheduler.runAfter(
-        0,
+        dispatchDelayMs,
         internal.features.ttsProcessing.processTTSForCard,
         {
           ...next.args,

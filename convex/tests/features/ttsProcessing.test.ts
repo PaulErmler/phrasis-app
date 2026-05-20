@@ -9,9 +9,24 @@ import { internal } from "../../_generated/api";
 vi.mock("../../lib/ttsSemanticValidation", () => ({
   textsMatchSemantic: vi.fn(),
 }));
- 
+
+// Mock the rate limiter at the module boundary. The real component requires
+// `t.registerComponent` setup (flagged fragile in this project) and would
+// pull in the @convex-dev/rate-limiter component's tables. Tests that need
+// a specific verdict from `rateLimiter.limit` reassign `mockLimit` below.
+vi.mock("../../rateLimiter", () => ({
+  rateLimiter: { limit: vi.fn() },
+  TTS_RATE_LIMIT_BY_PROVIDER: {
+    google: "googleTts",
+    elevenlabs: "elevenlabsTts",
+    azure: "azureTts",
+  },
+}));
+
 import { textsMatchSemantic } from "../../lib/ttsSemanticValidation";
+import { rateLimiter } from "../../rateLimiter";
 const mockSemantic = vi.mocked(textsMatchSemantic);
+const mockLimit = vi.mocked(rateLimiter.limit);
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -690,6 +705,150 @@ describe("features/ttsProcessing", () => {
       });
 
       expect(order).toEqual(['active-newest', 'normal-old', 'normal-new']);
+    });
+
+    it('pumpQueue dispatches with zero delay when the rate limiter grants a token immediately', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert('ttsQueue', {
+          provider: 'google',
+          args: {
+            textId,
+            text: 'Hola',
+            language: 'es',
+            voiceName: 'es-ES-Chirp3-HD-Leda',
+            voiceGender: 'female',
+            speed: 1,
+          },
+          queuedAt: 0,
+          priority: 0,
+        });
+      });
+
+      mockLimit.mockResolvedValueOnce({ ok: true, retryAfter: 0 });
+
+      await t.mutation(internal.features.ttsProcessing.pumpQueue, {
+        provider: 'google',
+      });
+
+      const queueRows = await t.run((ctx) =>
+        ctx.db.query('ttsQueue').collect(),
+      );
+      const slots = await t.run((ctx) =>
+        ctx.db.query('ttsProviderSlots').collect(),
+      );
+      expect(queueRows.length).toBe(0);
+      expect(slots.length).toBe(1);
+      expect(mockLimit).toHaveBeenCalledWith(
+        expect.anything(),
+        'googleTts',
+        { reserve: true },
+      );
+    });
+
+    it('pumpQueue still dispatches but with the reserved delay when retryAfter > 0', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert('ttsQueue', {
+          provider: 'google',
+          args: {
+            textId,
+            text: 'Hola',
+            language: 'es',
+            voiceName: 'es-ES-Chirp3-HD-Leda',
+            voiceGender: 'female',
+            speed: 1,
+          },
+          queuedAt: 0,
+          priority: 0,
+        });
+      });
+
+      mockLimit.mockResolvedValueOnce({ ok: true, retryAfter: 5_000 });
+
+      await t.mutation(internal.features.ttsProcessing.pumpQueue, {
+        provider: 'google',
+      });
+
+      // Queue still drains and a slot is held even though dispatch is deferred —
+      // the slot reserves the concurrency seat through the wait.
+      const queueRows = await t.run((ctx) =>
+        ctx.db.query('ttsQueue').collect(),
+      );
+      const slots = await t.run((ctx) =>
+        ctx.db.query('ttsProviderSlots').collect(),
+      );
+      expect(queueRows.length).toBe(0);
+      expect(slots.length).toBe(1);
+
+      // Verify the scheduled action carries the rate-limiter's reservation delay.
+      const scheduled = await t.run((ctx) =>
+        ctx.db.system.query('_scheduled_functions').collect(),
+      );
+      const processCalls = scheduled.filter((s) =>
+        s.name.includes('processTTSForCard'),
+      );
+      expect(processCalls.length).toBe(1);
+      expect(processCalls[0].scheduledTime).toBeGreaterThan(Date.now() + 4_000);
+    });
+
+    it('pumpQueue stops dispatching and reschedules itself when rate limiter denies', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+
+      await t.run(async (ctx) => {
+        await ctx.db.insert('ttsQueue', {
+          provider: 'google',
+          args: {
+            textId,
+            text: 'Hola',
+            language: 'es',
+            voiceName: 'es-ES-Chirp3-HD-Leda',
+            voiceGender: 'female',
+            speed: 1,
+          },
+          queuedAt: 0,
+          priority: 0,
+        });
+      });
+
+      mockLimit.mockResolvedValueOnce({ ok: false, retryAfter: 30_000 });
+
+      await t.mutation(internal.features.ttsProcessing.pumpQueue, {
+        provider: 'google',
+      });
+
+      // Nothing dispatched: queue row untouched, no slot taken, no
+      // processTTSForCard scheduled. A re-pump must be queued at retryAfter.
+      const queueRows = await t.run((ctx) =>
+        ctx.db.query('ttsQueue').collect(),
+      );
+      const slots = await t.run((ctx) =>
+        ctx.db.query('ttsProviderSlots').collect(),
+      );
+      expect(queueRows.length).toBe(1);
+      expect(slots.length).toBe(0);
+
+      const scheduled = await t.run((ctx) =>
+        ctx.db.system.query('_scheduled_functions').collect(),
+      );
+      const processCalls = scheduled.filter((s) =>
+        s.name.includes('processTTSForCard'),
+      );
+      const pumpRescheduled = scheduled.filter((s) =>
+        s.name.includes('pumpQueue'),
+      );
+      expect(processCalls.length).toBe(0);
+      expect(pumpRescheduled.length).toBeGreaterThanOrEqual(1);
+      expect(
+        pumpRescheduled.some(
+          (s) => s.scheduledTime > Date.now() + 25_000,
+        ),
+      ).toBe(true);
     });
 
     it('llmTranslationQueue priority=1 drains before priority=0', async () => {
