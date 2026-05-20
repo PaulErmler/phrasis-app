@@ -26,6 +26,8 @@ export async function upsertCourseSettings(
     initialReviewCount: number;
     activeCollectionId?: Id<'collections'>;
     reviewMode?: 'audio' | 'full';
+    autoAddCards?: boolean;
+    cardsToAddBatchSize?: number;
   },
 ): Promise<Id<'courseSettings'>> {
   const existing = await ctx.db

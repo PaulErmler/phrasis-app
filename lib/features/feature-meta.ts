@@ -9,7 +9,7 @@ import { FEATURE_IDS, type FeatureId } from '@/convex/features/featureIds';
  * consumable = undefined → boolean flag, not metered (multiple languages)
  *
  * displayCount → override for boolean features where included_usage is 0
- *                but the actual limit is a known constant (e.g. 5 languages).
+ *                but the actual limit is a known constant (e.g. 3 languages).
  *
  * hidden = true → internal-only feature, excluded from pricing tables and
  *                 upgrade flows. Limit-reached UI shows a "contact us" dialog
@@ -23,10 +23,12 @@ export const FEATURE_META: Record<
   [FEATURE_IDS.COURSES]: { i18nKey: 'courses', consumable: false, paywallKey: 'courseCapWithArchiveOption' },
   [FEATURE_IDS.SENTENCES]: { i18nKey: 'sentences', consumable: true, displayAsUnlimited: true },
   [FEATURE_IDS.CUSTOM_SENTENCES]: { i18nKey: 'customSentences', consumable: true },
-  [FEATURE_IDS.MULTIPLE_LANGUAGES]: { i18nKey: 'multipleLanguages', displayCount: 5 },
+  [FEATURE_IDS.MULTIPLE_LANGUAGES]: { i18nKey: 'multipleLanguages', displayCount: 3 },
   [FEATURE_IDS.TRANSCRIPTIONS]: { i18nKey: 'transcriptions', consumable: true, hidden: true },
   [FEATURE_IDS.CARD_EDITS]: { i18nKey: 'cardEdits', consumable: true, hidden: true },
   [FEATURE_IDS.TRANSLATION_AUTO_FILL]: { i18nKey: 'translationAutoFill', consumable: true, hidden: true },
+  [FEATURE_IDS.AUDIO_REGENERATIONS]: { i18nKey: 'audioRegenerations', consumable: true, hidden: true },
+  [FEATURE_IDS.TRANSLATION_FLAGS]: { i18nKey: 'translationFlags', consumable: true, hidden: true },
 };
 
 export function getFeatureI18nKey(featureId: string): string {

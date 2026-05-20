@@ -20,10 +20,10 @@ import { useCardApprovals } from '@/hooks/use-card-approvals';
 import { useScreenWakeLock } from '@/hooks/use-screen-wake-lock';
 import { useThread } from '@/hooks/use-thread';
 import { Loader } from '@/components/ai-elements/loader';
-import { useAppData } from '@/components/app/AppDataProvider';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
 import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
 import type { Id } from '@/convex/_generated/dataModel';
+import { buildSessionSnapshot } from '@/components/app/learning/sessionSnapshot';
 
 function WrappedChatPanel({
   threadId,
@@ -107,20 +107,73 @@ interface LearnViewProps {
   onNavigateToChat: () => void;
   /** Navigate to the custom-card creation page. Same condition. */
   onNavigateToAddCustomCards: () => void;
+  /**
+   * Render mode. `'onboarding'`:
+   *   - Suppresses the auto-firing `useTutorial(FULL_REVIEW_INTRO|AUDIO_REVIEW_INTRO)`
+   *     so the onboarding wizard's coachmarks are the only teaching layer.
+   *   - Renders a minimal header (no back/settings/help) — chrome is
+   *     handled by the wizard around it.
+   *   - Forwards to `LearningMode`'s `mode='onboarding'` (hides the
+   *     settings sheet).
+   * Defaults to `'normal'`.
+   */
+  mode?: 'normal' | 'onboarding';
+  /** Optional minimal header content (e.g. just the ReviewModeSwitcher) for
+   *  `mode='onboarding'`. Ignored in normal mode. */
+  onboardingHeader?: React.ReactNode;
+  /** Called when a user rates a card — wizard uses this to count cards
+   *  toward the lesson-complete threshold AND to capture session counters
+   *  for the celebration screen. */
+  onCardRated?: (
+    rating: import('@/lib/scheduling').ReviewRating | undefined,
+    snapshot: {
+      sessionId: string;
+      dailyReviewsToday: number;
+      dailyTimeMsToday: number;
+      dailyNewWordsToday: number;
+    },
+  ) => void;
+  /** External autoplay override (onboarding-mode only). When true, autoplay
+   *  stays gated regardless of course settings — used by the wizard to keep
+   *  card audio silent while the first-lesson coachmarks are running so the
+   *  spoken sentence doesn't fight the popover. */
+  forceDisableAutoPlay?: boolean;
+  /** Onboarding-only: seed the underlying session so a mid-lesson reload
+   *  resumes the same session — the X/N progress bar continues from where
+   *  the user left off, and `getNewWordsForCelebration` keeps returning
+   *  the same hero number on the stats-recap screen. */
+  initialSessionId?: string;
+  initialSessionCardCount?: number;
 }
 
-export function LearnView({
-  onBack,
-  prefetchedThreadId,
-  onNavigateToChat,
-  onNavigateToAddCustomCards,
-}: LearnViewProps) {
+export function LearnView(props: LearnViewProps) {
+  return <LearnViewInner {...props} />;
+}
+
+/**
+ * Onboarding-only wrapper around `LearnView`. The wizard uses this so it
+ * can't accidentally forget to set `mode='onboarding'` (which would re-enable
+ * the auto-firing tutorial and the full header chrome). Normal-mode callers
+ * should use `LearnView` directly.
+ */
+export type LearnViewOnboardingProps = Omit<
+  LearnViewProps,
+  'mode' | 'onNavigateToChat' | 'onNavigateToAddCustomCards'
+> & {
+  onboardingHeader: React.ReactNode;
+};
+
+export function LearnViewOnboarding(props: LearnViewOnboardingProps) {
   return (
-    <LearnViewInner
-      onBack={onBack}
-      prefetchedThreadId={prefetchedThreadId}
-      onNavigateToChat={onNavigateToChat}
-      onNavigateToAddCustomCards={onNavigateToAddCustomCards}
+    <LearnView
+      {...props}
+      mode="onboarding"
+      onNavigateToChat={() => {
+        /* chat navigation disabled inside the wizard */
+      }}
+      onNavigateToAddCustomCards={() => {
+        /* custom-card flow disabled inside the wizard */
+      }}
     />
   );
 }
@@ -130,12 +183,22 @@ function LearnViewInner({
   prefetchedThreadId,
   onNavigateToChat,
   onNavigateToAddCustomCards,
+  mode = 'normal',
+  onboardingHeader,
+  onCardRated,
+  forceDisableAutoPlay = false,
+  initialSessionId,
+  initialSessionCardCount,
 }: LearnViewProps) {
-  const { preloadedCourseSettings, preloadedActiveCourse } = useAppData();
-
   const state = useLearningMode({
-    courseSettings: preloadedCourseSettings,
-    activeCourse: preloadedActiveCourse,
+    initialSessionId,
+    initialSessionCardCount,
+    // Onboarding adds 2 cards at a time (smaller batches keep the first
+    // lesson feeling brisk and unblocked). In-memory override only — the
+    // persisted `cardsToAddBatchSize` written by `completeOnboarding`
+    // stays at `ONBOARDING_CARDS_BATCH_SIZE`, so regular learning after
+    // onboarding resumes the normal batch.
+    batchSizeOverride: mode === 'onboarding' ? 2 : undefined,
   });
   useScreenWakeLock(state.status === 'reviewing');
   const reviewMode = state.status !== 'loading' ? (state.courseSettings?.reviewMode ?? 'audio') : 'audio';
@@ -143,22 +206,53 @@ function LearnViewInner({
     ? (state.courseSettings?.schedulingMode ?? 'learnAndReview')
     : 'learnAndReview';
   const isRadio = schedulingMode === 'radio';
+  const isOnboarding = mode === 'onboarding';
   const tutorialId = reviewMode === 'full' ? TUTORIAL_IDS.FULL_REVIEW_INTRO : TUTORIAL_IDS.AUDIO_REVIEW_INTRO;
   const { isActive, isCompleted, restartTutorial } = useTutorial(tutorialId, {
     delayMs: 1000,
     // Radio mode is its own flow — don't trigger the audio-review tutorial
     // when the user explicitly chose to listen.
-    enabled: state.status === 'reviewing' && !state.settingsOpen && !isRadio,
+    // Onboarding flow: suppressed — coachmarks are the only teaching layer.
+    enabled:
+      !isOnboarding &&
+      state.status === 'reviewing' &&
+      !state.settingsOpen &&
+      !isRadio,
   });
   // `progressDisplayActive` lives on BaseState so it persists across status
   // transitions (e.g. milestone hit on the last card → noCardsDue mid-cele).
   const progressDisplayActive = state.progressDisplayActive;
+  // Audio-mode auto-advance bypasses `LearningMode.handleNextWithAccuracy`
+  // (and therefore the wizard's `onCardRated` plumbing) by calling
+  // `state.handleNext()` directly. Fire `onCardRated` from here so
+  // auto-advanced cards still count toward the onboarding card threshold
+  // and the staged coachmark unlocks.
+  const fireOnCardRated = useCallback(() => {
+    if (state.status !== 'reviewing' || !onCardRated) return;
+    onCardRated(undefined, buildSessionSnapshot(state));
+  }, [state, onCardRated]);
+
+  const hasInflightCardAction =
+    state.status === 'reviewing' && state.hasInflightCardAction;
   const { audio, openSettings } = useLearningAudio(state, {
     // Radio mode forces autoplay + auto-advance. The tutorial gates and the
     // celebration pause don't apply (no tutorial in radio, no celebration in
-    // radio).
-    disableAutoAdvance: !isRadio && reviewMode === 'audio' && isActive,
-    disableAutoPlay: !isRadio && (isActive || !isCompleted || progressDisplayActive),
+    // radio). In onboarding mode, the in-app `useTutorial` is suppressed so
+    // `isCompleted` would stay false forever and block every card's autoplay
+    // — gate the tutorial-completion check on `mode !== 'onboarding'`.
+    // `hasInflightCardAction` keeps the user on the current card while a
+    // flag retranslation or audio regenerate is mid-flight — auto-advancing
+    // before the new content lands would skip past the very thing they
+    // asked for.
+    disableAutoAdvance:
+      (!isRadio && reviewMode === 'audio' && isActive) || hasInflightCardAction,
+    disableAutoPlay:
+      !isRadio &&
+      (isActive ||
+        (!isOnboarding && !isCompleted) ||
+        progressDisplayActive ||
+        forceDisableAutoPlay),
+    onAutoNext: fireOnCardRated,
   });
 
   const goHome = useCallback(() => {
@@ -216,7 +310,11 @@ function LearnViewInner({
     </div>
   ) : null;
 
-  const header = (
+  const header = isOnboarding ? (
+    // Onboarding renders its own minimal header (typically just the mode
+    // switcher) — no back/settings/help chrome. Wizard handles navigation.
+    onboardingHeader ?? null
+  ) : (
     <LearningHeader
       onBack={goHome}
       onSettingsOpen={openSettings}
@@ -232,11 +330,14 @@ function LearnViewInner({
       header={header}
       chatPanel={chatPanel}
       onChatOpen={handleChatOpen}
+      hideChatToggle={progressDisplayActive}
     >
       <LearningMode
         state={state}
         audio={audio}
         onGoHome={goHome}
+        mode={mode}
+        onCardRated={onCardRated}
         onNavigateToChat={onNavigateToChat}
         onNavigateToAddCustomCards={onNavigateToAddCustomCards}
       />

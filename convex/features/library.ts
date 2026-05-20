@@ -24,6 +24,12 @@ const activeFilterValidator = v.optional(
   ),
 );
 
+// 'custom' includes both 'custom' and 'chat' origins (anything the user
+// authored — manual entry or via chat). 'premade' is curated course content.
+const sourceFilterValidator = v.optional(
+  v.union(v.literal('custom'), v.literal('premade')),
+);
+
 const libraryCardValidator = v.object({
   _id: v.id('cards'),
   _creationTime: v.number(),
@@ -44,8 +50,8 @@ const libraryCardValidator = v.object({
 });
 
 /**
- * Paginated library query with optional full-text search and an exclusive
- * filter selection.
+ * Library query with optional full-text search and an exclusive filter
+ * selection. Returns up to `LIBRARY_LIMIT` cards in one shot — no pagination.
  *
  * activeFilter:
  *   undefined  → all non-hidden cards (default)
@@ -53,12 +59,13 @@ const libraryCardValidator = v.object({
  *   'hidden'   → only hidden cards
  *   'favorites'→ only favorited non-hidden cards
  */
-const LIBRARY_LIMIT = 20;
+const LIBRARY_LIMIT = 100;
 
 export const getLibraryCards = query({
   args: {
     searchQuery: v.optional(v.string()),
     activeFilter: activeFilterValidator,
+    sourceFilter: sourceFilterValidator,
   },
   returns: v.array(libraryCardValidator),
   handler: async (ctx, args) => {
@@ -73,51 +80,175 @@ export const getLibraryCards = query({
     if (!deck) return [];
 
     const filter = args.activeFilter ?? null;
+    const source = args.sourceFilter ?? null;
     const searchQuery = args.searchQuery?.trim() ?? '';
+
+    // Each (state × source) combo resolves via a single pure-index query, or
+    // (for source === 'custom') two pure-index queries merged on the server —
+    // no Convex `.filter()` post-scans. 'custom' covers origins
+    // ∈ {'custom','chat'}; 'premade' is curated course content. The state
+    // dimension has its own existing indexes; the new
+    // `*_origin_lastReviewedAt` indexes mirror each state index for the
+    // origin-extended case.
+
+    const isHidden = filter === 'hidden';
+
+    type Origin = 'premade' | 'custom' | 'chat';
+    const NON_PREMADE_ORIGINS: readonly Origin[] = ['custom', 'chat'] as const;
+
+    const mergeByLastReviewedDesc = (
+      buckets: Doc<'cards'>[][],
+    ): Doc<'cards'>[] =>
+      buckets
+        .flat()
+        .sort((a, b) => (b.lastReviewedAt ?? 0) - (a.lastReviewedAt ?? 0))
+        .slice(0, LIBRARY_LIMIT);
 
     let cards: Doc<'cards'>[];
 
     if (searchQuery.length > 0) {
-      cards = await ctx.db
-        .query('cards')
-        .withSearchIndex('search_text', (q) => {
-          let sq = q.search('searchableText', searchQuery).eq('deckId', deck._id);
-          if (filter === 'mastered') {
-            sq = sq.eq('isHidden', false).eq('isMastered', true);
-          } else if (filter === 'hidden') {
-            sq = sq.eq('isHidden', true);
-          } else if (filter === 'favorites') {
-            sq = sq.eq('isHidden', false).eq('isFavorite', true);
-          } else {
-            sq = sq.eq('isHidden', false);
-          }
-          return sq;
-        })
-        .take(LIBRARY_LIMIT);
+      const runSearch = (originValue?: Origin) =>
+        ctx.db
+          .query('cards')
+          .withSearchIndex('search_text', (q) => {
+            let sq = q
+              .search('searchableText', searchQuery)
+              .eq('deckId', deck._id);
+            if (filter === 'mastered') {
+              sq = sq.eq('isHidden', false).eq('isMastered', true);
+            } else if (filter === 'hidden') {
+              sq = sq.eq('isHidden', true);
+            } else if (filter === 'favorites') {
+              sq = sq.eq('isHidden', false).eq('isFavorite', true);
+            } else {
+              sq = sq.eq('isHidden', false);
+            }
+            if (originValue !== undefined) {
+              sq = sq.eq('collectionOrigin', originValue);
+            }
+            return sq;
+          })
+          .take(LIBRARY_LIMIT);
+
+      if (source === 'premade') {
+        cards = await runSearch('premade');
+      } else if (source === 'custom') {
+        const buckets = await Promise.all(
+          NON_PREMADE_ORIGINS.map((o) => runSearch(o)),
+        );
+        // Search results are returned in relevance order; lastReviewedAt
+        // re-sort here matches the ordering used by the non-search branches
+        // so the library list is consistent regardless of which path served
+        // the query.
+        cards = mergeByLastReviewedDesc(buckets);
+      } else {
+        cards = await runSearch();
+      }
     } else if (filter === 'mastered') {
-      cards = await ctx.db
-        .query('cards')
-        .withIndex('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', (q) =>
-          q.eq('deckId', deck._id).eq('isHidden', false).eq('isMastered', true),
-        )
-        .order('desc')
-        .take(LIBRARY_LIMIT);
+      const fetchOrigin = (origin: Origin) =>
+        ctx.db
+          .query('cards')
+          .withIndex(
+            'by_deckId_isHidden_mastered_origin_lastReviewedAt',
+            (q) =>
+              q
+                .eq('deckId', deck._id)
+                .eq('isHidden', false)
+                .eq('isMastered', true)
+                .eq('collectionOrigin', origin),
+          )
+          .order('desc')
+          .take(LIBRARY_LIMIT);
+
+      if (source === 'premade') {
+        cards = await fetchOrigin('premade');
+      } else if (source === 'custom') {
+        const buckets = await Promise.all(
+          NON_PREMADE_ORIGINS.map(fetchOrigin),
+        );
+        cards = mergeByLastReviewedDesc(buckets);
+      } else {
+        cards = await ctx.db
+          .query('cards')
+          .withIndex(
+            'by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt',
+            (q) =>
+              q
+                .eq('deckId', deck._id)
+                .eq('isHidden', false)
+                .eq('isMastered', true),
+          )
+          .order('desc')
+          .take(LIBRARY_LIMIT);
+      }
     } else if (filter === 'favorites') {
-      cards = await ctx.db
-        .query('cards')
-        .withIndex('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', (q) =>
-          q.eq('deckId', deck._id).eq('isHidden', false).eq('isFavorite', true),
-        )
-        .order('desc')
-        .take(LIBRARY_LIMIT);
+      const fetchOrigin = (origin: Origin) =>
+        ctx.db
+          .query('cards')
+          .withIndex(
+            'by_deckId_isHidden_favorite_origin_lastReviewedAt',
+            (q) =>
+              q
+                .eq('deckId', deck._id)
+                .eq('isHidden', false)
+                .eq('isFavorite', true)
+                .eq('collectionOrigin', origin),
+          )
+          .order('desc')
+          .take(LIBRARY_LIMIT);
+
+      if (source === 'premade') {
+        cards = await fetchOrigin('premade');
+      } else if (source === 'custom') {
+        const buckets = await Promise.all(
+          NON_PREMADE_ORIGINS.map(fetchOrigin),
+        );
+        cards = mergeByLastReviewedDesc(buckets);
+      } else {
+        cards = await ctx.db
+          .query('cards')
+          .withIndex(
+            'by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt',
+            (q) =>
+              q
+                .eq('deckId', deck._id)
+                .eq('isHidden', false)
+                .eq('isFavorite', true),
+          )
+          .order('desc')
+          .take(LIBRARY_LIMIT);
+      }
     } else {
-      cards = await ctx.db
-        .query('cards')
-        .withIndex('by_deckId_and_isHidden_and_lastReviewedAt', (q) =>
-          q.eq('deckId', deck._id).eq('isHidden', filter === 'hidden'),
-        )
-        .order('desc')
-        .take(LIBRARY_LIMIT);
+      // No state filter (or filter === 'hidden') — `isHidden` is the only
+      // state component.
+      const fetchOrigin = (origin: Origin) =>
+        ctx.db
+          .query('cards')
+          .withIndex('by_deckId_isHidden_origin_lastReviewedAt', (q) =>
+            q
+              .eq('deckId', deck._id)
+              .eq('isHidden', isHidden)
+              .eq('collectionOrigin', origin),
+          )
+          .order('desc')
+          .take(LIBRARY_LIMIT);
+
+      if (source === 'premade') {
+        cards = await fetchOrigin('premade');
+      } else if (source === 'custom') {
+        const buckets = await Promise.all(
+          NON_PREMADE_ORIGINS.map(fetchOrigin),
+        );
+        cards = mergeByLastReviewedDesc(buckets);
+      } else {
+        cards = await ctx.db
+          .query('cards')
+          .withIndex('by_deckId_and_isHidden_and_lastReviewedAt', (q) =>
+            q.eq('deckId', deck._id).eq('isHidden', isHidden),
+          )
+          .order('desc')
+          .take(LIBRARY_LIMIT);
+      }
     }
 
     if (cards.length === 0) {

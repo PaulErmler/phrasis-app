@@ -13,6 +13,8 @@ import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
 import { trackEvent } from '../../db/stats/dailyStats';
+import { getTranslationSource } from '../../../lib/languages';
+import { OPENROUTER_MODELS } from '../../config/aiModels';
 
 /**
  * Fetches an approval and validates the user is authorized to act on it.
@@ -61,12 +63,20 @@ async function processApproval(
     collectionRank: nextRank,
   });
 
+  // The approval's translations were produced by the language-teacher chat
+  // model (see OPENROUTER_MODELS.languageTeacher). No reasoning is used on
+  // that path, so the source is just `<model>-none`.
+  const chatTranslationSource = getTranslationSource(
+    OPENROUTER_MODELS.languageTeacher,
+  );
+
   for (let i = 1; i < approval.translations.length; i++) {
     const entry = approval.translations[i];
     await ctx.db.insert('translations', {
       textId,
       targetLanguage: entry.language,
       translatedText: entry.text,
+      translationSource: chatTranslationSource,
     });
   }
 

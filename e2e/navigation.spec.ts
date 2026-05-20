@@ -12,30 +12,20 @@ test.describe("authed navigation shell", () => {
     await page.waitForLoadState("domcontentloaded");
     await dismissTour(page);
 
-    // Bottom nav exposes buttons / tabs labelled with the view name.
-    // We rely on the nav rendering at least the four main destinations.
-    const targets = [
-      { name: /library|bibliothek/i, urlFragment: /\/app\/library/ },
-      { name: /stats|statistik/i, urlFragment: /\/app\/stats/ },
-      { name: /settings|einstellungen/i, urlFragment: /\/app\/settings/ },
-      { name: /home|start/i, urlFragment: /\/app(\/?$|\/?\?)/ },
+    // Testid-based selection — accessible-name regexes were catching
+    // hero/CTA buttons like "Start lesson" before they reached the
+    // bottom-nav "Home" button.
+    const targets: Array<{ view: 'library' | 'stats' | 'settings' | 'home'; urlFragment: RegExp }> = [
+      { view: 'library', urlFragment: /\/app\/library/ },
+      { view: 'stats', urlFragment: /\/app\/stats/ },
+      { view: 'settings', urlFragment: /\/app\/settings/ },
+      { view: 'home', urlFragment: /\/app(\/?$|\/?\?)/ },
     ];
 
     for (const t of targets) {
-      const link = page
-        .getByRole("button", { name: t.name })
-        .or(page.getByRole("link", { name: t.name }))
-        .first();
-
-      if (!(await link.isVisible().catch(() => false))) {
-        test.info().annotations.push({
-          type: "skip-target",
-          description: `Nav target ${t.name} not visible — skipping.`,
-        });
-        continue;
-      }
-
-      await link.click();
+      const button = page.getByTestId(`bottom-nav-${t.view}`);
+      await expect(button).toBeVisible({ timeout: 10_000 });
+      await button.click();
       await expect(page).toHaveURL(t.urlFragment, { timeout: 10_000 });
     }
   });
@@ -46,7 +36,7 @@ test.describe("authed navigation shell", () => {
     await dismissTour(page);
 
     // Library via BottomNav
-    await page.getByRole("button", { name: /library|bibliothek/i }).first().click();
+    await page.getByTestId("bottom-nav-library").click();
     await expect(page).toHaveURL(/\/app\/library/, { timeout: 10_000 });
     await expect(page.getByTestId("library-search").first()).toBeVisible({ timeout: 10_000 });
 
@@ -70,12 +60,12 @@ test.describe("authed navigation shell", () => {
     await expect(page.getByRole("tablist").first()).toBeVisible({ timeout: 15_000 });
 
     // /app → /app/library
-    await page.getByRole("button", { name: /library|bibliothek/i }).first().click();
+    await page.getByTestId("bottom-nav-library").click();
     await expect(page).toHaveURL(/\/app\/library/, { timeout: 10_000 });
     await expect(page.getByTestId("library-search").first()).toBeVisible({ timeout: 10_000 });
 
     // /app/library → /app/stats
-    await page.getByRole("button", { name: /stats|statistik/i }).first().click();
+    await page.getByTestId("bottom-nav-stats").click();
     await expect(page).toHaveURL(/\/app\/stats/, { timeout: 10_000 });
 
     // Back to /app/library

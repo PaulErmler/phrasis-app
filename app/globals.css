@@ -177,7 +177,7 @@
 @layer components {
   /* Layout */
   .sticky-header {
-    @apply sticky top-0 z-10 border-b bg-background;
+    @apply sticky top-0 z-10 border-b bg-background pt-[env(safe-area-inset-top)];
   }
   .header-bar {
     @apply container mx-auto px-4 h-14 flex items-center justify-between;
@@ -189,9 +189,50 @@
     @apply flex-1 min-h-0 overflow-y-auto px-4 pt-6 pb-24;
   }
 
+  /* Slim scrollbar — used inside the onboarding wizard step containers so
+     the chunky native scrollbar (especially the Windows / always-on flavour)
+     doesn't crowd the tile grids. Applied via an attribute selector so we
+     don't have to thread a class through every step's root. */
+  [data-testid^="onboarding-step-"],
+  [data-testid^="onboarding-step-"] *,
+  .scrollbar-slim,
+  .scrollbar-slim * {
+    scrollbar-width: thin;
+    /* Theme colors are oklch — use color-mix to keep the alpha-blend in
+       gamut instead of wrapping in hsl() (which would silently fail). */
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent)
+      transparent;
+  }
+  [data-testid^="onboarding-step-"]::-webkit-scrollbar,
+  [data-testid^="onboarding-step-"] *::-webkit-scrollbar,
+  .scrollbar-slim::-webkit-scrollbar,
+  .scrollbar-slim *::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  [data-testid^="onboarding-step-"]::-webkit-scrollbar-track,
+  [data-testid^="onboarding-step-"] *::-webkit-scrollbar-track,
+  .scrollbar-slim::-webkit-scrollbar-track,
+  .scrollbar-slim *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  [data-testid^="onboarding-step-"]::-webkit-scrollbar-thumb,
+  [data-testid^="onboarding-step-"] *::-webkit-scrollbar-thumb,
+  .scrollbar-slim::-webkit-scrollbar-thumb,
+  .scrollbar-slim *::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+    border-radius: 9999px;
+  }
+  [data-testid^="onboarding-step-"]::-webkit-scrollbar-thumb:hover,
+  [data-testid^="onboarding-step-"] *::-webkit-scrollbar-thumb:hover,
+  .scrollbar-slim::-webkit-scrollbar-thumb:hover,
+  .scrollbar-slim *::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+  }
+
   /* Sheet / panel layout */
   .sheet-header {
-    @apply sticky top-0 z-10 border-b bg-background px-4 h-14 flex items-center justify-between;
+    @apply sticky top-0 z-10 border-b bg-background px-4 min-h-14 flex items-center justify-between pt-[env(safe-area-inset-top)];
   }
   .sheet-body {
     @apply flex-1 overflow-y-auto px-4 py-6;

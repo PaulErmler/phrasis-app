@@ -57,7 +57,52 @@ function buildSegments(chunks: CharChunk[]): AlignedSegment[] {
   return segments;
 }
 
+function PunctChip({ word }: { word: AlignedWord }) {
+  // -ml-1 cancels the parent's gap-x-1 so punctuation hugs the preceding word
+  // like natural text.
+  if (word.tag === 'equal') {
+    return (
+      <span className="-ml-1 rounded-sm bg-success/15 text-success px-1 py-0.5">
+        {word.actual}
+      </span>
+    );
+  }
+  if (word.tag === 'missing') {
+    return (
+      <span className="-ml-1 rounded-sm border border-dashed border-amber-500/60 text-amber-700 dark:text-amber-300 px-0.5 font-medium">
+        {word.expected}
+      </span>
+    );
+  }
+  if (word.tag === 'extra') {
+    return (
+      <span className="-ml-1 rounded-sm bg-destructive/15 text-destructive px-0.5">
+        {word.actual}
+      </span>
+    );
+  }
+  // 'wrong' (or 'typo' — punctuation never tags as typo, but be safe):
+  // show expected at the baseline with the user's mark floated above in red.
+  return (
+    <span className="-ml-1 rounded-sm bg-destructive/10 text-destructive px-0.5 relative inline-block">
+      <span
+        aria-hidden
+        className="absolute left-1/2 -translate-x-1/2 -top-2.5 text-[0.7rem] leading-none text-destructive whitespace-pre pointer-events-none font-medium"
+      >
+        {word.actual}
+      </span>
+      <span className="underline decoration-destructive/60 decoration-2 underline-offset-2">
+        {word.expected}
+      </span>
+    </span>
+  );
+}
+
 function WordChip({ word, language }: { word: AlignedWord; language: string }) {
+  if (word.kind === 'punct') {
+    return <PunctChip word={word} />;
+  }
+
   if (word.tag === 'equal') {
     return (
       <span className="rounded-sm bg-success/15 text-success px-1 py-0.5">

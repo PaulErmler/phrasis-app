@@ -5,7 +5,7 @@ import { FEATURE_IDS } from './convex/features/featureIds';
 // Features
 export const multiple_languages = feature({
   id: 'multiple_languages',
-  name: 'Up To 5 Languages per Course',
+  name: 'Up To 3 Languages per Course',
   type: 'boolean',
 });
 
@@ -58,12 +58,38 @@ export const translation_auto_fill = feature({
   consumable: true,
 });
 
+// Internal-only meters: hidden from the pricing table (gated client-side
+
+// via `isFeatureHidden` in `lib/features/feature-meta.ts`) but enforced by
+
+// `consumeQuota` in the corresponding card-action mutations.
+export const audio_regenerations = feature({
+  id: 'audio_regenerations',
+  name: 'Audio Regenerations',
+  type: 'metered',
+  consumable: true,
+});
+
+export const translation_flags = feature({
+  id: 'translation_flags',
+  name: 'Translation Flags',
+  type: 'metered',
+  consumable: true,
+});
+
 // Plans
 export const free = plan({
   id: 'free',
   name: 'Free',
   autoEnable: true,
   items: [
+    item({
+      featureId: audio_regenerations.id,
+      included: 20,
+      reset: {
+        interval: 'month',
+      },
+    }),
     item({
       featureId: card_edits.id,
       included: 50,
@@ -110,6 +136,13 @@ export const free = plan({
         interval: 'month',
       },
     }),
+    item({
+      featureId: translation_flags.id,
+      included: 20,
+      reset: {
+        interval: 'month',
+      },
+    }),
   ],
 });
 
@@ -122,8 +155,15 @@ export const basic = plan({
   },
   items: [
     item({
+      featureId: audio_regenerations.id,
+      included: 500,
+      reset: {
+        interval: 'month',
+      },
+    }),
+    item({
       featureId: card_edits.id,
-      included: 200,
+      included: 500,
       reset: {
         interval: 'month',
       },
@@ -167,6 +207,13 @@ export const basic = plan({
         interval: 'month',
       },
     }),
+    item({
+      featureId: translation_flags.id,
+      included: 500,
+      reset: {
+        interval: 'month',
+      },
+    }),
   ],
 });
 
@@ -179,8 +226,15 @@ export const pro = plan({
   },
   items: [
     item({
+      featureId: audio_regenerations.id,
+      included: 800,
+      reset: {
+        interval: 'month',
+      },
+    }),
+    item({
       featureId: card_edits.id,
-      included: 300,
+      included: 800,
       reset: {
         interval: 'month',
       },
@@ -225,8 +279,16 @@ export const pro = plan({
       },
     }),
     item({
+      featureId: translation_flags.id,
+      included: 800,
+      reset: {
+        interval: 'month',
+      },
+    }),
+    item({
       featureId: multiple_languages.id,
       included: 0,
     }),
   ],
+  freeTrial: { durationLength: 21, durationType: 'day', cardRequired: true },
 });

@@ -12,6 +12,7 @@ export type {
 export { alignWords } from './wordAlign';
 export type {
   AlignedWord,
+  AlignedKind,
   WordTag,
   WordAlignResult,
   WordAlignOptions,

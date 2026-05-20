@@ -1,5 +1,6 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query, MutationCtx, QueryCtx } from '../_generated/server';
+import { internal } from '../_generated/api';
 import { buildCardSearchableText } from '../lib/cardContent';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
@@ -26,11 +27,20 @@ import {
   schedulingPhaseValidator
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
+import { getTodayInTimezone } from '../lib/dateUtils';
 import { getAudioForText } from '../lib/audio';
-import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
+import {
+  ROMANIZATION_LANGUAGES,
+  USER_PROVIDED_TRANSLATION_SOURCE,
+  FLAG_AUTO_RETRANSLATION_MAX,
+} from '../../lib/languages';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
+import {
+  claimLlmTranslationIfAvailable,
+  CLAIM_STALE_MS as LLM_CLAIM_STALE_MS,
+} from './llmTranslationQueue';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 import {
   CARD_OVERRIDE_SPEED_MIN,
@@ -233,15 +243,25 @@ async function fetchDueCardsWithFilter(
 }
 
 export const getCardForReview = query({
-  args: {},
+  // `timezone` is optional so callers that don't care about the daily-count
+  // side-channel (tests, the layout warm-up) can still call `{}`. The learn
+  // view always supplies it so the in-learn progress bar can subscribe to
+  // today's active review count via this single query — no separate
+  // `getTodayReviewCount` subscription, and updates flow in live whether they
+  // come from a local mutation or another device.
+  args: { timezone: v.optional(v.string()) },
   returns: v.union(
     v.object({
       ...cardResultFields,
       nextCard: v.union(cardResultValidator, v.null()),
+      /** Today's non-radio review count (audio + full) for the active course,
+       * mirroring what drives `triggerCelebration` in `reviewCard`. 0 when
+       * `timezone` is omitted (caller opted out of the side-channel). */
+      dailyReviewsToday: v.number(),
     }),
     v.null(),
   ),
-  handler: async (ctx) => {
+  handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
@@ -282,6 +302,26 @@ export const getCardForReview = query({
 
       const sourceLanguage = text.language;
 
+      const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
+
+      // Per-language LLM-claim lookup. A non-stale row in
+      // `llmTranslationClaims` means a `flagTranslation`-triggered LLM
+      // retranslation is currently in flight; the "Retranslating" pill
+      // keys off this rather than "audio is missing" so it doesn't fire
+      // when the user clicks "regenerate audio" (no LLM phase).
+      const claimsByLang = new Map<string, number | null>();
+      await Promise.all(
+        allLanguages.map(async (lang) => {
+          const claim = await ctx.db
+            .query('llmTranslationClaims')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', card.textId).eq('targetLanguage', lang),
+            )
+            .first();
+          claimsByLang.set(lang, claim?.claimedAt ?? null);
+        }),
+      );
+
       const translations = await Promise.all(
         allLanguages.map(async (lang) => {
           if (lang === sourceLanguage) {
@@ -291,6 +331,7 @@ export const getCardForReview = query({
               isBaseLanguage: course.baseLanguages.includes(lang),
               isTargetLanguage: course.targetLanguages.includes(lang),
               romanization: text.romanizedText ?? undefined,
+              retranslating: false,
             };
           }
           const translation = await ctx.db
@@ -299,17 +340,25 @@ export const getCardForReview = query({
               q.eq('textId', card.textId).eq('targetLanguage', lang),
             )
             .first();
+          const translatedText = translation?.translatedText || '';
+          const claimedAt = claimsByLang.get(lang) ?? null;
+          const llmClaimHeld =
+            claimedAt !== null &&
+            Date.now() - claimedAt < LLM_CLAIM_STALE_MS;
+          // Show the pill only for *re*translations — first-time
+          // translations of new cards also hold a claim, but there's no
+          // prior text to retranslate from, so the pill would be confusing
+          // pre-translation. Gate on `translatedText` being non-empty.
           return {
             language: lang,
-            text: translation?.translatedText || '',
+            text: translatedText,
             isBaseLanguage: course.baseLanguages.includes(lang),
             isTargetLanguage: course.targetLanguages.includes(lang),
             romanization: translation?.romanizedText ?? undefined,
+            retranslating: llmClaimHeld && translatedText.length > 0,
           };
         }),
       );
-
-      const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
 
       const hasMissingTranslation = translations.some(
         (tr) => tr.language !== sourceLanguage && !tr.text,
@@ -347,7 +396,25 @@ export const getCardForReview = query({
 
     if (!current) return null;
 
-    return { ...current, nextCard: next };
+    // Today's active (non-radio) review count — same audio+full sum used by
+    // `triggerCelebration` in `reviewCard`. Folding it into this query means
+    // the bar updates live across devices via the same subscription, and we
+    // avoid a second `getTodayReviewCount` subscription on the hot path.
+    let dailyReviewsToday = 0;
+    if (args.timezone) {
+      const today = getTodayInTimezone(args.timezone);
+      const todayStats = await ctx.db
+        .query('dailyStats')
+        .withIndex('by_userId_and_courseId_and_date', (q) =>
+          q.eq('userId', userId).eq('courseId', course._id).eq('date', today),
+        )
+        .unique();
+      dailyReviewsToday =
+        (todayStats?.reviewsByMode?.audio ?? 0) +
+        (todayStats?.reviewsByMode?.full ?? 0);
+    }
+
+    return { ...current, nextCard: next, dailyReviewsToday };
   },
 });
 
@@ -764,8 +831,12 @@ export const unhideCard = mutation({
  *
  * Catch-up rule: a brand-new card (counter 0) joining a deck whose other
  * cards are all at e.g. 100 should not replay 99 more times. After playing,
- * its counter jumps to `max(picked + 1, floorOfOthers)` so it lands beside
- * the rest of the deck and rejoins the round-robin rotation.
+ * its counter jumps to `max(picked, floorOfOthers) + 1` so it lands one
+ * step past the rest of the deck — strictly above every other playable
+ * card. This guarantees the just-played card is never re-picked as the
+ * next card while any other playable card exists (the random `radioOrderKey`
+ * tiebreak only kicks in at equal counters, which can no longer include
+ * the played card).
  *
  * Stats: writes `dailyStats.reviewsByMode.radio` + `timeMsByMode.radio` and
  * the equivalent rollups, plus `courseStats.totalReviewsByMode.radio` and
@@ -805,7 +876,10 @@ export const advanceRadioCard = mutation({
     // `card`; in that case the floor is whichever of the two is not `card`.
     const floorCard = lowestTwo.find((c) => c._id !== card._id) ?? null;
     const floorCounter = floorCard ? (floorCard.radioRoundCounter ?? 0) : pickedCounter;
-    const newCounter = Math.max(pickedCounter + 1, floorCounter);
+    // Land strictly above the floor so the played card cannot tie with the
+    // rest of the round; combined with ascending counter ordering this rules
+    // out an immediate repeat as long as ≥1 other playable card exists.
+    const newCounter = Math.max(pickedCounter, floorCounter) + 1;
 
     await patchCard(
       ctx,
@@ -928,6 +1002,239 @@ export const toggleFavoriteCard = mutation({
   },
 });
 
+/** Maximum auto-retranslations per flagged row. Shared with the card queries
+ * (which use it to decide between "Retranslating" vs "Flagged" pill state). */
+const FLAG_RETRANSLATION_MAX = FLAG_AUTO_RETRANSLATION_MAX;
+
+/**
+ * Flag a card as having bad translation content. The user sees a single
+ * "Flag" affordance on the card; we then increment `flagCount` on every
+ * non-source-language `translations` row for that card's text, and enqueue
+ * a retranslation for each one whose post-increment count is within
+ * `FLAG_RETRANSLATION_MAX` AND whose language is part of the user's
+ * course. Counts past the cap still increment the counter (for later
+ * admin triage) but skip the retranslation work to bound cost.
+ *
+ * Routing per text: curriculum (premade-dataset) texts use
+ * `retranslation_high` (Pro-medium). User-created custom texts are
+ * **flagged without retranslation** — the LLM has no curated source of
+ * truth to second-guess against, so flagging a custom-text translation
+ * only bumps `flagCount` (for admin triage / surfacing the "Flagged" pill)
+ * and exits without enqueueing an LLM call. The rule applies to the whole
+ * card because `text.userCreated` is a property of the text, not the
+ * translation.
+ *
+ * Quota: one `translation_flags` unit total per flag click, regardless of
+ * how many languages were retranslated. Charged on the first language
+ * that successfully claims a slot; not charged at all if every language
+ * was over-cap or claim-contested. If `consumeQuota` throws USAGE_LIMIT,
+ * the whole mutation rolls back — counters and any prior claim/audio
+ * deletion are reverted.
+ */
+export const flagTranslation = mutation({
+  args: {
+    cardId: v.id('cards'),
+  },
+  returns: v.object({
+    retranslated: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
+
+    const text = await ctx.db.get(card.textId);
+    if (!text) throw new ConvexError('Text not found');
+
+    // Languages we need translations for: every base + target language in
+    // the user's course except the source. Dedupe in case a language is
+    // both base and target (unusual but possible). Fetching this exact
+    // set via the `by_text_and_language` index lets us skip orphan
+    // translation rows that may exist for languages the user has since
+    // removed from their course — we shouldn't bump flagCount on those.
+    const cardLanguages = Array.from(
+      new Set([...course.baseLanguages, ...course.targetLanguages]),
+    ).filter((lang) => lang !== text.language);
+
+    if (cardLanguages.length === 0) {
+      return { retranslated: false };
+    }
+
+    // Parallel indexed reads — one per language, each O(1) via the
+    // composite index. Faster than a single `by_textId` collect + JS
+    // filter when only a subset of the text's translations matter.
+    const fetched = await Promise.all(
+      cardLanguages.map((lang) =>
+        ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', card.textId).eq('targetLanguage', lang),
+          )
+          .first(),
+      ),
+    );
+
+    // Drop languages with no translation row (the card simply doesn't
+    // have a translation in that language yet — nothing to flag).
+    const nonSourceTranslations = fetched.filter(
+      (tr): tr is NonNullable<typeof tr> => tr !== null,
+    );
+
+    if (nonSourceTranslations.length === 0) {
+      return { retranslated: false };
+    }
+
+    // 1) Compute the post-patch count once per row and persist it. Doing the
+    // increment up front means a quota failure later in this mutation
+    // cleanly rolls back every counter via the surrounding transaction.
+    const withCounts = nonSourceTranslations.map((tr) => ({
+      tr,
+      nextCount: (tr.flagCount ?? 0) + 1,
+    }));
+    for (const { tr, nextCount } of withCounts) {
+      await ctx.db.patch(tr._id, { flagCount: nextCount });
+    }
+
+    // Custom-text flag policy: increment counters but never auto-retranslate.
+    // Custom texts have no curated source of truth — the LLM would only be
+    // second-guessing the user's own content. Flagging surfaces them in the
+    // "Flagged" UI pill for the user and admin triage; that's the full
+    // workflow. No quota charge, no audio invalidation, no enqueue.
+    if (text.userCreated) {
+      return { retranslated: false };
+    }
+
+    // 2) Filter to rows still under-cap. Over-cap rows already had their
+    // counter bumped above but skip the enqueue + quota path. All rows are
+    // guaranteed in-course because we fetched from the course's language
+    // set above.
+    const enqueueable = withCounts.filter(
+      ({ nextCount }) => nextCount <= FLAG_RETRANSLATION_MAX,
+    );
+
+    if (enqueueable.length === 0) {
+      // Everything was over-cap. Counters incremented, no quota charge,
+      // no retranslations.
+      return { retranslated: false };
+    }
+
+    // Curriculum-only path: user-created texts already short-circuited above.
+    const ruleOverride = 'retranslation_high';
+
+    // 3) Per-language: claim slot, charge quota on first success only,
+    // delete stale audio, enqueue retranslation. Claim-contested rows
+    // skip silently (something else is already retranslating them).
+    let anyEnqueued = false;
+    let quotaCharged = false;
+
+    for (const { tr } of enqueueable) {
+      const lang = tr.targetLanguage;
+
+      const claimed = await claimLlmTranslationIfAvailable(
+        ctx,
+        card.textId,
+        lang,
+      );
+      if (!claimed) continue;
+
+      // Charge quota once total — on the first successful claim. If the
+      // user is depleted, this throws USAGE_LIMIT and the whole mutation
+      // rolls back (counters, claim row, audio deletes).
+      if (!quotaCharged) {
+        await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
+        quotaCharged = true;
+      }
+
+      // The new translation will likely differ from the current text, so
+      // existing audio for this language is stale. Drop it; the worker's
+      // storeTranslationAndScheduleTTS path regenerates after the LLM lands.
+      const audioRows = await ctx.db
+        .query('audioRecordings')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', card.textId).eq('language', lang),
+        )
+        .take(10);
+      for (const audioRow of audioRows) {
+        await ctx.db.delete(audioRow._id);
+      }
+
+      await ctx.runMutation(
+        internal.features.llmTranslationQueue.enqueueLlmTranslation,
+        {
+          args: {
+            textId: card.textId,
+            sourceLanguage: text.language,
+            targetLanguage: lang,
+            text: text.text,
+            audioSpeakerGender: text.audioSpeakerGender,
+            ruleOverride,
+            // Deliberate retranslation — overwrite the existing translation
+            // row (and its romanization) once the LLM lands.
+            replaceExisting: true,
+          },
+          priority: 1,
+        },
+      );
+      anyEnqueued = true;
+    }
+
+    return { retranslated: anyEnqueued };
+  },
+});
+
+/**
+ * Regenerate audio for every language on the card. Consumes one
+ * `audio_regenerations` quota unit per call regardless of language count.
+ * Deletes all `audioRecordings` rows for the card's text and re-invokes
+ * `scheduleMissingContent`, which only schedules audio jobs for languages
+ * that already have translations (no re-translation here).
+ */
+export const regenerateCardAudio = mutation({
+  args: {
+    cardId: v.id('cards'),
+    timezone: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, card, course } = await authorizeCardAccess(ctx, args.cardId);
+
+    const text = await ctx.db.get(card.textId);
+    if (!text) throw new ConvexError('Text not found');
+
+    await consumeQuota(ctx, userId, FEATURE_IDS.AUDIO_REGENERATIONS);
+    await trackEvent(ctx, {
+      userId,
+      courseId: course._id,
+      timezone: args.timezone,
+      field: 'cardsEdited',
+    });
+
+    const allLanguages = [
+      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
+    ];
+    for (const lang of allLanguages) {
+      const audioRows = await ctx.db
+        .query('audioRecordings')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', card.textId).eq('language', lang),
+        )
+        .take(10);
+      for (const row of audioRows) {
+        await ctx.db.delete(row._id);
+      }
+    }
+
+    await scheduleMissingContent(
+      ctx,
+      card.textId,
+      text,
+      course.baseLanguages,
+      course.targetLanguages,
+      { priority: 1 },
+    );
+
+    return null;
+  },
+});
+
 /**
  * Edit the translations of a card.
  *
@@ -1039,15 +1346,22 @@ export const editCard = mutation({
         if (!changedLanguages.has(lang)) continue;
         const existing = existingTranslationMap.get(lang);
         if (existing) {
+          // User edited an existing translation — drop the romanization (it
+          // doesn't match the new text), drop the old romanization source,
+          // and re-tag as user-provided so a future strategy swap doesn't
+          // overwrite the user's edit.
           await ctx.db.patch(existing._id, {
             translatedText: submittedMap.get(lang)!,
             romanizedText: undefined,
+            romanizationSource: undefined,
+            translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
           });
         } else {
           await ctx.db.insert('translations', {
             textId: card.textId,
             targetLanguage: lang,
             translatedText: submittedMap.get(lang)!,
+            translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
           });
         }
       }
@@ -1072,6 +1386,10 @@ export const editCard = mutation({
         text: sourceChanged && submittedSource ? submittedSource : text.text,
         language: text.language,
         romanizedText: sourceChanged ? undefined : text.romanizedText,
+        // Source travels with the value: copy when unchanged (so we keep
+        // pointing at whichever romanizer produced the carried-over text);
+        // drop when changed (next ensureContent will re-romanize and tag).
+        romanizationSource: sourceChanged ? undefined : text.romanizationSource,
         userCreated: true,
         userId,
         collectionId: text.collectionId,
@@ -1095,7 +1413,12 @@ export const editCard = mutation({
       });
       resolvedTextId = newTextId;
 
-      // Create translations rows for all non-source languages
+      // Create translations rows for all non-source languages.
+      // Sources travel with their values:
+      //   - User-edited rows: tag as `'user-provided'`; carry no romanization.
+      //   - Unchanged rows: copy `translatedText` + `translationSource` + (if
+      //     present) `romanizedText` + `romanizationSource` so we don't lose
+      //     the original tags on the logical-copy operation.
       for (const lang of allLanguages) {
         if (lang === sourceLanguage) continue;
         const existing = existingTranslationMap.get(lang);
@@ -1106,7 +1429,21 @@ export const editCard = mutation({
           translatedText: changed
             ? (submittedMap.get(lang) ?? '')
             : (existing?.translatedText ?? ''),
-          ...(changed ? {} : existing?.romanizedText ? { romanizedText: existing.romanizedText } : {}),
+          ...(changed
+            ? { translationSource: USER_PROVIDED_TRANSLATION_SOURCE }
+            : existing?.translationSource
+              ? { translationSource: existing.translationSource }
+              : {}),
+          ...(changed
+            ? {}
+            : existing?.romanizedText !== undefined
+              ? {
+                romanizedText: existing.romanizedText,
+                ...(existing.romanizationSource
+                  ? { romanizationSource: existing.romanizationSource }
+                  : {}),
+              }
+              : {}),
         });
       }
 

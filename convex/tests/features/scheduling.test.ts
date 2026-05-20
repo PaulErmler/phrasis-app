@@ -146,6 +146,64 @@ describe("features/scheduling", () => {
       expect(res?._id).toBe(cardId);
       expect(res?.sourceText).toBe("Hola");
     });
+
+    it("returns dailyReviewsToday = 0 when timezone is omitted (opt-out)", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCardWithCourse(t);
+      // Even if today's row has plenty of active reviews, omitting `timezone`
+      // makes the caller opt out of the count side-channel — the field must
+      // be 0 so test callers (and the layout warm-up) don't accidentally
+      // depend on it.
+      const today = new Date().toISOString().slice(0, 10);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("dailyStats", {
+          userId: "user_A",
+          courseId,
+          date: today,
+          reps: 7,
+          newCards: 0,
+          timeMs: 0,
+          cardsReviewed: 7,
+          reviewsByMode: { audio: 5, full: 2, radio: 0 },
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.scheduling.getCardForReview, {});
+      expect(res?.dailyReviewsToday).toBe(0);
+    });
+
+    it("returns audio + full from today's dailyStats when timezone is provided (excludes radio)", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCardWithCourse(t);
+      const today = new Date().toISOString().slice(0, 10);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("dailyStats", {
+          userId: "user_A",
+          courseId,
+          date: today,
+          reps: 12,
+          newCards: 0,
+          timeMs: 0,
+          cardsReviewed: 12,
+          reviewsByMode: { audio: 4, full: 3, radio: 5 },
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.scheduling.getCardForReview, {
+        timezone: "UTC",
+      });
+      expect(res?.dailyReviewsToday).toBe(7);
+    });
+
+    it("returns dailyReviewsToday = 0 when no dailyStats row exists yet today", async () => {
+      const t = convexTest(schema, modules);
+      await seedCardWithCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.scheduling.getCardForReview, {
+        timezone: "UTC",
+      });
+      expect(res?.dailyReviewsToday).toBe(0);
+    });
   });
 
   describe("masterCard / hideCard / toggleFavoriteCard", () => {
@@ -433,6 +491,113 @@ describe("features/scheduling", () => {
       expect(audio?.speed).toBe(0.9);
       expect(audio?.wordTimings).toEqual([{ word: "Hej", start: 0, end: 0.5 }]);
     });
+
+    it("carries translationSource on unchanged rows and tags edited rows as user-provided", async () => {
+      // Seed a Path-B card whose existing en translation was produced by an
+      // LLM stage. Editing the source `sv` (not `en`) keeps `en` unchanged,
+      // so the logical-copy must carry the existing tag onto the new
+      // textId. Add a second target (`de`) and edit it inline to prove the
+      // edited branch overwrites to `'user-provided'`.
+      const ORIGINAL_EN_SOURCE =
+        "google/gemini-3.1-flash-lite-preview-none";
+      const t = convexTest(schema, modules);
+      const { cardId, textId: oldTextId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["sv", "de"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const deckId = await ctx.db.insert("decks", {
+          courseId,
+          name: "d",
+          cardCount: 1,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hej",
+          language: "sv",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "en",
+          translatedText: "Hello",
+          translationSource: ORIGINAL_EN_SOURCE,
+        });
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "de",
+          translatedText: "Hallo",
+          translationSource: ORIGINAL_EN_SOURCE,
+        });
+        const cardId = await ctx.db.insert("cards", {
+          deckId,
+          textId,
+          collectionId,
+          dueDate: Date.now() - 1000,
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            card_edits: {
+              balance: 100,
+              included: 100,
+              used: 0,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+        return { cardId, textId };
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          // sv (source) changes → forces Path B (new textId).
+          { language: "sv", text: "Hejsan" },
+          // en unchanged → logical-copy must carry the existing tag over.
+          { language: "en", text: "Hello" },
+          // de edited → must be retagged as user-provided.
+          { language: "de", text: "Hallöchen" },
+        ],
+        timezone: "UTC",
+      });
+
+      const allCards = await t.run(async (ctx) =>
+        ctx.db.query("cards").collect(),
+      );
+      const replacement = allCards.find((c) => c.textId !== oldTextId);
+      expect(replacement, "Path B should produce a replacement card").toBeTruthy();
+      const newTextId = replacement!.textId;
+
+      const newTranslations = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_textId", (q) => q.eq("textId", newTextId))
+          .collect(),
+      );
+      const byLang = Object.fromEntries(
+        newTranslations.map((tr) => [tr.targetLanguage, tr.translationSource]),
+      );
+      expect(byLang.en).toBe(ORIGINAL_EN_SOURCE);
+      expect(byLang.de).toBe("user-provided");
+    });
   });
 
   describe("reviewCard — progress display plumbing", () => {
@@ -463,6 +628,9 @@ describe("features/scheduling", () => {
       const { cardId, courseId } = await seedCardWithCourseAndStats(t);
       // Pre-seed today's reviews so the next one lands exactly on the
       // milestone boundary. UTC matches the timezone arg below.
+      // `reviewsByMode.audio` must mirror `reps` here — the milestone trigger
+      // counts non-radio reviews (audio + full), and the next review will
+      // bump audio from INTERVAL-1 → INTERVAL.
       const today = new Date().toISOString().slice(0, 10);
       await t.run(async (ctx) => {
         await ctx.db.insert("dailyStats", {
@@ -473,6 +641,7 @@ describe("features/scheduling", () => {
           newCards: 0,
           timeMs: 0,
           cardsReviewed: PROGRESS_DISPLAY_INTERVAL - 1,
+          reviewsByMode: { audio: PROGRESS_DISPLAY_INTERVAL - 1, full: 0, radio: 0 },
         });
       });
       const asUser = t.withIdentity({ subject: "user_A" });
@@ -499,6 +668,7 @@ describe("features/scheduling", () => {
           newCards: 0,
           timeMs: 0,
           cardsReviewed: PROGRESS_DISPLAY_INTERVAL - 1,
+          reviewsByMode: { audio: PROGRESS_DISPLAY_INTERVAL - 1, full: 0, radio: 0 },
         });
         await ctx.db.insert("courseSettings", {
           courseId,
@@ -567,6 +737,41 @@ describe("features/scheduling", () => {
       for (const row of allWords) {
         expect(row.sessionId).toBeUndefined();
       }
+    });
+
+    it("excludes radio plays from dailyReviewsToday so the milestone fires on the Nth active review", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, courseId } = await seedCardWithCourseAndStats(t);
+      // Pre-seed today's dailyStats with INTERVAL-1 audio reviews PLUS a few
+      // radio plays. Total `reps` already exceeds the milestone — but only the
+      // audio count drives the celebration trigger.
+      const today = new Date().toISOString().slice(0, 10);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("dailyStats", {
+          userId: "user_A",
+          courseId,
+          date: today,
+          reps: PROGRESS_DISPLAY_INTERVAL + 4,
+          newCards: 0,
+          timeMs: 0,
+          cardsReviewed: PROGRESS_DISPLAY_INTERVAL + 4,
+          reviewsByMode: {
+            audio: PROGRESS_DISPLAY_INTERVAL - 1,
+            full: 0,
+            radio: 5,
+          },
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const result = await asUser.mutation(api.features.scheduling.reviewCard, {
+        cardId,
+        rating: "understood",
+        timezone: "UTC",
+        sessionId: "session_X",
+      });
+      // dailyReviewsToday is the active count (audio + full), not total reps.
+      expect(result.dailyReviewsToday).toBe(PROGRESS_DISPLAY_INTERVAL);
+      expect(result.triggerCelebration).toBe(true);
     });
 
     it("accumulates dailyReviewsToday across multiple cards reviewed today", async () => {
@@ -844,10 +1049,13 @@ describe("features/scheduling", () => {
         expect(result.nextRadioRoundCounter).toBe(6);
       });
 
-      it("catches a fresh card up to the floor instead of incrementing by 1", async () => {
+      it("catches a fresh card up to one past the floor instead of incrementing by 1", async () => {
         // Headline catch-up rule: picked card at 0, floor at 100.
-        // newCounter = max(0+1, 100) = 100. The picked card lands beside the
-        // rest of the deck so it doesn't replay 99 more times in a row.
+        // newCounter = max(0, 100) + 1 = 101. The picked card lands one step
+        // PAST the rest of the deck — strictly above every other playable
+        // card — so it doesn't replay 99 more times in a row AND so it cannot
+        // be immediately re-picked when the random `radioOrderKey` tiebreak
+        // would otherwise put it first within a tie.
         const t = convexTest(schema, modules);
         const { cardIds } = await seedRadioDeck(t, [
           { counter: 100, text: "old-A" },
@@ -859,9 +1067,9 @@ describe("features/scheduling", () => {
           api.features.scheduling.advanceRadioCard,
           { cardId: cardIds[2], timezone: "UTC" },
         );
-        expect(result.nextRadioRoundCounter).toBe(100);
+        expect(result.nextRadioRoundCounter).toBe(101);
         const card = await t.run(async (ctx) => ctx.db.get(cardIds[2]));
-        expect(card?.radioRoundCounter).toBe(100);
+        expect(card?.radioRoundCounter).toBe(101);
       });
 
       it("does not modify FSRS state, dueDate, schedulingPhase, or preReviewCount", async () => {
@@ -1348,6 +1556,520 @@ describe("features/scheduling", () => {
         );
         expect(res).toBe(false);
       });
+    });
+  });
+
+  describe("flagTranslation", () => {
+    // Seeds: course en→es with a card; translation row for `en`; audio row
+    // for `en`; usage quota with translation_flags balance > 0.
+    async function seedFlaggableCard(
+      t: ReturnType<typeof convexTest>,
+      opts: {
+        flagsBalance?: number;
+        flagCount?: number;
+        userCreated?: boolean;
+      } = {},
+    ) {
+      return t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const deckId = await ctx.db.insert("decks", {
+          courseId,
+          name: "d",
+          cardCount: 1,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hola mundo",
+          language: "es",
+          userCreated: opts.userCreated ?? false,
+          collectionId,
+          collectionRank: 1,
+        });
+        const translationId = await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "en",
+          translatedText: "Hello world",
+          ...(opts.flagCount != null ? { flagCount: opts.flagCount } : {}),
+        });
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        const audioId = await ctx.db.insert("audioRecordings", {
+          textId,
+          language: "en",
+          voiceName: "en-US-test",
+          storageId,
+          ttsQuality: "validated",
+          ttsProvider: "google",
+          voiceGender: "female",
+        });
+        const cardId = await ctx.db.insert("cards", {
+          deckId,
+          textId,
+          collectionId,
+          dueDate: Date.now() - 1000,
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+        const flagsBalance = opts.flagsBalance ?? 10;
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            translation_flags: {
+              balance: flagsBalance,
+              included: 10,
+              used: 10 - flagsBalance,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+        return { cardId, textId, translationId, audioId };
+      });
+    }
+
+    it("first flag increments count, enqueues retranslation_high, deletes audio, charges quota", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, translationId } = await seedFlaggableCard(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
+      expect(res).toEqual({ retranslated: true });
+
+      const translation = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(translation?.flagCount).toBe(1);
+
+      // Audio row for the flagged language was wiped.
+      const audioRows = await t.run(async (ctx) =>
+        ctx.db
+          .query("audioRecordings")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("language", "en"),
+          )
+          .collect(),
+      );
+      expect(audioRows).toHaveLength(0);
+
+      // Queue row inserted with the retranslation_high override + priority 1.
+      // `replaceExisting: true` ensures storeTranslationAndScheduleTTS will
+      // overwrite the existing translatedText when the LLM lands.
+      const queueRows = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationQueue").collect(),
+      );
+      expect(queueRows).toHaveLength(1);
+      expect(queueRows[0].args.ruleOverride).toBe("retranslation_high");
+      expect(queueRows[0].args.replaceExisting).toBe(true);
+      expect(queueRows[0].args.targetLanguage).toBe("en");
+      expect(queueRows[0].priority).toBe(1);
+
+      // Quota debited by exactly 1 — single charge per flag click,
+      // regardless of how many languages got retranslated.
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.translation_flags.balance).toBe(9);
+    });
+
+    it("flagging a custom (user-created) text increments flagCount but does not retranslate", async () => {
+      // Curriculum texts (userCreated: false) get retranslated via
+      // `retranslation_high`. Custom texts (userCreated: true) are
+      // flag-only: counter bumps, no LLM enqueue, no quota charge — the
+      // LLM has no source-of-truth to second-guess user-created content.
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedFlaggableCard(t, { userCreated: true });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
+      expect(res).toEqual({ retranslated: false });
+
+      const queueRows = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationQueue").collect(),
+      );
+      expect(queueRows).toHaveLength(0);
+
+      // Counter still bumped so the "Flagged" pill surfaces in the UI.
+      const translations = await t.run(async (ctx) =>
+        ctx.db.query("translations").collect(),
+      );
+      expect(translations).toHaveLength(1);
+      expect(translations[0].flagCount).toBe(1);
+
+      // No quota charge — the helper seeds 10 units, expect all 10 left.
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.translation_flags.balance).toBe(10);
+    });
+
+    it("flags every non-source-language translation at once, single quota charge", async () => {
+      // Card with translations in two non-source languages. The mutation
+      // should retranslate BOTH but only charge quota once.
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en", "fr"],
+          targetLanguages: ["es"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const deckId = await ctx.db.insert("decks", {
+          courseId,
+          name: "d",
+          cardCount: 1,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hola mundo",
+          language: "es",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "en",
+          translatedText: "Hello world",
+        });
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "fr",
+          translatedText: "Bonjour le monde",
+        });
+        const cardId = await ctx.db.insert("cards", {
+          deckId,
+          textId,
+          collectionId,
+          dueDate: Date.now() - 1000,
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            translation_flags: {
+              balance: 10,
+              included: 10,
+              used: 0,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+        return { cardId, textId };
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
+      expect(res).toEqual({ retranslated: true });
+
+      // Both translation rows got their flagCount bumped.
+      const translations = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_textId", (q) => q.eq("textId", textId))
+          .collect(),
+      );
+      expect(translations).toHaveLength(2);
+      for (const tr of translations) {
+        expect(tr.flagCount).toBe(1);
+      }
+
+      // Both languages got a queue row.
+      const queueRows = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationQueue").collect(),
+      );
+      expect(queueRows).toHaveLength(2);
+      const enqueuedLangs = queueRows
+        .map((r) => r.args.targetLanguage)
+        .sort();
+      expect(enqueuedLangs).toEqual(["en", "fr"]);
+
+      // Single quota charge regardless of language count.
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.translation_flags.balance).toBe(9);
+    });
+
+    it("over-cap flag only increments counter — no enqueue, no charge", async () => {
+      // Pre-seed flagCount=2 (the cap). Next flag bumps it to 3, which is
+      // past FLAG_RETRANSLATION_MAX, so the short-circuit returns before
+      // claiming, enqueuing, or charging quota.
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedFlaggableCard(t, {
+        flagCount: 2,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
+      expect(res).toEqual({ retranslated: false });
+
+      const translation = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(translation?.flagCount).toBe(3);
+
+      const queueRows = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationQueue").collect(),
+      );
+      expect(queueRows).toHaveLength(0);
+
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      // Balance untouched — the over-cap path doesn't bill.
+      expect(quota?.features.translation_flags.balance).toBe(10);
+    });
+
+    it("when claim is already held, increments counter but skips enqueue and charge", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, translationId } = await seedFlaggableCard(t);
+      // Pre-insert a fresh claim row → `claimLlmTranslationIfAvailable` will
+      // return false on the flag path.
+      await t.run(async (ctx) => {
+        await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "en",
+          claimedAt: Date.now(),
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+      });
+      expect(res).toEqual({ retranslated: false });
+
+      const translation = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(translation?.flagCount).toBe(1);
+
+      const queueRows = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationQueue").collect(),
+      );
+      expect(queueRows).toHaveLength(0);
+
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.translation_flags.balance).toBe(10);
+    });
+
+    it("rolls back the flagCount patch when quota is depleted", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, translationId } = await seedFlaggableCard(t, {
+        flagsBalance: 0,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await expect(
+        asUser.mutation(api.features.scheduling.flagTranslation, {
+          cardId,
+        }),
+      ).rejects.toThrow();
+
+      // Transaction-level rollback: flagCount stays unset, no claim row
+      // remains, no queue row was inserted.
+      const translation = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(translation?.flagCount ?? 0).toBe(0);
+
+      const claims = await t.run(async (ctx) =>
+        ctx.db
+          .query("llmTranslationClaims")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("targetLanguage", "en"),
+          )
+          .collect(),
+      );
+      expect(claims).toHaveLength(0);
+
+      const queueRows = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationQueue").collect(),
+      );
+      expect(queueRows).toHaveLength(0);
+    });
+  });
+
+  describe("regenerateCardAudio", () => {
+    async function seedCardWithAudioForAllLanguages(
+      t: ReturnType<typeof convexTest>,
+      opts: { audioBalance?: number } = {},
+    ) {
+      return t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["es", "fr"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        const deckId = await ctx.db.insert("decks", {
+          courseId,
+          name: "d",
+          cardCount: 1,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hola",
+          language: "es",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        // Translations for both `en` (base) and `fr` (extra target). Source
+        // language `es` doesn't need a translation row.
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "en",
+          translatedText: "Hello",
+        });
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "fr",
+          translatedText: "Bonjour",
+        });
+        // Seed an audio row for each language so we can assert wipe.
+        const audioIds: Record<string, unknown> = {};
+        for (const lang of ["en", "es", "fr"] as const) {
+          const storageId = await ctx.storage.store(
+            new Blob([new Uint8Array([1, 2, 3])]),
+          );
+          audioIds[lang] = await ctx.db.insert("audioRecordings", {
+            textId,
+            language: lang,
+            voiceName: `${lang}-test`,
+            storageId,
+            ttsQuality: "validated",
+            ttsProvider: "google",
+            voiceGender: "female",
+          });
+        }
+        const cardId = await ctx.db.insert("cards", {
+          deckId,
+          textId,
+          collectionId,
+          dueDate: Date.now() - 1000,
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+        const balance = opts.audioBalance ?? 5;
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            audio_regenerations: {
+              balance,
+              included: 5,
+              used: 5 - balance,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+        return { cardId, textId, audioIds };
+      });
+    }
+
+    it("deletes every audio row for the card and debits one audio_regenerations unit", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await seedCardWithAudioForAllLanguages(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.regenerateCardAudio, {
+        cardId,
+        timezone: "UTC",
+      });
+
+      // All audio rows for the card's text are gone (across base + target langs).
+      const remaining = await t.run(async (ctx) =>
+        ctx.db
+          .query("audioRecordings")
+          .withIndex("by_textId", (q) => q.eq("textId", textId))
+          .collect(),
+      );
+      expect(remaining).toHaveLength(0);
+
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.audio_regenerations.balance).toBe(4);
+    });
+
+    it("rejects when audio_regenerations quota is depleted", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await seedCardWithAudioForAllLanguages(t, {
+        audioBalance: 0,
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await expect(
+        asUser.mutation(api.features.scheduling.regenerateCardAudio, {
+          cardId,
+          timezone: "UTC",
+        }),
+      ).rejects.toThrow();
+
+      // Audio rows survive the rollback.
+      const remaining = await t.run(async (ctx) =>
+        ctx.db
+          .query("audioRecordings")
+          .withIndex("by_textId", (q) => q.eq("textId", textId))
+          .collect(),
+      );
+      expect(remaining.length).toBeGreaterThan(0);
     });
   });
 });

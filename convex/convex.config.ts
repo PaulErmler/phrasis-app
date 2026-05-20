@@ -4,6 +4,7 @@ import agent from '@convex-dev/agent/convex.config';
 import autumn from "@useautumn/convex/convex.config";
 import aggregate from '@convex-dev/aggregate/convex.config';
 import actionRetrier from '@convex-dev/action-retrier/convex.config';
+import rateLimiter from '@convex-dev/rate-limiter/convex.config';
 
 const app = defineApp();
 app.use(betterAuth);
@@ -13,5 +14,6 @@ app.use(aggregate, { name: 'cardsByState' });
 app.use(aggregate, { name: 'cardsByDueDate' });
 app.use(aggregate, { name: 'cardsByStateAndDueDate' });
 app.use(actionRetrier);
+app.use(rateLimiter);
 
 export default app;

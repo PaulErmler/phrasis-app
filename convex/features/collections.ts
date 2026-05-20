@@ -17,6 +17,7 @@ import {
   LEGACY_LEVEL_ORDER,
   isPremadeLevelCollection,
 } from '../lib/collections';
+import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 import { getCourseSettings } from '../db/courseSettings';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
@@ -186,6 +187,12 @@ export const ensureContentForCollection = mutation({
 
     // Parallel over texts — each text writes only to its own (textId, language)
     // keyed rows, so no cross-text contention within this transaction.
+    //
+    // priority: 1 — opening a collection preview is a direct user signal that
+    // they're considering this collection. Jump ahead of background warmup
+    // (priority 0, e.g. cross-level prewarm from onboarding) so the preview
+    // populates promptly, while still yielding to onboarding-critical work
+    // (priority 2) like placement test or chosen-level seeding.
     const results = await Promise.all(
       texts.map((text) =>
         scheduleMissingContent(
@@ -194,6 +201,7 @@ export const ensureContentForCollection = mutation({
           text,
           course.baseLanguages,
           course.targetLanguages,
+          { priority: 1 },
         ),
       ),
     );
@@ -320,5 +328,95 @@ export const ensureFirstSentencesForCollection = internalMutation({
       ),
     );
     return null;
+  },
+});
+
+/**
+ * Warm up content for every language in `SUPPORTED_LANGUAGES`, regardless of
+ * which pairs are currently in use across `courses`. Per non-English target
+ * language we schedule two fan-outs:
+ *
+ *   1. **Cross-level warmup** — `ensureFirstSentencesAcrossLevelCollections`
+ *      with `en` as the source and that target as the only target language,
+ *      populating the first 5 sentences of every level collection.
+ *   2. **Placement-test translations + audio backstop** —
+ *      `enqueueMissingPlacementTranslations` followed by a 60s-delayed
+ *      `ensureAudioForTestTranslations` so the placement test renders
+ *      instantly for any user picking that target.
+ *
+ * Internal mutation — invoke from the Convex dashboard when a new model is
+ * rolled out, a new dataset is published, or any other time you want to
+ * proactively populate translations + audio for every supported language.
+ * Fully idempotent (the underlying mutations skip rows that already have
+ * translations/audio), so re-runs are cheap reads only.
+ *
+ * English-family targets (`en`, `en_gb`, `en_us`, `en_au`) are skipped: the
+ * placement sentences and curriculum texts are already in `en`, and there
+ * is no value in LLM-translating English to British English.
+ *
+ * All targets are scheduled immediately; the per-provider rate limiter in
+ * `convex/rateLimiter.ts` holds TTS dispatch under Google's 200 req/min
+ * quota across the shared queue. The priority queue ensures any concurrent
+ * user-facing TTS (priority 1/2) jumps ahead of warmup work (priority 0).
+ */
+const WARMUP_SOURCE_LANGUAGE = 'en';
+// Delay before the per-target placement-test audio backstop sweep runs.
+// Matches the value used by `prepareLanguagePair` so translations have time
+// to land before the sweep checks for orphans.
+const WARMUP_AUDIO_BACKSTOP_DELAY_MS = 60_000;
+// Estimated TTS jobs per target language (level warmup ~100 + placement
+// test ~100). Only used to compute an informational ETA in the return
+// value; rate-limiter throttling does not depend on this number.
+const WARMUP_TTS_JOBS_PER_LANGUAGE = 200;
+// Effective dispatch rate (the `googleTts` token-bucket `rate` in
+// `convex/rateLimiter.ts`). Kept in sync manually — purely for the ETA.
+const WARMUP_GOOGLE_TTS_RATE_PER_MINUTE = 150;
+
+export const warmupAllCourses = internalMutation({
+  args: {},
+  returns: v.object({
+    targetLanguagesScheduled: v.number(),
+    estimatedDurationMinutes: v.number(),
+  }),
+  handler: async (ctx) => {
+    const targetLanguages = SUPPORTED_LANGUAGES.map((l) => l.code).filter(
+      (code) => !code.startsWith('en'),
+    );
+
+    for (const targetLanguage of targetLanguages) {
+      // Per-target level warmup: first 5 sentences of every level
+      // collection get translated + audio'd into `targetLanguage`.
+      // `scheduleMissingContent` automatically includes `text.language`
+      // (always `en`) in its source-audio handling.
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.collections
+          .ensureFirstSentencesAcrossLevelCollections,
+        {
+          baseLanguages: [WARMUP_SOURCE_LANGUAGE],
+          targetLanguages: [targetLanguage],
+        },
+      );
+
+      // Placement-test translation + audio backstop sweep.
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.onboarding.enqueueMissingPlacementTranslations,
+        { sourceLanguage: WARMUP_SOURCE_LANGUAGE, targetLanguage },
+      );
+      await ctx.scheduler.runAfter(
+        WARMUP_AUDIO_BACKSTOP_DELAY_MS,
+        internal.features.onboarding.ensureAudioForTestTranslations,
+        { targetLanguage, sourceLanguage: WARMUP_SOURCE_LANGUAGE },
+      );
+    }
+
+    const totalTtsJobs = targetLanguages.length * WARMUP_TTS_JOBS_PER_LANGUAGE;
+    return {
+      targetLanguagesScheduled: targetLanguages.length,
+      estimatedDurationMinutes: Math.ceil(
+        totalTtsJobs / WARMUP_GOOGLE_TTS_RATE_PER_MINUTE,
+      ),
+    };
   },
 });

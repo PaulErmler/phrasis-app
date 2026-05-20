@@ -445,7 +445,7 @@ export function LearningModeSettings({
             </div>
             <Switch
               id="autoAdd"
-              checked={courseSettings.autoAddCards ?? false}
+              checked={courseSettings.autoAddCards !== false}
               onCheckedChange={handleAutoAddChange}
               className="mt-0.5"
             />
@@ -526,7 +526,7 @@ export function LearningModeSettings({
             </div>
             <Switch
               id="highlightWords"
-              checked={courseSettings.highlightWords !== false}
+              checked={courseSettings.highlightWords === true}
               onCheckedChange={handleHighlightWordsChange}
               className="mt-0.5"
             />
@@ -860,7 +860,7 @@ export function LearningModeSettings({
             </div>
             <Switch
               id="showProgressBar"
-              checked={courseSettings.showProgressBar ?? false}
+              checked={courseSettings.showProgressBar ?? true}
               onCheckedChange={handleShowProgressBarChange}
               className="mt-0.5"
             />

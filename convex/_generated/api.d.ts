@@ -50,6 +50,8 @@ import type * as features_featureIds from "../features/featureIds.js";
 import type * as features_home from "../features/home.js";
 import type * as features_library from "../features/library.js";
 import type * as features_llmTranslationQueue from "../features/llmTranslationQueue.js";
+import type * as features_onboarding from "../features/onboarding.js";
+import type * as features_placementTest from "../features/placementTest.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_sentenceMetadata from "../features/sentenceMetadata.js";
 import type * as features_stats from "../features/stats.js";
@@ -80,13 +82,18 @@ import type * as migrations_backfillCardAggregates from "../migrations/backfillC
 import type * as migrations_backfillCustomSentenceMetadata from "../migrations/backfillCustomSentenceMetadata.js";
 import type * as migrations_backfillDisplayWord from "../migrations/backfillDisplayWord.js";
 import type * as migrations_backfillIsGraduated from "../migrations/backfillIsGraduated.js";
+import type * as migrations_backfillRomanizationSource from "../migrations/backfillRomanizationSource.js";
+import type * as migrations_backfillTranslationSource from "../migrations/backfillTranslationSource.js";
 import type * as migrations_backfillUserStats from "../migrations/backfillUserStats.js";
 import type * as migrations_backfillWordTexts from "../migrations/backfillWordTexts.js";
 import type * as migrations_datasetMigration_backfillCardsMastered from "../migrations/datasetMigration_backfillCardsMastered.js";
 import type * as migrations_datasetMigration_backfillLegacyCarry from "../migrations/datasetMigration_backfillLegacyCarry.js";
 import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
+import type * as migrations_recalcUserCardAggregates from "../migrations/recalcUserCardAggregates.js";
 import type * as migrations_retokenizeAllWords from "../migrations/retokenizeAllWords.js";
 import type * as migrations_seedMockStats from "../migrations/seedMockStats.js";
+import type * as migrations_seedPlacementTestSentences from "../migrations/seedPlacementTestSentences.js";
+import type * as rateLimiter from "../rateLimiter.js";
 import type * as retrier from "../retrier.js";
 import type * as types from "../types.js";
 import type * as usage_actions from "../usage/actions.js";
@@ -143,6 +150,8 @@ declare const fullApi: ApiFromModules<{
   "features/home": typeof features_home;
   "features/library": typeof features_library;
   "features/llmTranslationQueue": typeof features_llmTranslationQueue;
+  "features/onboarding": typeof features_onboarding;
+  "features/placementTest": typeof features_placementTest;
   "features/scheduling": typeof features_scheduling;
   "features/sentenceMetadata": typeof features_sentenceMetadata;
   "features/stats": typeof features_stats;
@@ -173,13 +182,18 @@ declare const fullApi: ApiFromModules<{
   "migrations/backfillCustomSentenceMetadata": typeof migrations_backfillCustomSentenceMetadata;
   "migrations/backfillDisplayWord": typeof migrations_backfillDisplayWord;
   "migrations/backfillIsGraduated": typeof migrations_backfillIsGraduated;
+  "migrations/backfillRomanizationSource": typeof migrations_backfillRomanizationSource;
+  "migrations/backfillTranslationSource": typeof migrations_backfillTranslationSource;
   "migrations/backfillUserStats": typeof migrations_backfillUserStats;
   "migrations/backfillWordTexts": typeof migrations_backfillWordTexts;
   "migrations/datasetMigration_backfillCardsMastered": typeof migrations_datasetMigration_backfillCardsMastered;
   "migrations/datasetMigration_backfillLegacyCarry": typeof migrations_datasetMigration_backfillLegacyCarry;
   "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;
+  "migrations/recalcUserCardAggregates": typeof migrations_recalcUserCardAggregates;
   "migrations/retokenizeAllWords": typeof migrations_retokenizeAllWords;
   "migrations/seedMockStats": typeof migrations_seedMockStats;
+  "migrations/seedPlacementTestSentences": typeof migrations_seedPlacementTestSentences;
+  rateLimiter: typeof rateLimiter;
   retrier: typeof retrier;
   types: typeof types;
   "usage/actions": typeof usage_actions;
@@ -24844,6 +24858,140 @@ export declare const components: {
             type: "completed";
           }
       >;
+    };
+  };
+  rateLimiter: {
+    lib: {
+      checkRateLimit: FunctionReference<
+        "query",
+        "internal",
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          count?: number;
+          key?: string;
+          name: string;
+          reserve?: boolean;
+          throws?: boolean;
+        },
+        { ok: true; retryAfter?: number } | { ok: false; retryAfter: number }
+      >;
+      clearAll: FunctionReference<
+        "mutation",
+        "internal",
+        { before?: number },
+        null
+      >;
+      getServerTime: FunctionReference<"mutation", "internal", {}, number>;
+      getValue: FunctionReference<
+        "query",
+        "internal",
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          key?: string;
+          name: string;
+          sampleShards?: number;
+        },
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          shard: number;
+          ts: number;
+          value: number;
+        }
+      >;
+      rateLimit: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          count?: number;
+          key?: string;
+          name: string;
+          reserve?: boolean;
+          throws?: boolean;
+        },
+        { ok: true; retryAfter?: number } | { ok: false; retryAfter: number }
+      >;
+      resetRateLimit: FunctionReference<
+        "mutation",
+        "internal",
+        { key?: string; name: string },
+        null
+      >;
+    };
+    time: {
+      getServerTime: FunctionReference<"mutation", "internal", {}, number>;
     };
   };
 };

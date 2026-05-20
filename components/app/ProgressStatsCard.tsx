@@ -1,15 +1,25 @@
 'use client';
 
-import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { usePreloadedQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { useCachedQuery } from '@/hooks/use-cached-query';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
 import { useStatsSnapshot } from '@/hooks/use-stats-snapshot';
 import { motion, AnimatePresence } from 'motion/react';
-import { Flame, RotateCcw, MessageSquare, Clock, Snowflake } from 'lucide-react';
+import {
+  Flame,
+  RotateCcw,
+  MessageSquare,
+  Clock,
+  Snowflake,
+  BookOpen,
+} from 'lucide-react';
 import { formatTimeMs } from '@/lib/formatTime';
 import { StartLearningButton } from '@/components/app/StartLearningButton';
+import { CEFR_COLORS, isCefr } from '@/components/app/segmented/cefr';
+import { getLanguageByCode } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
 
@@ -22,6 +32,7 @@ function StatColumn({
   todayLabel = 'today',
   todayFormatter,
   animateToday = true,
+  className,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -31,6 +42,9 @@ function StatColumn({
   todayLabel?: string;
   todayFormatter?: (v: number) => string;
   animateToday?: boolean;
+  /** Extra classes for the column wrapper — used by the home view to hide
+   * the words stat on narrow screens (`hidden sm:flex`). */
+  className?: string;
 }) {
   const displayValue =
     todayValue != null && todayValue > 0
@@ -43,7 +57,12 @@ function StatColumn({
     'text-xs font-medium text-primary tabular-nums leading-none mt-0.5 whitespace-nowrap';
 
   return (
-    <div className="flex flex-col items-center text-center gap-1">
+    <div
+      className={cn(
+        'flex flex-col items-center text-center gap-1',
+        className,
+      )}
+    >
       <div className="text-muted-foreground">{icon}</div>
       <p className="text-lg font-semibold tabular-nums leading-tight whitespace-nowrap">
         {value}
@@ -112,7 +131,46 @@ export function ProgressStatsCard({
   const streak = stats?.currentStreak ?? 0;
   const reps = stats?.totalRepetitions ?? 0;
   const cards = stats?.totalCards ?? 0;
+  const words = stats?.totalWordCount ?? 0;
   const time = formatTimeMs(stats?.totalTimeMs ?? 0);
+
+  // Home summary powers the "current level" header strip — preloaded
+  // server-side in app/app/layout.tsx so the level header is available on
+  // the first paint and the card height doesn't grow when the data arrives.
+  const { preloadedHomeSummary } = useAppData();
+  const homeSummary = usePreloadedQuery(preloadedHomeSummary);
+
+  // Only render the level header when a *premade* CEFR level is active.
+  // Custom and chat collections live in `customCollections` and don't carry
+  // a tier/code we can label here.
+  const activeLevel =
+    homeSummary?.levels.find(
+      (l) => l.collectionId === homeSummary.activeCollectionId,
+    ) ?? null;
+
+  // Compose the level label: "Spanish · French A1.2" when the course has
+  // multiple target languages, "Spanish A1.2" for a single language. Falls
+  // back to the raw level code if none of the codes resolve to a Language
+  // (e.g. during loading or in misconfigured tests).
+  const targetLanguageNames =
+    (stats?.targetLanguages ?? [])
+      .map((code) => getLanguageByCode(code)?.name)
+      .filter((n): n is string => !!n);
+  const levelLabel = activeLevel
+    ? targetLanguageNames.length > 0
+      ? `${targetLanguageNames.join(' · ')} ${activeLevel.code}`
+      : activeLevel.code
+    : null;
+
+  // Progress within the active premade level.
+  const levelPct =
+    activeLevel && activeLevel.totalTexts > 0
+      ? Math.min(1, activeLevel.cardsAdded / activeLevel.totalTexts)
+      : 0;
+  const levelPctLabel = `${Math.round(levelPct * 100)}%`;
+  const levelTier =
+    activeLevel && isCefr(activeLevel.cefrTier) ? activeLevel.cefrTier : null;
+  const levelTierColor = levelTier ? CEFR_COLORS[levelTier] : null;
 
   const hasLearned = todayStats != null && todayStats.reps > 0;
   const isFrozen = stats?.streakFrozenToday === true && !hasLearned;
@@ -141,130 +199,186 @@ export function ProgressStatsCard({
   );
 
   const content = (
-    <div className="card-surface p-4 space-y-4" data-tutorial="progress-stats">
-      <div className="flex items-end gap-4">
-        {/* Streak badge */}
-        <div className="flex flex-col items-center gap-0.5">
-          <motion.div
-            className={cn(
-              'flex items-center justify-center h-10 w-10 rounded-xl transition-colors duration-400 ease-out',
-              isInactive && 'bg-transparent',
-              isFrozen && 'bg-primary/15',
-              hasLearned && 'bg-streak-active/15',
-              !isInactive && !isFrozen && !hasLearned && 'bg-accent-orange/10',
-            )}
-            animate={
-              isInactive
-                ? { scale: 1 }
-                : isFrozen
-                  ? { scale: [1, 1.05, 1] }
-                  : hasLearned
-                    ? { scale: statsActuallyChanged ? [1, 1.15, 1] : 1 }
-                    : { scale: 1 }
-            }
-            transition={
-              isInactive
-                ? { duration: 0.3 }
-                : isFrozen
-                  ? { duration: 2, repeat: Infinity, repeatType: 'reverse' as const }
-                  : hasLearned
-                    ? { duration: 1, ease: 'easeOut' }
-                    : { duration: 0.3 }
-            }
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              {isFrozen ? (
-                <motion.div
-                  key="snowflake"
-                  initial={{ opacity: 0, scale: 0.5, rotate: -90 }}
-                  animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                  exit={{ opacity: 0, scale: 0.3, rotate: 90, filter: 'blur(4px)' }}
-                  transition={{ duration: 0.4 }}
-                >
-                  <Snowflake className="h-5 w-5" style={{ color: 'var(--primary)' }} />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="flame"
-                  initial={{ opacity: 0, scale: 0.3, rotate: 90, filter: 'blur(4px)' }}
-                  animate={{
-                    opacity: 1,
-                    scale: hasLearned && statsActuallyChanged ? [0.3, 1.3, 1] : 1,
-                    rotate: hasLearned && statsActuallyChanged ? [90, -10, 0] : 0,
-                    filter: 'blur(0px)',
-                  }}
-                  transition={{ duration: hasLearned && statsActuallyChanged ? 1.4 : 0.4, ease: 'easeOut' }}
-                >
-                  <Flame
-                    className="h-5 w-5 transition-colors duration-400"
-                    style={{
-                      color: hasLearned
-                        ? 'var(--streak-active)'
-                        : isInactive
-                          ? 'var(--muted-foreground)'
-                          : 'var(--accent-orange)',
-                    }}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-          <span
-            className="text-lg font-bold tabular-nums leading-tight transition-colors duration-400"
-            style={{
-              color: isInactive
-                ? 'var(--muted-foreground)'
-                : isFrozen
-                  ? 'var(--primary)'
-                  : hasLearned
-                    ? 'var(--streak-active)'
-                    : undefined,
-            }}
-          >
-            {streak}
-          </span>
-          <span className="text-muted-xs leading-none">{t('stats.streak')}</span>
+    <div className="space-y-2">
+      <div
+        className="card-surface overflow-hidden"
+        data-tutorial="progress-stats"
+      >
+        {/* Top progress bar — pinned to the card's top edge, tinted with the
+         * active CEFR tier color. Renders even when level info hasn't loaded
+         * yet (width: 0) so the card height stays stable. */}
+        <div className="h-1 bg-muted">
+          {activeLevel && levelTierColor && (
+            <div
+              className="h-full transition-all"
+              style={{
+                width: `${levelPct * 100}%`,
+                backgroundColor: levelTierColor,
+              }}
+            />
+          )}
         </div>
 
-        {/* Divider */}
-        <div className="w-px self-stretch bg-border" />
+        <div className="space-y-3 p-4">
+          {/* Level header row — inline CEFR badge + label + count + % pill.
+           * Hidden when the active collection is custom/chat. `homeSummary`
+           * is preloaded server-side so this either renders on the first
+           * paint or never; no two-step layout. */}
+          {activeLevel && (
+            <>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums text-primary">
+                    {activeLevel.cefrTier}
+                  </span>
+                  <span className="truncate text-sm font-medium">
+                    {levelLabel}
+                  </span>
+                  <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                    · {activeLevel.cardsAdded} / {activeLevel.totalTexts}
+                  </span>
+                </div>
+                <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium tabular-nums text-primary">
+                  {levelPctLabel}
+                </span>
+              </div>
+              <div className="-mx-4 border-t" />
+            </>
+          )}
 
-        {/* 3 stat columns */}
-        <div className="flex-1 grid grid-cols-3 gap-2">
-          <StatColumn
-            icon={<RotateCcw className="h-4 w-4" />}
-            label={t('stats.reps')}
-            value={String(reps)}
-            todayValue={hasLearned ? animatedReps : undefined}
-            todayLabel={t('stats.today')}
-            animateToday={statsActuallyChanged}
-          />
-          <StatColumn
-            icon={<MessageSquare className="h-4 w-4" />}
-            label={t('stats.sentences')}
-            value={String(cards)}
-            todayValue={hasLearned && todayStats.newCards > 0 ? animatedNew : undefined}
-            todayPrefix="+"
-            todayLabel={t('stats.new')}
-            animateToday={statsActuallyChanged}
-          />
-          <StatColumn
-            icon={<Clock className="h-4 w-4" />}
-            label={t('stats.time')}
-            value={time}
-            todayValue={hasLearned && todayStats.timeMs > 0 ? animatedTimeMs : undefined}
-            todayFormatter={formatTimeMs}
-            todayLabel={t('stats.today')}
-            animateToday={statsActuallyChanged}
-          />
+          <div className="flex items-end gap-4">
+            {/* Streak badge */}
+            <div className="flex flex-col items-center gap-0.5">
+              <motion.div
+                className={cn(
+                  'flex items-center justify-center h-10 w-10 rounded-xl transition-colors duration-400 ease-out',
+                  isInactive && 'bg-transparent',
+                  isFrozen && 'bg-primary/15',
+                  hasLearned && 'bg-streak-active/15',
+                  !isInactive && !isFrozen && !hasLearned && 'bg-accent-orange/10',
+                )}
+                animate={
+                  isInactive
+                    ? { scale: 1 }
+                    : isFrozen
+                      ? { scale: [1, 1.05, 1] }
+                      : hasLearned
+                        ? { scale: statsActuallyChanged ? [1, 1.15, 1] : 1 }
+                        : { scale: 1 }
+                }
+                transition={
+                  isInactive
+                    ? { duration: 0.3 }
+                    : isFrozen
+                      ? { duration: 2, repeat: Infinity, repeatType: 'reverse' as const }
+                      : hasLearned
+                        ? { duration: 1, ease: 'easeOut' }
+                        : { duration: 0.3 }
+                }
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {isFrozen ? (
+                    <motion.div
+                      key="snowflake"
+                      initial={{ opacity: 0, scale: 0.5, rotate: -90 }}
+                      animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                      exit={{ opacity: 0, scale: 0.3, rotate: 90, filter: 'blur(4px)' }}
+                      transition={{ duration: 0.4 }}
+                    >
+                      <Snowflake className="h-5 w-5" style={{ color: 'var(--primary)' }} />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="flame"
+                      initial={{ opacity: 0, scale: 0.3, rotate: 90, filter: 'blur(4px)' }}
+                      animate={{
+                        opacity: 1,
+                        scale: hasLearned && statsActuallyChanged ? [0.3, 1.3, 1] : 1,
+                        rotate: hasLearned && statsActuallyChanged ? [90, -10, 0] : 0,
+                        filter: 'blur(0px)',
+                      }}
+                      transition={{ duration: hasLearned && statsActuallyChanged ? 1.4 : 0.4, ease: 'easeOut' }}
+                    >
+                      <Flame
+                        className="h-5 w-5 transition-colors duration-400"
+                        style={{
+                          color: hasLearned
+                            ? 'var(--streak-active)'
+                            : isInactive
+                              ? 'var(--muted-foreground)'
+                              : 'var(--accent-orange)',
+                        }}
+                      />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+              <span
+                className="text-lg font-bold tabular-nums leading-tight transition-colors duration-400"
+                style={{
+                  color: isInactive
+                    ? 'var(--muted-foreground)'
+                    : isFrozen
+                      ? 'var(--primary)'
+                      : hasLearned
+                        ? 'var(--streak-active)'
+                        : undefined,
+                }}
+              >
+                {streak}
+              </span>
+              <span className="text-muted-xs leading-none">{t('stats.streak')}</span>
+            </div>
+
+            {/* Divider */}
+            <div className="w-px self-stretch bg-border" />
+
+            {/* Stats grid — 3 columns on mobile, 4 on sm+ where words fits. */}
+            <div className="flex-1 grid grid-cols-3 gap-2 sm:grid-cols-4">
+              <StatColumn
+                icon={<RotateCcw className="h-4 w-4" />}
+                label={t('stats.reps')}
+                value={String(reps)}
+                todayValue={hasLearned ? animatedReps : undefined}
+                todayLabel={t('stats.today')}
+                animateToday={statsActuallyChanged}
+              />
+              <StatColumn
+                icon={<MessageSquare className="h-4 w-4" />}
+                label={t('stats.sentences')}
+                value={String(cards)}
+                todayValue={hasLearned && todayStats.newCards > 0 ? animatedNew : undefined}
+                todayPrefix="+"
+                todayLabel={t('stats.new')}
+                animateToday={statsActuallyChanged}
+              />
+              <StatColumn
+                icon={<BookOpen className="h-4 w-4" />}
+                label={t('stats.words')}
+                value={String(words)}
+                className="hidden sm:flex"
+              />
+              <StatColumn
+                icon={<Clock className="h-4 w-4" />}
+                label={t('stats.time')}
+                value={time}
+                todayValue={hasLearned && todayStats.timeMs > 0 ? animatedTimeMs : undefined}
+                todayFormatter={formatTimeMs}
+                todayLabel={t('stats.today')}
+                animateToday={statsActuallyChanged}
+              />
+            </div>
+          </div>
         </div>
       </div>
-      <StartLearningButton
-        onStartLearn={onStartLearn}
-        reviewMode={reviewMode}
-        onReviewModeChange={onReviewModeChange}
-        hasPlayableCards={hasPlayableCards}
-      />
+      <div className="card-surface p-3">
+        <StartLearningButton
+          onStartLearn={onStartLearn}
+          reviewMode={reviewMode}
+          onReviewModeChange={onReviewModeChange}
+          hasPlayableCards={hasPlayableCards}
+        />
+      </div>
     </div>
   );
 

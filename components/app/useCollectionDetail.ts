@@ -50,10 +50,16 @@ export function useCollectionDetail({
       : 'skip',
   );
 
-  // Trigger content generation for missing translations/audio
+  // Trigger background content generation as soon as the user opens a
+  // collection — covers the next CONTENT_LOOKAHEAD_SIZE (15) sentences
+  // beyond the user's current progress, so the next two or three "Add"
+  // taps land instantly. The previous guard on `contentData.hasMissingContent`
+  // only fired when the 5-card preview itself was incomplete, which left
+  // sentences 6-15 to lazy-load when the user actually added them.
+  // The `ensuredRef` dedup still prevents repeated calls within a session
+  // until the user adds cards (which clears the entry in `handleAddCards`).
   useEffect(() => {
-    if (!contentData?.hasMissingContent || !openCollectionId || !activeCourseId)
-      return;
+    if (!openCollectionId || !activeCourseId) return;
 
     const key = `${activeCourseId}:${openCollectionId}`;
     if (ensuredRef.current.has(key)) return;
@@ -64,7 +70,7 @@ export function useCollectionDetail({
     }).catch(() => {
       ensuredRef.current.delete(key);
     });
-  }, [contentData, openCollectionId, activeCourseId, ensureContent]);
+  }, [openCollectionId, activeCourseId, ensureContent]);
 
   const effectiveBatchSize = sentencesQuota.unlimited
     ? COLLECTION_PREVIEW_SIZE
@@ -117,7 +123,14 @@ export function useCollectionDetail({
     contentData,
     isAdding,
     handleAddCards,
-    sentencesRemaining: sentencesQuota.unlimited ? null : sentencesQuota.balance,
+    // While the quota query is loading, treat as unlimited so the inline
+    // detail renders "+Add" by default instead of flashing the locked
+    // Upgrade button before the real balance arrives. The server mutation
+    // is still the authoritative gate if the user actually has 0 quota.
+    sentencesRemaining:
+      sentencesQuota.isLoading || sentencesQuota.unlimited
+        ? null
+        : sentencesQuota.balance,
     sentencesQuota,
     usageLimitHit,
   };

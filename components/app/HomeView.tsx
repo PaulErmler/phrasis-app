@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Preloaded, usePreloadedQuery, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { NewChatInput } from '@/components/chat/NewChatInput';
+import { HomeChatInput } from '@/components/chat/HomeChatInput';
 import { SegmentedHomeSection } from '@/components/app/segmented/SegmentedHomeSection';
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
@@ -170,13 +170,8 @@ export function HomeView({
         />
 
         {/* Content actions */}
-        <div className="card-surface p-4 space-y-3">
-          <NewChatInput
-            showSuggestions={false}
-            autoFocus={false}
-            className="[&_[data-slot=input-group]]:rounded-xl"
-            onChatCreated={onChatOpen}
-          />
+        <div className="card-surface space-y-2 p-3">
+          <HomeChatInput onChatCreated={onChatOpen} />
 
           <div className="grid grid-cols-2 gap-2">
             <Button
@@ -187,9 +182,9 @@ export function HomeView({
               disabled={isChatNavigating}
             >
               {isChatNavigating ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <MessageSquare className="h-5 w-5" />
+                <MessageSquare className="h-4 w-4" />
               )}
               {t('content.chat.title')}
             </Button>
@@ -199,14 +194,14 @@ export function HomeView({
               className="w-full gap-2"
               onClick={onEnterTexts}
             >
-              <PenLine className="h-5 w-5" />
+              <PenLine className="h-4 w-4" />
               {t('customContent')}
             </Button>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <h2 className="heading-section">
+        <div className="card-surface space-y-3 p-3">
+          <h2 className="heading-section px-1">
             {t('collections.carousel.sectionTitle')}
           </h2>
           <SegmentedHomeSection

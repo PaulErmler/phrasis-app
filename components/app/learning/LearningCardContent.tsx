@@ -10,6 +10,7 @@ import { useButtonPlayback } from '@/hooks/use-button-playback';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import type { CardTranslation, CardAudioRecording } from './types';
+import type { PinnableCardAction } from '@/lib/cardActions';
 
 interface LearningCardContentProps {
   preReviewCount: number;
@@ -29,6 +30,12 @@ interface LearningCardContentProps {
   onFavorite: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onFlag?: () => void;
+  onRegenerateAudio?: () => void;
+  pinnedActions?: readonly string[];
+  onUpdatePinnedActions?: (actions: PinnableCardAction[]) => void;
+  /** Per-action quota state forwarded to CardActionsMenu. */
+  quotaState?: import('./CardActionsMenu').CardActionsMenuProps['quotaState'];
   onAudioPlay?: () => void;
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
@@ -60,6 +67,15 @@ interface LearningCardContentProps {
   onSpeedCycle?: (language: string, next: number | null) => void;
   /** Badge behavior — `ephemeral` hides the null/default slot and greys 1.0. */
   speedBadgeVariant?: 'persistent' | 'ephemeral';
+  /** Client-only session flag: did the viewer click flag on this card? */
+  flaggedInSession?: boolean;
+  /** Merged-audio playback for the slim progress bar at the card's bottom edge. */
+  audioRef?: React.RefObject<HTMLAudioElement | null>;
+  durationSec?: number;
+  isPlaying?: boolean;
+  isMerging?: boolean;
+  onSeek?: (seconds: number) => void;
+  showProgressBar?: boolean;
 }
 
 export function LearningCardContent({
@@ -79,6 +95,11 @@ export function LearningCardContent({
   onFavorite,
   onEdit,
   onDelete,
+  onFlag,
+  onRegenerateAudio,
+  pinnedActions,
+  onUpdatePinnedActions,
+  quotaState,
   onAudioPlay,
   hideTargetLanguages = false,
   autoRevealLanguages = false,
@@ -93,6 +114,13 @@ export function LearningCardContent({
   audioSpeedOverrides,
   onSpeedCycle,
   speedBadgeVariant,
+  flaggedInSession = false,
+  audioRef,
+  durationSec,
+  isPlaying,
+  isMerging,
+  onSeek,
+  showProgressBar,
 }: LearningCardContentProps) {
   const buttonPlayback = useButtonPlayback();
 
@@ -188,6 +216,11 @@ export function LearningCardContent({
         onFavorite={onFavorite}
         onEdit={onEdit}
         onDelete={onDelete}
+        onFlag={onFlag}
+        onRegenerateAudio={onRegenerateAudio}
+        pinnedActions={pinnedActions}
+        onUpdatePinnedActions={onUpdatePinnedActions}
+        quotaState={quotaState}
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}
@@ -199,6 +232,14 @@ export function LearningCardContent({
         audioSpeedOverrides={audioSpeedOverrides}
         onSpeedCycle={onSpeedCycle}
         speedBadgeVariant={speedBadgeVariant}
+        flaggedInSession={flaggedInSession}
+        audioRef={audioRef}
+        durationSec={durationSec}
+        isPlaying={isPlaying}
+        isMerging={isMerging}
+        onSeek={onSeek}
+        showProgressBar={showProgressBar}
+        languageCues={mergedPlayback?.languageCues}
       >
         {({ targetTranslations }) => (
           <div className="space-y-2">
@@ -235,6 +276,9 @@ export function LearningCardContent({
                       enabled={highlightEnabled}
                       interactive={!isBlurred}
                       className={`body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                      // Onboarding's word-tap tutorial targets the longest
+                      // target-language word via this data attribute.
+                      coachmarkAnchorForLongestWord={index === 0 ? 'word-tap' : undefined}
                     />
                     {showRomanization && translation.romanization && (
                       <p

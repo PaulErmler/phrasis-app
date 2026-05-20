@@ -24,7 +24,7 @@ export const courseSettingsFields = {
   autoAddCards: v.optional(v.boolean()), // Auto-add cards when none are due
 
   // Audio playback settings
-  highlightWords: v.optional(v.boolean()), // Karaoke-style word highlighting during audio playback (default true)
+  highlightWords: v.optional(v.boolean()), // Karaoke-style word highlighting during audio playback. Default OFF — only `=== true` enables it. Most languages now have `supportsKaraoke: false` in lib/languages.ts; this user-level switch is the secondary opt-in for the ones that do support it.
   autoPlayAudio: v.optional(v.boolean()), // Auto-play audio when card is shown
   autoAdvance: v.optional(v.boolean()), // Auto-advance after audio finishes
   languageRepetitions: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 2, "es": 2 }
@@ -62,6 +62,12 @@ export const courseSettingsFields = {
   studyContentFilter: v.optional(
     v.union(v.literal('custom'), v.literal('course'), v.literal('both')),
   ),
+  // Current "between celebrations" bucket id. Rotated by the client on
+  // celebration dismiss (via `setCurrentSessionId`). Stored server-side so
+  // the bucket survives the user closing the learn view OR moving to a
+  // different device — `getNewWordsForCelebration` then keeps counting words
+  // toward the same milestone instead of restarting from zero on each remount.
+  currentSessionId: v.optional(v.string()),
 } as const;
 
 // Full `courseSettings` document validator (includes system fields).
@@ -120,6 +126,14 @@ export default defineSchema({
     text: v.string(),
     language: v.string(), // e.g., "en" for English
     romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Identifier of which romanizer produced `romanizedText` (e.g.
+    // "arabic-transliterate-v1", "google-v3"). Stored so a future strategy
+    // swap can find + invalidate rows produced by the old method via a
+    // simple `romanizationSource != currentSource` migration. Also set when
+    // `romanizedText` is the empty-string "tried, failed, leave empty"
+    // sentinel — bumping the source identifier on the failing method is
+    // how you re-attempt those rows.
+    romanizationSource: v.optional(v.string()),
     userCreated: v.boolean(), // false for uploaded data, true for user-created
     userId: v.optional(v.string()), // User who created (for user-created texts)
     collectionId: v.id('collections'), // Reference to collection (required for all texts)
@@ -135,13 +149,24 @@ export default defineSchema({
     tenseAspect: v.optional(v.string()), // simple_present / past_continuous / etc.
     sentenceType: v.optional(v.string()), // declarative / interrogative / imperative / exclamatory
     literalFigurative: v.optional(v.string()), // literal / figurative
+    // OGTE arc grouping (curation manifest). Sentences sharing the same
+    // (collectionId, arcId) form a thematic sequence; the translation worker
+    // pulls a sliding window of arc siblings into the LLM prompt so pronouns,
+    // gender agreement, and discourse register stay consistent across the
+    // arc. Undefined for legacy rows and user-created texts (custom/chat).
+    arcId: v.optional(v.string()),
   })
     .index('by_text', ['text'])
     .index('by_datasetSentenceId', ['datasetSentenceId'])
     .index('by_dataset_and_externalId', ['datasetId', 'externalId'])
     .index('by_collection_and_rank', ['collectionId', 'collectionRank'])
     .index('by_collection_and_userCreated_and_rank', ['collectionId', 'userCreated', 'collectionRank'])
-    .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank']),
+    .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank'])
+    // Sliding-window arc-context lookup: equality on (collectionId, arcId)
+    // followed by `.lt('collectionRank', X).order('desc').take(5)` for the
+    // preceding window and `.gt('collectionRank', X).order('asc').take(3)` for
+    // the following window. Constant-cost (≤ 8 reads) regardless of arc size.
+    .index('by_collection_arcId_and_rank', ['collectionId', 'arcId', 'collectionRank']),
 
   // Translations table - stores translations of texts
   translations: defineTable({
@@ -149,6 +174,32 @@ export default defineSchema({
     targetLanguage: v.string(), // e.g., "es" for Spanish
     translatedText: v.string(),
     romanizedText: v.optional(v.string()), // Latin transliteration for non-Latin scripts
+    // Same purpose as on `texts` — identifier of the romanizer that produced
+    // `romanizedText` (or attempted to and persisted the empty-string
+    // sentinel). See the texts table for the migration pattern.
+    romanizationSource: v.optional(v.string()),
+    // Identifier of the translation method that produced `translatedText`.
+    // Format: "<model-slug>-<reasoning|none>" for LLM translations (e.g.
+    // "google/gemini-3.1-flash-lite-high"), "google-translate-v2"
+    // for the legacy Google Translate path, "user-provided" for
+    // manually-typed custom-text translations. Persisted so a future
+    // strategy swap (new dataset version, new model, new prompt) can find
+    // and regenerate rows produced by the prior method via a simple
+    // `translationSource != currentSource` migration. Optional for
+    // backward-compat with rows that landed before this field existed —
+    // see `convex/migrations/backfillTranslationSource.ts`.
+    translationSource: v.optional(v.string()),
+    // Concrete regional variant chosen for this row when `targetLanguage` is a
+    // mixed/aggregate code (today: "es_mixed"). Stored as a Google voice-locale
+    // prefix such as "es-ES" or "es-US" so the audio player can call
+    // `getVoiceForLanguageVariant` and synthesize with the matching accent.
+    // Undefined for non-mixed languages.
+    regionVariant: v.optional(v.string()),
+    // Number of times a user has flagged this translation as bad. Drives the
+    // automatic retranslation policy in `flagTranslation` — flags 1 and 2
+    // enqueue a stronger model; flags 3+ only increment the counter for
+    // later admin triage. Undefined treated as 0 for back-compat.
+    flagCount: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),
@@ -184,6 +235,26 @@ export default defineSchema({
       'voiceName',
     ]),
 
+  // Placement-test sentence index. The actual English source text lives in
+  // `texts` (so it gets translations/audio from the standard pipelines); this
+  // side table just records *which* texts belong to the placement test, at
+  // which OGTE level and position. Seeded by
+  // `convex/migrations/seedPlacementTestSentences.ts` from
+  // `data/placement-test/english.json`.
+  //
+  // Per OGTE level (1..20) there are 5 positions (0..4). `level + position`
+  // therefore uniquely identifies a sentence; the unique-pair guarantee is
+  // enforced by the seed mutation (idempotent upsert).
+  placementTestSentences: defineTable({
+    level: v.number(),               // 1..20 (OGTE level)
+    position: v.number(),            // 0..4 within the level
+    textId: v.id('texts'),           // English source — translations + audio live here
+    rarestWord: v.optional(v.string()),
+    ogteId: v.optional(v.string()),  // Traceability back to the source OGTE row
+  })
+    .index('by_level_and_position', ['level', 'position'])
+    .index('by_textId', ['textId']),
+
   // User settings table - stores user preferences and onboarding status
   userSettings: defineTable({
     userId: v.string(), // Links to auth user
@@ -191,16 +262,67 @@ export default defineSchema({
     learningStyle: v.optional(learningStyleValidator),
     activeCourseId: v.optional(v.id('courses')), // Active course for the user
     completedTutorials: v.optional(v.array(v.string())), // IDs of completed tutorials (e.g. "home_tour", "audio_review_intro")
+    // Ordered list of card-action keys the user has surfaced on the card.
+    // Whitelist + max enforced by `normalizePinnedCardActions` in
+    // `lib/cardActions.ts`. Empty or undefined = use DEFAULT_PINNED_CARD_ACTIONS.
+    pinnedCardActions: v.optional(v.array(v.string())),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table - stores temporary onboarding data until completion
   onboardingProgress: defineTable({
     userId: v.string(), // Links to auth user
-    step: v.number(), // Current step in onboarding (1-5)
+    step: v.number(), // Current step number in the new flow
     reviewMode: v.optional(reviewModeValidator),
     currentLevel: v.optional(currentLevelValidator),
     targetLanguages: v.optional(v.array(v.string())),
     baseLanguages: v.optional(v.array(v.string())),
+    // New onboarding-flow fields (mirrored to `userSettings` on completion).
+    acquisitionSource: v.optional(v.string()),
+    acquisitionSourceFreeText: v.optional(v.string()),
+    learningGoals: v.optional(v.array(v.string())),
+    learningGoalFreeText: v.optional(v.string()),
+    dailyTimeGoalMinutes: v.optional(v.number()),
+    // Placement-test working state. `history` accumulates as the user answers;
+    // `finalLevel` is set when the strategy reports `nextQuestionLevel() === null`.
+    placementTest: v.optional(
+      v.object({
+        // Schema-version of the placement state. Bump
+        // CURRENT_PLACEMENT_STRATEGY_VERSION in
+        // app/app/onboarding/lib/placementStrategies.ts whenever the shape
+        // of `history`/`strategy`/`finalLevel` changes — readers discard
+        // rows whose version doesn't match (kill-switch for resuming
+        // incompatible state). Optional so historical rows (written before
+        // this field existed) still validate; treat missing as version 0
+        // and discard on read.
+        strategyVersion: v.optional(v.number()),
+        strategy: v.string(), // 'bayesian' | 'binary' | 'staircase'
+        history: v.array(
+          v.object({ level: v.number(), knew: v.boolean() }),
+        ),
+        finalLevel: v.optional(v.number()),
+      }),
+    ),
+    // Number of cards the user has rated inside the embedded first lesson.
+    // Persisted so a reload mid-lesson resumes at the right card count and
+    // re-seeds which staged tutorials have already fired.
+    firstLessonCardsRated: v.optional(v.number()),
+    // Underlying `studySessions` row id for the embedded first lesson —
+    // captured on the first rated card and replayed into `useLearningMode`
+    // on the next mount so X/N progress and the +N new-words hero stay
+    // continuous across a mid-flow reload.
+    firstLessonSessionId: v.optional(v.string()),
+    // Snapshot of the embedded first-lesson session — written when the
+    // lesson completes (or skipped). Keeps the stats-recap +
+    // word-projection screens alive across a mid-flow reload.
+    firstLessonSummary: v.optional(
+      v.object({
+        cardsRated: v.number(),
+        sessionId: v.string(),
+        dailyReviewsToday: v.number(),
+        dailyTimeMsToday: v.number(),
+        dailyNewWordsToday: v.number(),
+      }),
+    ),
   }).index('by_userId', ['userId']),
 
   // Courses table - stores user language learning courses
@@ -302,9 +424,34 @@ export default defineSchema({
       'radioOrderKey',
     ])
     .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
+    // Library source-filter variants — origin appended to each state-aware
+    // library index so every (state × origin) combo resolves via a pure index
+    // query (no post-filter). For 'custom' (= origin ∈ {'custom','chat'}) the
+    // query runs twice, once per non-premade origin, and the results are
+    // merged on the server.
+    .index('by_deckId_isHidden_origin_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'collectionOrigin',
+      'lastReviewedAt',
+    ])
+    .index('by_deckId_isHidden_mastered_origin_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'lastReviewedAt',
+    ])
+    .index('by_deckId_isHidden_favorite_origin_lastReviewedAt', [
+      'deckId',
+      'isHidden',
+      'isFavorite',
+      'collectionOrigin',
+      'lastReviewedAt',
+    ])
     .searchIndex('search_text', {
       searchField: 'searchableText',
-      filterFields: ['deckId', 'isHidden', 'isMastered', 'isFavorite'],
+      filterFields: ['deckId', 'isHidden', 'isMastered', 'isFavorite', 'collectionOrigin'],
     }),
 
   // Course stats table - tracks learning statistics per course
@@ -451,6 +598,15 @@ export default defineSchema({
       voiceName: v.string(),
       voiceGender: voiceGenderValidator,
       speed: v.number(),
+      // Azure STT locale forwarded to `processTTSForCard` for mixed-dialect
+      // rows. Optional; set when the translation row has a `regionVariant`.
+      regionVariant: v.optional(v.string()),
+      // Number of prior `processTTSForCard` failures for this job. When the
+      // action throws (synthesis / storage / transcription error), it
+      // re-enqueues with this incremented. Bounded retries prevent silent
+      // permanent failures (translation lands, audio never does) without
+      // requiring an external cron sweep.
+      failureCount: v.optional(v.number()),
     }),
     queuedAt: v.number(),
     priority: v.optional(v.number()),
@@ -464,8 +620,9 @@ export default defineSchema({
 
   // ── LLM translation queue (mirrors the TTS queue structure) ──────────────
   // OpenRouter rate-limits aggressively, so concurrent LLM translation calls
-  // are capped at MAX_LLM_CONCURRENCY (100; active from day one, unlike the
-  // dormant TTS gate). Same three-table pattern: queue + slots + claims.
+  // are capped at MAX_LLM_CONCURRENCY (currently 64; see lib constant in
+  // convex/features/llmTranslationQueue.ts). Active from day one, unlike the
+  // dormant TTS gate. Same three-table pattern: queue + slots + claims.
 
   // Priority/FIFO queue of pending LLM translation jobs. Drained by
   // `pumpLlmQueue` highest-priority first, FIFO within each level. See the
@@ -477,6 +634,17 @@ export default defineSchema({
       targetLanguage: v.string(),
       text: v.string(),
       audioSpeakerGender: v.optional(v.string()),
+      // Optional translation-rule override forwarded by `flagTranslation` to
+      // force the `retranslation_high` chain. Worker validates the string
+      // against `TRANSLATION_RULES` and falls back to the language's normal
+      // rule on unknown values. Must be optional so existing queue rows
+      // (and the standard `scheduleMissingContent` enqueue path) keep
+      // validating.
+      ruleOverride: v.optional(v.string()),
+      // Retranslation flag for deliberate overwrites. See the
+      // storeTranslationAndScheduleTTS docstring for replacement semantics.
+      // Optional so pre-flag queue rows still validate.
+      replaceExisting: v.optional(v.boolean()),
     }),
     queuedAt: v.number(),
     priority: v.optional(v.number()),

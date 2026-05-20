@@ -23,6 +23,7 @@ import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
 import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { Id } from '@/convex/_generated/dataModel';
+import type { PinnableCardAction } from '@/lib/cardActions';
 
 type TargetAudioMode = 'always' | 'afterSubmit' | 'never';
 
@@ -47,6 +48,12 @@ interface FullReviewCardContentProps {
   onFavorite: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onFlag?: () => void;
+  onRegenerateAudio?: () => void;
+  pinnedActions?: readonly string[];
+  onUpdatePinnedActions?: (actions: PinnableCardAction[]) => void;
+  /** Per-action quota state forwarded to CardActionsMenu. */
+  quotaState?: import('./CardActionsMenu').CardActionsMenuProps['quotaState'];
   onAudioPlay?: () => void;
   targetAudioMode: TargetAudioMode;
   allRevealed?: boolean;
@@ -60,6 +67,8 @@ interface FullReviewCardContentProps {
   shortcutsDisabled?: boolean;
   /** Karaoke word highlighting toggle (defaults true). */
   highlightEnabled?: boolean;
+  /** Client-only session flag: did the viewer click flag on this card? */
+  flaggedInSession?: boolean;
   /** Merged-audio state from useAudioPlayer; used when merged playback is active. */
   mergedPlayback?: {
     isPlaying: boolean;
@@ -74,6 +83,13 @@ interface FullReviewCardContentProps {
   audioSpeedOverrides?: Record<string, number>;
   /** Cycle handler for the speed badge; null clears the override. */
   onSpeedCycle?: (language: string, next: number | null) => void;
+  /** Merged-audio playback for the slim progress bar at the card's bottom edge. */
+  audioRef?: React.RefObject<HTMLAudioElement | null>;
+  durationSec?: number;
+  isPlaying?: boolean;
+  isMerging?: boolean;
+  onSeek?: (seconds: number) => void;
+  showProgressBar?: boolean;
 }
 
 export function FullReviewCardContent({
@@ -91,6 +107,11 @@ export function FullReviewCardContent({
   onFavorite,
   onEdit,
   onDelete,
+  onFlag,
+  onRegenerateAudio,
+  pinnedActions,
+  onUpdatePinnedActions,
+  quotaState,
   onAudioPlay,
   targetAudioMode,
   allRevealed = false,
@@ -101,10 +122,17 @@ export function FullReviewCardContent({
   cardId,
   shortcutsDisabled = false,
   highlightEnabled = true,
+  flaggedInSession = false,
   mergedPlayback,
   languagePlaybackSpeeds,
   audioSpeedOverrides,
   onSpeedCycle,
+  audioRef,
+  durationSec,
+  isPlaying,
+  isMerging,
+  onSeek,
+  showProgressBar,
 }: FullReviewCardContentProps) {
   const t = useTranslations('LearningMode');
   const locale = useLocale();
@@ -379,16 +407,29 @@ export function FullReviewCardContent({
         onFavorite={onFavorite}
         onEdit={onEdit}
         onDelete={onDelete}
+        onFlag={onFlag}
+        onRegenerateAudio={onRegenerateAudio}
+        pinnedActions={pinnedActions}
+        onUpdatePinnedActions={onUpdatePinnedActions}
+        quotaState={quotaState}
         onAudioPlay={onAudioPlay}
         bare={bare}
         showRomanization={showRomanization}
         highlightEnabled={highlightEnabled}
+        flaggedInSession={flaggedInSession}
         activeClip={activeClip}
         onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
         onButtonStop={buttonPlayback.onStop}
         languagePlaybackSpeeds={languagePlaybackSpeeds}
         audioSpeedOverrides={audioSpeedOverrides}
         onSpeedCycle={onSpeedCycle}
+        audioRef={audioRef}
+        durationSec={durationSec}
+        isPlaying={isPlaying}
+        isMerging={isMerging}
+        onSeek={onSeek}
+        showProgressBar={showProgressBar}
+        languageCues={mergedPlayback?.languageCues}
       >
         {({ targetTranslations: targets }) => (
           <div className="space-y-4">

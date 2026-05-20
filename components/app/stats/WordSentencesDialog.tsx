@@ -54,7 +54,7 @@ export function WordSentencesDialog({
   const t = useTranslations('LearningMode');
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
-  const highlightEnabled = courseSettings?.highlightWords !== false;
+  const highlightEnabled = courseSettings?.highlightWords === true;
   const buttonPlayback = useButtonPlayback();
 
   // Ephemeral per-card per-language speed overrides. This dialog is a

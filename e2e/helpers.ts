@@ -1,5 +1,245 @@
-import type { Page } from "@playwright/test";
+import type { Page, Locator } from "@playwright/test";
 import { expect } from "@playwright/test";
+
+/**
+ * Choices the onboarding helper can take at each step. Defaults match the
+ * fastest happy-path the auth fixture uses (English → Spanish, brand-new
+ * learner, skip the embedded lesson). Override per test to exercise other
+ * branches without duplicating the walk.
+ */
+export interface OnboardingWalkOptions {
+  source?: string; // ISO code, default "en"
+  target?: string; // ISO code, default "es"
+  acquisition?:
+    | "reddit"
+    | "chatgpt"
+    | "gemini"
+    | "claude"
+    | "google"
+    | "friend"
+    | "appstore"
+    | "other";
+  acquisitionOtherText?: string;
+  // The goal step is multi-select; pass a non-empty array.
+  goals?: Array<"travel" | "family" | "work" | "curiosity" | "exam" | "other">;
+  goalOtherText?: string;
+  // Either a preset minute count or "custom" + value.
+  dailyTime?: 5 | 10 | 20 | 30 | { custom: number };
+  // Branch picker: "new" lands on customizing instantly, "self-pick" walks
+  // through the CEFR slider + confirm dialog (Start here), and "test" runs
+  // the placement test answering everything as "I didn't know" — yielding
+  // the lowest level (~1) deterministically.
+  proficiency?: "new" | "self-pick" | "test";
+  // Number of placement-test questions to answer before the strategy resolves.
+  // The default staircase strategy ends after ~7–10 reversals; we'll cap at
+  // `placementMaxQuestions` to bail if something goes wrong.
+  placementAnswer?: "knew" | "didnt"; // applied to every question
+  placementMaxQuestions?: number;
+  // First lesson — default skips (faster, doesn't depend on TTS readiness).
+  // Set `mode` to drive a real lesson via Audio or Full Review.
+  firstLesson?: "skip" | { mode: "audio" | "full"; cardsToRate?: number };
+  // Plan pick — default uses the "Maybe later" link (stays on Free).
+  planPick?: "skip";
+}
+
+/**
+ * Walk the new onboarding wizard end-to-end using ONLY data-testid
+ * selectors (no copy or role matching), then wait for the post-wizard
+ * redirect to /app. Used by both the auth.setup.ts fixture (for the
+ * shared session) and the dedicated onboarding spec (one per branch).
+ *
+ * Step path (see app/app/onboarding/page.tsx for the canonical order):
+ *   language-pair → acquisition → goal → daily-time → proficiency →
+ *   (cefr-pick + dialog | placement-test + result | none) →
+ *   customizing (auto) → first-lesson → stats-recap → word-projection →
+ *   feature-tour → plan-pick → /app.
+ */
+export async function completeOnboardingFresh(
+  page: Page,
+  opts: OnboardingWalkOptions = {},
+): Promise<void> {
+  const {
+    source = "en",
+    target = "es",
+    acquisition = "other",
+    acquisitionOtherText,
+    goals = ["curiosity"],
+    goalOtherText,
+    dailyTime = 5,
+    proficiency = "new",
+    placementAnswer = "didnt",
+    placementMaxQuestions = 15,
+    firstLesson = "skip",
+    planPick = "skip",
+  } = opts;
+
+  // Helper: click a testid and assert the wizard's next step rendered.
+  const advance = async (
+    actions: (() => Promise<void>) | null,
+    nextStepTestId: string,
+  ) => {
+    if (actions) await actions();
+    await page.getByTestId("onboarding-continue").click();
+    await expect(page.getByTestId(nextStepTestId)).toBeVisible({
+      timeout: 20_000,
+    });
+  };
+
+  // 1. Language pair — source first, then target. The selector hides + re-
+  //    reveals between picks, so we re-query each time.
+  await expect(page.getByTestId("onboarding-step-language-pair")).toBeVisible({
+    timeout: 30_000,
+  });
+  await page.getByTestId(`language-option-${source}`).first().click();
+  await page.getByTestId(`language-option-${target}`).first().click();
+  await advance(null, "onboarding-step-acquisition");
+
+  // 2. Acquisition source.
+  await page.getByTestId(`acquisition-option-${acquisition}`).click();
+  if (acquisition === "other" && acquisitionOtherText) {
+    await page.getByTestId("acquisition-other-input").fill(acquisitionOtherText);
+  }
+  await advance(null, "onboarding-step-goal");
+
+  // 3. Learning goal — multi-select, at least one.
+  for (const goal of goals) {
+    await page.getByTestId(`goal-option-${goal}`).click();
+  }
+  if (goals.includes("other") && goalOtherText) {
+    await page.getByTestId("goal-other-input").fill(goalOtherText);
+  }
+  await advance(null, "onboarding-step-daily-time");
+
+  // 4. Daily time goal.
+  if (typeof dailyTime === "number") {
+    await page.getByTestId(`daily-time-option-${dailyTime}`).click();
+  } else {
+    await page.getByTestId("daily-time-option-custom").click();
+    await page.getByTestId("daily-time-custom-input").fill(String(dailyTime.custom));
+  }
+  await advance(null, "onboarding-step-proficiency");
+
+  // 5. Proficiency branch. Picking a branch only selects it — Continue is
+  // what actually advances the wizard. All three sub-branches click it.
+  await page.getByTestId(`proficiency-branch-${proficiency}`).click();
+  await page.getByTestId("onboarding-continue").click();
+  if (proficiency === "new") {
+    // Lands on customizing directly — the next assertion below picks it up.
+  } else if (proficiency === "self-pick") {
+    await expect(page.getByTestId("onboarding-step-cefr-pick")).toBeVisible({
+      timeout: 20_000,
+    });
+    // Default slider position is fine for the walk — confirm + start.
+    await page.getByTestId("onboarding-continue").click();
+    await expect(page.getByTestId("cefr-confirm-dialog")).toBeVisible({
+      timeout: 10_000,
+    });
+    await page.getByTestId("cefr-confirm-start-here").click();
+  } else {
+    // proficiency === "test" — run the placement test deterministically.
+    await expect(page.getByTestId("onboarding-step-placement-test")).toBeVisible({
+      timeout: 20_000,
+    });
+    const answerTestId =
+      placementAnswer === "knew"
+        ? "placement-test-knew-it"
+        : "placement-test-didnt-know";
+    // Loop until the result screen renders or we hit the cap.
+    for (let q = 0; q < placementMaxQuestions; q++) {
+      const resultVisible = await page
+        .getByTestId("onboarding-step-placement-result")
+        .isVisible()
+        .catch(() => false);
+      if (resultVisible) break;
+      await page.getByTestId("placement-test-reveal").click();
+      await page.getByTestId(answerTestId).click();
+    }
+    await expect(
+      page.getByTestId("onboarding-step-placement-result"),
+    ).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId("placement-result-continue").click();
+  }
+
+  // 6. Customizing — auto-advances after the bar + completeOnboarding mutation.
+  await expect(page.getByTestId("onboarding-step-customizing")).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(
+    page.getByTestId("onboarding-step-first-lesson-intro"),
+  ).toBeVisible({ timeout: 60_000 });
+
+  // 7. First lesson intro (mode picker → Start or Skip).
+  // Skip jumps straight to feature-tour (stats-recap + word-projection are
+  // only shown when the user actually rated cards — see
+  // app/app/onboarding/page.tsx onSkipLesson).
+  if (firstLesson === "skip") {
+    await page.getByTestId("first-lesson-skip").click();
+  } else {
+    await page.getByTestId(`first-lesson-mode-${firstLesson.mode}`).click();
+    await page.getByTestId("first-lesson-start").click();
+    // Driving real cards is opt-in — leave that to the dedicated spec.
+    // If the caller asked for it, rate the requested number of cards then
+    // wait for the stats-recap.
+    const cardsToRate = firstLesson.cardsToRate ?? 0;
+    for (let i = 0; i < cardsToRate; i++) {
+      // Dismiss whichever onboarding tutorial popover is on screen first.
+      await dismissTour(page).catch(() => {});
+      // Hit the audio "Next" / rating "Good" — best-effort, since this
+      // depends on real card content being ready, which is brittle for
+      // the auth fixture. Suites that drive real cards should manage
+      // their own per-card flow.
+      const next = page
+        .getByRole("button", { name: /^next$|^good$/i })
+        .first();
+      await next.click({ timeout: 10_000 }).catch(() => {});
+    }
+
+    // 8. Stats recap.
+    await expect(page.getByTestId("onboarding-step-stats-recap")).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.getByTestId("progress-display-continue").click();
+
+    // 9. Word projection.
+    await expect(
+      page.getByTestId("onboarding-step-word-projection"),
+    ).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId("word-projection-continue").click();
+  }
+
+  // 10. Feature tour — click Next until the Done button appears, then Done.
+  await expect(page.getByTestId("onboarding-step-feature-tour")).toBeVisible({
+    timeout: 20_000,
+  });
+  for (let i = 0; i < 10; i++) {
+    const done = page.getByTestId("feature-tour-done");
+    if (await done.isVisible().catch(() => false)) {
+      await done.click();
+      break;
+    }
+    await page.getByTestId("feature-tour-next").click();
+  }
+
+  // 11. Plan pick — skip onto Free.
+  await expect(page.getByTestId("onboarding-step-plan-pick")).toBeVisible({
+    timeout: 20_000,
+  });
+  if (planPick === "skip") {
+    await page.getByTestId("plan-pick-skip").click();
+  }
+
+  // 12. Wait for the post-wizard redirect to /app.
+  await page.waitForURL(
+    (url) => /\/app(\/|$)/.test(url.pathname) && !/onboarding/.test(url.pathname),
+    { timeout: 30_000 },
+  );
+}
+
+// Re-exported so spec files can reach in for individual testid locators if
+// they want to assert step transitions without driving the full walk.
+export function onboardingStep(page: Page, testId: string): Locator {
+  return page.getByTestId(testId);
+}
 
 /**
  * Known tutorial identifiers, matching convex/features/tutorialIds.ts plus

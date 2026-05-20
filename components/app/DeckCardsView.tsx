@@ -38,7 +38,7 @@ export function DeckCardsView() {
 
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
-  const highlightEnabled = courseSettings?.highlightWords !== false;
+  const highlightEnabled = courseSettings?.highlightWords === true;
   const languagePlaybackSpeeds = courseSettings?.languagePlaybackSpeeds ?? {};
   const buttonPlayback = useButtonPlayback();
 

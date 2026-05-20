@@ -1,32 +1,69 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { completeOnboardingFresh, type OnboardingWalkOptions } from "./helpers";
 
 /**
  * Setup project — runs before every chromium spec.
  *
- * Strategy: each run creates a BRAND NEW test user, completes onboarding,
- * and saves the resulting session to e2e/.auth/user.json. This means:
- *   - no stale cookies
- *   - onboarding is exercised on every full run
- *   - no shared state between runs (except accumulated rows in the dev DB)
+ * Creates exactly TWO fresh test users in a single run, each walks a different
+ * onboarding-wizard branch (so the wizard's branching logic is covered as a
+ * side-effect of producing the fixtures), and saves the resulting sessions to:
+ *
+ *   - `e2e/.auth/user.json`   — user A, default "completely-new" walk
+ *       (proficiency=new, skip lesson). This is the **primary shared user**
+ *       consumed by every downstream parallel + serial project — keeping
+ *       the filename stable means none of those configs need to change.
+ *   - `e2e/.auth/user-b.json` — user B, "placement-test" walk
+ *       (proficiency=test, all-"didn't know" answers). Available as a
+ *       secondary fixture for any test that wants a second account.
+ *
+ * Why two and not one: previously every test in `onboarding.spec.ts` signed
+ * up its OWN fresh user (5 extra signups per run, 6 total). Running those in
+ * parallel saturated the LLM/TTS translation queues that `completeOnboarding`
+ * fans out to, causing intermittent 60s timeouts in the wizard walks. The
+ * 2-user cap keeps wizard-branch coverage (default + placement-test branch)
+ * while removing the parallel signup contention.
+ *
+ * Why two and not one (coverage side): the placement-test branch hits the
+ * most distinct backend code paths (`enqueueMissingPlacementTranslations`,
+ * `getPlacementSentence`, the placement question loop). The other wizard
+ * variants (self-pick, "Other" goal free-text, mid-wizard reload) are
+ * covered by unit/component tests — see:
+ *   - tests/components/onboarding/CefrConfirmDialog.test.tsx (self-pick)
+ *   - tests/components/onboarding/{AcquisitionSourceStep,LearningGoalStep}.test.tsx (free-text)
+ *   - convex/tests/features/onboarding.test.ts (server-side resume + idempotency)
+ *
+ * Both users are written serially so they don't compete for backend resources
+ * during their warmup-fanout. The two `test()` calls inside this file run
+ * sequentially because of `test.describe.configure({ mode: "serial" })`.
+ *
+ * The `home_tour` driver.js tour fires on first /app landing because the
+ * onboarding wizard intentionally does NOT pre-mark it (see
+ * convex/features/onboarding.ts:finalizeOnboarding). Suites that don't care
+ * about the tour should call `dismissTour(page, 'home_tour')` in beforeEach.
+ *
+ * The wizard walker uses `data-testid` attributes exclusively — no copy
+ * matching — so locale flips, copy tweaks, or language renames cannot
+ * break this fixture.
  *
  * Email verification is disabled in convex/auth.ts (`requireEmailVerification:
- * false`), so the account is immediately usable.
- *
- * Cleanup: the project has no delete-account endpoint. Test users pile up in
- * the dev backend; accept that or add a cleanup mutation later.
+ * false`), so the accounts are immediately usable.
  */
 
-const STORAGE_STATE = path.resolve(__dirname, ".auth/user.json");
+test.describe.configure({ mode: "serial" });
 
-function generateCredentials() {
+const STORAGE_STATE_A = path.resolve(__dirname, ".auth/user.json");
+const STORAGE_STATE_B = path.resolve(__dirname, ".auth/user-b.json");
+const CREDENTIALS_DIR = path.resolve(__dirname, ".auth");
+
+function generateCredentials(prefix: string) {
   const random = crypto.randomBytes(6).toString("hex");
   return {
-    email: `e2e-${Date.now()}-${random}@test.de`,
+    email: `e2e-${prefix}-${Date.now()}-${random}@test.de`,
     password: `E2ePass!${random}`,
-    name: `E2E User ${random}`,
+    name: `E2E ${prefix} ${random}`,
   };
 }
 
@@ -37,22 +74,22 @@ async function fillSignUp(
   await page.goto("/auth/sign-up");
   await page.waitForLoadState("domcontentloaded");
 
-  // Better Auth UI labels fields by their human names. `name` is optional
-  // depending on config — fill if present.
+  // The sign-up form predates this testid initiative and still uses
+  // ARIA labels; signing in correctly is verified by the resulting redirect
+  // to /app/onboarding (asserted below), so label-based selection is fine
+  // here. All subsequent onboarding interaction is testid-driven.
   const nameField = page.getByLabel(/^name$/i);
   if (await nameField.count()) {
     await nameField.first().fill(creds.name);
   }
   await page.getByLabel(/email/i).first().fill(creds.email);
 
-  // There are usually two password fields (password + confirm). Fill all.
   const passwordFields = page.getByLabel(/password/i);
   const passwordCount = await passwordFields.count();
   for (let i = 0; i < passwordCount; i++) {
     await passwordFields.nth(i).fill(creds.password);
   }
 
-  // Dismiss the cookie-consent dialog if present — it can intercept clicks.
   const acceptCookies = page.getByRole("button", { name: /accept all/i });
   if (await acceptCookies.count()) {
     await acceptCookies.first().click().catch(() => {});
@@ -62,74 +99,46 @@ async function fillSignUp(
     .getByRole("button", { name: /create an account|create account|^sign\s*up$/i })
     .click();
 
-  // After sign-up the app redirects to /app/onboarding (see
-  // app/auth/[path]/page.tsx `redirectTo="/app/onboarding"`).
   await page.waitForURL(/\/app\/onboarding/, { timeout: 30_000 });
 }
 
-async function completeOnboarding(page: Page) {
-  // Step 1 — target language. Any available language works; pick Spanish
-  // because it's near-universally enabled in lib/languages.
-  await page
-    .getByRole("button", { name: /spanish|español/i })
-    .first()
-    .click();
-  await page.getByRole("button", { name: /continue/i }).click();
-
-  // Step 2 — base language. Pick English.
-  // Accessible name looks like "🇬🇧 English English" (flag + name + native).
-  // Match substring, avoid "American English" variants if present.
-  await page
-    .getByRole("button", { name: /(?<!american\s)English/i })
-    .first()
-    .click();
-  await page.getByRole("button", { name: /continue/i }).click();
-
-  // Step 3 — current level. Beginner.
-  await page
-    .getByRole("button", { name: /beginner/i })
-    .first()
-    .click();
-  await page.getByRole("button", { name: /continue/i }).click();
-
-  // Step 4 — review mode. Pick Full Review (typing) because it requires
-  // the least device permission setup.
-  await page
-    .getByRole("button", { name: /full\s*review/i })
-    .first()
-    .click();
-  await page.getByRole("button", { name: /continue/i }).click();
-
-  // Step 5 — "Start Learning" finalizes onboarding and redirects to /app.
-  await page
-    .getByRole("button", { name: /start\s*learning/i })
-    .click({ timeout: 30_000 });
-
-  await page.waitForURL(
-    (url) => /\/app(\/|$)/.test(url.pathname) && !/onboarding/.test(url.pathname),
-    { timeout: 30_000 },
-  );
-}
-
-test("authenticate", async ({ page }) => {
-  const creds = generateCredentials();
+async function signUpAndOnboard(
+  page: Page,
+  prefix: string,
+  storagePath: string,
+  walk: OnboardingWalkOptions,
+) {
+  const creds = generateCredentials(prefix);
   test.info().annotations.push({
     type: "auth",
-    description: `Creating fresh test user ${creds.email}`,
+    description: `Creating fresh test user ${creds.email} (walk=${prefix})`,
   });
 
   await fillSignUp(page, creds);
-  await completeOnboarding(page);
+  await completeOnboardingFresh(page, walk);
 
-  // Sanity check: we're on the authed shell.
-  await expect(page).toHaveURL(/\/app/);
+  fs.mkdirSync(CREDENTIALS_DIR, { recursive: true });
+  await page.context().storageState({ path: storagePath });
 
-  fs.mkdirSync(path.dirname(STORAGE_STATE), { recursive: true });
-  await page.context().storageState({ path: STORAGE_STATE });
-
-  // Stash creds alongside for anyone debugging a failure. Git-ignored.
   fs.writeFileSync(
-    path.resolve(__dirname, ".auth/credentials.json"),
+    path.resolve(CREDENTIALS_DIR, `credentials-${prefix}.json`),
     JSON.stringify({ ...creds, createdAt: new Date().toISOString() }, null, 2),
   );
+}
+
+test("authenticate user A (default 'completely-new' walk)", async ({ page }) => {
+  // Default walk — proficiency=new, skip lesson. Exercises the most common
+  // path through the wizard and produces the primary shared session.
+  await signUpAndOnboard(page, "a", STORAGE_STATE_A, {});
+});
+
+test("authenticate user B (placement-test branch walk)", async ({ page }) => {
+  // Placement-test branch — answers every question as "I didn't know" so the
+  // strategy resolves to ~L01 deterministically. Exercises
+  // `enqueueMissingPlacementTranslations`, `getPlacementSentence`, and the
+  // staircase loop in one go.
+  await signUpAndOnboard(page, "b", STORAGE_STATE_B, {
+    proficiency: "test",
+    placementAnswer: "didnt",
+  });
 });

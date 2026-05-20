@@ -1,8 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Popover,
@@ -31,6 +30,11 @@ interface Props {
   className?: string;
   /** When false, renders plain text without popovers (e.g. blurred translations). */
   interactive?: boolean;
+  /** When set, tag the longest cleaned word with this `data-coachmark-anchor`
+   *  value so onboarding's driver.js step can target a single concrete word
+   *  rather than the whole sentence wrapper. Only the target-language
+   *  instance of `ClickableWords` should set this. */
+  coachmarkAnchorForLongestWord?: string;
 }
 
 /** Strip leading/trailing punctuation/symbols so "Haus," → "Haus". */
@@ -42,10 +46,12 @@ const MIN_MATCH_RATIO = 0.5;
 
 /**
  * Tokenized card text: each word is clickable and opens a popover with an
- * "Ask AI" button that pre-fills the learning-mode chat with an explanation
- * prompt. Preserves the karaoke highlighting behavior of HighlightedText.
+ * "Explain this word" button that pre-fills the learning-mode chat with an
+ * explanation prompt. Preserves the karaoke highlighting behavior of
+ * HighlightedText.
  */
 export function ClickableWords({
+  coachmarkAnchorForLongestWord,
   text,
   language,
   wordTimings,
@@ -85,16 +91,18 @@ export function ClickableWords({
     return (
       <p className={className}>
         {aligned.map((w, i) => (
-          <span
-            key={i}
-            className={cn(
-              'transition-colors duration-200',
-              i === currentIndex && 'text-primary',
-            )}
-          >
-            {w.leading}
-            {w.display}
-          </span>
+          <Fragment key={i}>
+            <span
+              className={cn(
+                'transition-colors duration-200',
+                i === currentIndex && 'text-primary',
+              )}
+            >
+              {w.leading}
+              {w.display}
+            </span>
+            {w.trailing}
+          </Fragment>
         ))}
       </p>
     );
@@ -107,10 +115,29 @@ export function ClickableWords({
     setOpenIndex(null);
   };
 
+  // Tag the longest cleaned word with a `data-coachmark-anchor` *only* when
+  // the caller opted in (target-language instance). Without the opt-in, the
+  // first ClickableWords in DOM order would win the global query selector —
+  // typically the source paragraph, which is the wrong thing to highlight.
+  const longestWordIndex = coachmarkAnchorForLongestWord
+    ? aligned.reduce<{ idx: number; len: number }>(
+      (best, w, i) => {
+        const cleanedLen = cleanWord(w.display).length;
+        return cleanedLen > best.len ? { idx: i, len: cleanedLen } : best;
+      },
+      { idx: -1, len: 0 },
+    ).idx
+    : -1;
+
   return (
     <p className={className}>
       {aligned.map((w, i) => (
-        <span key={i}>
+        // Fragment (not wrapper <span>) — wrapping each word in a span made
+        // the LAST word's clickable area lose the hit-test in RTL paragraphs:
+        // the picker landed on the wrapper instead of the inner trigger span,
+        // and hover/click never fired on the actual word. Inline children of
+        // the <p> participate directly in the parent bidi context.
+        <Fragment key={i}>
           {w.leading}
           <Popover
             open={openIndex === i}
@@ -122,6 +149,9 @@ export function ClickableWords({
                 tabIndex={0}
                 aria-label={t('askAboutWord', { word: cleanWord(w.display) })}
                 data-testid="clickable-word"
+                data-coachmark-anchor={
+                  i === longestWordIndex ? coachmarkAnchorForLongestWord : undefined
+                }
                 className={cn(
                   'cursor-pointer rounded-sm transition-colors duration-200 hover:bg-muted',
                   i === currentIndex && 'text-primary',
@@ -149,12 +179,12 @@ export function ClickableWords({
                 data-testid="ask-ai-button"
                 onClick={() => handleAsk(w.display)}
               >
-                <Sparkles className="h-3.5 w-3.5" />
                 {t('askAI')}
               </Button>
             </PopoverContent>
           </Popover>
-        </span>
+          {w.trailing}
+        </Fragment>
       ))}
     </p>
   );

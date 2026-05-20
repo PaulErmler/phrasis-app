@@ -11,16 +11,19 @@ const plans = [
   {
     key: 'free' as const,
     highlighted: false,
+    hasTrial: false,
     features: ['sentences', 'customSentences', 'courses', 'chatMessages', 'detailedStatistics'],
   },
   {
     key: 'basic' as const,
     highlighted: true,
+    hasTrial: true,
     features: ['sentences', 'customSentences', 'courses', 'chatMessages', 'detailedStatistics'],
   },
   {
     key: 'pro' as const,
     highlighted: false,
+    hasTrial: true,
     features: [
       'sentences',
       'customSentences',
@@ -105,6 +108,16 @@ export function PricingSection() {
                     /{t(`plans.${plan.key}.period`)}
                   </span>
                 </div>
+                {plan.hasTrial && (
+                  <p
+                    className={cn(
+                      'mt-2 text-sm font-medium',
+                      plan.highlighted ? 'text-primary' : 'text-foreground/80',
+                    )}
+                  >
+                    {t(`plans.${plan.key}.trial`)}
+                  </p>
+                )}
               </div>
 
               <ul className="mb-8 flex-1 space-y-3">

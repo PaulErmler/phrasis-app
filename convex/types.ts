@@ -41,6 +41,16 @@ export const translationValidator = v.object({
   isBaseLanguage: v.boolean(),
   isTargetLanguage: v.boolean(),
   romanization: v.optional(v.string()),
+  /**
+   * True iff an LLM retranslation is currently in flight for this language:
+   * a non-stale row exists in `llmTranslationClaims` for (textId, lang) AND
+   * a `translatedText` is already on file (so it's a *re*translation, not
+   * the first-time translation of a brand-new card). Drives the warning-
+   * color "Retranslating" pill in the card header. Keyed off the LLM claim
+   * (not on "audio missing") so it does NOT fire when the user clicks
+   * "regenerate audio" — that flow has no LLM phase.
+   */
+  retranslating: v.optional(v.boolean()),
 });
 
 export const audioRecordingValidator = v.object({
@@ -62,6 +72,14 @@ export const audioRecordingValidator = v.object({
     ),
     v.null(),
   ),
+  // TTS validation status: 'unknown' while a synthesis attempt is in flight
+  // (or between retries), 'validated' once transcription matched, 'unvalidated'
+  // for languages without STT support or when all retries mismatched. Surfaced
+  // so the "Retranslating" pill in the learning view can stay visible while
+  // ttsQuality === 'unknown' (the audio row exists but the audio it points
+  // to may still be a not-yet-validated synthesis). Nullable for rows that
+  // pre-date this field or for placeholders.
+  ttsQuality: v.union(v.string(), v.null()),
 });
 
 export const reviewModeValidator = v.union(

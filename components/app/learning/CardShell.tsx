@@ -5,12 +5,15 @@ import { useTranslations } from 'next-intl';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AudioButton } from './AudioButton';
-import { CardActionsMenu } from './CardActionsMenu';
+import { AudioProgressBar } from './AudioProgressBar';
+import { CardActionsMenu, type CardActionsMenuProps } from './CardActionsMenu';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
+import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
+import type { PinnableCardAction } from '@/lib/cardActions';
 
 interface CardShellProps {
   reviewCount: number;
@@ -27,6 +30,12 @@ interface CardShellProps {
   onFavorite: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onFlag?: () => void;
+  onRegenerateAudio?: () => void;
+  pinnedActions?: readonly string[];
+  onUpdatePinnedActions?: (actions: PinnableCardAction[]) => void;
+  /** Per-action quota state for the action menu (Edit / Regenerate / Flag). */
+  quotaState?: CardActionsMenuProps['quotaState'];
   onAudioPlay?: () => void;
   bare?: boolean;
   showRomanization?: boolean;
@@ -46,6 +55,24 @@ interface CardShellProps {
   onSpeedCycle?: (language: string, next: number | null) => void;
   /** Badge behavior — `ephemeral` hides the null/default slot and greys 1.0. */
   speedBadgeVariant?: 'persistent' | 'ephemeral';
+  /**
+   * Client-only session state: did the viewer click the flag action on this
+   * card during the current view? Set on click, cleared when navigating
+   * away. Drives the warning-color "Flagged" pill — a per-session signal
+   * scoped to the flagger, NOT a global server-derived state (which would
+   * leak the flag to other users). Wins visually over the server-driven
+   * "Retranslating" pill when both apply.
+   */
+  flaggedInSession?: boolean;
+  /** Merged-audio playback for the slim progress bar at the card's bottom edge. */
+  audioRef?: React.RefObject<HTMLAudioElement | null>;
+  durationSec?: number;
+  isPlaying?: boolean;
+  isMerging?: boolean;
+  onSeek?: (seconds: number) => void;
+  showProgressBar?: boolean;
+  /** Cue boundaries (per-language start times) for the progress bar's hover ticks. */
+  languageCues?: ReadonlyArray<LanguageCue>;
   children: (ctx: {
     baseTranslations: CardTranslation[];
     targetTranslations: CardTranslation[];
@@ -67,6 +94,11 @@ export function CardShell({
   onFavorite,
   onEdit,
   onDelete,
+  onFlag,
+  onRegenerateAudio,
+  pinnedActions,
+  onUpdatePinnedActions,
+  quotaState,
   onAudioPlay,
   bare = false,
   showRomanization = true,
@@ -78,6 +110,14 @@ export function CardShell({
   audioSpeedOverrides,
   onSpeedCycle,
   speedBadgeVariant,
+  flaggedInSession = false,
+  audioRef,
+  durationSec,
+  isPlaying,
+  isMerging,
+  onSeek,
+  showProgressBar = false,
+  languageCues,
   children,
 }: CardShellProps) {
   const t = useTranslations('LearningMode');
@@ -86,14 +126,45 @@ export function CardShell({
   const masterActive = isMastered || isPendingMaster;
   const hideActive = isHidden || isPendingHide;
 
+  // Translation-state pill, single source for the card header.
+  // - "Retranslating" (server-driven, global): an LLM retranslation is in
+  //   flight for at least one target language. Doesn't fire on "regenerate
+  //   audio" (no LLM phase, no claim). Shown to everyone, including the
+  //   flagger, so they get the live "in progress" signal.
+  // - "Flagged" (client-only, session-scoped): the viewer clicked the flag
+  //   action on this card. Persists after the LLM lands (or shows
+  //   immediately for over-cap flags that don't enqueue an LLM job),
+  //   purely client state — NOT leaked to other users.
+  // Retranslating wins while the work is actively happening; Flagged
+  // takes over once the retranslation finishes (or never started).
+  const anyTargetRetranslating = targetTranslations.some(
+    (tr) => tr.retranslating === true,
+  );
+  const translationStatePill = anyTargetRetranslating
+    ? { key: 'retranslating' as const, label: t('retranslating') }
+    : flaggedInSession
+      ? { key: 'flagged' as const, label: t('flagged') }
+      : null;
+
   const cardSurface = (
-    <div className="card-surface" data-tutorial="card-flashcard">
+    <div className="card-surface overflow-hidden" data-tutorial="card-flashcard">
       {/* Card top bar: metadata left, actions right */}
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
             {t('reviewCount', { count: reviewCount })}
           </Badge>
+          {translationStatePill && (
+            <Badge
+              // Transparent warning fill (15% alpha of theme's --color-warning).
+              // aria-live announces transitions (retranslating → flagged, or
+              // cleared) without grabbing focus.
+              className="border-transparent bg-warning/15 text-warning text-xs"
+              aria-live="polite"
+            >
+              {translationStatePill.label}
+            </Badge>
+          )}
         </div>
         <CardActionsMenu
           isFavorite={isFavorite}
@@ -104,6 +175,11 @@ export function CardShell({
           onHide={onHide}
           onEdit={onEdit}
           onDelete={onDelete}
+          onFlag={onFlag}
+          onRegenerateAudio={onRegenerateAudio}
+          pinnedActions={pinnedActions}
+          onUpdatePinnedActions={onUpdatePinnedActions}
+          quotaState={quotaState}
         />
       </div>
 
@@ -180,6 +256,17 @@ export function CardShell({
 
         {children({ baseTranslations, targetTranslations })}
       </div>
+
+      {showProgressBar && audioRef && onSeek && (
+        <AudioProgressBar
+          audioRef={audioRef}
+          durationSec={durationSec ?? 0}
+          isPlaying={isPlaying ?? false}
+          onSeek={onSeek}
+          isMerging={isMerging ?? false}
+          languageCues={languageCues}
+        />
+      )}
     </div>
   );
 

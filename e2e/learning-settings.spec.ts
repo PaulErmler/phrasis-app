@@ -41,6 +41,39 @@ async function isSelectedTestId(
   return /ring-primary|bg-primary/.test(cls);
 }
 
+/**
+ * Poll until a locator's bounding box is fully inside the viewport.
+ * Necessary for elements inside the Sheet: between mode-button clicks the
+ * Sheet briefly re-animates (likely Radix focus-management round-tripping
+ * the `data-state` attribute), leaving the next mode button mid-transform
+ * for ~500ms. `force: true` doesn't bypass the viewport check, and the
+ * element is `position: fixed` so Playwright's auto-scroll can't bring it
+ * in. Polling the bounding box lets us wait out the animation deterministically.
+ */
+async function waitForInViewport(
+  page: Page,
+  locator: ReturnType<Page["getByTestId"]>,
+  timeoutMs = 5_000,
+): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport) return;
+  await expect
+    .poll(
+      async () => {
+        const box = await locator.boundingBox();
+        if (!box) return false;
+        return (
+          box.x >= 0 &&
+          box.y >= 0 &&
+          box.x + box.width <= viewport.width &&
+          box.y + box.height <= viewport.height
+        );
+      },
+      { timeout: timeoutMs, intervals: [100, 200, 400] },
+    )
+    .toBe(true);
+}
+
 test.describe("learning settings", () => {
   test("toggle review mode between audio and full", async ({ page }) => {
     await page.goto("/app/learn");
@@ -55,10 +88,16 @@ test.describe("learning settings", () => {
     await expect(audioBtn).toBeVisible({ timeout: 10_000 });
     await expect(fullBtn).toBeVisible();
 
+    // Wait for both buttons to be fully in viewport before each click.
+    // The Sheet may re-animate after a mode change (see waitForInViewport
+    // docstring) so the second click in particular needs to wait for the
+    // Sheet to settle, not just for a fixed 300ms.
+    await waitForInViewport(page, audioBtn);
     await audioBtn.click({ force: true });
     await page.waitForTimeout(300);
     expect(await isSelectedTestId(page, "settings-mode-audio")).toBe(true);
 
+    await waitForInViewport(page, fullBtn);
     await fullBtn.click({ force: true });
     await page.waitForTimeout(300);
     expect(await isSelectedTestId(page, "settings-mode-full")).toBe(true);

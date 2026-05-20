@@ -2,14 +2,16 @@
 
 import {
   useState,
+  useEffect,
   useCallback,
   useRef,
   createContext,
   useContext,
   type ReactNode,
 } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { MessageCircle, ChevronRight } from 'lucide-react';
+import { useMediaQuery } from '@/hooks/use-media-query';
+import { cn } from '@/lib/utils';
 
 // -- Context to share chat toggle state with the header ----------------------
 
@@ -26,10 +28,9 @@ interface LearningChatContextValue {
   pendingPrompt: PendingPrompt | null;
   openChatWithPrompt: (text: string) => void;
   /**
-   * Returns true only for the first caller of a given nonce. Guards against
-   * duplicate submissions when the chat panel is mounted in multiple slots
-   * (desktop + mobile are both always in the React tree, CSS just hides one)
-   * and against React Strict Mode's double-effect behavior in dev.
+   * Returns true only for the first caller of a given nonce. Defends against
+   * React Strict Mode's double-effect behaviour in dev so a prompt is only
+   * submitted once even if `WrappedChatPanel`'s effect fires twice.
    */
   claimPrompt: (nonce: number) => boolean;
 }
@@ -47,23 +48,52 @@ interface LearningChatLayoutProps {
   children: ReactNode;
   chatPanel: ReactNode;
   onChatOpen?: () => void;
+  /**
+   * When true, suppresses the desktop chat toggle bar and force-closes any
+   * open chat panel. Used during the celebration screen so chat affordances
+   * stay out of that flow. The mobile chat button lives inside `LearningMode`
+   * and is already hidden by the celebration early-return there.
+   */
+  hideChatToggle?: boolean;
 }
 
 /**
- * Responsive layout for learning mode + chat:
- * - Header spans full width on top
- * - Desktop (lg+): learning content and chat sidebar side-by-side below header
- * - Mobile (<lg): chat replaces learning content when toggled (via header button)
+ * Responsive layout for learning mode + chat.
+ *
+ * `{children}` and `{chatPanel}` are each rendered exactly once at a fixed
+ * React tree position; the viewport flip only swaps Tailwind classes on
+ * their wrapper divs. The DOM never moves on resize, so `LearningMode`,
+ * `ProgressDisplay`, and any in-flight audio/timers stay alive across the
+ * `isDesktop` boundary — a mid-celebration window resize no longer restarts
+ * the success sound or the counter animations.
+ *
+ * The chat slide (mobile) and width animation (desktop) use CSS transitions
+ * instead of `motion.react` springs. Two motion.divs at different tree
+ * positions would re-introduce the original dual-mount bug; keeping a
+ * single wrapper and animating it via `transition-transform` /
+ * `transition-[width]` is the trade-off that preserves the dedup invariant.
  */
 export function LearningChatLayout({
   header,
   children,
   chatPanel,
   onChatOpen,
+  hideChatToggle = false,
 }: LearningChatLayoutProps) {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null);
   const claimedNonceRef = useRef<number | null>(null);
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+
+  // Match previous `NoChatContext` behaviour: celebration closes chat, and
+  // it stays closed after the cele dismisses.
+  useEffect(() => {
+    if (hideChatToggle) setIsChatOpen(false);
+  }, [hideChatToggle]);
+  // Defensive — covers the single frame between `hideChatToggle` flipping
+  // true and the effect's `setIsChatOpen(false)` landing.
+  const effectiveChatOpen = isChatOpen && !hideChatToggle;
+
 
   const openChat = useCallback(() => {
     setIsChatOpen(true);
@@ -96,7 +126,7 @@ export function LearningChatLayout({
   return (
     <LearningChatContext.Provider
       value={{
-        isChatOpen,
+        isChatOpen: effectiveChatOpen,
         openChat,
         closeChat,
         toggleChat,
@@ -108,61 +138,83 @@ export function LearningChatLayout({
       <div className="h-dvh max-h-dvh flex flex-col overflow-hidden">
         {header}
 
-        <div className="relative flex-1 flex flex-col lg:flex-row min-h-0 w-full">
-          {/* Desktop: learning body */}
-          <div className="hidden lg:flex flex-1 min-w-0 min-h-0 justify-center overflow-hidden">
-            <div className="w-full max-w-2xl flex flex-col min-h-0">
+        <div
+          className={cn(
+            'relative flex-1 min-h-0 w-full',
+            isDesktop ? 'flex flex-row' : 'overflow-clip',
+          )}
+        >
+          {/* Body — fixed React tree position. Desktop: flex item. Mobile:
+              absolute-positioned overlay that slides left when chat opens. */}
+          <div
+            className={cn(
+              'min-w-0 min-h-0',
+              isDesktop
+                ? 'flex flex-1 justify-center overflow-hidden'
+                : cn(
+                  'absolute inset-0 flex flex-col transition-transform duration-300 ease-out',
+                  effectiveChatOpen ? '-translate-x-full' : 'translate-x-0',
+                ),
+            )}
+          >
+            <div
+              className={cn(
+                'min-w-0 min-h-0 flex flex-col',
+                isDesktop ? 'w-full max-w-2xl' : 'flex-1',
+              )}
+            >
               {children}
             </div>
           </div>
 
-          {/* Desktop: full height toggle bar — carries tutorial attr only when chat is closed */}
-          <div
-            className="hidden lg:flex flex-col justify-center items-center w-8 shrink-0 border-l bg-muted/10 hover:bg-muted/30 cursor-pointer transition-colors z-20"
-            onClick={toggleChat}
-            {...(!isChatOpen ? { 'data-tutorial': 'chat-button' } : {})}
-          >
-            {isChatOpen ? <ChevronRight className="h-4 w-4 text-muted-foreground" /> : <MessageCircle className="h-4 w-4 text-muted-foreground" />}
-          </div>
-
-          {/* Desktop: collapsible chat sidebar — carries tutorial attr when open */}
-          <AnimatePresence initial={false}>
-            {isChatOpen && (
-              <motion.div
-                key="desktop-chat"
-                className="hidden lg:flex shrink-0 min-w-0 min-h-0 bg-background relative z-10"
-                initial={{ width: 0 }}
-                animate={{ width: "calc(33vw - 1rem)" }}
-                exit={{ width: 0 }}
-                transition={{ type: "spring", stiffness: 350, damping: 35 }}
-                data-tutorial="chat-button"
-              >
-                <div className="w-[calc(33vw-1rem)] min-w-[calc(33vw-1rem)] h-full overflow-hidden border-l">
-                  {chatPanel}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Mobile: both panels always mounted, slide to toggle */}
-          <div className="flex-1 lg:hidden min-w-0 min-h-0 relative overflow-clip">
-            <motion.div
-              className="absolute inset-0 flex flex-col"
-              initial={false}
-              animate={{ x: isChatOpen ? '-100%' : 0 }}
-              transition={{ type: 'spring', stiffness: 350, damping: 35 }}
+          {/* Toggle bar — desktop only, suppressed during the celebration. */}
+          {isDesktop && !hideChatToggle && (
+            <div
+              className="flex flex-col justify-center items-center w-8 shrink-0 border-l bg-muted/10 hover:bg-muted/30 cursor-pointer transition-colors z-20"
+              onClick={toggleChat}
+              data-coachmark-anchor="chat-button-desktop"
+              {...(!effectiveChatOpen ? { 'data-tutorial': 'chat-button' } : {})}
             >
-              {children}
-            </motion.div>
-            <motion.div
-              className="absolute inset-0 flex flex-col bg-background"
-              initial={false}
-              animate={{ x: isChatOpen ? 0 : '100%' }}
-              transition={{ type: 'spring', stiffness: 350, damping: 35 }}
-              {...(isChatOpen ? { 'data-tutorial': 'chat-button' } : {})}
+              {effectiveChatOpen ? (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <MessageCircle className="h-4 w-4 text-muted-foreground" />
+              )}
+            </div>
+          )}
+
+          {/* Chat — fixed React tree position. Desktop: collapsible sidebar
+              (width 0 ↔ open). Mobile: shown when open, fully hidden
+              (display:none) when closed so the wrapper can't run any
+              transform transition on viewport flip (the prior approach with
+              `translate-x-full` would animate from no-transform to off-screen
+              when going from desktop-closed to mobile-closed, briefly
+              flashing the chat into view). Trade-off: no slide-in/out
+              animation on mobile toggle — the chat snaps in/out. */}
+          <div
+            className={cn(
+              'min-w-0 min-h-0 bg-background overflow-hidden',
+              isDesktop
+                ? cn(
+                  'flex shrink-0 border-l relative z-10 transition-[width] duration-300 ease-out',
+                  effectiveChatOpen ? 'w-[calc(33vw-1rem)]' : 'w-0',
+                )
+                : effectiveChatOpen
+                  ? 'absolute inset-0 flex flex-col'
+                  : 'hidden',
+            )}
+            {...(effectiveChatOpen ? { 'data-tutorial': 'chat-button' } : {})}
+          >
+            <div
+              className={cn(
+                'flex flex-col min-w-0 min-h-0 h-full',
+                isDesktop
+                  ? 'w-[calc(33vw-1rem)] min-w-[calc(33vw-1rem)] overflow-hidden'
+                  : 'flex-1',
+              )}
             >
               {chatPanel}
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>

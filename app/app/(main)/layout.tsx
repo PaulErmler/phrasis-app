@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, MessageSquarePlus, PanelLeft } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import { getUserTimezone } from '@/lib/timezone';
 import { HomeView } from '@/components/app/HomeView';
 import { AddCardsView } from '@/components/app/AddCardsView';
 import { LibraryView } from '@/components/app/LibraryView';
@@ -111,10 +112,12 @@ export default function MainLayout({
   }, [isDesktop]);
 
   // Warm the getCardForReview Convex subscription before learn opens;
-  // skip once learn is open since useLearningMode manages its own subscription
+  // skip once learn is open since useLearningMode manages its own subscription.
+  // Match the hook's args (timezone) so we hit the same subscription cache
+  // entry and the warm subscription survives the handoff.
   useQuery(
     api.features.scheduling.getCardForReview,
-    !isLearnOpen ? {} : 'skip',
+    !isLearnOpen ? { timezone: getUserTimezone() } : 'skip',
   );
 
   const threads = useQuery(
@@ -270,7 +273,7 @@ export default function MainLayout({
     : t('changeCourse');
 
   return (
-    <div className="h-svh max-h-svh md:h-screen md:max-h-screen flex flex-col overflow-hidden">
+    <div className="h-dvh max-h-dvh md:h-screen md:max-h-screen flex flex-col overflow-hidden">
       {!isAddCardsRoute && (
         <header className="fixed top-0 left-0 right-0 z-20 border-b bg-background pt-[env(safe-area-inset-top)]">
           <div className="header-bar">
@@ -429,7 +432,7 @@ export default function MainLayout({
       </main>
 
       {!isAddCardsRoute && (
-        <div className="shrink-0 h-16 pb-[env(safe-area-inset-bottom,0px)]" />
+        <div className="shrink-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))]" />
       )}
       {!isAddCardsRoute && (
         <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
