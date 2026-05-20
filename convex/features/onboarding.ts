@@ -54,7 +54,7 @@ export const prepareLanguagePair = mutation({
     await ctx.scheduler.runAfter(
       60_000,
       internal.features.onboarding.ensureAudioForTestTranslations,
-      { targetLanguage },
+      { targetLanguage, sourceLanguage },
     );
 
     return null;
@@ -99,19 +99,8 @@ export const enqueueMissingPlacementTranslations = internalMutation({
 
 async function enqueueMissingPlacementTranslationsImpl(
   ctx: import('../_generated/server').MutationCtx,
-  { targetLanguage, sourceLanguage: _sourceLanguage }: { targetLanguage: string; sourceLanguage: string },
+  { targetLanguage, sourceLanguage }: { targetLanguage: string; sourceLanguage: string },
 ): Promise<{ enqueued: number }> {
-  // The caller-provided `sourceLanguage` is the user's chosen UI variant
-  // (e.g. `en_gb`, `en_us`). Placement texts are stored with their actual
-  // language on `text.language` (always `en` today). Passing the variant
-  // to `scheduleMissingContent` as `baseLanguages` would (a) miss source
-  // audio because `text.language` wouldn't be in `allRequiredLanguages`,
-  // and (b) wastefully enqueue an LLM call to "translate English to
-  // British English". So we ignore the variant here and use the text's
-  // own language for the source slot — `_sourceLanguage` is preserved
-  // in the signature for backward-compat with the public mutation.
-  void _sourceLanguage;
-
   // Seed migration caps the corpus at ~100 rows. Use `.take()` with an
   // explicit safety bound so a future seed bump fails loudly (warning +
   // capped slice) rather than silently blowing the per-mutation read limit.
@@ -126,19 +115,27 @@ async function enqueueMissingPlacementTranslationsImpl(
   }
 
   // Defer to `scheduleMissingContent` — it handles source-language audio
-  // (the text's own language) AND target-language translation enqueueing
-  // AND the downstream target-language audio trigger via
+  // (the text's own language) AND translation enqueueing for every
+  // additional language AND the downstream audio trigger via
   // `storeTranslationAndScheduleTTS`, all with idempotent claim/dedupe.
+  //
+  // We pass the user's chosen base language as an additional translation
+  // target so the placement test can render the source side in that
+  // language. `scheduleMissingContent` filters out the text's own language
+  // internally, so the no-op case (sourceLanguage === text.language) is safe.
   let translationsScheduled = 0;
   for (const s of sentences) {
     const text = await ctx.db.get(s.textId);
     if (!text) continue;
+    const targetLanguages = Array.from(
+      new Set([targetLanguage, sourceLanguage].filter((l) => l !== text.language)),
+    );
     const result = await scheduleMissingContent(
       ctx,
       text._id,
       text,
       [text.language],
-      [targetLanguage],
+      targetLanguages,
       { priority: 2 }, // placement test — user is on the screen waiting
     );
     translationsScheduled += result.translationsScheduled;
@@ -168,6 +165,7 @@ async function enqueueMissingPlacementTranslationsImpl(
 export const ensureAudioForTestTranslations = internalMutation({
   args: {
     targetLanguage: v.string(),
+    sourceLanguage: v.string(),
   },
   returns: v.object({
     translationsScheduled: v.number(),
@@ -179,7 +177,7 @@ export const ensureAudioForTestTranslations = internalMutation({
 
 async function ensureAudioForTestTranslationsImpl(
   ctx: import('../_generated/server').MutationCtx,
-  { targetLanguage }: { targetLanguage: string },
+  { targetLanguage, sourceLanguage }: { targetLanguage: string; sourceLanguage: string },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sentences = await ctx.db
     .query('placementTestSentences')
@@ -195,12 +193,15 @@ async function ensureAudioForTestTranslationsImpl(
   for (const s of sentences) {
     const text = await ctx.db.get(s.textId);
     if (!text) continue;
+    const targetLanguages = Array.from(
+      new Set([targetLanguage, sourceLanguage].filter((l) => l !== text.language)),
+    );
     const result = await scheduleMissingContent(
       ctx,
       text._id,
       text,
       [text.language],
-      [targetLanguage],
+      targetLanguages,
       // Critical — user just finished placement and we're patching a hole
       // that already cost them the initial audio.
       { priority: 2 },

@@ -1160,7 +1160,7 @@
     },
     "cardActions": {
       "title": "Card options",
-      "description": "Star a card to favourite it, mark it as mastered (it stops appearing in review), hide it from your deck, or edit/delete it. Use these whenever a card is too easy, too hard, or just wrong for you."
+      "description": "Star a card to favourite it, mark it as mastered (it stops appearing in review), hide it from your deck, or edit/delete it. Use these whenever a card is too easy, too hard, or just wrong for you. You can also flag a wrong translation, or regenerate the audio."
     },
     "wordTap": {
       "title": "Tap any word",

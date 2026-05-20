@@ -69,6 +69,13 @@ interface LearningCardContentProps {
   speedBadgeVariant?: 'persistent' | 'ephemeral';
   /** Client-only session flag: did the viewer click flag on this card? */
   flaggedInSession?: boolean;
+  /** Merged-audio playback for the slim progress bar at the card's bottom edge. */
+  audioRef?: React.RefObject<HTMLAudioElement | null>;
+  durationSec?: number;
+  isPlaying?: boolean;
+  isMerging?: boolean;
+  onSeek?: (seconds: number) => void;
+  showProgressBar?: boolean;
 }
 
 export function LearningCardContent({
@@ -108,6 +115,12 @@ export function LearningCardContent({
   onSpeedCycle,
   speedBadgeVariant,
   flaggedInSession = false,
+  audioRef,
+  durationSec,
+  isPlaying,
+  isMerging,
+  onSeek,
+  showProgressBar,
 }: LearningCardContentProps) {
   const buttonPlayback = useButtonPlayback();
 
@@ -220,6 +233,13 @@ export function LearningCardContent({
         onSpeedCycle={onSpeedCycle}
         speedBadgeVariant={speedBadgeVariant}
         flaggedInSession={flaggedInSession}
+        audioRef={audioRef}
+        durationSec={durationSec}
+        isPlaying={isPlaying}
+        isMerging={isMerging}
+        onSeek={onSeek}
+        showProgressBar={showProgressBar}
+        languageCues={mergedPlayback?.languageCues}
       >
         {({ targetTranslations }) => (
           <div className="space-y-2">

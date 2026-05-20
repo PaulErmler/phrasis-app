@@ -73,7 +73,7 @@ describe("getPlacementSentence", () => {
     const t = convexTest(schema, modules);
     const res = await t.query(
       api.features.placementTest.getPlacementSentence,
-      { level: 5, position: 0, targetLanguage: "es" },
+      { level: 5, position: 0, targetLanguage: "es", sourceLanguage: "en" },
     );
     expect(res).toBeNull();
   });
@@ -90,7 +90,7 @@ describe("getPlacementSentence", () => {
 
     const res = await t.query(
       api.features.placementTest.getPlacementSentence,
-      { level: 3, position: 1, targetLanguage: "es" },
+      { level: 3, position: 1, targetLanguage: "es", sourceLanguage: "en" },
     );
     expect(res).not.toBeNull();
     expect(res!.sourceText).toBe("I have a cat.");
@@ -110,11 +110,58 @@ describe("getPlacementSentence", () => {
 
     const res = await t.query(
       api.features.placementTest.getPlacementSentence,
-      { level: 3, position: 1, targetLanguage: "fr" },
+      { level: 3, position: 1, targetLanguage: "fr", sourceLanguage: "en" },
     );
     expect(res).not.toBeNull();
     expect(res!.sourceText).toBe("I have a cat.");
     expect(res!.targetText).toBeUndefined();
+  });
+
+  it("renders the source side in the user's base language when its translation exists", async () => {
+    const t = convexTest(schema, modules);
+    const { textId } = await seedPlacementSentence(t, {
+      level: 3,
+      position: 1,
+      text: "I have a cat.",
+      targetLanguage: "fr",
+      targetText: "J'ai un chat.",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("translations", {
+        textId,
+        targetLanguage: "es",
+        translatedText: "Tengo un gato.",
+      });
+    });
+
+    const res = await t.query(
+      api.features.placementTest.getPlacementSentence,
+      { level: 3, position: 1, targetLanguage: "fr", sourceLanguage: "es" },
+    );
+    expect(res).not.toBeNull();
+    expect(res!.sourceText).toBe("Tengo un gato.");
+    expect(res!.sourceLanguage).toBe("es");
+    expect(res!.targetText).toBe("J'ai un chat.");
+  });
+
+  it("falls back to the English source when the base-language translation hasn't landed yet", async () => {
+    const t = convexTest(schema, modules);
+    await seedPlacementSentence(t, {
+      level: 3,
+      position: 1,
+      text: "I have a cat.",
+      targetLanguage: "fr",
+      targetText: "J'ai un chat.",
+    });
+
+    const res = await t.query(
+      api.features.placementTest.getPlacementSentence,
+      { level: 3, position: 1, targetLanguage: "fr", sourceLanguage: "es" },
+    );
+    expect(res).not.toBeNull();
+    expect(res!.sourceText).toBe("I have a cat.");
+    expect(res!.sourceLanguage).toBe("en");
+    expect(res!.targetText).toBe("J'ai un chat.");
   });
 });
 

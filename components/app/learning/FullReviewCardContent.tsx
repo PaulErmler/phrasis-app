@@ -83,6 +83,13 @@ interface FullReviewCardContentProps {
   audioSpeedOverrides?: Record<string, number>;
   /** Cycle handler for the speed badge; null clears the override. */
   onSpeedCycle?: (language: string, next: number | null) => void;
+  /** Merged-audio playback for the slim progress bar at the card's bottom edge. */
+  audioRef?: React.RefObject<HTMLAudioElement | null>;
+  durationSec?: number;
+  isPlaying?: boolean;
+  isMerging?: boolean;
+  onSeek?: (seconds: number) => void;
+  showProgressBar?: boolean;
 }
 
 export function FullReviewCardContent({
@@ -120,6 +127,12 @@ export function FullReviewCardContent({
   languagePlaybackSpeeds,
   audioSpeedOverrides,
   onSpeedCycle,
+  audioRef,
+  durationSec,
+  isPlaying,
+  isMerging,
+  onSeek,
+  showProgressBar,
 }: FullReviewCardContentProps) {
   const t = useTranslations('LearningMode');
   const locale = useLocale();
@@ -410,6 +423,13 @@ export function FullReviewCardContent({
         languagePlaybackSpeeds={languagePlaybackSpeeds}
         audioSpeedOverrides={audioSpeedOverrides}
         onSpeedCycle={onSpeedCycle}
+        audioRef={audioRef}
+        durationSec={durationSec}
+        isPlaying={isPlaying}
+        isMerging={isMerging}
+        onSeek={onSeek}
+        showProgressBar={showProgressBar}
+        languageCues={mergedPlayback?.languageCues}
       >
         {({ targetTranslations: targets }) => (
           <div className="space-y-4">

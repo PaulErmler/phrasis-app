@@ -287,14 +287,12 @@ export function LearningMode({
           onSelectRating={() => {}}
           onPlay={audio.play}
           onPause={audio.pause}
-          audioRef={audio.audioRef}
           isPlaying={audio.isPlaying}
           isMerging={audio.isMerging}
           durationSec={audio.durationSec}
           onSeek={audio.seekTo}
           onNext={() => {}}
           isReviewing={true}
-          showProgressBar={false}
           shortcutsDisabled={state.settingsOpen}
         />
       </div>
@@ -417,6 +415,12 @@ export function LearningMode({
         languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
         audioSpeedOverrides={state.audioSpeedOverrides}
         onSpeedCycle={handleSpeedCycle}
+        audioRef={audio.audioRef}
+        durationSec={audio.durationSec}
+        isPlaying={audio.isPlaying}
+        isMerging={audio.isMerging}
+        onSeek={audio.seekTo}
+        showProgressBar={state.courseSettings.showProgressBar ?? true}
       />
     ) : (
       <LearningCardContent
@@ -457,6 +461,12 @@ export function LearningMode({
         languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
         audioSpeedOverrides={state.audioSpeedOverrides}
         onSpeedCycle={handleSpeedCycle}
+        audioRef={audio.audioRef}
+        durationSec={audio.durationSec}
+        isPlaying={audio.isPlaying}
+        isMerging={audio.isMerging}
+        onSeek={audio.seekTo}
+        showProgressBar={state.courseSettings.showProgressBar ?? true}
       />
     );
 
@@ -516,14 +526,12 @@ export function LearningMode({
         onSelectRating={state.setSelectedRating}
         onPlay={audio.play}
         onPause={audio.pause}
-        audioRef={audio.audioRef}
         isPlaying={audio.isPlaying}
         isMerging={audio.isMerging}
         durationSec={audio.durationSec}
         onSeek={audio.seekTo}
         onNext={handleNextWithAccuracy}
         isReviewing={state.isReviewing}
-        showProgressBar={state.courseSettings.showProgressBar ?? false}
         instantProceed={instantProceed}
         isFullReview={reviewMode === 'full'}
         fullReviewRevealed={fullReviewRevealed || allSubmitted}

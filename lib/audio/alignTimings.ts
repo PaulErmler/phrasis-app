@@ -20,6 +20,14 @@ export interface AlignedWord {
   display: string;
   /** Whitespace preceding the token — preserved so rendering looks natural. */
   leading: string;
+  /**
+   * Non-word run that follows the LAST word in the source text (final period,
+   * "!", "؟", etc.). Empty string on every token except the last. Kept off
+   * `display` so the last word's clickable span contains only word characters
+   * — mixing in trailing LTR punctuation inside an RTL `<span>` made the
+   * popover trigger silently fail for Arabic sentences.
+   */
+  trailing: string;
   /** Timing in seconds; interpolated when the token has no Scribe match. */
   start: number;
   end: number;
@@ -42,13 +50,17 @@ export function normalise(s: string): string {
  * linguistic word instead of collapsing into a single sentence-token. Falls
  * back to a whitespace split if Segmenter throws on an invalid locale.
  *
- * Trailing punctuation that follows the LAST word is appended to that word's
- * `display` so the rendered output still includes the final period/quote.
+ * Any non-word run that follows the LAST word (final period/quote) is
+ * returned separately as `trailing`. Callers render it after the last word's
+ * clickable span so the rendered output still includes the final punctuation
+ * without contaminating the trigger's child content — historically this
+ * trailing run was glued onto `display`, but mixing LTR punctuation inside
+ * an RTL `<span>` silently broke the popover trigger on Arabic sentences.
  */
 function tokenise(
   text: string,
   language: string,
-): { display: string; leading: string }[] {
+): { tokens: { display: string; leading: string }[]; trailing: string } {
   try {
     const segmenter = getWordSegmenter(language);
     const tokens: { display: string; leading: string }[] = [];
@@ -61,13 +73,7 @@ function tokenise(
         pendingLeading += seg.segment;
       }
     }
-    // Any trailing non-word run (e.g. final period) attaches to the last word
-    // so we preserve the rendered punctuation. `normalise()` strips it before
-    // matching against Scribe.
-    if (pendingLeading && tokens.length > 0) {
-      tokens[tokens.length - 1].display += pendingLeading;
-    }
-    return tokens;
+    return { tokens, trailing: pendingLeading };
   } catch {
     const tokens: { display: string; leading: string }[] = [];
     const regex = /(\s*)(\S+)/g;
@@ -75,7 +81,7 @@ function tokenise(
     while ((m = regex.exec(text)) !== null) {
       tokens.push({ leading: m[1], display: m[2] });
     }
-    return tokens;
+    return { tokens, trailing: '' };
   }
 }
 
@@ -93,19 +99,23 @@ export function alignWordTimings(
   scribe: ScribeWord[] | null | undefined,
   language: string,
 ): AlignedWord[] {
-  const tokens = tokenise(text, language);
+  const { tokens, trailing } = tokenise(text, language);
   if (tokens.length === 0) return [];
 
   type Partial = {
     display: string;
     leading: string;
+    trailing: string;
     start: number | null;
     end: number | null;
     matched: boolean;
   };
 
-  const partials: Partial[] = tokens.map((t) => ({
+  const partials: Partial[] = tokens.map((t, i) => ({
     ...t,
+    // Only the last token carries the trailing run; every other token
+    // contributes its inter-word non-word run to the NEXT token's leading.
+    trailing: i === tokens.length - 1 ? trailing : '',
     start: null,
     end: null,
     matched: false,
@@ -159,6 +169,7 @@ export function alignWordTimings(
   return partials.map((p) => ({
     display: p.display,
     leading: p.leading,
+    trailing: p.trailing,
     start: p.start as number,
     end: p.end as number,
     matched: p.matched,

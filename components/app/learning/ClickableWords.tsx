@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import {
@@ -91,16 +91,18 @@ export function ClickableWords({
     return (
       <p className={className}>
         {aligned.map((w, i) => (
-          <span
-            key={i}
-            className={cn(
-              'transition-colors duration-200',
-              i === currentIndex && 'text-primary',
-            )}
-          >
-            {w.leading}
-            {w.display}
-          </span>
+          <Fragment key={i}>
+            <span
+              className={cn(
+                'transition-colors duration-200',
+                i === currentIndex && 'text-primary',
+              )}
+            >
+              {w.leading}
+              {w.display}
+            </span>
+            {w.trailing}
+          </Fragment>
         ))}
       </p>
     );
@@ -130,7 +132,12 @@ export function ClickableWords({
   return (
     <p className={className}>
       {aligned.map((w, i) => (
-        <span key={i}>
+        // Fragment (not wrapper <span>) — wrapping each word in a span made
+        // the LAST word's clickable area lose the hit-test in RTL paragraphs:
+        // the picker landed on the wrapper instead of the inner trigger span,
+        // and hover/click never fired on the actual word. Inline children of
+        // the <p> participate directly in the parent bidi context.
+        <Fragment key={i}>
           {w.leading}
           <Popover
             open={openIndex === i}
@@ -176,7 +183,8 @@ export function ClickableWords({
               </Button>
             </PopoverContent>
           </Popover>
-        </span>
+          {w.trailing}
+        </Fragment>
       ))}
     </p>
   );

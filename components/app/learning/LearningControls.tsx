@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, ChevronsLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
-import { AudioProgressBar } from './AudioProgressBar';
 import type { ReviewRating } from '@/lib/scheduling';
 
 interface LearningControlsProps {
@@ -14,7 +13,6 @@ interface LearningControlsProps {
   onSelectRating: (rating: ReviewRating) => void;
   onPlay: () => void;
   onPause: () => void;
-  audioRef: React.RefObject<HTMLAudioElement | null>;
   isPlaying: boolean;
   isMerging: boolean;
   durationSec: number;
@@ -22,7 +20,6 @@ interface LearningControlsProps {
   /** Pass `ratingOverride` when advancing in the same tick as a rating pick (instant proceed). */
   onNext: (ratingOverride?: ReviewRating) => void;
   isReviewing: boolean;
-  showProgressBar?: boolean;
   instantProceed?: boolean;
   isFullReview?: boolean;
   fullReviewRevealed?: boolean;
@@ -43,14 +40,12 @@ export function LearningControls({
   onSelectRating,
   onPlay,
   onPause,
-  audioRef,
   isPlaying,
   isMerging,
   durationSec,
   onSeek,
   onNext,
   isReviewing,
-  showProgressBar = false,
   instantProceed = false,
   isFullReview = false,
   fullReviewRevealed = false,
@@ -204,17 +199,6 @@ export function LearningControls({
                 </div>
               ))}
             </div>
-          )}
-
-        
-          {showProgressBar && (
-            <AudioProgressBar
-              audioRef={audioRef}
-              durationSec={durationSec}
-              isPlaying={isPlaying}
-              onSeek={onSeek}
-              isMerging={isMerging}
-            />
           )}
 
           {/* Restart + Play + Next row */}

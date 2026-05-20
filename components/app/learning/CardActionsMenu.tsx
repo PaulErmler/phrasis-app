@@ -424,7 +424,11 @@ export function CardActionsMenu({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   return (
-    <div className="flex items-center">
+    <div
+      className="flex items-center"
+      data-coachmark-anchor="card-actions"
+      data-tutorial="card-actions"
+    >
       {pinnedKeys.map((key) => renderSurfaceButton(actions[key]))}
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
@@ -436,8 +440,6 @@ export function CardActionsMenu({
             className={`${triggerClassName} text-muted-foreground hover:text-foreground hover:bg-muted`}
             onPointerDown={(e) => e.preventDefault()}
             onClick={() => setOpen((v) => !v)}
-            data-coachmark-anchor="card-actions"
-            data-tutorial="card-actions"
           >
             <MoreHorizontal className={triggerIconClassName} />
           </Button>

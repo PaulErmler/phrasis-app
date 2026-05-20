@@ -1157,7 +1157,7 @@
     },
     "cardActions": {
       "title": "Kartenoptionen",
-      "description": "Markiere eine Karte als Favorit, setze sie auf gemeistert (sie erscheint nicht mehr im Review), blende sie aus oder bearbeite/lösche sie. Nutze diese Optionen, wenn eine Karte zu leicht, zu schwer oder einfach nicht passend ist."
+      "description": "Markiere eine Karte als Favorit, setze sie auf gemeistert (sie erscheint nicht mehr im Review), blende sie aus oder bearbeite/lösche sie. Nutze diese Optionen, wenn eine Karte zu leicht, zu schwer oder einfach nicht passend ist. Du kannst außerdem eine falsche Übersetzung melden oder die Audio neu generieren."
     },
     "wordTap": {
       "title": "Tippe ein beliebiges Wort an",

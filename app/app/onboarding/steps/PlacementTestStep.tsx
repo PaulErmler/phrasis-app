@@ -100,7 +100,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
   const sentence = useQuery(
     api.features.placementTest.getPlacementSentence,
     nextLevel !== null
-      ? { level: nextLevel, position, targetLanguage }
+      ? { level: nextLevel, position, targetLanguage, sourceLanguage }
       : 'skip',
   );
 
@@ -159,6 +159,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
         level: prefetchKnew.level,
         position: prefetchKnew.position,
         targetLanguage,
+        sourceLanguage,
       }
       : 'skip',
   );
@@ -169,6 +170,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
         level: prefetchNotKnew.level,
         position: prefetchNotKnew.position,
         targetLanguage,
+        sourceLanguage,
       }
       : 'skip',
   );
@@ -208,6 +210,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
         finalLevel={finalLevel}
         questionsAsked={history.length}
         targetLanguage={targetLanguage}
+        sourceLanguage={sourceLanguage}
         onContinue={(adjustedLevel) =>
           onComplete({
             strategy: strategyName,
@@ -391,11 +394,13 @@ function PlacementResult({
   finalLevel,
   questionsAsked,
   targetLanguage,
+  sourceLanguage,
   onContinue,
 }: {
   finalLevel: number;
   questionsAsked: number;
   targetLanguage: string;
+  sourceLanguage: string;
   onContinue: (adjustedLevel: number) => void;
 }) {
   const t = useTranslations('Onboarding.placementTest.result');
@@ -464,6 +469,7 @@ function PlacementResult({
                   level={level}
                   position={p}
                   targetLanguage={targetLanguage}
+                  sourceLanguage={sourceLanguage}
                 />
               ))}
             </div>
@@ -488,15 +494,18 @@ function ResultSample({
   level,
   position,
   targetLanguage,
+  sourceLanguage,
 }: {
   level: number;
   position: number;
   targetLanguage: string;
+  sourceLanguage: string;
 }) {
   const sentence = useQuery(api.features.placementTest.getPlacementSentence, {
     level,
     position,
     targetLanguage,
+    sourceLanguage,
   });
   // Hold onto the last good sentence so Easier/Harder doesn't blank the
   // row to a skeleton — the previous level's sentence stays visible until

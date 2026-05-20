@@ -21,16 +21,24 @@ import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
  */
 
 /**
- * Returns one English placement-test sentence (along with the translation in
- * the requested target language, if available) for the given OGTE level. The
+ * Returns one placement-test sentence (along with the translation in the
+ * requested target language, if available) for the given OGTE level. The
  * caller picks a `position` 0..4 to vary which of the 5 curated sentences
  * for that level appears.
+ *
+ * The "source" side of the card renders in the user's chosen base language
+ * (`sourceLanguage`). The underlying texts are stored as English, so when
+ * the base language differs we look up its translation and swap it in.
+ * Translation backfill is driven by `prepareLanguagePair` /
+ * `ensurePlacementTranslations`; until it lands we fall back to the stored
+ * English text so the user always sees a sentence.
  */
 export const getPlacementSentence = query({
   args: {
     level: v.number(),
     position: v.number(),
     targetLanguage: v.string(),
+    sourceLanguage: v.string(),
   },
   returns: v.union(
     v.object({
@@ -46,7 +54,7 @@ export const getPlacementSentence = query({
     }),
     v.null(),
   ),
-  handler: async (ctx, { level, position, targetLanguage }) => {
+  handler: async (ctx, { level, position, targetLanguage, sourceLanguage }) => {
     const indexRow = await ctx.db
       .query('placementTestSentences')
       .withIndex('by_level_and_position', (q) =>
@@ -58,12 +66,27 @@ export const getPlacementSentence = query({
     const text = await ctx.db.get(indexRow.textId);
     if (!text) return null;
 
-    // Source audio (e.g. English) — always attempt the lookup so the test
-    // can play back the source sentence on demand.
+    // Resolve the source-side rendering: if the user's base language
+    // differs from the text's stored language, swap in its translation.
+    let resolvedSourceText = text.text;
+    let resolvedSourceLanguage = text.language;
+    if (sourceLanguage && sourceLanguage !== text.language) {
+      const sourceTranslation = await ctx.db
+        .query('translations')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', text._id).eq('targetLanguage', sourceLanguage),
+        )
+        .first();
+      if (sourceTranslation) {
+        resolvedSourceText = sourceTranslation.translatedText;
+        resolvedSourceLanguage = sourceLanguage;
+      }
+    }
+
     const sourceAudio = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', text._id).eq('language', text.language),
+        q.eq('textId', text._id).eq('language', resolvedSourceLanguage),
       )
       .first();
     const sourceAudioUrl = sourceAudio
@@ -92,8 +115,8 @@ export const getPlacementSentence = query({
 
     return {
       textId: text._id,
-      sourceText: text.text,
-      sourceLanguage: text.language,
+      sourceText: resolvedSourceText,
+      sourceLanguage: resolvedSourceLanguage,
       sourceAudioUrl: sourceAudioUrl,
       targetText: translation?.translatedText,
       targetRomanization: translation?.romanizedText,

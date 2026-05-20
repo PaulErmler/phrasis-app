@@ -1,14 +1,9 @@
 'use client';
 
 import { useState, useEffect, memo } from 'react';
-import { Slider } from '@/components/ui/slider';
+import * as SliderPrimitive from '@radix-ui/react-slider';
 import { updateMediaSessionPosition } from '@/lib/audio/mediaSession';
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-}
+import type { LanguageCue } from '@/lib/audio/mergeAudio';
 
 export const AudioProgressBar = memo(function AudioProgressBar({
   audioRef,
@@ -16,12 +11,16 @@ export const AudioProgressBar = memo(function AudioProgressBar({
   isPlaying,
   onSeek,
   isMerging = false,
+  languageCues,
 }: {
   audioRef: React.RefObject<HTMLAudioElement | null>;
   durationSec: number;
   isPlaying: boolean;
   onSeek: (seconds: number) => void;
   isMerging?: boolean;
+  /** Cue boundaries (start of each language clip in the merged track). Used
+   *  to draw separator tick marks on hover. The first cue at 0s is skipped. */
+  languageCues?: ReadonlyArray<LanguageCue>;
 }) {
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -33,45 +32,83 @@ export const AudioProgressBar = memo(function AudioProgressBar({
     const audio = audioRef.current;
     if (!audio) return;
 
-    const updatePosition = () => {
+    // Always sync once on mount/state change so the bar reflects post-seek
+    // position even when paused.
+    setCurrentTime(audio.currentTime);
+    updateMediaSessionPosition(audio.duration || 0, audio.currentTime);
+
+    // Listen for seek events while paused so manual scrubs land.
+    const onSeeked = () => {
       setCurrentTime(audio.currentTime);
       updateMediaSessionPosition(audio.duration || 0, audio.currentTime);
     };
+    audio.addEventListener('seeked', onSeeked);
 
-    updatePosition();
+    if (!isPlaying) {
+      return () => {
+        audio.removeEventListener('seeked', onSeeked);
+      };
+    }
 
-    if (!isPlaying) return;
-
-    audio.addEventListener('timeupdate', updatePosition);
-    audio.addEventListener('seeked', updatePosition);
+    // While playing, read currentTime each animation frame for a smoothly
+    // sliding bar — the native `timeupdate` event only fires at ~250ms.
+    let raf = 0;
+    const tick = () => {
+      setCurrentTime(audio.currentTime);
+      updateMediaSessionPosition(audio.duration || 0, audio.currentTime);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
 
     return () => {
-      audio.removeEventListener('timeupdate', updatePosition);
-      audio.removeEventListener('seeked', updatePosition);
+      cancelAnimationFrame(raf);
+      audio.removeEventListener('seeked', onSeeked);
     };
   }, [isPlaying, audioRef]);
 
   const inactive = durationSec <= 0 || isMerging;
 
+  // Cue boundaries to render as thin separator ticks on hover. Drop the
+  // leading 0s cue (it lines up with the bar's left edge) and any cue past
+  // duration (shouldn't happen, but defensive).
+  const cueMarks =
+    !inactive && languageCues
+      ? languageCues
+        .filter((c) => c.startSec > 0 && c.startSec < durationSec)
+        .map((c) => (c.startSec / durationSec) * 100)
+      : [];
+
   return (
-    <div className={`flex items-center gap-2 transition-opacity duration-150 ${inactive ? 'opacity-30 pointer-events-none' : ''}`}>
-      <span className="text-[11px] text-muted-foreground tabular-nums w-8 text-right">
-        {formatTime(inactive ? 0 : currentTime)}
-      </span>
-      <Slider
-        value={[inactive ? 0 : currentTime]}
-        max={inactive ? 1 : durationSec}
-        step={0.1}
-        onValueChange={([v]) => {
-          setCurrentTime(v);
-          onSeek(v);
-        }}
-        className="flex-1"
-        disabled={inactive}
+    <SliderPrimitive.Root
+      value={[inactive ? 0 : currentTime]}
+      max={inactive ? 1 : durationSec}
+      step={0.01}
+      disabled={inactive}
+      onValueChange={([v]) => {
+        setCurrentTime(v);
+        onSeek(v);
+      }}
+      className={`group relative flex w-full touch-none items-center select-none transition-opacity duration-150 ${
+        inactive ? 'opacity-30 pointer-events-none' : ''
+      }`}
+    >
+      <SliderPrimitive.Track className="bg-primary/20 relative h-1 w-full grow overflow-hidden">
+        <SliderPrimitive.Range className="bg-primary absolute h-full" />
+        {cueMarks.map((leftPct, i) => (
+          <span
+            key={i}
+            aria-hidden="true"
+            className="bg-card pointer-events-none absolute top-0 h-full w-px opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+            style={{ left: `${leftPct}%` }}
+          />
+        ))}
+      </SliderPrimitive.Track>
+      {/* No visible thumb — would get clipped by the card's overflow-hidden.
+          The fill edge already indicates drag position. */}
+      <SliderPrimitive.Thumb
+        aria-label="Audio progress"
+        className="block size-0 outline-none"
       />
-      <span className="text-[11px] text-muted-foreground tabular-nums w-8">
-        {formatTime(inactive ? 0 : durationSec)}
-      </span>
-    </div>
+    </SliderPrimitive.Root>
   );
 });

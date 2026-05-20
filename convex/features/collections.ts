@@ -407,7 +407,7 @@ export const warmupAllCourses = internalMutation({
       await ctx.scheduler.runAfter(
         WARMUP_AUDIO_BACKSTOP_DELAY_MS,
         internal.features.onboarding.ensureAudioForTestTranslations,
-        { targetLanguage },
+        { targetLanguage, sourceLanguage: WARMUP_SOURCE_LANGUAGE },
       );
     }
 
