@@ -306,7 +306,11 @@ export const PricingCard = ({
 
   const { name, display: productDisplay } = product;
 
-  const { buttonText } = getPricingTableContent(product, t);
+  const { buttonText } = getPricingTableContent(
+    product,
+    t,
+    userHasNonTrialSubscription,
+  );
 
   const isRecommended = productDisplay?.recommend_text ? true : false;
   const intervalGroup = product.properties?.interval_group;
