@@ -13,7 +13,9 @@ import type * as admin_backfillCollectionOrigin from "../admin/backfillCollectio
 import type * as admin_backfillTextMetadata from "../admin/backfillTextMetadata.js";
 import type * as admin_diagCutoverState from "../admin/diagCutoverState.js";
 import type * as admin_uploadDataset from "../admin/uploadDataset.js";
-import type * as admin_warmupExistingCourses from "../admin/warmupExistingCourses.js";
+import type * as admin_warmupCourseLevels from "../admin/warmupCourseLevels.js";
+import type * as admin_warmupPlacementTranslations from "../admin/warmupPlacementTranslations.js";
+import type * as admin_warmupSingleLanguage from "../admin/warmupSingleLanguage.js";
 import type * as auth from "../auth.js";
 import type * as autumn from "../autumn.js";
 import type * as config_aiModels from "../config/aiModels.js";
@@ -113,7 +115,9 @@ declare const fullApi: ApiFromModules<{
   "admin/backfillTextMetadata": typeof admin_backfillTextMetadata;
   "admin/diagCutoverState": typeof admin_diagCutoverState;
   "admin/uploadDataset": typeof admin_uploadDataset;
-  "admin/warmupExistingCourses": typeof admin_warmupExistingCourses;
+  "admin/warmupCourseLevels": typeof admin_warmupCourseLevels;
+  "admin/warmupPlacementTranslations": typeof admin_warmupPlacementTranslations;
+  "admin/warmupSingleLanguage": typeof admin_warmupSingleLanguage;
   auth: typeof auth;
   autumn: typeof autumn;
   "config/aiModels": typeof config_aiModels;
