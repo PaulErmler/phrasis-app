@@ -18,9 +18,9 @@
     "themeSystem": "System"
   },
   "hero": {
-    "sectionLabel": "Sprachenlernen, neu gedacht",
+    "sectionLabel": "Sprachenlernen, aber effizient",
     "tagline": "Die Sprach-App, die <highlight>mit dir wächst</highlight>.",
-    "subtitle": "Mehrsprachige (Audio-)Lernkarten mit Spaced Repetition und KI, damit du so effizient wie möglich lernen kannst. Minimalistisch und ablenkungsfrei. Bringe deine eigenen Inhalte mit, wenn du möchtest.",
+    "subtitle": "Audiobasiertes Sprachenlernen mit Spaced Repetition und Anpassung an dich.",
     "cta": {
       "start": "Kostenlos starten",
       "howItWorks": "So funktioniert's",
@@ -66,7 +66,7 @@
   "chatDemo": {
     "title": "Stell jede Frage.",
     "titleHighlight": "Behalte die Antwort.",
-    "subtitle": "Grammatik klären, nützliche Sätze sammeln oder deiner Neugier folgen. Der Chat kann Karten aus dem Gespräch vorschlagen — zum Hinzufügen einfach tippen. Neue Karten anzulegen war noch nie einfacher.",
+    "subtitle": "Du verstehst ein Wort nicht? Nicht ganz sicher, warum der Satz so formuliert ist? Frag einfach und erhalte sofortige Antworten von hochmodernen Sprachmodellen. Wir erstellen automatisch Lernkarten, damit du dir genau die Konzepte merkst, mit denen du gerade kämpfst.",
     "scenarioGrammar": "Grammatik",
     "scenarioCards": "Neue Karten",
     "scenarioCuriosity": "Neugier",
@@ -342,7 +342,7 @@
       {
         "question": "Welche Sprachen unterstützt Flexling?",
         "answer": [
-          "In Flexling kannst du folgende Sprachen lernen: Englisch (mit UK-, US-, australischen und gemischten Akzent-Varianten), Spanisch (Spanien, Lateinamerika und eine gemischte Spanien-+-Lateinamerika-Variante), Französisch, Deutsch, Italienisch, Rumänisch, Portugiesisch (Brasilien), Niederländisch, Schwedisch, Dänisch, Finnisch, Griechisch, Polnisch, Tschechisch, Slowakisch, Ungarisch, Russisch, Hindi, Bengalisch, Hebräisch, Türkisch, Arabisch (Hocharabisch sowie saudische, ägyptische und irakische Dialekte), Chinesisch (vereinfacht und traditionell), Kantonesisch (vereinfacht und traditionell), Japanisch, Koreanisch, Vietnamesisch, Thai, Indonesisch und Swahili (Kenia und Tansania) – weitere Sprachen kommen regelmäßig dazu.",
+          "In Flexling kannst du folgende Sprachen lernen: Englisch, Spanisch (Spanien, Lateinamerika und eine gemischte Spanien-+-Lateinamerika-Variante), Französisch, Deutsch, Italienisch, Rumänisch, Portugiesisch (Brasilien), Niederländisch, Schwedisch, Dänisch, Finnisch, Griechisch, Polnisch, Tschechisch, Slowakisch, Ungarisch, Russisch, Hindi, Bengalisch, Hebräisch, Türkisch, Arabisch (Hocharabisch sowie saudische, ägyptische und irakische Dialekte), Chinesisch (vereinfacht und traditionell), Kantonesisch (vereinfacht und traditionell), Japanisch, Koreanisch, Vietnamesisch, Thai, Indonesisch und Swahili (Kenia und Tansania) – weitere Sprachen kommen regelmäßig dazu.",
           "Wird deine Sprache nicht unterstützt? Lass es uns wissen und wir werden versuchen, sie zu priorisieren."
         ]
       },

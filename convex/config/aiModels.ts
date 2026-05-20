@@ -8,17 +8,17 @@ export const OPENROUTER_MODELS = {
   /** Main language-tutor chat (tools, streaming) */
   languageTeacher: 'moonshotai/kimi-k2.6:nitro',
   /** Bulk translation JSON for custom card auto-fill */
-  translationAutoFill: 'google/gemini-3-flash-preview',
+  translationAutoFill: 'google/gemini-3.1-flash-lite',
   /** Linguistic metadata inference (register, gender, addresseeNumber) for
    *  newly-created cards. Runs once per row, including during bulk import,
    *  so we pick the cheaper/faster lite tier. */
-  sentenceMetadata: 'google/gemini-3.1-flash-lite-preview',
+  sentenceMetadata: 'google/gemini-3.1-flash-lite',
   /** Short thread title from first user message */
-  threadTitle: 'google/gemini-3.1-flash-lite-preview',
+  threadTitle: 'google/gemini-3.1-flash-lite',
   /** Lenient TTS validation — decides whether an STT transcription is
    *  semantically equivalent to the original (ignores phonetic name
    *  spellings, digits-vs-words, punctuation, etc.). */
-  ttsValidation: 'google/gemini-3.1-flash-lite-preview',
+  ttsValidation: 'google/gemini-3.1-flash-lite',
 } as const;
 
 /** Provider routing for the chat agent via OpenRouter.

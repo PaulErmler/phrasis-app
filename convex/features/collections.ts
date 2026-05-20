@@ -17,6 +17,7 @@ import {
   LEGACY_LEVEL_ORDER,
   isPremadeLevelCollection,
 } from '../lib/collections';
+import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 import { getCourseSettings } from '../db/courseSettings';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
@@ -186,6 +187,12 @@ export const ensureContentForCollection = mutation({
 
     // Parallel over texts — each text writes only to its own (textId, language)
     // keyed rows, so no cross-text contention within this transaction.
+    //
+    // priority: 1 — opening a collection preview is a direct user signal that
+    // they're considering this collection. Jump ahead of background warmup
+    // (priority 0, e.g. cross-level prewarm from onboarding) so the preview
+    // populates promptly, while still yielding to onboarding-critical work
+    // (priority 2) like placement test or chosen-level seeding.
     const results = await Promise.all(
       texts.map((text) =>
         scheduleMissingContent(
@@ -194,6 +201,7 @@ export const ensureContentForCollection = mutation({
           text,
           course.baseLanguages,
           course.targetLanguages,
+          { priority: 1 },
         ),
       ),
     );
@@ -320,5 +328,108 @@ export const ensureFirstSentencesForCollection = internalMutation({
       ),
     );
     return null;
+  },
+});
+
+/**
+ * Warm up content for every language in `SUPPORTED_LANGUAGES`, regardless of
+ * which pairs are currently in use across `courses`. Per non-English target
+ * language we schedule two fan-outs:
+ *
+ *   1. **Cross-level warmup** — `ensureFirstSentencesAcrossLevelCollections`
+ *      with `en` as the source and that target as the only target language,
+ *      populating the first 5 sentences of every level collection.
+ *   2. **Placement-test translations + audio backstop** —
+ *      `enqueueMissingPlacementTranslations` followed by a 60s-delayed
+ *      `ensureAudioForTestTranslations` so the placement test renders
+ *      instantly for any user picking that target.
+ *
+ * Internal mutation — invoke from the Convex dashboard when a new model is
+ * rolled out, a new dataset is published, or any other time you want to
+ * proactively populate translations + audio for every supported language.
+ * Fully idempotent (the underlying mutations skip rows that already have
+ * translations/audio), so re-runs are cheap reads only.
+ *
+ * English-family targets (`en`, `en_gb`, `en_us`, `en_au`) are skipped: the
+ * placement sentences and curriculum texts are already in `en`, and there
+ * is no value in LLM-translating English to British English.
+ *
+ * **Throttled** to stay under Google's 200 req/min TTS quota. Each target
+ * language generates ~200 TTS jobs (level + placement), so launches are
+ * staggered 2 minutes apart, holding the rolling-minute average around
+ * 100 req/min. Bursts inside a single language may briefly exceed the
+ * budget; the bounded TTS retry in `processTTSForCard` absorbs any
+ * resulting 429s without dropping work.
+ */
+const WARMUP_SOURCE_LANGUAGE = 'en';
+// Delay before the per-target placement-test audio backstop sweep runs.
+// Matches the value used by `prepareLanguagePair` so translations have time
+// to land before the sweep checks for orphans.
+const WARMUP_AUDIO_BACKSTOP_DELAY_MS = 60_000;
+// Estimated TTS jobs queued per target language across the level-collection
+// warmup (~100) and placement-test audio (~100). Used to derive the
+// per-language stagger that keeps the average TTS dispatch rate under
+// `WARMUP_TARGET_REQUESTS_PER_MINUTE`.
+const WARMUP_TTS_JOBS_PER_LANGUAGE = 200;
+// Target average TTS dispatch rate during warmup. Set well below Google's
+// 200 req/min ceiling so we have headroom for any user-facing TTS that
+// runs concurrently with the warmup, and so the per-language burst stays
+// inside a single 60s rolling window's budget. Lower if you see persistent
+// 429s; raise only if you've also raised Google's quota.
+const WARMUP_TARGET_REQUESTS_PER_MINUTE = 100;
+// Stagger between consecutive target-language launches. Derived so that the
+// rolling-minute average across the whole warmup approaches the target
+// rate: (jobs-per-language / target-rate-per-minute) × 60 seconds. At the
+// current values this is 2 minutes per language.
+const WARMUP_LANGUAGE_STAGGER_MS = Math.ceil(
+  (WARMUP_TTS_JOBS_PER_LANGUAGE / WARMUP_TARGET_REQUESTS_PER_MINUTE) * 60_000,
+);
+
+export const warmupAllCourses = internalMutation({
+  args: {},
+  returns: v.object({
+    targetLanguagesScheduled: v.number(),
+    estimatedDurationMinutes: v.number(),
+  }),
+  handler: async (ctx) => {
+    const targetLanguages = SUPPORTED_LANGUAGES.map((l) => l.code).filter(
+      (code) => !code.startsWith('en'),
+    );
+
+    let delayMs = 0;
+    for (const targetLanguage of targetLanguages) {
+      // Per-target level warmup: first 5 sentences of every level
+      // collection get translated + audio'd into `targetLanguage`.
+      // `scheduleMissingContent` automatically includes `text.language`
+      // (always `en`) in its source-audio handling.
+      await ctx.scheduler.runAfter(
+        delayMs,
+        internal.features.collections
+          .ensureFirstSentencesAcrossLevelCollections,
+        {
+          baseLanguages: [WARMUP_SOURCE_LANGUAGE],
+          targetLanguages: [targetLanguage],
+        },
+      );
+
+      // Placement-test translation + audio backstop sweep.
+      await ctx.scheduler.runAfter(
+        delayMs,
+        internal.features.onboarding.enqueueMissingPlacementTranslations,
+        { sourceLanguage: WARMUP_SOURCE_LANGUAGE, targetLanguage },
+      );
+      await ctx.scheduler.runAfter(
+        delayMs + WARMUP_AUDIO_BACKSTOP_DELAY_MS,
+        internal.features.onboarding.ensureAudioForTestTranslations,
+        { targetLanguage },
+      );
+
+      delayMs += WARMUP_LANGUAGE_STAGGER_MS;
+    }
+
+    return {
+      targetLanguagesScheduled: targetLanguages.length,
+      estimatedDurationMinutes: Math.ceil(delayMs / 60_000),
+    };
   },
 });

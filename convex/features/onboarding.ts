@@ -2,8 +2,8 @@ import { v } from 'convex/values';
 import { mutation, query, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { requireAuthUserId, getAuthUserId } from '../db/users';
-import { resolveAudioSpeakerGender } from '../../lib/languages';
 import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
+import { scheduleMissingContent } from './decks';
 
 /**
  * Backend support for the new onboarding flow.
@@ -45,6 +45,16 @@ export const prepareLanguagePair = mutation({
       0,
       internal.features.onboarding.enqueueMissingPlacementTranslations,
       { targetLanguage, sourceLanguage },
+    );
+
+    // Backstop sweep — runs after 60s so most placement translations have
+    // had time to land. Re-enqueues TTS for any (translation exists,
+    // audio missing) orphan left by an exhausted-retry TTS failure or
+    // a claim race. Idempotent.
+    await ctx.scheduler.runAfter(
+      60_000,
+      internal.features.onboarding.ensureAudioForTestTranslations,
+      { targetLanguage },
     );
 
     return null;
@@ -89,9 +99,18 @@ export const enqueueMissingPlacementTranslations = internalMutation({
 
 async function enqueueMissingPlacementTranslationsImpl(
   ctx: import('../_generated/server').MutationCtx,
-  { targetLanguage, sourceLanguage }: { targetLanguage: string; sourceLanguage: string },
+  { targetLanguage, sourceLanguage: _sourceLanguage }: { targetLanguage: string; sourceLanguage: string },
 ): Promise<{ enqueued: number }> {
-  if (targetLanguage === sourceLanguage) return { enqueued: 0 };
+  // The caller-provided `sourceLanguage` is the user's chosen UI variant
+  // (e.g. `en_gb`, `en_us`). Placement texts are stored with their actual
+  // language on `text.language` (always `en` today). Passing the variant
+  // to `scheduleMissingContent` as `baseLanguages` would (a) miss source
+  // audio because `text.language` wouldn't be in `allRequiredLanguages`,
+  // and (b) wastefully enqueue an LLM call to "translate English to
+  // British English". So we ignore the variant here and use the text's
+  // own language for the source slot — `_sourceLanguage` is preserved
+  // in the signature for backward-compat with the public mutation.
+  void _sourceLanguage;
 
   // Seed migration caps the corpus at ~100 rows. Use `.take()` with an
   // explicit safety bound so a future seed bump fails loudly (warning +
@@ -106,57 +125,90 @@ async function enqueueMissingPlacementTranslationsImpl(
     );
   }
 
-  let enqueued = 0;
+  // Defer to `scheduleMissingContent` — it handles source-language audio
+  // (the text's own language) AND target-language translation enqueueing
+  // AND the downstream target-language audio trigger via
+  // `storeTranslationAndScheduleTTS`, all with idempotent claim/dedupe.
+  let translationsScheduled = 0;
   for (const s of sentences) {
     const text = await ctx.db.get(s.textId);
     if (!text) continue;
-
-    // Skip if translation already exists.
-    const existing = await ctx.db
-      .query('translations')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', text._id).eq('targetLanguage', targetLanguage),
-      )
-      .first();
-    if (existing) continue;
-
-    // Skip if a job is already in-flight (claim row exists).
-    const claim = await ctx.db
-      .query('llmTranslationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', text._id).eq('targetLanguage', targetLanguage),
-      )
-      .first();
-    if (claim) continue;
-
-    await ctx.db.insert('llmTranslationClaims', {
-      textId: text._id,
-      targetLanguage,
-      claimedAt: Date.now(),
-    });
-
-    // Seeded by textId so concurrent placement-translation enqueues for
-    // the same sentence pick the same gender (same fix as decks.ts —
-    // prevents an audio-regen loop later).
-    const audioSpeakerGender = resolveAudioSpeakerGender(text.speakerGender, text._id);
-
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.llmTranslationQueue.enqueueLlmTranslation,
-      {
-        args: {
-          textId: text._id,
-          sourceLanguage,
-          targetLanguage,
-          text: text.text,
-          audioSpeakerGender,
-        },
-        priority: 1, // user-facing, prioritize over background
-      },
+    const result = await scheduleMissingContent(
+      ctx,
+      text._id,
+      text,
+      [text.language],
+      [targetLanguage],
+      { priority: 2 }, // placement test — user is on the screen waiting
     );
-    enqueued++;
+    translationsScheduled += result.translationsScheduled;
   }
-  return { enqueued };
+  return { enqueued: translationsScheduled };
+}
+
+/**
+ * Backstop sweep for placement-test content.
+ *
+ * When `processTTSForCard` exhausts its bounded retries (synthesis API
+ * keeps throwing, transcription crashes, storage timeouts), or an LLM
+ * translation never lands, the placement-test row stays silently
+ * incomplete. Nothing else re-enters `scheduleMissingContent` for those
+ * texts afterwards.
+ *
+ * This mutation walks every placement-test sentence and re-runs
+ * `scheduleMissingContent` for both the source language (English audio)
+ * and the target language (translation + downstream audio). All checks
+ * inside `scheduleMissingContent` are idempotent — rows that already have
+ * translations + audio do nothing but reads.
+ *
+ * Scheduled 60s after `prepareLanguagePair` so most in-flow translations
+ * have had time to land. Also dashboard-callable for re-healing a stuck
+ * onboarding.
+ */
+export const ensureAudioForTestTranslations = internalMutation({
+  args: {
+    targetLanguage: v.string(),
+  },
+  returns: v.object({
+    translationsScheduled: v.number(),
+    audioScheduled: v.number(),
+  }),
+  handler: async (ctx, args) =>
+    ensureAudioForTestTranslationsImpl(ctx, args),
+});
+
+async function ensureAudioForTestTranslationsImpl(
+  ctx: import('../_generated/server').MutationCtx,
+  { targetLanguage }: { targetLanguage: string },
+): Promise<{ translationsScheduled: number; audioScheduled: number }> {
+  const sentences = await ctx.db
+    .query('placementTestSentences')
+    .take(PLACEMENT_SENTENCES_QUERY_CAP);
+  if (sentences.length === PLACEMENT_SENTENCES_QUERY_CAP) {
+    console.warn(
+      `[ensureAudioForTestTranslations] hit cap ${PLACEMENT_SENTENCES_QUERY_CAP} — raise it or paginate.`,
+    );
+  }
+
+  let translationsScheduled = 0;
+  let audioScheduled = 0;
+  for (const s of sentences) {
+    const text = await ctx.db.get(s.textId);
+    if (!text) continue;
+    const result = await scheduleMissingContent(
+      ctx,
+      text._id,
+      text,
+      [text.language],
+      [targetLanguage],
+      // Critical — user just finished placement and we're patching a hole
+      // that already cost them the initial audio.
+      { priority: 2 },
+    );
+    translationsScheduled += result.translationsScheduled;
+    audioScheduled += result.audioScheduled;
+  }
+  return { translationsScheduled, audioScheduled };
 }
 
 /**

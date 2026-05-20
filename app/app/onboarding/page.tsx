@@ -66,7 +66,7 @@ import { PlanPickStep } from './steps/PlanPickStep';
  *   6a. cefr-pick             → customizing
  *   6b. placement-test        → customizing
  *   7.  customizing           → first-lesson (calls completeOnboarding on entry)
- *   8.  first-lesson          → stats-recap (or feature-tour if no lesson summary)
+ *   8.  first-lesson          → stats-recap (or feature-tour on skip)
  *   9.  stats-recap           → word-projection
  *   10. word-projection       → feature-tour
  *   11. feature-tour          → plan-pick
@@ -813,17 +813,9 @@ function renderStep({
           onAdvance('stats-recap');
         }}
         onSkipLesson={() => {
-          // Skipped lessons still flow through the post-lesson screens.
-          // CRITICAL: do NOT wipe `lessonSummary` here. If the user
-          // rated cards in a prior session, aborted, restarted, and is
-          // now skipping, the persisted `firstLessonSummary` from
-          // `onSnapshotUpdate` is the most accurate record of what they
-          // actually earned. Setting null would downgrade the post-
-          // lesson screens to zeros for no reason. If the user genuinely
-          // never rated a card, `firstLessonSummary` is already null and
-          // the screens render zeros via the existing live-fallback in
-          // WordProjectionStep / StatsRecapStep.
-          onAdvance('stats-recap');
+          // Skip the stats-recap and word-projection screens — they're
+          // only meaningful when the user actually rated cards.
+          onAdvance('feature-tour');
         }}
       />
     );

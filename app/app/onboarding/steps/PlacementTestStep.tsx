@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Volume2, EyeOff } from 'lucide-react';
@@ -12,9 +13,38 @@ import {
   DEFAULT_STRATEGY,
   type PlacementStrategy,
   type StrategyName,
+  type PlacementAnswer,
   ogteToCurrentLevel,
 } from '../lib/placementStrategies';
 import type { CurrentLevel } from '../types';
+
+/**
+ * Predict the (level, position) the next question would land on if the user
+ * answers `knew` to the current question, without mutating the real strategy.
+ *
+ * Works for every `PlacementStrategy` because each strategy is fully
+ * determined by `init(opts)` + the `history` of (level, knew) pairs — so we
+ * spin up a fresh instance, replay history, apply the would-be answer, and
+ * read its `nextQuestionLevel()`. Used for client-side query prefetching so
+ * the next sentence is already in Convex's cache when the user clicks an
+ * answer button.
+ */
+function peekNextLevelAndPosition(
+  strategyName: StrategyName,
+  initialOgteLevel: number | undefined,
+  currentHistory: readonly PlacementAnswer[],
+  currentLevel: number,
+  knew: boolean,
+): { level: number; position: number } | null {
+  const clone = createStrategy(strategyName);
+  clone.init(initialOgteLevel ? { userGuess: initialOgteLevel } : undefined);
+  for (const ans of currentHistory) clone.recordAnswer(ans.level, ans.knew);
+  clone.recordAnswer(currentLevel, knew);
+  const level = clone.nextQuestionLevel();
+  if (level === null) return null;
+  const seen = clone.history().filter((h) => h.level === level).length;
+  return { level, position: seen % 5 };
+}
 
 interface Props {
   targetLanguage: string;
@@ -67,8 +97,6 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
     return seen % 5;
   }, [nextLevel, history]);
 
-  const [revealed, setRevealed] = useState(false);
-
   const sentence = useQuery(
     api.features.placementTest.getPlacementSentence,
     nextLevel !== null
@@ -76,23 +104,93 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
       : 'skip',
   );
 
-  // Safety-net: if the placement sentence resolved but its translation is
-  // missing for the target language, fire `ensurePlacementTranslations` once
-  // per language to (re-)enqueue any missing translations. The mutation is
-  // idempotent on the server (no-ops if a claim already exists).
+  // `revealed` derives from comparing the user-last-revealed textId to the
+  // current sentence's textId. State stored as the *revealed* id (not a
+  // boolean) so revealed becomes synchronously false the moment the sentence
+  // changes — important now that the next question is prefetched and the
+  // useQuery returns the next sentence on the SAME render as the answer
+  // click. With a separate `useEffect(() => setRevealed(false), [...])` reset
+  // there was one render where revealed was still true AND the next
+  // sentence's `targetAudioUrl` was already populated, which caused the
+  // auto-play effect to fire on the not-yet-revealed next question.
+  const [revealedTextId, setRevealedTextId] = useState<Id<'texts'> | null>(null);
+  const revealed =
+    sentence?.textId != null && sentence.textId === revealedTextId;
+  const handleReveal = () => {
+    if (sentence?.textId) setRevealedTextId(sentence.textId);
+  };
+
+  // Prefetch the two possible next sentences (one per answer path) so the
+  // Convex client cache holds them by the time the user clicks an answer
+  // button — eliminates the "loading…" flash between questions. Both
+  // results are discarded; only the subscription matters. Strategies are
+  // deterministic given `init` + history, so the peek helper replays the
+  // sequence on a clone to predict where each branch lands.
+  const prefetchKnew = useMemo(
+    () =>
+      nextLevel !== null
+        ? peekNextLevelAndPosition(
+          strategyName,
+          initialOgteLevel,
+          history,
+          nextLevel,
+          true,
+        )
+        : null,
+    [strategyName, initialOgteLevel, history, nextLevel],
+  );
+  const prefetchNotKnew = useMemo(
+    () =>
+      nextLevel !== null
+        ? peekNextLevelAndPosition(
+          strategyName,
+          initialOgteLevel,
+          history,
+          nextLevel,
+          false,
+        )
+        : null,
+    [strategyName, initialOgteLevel, history, nextLevel],
+  );
+  useQuery(
+    api.features.placementTest.getPlacementSentence,
+    prefetchKnew !== null
+      ? {
+        level: prefetchKnew.level,
+        position: prefetchKnew.position,
+        targetLanguage,
+      }
+      : 'skip',
+  );
+  useQuery(
+    api.features.placementTest.getPlacementSentence,
+    prefetchNotKnew !== null
+      ? {
+        level: prefetchNotKnew.level,
+        position: prefetchNotKnew.position,
+        targetLanguage,
+      }
+      : 'skip',
+  );
+
+  // Safety-net: if the placement sentence resolved but any of (translation,
+  // source audio, target audio) is missing, fire `ensurePlacementTranslations`
+  // once per language. The mutation now routes through `scheduleMissingContent`,
+  // so it covers all three content kinds for every placement sentence in one
+  // pass. Fully idempotent on the server.
   const ensureTranslations = useMutation(api.features.onboarding.ensurePlacementTranslations);
   const ensuredForLanguageRef = useRef<string | null>(null);
-  const translationMissing = sentence != null && !sentence.targetText;
+  const contentMissing =
+    sentence != null &&
+    (!sentence.targetText ||
+      !sentence.sourceAudioUrl ||
+      !sentence.targetAudioUrl);
   useEffect(() => {
-    if (!translationMissing) return;
+    if (!contentMissing) return;
     if (ensuredForLanguageRef.current === targetLanguage) return;
     ensuredForLanguageRef.current = targetLanguage;
     ensureTranslations({ targetLanguage, sourceLanguage }).catch(() => {});
-  }, [translationMissing, targetLanguage, sourceLanguage, ensureTranslations]);
-
-  useEffect(() => {
-    setRevealed(false);
-  }, [nextLevel, position]);
+  }, [contentMissing, targetLanguage, sourceLanguage, ensureTranslations]);
 
   // Auto-play target audio on reveal.
   const targetAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -227,7 +325,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
               ) : (
                 <button
                   type="button"
-                  onClick={() => setRevealed(true)}
+                  onClick={handleReveal}
                   disabled={targetLoading}
                   className="min-h-[4rem] w-full flex items-center justify-center rounded-md text-center text-muted-foreground italic text-sm transition-colors hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
                   aria-label={t('tapReveal')}
@@ -247,7 +345,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
               size="lg"
               className="w-full"
               disabled={targetLoading}
-              onClick={() => setRevealed(true)}
+              onClick={handleReveal}
               data-testid="placement-test-reveal"
             >
               <EyeOff className="h-4 w-4 mr-2" />

@@ -607,12 +607,14 @@ describe("features/ttsProcessing", () => {
           speed: 1,
         },
       });
-      // pumpQueue runs synchronously and dispatches the row, leaving the queue
-      // empty. Read raw to confirm the row was deleted (= dispatched).
-      const remaining = await t.run((ctx) =>
-        ctx.db.query('ttsQueue').collect(),
-      );
-      expect(remaining.length).toBe(0);
+      // The pump runs in a separate transaction now (scheduler.runAfter) to
+      // avoid OCC contention with the re-enabled concurrency cap, so the
+      // queue row is still visible when this mutation returns. Read it back
+      // and assert priority defaulted to 0 — the contract this test exists
+      // to enforce.
+      const rows = await t.run((ctx) => ctx.db.query('ttsQueue').collect());
+      expect(rows.length).toBe(1);
+      expect(rows[0].priority).toBe(0);
     });
 
     it('priority=1 rows drain before priority=0 rows', async () => {

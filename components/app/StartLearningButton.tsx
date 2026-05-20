@@ -82,7 +82,10 @@ export function StartLearningButton({
        * primary tint (not the solid dark-blue fill) so the hierarchy stays
        * clean: only Learn & Review carries the strong accent. */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-        <div className="flex w-full rounded-lg border bg-muted/50 p-0.5 sm:flex-1">
+        <div
+          className="flex w-full rounded-lg border bg-muted/50 p-0.5 sm:flex-1"
+          data-tutorial="review-mode-toggle"
+        >
           {([
             { mode: 'audio' as const, icon: Headphones, label: t('audioReview') },
             { mode: 'full' as const, icon: PenLine, label: t('fullReview') },

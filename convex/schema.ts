@@ -180,7 +180,7 @@ export default defineSchema({
     romanizationSource: v.optional(v.string()),
     // Identifier of the translation method that produced `translatedText`.
     // Format: "<model-slug>-<reasoning|none>" for LLM translations (e.g.
-    // "google/gemini-3.1-flash-lite-preview-none"), "google-translate-v2"
+    // "google/gemini-3.1-flash-lite-high"), "google-translate-v2"
     // for the legacy Google Translate path, "user-provided" for
     // manually-typed custom-text translations. Persisted so a future
     // strategy swap (new dataset version, new model, new prompt) can find
@@ -598,6 +598,15 @@ export default defineSchema({
       voiceName: v.string(),
       voiceGender: voiceGenderValidator,
       speed: v.number(),
+      // Azure STT locale forwarded to `processTTSForCard` for mixed-dialect
+      // rows. Optional; set when the translation row has a `regionVariant`.
+      regionVariant: v.optional(v.string()),
+      // Number of prior `processTTSForCard` failures for this job. When the
+      // action throws (synthesis / storage / transcription error), it
+      // re-enqueues with this incremented. Bounded retries prevent silent
+      // permanent failures (translation lands, audio never does) without
+      // requiring an external cron sweep.
+      failureCount: v.optional(v.number()),
     }),
     queuedAt: v.number(),
     priority: v.optional(v.number()),
@@ -611,7 +620,7 @@ export default defineSchema({
 
   // ── LLM translation queue (mirrors the TTS queue structure) ──────────────
   // OpenRouter rate-limits aggressively, so concurrent LLM translation calls
-  // are capped at MAX_LLM_CONCURRENCY (currently 500; see lib constant in
+  // are capped at MAX_LLM_CONCURRENCY (currently 64; see lib constant in
   // convex/features/llmTranslationQueue.ts). Active from day one, unlike the
   // dormant TTS gate. Same three-table pattern: queue + slots + claims.
 

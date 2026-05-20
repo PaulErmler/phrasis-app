@@ -473,6 +473,8 @@
       "stateLearning": "lernend",
       "stateReview": "Wiederholung",
       "continue": "Weiter",
+      "pause": "Automatisches Weiterleiten pausieren",
+      "resume": "Automatisches Weiterleiten fortsetzen",
       "progressToNextMilestone": "Fortschritt bis zum nächsten Meilenstein",
       "mediaSessionTitle": "Lernfortschritt"
     },
@@ -600,7 +602,7 @@
     "emptyBullet2": "Der Chat kennt den Satz, den du gerade lernst.",
     "emptyBullet3": "Er kann Sätze für dich erstellen — du bestätigst sie einfach.",
     "input": {
-      "placeholder": "Was möchtest du wissen?",
+      "placeholder": "Was möchtest du sagen?",
       "prompts": {
         "grammar": "Erkläre mir die Grammatik dieses Satzes.",
         "sayInLanguage": "Wie kann ich das einfacher sagen?",
@@ -1195,6 +1197,10 @@
       "difficultySelection": {
         "title": "Schwierigkeitsauswahl",
         "description": "Hier kannst du deine Schwierigkeit auswählen. Jede Schwierigkeit ist eine Sammlung von Sätzen zum Lernen. Die Sätze wurden nach der Häufigkeit der Wörter ausgewählt, sodass du zuerst die gebräuchlichsten Wörter lernst. Klicke auf eine Sammlung, um die nächsten Sätze zu sehen. Wenn du bereit bist, starte mit einem der Lernmodi."
+      },
+      "readyToLearn": {
+        "title": "Bereit zum Weiterlernen?",
+        "description": ""
       }
     },
     "audioReview": {

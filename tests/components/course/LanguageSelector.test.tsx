@@ -67,12 +67,17 @@ function renderSelector(
   );
 }
 
+// The selector hides any language with `hiddenFromPicker: true` (currently
+// the English sub-variants), so the rendered row count compares against the
+// picker-visible subset, not the full SUPPORTED_LANGUAGES list.
+const PICKER_LANGUAGES = SUPPORTED_LANGUAGES.filter((l) => !l.hiddenFromPicker);
+
 describe("LanguageSelector", () => {
-  it("renders one CommandItem per supported language", () => {
+  it("renders one CommandItem per picker-visible language", () => {
     const { container } = renderSelector();
     // cmdk uses role="option" for items.
     const rows = container.querySelectorAll('[cmdk-item=""]');
-    expect(rows.length).toBe(SUPPORTED_LANGUAGES.length);
+    expect(rows.length).toBe(PICKER_LANGUAGES.length);
   });
 
   it("calls onToggleLanguage with the matching code when an item is clicked", async () => {
@@ -88,9 +93,9 @@ describe("LanguageSelector", () => {
   });
 
   it("filters out excluded languages", () => {
-    const [a] = SUPPORTED_LANGUAGES;
+    const [a] = PICKER_LANGUAGES;
     const { container } = renderSelector({ excludeLanguages: [a.code] });
     const rows = container.querySelectorAll('[cmdk-item=""]');
-    expect(rows.length).toBe(SUPPORTED_LANGUAGES.length - 1);
+    expect(rows.length).toBe(PICKER_LANGUAGES.length - 1);
   });
 });

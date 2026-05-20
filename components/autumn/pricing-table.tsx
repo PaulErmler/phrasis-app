@@ -374,18 +374,24 @@ export const PricingCard = ({
             {/* Trial badge only when:
                  - the product itself offers a trial,
                  - this card is one the viewer can fresh-subscribe to
-                   (`scenario === "new"` — hides the badge on the card
-                   the viewer is already trialing or subscribed to), AND
+                   (scenario `"new"` for users with no plan record,
+                   `"upgrade"` for users on the auto-default free plan
+                   moving to a paid tier — both mean "not currently on
+                   this card"; "active"/"scheduled"/"renew"/"cancel"
+                   indicate the viewer is on or scheduled-onto this
+                   card and should NOT see the trial promo), AND
                  - the viewer has no committed paid plan (trials don't
                    count, so a Basic-trial user can still see the Pro
                    trial badge).
-                The extra `userHasNonTrialSubscription` guard is the
-                safety net: Autumn occasionally returns
-                `scenario === "new"` on the *other* card for paid users
-                (e.g. paid-Pro viewing Basic), which would otherwise
-                leak the trial promo. */}
+                The `userHasNonTrialSubscription` guard is the safety
+                net: a paid Pro viewer looking at Basic could see
+                `scenario === "downgrade"` (also non-current), so the
+                third condition prevents the trial promo leaking on
+                paid users regardless of how Autumn labels the other
+                card. */}
             {product.properties?.has_trial &&
-              product.scenario === "new" &&
+              (product.scenario === "new" ||
+                product.scenario === "upgrade") &&
               !userHasNonTrialSubscription && (
               <div className="px-6 mb-4">
                 <div className="rounded-md bg-primary/10 text-primary border border-primary/20 px-3 py-2 text-sm font-semibold text-center">

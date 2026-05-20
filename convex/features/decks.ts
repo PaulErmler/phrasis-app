@@ -82,11 +82,12 @@ export async function scheduleMissingContent(
   text: Doc<'texts'>,
   baseLanguages: string[],
   targetLanguages: string[],
-  options?: { priority?: 0 | 1 },
+  options?: { priority?: 0 | 1 | 2 },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
-  // Default to 0 (normal). Callers schedule with priority 1 when this text
-  // belongs to the requesting user's currently-active collection — see
-  // ensureCardContent / ensureUpcomingCardsContent / addCardsFromCollection.
+  // Default to 0 (normal). Priority tiers: 2 = critical (onboarding seed /
+  // placement test — the user is blocked on this content right now),
+  // 1 = active collection (foreground drilling, lookahead, retranslation),
+  // 0 = background warmup (cross-level first-5 prewarm, opportunistic sync).
   const priority = options?.priority ?? 0;
   const sourceLanguage = text.language;
 
@@ -105,11 +106,23 @@ export async function scheduleMissingContent(
     await ctx.db.patch(textId, { audioSpeakerGender });
   }
 
+  // Always include the text's own language (`sourceLanguage`) so the
+  // source-language branch below queues audio for it regardless of what
+  // the caller passed in `baseLanguages`. Without this, a user whose
+  // course uses an English VARIANT (`en_gb` / `en_us` / `en_au`) would
+  // never get audio for `en` curriculum + placement-test texts —
+  // `allRequiredLanguages` wouldn't contain `'en'`, so the
+  // `lang === sourceLanguage` branch never fires. Same shape applies to
+  // any other text where the user's variant differs from the text's
+  // actual language code (`es` vs `es_latam`, etc.). The Set dedupes
+  // when `baseLanguages`/`targetLanguages` already contain the source.
   const allRequiredLanguages = [
-    ...new Set([...baseLanguages, ...targetLanguages]),
+    ...new Set([sourceLanguage, ...baseLanguages, ...targetLanguages]),
   ];
 
-  // Languages that need translation (all except source)
+  // Languages that need translation (all except source). `sourceLanguage`
+  // is in `allRequiredLanguages` by construction above; filtering it out
+  // here ensures we don't enqueue a self-translation for it.
   const langsNeedingTranslation = allRequiredLanguages.filter(
     (l) => l !== sourceLanguage,
   );
@@ -907,7 +920,7 @@ export const addCardsFromCollection = mutation({
     // Snapshot whether each prepareCardContent we schedule below should be
     // marked high-priority. Comparing by `===` is enough since both sides are
     // Convex Id strings (or undefined).
-    const priorityForCollection = (collectionId: Id<'collections'>): 0 | 1 =>
+    const priorityForCollection = (collectionId: Id<'collections'>): 0 | 1 | 2 =>
       activeCollectionId && activeCollectionId === collectionId ? 1 : 0;
     const requestedCollection = await ctx.db.get(args.collectionId);
     const isLevelCollection = requestedCollection
@@ -1196,14 +1209,17 @@ export const ensureCardContent = mutation({
     if (!text) return { translationsScheduled: 0, audioScheduled: 0 };
 
     // Prioritize when this card is from the user's currently-active
-    // collection. Comparing IDs by string keeps the check resilient if either
+    // collection. priority: 2 because `ensureCardContent` fires during
+    // review/study — the user is staring at the card right now and is
+    // blocked on its content. Same tier as placement test / onboarding
+    // seed. Comparing IDs by string keeps the check resilient if either
     // field is undefined.
     const settings = await getCourseSettings(ctx, active.course._id);
     const priority =
       settings?.activeCollectionId &&
       card.collectionId &&
       settings.activeCollectionId === card.collectionId
-        ? 1
+        ? 2
         : 0;
 
     return scheduleMissingContent(
@@ -1271,11 +1287,14 @@ export const ensureUpcomingCardsContent = mutation({
       if (!text) continue;
       // Bump priority for cards in the user's currently-active collection
       // so their content jumps to the front of the TTS / LLM queues.
+      // priority: 2 because `ensureUpcomingCardsContent` is the lookahead
+      // path during review — the user will reach these cards within the
+      // current session, so they're effectively blocking.
       const priority =
         activeCollectionId &&
         card.collectionId &&
         activeCollectionId === card.collectionId
-          ? 1
+          ? 2
           : 0;
       await scheduleMissingContent(
         ctx,
@@ -1342,7 +1361,7 @@ export const prepareCardContent = internalMutation({
     // the user's `activeCollectionId`. We snapshot intent here instead of
     // re-reading the active collection at run time so a user switching
     // collections mid-batch doesn't reshuffle work that's already queued.
-    priority: v.optional(v.union(v.literal(0), v.literal(1))),
+    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1401,7 +1420,7 @@ export const processTranslationForCard = internalAction({
     targetLanguage: v.string(),
     text: v.string(),
     audioSpeakerGender: v.optional(v.string()),
-    priority: v.optional(v.union(v.literal(0), v.literal(1))),
+    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
     /**
      * Retranslation flag. Set when this action is dispatched as the
      * Google fallback for a deliberate LLM retranslation (flagTranslation
@@ -1558,7 +1577,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      * can pick a voice in the matching locale.
      */
     regionVariant: v.optional(v.string()),
-    priority: v.optional(v.union(v.literal(0), v.literal(1))),
+    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
     /**
      * Retranslation flag. Set by callers that deliberately want to overwrite
      * an existing translation — today only `flagTranslation` (the user

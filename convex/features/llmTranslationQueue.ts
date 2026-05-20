@@ -43,7 +43,7 @@ import { getRomanizationSource } from '../lib/localRomanization';
  *      waiter, atomically.
  */
 
-const MAX_LLM_CONCURRENCY = 200;
+const MAX_LLM_CONCURRENCY = 64;
 const SLOT_STALE_MS = 60 * 1000; // 1 minute — longer than the longest API call
 /**
  * Per-(textId, language) LLM claim freshness window. Claims older than this
@@ -126,11 +126,12 @@ const llmJobArgsValidator = v.object({
   targetLanguage: v.string(),
   text: v.string(),
   audioSpeakerGender: v.optional(v.string()),
-  // Active-collection priority forwarded by the originating scheduling
-  // mutation. Used to keep prioritization intact when the worker hands off
-  // to storeTranslationAndScheduleTTS (downstream TTS) or to the Google
-  // fallback path. Defaults to 0 (normal) when missing.
-  priority: v.optional(v.union(v.literal(0), v.literal(1))),
+  // Priority forwarded by the originating scheduling mutation. Used to keep
+  // prioritization intact when the worker hands off to
+  // storeTranslationAndScheduleTTS (downstream TTS) or to the Google fallback
+  // path. Tiers: 2 = critical (onboarding seed / placement test), 1 = active
+  // collection, 0 = background warmup. Defaults to 0 when missing.
+  priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
   // Retranslation flag forwarded to `storeTranslationAndScheduleTTS` (and
   // through `scheduleGoogleFallback` to `processTranslationForCard`). Set
   // by `flagTranslation` so the new LLM output overwrites the displayed
@@ -156,10 +157,18 @@ export const pumpLlmQueue = internalMutation({
   handler: async (ctx) => {
     let used = await countLiveSlotsAndReclaimStale(ctx);
     while (used < MAX_LLM_CONCURRENCY) {
-      // Priority drain: high-priority (1, active collection) first, then
-      // normal (0), then any pre-priority rows (undefined) left over from a
-      // deploy. FIFO within each level via the queuedAt suffix in the index.
+      // Priority drain: critical (2, onboarding seed / placement test) first,
+      // then high (1, active collection), then normal (0), then any
+      // pre-priority rows (undefined) left over from a deploy. FIFO within
+      // each level via the queuedAt suffix in the index.
       const next =
+        (await ctx.db
+          .query('llmTranslationQueue')
+          .withIndex('by_priority_and_queuedAt', (q) =>
+            q.eq('priority', 2),
+          )
+          .order('asc')
+          .first()) ??
         (await ctx.db
           .query('llmTranslationQueue')
           .withIndex('by_priority_and_queuedAt', (q) =>
@@ -211,7 +220,7 @@ export const pumpLlmQueue = internalMutation({
 export const enqueueLlmTranslation = internalMutation({
   args: {
     args: llmJobArgsValidator,
-    priority: v.optional(v.union(v.literal(0), v.literal(1))),
+    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -603,7 +612,7 @@ async function scheduleGoogleFallback(
     targetLanguage: string;
     text: string;
     audioSpeakerGender?: string;
-    priority?: 0 | 1;
+    priority?: 0 | 1 | 2;
     replaceExisting?: boolean;
   },
 ): Promise<void> {

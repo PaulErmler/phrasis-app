@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
-import { BookOpen, Clock, RotateCcw } from 'lucide-react';
+import { BookOpen, ChevronRight, Clock, Pause, Play, RotateCcw } from 'lucide-react';
 import { api } from '@/convex/_generated/api';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
 import { formatTimeMs } from '@/lib/formatTime';
@@ -128,6 +128,33 @@ function buildHeroEasing(N: number): (t: number) => number {
   };
 }
 
+// Module-level guard against future regressions of the duplicate-mount bug
+// fixed by the LearningChatLayout dedup. Dev-only — production stays silent.
+// If a layout change reintroduces double-mount (e.g. children rendered in
+// two tree positions, or LearningMode mounted twice), this fires at mount
+// time with a stack trace pointing at the offending caller.
+const mountedInstances = new Set<number>();
+let nextInstanceId = 0;
+
+function useDuplicateMountGuard() {
+  const idRef = useRef<number | null>(null);
+  if (idRef.current === null) idRef.current = nextInstanceId++;
+  useEffect(() => {
+    const id = idRef.current!;
+    mountedInstances.add(id);
+    if (process.env.NODE_ENV !== 'production' && mountedInstances.size > 1) {
+      console.error(
+        '[ProgressDisplay] multiple instances mounted simultaneously — ' +
+          'the LearningChatLayout dedup invariant has regressed. ' +
+          `Instance count: ${mountedInstances.size}`,
+      );
+    }
+    return () => {
+      mountedInstances.delete(id);
+    };
+  }, []);
+}
+
 /**
  * Outer shell: holds an empty placeholder until the milestone mutation has
  * resolved AND the celebration's queries have returned. Only then does
@@ -136,6 +163,7 @@ function buildHeroEasing(N: number): (t: number) => number {
  * fresh post-mutation data.
  */
 export function ProgressDisplay(props: ProgressDisplayProps) {
+  useDuplicateMountGuard();
   const { ready = true } = props;
   // Resolve user's IANA zone once per mount; it's a constant for the runtime.
   const timezone = useMemo(() => getUserTimezone(), []);
@@ -145,10 +173,34 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
     { sessionId: props.sessionId, timezone },
   );
 
+  // Cache the most-recent resolved query results so a Convex re-subscription
+  // doesn't unmount `CelebrationContent`. Re-subscriptions happen when args
+  // change — most notably when another tab rotates `currentSessionId`
+  // (via its own celebration dismiss), which propagates to this tab's
+  // `courseSettingsQuery` → flows into `props.sessionId` → forces
+  // `celebrationWordsQuery` to re-subscribe. While the new subscription is
+  // loading, `useQuery` returns `undefined`. Without the cache the
+  // `queriesResolved` gate flips false and `CelebrationContent` unmounts,
+  // wiping `isPausedRef` and restarting the 7-second auto-advance clock
+  // from 0 — i.e., a paused celebration silently resumes.
+  const lastCardCountsRef = useRef<CardCounts | null | undefined>(undefined);
+  const lastWordsRef = useRef<
+    { session: LearnedWord[]; today: LearnedWord[] } | undefined
+  >(undefined);
+  if (cardCountsQuery !== undefined) lastCardCountsRef.current = cardCountsQuery;
+  if (celebrationWordsQuery !== undefined) lastWordsRef.current = celebrationWordsQuery;
+
+  const effectiveCardCounts =
+    cardCountsQuery !== undefined ? cardCountsQuery : lastCardCountsRef.current;
+  const effectiveWords =
+    celebrationWordsQuery !== undefined
+      ? celebrationWordsQuery
+      : lastWordsRef.current;
+
   // `getCardCounts` returns `null` for unauthenticated / no-active-deck users
   // — that's a resolved value too (we just won't render the pills).
   const queriesResolved =
-    cardCountsQuery !== undefined && celebrationWordsQuery !== undefined;
+    effectiveCardCounts !== undefined && effectiveWords !== undefined;
 
   if (!ready || !queriesResolved) {
     // Empty placeholder of identical size — no sound, no bar movement,
@@ -160,9 +212,9 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
   return (
     <CelebrationContent
       {...props}
-      cardCounts={cardCountsQuery ?? null}
-      sessionWordsList={celebrationWordsQuery.session}
-      todayWordsList={celebrationWordsQuery.today}
+      cardCounts={effectiveCardCounts ?? null}
+      sessionWordsList={effectiveWords.session}
+      todayWordsList={effectiveWords.today}
     />
   );
 }
@@ -236,9 +288,70 @@ function CelebrationContent({
   );
   const todayWordsOverflowed = dailyNewWordsToday > NEW_WORDS_CAP;
 
-  // ----- Sound + Media Session (mounts only when ready) -----
+  // ----- Sound + Media Session + Auto-advance (mounts only when ready) -----
+  // Pause state. The REF (`isPausedRef`) is the source of truth for any
+  // non-React code path — media session callbacks, audio event listeners,
+  // the auto-advance interval. The REACT STATE (`isPaused`) only drives
+  // rendering (icon swap). Both are updated synchronously in `pauseSync` /
+  // `resumeSync`.
+  //
+  // Auto-advance mirrors the regular card's pause pattern: the card's
+  // "clock" is the audio element itself, and `audio.pause()` freezes the
+  // clock so the `ended` event never fires. Here the clock is a single
+  // `setInterval` that reads `isPausedRef.current` on every tick — when
+  // paused, the tick is a no-op so the accumulated playtime doesn't
+  // advance. There is no separate `setTimeout` to race against the pause
+  // click; the only way the celebration auto-dismisses is for the tick
+  // loop to observe `accumulated >= DURATION`, and that can't happen
+  // while pause is held.
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const onContinueRef = useRef(onContinue);
+  const isPausedRef = useRef(false);
+  const [isPaused, setIsPaused] = useState(false);
   const mediaSessionTitle = t('mediaSessionTitle');
+
+  useEffect(() => {
+    onContinueRef.current = onContinue;
+  }, [onContinue]);
+
+  // The celebration only auto-advances when the underlying review flow
+  // does (audio mode + the user's `autoAdvance` setting). In every other
+  // case — including onboarding's first-lesson recap which passes
+  // `autoAdvance={false}` — the screen stays up until the user taps
+  // Continue. The play/pause + bar pattern is layered on top of the
+  // auto-advancing variant ONLY.
+  const celebrationAutoAdvances = reviewMode === 'audio' && autoAdvance;
+  const [progressPct, setProgressPct] = useState(0);
+  // Accumulated "playing" time. The tick interval reads / writes this
+  // ref directly; pause/resume don't touch it. The bar reads `progressPct`,
+  // which the tick keeps in sync.
+  const accumulatedMsRef = useRef(0);
+
+  const pauseSync = useCallback(() => {
+    isPausedRef.current = true;
+    setIsPaused(true);
+    audioRef.current?.pause();
+    setMediaSessionPlaybackState('paused');
+  }, []);
+
+  const resumeSync = useCallback(() => {
+    isPausedRef.current = false;
+    setIsPaused(false);
+    // Don't resume past natural end — `audio.play()` on an ended element
+    // restarts from 0 in some browsers, which we don't want for a one-
+    // shot ding. The visual auto-advance interval will keep ticking.
+    const audio = audioRef.current;
+    if (audio && !audio.ended && audio.currentTime < audio.duration) {
+      audio.play().catch(() => {});
+    }
+    setMediaSessionPlaybackState('playing');
+  }, []);
+
+  const togglePause = useCallback(() => {
+    if (isPausedRef.current) resumeSync();
+    else pauseSync();
+  }, [pauseSync, resumeSync]);
+
   useEffect(() => {
     const audio = new Audio(PROGRESS_SOUND_URL);
     audio.preload = 'auto';
@@ -250,9 +363,18 @@ function CelebrationContent({
     const teardown = setupMediaSession({
       title: mediaSessionTitle,
       artist: 'Flexling',
-      onPlay: () => audio.play().catch(() => {}),
-      onPause: () => audio.pause(),
-      onNextTrack: () => onContinue(),
+      onPlay: () => resumeSync(),
+      onPause: () => pauseSync(),
+      // Guarded against the user's explicit pause: if they paused the
+      // celebration, an OS-level / auto-fired `nexttrack` must not
+      // dismiss it. The user can still resume + tap the on-screen Next
+      // button. `isPausedRef` is updated SYNCHRONOUSLY in `pauseSync`
+      // (no useEffect lag), so even a `nexttrack` fired ~1 ms after the
+      // pause click observes the correct value.
+      onNextTrack: () => {
+        if (isPausedRef.current) return;
+        onContinueRef.current();
+      },
       onPreviousTrack: () => {},
     });
     setMediaSessionPlaybackState('playing');
@@ -264,19 +386,41 @@ function CelebrationContent({
       setMediaSessionPlaybackState('none');
       teardown();
     };
-  }, [onContinue, mediaSessionTitle]);
+  }, [mediaSessionTitle, pauseSync, resumeSync]);
 
-  // ----- Auto-advance (audio mode + auto-advance setting only) -----
-  // The celebration only auto-dismisses if the underlying review flow itself
-  // auto-advances. In full review mode or when the user has auto-advance off,
-  // they're driving the pace by hand and we keep the celebration up until
-  // they tap Continue.
-  const celebrationAutoAdvances = reviewMode === 'audio' && autoAdvance;
+  // Single ticking clock. On every tick: bank the wall-clock delta since
+  // the last tick into `accumulatedMsRef`, unless paused — in which case
+  // the tick is a no-op (`lastTickAt` advances so the next active tick
+  // doesn't retroactively credit the paused interval). When accumulated
+  // playtime reaches DURATION, dismiss. No separate timeout exists, so
+  // pause is "free": flipping `isPausedRef.current` halts the clock with
+  // no clearTimeout needed.
   useEffect(() => {
     if (!celebrationAutoAdvances) return;
-    const timer = setTimeout(onContinue, PROGRESS_DISPLAY_DURATION_MS);
-    return () => clearTimeout(timer);
-  }, [onContinue, celebrationAutoAdvances]);
+
+    let lastTickAt = Date.now();
+    const tickId = setInterval(() => {
+      const now = Date.now();
+      const delta = now - lastTickAt;
+      lastTickAt = now;
+
+      if (isPausedRef.current) return;
+
+      const next = Math.min(
+        PROGRESS_DISPLAY_DURATION_MS,
+        accumulatedMsRef.current + delta,
+      );
+      accumulatedMsRef.current = next;
+      setProgressPct((next / PROGRESS_DISPLAY_DURATION_MS) * 100);
+
+      if (next >= PROGRESS_DISPLAY_DURATION_MS) {
+        clearInterval(tickId);
+        onContinueRef.current();
+      }
+    }, 50);
+
+    return () => clearInterval(tickId);
+  }, [celebrationAutoAdvances]);
 
   // ----- Confetti burst on the final ding -----
   // Fires once at the moment of the last hero integer tick. Aligned to the
@@ -422,24 +566,64 @@ function CelebrationContent({
         )}
       </motion.div>
 
-      {/* Bottom: Continue button + auto-advance bar (only when the
-          celebration is going to auto-advance). */}
+      {/* Bottom controls. In auto-advancing mode (main app, audio +
+          autoAdvance) we show a pausable progress bar with play/pause +
+          next buttons so the user can stop to read the stats and tap
+          next to skip. In every other mode — most importantly
+          onboarding's StatsRecapStep — we keep the original full-width
+          Continue button so the existing UX is byte-identical. */}
       <motion.div
         className="flex flex-col items-stretch gap-3 max-w-sm w-full mx-auto"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.3, delay: 0.4, ease: 'easeOut' }}
       >
-        <Button
-          onClick={onContinue}
-          variant="default"
-          size="lg"
-          className="w-full"
-          data-testid="progress-display-continue"
-        >
-          {t('continue')}
-        </Button>
-        {celebrationAutoAdvances && <AutoAdvanceBarInner />}
+        {celebrationAutoAdvances ? (
+          <>
+            <div
+              className="bg-primary/20 relative h-1.5 w-full overflow-hidden rounded-full"
+              role="progressbar"
+              aria-hidden="true"
+            >
+              <div
+                className="bg-primary h-full transition-[width] ease-linear duration-100"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <div className="flex gap-2 w-full">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={togglePause}
+                aria-label={isPaused ? t('resume') : t('pause')}
+                className="flex-[2]"
+                data-testid="progress-display-play-pause"
+              >
+                {isPaused ? <Play /> : <Pause />}
+              </Button>
+              <Button
+                variant="default"
+                size="lg"
+                onClick={onContinue}
+                aria-label={t('continue')}
+                className="flex-[1]"
+                data-testid="progress-display-continue"
+              >
+                <ChevronRight />
+              </Button>
+            </div>
+          </>
+        ) : (
+          <Button
+            onClick={onContinue}
+            variant="default"
+            size="lg"
+            className="w-full"
+            data-testid="progress-display-continue"
+          >
+            {t('continue')}
+          </Button>
+        )}
       </motion.div>
     </div>
   );
@@ -505,27 +689,6 @@ function StatePill({
     <div className="flex flex-col items-center gap-0.5 min-w-24">
       <span className={`text-lg font-semibold tabular-nums ${colorClass}`}>{display}</span>
       <span className="text-muted-xs">{label}</span>
-    </div>
-  );
-}
-
-function AutoAdvanceBarInner() {
-  const ref = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.width = '0%';
-    void el.offsetWidth;
-    el.style.transition = `width ${PROGRESS_DISPLAY_DURATION_MS}ms linear`;
-    el.style.width = '100%';
-  }, []);
-  return (
-    <div
-      className="bg-primary/20 relative h-1.5 w-full overflow-hidden rounded-full"
-      role="progressbar"
-      aria-hidden="true"
-    >
-      <div ref={ref} className="bg-primary h-full" style={{ width: '0%' }} />
     </div>
   );
 }

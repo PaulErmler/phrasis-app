@@ -21,76 +21,78 @@ import {
 import {
   HYBRID_LENGTH_THRESHOLD,
   resolveTranslationStages,
-  TRANSLATION_RULES,
 } from "../../../lib/languages";
 
 describe("features/translationLLM", () => {
   describe("translation rules", () => {
-    it("default_hybrid: every sentence resolves to full Gemini 3 Flash with high reasoning", () => {
+    it("default_hybrid: Gemini 3 Flash (minimal) primary AND fallback", () => {
       // 'de' has no `translationRule` set → defaults to `default_hybrid`.
-      // Length-hybrid branching was retired; high reasoning is the floor
-      // regardless of source length.
+      // Length-hybrid branching was retired — every source length runs
+      // the same chain. Fallback is the same config as primary; it only
+      // exists to retry once on transient HTTP errors before Google.
+      const stages = resolveTranslationStages("de", 12);
+      expect(stages.length).toBe(2);
+      const flashMinimal = {
+        model: "google/gemini-3-flash-preview",
+        reasoning: "minimal",
+        maxOutputTokens: 4_000,
+      };
+      expect(stages[0]).toEqual(flashMinimal);
+      expect(stages[1]).toEqual(flashMinimal);
+    });
+
+    it("default_hybrid is length-agnostic — same chain for short and long inputs", () => {
       const short = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD - 1);
-      const long = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD);
-      for (const stages of [short, long]) {
-        expect(stages.length).toBe(1);
-        expect(stages[0]).toEqual({
-          model: "google/gemini-3-flash-preview",
-          reasoning: "high",
-          maxOutputTokens: 6_000,
-        });
-      }
+      const long = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD + 100);
+      expect(short).toEqual(long);
     });
 
     it("retranslation_high: forced via ruleOverride uses Gemini 3.1 Pro (medium) as a second opinion", () => {
       const stages = resolveTranslationStages("de", 100, {
         ruleOverride: "retranslation_high",
       });
-      // Different model than the default (Flash) so flagged rows get an
-      // actual cross-model retry rather than re-sampling Flash.
+      // Different (heavier) model than the default Flash tier so flagged
+      // curriculum rows get an actual cross-model second opinion rather
+      // than re-sampling Flash.
       expect(stages.length).toBe(1);
       expect(stages[0]).toEqual({
         model: "google/gemini-3.1-pro-preview",
         reasoning: "medium",
-        maxOutputTokens: 6_000,
-      });
-    });
-
-    it("asian_deepseek rule definition still exposes DeepSeek high → Gemini fallback", () => {
-      // Currently no language uses this rule (Asian languages reverted to
-      // default_hybrid pending a quality eval). The rule itself is preserved
-      // so we can re-enable it without re-deriving the shape.
-      const rule = TRANSLATION_RULES.asian_deepseek;
-      expect(rule.branches.length).toBe(1);
-      const onlyBranch = rule.branches[0];
-      expect(onlyBranch.primary).toEqual({
-        model: "deepseek/deepseek-v4-flash",
-        reasoning: "high",
         maxOutputTokens: 8_000,
       });
-      expect(onlyBranch.fallbacks).toEqual([
-        {
-          model: "google/gemini-3.1-flash-lite-preview",
-          maxOutputTokens: 5_000,
-        },
-      ]);
     });
 
-    it("zh now resolves through default_hybrid (Asian languages reverted)", () => {
-      const stages = resolveTranslationStages("zh", 12);
+    it("retranslation_custom: forced via ruleOverride uses Gemini 3.1 Flash Lite (minimal)", () => {
+      const stages = resolveTranslationStages("de", 100, {
+        ruleOverride: "retranslation_custom",
+      });
+      // Custom-text retranslations stay on the cheaper Flash Lite tier
+      // with a `minimal` thinking pass so the retranslation has a real
+      // shot at catching what the user flagged.
       expect(stages.length).toBe(1);
       expect(stages[0]).toEqual({
-        model: "google/gemini-3-flash-preview",
-        reasoning: "high",
-        maxOutputTokens: 6_000,
+        model: "google/gemini-3.1-flash-lite",
+        reasoning: "minimal",
+        maxOutputTokens: 4_000,
       });
+    });
+
+    it("zh resolves through default_hybrid (no language-specific override)", () => {
+      const stages = resolveTranslationStages("zh", 12);
+      expect(stages.length).toBe(2);
+      expect(stages[0].model).toBe("google/gemini-3-flash-preview");
+      expect(stages[0].reasoning).toBe("minimal");
+      expect(stages[1].model).toBe("google/gemini-3-flash-preview");
+      expect(stages[1].reasoning).toBe("minimal");
     });
 
     it("unknown language code falls through to default_hybrid", () => {
       const stages = resolveTranslationStages("zz", 100);
-      expect(stages.length).toBe(1);
+      expect(stages.length).toBe(2);
       expect(stages[0].model).toBe("google/gemini-3-flash-preview");
-      expect(stages[0].reasoning).toBe("high");
+      expect(stages[0].reasoning).toBe("minimal");
+      expect(stages[1].model).toBe("google/gemini-3-flash-preview");
+      expect(stages[1].reasoning).toBe("minimal");
     });
   });
 
@@ -208,7 +210,7 @@ describe("features/translationLLM", () => {
       targetRegion: "Germany",
       addressesSomeone: true,
       referentGender: "female" as const,
-      model: "google/gemini-3.1-flash-lite-preview",
+      model: "google/gemini-3.1-flash-lite",
     };
 
     function mockOpenRouterOk(content: string, finishReason: string = "stop") {
@@ -326,6 +328,23 @@ describe("features/translationLLM", () => {
       const callArg = vi.mocked(generateText).mock.calls[0][0];
       expect(callArg.providerOptions).toEqual({
         openrouter: { reasoning: { effort: "high" } },
+      });
+    });
+
+    it("sends reasoning effort='minimal' verbatim despite SDK type only covering low/medium/high", async () => {
+      // OpenRouter accepts `'minimal'` at runtime (maps to Gemini's
+      // `thinkingLevel: 'minimal'`); the @openrouter/ai-sdk-provider@1.5.4
+      // types haven't caught up, so `translateTextWithLLM` casts at the
+      // SDK boundary. Verify the string survives intact.
+      mockOpenRouterOk("Hallo.");
+      await translateTextWithLLM({
+        ...callArgs,
+        text: "Hi.",
+        reasoning: "minimal",
+      });
+      const callArg = vi.mocked(generateText).mock.calls[0][0];
+      expect(callArg.providerOptions).toEqual({
+        openrouter: { reasoning: { effort: "minimal" } },
       });
     });
   });

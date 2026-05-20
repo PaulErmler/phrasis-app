@@ -695,8 +695,15 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     settingsOpen,
   ]);
 
-  // Reset selectedRating, pending master/hide state, exit flag, and card timer when card changes
+  // Reset selectedRating, pending master/hide state, exit flag, and card timer when card changes.
+  // Skip reset while cardForReview is transiently null during the auto-add gap. During that
+  // window, displayCard falls back to lastReviewingCardRef (the just-reviewed card); if we
+  // cleared isExiting here, AnimatePresence would re-mount a motion.div showing the previous
+  // card, producing a visible "flash back" until the next card arrives. Keeping isExiting=true
+  // leaves the card pane blank until cardForReview becomes a real id (the next card), at which
+  // point this effect fires cleanly with fresh state.
   useEffect(() => {
+    if (cardForReview?._id == null) return;
     setSelectedRating(null);
     setIsPendingMaster(false);
     setIsPendingHide(false);
@@ -783,6 +790,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
       reviewMode,
       progressDisplayEnabled,
       dailyReviewsToday,
+      sessionId,
     ],
   );
 

@@ -1016,10 +1016,13 @@ const FLAG_RETRANSLATION_MAX = FLAG_AUTO_RETRANSLATION_MAX;
  * admin triage) but skip the retranslation work to bound cost.
  *
  * Routing per text: curriculum (premade-dataset) texts use
- * `retranslation_high` (Pro-medium); user-created custom texts use
- * `retranslation_custom` (Flash-Lite-high). All languages of the same
- * text share the same rule because the rule depends on `text.userCreated`,
- * which is a property of the text, not the translation.
+ * `retranslation_high` (Pro-medium). User-created custom texts are
+ * **flagged without retranslation** — the LLM has no curated source of
+ * truth to second-guess against, so flagging a custom-text translation
+ * only bumps `flagCount` (for admin triage / surfacing the "Flagged" pill)
+ * and exits without enqueueing an LLM call. The rule applies to the whole
+ * card because `text.userCreated` is a property of the text, not the
+ * translation.
  *
  * Quota: one `translation_flags` unit total per flag click, regardless of
  * how many languages were retranslated. Charged on the first language
@@ -1079,35 +1082,42 @@ export const flagTranslation = mutation({
       return { retranslated: false };
     }
 
-    // 1) Increment flagCount on every non-source translation. Done up front
-    // so a quota failure later in the mutation cleanly rolls back every
-    // counter via the surrounding transaction.
-    for (const tr of nonSourceTranslations) {
-      await ctx.db.patch(tr._id, {
-        flagCount: (tr.flagCount ?? 0) + 1,
-      });
+    // 1) Compute the post-patch count once per row and persist it. Doing the
+    // increment up front means a quota failure later in this mutation
+    // cleanly rolls back every counter via the surrounding transaction.
+    const withCounts = nonSourceTranslations.map((tr) => ({
+      tr,
+      nextCount: (tr.flagCount ?? 0) + 1,
+    }));
+    for (const { tr, nextCount } of withCounts) {
+      await ctx.db.patch(tr._id, { flagCount: nextCount });
     }
 
-    // 2) Filter to the rows that are still under-cap post-increment.
-    // Over-cap rows already had their counter bumped above but skip the
-    // enqueue + quota path. All rows are guaranteed in-course because we
-    // fetched from the course's language set above.
-    const enqueueable = nonSourceTranslations.filter((tr) => {
-      const nextCount = (tr.flagCount ?? 0) + 1; // pre-patch + 1 = post-patch
-      return nextCount <= FLAG_RETRANSLATION_MAX;
-    });
-
-    if (enqueueable.length === 0) {
-      // Everything was over-cap or out-of-course. Counters incremented, no
-      // quota charge, no retranslations.
+    // Custom-text flag policy: increment counters but never auto-retranslate.
+    // Custom texts have no curated source of truth — the LLM would only be
+    // second-guessing the user's own content. Flagging surfaces them in the
+    // "Flagged" UI pill for the user and admin triage; that's the full
+    // workflow. No quota charge, no audio invalidation, no enqueue.
+    if (text.userCreated) {
       return { retranslated: false };
     }
 
-    // Curriculum vs custom routing — depends on `text.userCreated`, not
-    // on the target language, so the rule is fixed for the whole card.
-    const ruleOverride = text.userCreated
-      ? 'retranslation_custom'
-      : 'retranslation_high';
+    // 2) Filter to rows still under-cap. Over-cap rows already had their
+    // counter bumped above but skip the enqueue + quota path. All rows are
+    // guaranteed in-course because we fetched from the course's language
+    // set above.
+    const enqueueable = withCounts.filter(
+      ({ nextCount }) => nextCount <= FLAG_RETRANSLATION_MAX,
+    );
+
+    if (enqueueable.length === 0) {
+      // Everything was over-cap. Counters incremented, no quota charge,
+      // no retranslations.
+      return { retranslated: false };
+    }
+
+    // Curriculum-only path: user-created texts already short-circuited above.
+    const ruleOverride = 'retranslation_high';
 
     // 3) Per-language: claim slot, charge quota on first success only,
     // delete stale audio, enqueue retranslation. Claim-contested rows
@@ -1115,7 +1125,7 @@ export const flagTranslation = mutation({
     let anyEnqueued = false;
     let quotaCharged = false;
 
-    for (const tr of enqueueable) {
+    for (const { tr } of enqueueable) {
       const lang = tr.targetLanguage;
 
       const claimed = await claimLlmTranslationIfAvailable(

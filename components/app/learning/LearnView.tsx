@@ -330,6 +330,7 @@ function LearnViewInner({
       header={header}
       chatPanel={chatPanel}
       onChatOpen={handleChatOpen}
+      hideChatToggle={progressDisplayActive}
     >
       <LearningMode
         state={state}

@@ -66,7 +66,10 @@ export function LanguageSelector({
 
   const availableLanguages = useMemo(
     () =>
-      SUPPORTED_LANGUAGES.filter((lang) => !excludeLanguages.includes(lang.code)),
+      SUPPORTED_LANGUAGES.filter(
+        (lang) =>
+          !lang.hiddenFromPicker && !excludeLanguages.includes(lang.code),
+      ),
     [excludeLanguages],
   );
 

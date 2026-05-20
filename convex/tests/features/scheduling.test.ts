@@ -1689,10 +1689,11 @@ describe("features/scheduling", () => {
       expect(quota?.features.translation_flags.balance).toBe(9);
     });
 
-    it("flagging a custom (user-created) text routes to retranslation_custom rule", async () => {
-      // Curriculum texts (userCreated: false) get Pro-medium via
-      // `retranslation_high`; custom texts (userCreated: true) get
-      // Flash-Lite-high via `retranslation_custom`. Verify the dispatch.
+    it("flagging a custom (user-created) text increments flagCount but does not retranslate", async () => {
+      // Curriculum texts (userCreated: false) get retranslated via
+      // `retranslation_high`. Custom texts (userCreated: true) are
+      // flag-only: counter bumps, no LLM enqueue, no quota charge — the
+      // LLM has no source-of-truth to second-guess user-created content.
       const t = convexTest(schema, modules);
       const { cardId } = await seedFlaggableCard(t, { userCreated: true });
       const asUser = t.withIdentity({ subject: "user_A" });
@@ -1700,15 +1701,28 @@ describe("features/scheduling", () => {
       const res = await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
       });
-      expect(res).toEqual({ retranslated: true });
+      expect(res).toEqual({ retranslated: false });
 
       const queueRows = await t.run(async (ctx) =>
         ctx.db.query("llmTranslationQueue").collect(),
       );
-      expect(queueRows).toHaveLength(1);
-      expect(queueRows[0].args.ruleOverride).toBe("retranslation_custom");
-      expect(queueRows[0].args.replaceExisting).toBe(true);
-      expect(queueRows[0].args.targetLanguage).toBe("en");
+      expect(queueRows).toHaveLength(0);
+
+      // Counter still bumped so the "Flagged" pill surfaces in the UI.
+      const translations = await t.run(async (ctx) =>
+        ctx.db.query("translations").collect(),
+      );
+      expect(translations).toHaveLength(1);
+      expect(translations[0].flagCount).toBe(1);
+
+      // No quota charge — the helper seeds 10 units, expect all 10 left.
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.translation_flags.balance).toBe(10);
     });
 
     it("flags every non-source-language translation at once, single quota charge", async () => {

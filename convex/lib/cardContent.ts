@@ -162,13 +162,23 @@ export async function buildTextContentBatchForLanguages(
     });
 
     const translations = allLanguages.map((lang) => {
+      // Gate stored romanization on the language's current
+      // `needsRomanization` flag. Rows written while the flag was on stay
+      // in the DB untouched, but their romanizedText is dropped from the
+      // response so the UI doesn't render stale transliteration after the
+      // language is flipped off. See ROMANIZATION_LANGUAGES in
+      // lib/languages.ts — it's derived from the Language entries so this
+      // check stays in sync automatically.
+      const langNeedsRomanization = ROMANIZATION_LANGUAGES.has(lang);
       if (lang === input.sourceLanguage) {
         return {
           language: lang,
           text: input.sourceText,
           isBaseLanguage: baseLanguages.includes(lang),
           isTargetLanguage: targetLanguages.includes(lang),
-          romanization: input.sourceRomanization,
+          romanization: langNeedsRomanization
+            ? input.sourceRomanization
+            : undefined,
           retranslating: false,
         };
       }
@@ -182,7 +192,7 @@ export async function buildTextContentBatchForLanguages(
         text: translatedText,
         isBaseLanguage: baseLanguages.includes(lang),
         isTargetLanguage: targetLanguages.includes(lang),
-        romanization: entry?.romanization,
+        romanization: langNeedsRomanization ? entry?.romanization : undefined,
         // Show the pill only when an LLM retranslation is in flight AND a
         // prior translatedText exists (i.e. this is a *re*translation, not
         // the first-time translation of a new card).

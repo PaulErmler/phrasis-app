@@ -152,6 +152,18 @@ export interface Language {
    * "Modern" is implicit in a contemporary language-learning context.
    */
   translationName?: string;
+  /**
+   * When `true`, this language is excluded from user-facing pickers in
+   * onboarding / course creation / settings (`LanguageSelector` and
+   * `DualLanguageEditor`). The entry remains in `SUPPORTED_LANGUAGES` so
+   * voice lookups, `getLanguageByCode`, and existing course data referring
+   * to the code keep working — only the *picker* surfaces hide it.
+   *
+   * Used today to retire the English sub-variants (`en_gb`, `en_us`,
+   * `en_au`) from course-creation UIs while their voice + display metadata
+   * stays available for any rows already referencing them.
+   */
+  hiddenFromPicker?: boolean;
 }
 
 export const SUPPORTED_LANGUAGES: Language[] = [
@@ -180,6 +192,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    hiddenFromPicker: true,
   },
   {
     code: 'en_us',
@@ -193,6 +206,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    hiddenFromPicker: true,
   },
   {
     code: 'en_au',
@@ -206,6 +220,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    hiddenFromPicker: true,
   },
   {
     code: 'es',
@@ -550,10 +565,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'asian-east',
     llmSupportTier: 'tier2',
     ttsProvider: 'google',
-    // Romanization via cantonese-romanisation (LSHK / Jyutping). The lookup
-    // table is traditional-script oriented, so simplified Cantonese may
-    // surface gaps for a few characters — see romanizeCantonese().
-    needsRomanization: true,
+    // Romanization disabled — the cantonese-romanisation (LSHK / Jyutping)
+    // lookup table is traditional-script oriented, so simplified Cantonese
+    // surfaces too many gaps to ship reliably. Traditional Cantonese
+    // (`yue_traditional`) keeps romanization on.
+    needsRomanization: false,
     supportsKaraoke: false,
     supportsStt: true,
   },
@@ -649,7 +665,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     displayCode: 'ar',
     name: 'Arabic (Modern Standard)',
     nativeName: 'العربية (الفصحى)',
-    flag: '🇸🇦',
+    flag: '🌎',
     category: 'semitic',
     llmSupportTier: 'tier1',
     ttsProvider: 'google',
@@ -784,10 +800,16 @@ export function getTtsProviderForLanguage(code: string): TtsProvider {
 
 /** One leg of a translation rule — an OpenRouter model + optional reasoning. */
 export type ModelStage = {
-  /** OpenRouter slug, e.g. `'google/gemini-3.1-flash-lite-preview'`. */
+  /** OpenRouter slug, e.g. `'google/gemini-3.1-flash-lite'`. */
   model: string;
-  /** Reasoning / thinking effort. `undefined` = no thinking. */
-  reasoning?: 'low' | 'medium' | 'high';
+  /**
+   * Reasoning / thinking effort. `undefined` = no thinking. `'minimal'` is
+   * Gemini-3-specific — OpenRouter maps it to Google's `thinkingLevel:
+   * 'minimal'`, strictly below `'low'`. The `@openrouter/ai-sdk-provider`
+   * types only enumerate `'low' | 'medium' | 'high'`; the cast lives in
+   * `translateTextWithLLM`.
+   */
+  reasoning?: 'minimal' | 'low' | 'medium' | 'high';
   /**
    * Per-stage cap on response tokens. Tuned so reasoning-heavy stages have
    * the headroom their thinking traces need (DeepSeek V4 Flash with `high`
@@ -824,7 +846,7 @@ export const USER_PROVIDED_TRANSLATION_SOURCE = 'user-provided';
  */
 export function getTranslationSource(
   model: string,
-  reasoning?: 'low' | 'medium' | 'high',
+  reasoning?: 'minimal' | 'low' | 'medium' | 'high',
 ): string {
   return `${model}-${reasoning ?? 'none'}`;
 }
@@ -861,46 +883,40 @@ export type TranslationRule = {
 
 // --- Shared model stages (referenced by multiple rules) --------------------
 
-// Gemini Flash Lite never approaches the 5K token mark on translation output —
-// the cap is mainly a runaway safeguard. Retained as a low-cost truncation
-// fallback for `asian_deepseek` (kept dormant pending re-eval).
-const GEMINI_FLASH_LITE: ModelStage = {
-  model: 'google/gemini-3.1-flash-lite-preview',
-  maxOutputTokens: 5_000,
-};
-// Gemini Flash Lite with high reasoning — primary for `retranslation_custom`
-// (flagged retranslations of user-created texts). Cheaper than the curriculum
-// retranslation rule on the assumption that custom texts are mostly the
-// user's own content where a heavyweight cross-model second opinion adds
-// less value than on curated material.
-const GEMINI_FLASH_LITE_HIGH: ModelStage = {
-  model: 'google/gemini-3.1-flash-lite-preview',
-  reasoning: 'high',
-  maxOutputTokens: 6_000,
-};
-// Full Gemini 3 Flash with high reasoning — primary for `default_hybrid`
-// (the rule every language without an explicit override falls through to).
-const GEMINI_FLASH_HIGH: ModelStage = {
+// Gemini 3 Flash preview with `minimal` reasoning — primary AND fallback
+// for `default_hybrid`. Used for the initial LLM translation of premade
+// curriculum sentences and placement-test material. `effort: 'minimal'`
+// maps to Gemini's `thinkingLevel: 'minimal'` (strictly lower than
+// `'low'`) — the cheapest reasoning tier OpenRouter exposes for Gemini 3.
+// Used as the fallback too so the worker still gets a real LLM retry on
+// transient HTTP errors before dropping to the Google safety net.
+const GEMINI_3_FLASH_MINIMAL: ModelStage = {
   model: 'google/gemini-3-flash-preview',
-  reasoning: 'high',
-  maxOutputTokens: 6_000,
+  reasoning: 'minimal',
+  maxOutputTokens: 4_000,
+};
+// Gemini 3.1 Flash Lite with `minimal` reasoning — primary for
+// `retranslation_custom` (flagged retranslations of user-created texts).
+// Kept on the cheaper Flash Lite tier (vs. Pro Medium for curriculum) on
+// the assumption that custom texts are mostly the user's own content where
+// a heavyweight cross-model second opinion adds less value than on curated
+// material. Minimal thinking still gives the retranslation a brief shot at
+// catching what the user flagged.
+const GEMINI_FLASH_LITE_MINIMAL: ModelStage = {
+  model: 'google/gemini-3.1-flash-lite',
+  reasoning: 'minimal',
+  maxOutputTokens: 4_000,
 };
 // Gemini 3.1 Pro with medium reasoning — primary for `retranslation_high`
-// (flagged retranslations of curriculum / premade-dataset texts). A heavier
-// *different* model than the default Flash tier, so a flagged curriculum
-// row gets a genuine cross-model second opinion. Medium reasoning keeps
-// cost in check while still benefiting from Pro's larger base capacity.
+// (first-flag retranslations of curriculum / premade-dataset texts). A
+// heavier *different* model than the default Flash tier so a flagged row
+// gets a genuine cross-model second opinion. Medium reasoning is the
+// sweet spot between cost and Pro's larger base capacity; 8k output
+// tokens leaves comfortable headroom for the reasoning trace before
+// truncation forces a Google fallback.
 const GEMINI_PRO_MEDIUM: ModelStage = {
   model: 'google/gemini-3.1-pro-preview',
   reasoning: 'medium',
-  maxOutputTokens: 6_000,
-};
-// DeepSeek V4 Flash at `high` reasoning emits 3–6K tokens of thinking before
-// the visible translation. The wider 8K cap gives the thinking trace room
-// before truncation triggers the Gemini fallback stage.
-const DEEPSEEK_V4_FLASH_HIGH: ModelStage = {
-  model: 'deepseek/deepseek-v4-flash',
-  reasoning: 'high',
   maxOutputTokens: 8_000,
 };
 
@@ -915,35 +931,49 @@ export const HYBRID_LENGTH_THRESHOLD = 30;
 
 /**
  * Maximum number of auto-retranslations triggered by user flags on a single
- * translation row. Flags 1..MAX each enqueue a retranslation via
- * `retranslation_high` / `retranslation_custom`; flag (MAX+1) and beyond
- * only increment `flagCount` for admin triage. Surfaced here (rather than
- * inline in `flagTranslation`) so the card queries can also use it to
- * decide between the "Retranslating" pill (under-cap, in flight) and the
- * "Flagged" pill (over-cap, no auto-retranslation will happen).
+ * translation row. The first flag enqueues a retranslation via
+ * `retranslation_high` / `retranslation_custom`; the second flag (and
+ * beyond) only increments `flagCount` for admin triage — at that point the
+ * row has already had its one shot at automatic recovery, so further
+ * complaints surface as "Flagged" rather than retriggering the pipeline.
+ * Surfaced here (rather than inline in `flagTranslation`) so the card
+ * queries can also use it to decide between the "Retranslating" pill
+ * (under-cap, in flight) and the "Flagged" pill (over-cap, no
+ * auto-retranslation will happen).
  */
-export const FLAG_AUTO_RETRANSLATION_MAX = 2;
+export const FLAG_AUTO_RETRANSLATION_MAX = 1;
 
 export const TRANSLATION_RULES = {
   /**
-   * Default for every language without an explicit `translationRule`. Every
-   * sentence — regardless of length — runs full Gemini 3 Flash with high
-   * reasoning. Length-hybrid branching was retired so the quality floor
-   * matches across all input sizes.
+   * Default for every language without an explicit `translationRule`. Used
+   * for the initial LLM translation of premade curriculum sentences and
+   * placement-test material. Single branch — length-hybrid branching was
+   * retired so the model + reasoning level is identical regardless of
+   * input length. One LLM fallback (cheap no-thinking Flash Lite) before
+   * the Google safety net catches truncation / HTTP errors without forcing
+   * an immediate drop to Google.
    */
   default_hybrid: {
     id: 'default_hybrid',
-    label: 'Gemini 3 Flash — high reasoning',
+    label: 'Gemini 3 Flash (minimal) → Gemini 3 Flash (minimal, retry) → Google',
     branches: [
-      { maxChars: Infinity, primary: GEMINI_FLASH_HIGH },
+      {
+        maxChars: Infinity,
+        primary: GEMINI_3_FLASH_MINIMAL,
+        // Same model + reasoning + cap as the primary — the fallback
+        // exists only to retry once on transient HTTP errors before the
+        // Google safety net kicks in. Truncation is rare at this thinking
+        // level / token cap, so retrying the same config is cheap insurance.
+        fallbacks: [GEMINI_3_FLASH_MINIMAL],
+      },
     ],
   },
   /**
    * Triggered by `flagTranslation` for flagged retranslations of CURRICULUM
    * (premade-dataset) texts, on flag counts 1 through
-   * FLAG_RETRANSLATION_MAX. Routes through Gemini 3.1 Pro with medium
-   * reasoning — a different (heavier) model than the default Flash tier,
-   * so a flagged curriculum row genuinely gets a cross-model second
+   * `FLAG_AUTO_RETRANSLATION_MAX`. Routes through Gemini 3.1 Pro with
+   * medium reasoning — a different (heavier) model than the default Flash
+   * tier, so a flagged curriculum row genuinely gets a cross-model second
    * opinion. The worker also threads the previously-flagged translation
    * into the prompt as `<previous_translation>` context. Custom (user-
    * created) texts use `retranslation_custom` instead.
@@ -957,37 +987,19 @@ export const TRANSLATION_RULES = {
   },
   /**
    * Triggered by `flagTranslation` for flagged retranslations of CUSTOM
-   * (user-created) texts. Routes through Gemini Flash Lite with high
-   * reasoning — same model as the legacy default, used here because
-   * custom texts are user-generated content where a heavyweight Pro
-   * second opinion adds less value than on curated curriculum material.
-   * Worker behavior (previous-translation prompt block, replaceExisting
-   * write semantics) matches `retranslation_high`.
+   * (user-created) texts. Routes through Gemini 3.1 Flash Lite with
+   * `minimal` reasoning — kept on the cheaper Lite tier (vs. Pro Medium
+   * for curriculum) on the assumption that custom texts are mostly the
+   * user's own content where a heavyweight cross-model second opinion
+   * adds less value than on curated material. Worker behavior
+   * (previous-translation prompt block, `replaceExisting` write semantics)
+   * matches `retranslation_high`.
    */
   retranslation_custom: {
     id: 'retranslation_custom',
-    label: 'Gemini Flash Lite (high) — flagged custom retranslation',
+    label: 'Gemini 3.1 Flash Lite (minimal) — flagged custom retranslation',
     branches: [
-      { maxChars: Infinity, primary: GEMINI_FLASH_LITE_HIGH },
-    ],
-  },
-  /**
-   * DeepSeek V4 Flash with high reasoning, Gemini Flash Lite fallback on
-   * truncation. Currently **not assigned to any language** — kept around so
-   * we can re-enable it after running a quality eval. An initial side-by-side
-   * comparison on English→Chinese sentences showed DeepSeek tends toward
-   * over-literal renderings on idiomatic Chinese vs. Gemini Flash Lite, so
-   * all Asian languages are routed through `default_hybrid` for now.
-   */
-  asian_deepseek: {
-    id: 'asian_deepseek',
-    label: 'DeepSeek V4 Flash (high) → Gemini Flash Lite on truncation',
-    branches: [
-      {
-        maxChars: Infinity,
-        primary: DEEPSEEK_V4_FLASH_HIGH,
-        fallbacks: [GEMINI_FLASH_LITE],
-      },
+      { maxChars: Infinity, primary: GEMINI_FLASH_LITE_MINIMAL },
     ],
   },
 } satisfies Record<string, TranslationRule>;
@@ -1206,13 +1218,15 @@ export function getLocalizedLanguageNameByCode(
  *    pure-JS Thai romanizer into `convex/lib/localRomanization.ts` (no
  *    learner-grade option exists yet at the time of this change).
  */
-export const ROMANIZATION_LANGUAGES = new Set([
-  'ru', 'hi', 'bn', 'ja', 'ko',
-  'zh', 'zh_traditional',
-  'yue', 'yue_traditional',
-  'el', 'he',
-  'ar', 'ar_sa', 'ar_eg', 'ar_iq',
-]);
+// Derived from `SUPPORTED_LANGUAGES` so `needsRomanization` is the single
+// source of truth: flipping the flag on a language entry above immediately
+// removes it from every scheduling decision (decks.ts / llmTranslationQueue.ts
+// / translation.ts) and from every query response (cardContent.ts), and the
+// UI stops rendering stored romanization even for rows that were written
+// while the flag was still on.
+export const ROMANIZATION_LANGUAGES = new Set<string>(
+  SUPPORTED_LANGUAGES.filter((l) => l.needsRomanization).map((l) => l.code),
+);
 
 export function languageNeedsRomanization(code: string): boolean {
   return ROMANIZATION_LANGUAGES.has(code);

@@ -9,11 +9,11 @@
  * Prompt = the XML-structured Prompt B that won the eval (see
  * data_preparation/translation_eval/prompts.py).
  *
- * Reasoning level = the hybrid length-based rule by default
- *   - src_len < 30 chars → no reasoning field (minimal/fastest path)
- *   - src_len >= 30 chars → `reasoning: { effort: 'low' }`
- * unless the per-language override `translationReasoning` is set on the
- * Language config in lib/languages.ts (e.g. 'medium' for a tricky language).
+ * Reasoning level is decided by the caller (the translation rule's matching
+ * `ModelStage` in `lib/languages.ts → TRANSLATION_RULES`). This function
+ * just passes the provided `reasoning?: 'low' | 'medium' | 'high'` through
+ * to OpenRouter verbatim; if the caller omits it, no reasoning field is
+ * sent (the no-thinking path used by `default_hybrid`'s fallback stage).
  *
  * Truncation handling: if OpenRouter returns finishReason === 'length' (the
  * call hit MAX_OUTPUT_TOKENS — typically because reasoning ate the whole
@@ -38,7 +38,16 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
  */
 export const MAX_OUTPUT_TOKENS = 5_000;
 
-export type ReasoningEffort = 'low' | 'medium' | 'high';
+/**
+ * OpenRouter's documented reasoning-effort levels. The
+ * `@openrouter/ai-sdk-provider@1.5.4` types only enumerate
+ * `'high' | 'medium' | 'low'`, but OpenRouter itself accepts `'minimal'`
+ * (and `'none'` / `'xhigh'`) at runtime — for Gemini 3 / 3.1 it maps
+ * `effort: 'minimal'` to Google's `thinkingLevel: 'minimal'`, which is
+ * strictly lower than `'low'`. We allow `'minimal'` here and cast at the
+ * SDK boundary in `translateTextWithLLM` below.
+ */
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
 
 export type LlmTranslationFailure =
   | { ok: false; reason: 'truncated'; detail?: string }
@@ -228,8 +237,17 @@ export async function translateTextWithLLM(
       prompt,
       temperature: 0,
       maxOutputTokens,
+      // Cast: the SDK provider's typed enum is `'high' | 'medium' | 'low'`
+      // but OpenRouter accepts `'minimal'` at runtime (mapped to Gemini's
+      // `thinkingLevel: 'minimal'`). See the `ReasoningEffort` type above.
       ...(effort
-        ? { providerOptions: { openrouter: { reasoning: { effort } } } }
+        ? {
+            providerOptions: {
+              openrouter: {
+                reasoning: { effort: effort as 'low' | 'medium' | 'high' },
+              },
+            },
+          }
         : {}),
     });
   } catch (err) {

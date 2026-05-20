@@ -50,8 +50,8 @@ const libraryCardValidator = v.object({
 });
 
 /**
- * Paginated library query with optional full-text search and an exclusive
- * filter selection.
+ * Library query with optional full-text search and an exclusive filter
+ * selection. Returns up to `LIBRARY_LIMIT` cards in one shot — no pagination.
  *
  * activeFilter:
  *   undefined  → all non-hidden cards (default)
@@ -59,7 +59,7 @@ const libraryCardValidator = v.object({
  *   'hidden'   → only hidden cards
  *   'favorites'→ only favorited non-hidden cards
  */
-const LIBRARY_LIMIT = 200;
+const LIBRARY_LIMIT = 100;
 
 export const getLibraryCards = query({
   args: {

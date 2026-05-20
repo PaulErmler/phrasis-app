@@ -68,6 +68,18 @@ export function createHomeTour(t: TranslateFn): TutorialDefinition {
         align: 'center',
       },
     },
+    // Closing call-to-action — re-highlights Learn & Review (the primary
+    // entry point) so the tour finishes on the button the user is most
+    // likely to click next.
+    {
+      element: '[data-tutorial="learn-and-review"]',
+      popover: {
+        title: t('home.readyToLearn.title'),
+        description: t('home.readyToLearn.description'),
+        side: 'bottom',
+        align: 'center',
+      },
+    },
   ];
 
   return {

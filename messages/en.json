@@ -476,6 +476,8 @@
       "stateLearning": "learning",
       "stateReview": "review",
       "continue": "Continue",
+      "pause": "Pause auto-advance",
+      "resume": "Resume auto-advance",
       "progressToNextMilestone": "Progress to next milestone",
       "mediaSessionTitle": "Progress milestone"
     },
@@ -603,7 +605,7 @@
     "emptyBullet2": "The chat knows the sentence you are currently learning.",
     "emptyBullet3": "It can create sentences for you — you just confirm them.",
     "input": {
-      "placeholder": "What would you like to know?",
+      "placeholder": "What would you like to say?",
       "prompts": {
         "grammar": "Explain me the grammar of this sentence.",
         "sayInLanguage": "What is a simpler way to say this?",
@@ -1198,6 +1200,10 @@
       "difficultySelection": {
         "title": "Difficulty Selection",
         "description": "Here you can select your difficulty. Each difficulty is a collection of sentences for you to learn. They have been chosen based on word frequency such that you learn the most common words first. You can click on a collection to preview the upcoming sentences. Once you are ready, start with one of the learning modes."
+      },
+      "readyToLearn": {
+        "title": "Are you ready to continue learning?",
+        "description": ""
       }
     },
     "audioReview": {
