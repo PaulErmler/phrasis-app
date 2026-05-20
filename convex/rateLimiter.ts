@@ -7,13 +7,15 @@ import type { TtsProvider } from './types';
 // tokens and refills continuously. Sharded with the power-of-two-choices
 // trick to absorb concurrent `pumpQueue` mutations without OCC retries.
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
-  // 5% headroom under Google's 200 req/min Text-to-Speech quota.
+  // 25% headroom under Google's 200 req/min Text-to-Speech quota — lowered
+  // from 190 after still seeing 429s. TTS retries (validation re-synthesis)
+  // and clock drift between Convex and Google account for the gap.
   googleTts: {
     kind: 'token bucket',
-    rate: 190,
+    rate: 150,
     period: MINUTE,
-    capacity: 190,
-    shards: 10,
+    capacity: 150,
+    shards: 8,
   },
   elevenlabsTts: {
     kind: 'token bucket',
