@@ -202,9 +202,12 @@ export function ChatFlashcardDemo() {
       { code: baseLangCode, text: base },
       { code: 'es', text: target },
     ];
+    // Multi-language card: 1 base + 2 targets (es + fr). The MultiCardFields
+    // type still carries `hi` / `hiRoman` from the i18n source for back-
+    // compat, but they're no longer rendered — matches the Pro plan's
+    // "up to 3 languages per course" cap.
     const multiLines = (m: MultiCardFields): ProposalLine[] => [
       { code: baseLangCode, text: m.base },
-      { code: 'hi', text: m.hi, romanization: m.hiRoman },
       { code: 'es', text: m.es },
       { code: 'fr', text: m.fr },
     ];

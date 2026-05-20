@@ -25,12 +25,12 @@ describe('alignWordTimings', () => {
     ];
     const aligned = alignWordTimings('hola mundo', scribe, 'es');
     expect(aligned).toEqual([
-      { display: 'hola', leading: '', start: 0, end: 0.5, matched: true },
-      { display: 'mundo', leading: ' ', start: 0.6, end: 1.2, matched: true },
+      { display: 'hola', leading: '', trailing: '', start: 0, end: 0.5, matched: true },
+      { display: 'mundo', leading: ' ', trailing: '', start: 0.6, end: 1.2, matched: true },
     ]);
   });
 
-  it('folds intra-sentence punctuation into leading and matches the bare word', () => {
+  it('folds intra-sentence punctuation into leading and parks trailing on the last token', () => {
     const scribe: ScribeWord[] = [
       { word: 'hola', start: 0, end: 0.5 },
       { word: 'mundo', start: 0.6, end: 1.2 },
@@ -40,12 +40,27 @@ describe('alignWordTimings', () => {
     expect(aligned[0].matched).toBe(true);
     expect(aligned[1].matched).toBe(true);
     // Intra-sentence non-word runs go to the next token's `leading`; the
-    // trailing "!" (no token after it) attaches to the last token's display
-    // so the rendered text still includes final punctuation.
+    // trailing "!" (no token after it) is parked on the last token's
+    // `trailing` so the renderer can place it OUTSIDE the clickable span.
     expect(aligned[0].display).toBe('Hola');
     expect(aligned[0].leading).toBe('¡');
-    expect(aligned[1].display).toBe('mundo!');
+    expect(aligned[0].trailing).toBe('');
+    expect(aligned[1].display).toBe('mundo');
     expect(aligned[1].leading).toBe(', ');
+    expect(aligned[1].trailing).toBe('!');
+  });
+
+  it('keeps the last Arabic word free of trailing punctuation', () => {
+    // Regression: Arabic sentences ending in punctuation glued the final "؟"
+    // onto the last word's display, so the clickable span contained mixed
+    // RTL+LTR content and the popover trigger silently failed. The trailing
+    // run now lives on `.trailing`, leaving `.display` as pure Arabic.
+    const aligned = alignWordTimings('كيف حالك؟', null, 'ar');
+    expect(aligned).toHaveLength(2);
+    expect(aligned[0].display).toBe('كيف');
+    expect(aligned[0].trailing).toBe('');
+    expect(aligned[1].display).toBe('حالك');
+    expect(aligned[1].trailing).toBe('؟');
   });
 
   it('does not produce tokens for pure-punctuation runs between words', () => {
@@ -138,10 +153,12 @@ describe('alignWordTimings', () => {
       { word: 'bonito', start: 1.1, end: 1.6 },
     ];
     const aligned = alignWordTimings(text, scribe, 'es');
-    const reconstructed = aligned.map((w) => w.leading + w.display).join('');
-    // Joining leading+display across all tokens reconstructs the full source —
-    // every codepoint is in either a leading run or the trailing-attached
-    // display of the last token.
+    const reconstructed = aligned
+      .map((w) => w.leading + w.display + w.trailing)
+      .join('');
+    // Joining leading+display+trailing across all tokens reconstructs the
+    // full source — every codepoint is in either an inter-word leading run
+    // on the next token or in the final trailing slot on the last token.
     expect(reconstructed).toBe(text);
   });
 

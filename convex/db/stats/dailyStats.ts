@@ -42,7 +42,15 @@ export async function upsertDailyStats(
     hourOfDay?: number;
     cardState?: number; // 0=new, 1=learning, 2=review, 3=relearning
   },
-): Promise<{ isFirstActivityToday: boolean; repsAfter: number; timeMsAfter: number }> {
+): Promise<{
+  isFirstActivityToday: boolean;
+  repsAfter: number;
+  timeMsAfter: number;
+  /** Post-update count of non-radio reviews (audio + full). Drives the
+   * celebration milestone and the in-learn progress bar so radio plays don't
+   * inflate either. */
+  activeReviewsAfter: number;
+}> {
   const existing = await ctx.db
     .query('dailyStats')
     .withIndex('by_userId_and_courseId_and_date', (q) =>
@@ -123,7 +131,9 @@ export async function upsertDailyStats(
         ? { defaultRatingChanged: (existing.defaultRatingChanged ?? 0) + 1 }
         : {}),
     });
-    return { isFirstActivityToday: false, repsAfter, timeMsAfter };
+    const modeAfter = reviewsByMode ?? existing.reviewsByMode;
+    const activeReviewsAfter = (modeAfter?.audio ?? 0) + (modeAfter?.full ?? 0);
+    return { isFirstActivityToday: false, repsAfter, timeMsAfter, activeReviewsAfter };
   }
 
   // Insert new document
@@ -170,7 +180,14 @@ export async function upsertDailyStats(
     ...(args.wasDefaultRating === true ? { defaultRatingUsed: 1, defaultRatingChanged: 0 } : {}),
     ...(args.wasDefaultRating === false ? { defaultRatingUsed: 0, defaultRatingChanged: 1 } : {}),
   });
-  return { isFirstActivityToday: true, repsAfter: 1, timeMsAfter: args.timeMs };
+  const activeReviewsAfter =
+    args.reviewMode === 'audio' || args.reviewMode === 'full' ? 1 : 0;
+  return {
+    isFirstActivityToday: true,
+    repsAfter: 1,
+    timeMsAfter: args.timeMs,
+    activeReviewsAfter,
+  };
 }
 
 /**

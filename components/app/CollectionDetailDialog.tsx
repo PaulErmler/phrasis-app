@@ -94,7 +94,7 @@ export function CollectionDetailDialog({
 
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
-  const highlightEnabled = courseSettings?.highlightWords !== false;
+  const highlightEnabled = courseSettings?.highlightWords === true;
 
   if (!collectionName) return null;
 

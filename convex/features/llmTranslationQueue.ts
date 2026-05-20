@@ -11,10 +11,17 @@ import { Doc, Id } from '../_generated/dataModel';
 import { translateTextWithLLM, type ReasoningEffort } from './translationLLM';
 import {
   getTranslationConfigForLanguage,
+  getTranslationSourceFromStage,
   getVoiceForLanguage,
+  getVoiceForLanguageVariant,
+  resolveMixedVariant,
+  resolveTranslationStages,
   ROMANIZATION_LANGUAGES,
+  TRANSLATION_RULES,
+  type TranslationRuleId,
 } from '../../lib/languages';
 import { romanizeText } from './translation';
+import { getRomanizationSource } from '../lib/localRomanization';
 
 /**
  * LLM translation queue. Mirrors the TTS queue pattern in `ttsProcessing.ts`
@@ -36,9 +43,16 @@ import { romanizeText } from './translation';
  *      waiter, atomically.
  */
 
-const MAX_LLM_CONCURRENCY = 200;
+const MAX_LLM_CONCURRENCY = 64;
 const SLOT_STALE_MS = 60 * 1000; // 1 minute — longer than the longest API call
-const CLAIM_STALE_MS = 30 * 1000;
+/**
+ * Per-(textId, language) LLM claim freshness window. Claims older than this
+ * are treated as stale and reclaimable. Exported so callers like
+ * `scheduleMissingContent` can decide whether to defer a TTS enqueue while
+ * an LLM retranslation is in flight for the same row (a stale claim still
+ * holds the slot from this caller's perspective — pump will reclaim it).
+ */
+export const CLAIM_STALE_MS = 30 * 1000;
 
 // Slot bookkeeping bounds for `countLiveSlotsAndReclaimStale`. At steady-state
 // peak we can see up to MAX_LLM_CONCURRENCY fresh slots plus a backlog of
@@ -112,11 +126,23 @@ const llmJobArgsValidator = v.object({
   targetLanguage: v.string(),
   text: v.string(),
   audioSpeakerGender: v.optional(v.string()),
-  // Active-collection priority forwarded by the originating scheduling
-  // mutation. Used to keep prioritization intact when the worker hands off
-  // to storeTranslationAndScheduleTTS (downstream TTS) or to the Google
-  // fallback path. Defaults to 0 (normal) when missing.
-  priority: v.optional(v.union(v.literal(0), v.literal(1))),
+  // Priority forwarded by the originating scheduling mutation. Used to keep
+  // prioritization intact when the worker hands off to
+  // storeTranslationAndScheduleTTS (downstream TTS) or to the Google fallback
+  // path. Tiers: 2 = critical (onboarding seed / placement test), 1 = active
+  // collection, 0 = background warmup. Defaults to 0 when missing.
+  priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
+  // Retranslation flag forwarded to `storeTranslationAndScheduleTTS` (and
+  // through `scheduleGoogleFallback` to `processTranslationForCard`). Set
+  // by `flagTranslation` so the new LLM output overwrites the displayed
+  // text. See the storeTranslationAndScheduleTTS docstring for replacement
+  // semantics.
+  replaceExisting: v.optional(v.boolean()),
+  // Optional rule override forwarded to `resolveTranslationStages`. Used by
+  // `flagTranslation` to force the `retranslation_high` chain regardless of
+  // the language's normal routing. Worker validates against TRANSLATION_RULES
+  // and silently falls back to the language's rule on unknown values.
+  ruleOverride: v.optional(v.string()),
 });
 
 /**
@@ -131,10 +157,18 @@ export const pumpLlmQueue = internalMutation({
   handler: async (ctx) => {
     let used = await countLiveSlotsAndReclaimStale(ctx);
     while (used < MAX_LLM_CONCURRENCY) {
-      // Priority drain: high-priority (1, active collection) first, then
-      // normal (0), then any pre-priority rows (undefined) left over from a
-      // deploy. FIFO within each level via the queuedAt suffix in the index.
+      // Priority drain: critical (2, onboarding seed / placement test) first,
+      // then high (1, active collection), then normal (0), then any
+      // pre-priority rows (undefined) left over from a deploy. FIFO within
+      // each level via the queuedAt suffix in the index.
       const next =
+        (await ctx.db
+          .query('llmTranslationQueue')
+          .withIndex('by_priority_and_queuedAt', (q) =>
+            q.eq('priority', 2),
+          )
+          .order('asc')
+          .first()) ??
         (await ctx.db
           .query('llmTranslationQueue')
           .withIndex('by_priority_and_queuedAt', (q) =>
@@ -186,7 +220,7 @@ export const pumpLlmQueue = internalMutation({
 export const enqueueLlmTranslation = internalMutation({
   args: {
     args: llmJobArgsValidator,
-    priority: v.optional(v.union(v.literal(0), v.literal(1))),
+    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -225,8 +259,8 @@ export const finalizeLlmTranslationJob = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Release one slot — pick the oldest. With 200 in-flight calls this is
-    // bounded reading, so `.first()` is fine.
+    // Release one slot — pick the oldest. With MAX_LLM_CONCURRENCY in-flight
+    // calls this is bounded reading, so `.first()` is fine.
     const slot = await ctx.db.query('llmTranslationSlots').first();
     if (slot) {
       await ctx.db.delete(slot._id);
@@ -288,12 +322,35 @@ export const processLlmTranslationForCard = internalAction({
         return null;
       }
 
-      const cfg = getTranslationConfigForLanguage(args.targetLanguage);
-      if (cfg.provider !== 'openrouter' || !cfg.model) {
+      // Mixed-dialect targets (today: es_mixed) resolve to a concrete sub-
+      // variant per text. The LLM prompt is built using the sub-variant's
+      // config so the model gets accurate region instructions, and the
+      // persisted regionVariant lets the audio player synthesize with the
+      // matching accent.
+      const mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
+      const cfgLanguageCode = mixed ? mixed.subCode : args.targetLanguage;
+      const regionVariant = mixed?.regionVariant;
+
+      const cfg = getTranslationConfigForLanguage(cfgLanguageCode);
+      // Validate the rule override before passing it through — an unknown
+      // string would crash `resolveTranslationStages`. Unknown values silently
+      // fall back to the language's normal routing.
+      const ruleOverride =
+        args.ruleOverride && args.ruleOverride in TRANSLATION_RULES
+          ? (args.ruleOverride as TranslationRuleId)
+          : undefined;
+      const stages = resolveTranslationStages(
+        cfgLanguageCode,
+        text.text.length,
+        ruleOverride ? { ruleOverride } : undefined,
+      );
+      if (cfg.provider !== 'openrouter' || stages.length === 0) {
         // Misrouted: the queue worker should only ever receive openrouter
         // languages. Fall back to Google so the row still gets translated.
         console.warn('[llmTranslationQueue] non-openrouter language reached worker — falling back', {
           targetLanguage: args.targetLanguage,
+          resolvedSubCode: cfgLanguageCode,
+          stageCount: stages.length,
         });
         await scheduleGoogleFallback(ctx, args);
         scheduledFallback = true;
@@ -337,20 +394,113 @@ export const processLlmTranslationForCard = internalAction({
           ? (text.register as 'formal' | 'informal' | 'neutral')
           : undefined;
 
-      const result = await translateTextWithLLM({
+      // Fetch the sliding window of arc siblings (≤ 5 preceding + ≤ 3
+      // following), but only when this text has an arcId. Custom/chat and
+      // legacy rows skip the lookup entirely, so they pay no extra cost.
+      let arcContext:
+        | { preceding: string[]; following: string[] }
+        | undefined;
+      if (text.arcId && text.arcId.length > 0) {
+        arcContext = await ctx.runQuery(
+          internal.features.llmTranslationQueue.getArcWindowForText,
+          {
+            collectionId: text.collectionId,
+            arcId: text.arcId,
+            targetRank: text.collectionRank,
+          },
+        );
+        if (
+          arcContext.preceding.length === 0 &&
+          arcContext.following.length === 0
+        ) {
+          arcContext = undefined;
+        }
+      }
+
+      // Gate the "previous translation" prompt block to flag-triggered
+      // retranslations only. `flagTranslation` is the unique caller that
+      // sets BOTH `replaceExisting: true` (the storage-overwrite semantic)
+      // AND a flag-specific `ruleOverride` ('retranslation_high' for
+      // curriculum texts, 'retranslation_custom' for user-created texts).
+      // A future caller that sets `replaceExisting` for some other reason
+      // — e.g. a model-swap migration — must NOT see the "the user flagged
+      // this as wrong" framing, which would be a lie.
+      const FLAG_TRIGGERED_RULES = new Set<string>([
+        'retranslation_high',
+        'retranslation_custom',
+      ]);
+      let previousTranslation: string | undefined;
+      if (
+        args.replaceExisting &&
+        args.ruleOverride &&
+        FLAG_TRIGGERED_RULES.has(args.ruleOverride)
+      ) {
+        const existing = await ctx.runQuery(
+          internal.features.decks.getTranslationForTextLanguage,
+          {
+            textId: args.textId,
+            targetLanguage: args.targetLanguage,
+          },
+        );
+        if (existing && existing.translatedText.length > 0) {
+          previousTranslation = existing.translatedText;
+        }
+      }
+
+      const promptArgs = {
         text: text.text,
         sourceLang: args.sourceLanguage,
-        targetLang: args.targetLanguage,
+        // For mixed languages, expose the resolved sub-code to the LLM (e.g.
+        // 'es' or 'es_latam' rather than 'es_mixed'). The persisted row still
+        // uses the mixed code as targetLanguage; only the prompt's region
+        // context comes from the sub-variant.
+        targetLang: cfgLanguageCode,
         targetLangName: cfg.targetLangName,
+        targetLangNativeName: cfg.targetLangNativeName,
         targetRegion: cfg.targetRegion,
         addressesSomeone,
         referentGender,
         speakerGender,
         addresseeGender,
         formality,
-        model: cfg.model,
-        reasoning: cfg.reasoning as ReasoningEffort | undefined,
-      });
+        arcContext,
+        previousTranslation,
+      } as const;
+
+      // Run each stage of the resolved translation rule in order. The first
+      // success wins; on truncated / empty / HTTP error we try the next
+      // fallback. After the chain exhausts the worker schedules Google
+      // Translate as the final safety net. Track which stage produced the
+      // winning result so it can be persisted as `translationSource`.
+      let result: Awaited<ReturnType<typeof translateTextWithLLM>> | null = null;
+      let winningStage: (typeof stages)[number] | null = null;
+      for (let i = 0; i < stages.length; i++) {
+        const stage = stages[i];
+        result = await translateTextWithLLM({
+          ...promptArgs,
+          model: stage.model,
+          reasoning: stage.reasoning as ReasoningEffort | undefined,
+          maxOutputTokens: stage.maxOutputTokens,
+        });
+        if (result.ok) {
+          winningStage = stage;
+          break;
+        }
+        if (i < stages.length - 1) {
+          const next = stages[i + 1];
+          console.warn('[llmTranslationQueue] stage failed — retrying with next stage', {
+            textId: args.textId,
+            targetLanguage: args.targetLanguage,
+            stageIndex: i,
+            stageModel: stage.model,
+            stageReasoning: stage.reasoning,
+            reason: result.reason,
+            nextStageModel: next.model,
+            nextStageReasoning: next.reasoning,
+          });
+        }
+      }
+      if (!result) throw new Error('Unreachable: stages.length >= 1');
 
       if (!result.ok) {
         // Truncation / empty / HTTP error — fall back to Google for this row.
@@ -365,20 +515,47 @@ export const processLlmTranslationForCard = internalAction({
         return null;
       }
 
-      // Success: optionally romanize the translation (non-fatal), then write.
+      // Success: optionally romanize the translation, then write.
+      // `romanizeText` already retries up to 3 times internally; on full
+      // exhaustion we persist an empty-string sentinel so ensureContent
+      // doesn't reschedule another burst on every call.
       let romanizedText: string | undefined;
       if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
         try {
           romanizedText = await romanizeText(result.text, args.targetLanguage);
-        } catch {
-          // Non-fatal; downstream backfill action will retry on demand.
+        } catch (err) {
+          console.error(
+            `[llmTranslationQueue] Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
+            err instanceof Error ? err.message : err,
+          );
+          romanizedText = '';
         }
       }
 
-      const voiceName = getVoiceForLanguage(
-        args.targetLanguage,
-        args.audioSpeakerGender,
-      );
+      // For mixed languages, pick a voice matching the resolved regional
+      // variant so the synthesized audio agrees with the persisted
+      // `regionVariant`. Non-mixed languages fall through to the simple picker.
+      const voiceName = regionVariant
+        ? getVoiceForLanguageVariant(
+          args.targetLanguage,
+          regionVariant,
+          args.audioSpeakerGender,
+        )
+        : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
+
+      // Source resolved from `cfgLanguageCode` (the sub-code for mixed
+      // dialects) so the recorded source matches what `romanizeText` ran on.
+      const romanizationSource =
+        romanizedText !== undefined
+          ? getRomanizationSource(cfgLanguageCode)
+          : undefined;
+
+      // Translation source: derived from the stage that actually produced
+      // the result (not the primary), so a row that succeeded on a fallback
+      // is tagged with the fallback's model/reasoning.
+      const translationSource = winningStage
+        ? getTranslationSourceFromStage(winningStage)
+        : undefined;
 
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,
@@ -388,7 +565,11 @@ export const processLlmTranslationForCard = internalAction({
           translatedText: result.text,
           voiceName,
           romanizedText,
+          romanizationSource,
+          translationSource,
+          regionVariant,
           priority: args.priority,
+          replaceExisting: args.replaceExisting,
         },
       );
     } catch (err) {
@@ -431,7 +612,8 @@ async function scheduleGoogleFallback(
     targetLanguage: string;
     text: string;
     audioSpeakerGender?: string;
-    priority?: 0 | 1;
+    priority?: 0 | 1 | 2;
+    replaceExisting?: boolean;
   },
 ): Promise<void> {
   await ctx.scheduler.runAfter(
@@ -444,6 +626,7 @@ async function scheduleGoogleFallback(
       text: args.text,
       audioSpeakerGender: args.audioSpeakerGender,
       priority: args.priority,
+      replaceExisting: args.replaceExisting,
     },
   );
 }
@@ -486,6 +669,12 @@ export const getTextRowForTranslation = internalQuery({
       addresseeGender: v.optional(v.string()),
       register: v.optional(v.string()),
       referentGender: v.optional(v.string()),
+      // Arc-context plumbing fields. Present for premade-dataset texts that
+      // carry an arcId; undefined for legacy or user-created rows (which the
+      // worker then skips the arc-window lookup for).
+      collectionId: v.id('collections'),
+      collectionRank: v.number(),
+      arcId: v.optional(v.string()),
     }),
   ),
   handler: async (ctx, args) => {
@@ -501,6 +690,60 @@ export const getTextRowForTranslation = internalQuery({
       addresseeGender: row.addresseeGender,
       register: row.register,
       referentGender: row.referentGender,
+      collectionId: row.collectionId,
+      collectionRank: row.collectionRank,
+      arcId: row.arcId,
+    };
+  },
+});
+
+const ARC_WINDOW_PRECEDING = 5;
+const ARC_WINDOW_FOLLOWING = 3;
+
+/**
+ * Sliding-window arc context. Two bounded indexed range scans (≤ 5 + ≤ 3
+ * documents) against `by_collection_arcId_and_rank`. Returns sentences in
+ * chronological (collectionRank ASC) order — the target's neighbors but not
+ * the target itself, which the caller wraps with `<target>` in the prompt.
+ */
+export const getArcWindowForText = internalQuery({
+  args: {
+    collectionId: v.id('collections'),
+    arcId: v.string(),
+    targetRank: v.number(),
+  },
+  returns: v.object({
+    preceding: v.array(v.string()),
+    following: v.array(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    const precedingDesc = await ctx.db
+      .query('texts')
+      .withIndex('by_collection_arcId_and_rank', (q) =>
+        q
+          .eq('collectionId', args.collectionId)
+          .eq('arcId', args.arcId)
+          .lt('collectionRank', args.targetRank),
+      )
+      .order('desc')
+      .take(ARC_WINDOW_PRECEDING);
+
+    const following = await ctx.db
+      .query('texts')
+      .withIndex('by_collection_arcId_and_rank', (q) =>
+        q
+          .eq('collectionId', args.collectionId)
+          .eq('arcId', args.arcId)
+          .gt('collectionRank', args.targetRank),
+      )
+      .order('asc')
+      .take(ARC_WINDOW_FOLLOWING);
+
+    // `precedingDesc` came back in descending rank order; reverse so the
+    // prompt window reads chronologically (oldest → target → newest).
+    return {
+      preceding: precedingDesc.reverse().map((t) => t.text),
+      following: following.map((t) => t.text),
     };
   },
 });

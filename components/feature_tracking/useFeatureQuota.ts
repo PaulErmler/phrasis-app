@@ -16,42 +16,33 @@ export interface FeatureQuotaInfo {
  * Reactive hook for a single feature's quota state, powered by the Convex
  * `usageQuotas` table. Defaults to available while loading so the UI doesn't
  * flash a false "locked" state -- the server mutation is the authoritative gate.
+ *
+ * Note: `getMyQuotas` returns `null` both when the user is unauthenticated and
+ * when their `usageQuotas` row hasn't been synced yet (syncQuotas runs as a
+ * side effect on app mount and can take hundreds of ms). The same goes for a
+ * feature that just isn't in the synced map yet. We treat both as transient
+ * loading so the +Add / call-to-action button doesn't flash from gated to
+ * enabled while sync completes.
  */
 export function useFeatureQuota(featureId: string): FeatureQuotaInfo {
   const quotas = useQuery(api.usage.queries.getMyQuotas);
 
-  if (quotas === undefined) {
-    return {
-      balance: 0,
-      included: 0,
-      used: 0,
-      unlimited: false,
-      isAvailable: true,
-      isLoading: true,
-    };
-  }
+  const loadingFallback: FeatureQuotaInfo = {
+    balance: 0,
+    included: 0,
+    used: 0,
+    unlimited: false,
+    isAvailable: true,
+    isLoading: true,
+  };
 
-  if (quotas === null) {
-    return {
-      balance: 0,
-      included: 0,
-      used: 0,
-      unlimited: false,
-      isAvailable: false,
-      isLoading: false,
-    };
+  if (quotas === undefined || quotas === null) {
+    return loadingFallback;
   }
 
   const feature = quotas.features[featureId];
   if (!feature) {
-    return {
-      balance: 0,
-      included: 0,
-      used: 0,
-      unlimited: false,
-      isAvailable: false,
-      isLoading: false,
-    };
+    return loadingFallback;
   }
 
   return {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { Fragment, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import {
   alignWordTimings,
@@ -106,21 +106,28 @@ export function HighlightedText({
       const isCurrent = i === currentIndex;
       const isHighlighted = highlightedIndices?.has(i) ?? false;
       return (
-        <span
-          key={i}
-          className={cn(
-            'transition-colors duration-200',
-            isCurrent && 'text-primary',
-          )}
-          style={
-            !isCurrent && isHighlighted
-              ? { color: 'var(--accent-orange)' }
-              : undefined
-          }
-        >
-          {w.leading}
-          {w.display}
-        </span>
+        // Fragment (not wrapper span) so the rendered span count stays at one
+        // per word — tests query `container.querySelectorAll('span')` and
+        // index by word position. Trailing is "" on every token except the
+        // last, so this is effectively a single text node after the final
+        // word's colored span.
+        <Fragment key={i}>
+          <span
+            className={cn(
+              'transition-colors duration-200',
+              isCurrent && 'text-primary',
+            )}
+            style={
+              !isCurrent && isHighlighted
+                ? { color: 'var(--accent-orange)' }
+                : undefined
+            }
+          >
+            {w.leading}
+            {w.display}
+          </span>
+          {w.trailing}
+        </Fragment>
       );
     });
   }, [aligned, currentIndex, highlightedIndices]);

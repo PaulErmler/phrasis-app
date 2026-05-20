@@ -16,6 +16,13 @@ export interface CardTranslation {
   isBaseLanguage: boolean;
   isTargetLanguage: boolean;
   romanization?: string;
+  /**
+   * True while an LLM retranslation is in flight for this language
+   * (server-driven, keyed off `llmTranslationClaims`). Excludes the
+   * "regenerate audio" flow, which has no LLM phase. Drives the warning-
+   * color "Retranslating" pill in the card header.
+   */
+  retranslating?: boolean;
 }
 
 export interface WordTiming {
@@ -29,6 +36,13 @@ export interface CardAudioRecording {
   voiceName: string | null;
   url: string | null;
   wordTimings: WordTiming[] | null;
+  /**
+   * TTS validation state mirrored from the server. 'unknown' while a synthesis
+   * attempt is in flight; 'validated' or 'unvalidated' once the loop finishes.
+   * Drives the retranslating-pill logic in the server query — clients
+   * generally don't need to read it directly.
+   */
+  ttsQuality: string | null;
 }
 
 export interface CourseSettings {

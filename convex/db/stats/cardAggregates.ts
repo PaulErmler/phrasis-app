@@ -9,7 +9,7 @@ import { LEGACY_TO_NEW_CODE } from '../../lib/collections';
 // State label helpers
 // ============================================================================
 
-import { FSRS_STATE_LABELS } from '../../lib/fsrsStates';
+import { FSRS_STATE_LABELS, EXTENDED_STATE_LABELS } from '../../lib/fsrsStates';
 
 /**
  * Derive a single state label for a card document.
@@ -206,6 +206,24 @@ async function resolveProgressTargetCollectionId(
     .collect();
   const target = candidates.find((c) => c.datasetId === reconciledDatasetId);
   return target?._id ?? collectionId;
+}
+
+/**
+ * Clear all three card aggregates for a single deck. For `cardsByStateAndDueDate`
+ * the namespace is `${deckId}:${state}`, so we clear every possible state label.
+ *
+ * Used by the global backfill and the per-user recalc migrations before they
+ * re-insert from the cards table.
+ */
+export async function clearAggregatesForDeck(
+  ctx: MutationCtx,
+  deckId: Id<'decks'>,
+): Promise<void> {
+  await cardsByState.clear(ctx, { namespace: deckId });
+  await cardsByDueDate.clear(ctx, { namespace: deckId });
+  for (const state of EXTENDED_STATE_LABELS) {
+    await cardsByStateAndDueDate.clear(ctx, { namespace: `${deckId}:${state}` });
+  }
 }
 
 /**

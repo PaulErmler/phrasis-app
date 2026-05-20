@@ -1,19 +1,29 @@
 import { describe, it, expect } from 'vitest';
 import { scoreWordAlignment } from '@/lib/textCompare/score';
-import type { WordAlignResult } from '@/lib/textCompare/wordAlign';
+import type {
+  AlignedWord,
+  WordAlignResult,
+  WordTag,
+} from '@/lib/textCompare/wordAlign';
 
 function makeResult(counts: Partial<WordAlignResult['counts']>): WordAlignResult {
-  return {
-    words: [],
-    counts: {
-      equal: 0,
-      typo: 0,
-      wrong: 0,
-      missing: 0,
-      extra: 0,
-      ...counts,
-    },
+  const full = {
+    equal: 0,
+    typo: 0,
+    wrong: 0,
+    missing: 0,
+    extra: 0,
+    ...counts,
   };
+  // Score reads from `words` (so punctuation tokens can be filtered out), so
+  // expand the counts into a matching synthetic words array.
+  const words: AlignedWord[] = [];
+  (Object.keys(full) as WordTag[]).forEach((tag) => {
+    for (let i = 0; i < full[tag]; i++) {
+      words.push({ tag, kind: 'word', expected: 'x', actual: 'x' });
+    }
+  });
+  return { words, counts: full };
 }
 
 describe('scoreWordAlignment', () => {

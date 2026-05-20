@@ -85,7 +85,9 @@ export function LanguageSwitcher({
   // Compact mode - use DropdownMenu like ThemeSwitcher
   if (compact) {
     return (
-      <DropdownMenu>
+      // `modal={false}` — see ThemeSwitcher for the same reasoning. Default
+      // modal=true locks body scroll and shifts the layout on every open.
+      <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"

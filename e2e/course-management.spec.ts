@@ -155,14 +155,16 @@ test.describe("course management", () => {
     ).toBeVisible({ timeout: 8_000 });
     await createBtn.click();
 
-    // Step 1: target language. Buttons are labelled "French Français" /
-    // "Italian Italiano" (English name + native), so match by substring.
-    const french = page.getByRole("button", { name: /french|français/i }).first();
-    const italian = page.getByRole("button", { name: /italian|italiano/i }).first();
+    // Step 1: target language. Use testids — `language-option-<code>` is
+    // attached to every CommandItem inside the shared LanguageSelector.
+    const french = page.getByTestId("language-option-fr").first();
+    const italian = page.getByTestId("language-option-it").first();
     let targetLang = "";
+    let targetCode = "";
     if (await french.isVisible().catch(() => false)) {
       await french.click();
       targetLang = "french";
+      targetCode = "fr";
     } else {
       await expect(
         italian,
@@ -170,13 +172,12 @@ test.describe("course management", () => {
       ).toBeVisible({ timeout: 5_000 });
       await italian.click();
       targetLang = "italian";
+      targetCode = "it";
     }
     await page.getByTestId("course-dialog-next").first().click();
 
-    // Step 2: base language. Same substring-match approach.
-    const english = page
-      .getByRole("button", { name: /(?<!american\s)english/i })
-      .first();
+    // Step 2: base language — English.
+    const english = page.getByTestId("language-option-en").first();
     if (await english.isVisible().catch(() => false)) {
       await english.click();
     }
@@ -188,11 +189,18 @@ test.describe("course management", () => {
 
     await expect(async () => {
       const onLearn = /\/app\/learn/.test(page.url());
-      const courseBtn = page
+      // After course creation, the course menu list (still mounted at this
+      // point in the flow) gets a new entry tagged with its target language
+      // via `data-target-language=<code>`. Look for it deterministically.
+      const courseRow = page
+        .locator(`[data-testid="course-menu-entry"][data-target-language="${targetCode}"]`)
+        .first();
+      const rowVisible = await courseRow.isVisible().catch(() => false);
+      const fallbackByName = page
         .getByRole("button", { name: new RegExp(targetLang, "i") })
         .first();
-      const btnVisible = await courseBtn.isVisible().catch(() => false);
-      expect(onLearn || btnVisible).toBe(true);
+      const fallbackVisible = await fallbackByName.isVisible().catch(() => false);
+      expect(onLearn || rowVisible || fallbackVisible).toBe(true);
     }).toPass({ timeout: 30_000 });
   });
 });

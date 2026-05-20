@@ -21,14 +21,21 @@ import { CarouselDots } from "@/components/ui/carousel-dots";
 
 export default function PricingTable({
   productDetails,
+  excludeFreePlan = false,
 }: {
   productDetails?: ProductDetails[];
+  /** When true, drop products whose `properties.is_free` is set. Used by the
+   *  onboarding flow where the user must commit to a paid tier to finish. */
+  excludeFreePlan?: boolean;
 }) {
   const t = useTranslations("Pricing");
   const { customer, checkout, isLoading: isCustomerLoading } = useCustomer({ errorOnNotFound: false });
 
   const [isAnnual, setIsAnnual] = useState(false);
-  const { products, isLoading: isProductsLoading, error, refetch } = usePricingTable({ productDetails });
+  const { products: rawProducts, isLoading: isProductsLoading, error, refetch } = usePricingTable({ productDetails });
+  const products = excludeFreePlan
+    ? rawProducts?.filter((p) => !p.properties?.is_free)
+    : rawProducts;
 
   const hasRefetchedRef = useRef(false);
   const [isRefetching, setIsRefetching] = useState(false);
@@ -109,6 +116,9 @@ export default function PricingTable({
       {products && (
         <PricingTableContainer
           products={products}
+          customerProducts={
+            (customer?.products ?? []) as CustomerProductLite[]
+          }
           isAnnualToggle={isAnnual}
           setIsAnnualToggle={setIsAnnual}
           multiInterval={multiInterval}
@@ -142,15 +152,30 @@ export default function PricingTable({
   );
 }
 
+// Minimal subset of Autumn's CustomerProduct that the badge-gating logic
+// needs. Avoids depending on the (non-exported) full CustomerProduct type;
+// the fields here match what `useCustomer().customer.products[number]` ships.
+// `is_default` marks Autumn's auto-assigned free plan that every customer
+// has — we need to ignore it when asking "has the user subscribed to
+// anything?".
+type CustomerProductLite = {
+  id: string;
+  status: string;
+  is_default: boolean;
+  is_add_on: boolean;
+};
+
 const PricingTableContext = createContext<{
   isAnnualToggle: boolean;
   setIsAnnualToggle: (isAnnual: boolean) => void;
   products: Product[];
+  customerProducts: CustomerProductLite[];
   showFeatures: boolean;
     }>({
       isAnnualToggle: false,
       setIsAnnualToggle: () => {},
       products: [],
+      customerProducts: [],
       showFeatures: true,
     });
 
@@ -167,6 +192,7 @@ export const usePricingTableContext = (componentName: string) => {
 export const PricingTableContainer = ({
   children,
   products,
+  customerProducts = [],
   showFeatures = true,
   className,
   isAnnualToggle,
@@ -175,6 +201,7 @@ export const PricingTableContainer = ({
 }: {
   children?: React.ReactNode;
   products?: Product[];
+  customerProducts?: CustomerProductLite[];
   showFeatures?: boolean;
   className?: string;
   isAnnualToggle: boolean;
@@ -194,7 +221,13 @@ export const PricingTableContainer = ({
   const hasRecommended = products?.some((p) => p.display?.recommend_text);
   return (
     <PricingTableContext.Provider
-      value={{ isAnnualToggle, setIsAnnualToggle, products, showFeatures }}
+      value={{
+        isAnnualToggle,
+        setIsAnnualToggle,
+        products,
+        customerProducts,
+        showFeatures,
+      }}
     >
       <div
         className={cn(
@@ -251,9 +284,21 @@ export const PricingCard = ({
 }: PricingCardProps) => {
   const t = useTranslations("Pricing");
   const tFeatures = useTranslations("Features");
-  const { products, showFeatures } = usePricingTableContext("PricingCard");
+  const { products, showFeatures, customerProducts } =
+    usePricingTableContext("PricingCard");
 
   const product = products.find((p) => p.id === productId);
+
+  // Trial badge gating: hide once the user has a real paid relationship,
+  // but keep showing it to trialing users so e.g. a Basic-trial customer
+  // can still start a Pro trial. `is_default: true` is Autumn's auto-
+  // assigned free plan, `is_add_on: true` is a bolt-on usage product —
+  // neither counts as a subscription. Trial entries (`status:
+  // "trialing"`) are skipped on purpose so trial-stacking stays open.
+  const userHasNonTrialSubscription = customerProducts.some(
+    (cp) =>
+      !cp.is_default && !cp.is_add_on && cp.status !== "trialing",
+  );
 
   if (!product) {
     throw new Error(`Product with id ${productId} not found`);
@@ -261,7 +306,11 @@ export const PricingCard = ({
 
   const { name, display: productDisplay } = product;
 
-  const { buttonText } = getPricingTableContent(product, t);
+  const { buttonText } = getPricingTableContent(
+    product,
+    t,
+    userHasNonTrialSubscription,
+  );
 
   const isRecommended = productDisplay?.recommend_text ? true : false;
   const intervalGroup = product.properties?.interval_group;
@@ -326,6 +375,34 @@ export const PricingCard = ({
                 </div>
               </h3>
             </div>
+            {/* Trial badge only when:
+                 - the product itself offers a trial,
+                 - this card is one the viewer can fresh-subscribe to
+                   (scenario `"new"` for users with no plan record,
+                   `"upgrade"` for users on the auto-default free plan
+                   moving to a paid tier — both mean "not currently on
+                   this card"; "active"/"scheduled"/"renew"/"cancel"
+                   indicate the viewer is on or scheduled-onto this
+                   card and should NOT see the trial promo), AND
+                 - the viewer has no committed paid plan (trials don't
+                   count, so a Basic-trial user can still see the Pro
+                   trial badge).
+                The `userHasNonTrialSubscription` guard is the safety
+                net: a paid Pro viewer looking at Basic could see
+                `scenario === "downgrade"` (also non-current), so the
+                third condition prevents the trial promo leaking on
+                paid users regardless of how Autumn labels the other
+                card. */}
+            {product.properties?.has_trial &&
+              (product.scenario === "new" ||
+                product.scenario === "upgrade") &&
+              !userHasNonTrialSubscription && (
+              <div className="px-6 mb-4">
+                <div className="rounded-md bg-primary/10 text-primary border border-primary/20 px-3 py-2 text-sm font-semibold text-center">
+                  21-day free trial
+                </div>
+              </div>
+            )}
           </div>
           {showFeatures && featureItems.length > 0 && (
             <div className="flex-grow px-6 mb-6">

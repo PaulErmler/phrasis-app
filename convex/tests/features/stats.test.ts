@@ -142,98 +142,86 @@ describe("features/stats", () => {
     });
   });
 
-  describe("getTodayReviewCount", () => {
-    it("returns 0 when unauthenticated", async () => {
-      const t = convexTest(schema, modules);
-      const res = await t.query(api.features.stats.getTodayReviewCount, {
-        timezone: "UTC",
-      });
-      expect(res).toBe(0);
-    });
-
-    it("returns 0 when there is no active course", async () => {
-      const t = convexTest(schema, modules);
-      const asUser = t.withIdentity({ subject: "user_A" });
-      const res = await asUser.query(api.features.stats.getTodayReviewCount, {
-        timezone: "UTC",
-      });
-      expect(res).toBe(0);
-    });
-
-    it("returns 0 when no dailyStats row exists for today", async () => {
-      const t = convexTest(schema, modules);
-      await seedActiveCourse(t);
-      const asUser = t.withIdentity({ subject: "user_A" });
-      const res = await asUser.query(api.features.stats.getTodayReviewCount, {
-        timezone: "UTC",
-      });
-      expect(res).toBe(0);
-    });
-
-    it("returns the reps from today's dailyStats row", async () => {
+  describe("getNewWordsForCelebration", () => {
+    it("buckets rows by sessionId match: matching → session, different or missing → today", async () => {
       const t = convexTest(schema, modules);
       const { courseId } = await seedActiveCourse(t);
-      // Compute today the same way the query does (UTC).
-      const today = new Date().toISOString().slice(0, 10);
       await t.run(async (ctx) => {
-        await ctx.db.insert("dailyStats", {
+        // Matching sessionId → session bucket
+        await ctx.db.insert("userWords", {
           userId: "user_A",
           courseId,
-          date: today,
-          reps: 7,
-          newCards: 3,
-          timeMs: 60_000,
-          cardsReviewed: 7,
+          language: "es",
+          word: "hola",
+          displayWord: "hola",
+          sessionId: "session-current",
+        });
+        // Different sessionId → today bucket (earlier session today)
+        await ctx.db.insert("userWords", {
+          userId: "user_A",
+          courseId,
+          language: "es",
+          word: "adios",
+          displayWord: "adios",
+          sessionId: "session-earlier",
+        });
+        // No sessionId field → today bucket. Strict semantics: an orphaned
+        // row stays orphaned so a regression that re-introduces missing
+        // sessionIds is visible on the celebration screen, not masked.
+        await ctx.db.insert("userWords", {
+          userId: "user_A",
+          courseId,
+          language: "es",
+          word: "gracias",
+          displayWord: "gracias",
         });
       });
+
       const asUser = t.withIdentity({ subject: "user_A" });
-      const res = await asUser.query(api.features.stats.getTodayReviewCount, {
-        timezone: "UTC",
-      });
-      expect(res).toBe(7);
+      const res = await asUser.query(
+        api.features.stats.getNewWordsForCelebration,
+        { sessionId: "session-current", timezone: "UTC" },
+      );
+
+      expect(res.session.map((w) => w.display)).toEqual(["hola"]);
+      expect(res.today.map((w) => w.display).sort()).toEqual([
+        "adios",
+        "gracias",
+      ]);
     });
 
-    it("ignores other dates and other users' dailyStats", async () => {
+    it("dedupes by (language, word) and promotes today → session when a session row exists for the same word", async () => {
       const t = convexTest(schema, modules);
       const { courseId } = await seedActiveCourse(t);
-      const today = new Date().toISOString().slice(0, 10);
       await t.run(async (ctx) => {
-        // Yesterday — must be ignored.
-        await ctx.db.insert("dailyStats", {
+        // Two rows for the same (language, word) — different sessionIds.
+        // The session row must win regardless of insertion order.
+        await ctx.db.insert("userWords", {
           userId: "user_A",
           courseId,
-          date: "2000-01-01",
-          reps: 999,
-          newCards: 0,
-          timeMs: 0,
-          cardsReviewed: 999,
+          language: "es",
+          word: "hola",
+          displayWord: "hola",
+          sessionId: "session-earlier",
         });
-        // Different user, today — must be ignored.
-        await ctx.db.insert("dailyStats", {
-          userId: "user_B",
-          courseId,
-          date: today,
-          reps: 999,
-          newCards: 0,
-          timeMs: 0,
-          cardsReviewed: 999,
-        });
-        // Today, this user — should be returned.
-        await ctx.db.insert("dailyStats", {
+        await ctx.db.insert("userWords", {
           userId: "user_A",
           courseId,
-          date: today,
-          reps: 4,
-          newCards: 1,
-          timeMs: 30_000,
-          cardsReviewed: 4,
+          language: "es",
+          word: "hola",
+          displayWord: "hola",
+          sessionId: "session-current",
         });
       });
+
       const asUser = t.withIdentity({ subject: "user_A" });
-      const res = await asUser.query(api.features.stats.getTodayReviewCount, {
-        timezone: "UTC",
-      });
-      expect(res).toBe(4);
+      const res = await asUser.query(
+        api.features.stats.getNewWordsForCelebration,
+        { sessionId: "session-current", timezone: "UTC" },
+      );
+
+      expect(res.session.map((w) => w.display)).toEqual(["hola"]);
+      expect(res.today).toEqual([]);
     });
   });
 });

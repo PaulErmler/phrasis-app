@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { dismissTour } from "./helpers";
 
 /**
  * Mutating tests for the content-source filter dropdown. Runs in the
@@ -7,12 +8,26 @@ import { test, expect } from "@playwright/test";
  *
  * Each test resets the filter to "Both" in afterEach so subsequent specs
  * see the same baseline.
+ *
+ * NOTE: the `home_tour` driver.js overlay highlights the very element
+ * these tests click (`[data-tutorial="content-source-filter"]`, see
+ * `lib/tutorials/home-tour.ts`). Without an explicit dismiss the SVG
+ * backdrop intercepts every click. `beforeEach` lands on `/app` once and
+ * tears the overlay down before any per-test interaction begins.
  */
 
 test.describe("content filter — mutating dropdown flows", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/app");
+    await page.waitForLoadState("domcontentloaded");
+    await dismissTour(page, "home_tour");
+  });
+
   test.afterEach(async ({ page }) => {
-    // Best-effort reset. If the test left us on a different page, the
-    // dropdown won't be present and this is a no-op.
+    // Best-effort reset. The test body may have re-fired the tour (a
+    // route bounce, re-mount, etc.); strip it again before touching the
+    // trigger so the SVG backdrop doesn't intercept the click.
+    await dismissTour(page).catch(() => {});
     const trigger = page.getByTestId("content-filter-trigger");
     if (await trigger.isVisible().catch(() => false)) {
       await trigger.click();
@@ -29,9 +44,6 @@ test.describe("content filter — mutating dropdown flows", () => {
   test("trigger keeps a fixed width across all three selections", async ({
     page,
   }) => {
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
-
     const trigger = page.getByTestId("content-filter-trigger");
     await expect(trigger).toBeVisible({ timeout: 10_000 });
 
@@ -59,9 +71,6 @@ test.describe("content filter — mutating dropdown flows", () => {
   test("setting filter to 'course' shows the Off pill on the Custom tab only", async ({
     page,
   }) => {
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
-
     const trigger = page.getByTestId("content-filter-trigger");
     await expect(trigger).toBeVisible({ timeout: 10_000 });
 
@@ -76,9 +85,6 @@ test.describe("content filter — mutating dropdown flows", () => {
   test("setting filter to 'custom' shows the Off pill on the Course tab only", async ({
     page,
   }) => {
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
-
     const trigger = page.getByTestId("content-filter-trigger");
     await expect(trigger).toBeVisible({ timeout: 10_000 });
 
@@ -92,9 +98,6 @@ test.describe("content filter — mutating dropdown flows", () => {
   test("clicking the Off pill on the currently-selected tab opens a re-enable popover", async ({
     page,
   }) => {
-    await page.goto("/app");
-    await page.waitForLoadState("domcontentloaded");
-
     // Set filter to 'custom' → Course tab gets the Off pill.
     const trigger = page.getByTestId("content-filter-trigger");
     await trigger.click();

@@ -109,6 +109,66 @@ describe("features/customTexts", () => {
       expect(quota?.features.custom_sentences.balance).toBe(9);
       expect(quota?.features.custom_sentences.used).toBe(1);
     });
+
+    it("persists the caller-supplied translationSource on each translation row", async () => {
+      // Simulates the EnterTextsView save flow where some rows came back
+      // from autofill (carry an LLM model id) and others were user-typed
+      // (carry `'user-provided'`).
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["es", "fr"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            custom_sentences: { balance: 10, included: 10, used: 0, unlimited: false },
+            card_edits: { balance: 10, included: 10, used: 0, unlimited: false },
+            translation_auto_fill: { balance: 10, included: 10, used: 0, unlimited: false },
+          },
+          lastSyncedAt: Date.now(),
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.customTexts.createCustomText,
+        {
+          translations: [
+            { language: "en", text: "Hello", translationSource: "user-provided" },
+            {
+              language: "es",
+              text: "Hola",
+              translationSource: "openrouter/some-model-none",
+            },
+            // fr deliberately omits translationSource — the row should land
+            // with the field unset (null in Convex), not be rejected.
+            { language: "fr", text: "Bonjour" },
+          ],
+          timezone: "UTC",
+        },
+      );
+      const translations = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_textId", (q) => q.eq("textId", res.textId))
+          .collect(),
+      );
+      const byLang = Object.fromEntries(
+        translations.map((tr) => [tr.targetLanguage, tr.translationSource]),
+      );
+      expect(byLang.es).toBe("openrouter/some-model-none");
+      // `fr` omitted a source → row lands with the field unset. Convex's
+      // serialization through `.collect()` for unset optionals can surface
+      // as either `null` or `undefined`; either means "no tag".
+      expect(byLang.fr ?? null).toBeNull();
+    });
   });
 
   describe("autoFillTranslations", () => {
@@ -120,6 +180,32 @@ describe("features/customTexts", () => {
           targetLanguages: ["es"],
         }),
       ).rejects.toThrow();
+    });
+
+    it("throws INVALID_LANGUAGES when a source language is not in the active course", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      // Active course is en→es; fr is not in the course.
+      await expect(
+        asUser.action(api.features.customTexts.autoFillTranslations, {
+          texts: [{ language: "fr", text: "Bonjour" }],
+          targetLanguages: ["es"],
+        }),
+      ).rejects.toThrow(/fr/);
+    });
+
+    it("throws INVALID_LANGUAGES when a target language is not in the active course", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      // Active course is en→es; de is not in the course.
+      await expect(
+        asUser.action(api.features.customTexts.autoFillTranslations, {
+          texts: [{ language: "en", text: "Hello" }],
+          targetLanguages: ["de"],
+        }),
+      ).rejects.toThrow(/de/);
     });
 
     it("calls OpenRouter with the system prompt", async () => {
@@ -145,7 +231,17 @@ describe("features/customTexts", () => {
           targetLanguages: ["es"],
         },
       );
-      expect(res.translations).toEqual([{ language: "es", text: "Hola" }]);
+      // Every autofill row carries a `translationSource` tag now — the
+      // autofill model id, no reasoning suffix. The exact slug is owned by
+      // OPENROUTER_MODELS.translationAutoFill in convex/config/aiModels.ts;
+      // we just assert the shape (language/text/translationSource) rather
+      // than re-spelling that slug here.
+      expect(res.translations).toHaveLength(1);
+      expect(res.translations[0]).toMatchObject({
+        language: "es",
+        text: "Hola",
+      });
+      expect(res.translations[0].translationSource).toMatch(/-none$/);
       expect(res.metadata.register).toBe("neutral");
       // Verify the system prompt was passed through.
       expect(generateText).toHaveBeenCalled();
@@ -241,6 +337,26 @@ describe("features/customTexts", () => {
         ctx.db.query("collections").first(),
       );
       expect(collection?.textCount).toBe(3);
+
+      // Bulk-import path is exclusively manual — every inserted translation
+      // must carry the `'user-provided'` tag so a future strategy swap won't
+      // overwrite text the user typed.
+      const allTranslations = await t.run(async (ctx) =>
+        Promise.all(
+          res.createdTextIds.map((textId) =>
+            ctx.db
+              .query("translations")
+              .withIndex("by_textId", (q) => q.eq("textId", textId))
+              .collect(),
+          ),
+        ),
+      );
+      for (const rows of allTranslations) {
+        expect(rows.length).toBeGreaterThan(0);
+        for (const row of rows) {
+          expect(row.translationSource).toBe("user-provided");
+        }
+      }
     });
 
     it("returns skipped entries for invalid rows without aborting the batch", async () => {

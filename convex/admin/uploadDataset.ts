@@ -118,6 +118,10 @@ export const batchUpsertDatasetTexts = internalMutation({
         addressesSomeone: v.union(v.boolean(), v.null()),
         addresseeGender: v.union(v.string(), v.null()), // '' for descriptive; else 'male'|'female'
         referentGender: v.union(v.string(), v.null()), // always 'male'|'female' for sentences with a human referent; '' if upload omits
+        // OGTE arc grouping (curation manifest). Empty string / null → clear
+        // the field. Sentences sharing a (collectionId, arcId) get pulled
+        // into each other's translation prompts as a sliding context window.
+        arcId: v.union(v.string(), v.null()),
       }),
     ),
   },
@@ -161,6 +165,8 @@ export const batchUpsertDatasetTexts = internalMutation({
         t.addresseeGender === null || t.addresseeGender === '' ? undefined : t.addresseeGender;
       const referentGender =
         t.referentGender === null || t.referentGender === '' ? undefined : t.referentGender;
+      const arcId =
+        t.arcId === null || t.arcId === '' ? undefined : t.arcId;
       const existing = existingByExternalId.get(t.externalId);
       if (existing) {
         await ctx.db.patch(existing._id, {
@@ -172,6 +178,7 @@ export const batchUpsertDatasetTexts = internalMutation({
           addressesSomeone,
           addresseeGender,
           referentGender,
+          arcId,
         });
         updated++;
       } else {
@@ -188,6 +195,7 @@ export const batchUpsertDatasetTexts = internalMutation({
           addressesSomeone,
           addresseeGender,
           referentGender,
+          arcId,
         });
         inserted++;
         textCountDelta++;

@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import { Check, MessageSquare, PenLine } from 'lucide-react';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation, usePreloadedQuery, useQuery } from 'convex/react';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
@@ -45,8 +46,14 @@ export function SegmentedHomeSection({
   onNavigateToContent,
   onNavigateToChat,
 }: SegmentedHomeSectionProps) {
-  const summary = useQuery(api.features.home.getHomeSummary, {});
-  const settings = useQuery(api.features.courses.getActiveCourseSettings, {});
+  // Preloaded server-side in app/app/layout.tsx so the section renders with
+  // real data on the first paint; usePreloadedQuery still subscribes to live
+  // updates after hydration. Using the preloaded course settings (instead of
+  // a fresh useQuery) avoids a flash where the "Off" pill on the excluded
+  // source tab only appears after a brief delay.
+  const { preloadedHomeSummary, preloadedCourseSettings } = useAppData();
+  const summary = usePreloadedQuery(preloadedHomeSummary);
+  const settings = usePreloadedQuery(preloadedCourseSettings);
   const updateSettings = useUpdateStudyContentFilter();
   const t = useTranslations('AppPage.collections.carousel');
   const [currentTab, setCurrentTab] = React.useState<'premade' | 'custom'>('premade');
@@ -284,8 +291,31 @@ function GroupedLevelRail({
   const railRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    const el = railRef.current?.querySelector(`[data-focused="true"]`) as HTMLElement | null;
-    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    // Horizontal-only "scroll into view if needed" — equivalent to
+    // `scrollIntoView({ block: 'nearest', inline: 'nearest' })` but
+    // operating only on the rail's scrollLeft, so the page is never
+    // nudged vertically (the mobile OS-chrome jog bug). If the focused
+    // chip is already fully visible we leave the rail where it is —
+    // the previous "always center" behavior shifted the rail on every
+    // selection, which surprised users who'd manually scrolled it.
+    const rail = railRef.current;
+    const el = rail?.querySelector(
+      `[data-focused="true"]`,
+    ) as HTMLElement | null;
+    if (!rail || !el) return;
+    const railRect = rail.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    if (elRect.left < railRect.left) {
+      rail.scrollTo({
+        left: rail.scrollLeft + (elRect.left - railRect.left),
+        behavior: 'smooth',
+      });
+    } else if (elRect.right > railRect.right) {
+      rail.scrollTo({
+        left: rail.scrollLeft + (elRect.right - railRect.right),
+        behavior: 'smooth',
+      });
+    }
   }, [focusedId]);
 
   return (
@@ -295,8 +325,9 @@ function GroupedLevelRail({
       // the top (overflow-x-auto clips vertically too). pb-5 gives breathing
       // room between the chips and the horizontal scrollbar on platforms
       // where the scrollbar is rendered despite our hide hints (Safari, some
-      // touch surfaces). -mx-4 + px-4 lets the rail bleed to viewport edges.
-      className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // touch surfaces). -mx-3 + px-3 lets the rail bleed to the edges of the
+      // wrapping collections card (which has p-3).
+      className="-mx-3 flex gap-3 overflow-x-auto px-3 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {groups.map((g) => {
         const total = g.levels.reduce((acc, l) => acc + l.totalTexts, 0);
@@ -434,7 +465,10 @@ function CustomTab({
 
   // The custom tab uses the user's `activeCustomCollectionIds` for the
   // active-set indicator (Select toggles inclusion in the auto-add pool).
-  const courseSettings = useQuery(api.features.courses.getActiveCourseSettings, {});
+  // Use the preloaded query so the selected-set dot is correct on the first
+  // paint instead of flickering on after hydration.
+  const { preloadedCourseSettings } = useAppData();
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   // Stored as Set<string> so the branded `Id<'collections'>` values match the
   // `string`-typed `CollectionProgressItem.collectionId` on lookup. Convex Ids
   // are strings at runtime so iterating works directly.
@@ -635,16 +669,35 @@ function CustomChipRail({
 }) {
   const railRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    const el = railRef.current?.querySelector(`[data-focused="true"]`) as HTMLElement | null;
-    el?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' });
+    // Horizontal-only "scroll into view if needed". See the matching
+    // comment on `GroupedLevelRail` for the mobile OS-chrome rationale.
+    const rail = railRef.current;
+    const el = rail?.querySelector(
+      `[data-focused="true"]`,
+    ) as HTMLElement | null;
+    if (!rail || !el) return;
+    const railRect = rail.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    if (elRect.left < railRect.left) {
+      rail.scrollTo({
+        left: rail.scrollLeft + (elRect.left - railRect.left),
+        behavior: 'smooth',
+      });
+    } else if (elRect.right > railRect.right) {
+      rail.scrollTo({
+        left: rail.scrollLeft + (elRect.right - railRect.right),
+        behavior: 'smooth',
+      });
+    }
   }, [focusedId]);
 
   return (
     <div
       ref={railRef}
       // Same headroom math as GroupedLevelRail so the focused ring isn't
-      // clipped by overflow-x-auto.
-      className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // clipped by overflow-x-auto. -mx-3 + px-3 bleeds to the wrapping
+      // collections-card edges (p-3 in HomeView).
+      className="-mx-3 flex gap-3 overflow-x-auto px-3 pt-2 pb-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <div className="flex shrink-0 flex-col gap-1.5">
         {/* Invisible spacer — mirrors the band-header row in
@@ -866,7 +919,7 @@ function SegmentedSkeleton() {
         <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
         <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
       </div>
-      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pt-2 pb-5">
+      <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pt-2 pb-5">
         {Array.from({ length: 7 }).map((_, i) => (
           <div key={i} className="flex shrink-0 flex-col gap-1.5">
             <div className="h-3 w-16 animate-pulse rounded bg-muted" />

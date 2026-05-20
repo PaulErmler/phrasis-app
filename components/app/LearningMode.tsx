@@ -21,6 +21,7 @@ import { useLearningChatToggle } from '@/components/app/learning/LearningChatLay
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
+import { buildSessionSnapshot } from '@/components/app/learning/sessionSnapshot';
 import type { ReviewRating } from '@/lib/scheduling';
 import type { AudioPlayerState } from '@/hooks/use-audio-player';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
@@ -48,6 +49,27 @@ interface LearningModeProps {
   onNavigateToChat: () => void;
   /** Navigate to the custom-card creation page (same condition). */
   onNavigateToAddCustomCards: () => void;
+  /**
+   * Render mode. In `'onboarding'`, the LearningModeSettings sheet is
+   * suppressed so the user can't slip into deep settings during their guided
+   * first lesson. Other behaviour (chat, FSRS, audio) is unchanged.
+   */
+  mode?: 'normal' | 'onboarding';
+  /**
+   * Fires after the user rates a card and the FSRS update is in flight.
+   * Receives the rating + a snapshot of the session counters so the
+   * onboarding wizard can advance / surface stats without spinning up its
+   * own counter logic.
+   */
+  onCardRated?: (
+    rating: ReviewRating | undefined,
+    snapshot: {
+      sessionId: string;
+      dailyReviewsToday: number;
+      dailyTimeMsToday: number;
+      dailyNewWordsToday: number;
+    },
+  ) => void;
 }
 
 /**
@@ -60,6 +82,8 @@ export function LearningMode({
   onGoHome,
   onNavigateToChat,
   onNavigateToAddCustomCards,
+  mode = 'normal',
+  onCardRated,
 }: LearningModeProps) {
   const t = useTranslations('LearningMode');
   const chatContext = useLearningChatToggle();
@@ -70,6 +94,7 @@ export function LearningMode({
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [flagConfirmOpen, setFlagConfirmOpen] = useState(false);
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
   const [allSubmitted, setAllSubmitted] = useState(false);
   const [fullReviewAccuracy, setFullReviewAccuracy] = useState<number | null>(null);
@@ -186,13 +211,16 @@ export function LearningMode({
     [reviewingCardId, setCardAudioSpeedOverrideMutation],
   );
 
-  // Wrap handleNext to include accuracy from full review mode
+  // Wrap handleNext to include accuracy from full review mode + notify the
+  // onboarding container (if any) that a card was just rated, along with a
+  // session-state snapshot so the wizard can show the celebration screen.
   const handleNextWithAccuracy = useCallback(
     (ratingOverride?: ReviewRating) => {
       if (state.status !== 'reviewing') return;
       state.handleNext(ratingOverride, fullReviewAccuracy ?? undefined);
+      onCardRated?.(ratingOverride, buildSessionSnapshot(state));
     },
-    [state, fullReviewAccuracy],
+    [state, fullReviewAccuracy, onCardRated],
   );
   const handleRevealAllAudioTargets = useCallback(() => {
     setAudioRevealNonce((n) => n + 1);
@@ -210,6 +238,21 @@ export function LearningMode({
     setDeleteConfirmOpen(false);
     await state.handleDelete();
   }, [state]);
+  // Card-level flag — the mutation flags every non-source-language
+  // translation on the card at once, so no per-language pick here.
+  const handleConfirmFlag = useCallback(async () => {
+    if (state.status !== 'reviewing') return;
+    setFlagConfirmOpen(false);
+    await state.handleFlag();
+  }, [state]);
+  // Declared up here (above the early returns) so its `useCallback` keeps a
+  // stable position in the hook list across loading → reviewing transitions.
+  // Gates on status internally — non-reviewing states get a no-op.
+  const handleRegenerateAudioWithPause = useCallback(() => {
+    if (state.status !== 'reviewing') return;
+    audio.pause();
+    void state.handleRegenerateAudio();
+  }, [audio, state]);
 
   // Top-level celebration: shown across every underlying status so a milestone
   // hit on the very last card still gets celebrated before "no cards due"
@@ -244,14 +287,12 @@ export function LearningMode({
           onSelectRating={() => {}}
           onPlay={audio.play}
           onPause={audio.pause}
-          audioRef={audio.audioRef}
           isPlaying={audio.isPlaying}
           isMerging={audio.isMerging}
           durationSec={audio.durationSec}
           onSeek={audio.seekTo}
           onNext={() => {}}
           isReviewing={true}
-          showProgressBar={false}
           shortcutsDisabled={state.settingsOpen}
         />
       </div>
@@ -262,13 +303,15 @@ export function LearningMode({
     return (
       <div className="flex flex-col h-full">
         <NoCollectionState onGoHome={onGoHome} />
-        <LearningModeSettings
-          open={state.settingsOpen}
-          onOpenChange={state.setSettingsOpen}
-          courseSettings={state.courseSettings}
-          baseLanguages={state.baseLanguages}
-          targetLanguages={state.targetLanguages}
-        />
+        {mode === 'onboarding' ? null : (
+          <LearningModeSettings
+            open={state.settingsOpen}
+            onOpenChange={state.setSettingsOpen}
+            courseSettings={state.courseSettings}
+            baseLanguages={state.baseLanguages}
+            targetLanguages={state.targetLanguages}
+          />
+        )}
       </div>
     );
   }
@@ -287,13 +330,15 @@ export function LearningMode({
           onNavigateToChat={onNavigateToChat}
           onNavigateToAddCustomCards={onNavigateToAddCustomCards}
         />
-        <LearningModeSettings
-          open={state.settingsOpen}
-          onOpenChange={state.setSettingsOpen}
-          courseSettings={state.courseSettings}
-          baseLanguages={state.baseLanguages}
-          targetLanguages={state.targetLanguages}
-        />
+        {mode === 'onboarding' ? null : (
+          <LearningModeSettings
+            open={state.settingsOpen}
+            onOpenChange={state.setSettingsOpen}
+            courseSettings={state.courseSettings}
+            baseLanguages={state.baseLanguages}
+            targetLanguages={state.targetLanguages}
+          />
+        )}
         {paywallOpen && (
           <PaywallDialog
             open={paywallOpen}
@@ -309,6 +354,25 @@ export function LearningMode({
   const instantProceed = reviewMode === 'full'
     ? (state.courseSettings.instantProceedFull ?? true)
     : (state.courseSettings.instantProceedAudio ?? false);
+
+  // Flagging acts at the card level — the mutation retranslates every
+  // non-source-language translation on the card. We hide the button when
+  // there's no target translation to display since "flag" makes little
+  // sense to the learner on a card they can't actually review.
+  const hasTargetTranslation = state.translations.some(
+    (tr) => tr.isTargetLanguage,
+  );
+  // Flag opens a confirmation dialog instead of firing immediately: the
+  // action triggers a background retranslation that overwrites the
+  // currently-displayed text, so we want an explicit confirm step. The
+  // actual flag fires in `handleConfirmFlag` below; the card itself is
+  // not deleted.
+  const handleFlagPrimary = hasTargetTranslation
+    ? () => {
+      audio.pause();
+      setFlagConfirmOpen(true);
+    }
+    : undefined;
 
   const cardContent =
     reviewMode === 'full' ? (
@@ -327,6 +391,11 @@ export function LearningMode({
         onFavorite={state.handleFavorite}
         onEdit={handleEdit}
         onDelete={handleRequestDelete}
+        onFlag={handleFlagPrimary}
+        onRegenerateAudio={handleRegenerateAudioWithPause}
+        pinnedActions={state.pinnedCardActions}
+        onUpdatePinnedActions={state.handleUpdatePinnedActions}
+        quotaState={state.cardActionQuotas}
         onAudioPlay={audio.stop}
         targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
         allRevealed={fullReviewRevealed}
@@ -335,7 +404,8 @@ export function LearningMode({
         showRomanization={state.courseSettings.showRomanization ?? true}
         cardId={state.cardId}
         shortcutsDisabled={state.settingsOpen || editDialogOpen}
-        highlightEnabled={state.courseSettings.highlightWords !== false}
+        highlightEnabled={state.courseSettings.highlightWords === true}
+        flaggedInSession={state.flaggedInSession}
         mergedPlayback={{
           isPlaying: audio.isPlaying,
           currentTime: audio.currentTime,
@@ -345,6 +415,12 @@ export function LearningMode({
         languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
         audioSpeedOverrides={state.audioSpeedOverrides}
         onSpeedCycle={handleSpeedCycle}
+        audioRef={audio.audioRef}
+        durationSec={audio.durationSec}
+        isPlaying={audio.isPlaying}
+        isMerging={audio.isMerging}
+        onSeek={audio.seekTo}
+        showProgressBar={state.courseSettings.showProgressBar ?? true}
       />
     ) : (
       <LearningCardContent
@@ -362,6 +438,11 @@ export function LearningMode({
         onFavorite={state.handleFavorite}
         onEdit={handleEdit}
         onDelete={handleRequestDelete}
+        onFlag={handleFlagPrimary}
+        onRegenerateAudio={handleRegenerateAudioWithPause}
+        pinnedActions={state.pinnedCardActions}
+        onUpdatePinnedActions={state.handleUpdatePinnedActions}
+        quotaState={state.cardActionQuotas}
         onAudioPlay={audio.stop}
         hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
         autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? true}
@@ -369,7 +450,8 @@ export function LearningMode({
         showRomanization={state.courseSettings.showRomanization ?? true}
         revealAllSignal={audioRevealNonce}
         onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
-        highlightEnabled={state.courseSettings.highlightWords !== false}
+        highlightEnabled={state.courseSettings.highlightWords === true}
+        flaggedInSession={state.flaggedInSession}
         mergedPlayback={{
           isPlaying: audio.isPlaying,
           currentTime: audio.currentTime,
@@ -379,6 +461,12 @@ export function LearningMode({
         languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
         audioSpeedOverrides={state.audioSpeedOverrides}
         onSpeedCycle={handleSpeedCycle}
+        audioRef={audio.audioRef}
+        durationSec={audio.durationSec}
+        isPlaying={audio.isPlaying}
+        isMerging={audio.isMerging}
+        onSeek={audio.seekTo}
+        showProgressBar={state.courseSettings.showProgressBar ?? true}
       />
     );
 
@@ -386,8 +474,18 @@ export function LearningMode({
 
   return (
     <div className="flex flex-col h-full">
-      {!isRadio && state.courseSettings.progressDisplayEnabled !== false && (
-        <SessionProgressBar dailyReviewsToday={state.dailyReviewsToday} />
+      {/* Normal mode: bar tracks `dailyReviewsToday` (audio + full, server-
+          persisted, hydrated on mount) so the fill level always matches when
+          the milestone celebration will fire, even after a reload or a break
+          mid-day. Onboarding keeps its in-memory session counter (0/10 lesson
+          progress). Radio mode never shows the bar since plays don't count
+          toward the milestone. */}
+      {!isRadio &&
+        state.courseSettings.progressDisplayEnabled !== false && (
+        <SessionProgressBar
+          current={mode === 'onboarding' ? state.sessionCardCount : state.dailyReviewsToday}
+          max={mode === 'onboarding' ? 10 : undefined}
+        />
       )}
       <div className="flex-1 min-h-0 relative">
         <AnimatePresence mode="wait" initial={false}>
@@ -414,6 +512,7 @@ export function LearningMode({
             className="h-9 w-9 shrink-0 pointer-events-auto"
             aria-label="Open chat"
             data-tutorial="chat-button"
+            data-coachmark-anchor="chat-button"
           >
             <MessageCircle className="h-5 w-5" />
           </Button>
@@ -427,14 +526,12 @@ export function LearningMode({
         onSelectRating={state.setSelectedRating}
         onPlay={audio.play}
         onPause={audio.pause}
-        audioRef={audio.audioRef}
         isPlaying={audio.isPlaying}
         isMerging={audio.isMerging}
         durationSec={audio.durationSec}
         onSeek={audio.seekTo}
         onNext={handleNextWithAccuracy}
         isReviewing={state.isReviewing}
-        showProgressBar={state.courseSettings.showProgressBar ?? false}
         instantProceed={instantProceed}
         isFullReview={reviewMode === 'full'}
         fullReviewRevealed={fullReviewRevealed || allSubmitted}
@@ -445,13 +542,15 @@ export function LearningMode({
         onRevealAllAudioTargets={handleRevealAllAudioTargets}
       />
 
-      <LearningModeSettings
-        open={state.settingsOpen}
-        onOpenChange={state.setSettingsOpen}
-        courseSettings={state.courseSettings}
-        baseLanguages={state.baseLanguages}
-        targetLanguages={state.targetLanguages}
-      />
+      {mode === 'onboarding' ? null : (
+        <LearningModeSettings
+          open={state.settingsOpen}
+          onOpenChange={state.setSettingsOpen}
+          courseSettings={state.courseSettings}
+          baseLanguages={state.baseLanguages}
+          targetLanguages={state.targetLanguages}
+        />
+      )}
 
       <EditCardDialog
         open={editDialogOpen}
@@ -479,6 +578,27 @@ export function LearningMode({
               onClick={handleConfirmDelete}
             >
               {t('actions.deleteConfirmConfirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={flagConfirmOpen} onOpenChange={setFlagConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('actions.flagConfirmTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('actions.flagConfirmDescription')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {t('actions.flagConfirmCancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmFlag}>
+              {t('actions.flagConfirmConfirm')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

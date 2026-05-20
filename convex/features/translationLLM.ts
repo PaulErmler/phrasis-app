@@ -9,11 +9,11 @@
  * Prompt = the XML-structured Prompt B that won the eval (see
  * data_preparation/translation_eval/prompts.py).
  *
- * Reasoning level = the hybrid length-based rule by default
- *   - src_len < 30 chars → no reasoning field (minimal/fastest path)
- *   - src_len >= 30 chars → `reasoning: { effort: 'low' }`
- * unless the per-language override `translationReasoning` is set on the
- * Language config in lib/languages.ts (e.g. 'medium' for a tricky language).
+ * Reasoning level is decided by the caller (the translation rule's matching
+ * `ModelStage` in `lib/languages.ts → TRANSLATION_RULES`). This function
+ * just passes the provided `reasoning?: 'low' | 'medium' | 'high'` through
+ * to OpenRouter verbatim; if the caller omits it, no reasoning field is
+ * sent (the no-thinking path used by `default_hybrid`'s fallback stage).
  *
  * Truncation handling: if OpenRouter returns finishReason === 'length' (the
  * call hit MAX_OUTPUT_TOKENS — typically because reasoning ate the whole
@@ -26,22 +26,28 @@
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 
-/** Hard cap on tokens per response. Anything more is a bug. */
+/**
+ * Default cap on tokens per response when the caller doesn't supply a
+ * per-stage override. Sized to comfortably accommodate Gemini Flash Lite at
+ * `reasoning: 'low'` translation output. Reasoning-heavy stages (e.g.
+ * DeepSeek V4 Flash with `high` effort) declare their own larger cap via
+ * `ModelStage.maxOutputTokens` in `lib/languages.ts`. On
+ * `finishReason === 'length'` the queue advances to the next fallback stage
+ * of the rule (see `llmTranslationQueue.processLlmTranslationForCard` and
+ * `lib/languages.ts → TRANSLATION_RULES`).
+ */
 export const MAX_OUTPUT_TOKENS = 5_000;
 
-/** Source-length threshold for the hybrid reasoning rule. */
-export const HYBRID_LENGTH_THRESHOLD = 30;
-
-export type ReasoningEffort = 'low' | 'medium' | 'high';
-
-/** Pick the reasoning effort: explicit override wins, else hybrid length-based default. */
-export function pickReasoning(
-  text: string,
-  override?: ReasoningEffort,
-): ReasoningEffort | undefined {
-  if (override) return override;
-  return text.length < HYBRID_LENGTH_THRESHOLD ? undefined : 'low';
-}
+/**
+ * OpenRouter's documented reasoning-effort levels. The
+ * `@openrouter/ai-sdk-provider@1.5.4` types only enumerate
+ * `'high' | 'medium' | 'low'`, but OpenRouter itself accepts `'minimal'`
+ * (and `'none'` / `'xhigh'`) at runtime — for Gemini 3 / 3.1 it maps
+ * `effort: 'minimal'` to Google's `thinkingLevel: 'minimal'`, which is
+ * strictly lower than `'low'`. We allow `'minimal'` here and cast at the
+ * SDK boundary in `translateTextWithLLM` below.
+ */
+export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
 
 export type LlmTranslationFailure =
   | { ok: false; reason: 'truncated'; detail?: string }
@@ -70,13 +76,42 @@ export type TranslationPromptArgs = {
   text: string;
   sourceLang: string;        // 'en'
   targetLang: string;        // internal code, e.g. 'de'
-  targetLangName: string;    // English language name for the prompt, e.g. 'German'
+  targetLangName: string;    // English language name, e.g. 'German'
+  /**
+   * Native-script language name (e.g. 'Deutsch', '中文（简体）', 'العربية').
+   * Always emitted alongside `targetLangName` in the prompt so the model gets
+   * the canonical name in the script it's being asked to produce, which
+   * measurably reduces wrong-language outputs on tier-2 dialects. Falls back
+   * to `targetLangName` when a language has no separate native form (e.g.
+   * English variants share the script).
+   */
+  targetLangNativeName: string;
   targetRegion: string;      // region label for the prompt, e.g. 'Germany'
   addressesSomeone: boolean;
   speakerGender?: 'male' | 'female' | 'neutral';
   addresseeGender?: 'male' | 'female';
   formality?: 'formal' | 'informal' | 'neutral';
   referentGender: 'male' | 'female';
+  /**
+   * OGTE arc sliding-window context: up to 5 sentences immediately preceding
+   * `text` in the same thematic arc, and up to 3 immediately following.
+   * Emitted as an `<arc_context>` block before `<source>` so the model can
+   * use the surrounding discourse for pronoun/gender/register consistency
+   * without translating anything but the `<source>` payload. Undefined for
+   * single-sentence arcs, custom/chat texts, and legacy rows without arcId.
+   */
+  arcContext?: {
+    preceding: string[];
+    following: string[];
+  };
+  /**
+   * Previous (flagged) translation, when this call is a retranslation
+   * triggered by `flagTranslation`. Surfaced to the model so it can see
+   * what the user rejected. The prompt is careful to note the previous
+   * translation might still be correct — we want the model to reconsider
+   * rather than feel pressured to differ.
+   */
+  previousTranslation?: string;
 };
 
 /** Build the user-message string for one translation call. */
@@ -92,12 +127,52 @@ export function buildPrompt(args: TranslationPromptArgs): string {
       `  <register>${args.formality ?? 'neutral'}</register>`,
     );
   }
+  // If the native name matches the English name (English variants, romance
+  // languages already in Latin script with same spelling), drop the parens to
+  // avoid a redundant "German (German)".
+  const fullName =
+    args.targetLangNativeName && args.targetLangNativeName !== args.targetLangName
+      ? `${args.targetLangName} (${args.targetLangNativeName})`
+      : args.targetLangName;
+
+  // Optional arc-context block. Only emitted when at least one neighbor was
+  // returned by the worker's sliding-window query; the model still translates
+  // only the `<source>` payload (see the closing instruction).
+  const arc = args.arcContext;
+  const arcBlock =
+    arc && (arc.preceding.length > 0 || arc.following.length > 0)
+      ? [
+        ``,
+        `<arc_context>`,
+        `  The sentence to translate appears in this sequence of related sentences (up to 5 immediately preceding it and up to 3 immediately following it within the same thematic arc). Use the surrounding sentences only to inform consistency of register, pronouns, gender agreement, and discourse flow. Translate ONLY the sentence wrapped in <target>.`,
+        ...arc.preceding.map((s) => `  <sentence>${s}</sentence>`),
+        `  <target>${args.text}</target>`,
+        ...arc.following.map((s) => `  <sentence>${s}</sentence>`),
+        `</arc_context>`,
+      ]
+      : [];
+
+  // Optional previous-translation block. Surfaces what the user flagged so
+  // the model can reconsider — explicitly leaving open that the prior was
+  // correct, so the model isn't forced to change its answer just to look
+  // different from a translation that might already be right.
+  const prevBlock = args.previousTranslation
+    ? [
+      ``,
+      `<previous_translation>`,
+      `  This sentence was previously translated as <prior>${args.previousTranslation}</prior>. The user flagged that translation as wrong, but there is a chance it was correct anyway. Reconsider it: if you genuinely agree the prior is the best rendering, you may produce the same translation; otherwise output the translation you actually stand behind.`,
+      `</previous_translation>`,
+    ]
+    : [];
+
   return [
-    `You are a professional English-to-${args.targetLangName} translator. Translate the text inside <source> tags into ${args.targetLangName} (${args.targetLang}), suitable for ${args.targetRegion}.`,
+    `You are a professional English-to-${fullName} translator. Translate the text inside <source> tags into ${fullName} (${args.targetLang}), suitable for ${args.targetRegion}.`,
     ``,
     `<context>`,
     ...contextLines,
     `</context>`,
+    ...arcBlock,
+    ...prevBlock,
     ``,
     `<instructions>`,
     PROMPT_B_INSTRUCTIONS,
@@ -105,7 +180,7 @@ export function buildPrompt(args: TranslationPromptArgs): string {
     ``,
     `<source>${args.text}</source>`,
     ``,
-    `Output only the ${args.targetLangName} translation of the text inside <source>. No commentary, no tags, no quotation marks, no alternatives.`,
+    `Output only the ${fullName} translation of the text inside <source>. No commentary, no tags, no quotation marks, no alternatives.`,
   ].join('\n');
 }
 
@@ -128,6 +203,13 @@ export async function translateTextWithLLM(
   args: TranslationPromptArgs & {
     model: string;
     reasoning?: ReasoningEffort;
+    /**
+     * Per-call cap on response tokens. Set by the queue worker from the
+     * matching `ModelStage.maxOutputTokens` so reasoning-heavy stages get the
+     * extra headroom their thinking trace needs. Falls back to
+     * `MAX_OUTPUT_TOKENS` when omitted.
+     */
+    maxOutputTokens?: number;
   },
 ): Promise<LlmTranslationResult> {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -140,7 +222,10 @@ export async function translateTextWithLLM(
   }
 
   const prompt = buildPrompt(args);
-  const effort = pickReasoning(args.text, args.reasoning);
+  // Reasoning is decided by the caller (translation rule). Pass through
+  // verbatim — no length-based hybrid in this layer.
+  const effort = args.reasoning;
+  const maxOutputTokens = args.maxOutputTokens ?? MAX_OUTPUT_TOKENS;
 
   const openrouter = createOpenRouter({ apiKey });
 
@@ -151,9 +236,18 @@ export async function translateTextWithLLM(
       model: openrouter(args.model),
       prompt,
       temperature: 0,
-      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      maxOutputTokens,
+      // Cast: the SDK provider's typed enum is `'high' | 'medium' | 'low'`
+      // but OpenRouter accepts `'minimal'` at runtime (mapped to Gemini's
+      // `thinkingLevel: 'minimal'`). See the `ReasoningEffort` type above.
       ...(effort
-        ? { providerOptions: { openrouter: { reasoning: { effort } } } }
+        ? {
+          providerOptions: {
+            openrouter: {
+              reasoning: { effort: effort as 'low' | 'medium' | 'high' },
+            },
+          },
+        }
         : {}),
     });
   } catch (err) {

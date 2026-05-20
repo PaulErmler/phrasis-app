@@ -183,6 +183,107 @@ describe("features/courses", () => {
     });
   });
 
+  describe("setCurrentSessionId", () => {
+    it("inserts a courseSettings row with the sessionId on first call", async () => {
+      const t = convexTest(schema, modules);
+      const courseId = await t.run(async (ctx) =>
+        ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.setActiveCourse, { courseId });
+      await asUser.mutation(api.features.courses.setCurrentSessionId, {
+        courseId,
+        sessionId: "session-abc",
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.currentSessionId).toBe("session-abc");
+    });
+
+    it("patches an existing courseSettings row without touching other fields", async () => {
+      const t = convexTest(schema, modules);
+      const courseId = await t.run(async (ctx) => {
+        const cid = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+        });
+        await ctx.db.insert("courseSettings", {
+          courseId: cid,
+          initialReviewCount: 5,
+          autoPlayAudio: true,
+          studyContentFilter: "custom",
+        });
+        return cid;
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.setActiveCourse, { courseId });
+      await asUser.mutation(api.features.courses.setCurrentSessionId, {
+        courseId,
+        sessionId: "session-xyz",
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.currentSessionId).toBe("session-xyz");
+      // Pre-existing fields survive — the mutation only patches the one field.
+      expect(settings?.initialReviewCount).toBe(5);
+      expect(settings?.autoPlayAudio).toBe(true);
+      expect(settings?.studyContentFilter).toBe("custom");
+    });
+
+    it("rotates the id on subsequent calls (no append, just overwrite)", async () => {
+      const t = convexTest(schema, modules);
+      const courseId = await t.run(async (ctx) =>
+        ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.setActiveCourse, { courseId });
+      await asUser.mutation(api.features.courses.setCurrentSessionId, {
+        courseId,
+        sessionId: "first",
+      });
+      await asUser.mutation(api.features.courses.setCurrentSessionId, {
+        courseId,
+        sessionId: "second",
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.currentSessionId).toBe("second");
+    });
+
+    it("rejects when the course belongs to another user", async () => {
+      const t = convexTest(schema, modules);
+      const courseId = await t.run(async (ctx) =>
+        ctx.db.insert("courses", {
+          userId: "user_B",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(api.features.courses.setCurrentSessionId, {
+          courseId,
+          sessionId: "nope",
+        }),
+      ).rejects.toThrow();
+    });
+  });
+
   describe("completeTutorial", () => {
     it("records the tutorial id", async () => {
       const t = convexTest(schema, modules);
@@ -202,6 +303,194 @@ describe("features/courses", () => {
         {},
       );
       expect(tutorials).toContain("home_tour");
+    });
+  });
+
+  describe("setCurrentSessionId", () => {
+    async function seedOwnedCourse(t: ReturnType<typeof convexTest>) {
+      return t.run(async (ctx) => {
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        return courseId;
+      });
+    }
+
+    it("patches currentSessionId on an existing courseSettings row", async () => {
+      const t = convexTest(schema, modules);
+      const courseId = await seedOwnedCourse(t);
+      const settingsId = await t.run(async (ctx) =>
+        ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 5,
+          currentSessionId: "old-session",
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.setCurrentSessionId, {
+        courseId,
+        sessionId: "new-session",
+      });
+      const row = await t.run(async (ctx) => ctx.db.get(settingsId));
+      expect(row?.currentSessionId).toBe("new-session");
+      // initialReviewCount is preserved on the patch.
+      expect(row?.initialReviewCount).toBe(5);
+    });
+
+    it("inserts a courseSettings row with the default initialReviewCount when missing", async () => {
+      const t = convexTest(schema, modules);
+      const courseId = await seedOwnedCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.setCurrentSessionId, {
+        courseId,
+        sessionId: "seed-session",
+      });
+      const row = await t.run(async (ctx) =>
+        ctx.db
+          .query("courseSettings")
+          .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+          .first(),
+      );
+      expect(row?.currentSessionId).toBe("seed-session");
+      // Server picks the default when inserting from scratch.
+      expect(row?.initialReviewCount).toBe(5);
+    });
+
+    it("rejects when the course belongs to a different user", async () => {
+      const t = convexTest(schema, modules);
+      const courseId = await t.run(async (ctx) =>
+        ctx.db.insert("courses", {
+          userId: "user_B",
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+        }),
+      );
+      await t.run(async (ctx) =>
+        ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(api.features.courses.setCurrentSessionId, {
+          courseId,
+          sessionId: "anything",
+        }),
+      ).rejects.toThrow(/does not belong/i);
+    });
+  });
+
+  describe("updatePinnedCardActions", () => {
+    async function seedAuthenticated(t: ReturnType<typeof convexTest>) {
+      await t.run(async (ctx) =>
+        ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+        }),
+      );
+    }
+
+    it("persists a valid action list verbatim", async () => {
+      const t = convexTest(schema, modules);
+      await seedAuthenticated(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.updatePinnedCardActions, {
+        actions: ["favorite", "edit", "regenerateAudio"],
+      });
+      const settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.pinnedCardActions).toEqual([
+        "favorite",
+        "edit",
+        "regenerateAudio",
+      ]);
+    });
+
+    it("strips unknown action keys via normalizePinnedCardActions", async () => {
+      const t = convexTest(schema, modules);
+      await seedAuthenticated(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.updatePinnedCardActions, {
+        actions: ["favorite", "bogus", "edit", "also-bogus"],
+      });
+      const settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.pinnedCardActions).toEqual(["favorite", "edit"]);
+    });
+
+    it("dedupes and clamps to MAX_PINNED_CARD_ACTIONS", async () => {
+      const t = convexTest(schema, modules);
+      await seedAuthenticated(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.updatePinnedCardActions, {
+        actions: [
+          "favorite",
+          "favorite",
+          "master",
+          "hide",
+          "edit",
+          "regenerateAudio",
+          "flag", // 6th distinct — past the max of 5
+        ],
+      });
+      const settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.pinnedCardActions).toEqual([
+        "favorite",
+        "master",
+        "hide",
+        "edit",
+        "regenerateAudio",
+      ]);
+    });
+
+    it("falls back to the default action set when given an empty array", async () => {
+      const t = convexTest(schema, modules);
+      await seedAuthenticated(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.updatePinnedCardActions, {
+        actions: [],
+      });
+      const settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      // DEFAULT_PINNED_CARD_ACTIONS in lib/cardActions.ts
+      expect(settings?.pinnedCardActions).toEqual([
+        "favorite",
+        "master",
+        "hide",
+        "edit",
+      ]);
+    });
+
+    it("creates a userSettings row when none exists yet", async () => {
+      const t = convexTest(schema, modules);
+      // No seed — settings row absent on first call.
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.updatePinnedCardActions, {
+        actions: ["edit"],
+      });
+      const settings = await asUser.query(
+        api.features.courses.getUserSettings,
+        {},
+      );
+      expect(settings?.pinnedCardActions).toEqual(["edit"]);
+      expect(settings?.hasCompletedOnboarding).toBe(false);
     });
   });
 });

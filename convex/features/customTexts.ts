@@ -8,7 +8,13 @@ import { getOrCreateCustomCollection } from '../db/collections';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARD_TEXT_LENGTH, MAX_IMPORT_BATCH } from '../../lib/constants/learning';
-import { getLanguageByCode } from '../../lib/languages';
+import {
+  getLanguageByCode,
+  getTranslationSource,
+  isMixedLanguage,
+  resolveMixedVariant,
+  USER_PROVIDED_TRANSLATION_SOURCE,
+} from '../../lib/languages';
 import { trackEvent } from '../db/stats/dailyStats';
 import { isValidTimezone } from '../lib/dateUtils';
 import { generateText } from 'ai';
@@ -55,17 +61,32 @@ TRANSLATION RULES:
 
 4. CONSISTENCY — All translations must express the exact same meaning, register, and tone. No translation may add or remove nuance.
 
-5. REGIONAL VARIANTS (use exactly these):
+5. REGIONAL VARIANTS (use exactly these — match the code to the variant):
    - es: Castilian Spanish as spoken in Spain (vosotros for informal plural, peninsular vocabulary)
+   - es_latam: Latin American Spanish (ustedes for plural, regionally neutral LatAm vocabulary)
    - fr: Metropolitan French (France)
    - pt: Brazilian Portuguese
-   - zh: Simplified Chinese (Mandarin)
+   - en: neutral English (no strong British/American spelling bias)
+   - en_gb: British English spelling and vocabulary (colour, lift, queue)
+   - en_us: American English spelling and vocabulary (color, elevator, line)
+   - en_au: Australian English (closer to British spelling, Australian vocab where natural)
+   - zh: Simplified Chinese characters, Mainland Mandarin
+   - zh_traditional: Traditional Chinese characters, Taiwanese Mandarin (Taiwan vocabulary)
+   - yue: Cantonese in simplified Chinese script (Hong Kong dialect, written as one would read it aloud in Cantonese)
+   - yue_traditional: Cantonese in traditional Chinese script (Hong Kong)
    - ar: Modern Standard Arabic (MSA / fuṣḥā)
+   - ar_sa: Saudi Arabic — MSA-leaning but with Hejazi/Najdi colloquial markers where natural
+   - ar_eg: Egyptian Cairene colloquial Arabic
+   - ar_iq: Iraqi colloquial Arabic
+   - sw: Swahili as spoken in Kenya (Sheng-free, standard Kiswahili)
+   - sw_tz: Swahili as spoken in Tanzania (standard Kiswahili sanifu, Tanzanian vocabulary)
 
 6. LANGUAGE-SPECIFIC:
    - Japanese: match the formality of the source — informal → plain form (だ / する), formal → polite form (です / ます)
    - Korean: informal → 반말, formal → 해요체 or 합쇼체 as appropriate
    - Hindi: informal → तुम form, formal → आप form
+   - Thai: use polite particles (ครับ/ค่ะ) only when the source register is formal
+   - Hebrew: use modern Israeli Hebrew; match speaker gender to the verb form
    - Arabic: MSA grammar; when the input does not specify gender, pick a grammatically valid form but do not let that choice influence the metadata gender fields
    - Finnish: formal/informal distinction is minimal; focus on naturalness
 
@@ -130,7 +151,23 @@ export const autoFillTranslations = action({
     targetLanguages: v.array(v.string()),
   },
   returns: v.object({
-    translations: v.array(v.object({ language: v.string(), text: v.string() })),
+    translations: v.array(
+      v.object({
+        language: v.string(),
+        text: v.string(),
+        // Concrete regional sub-locale chosen for this row when `language`
+        // is a mixed-dialect code (today: `es_mixed` → e.g. `'es-US'` or
+        // `'es-ES'`). Plumbed back to `createCustomText` so the row stored
+        // on the translations table records the variant the LLM saw,
+        // matching the deck-card path in `processLlmTranslationForCard`.
+        regionVariant: v.optional(v.string()),
+        // Identifier of the LLM that produced this translation (the autofill
+        // model, no reasoning). Plumbed back to `createCustomText` so a
+        // future strategy swap can target rows by source. Same format as
+        // the `translationSource` on deck-card rows.
+        translationSource: v.optional(v.string()),
+      }),
+    ),
     metadata: sentenceMetadataValidator,
   }),
   handler: async (ctx, args) => {
@@ -188,17 +225,54 @@ export const autoFillTranslations = action({
       { userId },
     );
 
+    // Native name is appended in parens so the model sees the language in
+    // both the English label AND its native script — mirrors the single-
+    // sentence prompt in translationLLM.ts. Skipped when both names match
+    // (English variants share a script) to avoid `English (English)` noise.
+    const formatLangLabel = (code: string): string => {
+      const lang = getLanguageByCode(code);
+      if (!lang) return code;
+      if (lang.nativeName && lang.nativeName !== lang.name) {
+        return `${lang.name} (${lang.nativeName})`;
+      }
+      return lang.name;
+    };
+
+    // Resolve mixed-dialect targets (today: `es_mixed`) to a concrete
+    // sub-code BEFORE building the prompt — the LLM never sees the mixed
+    // sentinel; it gets a real regional code (`es`, `es_latam`) and an
+    // accurate regional prompt label. The seed is the source text(s) so the
+    // choice is deterministic for the same input across retries. The returned
+    // `regionVariant` is plumbed back to `createCustomText` so the persisted
+    // translations row agrees with the LLM's actual output, mirroring the
+    // deck-card path in `processLlmTranslationForCard`.
+    const variantSeed = args.texts
+      .map((t) => `${t.language}:${t.text}`)
+      .join('\n');
+    type Resolved = { resolved: string; regionVariant?: string };
+    const resolutionByRequested = new Map<string, Resolved>();
+    for (const code of targetLanguages) {
+      if (isMixedLanguage(code)) {
+        const r = resolveMixedVariant(code, variantSeed);
+        if (r) {
+          resolutionByRequested.set(code, {
+            resolved: r.subCode,
+            regionVariant: r.regionVariant,
+          });
+          continue;
+        }
+      }
+      resolutionByRequested.set(code, { resolved: code });
+    }
+
     const sourceDescription = args.texts
-      .map((t) => {
-        const lang = getLanguageByCode(t.language);
-        return `[${lang?.name ?? t.language}]: ${t.text}`;
-      })
+      .map((t) => `[${formatLangLabel(t.language)}]: ${t.text}`)
       .join('\n');
 
     const targetList = targetLanguages
       .map((code) => {
-        const lang = getLanguageByCode(code);
-        return `${code}: ${lang?.name ?? code}`;
+        const { resolved } = resolutionByRequested.get(code)!;
+        return `${resolved}: ${formatLangLabel(resolved)}`;
       })
       .join('\n');
 
@@ -233,13 +307,34 @@ export const autoFillTranslations = action({
       throw new ConvexError('Translation response missing "metadata" object');
     }
 
-    const results: { language: string; text: string }[] = [];
+    // Source identifier for every translation in this batch — single LLM
+    // call, no reasoning, so every row gets the same tag.
+    const translationSource = getTranslationSource(
+      OPENROUTER_MODELS.translationAutoFill,
+    );
+
+    const results: {
+      language: string;
+      text: string;
+      regionVariant?: string;
+      translationSource?: string;
+    }[] = [];
     for (const lang of targetLanguages) {
-      const translation = parsed.translations[lang];
+      const { resolved, regionVariant } = resolutionByRequested.get(lang)!;
+      // The LLM keys its response by the codes we passed in (resolved sub-
+      // codes for mixed dialects). Fall back to the original requested code
+      // for resilience against a model that ignored the substitution.
+      const translation =
+        parsed.translations[resolved] ?? parsed.translations[lang];
       if (typeof translation !== 'string' || translation.trim().length === 0) {
         throw new ConvexError(`Missing translation for language: ${lang}`);
       }
-      results.push({ language: lang, text: translation.trim() });
+      results.push({
+        language: lang,
+        text: translation.trim(),
+        ...(regionVariant ? { regionVariant } : {}),
+        translationSource,
+      });
     }
 
     let metadata;
@@ -262,7 +357,22 @@ export const autoFillTranslations = action({
  */
 export const createCustomText = mutation({
   args: {
-    translations: v.array(v.object({ language: v.string(), text: v.string() })),
+    translations: v.array(
+      v.object({
+        language: v.string(),
+        text: v.string(),
+        // Forwarded from `autoFillTranslations` when the requested target is
+        // a mixed-dialect code (today: `es_mixed`). Persisted on the
+        // translations row so audio synthesis and STT validation downstream
+        // honor the variant the LLM actually produced.
+        regionVariant: v.optional(v.string()),
+        // Forwarded from `autoFillTranslations` (the autofill model id) for
+        // autofilled entries; the frontend uses `'user-provided'` for
+        // manually-typed entries. Persisted on the translations row so a
+        // future strategy swap can target rows by source.
+        translationSource: v.optional(v.string()),
+      }),
+    ),
     timezone: v.string(),
     metadata: v.optional(sentenceMetadataValidator),
   },
@@ -356,6 +466,10 @@ export const createCustomText = mutation({
         textId,
         targetLanguage: entry.language,
         translatedText: entry.text,
+        ...(entry.regionVariant ? { regionVariant: entry.regionVariant } : {}),
+        ...(entry.translationSource
+          ? { translationSource: entry.translationSource }
+          : {}),
       });
     }
 
@@ -537,6 +651,10 @@ export const createCustomTextsBatch = mutation({
           textId,
           targetLanguage: entry.language,
           translatedText: entry.text,
+          // Bulk-import is exclusively manual — no autofill path here, so
+          // every inserted translation is user-typed. Tag it explicitly so
+          // a future strategy swap doesn't regenerate text the user wrote.
+          translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
         });
       }
 

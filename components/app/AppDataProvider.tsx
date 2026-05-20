@@ -12,6 +12,7 @@ export interface AppData {
   preloadedCourseSettings: Preloaded<
     typeof api.features.courses.getActiveCourseSettings
   >;
+  preloadedHomeSummary: Preloaded<typeof api.features.home.getHomeSummary>;
 }
 
 const AppDataContext = createContext<AppData | null>(null);

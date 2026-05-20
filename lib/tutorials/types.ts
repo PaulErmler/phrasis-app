@@ -1,6 +1,10 @@
 import type { DriveStep } from 'driver.js';
 
-export type TranslateFn = (key: string) => string;
+type MarkupValues = Record<string, (chunks: string) => string>;
+
+export type TranslateFn = ((key: string) => string) & {
+  markup?: (key: string, values: MarkupValues) => string;
+};
 
 export interface TutorialCallbacks {
   onComplete: () => void;

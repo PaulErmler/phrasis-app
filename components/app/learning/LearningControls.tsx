@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Play, Pause, ChevronsLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
-import { AudioProgressBar } from './AudioProgressBar';
 import type { ReviewRating } from '@/lib/scheduling';
 
 interface LearningControlsProps {
@@ -14,7 +13,6 @@ interface LearningControlsProps {
   onSelectRating: (rating: ReviewRating) => void;
   onPlay: () => void;
   onPause: () => void;
-  audioRef: React.RefObject<HTMLAudioElement | null>;
   isPlaying: boolean;
   isMerging: boolean;
   durationSec: number;
@@ -22,7 +20,6 @@ interface LearningControlsProps {
   /** Pass `ratingOverride` when advancing in the same tick as a rating pick (instant proceed). */
   onNext: (ratingOverride?: ReviewRating) => void;
   isReviewing: boolean;
-  showProgressBar?: boolean;
   instantProceed?: boolean;
   isFullReview?: boolean;
   fullReviewRevealed?: boolean;
@@ -43,14 +40,12 @@ export function LearningControls({
   onSelectRating,
   onPlay,
   onPause,
-  audioRef,
   isPlaying,
   isMerging,
   durationSec,
   onSeek,
   onNext,
   isReviewing,
-  showProgressBar = false,
   instantProceed = false,
   isFullReview = false,
   fullReviewRevealed = false,
@@ -166,7 +161,11 @@ export function LearningControls({
         <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
           {/* Rating buttons */}
           {validRatings.length > 0 && (
-            <div className="flex gap-2" data-tutorial="rating-buttons">
+            <div
+              className="flex gap-2"
+              data-tutorial="rating-buttons"
+              data-coachmark-anchor="rating-buttons"
+            >
               {validRatings.map((rating) => (
                 <div
                   key={rating}
@@ -202,17 +201,6 @@ export function LearningControls({
             </div>
           )}
 
-        
-          {showProgressBar && (
-            <AudioProgressBar
-              audioRef={audioRef}
-              durationSec={durationSec}
-              isPlaying={isPlaying}
-              onSeek={onSeek}
-              isMerging={isMerging}
-            />
-          )}
-
           {/* Restart + Play + Next row */}
           <div className="flex gap-2" data-tutorial="audio-controls">
             <Button
@@ -230,6 +218,7 @@ export function LearningControls({
               onClick={isPlaying ? onPause : onPlay}
               disabled={isMerging || durationSec === 0}
               className="h-9 flex-[2] min-w-0"
+              data-tutorial="audio-play"
             >
               {isPlaying ? (
                 <Pause className="h-4 w-4" />

@@ -38,6 +38,13 @@ export const batchUpsertTranslations = internalMutation({
           v.object({
             language: v.string(),
             text: v.string(),
+            // Optional source tag for the offline translation pipeline.
+            // When omitted, the row lands with `translationSource: undefined`
+            // and gets tagged by `convex/migrations/backfillTranslationSource.ts`
+            // under the legacy assumption (Gemini Flash Lite via the
+            // character rule). New pipeline versions should pass an explicit
+            // tag so future strategy swaps can target rows by source.
+            translationSource: v.optional(v.string()),
           }),
         ),
       }),
@@ -130,12 +137,25 @@ export const batchUpsertTranslations = internalMutation({
             textId,
             targetLanguage: tr.language,
             translatedText: tr.text,
+            ...(tr.translationSource
+              ? { translationSource: tr.translationSource }
+              : {}),
           });
           stats.translationsInserted++;
         } else if (existing.translatedText !== tr.text) {
+          // Text changed — clear romanization + its source (next ensureContent
+          // will re-romanize under the current method). For `translationSource`:
+          // only overwrite when the seed explicitly declares a new tag. If the
+          // seed omits it, KEEP the existing tag — clearing here would silently
+          // untag rows on every text edit once the legacy backfill has run.
+          // Seeds from the new pipeline should always carry `translationSource`.
           await ctx.db.patch(existing._id, {
             translatedText: tr.text,
             romanizedText: undefined,
+            romanizationSource: undefined,
+            ...(tr.translationSource !== undefined
+              ? { translationSource: tr.translationSource }
+              : {}),
           });
           stats.translationsUpdated++;
 

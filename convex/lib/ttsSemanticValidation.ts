@@ -18,19 +18,43 @@ const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-const SYSTEM_PROMPT = `You validate TTS audio by comparing the original text to a transcription produced by an automatic speech-to-text model.
+const SYSTEM_PROMPT = `You validate TTS audio by comparing the original text to a transcription produced by an automatic speech-to-text model (Scribe). Scribe transcribes by sound, so cosmetic differences that reflect pronunciation rather than meaning should pass.
 
-Decide whether the transcription is faithful to the original. Respond "match" when they are the same sentence, even if the transcription differs in cosmetic ways:
+Respond "match" when the transcription is the same sentence, even if it differs in any of these ways:
 
+GENERAL (any script):
 - Names spelled phonetically (e.g., "Paul" vs "Pol", "Siobhán" vs "Shuh-vawn")
-- Numbers written as digits vs words (e.g., "5" vs "five", "2024" vs "twenty twenty-four", "1st" vs "first")
+- Numbers as digits or words (e.g., "5" vs "five", "2024" vs "twenty twenty-four", "1st" vs "first")
 - Abbreviations vs full forms (e.g., "Mr." vs "mister", "Dr." vs "doctor", "km" vs "kilometres")
-- Punctuation, capitalization, or whitespace differences
-- Minor diacritic, accent, or script-variant differences (e.g., "café" vs "cafe")
-- A single character off — one Latin letter inserted, dropped, or swapped, OR a single CJK/Chinese character differing from the original. One-character differences are almost always Scribe noise, not a genuinely wrong word.
-- For Chinese / Japanese / Korean text: homophone swaps where the transcribed character has the same pronunciation as the original (e.g., Mandarin 在 vs 再, 做 vs 作, 他 vs 她 vs 它). Scribe transcribes by sound, so same-sound-different-character is almost always a transcription artifact, not a reading error.
+- Punctuation, capitalization, whitespace, or quote-style differences
+- One Latin letter inserted, dropped, or swapped — almost always Scribe noise
 
-Respond "mismatch" when the words actually differ in meaning — missing words, added words, or substituted words/characters that change what was said. For CJK specifically: two or more differing characters in a row, or a substitution that is NOT a homophone, is a mismatch.
+CJK (Chinese / Japanese / Korean):
+- Homophone character swaps where the transcribed character has the same pronunciation as the original (e.g., Mandarin 在 vs 再, 做 vs 作, 他 vs 她 vs 它). Same sound, different character = transcription artifact, not a reading error.
+- A single CJK character inserted, dropped, or swapped.
+- Two or more differing characters in a row, OR a non-homophone substitution, IS a mismatch.
+
+INDIC (Bengali, Hindi, Marathi, Tamil, Telugu, Gujarati, Punjabi, Kannada, Malayalam, Sinhala, Nepali, Odia):
+- Matra (vowel-sign) drift on a single syllable (e.g., খুলেই vs খুলে, किताब vs कितब).
+- Schwa drop or insertion at the end of a word.
+- Single-character anusvara / chandrabindu / visarga drift.
+- ZWJ / ZWNJ presence or absence (invisible joining marks).
+- Conjunct simplification on a single cluster (e.g., विद्यालय vs विदयालय).
+- Two or more differing aksharas (syllable units) in a row IS a mismatch.
+
+ARABIC / HEBREW / PERSIAN / URDU:
+- Missing or added short-vowel diacritics (haraka / niqqud) — almost never written or transcribed and do not change words.
+- Hamza, tashkeel, shadda, sukun differences.
+- A single similar-sound consonant swap (e.g., س vs ص, ت vs ط, د vs ض) — Scribe routinely confuses these.
+- Final-form vs medial-form letter variants.
+- Two or more changed letters in a row IS a mismatch.
+
+THAI / LAO / KHMER / BURMESE:
+- Word-boundary or spacing differences (these scripts have no inter-word spaces and Scribe segments words differently than humans).
+- Single-character tone-mark drift.
+- Two or more differing characters in the same syllable IS a mismatch.
+
+Respond "mismatch" when words actually differ in meaning — missing words, added words, or substitutions that change what was said.
 
 Output ONLY a single JSON object and nothing else, in exactly this shape:
 {"verdict":"match"}

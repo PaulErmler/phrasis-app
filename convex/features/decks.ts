@@ -12,10 +12,12 @@ import { Id, Doc } from '../_generated/dataModel';
 import { insertCard } from '../db/stats/cardAggregates';
 import {
   getVoiceForLanguage,
+  getVoiceForLanguageVariant,
   getVoiceGenderByApiCode,
   resolveAudioSpeakerGender,
   getTtsProviderForLanguage,
   getTranslationConfigForLanguage,
+  resolveMixedVariant,
 } from '../../lib/languages';
 import {
   getCourseSettings,
@@ -32,7 +34,11 @@ import {
   getNextTextsFromRank,
 } from '../db/collections';
 import { translateText, romanizeText } from './translation';
-import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
+import { getRomanizationSource } from '../lib/localRomanization';
+import {
+  GOOGLE_TRANSLATE_SOURCE,
+  ROMANIZATION_LANGUAGES,
+} from '../../lib/languages';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   translationValidator,
@@ -43,7 +49,10 @@ import {
 } from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
 import { languageSupportsStt } from '../../lib/languages';
-import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
+import {
+  claimLlmTranslationIfAvailable,
+  CLAIM_STALE_MS as LLM_CLAIM_STALE_MS,
+} from './llmTranslationQueue';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
   COLLECTION_PREVIEW_SIZE,
@@ -73,57 +82,92 @@ export async function scheduleMissingContent(
   text: Doc<'texts'>,
   baseLanguages: string[],
   targetLanguages: string[],
-  options?: { priority?: 0 | 1 },
+  options?: { priority?: 0 | 1 | 2 },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
-  // Default to 0 (normal). Callers schedule with priority 1 when this text
-  // belongs to the requesting user's currently-active collection — see
-  // ensureCardContent / ensureUpcomingCardsContent / addCardsFromCollection.
+  // Default to 0 (normal). Priority tiers: 2 = critical (onboarding seed /
+  // placement test — the user is blocked on this content right now),
+  // 1 = active collection (foreground drilling, lookahead, retranslation),
+  // 0 = background warmup (cross-level first-5 prewarm, opportunistic sync).
   const priority = options?.priority ?? 0;
   const sourceLanguage = text.language;
 
   // Resolve audioSpeakerGender: prefer existing valid value, fall back to speakerGender,
   // then coin-flip via resolveAudioSpeakerGender. Patch the text to make it durable.
   const storedGender = text.audioSpeakerGender;
+  // Seed the coin-flip with the textId so two concurrent invocations against
+  // the same text resolve to the same gender — prevents two racing audio
+  // jobs from writing rows in different genders, which would otherwise
+  // trigger a regeneration loop the next time `genderMismatch` is checked.
   const audioSpeakerGender: 'male' | 'female' =
     storedGender === 'male' || storedGender === 'female'
       ? storedGender
-      : resolveAudioSpeakerGender(text.speakerGender);
+      : resolveAudioSpeakerGender(text.speakerGender, textId);
   if (storedGender !== audioSpeakerGender) {
     await ctx.db.patch(textId, { audioSpeakerGender });
   }
 
+  // Always include the text's own language (`sourceLanguage`) so the
+  // source-language branch below queues audio for it regardless of what
+  // the caller passed in `baseLanguages`. Without this, a user whose
+  // course uses an English VARIANT (`en_gb` / `en_us` / `en_au`) would
+  // never get audio for `en` curriculum + placement-test texts —
+  // `allRequiredLanguages` wouldn't contain `'en'`, so the
+  // `lang === sourceLanguage` branch never fires. Same shape applies to
+  // any other text where the user's variant differs from the text's
+  // actual language code (`es` vs `es_latam`, etc.). The Set dedupes
+  // when `baseLanguages`/`targetLanguages` already contain the source.
   const allRequiredLanguages = [
-    ...new Set([...baseLanguages, ...targetLanguages]),
+    ...new Set([sourceLanguage, ...baseLanguages, ...targetLanguages]),
   ];
 
-  // Languages that need translation (all except source)
+  // Languages that need translation (all except source). `sourceLanguage`
+  // is in `allRequiredLanguages` by construction above; filtering it out
+  // here ensures we don't enqueue a self-translation for it.
   const langsNeedingTranslation = allRequiredLanguages.filter(
     (l) => l !== sourceLanguage,
   );
 
-  // Batch load existing translations and audio for only the needed languages
-  const [existingTranslations, existingAudio] = await Promise.all([
-    Promise.all(
-      langsNeedingTranslation.map((lang) =>
-        ctx.db
-          .query('translations')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('targetLanguage', lang),
-          )
-          .first(),
+  // Batch load existing translations, audio, AND LLM claims for the
+  // needed languages — all three sets in one Promise.all so the read
+  // round-trips run in parallel rather than serially inside the loop
+  // below. The claim lookup gates whether `scheduleMissingContent`
+  // should defer a TTS enqueue while an LLM retranslation is in flight;
+  // doing it per-language inline turned a fast O(languages) read into
+  // a serial chain that pushed the mutation past Convex's 1s budget
+  // when called from a batched caller like `ensureContentForCollection`.
+  const [existingTranslations, existingAudio, existingLlmClaims] =
+    await Promise.all([
+      Promise.all(
+        langsNeedingTranslation.map((lang) =>
+          ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', textId).eq('targetLanguage', lang),
+            )
+            .first(),
+        ),
       ),
-    ),
-    Promise.all(
-      allRequiredLanguages.map((lang) =>
-        ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('language', lang),
-          )
-          .first(),
+      Promise.all(
+        allRequiredLanguages.map((lang) =>
+          ctx.db
+            .query('audioRecordings')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', textId).eq('language', lang),
+            )
+            .first(),
+        ),
       ),
-    ),
-  ]);
+      Promise.all(
+        langsNeedingTranslation.map((lang) =>
+          ctx.db
+            .query('llmTranslationClaims')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', textId).eq('targetLanguage', lang),
+            )
+            .first(),
+        ),
+      ),
+    ]);
 
   // Build lookup maps
   const translationMap = new Map(
@@ -131,6 +175,9 @@ export async function scheduleMissingContent(
   );
   const audioMap = new Map(
     allRequiredLanguages.map((lang, i) => [lang, existingAudio[i]]),
+  );
+  const llmClaimMap = new Map(
+    langsNeedingTranslation.map((lang, i) => [lang, existingLlmClaims[i]]),
   );
 
   // Validate storage files — delete stale rows where the file was removed.
@@ -189,15 +236,26 @@ export async function scheduleMissingContent(
     if (!languageSupportsStt(lang)) return;
     const claimed = await claimTtsIfAvailable(ctx, textId, lang);
     if (!claimed) return;
+    // Forward the persisted regionVariant for mixed-dialect rows so STT runs
+    // against the same locale the voice was synthesized in. Undefined for
+    // non-mixed languages and for the source-language (no translations row).
+    const regionVariant = translationMap.get(lang)?.regionVariant;
     await ctx.scheduler.runAfter(
       0,
       internal.features.ttsProcessing.backfillWordTimings,
-      { textId, language: lang, storageId: audio.storageId },
+      { textId, language: lang, storageId: audio.storageId, regionVariant },
     );
   };
 
-  // Schedule romanization for source text if needed and missing
-  if (ROMANIZATION_LANGUAGES.has(sourceLanguage) && !text.romanizedText) {
+  // Schedule romanization for source text if needed and missing.
+  // `=== undefined` (not `!x`) so the empty-string sentinel that
+  // `processRomanizationForSourceText` writes after 3 failed retries is
+  // honored — without that distinction every ensureContent call would burn
+  // another 3 retries against the same failing input.
+  if (
+    ROMANIZATION_LANGUAGES.has(sourceLanguage) &&
+    text.romanizedText === undefined
+  ) {
     await ctx.scheduler.runAfter(
       0,
       internal.features.decks.processRomanizationForSourceText,
@@ -287,7 +345,13 @@ export async function scheduleMissingContent(
         }
       } else {
         // Translation exists — backfill romanization if missing
-        if (ROMANIZATION_LANGUAGES.has(lang) && !translation.romanizedText) {
+        // `=== undefined` (not `!x`) so the empty-string "tried, failed,
+        // leave empty" sentinel persisted by `processRomanizationForTranslation`
+        // is respected on subsequent ensureContent runs.
+        if (
+          ROMANIZATION_LANGUAGES.has(lang) &&
+          translation.romanizedText === undefined
+        ) {
           await ctx.scheduler.runAfter(
             0,
             internal.features.decks.processRomanizationForTranslation,
@@ -295,31 +359,56 @@ export async function scheduleMissingContent(
           );
         }
         if (!hasAudio) {
-          const claimed = await claimTtsIfAvailable(ctx, textId, lang);
-          if (claimed) {
-            const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
-            const voiceGender = getVoiceGenderByApiCode(voiceName);
-            if (voiceGender === undefined) {
-              throw new Error(
-                `Cannot enqueue TTS: voice "${voiceName}" for language "${lang}" is not in the curated voice list.`,
-              );
-            }
-            await ctx.runMutation(
-              internal.features.ttsProcessing.enqueueTtsJob,
-              {
-                provider: getTtsProviderForLanguage(lang),
-                args: {
-                  textId,
-                  text: translation.translatedText,
-                  language: lang,
-                  voiceName,
-                  voiceGender,
-                  speed: 1,
+          // Defer TTS while an LLM retranslation is in flight for this
+          // (textId, lang). Without this guard, `flagTranslation` (which
+          // deletes audio + enqueues an LLM retranslation) races with a
+          // concurrent `scheduleMissingContent` that would otherwise see
+          // "translation exists, audio missing" and enqueue TTS against
+          // the OLD `translation.translatedText` — producing stale audio
+          // just before the new translation lands. The LLM worker's
+          // `storeTranslationAndScheduleTTS` will enqueue TTS for the new
+          // text once the LLM completes. The claim was pre-fetched in
+          // the batched Promise.all above; no per-iteration DB read here.
+          const existingLlmClaim = llmClaimMap.get(lang) ?? null;
+          const llmRetranslationInFlight =
+            existingLlmClaim !== null &&
+            Date.now() - existingLlmClaim.claimedAt < LLM_CLAIM_STALE_MS;
+          if (llmRetranslationInFlight) {
+            // Skip — the LLM worker owns the next TTS enqueue for this row.
+          } else {
+            const claimed = await claimTtsIfAvailable(ctx, textId, lang);
+            if (claimed) {
+              // For mixed-dialect rows, prefer a voice in the same locale that
+              // was picked at translation time and forward the variant to TTS
+              // so the validation roundtrip uses the matching STT locale.
+              const regionVariant = translation.regionVariant;
+              const voiceName = regionVariant
+                ? getVoiceForLanguageVariant(lang, regionVariant, audioSpeakerGender)
+                : getVoiceForLanguage(lang, audioSpeakerGender);
+              const voiceGender = getVoiceGenderByApiCode(voiceName);
+              if (voiceGender === undefined) {
+                throw new Error(
+                  `Cannot enqueue TTS: voice "${voiceName}" for language "${lang}" is not in the curated voice list.`,
+                );
+              }
+              await ctx.runMutation(
+                internal.features.ttsProcessing.enqueueTtsJob,
+                {
+                  provider: getTtsProviderForLanguage(lang),
+                  args: {
+                    textId,
+                    text: translation.translatedText,
+                    language: lang,
+                    voiceName,
+                    voiceGender,
+                    speed: 1,
+                    regionVariant,
+                  },
+                  priority,
                 },
-                priority,
-              },
-            );
-            audioScheduled++;
+              );
+              audioScheduled++;
+            }
           }
         } else {
           await scheduleTimingsBackfillIfNeeded(lang);
@@ -831,7 +920,7 @@ export const addCardsFromCollection = mutation({
     // Snapshot whether each prepareCardContent we schedule below should be
     // marked high-priority. Comparing by `===` is enough since both sides are
     // Convex Id strings (or undefined).
-    const priorityForCollection = (collectionId: Id<'collections'>): 0 | 1 =>
+    const priorityForCollection = (collectionId: Id<'collections'>): 0 | 1 | 2 =>
       activeCollectionId && activeCollectionId === collectionId ? 1 : 0;
     const requestedCollection = await ctx.db.get(args.collectionId);
     const isLevelCollection = requestedCollection
@@ -1120,14 +1209,17 @@ export const ensureCardContent = mutation({
     if (!text) return { translationsScheduled: 0, audioScheduled: 0 };
 
     // Prioritize when this card is from the user's currently-active
-    // collection. Comparing IDs by string keeps the check resilient if either
+    // collection. priority: 2 because `ensureCardContent` fires during
+    // review/study — the user is staring at the card right now and is
+    // blocked on its content. Same tier as placement test / onboarding
+    // seed. Comparing IDs by string keeps the check resilient if either
     // field is undefined.
     const settings = await getCourseSettings(ctx, active.course._id);
     const priority =
       settings?.activeCollectionId &&
       card.collectionId &&
       settings.activeCollectionId === card.collectionId
-        ? 1
+        ? 2
         : 0;
 
     return scheduleMissingContent(
@@ -1195,11 +1287,14 @@ export const ensureUpcomingCardsContent = mutation({
       if (!text) continue;
       // Bump priority for cards in the user's currently-active collection
       // so their content jumps to the front of the TTS / LLM queues.
+      // priority: 2 because `ensureUpcomingCardsContent` is the lookahead
+      // path during review — the user will reach these cards within the
+      // current session, so they're effectively blocking.
       const priority =
         activeCollectionId &&
         card.collectionId &&
         activeCollectionId === card.collectionId
-          ? 1
+          ? 2
           : 0;
       await scheduleMissingContent(
         ctx,
@@ -1266,7 +1361,7 @@ export const prepareCardContent = internalMutation({
     // the user's `activeCollectionId`. We snapshot intent here instead of
     // re-reading the active collection at run time so a user switching
     // collections mid-batch doesn't reshuffle work that's already queued.
-    priority: v.optional(v.union(v.literal(0), v.literal(1))),
+    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1325,7 +1420,17 @@ export const processTranslationForCard = internalAction({
     targetLanguage: v.string(),
     text: v.string(),
     audioSpeakerGender: v.optional(v.string()),
-    priority: v.optional(v.union(v.literal(0), v.literal(1))),
+    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
+    /**
+     * Retranslation flag. Set when this action is dispatched as the
+     * Google fallback for a deliberate LLM retranslation (flagTranslation
+     * or the model-swap migration). When true, the action skips the
+     * "reuse existing translatedText" shortcut and Google-translates fresh,
+     * then forwards the flag to `storeTranslationAndScheduleTTS` so the
+     * existing row is actually overwritten. False/absent → historical
+     * behavior (reuse existing translation if present).
+     */
+    replaceExisting: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1338,43 +1443,77 @@ export const processTranslationForCard = internalAction({
         },
       );
 
+      // Mixed-dialect targets (today: es_mixed) pick a deterministic
+      // sub-variant per text. The Google translate target is the sub-code so
+      // we get regional spelling/vocab; the persisted row keeps the mixed
+      // code as `targetLanguage` and records the chosen variant.
+      const mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
+      const translateTarget = mixed ? mixed.subCode : args.targetLanguage;
+      const regionVariant = mixed?.regionVariant;
+
       let translation: string;
       let romanizedText: string | undefined;
 
-      if (existingRow) {
-        translation = existingRow.translatedText;
-        if (ROMANIZATION_LANGUAGES.has(args.targetLanguage) && !existingRow.romanizedText) {
+      // Honor `replaceExisting`: a retranslation that fell back to Google
+      // must Google-translate fresh rather than reuse the stale existing
+      // translatedText — otherwise the audio would be regenerated against
+      // an unchanged translation and we'd write the same row back.
+      const reuseExisting = !args.replaceExisting && existingRow !== null;
+      if (reuseExisting) {
+        translation = existingRow!.translatedText;
+        // `=== undefined`: respect the empty-string sentinel from a prior
+        // failed attempt so we don't keep re-running the 3-retry burst.
+        if (
+          ROMANIZATION_LANGUAGES.has(translateTarget) &&
+          existingRow!.romanizedText === undefined
+        ) {
           try {
-            romanizedText = await romanizeText(translation, args.targetLanguage);
+            romanizedText = await romanizeText(translation, translateTarget);
           } catch {
-            // Romanization is non-fatal; skip silently
+            // 3 retries already exhausted — persist sentinel so subsequent
+            // ensureContent runs see "tried" and skip rescheduling.
+            romanizedText = '';
           }
         } else {
-          romanizedText = existingRow.romanizedText;
+          romanizedText = existingRow!.romanizedText;
         }
       } else {
         translation = await translateText(
           args.text,
           args.sourceLanguage,
-          args.targetLanguage,
+          translateTarget,
         );
-        if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
+        if (ROMANIZATION_LANGUAGES.has(translateTarget)) {
           try {
-            romanizedText = await romanizeText(translation, args.targetLanguage);
+            romanizedText = await romanizeText(translation, translateTarget);
           } catch (err) {
-            // Romanization is non-fatal — the translation still lands without
-            // it — but we log so the next time a new locale silently fails to
-            // romanize, we notice (the Arabic bug went unnoticed because of
-            // an empty `catch`).
+            // 3 retries already exhausted — persist the empty-string
+            // sentinel so ensureContent doesn't reschedule another burst.
             console.error(
-              `Romanization failed for ${args.targetLanguage}:`,
+              `Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
               err instanceof Error ? err.message : err,
             );
+            romanizedText = '';
           }
         }
       }
 
-      const voiceName = getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
+      const voiceName = regionVariant
+        ? getVoiceForLanguageVariant(
+          args.targetLanguage,
+          regionVariant,
+          args.audioSpeakerGender,
+        )
+        : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
+
+      // Source travels with the romanization value (real or sentinel) so a
+      // future strategy swap can target rows produced by the old method.
+      // Resolved from `translateTarget` (the actual code romanizeText was
+      // given) so mixed dialects record the sub-code's source.
+      const romanizationSource =
+        romanizedText !== undefined
+          ? getRomanizationSource(translateTarget)
+          : undefined;
 
       await ctx.runMutation(
         internal.features.decks.storeTranslationAndScheduleTTS,
@@ -1384,7 +1523,14 @@ export const processTranslationForCard = internalAction({
           translatedText: translation,
           voiceName,
           romanizedText,
+          romanizationSource,
+          // Legacy Google Translate path (used as the fallback when the LLM
+          // queue's stage chain exhausts, or for languages explicitly pinned
+          // to `translationProvider: 'google'`).
+          translationSource: GOOGLE_TRANSLATE_SOURCE,
+          regionVariant,
           priority: args.priority,
+          replaceExisting: args.replaceExisting,
         },
       );
     } catch (err) {
@@ -1410,7 +1556,48 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     translatedText: v.string(),
     voiceName: v.string(),
     romanizedText: v.optional(v.string()),
-    priority: v.optional(v.union(v.literal(0), v.literal(1))),
+    /**
+     * Identifier of the romanizer that produced `romanizedText` (or
+     * attempted to and emitted the empty-string sentinel). Required when
+     * `romanizedText` is supplied, omitted otherwise. Persisted alongside
+     * the text so a future strategy swap can target rows by source.
+     */
+    romanizationSource: v.optional(v.string()),
+    /**
+     * Identifier of the translation method (model + reasoning, or
+     * `google-translate-v2` for the legacy path). Persisted on the
+     * translation row so a future strategy swap can target rows produced
+     * by the old method. Optional during rollout so old call sites that
+     * haven't been threaded yet still compile.
+     */
+    translationSource: v.optional(v.string()),
+    /**
+     * Concrete regional variant chosen when `targetLanguage` is a mixed code
+     * (today: `es_mixed`). Stored on the translation row so the audio player
+     * can pick a voice in the matching locale.
+     */
+    regionVariant: v.optional(v.string()),
+    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
+    /**
+     * Retranslation flag. Set by callers that deliberately want to overwrite
+     * an existing translation — today only `flagTranslation` (the user
+     * reported a bad translation and we want the new LLM output to replace
+     * the displayed text).
+     *
+     * When `true` AND a translation row already exists, the mutation
+     * replaces `translatedText`, `romanizedText` (matched with its source),
+     * `translationSource`, and `regionVariant`. `flagCount` is preserved —
+     * it tracks user dissatisfaction history. Audio rows for the language
+     * are not touched here; retranslation callers delete them before
+     * enqueueing so the no-audio guard below schedules a fresh TTS.
+     *
+     * When `false`/absent, the historical concurrent-write protection
+     * stays in place: existing `translatedText` is never overwritten and
+     * metadata is patched only when missing. This is the safe default for
+     * the normal new-card insertion path and for any Google-fallback that
+     * fires after another write already landed.
+     */
+    replaceExisting: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1426,10 +1613,87 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         textId: args.textId,
         targetLanguage: args.targetLanguage,
         translatedText: args.translatedText,
-        ...(args.romanizedText ? { romanizedText: args.romanizedText } : {}),
+        // `!== undefined` so the empty-string sentinel ("tried, failed,
+        // leave empty") persists on the new row and ensureContent stops
+        // rescheduling — otherwise `args.romanizedText === ''` would be
+        // dropped by the truthy spread and look like "never attempted".
+        ...(args.romanizedText !== undefined
+          ? {
+            romanizedText: args.romanizedText,
+            ...(args.romanizationSource
+              ? { romanizationSource: args.romanizationSource }
+              : {}),
+          }
+          : {}),
+        ...(args.translationSource
+          ? { translationSource: args.translationSource }
+          : {}),
+        ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
       });
-    } else if (args.romanizedText && !existing.romanizedText) {
-      await ctx.db.patch(existing._id, { romanizedText: args.romanizedText });
+    } else if (args.replaceExisting) {
+      // Deliberate retranslation: overwrite the translation and its matched
+      // metadata. romanizedText and romanizationSource travel as a unit —
+      // both replaced together, including the empty-string sentinel. If the
+      // caller didn't compute a new romanization (`romanizedText` undefined),
+      // clear both fields so the next ensureContent pass regenerates them
+      // against the new translatedText.
+      const patch: Partial<{
+        translatedText: string;
+        romanizedText: string | undefined;
+        romanizationSource: string | undefined;
+        translationSource: string | undefined;
+        regionVariant: string | undefined;
+      }> = {
+        translatedText: args.translatedText,
+      };
+      if (args.romanizedText !== undefined) {
+        patch.romanizedText = args.romanizedText;
+        patch.romanizationSource = args.romanizationSource;
+      } else {
+        // Convex `patch` semantics: `undefined` clears the field.
+        patch.romanizedText = undefined;
+        patch.romanizationSource = undefined;
+      }
+      if (args.translationSource) {
+        patch.translationSource = args.translationSource;
+      }
+      if (args.regionVariant) {
+        patch.regionVariant = args.regionVariant;
+      }
+      await ctx.db.patch(existing._id, patch);
+    } else {
+      const patch: Partial<{
+        romanizedText: string;
+        romanizationSource: string;
+        translationSource: string;
+        regionVariant: string;
+      }> = {};
+      // Same `!== undefined` reasoning: persist the sentinel on first write
+      // but never overwrite a previously-stored real value. Source travels
+      // with the value — they're written/cleared as a unit.
+      if (
+        args.romanizedText !== undefined &&
+        existing.romanizedText === undefined
+      ) {
+        patch.romanizedText = args.romanizedText;
+        if (args.romanizationSource) {
+          patch.romanizationSource = args.romanizationSource;
+        }
+      }
+      // Translation source is set on first-write of `translatedText` (which
+      // happened upstream when the row was inserted). For existing rows we
+      // only fill it in if it's missing — the legacy-backfill migration
+      // handles older rows, but a concurrent regenerate against an existing
+      // row should keep the original source as the canonical record.
+      if (args.translationSource && existing.translationSource === undefined) {
+        patch.translationSource = args.translationSource;
+      }
+      if (args.regionVariant && !existing.regionVariant) {
+        patch.regionVariant = args.regionVariant;
+      }
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.patch(existing._id, patch);
+      }
     }
 
     // Release any LLM translation claim now that the translation row exists.
@@ -1477,6 +1741,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
               voiceName: args.voiceName,
               voiceGender,
               speed: 1,
+              regionVariant: args.regionVariant,
             },
             priority: args.priority,
           },
@@ -1499,32 +1764,54 @@ export const processRomanizationForSourceText = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    let romanized: string;
     try {
-      const romanized = await romanizeText(args.text, args.language);
-      await ctx.runMutation(
-        internal.features.decks.storeSourceRomanization,
-        { textId: args.textId, romanizedText: romanized },
-      );
+      romanized = await romanizeText(args.text, args.language);
     } catch (err) {
-      console.error('Source romanization error:', err);
+      // `romanizeText` already retried up to 3 times before throwing.
+      // Persist an empty-string sentinel so `scheduleMissingContent` doesn't
+      // reschedule another 3-retry burst on every ensureContent call.
+      console.error('Source romanization error (persisting sentinel):', err);
+      romanized = '';
     }
+    // Source recorded even on failure: lets a strategy swap target failed
+    // rows by the source that produced the sentinel.
+    const romanizationSource = getRomanizationSource(args.language);
+    await ctx.runMutation(
+      internal.features.decks.storeSourceRomanization,
+      {
+        textId: args.textId,
+        romanizedText: romanized,
+        romanizationSource,
+      },
+    );
     return null;
   },
 });
 
 /**
  * Internal mutation to store romanized text on a source text document.
+ *
+ * Idempotent against a real-value race: only patches when the row hasn't
+ * been written yet (`romanizedText === undefined`). The empty-string
+ * sentinel for "tried and failed" also wins on first write but never
+ * overwrites a previously-stored real value. `romanizationSource` is
+ * recorded so a future strategy swap can find + invalidate the row.
  */
 export const storeSourceRomanization = internalMutation({
   args: {
     textId: v.id('texts'),
     romanizedText: v.string(),
+    romanizationSource: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const text = await ctx.db.get(args.textId);
-    if (text && !text.romanizedText) {
-      await ctx.db.patch(args.textId, { romanizedText: args.romanizedText });
+    if (text && text.romanizedText === undefined) {
+      await ctx.db.patch(args.textId, {
+        romanizedText: args.romanizedText,
+        romanizationSource: args.romanizationSource,
+      });
     }
     return null;
   },
@@ -1541,27 +1828,50 @@ export const processRomanizationForTranslation = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    let romanized: string;
     try {
-      const romanized = await romanizeText(args.translatedText, args.language);
-      await ctx.runMutation(
-        internal.features.decks.storeTranslationRomanization,
-        { textId: args.textId, language: args.language, romanizedText: romanized },
-      );
+      romanized = await romanizeText(args.translatedText, args.language);
     } catch (err) {
-      console.error('Translation romanization error:', err);
+      // `romanizeText` already retried up to 3 times before throwing.
+      // Persist an empty-string sentinel so `scheduleMissingContent` doesn't
+      // reschedule another 3-retry burst on every ensureContent call.
+      console.error(
+        'Translation romanization error (persisting sentinel):',
+        err,
+      );
+      romanized = '';
     }
+    // Source recorded even on failure: lets a strategy swap target failed
+    // rows by the source that produced the sentinel.
+    const romanizationSource = getRomanizationSource(args.language);
+    await ctx.runMutation(
+      internal.features.decks.storeTranslationRomanization,
+      {
+        textId: args.textId,
+        language: args.language,
+        romanizedText: romanized,
+        romanizationSource,
+      },
+    );
     return null;
   },
 });
 
 /**
  * Internal mutation to store romanized text on a translation document.
+ *
+ * Idempotent against a real-value race: only patches when the field hasn't
+ * been written yet. The empty-string sentinel for "tried and failed" wins
+ * on first write but never overwrites a previously-stored real value.
+ * `romanizationSource` is recorded so a future strategy swap can find +
+ * invalidate the row.
  */
 export const storeTranslationRomanization = internalMutation({
   args: {
     textId: v.id('texts'),
     language: v.string(),
     romanizedText: v.string(),
+    romanizationSource: v.string(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1571,8 +1881,11 @@ export const storeTranslationRomanization = internalMutation({
         q.eq('textId', args.textId).eq('targetLanguage', args.language),
       )
       .first();
-    if (translation && !translation.romanizedText) {
-      await ctx.db.patch(translation._id, { romanizedText: args.romanizedText });
+    if (translation && translation.romanizedText === undefined) {
+      await ctx.db.patch(translation._id, {
+        romanizedText: args.romanizedText,
+        romanizationSource: args.romanizationSource,
+      });
     }
     return null;
   },

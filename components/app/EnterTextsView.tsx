@@ -11,7 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ChevronLeft, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
-import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import {
+  getLocalizedLanguageNameByCode,
+  USER_PROVIDED_TRANSLATION_SOURCE,
+} from '@/lib/languages';
 import {
   MAX_CARD_TEXT_LENGTH,
   CARD_TEXT_SHOW_COUNT_REMAINING_THRESHOLD,
@@ -49,6 +52,19 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [userEditedLangs, setUserEditedLangs] = useState<Set<string>>(new Set());
   const [autoFillMetadata, setAutoFillMetadata] = useState<SentenceMetadata | null>(null);
+  // Region variants returned by the autofill action for mixed-dialect targets
+  // (today: `es_mixed` → e.g. `'es-US'`). Kept in lockstep with `texts`: when
+  // a user manually edits a row we drop its variant so we don't persist a
+  // stale dialect choice against text the LLM didn't produce.
+  const [regionVariants, setRegionVariants] = useState<Record<string, string>>(
+    {},
+  );
+  // Translation source returned by the autofill action (the LLM model id).
+  // Same lifecycle as `regionVariants`: set after autofill, cleared when the
+  // user manually edits a row so we don't tag user-typed text as LLM-produced.
+  const [translationSources, setTranslationSources] = useState<
+    Record<string, string>
+  >({});
   const [isSaving, setIsSaving] = useState(false);
   const [isAutoFilling, setIsAutoFilling] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
@@ -94,6 +110,8 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
     setTexts({});
     setUserEditedLangs(new Set());
     setAutoFillMetadata(null);
+    setRegionVariants({});
+    setTranslationSources({});
     firstInputRef.current?.focus();
   }, []);
 
@@ -130,6 +148,38 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
             (prev[r.language] ?? '').trim().length > 0;
           if (manualBlock) continue;
           next[r.language] = r.text;
+        }
+        return next;
+      });
+      setRegionVariants((prev) => {
+        const next = { ...prev };
+        for (const r of results) {
+          const manualBlock =
+            editedSnapshot.has(r.language) &&
+            (prev[r.language] ?? '').trim().length > 0;
+          if (manualBlock) continue;
+          if (r.regionVariant) {
+            next[r.language] = r.regionVariant;
+          } else {
+            delete next[r.language];
+          }
+        }
+        return next;
+      });
+      setTranslationSources((prev) => {
+        const next = { ...prev };
+        for (const r of results) {
+          // `translationSources` only stores non-empty model ids, so the
+          // `.trim().length > 0` predicate used by `setTexts` /
+          // `setRegionVariants` above collapses to a presence check here.
+          const manualBlock =
+            editedSnapshot.has(r.language) && prev[r.language] !== undefined;
+          if (manualBlock) continue;
+          if (r.translationSource) {
+            next[r.language] = r.translationSource;
+          } else {
+            delete next[r.language];
+          }
         }
         return next;
       });
@@ -170,10 +220,21 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
 
     setIsSaving(true);
     try {
-      const translations = orderedLanguages.map((lang) => ({
-        language: lang,
-        text: texts[lang].trim(),
-      }));
+      const translations = orderedLanguages.map((lang) => {
+        const regionVariant = regionVariants[lang];
+        // Source from autofill survives manual-edit invalidation in
+        // `setTranslationSources` above; if the user edited a row after
+        // autofill, the source is dropped and we tag the row as user-
+        // provided so a future strategy swap doesn't rewrite it.
+        const translationSource =
+          translationSources[lang] ?? USER_PROVIDED_TRANSLATION_SOURCE;
+        return {
+          language: lang,
+          text: texts[lang].trim(),
+          translationSource,
+          ...(regionVariant ? { regionVariant } : {}),
+        };
+      });
       await createCustomText({
         translations,
         timezone: getUserTimezone(),
@@ -183,6 +244,8 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
       setTexts({});
       setUserEditedLangs(new Set());
       setAutoFillMetadata(null);
+      setRegionVariants({});
+      setTranslationSources({});
       firstInputRef.current?.focus();
     } catch (err) {
       if (
@@ -202,7 +265,7 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
     } finally {
       setIsSaving(false);
     }
-  }, [saveQuota.isAvailable, orderedLanguages, texts, createCustomText, t, autoFillMetadata]);
+  }, [saveQuota.isAvailable, orderedLanguages, texts, regionVariants, translationSources, createCustomText, t, autoFillMetadata]);
 
   return (
     <>
@@ -272,6 +335,23 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
                           if (prev.has(lang)) return prev;
                           const next = new Set(prev);
                           next.add(lang);
+                          return next;
+                        });
+                        // User-edited rows discard the autofill's regional
+                        // variant so we don't persist a stale dialect choice
+                        // against text the LLM didn't produce.
+                        setRegionVariants((prev) => {
+                          if (!(lang in prev)) return prev;
+                          const next = { ...prev };
+                          delete next[lang];
+                          return next;
+                        });
+                        // Same logic for the translation-source tag: a
+                        // user-edited row stops being LLM-produced.
+                        setTranslationSources((prev) => {
+                          if (!(lang in prev)) return prev;
+                          const next = { ...prev };
+                          delete next[lang];
                           return next;
                         });
                         // Any edit invalidates auto-fill metadata; the server will regenerate it.

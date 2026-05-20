@@ -29,7 +29,7 @@ describe('feature-meta helpers', () => {
   });
 
   it('getFeatureDisplayCount returns the override when present', () => {
-    expect(getFeatureDisplayCount(FEATURE_IDS.MULTIPLE_LANGUAGES)).toBe(5);
+    expect(getFeatureDisplayCount(FEATURE_IDS.MULTIPLE_LANGUAGES)).toBe(3);
     expect(getFeatureDisplayCount(FEATURE_IDS.CHAT_MESSAGES)).toBeUndefined();
   });
 

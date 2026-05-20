@@ -30,6 +30,8 @@ export function BottomNav({ currentView, onViewChange, onLearnOpen }: BottomNavP
       <button
         type="button"
         onClick={() => onViewChange(view)}
+        data-testid={`bottom-nav-${view}`}
+        aria-label={t(labelKey)}
         className={`flex flex-col items-center gap-1 h-auto w-full py-2 rounded-md transition-colors ${currentView === view ? 'text-primary' : 'text-muted-foreground'}`}
       >
         <Icon className="h-5 w-5" />

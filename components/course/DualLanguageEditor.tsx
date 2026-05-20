@@ -185,7 +185,7 @@ function DroppableGroup({
   const atTotalMax = maxTotal != null && allItems.length >= maxTotal;
   const canAdd = !atGroupMax && !atTotalMax;
   const availableLanguages = SUPPORTED_LANGUAGES.filter(
-    (lang) => !allItems.includes(lang.code),
+    (lang) => !lang.hiddenFromPicker && !allItems.includes(lang.code),
   );
 
   const locked = lockedCodes ?? [];

@@ -111,6 +111,14 @@ export function useAudioPlayer(
   onResetReviewFlagRef.current = onResetReviewFlag;
   const onNextRef = useRef(onNext);
   onNextRef.current = onNext;
+  // Latest autoPlay value, read at the moment of `.play()` instead of from
+  // the merge effect's captured closure. The merge effect's async pipeline
+  // (fetch → decode → merge → loadedmetadata) takes 50-200ms; if the
+  // caller flips autoPlay false during that window (e.g. an onboarding
+  // tutorial popover opens), we want the play decision at resolution time
+  // to honor the *current* value, not the stale closure.
+  const autoPlayRef = useRef(autoPlay);
+  autoPlayRef.current = autoPlay;
 
 
   const getAudio = useCallback((): HTMLAudioElement => {
@@ -479,13 +487,16 @@ export function useAudioPlayer(
       if (!audio.paused) audio.pause();
       audio.src = cached.result.blobUrl;
 
-      const shouldAutoPlay =
-        !hasAutoPlayedForCardRef.current &&
-        autoPlay &&
-        getReviewInitiatedByThisTab();
+      const initiatedByThisTab = getReviewInitiatedByThisTab();
 
       const doStart = () => {
-        if (shouldAutoPlay) {
+        // Re-check autoPlay at the moment of play, not from the captured
+        // closure — see `autoPlayRef` comment near hook top.
+        if (
+          !hasAutoPlayedForCardRef.current &&
+          autoPlayRef.current &&
+          initiatedByThisTab
+        ) {
           hasAutoPlayedForCardRef.current = true;
           onResetReviewFlagRef.current();
           audio.play().catch((err) => {
@@ -561,21 +572,7 @@ export function useAudioPlayer(
         setDurationSec(result.durationSec);
         setIsMerging(false);
 
-        // Same-card remerge (e.g. settings tweak or client refresh): resume if
-        // playback was already running so JWT/query churn does not strand audio.
-        const shouldResumePlay = wasPlayingSameCard;
-        // Composition change is, by definition, a user-initiated mode toggle
-        // in this tab — bypass the `hasAutoPlayed` and `reviewInitiatedByThisTab`
-        // gates. Those gates exist to stop spurious auto-plays from URL refreshes
-        // and to coordinate across tabs on the initial card load; once the user
-        // explicitly flips review modes neither concern applies, and the
-        // tab-flag is otherwise stuck at false (it's only re-set by handleReview/
-        // handleNext/handleDelete, not by settings updates).
-        const shouldAutoPlay =
-          !wasPlayingSameCard &&
-          autoPlay &&
-          (isCompositionChange ||
-            (!hasAutoPlayedForCardRef.current && getReviewInitiatedByThisTab()));
+        const initiatedByThisTab = getReviewInitiatedByThisTab();
 
         // Assigning `audio.src` resets `currentTime` to 0. If the user had a
         // structural position before this remerge, map it onto the new blob's
@@ -602,6 +599,24 @@ export function useAudioPlayer(
               }
             }
           }
+          // Same-card remerge resume (e.g. settings tweak or client refresh):
+          // only resume if playback was running AND the caller hasn't gated
+          // autoplay since. Resume-after-async-merge isn't "user-initiated at
+          // the moment of play" — the user clicked Play 100s of ms ago and an
+          // onboarding tutorial may have opened in between.
+          const shouldResumePlay = wasPlayingSameCard && autoPlayRef.current;
+          // Composition change is a user-initiated mode toggle in this tab —
+          // bypass the `hasAutoPlayed` and `reviewInitiatedByThisTab` gates.
+          // Those exist to stop spurious auto-plays from URL refreshes and to
+          // coordinate across tabs on initial load; once the user explicitly
+          // flips review modes neither applies, and the tab-flag is otherwise
+          // stuck at false. We still honor `autoPlayRef.current` so callers
+          // (the onboarding tutorial gate) can suppress mid-flight plays.
+          const shouldAutoPlay =
+            !wasPlayingSameCard &&
+            autoPlayRef.current &&
+            (isCompositionChange ||
+              (!hasAutoPlayedForCardRef.current && initiatedByThisTab));
           if (shouldResumePlay) {
             audio.play().catch((err) => {
               if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
