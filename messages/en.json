@@ -934,7 +934,7 @@
     "placementTest": {
       "questionLabel": "Question {n}",
       "prompt": "Do you know how to translate this?",
-      "sourceLabel": "English",
+      "sourceLabel": "{language}",
       "translationLabel": "Translation",
       "loading": "Loading…",
       "noSentence": "No sentence at this level.",
@@ -943,7 +943,7 @@
       "reveal": "Reveal translation",
       "iDidntKnow": "I didn't know",
       "iKnewIt": "I knew it",
-      "playSourceAudio": "Play English audio",
+      "playSourceAudio": "Play {language} audio",
       "playTranslationAudio": "Play translation audio",
       "result": {
         "title": "Got it",

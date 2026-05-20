@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Volume2, EyeOff } from 'lucide-react';
+import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import {
   createStrategy,
   DEFAULT_STRATEGY,
@@ -75,6 +76,7 @@ interface Props {
  */
 export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteLevel, onComplete }: Props) {
   const t = useTranslations('Onboarding.placementTest');
+  const locale = useLocale();
   const strategyName: StrategyName = DEFAULT_STRATEGY;
   const [strategyAndTick] = useState<{ s: PlacementStrategy }>(() => {
     const s = createStrategy(strategyName);
@@ -234,6 +236,15 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
   const targetText = sentence?.targetText;
   const targetMissing = sentence === null || !targetText;
 
+  // Label the source side with the language the query actually rendered
+  // — falls back to the user's requested base language while the sentence
+  // is still loading.
+  const renderedSourceLanguage = sentence?.sourceLanguage ?? sourceLanguage;
+  const sourceLanguageLabel = getLocalizedLanguageNameByCode(
+    renderedSourceLanguage,
+    locale,
+  );
+
   return (
     <div
       data-testid="onboarding-step-placement-test"
@@ -258,7 +269,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
             <div>
               <div className="flex items-center justify-between mb-2">
                 <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                  {t('sourceLabel')}
+                  {t('sourceLabel', { language: sourceLanguageLabel })}
                 </div>
                 {sentence?.sourceAudioUrl ? (
                   <Button
@@ -266,7 +277,7 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
                     size="icon"
                     className="h-7 w-7"
                     onClick={() => sourceAudioRef.current?.play().catch(() => {})}
-                    aria-label={t('playSourceAudio')}
+                    aria-label={t('playSourceAudio', { language: sourceLanguageLabel })}
                   >
                     <Volume2 className="h-4 w-4" />
                   </Button>

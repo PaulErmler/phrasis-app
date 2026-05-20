@@ -931,7 +931,7 @@
     "placementTest": {
       "questionLabel": "Frage {n}",
       "prompt": "Weißt du, wie man das übersetzt?",
-      "sourceLabel": "Englisch",
+      "sourceLabel": "{language}",
       "translationLabel": "Übersetzung",
       "loading": "Lädt…",
       "noSentence": "Auf diesem Level gibt es keinen Satz.",
@@ -940,7 +940,7 @@
       "reveal": "Übersetzung aufdecken",
       "iDidntKnow": "Ich wusste es nicht",
       "iKnewIt": "Ich wusste es",
-      "playSourceAudio": "Englisches Audio abspielen",
+      "playSourceAudio": "{language}-Audio abspielen",
       "playTranslationAudio": "Übersetzungsaudio abspielen",
       "result": {
         "title": "Alles klar",
