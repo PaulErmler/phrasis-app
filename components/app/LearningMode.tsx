@@ -371,9 +371,9 @@ export function LearningMode({
   // not deleted.
   const handleFlagPrimary = hasTargetTranslation
     ? () => {
-        audio.pause();
-        setFlagConfirmOpen(true);
-      }
+      audio.pause();
+      setFlagConfirmOpen(true);
+    }
     : undefined;
 
   const cardContent =

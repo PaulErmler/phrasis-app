@@ -152,9 +152,9 @@ export function LearningChatLayout({
               isDesktop
                 ? 'flex flex-1 justify-center overflow-hidden'
                 : cn(
-                    'absolute inset-0 flex flex-col transition-transform duration-300 ease-out',
-                    effectiveChatOpen ? '-translate-x-full' : 'translate-x-0',
-                  ),
+                  'absolute inset-0 flex flex-col transition-transform duration-300 ease-out',
+                  effectiveChatOpen ? '-translate-x-full' : 'translate-x-0',
+                ),
             )}
           >
             <div
@@ -196,9 +196,9 @@ export function LearningChatLayout({
               'min-w-0 min-h-0 bg-background overflow-hidden',
               isDesktop
                 ? cn(
-                    'flex shrink-0 border-l relative z-10 transition-[width] duration-300 ease-out',
-                    effectiveChatOpen ? 'w-[calc(33vw-1rem)]' : 'w-0',
-                  )
+                  'flex shrink-0 border-l relative z-10 transition-[width] duration-300 ease-out',
+                  effectiveChatOpen ? 'w-[calc(33vw-1rem)]' : 'w-0',
+                )
                 : effectiveChatOpen
                   ? 'absolute inset-0 flex flex-col'
                   : 'hidden',

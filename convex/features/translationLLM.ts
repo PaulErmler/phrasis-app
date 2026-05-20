@@ -142,14 +142,14 @@ export function buildPrompt(args: TranslationPromptArgs): string {
   const arcBlock =
     arc && (arc.preceding.length > 0 || arc.following.length > 0)
       ? [
-          ``,
-          `<arc_context>`,
-          `  The sentence to translate appears in this sequence of related sentences (up to 5 immediately preceding it and up to 3 immediately following it within the same thematic arc). Use the surrounding sentences only to inform consistency of register, pronouns, gender agreement, and discourse flow. Translate ONLY the sentence wrapped in <target>.`,
-          ...arc.preceding.map((s) => `  <sentence>${s}</sentence>`),
-          `  <target>${args.text}</target>`,
-          ...arc.following.map((s) => `  <sentence>${s}</sentence>`),
-          `</arc_context>`,
-        ]
+        ``,
+        `<arc_context>`,
+        `  The sentence to translate appears in this sequence of related sentences (up to 5 immediately preceding it and up to 3 immediately following it within the same thematic arc). Use the surrounding sentences only to inform consistency of register, pronouns, gender agreement, and discourse flow. Translate ONLY the sentence wrapped in <target>.`,
+        ...arc.preceding.map((s) => `  <sentence>${s}</sentence>`),
+        `  <target>${args.text}</target>`,
+        ...arc.following.map((s) => `  <sentence>${s}</sentence>`),
+        `</arc_context>`,
+      ]
       : [];
 
   // Optional previous-translation block. Surfaces what the user flagged so
@@ -158,11 +158,11 @@ export function buildPrompt(args: TranslationPromptArgs): string {
   // different from a translation that might already be right.
   const prevBlock = args.previousTranslation
     ? [
-        ``,
-        `<previous_translation>`,
-        `  This sentence was previously translated as <prior>${args.previousTranslation}</prior>. The user flagged that translation as wrong, but there is a chance it was correct anyway. Reconsider it: if you genuinely agree the prior is the best rendering, you may produce the same translation; otherwise output the translation you actually stand behind.`,
-        `</previous_translation>`,
-      ]
+      ``,
+      `<previous_translation>`,
+      `  This sentence was previously translated as <prior>${args.previousTranslation}</prior>. The user flagged that translation as wrong, but there is a chance it was correct anyway. Reconsider it: if you genuinely agree the prior is the best rendering, you may produce the same translation; otherwise output the translation you actually stand behind.`,
+      `</previous_translation>`,
+    ]
     : [];
 
   return [
@@ -242,12 +242,12 @@ export async function translateTextWithLLM(
       // `thinkingLevel: 'minimal'`). See the `ReasoningEffort` type above.
       ...(effort
         ? {
-            providerOptions: {
-              openrouter: {
-                reasoning: { effort: effort as 'low' | 'medium' | 'high' },
-              },
+          providerOptions: {
+            openrouter: {
+              reasoning: { effort: effort as 'low' | 'medium' | 'high' },
             },
-          }
+          },
+        }
         : {}),
     });
   } catch (err) {

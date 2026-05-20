@@ -270,7 +270,7 @@ export function useOnboardingLessonTutorial({
         runStage('chat', buildChatSteps(tRef.current));
       }, 350);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [cardsRated]);
 }
 

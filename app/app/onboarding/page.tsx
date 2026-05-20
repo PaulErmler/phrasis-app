@@ -608,7 +608,7 @@ function OnboardingWizard({
   // Passes useCallback values + useState setters into a plain function called
   // during render — `react-hooks/refs` can't tell these aren't refs, so the
   // rule fires a false positive here.
-  // eslint-disable-next-line react-hooks/refs
+   
   const stepNode = renderStep({
     stepId,
     data,

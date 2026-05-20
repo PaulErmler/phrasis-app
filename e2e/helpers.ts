@@ -169,6 +169,9 @@ export async function completeOnboardingFresh(
   ).toBeVisible({ timeout: 60_000 });
 
   // 7. First lesson intro (mode picker → Start or Skip).
+  // Skip jumps straight to feature-tour (stats-recap + word-projection are
+  // only shown when the user actually rated cards — see
+  // app/app/onboarding/page.tsx onSkipLesson).
   if (firstLesson === "skip") {
     await page.getByTestId("first-lesson-skip").click();
   } else {
@@ -190,19 +193,19 @@ export async function completeOnboardingFresh(
         .first();
       await next.click({ timeout: 10_000 }).catch(() => {});
     }
+
+    // 8. Stats recap.
+    await expect(page.getByTestId("onboarding-step-stats-recap")).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.getByTestId("progress-display-continue").click();
+
+    // 9. Word projection.
+    await expect(
+      page.getByTestId("onboarding-step-word-projection"),
+    ).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId("word-projection-continue").click();
   }
-
-  // 8. Stats recap.
-  await expect(page.getByTestId("onboarding-step-stats-recap")).toBeVisible({
-    timeout: 30_000,
-  });
-  await page.getByTestId("progress-display-continue").click();
-
-  // 9. Word projection.
-  await expect(
-    page.getByTestId("onboarding-step-word-projection"),
-  ).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId("word-projection-continue").click();
 
   // 10. Feature tour — click Next until the Done button appears, then Done.
   await expect(page.getByTestId("onboarding-step-feature-tour")).toBeVisible({

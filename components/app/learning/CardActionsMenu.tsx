@@ -238,27 +238,27 @@ export function CardActionsMenu({
 
   const toneClassesForButton = (tone: ActionConfig['activeTone']) => {
     switch (tone) {
-      case 'favorite':
-        return 'text-favorite hover:text-favorite/80 hover:bg-favorite/10';
-      case 'success':
-        return 'text-success hover:text-success/80 hover:bg-success/10';
-      case 'destructive':
-        return 'text-destructive hover:text-destructive/80 hover:bg-destructive/10';
-      default:
-        return 'text-muted-foreground hover:text-foreground hover:bg-muted';
+    case 'favorite':
+      return 'text-favorite hover:text-favorite/80 hover:bg-favorite/10';
+    case 'success':
+      return 'text-success hover:text-success/80 hover:bg-success/10';
+    case 'destructive':
+      return 'text-destructive hover:text-destructive/80 hover:bg-destructive/10';
+    default:
+      return 'text-muted-foreground hover:text-foreground hover:bg-muted';
     }
   };
 
   const toneClassForMenuIcon = (tone: ActionConfig['activeTone']) => {
     switch (tone) {
-      case 'favorite':
-        return 'text-favorite fill-current';
-      case 'success':
-        return 'text-success';
-      case 'destructive':
-        return 'text-destructive';
-      default:
-        return undefined;
+    case 'favorite':
+      return 'text-favorite fill-current';
+    case 'success':
+      return 'text-success';
+    case 'destructive':
+      return 'text-destructive';
+    default:
+      return undefined;
     }
   };
 

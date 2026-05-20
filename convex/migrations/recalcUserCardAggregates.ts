@@ -88,10 +88,10 @@ export const processBatch = internalMutation({
         advanceDeck
           ? { deckIds: args.deckIds, deckIdx: nextDeckIdx }
           : {
-              deckIds: args.deckIds,
-              deckIdx: nextDeckIdx,
-              cursor: result.continueCursor,
-            },
+            deckIds: args.deckIds,
+            deckIdx: nextDeckIdx,
+            cursor: result.continueCursor,
+          },
       );
     }
 

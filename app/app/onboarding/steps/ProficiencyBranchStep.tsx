@@ -24,38 +24,38 @@ export function ProficiencyBranchStep({ selected, onSelect }: Props) {
       className="h-full overflow-y-auto animate-in fade-in slide-in-from-bottom-4 duration-500"
     >
       <div className="min-h-full flex flex-col justify-center py-6">
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold">{t('title')}</h2>
-        <p className="text-sm text-muted-foreground mt-1">{t('subtitle')}</p>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-3xl mx-auto w-full">
-        <BranchCard
-          testId="proficiency-branch-new"
-          selected={selected === 'new'}
-          onClick={() => onSelect('new')}
-          Icon={Sparkles}
-          title={t('branches.new.title')}
-          description={t('branches.new.description')}
-        />
-        <BranchCard
-          testId="proficiency-branch-self-pick"
-          selected={selected === 'self-pick'}
-          onClick={() => onSelect('self-pick')}
-          Icon={Layers}
-          title={t('branches.selfPick.title')}
-          description={t('branches.selfPick.description')}
-        />
-        <BranchCard
-          testId="proficiency-branch-test"
-          selected={selected === 'test'}
-          onClick={() => onSelect('test')}
-          Icon={QuickTestIcon}
-          title={t('branches.test.title')}
-          description={t('branches.test.description')}
-          recommended
-          recommendedLabel={t('recommended')}
-        />
-      </div>
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold">{t('title')}</h2>
+          <p className="text-sm text-muted-foreground mt-1">{t('subtitle')}</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-3xl mx-auto w-full">
+          <BranchCard
+            testId="proficiency-branch-new"
+            selected={selected === 'new'}
+            onClick={() => onSelect('new')}
+            Icon={Sparkles}
+            title={t('branches.new.title')}
+            description={t('branches.new.description')}
+          />
+          <BranchCard
+            testId="proficiency-branch-self-pick"
+            selected={selected === 'self-pick'}
+            onClick={() => onSelect('self-pick')}
+            Icon={Layers}
+            title={t('branches.selfPick.title')}
+            description={t('branches.selfPick.description')}
+          />
+          <BranchCard
+            testId="proficiency-branch-test"
+            selected={selected === 'test'}
+            onClick={() => onSelect('test')}
+            Icon={QuickTestIcon}
+            title={t('branches.test.title')}
+            description={t('branches.test.description')}
+            recommended
+            recommendedLabel={t('recommended')}
+          />
+        </div>
       </div>
     </div>
   );
