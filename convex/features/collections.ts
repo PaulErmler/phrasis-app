@@ -370,7 +370,7 @@ const WARMUP_AUDIO_BACKSTOP_DELAY_MS = 60_000;
 const WARMUP_TTS_JOBS_PER_LANGUAGE = 200;
 // Effective dispatch rate (the `googleTts` token-bucket `rate` in
 // `convex/rateLimiter.ts`). Kept in sync manually — purely for the ETA.
-const WARMUP_GOOGLE_TTS_RATE_PER_MINUTE = 190;
+const WARMUP_GOOGLE_TTS_RATE_PER_MINUTE = 150;
 
 export const warmupAllCourses = internalMutation({
   args: {},
