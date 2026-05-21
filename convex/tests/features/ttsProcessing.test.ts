@@ -13,9 +13,14 @@ vi.mock("../../lib/ttsSemanticValidation", () => ({
 // Mock the rate limiter at the module boundary. The real component requires
 // `t.registerComponent` setup (flagged fragile in this project) and would
 // pull in the @convex-dev/rate-limiter component's tables. Tests that need
-// a specific verdict from `rateLimiter.limit` reassign `mockLimit` below.
+// a specific verdict from `rateLimiter.limit` reassign `mockLimit` below;
+// the default resolved value lets STT-touching paths (`reserveAzureSttSlot`)
+// pass through without per-test setup.
 vi.mock("../../rateLimiter", () => ({
-  rateLimiter: { limit: vi.fn() },
+  rateLimiter: {
+    limit: vi.fn().mockResolvedValue({ ok: true, retryAfter: 0 }),
+    check: vi.fn().mockResolvedValue({ ok: true, retryAfter: 0 }),
+  },
   TTS_RATE_LIMIT_BY_PROVIDER: {
     google: "googleTts",
     elevenlabs: "elevenlabsTts",
