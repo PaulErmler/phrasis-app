@@ -14,7 +14,47 @@
  *   - cheaper than batch, faster than the SDK path
  */
 
+import type { ActionCtx } from '../../_generated/server';
+import { rateLimiter } from '../../rateLimiter';
 import { buildAutoDetectLocales, toAzureSttLocales } from './languageCodes';
+
+/**
+ * Reserve a slot in the `azureStt` token bucket before an Azure STT call.
+ * Background callers (TTS validation, word-timing backfill) pass no max and
+ * wait out the bucket. Interactive callers (chat voice) pass `maxWaitMs` so
+ * a saturated bucket fast-fails into a user-facing "busy" error instead of
+ * hanging the mic button for tens of seconds.
+ *
+ * Fast-fail uses `check` (non-consuming) before `limit` (consuming) so a
+ * rejected interactive call doesn't burn a reservation it then walks away
+ * from. There is a small race — another caller may grab a token between
+ * check and limit — but the resulting overshoot is bounded by one extra
+ * reservation, which is fine.
+ */
+export async function reserveAzureSttSlot(
+  ctx: ActionCtx,
+  opts: { maxWaitMs?: number } = {},
+): Promise<void> {
+  if (opts.maxWaitMs != null) {
+    const peek = await rateLimiter.check(ctx, 'azureStt', { reserve: true });
+    const projectedWait = peek.retryAfter ?? 0;
+    if (!peek.ok || projectedWait > opts.maxWaitMs) {
+      throw new Error(
+        `Azure STT busy — try again in ${Math.ceil(projectedWait / 1000)}s`,
+      );
+    }
+  }
+
+  const result = await rateLimiter.limit(ctx, 'azureStt', { reserve: true });
+  if (!result.ok) {
+    // Only reachable if `maxReserved` is ever configured on the bucket.
+    throw new Error('Azure STT reservation pool full — try again later');
+  }
+  const wait = result.retryAfter ?? 0;
+  if (wait > 0) {
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+}
 
 /**
  * Optional knobs for `transcribeAudio`. Either branch hands off to

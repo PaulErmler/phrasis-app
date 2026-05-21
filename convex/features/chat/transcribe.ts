@@ -4,7 +4,7 @@ import { internal } from '../../_generated/api';
 import { requireAuthUserId } from '../../db/users';
 import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
-import { transcribeAudio as runStt } from '../../lib/stt';
+import { transcribeAudio as runStt, reserveAzureSttSlot } from '../../lib/stt';
 import { getActiveCourseForUser } from '../../db/courses';
 
 export const consumeTranscriptionQuota = internalMutation({
@@ -62,6 +62,7 @@ export const transcribeAudio = action({
     try {
       const baseMime = (args.mimeType ?? 'audio/webm').split(';')[0].trim();
       const blob = new Blob([args.audio], { type: baseMime });
+      await reserveAzureSttSlot(ctx, { maxWaitMs: 3000 });
       const { text } = await runStt(blob, undefined, {
         autoDetectCourseLanguages: courseLanguages,
       });

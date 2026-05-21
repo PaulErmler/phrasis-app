@@ -62,14 +62,24 @@ export async function getOrCreateUserSettings(
 }
 
 /**
- * Get onboarding progress for a user.
+ * Get the user's *active* onboarding progress row (i.e. an in-flight
+ * onboarding that hasn't been finalized yet). Returns null once
+ * `finalizeOnboarding` has stamped `completedAt` on the row — completed
+ * rows are the permanent snapshot of the user's answers and must not be
+ * mutated by the wizard.
+ *
+ * All in-app reads of `onboardingProgress` must funnel through here so
+ * the active/frozen distinction stays the responsibility of one
+ * function. JS-side check (rather than a `.filter()` clause) per the
+ * Convex query guideline against `filter` on non-indexed fields.
  */
 export async function getOnboardingProgress(
   ctx: QueryCtx,
   userId: string,
 ): Promise<Doc<'onboardingProgress'> | null> {
-  return ctx.db
+  const row = await ctx.db
     .query('onboardingProgress')
     .withIndex('by_userId', (q) => q.eq('userId', userId))
     .first();
+  return row && row.completedAt === undefined ? row : null;
 }

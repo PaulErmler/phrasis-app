@@ -1,7 +1,11 @@
 import { v } from 'convex/values';
 import { mutation, query, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { requireAuthUserId, getAuthUserId } from '../db/users';
+import {
+  requireAuthUserId,
+  getAuthUserId,
+  getOnboardingProgress,
+} from '../db/users';
 import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
 import { scheduleMissingContent } from './decks';
 
@@ -219,17 +223,22 @@ async function ensureAudioForTestTranslationsImpl(
  *   - Pre-marks the in-app driver.js tutorials (`HOME_TOUR`, `FULL_REVIEW_INTRO`,
  *     `AUDIO_REVIEW_INTRO`) complete — the onboarding flow already taught
  *     those mechanics during the embedded first lesson.
- *   - Deletes the `onboardingProgress` row.
+ *   - Stamps `completedAt` on the `onboardingProgress` row (the row is
+ *     kept as the permanent snapshot of the user's onboarding answers;
+ *     `getOnboardingProgress` filters frozen rows out so the wizard
+ *     can't re-edit them).
  *
- * The course/deck/cards are created earlier in `completeOnboarding`
+ * The course/deck/cards (and the per-course `dailyTimeGoalMinutes` on
+ * `courseSettings`) are created earlier in `completeOnboarding`
  * (`convex/features/courses.ts`). Keeping the flag-set deferred to this
  * final step means the `OnboardingGuard` redirect logic stays the single
  * source of truth: as long as `hasCompletedOnboarding` is false the user
  * is in onboarding, the wizard resumes from `onboardingProgress.step` on
  * reload, and a back-nav doesn't accidentally flag the user "done".
  *
- * Idempotent: safe to call when progress is already gone or the flag is
- * already true.
+ * Idempotent: a second call finds no active progress row (the previous
+ * call stamped `completedAt`) and skips the row patch; `userSettings`
+ * is still patched but the writes are no-ops.
  */
 export const finalizeOnboarding = mutation({
   args: {},
@@ -272,12 +281,12 @@ export const finalizeOnboarding = mutation({
       });
     }
 
-    const progress = await ctx.db
-      .query('onboardingProgress')
-      .withIndex('by_userId', (q) => q.eq('userId', userId))
-      .first();
+    // `getOnboardingProgress` only returns rows where `completedAt` is
+    // unset, so a re-entry after completion sees null and the row isn't
+    // double-stamped.
+    const progress = await getOnboardingProgress(ctx, userId);
     if (progress) {
-      await ctx.db.delete(progress._id);
+      await ctx.db.patch(progress._id, { completedAt: Date.now() });
     }
 
     return { alreadyFinalized };
