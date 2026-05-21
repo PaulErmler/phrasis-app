@@ -37,11 +37,13 @@ export async function reserveAzureSttSlot(
 ): Promise<void> {
   if (opts.maxWaitMs != null) {
     const peek = await rateLimiter.check(ctx, 'azureStt', { reserve: true });
-    const projectedWait = peek.retryAfter ?? 0;
-    if (!peek.ok || projectedWait > opts.maxWaitMs) {
-      throw new Error(
-        `Azure STT busy — try again in ${Math.ceil(projectedWait / 1000)}s`,
-      );
+    const projectedWait = peek.retryAfter;
+    if (!peek.ok || (projectedWait != null && projectedWait > opts.maxWaitMs)) {
+      const retryHint =
+        projectedWait != null
+          ? `try again in ${Math.ceil(projectedWait / 1000)}s`
+          : 'try again shortly';
+      throw new Error(`Azure STT busy — ${retryHint}`);
     }
   }
 
