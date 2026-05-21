@@ -47,6 +47,11 @@ export const courseSettingsFields = {
   instantProceedFull: v.optional(v.boolean()), // auto-advance when rating is clicked (full mode, default true)
   // Review mode
   reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
+  // Daily study-time goal in minutes. Seeded from the user's onboarding
+  // answer when the course is created by `completeOnboarding`. Lives
+  // here rather than `userSettings` because the goal is per-course
+  // (different courses can have different pacing targets).
+  dailyTimeGoalMinutes: v.optional(v.number()),
   // Scheduling mode
   schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))), // 'learnAndReview' (default), 'learn_new', or 'radio' (round-robin playback, no FSRS)
   fullReviewTargetAudioMode: v.optional(
@@ -268,7 +273,24 @@ export default defineSchema({
     pinnedCardActions: v.optional(v.array(v.string())),
   }).index('by_userId', ['userId']),
 
-  // Onboarding progress table - stores temporary onboarding data until completion
+  // Onboarding progress table — stores the user's onboarding answers.
+  //
+  // Row lifecycle:
+  //   - `completedAt === undefined` → in-progress; the wizard reads and
+  //     debounce-writes to this row.
+  //   - `completedAt` set → frozen snapshot of the user's onboarding
+  //     answers. `finalizeOnboarding` flips the row from active to
+  //     frozen (the previous behaviour was to delete it).
+  //
+  // All reads must go through `getOnboardingProgress` in
+  // `convex/db/users.ts`, which filters to active rows; that helper is
+  // the only safe way to look at this table.
+  //
+  // Languages / level / review mode / `dailyTimeGoalMinutes` are written
+  // through to `courses` / `courseSettings` by `completeOnboarding` so
+  // they participate in the live per-course settings surface. Everything
+  // else (acquisition source, learning goals, placement-test history,
+  // first-lesson summary) lives only on this row.
   onboardingProgress: defineTable({
     userId: v.string(), // Links to auth user
     step: v.number(), // Current step number in the new flow
@@ -276,7 +298,7 @@ export default defineSchema({
     currentLevel: v.optional(currentLevelValidator),
     targetLanguages: v.optional(v.array(v.string())),
     baseLanguages: v.optional(v.array(v.string())),
-    // New onboarding-flow fields (mirrored to `userSettings` on completion).
+    // Survey answers.
     acquisitionSource: v.optional(v.string()),
     acquisitionSourceFreeText: v.optional(v.string()),
     learningGoals: v.optional(v.array(v.string())),
@@ -323,6 +345,12 @@ export default defineSchema({
         dailyNewWordsToday: v.number(),
       }),
     ),
+    // Set by `finalizeOnboarding` (replaces the previous delete). When
+    // undefined, the row is in-progress and is the only row the wizard
+    // reads / writes. When set, the row is the permanent record of the
+    // user's onboarding answers — `getOnboardingProgress` filters these
+    // out so completed rows can't be accidentally re-edited.
+    completedAt: v.optional(v.number()),
   }).index('by_userId', ['userId']),
 
   // Courses table - stores user language learning courses

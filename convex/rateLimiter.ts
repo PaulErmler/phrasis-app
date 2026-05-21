@@ -31,6 +31,18 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 200,
     shards: 10,
   },
+  // Azure Speech-to-Text Fast Transcription S0 tier — same 200 req/min cap as
+  // azureTts. Hit by TTS validation (synthesizeAndValidate), word-timing
+  // backfill, and chat voice transcription. If 429s persist after this lands,
+  // consider dropping rate to ~180 — clock drift + parallel retries can push
+  // instantaneous load over the cap, same reasoning as googleTts → 150.
+  azureStt: {
+    kind: 'token bucket',
+    rate: 200,
+    period: MINUTE,
+    capacity: 200,
+    shards: 10,
+  },
 });
 
 export const TTS_RATE_LIMIT_BY_PROVIDER: Record<

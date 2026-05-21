@@ -7,7 +7,12 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
-import { synthesizeSpeech, transcribeAudio, type WordTiming } from './tts';
+import {
+  synthesizeSpeech,
+  transcribeAudio,
+  reserveAzureSttSlot,
+  type WordTiming,
+} from './tts';
 import { languageSupportsStt } from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
 import { textsMatchSemantic } from '../lib/ttsSemanticValidation';
@@ -168,6 +173,7 @@ async function synthesizeAndValidate(
     }
 
     try {
+      await reserveAzureSttSlot(ctx);
       const { text: transcribed, wordTimings } = await transcribeAudio(
         blob,
         args.language,
@@ -213,6 +219,11 @@ async function synthesizeAndValidate(
         `Transcription failed (attempt ${attempt + 1}/${maxAttempts}):`,
         transcriptionErr,
       );
+      if (attempt + 1 < maxAttempts) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, 500 + Math.random() * 250),
+        );
+      }
     }
   }
   return { validated: false, lastStorageId, wordTimings: null };
@@ -463,6 +474,7 @@ export const backfillWordTimings = internalAction({
         });
         return null;
       }
+      await reserveAzureSttSlot(ctx);
       const { wordTimings } = await transcribeAudio(blob, args.language, {
         regionVariant: args.regionVariant,
       });

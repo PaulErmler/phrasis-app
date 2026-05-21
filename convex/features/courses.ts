@@ -318,6 +318,7 @@ export const getOnboardingProgress = query({
           finalLevel: v.optional(v.number()),
         }),
       ),
+      completedAt: v.optional(v.number()),
     }),
     v.null(),
   ),
@@ -654,6 +655,11 @@ export const saveOnboardingProgress = mutation({
     _creationTime: v.number(),
     userId: v.string(),
     ...onboardingProgressFields,
+    // Not in args (wizard can't set this — only `finalizeOnboarding`
+    // does), but present on the returned Doc, so the validator must
+    // accept it. Always undefined on rows reachable by this mutation
+    // because `dbGetOnboardingProgress` filters out completed rows.
+    completedAt: v.optional(v.number()),
   }),
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
@@ -847,6 +853,7 @@ export const completeOnboarding = mutation({
       // ONBOARDING_INITIAL_SEED_CARDS / ONBOARDING_FIRST_LESSON_CARDS in
       // lib/constants/onboarding.ts for the rationale.
       cardsToAddBatchSize: ONBOARDING_CARDS_BATCH_SIZE,
+      dailyTimeGoalMinutes: progress.dailyTimeGoalMinutes,
     });
 
     // Auto-create a deck
@@ -898,10 +905,13 @@ export const completeOnboarding = mutation({
       }
     }
 
-    // Pin the active course on userSettings. Onboarding answers (acquisition,
-    // goals, daily-time, placement level) live ONLY on `onboardingProgress`
-    // and are discarded with that row on `finalizeOnboarding` — we don't
-    // mirror them here. `hasCompletedOnboarding` stays whatever it was
+    // Pin the active course on userSettings. The survey answers
+    // (acquisition source, learning goals, placement-test history) stay
+    // on `onboardingProgress`, which is frozen (not deleted) by
+    // `finalizeOnboarding` and serves as the permanent snapshot — they
+    // aren't mirrored to `userSettings`. `dailyTimeGoalMinutes` was
+    // already written above as a `courseSettings` field (per-course
+    // pacing target). `hasCompletedOnboarding` stays whatever it was
     // (only `finalizeOnboarding` is allowed to flip it true, so mid-flow
     // reload/back-nav stays in the wizard).
     const settingsPatch = {

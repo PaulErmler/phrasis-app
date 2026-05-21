@@ -28,6 +28,7 @@ export async function upsertCourseSettings(
     reviewMode?: 'audio' | 'full';
     autoAddCards?: boolean;
     cardsToAddBatchSize?: number;
+    dailyTimeGoalMinutes?: number;
   },
 ): Promise<Id<'courseSettings'>> {
   const existing = await ctx.db

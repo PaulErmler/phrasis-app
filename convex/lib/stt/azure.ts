@@ -14,7 +14,32 @@
  *   - cheaper than batch, faster than the SDK path
  */
 
+import type { ActionCtx } from '../../_generated/server';
+import { rateLimiter } from '../../rateLimiter';
 import { buildAutoDetectLocales, toAzureSttLocales } from './languageCodes';
+
+/**
+ * Reserve a slot in the `azureStt` token bucket before an Azure STT call.
+ * Background callers (TTS validation, word-timing backfill) pass no max and
+ * wait out the bucket. Interactive callers (chat voice) pass `maxWaitMs` so
+ * a saturated bucket fast-fails into a user-facing "busy" error instead of
+ * hanging the mic button for tens of seconds.
+ */
+export async function reserveAzureSttSlot(
+  ctx: ActionCtx,
+  opts: { maxWaitMs?: number } = {},
+): Promise<void> {
+  const result = await rateLimiter.limit(ctx, 'azureStt', { reserve: true });
+  const wait = result.retryAfter ?? 0;
+  if (opts.maxWaitMs != null && wait > opts.maxWaitMs) {
+    throw new Error(
+      `Azure STT busy — try again in ${Math.ceil(wait / 1000)}s`,
+    );
+  }
+  if (wait > 0) {
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+}
 
 /**
  * Optional knobs for `transcribeAudio`. Either branch hands off to

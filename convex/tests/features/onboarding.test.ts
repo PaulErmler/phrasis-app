@@ -255,10 +255,13 @@ describe("completeOnboarding", () => {
     await seedQuota(t, "user_A");
     const asUser = t.withIdentity({ subject: "user_A" });
 
-    // The onboarding-answer fields (acquisitionSource, learningGoals,
-    // dailyTimeGoalMinutes, placementTest) live only on
-    // `onboardingProgress` and are discarded on finalizeOnboarding —
-    // userSettings only carries identity + activeCourseId + tutorial state.
+    // The survey-only answers (acquisitionSource, learningGoals,
+    // placementTest) live on `onboardingProgress` and stay there as the
+    // permanent snapshot (the row is frozen, not deleted, by
+    // finalizeOnboarding). `dailyTimeGoalMinutes` is mirrored to
+    // `courseSettings` because it's a per-course pacing target — see
+    // the dedicated test below. `userSettings` only carries identity +
+    // activeCourseId + tutorial state.
     await asUser.mutation(api.features.courses.saveOnboardingProgress, {
       step: 6,
       targetLanguages: ["es"],
@@ -282,6 +285,36 @@ describe("completeOnboarding", () => {
     const settings = await asUser.query(api.features.courses.getUserSettings, {});
     expect(settings?.hasCompletedOnboarding).toBe(false);
     expect(settings?.activeCourseId).toBeDefined();
+
+    await drainScheduled(t);
+  });
+
+  it("mirrors dailyTimeGoalMinutes from onboarding answers to the new course's courseSettings", async () => {
+    const t = convexTest(schema, modules);
+    await seedEssentialCollection(t);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 6,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "beginner",
+      reviewMode: "audio",
+      dailyTimeGoalMinutes: 25,
+    });
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+
+    const courseSettings = await t.run(async (ctx) =>
+      ctx.db
+        .query("courseSettings")
+        .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+        .first(),
+    );
+    expect(courseSettings?.dailyTimeGoalMinutes).toBe(25);
 
     await drainScheduled(t);
   });
@@ -368,7 +401,7 @@ describe("saveOnboardingProgress — free-text length guard", () => {
 });
 
 describe("finalizeOnboarding", () => {
-  it("flips hasCompletedOnboarding, deletes progress, and pre-marks in-lesson tutorials", async () => {
+  it("flips hasCompletedOnboarding, freezes progress with completedAt, and pre-marks in-lesson tutorials", async () => {
     const t = convexTest(schema, modules);
     const asUser = t.withIdentity({ subject: "user_A" });
 
@@ -392,14 +425,79 @@ describe("finalizeOnboarding", () => {
     // home_tour is intentionally NOT pre-marked.
     expect(settings?.completedTutorials).not.toContain("home_tour");
 
+    // Helper-mediated query hides frozen rows from the wizard.
     const progress = await asUser.query(
       api.features.courses.getOnboardingProgress,
       {},
     );
     expect(progress).toBeNull();
+
+    // But the underlying row survives as the permanent snapshot.
+    const row = await t.run(async (ctx) =>
+      ctx.db
+        .query("onboardingProgress")
+        .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+        .first(),
+    );
+    expect(row).not.toBeNull();
+    expect(typeof row?.completedAt).toBe("number");
   });
 
-  it("is idempotent — a second call reports alreadyFinalized and does not duplicate tutorial entries", async () => {
+  it("preserves the full set of survey answers on the frozen progress row", async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 12,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "beginner",
+      acquisitionSource: "friend",
+      learningGoals: ["travel", "career"],
+      dailyTimeGoalMinutes: 15,
+      placementTest: {
+        strategy: "binary",
+        history: [
+          { level: 5, knew: true },
+          { level: 10, knew: false },
+        ],
+        finalLevel: 7,
+      },
+    });
+
+    await asUser.mutation(api.features.onboarding.finalizeOnboarding, {});
+
+    const row = await t.run(async (ctx) =>
+      ctx.db
+        .query("onboardingProgress")
+        .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+        .first(),
+    );
+    expect(row?.acquisitionSource).toBe("friend");
+    expect(row?.learningGoals).toEqual(["travel", "career"]);
+    // Snapshot of the daily-time answer stays on the frozen row even
+    // though the live setting lives on `courseSettings`.
+    expect(row?.dailyTimeGoalMinutes).toBe(15);
+    expect(row?.placementTest?.history).toHaveLength(2);
+    expect(row?.placementTest?.finalLevel).toBe(7);
+  });
+
+  it("works when the user has no progress row (defensive — userSettings stays well-formed)", async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    // No saveOnboardingProgress call; finalize is allowed and should not crash.
+    const { alreadyFinalized } = await asUser.mutation(
+      api.features.onboarding.finalizeOnboarding,
+      {},
+    );
+    expect(alreadyFinalized).toBe(false);
+
+    const settings = await asUser.query(api.features.courses.getUserSettings, {});
+    expect(settings?.hasCompletedOnboarding).toBe(true);
+  });
+
+  it("is idempotent — a second call reports alreadyFinalized, does not duplicate tutorial entries, and does not re-stamp completedAt", async () => {
     const t = convexTest(schema, modules);
     const asUser = t.withIdentity({ subject: "user_A" });
 
@@ -410,11 +508,20 @@ describe("finalizeOnboarding", () => {
       currentLevel: "beginner",
     });
     await asUser.mutation(api.features.onboarding.finalizeOnboarding, {});
+
+    const firstCompletedAt = await t.run(async (ctx) => {
+      const row = await ctx.db
+        .query("onboardingProgress")
+        .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+        .first();
+      return row?.completedAt;
+    });
+    expect(typeof firstCompletedAt).toBe("number");
+
     const second = await asUser.mutation(
       api.features.onboarding.finalizeOnboarding,
       {},
     );
-
     expect(second.alreadyFinalized).toBe(true);
 
     const settings = await asUser.query(api.features.courses.getUserSettings, {});
@@ -425,5 +532,14 @@ describe("finalizeOnboarding", () => {
     expect(
       completed.filter((id) => id === "audio_review_intro").length,
     ).toBe(1);
+
+    const secondCompletedAt = await t.run(async (ctx) => {
+      const row = await ctx.db
+        .query("onboardingProgress")
+        .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+        .first();
+      return row?.completedAt;
+    });
+    expect(secondCompletedAt).toBe(firstCompletedAt);
   });
 });
