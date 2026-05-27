@@ -205,6 +205,14 @@ export default defineSchema({
     // enqueue a stronger model; flags 3+ only increment the counter for
     // later admin triage. Undefined treated as 0 for back-compat.
     flagCount: v.optional(v.number()),
+    // Speaker gender ('male' | 'female') the translation was produced under,
+    // mirroring the card's `texts.speakerGender` at write time. Used by
+    // `scheduleMissingContent` to invalidate translations whose grammar
+    // would no longer agree with the card's current voice gender (e.g.
+    // when LLM metadata analysis lands a definitive gender that overrides
+    // the initial coin-flip). Undefined on legacy rows written before this
+    // field existed — treated as "unknown, regenerate on next sweep."
+    speakerGender: v.optional(v.string()),
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),

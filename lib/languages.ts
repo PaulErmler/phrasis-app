@@ -683,7 +683,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇦',
     category: 'semitic',
     llmSupportTier: 'tier2',
-    ttsProvider: 'azure',
+    // No dedicated Saudi Chirp3 voices — route through the shared Google MSA
+    // pool (`ar-XA`). See lib/voices.ts for the pool entry.
+    ttsProvider: 'google',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
@@ -709,7 +711,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇶',
     category: 'semitic',
     llmSupportTier: 'tier2',
-    ttsProvider: 'azure',
+    // No dedicated Iraqi Chirp3 voices — route through the shared Google MSA
+    // pool (`ar-XA`). See lib/voices.ts for the pool entry.
+    ttsProvider: 'google',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,

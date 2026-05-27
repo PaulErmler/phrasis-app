@@ -14,7 +14,7 @@
 import type { TtsProvider } from './languages';
 
 export const TTS_PROVIDER_OVERRIDES: Record<TtsProvider, readonly TtsProvider[]> = {
-  google: [],
+  google: ['azure'],
   elevenlabs: [],
   azure: ['elevenlabs'],
 };
