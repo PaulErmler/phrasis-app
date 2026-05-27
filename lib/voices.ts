@@ -461,12 +461,13 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   el: [...buildChirp3Pool('el-GR', 'Greece'), ...ELEVENLABS_VOICES_EL],
   he: [...buildChirp3Pool('he-IL', 'Israel'), ...AZURE_VOICES_HE],
   ar: [...buildChirp3Pool('ar-XA', 'MSA'), ...ELEVENLABS_VOICES_AR],
-  // Saudi and Iraqi dialects share the Google MSA pool (`ar-XA`) — neither
-  // has dedicated Chirp3 voices, and dialect-specific Azure voices read
-  // worse than MSA on these dialects' typical content.
+  // Saudi, Iraqi, and Levantine dialects share the Google MSA pool (`ar-XA`)
+  // — none has dedicated Chirp3 voices, and dialect-specific Azure voices
+  // read worse than MSA on these dialects' typical content.
   ar_sa: [...buildChirp3Pool('ar-XA', 'MSA')],
   ar_eg: [...activate(AZURE_VOICES_AR_EG)],
   ar_iq: [...buildChirp3Pool('ar-XA', 'MSA')],
+  ar_lev: [...buildChirp3Pool('ar-XA', 'MSA')],
   sw: [...activate(AZURE_VOICES_SW_KE)],
   sw_tz: [...activate(AZURE_VOICES_SW_TZ)],
 };

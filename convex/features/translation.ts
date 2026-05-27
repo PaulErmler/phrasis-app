@@ -55,6 +55,7 @@ const GOOGLE_TRANSLATE_CODE_MAP: Record<string, string> = {
   ar_sa: 'ar',
   ar_eg: 'ar',
   ar_iq: 'ar',
+  ar_lev: 'ar',
   // Swahili: Google's translate codes are `sw`; pass the bare code for both
   // regional variants (the regional difference matters for voices, not text).
   sw: 'sw',
@@ -318,7 +319,7 @@ async function romanizeViaGoogleV3Once(
  *   - Greek: greek-utils phonetic Latin
  *   - Korean: hangul-romanization (Revised Romanization)
  *   - Hebrew: hebrew-transliteration (SBL Academic)
- *   - Arabic (incl. ar_sa / ar_eg / ar_iq): arabic-transliterate (IJMES)
+ *   - Arabic (incl. ar_sa / ar_eg / ar_iq / ar_lev): arabic-transliterate (IJMES)
  *   - everything else in `ROMANIZATION_LANGUAGES`: Google Cloud Translation
  *     v3 romanizeText, retried up to `ROMANIZE_MAX_ATTEMPTS` times.
  *

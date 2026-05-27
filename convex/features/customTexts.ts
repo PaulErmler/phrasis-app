@@ -78,6 +78,7 @@ TRANSLATION RULES:
    - ar_sa: Saudi Arabic — MSA-leaning but with Hejazi/Najdi colloquial markers where natural
    - ar_eg: Egyptian Cairene colloquial Arabic
    - ar_iq: Iraqi colloquial Arabic
+   - ar_lev: Levantine Arabic — colloquial Arabic of Lebanon, Syria, Palestine, and Jordan
    - sw: Swahili as spoken in Kenya (Sheng-free, standard Kiswahili)
    - sw_tz: Swahili as spoken in Tanzania (standard Kiswahili sanifu, Tanzanian vocabulary)
 
