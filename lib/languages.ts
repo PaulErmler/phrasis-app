@@ -36,6 +36,7 @@ function regionLabelFromDisplayCode(displayCode: string): string {
     'ar-SA': 'Saudi Arabia',
     'ar-EG': 'Egypt',
     'ar-IQ': 'Iraq',
+    'ar-LB': 'the Levant (Lebanon, Syria, Palestine, Jordan)',
     'yue-Hans-HK': 'Hong Kong (simplified script)',
     'yue-Hant-HK': 'Hong Kong (traditional script)',
     'sw-KE': 'Kenya',
@@ -683,7 +684,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇦',
     category: 'semitic',
     llmSupportTier: 'tier2',
-    ttsProvider: 'azure',
+    // No dedicated Saudi Chirp3 voices — route through the shared Google MSA
+    // pool (`ar-XA`). See lib/voices.ts for the pool entry.
+    ttsProvider: 'google',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
@@ -709,7 +712,24 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇶',
     category: 'semitic',
     llmSupportTier: 'tier2',
-    ttsProvider: 'azure',
+    // No dedicated Iraqi Chirp3 voices — route through the shared Google MSA
+    // pool (`ar-XA`). See lib/voices.ts for the pool entry.
+    ttsProvider: 'google',
+    needsRomanization: true,
+    supportsKaraoke: false,
+    supportsStt: true,
+  },
+  {
+    code: 'ar_lev',
+    displayCode: 'ar-LB',
+    name: 'Arabic (Levantine)',
+    nativeName: 'العربية (الشامية)',
+    flag: '🇱🇧',
+    category: 'semitic',
+    llmSupportTier: 'tier2',
+    // No dedicated Levantine Chirp3 voices — route through the shared Google
+    // MSA pool (`ar-XA`). See lib/voices.ts for the pool entry.
+    ttsProvider: 'google',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
@@ -1138,6 +1158,7 @@ const NAME_OVERRIDES: Record<string, Record<string, string>> = {
   ar_sa: { en: 'Arabic (Saudi)', de: 'Arabisch (Saudisch)' },
   ar_eg: { en: 'Arabic (Egyptian)', de: 'Arabisch (Ägyptisch)' },
   ar_iq: { en: 'Arabic (Iraqi)', de: 'Arabisch (Irakisch)' },
+  ar_lev: { en: 'Arabic (Levantine)', de: 'Arabisch (Levantinisch)' },
   sw: { en: 'Swahili (Kenya)', de: 'Swahili (Kenia)' },
   sw_tz: { en: 'Swahili (Tanzania)', de: 'Swahili (Tansania)' },
 };
@@ -1262,7 +1283,7 @@ export function languageSupportsStt(code: string): boolean {
  * the variants-collapsing UI rely on this list. Kept as a single union so a
  * code like "ar_iq" collapses to "ar" rather than passing through.
  */
-const VARIANT_SUFFIX_RE = /_(latam|mixed|traditional|gb|us|au|sa|eg|iq|tz)$/;
+const VARIANT_SUFFIX_RE = /_(latam|mixed|traditional|gb|us|au|sa|eg|iq|lev|tz)$/;
 
 /**
  * Mixed-dialect language codes whose translations span multiple regional

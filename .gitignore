@@ -87,3 +87,7 @@ scripts/voice-samples/
 
 # OGTE dataset (data files only — scripts are committed)
 data_preparation/ogte-dataset/data/
+
+# One-shot Tagalog sample generator + its output
+scripts/_tmp-tagalog-sample.ts
+tagalog-sample/

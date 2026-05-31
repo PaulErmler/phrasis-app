@@ -38,6 +38,7 @@ import { getRomanizationSource } from '../lib/localRomanization';
 import {
   GOOGLE_TRANSLATE_SOURCE,
   ROMANIZATION_LANGUAGES,
+  USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../lib/languages';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
@@ -91,19 +92,76 @@ export async function scheduleMissingContent(
   const priority = options?.priority ?? 0;
   const sourceLanguage = text.language;
 
-  // Resolve audioSpeakerGender: prefer existing valid value, fall back to speakerGender,
-  // then coin-flip via resolveAudioSpeakerGender. Patch the text to make it durable.
-  const storedGender = text.audioSpeakerGender;
-  // Seed the coin-flip with the textId so two concurrent invocations against
-  // the same text resolve to the same gender — prevents two racing audio
-  // jobs from writing rows in different genders, which would otherwise
-  // trigger a regeneration loop the next time `genderMismatch` is checked.
-  const audioSpeakerGender: 'male' | 'female' =
-    storedGender === 'male' || storedGender === 'female'
-      ? storedGender
-      : resolveAudioSpeakerGender(text.speakerGender, textId);
-  if (storedGender !== audioSpeakerGender) {
-    await ctx.db.patch(textId, { audioSpeakerGender });
+  // Resolve gender for both the voice (audioSpeakerGender) and the translation
+  // prompt's <speaker_gender> tag (read from text.speakerGender). They must
+  // agree on the grammatical gender for the audio voice to match the
+  // translation grammar; otherwise we hit the user-facing "voice is the
+  // opposite gender" bug.
+  //
+  // `speakerGender` is the definitive answer for what `audioSpeakerGender`
+  // should be — when it's `'male'`/`'female'`, audio mirrors it. The two
+  // fields diverge in semantics for `'neutral'`/undefined:
+  //
+  //   - Custom sentences (`userCreated === true`): `speakerGender` is owned
+  //     by the LLM metadata pipeline (`generateSentenceMetadata`). A `'neutral'`
+  //     verdict means the LLM looked at every supplied translation and found
+  //     no morphology that forces a gender — overwriting that with a
+  //     coin-flipped `'male'`/`'female'` would force gendered grammar where
+  //     none is appropriate. So we preserve `speakerGender` as-is and only
+  //     resolve `audioSpeakerGender` (the voice still has to be one of
+  //     `'male'`/`'female'`).
+  //
+  //   - Pre-made dataset sentences (`userCreated === false`): no LLM gender
+  //     analysis ever runs, so `speakerGender` is always undefined unless a
+  //     future dataset/curator sets it. We coin-flip a definitive gender
+  //     (deterministic per textId) and write it to BOTH fields so the
+  //     translation prompt and the audio voice agree. If a future dataset
+  //     does set `speakerGender` to `'male'`/`'female'`, the first branch
+  //     below honors it.
+  let audioSpeakerGender: 'male' | 'female';
+  const genderPatch: {
+    speakerGender?: 'male' | 'female';
+    audioSpeakerGender?: 'male' | 'female';
+  } = {};
+
+  if (text.speakerGender === 'male' || text.speakerGender === 'female') {
+    // Definitive (LLM for custom, dataset for pre-made if ever set).
+    // Source of truth — never overwrite; mirror into audioSpeakerGender.
+    audioSpeakerGender = text.speakerGender;
+    if (text.audioSpeakerGender !== audioSpeakerGender) {
+      genderPatch.audioSpeakerGender = audioSpeakerGender;
+    }
+  } else if (text.userCreated) {
+    // Custom + neutral/undefined: preserve the LLM's call on `speakerGender`,
+    // only resolve `audioSpeakerGender`. Prior coin-flip preserved when
+    // present so two runs don't disagree; else seeded by textId so the
+    // resolution is deterministic and stable across retries.
+    audioSpeakerGender =
+      text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female'
+        ? text.audioSpeakerGender
+        : resolveAudioSpeakerGender(text.speakerGender, textId);
+    if (text.audioSpeakerGender !== audioSpeakerGender) {
+      genderPatch.audioSpeakerGender = audioSpeakerGender;
+    }
+  } else {
+    // Pre-made + neutral/undefined: coin-flip BOTH fields to the same value
+    // so the translation prompt's <speaker_gender> tag and the audio voice
+    // agree. Prior `audioSpeakerGender` preserved when present so the
+    // resolution doesn't re-roll between runs.
+    audioSpeakerGender =
+      text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female'
+        ? text.audioSpeakerGender
+        : resolveAudioSpeakerGender(undefined, textId);
+    if (text.speakerGender !== audioSpeakerGender) {
+      genderPatch.speakerGender = audioSpeakerGender;
+    }
+    if (text.audioSpeakerGender !== audioSpeakerGender) {
+      genderPatch.audioSpeakerGender = audioSpeakerGender;
+    }
+  }
+
+  if (Object.keys(genderPatch).length > 0) {
+    await ctx.db.patch(textId, genderPatch);
   }
 
   // Always include the text's own language (`sourceLanguage`) so the
@@ -180,6 +238,12 @@ export async function scheduleMissingContent(
     langsNeedingTranslation.map((lang, i) => [lang, existingLlmClaims[i]]),
   );
 
+  // Tracks languages whose audio was found to have drifted gender, so the
+  // translation sweep below can also invalidate the legacy translation row
+  // (the one without a stamped `speakerGender`) that was generated alongside
+  // the now-stale audio. See the sweep comment for full rationale.
+  const langsWithAudioGenderDrift = new Set<string>();
+
   // Validate storage files — delete stale rows where the file was removed.
   // Do not delete while TTS is in flight: `processTTSForCard` may have inserted
   // a row whose URL is not yet resolvable, or concurrent cleanup would remove
@@ -214,12 +278,70 @@ export async function scheduleMissingContent(
           currentProvider,
           existingProvider,
         );
+        if (genderMismatch) {
+          langsWithAudioGenderDrift.add(lang);
+        }
         if (genderMismatch || providerMismatch) {
           await ctx.storage.delete(audio.storageId);
           await ctx.db.delete(audio._id);
           audioMap.set(lang, null);
         }
       }
+    }
+  }
+
+  // Invalidate translations whose recorded gender no longer matches the card's
+  // current `audioSpeakerGender`. Two cases trigger deletion:
+  //
+  //  1. Post-PR drift: `translation.speakerGender` is stamped and disagrees
+  //     with `audioSpeakerGender`. The card flipped gender (custom-chat path
+  //     when the metadata LLM lands a definitive gender that overrides the
+  //     initial coin-flip; or any future code path that updates the field)
+  //     after the translation was written.
+  //
+  //  2. Legacy drift: `translation.speakerGender` is undefined (row written
+  //     before the field existed) AND the matching audio was just flagged as
+  //     gender-drifted by the validity loop above. Audio drift is the
+  //     retrospective signal that the translation alongside it was almost
+  //     certainly generated under a gender that's now wrong. Without this,
+  //     the audio loop heals the voice but the translation text — produced
+  //     with the wrong grammar — survives and gets stamped as if correct by
+  //     the "fill if missing" path, so the user ends up hearing the right
+  //     voice reading wrong-grammar text.
+  //
+  // Legacy rows without an audio drift signal are left alone — we have no
+  // evidence they're wrong, and a blanket invalidation would cause a regen
+  // storm across the database.
+  //
+  // User-provided translations are skipped unconditionally — the user picked
+  // the wording (and implicitly the gender) themselves.
+  //
+  // Skip when TTS is in flight: deleting now would race the pending write
+  // and leave an audio row pointing at no translation. Defer to the next
+  // `scheduleMissingContent` pass.
+  for (const [lang, translation] of translationMap) {
+    if (!translation) continue;
+    if (translation.translationSource === USER_PROVIDED_TRANSLATION_SOURCE) continue;
+
+    const isLegacy = translation.speakerGender === undefined;
+    const isDrifted = !isLegacy && translation.speakerGender !== audioSpeakerGender;
+    const isLegacyAlongsideDriftedAudio = isLegacy && langsWithAudioGenderDrift.has(lang);
+
+    if (!isDrifted && !isLegacyAlongsideDriftedAudio) continue;
+    if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
+
+    await ctx.db.delete(translation._id);
+    translationMap.set(lang, null);
+    // Audio for the legacy-alongside-drifted case was already deleted by the
+    // validity loop. The block below only fires when the sweep itself owns
+    // the delete — i.e. post-PR drift where the audio looked fine to the
+    // validity loop (correct voiceGender) but the translation row was
+    // produced under a stale `text.speakerGender`.
+    const staleAudio = audioMap.get(lang);
+    if (staleAudio?.storageId) {
+      await ctx.storage.delete(staleAudio.storageId);
+      await ctx.db.delete(staleAudio._id);
+      audioMap.set(lang, null);
     }
   }
 
@@ -927,12 +1049,12 @@ export const addCardsFromCollection = mutation({
       ? isPremadeLevelCollection(requestedCollection)
       : false;
 
-    // Content-source filter: when set to 'course', skip custom/chat collections
-    // entirely; when set to 'custom', skip the premade level collection (Phase 2).
-    // Default ('both' / undefined) is unchanged.
+    // Content-source filter: scopes the learning-mode auto-add flow only.
+    // When `exclusive` is set, the user is explicitly adding from a specific
+    // collection via the collection detail dialog — honor that source directly.
     const studyContentFilter = courseSettings?.studyContentFilter ?? 'both';
-    const skipCustomSources = studyContentFilter === 'course';
-    const skipPremadeSource = studyContentFilter === 'custom';
+    const skipCustomSources = !args.exclusive && studyContentFilter === 'course';
+    const skipPremadeSource = !args.exclusive && studyContentFilter === 'custom';
 
     const customCollectionIdsToProcess: Id<'collections'>[] = skipCustomSources
       ? []
@@ -1531,6 +1653,7 @@ export const processTranslationForCard = internalAction({
           regionVariant,
           priority: args.priority,
           replaceExisting: args.replaceExisting,
+          speakerGender: args.audioSpeakerGender,
         },
       );
     } catch (err) {
@@ -1598,6 +1721,14 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      * fires after another write already landed.
      */
     replaceExisting: v.optional(v.boolean()),
+    /**
+     * Speaker gender ('male' | 'female') the translation was produced under.
+     * Persisted on the translation row so the gender-mismatch sweep in
+     * `scheduleMissingContent` can invalidate translations whose grammar no
+     * longer agrees with the card's current voice gender. Optional during
+     * rollout so old call sites that haven't been threaded yet still compile.
+     */
+    speakerGender: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1629,6 +1760,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
           ? { translationSource: args.translationSource }
           : {}),
         ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
+        ...(args.speakerGender ? { speakerGender: args.speakerGender } : {}),
       });
     } else if (args.replaceExisting) {
       // Deliberate retranslation: overwrite the translation and its matched
@@ -1643,6 +1775,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         romanizationSource: string | undefined;
         translationSource: string | undefined;
         regionVariant: string | undefined;
+        speakerGender: string;
       }> = {
         translatedText: args.translatedText,
       };
@@ -1660,6 +1793,11 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       if (args.regionVariant) {
         patch.regionVariant = args.regionVariant;
       }
+      // Update the recorded speakerGender — a retranslation is what fixes a
+      // stale gender, so the new row's gender should reflect the current card.
+      if (args.speakerGender) {
+        patch.speakerGender = args.speakerGender;
+      }
       await ctx.db.patch(existing._id, patch);
     } else {
       const patch: Partial<{
@@ -1667,6 +1805,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         romanizationSource: string;
         translationSource: string;
         regionVariant: string;
+        speakerGender: string;
       }> = {};
       // Same `!== undefined` reasoning: persist the sentinel on first write
       // but never overwrite a previously-stored real value. Source travels
@@ -1690,6 +1829,13 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       }
       if (args.regionVariant && !existing.regionVariant) {
         patch.regionVariant = args.regionVariant;
+      }
+      // Same "fill if missing" pattern as the other metadata fields. Legacy
+      // translation rows written before `speakerGender` existed get stamped
+      // here on the first ensureContent pass that reaches them, so the
+      // gender-mismatch sweep doesn't loop on them forever.
+      if (args.speakerGender && existing.speakerGender === undefined) {
+        patch.speakerGender = args.speakerGender;
       }
       if (Object.keys(patch).length > 0) {
         await ctx.db.patch(existing._id, patch);

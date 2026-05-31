@@ -55,6 +55,7 @@ const PER_LANGUAGE: Record<string, Partial<CompareConfig>> = {
   ar_sa: { locale: 'ar-SA' },
   ar_eg: { locale: 'ar-EG' },
   ar_iq: { locale: 'ar-IQ' },
+  ar_lev: { locale: 'ar-LB' },
   sw: { locale: 'sw-KE' },
   sw_tz: { locale: 'sw-TZ' },
   ko: { locale: 'ko' },
