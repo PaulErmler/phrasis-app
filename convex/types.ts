@@ -103,6 +103,9 @@ export const ttsProviderValidator = v.union(
   v.literal('google'),
   v.literal('elevenlabs'),
   v.literal('azure'),
+  // Gemini 3.1 Flash TTS, reached through OpenRouter's /audio/speech endpoint.
+  // Distinct from 'google' (Google Cloud Chirp3). See convex/lib/tts/gemini.ts.
+  v.literal('gemini'),
 );
 
 export const voiceGenderValidator = v.union(

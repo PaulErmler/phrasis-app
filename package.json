@@ -26,11 +26,13 @@
     "prepare": "husky install",
     "snapshot": "mkdir -p .convex-snapshots && convex export --env-file .env.local --path .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip && echo '[convex] Snapshot saved.'",
     "snapshot:restore": "convex import --replace -y --env-file .env.local .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip",
-    "landing:audio": "tsx --env-file=.env.local scripts/generate-landing-audio.ts"
+    "landing:audio": "tsx --env-file=.env.local scripts/generate-landing-audio.ts",
+    "tts:prototype": "tsx --env-file=.env.local scripts/tts-prototype.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.62",
     "@ai-sdk/openai": "^2.0.100",
+    "@breezystack/lamejs": "^1.2.7",
     "@c15t/backend": "^1.8.5",
     "@c15t/nextjs": "^1.8.5",
     "@c15t/react": "^1.8.5",

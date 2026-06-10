@@ -95,6 +95,32 @@ function createAzureVoice(
 }
 
 /**
+ * Gemini 3.1 Flash TTS voices (via OpenRouter). apiCode is the bare Gemini
+ * voice name (e.g. "Kore") — the provider sends the language separately as a
+ * BCP-47 `language_code`, so one voice serves every language. Active by
+ * default: the languages routed to Gemini (de, sv) want these selectable.
+ */
+function createGeminiVoice(name: string, gender: 'female' | 'male'): Voice {
+  return {
+    provider: 'gemini',
+    name,
+    displayName: `${name} (${gender === 'female' ? 'Female' : 'Male'}) - Gemini`,
+    apiCode: name,
+    gender,
+  };
+}
+
+// The four Gemini voices selected for production (2F + 2M), tuned for clear,
+// neutral language-learning delivery. Gemini is multilingual, so the same names
+// serve every language routed to it (currently de, sv).
+const GEMINI_CORE: Voice[] = [
+  createGeminiVoice('Kore', 'female'),
+  createGeminiVoice('Sulafat', 'female'),
+  createGeminiVoice('Charon', 'male'),
+  createGeminiVoice('Iapetus', 'male'),
+];
+
+/**
  * Mark a voice list as selectable. Used by pools for languages whose
  * `ttsProvider` is currently `'elevenlabs'` — wraps the list so every
  * entry becomes `active: true` without touching the per-voice definitions.
@@ -422,7 +448,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
     ...buildChirp3Pool('es-US', 'Latin America'),
   ],
   fr: [...buildChirp3Pool('fr-FR', 'France'), ...ELEVENLABS_VOICES_FR],
-  de: [...buildChirp3Pool('de-DE', 'Germany'), ...ELEVENLABS_VOICES_DE],
+  de: [...buildChirp3Pool('de-DE', 'Germany'), ...ELEVENLABS_VOICES_DE, ...GEMINI_CORE],
   it: [...buildChirp3Pool('it-IT', 'Italy'), ...ELEVENLABS_VOICES_IT],
   pt: [...buildChirp3Pool('pt-BR', 'Brazil'), ...ELEVENLABS_VOICES_PT],
   ru: [...buildChirp3Pool('ru-RU', 'Russia', 'core'), ...ELEVENLABS_VOICES_RU],
@@ -453,6 +479,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
     ...buildChirp3Pool('sv-SE', 'Sweden'),
     ...ELEVENLABS_VOICES_SV,
     ...AZURE_VOICES_SV,
+    ...GEMINI_CORE,
   ],
   // nb: [...buildChirp3Pool('nb-NO', 'Norway')], // disabled — see SUPPORTED_LANGUAGES
   da: [...buildChirp3Pool('da-DK', 'Denmark')],

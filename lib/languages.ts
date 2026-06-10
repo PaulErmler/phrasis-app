@@ -11,8 +11,13 @@
  * `getVoiceForLanguage` from `lib/languages` keep working.
  */
 
-/** Identifier for which TTS backend a language currently uses. */
-export type TtsProvider = 'google' | 'elevenlabs' | 'azure';
+/**
+ * Identifier for which TTS backend a language currently uses. Must stay in sync
+ * with `ttsProviderValidator` in `convex/types.ts` (the Convex-side source of
+ * truth used for stored `audioRecordings.ttsProvider`). 'gemini' = Gemini 3.1
+ * Flash TTS via OpenRouter (distinct from 'google' = Google Cloud Chirp3).
+ */
+export type TtsProvider = 'google' | 'elevenlabs' | 'azure' | 'gemini';
 
 /** Identifier for which translation backend a target language currently uses. */
 export type TranslationProvider = 'google' | 'openrouter';
@@ -286,7 +291,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇩🇪',
     category: 'germanic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -404,7 +409,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇪',
     category: 'germanic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,

@@ -37,6 +37,8 @@ const PROVIDER_MAX_CONCURRENCY: Record<TtsProvider, number> = {
   google: 64,
   elevenlabs: 3,
   azure: 8,
+  // Conservative start for OpenRouter-hosted Gemini TTS; tune after first runs.
+  gemini: 8,
 };
 const SLOT_STALE_MS = 60 * 1000; // 1 minute — longer than the longest API call
 
