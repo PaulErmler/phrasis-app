@@ -17,9 +17,12 @@ import { transliterate as transliterateHebrew } from 'hebrew-transliteration';
 import { getLshk } from 'cantonese-romanisation';
 // @ts-expect-error no type declarations for arabic-transliterate (pure JS, ~74KB, zero deps)
 import arabictransliterate from 'arabic-transliterate';
+import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 
 /**
- * Languages we can romanize locally without a network call.
+ * Languages we can romanize locally without a network call. Derived from each
+ * Language's `romanizationBackend === 'local'` flag (single source of truth in
+ * lib/languages.ts); languages on `'google-v3'` (ru/hi/bn/ja) are excluded.
  *
  * Arabic was moved here off the Google v3 path after a regression where the
  * romanizeText endpoint started returning `{"romanizations":[{}]}` for short
@@ -27,12 +30,11 @@ import arabictransliterate from 'arabic-transliterate';
  * library produces a deterministic IJMES romanization with zero deps, fine
  * for the Convex V8 runtime).
  */
-export const LOCAL_ROMANIZATION_LANGUAGES = new Set([
-  'zh', 'zh_traditional',
-  'yue', 'yue_traditional',
-  'el', 'ko', 'he',
-  'ar', 'ar_sa', 'ar_eg', 'ar_iq', 'ar_lev',
-]);
+export const LOCAL_ROMANIZATION_LANGUAGES = new Set(
+  SUPPORTED_LANGUAGES.filter((l) => l.romanizationBackend === 'local').map(
+    (l) => l.code,
+  ),
+);
 
 export function hasLocalRomanization(code: string): boolean {
   return LOCAL_ROMANIZATION_LANGUAGES.has(code);

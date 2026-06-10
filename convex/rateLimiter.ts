@@ -36,10 +36,10 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   // observed real throughput without 429s.
   geminiTts: {
     kind: 'token bucket',
-    rate: 60,
+    rate: 240,
     period: MINUTE,
-    capacity: 60,
-    shards: 4,
+    capacity: 240,
+    shards: 32,
   },
   // Azure Speech-to-Text Fast Transcription S0 tier — same 200 req/min cap as
   // azureTts. Hit by TTS validation (synthesizeAndValidate), word-timing

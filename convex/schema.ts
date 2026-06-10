@@ -191,8 +191,8 @@ export default defineSchema({
     // strategy swap (new dataset version, new model, new prompt) can find
     // and regenerate rows produced by the prior method via a simple
     // `translationSource != currentSource` migration. Optional for
-    // backward-compat with rows that landed before this field existed —
-    // see `convex/migrations/backfillTranslationSource.ts`.
+    // backward-compat with rows that landed before this field existed — the
+    // one-time backfill that tagged them has since run and been removed.
     translationSource: v.optional(v.string()),
     // Concrete regional variant chosen for this row when `targetLanguage` is a
     // mixed/aggregate code (today: "es_mixed"). Stored as a Google voice-locale
@@ -720,7 +720,8 @@ export default defineSchema({
 
   // Unique words per user per course per language.
   // courseId is optional only to accommodate pre-migration rows; new writes
-  // always populate it and backfillUserStats rebuilds historical data.
+  // always populate it (historical rows were rebuilt by a one-time stats
+  // backfill that has since run and been removed).
   userWords: defineTable({
     userId: v.string(),
     courseId: v.optional(v.id('courses')),
@@ -831,10 +832,10 @@ export default defineSchema({
     .index('by_userId_and_courseId', ['userId', 'courseId'])
     .index('by_userId_and_courseId_and_reviewNumber', ['userId', 'courseId', 'reviewNumber']),
 
-  // Per-user state for the retokenizeAllWords migration. Accumulated across
-  // paginated `run` passes so the clear-and-rebuild chain fires exactly once
-  // per user with their full course list, regardless of how many pages the
-  // user's courses span. Rows are deleted as each user's chain is scheduled.
+  // Per-user state left over from the (now-removed) one-shot retokenize
+  // migration. No longer read or written; the table is retained pending a
+  // separate schema-only cleanup so a deploy doesn't drop a still-populated
+  // table.
   retokenizeMigrationState: defineTable({
     userId: v.string(),
     courseIds: v.array(v.id('courses')),

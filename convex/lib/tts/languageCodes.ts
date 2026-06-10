@@ -1,3 +1,5 @@
+import { SUPPORTED_LANGUAGES } from '../../../lib/languages';
+
 /**
  * Map our internal language codes to ISO 639-1 codes that ElevenLabs APIs
  * accept. App-internal codes like `es_latam` and `cmn` aren't valid ISO 639-1
@@ -26,55 +28,16 @@ export function toElevenLabsLanguageCode(internalCode: string): string {
  * nearest documented one (Arabic dialects → `ar-001` World Arabic, except
  * Egyptian which has `ar-EG`; `sw_tz` → `sw-KE`; `es_mixed` → `es-ES`).
  */
+// Derived from each Language's `geminiBcp47` field (single source of truth in
+// lib/languages.ts). Codes without one (Cantonese `yue`/`yue_traditional`) are
+// absent and pass through unchanged so Gemini relies on text auto-detection.
+const GEMINI_BCP47: Record<string, string> = Object.fromEntries(
+  SUPPORTED_LANGUAGES.filter((l) => l.geminiBcp47).map((l) => [
+    l.code,
+    l.geminiBcp47 as string,
+  ]),
+);
+
 export function toGeminiBcp47(internalCode: string): string {
-  const map: Record<string, string> = {
-    // English
-    en: 'en-US',
-    en_us: 'en-US',
-    en_gb: 'en-GB',
-    en_au: 'en-AU',
-    // Spanish
-    es: 'es-ES',
-    es_latam: 'es-419',
-    es_mixed: 'es-ES',
-    // European
-    fr: 'fr-FR',
-    de: 'de-DE',
-    it: 'it-IT',
-    pt: 'pt-BR',
-    ro: 'ro-RO',
-    ru: 'ru-RU',
-    pl: 'pl-PL',
-    sk: 'sk-SK',
-    cs: 'cs-CZ',
-    nl: 'nl-NL',
-    sv: 'sv-SE',
-    da: 'da-DK',
-    fi: 'fi-FI',
-    el: 'el-GR',
-    hu: 'hu-HU',
-    he: 'he-IL',
-    tr: 'tr-TR',
-    // Asian
-    hi: 'hi-IN',
-    bn: 'bn-BD',
-    zh: 'cmn-CN',
-    zh_traditional: 'cmn-TW',
-    ja: 'ja-JP',
-    ko: 'ko-KR',
-    vi: 'vi-VN',
-    th: 'th-TH',
-    id: 'id-ID',
-    // Arabic — Gemini ships only World (ar-001) + Egyptian (ar-EG); other
-    // dialects route to World Arabic.
-    ar: 'ar-001',
-    ar_sa: 'ar-001',
-    ar_eg: 'ar-EG',
-    ar_iq: 'ar-001',
-    ar_lev: 'ar-001',
-    // Swahili — Gemini ships only Kenyan (sw-KE).
-    sw: 'sw-KE',
-    sw_tz: 'sw-KE',
-  };
-  return map[internalCode] ?? internalCode;
+  return GEMINI_BCP47[internalCode] ?? internalCode;
 }

@@ -116,7 +116,7 @@ Low Convex numbers reflect the large share of code behind `@convex-dev/agent`, `
 
 ## Test summary
 
-**346 vitest tests across 69 files — 340 passing, 6 skipped.**
+**868 vitest tests across 107 files — 862 passing, 6 skipped.**
 **19 Playwright specs across 13 files — runnable against a local `pnpm dev`.** Four specs in `e2e/chat-live.spec.ts` are tagged `@live` and hit real OpenRouter / TTS APIs via the dev backend.
 
 ### Covered (vitest)
@@ -191,7 +191,7 @@ Unblocking would require either `t.registerComponent("../../node_modules/@convex
 - `convex/features/chat/agent.ts`, `chat/transcribe.ts` — action surfaces entirely owned by AI SDK + agent component.
 - `convex/db/stats/*` (8 aggregation modules) — only smoke coverage via `features/stats`; each module deserves direct unit tests.
 - `convex/usage/*` — Autumn integration; needs stub harness.
-- `convex/migrations/*` — one-off backfills; historically fine to leave untested, but worth a snapshot test if we touch them again.
+- `convex/migrations/*` — the one-shot historical backfills were deleted once run. What remains is the dataset-cutover family (`datasetMigration_*`, live — called by `admin/activateDataset`, and tested) plus reusable seed/ops utilities (`seedMockStats`, `seedPlacementTestSentences`, `recalcUserCardAggregates`).
 - `convex/http.ts`, `convex/auth.ts`, `convex/functions.ts` — plumbing modules.
 
 **Frontend**

@@ -40,10 +40,10 @@ export const batchUpsertTranslations = internalMutation({
             text: v.string(),
             // Optional source tag for the offline translation pipeline.
             // When omitted, the row lands with `translationSource: undefined`
-            // and gets tagged by `convex/migrations/backfillTranslationSource.ts`
-            // under the legacy assumption (Gemini Flash Lite via the
-            // character rule). New pipeline versions should pass an explicit
-            // tag so future strategy swaps can target rows by source.
+            // (a one-time backfill previously tagged such rows under the legacy
+            // assumption; it has since run and been removed). New pipeline
+            // versions should pass an explicit tag so future strategy swaps can
+            // target rows by source.
             translationSource: v.optional(v.string()),
           }),
         ),

@@ -27,7 +27,10 @@
     "snapshot": "mkdir -p .convex-snapshots && convex export --env-file .env.local --path .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip && echo '[convex] Snapshot saved.'",
     "snapshot:restore": "convex import --replace -y --env-file .env.local .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip",
     "landing:audio": "tsx --env-file=.env.local scripts/generate-landing-audio.ts",
-    "tts:prototype": "tsx --env-file=.env.local scripts/tts-prototype.ts"
+    "tts:prototype": "tsx --env-file=.env.local scripts/tts-prototype.ts",
+    "tts:probe": "tsx --env-file=.env.local scripts/tts-openrouter-format-probe.ts",
+    "tts:prompt-test": "tsx --env-file=.env.local scripts/tts-prompt-test.ts",
+    "tts:levantine": "tsx --env-file=.env.local scripts/tts-levantine-probe.mts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.62",

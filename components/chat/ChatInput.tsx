@@ -1,20 +1,11 @@
 import { useEffect, useRef } from 'react';
 import {
   PromptInput,
-  // File attachment imports — disabled for now, re-enable when file upload is supported
-  // PromptInputActionAddAttachments,
-  // PromptInputActionMenu,
-  // PromptInputActionMenuContent,
-  // PromptInputActionMenuTrigger,
-  // PromptInputAttachment,
-  // PromptInputAttachments,
   PromptInputBody,
   PromptInputFooter,
-  // PromptInputHeader,
   type PromptInputMessage,
   PromptInputSubmit,
   PromptInputTextarea,
-  // PromptInputTools,
 } from '@/components/ai-elements/prompt-input';
 import { useTranslations } from 'next-intl';
 import { Suggestion, Suggestions } from '@/components/ai-elements/suggestion';
@@ -112,14 +103,6 @@ export function ChatInput({
             onSubmit={onSubmit}
             className="w-full"
           >
-            {/* File attachment header — disabled for now
-            <PromptInputHeader>
-              <PromptInputAttachments>
-                {(attachment) => <PromptInputAttachment data={attachment} />}
-              </PromptInputAttachments>
-            </PromptInputHeader>
-            */}
-
             <PromptInputBody>
               <PromptInputTextarea
                 placeholder={t('placeholder')}

@@ -1,4 +1,5 @@
 import { v, Infer } from 'convex/values';
+import { TTS_PROVIDERS } from '../lib/languages';
 
 export const learningStyleValidator = v.union(
   v.literal('casual'),
@@ -99,13 +100,16 @@ export const ttsQualityValidator = v.union(
   v.literal('unvalidated'),
 );
 
+// Single source of truth for the provider list is `TTS_PROVIDERS` in
+// lib/languages.ts; this validator (for stored `audioRecordings.ttsProvider`)
+// is built from it so the two can't drift. Indexed access keeps the exact
+// string-literal union for `Infer`. 'gemini' = Gemini 3.1 Flash TTS via
+// OpenRouter's /audio/speech endpoint (distinct from 'google' = Cloud Chirp3).
 export const ttsProviderValidator = v.union(
-  v.literal('google'),
-  v.literal('elevenlabs'),
-  v.literal('azure'),
-  // Gemini 3.1 Flash TTS, reached through OpenRouter's /audio/speech endpoint.
-  // Distinct from 'google' (Google Cloud Chirp3). See convex/lib/tts/gemini.ts.
-  v.literal('gemini'),
+  v.literal(TTS_PROVIDERS[0]),
+  v.literal(TTS_PROVIDERS[1]),
+  v.literal(TTS_PROVIDERS[2]),
+  v.literal(TTS_PROVIDERS[3]),
 );
 
 export const voiceGenderValidator = v.union(

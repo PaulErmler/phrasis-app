@@ -95,29 +95,66 @@ function createAzureVoice(
 }
 
 /**
- * Gemini 3.1 Flash TTS voices (via OpenRouter). apiCode is the bare Gemini
- * voice name (e.g. "Kore") — the provider sends the language separately as a
- * BCP-47 `language_code`, so one voice serves every language. Active by
- * default: the languages routed to Gemini (de, sv) want these selectable.
+ * Gemini 3.1 Flash TTS voices (via OpenRouter). The Gemini voice name itself is
+ * accent-neutral; pronunciation/accent comes from the BCP-47 `language_code`
+ * the provider sends. For single-locale languages (de, sv, pt_pt) the locale is
+ * derived from the language code via `toGeminiBcp47`, so the apiCode is the bare
+ * voice name (e.g. "Kore").
+ *
+ * For languages whose pool spans multiple accents (English: US/GB/AU) the
+ * accent can't come from the language code, so the locale is encoded into the
+ * apiCode as `"<Name>@<bcp47>"` (e.g. "Kore@en-GB") — mirroring how Google
+ * embeds the locale in `en-GB-Chirp3-HD-Leda`. The provider in
+ * convex/lib/tts/gemini.ts splits on `@`, sends the bare name as the voice, and
+ * uses the suffix as the `language_code`. Active by default.
  */
-function createGeminiVoice(name: string, gender: 'female' | 'male'): Voice {
+function createGeminiVoice(
+  name: string,
+  gender: 'female' | 'male',
+  locale?: string,
+): Voice {
+  const genderLabel = gender === 'female' ? 'Female' : 'Male';
   return {
     provider: 'gemini',
     name,
-    displayName: `${name} (${gender === 'female' ? 'Female' : 'Male'}) - Gemini`,
-    apiCode: name,
+    displayName: locale
+      ? `${name} (${genderLabel}) - Gemini ${locale}`
+      : `${name} (${genderLabel}) - Gemini`,
+    apiCode: locale ? `${name}@${locale}` : name,
     gender,
   };
 }
 
 // The four Gemini voices selected for production (2F + 2M), tuned for clear,
-// neutral language-learning delivery. Gemini is multilingual, so the same names
-// serve every language routed to it (currently de, sv).
-const GEMINI_CORE: Voice[] = [
-  createGeminiVoice('Kore', 'female'),
-  createGeminiVoice('Sulafat', 'female'),
-  createGeminiVoice('Charon', 'male'),
-  createGeminiVoice('Iapetus', 'male'),
+// neutral language-learning delivery.
+const GEMINI_VOICE_DEFS: ReadonlyArray<readonly [string, 'female' | 'male']> = [
+  ['Kore', 'female'],
+  ['Sulafat', 'female'],
+  ['Charon', 'male'],
+  ['Iapetus', 'male'],
+];
+
+// Bare (locale-from-language) pool for single-accent Gemini languages (de, sv,
+// pt_pt).
+const GEMINI_CORE: Voice[] = GEMINI_VOICE_DEFS.map(([n, g]) =>
+  createGeminiVoice(n, g),
+);
+
+// Locale-tagged Gemini pool: the same four voices steered to a specific accent
+// via the `@<locale>` apiCode suffix. Used for English's per-accent pools.
+function buildGeminiAccentPool(locale: string): Voice[] {
+  return GEMINI_VOICE_DEFS.map(([n, g]) => createGeminiVoice(n, g, locale));
+}
+
+// English Gemini accent pools. The default `en` pool unions all three so a
+// random pick yields a mix of US/GB/AU accents; the dialect codes pin one.
+const GEMINI_EN_US: Voice[] = buildGeminiAccentPool('en-US');
+const GEMINI_EN_GB: Voice[] = buildGeminiAccentPool('en-GB');
+const GEMINI_EN_AU: Voice[] = buildGeminiAccentPool('en-AU');
+const GEMINI_EN_MIXED: Voice[] = [
+  ...GEMINI_EN_US,
+  ...GEMINI_EN_GB,
+  ...GEMINI_EN_AU,
 ];
 
 /**
@@ -430,10 +467,14 @@ const CHIRP3_EN_MIXED: Voice[] = [
 ];
 
 export const VOICE_POOLS: Record<string, Voice[]> = {
-  en: [...CHIRP3_EN_MIXED, ...ELEVENLABS_VOICES_EN],
-  en_gb: [...buildChirp3Pool('en-GB', 'UK')],
-  en_us: [...buildChirp3Pool('en-US', 'US')],
-  en_au: [...buildChirp3Pool('en-AU', 'Australia')],
+  // English runs on Gemini (mixed US/GB/AU accents on the default `en`, pinned
+  // accent on the dialect codes). Google Chirp3 + ElevenLabs voices stay listed
+  // but go dormant — the `ttsProvider: 'gemini'` filter excludes them — so a
+  // revert is a one-line `ttsProvider` flip in lib/languages.ts.
+  en: [...CHIRP3_EN_MIXED, ...ELEVENLABS_VOICES_EN, ...GEMINI_EN_MIXED],
+  en_gb: [...buildChirp3Pool('en-GB', 'UK'), ...GEMINI_EN_GB],
+  en_us: [...buildChirp3Pool('en-US', 'US'), ...GEMINI_EN_US],
+  en_au: [...buildChirp3Pool('en-AU', 'Australia'), ...GEMINI_EN_AU],
   es: [...buildChirp3Pool('es-ES', 'Spain'), ...activate(ELEVENLABS_VOICES_ES)],
   es_latam: [
     ...buildChirp3Pool('es-US', 'Latin America'),
@@ -451,6 +492,10 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   de: [...buildChirp3Pool('de-DE', 'Germany'), ...ELEVENLABS_VOICES_DE, ...GEMINI_CORE],
   it: [...buildChirp3Pool('it-IT', 'Italy'), ...ELEVENLABS_VOICES_IT],
   pt: [...buildChirp3Pool('pt-BR', 'Brazil'), ...ELEVENLABS_VOICES_PT],
+  // European Portuguese runs on Gemini. Google ships no Chirp3-HD pt-PT voices
+  // (verified against /v1/voices), so there's no Google fallback to list —
+  // Gemini is the only pool.
+  pt_pt: [...GEMINI_CORE],
   ru: [...buildChirp3Pool('ru-RU', 'Russia', 'core'), ...ELEVENLABS_VOICES_RU],
   pl: [...buildChirp3Pool('pl-PL', 'Poland')],
   sk: [...buildChirp3Pool('sk-SK', 'Slovakia'), ...AZURE_VOICES_SK],

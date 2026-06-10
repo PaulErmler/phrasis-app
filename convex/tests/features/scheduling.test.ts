@@ -413,15 +413,16 @@ describe("features/scheduling", () => {
         const audioId = await ctx.db.insert("audioRecordings", {
           textId,
           language: "sv",
-          // Use the current Swedish provider (Google Chirp3) so the row
-          // survives the precedence sweep on the copied textId — `google` now
-          // overrides `azure` (lib/ttsPrecedence.ts), so an Azure row here
-          // would be deleted and regenerated. The test's intent is to verify
-          // copy preserves all fields, not the regen logic.
-          voiceName: "sv-SE-Chirp3-HD-Leda",
+          // Use the current Swedish provider (Gemini) so the row survives the
+          // precedence sweep on the copied textId — `gemini` sits at the top of
+          // lib/ttsPrecedence.ts (it overrides google/azure/elevenlabs and
+          // nothing overrides it), so a google/azure row here would be deleted
+          // and regenerated. The test's intent is to verify copy preserves all
+          // fields, not the regen logic.
+          voiceName: "Kore",
           storageId,
           ttsQuality: "validated",
-          ttsProvider: "google",
+          ttsProvider: "gemini",
           voiceGender: "female",
           speed: 0.9,
           wordTimings: [{ word: "Hej", start: 0, end: 0.5 }],
@@ -486,9 +487,9 @@ describe("features/scheduling", () => {
       );
       // Every field from the source row must be preserved on the copy.
       expect(audio, "audio row was not copied for unchanged language").toBeTruthy();
-      expect(audio?.voiceName).toBe("sv-SE-Chirp3-HD-Leda");
+      expect(audio?.voiceName).toBe("Kore");
       expect(audio?.ttsQuality).toBe("validated");
-      expect(audio?.ttsProvider).toBe("google");
+      expect(audio?.ttsProvider).toBe("gemini");
       expect(audio?.voiceGender).toBe("female");
       expect(audio?.speed).toBe(0.9);
       expect(audio?.wordTimings).toEqual([{ word: "Hej", start: 0, end: 0.5 }]);

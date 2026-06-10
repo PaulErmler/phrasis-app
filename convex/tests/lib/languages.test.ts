@@ -2,26 +2,30 @@
 import { describe, it, expect } from "vitest";
 import {
   getTranslationConfigForLanguage,
-  DEFAULT_LLM_TRANSLATION_MODEL,
+  resolveTranslationStages,
 } from "../../../lib/languages";
 
 describe("lib/languages — getTranslationConfigForLanguage", () => {
   it("returns provider='google' for English (source-only, never translated)", () => {
     const cfg = getTranslationConfigForLanguage("en");
     expect(cfg.provider).toBe("google");
-    expect(cfg.model).toBeUndefined();
   });
 
-  it("defaults non-English to provider='openrouter' with the default model", () => {
-    const cfg = getTranslationConfigForLanguage("de");
-    expect(cfg.provider).toBe("openrouter");
-    expect(cfg.model).toBe(DEFAULT_LLM_TRANSLATION_MODEL);
-    expect(cfg.reasoning).toBeUndefined(); // → hybrid rule applies
+  it("defaults non-English to provider='openrouter'", () => {
+    expect(getTranslationConfigForLanguage("de").provider).toBe("openrouter");
+    expect(getTranslationConfigForLanguage("fr").provider).toBe("openrouter");
   });
 
-  it("populates targetLangName from the English language name", () => {
-    expect(getTranslationConfigForLanguage("de").targetLangName).toBe("German");
-    expect(getTranslationConfigForLanguage("fr").targetLangName).toBe("French");
+  it("populates targetLangName + native name from the language record", () => {
+    const de = getTranslationConfigForLanguage("de");
+    expect(de.targetLangName).toBe("German");
+    expect(de.targetLangNativeName).toBe("Deutsch");
+  });
+
+  it("uses translationName override when present (Hebrew → Modern Hebrew)", () => {
+    expect(getTranslationConfigForLanguage("he").targetLangName).toBe(
+      "Modern Hebrew",
+    );
   });
 
   it("populates targetRegion correctly for region-specific variants", () => {
@@ -32,14 +36,18 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
     expect(getTranslationConfigForLanguage("zh").targetRegion).toBe(
       "Mainland China",
     );
+    expect(getTranslationConfigForLanguage("ar_lev").targetRegion).toBe(
+      "the Levant (Lebanon, Syria, Palestine, Jordan)",
+    );
   });
 
   it("falls back to provider='google' for unknown language codes", () => {
-    const cfg = getTranslationConfigForLanguage("klingon-xyz");
-    expect(cfg.provider).toBe("google");
+    expect(getTranslationConfigForLanguage("klingon-xyz").provider).toBe(
+      "google",
+    );
   });
 
-  it("returns provider='openrouter' for all 16 production target languages", () => {
+  it("returns provider='openrouter' for the production target languages", () => {
     const targets = [
       "es",
       "es_latam",
@@ -60,9 +68,35 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
       "ar",
     ];
     for (const code of targets) {
-      const cfg = getTranslationConfigForLanguage(code);
-      expect(cfg.provider, `code=${code}`).toBe("openrouter");
-      expect(cfg.model, `code=${code}`).toBe(DEFAULT_LLM_TRANSLATION_MODEL);
+      expect(getTranslationConfigForLanguage(code).provider, `code=${code}`).toBe(
+        "openrouter",
+      );
     }
+  });
+});
+
+describe("lib/languages — resolveTranslationStages", () => {
+  it("returns the default_hybrid chain (primary + one fallback) for an unruled language", () => {
+    const stages = resolveTranslationStages("de", 50);
+    expect(stages.length).toBe(2);
+    expect(stages[0].model).toBe("google/gemini-3-flash-preview");
+    expect(stages[0].reasoning).toBe("minimal");
+    // The single fallback retries the same config before the Google safety net.
+    expect(stages[1]).toEqual(stages[0]);
+  });
+
+  it("is length-agnostic (length-hybrid branching was retired)", () => {
+    expect(resolveTranslationStages("de", 5)).toEqual(
+      resolveTranslationStages("de", 500),
+    );
+  });
+
+  it("ruleOverride forces the retranslation_high chain regardless of language", () => {
+    const stages = resolveTranslationStages("de", 100, {
+      ruleOverride: "retranslation_high",
+    });
+    expect(stages.length).toBe(1);
+    expect(stages[0].model).toBe("google/gemini-3.1-pro-preview");
+    expect(stages[0].reasoning).toBe("medium");
   });
 });

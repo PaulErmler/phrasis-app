@@ -270,7 +270,6 @@ export function useOnboardingLessonTutorial({
         runStage('chat', buildChatSteps(tRef.current));
       }, 350);
     }
-     
   }, [cardsRated]);
 }
 

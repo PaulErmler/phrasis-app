@@ -633,46 +633,31 @@ export const pumpQueue = internalMutation({
   args: { provider: ttsProviderValidator },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const cap = PROVIDER_MAX_CONCURRENCY[args.provider as TtsProvider];
-    let used = await countLiveSlotsAndReclaimStale(
-      ctx,
-      args.provider as TtsProvider,
-    );
+    // Priority order drained per pump tick: critical (2, onboarding seed /
+    // placement test) first, then high (1, active collection), then normal
+    // (0), then any pre-priority rows (undefined) left over from a deploy.
+    const QUEUE_PRIORITY_ORDER = [2, 1, 0, undefined] as const;
+    const cap = PROVIDER_MAX_CONCURRENCY[args.provider];
+    let used = await countLiveSlotsAndReclaimStale(ctx, args.provider);
+
+    // Returns the oldest queued row at the highest non-empty priority, or null
+    // when the queue is empty. FIFO within each level via the queuedAt suffix.
+    const dequeueNext = async () => {
+      for (const priority of QUEUE_PRIORITY_ORDER) {
+        const row = await ctx.db
+          .query('ttsQueue')
+          .withIndex('by_provider_priority_and_queuedAt', (q) =>
+            q.eq('provider', args.provider).eq('priority', priority),
+          )
+          .order('asc')
+          .first();
+        if (row) return row;
+      }
+      return null;
+    };
 
     while (used < cap) {
-      // Priority drain: critical (2, onboarding seed / placement test) first,
-      // then high (1, active collection), then normal (0), then any
-      // pre-priority rows (undefined) left over from a deploy. FIFO within
-      // each level via the queuedAt suffix in the index.
-      const next =
-        (await ctx.db
-          .query('ttsQueue')
-          .withIndex('by_provider_priority_and_queuedAt', (q) =>
-            q.eq('provider', args.provider).eq('priority', 2),
-          )
-          .order('asc')
-          .first()) ??
-        (await ctx.db
-          .query('ttsQueue')
-          .withIndex('by_provider_priority_and_queuedAt', (q) =>
-            q.eq('provider', args.provider).eq('priority', 1),
-          )
-          .order('asc')
-          .first()) ??
-        (await ctx.db
-          .query('ttsQueue')
-          .withIndex('by_provider_priority_and_queuedAt', (q) =>
-            q.eq('provider', args.provider).eq('priority', 0),
-          )
-          .order('asc')
-          .first()) ??
-        (await ctx.db
-          .query('ttsQueue')
-          .withIndex('by_provider_priority_and_queuedAt', (q) =>
-            q.eq('provider', args.provider).eq('priority', undefined),
-          )
-          .order('asc')
-          .first());
+      const next = await dequeueNext();
       if (!next) break;
 
       // Reserve one provider request from the per-minute budget. `reserve:
@@ -683,7 +668,7 @@ export const pumpQueue = internalMutation({
       // reservation is ~10s — comfortably inside `TTS_CLAIM_STALE_MS`.
       const limit = await rateLimiter.limit(
         ctx,
-        TTS_RATE_LIMIT_BY_PROVIDER[args.provider as TtsProvider],
+        TTS_RATE_LIMIT_BY_PROVIDER[args.provider],
         { reserve: true },
       );
       if (!limit.ok) {

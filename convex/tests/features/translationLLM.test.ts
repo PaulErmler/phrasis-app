@@ -18,10 +18,7 @@ import {
   MAX_OUTPUT_TOKENS,
   translateTextWithLLM,
 } from "../../features/translationLLM";
-import {
-  HYBRID_LENGTH_THRESHOLD,
-  resolveTranslationStages,
-} from "../../../lib/languages";
+import { resolveTranslationStages } from "../../../lib/languages";
 
 describe("features/translationLLM", () => {
   describe("translation rules", () => {
@@ -42,8 +39,10 @@ describe("features/translationLLM", () => {
     });
 
     it("default_hybrid is length-agnostic — same chain for short and long inputs", () => {
-      const short = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD - 1);
-      const long = resolveTranslationStages("de", HYBRID_LENGTH_THRESHOLD + 100);
+      // Lengths are arbitrary — length-hybrid branching was retired, so any
+      // short vs long pair must resolve to the same chain.
+      const short = resolveTranslationStages("de", 5);
+      const long = resolveTranslationStages("de", 200);
       expect(short).toEqual(long);
     });
 
@@ -309,7 +308,7 @@ describe("features/translationLLM", () => {
       mockOpenRouterOk("...");
       await translateTextWithLLM({
         ...callArgs,
-        text: "a".repeat(HYBRID_LENGTH_THRESHOLD + 5),
+        text: "a".repeat(35),
         reasoning: "low",
       });
       const callArg = vi.mocked(generateText).mock.calls[0][0];

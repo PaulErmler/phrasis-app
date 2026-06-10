@@ -57,7 +57,6 @@ import {
 } from './llmTranslationQueue';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
-  COLLECTION_PREVIEW_SIZE,
   CONTENT_LOOKAHEAD_SIZE,
   LEGACY_LEVEL_ORDER,
   isPremadeLevelCollection,
@@ -1013,7 +1012,7 @@ export const addCardsFromCollection = mutation({
     totalCardsInDeck: v.number(),
   }),
   handler: async (ctx, args) => {
-    const { userId, settings, course } = await requireActiveCourse(ctx);
+    const { userId, course } = await requireActiveCourse(ctx);
     const courseId = course._id;
 
     const clampedBatchSize = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(args.batchSize)));
@@ -1406,8 +1405,13 @@ export const ensureUpcomingCardsContent = mutation({
     }
 
     let processed = 0;
-    for (const card of cards) {
-      const text = await ctx.db.get(card.textId);
+    // Batch-load the texts for all due cards up front (one concurrent read
+    // instead of one sequential `ctx.db.get` per card) before the sequential
+    // scheduleMissingContent loop.
+    const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      const text = texts[i];
       if (!text) continue;
       // Bump priority for cards in the user's currently-active collection
       // so their content jumps to the front of the TTS / LLM queues.

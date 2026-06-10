@@ -11,56 +11,24 @@
 
 import { romanizeLocal } from '../lib/localRomanization';
 import { SignJWT, importPKCS8 } from 'jose';
+import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 
 /**
  * Map internal language codes to Google Translate / romanization API codes.
- * Codes not listed here are passed through as-is. Most ISO 639-1 codes work
- * unmapped against both the v2 translate and v3 romanizeText endpoints —
- * only regional variants and our internal dialect codes need an override.
- *
- * For Arabic dialects we deliberately collapse to plain `ar` (MSA) because
- * Google has no per-dialect romanization model — the user requested this
- * fallback explicitly. Cantonese variants collapse to `yue`; Chinese
- * Traditional uses local pinyin (see localRomanization.ts) so its entry here
- * only matters when translating away from `zh_traditional`.
+ * Derived from each Language's `googleTranslateCode` field (single source of
+ * truth in lib/languages.ts); codes without one pass through unchanged. Most
+ * ISO 639-1 codes work unmapped against both the v2 translate and v3
+ * romanizeText endpoints — only regional variants and internal dialect codes
+ * set an override (e.g. Spanish/English variants collapse to the bare lang,
+ * Arabic dialects collapse to `ar`, Chinese Traditional / European Portuguese
+ * keep their locale-tagged form which v2 accepts).
  */
-const GOOGLE_TRANSLATE_CODE_MAP: Record<string, string> = {
-  // Spanish variants collapse to plain `es`. Google Translate v2 does NOT
-  // accept locale tags like `es-ES` / `es-US` (verified against /v2/languages)
-  // — only `zh-CN`, `zh-TW`, `pt-PT`, `fr-CA` and a few script-tagged codes
-  // are locale-aware. Regional flavor only matters for LLM/voice paths; v2
-  // is the legacy fallback and degrading to base Spanish is acceptable when
-  // it fires.
-  es: 'es',
-  es_latam: 'es',
-  es_mixed: 'es',
-  // English variants collapse to plain `en` for the same reason (v2 rejects
-  // `en-GB` / `en-US` / `en-AU`). English is source-only in normal flows, so
-  // this only matters if a non-English course translates *into* an English
-  // variant via the fallback.
-  en_gb: 'en',
-  en_us: 'en',
-  en_au: 'en',
-  // Chinese Traditional: Google accepts `zh-TW` (one of the few locale-tagged
-  // codes the v2 catalog actually exposes).
-  zh_traditional: 'zh-TW',
-  // Cantonese: Google romanization v3 supports `yue`.
-  yue: 'yue',
-  yue_traditional: 'yue',
-  // Norwegian Bokmål: v2 lists `no` (generic Norwegian), not `nb`.
-  nb: 'no',
-  // Arabic dialects → plain `ar` for romanization (Google has no per-dialect
-  // model). The same code is fine for translate v2 — the LLM/Azure handle
-  // dialect-specific output via voice + prompt, not translate API.
-  ar_sa: 'ar',
-  ar_eg: 'ar',
-  ar_iq: 'ar',
-  ar_lev: 'ar',
-  // Swahili: Google's translate codes are `sw`; pass the bare code for both
-  // regional variants (the regional difference matters for voices, not text).
-  sw: 'sw',
-  sw_tz: 'sw',
-};
+const GOOGLE_TRANSLATE_CODE_MAP: Record<string, string> = Object.fromEntries(
+  SUPPORTED_LANGUAGES.filter((l) => l.googleTranslateCode).map((l) => [
+    l.code,
+    l.googleTranslateCode as string,
+  ]),
+);
 
 export function toGoogleTranslateCode(code: string): string {
   return GOOGLE_TRANSLATE_CODE_MAP[code] ?? code;
