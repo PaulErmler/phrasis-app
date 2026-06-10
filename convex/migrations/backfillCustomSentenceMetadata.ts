@@ -121,8 +121,16 @@ export const processBatch = internalMutation({
           skipped++;
           continue;
         }
+        // Seed with textId so the backfill picks the same gender that
+        // `scheduleMissingContent` would later pick under (I1). Without the
+        // seed this path falls back to `Math.random()` for rows whose
+        // `speakerGender` is undefined/neutral, and disagreement with
+        // `scheduleMissingContent` would trigger spurious regenerations.
         await ctx.db.patch(text._id, {
-          audioSpeakerGender: resolveAudioSpeakerGender(text.speakerGender),
+          audioSpeakerGender: resolveAudioSpeakerGender(
+            text.speakerGender,
+            text._id,
+          ),
         });
         preMadePatched++;
         continue;
@@ -131,8 +139,12 @@ export const processBatch = internalMutation({
       // Custom sentence.
       if (hasAllMetadata) {
         // Linguistic metadata already present; only audioSpeakerGender missing.
+        // Same `text._id` seed as the pre-made branch above — see comment there.
         await ctx.db.patch(text._id, {
-          audioSpeakerGender: resolveAudioSpeakerGender(text.speakerGender),
+          audioSpeakerGender: resolveAudioSpeakerGender(
+            text.speakerGender,
+            text._id,
+          ),
         });
 
         const langs = await getCourseLanguagesForText(ctx, text, courseLanguagesCache);

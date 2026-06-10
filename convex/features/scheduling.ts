@@ -1355,6 +1355,13 @@ export const editCard = mutation({
             romanizedText: undefined,
             romanizationSource: undefined,
             translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
+            // Stamp with the card's current gender so the mismatch sweep in
+            // `scheduleMissingContent` sees agreement (the user-provided
+            // branch is already skipped by the sweep, but keeping this in
+            // sync avoids relying on that skip).
+            ...(text.audioSpeakerGender
+              ? { speakerGender: text.audioSpeakerGender }
+              : {}),
           });
         } else {
           await ctx.db.insert('translations', {
@@ -1362,6 +1369,9 @@ export const editCard = mutation({
             targetLanguage: lang,
             translatedText: submittedMap.get(lang)!,
             translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
+            ...(text.audioSpeakerGender
+              ? { speakerGender: text.audioSpeakerGender }
+              : {}),
           });
         }
       }
@@ -1443,6 +1453,18 @@ export const editCard = mutation({
                   ? { romanizationSource: existing.romanizationSource }
                   : {}),
               }
+              : {}),
+          // Copy the prior row's speakerGender on the carry-over path so the
+          // logical copy doesn't trigger a gender-mismatch regeneration on
+          // the new text. For user-edited (changed) rows, stamp with the
+          // new text's current gender (which copies `text.audioSpeakerGender`
+          // a few lines above).
+          ...(changed
+            ? text.audioSpeakerGender
+              ? { speakerGender: text.audioSpeakerGender }
+              : {}
+            : existing?.speakerGender
+              ? { speakerGender: existing.speakerGender }
               : {}),
         });
       }

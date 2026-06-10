@@ -570,6 +570,7 @@ export const processLlmTranslationForCard = internalAction({
           regionVariant,
           priority: args.priority,
           replaceExisting: args.replaceExisting,
+          speakerGender: args.audioSpeakerGender,
         },
       );
     } catch (err) {

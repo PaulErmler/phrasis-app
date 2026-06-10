@@ -117,7 +117,7 @@ describe("features/translation helpers", () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it("Arabic dialect codes (ar_sa / ar_eg / ar_iq) also use the local path", async () => {
+    it("Arabic dialect codes (ar_sa / ar_eg / ar_iq / ar_lev) also use the local path", async () => {
       const fetchMock = vi.fn(async () => {
         throw new Error(
           "Arabic dialect romanization hit the network — local path regressed",
@@ -125,7 +125,7 @@ describe("features/translation helpers", () => {
       });
       vi.stubGlobal("fetch", fetchMock);
       try {
-        for (const code of ["ar_sa", "ar_eg", "ar_iq"] as const) {
+        for (const code of ["ar_sa", "ar_eg", "ar_iq", "ar_lev"] as const) {
           const out = await romanizeText("هلو", code);
           expect(out.length).toBeGreaterThan(0);
         }

@@ -60,6 +60,7 @@ export function toAzureSttLocale(internalCode: string): string {
     ar_sa: 'ar-SA',
     ar_eg: 'ar-EG',
     ar_iq: 'ar-IQ',
+    ar_lev: 'ar-LB',
     sw: 'sw-KE',
     // sw_tz is unsupported by Fast Transcription — the language is configured
     // with supportsStt: false in lib/languages.ts. Mapping kept here for

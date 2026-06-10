@@ -31,7 +31,7 @@ export const LOCAL_ROMANIZATION_LANGUAGES = new Set([
   'zh', 'zh_traditional',
   'yue', 'yue_traditional',
   'el', 'ko', 'he',
-  'ar', 'ar_sa', 'ar_eg', 'ar_iq',
+  'ar', 'ar_sa', 'ar_eg', 'ar_iq', 'ar_lev',
 ]);
 
 export function hasLocalRomanization(code: string): boolean {
@@ -78,7 +78,8 @@ export function getRomanizationSource(language: string): RomanizationSource {
     language === 'ar' ||
     language === 'ar_sa' ||
     language === 'ar_eg' ||
-    language === 'ar_iq'
+    language === 'ar_iq' ||
+    language === 'ar_lev'
   ) {
     return ROMANIZATION_SOURCES.arabicTransliterate;
   }
@@ -122,7 +123,8 @@ export function romanizeLocal(text: string, language: string): string | null {
     language === 'ar' ||
     language === 'ar_sa' ||
     language === 'ar_eg' ||
-    language === 'ar_iq'
+    language === 'ar_iq' ||
+    language === 'ar_lev'
   ) {
     // IJMES Arabic→Latin transliteration. The library treats all dialects as
     // the same script (it operates on the Arabic Unicode block), so the
