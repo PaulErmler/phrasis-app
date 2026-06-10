@@ -110,6 +110,18 @@ export const voiceGenderValidator = v.union(
   v.literal('female'),
 );
 
+/**
+ * Narrow a loosely-typed string to a strict voice gender, or `undefined` when
+ * it is neither. Use at boundaries where a `v.string()`-typed value (e.g.
+ * `texts.audioSpeakerGender`, or a queued job's `audioSpeakerGender`) flows
+ * into a strict `voiceGenderValidator` field such as `translations.speakerGender`.
+ */
+export function asVoiceGender(
+  value: string | undefined,
+): 'male' | 'female' | undefined {
+  return value === 'male' || value === 'female' ? value : undefined;
+}
+
 export const cardApprovalStatusValidator = v.union(
   v.literal('pending'),
   v.literal('approved'),

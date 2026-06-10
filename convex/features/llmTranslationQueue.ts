@@ -22,6 +22,7 @@ import {
 } from '../../lib/languages';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
+import { asVoiceGender } from '../types';
 
 /**
  * LLM translation queue. Mirrors the TTS queue pattern in `ttsProcessing.ts`
@@ -570,7 +571,7 @@ export const processLlmTranslationForCard = internalAction({
           regionVariant,
           priority: args.priority,
           replaceExisting: args.replaceExisting,
-          speakerGender: args.audioSpeakerGender,
+          speakerGender: asVoiceGender(args.audioSpeakerGender),
         },
       );
     } catch (err) {

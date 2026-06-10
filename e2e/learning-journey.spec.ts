@@ -192,14 +192,22 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     ).toBeVisible({ timeout: 15_000 });
     await learnAndReviewBtn.click();
 
-    await dismissTour(page, "audio_review_intro", 500);
-    await dismissTour(page, "full_review_intro", 500);
+    // Both these tours anchor a step to the settings button; under @live
+    // load they can render >500ms after the learn overlay mounts, so wait the
+    // default window rather than racing them.
+    await dismissTour(page, "audio_review_intro");
+    await dismissTour(page, "full_review_intro");
 
     const settings = page.getByTestId("learn-settings").first();
     await expect(
       settings,
       "learn-settings trigger should render in the LearningHeader after opening the learn overlay",
     ).toBeVisible({ timeout: 10_000 });
+    // Belt-and-braces: a tour can still be mid-render here, and its
+    // `.driver-overlay` backdrop intercepts the click (body.driver-active).
+    // Clear any stray popover/overlay right before clicking, mirroring the
+    // per-card loop above.
+    await dismissTour(page, undefined, 500);
     await settings.click();
 
     const sheet = page.getByTestId("learning-settings-sheet").first();

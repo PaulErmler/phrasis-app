@@ -243,6 +243,23 @@ export const sendMessage = mutation({
 });
 
 /**
+ * Empty, correctly-shaped `streams` value matching what `syncStreams` returns
+ * for the requested `streamArgs`. The client streaming hook reads
+ * `result.streams.messages` whenever it issues a `kind: 'list'` query, so the
+ * early-return branches in `listMessages` (unauthenticated / thread not owned)
+ * must still include a `streams` field of the right shape — otherwise the hook
+ * throws `Cannot read properties of undefined (reading 'messages')`. Mirrors
+ * `syncStreams` by returning `undefined` when no streaming was requested.
+ */
+function emptyStreamsFor(streamArgs: unknown) {
+  if (!streamArgs || typeof streamArgs !== 'object') return undefined;
+  const kind = (streamArgs as { kind?: string }).kind;
+  if (kind === 'list') return { kind: 'list' as const, messages: [] };
+  if (kind === 'deltas') return { kind: 'deltas' as const, deltas: [] };
+  return undefined;
+}
+
+/**
  * List messages for a thread in UI-friendly format.
  */
 export const listMessages = query({
@@ -260,7 +277,12 @@ export const listMessages = query({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      return { page: [], isDone: true, continueCursor: '' };
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: '',
+        streams: emptyStreamsFor(args.streamArgs),
+      };
     }
 
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {
@@ -268,7 +290,12 @@ export const listMessages = query({
     });
 
     if (!thread || thread.userId !== userId) {
-      return { page: [], isDone: true, continueCursor: '' };
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: '',
+        streams: emptyStreamsFor(args.streamArgs),
+      };
     }
 
     const messages = await listUIMessages(ctx, agentComponent, {

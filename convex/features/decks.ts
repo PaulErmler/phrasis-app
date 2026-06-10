@@ -47,6 +47,7 @@ import {
   ttsQualityValidator,
   ttsProviderValidator,
   voiceGenderValidator,
+  asVoiceGender,
 } from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
 import { languageSupportsStt } from '../../lib/languages';
@@ -272,8 +273,9 @@ export async function scheduleMissingContent(
         const existingProvider = audio.ttsProvider ?? 'google';
         const currentProvider = getTtsProviderForLanguage(lang);
         // Provider regen is now gated by lib/ttsPrecedence.ts — only the
-        // matchups listed there force a delete + re-synth. Unlisted pairs
-        // keep the existing audio (e.g. Google rows are never overwritten).
+        // (current, existing) matchups listed there force a delete + re-synth
+        // (e.g. google now overwrites azure, to migrate the Arabic dialects
+        // off Azure). Unlisted pairs keep the existing audio.
         const providerMismatch = shouldOverwriteProvider(
           currentProvider,
           existingProvider,
@@ -1653,7 +1655,7 @@ export const processTranslationForCard = internalAction({
           regionVariant,
           priority: args.priority,
           replaceExisting: args.replaceExisting,
-          speakerGender: args.audioSpeakerGender,
+          speakerGender: asVoiceGender(args.audioSpeakerGender),
         },
       );
     } catch (err) {
@@ -1722,13 +1724,14 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      */
     replaceExisting: v.optional(v.boolean()),
     /**
-     * Speaker gender ('male' | 'female') the translation was produced under.
-     * Persisted on the translation row so the gender-mismatch sweep in
-     * `scheduleMissingContent` can invalidate translations whose grammar no
-     * longer agrees with the card's current voice gender. Optional during
-     * rollout so old call sites that haven't been threaded yet still compile.
+     * Speaker gender ('male' | 'female') the translation was produced under
+     * — the card's resolved `audioSpeakerGender`. Persisted on the translation
+     * row so the gender-mismatch sweep in `scheduleMissingContent` can
+     * invalidate translations whose grammar no longer agrees with the card's
+     * current voice gender. Optional during rollout so old call sites that
+     * haven't been threaded yet still compile.
      */
-    speakerGender: v.optional(v.string()),
+    speakerGender: v.optional(voiceGenderValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1775,7 +1778,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         romanizationSource: string | undefined;
         translationSource: string | undefined;
         regionVariant: string | undefined;
-        speakerGender: string;
+        speakerGender: 'male' | 'female';
       }> = {
         translatedText: args.translatedText,
       };
@@ -1805,7 +1808,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         romanizationSource: string;
         translationSource: string;
         regionVariant: string;
-        speakerGender: string;
+        speakerGender: 'male' | 'female';
       }> = {};
       // Same `!== undefined` reasoning: persist the sentinel on first write
       // but never overwrite a previously-stored real value. Source travels

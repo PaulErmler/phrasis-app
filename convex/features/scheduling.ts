@@ -24,7 +24,8 @@ import {
   fsrsStateValidator,
   translationValidator,
   audioRecordingValidator,
-  schedulingPhaseValidator
+  schedulingPhaseValidator,
+  asVoiceGender,
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import { getTodayInTimezone } from '../lib/dateUtils';
@@ -1261,6 +1262,12 @@ export const editCard = mutation({
     const text = await ctx.db.get(card.textId);
     if (!text) throw new ConvexError('Text not found');
 
+    // Narrow the card's resolved voice gender once for stamping onto the
+    // translation rows below. `texts.audioSpeakerGender` is typed as a loose
+    // string but is always 'male' | 'female' in practice; the stamped
+    // `translations.speakerGender` field is strict.
+    const audioGenderStamp = asVoiceGender(text.audioSpeakerGender);
+
     const sourceLanguage = text.language;
     const allLanguages = [
       ...new Set([...course.baseLanguages, ...course.targetLanguages]),
@@ -1359,8 +1366,8 @@ export const editCard = mutation({
             // `scheduleMissingContent` sees agreement (the user-provided
             // branch is already skipped by the sweep, but keeping this in
             // sync avoids relying on that skip).
-            ...(text.audioSpeakerGender
-              ? { speakerGender: text.audioSpeakerGender }
+            ...(audioGenderStamp
+              ? { speakerGender: audioGenderStamp }
               : {}),
           });
         } else {
@@ -1369,8 +1376,8 @@ export const editCard = mutation({
             targetLanguage: lang,
             translatedText: submittedMap.get(lang)!,
             translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
-            ...(text.audioSpeakerGender
-              ? { speakerGender: text.audioSpeakerGender }
+            ...(audioGenderStamp
+              ? { speakerGender: audioGenderStamp }
               : {}),
           });
         }
@@ -1460,8 +1467,8 @@ export const editCard = mutation({
           // new text's current gender (which copies `text.audioSpeakerGender`
           // a few lines above).
           ...(changed
-            ? text.audioSpeakerGender
-              ? { speakerGender: text.audioSpeakerGender }
+            ? audioGenderStamp
+              ? { speakerGender: audioGenderStamp }
               : {}
             : existing?.speakerGender
               ? { speakerGender: existing.speakerGender }
