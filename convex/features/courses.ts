@@ -30,8 +30,7 @@ import {
   getCourseStats as dbGetCourseStats,
   createCourseStats,
   getTodayInTimezone,
-  getPreviousDay,
-  getNextDay,
+  deriveStreakDisplay,
 } from '../db/courseStats';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { consumeQuota, hasFeatureAccess, releaseQuota } from '../usage/helpers';
@@ -346,6 +345,13 @@ export const getCourseStats = query({
       currentStreak: v.number(),
       streakFreezeCount: v.number(),
       streakFrozenToday: v.boolean(),
+      streakState: v.union(
+        v.literal('active'),
+        v.literal('pending'),
+        v.literal('frozen'),
+        v.literal('broken'),
+        v.literal('none'),
+      ),
       totalWordCount: v.optional(v.number()),
       totalChatMessages: v.optional(v.number()),
       totalChatCardsApproved: v.optional(v.number()),
@@ -379,26 +385,25 @@ export const getCourseStats = query({
       if (!stats) return null;
 
       const todayStr = getTodayInTimezone(args.timezone);
-      const yesterday = getPreviousDay(todayStr);
-      const streakFrozenToday =
-        !!stats.streakFreezeUsedDate &&
-        stats.streakFreezeUsedDate === yesterday;
-
-      // Freeze is a single slot derived from streakFreezeUsedDate plus
-      // last activity. It regenerates once the user has an activity day
-      // strictly after the day following the covered gap.
-      const freezeAvailable =
-        !stats.streakFreezeUsedDate ||
-        (!!stats.lastActivityDate &&
-          stats.lastActivityDate > getNextDay(stats.streakFreezeUsedDate));
+      // Re-derive the live streak state at read time — the stored streak goes
+      // stale between activities (it's only recomputed when the user studies),
+      // so a lapsed streak must show 0 and the frozen/pending states must be
+      // computed from lastActivityDate vs today rather than the stored row.
+      const derived = deriveStreakDisplay(
+        stats.lastActivityDate,
+        todayStr,
+        stats.currentStreak,
+        stats.streakFreezeUsedDate,
+      );
 
       return {
         totalRepetitions: stats.totalRepetitions,
         totalTimeMs: stats.totalTimeMs,
         totalCards: stats.totalCards,
-        currentStreak: stats.currentStreak,
-        streakFreezeCount: freezeAvailable ? 1 : 0,
-        streakFrozenToday,
+        currentStreak: derived.displayStreak,
+        streakFreezeCount: derived.freezeAvailable ? 1 : 0,
+        streakFrozenToday: derived.state === 'frozen',
+        streakState: derived.state,
         totalWordCount: stats.totalWordCount,
         totalChatMessages: stats.totalChatMessages,
         totalChatCardsApproved: stats.totalChatCardsApproved,

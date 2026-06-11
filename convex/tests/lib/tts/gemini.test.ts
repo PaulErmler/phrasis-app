@@ -86,7 +86,7 @@ describe('geminiTts.speak — empty-response retry', () => {
     await geminiTts.speak(INPUT);
 
     const body = bodyOf(fetchMock.mock.calls[0]);
-    expect(body.input).toMatch(/^## Context:/);
+    expect(body.input).toMatch(/^## Instruction:/);
     expect(body.input).toContain('German'); // getLanguageByCode('de').name
     expect(body.input).toContain('## Transcript: Guten Morgen!');
     // Strategy C: the style rides in `input`, so no prompt field is sent.

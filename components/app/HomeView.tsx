@@ -15,6 +15,11 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
 
+// Module-level guard so the all-modes content warm fires at most once per
+// course per page session (not on every HomeView re-render or remount). Keyed
+// by courseId so switching the active course re-warms.
+const warmedCourseIds = new Set<string>();
+
 export function HomeView({
   preloadedCourseSettings,
   onLearnOpen,
@@ -79,6 +84,27 @@ export function HomeView({
       );
     }
   });
+
+  const ensureAllModesContent = useMutation(
+    api.features.decks.ensureUpcomingCardsContentAllModes,
+  );
+
+  // Pre-warm card content (translations + TTS) for the upcoming cards of every
+  // scheduling mode while the user is on Home, so whichever mode they pick
+  // starts without waiting on content generation. Skipped while HomeView is
+  // hidden (user mid-LearnView, where useLearningMode already warms content).
+  const courseId = courseSettings?.courseId;
+  useEffect(() => {
+    if (isHidden) return;
+    if (!courseId) return;
+    if (warmedCourseIds.has(courseId)) return;
+
+    warmedCourseIds.add(courseId);
+    ensureAllModesContent().catch((error) => {
+      console.error('Failed to ensure upcoming cards content:', error);
+      warmedCourseIds.delete(courseId);
+    });
+  }, [isHidden, courseId, ensureAllModesContent]);
 
   const getOrCreateEmptyThread = useMutation(
     api.features.chat.threads.getOrCreateEmptyThread,

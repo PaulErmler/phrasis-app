@@ -42,6 +42,9 @@ interface CumulativeLineChartProps {
   monthlyData: MonthlyPoint[];
   weeklyData?: WeeklyPoint[];
   languageDailyData?: LanguageDailyPoint[];
+  /** User's IANA timezone — used to build the day range so the cumulative line
+   * spans every calendar day through today (in the user's zone). */
+  timezone: string;
 }
 
 const METRICS: Metric[] = ['words', 'reviews', 'sentences', 'time'];
@@ -79,6 +82,26 @@ function getWeeklyValue(point: WeeklyPoint, metric: Metric): number {
   case 'sentences': return point.totalNewCards;
   case 'time': return point.totalTimeMs;
   }
+}
+
+/** Format a Date as "YYYY-MM-DD" in the user's timezone (matches how daily
+ * stats are keyed server-side, and the ActivityHeatmap day grid). */
+function formatDateInTz(date: Date, timezone: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(date);
+}
+
+/** Inclusive list of "YYYY-MM-DD" day keys ending at today (user's timezone),
+ * spanning `daysBack` days back — so the cumulative series reaches today and
+ * flat-lines across inactive days. daysBack=7 → 8 points, daysBack=30 → 31. */
+function buildDayRange(daysBack: number, timezone: string): string[] {
+  const today = new Date();
+  const days: string[] = [];
+  for (let i = daysBack; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    days.push(formatDateInTz(d, timezone));
+  }
+  return days;
 }
 
 /** Convert "YYYY-Www" to the Monday date of that ISO week, formatted as "MM-DD". */
@@ -125,7 +148,7 @@ function formatTooltipDate(label: string): string {
   return `${mm}-${dd}-${String(year).slice(2)}`;
 }
 
-export function CumulativeLineChart({ dailyData, monthlyData, weeklyData, languageDailyData }: CumulativeLineChartProps) {
+export function CumulativeLineChart({ dailyData, monthlyData, weeklyData, languageDailyData, timezone }: CumulativeLineChartProps) {
   const t = useTranslations('StatsPage');
   const [metric, setMetric] = useState<Metric>('words');
   const [range, setRange] = useState<TimeRange>('month');
@@ -152,28 +175,24 @@ export function CumulativeLineChart({ dailyData, monthlyData, weeklyData, langua
       });
     }
 
-    const now = new Date();
+    // Build a continuous daily series from the window edge through today so the
+    // cumulative line reaches today and flat-lines across days with no activity
+    // (rather than ending at the last active day).
     const daysBack = range === 'week' ? 7 : 30;
-    const cutoff = new Date(now);
-    cutoff.setDate(cutoff.getDate() - daysBack);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
-
-    const filtered = dailyData
-      .filter((d) => d.date >= cutoffStr)
-      .sort((a, b) => a.date.localeCompare(b.date));
+    const dayKeys = buildDayRange(daysBack, timezone);
+    const byDate = new Map(dailyData.map((d) => [d.date, d]));
 
     let cumulative = 0;
-    return filtered.map((p) => {
-      cumulative += getDailyValue(p, metric);
-      return { label: p.date.slice(5), value: cumulative };
+    return dayKeys.map((date) => {
+      const point = byDate.get(date);
+      cumulative += point ? getDailyValue(point, metric) : 0;
+      return { label: date.slice(5), value: cumulative };
     });
-  }, [dailyData, weeklyData, metric, range, isWordsByLanguage]);
+  }, [dailyData, weeklyData, metric, range, isWordsByLanguage, timezone]);
 
   // Per-language words chart data
   const langChartData = useMemo(() => {
     if (!isWordsByLanguage || !languageDailyData?.length) return [];
-
-    const now = new Date();
 
     if (range === 'year') {
       // Aggregate daily language data into ISO weeks, then accumulate
@@ -200,35 +219,32 @@ export function CumulativeLineChart({ dailyData, monthlyData, weeklyData, langua
       });
     }
 
-    // Week or month
+    // Week or month — continuous daily series from the window edge through
+    // today (mirrors chartData) so each language line reaches today.
     const daysBack = range === 'week' ? 7 : 30;
-    const cutoff = new Date(now);
-    cutoff.setDate(cutoff.getDate() - daysBack);
-    const cutoffStr = cutoff.toISOString().slice(0, 10);
+    const dayKeys = buildDayRange(daysBack, timezone);
 
-    // Group by date
+    // Group by date (only days in range are looked up below).
     const dateMap = new Map<string, Map<string, number>>();
     for (const d of languageDailyData) {
-      if (d.date < cutoffStr) continue;
       if (!dateMap.has(d.date)) dateMap.set(d.date, new Map());
       const langMap = dateMap.get(d.date)!;
       langMap.set(d.language, (langMap.get(d.language) ?? 0) + d.newWordsCount);
     }
 
-    const sortedDates = Array.from(dateMap.keys()).sort();
     const cumulatives = new Map<string, number>();
     for (const lang of languages) cumulatives.set(lang, 0);
 
-    return sortedDates.map((date) => {
-      const langMap = dateMap.get(date)!;
+    return dayKeys.map((date) => {
+      const langMap = dateMap.get(date);
       const point: Record<string, string | number> = { label: date.slice(5) };
       for (const lang of languages) {
-        cumulatives.set(lang, (cumulatives.get(lang) ?? 0) + (langMap.get(lang) ?? 0));
+        cumulatives.set(lang, cumulatives.get(lang)! + (langMap?.get(lang) ?? 0));
         point[lang] = cumulatives.get(lang)!;
       }
       return point;
     });
-  }, [languageDailyData, languages, range, isWordsByLanguage]);
+  }, [languageDailyData, languages, range, isWordsByLanguage, timezone]);
 
   const chartConfig: ChartConfig = isWordsByLanguage
     ? Object.fromEntries(

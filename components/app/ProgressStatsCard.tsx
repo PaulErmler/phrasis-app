@@ -172,9 +172,15 @@ export function ProgressStatsCard({
     activeLevel && isCefr(activeLevel.cefrTier) ? activeLevel.cefrTier : null;
   const levelTierColor = levelTier ? CEFR_COLORS[levelTier] : null;
 
+  // Streak badge visuals are driven by the server-derived live state so a
+  // lapsed streak reads as broken (grey, 0) and the frozen/pending states show
+  // correctly on home entry. `hasLearned` is kept separately — it drives the
+  // today-counter animations below (reps/new/time), not the streak color.
   const hasLearned = todayStats != null && todayStats.reps > 0;
-  const isFrozen = stats?.streakFrozenToday === true && !hasLearned;
-  const isInactive = streak === 0 && !hasLearned && !isFrozen;
+  const streakState = stats?.streakState ?? 'none';
+  const isActive = streakState === 'active';
+  const isFrozen = streakState === 'frozen';
+  const isInactive = streakState === 'broken' || streakState === 'none';
 
   const animatedReps = useAnimatedCounter(
     hasLearned ? todayStats.reps : 0,
@@ -254,15 +260,15 @@ export function ProgressStatsCard({
                   'flex items-center justify-center h-10 w-10 rounded-xl transition-colors duration-400 ease-out',
                   isInactive && 'bg-transparent',
                   isFrozen && 'bg-primary/15',
-                  hasLearned && 'bg-streak-active/15',
-                  !isInactive && !isFrozen && !hasLearned && 'bg-accent-orange/10',
+                  isActive && 'bg-streak-active/15',
+                  !isInactive && !isFrozen && !isActive && 'bg-accent-orange/10',
                 )}
                 animate={
                   isInactive
                     ? { scale: 1 }
                     : isFrozen
                       ? { scale: [1, 1.05, 1] }
-                      : hasLearned
+                      : isActive
                         ? { scale: statsActuallyChanged ? [1, 1.15, 1] : 1 }
                         : { scale: 1 }
                 }
@@ -271,7 +277,7 @@ export function ProgressStatsCard({
                     ? { duration: 0.3 }
                     : isFrozen
                       ? { duration: 2, repeat: Infinity, repeatType: 'reverse' as const }
-                      : hasLearned
+                      : isActive
                         ? { duration: 1, ease: 'easeOut' }
                         : { duration: 0.3 }
                 }
@@ -293,16 +299,16 @@ export function ProgressStatsCard({
                       initial={{ opacity: 0, scale: 0.3, rotate: 90, filter: 'blur(4px)' }}
                       animate={{
                         opacity: 1,
-                        scale: hasLearned && statsActuallyChanged ? [0.3, 1.3, 1] : 1,
-                        rotate: hasLearned && statsActuallyChanged ? [90, -10, 0] : 0,
+                        scale: isActive && statsActuallyChanged ? [0.3, 1.3, 1] : 1,
+                        rotate: isActive && statsActuallyChanged ? [90, -10, 0] : 0,
                         filter: 'blur(0px)',
                       }}
-                      transition={{ duration: hasLearned && statsActuallyChanged ? 1.4 : 0.4, ease: 'easeOut' }}
+                      transition={{ duration: isActive && statsActuallyChanged ? 1.4 : 0.4, ease: 'easeOut' }}
                     >
                       <Flame
                         className="h-5 w-5 transition-colors duration-400"
                         style={{
-                          color: hasLearned
+                          color: isActive
                             ? 'var(--streak-active)'
                             : isInactive
                               ? 'var(--muted-foreground)'
@@ -320,9 +326,9 @@ export function ProgressStatsCard({
                     ? 'var(--muted-foreground)'
                     : isFrozen
                       ? 'var(--primary)'
-                      : hasLearned
+                      : isActive
                         ? 'var(--streak-active)'
-                        : undefined,
+                        : 'var(--accent-orange)',
                 }}
               >
                 {streak}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Flame, BookOpen, RotateCcw, MessageSquare, Clock, Target } from 'lucide-react';
+import { Flame, Snowflake, BookOpen, RotateCcw, MessageSquare, Clock, Target } from 'lucide-react';
 import { formatTimeMs } from '@/lib/formatTime';
 import { getLanguageByCode } from '@/lib/languages';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
@@ -17,15 +17,17 @@ interface LanguageWordCount {
 type StatsPeriod = 'day' | 'week' | 'month';
 const STATS_PERIODS: StatsPeriod[] = ['day', 'week', 'month'];
 
+type StreakState = 'active' | 'pending' | 'frozen' | 'broken' | 'none';
+
 interface NumbersRowProps {
   streak: number;
+  streakState?: StreakState;
   words: number;
   reviews: number;
   sentences: number;
   timeMs: number;
   accuracySum: number;
   accuracyCount: number;
-  hasLearnedToday?: boolean;
   languageWordCounts: LanguageWordCount[];
   todayReps?: number;
   todayNewCards?: number;
@@ -119,13 +121,13 @@ function WordsCell({ languageWordCounts, totalWords, t, subDisplay }: {
 
 export function NumbersRow({
   streak,
+  streakState = 'none',
   words,
   reviews,
   sentences,
   timeMs,
   accuracySum,
   accuracyCount,
-  hasLearnedToday,
   languageWordCounts,
   todayReps = 0,
   todayNewCards = 0,
@@ -154,11 +156,13 @@ export function NumbersRow({
 
   // --- Snapshot-based delta animation ---
   // Track all period values so each period has its own cached "from" state.
+  // dateScoped resets the snapshot at the day boundary so the `day` counters
+  // animate from today's baseline rather than yesterday's stale totals.
   const { prev, changed } = useStatsSnapshot('statsPage_periods', {
     dayReps: todayReps, dayNewCards: todayNewCards, dayTimeMs: todayTimeMs, dayNewWords: todayNewWords,
     weekReps, weekNewCards, weekTimeMs, weekNewWords,
     monthReps, monthNewCards, monthTimeMs, monthNewWords,
-  });
+  }, { dateScoped: true });
 
   // Only animate on initial mount, not on period switches.
   const [hasMountAnimated, setHasMountAnimated] = useState(false);
@@ -180,11 +184,19 @@ export function NumbersRow({
   const animTime = useAnimatedCounter(periodTimeMs, shouldAnimate ? prevTimeMs : periodTimeMs, 1500, 600, shouldAnimate && periodTimeMs !== prevTimeMs);
   const animWords = useAnimatedCounter(periodNewWords, shouldAnimate ? prevNewWords : periodNewWords, 1500, 250, shouldAnimate && periodNewWords !== prevNewWords);
 
-  const streakColor = hasLearnedToday
-    ? 'var(--streak-active)'
-    : streak > 0
-      ? 'var(--accent-orange)'
-      : undefined;
+  // Match the home card's live streak states: green = studied today,
+  // blue snowflake = a freeze is shielding the streak, orange = alive but not
+  // yet validated today, grey = broken/none.
+  const streakIsFrozen = streakState === 'frozen';
+  const StreakIcon = streakIsFrozen ? Snowflake : Flame;
+  const streakColor =
+    streakState === 'active'
+      ? 'var(--streak-active)'
+      : streakState === 'frozen'
+        ? 'var(--primary)'
+        : streakState === 'pending'
+          ? 'var(--accent-orange)'
+          : 'var(--muted-foreground)';
 
   const repsDisplay = periodReps > 0 ? `${animReps}` : null;
   const newDisplay = periodNewCards > 0 ? `+${animNew}` : null;
@@ -212,7 +224,7 @@ export function NumbersRow({
       {/* Top row: always 3 items */}
       <div className="grid grid-cols-3 gap-x-4">
         <div className="flex flex-col items-center text-center gap-0.5" data-testid="stats-tile-streak">
-          <Flame className="h-3.5 w-3.5" style={{ color: streakColor ?? 'var(--muted-foreground)' }} />
+          <StreakIcon className="h-3.5 w-3.5" style={{ color: streakColor }} />
           <p className="text-lg font-semibold tabular-nums leading-tight" style={{ color: streakColor }}>
             {streak}
           </p>

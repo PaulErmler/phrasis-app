@@ -128,9 +128,9 @@ function createGeminiVoice(
 // The four Gemini voices selected for production (2F + 2M), tuned for clear,
 // neutral language-learning delivery.
 const GEMINI_VOICE_DEFS: ReadonlyArray<readonly [string, 'female' | 'male']> = [
-  ['Kore', 'female'],
-  ['Sulafat', 'female'],
-  ['Charon', 'male'],
+  ['Leda', 'female'],
+  ['Gacrux', 'female'],
+  ['Achird', 'male'],
   ['Iapetus', 'male'],
 ];
 
