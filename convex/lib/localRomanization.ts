@@ -17,6 +17,7 @@ import { transliterate as transliterateHebrew } from 'hebrew-transliteration';
 import { getLshk } from 'cantonese-romanisation';
 // @ts-expect-error no type declarations for arabic-transliterate (pure JS, ~74KB, zero deps)
 import arabictransliterate from 'arabic-transliterate';
+import transliterate from '@sindresorhus/transliterate';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 
 /**
@@ -54,6 +55,7 @@ export const ROMANIZATION_SOURCES = {
   hebrewTransliteration: 'hebrew-transliteration-v1',
   cantoneseRomanisation: 'cantonese-romanisation-v1',
   arabicTransliterate: 'arabic-transliterate-v1',
+  sindresorhusTransliterate: 'sindresorhus-transliterate-v1',
   googleV3: 'google-v3-v1',
 } as const;
 
@@ -85,6 +87,7 @@ export function getRomanizationSource(language: string): RomanizationSource {
   ) {
     return ROMANIZATION_SOURCES.arabicTransliterate;
   }
+  if (language === 'fa') return ROMANIZATION_SOURCES.sindresorhusTransliterate;
   // Everything else in ROMANIZATION_LANGUAGES (ru, hi, ja, bn) routes
   // through Google v3 — see `romanizeText` in convex/features/translation.ts.
   return ROMANIZATION_SOURCES.googleV3;
@@ -133,6 +136,14 @@ export function romanizeLocal(text: string, language: string): string | null {
     // dialect tail of the code is irrelevant here. Pass language='Arabic'
     // (the library's switch key, NOT the BCP-47 tag).
     return arabictransliterate(text, 'arabic2latin', 'Arabic') as string;
+  }
+  if (language === 'fa') {
+    // Persian (Perso-Arabic script). `@sindresorhus/transliterate` maps the
+    // written consonants + long vowels and the Persian-specific letters
+    // (پ/چ/ژ/گ) to Latin; short vowels aren't written in the script so they
+    // don't appear. Strip the zero-width non-joiner (U+200C) Persian uses
+    // between word parts so it doesn't leak as an invisible char into output.
+    return transliterate(text).replace(/‌/g, '');
   }
   return null;
 }

@@ -352,6 +352,14 @@ const AZURE_VOICES_HE: Voice[] = [
   createAzureVoice('Avri', 'male', 'he-IL-AvriNeural'),
 ];
 
+// Persian (Iran) — Azure Neural fallback (Gemini fa-IR is the active provider).
+// Verified against Azure's language-support docs: fa-IR ships two neural voices
+// and is supported by Fast Transcription.
+const AZURE_VOICES_FA_IR: Voice[] = [
+  createAzureVoice('Dilara', 'female', 'fa-IR-DilaraNeural'),
+  createAzureVoice('Farid', 'male', 'fa-IR-FaridNeural'),
+];
+
 // Slovak — Azure Neural fallback (Google Chirp3-HD sk-SK is primary).
 const AZURE_VOICES_SK: Voice[] = [
   createAzureVoice('Viktoria', 'female', 'sk-SK-ViktoriaNeural'),
@@ -540,6 +548,11 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   ar_eg: [...activate(AZURE_VOICES_AR_EG)],
   ar_iq: [...buildChirp3Pool('ar-XA', 'MSA')],
   ar_lev: [...buildChirp3Pool('ar-XA', 'MSA')],
+  // Persian runs on Gemini TTS (fa-IR). No Google Chirp3-HD fa voices, so
+  // Gemini is the active pool (mirrors pt_pt). Azure fa-IR Neural voices are
+  // listed dormant as a verified fallback — flip the language's ttsProvider to
+  // 'azure' to activate them.
+  fa: [...GEMINI_CORE, ...AZURE_VOICES_FA_IR],
   sw: [...activate(AZURE_VOICES_SW_KE)],
   sw_tz: [...activate(AZURE_VOICES_SW_TZ)],
 };

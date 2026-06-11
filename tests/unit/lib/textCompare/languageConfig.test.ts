@@ -50,6 +50,7 @@ const EXPECTED_COMPARE: Record<string, { locale: string; hasWordBoundaries: bool
   ar_iq: { locale: 'ar-IQ', hasWordBoundaries: true },
   ar_lev: { locale: 'ar-LB', hasWordBoundaries: true },
   he: { locale: 'he', hasWordBoundaries: true },
+  fa: { locale: 'fa', hasWordBoundaries: true },
   sw: { locale: 'sw-KE', hasWordBoundaries: true },
   sw_tz: { locale: 'sw-TZ', hasWordBoundaries: true },
 };

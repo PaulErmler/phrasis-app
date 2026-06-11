@@ -52,6 +52,7 @@ const EXPECTED_AZURE: Record<string, string> = {
   nl: 'nl-NL',
   el: 'el-GR',
   he: 'he-IL',
+  fa: 'fa-IR',
   ar: 'ar-SA',
   ar_sa: 'ar-SA',
   ar_eg: 'ar-EG',

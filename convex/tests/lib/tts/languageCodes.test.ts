@@ -59,6 +59,7 @@ const EXPECTED_GEMINI: Record<string, string> = {
   ar_iq: 'ar-001',
   ar_lev: 'ar-001',
   he: 'he-IL',
+  fa: 'fa-IR',
   sw: 'sw-KE',
   sw_tz: 'sw-KE',
 };

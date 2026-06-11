@@ -198,6 +198,9 @@ importers:
       '@radix-ui/react-use-controllable-state':
         specifier: ^1.2.2
         version: 1.2.2(@types/react@19.2.14)(react@19.2.4)
+      '@sindresorhus/transliterate':
+        specifier: ^2.3.1
+        version: 2.3.1
       '@useautumn/convex':
         specifier: ^0.0.23
         version: 0.0.23(@standard-schema/spec@1.1.0)(autumn-js@0.1.85(better-auth@1.5.5(drizzle-orm@0.45.2(@opentelemetry/api@1.9.0)(kysely@0.28.17))(mongodb@6.21.0)(next@16.2.6(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.59.1)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@4.1.4))(better-call@1.3.2(zod@4.3.6))(convex@1.34.1(react@19.2.4))(react@19.2.4))(convex@1.34.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.3.6)
@@ -3467,6 +3470,10 @@ packages:
   '@sindresorhus/merge-streams@4.0.0':
     resolution: {integrity: sha512-tlqY9xq5ukxTUZBmoOp+m61cqwQD5pHJtFY3Mn8CA8ps6yghLH/Hw8UPdqg4OLmFW3IFlcXnQNmo/dh8HzXYIQ==}
     engines: {node: '>=18'}
+
+  '@sindresorhus/transliterate@2.3.1':
+    resolution: {integrity: sha512-gVaaGtKYMYAMmI8buULVH3A2TXVJ98QiwGwI7ddrWGuGidGC2uRt4FHs22+8iROJ0QTzju9CuMjlVsrvpqsdhA==}
+    engines: {node: '>=20'}
 
   '@sqltools/formatter@1.2.5':
     resolution: {integrity: sha512-Uy0+khmZqUrUGm5dmMqVlnvufZRSK0FbYzVgp0UMstm+F5+W2/jnEEQyc9vo1ZR/E5ZI/B1WjjoTqBqwJL6Krw==}
@@ -11606,6 +11613,8 @@ snapshots:
       '@peculiar/x509': 1.14.3
 
   '@sindresorhus/merge-streams@4.0.0': {}
+
+  '@sindresorhus/transliterate@2.3.1': {}
 
   '@sqltools/formatter@1.2.5': {}
 

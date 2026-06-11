@@ -963,6 +963,32 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Modern Hebrew',
   },
   {
+    code: 'fa',
+    displayCode: 'fa',
+    regionLabel: 'Iran',
+    geminiBcp47: 'fa-IR',
+    azureSttLocale: 'fa-IR',
+    name: 'Persian',
+    nativeName: 'فارسی',
+    flag: '🇮🇷',
+    category: 'other',
+    llmSupportTier: 'tier1',
+    // Gemini 3 Flash TTS (via OpenRouter); fa-IR is a documented Gemini TTS
+    // locale. See VOICE_POOLS in lib/voices.ts (`fa: [...GEMINI_CORE]`).
+    ttsProvider: 'gemini',
+    // Perso-Arabic script — romanized locally via `@sindresorhus/transliterate`
+    // (handles the Persian-specific letters پ/چ/ژ/گ that the Arabic library
+    // mangles). Note it's a consonant-skeleton transliteration: Persian script
+    // omits short vowels, so they're absent from the output (سلام → "slam").
+    // Wired in convex/lib/localRomanization.ts. Google v3 isn't an option here
+    // (its romanizeText 400s on `fa`).
+    needsRomanization: true,
+    romanizationBackend: 'local',
+    // Non-Latin script — karaoke highlighting off (matches Arabic/Hebrew).
+    supportsKaraoke: false,
+    supportsStt: true,
+  },
+  {
     code: 'sw',
     displayCode: 'sw-KE',
     regionLabel: 'Kenya',

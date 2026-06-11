@@ -21,6 +21,7 @@ describe('hasLocalRomanization', () => {
     'ar_eg',
     'ar_iq',
     'ar_lev',
+    'fa',
   ];
   // Romanized, but via Google Cloud v3 (not local).
   const GOOGLE_V3 = ['ru', 'hi', 'bn', 'ja'];
