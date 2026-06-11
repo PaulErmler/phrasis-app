@@ -76,6 +76,33 @@ describe('resolveActiveClip', () => {
       localTime: 98,
     });
   });
+
+  it('prefers the per-cue speed over the language map (same lang, two speeds)', () => {
+    // resolveActiveClip is the function the live word-highlight render path uses
+    // (LearningCardContent / FullReviewCardContent). The same language plays
+    // before base at 0.7× and after base at 1.2×; each occurrence must rescale
+    // localTime by its own cue speed, not one language-keyed value.
+    const cues: LanguageCue[] = [
+      { language: 'es', startSec: 0, speed: 0.7 }, // before-base
+      { language: 'en', startSec: 5, speed: 1 },
+      { language: 'es', startSec: 8, speed: 1.2 }, // after-base
+    ];
+    expect(resolveActiveClip(cues, 1.0)).toEqual({
+      language: 'es',
+      localTime: 0.7,
+    });
+    expect(resolveActiveClip(cues, 9.0)).toEqual({
+      language: 'es',
+      localTime: 1.2,
+    });
+    // cue.speed must win over a conflicting speedByLanguage fallback, which for
+    // a dual-group language holds only the after-group's 1.2× (the before-group
+    // value was overwritten in scheduleGroup). This is the load-bearing case.
+    expect(resolveActiveClip(cues, 1.0, { es: 1.2 })).toEqual({
+      language: 'es',
+      localTime: 0.7,
+    });
+  });
 });
 
 describe('resolveActiveCuePosition', () => {
@@ -129,6 +156,27 @@ describe('resolveActiveCuePosition', () => {
       language: 'en',
       repIndex: 0,
       localTimeOriginal: 0.8,
+    });
+  });
+
+  it('prefers the per-cue speed over the language map (same lang, two speeds)', () => {
+    // The same language plays before base at 0.7× and after base at 1.2×.
+    // Each occurrence must rescale by its own cue speed, not a single
+    // language-keyed value.
+    const cues: LanguageCue[] = [
+      { language: 'es', startSec: 0, speed: 0.7 }, // before-base
+      { language: 'en', startSec: 5, speed: 1 },
+      { language: 'es', startSec: 8, speed: 1.2 }, // after-base
+    ];
+    expect(resolveActiveCuePosition(cues, 1.0)).toEqual({
+      language: 'es',
+      repIndex: 0,
+      localTimeOriginal: 0.7,
+    });
+    expect(resolveActiveCuePosition(cues, 9.0)).toEqual({
+      language: 'es',
+      repIndex: 1,
+      localTimeOriginal: 1.2,
     });
   });
 });

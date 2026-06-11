@@ -1080,10 +1080,18 @@ export const updateCourseSettings = mutation({
     pauseBaseToTarget: v.optional(v.number()),
     pauseTargetToTarget: v.optional(v.number()),
     pauseBeforeAutoAdvance: v.optional(v.number()),
+    playTargetBeforeBase: v.optional(v.boolean()),
+    playTargetAfterBase: v.optional(v.boolean()),
+    targetBeforeRepetitions: v.optional(v.record(v.string(), v.number())),
+    targetBeforeRepetitionPauses: v.optional(v.record(v.string(), v.number())),
+    targetBeforePlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
+    pauseTargetToBase: v.optional(v.number()),
     showProgressBar: v.optional(v.boolean()),
     progressDisplayEnabled: v.optional(v.boolean()),
     hideTargetLanguages: v.optional(v.boolean()),
     autoRevealLanguages: v.optional(v.boolean()),
+    hideBaseLanguages: v.optional(v.boolean()),
+    autoRevealBaseLanguages: v.optional(v.boolean()),
     showRomanization: v.optional(v.boolean()),
     baseLanguageOrder: v.optional(v.array(v.string())),
     targetLanguageOrder: v.optional(v.array(v.string())),
@@ -1124,10 +1132,18 @@ export const updateCourseSettings = mutation({
       'pauseBaseToTarget',
       'pauseTargetToTarget',
       'pauseBeforeAutoAdvance',
+      'playTargetBeforeBase',
+      'playTargetAfterBase',
+      'targetBeforeRepetitions',
+      'targetBeforeRepetitionPauses',
+      'targetBeforePlaybackSpeeds',
+      'pauseTargetToBase',
       'showProgressBar',
       'progressDisplayEnabled',
       'hideTargetLanguages',
       'autoRevealLanguages',
+      'hideBaseLanguages',
+      'autoRevealBaseLanguages',
       'showRomanization',
       'baseLanguageOrder',
       'targetLanguageOrder',
@@ -1146,7 +1162,12 @@ export const updateCourseSettings = mutation({
       if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
         value = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(value)));
       }
-      if (key === 'languagePlaybackSpeeds' && value && typeof value === 'object') {
+      if (
+        (key === 'languagePlaybackSpeeds' ||
+          key === 'targetBeforePlaybackSpeeds') &&
+        value &&
+        typeof value === 'object'
+      ) {
         const clamped: Record<string, number> = {};
         for (const [lang, speed] of Object.entries(value as Record<string, number>)) {
           if (typeof speed !== 'number' || !Number.isFinite(speed)) continue;
@@ -1179,10 +1200,19 @@ export const updateCourseSettings = mutation({
         pauseBaseToTarget: args.pauseBaseToTarget,
         pauseTargetToTarget: args.pauseTargetToTarget,
         pauseBeforeAutoAdvance: args.pauseBeforeAutoAdvance,
+        playTargetBeforeBase: args.playTargetBeforeBase,
+        playTargetAfterBase: args.playTargetAfterBase,
+        targetBeforeRepetitions: args.targetBeforeRepetitions,
+        targetBeforeRepetitionPauses: args.targetBeforeRepetitionPauses,
+        targetBeforePlaybackSpeeds: (patch.targetBeforePlaybackSpeeds as Record<string, number> | undefined) ?? args.targetBeforePlaybackSpeeds,
+        pauseTargetToBase: args.pauseTargetToBase,
         showProgressBar: args.showProgressBar,
         progressDisplayEnabled: args.progressDisplayEnabled,
         hideTargetLanguages: args.hideTargetLanguages,
         autoRevealLanguages: args.autoRevealLanguages,
+        hideBaseLanguages: args.hideBaseLanguages,
+        autoRevealBaseLanguages: args.autoRevealBaseLanguages,
+        showRomanization: args.showRomanization,
         baseLanguageOrder: args.baseLanguageOrder,
         targetLanguageOrder: args.targetLanguageOrder,
         instantProceedAudio: args.instantProceedAudio,

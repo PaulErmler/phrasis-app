@@ -31,13 +31,26 @@ export const courseSettingsFields = {
   languageRepetitionPauses: v.optional(v.record(v.string(), v.number())), // per-language pause between repeats (seconds)
   languagePlaybackSpeeds: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 1.0, "es": 0.9 }; range PLAYBACK_SPEED_MIN-PLAYBACK_SPEED_MAX (see lib/constants/audioPlayback); missing = 1.0. Pitch-preserved via HTMLMediaElement.preservesPitch for single clips and SoundTouchJS for the merged WAV.
   pauseBaseToBase: v.optional(v.number()), // seconds between different base languages
-  pauseBaseToTarget: v.optional(v.number()), // seconds between base and target sections
-  pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages
+  pauseBaseToTarget: v.optional(v.number()), // seconds between base and (after) target sections
+  pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages (both before- and after-base groups)
   pauseBeforeAutoAdvance: v.optional(v.number()), // seconds to wait before auto-advancing to next card
+  // Target-before-base ("Practice Listening") vs target-after-base ("Practice Speaking").
+  // At least one must be enabled; the client enforces this. Defaults reproduce the
+  // historical base→target sequence (after on, before off).
+  playTargetBeforeBase: v.optional(v.boolean()), // play target language(s) before base ("Practice Listening", default off)
+  playTargetAfterBase: v.optional(v.boolean()), // play target language(s) after base ("Practice Speaking", default on)
+  // Independent settings for the before-base target group (the after-base group reuses
+  // languageRepetitions / languageRepetitionPauses / languagePlaybackSpeeds).
+  targetBeforeRepetitions: v.optional(v.record(v.string(), v.number())), // reps per target lang, before-base group
+  targetBeforeRepetitionPauses: v.optional(v.record(v.string(), v.number())), // between-rep pause per target lang, before-base group
+  targetBeforePlaybackSpeeds: v.optional(v.record(v.string(), v.number())), // playback speed per target lang, before-base group; clamped PLAYBACK_SPEED_MIN-MAX
+  pauseTargetToBase: v.optional(v.number()), // seconds between the before-base target group and the base group (mirror of pauseBaseToTarget)
   showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
   progressDisplayEnabled: v.optional(v.boolean()), // celebrate every PROGRESS_DISPLAY_INTERVAL reviews (default true)
   hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
-  autoRevealLanguages: v.optional(v.boolean()), // unblur when audio starts playing
+  autoRevealLanguages: v.optional(v.boolean()), // unblur target text when its audio starts playing
+  hideBaseLanguages: v.optional(v.boolean()), // blur base language text by default (default off)
+  autoRevealBaseLanguages: v.optional(v.boolean()), // unblur base text when its audio starts playing
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
   // Language order overrides
   baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages

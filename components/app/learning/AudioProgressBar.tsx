@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import { updateMediaSessionPosition } from '@/lib/audio/mediaSession';
 import type { LanguageCue } from '@/lib/audio/mergeAudio';
@@ -27,6 +27,19 @@ export const AudioProgressBar = memo(function AudioProgressBar({
   useEffect(() => {
     setCurrentTime(0);
   }, [durationSec]);
+
+  // Reset the bar to the start whenever the merged track is re-baked while
+  // paused. A settings-sheet edit (speed/rep/pause tweak or a language reorder)
+  // pauses the audio and re-merges; resetting here keeps the bar from snapping
+  // back to the old position (which read as a flicker). Reordering languages
+  // keeps the same total duration, so the `durationSec` reset above can't catch
+  // it — this cue-identity reset does. Skipped while playing so a mid-playback
+  // speed change resumes smoothly instead of jumping to 0.
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+  useEffect(() => {
+    if (!isPlayingRef.current) setCurrentTime(0);
+  }, [languageCues]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -66,13 +79,17 @@ export const AudioProgressBar = memo(function AudioProgressBar({
     };
   }, [isPlaying, audioRef]);
 
-  const inactive = durationSec <= 0 || isMerging;
+  // No audio loaded yet (card change / first load) → render the bar dimmed and
+  // empty. A re-merge of already-loaded audio is NOT treated as inactive, so
+  // the bar doesn't dim/flicker on every settings tweak; seeking is still
+  // blocked mid-merge via `disabled` below.
+  const noAudio = durationSec <= 0;
 
   // Cue boundaries to render as thin separator ticks on hover. Drop the
   // leading 0s cue (it lines up with the bar's left edge) and any cue past
   // duration (shouldn't happen, but defensive).
   const cueMarks =
-    !inactive && languageCues
+    !noAudio && languageCues
       ? languageCues
         .filter((c) => c.startSec > 0 && c.startSec < durationSec)
         .map((c) => (c.startSec / durationSec) * 100)
@@ -80,16 +97,16 @@ export const AudioProgressBar = memo(function AudioProgressBar({
 
   return (
     <SliderPrimitive.Root
-      value={[inactive ? 0 : currentTime]}
-      max={inactive ? 1 : durationSec}
+      value={[noAudio ? 0 : currentTime]}
+      max={noAudio ? 1 : durationSec}
       step={0.01}
-      disabled={inactive}
+      disabled={noAudio || isMerging}
       onValueChange={([v]) => {
         setCurrentTime(v);
         onSeek(v);
       }}
       className={`group relative flex w-full touch-none items-center select-none transition-opacity duration-150 ${
-        inactive ? 'opacity-30 pointer-events-none' : ''
+        noAudio ? 'opacity-30 pointer-events-none' : ''
       }`}
     >
       <SliderPrimitive.Track className="bg-primary/20 relative h-1 w-full grow overflow-hidden">

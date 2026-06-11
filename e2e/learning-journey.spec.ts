@@ -49,12 +49,14 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
   });
 
   test("user learns 3 cards in audio review mode", async ({ page }) => {
-    // Each iteration touches the real FSRS mutation + a TTS roundtrip for
-    // the next card. Three cards plus tour dismissal + load + initial waits
-    // comfortably overflows the 30s default under @live conditions; 45s
-    // gives the slowest-card-prep iteration enough headroom without hiding
-    // an actual hang (the 5s+1.5s per-iteration budget is unchanged).
-    test.setTimeout(45_000);
+    // Each iteration touches the real FSRS mutation + a TTS roundtrip to prep
+    // the next card's audio. The 20s initial rating wait plus three cards each
+    // waiting up to 10s for the next card's ratings to mount can exceed 45s
+    // under @live load — which surfaced as a flaky "Test timeout exceeded".
+    // 90s gives the slowest-prep run headroom without masking a true hang:
+    // every wait inside the loop is still individually bounded, so a real stall
+    // breaks the loop early rather than silently consuming the budget.
+    test.setTimeout(90_000);
 
     await page.goto("/app/learn");
     await page.waitForLoadState("domcontentloaded");
@@ -112,12 +114,16 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
       await dismissTour(page, undefined, 250);
 
       // In Full Review mode ratings are gated behind submitting a
-      // translation. If a textbox is present, dispatch a trivial
-      // submission so the rating row becomes actionable.
+      // translation. If a textbox is present, dispatch a trivial submission so
+      // the rating row becomes actionable. Bound both interactions and swallow
+      // failures: once grading starts the input can disable/detach mid-action,
+      // and an unbounded `press` there is what previously hung the whole test
+      // until the timeout. If it fails we simply fall through to the rating
+      // wait below (which decides whether to advance or break).
       const translationInput = page.getByTestId("learn-translation-input").first();
       if (await translationInput.isVisible().catch(() => false)) {
-        await translationInput.fill("skip");
-        await translationInput.press("Enter");
+        await translationInput.fill("skip", { timeout: 5_000 }).catch(() => {});
+        await translationInput.press("Enter", { timeout: 5_000 }).catch(() => {});
         // Grading + rating-row mount can take >500ms under @live load.
         // Wait on the next assertion instead of a fixed sleep.
       }

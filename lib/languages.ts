@@ -835,6 +835,29 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
   },
   {
+    code: 'fil',
+    displayCode: 'fil',
+    regionLabel: 'the Philippines',
+    geminiBcp47: 'fil-PH',
+    azureSttLocale: 'fil-PH',
+    // Google Translate v2 (the legacy fallback path) catalogs Filipino under
+    // the Tagalog code `tl`; `fil` isn't in /v2/languages.
+    googleTranslateCode: 'tl',
+    name: 'Filipino',
+    nativeName: 'Filipino',
+    flag: '🇵🇭',
+    category: 'asian-southeast',
+    llmSupportTier: 'tier1',
+    // Gemini 3 Flash TTS (fil-PH, Preview). See VOICE_POOLS in lib/voices.ts
+    // (`fil: [...GEMINI_CORE, ...AZURE_VOICES_FIL_PH]`). Latin script, so no
+    // romanization; Azure fil-PH supports Fast Transcription, so STT + karaoke
+    // stay on.
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+  },
+  {
     code: 'ar',
     displayCode: 'ar',
     regionLabel: 'the Arab world',

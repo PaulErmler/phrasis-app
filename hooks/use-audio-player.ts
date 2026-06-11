@@ -31,6 +31,10 @@ export interface UseAudioPlayerOptions {
   sourceText: string;
   languageNames: string;
   autoPlay: boolean;
+  /** True while the settings sheet is open. A remerge triggered from settings
+   *  (a speed/rep/pause tweak, or a language reorder) resets playback to the
+   *  start instead of resuming the prior position. */
+  settingsOpen: boolean;
   getReviewInitiatedByThisTab: () => boolean;
   onScheduleComplete: () => void;
   onResetReviewFlag: () => void;
@@ -78,6 +82,7 @@ export function useAudioPlayer(
     sourceText,
     languageNames,
     autoPlay,
+    settingsOpen,
     getReviewInitiatedByThisTab,
     onScheduleComplete,
     onResetReviewFlag,
@@ -119,6 +124,10 @@ export function useAudioPlayer(
   // to honor the *current* value, not the stale closure.
   const autoPlayRef = useRef(autoPlay);
   autoPlayRef.current = autoPlay;
+  // Latest settings-sheet state, read at remerge time. A remerge while the
+  // sheet is open is a settings edit → reset to the start rather than resume.
+  const settingsOpenRef = useRef(settingsOpen);
+  settingsOpenRef.current = settingsOpen;
 
 
   const getAudio = useCallback((): HTMLAudioElement => {
@@ -281,7 +290,9 @@ export function useAudioPlayer(
       if (cues.length === 0) return;
       const currentTime = audio.currentTime;
       setRevealedLanguages((prev) => {
-        const toReveal = cues.filter((c) => c.startSec <= currentTime && !prev.has(c.language));
+        const toReveal = cues.filter(
+          (c) => c.reveals !== false && c.startSec <= currentTime && !prev.has(c.language),
+        );
         if (toReveal.length === 0) return prev;
         const next = new Set(prev);
         for (const c of toReveal) next.add(c.language);
@@ -383,6 +394,12 @@ export function useAudioPlayer(
         pauseT2T: settings.pauseT2T,
         autoAdvance: settings.autoAdvance,
         pauseBeforeAdvance: settings.pauseBeforeAdvance,
+        playTargetBefore: settings.playTargetBefore,
+        playTargetAfter: settings.playTargetAfter,
+        beforeReps: settings.beforeReps,
+        beforeRepPauses: settings.beforeRepPauses,
+        beforeSpeeds: settings.beforeSpeeds,
+        pauseT2B: settings.pauseT2B,
       }),
     [settings],
   );
@@ -427,8 +444,15 @@ export function useAudioPlayer(
     // the new blob to the equivalent (language, repIndex, localTimeOriginal) —
     // otherwise `audio.src = newBlob` implicitly resets `currentTime` to 0 and
     // a mid-playback speed change restarts playback from the top.
+    //
+    // Exception: a remerge driven from the open settings sheet (a speed/rep/
+    // pause tweak or a language reorder) intentionally resets to the start, so
+    // we skip the resume capture and let `currentTime` fall back to 0.
     const resumePos =
-      !isCardChange && audioBefore && languageCuesRef.current.length > 0
+      !isCardChange &&
+      !settingsOpenRef.current &&
+      audioBefore &&
+      languageCuesRef.current.length > 0
         ? resolveActiveCuePosition(
           languageCuesRef.current,
           audioBefore.currentTime,

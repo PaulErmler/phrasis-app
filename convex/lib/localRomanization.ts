@@ -141,9 +141,14 @@ export function romanizeLocal(text: string, language: string): string | null {
     // Persian (Perso-Arabic script). `@sindresorhus/transliterate` maps the
     // written consonants + long vowels and the Persian-specific letters
     // (پ/چ/ژ/گ) to Latin; short vowels aren't written in the script so they
-    // don't appear. Strip the zero-width non-joiner (U+200C) Persian uses
-    // between word parts so it doesn't leak as an invisible char into output.
-    return transliterate(text).replace(/‌/g, '');
+    // don't appear. The library passes a few combining marks through unchanged,
+    // so strip them post-transliteration or they leak as invisible/garbled
+    // chars: U+200C zero-width non-joiner (between word parts), U+0654 hamza
+    // above (the ezafe hamza on -e/-eh words — very common), and U+0670
+    // superscript alef.
+    // Alternation (not a character class) avoids no-misleading-character-class,
+    // which flags combining marks like U+0654/U+0670 inside `[...]`.
+    return transliterate(text).replace(/\u200C|\u0654|\u0670/g, '');
   }
   return null;
 }

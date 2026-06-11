@@ -446,6 +446,8 @@ export function LearningMode({
         onAudioPlay={audio.stop}
         hideTargetLanguages={state.courseSettings.hideTargetLanguages ?? true}
         autoRevealLanguages={state.courseSettings.autoRevealLanguages ?? true}
+        hideBaseLanguages={state.courseSettings.hideBaseLanguages === true}
+        autoRevealBaseLanguages={state.courseSettings.autoRevealBaseLanguages ?? true}
         revealedLanguages={audio.revealedLanguages}
         showRomanization={state.courseSettings.showRomanization ?? true}
         revealAllSignal={audioRevealNonce}

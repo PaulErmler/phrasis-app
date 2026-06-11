@@ -360,6 +360,14 @@ const AZURE_VOICES_FA_IR: Voice[] = [
   createAzureVoice('Farid', 'male', 'fa-IR-FaridNeural'),
 ];
 
+// Filipino (Philippines) — Azure Neural fallback (Gemini fil-PH is the active
+// provider). Verified against Azure's language-support docs: fil-PH ships two
+// neural voices and is supported by Fast Transcription.
+const AZURE_VOICES_FIL_PH: Voice[] = [
+  createAzureVoice('Blessica', 'female', 'fil-PH-BlessicaNeural'),
+  createAzureVoice('Angelo', 'male', 'fil-PH-AngeloNeural'),
+];
+
 // Slovak — Azure Neural fallback (Google Chirp3-HD sk-SK is primary).
 const AZURE_VOICES_SK: Voice[] = [
   createAzureVoice('Viktoria', 'female', 'sk-SK-ViktoriaNeural'),
@@ -528,6 +536,10 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...ELEVENLABS_VOICES_VI],
   th: [...buildChirp3Pool('th-TH', 'Thailand'), ...AZURE_VOICES_TH],
   id: [...buildChirp3Pool('id-ID', 'Indonesia')],
+  // Filipino runs on Gemini TTS (fil-PH). No Google Chirp3-HD fil voices, so
+  // Gemini is the active pool (mirrors fa); Azure fil-PH Neural voices are
+  // listed dormant as a verified fallback (flip ttsProvider to 'azure').
+  fil: [...GEMINI_CORE, ...AZURE_VOICES_FIL_PH],
   sv: [
     ...buildChirp3Pool('sv-SE', 'Sweden'),
     ...ELEVENLABS_VOICES_SV,
@@ -549,10 +561,13 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   ar_iq: [...buildChirp3Pool('ar-XA', 'MSA')],
   ar_lev: [...buildChirp3Pool('ar-XA', 'MSA')],
   // Persian runs on Gemini TTS (fa-IR). No Google Chirp3-HD fa voices, so
-  // Gemini is the active pool (mirrors pt_pt). Azure fa-IR Neural voices are
-  // listed dormant as a verified fallback — flip the language's ttsProvider to
-  // 'azure' to activate them.
-  fa: [...GEMINI_CORE, ...AZURE_VOICES_FA_IR],
+  // Gemini is the active pool (mirrors pt_pt). Azure fa-IR Neural voices are a
+  // verified fallback: wrapped in activate() (createAzureVoice defaults to
+  // active:false) so flipping the language's ttsProvider to 'azure' actually
+  // surfaces them — without activate() the provider filter would resolve to an
+  // empty pool. They stay dormant while ttsProvider is 'gemini' because
+  // getVoicesForLanguage also filters by provider.
+  fa: [...GEMINI_CORE, ...activate(AZURE_VOICES_FA_IR)],
   sw: [...activate(AZURE_VOICES_SW_KE)],
   sw_tz: [...activate(AZURE_VOICES_SW_TZ)],
 };

@@ -97,3 +97,24 @@ describe('voice pools completeness', () => {
     ).toEqual([]);
   });
 });
+
+describe('Persian (fa) voice pool', () => {
+  it('resolves to the Gemini pool for the active provider', () => {
+    const active = getVoicesByLanguageCode('fa');
+    expect(active.length).toBeGreaterThan(0);
+    expect(active.every((v) => v.provider === 'gemini')).toBe(true);
+    // The Azure fallback must NOT surface while ttsProvider is 'gemini'.
+    expect(active.some((v) => v.provider === 'azure')).toBe(false);
+  });
+
+  it('keeps the Azure fa-IR fallback in the full curated set', () => {
+    const all = getAllVoicesByLanguageCode('fa');
+    const azure = all.filter((v) => v.provider === 'azure');
+    expect(azure.map((v) => v.apiCode).sort()).toEqual([
+      'fa-IR-DilaraNeural',
+      'fa-IR-FaridNeural',
+    ]);
+    // Wrapped in activate() so flipping ttsProvider to 'azure' would surface them.
+    expect(azure.every((v) => v.active === true)).toBe(true);
+  });
+});

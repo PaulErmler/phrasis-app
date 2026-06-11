@@ -39,6 +39,8 @@ interface LearningCardContentProps {
   onAudioPlay?: () => void;
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
+  hideBaseLanguages?: boolean;
+  autoRevealBaseLanguages?: boolean;
   revealedLanguages?: ReadonlySet<string>;
   /** When this value changes (e.g. incremented by parent), all target lines are manually revealed. */
   revealAllSignal?: number;
@@ -103,6 +105,8 @@ export function LearningCardContent({
   onAudioPlay,
   hideTargetLanguages = false,
   autoRevealLanguages = false,
+  hideBaseLanguages = false,
+  autoRevealBaseLanguages = false,
   revealedLanguages,
   revealAllSignal = 0,
   onAllTargetsRevealedChange,
@@ -240,6 +244,11 @@ export function LearningCardContent({
         onSeek={onSeek}
         showProgressBar={showProgressBar}
         languageCues={mergedPlayback?.languageCues}
+        hideBaseLanguages={hideBaseLanguages}
+        autoRevealBaseLanguages={autoRevealBaseLanguages}
+        revealedLanguages={revealedLanguages}
+        manuallyRevealedLanguages={manuallyRevealed}
+        onRevealLanguage={handleReveal}
       >
         {({ targetTranslations }) => (
           <div className="space-y-2">

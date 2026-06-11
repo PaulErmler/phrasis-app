@@ -9,10 +9,12 @@ import type { LanguageCue } from './mergeAudio';
  * Returns null when `currentTime` is before the first cue (typically 0 at card
  * load, before playback begins).
  *
- * When clips were time-stretched at merge time (per-language speed), pass
- * `speedByLanguage` so the returned `localTime` is rescaled to the original
- * (1×) timeline that word timings live on. Word-highlighting would drift
- * without this rescale because a stretched clip is `original / speed` long.
+ * Clips are time-stretched at merge time, so the returned `localTime` is
+ * rescaled to the original (1×) timeline that word timings live on — otherwise
+ * highlighting drifts because a stretched clip is `original / speed` long. The
+ * speed is read from the matched cue (per-occurrence, so the same language can
+ * play at different speeds before vs after base); `speedByLanguage` is an
+ * optional legacy fallback for cues that predate the per-cue `speed` field.
  */
 export function resolveActiveClip(
   cues: ReadonlyArray<LanguageCue>,
@@ -23,7 +25,7 @@ export function resolveActiveClip(
     if (cues[i].startSec <= currentTime) {
       const language = cues[i].language;
       const mergedLocal = currentTime - cues[i].startSec;
-      const speed = speedByLanguage?.[language] ?? 1;
+      const speed = cues[i].speed ?? speedByLanguage?.[language] ?? 1;
       return {
         language,
         localTime: mergedLocal * speed,
@@ -61,7 +63,7 @@ export function resolveActiveCuePosition(
       for (let j = 0; j < i; j++) {
         if (cues[j].language === language) repIndex++;
       }
-      const speed = speedByLanguage?.[language] ?? 1;
+      const speed = cues[i].speed ?? speedByLanguage?.[language] ?? 1;
       const localTimeOriginal = (currentTime - cues[i].startSec) * speed;
       return { language, repIndex, localTimeOriginal };
     }
@@ -86,7 +88,7 @@ export function mergedTimeForCuePosition(
   for (let i = 0; i < newCues.length; i++) {
     if (newCues[i].language !== pos.language) continue;
     if (seen === pos.repIndex) {
-      const newSpeed = newSpeedByLanguage[pos.language] ?? 1;
+      const newSpeed = newCues[i].speed ?? newSpeedByLanguage[pos.language] ?? 1;
       return newCues[i].startSec + pos.localTimeOriginal / newSpeed;
     }
     seen++;

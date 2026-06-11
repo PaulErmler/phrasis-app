@@ -52,6 +52,7 @@ const EXPECTED_GOOGLE: Record<string, string> = {
   ar_lev: 'ar',
   he: 'he',
   fa: 'fa',
+  fil: 'tl',
   sw: 'sw',
   sw_tz: 'sw',
 };

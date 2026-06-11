@@ -3,6 +3,10 @@ import { convexTest } from "convex-test";
 import { describe, it, expect } from "vitest";
 import schema from "../../schema";
 import { api } from "../../_generated/api";
+import {
+  PLAYBACK_SPEED_MAX,
+  PLAYBACK_SPEED_MIN,
+} from "../../../lib/constants/audioPlayback";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -491,6 +495,84 @@ describe("features/courses", () => {
       );
       expect(settings?.pinnedCardActions).toEqual(["edit"]);
       expect(settings?.hasCompletedOnboarding).toBe(false);
+    });
+  });
+
+  describe("updateCourseSettings — audio playback", () => {
+    const makeActiveCourse = async (
+      t: ReturnType<typeof convexTest>,
+    ): Promise<{
+      asUser: ReturnType<ReturnType<typeof convexTest>["withIdentity"]>;
+      courseId: string;
+    }> => {
+      const courseId = await t.run(async (ctx) =>
+        ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.setActiveCourse, { courseId });
+      return { asUser, courseId };
+    };
+
+    // Regression: showRomanization was in the validator + PATCHABLE_KEYS but
+    // missing from the INSERT branch, so a brand-new courseSettings row dropped
+    // it. (See convex/features/courses.ts insert object.)
+    it("persists showRomanization on first insert", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        showRomanization: true,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.showRomanization).toBe(true);
+    });
+
+    it("persists the Practice Listening (target-before-base) fields on insert", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        playTargetBeforeBase: true,
+        playTargetAfterBase: false,
+        targetBeforeRepetitions: { de: 3 },
+        targetBeforeRepetitionPauses: { de: 4 },
+        targetBeforePlaybackSpeeds: { de: 0.7 },
+        pauseTargetToBase: 6,
+      });
+      const s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.playTargetBeforeBase).toBe(true);
+      expect(s?.playTargetAfterBase).toBe(false);
+      expect(s?.targetBeforeRepetitions).toEqual({ de: 3 });
+      expect(s?.targetBeforeRepetitionPauses).toEqual({ de: 4 });
+      expect(s?.targetBeforePlaybackSpeeds).toEqual({ de: 0.7 });
+      expect(s?.pauseTargetToBase).toBe(6);
+    });
+
+    it("clamps targetBeforePlaybackSpeeds to the allowed range server-side", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforePlaybackSpeeds: { de: 99, fr: 0.01 },
+      });
+      const s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.targetBeforePlaybackSpeeds).toEqual({
+        de: PLAYBACK_SPEED_MAX,
+        fr: PLAYBACK_SPEED_MIN,
+      });
     });
   });
 });

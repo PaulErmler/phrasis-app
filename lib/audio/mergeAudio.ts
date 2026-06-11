@@ -7,8 +7,11 @@ import {
   DEFAULT_AUTO_ADVANCE,
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
   DEFAULT_PAUSE_BASE_TO_TARGET,
+  DEFAULT_PAUSE_TARGET_TO_BASE,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
   DEFAULT_PLAYBACK_SPEED,
+  DEFAULT_PLAY_TARGET_BEFORE_BASE,
+  DEFAULT_PLAY_TARGET_AFTER_BASE,
 } from '@/lib/constants/audioPlayback';
 import {
   computeGain,
@@ -26,6 +29,15 @@ export interface ResolvedAudioSettings {
   pauseT2T: number;
   autoAdvance: boolean;
   pauseBeforeAdvance: number;
+  // Target-before-base ("Practice Listening") / target-after-base ("Practice Speaking").
+  playTargetBefore: boolean;
+  playTargetAfter: boolean;
+  // Independent reps/rep-pauses/speeds for the before-base target group.
+  beforeReps: Record<string, number>;
+  beforeRepPauses: Record<string, number>;
+  beforeSpeeds: Record<string, number>;
+  // Transition pause between the before-base target group and the base group.
+  pauseT2B: number;
 }
 
 /**
@@ -36,7 +48,18 @@ export function resolveLanguageSpeeds(
   cs: CourseSettings | null,
   cardOverrides?: Record<string, number>,
 ): Record<string, number> {
-  const general = cs?.languagePlaybackSpeeds ?? {};
+  return mergeSpeeds(cs?.languagePlaybackSpeeds ?? {}, cardOverrides);
+}
+
+/**
+ * Merge a general per-language speed map with per-card overrides. Overrides win,
+ * then the general value, then the global default. Used for both the after-base
+ * target group (via `resolveLanguageSpeeds`) and the before-base target group.
+ */
+function mergeSpeeds(
+  general: Record<string, number>,
+  cardOverrides?: Record<string, number>,
+): Record<string, number> {
   const overrides = cardOverrides ?? {};
   const langs = new Set([
     ...Object.keys(general),
@@ -63,12 +86,35 @@ export function resolveAudioSettings(
     pauseT2T: cs?.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES,
     autoAdvance,
     pauseBeforeAdvance: cs?.pauseBeforeAutoAdvance ?? DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
+    playTargetBefore: cs?.playTargetBeforeBase ?? DEFAULT_PLAY_TARGET_BEFORE_BASE,
+    playTargetAfter: cs?.playTargetAfterBase ?? DEFAULT_PLAY_TARGET_AFTER_BASE,
+    beforeReps: cs?.targetBeforeRepetitions ?? {},
+    beforeRepPauses: cs?.targetBeforeRepetitionPauses ?? {},
+    // Card-level speed overrides apply to the before-base group too (same language).
+    beforeSpeeds: mergeSpeeds(cs?.targetBeforePlaybackSpeeds ?? {}, cardOverrides),
+    pauseT2B: cs?.pauseTargetToBase ?? DEFAULT_PAUSE_TARGET_TO_BASE,
   };
 }
 
 export interface LanguageCue {
   language: string;
   startSec: number;
+  /**
+   * Effective speed this clip was time-stretched to. Carried per-cue (not just
+   * per-language) because the same language can appear in both the before- and
+   * after-base target groups at different speeds. Word-highlight consumers scale
+   * merged-clip `localTime` by this value to reach the original (1×) frame.
+   * Optional so callers/tests constructing cues by hand can omit it; consumers
+   * fall back to the per-language speed map then 1×.
+   */
+  speed?: number;
+  /**
+   * Whether reaching this cue should un-blur the language's text. Defaults to
+   * true. Set false for before-base ("Practice Listening") target cues when the
+   * same language also plays after base, so only the after-base playback reveals
+   * the blurred target text. Omitted (undefined) is treated as revealing.
+   */
+  reveals?: boolean;
 }
 
 export interface MergeResult {
@@ -105,10 +151,15 @@ export async function mergeCardAudio(
     type Entry = { language: string; url: string; reps: number; speed: number };
 
     const baseEntries: Entry[] = [];
-    const targetEntries: Entry[] = [];
+    // Target language(s) can play before base ("Practice Listening") and/or
+    // after base ("Practice Speaking"), each group with its own reps/speeds.
+    const beforeTargetEntries: Entry[] = [];
+    const afterTargetEntries: Entry[] = [];
 
     const speedFor = (lang: string) =>
       settings.speeds[lang] ?? DEFAULT_PLAYBACK_SPEED;
+    const beforeSpeedFor = (lang: string) =>
+      settings.beforeSpeeds[lang] ?? DEFAULT_PLAYBACK_SPEED;
 
     for (const lang of orderedBase) {
       const reps = settings.reps[lang] ?? DEFAULT_REPETITIONS_BASE;
@@ -116,14 +167,24 @@ export async function mergeCardAudio(
       const rec = audioRecordings.find((a) => a.language === lang);
       if (rec?.url) baseEntries.push({ language: lang, url: rec.url, reps, speed: speedFor(lang) });
     }
-    for (const lang of orderedTarget) {
-      const reps = settings.reps[lang] ?? DEFAULT_REPETITIONS_TARGET;
-      if (reps <= 0) continue;
-      const rec = audioRecordings.find((a) => a.language === lang);
-      if (rec?.url) targetEntries.push({ language: lang, url: rec.url, reps, speed: speedFor(lang) });
+    if (settings.playTargetBefore) {
+      for (const lang of orderedTarget) {
+        const reps = settings.beforeReps[lang] ?? DEFAULT_REPETITIONS_TARGET;
+        if (reps <= 0) continue;
+        const rec = audioRecordings.find((a) => a.language === lang);
+        if (rec?.url) beforeTargetEntries.push({ language: lang, url: rec.url, reps, speed: beforeSpeedFor(lang) });
+      }
+    }
+    if (settings.playTargetAfter) {
+      for (const lang of orderedTarget) {
+        const reps = settings.reps[lang] ?? DEFAULT_REPETITIONS_TARGET;
+        if (reps <= 0) continue;
+        const rec = audioRecordings.find((a) => a.language === lang);
+        if (rec?.url) afterTargetEntries.push({ language: lang, url: rec.url, reps, speed: speedFor(lang) });
+      }
     }
 
-    const allEntries = [...baseEntries, ...targetEntries];
+    const allEntries = [...beforeTargetEntries, ...baseEntries, ...afterTargetEntries];
     if (allEntries.length === 0) return null;
 
     // --- 2. Fetch & decode unique URLs in parallel ---
@@ -170,6 +231,8 @@ export async function mergeCardAudio(
     // --- 3. Compute total duration and schedule offsets ---
     const repPause = (lang: string) =>
       settings.repPauses[lang] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
+    const beforeRepPause = (lang: string) =>
+      settings.beforeRepPauses[lang] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
 
     type ScheduledClip = { buffer: AudioBuffer; startSec: number; gain: number };
     const clips: ScheduledClip[] = [];
@@ -177,9 +240,15 @@ export async function mergeCardAudio(
     const speedByLanguage: Record<string, number> = {};
     let cursor = 0; // seconds
 
+    // Languages that play after base. A before-base cue for one of these does
+    // NOT reveal the blurred text — only the later, after-base play does.
+    const afterLangs = new Set(afterTargetEntries.map((e) => e.language));
+
     const scheduleGroup = (
       entries: Entry[],
       pauseBetweenLanguages: number,
+      repPauseFor: (lang: string) => number,
+      revealsFor: (lang: string) => boolean = () => true,
     ) => {
       for (let i = 0; i < entries.length; i++) {
         const entry = entries[i];
@@ -191,13 +260,14 @@ export async function mergeCardAudio(
         const peak = computePeakFromBuffer(originalBuffer, entry.url);
         const gain = computeGain(peak);
         speedByLanguage[entry.language] = entry.speed;
+        const reveals = revealsFor(entry.language);
 
         for (let r = 0; r < entry.reps; r++) {
-          languageCues.push({ language: entry.language, startSec: cursor });
+          languageCues.push({ language: entry.language, startSec: cursor, speed: entry.speed, reveals });
           clips.push({ buffer, startSec: cursor, gain });
           cursor += buffer.duration;
           if (r < entry.reps - 1) {
-            cursor += repPause(entry.language);
+            cursor += repPauseFor(entry.language);
           }
         }
 
@@ -207,13 +277,35 @@ export async function mergeCardAudio(
       }
     };
 
-    scheduleGroup(baseEntries, settings.pauseB2B);
+    // Sequence: [before-target] → base → [after-target]. The pause-before-advance
+    // is always appended last (after whatever final group exists), so auto-advance
+    // works identically whether or not "Practice Speaking" (after) is enabled.
+    if (beforeTargetEntries.length > 0) {
+      // Before-base target reveals its text only when it isn't replayed after
+      // base — when both groups are on, the after-base play owns the reveal.
+      scheduleGroup(
+        beforeTargetEntries,
+        settings.pauseT2T,
+        beforeRepPause,
+        (lang) => !afterLangs.has(lang),
+      );
+      if (baseEntries.length > 0) {
+        cursor += settings.pauseT2B;
+      } else if (afterTargetEntries.length > 0) {
+        // No base between the two target groups (e.g. all base reps zeroed) —
+        // separate them with the target↔target pause so the before/after plays
+        // don't butt together with zero silence.
+        cursor += settings.pauseT2T;
+      }
+    }
 
-    if (baseEntries.length > 0 && targetEntries.length > 0) {
+    scheduleGroup(baseEntries, settings.pauseB2B, repPause);
+
+    if (baseEntries.length > 0 && afterTargetEntries.length > 0) {
       cursor += settings.pauseB2T;
     }
 
-    scheduleGroup(targetEntries, settings.pauseT2T);
+    scheduleGroup(afterTargetEntries, settings.pauseT2T, repPause);
 
     if (settings.autoAdvance) {
       cursor += settings.pauseBeforeAdvance;

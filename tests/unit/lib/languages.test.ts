@@ -295,3 +295,26 @@ describe('resolveMixedVariant', () => {
     expect(seen).toEqual(new Set(['es', 'es_latam']));
   });
 });
+
+describe('Persian (fa) language record', () => {
+  const fa = getLanguageByCode('fa');
+
+  it('is registered in SUPPORTED_LANGUAGES', () => {
+    expect(fa).toBeDefined();
+    expect(fa?.name).toBe('Persian');
+  });
+
+  it('routes TTS through Gemini (fa-IR) with Azure STT', () => {
+    expect(fa?.ttsProvider).toBe('gemini');
+    expect(fa?.geminiBcp47).toBe('fa-IR');
+    expect(fa?.azureSttLocale).toBe('fa-IR');
+    expect(fa?.supportsStt).toBe(true);
+  });
+
+  it('romanizes locally and disables karaoke (Perso-Arabic script)', () => {
+    expect(fa?.needsRomanization).toBe(true);
+    expect(fa?.romanizationBackend).toBe('local');
+    expect(languageNeedsRomanization('fa')).toBe(true);
+    expect(fa?.supportsKaraoke).toBe(false);
+  });
+});
