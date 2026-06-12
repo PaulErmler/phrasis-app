@@ -117,6 +117,18 @@ describe('geminiTts.speak — empty-response retry', () => {
     expect(body.provider.options.google.language_code).toBe('ar-001');
   });
 
+  it('rejects a voice apiCode with a trailing "@" and no locale', async () => {
+    // "Kore@" would otherwise yield an empty language_code and hard-400.
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      geminiTts.speak({ ...INPUT, voiceApiCode: 'Kore@' }),
+    ).rejects.toThrow('missing locale after "@"');
+    // Failed before any network call.
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('retries with a padded space when the first response is empty', async () => {
     const fetchMock = vi
       .fn()

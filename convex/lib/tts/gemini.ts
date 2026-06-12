@@ -11,8 +11,8 @@ import { getLanguageByCode } from '../../../lib/languages';
 // re-run `pnpm tts:probe` if that ever changes.) So we request PCM and transcode
 // to MP3 below — keeping stored audio compact and browser-playable like every
 // other provider. opus/wav aren't accepted either, and Gemini natively emits
-// only PCM, so the transcode has to happen client-side. Reuses the same
-// OPENROUTER_API_KEY as translation (features/translationLLM.ts).
+// only PCM, so the transcode has to happen in the Convex runtime. Reuses the
+// same OPENROUTER_API_KEY as translation (features/translationLLM.ts).
 const MODEL = 'google/gemini-3.1-flash-tts-preview';
 const ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
 
@@ -22,6 +22,13 @@ const ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
 // fraction of the equivalent WAV.
 const PCM_SAMPLE_RATE = 24000;
 const MP3_KBPS = 48;
+
+// The Int16Array decode in pcmToMp3 reads samples in the host's native byte
+// order. Gemini's PCM is little-endian, which matches the Convex V8 runtime, so
+// in practice this is always true; we detect it anyway and byte-swap on a
+// (theoretical) big-endian host rather than silently emitting corrupted audio.
+const HOST_IS_LITTLE_ENDIAN =
+  new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;
 
 
 function buildStyledInput(text: string, languageName: string): string {
@@ -45,12 +52,22 @@ function pcmToMp3(pcm: Uint8Array): Uint8Array<ArrayBuffer> {
     );
   }
   // Reinterpret the byte stream as signed 16-bit samples. Int16Array uses the
-  // platform's native byte order — little-endian in the Convex runtime, which
-  // matches the PCM Gemini returns.
+  // host's native byte order; Gemini's PCM is little-endian, so on a big-endian
+  // host we byte-swap a copy first. No-op (and no copy) on little-endian, which
+  // is the Convex runtime.
+  let bytes = pcm;
+  if (!HOST_IS_LITTLE_ENDIAN) {
+    bytes = pcm.slice();
+    for (let i = 0; i + 1 < bytes.length; i += 2) {
+      const lo = bytes[i];
+      bytes[i] = bytes[i + 1];
+      bytes[i + 1] = lo;
+    }
+  }
   const samples = new Int16Array(
-    pcm.buffer,
-    pcm.byteOffset,
-    Math.floor(pcm.byteLength / 2),
+    bytes.buffer,
+    bytes.byteOffset,
+    Math.floor(bytes.byteLength / 2),
   );
   const encoder = new Mp3Encoder(1, PCM_SAMPLE_RATE, MP3_KBPS);
   const chunks: Uint8Array[] = [];
@@ -95,7 +112,16 @@ function parseVoiceApiCode(apiCode: string): {
       `Invalid Gemini voice apiCode "${apiCode}": missing voice name`,
     );
   }
-  return at === -1 ? { voiceName } : { voiceName, locale: apiCode.slice(at + 1) };
+  if (at === -1) return { voiceName };
+  // A trailing "@" with no locale ("Kore@") would become an empty
+  // language_code and hard-400 the OpenRouter request — reject it here.
+  const locale = apiCode.slice(at + 1);
+  if (!locale) {
+    throw new Error(
+      `Invalid Gemini voice apiCode "${apiCode}": missing locale after "@"`,
+    );
+  }
+  return { voiceName, locale };
 }
 
 /** One PCM synthesis request. Returns raw headerless PCM (possibly zero-byte —
