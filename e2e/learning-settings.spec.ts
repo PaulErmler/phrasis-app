@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 import { dismissTour } from "./helpers";
 
 /**
@@ -74,6 +74,61 @@ async function waitForInViewport(
     .toBe(true);
 }
 
+/** Ensure the settings sheet is in Audio review mode (the Practice Listening /
+ *  Speaking toggles only render there). No-op if already selected. */
+async function ensureAudioMode(page: Page): Promise<void> {
+  const audioBtn = page.getByTestId("settings-mode-audio").first();
+  await expect(audioBtn).toBeVisible({ timeout: 10_000 });
+  if (!(await isSelectedTestId(page, "settings-mode-audio"))) {
+    await waitForInViewport(page, audioBtn);
+    await audioBtn.click({ force: true });
+    await expect
+      .poll(() => isSelectedTestId(page, "settings-mode-audio"), {
+        timeout: 5_000,
+      })
+      .toBe(true);
+  }
+}
+
+// The two Practice toggles are Radix switches; target them by their `id`
+// (CSS selectors ignore the aria-hidden Radix sometimes sets on the sheet).
+function practiceSwitch(page: Page, which: "before" | "after"): Locator {
+  return page.locator(
+    which === "before" ? "#playTargetBeforeBase" : "#playTargetAfterBase",
+  );
+}
+
+async function isSwitchOn(
+  page: Page,
+  which: "before" | "after",
+): Promise<boolean> {
+  return (
+    (await practiceSwitch(page, which).getAttribute("aria-checked")) === "true"
+  );
+}
+
+/** Poll the switch's checked state (toggles persist via a Convex mutation, so
+ *  the rendered state settles asynchronously after the click). */
+async function expectSwitch(
+  page: Page,
+  which: "before" | "after",
+  on: boolean,
+): Promise<void> {
+  await expect.poll(() => isSwitchOn(page, which), { timeout: 8_000 }).toBe(on);
+}
+
+/** Click the switch and wait until it reaches the desired checked state. Turning
+ *  a switch ON never disables the other, so this is safe for normalization. */
+async function setSwitch(
+  page: Page,
+  which: "before" | "after",
+  on: boolean,
+): Promise<void> {
+  if ((await isSwitchOn(page, which)) === on) return;
+  await practiceSwitch(page, which).click({ force: true });
+  await expectSwitch(page, which, on);
+}
+
 test.describe("learning settings", () => {
   test("toggle review mode between audio and full", async ({ page }) => {
     await page.goto("/app/learn");
@@ -129,5 +184,77 @@ test.describe("learning settings", () => {
 
     await sw.click({ force: true });
     await page.waitForTimeout(300);
+  });
+
+  test("Practice Listening / Speaking toggles render and persist", async ({
+    page,
+  }) => {
+    await page.goto("/app/learn");
+    await page.waitForLoadState("domcontentloaded");
+    await dismissTour(page, "audio_review_intro", 500);
+    await dismissTour(page, "full_review_intro", 500);
+
+    await openSettingsSheet(page);
+    await ensureAudioMode(page);
+
+    // Both toggles are present in audio mode.
+    await expect(practiceSwitch(page, "before")).toBeVisible({ timeout: 8_000 });
+    await expect(practiceSwitch(page, "after")).toBeVisible();
+
+    // Start from the default-ish state (Listening off, Speaking on).
+    await setSwitch(page, "after", true);
+    await setSwitch(page, "before", false);
+
+    // Enable Practice Listening, then confirm it survives a sheet close/reopen.
+    await practiceSwitch(page, "before").click({ force: true });
+    await expectSwitch(page, "before", true);
+
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(400);
+    await openSettingsSheet(page);
+    await ensureAudioMode(page);
+    await expectSwitch(page, "before", true);
+
+    // Restore the default so later serial specs start clean.
+    await practiceSwitch(page, "before").click({ force: true });
+    await expectSwitch(page, "before", false);
+    await expectSwitch(page, "after", true);
+
+    await page.keyboard.press("Escape").catch(() => {});
+  });
+
+  test("Practice toggles keep at least one enabled (mutual exclusion)", async ({
+    page,
+  }) => {
+    await page.goto("/app/learn");
+    await page.waitForLoadState("domcontentloaded");
+    await dismissTour(page, "audio_review_intro", 500);
+    await dismissTour(page, "full_review_intro", 500);
+
+    await openSettingsSheet(page);
+    await ensureAudioMode(page);
+
+    // Normalize to BOTH on (turning a switch on never disables the other).
+    await setSwitch(page, "before", true);
+    await setSwitch(page, "after", true);
+    await expectSwitch(page, "before", true);
+    await expectSwitch(page, "after", true);
+
+    // Turn Listening off — Speaking is unaffected (not the last-on toggle).
+    await setSwitch(page, "before", false);
+    await expectSwitch(page, "after", true);
+
+    // Turn Speaking off while Listening is already off → Listening auto-enables
+    // (the invariant: the two can never both be off).
+    await practiceSwitch(page, "after").click({ force: true });
+    await expectSwitch(page, "after", false);
+    await expectSwitch(page, "before", true);
+
+    // And the mirror: turning the now-last-on Listening off re-enables Speaking.
+    await practiceSwitch(page, "before").click({ force: true });
+    await expectSwitch(page, "before", false);
+    await expectSwitch(page, "after", true); // back to the default → clean state
+
+    await page.keyboard.press("Escape").catch(() => {});
   });
 });

@@ -97,3 +97,55 @@ describe('voice pools completeness', () => {
     ).toEqual([]);
   });
 });
+
+describe('Persian (fa) voice pool', () => {
+  it('resolves to the Gemini pool for the active provider', () => {
+    const active = getVoicesByLanguageCode('fa');
+    expect(active.length).toBeGreaterThan(0);
+    expect(active.every((v) => v.provider === 'gemini')).toBe(true);
+    // The Azure fallback must NOT surface while ttsProvider is 'gemini'.
+    expect(active.some((v) => v.provider === 'azure')).toBe(false);
+  });
+
+  it('keeps the Azure fa-IR fallback in the full curated set', () => {
+    const all = getAllVoicesByLanguageCode('fa');
+    const azure = all.filter((v) => v.provider === 'azure');
+    expect(azure.map((v) => v.apiCode).sort()).toEqual([
+      'fa-IR-DilaraNeural',
+      'fa-IR-FaridNeural',
+    ]);
+    // Wrapped in activate() so flipping ttsProvider to 'azure' would surface them.
+    expect(azure.every((v) => v.active === true)).toBe(true);
+  });
+});
+
+describe('Arabic dialects on the global Gemini voice name the dialect in the prompt', () => {
+  // The shared/global Gemini Arabic voice (GEMINI_CORE) has a bare apiCode (no
+  // "@locale" suffix), so convex/lib/tts/gemini.ts derives the locale from
+  // toGeminiBcp47 — which is `ar-001` (World Arabic) for EVERY Arabic dialect.
+  // That locale can't tell Levantine from MSA/Saudi/Iraqi, and the prompt
+  // builder strips the name's "(Levantine)" parenthetical. So any Arabic
+  // language served by the global Gemini voice MUST set `ttsPromptName` to name
+  // the dialect in the prose — the only signal Gemini gets. This guards against
+  // flipping another Arabic dialect to Gemini and silently losing the dialect.
+  const arabicOnGlobalGeminiVoice = SUPPORTED_LANGUAGES.filter((lang) => {
+    if (!lang.code.startsWith('ar')) return false;
+    return getVoicesByLanguageCode(lang.code).some(
+      (v) => v.provider === 'gemini' && !v.apiCode.includes('@'),
+    );
+  });
+
+  it('detects at least the Levantine entry (guards against a vacuous pass)', () => {
+    expect(arabicOnGlobalGeminiVoice.map((l) => l.code)).toContain('ar_lev');
+  });
+
+  it('every such language sets a non-empty ttsPromptName', () => {
+    const missing = arabicOnGlobalGeminiVoice
+      .filter((lang) => !lang.ttsPromptName?.trim())
+      .map((lang) => lang.code);
+    expect(
+      missing,
+      `Arabic languages served by the global Gemini voice (locale collapses to ar-001) must set ttsPromptName so the dialect is named in the TTS prompt: ${missing.join(', ') || '(none)'}`,
+    ).toEqual([]);
+  });
+});

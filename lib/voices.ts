@@ -95,6 +95,69 @@ function createAzureVoice(
 }
 
 /**
+ * Gemini 3.1 Flash TTS voices (via OpenRouter). The Gemini voice name itself is
+ * accent-neutral; pronunciation/accent comes from the BCP-47 `language_code`
+ * the provider sends. For single-locale languages (de, sv, pt_pt) the locale is
+ * derived from the language code via `toGeminiBcp47`, so the apiCode is the bare
+ * voice name (e.g. "Kore").
+ *
+ * For languages whose pool spans multiple accents (English: US/GB/AU) the
+ * accent can't come from the language code, so the locale is encoded into the
+ * apiCode as `"<Name>@<bcp47>"` (e.g. "Kore@en-GB") — mirroring how Google
+ * embeds the locale in `en-GB-Chirp3-HD-Leda`. The provider in
+ * convex/lib/tts/gemini.ts splits on `@`, sends the bare name as the voice, and
+ * uses the suffix as the `language_code`. Active by default.
+ */
+function createGeminiVoice(
+  name: string,
+  gender: 'female' | 'male',
+  locale?: string,
+): Voice {
+  const genderLabel = gender === 'female' ? 'Female' : 'Male';
+  return {
+    provider: 'gemini',
+    name,
+    displayName: locale
+      ? `${name} (${genderLabel}) - Gemini ${locale}`
+      : `${name} (${genderLabel}) - Gemini`,
+    apiCode: locale ? `${name}@${locale}` : name,
+    gender,
+  };
+}
+
+// The four Gemini voices selected for production (2F + 2M), tuned for clear,
+// neutral language-learning delivery.
+const GEMINI_VOICE_DEFS: ReadonlyArray<readonly [string, 'female' | 'male']> = [
+  ['Leda', 'female'],
+  ['Gacrux', 'female'],
+  ['Achird', 'male'],
+  ['Iapetus', 'male'],
+];
+
+// Bare (locale-from-language) pool for single-accent Gemini languages (de, sv,
+// pt_pt).
+const GEMINI_CORE: Voice[] = GEMINI_VOICE_DEFS.map(([n, g]) =>
+  createGeminiVoice(n, g),
+);
+
+// Locale-tagged Gemini pool: the same four voices steered to a specific accent
+// via the `@<locale>` apiCode suffix. Used for English's per-accent pools.
+function buildGeminiAccentPool(locale: string): Voice[] {
+  return GEMINI_VOICE_DEFS.map(([n, g]) => createGeminiVoice(n, g, locale));
+}
+
+// English Gemini accent pools. The default `en` pool unions all three so a
+// random pick yields a mix of US/GB/AU accents; the dialect codes pin one.
+const GEMINI_EN_US: Voice[] = buildGeminiAccentPool('en-US');
+const GEMINI_EN_GB: Voice[] = buildGeminiAccentPool('en-GB');
+const GEMINI_EN_AU: Voice[] = buildGeminiAccentPool('en-AU');
+const GEMINI_EN_MIXED: Voice[] = [
+  ...GEMINI_EN_US,
+  ...GEMINI_EN_GB,
+  ...GEMINI_EN_AU,
+];
+
+/**
  * Mark a voice list as selectable. Used by pools for languages whose
  * `ttsProvider` is currently `'elevenlabs'` — wraps the list so every
  * entry becomes `active: true` without touching the per-voice definitions.
@@ -289,6 +352,22 @@ const AZURE_VOICES_HE: Voice[] = [
   createAzureVoice('Avri', 'male', 'he-IL-AvriNeural'),
 ];
 
+// Persian (Iran) — Azure Neural fallback (Gemini fa-IR is the active provider).
+// Verified against Azure's language-support docs: fa-IR ships two neural voices
+// and is supported by Fast Transcription.
+const AZURE_VOICES_FA_IR: Voice[] = [
+  createAzureVoice('Dilara', 'female', 'fa-IR-DilaraNeural'),
+  createAzureVoice('Farid', 'male', 'fa-IR-FaridNeural'),
+];
+
+// Filipino (Philippines) — Azure Neural fallback (Gemini fil-PH is the active
+// provider). Verified against Azure's language-support docs: fil-PH ships two
+// neural voices and is supported by Fast Transcription.
+const AZURE_VOICES_FIL_PH: Voice[] = [
+  createAzureVoice('Blessica', 'female', 'fil-PH-BlessicaNeural'),
+  createAzureVoice('Angelo', 'male', 'fil-PH-AngeloNeural'),
+];
+
 // Slovak — Azure Neural fallback (Google Chirp3-HD sk-SK is primary).
 const AZURE_VOICES_SK: Voice[] = [
   createAzureVoice('Viktoria', 'female', 'sk-SK-ViktoriaNeural'),
@@ -404,10 +483,14 @@ const CHIRP3_EN_MIXED: Voice[] = [
 ];
 
 export const VOICE_POOLS: Record<string, Voice[]> = {
-  en: [...CHIRP3_EN_MIXED, ...ELEVENLABS_VOICES_EN],
-  en_gb: [...buildChirp3Pool('en-GB', 'UK')],
-  en_us: [...buildChirp3Pool('en-US', 'US')],
-  en_au: [...buildChirp3Pool('en-AU', 'Australia')],
+  // English runs on Gemini (mixed US/GB/AU accents on the default `en`, pinned
+  // accent on the dialect codes). Google Chirp3 + ElevenLabs voices stay listed
+  // but go dormant — the `ttsProvider: 'gemini'` filter excludes them — so a
+  // revert is a one-line `ttsProvider` flip in lib/languages.ts.
+  en: [...CHIRP3_EN_MIXED, ...ELEVENLABS_VOICES_EN, ...GEMINI_EN_MIXED],
+  en_gb: [...buildChirp3Pool('en-GB', 'UK'), ...GEMINI_EN_GB],
+  en_us: [...buildChirp3Pool('en-US', 'US'), ...GEMINI_EN_US],
+  en_au: [...buildChirp3Pool('en-AU', 'Australia'), ...GEMINI_EN_AU],
   es: [...buildChirp3Pool('es-ES', 'Spain'), ...activate(ELEVENLABS_VOICES_ES)],
   es_latam: [
     ...buildChirp3Pool('es-US', 'Latin America'),
@@ -422,9 +505,13 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
     ...buildChirp3Pool('es-US', 'Latin America'),
   ],
   fr: [...buildChirp3Pool('fr-FR', 'France'), ...ELEVENLABS_VOICES_FR],
-  de: [...buildChirp3Pool('de-DE', 'Germany'), ...ELEVENLABS_VOICES_DE],
+  de: [...buildChirp3Pool('de-DE', 'Germany'), ...ELEVENLABS_VOICES_DE, ...GEMINI_CORE],
   it: [...buildChirp3Pool('it-IT', 'Italy'), ...ELEVENLABS_VOICES_IT],
   pt: [...buildChirp3Pool('pt-BR', 'Brazil'), ...ELEVENLABS_VOICES_PT],
+  // European Portuguese runs on Gemini. Google ships no Chirp3-HD pt-PT voices
+  // (verified against /v1/voices), so there's no Google fallback to list —
+  // Gemini is the only pool.
+  pt_pt: [...GEMINI_CORE],
   ru: [...buildChirp3Pool('ru-RU', 'Russia', 'core'), ...ELEVENLABS_VOICES_RU],
   pl: [...buildChirp3Pool('pl-PL', 'Poland')],
   sk: [...buildChirp3Pool('sk-SK', 'Slovakia'), ...AZURE_VOICES_SK],
@@ -449,10 +536,15 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...ELEVENLABS_VOICES_VI],
   th: [...buildChirp3Pool('th-TH', 'Thailand'), ...AZURE_VOICES_TH],
   id: [...buildChirp3Pool('id-ID', 'Indonesia')],
+  // Filipino runs on Gemini TTS (fil-PH). No Google Chirp3-HD fil voices, so
+  // Gemini is the active pool (mirrors fa); Azure fil-PH Neural voices are
+  // listed dormant as a verified fallback (flip ttsProvider to 'azure').
+  fil: [...GEMINI_CORE, ...AZURE_VOICES_FIL_PH],
   sv: [
     ...buildChirp3Pool('sv-SE', 'Sweden'),
     ...ELEVENLABS_VOICES_SV,
     ...AZURE_VOICES_SV,
+    ...GEMINI_CORE,
   ],
   // nb: [...buildChirp3Pool('nb-NO', 'Norway')], // disabled — see SUPPORTED_LANGUAGES
   da: [...buildChirp3Pool('da-DK', 'Denmark')],
@@ -461,13 +553,25 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   el: [...buildChirp3Pool('el-GR', 'Greece'), ...ELEVENLABS_VOICES_EL],
   he: [...buildChirp3Pool('he-IL', 'Israel'), ...AZURE_VOICES_HE],
   ar: [...buildChirp3Pool('ar-XA', 'MSA'), ...ELEVENLABS_VOICES_AR],
-  // Saudi, Iraqi, and Levantine dialects share the Google MSA pool (`ar-XA`)
-  // — none has dedicated Chirp3 voices, and dialect-specific Azure voices
-  // read worse than MSA on these dialects' typical content.
+  // Saudi and Iraqi dialects share the Google MSA pool (`ar-XA`) — neither has
+  // dedicated Chirp3 voices, and dialect-specific Azure voices read worse than
+  // MSA on these dialects' typical content.
   ar_sa: [...buildChirp3Pool('ar-XA', 'MSA')],
   ar_eg: [...activate(AZURE_VOICES_AR_EG)],
   ar_iq: [...buildChirp3Pool('ar-XA', 'MSA')],
-  ar_lev: [...buildChirp3Pool('ar-XA', 'MSA')],
+  // Levantine runs on Gemini TTS via the shared/global Arabic Gemini voice
+  // (GEMINI_CORE + `language_code: ar-001`); the Levantine dialect is conveyed
+  // in the prompt (`ttsPromptName` in lib/languages.ts), since Gemini has no
+  // Levantine locale.
+  ar_lev: [...GEMINI_CORE],
+  // Persian runs on Gemini TTS (fa-IR). No Google Chirp3-HD fa voices, so
+  // Gemini is the active pool (mirrors pt_pt). Azure fa-IR Neural voices are a
+  // verified fallback: wrapped in activate() (createAzureVoice defaults to
+  // active:false) so flipping the language's ttsProvider to 'azure' actually
+  // surfaces them — without activate() the provider filter would resolve to an
+  // empty pool. They stay dormant while ttsProvider is 'gemini' because
+  // getVoicesForLanguage also filters by provider.
+  fa: [...GEMINI_CORE, ...activate(AZURE_VOICES_FA_IR)],
   sw: [...activate(AZURE_VOICES_SW_KE)],
   sw_tz: [...activate(AZURE_VOICES_SW_TZ)],
 };

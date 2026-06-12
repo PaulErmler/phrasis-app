@@ -26,8 +26,11 @@ export const DEFAULT_PAUSE_BETWEEN_REPETITIONS = 2;
 /** Gap between *different* languages inside the same group (base↔base or target↔target) */
 export const DEFAULT_PAUSE_BETWEEN_LANGUAGES = 3;
 
-/** Gap between the last base-language play and the first target-language play */
+/** Gap between the last base-language play and the first (after-base) target-language play */
 export const DEFAULT_PAUSE_BASE_TO_TARGET = 5;
+
+/** Gap between the last before-base target-language play and the first base-language play */
+export const DEFAULT_PAUSE_TARGET_TO_BASE = DEFAULT_PAUSE_BASE_TO_TARGET;
 
 /** Pause (in seconds) before auto-advancing to the next card after audio finishes */
 export const DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE = 2;
@@ -41,6 +44,12 @@ export const DEFAULT_AUTO_PLAY = true;
 
 /** Whether the next card is shown automatically after all audio finishes */
 export const DEFAULT_AUTO_ADVANCE = true;
+
+/** Whether the target language plays *before* the base language ("Practice Listening") */
+export const DEFAULT_PLAY_TARGET_BEFORE_BASE = false;
+
+/** Whether the target language plays *after* the base language ("Practice Speaking") */
+export const DEFAULT_PLAY_TARGET_AFTER_BASE = true;
 
 // ---------------------------------------------------------------------------
 // Playback speed (pitch-preserved; see lib/audio/timeStretch.ts)

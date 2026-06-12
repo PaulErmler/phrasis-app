@@ -1,75 +1,35 @@
+import { SUPPORTED_LANGUAGES } from '../../../lib/languages';
+
 /**
  * Map app-internal language codes to BCP-47 locales Azure Speech-to-Text
  * understands. The Fast Transcription API expects full locales like `sv-SE`,
- * not bare ISO 639-1 codes — so this is a richer mapping than the ElevenLabs
- * equivalent in ../tts/languageCodes.ts.
+ * not bare ISO 639-1 codes.
  *
- * Unmapped codes fall back to `<code>-<UPPER(code)>` (e.g. `pl` → `pl-PL`),
- * which is correct for the many symmetric ISO 639-1 / region pairs Azure
- * supports. Truly unknown codes still surface as a 400 from Azure.
+ * Derived from each Language's `azureSttLocale` field (single source of truth
+ * in lib/languages.ts). Codes without one fall back to `<code>-<UPPER(code)>`
+ * (correct for the many symmetric ISO 639-1 / region pairs Azure supports);
+ * truly unknown codes still surface as a 400 from Azure. `cmn` is a legacy
+ * non-Language input (Google voice locale prefix for Mandarin) kept as an alias.
  *
  * `es_mixed` returns a single-locale default; for the multi-locale path that
  * passes both Spanish classifiers to Azure's language-ID, call
  * `toAzureSttLocales('es_mixed')` instead.
  */
+const AZURE_STT_LOCALE: Record<string, string> = {
+  ...Object.fromEntries(
+    SUPPORTED_LANGUAGES.filter((l) => l.azureSttLocale).map((l) => [
+      l.code,
+      l.azureSttLocale as string,
+    ]),
+  ),
+  cmn: 'zh-CN',
+};
+
 export function toAzureSttLocale(internalCode: string): string {
-  const map: Record<string, string> = {
-    en: 'en-US',
-    en_gb: 'en-GB',
-    en_us: 'en-US',
-    en_au: 'en-AU',
-    es: 'es-ES',
-    es_latam: 'es-MX',
-    es_mixed: 'es-ES',
-    fr: 'fr-FR',
-    de: 'de-DE',
-    it: 'it-IT',
-    pt: 'pt-BR',
-    ru: 'ru-RU',
-    pl: 'pl-PL',
-    sk: 'sk-SK',
-    hi: 'hi-IN',
-    bn: 'bn-IN',
-    tr: 'tr-TR',
-    hu: 'hu-HU',
-    ro: 'ro-RO',
-    cs: 'cs-CZ',
-    zh: 'zh-CN',
-    zh_traditional: 'zh-TW',
-    cmn: 'zh-CN',
-    // Azure has no native yue-CN STT model; both Cantonese codes use zh-HK,
-    // which is Azure's official Cantonese (Traditional) Fast Transcription locale.
-    yue: 'zh-HK',
-    yue_traditional: 'zh-HK',
-    ja: 'ja-JP',
-    ko: 'ko-KR',
-    vi: 'vi-VN',
-    th: 'th-TH',
-    id: 'id-ID',
-    sv: 'sv-SE',
-    nb: 'nb-NO',
-    da: 'da-DK',
-    fi: 'fi-FI',
-    nl: 'nl-NL',
-    // el is unsupported by Fast Transcription — el-GR returns 400 InvalidLocale.
-    // The language is configured with supportsStt: false in lib/languages.ts so
-    // calls short-circuit before reaching Azure. Mapping kept for documentation.
-    el: 'el-GR',
-    he: 'he-IL',
-    ar: 'ar-SA',
-    ar_sa: 'ar-SA',
-    ar_eg: 'ar-EG',
-    ar_iq: 'ar-IQ',
-    ar_lev: 'ar-LB',
-    sw: 'sw-KE',
-    // sw_tz is unsupported by Fast Transcription — the language is configured
-    // with supportsStt: false in lib/languages.ts. Mapping kept here for
-    // completeness; calls will short-circuit before reaching Azure.
-    sw_tz: 'sw-TZ',
-  };
-  const mapped = map[internalCode];
-  if (mapped) return mapped;
-  return `${internalCode}-${internalCode.toUpperCase()}`;
+  return (
+    AZURE_STT_LOCALE[internalCode] ??
+    `${internalCode}-${internalCode.toUpperCase()}`
+  );
 }
 
 /**

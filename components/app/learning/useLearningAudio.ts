@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
-import { resolveAudioSettings } from '@/lib/audio/mergeAudio';
+import { resolveAudioSettings, applyOnlyNewListening } from '@/lib/audio/mergeAudio';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
 import type { LearningState } from './useLearningMode';
 
@@ -35,25 +35,59 @@ export function useLearningAudio(
       : null;
 
   const isReviewing = state.status === 'reviewing';
+  // While the settings sheet is open the user is configuring playback, not
+  // listening — never auto-start audio. This also stops changing the language
+  // order (a composition change that would otherwise be treated as a fresh
+  // "play this now" opportunity) from kicking off playback behind the sheet.
+  const settingsOpen = state.settingsOpen;
   // Radio mode is intrinsically a hands-free playback queue, so it forces
   // autoplay + auto-advance regardless of the user's setting. `disableAutoPlay`
   // (e.g. while a tutorial is starting) still wins so we don't start audio at
   // the wrong moment.
   const isRadio = cs?.schedulingMode === 'radio';
-  const autoPlay = disableAutoPlay
-    ? false
-    : isRadio
-      ? true
-      : (cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY);
+  const autoPlay =
+    disableAutoPlay || settingsOpen
+      ? false
+      : isRadio
+        ? true
+        : (cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY);
   const reviewMode = cs?.reviewMode ?? 'audio';
   const fullReviewTargetAudioMode = cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
 
   const cardSpeedOverrides =
     state.status === 'reviewing' ? state.audioSpeedOverrides : undefined;
-  const audioSettings = useMemo(
-    () => resolveAudioSettings(cs, cardSpeedOverrides),
-    [cs, cardSpeedOverrides],
-  );
+  // Per-card review counts for the "Only new" Practice-Listening limit. Active
+  // reviews (preReviewCount + FSRS reps) are bumped in audio/full mode; radio
+  // plays bump radioPlayCount instead, so radio counts max(active, radio).
+  const cardReviewCount =
+    state.status === 'reviewing'
+      ? state.preReviewCount + (state.fsrsState?.reps ?? 0)
+      : 0;
+  const cardRadioReviewCount =
+    state.status === 'reviewing' ? state.radioPlayCount : 0;
+  const audioSettings = useMemo(() => {
+    const resolved = resolveAudioSettings(cs, cardSpeedOverrides);
+    // The "Practice Listening / Speaking" (target before/after base) toggles
+    // only apply to the merged-audio practice path — audio review mode and
+    // radio. Full (typing) review mode keeps the historical base→target
+    // sequence regardless of the stored toggles.
+    if (reviewMode !== 'audio' && !isRadio) {
+      return { ...resolved, playTargetBefore: false, playTargetAfter: true };
+    }
+    // "Only new": drop Practice Listening once this card has graduated past its
+    // initial N reviews (counting radio plays in radio mode).
+    return applyOnlyNewListening(resolved, {
+      reviewCount: cardReviewCount,
+      radioReviewCount: isRadio ? cardRadioReviewCount : undefined,
+    });
+  }, [
+    cs,
+    cardSpeedOverrides,
+    reviewMode,
+    isRadio,
+    cardReviewCount,
+    cardRadioReviewCount,
+  ]);
 
   const handleNextFromAudio = useCallback(() => {
     if (state.status === 'reviewing') state.handleNext();
@@ -102,6 +136,7 @@ export function useLearningAudio(
       ? state.translations.filter((tr) => tr.isTargetLanguage).map((tr) => tr.text).filter(Boolean).join(' / ')
       : '',
     autoPlay,
+    settingsOpen,
     getReviewInitiatedByThisTab: isReviewing
       ? state.getReviewInitiatedByThisTab
       : alwaysFalse,

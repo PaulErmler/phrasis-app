@@ -2,6 +2,8 @@ import { v, ConvexError } from 'convex/values';
 import {
   PLAYBACK_SPEED_MIN,
   PLAYBACK_SPEED_MAX,
+  DEFAULT_PLAY_TARGET_BEFORE_BASE,
+  DEFAULT_PLAY_TARGET_AFTER_BASE,
 } from '../../lib/constants/audioPlayback';
 import { mutation, query, MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
@@ -30,8 +32,7 @@ import {
   getCourseStats as dbGetCourseStats,
   createCourseStats,
   getTodayInTimezone,
-  getPreviousDay,
-  getNextDay,
+  deriveStreakDisplay,
 } from '../db/courseStats';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { consumeQuota, hasFeatureAccess, releaseQuota } from '../usage/helpers';
@@ -346,6 +347,13 @@ export const getCourseStats = query({
       currentStreak: v.number(),
       streakFreezeCount: v.number(),
       streakFrozenToday: v.boolean(),
+      streakState: v.union(
+        v.literal('active'),
+        v.literal('pending'),
+        v.literal('frozen'),
+        v.literal('broken'),
+        v.literal('none'),
+      ),
       totalWordCount: v.optional(v.number()),
       totalChatMessages: v.optional(v.number()),
       totalChatCardsApproved: v.optional(v.number()),
@@ -379,26 +387,25 @@ export const getCourseStats = query({
       if (!stats) return null;
 
       const todayStr = getTodayInTimezone(args.timezone);
-      const yesterday = getPreviousDay(todayStr);
-      const streakFrozenToday =
-        !!stats.streakFreezeUsedDate &&
-        stats.streakFreezeUsedDate === yesterday;
-
-      // Freeze is a single slot derived from streakFreezeUsedDate plus
-      // last activity. It regenerates once the user has an activity day
-      // strictly after the day following the covered gap.
-      const freezeAvailable =
-        !stats.streakFreezeUsedDate ||
-        (!!stats.lastActivityDate &&
-          stats.lastActivityDate > getNextDay(stats.streakFreezeUsedDate));
+      // Re-derive the live streak state at read time — the stored streak goes
+      // stale between activities (it's only recomputed when the user studies),
+      // so a lapsed streak must show 0 and the frozen/pending states must be
+      // computed from lastActivityDate vs today rather than the stored row.
+      const derived = deriveStreakDisplay(
+        stats.lastActivityDate,
+        todayStr,
+        stats.currentStreak,
+        stats.streakFreezeUsedDate,
+      );
 
       return {
         totalRepetitions: stats.totalRepetitions,
         totalTimeMs: stats.totalTimeMs,
         totalCards: stats.totalCards,
-        currentStreak: stats.currentStreak,
-        streakFreezeCount: freezeAvailable ? 1 : 0,
-        streakFrozenToday,
+        currentStreak: derived.displayStreak,
+        streakFreezeCount: derived.freezeAvailable ? 1 : 0,
+        streakFrozenToday: derived.state === 'frozen',
+        streakState: derived.state,
         totalWordCount: stats.totalWordCount,
         totalChatMessages: stats.totalChatMessages,
         totalChatCardsApproved: stats.totalChatCardsApproved,
@@ -1075,10 +1082,19 @@ export const updateCourseSettings = mutation({
     pauseBaseToTarget: v.optional(v.number()),
     pauseTargetToTarget: v.optional(v.number()),
     pauseBeforeAutoAdvance: v.optional(v.number()),
+    playTargetBeforeBase: v.optional(v.boolean()),
+    playTargetAfterBase: v.optional(v.boolean()),
+    targetBeforeRepetitions: v.optional(v.record(v.string(), v.number())),
+    targetBeforeRepetitionPauses: v.optional(v.record(v.string(), v.number())),
+    targetBeforePlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
+    pauseTargetToBase: v.optional(v.number()),
+    targetBeforeOnlyNewReps: v.optional(v.number()),
     showProgressBar: v.optional(v.boolean()),
     progressDisplayEnabled: v.optional(v.boolean()),
     hideTargetLanguages: v.optional(v.boolean()),
     autoRevealLanguages: v.optional(v.boolean()),
+    hideBaseLanguages: v.optional(v.boolean()),
+    autoRevealBaseLanguages: v.optional(v.boolean()),
     showRomanization: v.optional(v.boolean()),
     baseLanguageOrder: v.optional(v.array(v.string())),
     targetLanguageOrder: v.optional(v.array(v.string())),
@@ -1119,10 +1135,19 @@ export const updateCourseSettings = mutation({
       'pauseBaseToTarget',
       'pauseTargetToTarget',
       'pauseBeforeAutoAdvance',
+      'playTargetBeforeBase',
+      'playTargetAfterBase',
+      'targetBeforeRepetitions',
+      'targetBeforeRepetitionPauses',
+      'targetBeforePlaybackSpeeds',
+      'pauseTargetToBase',
+      'targetBeforeOnlyNewReps',
       'showProgressBar',
       'progressDisplayEnabled',
       'hideTargetLanguages',
       'autoRevealLanguages',
+      'hideBaseLanguages',
+      'autoRevealBaseLanguages',
       'showRomanization',
       'baseLanguageOrder',
       'targetLanguageOrder',
@@ -1141,7 +1166,16 @@ export const updateCourseSettings = mutation({
       if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
         value = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(value)));
       }
-      if (key === 'languagePlaybackSpeeds' && value && typeof value === 'object') {
+      // "Only new" Practice-Listening limit: integer 1-10, or 0 for ∞ (always).
+      if (key === 'targetBeforeOnlyNewReps' && typeof value === 'number') {
+        value = Math.max(0, Math.min(10, Math.floor(value)));
+      }
+      if (
+        (key === 'languagePlaybackSpeeds' ||
+          key === 'targetBeforePlaybackSpeeds') &&
+        value &&
+        typeof value === 'object'
+      ) {
         const clamped: Record<string, number> = {};
         for (const [lang, speed] of Object.entries(value as Record<string, number>)) {
           if (typeof speed !== 'number' || !Number.isFinite(speed)) continue;
@@ -1155,6 +1189,29 @@ export const updateCourseSettings = mutation({
       if (value !== undefined) patch[key] = value;
     }
 
+    // Safety net for the "at least one target play position" invariant. The UI
+    // enforces it (LearningModeSettings auto-enables the other toggle), but a
+    // partial write or non-UI caller could otherwise persist both toggles off —
+    // which drops all target audio in audio mode. If this write touches the
+    // toggles and the resulting pair would be both-false, restore the historical
+    // default (Practice Speaking on). Routed into the insert object below too.
+    if (
+      args.playTargetBeforeBase !== undefined ||
+      args.playTargetAfterBase !== undefined
+    ) {
+      const effectiveBefore =
+        args.playTargetBeforeBase ??
+        existing?.playTargetBeforeBase ??
+        DEFAULT_PLAY_TARGET_BEFORE_BASE;
+      const effectiveAfter =
+        args.playTargetAfterBase ??
+        existing?.playTargetAfterBase ??
+        DEFAULT_PLAY_TARGET_AFTER_BASE;
+      if (!effectiveBefore && !effectiveAfter) {
+        patch.playTargetAfterBase = true;
+      }
+    }
+
     if (existing) {
       await ctx.db.patch(existing._id, patch);
     } else {
@@ -1162,7 +1219,11 @@ export const updateCourseSettings = mutation({
         courseId: args.courseId,
         initialReviewCount:
           args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
-        cardsToAddBatchSize: args.cardsToAddBatchSize,
+        // Use the clamped patch value (set in the loop above) so the insert path
+        // enforces the [1, MAX_CARDS_PER_BATCH] range, not just the patch path.
+        cardsToAddBatchSize:
+          (patch.cardsToAddBatchSize as number | undefined) ??
+          args.cardsToAddBatchSize,
         autoAddCards: args.autoAddCards,
         highlightWords: args.highlightWords,
         autoPlayAudio: args.autoPlayAudio,
@@ -1174,10 +1235,24 @@ export const updateCourseSettings = mutation({
         pauseBaseToTarget: args.pauseBaseToTarget,
         pauseTargetToTarget: args.pauseTargetToTarget,
         pauseBeforeAutoAdvance: args.pauseBeforeAutoAdvance,
+        playTargetBeforeBase: args.playTargetBeforeBase,
+        // Use the patched value so the both-toggles-off guard above also applies
+        // on first insert, not only on the patch path.
+        playTargetAfterBase:
+          (patch.playTargetAfterBase as boolean | undefined) ??
+          args.playTargetAfterBase,
+        targetBeforeRepetitions: args.targetBeforeRepetitions,
+        targetBeforeRepetitionPauses: args.targetBeforeRepetitionPauses,
+        targetBeforePlaybackSpeeds: (patch.targetBeforePlaybackSpeeds as Record<string, number> | undefined) ?? args.targetBeforePlaybackSpeeds,
+        pauseTargetToBase: args.pauseTargetToBase,
+        targetBeforeOnlyNewReps: (patch.targetBeforeOnlyNewReps as number | undefined) ?? args.targetBeforeOnlyNewReps,
         showProgressBar: args.showProgressBar,
         progressDisplayEnabled: args.progressDisplayEnabled,
         hideTargetLanguages: args.hideTargetLanguages,
         autoRevealLanguages: args.autoRevealLanguages,
+        hideBaseLanguages: args.hideBaseLanguages,
+        autoRevealBaseLanguages: args.autoRevealBaseLanguages,
+        showRomanization: args.showRomanization,
         baseLanguageOrder: args.baseLanguageOrder,
         targetLanguageOrder: args.targetLanguageOrder,
         instantProceedAudio: args.instantProceedAudio,

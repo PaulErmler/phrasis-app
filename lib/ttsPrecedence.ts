@@ -17,6 +17,11 @@ export const TTS_PROVIDER_OVERRIDES: Record<TtsProvider, readonly TtsProvider[]>
   google: ['azure'],
   elevenlabs: [],
   azure: ['elevenlabs'],
+  // Gemini is the new top provider for the languages routed to it (de, sv): a
+  // switch to Gemini deletes + re-synthesizes any prior audio from every other
+  // provider. Nothing lists 'gemini' as overridable, so Gemini audio is never
+  // clobbered by google/azure/elevenlabs.
+  gemini: ['google', 'azure', 'elevenlabs'],
 };
 
 export function shouldOverwriteProvider(

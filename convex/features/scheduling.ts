@@ -24,7 +24,8 @@ import {
   fsrsStateValidator,
   translationValidator,
   audioRecordingValidator,
-  schedulingPhaseValidator
+  schedulingPhaseValidator,
+  asVoiceGender,
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import { getTodayInTimezone } from '../lib/dateUtils';
@@ -107,6 +108,10 @@ const cardResultFields = {
   preReviewCount: v.number(),
   initialReviewCount: v.number(),
   fsrsState: v.union(fsrsStateValidator, v.null()),
+  // True count of radio plays for this card. Surfaced to the client so the
+  // "Only new" Practice-Listening limit can count radio plays (which don't bump
+  // the FSRS review count). Undefined for cards that predate the field.
+  radioPlayCount: v.optional(v.number()),
   hasMissingContent: v.boolean(),
   audioSpeedOverrides: v.optional(v.record(v.string(), v.number())),
 };
@@ -384,6 +389,7 @@ export const getCardForReview = query({
         preReviewCount: card.preReviewCount,
         initialReviewCount,
         fsrsState: card.fsrsState ?? null,
+        radioPlayCount: card.radioPlayCount,
         hasMissingContent: hasMissingTranslation || hasMissingAudio || hasMissingRomanization,
         audioSpeedOverrides: card.audioSpeedOverrides,
       };
@@ -881,11 +887,19 @@ export const advanceRadioCard = mutation({
     // out an immediate repeat as long as ≥1 other playable card exists.
     const newCounter = Math.max(pickedCounter, floorCounter) + 1;
 
+    // Separate from radioRoundCounter (a rotation position subject to the
+    // catch-up jump above): a true +1-per-play count for the "Only new"
+    // Practice-Listening limit. Seed from the card's review count for cards that
+    // predate the field so an already-practiced card doesn't reset to "new".
+    const reviewCount = card.preReviewCount + (card.fsrsState?.reps ?? 0);
+    const newPlayCount = (card.radioPlayCount ?? reviewCount) + 1;
+
     await patchCard(
       ctx,
       args.cardId,
       {
         radioRoundCounter: newCounter,
+        radioPlayCount: newPlayCount,
         // Re-roll the random tiebreak each play so the order changes between
         // loops and never aligns with the review (`dueDate`-driven) order.
         radioOrderKey: randomRadioOrderKey(),
@@ -1261,6 +1275,12 @@ export const editCard = mutation({
     const text = await ctx.db.get(card.textId);
     if (!text) throw new ConvexError('Text not found');
 
+    // Narrow the card's resolved voice gender once for stamping onto the
+    // translation rows below. `texts.audioSpeakerGender` is typed as a loose
+    // string but is always 'male' | 'female' in practice; the stamped
+    // `translations.speakerGender` field is strict.
+    const audioGenderStamp = asVoiceGender(text.audioSpeakerGender);
+
     const sourceLanguage = text.language;
     const allLanguages = [
       ...new Set([...course.baseLanguages, ...course.targetLanguages]),
@@ -1359,8 +1379,8 @@ export const editCard = mutation({
             // `scheduleMissingContent` sees agreement (the user-provided
             // branch is already skipped by the sweep, but keeping this in
             // sync avoids relying on that skip).
-            ...(text.audioSpeakerGender
-              ? { speakerGender: text.audioSpeakerGender }
+            ...(audioGenderStamp
+              ? { speakerGender: audioGenderStamp }
               : {}),
           });
         } else {
@@ -1369,8 +1389,8 @@ export const editCard = mutation({
             targetLanguage: lang,
             translatedText: submittedMap.get(lang)!,
             translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
-            ...(text.audioSpeakerGender
-              ? { speakerGender: text.audioSpeakerGender }
+            ...(audioGenderStamp
+              ? { speakerGender: audioGenderStamp }
               : {}),
           });
         }
@@ -1460,8 +1480,8 @@ export const editCard = mutation({
           // new text's current gender (which copies `text.audioSpeakerGender`
           // a few lines above).
           ...(changed
-            ? text.audioSpeakerGender
-              ? { speakerGender: text.audioSpeakerGender }
+            ? audioGenderStamp
+              ? { speakerGender: audioGenderStamp }
               : {}
             : existing?.speakerGender
               ? { speakerGender: existing.speakerGender }
@@ -1520,6 +1540,9 @@ export const editCard = mutation({
       schedulingPhase: card.schedulingPhase,
       preReviewCount: card.preReviewCount,
       radioRoundCounter: card.radioRoundCounter ?? 0,
+      // Preserve the true radio play-count so an in-place edit doesn't reset the
+      // "Only new" graduation (undefined for cards that predate the field).
+      radioPlayCount: card.radioPlayCount,
       // Preserve the existing tiebreak so the edited card keeps its place in
       // the radio rotation (or take a fresh random one if the original card
       // predates this field).

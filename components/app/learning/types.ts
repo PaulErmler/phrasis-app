@@ -64,10 +64,22 @@ export interface CourseSettings {
   pauseBaseToTarget?: number;
   pauseTargetToTarget?: number;
   pauseBeforeAutoAdvance?: number;
+  // Target-before-base ("Practice Listening") / target-after-base ("Practice Speaking")
+  playTargetBeforeBase?: boolean;
+  playTargetAfterBase?: boolean;
+  targetBeforeRepetitions?: Record<string, number>;
+  targetBeforeRepetitionPauses?: Record<string, number>;
+  targetBeforePlaybackSpeeds?: Record<string, number>;
+  pauseTargetToBase?: number;
+  // "Only new": Practice Listening only on a card's initial N reviews.
+  // 0 / undefined = always (∞); 1-10 = limit.
+  targetBeforeOnlyNewReps?: number;
   showProgressBar?: boolean;
   progressDisplayEnabled?: boolean;
   hideTargetLanguages?: boolean;
   autoRevealLanguages?: boolean;
+  hideBaseLanguages?: boolean;
+  autoRevealBaseLanguages?: boolean;
   showRomanization?: boolean;
   // Instant proceed on rating
   instantProceedAudio?: boolean;

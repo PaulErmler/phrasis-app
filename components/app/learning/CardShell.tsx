@@ -73,6 +73,16 @@ interface CardShellProps {
   showProgressBar?: boolean;
   /** Cue boundaries (per-language start times) for the progress bar's hover ticks. */
   languageCues?: ReadonlyArray<LanguageCue>;
+  /** Blur base-language text by default ("Hide base languages"). */
+  hideBaseLanguages?: boolean;
+  /** Un-blur a base language when its audio starts playing. */
+  autoRevealBaseLanguages?: boolean;
+  /** Languages revealed by audio playback (from useAudioPlayer). */
+  revealedLanguages?: ReadonlySet<string>;
+  /** Languages the viewer manually revealed by tapping the blurred text. */
+  manuallyRevealedLanguages?: ReadonlySet<string>;
+  /** Reveal a language on tap (shared with the parent's target-reveal state). */
+  onRevealLanguage?: (language: string) => void;
   children: (ctx: {
     baseTranslations: CardTranslation[];
     targetTranslations: CardTranslation[];
@@ -118,6 +128,11 @@ export function CardShell({
   onSeek,
   showProgressBar = false,
   languageCues,
+  hideBaseLanguages = false,
+  autoRevealBaseLanguages = false,
+  revealedLanguages,
+  manuallyRevealedLanguages,
+  onRevealLanguage,
   children,
 }: CardShellProps) {
   const t = useTranslations('LearningMode');
@@ -201,12 +216,31 @@ export function CardShell({
               : (languagePlaybackSpeeds?.[translation.language] ??
                 DEFAULT_PLAYBACK_SPEED);
             const effectiveSpeed = override ?? generalSpeed;
+            // Base-language blur mirrors the target-language behavior: hidden by
+            // default when enabled, un-blurred when its audio plays (auto-reveal)
+            // or when tapped.
+            const isAudioRevealed =
+              autoRevealBaseLanguages &&
+              (revealedLanguages?.has(translation.language) ?? false);
+            const isBlurred =
+              hideBaseLanguages &&
+              !isAudioRevealed &&
+              !(manuallyRevealedLanguages?.has(translation.language) ?? false);
+            // Base text matches the target rows' weight/size — no bolding.
+            const baseTextClass = 'body-large';
             return (
               <div
                 key={translation.language}
                 className="flex items-start gap-2"
               >
-                <div className="flex-1">
+                <div
+                  className="flex-1"
+                  onClick={
+                    isBlurred
+                      ? () => onRevealLanguage?.(translation.language)
+                      : undefined
+                  }
+                >
                   <ClickableWords
                     text={translation.text || '...'}
                     language={translation.language}
@@ -214,10 +248,13 @@ export function CardShell({
                     localTime={activeClip?.localTime ?? 0}
                     isActive={!!isActive}
                     enabled={highlightEnabled}
-                    className={bare ? 'body-large' : 'body-large font-medium'}
+                    interactive={!isBlurred}
+                    className={`${baseTextClass} ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
                   />
                   {showRomanization && translation.romanization && (
-                    <p className="text-romanization">
+                    <p
+                      className={`text-romanization ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                    >
                       {translation.romanization}
                     </p>
                   )}
@@ -246,9 +283,7 @@ export function CardShell({
             );
           })}
           {baseTranslations.length === 0 && (
-            <p className={bare ? 'body-large' : 'body-large font-medium'}>
-              {sourceText}
-            </p>
+            <p className="body-large">{sourceText}</p>
           )}
         </div>
 

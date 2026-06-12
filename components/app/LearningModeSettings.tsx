@@ -32,8 +32,11 @@ import {
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
   DEFAULT_PAUSE_BASE_TO_TARGET,
+  DEFAULT_PAUSE_TARGET_TO_BASE,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
   DEFAULT_PLAYBACK_SPEED,
+  DEFAULT_PLAY_TARGET_BEFORE_BASE,
+  DEFAULT_PLAY_TARGET_AFTER_BASE,
   PLAYBACK_SPEED_MIN,
   PLAYBACK_SPEED_MAX,
 } from '@/lib/constants/audioPlayback';
@@ -161,6 +164,21 @@ export function LearningModeSettings({
     });
   };
 
+  const handleHideBaseLanguagesChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      hideBaseLanguages: checked,
+      ...(!checked && { autoRevealBaseLanguages: false }),
+    });
+  };
+
+  const handleAutoRevealBaseLanguagesChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      autoRevealBaseLanguages: checked,
+    });
+  };
+
   const handleShowRomanizationChange = async (checked: boolean) => {
     await updateSettings({
       courseId: courseSettings.courseId,
@@ -233,6 +251,116 @@ export function LearningModeSettings({
     });
   };
 
+  // ---- target before/after base ("Practice Listening" / "Practice Speaking") ----
+
+  // When enabling the before-base target group for the first time, seed its
+  // reps/pauses/speeds from the current (after-base) target settings so it
+  // starts as a mirror, then edits independently. Returns {} once the before
+  // settings already exist (so we never clobber the user's tweaks).
+  // The guard checks ALL THREE before-maps, not just repetitions: each
+  // per-control handler writes only one of them (speed-only / pause-only / rep-
+  // only), and on a default course the rep map seeds empty, so checking reps
+  // alone would never latch and would re-seed away a lone speed/pause tweak.
+  const beforeSeedIfEmpty = () =>
+    Object.keys(courseSettings.targetBeforeRepetitions ?? {}).length === 0 &&
+    Object.keys(courseSettings.targetBeforeRepetitionPauses ?? {}).length ===
+      0 &&
+    Object.keys(courseSettings.targetBeforePlaybackSpeeds ?? {}).length === 0
+      ? {
+        targetBeforeRepetitions: {
+          ...(courseSettings.languageRepetitions ?? {}),
+        },
+        targetBeforeRepetitionPauses: {
+          ...(courseSettings.languageRepetitionPauses ?? {}),
+        },
+        targetBeforePlaybackSpeeds: {
+          ...(courseSettings.languagePlaybackSpeeds ?? {}),
+        },
+      }
+      : {};
+
+  const handlePlayTargetBeforeBaseChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      playTargetBeforeBase: checked,
+      // Cannot disable both: if turning this off while "after" is already off,
+      // auto-enable "after".
+      ...(!checked && !playTargetAfter ? { playTargetAfterBase: true } : {}),
+      // Mirror current target settings on first enable.
+      ...(checked ? beforeSeedIfEmpty() : {}),
+    });
+  };
+
+  const handlePlayTargetAfterBaseChange = async (checked: boolean) => {
+    const enablingBefore = !checked && !playTargetBefore;
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      playTargetAfterBase: checked,
+      // Cannot disable both: auto-enable "before" (and seed it) when turning
+      // this off while "before" is already off.
+      ...(enablingBefore
+        ? { playTargetBeforeBase: true, ...beforeSeedIfEmpty() }
+        : {}),
+    });
+  };
+
+  const handleTargetBeforeRepetitionChange = async (
+    language: string,
+    value: number,
+  ) => {
+    if (value < 0 || value > 10) return;
+    const current = courseSettings.targetBeforeRepetitions ?? {};
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      targetBeforeRepetitions: { ...current, [language]: value },
+    });
+  };
+
+  const handleTargetBeforeRepetitionPauseChange = async (
+    language: string,
+    value: number,
+  ) => {
+    if (value < 0 || value > 30) return;
+    const current = courseSettings.targetBeforeRepetitionPauses ?? {};
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      targetBeforeRepetitionPauses: { ...current, [language]: value },
+    });
+  };
+
+  const handleTargetBeforeSpeedChange = async (
+    language: string,
+    value: number,
+  ) => {
+    const clamped = Math.max(
+      PLAYBACK_SPEED_MIN,
+      Math.min(PLAYBACK_SPEED_MAX, Math.round(value * 10) / 10),
+    );
+    const current = courseSettings.targetBeforePlaybackSpeeds ?? {};
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      targetBeforePlaybackSpeeds: { ...current, [language]: clamped },
+    });
+  };
+
+  const handlePauseTargetToBaseChange = async (value: number) => {
+    if (value < 0 || value > 30) return;
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      pauseTargetToBase: value,
+    });
+  };
+
+  // "Only new": limit Practice Listening to a card's initial N reviews. Stored
+  // as 0 (= ∞ / always) or 1-10; the stepper's ∞ position maps to 0.
+  const handleTargetBeforeOnlyNewChange = async (value: number) => {
+    const clamped = value <= 0 ? 0 : Math.min(10, Math.max(1, Math.floor(value)));
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      targetBeforeOnlyNewReps: clamped,
+    });
+  };
+
   // ---- review mode handlers ----
 
   const handleReviewModeChange = async (mode: 'audio' | 'full') => {
@@ -279,6 +407,28 @@ export function LearningModeSettings({
     courseSettings.pauseBaseToTarget ?? DEFAULT_PAUSE_BASE_TO_TARGET;
   const pauseT2T =
     courseSettings.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+  const playTargetBefore =
+    courseSettings.playTargetBeforeBase ?? DEFAULT_PLAY_TARGET_BEFORE_BASE;
+  const playTargetAfter =
+    courseSettings.playTargetAfterBase ?? DEFAULT_PLAY_TARGET_AFTER_BASE;
+  const beforeReps = courseSettings.targetBeforeRepetitions ?? {};
+  const beforeRepPauses = courseSettings.targetBeforeRepetitionPauses ?? {};
+  const beforeSpeeds = courseSettings.targetBeforePlaybackSpeeds ?? {};
+  const pauseT2B = courseSettings.pauseTargetToBase ?? DEFAULT_PAUSE_TARGET_TO_BASE;
+  // "Only new" stepper: stored 0/undefined = ∞ (always), shown at the BOTTOM
+  // position (UI value 0) so "+" steps ∞ → 1 and "−" steps 1 → ∞. 1-10 map to
+  // themselves. The stored value already uses 0 for ∞, so no remapping needed.
+  const onlyNewStored = courseSettings.targetBeforeOnlyNewReps;
+  const onlyNewUiValue =
+    onlyNewStored && onlyNewStored > 0 ? Math.min(10, onlyNewStored) : 0;
+  // The after-base target section shows in audio mode only when "Practice
+  // Speaking" is on; full mode keeps its existing "always" gating (the
+  // before/after toggles don't apply there — see useLearningAudio).
+  const showAfterTarget =
+    reviewMode === 'audio'
+      ? playTargetAfter
+      : fullReviewTargetAudioMode === 'always';
+  const showBeforeTarget = reviewMode === 'audio' && playTargetBefore;
   const autoAdvance = courseSettings.autoAdvance ?? DEFAULT_AUTO_ADVANCE;
   const instantProceed =
     reviewMode === 'full'
@@ -548,6 +698,78 @@ export function LearningModeSettings({
             />
           </div>
 
+          {/* Practice Listening / Speaking — target before/after base (audio mode only).
+              At least one must stay enabled; toggling the last-on one auto-enables
+              the other. */}
+          {reviewMode === 'audio' && (
+            <>
+              <div className="settings-row">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="playTargetAfterBase"
+                    className="text-sm font-medium"
+                  >
+                    {t('practiceSpeaking')}
+                  </Label>
+                  <p className="text-muted-xs">
+                    {t('practiceSpeakingDescription')}
+                  </p>
+                </div>
+                <Switch
+                  id="playTargetAfterBase"
+                  checked={playTargetAfter}
+                  onCheckedChange={handlePlayTargetAfterBaseChange}
+                  className="mt-0.5"
+                />
+              </div>
+
+              <div className="settings-row">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="playTargetBeforeBase"
+                    className="text-sm font-medium"
+                  >
+                    {t('practiceListening')}
+                  </Label>
+                  <p className="text-muted-xs">
+                    {t('practiceListeningDescription')}
+                  </p>
+                </div>
+                <Switch
+                  id="playTargetBeforeBase"
+                  checked={playTargetBefore}
+                  onCheckedChange={handlePlayTargetBeforeBaseChange}
+                  className="mt-0.5"
+                />
+              </div>
+
+              {/* "Only new" — graduates a card from Practice Listening to
+                  Practice Speaking after its initial N reviews, so it only shows
+                  (and only takes effect) when BOTH are on. ∞ (default) keeps
+                  Practice Listening on every review. */}
+              {playTargetBefore && playTargetAfter && (
+                <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="targetBeforeOnlyNewReps"
+                      className="text-sm font-medium"
+                    >
+                      {t('onlyNew')}
+                    </Label>
+                    <p className="text-muted-xs">{t('onlyNewDescription')}</p>
+                  </div>
+                  <StepperControl
+                    value={onlyNewUiValue}
+                    min={0}
+                    max={10}
+                    onChange={handleTargetBeforeOnlyNewChange}
+                    formatValue={(v) => (v <= 0 ? '∞' : String(v))}
+                  />
+                </div>
+              )}
+            </>
+          )}
+
           {/* Target language audio — full review mode only */}
           {reviewMode === 'full' && (
             <div className="space-y-0">
@@ -618,6 +840,74 @@ export function LearningModeSettings({
           )}
 
           <div className="flex flex-col items-center gap-0 py-1">
+            {/* Before-base target languages ("Practice Listening") — shown above
+                base when the toggle is on. Reps/pauses/speed are independent of
+                the after-base group. */}
+            {showBeforeTarget && targetLanguages.length > 0 && (
+              <>
+                {targetLanguages.map((code, idx) => {
+                  const plays = beforeReps[code] ?? DEFAULT_REPETITIONS_TARGET;
+                  const repPause =
+                    beforeRepPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
+                  const nextCode = targetLanguages[idx + 1];
+                  const nextPlays = nextCode
+                    ? (beforeReps[nextCode] ?? DEFAULT_REPETITIONS_TARGET)
+                    : 0;
+
+                  return (
+                    <div
+                      key={`before-target-${code}`}
+                      className="w-full flex flex-col items-center"
+                    >
+                      <TimelineLanguageCard
+                        code={code}
+                        type="target"
+                        plays={plays}
+                        repPause={repPause}
+                        speed={beforeSpeeds[code] ?? DEFAULT_PLAYBACK_SPEED}
+                        onPlaysChange={(v) =>
+                          handleTargetBeforeRepetitionChange(code, v)
+                        }
+                        onRepPauseChange={(v) =>
+                          handleTargetBeforeRepetitionPauseChange(code, v)
+                        }
+                        onSpeedChange={(v) =>
+                          handleTargetBeforeSpeedChange(code, v)
+                        }
+                        repPauseLabel={t('pauseBetweenRepetitions')}
+                        speedLabel={t('playbackSpeed')}
+                        showReorderButtons={targetLanguages.length > 1}
+                        canMoveUp={idx > 0}
+                        canMoveDown={idx < targetLanguages.length - 1}
+                        onMoveUp={() => moveTargetUp(idx)}
+                        onMoveDown={() => moveTargetDown(idx)}
+                      />
+
+                      {/* Target → Target Pause connector (before-base group) */}
+                      {idx < targetLanguages.length - 1 && (
+                        <StepperPauseConnector
+                          label={t('pause')}
+                          seconds={pauseT2T}
+                          onChange={handlePauseTargetToTargetChange}
+                          lineOnly={plays === 0 || nextPlays === 0}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Before-target → Base Pause connector */}
+                {baseLanguages.length > 0 && (
+                  <StepperPauseConnector
+                    label={t('pause')}
+                    seconds={pauseT2B}
+                    onChange={handlePauseTargetToBaseChange}
+                    accent
+                  />
+                )}
+              </>
+            )}
+
             {/* Base languages */}
             {baseLanguages.map((code, idx) => {
               const plays = reps[code] ?? DEFAULT_REPETITIONS_BASE;
@@ -666,9 +956,9 @@ export function LearningModeSettings({
               );
             })}
 
-            {/* Target languages in timeline — only when they're part of the main audio sequence */}
-            {(reviewMode === 'audio' ||
-              fullReviewTargetAudioMode === 'always') && (
+            {/* After-base target languages ("Practice Speaking") — shown when
+                they're part of the main audio sequence */}
+            {showAfterTarget && (
               <>
                 {/* Base → Target Pause connector */}
                 {baseLanguages.length > 0 && targetLanguages.length > 0 && (
@@ -825,6 +1115,54 @@ export function LearningModeSettings({
                     id="autoRevealLanguages"
                     checked={courseSettings.autoRevealLanguages ?? true}
                     onCheckedChange={handleAutoRevealLanguagesChange}
+                    className="mt-0.5"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Hide base languages + sub-setting — audio mode only */}
+          {reviewMode === 'audio' && (
+            <div className="space-y-0">
+              <div className="settings-row">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="hideBaseLanguages"
+                    className="text-sm font-medium"
+                  >
+                    {t('hideBaseLanguages')}
+                  </Label>
+                  <p className="text-muted-xs">
+                    {t('hideBaseLanguagesDescription')}
+                  </p>
+                </div>
+                <Switch
+                  id="hideBaseLanguages"
+                  checked={courseSettings.hideBaseLanguages === true}
+                  onCheckedChange={handleHideBaseLanguagesChange}
+                  className="mt-0.5"
+                />
+              </div>
+
+              {/* Auto-reveal — visually indented as a sub-setting */}
+              {courseSettings.hideBaseLanguages === true && (
+                <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="autoRevealBaseLanguages"
+                      className="text-sm font-medium"
+                    >
+                      {t('autoRevealBaseLanguages')}
+                    </Label>
+                    <p className="text-muted-xs">
+                      {t('autoRevealBaseLanguagesDescription')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="autoRevealBaseLanguages"
+                    checked={courseSettings.autoRevealBaseLanguages ?? true}
+                    onCheckedChange={handleAutoRevealBaseLanguagesChange}
                     className="mt-0.5"
                   />
                 </div>

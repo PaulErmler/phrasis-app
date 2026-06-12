@@ -19,6 +19,9 @@ vi.mock("@convex-dev/aggregate", () => {
 
 import schema from "../../schema";
 import { api, internal } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
+import { scheduleMissingContent } from "../../features/decks";
+import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -521,6 +524,129 @@ describe("features/decks", () => {
       expect(row?.romanizedText).toBeUndefined();
       expect(row?.romanizationSource).toBeUndefined();
       expect(row?.translationSource).toBe("new-source");
+    });
+  });
+
+  describe("scheduleMissingContent — gender-drift translation sweep", () => {
+    // Seed a definitive-gender source text (female) plus one Spanish
+    // translation row, and optionally a Spanish audio row. Both
+    // `speakerGender` and `audioSpeakerGender` are 'female', so the gender
+    // resolution at the top of scheduleMissingContent is a no-op and the
+    // resolved voice gender the sweep compares against is 'female'.
+    async function seedTextWithSpanish(
+      t: ReturnType<typeof convexTest>,
+      args: {
+        translation: {
+          speakerGender?: "male" | "female";
+          translationSource?: string;
+        };
+        audio?: { voiceGender: "male" | "female" };
+      },
+    ) {
+      return t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: true,
+          speakerGender: "female",
+          audioSpeakerGender: "female",
+          collectionId,
+          collectionRank: 1,
+        });
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "es",
+          translatedText: "Hola",
+          ...(args.translation.translationSource
+            ? { translationSource: args.translation.translationSource }
+            : {}),
+          ...(args.translation.speakerGender
+            ? { speakerGender: args.translation.speakerGender }
+            : {}),
+        });
+        if (args.audio) {
+          const storageId = await ctx.storage.store(
+            new Blob([new Uint8Array([1, 2, 3])]),
+          );
+          await ctx.db.insert("audioRecordings", {
+            textId,
+            language: "es",
+            voiceName: "es-test-voice",
+            storageId,
+            ttsQuality: "validated",
+            ttsProvider: "google",
+            voiceGender: args.audio.voiceGender,
+          });
+        }
+        return { textId };
+      });
+    }
+
+    // Run the sweep and return the surviving Spanish translation row (or null
+    // if deleted). The query runs inside the same transaction as the sweep so
+    // scheduled re-translation functions haven't fired yet — we observe the
+    // exact post-sweep state.
+    async function runSweepAndGetSpanish(
+      t: ReturnType<typeof convexTest>,
+      textId: Id<"texts">,
+    ) {
+      return t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        await scheduleMissingContent(ctx, textId, text, ["en"], ["es"]);
+        return ctx.db
+          .query("translations")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("targetLanguage", "es"),
+          )
+          .first();
+      });
+    }
+
+    it("deletes a stamped translation whose gender drifted from the card's voice gender", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        // Stamped 'male' but the card's audioSpeakerGender is 'female' → drift.
+        translation: {
+          speakerGender: "male",
+          translationSource: "google-translate-v2",
+        },
+      });
+      expect(await runSweepAndGetSpanish(t, textId)).toBeNull();
+    });
+
+    it("deletes a legacy (unstamped) translation when its audio drifted gender", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        // No speakerGender (legacy row) + a male-voiced audio row that drifts
+        // from the female card → the audio-drift signal authorizes deletion.
+        translation: { translationSource: "google-translate-v2" },
+        audio: { voiceGender: "male" },
+      });
+      expect(await runSweepAndGetSpanish(t, textId)).toBeNull();
+    });
+
+    it("keeps a legacy translation when there is no audio-drift signal", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        // Legacy row, no audio at all → no evidence it's wrong, leave it.
+        translation: { translationSource: "google-translate-v2" },
+      });
+      expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
+    });
+
+    it("skips user-provided translations even when the gender drifts", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        translation: {
+          speakerGender: "male",
+          translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
+        },
+      });
+      expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
     });
   });
 });

@@ -137,13 +137,13 @@ export function StatsView() {
       <div className="app-view">
         <NumbersRow
           streak={cs?.currentStreak ?? 0}
+          streakState={cs?.streakState ?? 'none'}
           words={cs?.totalWordCount ?? 0}
           reviews={cs?.totalRepetitions ?? 0}
           sentences={cs?.totalCards ?? 0}
           timeMs={cs?.totalTimeMs ?? 0}
           accuracySum={cs?.totalAccuracySum ?? 0}
           accuracyCount={cs?.totalAccuracyCount ?? 0}
-          hasLearnedToday={(pageData?.todayReps ?? 0) > 0}
           languageWordCounts={pageData?.languageWordCounts ?? []}
           todayReps={pageData?.todayReps ?? 0}
           todayNewCards={pageData?.todayNewCards ?? 0}
@@ -179,6 +179,7 @@ export function StatsView() {
             totalTimeMs: w.totalTimeMs,
           }))}
           languageDailyData={filteredLanguageData}
+          timezone={tz}
         />
 
         <WordCloudSection />

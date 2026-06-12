@@ -17,9 +17,13 @@ import { transliterate as transliterateHebrew } from 'hebrew-transliteration';
 import { getLshk } from 'cantonese-romanisation';
 // @ts-expect-error no type declarations for arabic-transliterate (pure JS, ~74KB, zero deps)
 import arabictransliterate from 'arabic-transliterate';
+import transliterate from '@sindresorhus/transliterate';
+import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 
 /**
- * Languages we can romanize locally without a network call.
+ * Languages we can romanize locally without a network call. Derived from each
+ * Language's `romanizationBackend === 'local'` flag (single source of truth in
+ * lib/languages.ts); languages on `'google-v3'` (ru/hi/bn/ja) are excluded.
  *
  * Arabic was moved here off the Google v3 path after a regression where the
  * romanizeText endpoint started returning `{"romanizations":[{}]}` for short
@@ -27,12 +31,11 @@ import arabictransliterate from 'arabic-transliterate';
  * library produces a deterministic IJMES romanization with zero deps, fine
  * for the Convex V8 runtime).
  */
-export const LOCAL_ROMANIZATION_LANGUAGES = new Set([
-  'zh', 'zh_traditional',
-  'yue', 'yue_traditional',
-  'el', 'ko', 'he',
-  'ar', 'ar_sa', 'ar_eg', 'ar_iq', 'ar_lev',
-]);
+export const LOCAL_ROMANIZATION_LANGUAGES = new Set(
+  SUPPORTED_LANGUAGES.filter((l) => l.romanizationBackend === 'local').map(
+    (l) => l.code,
+  ),
+);
 
 export function hasLocalRomanization(code: string): boolean {
   return LOCAL_ROMANIZATION_LANGUAGES.has(code);
@@ -52,6 +55,7 @@ export const ROMANIZATION_SOURCES = {
   hebrewTransliteration: 'hebrew-transliteration-v1',
   cantoneseRomanisation: 'cantonese-romanisation-v1',
   arabicTransliterate: 'arabic-transliterate-v1',
+  sindresorhusTransliterate: 'sindresorhus-transliterate-v1',
   googleV3: 'google-v3-v1',
 } as const;
 
@@ -83,6 +87,7 @@ export function getRomanizationSource(language: string): RomanizationSource {
   ) {
     return ROMANIZATION_SOURCES.arabicTransliterate;
   }
+  if (language === 'fa') return ROMANIZATION_SOURCES.sindresorhusTransliterate;
   // Everything else in ROMANIZATION_LANGUAGES (ru, hi, ja, bn) routes
   // through Google v3 — see `romanizeText` in convex/features/translation.ts.
   return ROMANIZATION_SOURCES.googleV3;
@@ -131,6 +136,19 @@ export function romanizeLocal(text: string, language: string): string | null {
     // dialect tail of the code is irrelevant here. Pass language='Arabic'
     // (the library's switch key, NOT the BCP-47 tag).
     return arabictransliterate(text, 'arabic2latin', 'Arabic') as string;
+  }
+  if (language === 'fa') {
+    // Persian (Perso-Arabic script). `@sindresorhus/transliterate` maps the
+    // written consonants + long vowels and the Persian-specific letters
+    // (پ/چ/ژ/گ) to Latin; short vowels aren't written in the script so they
+    // don't appear. The library passes a few combining marks through unchanged,
+    // so strip them post-transliteration or they leak as invisible/garbled
+    // chars: U+200C zero-width non-joiner (between word parts), U+0654 hamza
+    // above (the ezafe hamza on -e/-eh words — very common), and U+0670
+    // superscript alef.
+    // Alternation (not a character class) avoids no-misleading-character-class,
+    // which flags combining marks like U+0654/U+0670 inside `[...]`.
+    return transliterate(text).replace(/\u200C|\u0654|\u0670/g, '');
   }
   return null;
 }

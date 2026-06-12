@@ -31,6 +31,16 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 200,
     shards: 10,
   },
+  // Gemini 3.1 Flash TTS via OpenRouter (/audio/speech). Conservative starting
+  // budget — OpenRouter per-key limits vary by credit balance; raise once we've
+  // observed real throughput without 429s.
+  geminiTts: {
+    kind: 'token bucket',
+    rate: 240,
+    period: MINUTE,
+    capacity: 240,
+    shards: 32,
+  },
   // Azure Speech-to-Text Fast Transcription S0 tier — same 200 req/min cap as
   // azureTts. Hit by TTS validation (synthesizeAndValidate), word-timing
   // backfill, and chat voice transcription. If 429s persist after this lands,
@@ -47,9 +57,10 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
 
 export const TTS_RATE_LIMIT_BY_PROVIDER: Record<
   TtsProvider,
-  'googleTts' | 'elevenlabsTts' | 'azureTts'
+  'googleTts' | 'elevenlabsTts' | 'azureTts' | 'geminiTts'
 > = {
   google: 'googleTts',
   elevenlabs: 'elevenlabsTts',
   azure: 'azureTts',
+  gemini: 'geminiTts',
 };

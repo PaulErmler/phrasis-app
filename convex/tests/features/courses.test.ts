@@ -3,6 +3,11 @@ import { convexTest } from "convex-test";
 import { describe, it, expect } from "vitest";
 import schema from "../../schema";
 import { api } from "../../_generated/api";
+import {
+  PLAYBACK_SPEED_MAX,
+  PLAYBACK_SPEED_MIN,
+} from "../../../lib/constants/audioPlayback";
+import { MAX_CARDS_PER_BATCH } from "../../../lib/constants/learning";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -491,6 +496,185 @@ describe("features/courses", () => {
       );
       expect(settings?.pinnedCardActions).toEqual(["edit"]);
       expect(settings?.hasCompletedOnboarding).toBe(false);
+    });
+  });
+
+  describe("updateCourseSettings — audio playback", () => {
+    const makeActiveCourse = async (
+      t: ReturnType<typeof convexTest>,
+    ): Promise<{
+      asUser: ReturnType<ReturnType<typeof convexTest>["withIdentity"]>;
+      courseId: string;
+    }> => {
+      const courseId = await t.run(async (ctx) =>
+        ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.setActiveCourse, { courseId });
+      return { asUser, courseId };
+    };
+
+    // Regression: showRomanization was in the validator + PATCHABLE_KEYS but
+    // missing from the INSERT branch, so a brand-new courseSettings row dropped
+    // it. (See convex/features/courses.ts insert object.)
+    it("persists showRomanization on first insert", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        showRomanization: true,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.showRomanization).toBe(true);
+    });
+
+    it("persists the Practice Listening (target-before-base) fields on insert", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        playTargetBeforeBase: true,
+        playTargetAfterBase: false,
+        targetBeforeRepetitions: { de: 3 },
+        targetBeforeRepetitionPauses: { de: 4 },
+        targetBeforePlaybackSpeeds: { de: 0.7 },
+        pauseTargetToBase: 6,
+      });
+      const s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.playTargetBeforeBase).toBe(true);
+      expect(s?.playTargetAfterBase).toBe(false);
+      expect(s?.targetBeforeRepetitions).toEqual({ de: 3 });
+      expect(s?.targetBeforeRepetitionPauses).toEqual({ de: 4 });
+      expect(s?.targetBeforePlaybackSpeeds).toEqual({ de: 0.7 });
+      expect(s?.pauseTargetToBase).toBe(6);
+    });
+
+    it("clamps targetBeforePlaybackSpeeds to the allowed range server-side", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforePlaybackSpeeds: { de: 99, fr: 0.01 },
+      });
+      const s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.targetBeforePlaybackSpeeds).toEqual({
+        de: PLAYBACK_SPEED_MAX,
+        fr: PLAYBACK_SPEED_MIN,
+      });
+    });
+
+    it("persists and clamps the 'Only new' Practice-Listening limit", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      // A valid value persists as-is.
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforeOnlyNewReps: 3,
+      });
+      let s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.targetBeforeOnlyNewReps).toBe(3);
+
+      // Out-of-range clamps to 10; 0 (∞) is allowed and round-trips.
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforeOnlyNewReps: 50,
+      });
+      s = await asUser.query(api.features.courses.getActiveCourseSettings, {});
+      expect(s?.targetBeforeOnlyNewReps).toBe(10);
+
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforeOnlyNewReps: 0,
+      });
+      s = await asUser.query(api.features.courses.getActiveCourseSettings, {});
+      expect(s?.targetBeforeOnlyNewReps).toBe(0);
+    });
+
+    it("clamps cardsToAddBatchSize to MAX_CARDS_PER_BATCH on first insert", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      // No courseSettings row yet, so this exercises the INSERT branch (not the
+      // patch branch) — the insert path previously skipped the clamp.
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        cardsToAddBatchSize: 999,
+      });
+      const s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.cardsToAddBatchSize).toBe(MAX_CARDS_PER_BATCH);
+    });
+
+    it("forces Practice Speaking on when a write would leave both target toggles off", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        playTargetBeforeBase: false,
+        playTargetAfterBase: false,
+      });
+      const s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.playTargetBeforeBase).toBe(false);
+      expect(s?.playTargetAfterBase).toBe(true);
+    });
+
+    it("leaves Practice Speaking off when Practice Listening is on (guard not over-eager)", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        playTargetBeforeBase: true,
+        playTargetAfterBase: false,
+      });
+      const s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.playTargetBeforeBase).toBe(true);
+      expect(s?.playTargetAfterBase).toBe(false);
+    });
+
+    it("heals to Practice Speaking when the last toggle is turned off on an existing row", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      // Existing valid state: Practice Listening on, Practice Speaking off.
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        playTargetBeforeBase: true,
+        playTargetAfterBase: false,
+      });
+      // Turn Listening off WITHOUT touching Speaking → would be both-off; the
+      // guard heals using the existing (after:false) value.
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        playTargetBeforeBase: false,
+      });
+      const s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.playTargetBeforeBase).toBe(false);
+      expect(s?.playTargetAfterBase).toBe(true);
     });
   });
 });

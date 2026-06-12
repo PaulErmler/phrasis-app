@@ -1,4 +1,5 @@
 import { v, Infer } from 'convex/values';
+import { TTS_PROVIDERS } from '../lib/languages';
 
 export const learningStyleValidator = v.union(
   v.literal('casual'),
@@ -99,16 +100,34 @@ export const ttsQualityValidator = v.union(
   v.literal('unvalidated'),
 );
 
+// Single source of truth for the provider list is `TTS_PROVIDERS` in
+// lib/languages.ts; this validator (for stored `audioRecordings.ttsProvider`)
+// is built from it so the two can't drift. Indexed access keeps the exact
+// string-literal union for `Infer`. 'gemini' = Gemini 3.1 Flash TTS via
+// OpenRouter's /audio/speech endpoint (distinct from 'google' = Cloud Chirp3).
 export const ttsProviderValidator = v.union(
-  v.literal('google'),
-  v.literal('elevenlabs'),
-  v.literal('azure'),
+  v.literal(TTS_PROVIDERS[0]),
+  v.literal(TTS_PROVIDERS[1]),
+  v.literal(TTS_PROVIDERS[2]),
+  v.literal(TTS_PROVIDERS[3]),
 );
 
 export const voiceGenderValidator = v.union(
   v.literal('male'),
   v.literal('female'),
 );
+
+/**
+ * Narrow a loosely-typed string to a strict voice gender, or `undefined` when
+ * it is neither. Use at boundaries where a `v.string()`-typed value (e.g.
+ * `texts.audioSpeakerGender`, or a queued job's `audioSpeakerGender`) flows
+ * into a strict `voiceGenderValidator` field such as `translations.speakerGender`.
+ */
+export function asVoiceGender(
+  value: string | undefined,
+): 'male' | 'female' | undefined {
+  return value === 'male' || value === 'female' ? value : undefined;
+}
 
 export const cardApprovalStatusValidator = v.union(
   v.literal('pending'),

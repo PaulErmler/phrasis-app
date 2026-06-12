@@ -66,6 +66,7 @@ TRANSLATION RULES:
    - es_latam: Latin American Spanish (ustedes for plural, regionally neutral LatAm vocabulary)
    - fr: Metropolitan French (France)
    - pt: Brazilian Portuguese
+   - pt_pt: European Portuguese as spoken in Portugal (European vocabulary, spelling, and phonetics)
    - en: neutral English (no strong British/American spelling bias)
    - en_gb: British English spelling and vocabulary (colour, lift, queue)
    - en_us: American English spelling and vocabulary (color, elevator, line)

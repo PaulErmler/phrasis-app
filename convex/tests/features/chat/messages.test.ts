@@ -52,6 +52,24 @@ describe("features/chat/messages", () => {
       // Without identity, this returns an empty list shape.
       expect(Array.isArray(res?.page ?? [])).toBe(true);
     });
+
+    it("includes a list-shaped streams field on the early return when streaming", async () => {
+      // Regression: the client streaming hook (useUIMessages → useDeltaStreams)
+      // reads `streams.messages` whenever it issues a `kind: 'list'` query. If
+      // the unauthenticated / thread-not-owned early return omits `streams`,
+      // the hook throws "Cannot read properties of undefined (reading
+      // 'messages')". The early return must mirror syncStreams' list shape.
+      const t = convexTest(schema, modules);
+      const res = await t.query(api.features.chat.messages.listMessages, {
+        threadId: "thread_x",
+        paginationOpts: { numItems: 10, cursor: null },
+        streamArgs: { kind: "list", startOrder: 0 },
+      });
+      expect(res.streams).toBeDefined();
+      expect(res.streams.kind).toBe("list");
+      expect(Array.isArray(res.streams.messages)).toBe(true);
+      expect(res.streams.messages).toHaveLength(0);
+    });
   });
 
   // STILL SKIPPED: each of these paths calls into the `@convex-dev/agent`

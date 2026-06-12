@@ -151,3 +151,73 @@ export function computeStreakUpdate(
     newFreezeUsedDate: streakFreezeUsedDate,
   };
 }
+
+export type StreakDisplayState =
+  | 'active'
+  | 'pending'
+  | 'frozen'
+  | 'broken'
+  | 'none';
+
+export interface StreakDisplayResult {
+  /** The streak as it should be DISPLAYED today — 0 once it has lapsed. */
+  displayStreak: number;
+  state: StreakDisplayState;
+  freezeAvailable: boolean;
+}
+
+/**
+ * Pure read-time derivation of the streak as it should be displayed today,
+ * without mutating the stored row.
+ *
+ * Streaks are only recomputed by `computeStreakUpdate` when the user does an
+ * activity, so the stored `currentStreak` / `lastActivityDate` go stale between
+ * activities. This re-derives the live state at read time:
+ *
+ *  - `active`  — learned today; streak shown as-is.
+ *  - `pending` — learned yesterday, not yet today; streak alive but not yet
+ *                validated for today.
+ *  - `frozen`  — missed yesterday, but a freeze is shielding the streak (the
+ *                next activity today would consume it); streak shown as-is.
+ *  - `broken`  — missed yesterday with no freeze, or a gap of 2+ days; the
+ *                streak is dead and shows 0.
+ *  - `none`    — no activity ever; shows 0.
+ *
+ * Kept consistent with `computeStreakUpdate`: for live states the displayed
+ * number equals what the next activity would leave in the document (it bumps
+ * to N+1); for dead states it shows 0 and the next activity resets to 1. The
+ * `freezeAvailable` expression is identical to `computeStreakUpdate`'s freeze
+ * check, so the frozen-vs-broken boundary at today-2 exactly matches whether
+ * the next activity would consume the freeze or reset the streak.
+ */
+export function deriveStreakDisplay(
+  lastActivityDate: string | undefined,
+  todayDate: string,
+  currentStreak: number,
+  streakFreezeUsedDate?: string,
+): StreakDisplayResult {
+  const freezeAvailable =
+    !streakFreezeUsedDate ||
+    (!!lastActivityDate &&
+      lastActivityDate > getNextDay(streakFreezeUsedDate));
+
+  if (!lastActivityDate) {
+    return { displayStreak: 0, state: 'none', freezeAvailable };
+  }
+  if (lastActivityDate === todayDate) {
+    return { displayStreak: currentStreak, state: 'active', freezeAvailable };
+  }
+
+  const yesterday = getPreviousDay(todayDate);
+  if (lastActivityDate === yesterday) {
+    return { displayStreak: currentStreak, state: 'pending', freezeAvailable };
+  }
+
+  const dayBeforeYesterday = getPreviousDay(yesterday);
+  if (lastActivityDate === dayBeforeYesterday && freezeAvailable) {
+    return { displayStreak: currentStreak, state: 'frozen', freezeAvailable };
+  }
+
+  // today-2 with no freeze, or a gap of 2+ days — the streak is dead.
+  return { displayStreak: 0, state: 'broken', freezeAvailable };
+}

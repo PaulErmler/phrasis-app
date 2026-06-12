@@ -8,6 +8,7 @@ import { cardsByState, cardsByDueDate, cardsByStateAndDueDate } from '../db/stat
 import {
   getCourseStats as dbGetCourseStats,
   getTodayInTimezone,
+  deriveStreakDisplay,
 } from '../db/courseStats';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { EXTENDED_STATE_LABELS as STATE_LABELS } from '../lib/fsrsStates';
@@ -158,12 +159,24 @@ export const getStatsPageData = query({
     // Derive total from the filtered per-language counts (target languages only)
     const totalWordCount = languageWordCounts.reduce((sum, lw) => sum + lw.words, 0);
 
+    // Re-derive the live streak at read time (see getCourseStats) so a lapsed
+    // streak shows 0 and the state matches the home card.
+    const streak = stats
+      ? deriveStreakDisplay(
+        stats.lastActivityDate,
+        todayStr,
+        stats.currentStreak,
+        stats.streakFreezeUsedDate,
+      )
+      : null;
+
     return {
       courseStats: stats ? {
         totalRepetitions: stats.totalRepetitions,
         totalTimeMs: stats.totalTimeMs,
         totalCards: stats.totalCards,
-        currentStreak: stats.currentStreak,
+        currentStreak: streak!.displayStreak,
+        streakState: streak!.state,
         totalWordCount,
         totalChatMessages: stats.totalChatMessages ?? 0,
         totalChatCardsApproved: stats.totalChatCardsApproved ?? 0,

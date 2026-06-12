@@ -11,8 +11,14 @@
  * `getVoiceForLanguage` from `lib/languages` keep working.
  */
 
-/** Identifier for which TTS backend a language currently uses. */
-export type TtsProvider = 'google' | 'elevenlabs' | 'azure';
+/**
+ * Identifier for which TTS backend a language currently uses. Must stay in sync
+ * with `ttsProviderValidator` in `convex/types.ts` (the Convex-side source of
+ * truth used for stored `audioRecordings.ttsProvider`). 'gemini' = Gemini 3.1
+ * Flash TTS via OpenRouter (distinct from 'google' = Google Cloud Chirp3).
+ */
+export const TTS_PROVIDERS = ['google', 'elevenlabs', 'azure', 'gemini'] as const;
+export type TtsProvider = (typeof TTS_PROVIDERS)[number];
 
 /** Identifier for which translation backend a target language currently uses. */
 export type TranslationProvider = 'google' | 'openrouter';
@@ -21,60 +27,15 @@ export type TranslationProvider = 'google' | 'openrouter';
  * BCP-47-ish region label used in the LLM translation prompt's <context>.
  * Tells the model whether to lean Spanish-Spain vs Spanish-LatAm,
  * Portuguese-Brazil vs Portuguese-Portugal, etc.
+ *
+ * Derived from each Language's `regionLabel` field (keyed by displayCode; see
+ * `DISPLAY_CODE_TO_REGION` below). Falls back to the region segment of the
+ * displayCode, or the bare tag when there's no dash — so a language without an
+ * explicit `regionLabel` (e.g. `en`) renders its code rather than a blank.
  */
 function regionLabelFromDisplayCode(displayCode: string): string {
-  const REGION_MAP: Record<string, string> = {
-    'es-ES': 'Spain',
-    'es-419': 'Latin America',
-    'pt-BR': 'Brazil',
-    'pt-PT': 'Portugal',
-    'zh-CN': 'Mainland China',
-    'zh-TW': 'Taiwan',
-    'en-US': 'United States',
-    'en-GB': 'United Kingdom',
-    'en-AU': 'Australia',
-    'ar-SA': 'Saudi Arabia',
-    'ar-EG': 'Egypt',
-    'ar-IQ': 'Iraq',
-    'ar-LB': 'the Levant (Lebanon, Syria, Palestine, Jordan)',
-    'yue-Hans-HK': 'Hong Kong (simplified script)',
-    'yue-Hant-HK': 'Hong Kong (traditional script)',
-    'sw-KE': 'Kenya',
-    'sw-TZ': 'Tanzania',
-    // Bare-code entries. Most Language records use a 2-letter displayCode
-    // (e.g. 'de', 'fr', 'he') with no region suffix. Without these, the
-    // prompt's "suitable for X" clause renders the raw code ("suitable for
-    // he"), which is meaningless to the model.
-    fr: 'France',
-    de: 'Germany',
-    it: 'Italy',
-    pt: 'Brazil',
-    ro: 'Romania',
-    ru: 'Russia',
-    pl: 'Poland',
-    sk: 'Slovakia',
-    cs: 'Czechia',
-    nl: 'Netherlands',
-    sv: 'Sweden',
-    nb: 'Norway',
-    da: 'Denmark',
-    fi: 'Finland',
-    el: 'Greece',
-    hi: 'India',
-    bn: 'Bangladesh',
-    tr: 'Turkey',
-    hu: 'Hungary',
-    ja: 'Japan',
-    ko: 'South Korea',
-    vi: 'Vietnam',
-    th: 'Thailand',
-    id: 'Indonesia',
-    // MSA is supra-regional; describe the readership rather than a country.
-    ar: 'the Arab world',
-    he: 'Israel',
-  };
-  if (REGION_MAP[displayCode]) return REGION_MAP[displayCode];
-  // Fall through: take the region segment after the dash, or the language tag if there isn't one.
+  const mapped = DISPLAY_CODE_TO_REGION[displayCode];
+  if (mapped) return mapped;
   const dash = displayCode.indexOf('-');
   return dash >= 0 ? displayCode.slice(dash + 1) : displayCode;
 }
@@ -154,6 +115,16 @@ export interface Language {
    */
   translationName?: string;
   /**
+   * Override for the language name used in the Gemini TTS prompt's "speak like
+   * a native X" instruction (convex/lib/tts/gemini.ts). Defaults to `name` with
+   * the region parenthetical stripped ("English (US)" → "English"), since the
+   * accent is normally pinned by `geminiBcp47`. Set this when the dialect can't
+   * be pinned by the locale and must be named in the prose instead — e.g.
+   * Levantine Arabic, whose `geminiBcp47` collapses to `ar-001` (World Arabic),
+   * shared with MSA/Saudi/Iraqi.
+   */
+  ttsPromptName?: string;
+  /**
    * When `true`, this language is excluded from user-facing pickers in
    * onboarding / course creation / settings (`LanguageSelector` and
    * `DualLanguageEditor`). The entry remains in `SUPPORTED_LANGUAGES` so
@@ -165,18 +136,78 @@ export interface Language {
    * stays available for any rows already referencing them.
    */
   hiddenFromPicker?: boolean;
+
+  // --- Provider locale codes + display overrides --------------------------
+  // Single source of truth for the per-language data that used to live in
+  // separate maps (REGION_MAP, toGeminiBcp47, toAzureSttLocale,
+  // GOOGLE_TRANSLATE_CODE_MAP, textCompare PER_LANGUAGE, NAME_OVERRIDES,
+  // MIXED_LANGUAGE_VARIANTS, LOCAL_ROMANIZATION_LANGUAGES). Each derived map is
+  // built from these fields; omit a field to take its documented default.
+
+  /**
+   * Region label injected into the LLM translation prompt's <context> (e.g.
+   * 'Spain', 'the Arab world'). Omit to fall back to the region segment of
+   * `displayCode` (or the bare code when there's no dash).
+   */
+  regionLabel?: string;
+  /**
+   * BCP-47 locale for Gemini TTS (`toGeminiBcp47`). Omit when Gemini should
+   * auto-detect from the text (Cantonese) — the code passes through unchanged.
+   */
+  geminiBcp47?: string;
+  /**
+   * Locale for Azure Fast Transcription (`toAzureSttLocale`). Omit to take the
+   * `<code>-<UPPER(code)>` default (correct for symmetric ISO-639-1 pairs).
+   */
+  azureSttLocale?: string;
+  /**
+   * Google Translate v2 / romanize-v3 code (`toGoogleTranslateCode`). Omit to
+   * pass the internal code through unchanged.
+   */
+  googleTranslateCode?: string;
+  /**
+   * Intl.Segmenter locale for answer text-comparison (`getCompareConfig`).
+   * Omit to default to the internal code.
+   */
+  compareLocale?: string;
+  /**
+   * Whether the script uses spaces between words. Omit (= true) for everything
+   * except scripts segmented per character/morpheme (zh/ja/th/yue), where the
+   * comparator falls back to char-level diffing.
+   */
+  hasWordBoundaries?: boolean;
+  /**
+   * How this language romanizes when `needsRomanization` is true: 'local'
+   * (in-process library, see convex/lib/localRomanization.ts) or 'google-v3'
+   * (Google Cloud romanizeText). Omit when the language needs no romanization.
+   */
+  romanizationBackend?: 'local' | 'google-v3';
+  /**
+   * Locale-keyed display-name overrides (e.g. { en: 'Spanish (Spain)' }) for
+   * codes where Intl.DisplayNames is ambiguous. Resolution falls back to the
+   * `en` value, then Intl. The `displayCode` is also registered as a lookup key.
+   */
+  displayNameOverrides?: Record<string, string>;
+  /**
+   * Mixed-dialect expansion: each entry is a concrete sub-variant the
+   * translation worker resolves deterministically per text. Presence marks the
+   * language as mixed (`isMixedLanguage`).
+   */
+  variants?: ReadonlyArray<{ subCode: string; voiceLocalePrefix: string }>;
 }
 
 export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'en',
     displayCode: 'en',
+    geminiBcp47: 'en-US',
+    azureSttLocale: 'en-US',
     name: 'English',
     nativeName: 'English',
     flag: '🌎',
     category: 'germanic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -184,12 +215,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'en_gb',
     displayCode: 'en-GB',
+    regionLabel: 'United Kingdom',
+    geminiBcp47: 'en-GB',
+    azureSttLocale: 'en-GB',
+    googleTranslateCode: 'en',
+    compareLocale: 'en-GB',
+    displayNameOverrides: { en: 'English (UK)', de: 'Englisch (UK)' },
     name: 'English (UK)',
     nativeName: 'English (UK)',
     flag: '🇬🇧',
     category: 'germanic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -198,12 +235,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'en_us',
     displayCode: 'en-US',
+    regionLabel: 'United States',
+    geminiBcp47: 'en-US',
+    azureSttLocale: 'en-US',
+    googleTranslateCode: 'en',
+    compareLocale: 'en-US',
+    displayNameOverrides: { en: 'English (US)', de: 'Englisch (USA)' },
     name: 'English (US)',
     nativeName: 'English (US)',
     flag: '🇺🇸',
     category: 'germanic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -212,12 +255,18 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'en_au',
     displayCode: 'en-AU',
+    regionLabel: 'Australia',
+    geminiBcp47: 'en-AU',
+    azureSttLocale: 'en-AU',
+    googleTranslateCode: 'en',
+    compareLocale: 'en-AU',
+    displayNameOverrides: { en: 'English (Australia)', de: 'Englisch (Australien)' },
     name: 'English (Australia)',
     nativeName: 'English (Australia)',
     flag: '🇦🇺',
     category: 'germanic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -226,6 +275,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'es',
     displayCode: 'es-ES',
+    regionLabel: 'Spain',
+    geminiBcp47: 'es-ES',
+    azureSttLocale: 'es-ES',
+    displayNameOverrides: { en: 'Spanish (Spain)', de: 'Spanisch (Spanien)' },
     name: 'Spanish (Spain)',
     nativeName: 'Español (España)',
     flag: '🇪🇸',
@@ -239,6 +292,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'es_latam',
     displayCode: 'es-419',
+    regionLabel: 'Latin America',
+    geminiBcp47: 'es-419',
+    azureSttLocale: 'es-MX',
+    googleTranslateCode: 'es',
+    compareLocale: 'es-419',
+    displayNameOverrides: { en: 'Spanish (Latin America)', de: 'Spanisch (Lateinamerika)' },
     name: 'Spanish (Latin America)',
     nativeName: 'Español (Latinoamérica)',
     flag: '🇲🇽',
@@ -255,6 +314,15 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // and expand to es-ES + es-419/es-MX as needed; Intl.DisplayNames is overridden
     // for this code so the displayCode value itself is never user-facing.
     displayCode: 'es',
+    geminiBcp47: 'es-ES',
+    azureSttLocale: 'es-ES',
+    googleTranslateCode: 'es',
+    compareLocale: 'es',
+    displayNameOverrides: { en: 'Spanish (Mixed)', de: 'Spanisch (Gemischt)' },
+    variants: [
+      { subCode: 'es', voiceLocalePrefix: 'es-ES' },
+      { subCode: 'es_latam', voiceLocalePrefix: 'es-US' },
+    ],
     name: 'Spanish (Mixed)',
     nativeName: 'Español (mixto)',
     flag: '🌎',
@@ -268,6 +336,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'fr',
     displayCode: 'fr',
+    regionLabel: 'France',
+    geminiBcp47: 'fr-FR',
     name: 'French',
     nativeName: 'Français',
     flag: '🇫🇷',
@@ -281,12 +351,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'de',
     displayCode: 'de',
+    regionLabel: 'Germany',
+    geminiBcp47: 'de-DE',
     name: 'German',
     nativeName: 'Deutsch',
     flag: '🇩🇪',
     category: 'germanic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -294,6 +366,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'it',
     displayCode: 'it',
+    regionLabel: 'Italy',
+    geminiBcp47: 'it-IT',
     name: 'Italian',
     nativeName: 'Italiano',
     flag: '🇮🇹',
@@ -307,6 +381,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'pt',
     displayCode: 'pt',
+    regionLabel: 'Brazil',
+    geminiBcp47: 'pt-BR',
+    azureSttLocale: 'pt-BR',
+    displayNameOverrides: { en: 'Portuguese (Brazil)', de: 'Portugiesisch (Brasilien)' },
     name: 'Portuguese (Brazil)',
     nativeName: 'Português',
     flag: '🇧🇷',
@@ -318,8 +396,29 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
   },
   {
+    code: 'pt_pt',
+    displayCode: 'pt-PT',
+    regionLabel: 'Portugal',
+    geminiBcp47: 'pt-PT',
+    azureSttLocale: 'pt-PT',
+    googleTranslateCode: 'pt-PT',
+    compareLocale: 'pt-PT',
+    displayNameOverrides: { en: 'Portuguese (Portugal)', de: 'Portugiesisch (Portugal)' },
+    name: 'Portuguese (Portugal)',
+    nativeName: 'Português (Portugal)',
+    flag: '🇵🇹',
+    category: 'romance',
+    llmSupportTier: 'tier1',
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+  },
+  {
     code: 'ro',
     displayCode: 'ro',
+    regionLabel: 'Romania',
+    geminiBcp47: 'ro-RO',
     name: 'Romanian',
     nativeName: 'Română',
     flag: '🇷🇴',
@@ -333,6 +432,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'ru',
     displayCode: 'ru',
+    regionLabel: 'Russia',
+    geminiBcp47: 'ru-RU',
+    romanizationBackend: 'google-v3',
     name: 'Russian',
     nativeName: 'Русский',
     flag: '🇷🇺',
@@ -347,6 +449,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'pl',
     displayCode: 'pl',
+    regionLabel: 'Poland',
+    geminiBcp47: 'pl-PL',
     name: 'Polish',
     nativeName: 'Polski',
     flag: '🇵🇱',
@@ -360,6 +464,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'sk',
     displayCode: 'sk',
+    regionLabel: 'Slovakia',
+    geminiBcp47: 'sk-SK',
     name: 'Slovak',
     nativeName: 'Slovenčina',
     flag: '🇸🇰',
@@ -373,6 +479,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'cs',
     displayCode: 'cs',
+    regionLabel: 'Czechia',
+    geminiBcp47: 'cs-CZ',
+    azureSttLocale: 'cs-CZ',
     name: 'Czech',
     nativeName: 'Čeština',
     flag: '🇨🇿',
@@ -386,6 +495,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'nl',
     displayCode: 'nl',
+    regionLabel: 'Netherlands',
+    geminiBcp47: 'nl-NL',
     name: 'Dutch',
     nativeName: 'Nederlands',
     flag: '🇳🇱',
@@ -399,22 +510,29 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'sv',
     displayCode: 'sv',
+    regionLabel: 'Sweden',
+    geminiBcp47: 'sv-SE',
+    azureSttLocale: 'sv-SE',
     name: 'Swedish',
     nativeName: 'Svenska',
     flag: '🇸🇪',
     category: 'germanic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
   },
-  // Norwegian (Bokmål) — disabled for now. Aux configs (voice pool, STT/textCompare
-  // maps, REGION_MAP entry, translation `nb→no` collapse) are left in place so
-  // re-enabling is a one-line uncomment.
+  // Norwegian (Bokmål) — disabled for now. The provider-locale fields the derived
+  // maps need (regionLabel, azureSttLocale `nb-NO`, googleTranslateCode `no`) are
+  // baked into the commented record below, and the voice pool / textCompare entry
+  // are still in place, so re-enabling is just uncommenting this block.
   // {
   //   code: 'nb',
   //   displayCode: 'nb',
+  //   regionLabel: 'Norway',
+  //   azureSttLocale: 'nb-NO',
+  //   googleTranslateCode: 'no',
   //   name: 'Norwegian (Bokmål)',
   //   nativeName: 'Norsk bokmål',
   //   flag: '🇳🇴',
@@ -428,6 +546,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'da',
     displayCode: 'da',
+    regionLabel: 'Denmark',
+    geminiBcp47: 'da-DK',
+    azureSttLocale: 'da-DK',
     name: 'Danish',
     nativeName: 'Dansk',
     flag: '🇩🇰',
@@ -441,6 +562,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'fi',
     displayCode: 'fi',
+    regionLabel: 'Finland',
+    geminiBcp47: 'fi-FI',
     name: 'Finnish',
     nativeName: 'Suomi',
     flag: '🇫🇮',
@@ -456,6 +579,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'el',
     displayCode: 'el',
+    regionLabel: 'Greece',
+    geminiBcp47: 'el-GR',
+    azureSttLocale: 'el-GR',
+    romanizationBackend: 'local',
     name: 'Greek',
     nativeName: 'Ελληνικά',
     flag: '🇬🇷',
@@ -471,6 +598,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'hi',
     displayCode: 'hi',
+    regionLabel: 'India',
+    geminiBcp47: 'hi-IN',
+    azureSttLocale: 'hi-IN',
+    romanizationBackend: 'google-v3',
     name: 'Hindi',
     nativeName: 'हिन्दी',
     flag: '🇮🇳',
@@ -485,6 +616,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'bn',
     displayCode: 'bn',
+    regionLabel: 'Bangladesh',
+    geminiBcp47: 'bn-BD',
+    azureSttLocale: 'bn-IN',
+    romanizationBackend: 'google-v3',
     name: 'Bengali',
     nativeName: 'বাংলা',
     // Flag is India, not Bangladesh: voice + STT infra is bn-IN (Google
@@ -501,6 +636,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'tr',
     displayCode: 'tr',
+    regionLabel: 'Turkey',
+    geminiBcp47: 'tr-TR',
     name: 'Turkish',
     nativeName: 'Türkçe',
     flag: '🇹🇷',
@@ -514,6 +651,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'hu',
     displayCode: 'hu',
+    regionLabel: 'Hungary',
+    geminiBcp47: 'hu-HU',
     name: 'Hungarian',
     nativeName: 'Magyar',
     flag: '🇭🇺',
@@ -529,6 +668,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'zh',
     displayCode: 'zh-CN',
+    regionLabel: 'Mainland China',
+    geminiBcp47: 'cmn-CN',
+    azureSttLocale: 'zh-CN',
+    hasWordBoundaries: false,
+    romanizationBackend: 'local',
+    displayNameOverrides: { en: 'Chinese (Simplified)', de: 'Chinesisch (Vereinfacht)' },
     name: 'Chinese (Simplified)',
     nativeName: '中文（简体）',
     flag: '🇨🇳',
@@ -545,6 +690,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'zh_traditional',
     displayCode: 'zh-TW',
+    regionLabel: 'Taiwan',
+    geminiBcp47: 'cmn-TW',
+    azureSttLocale: 'zh-TW',
+    googleTranslateCode: 'zh-TW',
+    compareLocale: 'zh-TW',
+    hasWordBoundaries: false,
+    romanizationBackend: 'local',
+    displayNameOverrides: { en: 'Chinese (Traditional)', de: 'Chinesisch (Traditionell)' },
     name: 'Chinese (Traditional)',
     nativeName: '中文（繁體）',
     flag: '🇹🇼',
@@ -560,6 +713,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'yue',
     displayCode: 'yue-Hans-HK',
+    regionLabel: 'Hong Kong (simplified script)',
+    azureSttLocale: 'zh-HK',
+    compareLocale: 'yue-Hans-HK',
+    hasWordBoundaries: false,
+    romanizationBackend: 'local',
+    displayNameOverrides: { en: 'Cantonese (Simplified)', de: 'Kantonesisch (Vereinfacht)' },
     name: 'Cantonese (Simplified)',
     nativeName: '粵語（简体）',
     flag: '🇭🇰',
@@ -577,6 +736,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'yue_traditional',
     displayCode: 'yue-Hant-HK',
+    regionLabel: 'Hong Kong (traditional script)',
+    azureSttLocale: 'zh-HK',
+    googleTranslateCode: 'yue',
+    compareLocale: 'yue-Hant-HK',
+    hasWordBoundaries: false,
+    romanizationBackend: 'local',
+    displayNameOverrides: { en: 'Cantonese (Traditional)', de: 'Kantonesisch (Traditionell)' },
     name: 'Cantonese (Traditional)',
     nativeName: '粵語（繁體）',
     flag: '🇭🇰',
@@ -590,6 +756,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'ja',
     displayCode: 'ja',
+    regionLabel: 'Japan',
+    geminiBcp47: 'ja-JP',
+    azureSttLocale: 'ja-JP',
+    hasWordBoundaries: false,
+    romanizationBackend: 'google-v3',
     name: 'Japanese',
     nativeName: '日本語',
     flag: '🇯🇵',
@@ -606,6 +777,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'ko',
     displayCode: 'ko',
+    regionLabel: 'South Korea',
+    geminiBcp47: 'ko-KR',
+    azureSttLocale: 'ko-KR',
+    romanizationBackend: 'local',
     name: 'Korean',
     nativeName: '한국어',
     flag: '🇰🇷',
@@ -620,6 +795,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'vi',
     displayCode: 'vi',
+    regionLabel: 'Vietnam',
+    geminiBcp47: 'vi-VN',
+    azureSttLocale: 'vi-VN',
     name: 'Vietnamese',
     nativeName: 'Tiếng Việt',
     flag: '🇻🇳',
@@ -633,6 +811,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'th',
     displayCode: 'th',
+    regionLabel: 'Thailand',
+    geminiBcp47: 'th-TH',
+    hasWordBoundaries: false,
     name: 'Thai',
     nativeName: 'ไทย',
     flag: '🇹🇭',
@@ -651,6 +832,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'id',
     displayCode: 'id',
+    regionLabel: 'Indonesia',
+    geminiBcp47: 'id-ID',
     name: 'Indonesian',
     nativeName: 'Bahasa Indonesia',
     flag: '🇮🇩',
@@ -662,8 +845,36 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
   },
   {
+    code: 'fil',
+    displayCode: 'fil',
+    regionLabel: 'the Philippines',
+    geminiBcp47: 'fil-PH',
+    azureSttLocale: 'fil-PH',
+    // Google Translate v2 (the legacy fallback path) catalogs Filipino under
+    // the Tagalog code `tl`; `fil` isn't in /v2/languages.
+    googleTranslateCode: 'tl',
+    name: 'Filipino',
+    nativeName: 'Filipino',
+    flag: '🇵🇭',
+    category: 'asian-southeast',
+    llmSupportTier: 'tier1',
+    // Gemini 3 Flash TTS (fil-PH, Preview). See VOICE_POOLS in lib/voices.ts
+    // (`fil: [...GEMINI_CORE, ...AZURE_VOICES_FIL_PH]`). Latin script, so no
+    // romanization; Azure fil-PH supports Fast Transcription, so STT + karaoke
+    // stay on.
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+  },
+  {
     code: 'ar',
     displayCode: 'ar',
+    regionLabel: 'the Arab world',
+    geminiBcp47: 'ar-001',
+    azureSttLocale: 'ar-SA',
+    romanizationBackend: 'local',
+    displayNameOverrides: { en: 'Arabic (Modern Standard)', de: 'Arabisch (Hocharabisch)' },
     name: 'Arabic (Modern Standard)',
     nativeName: 'العربية (الفصحى)',
     flag: '🌎',
@@ -679,6 +890,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'ar_sa',
     displayCode: 'ar-SA',
+    regionLabel: 'Saudi Arabia',
+    geminiBcp47: 'ar-001',
+    azureSttLocale: 'ar-SA',
+    googleTranslateCode: 'ar',
+    compareLocale: 'ar-SA',
+    romanizationBackend: 'local',
+    displayNameOverrides: { en: 'Arabic (Saudi)', de: 'Arabisch (Saudisch)' },
     name: 'Arabic (Saudi)',
     nativeName: 'العربية (السعودية)',
     flag: '🇸🇦',
@@ -694,6 +912,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'ar_eg',
     displayCode: 'ar-EG',
+    regionLabel: 'Egypt',
+    geminiBcp47: 'ar-EG',
+    azureSttLocale: 'ar-EG',
+    googleTranslateCode: 'ar',
+    compareLocale: 'ar-EG',
+    romanizationBackend: 'local',
+    displayNameOverrides: { en: 'Arabic (Egyptian)', de: 'Arabisch (Ägyptisch)' },
     name: 'Arabic (Egyptian)',
     nativeName: 'العربية (المصرية)',
     flag: '🇪🇬',
@@ -707,6 +932,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'ar_iq',
     displayCode: 'ar-IQ',
+    regionLabel: 'Iraq',
+    geminiBcp47: 'ar-001',
+    azureSttLocale: 'ar-IQ',
+    googleTranslateCode: 'ar',
+    compareLocale: 'ar-IQ',
+    romanizationBackend: 'local',
+    displayNameOverrides: { en: 'Arabic (Iraqi)', de: 'Arabisch (Irakisch)' },
     name: 'Arabic (Iraqi)',
     nativeName: 'العربية (العراقية)',
     flag: '🇮🇶',
@@ -722,14 +954,24 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'ar_lev',
     displayCode: 'ar-LB',
+    regionLabel: 'the Levant (Lebanon, Syria, Palestine, Jordan)',
+    geminiBcp47: 'ar-001',
+    azureSttLocale: 'ar-LB',
+    googleTranslateCode: 'ar',
+    compareLocale: 'ar-LB',
+    romanizationBackend: 'local',
+    displayNameOverrides: { en: 'Arabic (Levantine)', de: 'Arabisch (Levantinisch)' },
     name: 'Arabic (Levantine)',
     nativeName: 'العربية (الشامية)',
     flag: '🇱🇧',
     category: 'semitic',
     llmSupportTier: 'tier2',
-    // No dedicated Levantine Chirp3 voices — route through the shared Google
-    // MSA pool (`ar-XA`). See lib/voices.ts for the pool entry.
-    ttsProvider: 'google',
+    // Runs on Gemini TTS. Gemini has no Levantine locale (it collapses to
+    // `ar-001` World Arabic, shared with MSA/Saudi/Iraqi), so the voice is the
+    // shared/global Arabic Gemini voice and the dialect is named in the prompt
+    // via `ttsPromptName`. See lib/voices.ts (`ar_lev: [...GEMINI_CORE, ...]`).
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Levantine Arabic',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
@@ -737,6 +979,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'he',
     displayCode: 'he',
+    regionLabel: 'Israel',
+    geminiBcp47: 'he-IL',
+    azureSttLocale: 'he-IL',
+    romanizationBackend: 'local',
     name: 'Hebrew',
     nativeName: 'עברית',
     flag: '🌎',
@@ -753,8 +999,39 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Modern Hebrew',
   },
   {
+    code: 'fa',
+    displayCode: 'fa',
+    regionLabel: 'Iran',
+    geminiBcp47: 'fa-IR',
+    azureSttLocale: 'fa-IR',
+    name: 'Persian',
+    nativeName: 'فارسی',
+    flag: '🇮🇷',
+    category: 'other',
+    llmSupportTier: 'tier1',
+    // Gemini 3 Flash TTS (via OpenRouter); fa-IR is a documented Gemini TTS
+    // locale. See VOICE_POOLS in lib/voices.ts (`fa: [...GEMINI_CORE]`).
+    ttsProvider: 'gemini',
+    // Perso-Arabic script — romanized locally via `@sindresorhus/transliterate`
+    // (handles the Persian-specific letters پ/چ/ژ/گ that the Arabic library
+    // mangles). Note it's a consonant-skeleton transliteration: Persian script
+    // omits short vowels, so they're absent from the output (سلام → "slam").
+    // Wired in convex/lib/localRomanization.ts. Google v3 isn't an option here
+    // (its romanizeText 400s on `fa`).
+    needsRomanization: true,
+    romanizationBackend: 'local',
+    // Non-Latin script — karaoke highlighting off (matches Arabic/Hebrew).
+    supportsKaraoke: false,
+    supportsStt: true,
+  },
+  {
     code: 'sw',
     displayCode: 'sw-KE',
+    regionLabel: 'Kenya',
+    geminiBcp47: 'sw-KE',
+    azureSttLocale: 'sw-KE',
+    compareLocale: 'sw-KE',
+    displayNameOverrides: { en: 'Swahili (Kenya)', de: 'Swahili (Kenia)' },
     name: 'Swahili (Kenya)',
     nativeName: 'Kiswahili (Kenya)',
     flag: '🇰🇪',
@@ -768,6 +1045,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   {
     code: 'sw_tz',
     displayCode: 'sw-TZ',
+    regionLabel: 'Tanzania',
+    geminiBcp47: 'sw-KE',
+    azureSttLocale: 'sw-TZ',
+    googleTranslateCode: 'sw',
+    compareLocale: 'sw-TZ',
+    displayNameOverrides: { en: 'Swahili (Tanzania)', de: 'Swahili (Tansania)' },
     name: 'Swahili (Tanzania)',
     nativeName: 'Kiswahili (Tanzania)',
     flag: '🇹🇿',
@@ -782,6 +1065,17 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: false,
   },
 ];
+
+// displayCode → region label, derived from each Language's `regionLabel` field.
+// Consumed by `regionLabelFromDisplayCode` above. Languages without a
+// `regionLabel` (en, es_mixed) are absent here and fall through to the
+// dash-split default.
+const DISPLAY_CODE_TO_REGION: Record<string, string> = Object.fromEntries(
+  SUPPORTED_LANGUAGES.filter((l) => l.regionLabel).map((l) => [
+    l.displayCode,
+    l.regionLabel as string,
+  ]),
+);
 
 // ---------------------------------------------------------------------------
 // Language-metadata helpers
@@ -939,15 +1233,6 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
   reasoning: 'medium',
   maxOutputTokens: 8_000,
 };
-
-/**
- * Historical length threshold used by the previous length-hybrid default
- * rule. The active rule no longer branches on length, but the backfill
- * migration in `convex/migrations/backfillTranslationSource.ts` still uses
- * this constant to compute the pre-tagging `translationSource` for legacy
- * rows produced under the old policy.
- */
-export const HYBRID_LENGTH_THRESHOLD = 30;
 
 /**
  * Maximum number of auto-retranslations triggered by user flags on a single
@@ -1132,36 +1417,19 @@ export function generateCourseName(
 // Display-name overrides applied before falling back to Intl.DisplayNames.
 // Used where Intl returns an ambiguous string ("Cantonese" for both yue
 // scripts, "Spanish" for every es-* tag) or where we model a sentinel variant
-// ("Mixed"). Two lookup paths share the same map: internal codes (es_mixed,
-// zh_traditional) AND raw displayCodes for back-compat with the historical
+// ("Mixed"). Derived from each Language's `displayNameOverrides` field, keyed
+// by internal code. The Chinese entry's displayCode ('zh-CN') is also
+// registered for back-compat with the historical
 // `getLocalizedLanguageName('zh-CN', 'en')` contract.
-const NAME_OVERRIDES: Record<string, Record<string, string>> = {
-  // `en` falls through to Intl.DisplayNames so it displays as plain
-  // "English" / "Englisch" with no "(Mixed)" qualifier — the variant codes
-  // (en_gb / en_us / en_au) are what users see when they want a specific
-  // accent; `en` is the default English.
-  en_gb: { en: 'English (UK)', de: 'Englisch (UK)' },
-  en_us: { en: 'English (US)', de: 'Englisch (USA)' },
-  en_au: { en: 'English (Australia)', de: 'Englisch (Australien)' },
-  es: { en: 'Spanish (Spain)', de: 'Spanisch (Spanien)' },
-  es_latam: { en: 'Spanish (Latin America)', de: 'Spanisch (Lateinamerika)' },
-  es_mixed: { en: 'Spanish (Mixed)', de: 'Spanisch (Gemischt)' },
-  zh: { en: 'Chinese (Simplified)', de: 'Chinesisch (Vereinfacht)' },
-  // Historical displayCode key — pre-refactor callers passed 'zh-CN' directly
-  // to `getLocalizedLanguageName`. Kept so external consumers/tests don't
-  // break.
-  'zh-CN': { en: 'Chinese (Simplified)', de: 'Chinesisch (Vereinfacht)' },
-  zh_traditional: { en: 'Chinese (Traditional)', de: 'Chinesisch (Traditionell)' },
-  yue: { en: 'Cantonese (Simplified)', de: 'Kantonesisch (Vereinfacht)' },
-  yue_traditional: { en: 'Cantonese (Traditional)', de: 'Kantonesisch (Traditionell)' },
-  ar: { en: 'Arabic (Modern Standard)', de: 'Arabisch (Hocharabisch)' },
-  ar_sa: { en: 'Arabic (Saudi)', de: 'Arabisch (Saudisch)' },
-  ar_eg: { en: 'Arabic (Egyptian)', de: 'Arabisch (Ägyptisch)' },
-  ar_iq: { en: 'Arabic (Iraqi)', de: 'Arabisch (Irakisch)' },
-  ar_lev: { en: 'Arabic (Levantine)', de: 'Arabisch (Levantinisch)' },
-  sw: { en: 'Swahili (Kenya)', de: 'Swahili (Kenia)' },
-  sw_tz: { en: 'Swahili (Tanzania)', de: 'Swahili (Tansania)' },
-};
+const NAME_OVERRIDES: Record<string, Record<string, string>> = (() => {
+  const out: Record<string, Record<string, string>> = {};
+  for (const lang of SUPPORTED_LANGUAGES) {
+    if (lang.displayNameOverrides) out[lang.code] = lang.displayNameOverrides;
+  }
+  const zh = SUPPORTED_LANGUAGES.find((l) => l.code === 'zh');
+  if (zh?.displayNameOverrides) out['zh-CN'] = zh.displayNameOverrides;
+  return out;
+})();
 
 function localizedOverride(
   key: string,
@@ -1278,12 +1546,20 @@ export function languageSupportsStt(code: string): boolean {
 }
 
 /**
- * Variant suffixes recognised by `normalizeLanguageCode`. Add new ones here
- * whenever a new dialect variant is added to `SUPPORTED_LANGUAGES` — stats and
- * the variants-collapsing UI rely on this list. Kept as a single union so a
- * code like "ar_iq" collapses to "ar" rather than passing through.
+ * Variant suffixes recognised by `normalizeLanguageCode`, derived from the
+ * suffixes actually present in `SUPPORTED_LANGUAGES` codes (the segment after
+ * the first underscore, e.g. `es_latam` → `latam`). Adding a dialect variant
+ * to the catalog auto-extends the pattern. Kept as a single union so a code
+ * like "ar_iq" collapses to "ar" rather than passing through.
  */
-const VARIANT_SUFFIX_RE = /_(latam|mixed|traditional|gb|us|au|sa|eg|iq|lev|tz)$/;
+const VARIANT_SUFFIXES = [
+  ...new Set(
+    SUPPORTED_LANGUAGES.map((l) => l.code.split('_')[1]).filter(
+      (s): s is string => !!s,
+    ),
+  ),
+];
+const VARIANT_SUFFIX_RE = new RegExp(`_(${VARIANT_SUFFIXES.join('|')})$`);
 
 /**
  * Mixed-dialect language codes whose translations span multiple regional
@@ -1302,12 +1578,12 @@ const MIXED_LANGUAGE_VARIANTS: Record<
     subCode: string;
     voiceLocalePrefix: string;
   }>
-> = {
-  es_mixed: [
-    { subCode: 'es', voiceLocalePrefix: 'es-ES' },
-    { subCode: 'es_latam', voiceLocalePrefix: 'es-US' },
-  ],
-};
+> = Object.fromEntries(
+  SUPPORTED_LANGUAGES.filter((l) => l.variants?.length).map((l) => [
+    l.code,
+    l.variants as ReadonlyArray<{ subCode: string; voiceLocalePrefix: string }>,
+  ]),
+);
 
 export function isMixedLanguage(code: string): boolean {
   return code in MIXED_LANGUAGE_VARIANTS;

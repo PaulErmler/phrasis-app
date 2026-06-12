@@ -413,15 +413,16 @@ describe("features/scheduling", () => {
         const audioId = await ctx.db.insert("audioRecordings", {
           textId,
           language: "sv",
-          // Use the current Swedish provider (Google Chirp3) so the row
-          // survives the precedence sweep on the copied textId — `google` now
-          // overrides `azure` (lib/ttsPrecedence.ts), so an Azure row here
-          // would be deleted and regenerated. The test's intent is to verify
-          // copy preserves all fields, not the regen logic.
-          voiceName: "sv-SE-Chirp3-HD-Leda",
+          // Use the current Swedish provider (Gemini) so the row survives the
+          // precedence sweep on the copied textId — `gemini` sits at the top of
+          // lib/ttsPrecedence.ts (it overrides google/azure/elevenlabs and
+          // nothing overrides it), so a google/azure row here would be deleted
+          // and regenerated. The test's intent is to verify copy preserves all
+          // fields, not the regen logic.
+          voiceName: "Kore",
           storageId,
           ttsQuality: "validated",
-          ttsProvider: "google",
+          ttsProvider: "gemini",
           voiceGender: "female",
           speed: 0.9,
           wordTimings: [{ word: "Hej", start: 0, end: 0.5 }],
@@ -486,9 +487,9 @@ describe("features/scheduling", () => {
       );
       // Every field from the source row must be preserved on the copy.
       expect(audio, "audio row was not copied for unchanged language").toBeTruthy();
-      expect(audio?.voiceName).toBe("sv-SE-Chirp3-HD-Leda");
+      expect(audio?.voiceName).toBe("Kore");
       expect(audio?.ttsQuality).toBe("validated");
-      expect(audio?.ttsProvider).toBe("google");
+      expect(audio?.ttsProvider).toBe("gemini");
       expect(audio?.voiceGender).toBe("female");
       expect(audio?.speed).toBe(0.9);
       expect(audio?.wordTimings).toEqual([{ word: "Hej", start: 0, end: 0.5 }]);
@@ -599,6 +600,34 @@ describe("features/scheduling", () => {
       );
       expect(byLang.en).toBe(ORIGINAL_EN_SOURCE);
       expect(byLang.de).toBe("user-provided");
+    });
+
+    it("preserves radioPlayCount (and radioRoundCounter) on the replacement card", async () => {
+      // Path B replaces the card with a fresh row; the radio play-count must
+      // carry over so an in-place edit doesn't reset the "Only new" graduation.
+      const t = convexTest(schema, modules);
+      const { cardId, textId: oldTextId } = await seedSharedCardWithAudio(t);
+      await t.run(async (ctx) => {
+        await ctx.db.patch(cardId, { radioPlayCount: 12, radioRoundCounter: 3 });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hejsan" }, // source change → Path B
+          { language: "en", text: "Hello" },
+        ],
+        timezone: "UTC",
+      });
+
+      const allCards = await t.run(async (ctx) =>
+        ctx.db.query("cards").collect(),
+      );
+      const replacement = allCards.find((c) => c.textId !== oldTextId);
+      expect(replacement, "a replacement card should exist").toBeTruthy();
+      expect(replacement?.radioPlayCount).toBe(12);
+      expect(replacement?.radioRoundCounter).toBe(3);
     });
   });
 
@@ -978,6 +1007,25 @@ describe("features/scheduling", () => {
         expect(res).toBeNull();
       });
 
+      it("surfaces radioPlayCount to the client (and leaves it undefined for cards that predate the field)", async () => {
+        // The "Only new" limit reads radioPlayCount off the card result; the
+        // client treats undefined as 0 (→ baselined off the active review count).
+        const t = convexTest(schema, modules);
+        const { cardIds } = await seedRadioDeck(t, [{ counter: 0 }]);
+        const asUser = t.withIdentity({ subject: "user_A" });
+
+        // seedRadioDeck doesn't set radioPlayCount → undefined on the wire.
+        let res = await asUser.query(api.features.scheduling.getCardForReview, {});
+        expect(res?._id).toBe(cardIds[0]);
+        expect(res?.radioPlayCount).toBeUndefined();
+
+        await t.run(async (ctx) => {
+          await ctx.db.patch(cardIds[0], { radioPlayCount: 7 });
+        });
+        res = await asUser.query(api.features.scheduling.getCardForReview, {});
+        expect(res?.radioPlayCount).toBe(7);
+      });
+
       it("skips mastered and hidden cards", async () => {
         const t = convexTest(schema, modules);
         const { cardIds } = await seedRadioDeck(t, [
@@ -1072,6 +1120,35 @@ describe("features/scheduling", () => {
         expect(result.nextRadioRoundCounter).toBe(101);
         const card = await t.run(async (ctx) => ctx.db.get(cardIds[2]));
         expect(card?.radioRoundCounter).toBe(101);
+      });
+
+      it("seeds radioPlayCount from the review count for cards that predate the field, then +1 per play", async () => {
+        // The "Only new" limit needs a true radio play-count, distinct from the
+        // rotation-position `radioRoundCounter` (which jumps via catch-up). A
+        // card with no `radioPlayCount` (predates the field) but a review count
+        // of 4 (preReviewCount 4 + 0 reps) seeds to 4, then +1 → 5 on first
+        // play, 6 on the next — so an already-practiced card doesn't reset to
+        // "new" in radio.
+        const t = convexTest(schema, modules);
+        const { cardIds } = await seedRadioDeck(t, [{ counter: 0 }]);
+        await t.run(async (ctx) => {
+          await ctx.db.patch(cardIds[0], { preReviewCount: 4 });
+        });
+        const asUser = t.withIdentity({ subject: "user_A" });
+
+        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+          cardId: cardIds[0],
+          timezone: "UTC",
+        });
+        let card = await t.run(async (ctx) => ctx.db.get(cardIds[0]));
+        expect(card?.radioPlayCount).toBe(5);
+
+        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+          cardId: cardIds[0],
+          timezone: "UTC",
+        });
+        card = await t.run(async (ctx) => ctx.db.get(cardIds[0]));
+        expect(card?.radioPlayCount).toBe(6);
       });
 
       it("does not modify FSRS state, dueDate, schedulingPhase, or preReviewCount", async () => {

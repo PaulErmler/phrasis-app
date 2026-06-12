@@ -80,6 +80,24 @@ describe("useStatsSnapshot", () => {
     expect(result.current.prev).toEqual({ reviews: 0 });
   });
 
+  it("dateScoped — stale multi-period snapshot zeroes all keys (NumbersRow shape)", () => {
+    // Mirrors the stats-page `statsPage_periods` snapshot crossing a day
+    // boundary: yesterday's day/week totals must not become the animation's
+    // "from" value.
+    localStorage.setItem(
+      "statsPage_periods",
+      JSON.stringify({ __date: "2000-01-01", dayReps: 99, weekReps: 50 }),
+    );
+    const { result } = renderHook(() =>
+      useStatsSnapshot(
+        "statsPage_periods",
+        { dayReps: 3, weekReps: 12 },
+        { dateScoped: true },
+      ),
+    );
+    expect(result.current.prev).toEqual({ dayReps: 0, weekReps: 0 });
+  });
+
   it("does not persist when all values are zero", () => {
     const { rerender } = renderHook(
       ({ v }) => useStatsSnapshot("zero", v, { settleDuration: 50 }),

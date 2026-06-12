@@ -194,6 +194,42 @@ describe('getLocalizedLanguageNameByCode', () => {
   it('returns the input code when unknown', () => {
     expect(getLocalizedLanguageNameByCode('zz', 'en')).toBe('zz');
   });
+
+  // Characterizes the display-name overrides (en + de) for every code that has
+  // them, so the "single source of truth" refactor (overrides on the Language
+  // record) provably preserves the localized picker labels.
+  const EXPECTED_NAMES: Record<string, { en: string; de: string }> = {
+    en_gb: { en: 'English (UK)', de: 'Englisch (UK)' },
+    en_us: { en: 'English (US)', de: 'Englisch (USA)' },
+    en_au: { en: 'English (Australia)', de: 'Englisch (Australien)' },
+    es: { en: 'Spanish (Spain)', de: 'Spanisch (Spanien)' },
+    es_latam: { en: 'Spanish (Latin America)', de: 'Spanisch (Lateinamerika)' },
+    es_mixed: { en: 'Spanish (Mixed)', de: 'Spanisch (Gemischt)' },
+    pt: { en: 'Portuguese (Brazil)', de: 'Portugiesisch (Brasilien)' },
+    pt_pt: { en: 'Portuguese (Portugal)', de: 'Portugiesisch (Portugal)' },
+    zh: { en: 'Chinese (Simplified)', de: 'Chinesisch (Vereinfacht)' },
+    zh_traditional: { en: 'Chinese (Traditional)', de: 'Chinesisch (Traditionell)' },
+    yue: { en: 'Cantonese (Simplified)', de: 'Kantonesisch (Vereinfacht)' },
+    yue_traditional: { en: 'Cantonese (Traditional)', de: 'Kantonesisch (Traditionell)' },
+    ar: { en: 'Arabic (Modern Standard)', de: 'Arabisch (Hocharabisch)' },
+    ar_sa: { en: 'Arabic (Saudi)', de: 'Arabisch (Saudisch)' },
+    ar_eg: { en: 'Arabic (Egyptian)', de: 'Arabisch (Ägyptisch)' },
+    ar_iq: { en: 'Arabic (Iraqi)', de: 'Arabisch (Irakisch)' },
+    ar_lev: { en: 'Arabic (Levantine)', de: 'Arabisch (Levantinisch)' },
+    sw: { en: 'Swahili (Kenya)', de: 'Swahili (Kenia)' },
+    sw_tz: { en: 'Swahili (Tanzania)', de: 'Swahili (Tansania)' },
+  };
+
+  it('resolves the documented en + de override for every overridden code', () => {
+    for (const [code, names] of Object.entries(EXPECTED_NAMES)) {
+      expect(getLocalizedLanguageNameByCode(code, 'en'), `${code}/en`).toBe(
+        names.en,
+      );
+      expect(getLocalizedLanguageNameByCode(code, 'de'), `${code}/de`).toBe(
+        names.de,
+      );
+    }
+  });
 });
 
 describe('romanization helpers', () => {
@@ -257,5 +293,28 @@ describe('resolveMixedVariant', () => {
     // variant has probability ~2^-50; if this test ever flakes the hash is
     // catastrophically biased.
     expect(seen).toEqual(new Set(['es', 'es_latam']));
+  });
+});
+
+describe('Persian (fa) language record', () => {
+  const fa = getLanguageByCode('fa');
+
+  it('is registered in SUPPORTED_LANGUAGES', () => {
+    expect(fa).toBeDefined();
+    expect(fa?.name).toBe('Persian');
+  });
+
+  it('routes TTS through Gemini (fa-IR) with Azure STT', () => {
+    expect(fa?.ttsProvider).toBe('gemini');
+    expect(fa?.geminiBcp47).toBe('fa-IR');
+    expect(fa?.azureSttLocale).toBe('fa-IR');
+    expect(fa?.supportsStt).toBe(true);
+  });
+
+  it('romanizes locally and disables karaoke (Perso-Arabic script)', () => {
+    expect(fa?.needsRomanization).toBe(true);
+    expect(fa?.romanizationBackend).toBe('local');
+    expect(languageNeedsRomanization('fa')).toBe(true);
+    expect(fa?.supportsKaraoke).toBe(false);
   });
 });

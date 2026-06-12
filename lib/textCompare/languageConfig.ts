@@ -1,4 +1,5 @@
 import type { NormalizeOptions } from './normalize';
+import { SUPPORTED_LANGUAGES } from '../languages';
 
 /** Subset of CompareConfig that's actually consumed by charDiff/alignWords.
  * Kept separate so callers don't accidentally rely on hasWordBoundaries
@@ -23,51 +24,17 @@ const DEFAULT: CompareConfig = {
   hasWordBoundaries: true,
 };
 
-const PER_LANGUAGE: Record<string, Partial<CompareConfig>> = {
-  en: { locale: 'en' },
-  en_gb: { locale: 'en-GB' },
-  en_us: { locale: 'en-US' },
-  en_au: { locale: 'en-AU' },
-  de: { locale: 'de' },
-  es: { locale: 'es' },
-  es_latam: { locale: 'es-419' },
-  es_mixed: { locale: 'es' },
-  fr: { locale: 'fr' },
-  it: { locale: 'it' },
-  pt: { locale: 'pt' },
-  nl: { locale: 'nl' },
-  sv: { locale: 'sv' },
-  nb: { locale: 'nb' },
-  da: { locale: 'da' },
-  fi: { locale: 'fi' },
-  pl: { locale: 'pl' },
-  sk: { locale: 'sk' },
-  ru: { locale: 'ru' },
-  el: { locale: 'el' },
-  hi: { locale: 'hi' },
-  bn: { locale: 'bn' },
-  tr: { locale: 'tr' },
-  hu: { locale: 'hu' },
-  ro: { locale: 'ro' },
-  cs: { locale: 'cs' },
-  he: { locale: 'he' },
-  ar: { locale: 'ar' },
-  ar_sa: { locale: 'ar-SA' },
-  ar_eg: { locale: 'ar-EG' },
-  ar_iq: { locale: 'ar-IQ' },
-  ar_lev: { locale: 'ar-LB' },
-  sw: { locale: 'sw-KE' },
-  sw_tz: { locale: 'sw-TZ' },
-  ko: { locale: 'ko' },
-  vi: { locale: 'vi' },
-  id: { locale: 'id' },
-  zh: { locale: 'zh', hasWordBoundaries: false },
-  zh_traditional: { locale: 'zh-TW', hasWordBoundaries: false },
-  yue: { locale: 'yue-Hans-HK', hasWordBoundaries: false },
-  yue_traditional: { locale: 'yue-Hant-HK', hasWordBoundaries: false },
-  ja: { locale: 'ja', hasWordBoundaries: false },
-  th: { locale: 'th', hasWordBoundaries: false },
-};
+// Derived from each Language's `compareLocale` + `hasWordBoundaries` fields
+// (single source of truth in lib/languages.ts). `locale` defaults to the
+// internal code when `compareLocale` is unset; `hasWordBoundaries` is only set
+// when a language opts out (zh/ja/th/yue — no spaces between words).
+const PER_LANGUAGE: Record<string, Partial<CompareConfig>> = Object.fromEntries(
+  SUPPORTED_LANGUAGES.map((l) => {
+    const cfg: Partial<CompareConfig> = { locale: l.compareLocale ?? l.code };
+    if (l.hasWordBoundaries === false) cfg.hasWordBoundaries = false;
+    return [l.code, cfg];
+  }),
+);
 
 export function getCompareConfig(languageCode: string): CompareConfig {
   return { ...DEFAULT, ...(PER_LANGUAGE[languageCode] ?? {}) };

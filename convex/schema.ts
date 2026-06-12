@@ -31,13 +31,35 @@ export const courseSettingsFields = {
   languageRepetitionPauses: v.optional(v.record(v.string(), v.number())), // per-language pause between repeats (seconds)
   languagePlaybackSpeeds: v.optional(v.record(v.string(), v.number())), // e.g. { "en": 1.0, "es": 0.9 }; range PLAYBACK_SPEED_MIN-PLAYBACK_SPEED_MAX (see lib/constants/audioPlayback); missing = 1.0. Pitch-preserved via HTMLMediaElement.preservesPitch for single clips and SoundTouchJS for the merged WAV.
   pauseBaseToBase: v.optional(v.number()), // seconds between different base languages
-  pauseBaseToTarget: v.optional(v.number()), // seconds between base and target sections
-  pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages
+  pauseBaseToTarget: v.optional(v.number()), // seconds between base and (after) target sections
+  pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages (both before- and after-base groups)
   pauseBeforeAutoAdvance: v.optional(v.number()), // seconds to wait before auto-advancing to next card
+  // Target-before-base ("Practice Listening") vs target-after-base ("Practice Speaking").
+  // At least one must be enabled; the client enforces this. Defaults reproduce the
+  // historical base→target sequence (after on, before off).
+  playTargetBeforeBase: v.optional(v.boolean()), // play target language(s) before base ("Practice Listening", default off)
+  playTargetAfterBase: v.optional(v.boolean()), // play target language(s) after base ("Practice Speaking", default on)
+  // Independent settings for the before-base target group (the after-base group reuses
+  // languageRepetitions / languageRepetitionPauses / languagePlaybackSpeeds).
+  targetBeforeRepetitions: v.optional(v.record(v.string(), v.number())), // reps per target lang, before-base group
+  targetBeforeRepetitionPauses: v.optional(v.record(v.string(), v.number())), // between-rep pause per target lang, before-base group
+  targetBeforePlaybackSpeeds: v.optional(v.record(v.string(), v.number())), // playback speed per target lang, before-base group; clamped PLAYBACK_SPEED_MIN-MAX
+  pauseTargetToBase: v.optional(v.number()), // seconds between the before-base target group and the base group (mirror of pauseBaseToTarget)
+  // "Only new": with BOTH Practice Listening and Practice Speaking on, play
+  // target-before-base ("Practice Listening") only on a card's initial N reviews,
+  // then graduate it to target-after-base ("Practice Speaking"). Only takes
+  // effect when both are on; with Speaking off it's treated as ∞ (Listening
+  // always plays) and the sub-setting is hidden in the UI.
+  // 0 / undefined = always (∞, the default); 1-10 = limit. The review count is
+  // preReviewCount + FSRS reps in audio mode, and max(that, radioPlayCount)
+  // in radio mode (radio plays don't bump the FSRS review count).
+  targetBeforeOnlyNewReps: v.optional(v.number()),
   showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
   progressDisplayEnabled: v.optional(v.boolean()), // celebrate every PROGRESS_DISPLAY_INTERVAL reviews (default true)
   hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
-  autoRevealLanguages: v.optional(v.boolean()), // unblur when audio starts playing
+  autoRevealLanguages: v.optional(v.boolean()), // unblur target text when its audio starts playing
+  hideBaseLanguages: v.optional(v.boolean()), // blur base language text by default (default off)
+  autoRevealBaseLanguages: v.optional(v.boolean()), // unblur base text when its audio starts playing
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
   // Language order overrides
   baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
@@ -191,8 +213,8 @@ export default defineSchema({
     // strategy swap (new dataset version, new model, new prompt) can find
     // and regenerate rows produced by the prior method via a simple
     // `translationSource != currentSource` migration. Optional for
-    // backward-compat with rows that landed before this field existed —
-    // see `convex/migrations/backfillTranslationSource.ts`.
+    // backward-compat with rows that landed before this field existed — the
+    // one-time backfill that tagged them has since run and been removed.
     translationSource: v.optional(v.string()),
     // Concrete regional variant chosen for this row when `targetLanguage` is a
     // mixed/aggregate code (today: "es_mixed"). Stored as a Google voice-locale
@@ -205,14 +227,16 @@ export default defineSchema({
     // enqueue a stronger model; flags 3+ only increment the counter for
     // later admin triage. Undefined treated as 0 for back-compat.
     flagCount: v.optional(v.number()),
-    // Speaker gender ('male' | 'female') the translation was produced under,
-    // mirroring the card's `texts.speakerGender` at write time. Used by
-    // `scheduleMissingContent` to invalidate translations whose grammar
-    // would no longer agree with the card's current voice gender (e.g.
-    // when LLM metadata analysis lands a definitive gender that overrides
-    // the initial coin-flip). Undefined on legacy rows written before this
-    // field existed — treated as "unknown, regenerate on next sweep."
-    speakerGender: v.optional(v.string()),
+    // Voice/audio speaker gender ('male' | 'female') the translation was
+    // produced under — the resolved `texts.audioSpeakerGender` at write time,
+    // NOT `texts.speakerGender` (which can be 'neutral' and is what the
+    // translation prompt reads). Recording the voice gender is what lets
+    // `scheduleMissingContent` invalidate translations whose grammar would no
+    // longer agree with the card's current voice gender (e.g. when LLM
+    // metadata analysis lands a definitive gender that overrides the initial
+    // coin-flip). Undefined on legacy rows written before this field existed —
+    // treated as "unknown, regenerate on next sweep."
+    speakerGender: v.optional(voiceGenderValidator),
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),
@@ -406,6 +430,7 @@ export default defineSchema({
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
     radioRoundCounter: v.optional(v.number()), // Radio mode: # of times this card has been played in radio mode. Lowest counter plays next; new cards default to 0 so they play first. Optional for backward compat — undefined treated as 0.
     radioOrderKey: v.optional(v.number()), // Radio mode: random tiebreak within equal `radioRoundCounter`. Re-rolled on each play so the round-robin order shuffles every loop and never matches the review (`dueDate`-driven) order. Optional for backward compat.
+    radioPlayCount: v.optional(v.number()), // Radio mode: true count of radio plays (+1 per play, NOT subject to radioRoundCounter's catch-up jump). Drives the "Only new" Practice-Listening limit. Optional/undefined for pre-existing cards — treated as the card's review count (preReviewCount + FSRS reps) so they don't reset to "new".
   })
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_dueDate', ['deckId', 'dueDate'])
@@ -718,7 +743,8 @@ export default defineSchema({
 
   // Unique words per user per course per language.
   // courseId is optional only to accommodate pre-migration rows; new writes
-  // always populate it and backfillUserStats rebuilds historical data.
+  // always populate it (historical rows were rebuilt by a one-time stats
+  // backfill that has since run and been removed).
   userWords: defineTable({
     userId: v.string(),
     courseId: v.optional(v.id('courses')),
@@ -829,10 +855,10 @@ export default defineSchema({
     .index('by_userId_and_courseId', ['userId', 'courseId'])
     .index('by_userId_and_courseId_and_reviewNumber', ['userId', 'courseId', 'reviewNumber']),
 
-  // Per-user state for the retokenizeAllWords migration. Accumulated across
-  // paginated `run` passes so the clear-and-rebuild chain fires exactly once
-  // per user with their full course list, regardless of how many pages the
-  // user's courses span. Rows are deleted as each user's chain is scheduled.
+  // Per-user state left over from the (now-removed) one-shot retokenize
+  // migration. No longer read or written; the table is retained pending a
+  // separate schema-only cleanup so a deploy doesn't drop a still-populated
+  // table.
   retokenizeMigrationState: defineTable({
     userId: v.string(),
     courseIds: v.array(v.id('courses')),

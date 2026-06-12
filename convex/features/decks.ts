@@ -47,6 +47,8 @@ import {
   ttsQualityValidator,
   ttsProviderValidator,
   voiceGenderValidator,
+  asVoiceGender,
+  type SchedulingMode,
 } from '../types';
 import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
 import { languageSupportsStt } from '../../lib/languages';
@@ -56,7 +58,6 @@ import {
 } from './llmTranslationQueue';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
-  COLLECTION_PREVIEW_SIZE,
   CONTENT_LOOKAHEAD_SIZE,
   LEGACY_LEVEL_ORDER,
   isPremadeLevelCollection,
@@ -272,8 +273,9 @@ export async function scheduleMissingContent(
         const existingProvider = audio.ttsProvider ?? 'google';
         const currentProvider = getTtsProviderForLanguage(lang);
         // Provider regen is now gated by lib/ttsPrecedence.ts — only the
-        // matchups listed there force a delete + re-synth. Unlisted pairs
-        // keep the existing audio (e.g. Google rows are never overwritten).
+        // (current, existing) matchups listed there force a delete + re-synth
+        // (e.g. google now overwrites azure, to migrate the Arabic dialects
+        // off Azure). Unlisted pairs keep the existing audio.
         const providerMismatch = shouldOverwriteProvider(
           currentProvider,
           existingProvider,
@@ -947,6 +949,7 @@ export async function createCardsFromTexts(
         schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
         radioRoundCounter: 0,
+        radioPlayCount: 0,
         // Random tiebreak so that even brand-new cards inserted in a single
         // batch (which would otherwise share creation time + counter) end up
         // in a shuffled radio order rather than insertion order.
@@ -1011,7 +1014,7 @@ export const addCardsFromCollection = mutation({
     totalCardsInDeck: v.number(),
   }),
   handler: async (ctx, args) => {
-    const { userId, settings, course } = await requireActiveCourse(ctx);
+    const { userId, course } = await requireActiveCourse(ctx);
     const courseId = course._id;
 
     const clampedBatchSize = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(args.batchSize)));
@@ -1356,6 +1359,125 @@ export const ensureCardContent = mutation({
 });
 
 /**
+ * Query the next N upcoming (due) cards for a given scheduling mode. The card
+ * set differs by mode: `learn_new` pulls only new (non-graduated) cards via
+ * the graduated index, while `learnAndReview` / `radio` pull all due cards.
+ */
+async function getUpcomingCardsForMode(
+  ctx: MutationCtx,
+  deckId: Id<'decks'>,
+  mode: SchedulingMode,
+  now: number,
+): Promise<Doc<'cards'>[]> {
+  if (mode === 'learn_new') {
+    return ctx.db
+      .query('cards')
+      .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
+        q
+          .eq('deckId', deckId)
+          .eq('isHidden', false)
+          .eq('isMastered', false)
+          .eq('isGraduated', false)
+          .lte('dueDate', now),
+      )
+      .order('asc')
+      .take(ENSURE_CONTENT_LOOKAHEAD);
+  }
+  return ctx.db
+    .query('cards')
+    .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
+      q
+        .eq('deckId', deckId)
+        .eq('isHidden', false)
+        .eq('isMastered', false)
+        .lte('dueDate', now),
+    )
+    .order('asc')
+    .take(ENSURE_CONTENT_LOOKAHEAD);
+}
+
+/**
+ * Schedule missing content (translations + TTS) for the supplied due cards,
+ * then pre-prep the active premade collection's upcoming texts. Shared by the
+ * per-mode (`ensureUpcomingCardsContent`) and all-modes
+ * (`ensureUpcomingCardsContentAllModes`) ensure mutations. Returns the number
+ * of due cards processed.
+ */
+async function scheduleContentForUpcomingCards(
+  ctx: MutationCtx,
+  userId: string,
+  active: { settings: Doc<'userSettings'>; course: Doc<'courses'> },
+  cards: Doc<'cards'>[],
+  activeCollectionId: Id<'collections'> | undefined,
+): Promise<number> {
+  let processed = 0;
+  // Batch-load the texts for all due cards up front (one concurrent read
+  // instead of one sequential `ctx.db.get` per card) before the sequential
+  // scheduleMissingContent loop.
+  const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    const text = texts[i];
+    if (!text) continue;
+    // Bump priority for cards in the user's currently-active collection
+    // so their content jumps to the front of the TTS / LLM queues.
+    // priority: 2 because these are the lookahead cards the user will reach
+    // within the current (or an imminent) session, so they're effectively
+    // blocking.
+    const priority =
+      activeCollectionId &&
+      card.collectionId &&
+      activeCollectionId === card.collectionId
+        ? 2
+        : 0;
+    await scheduleMissingContent(
+      ctx,
+      card.textId,
+      text,
+      active.course.baseLanguages,
+      active.course.targetLanguages,
+      { priority },
+    );
+    processed++;
+  }
+
+  // Pre-prep the next batch of upcoming texts in the active premade
+  // collection — the ones a future addCardsFromCollection call would pull
+  // in. Without this, a user who exhausts due cards and clicks "Add" has
+  // to wait on TTS + translation for the freshly added cards.
+  if (activeCollectionId) {
+    const collection = await ctx.db.get(activeCollectionId);
+    if (collection && isPremadeLevelCollection(collection)) {
+      const progress = await getCollectionProgressHelper(
+        ctx,
+        userId,
+        active.course._id,
+        activeCollectionId,
+      );
+      const lastRank = progress?.lastRankProcessed ?? 0;
+      const upcomingTexts = await getNextTextsFromRank(
+        ctx,
+        activeCollectionId,
+        lastRank,
+        CONTENT_LOOKAHEAD_SIZE,
+        { onlyCurriculum: true },
+      );
+      for (const text of upcomingTexts) {
+        await scheduleMissingContent(
+          ctx,
+          text._id,
+          text,
+          active.course.baseLanguages,
+          active.course.targetLanguages,
+        );
+      }
+    }
+  }
+
+  return processed;
+}
+
+/**
  * Ensure content for the next N due cards in the user's active deck.
  * Called from the learning mode to pre-generate translations and audio
  * for upcoming cards so they're ready before the user reaches them.
@@ -1374,95 +1496,72 @@ export const ensureUpcomingCardsContent = mutation({
     const schedulingMode = settings?.schedulingMode ?? 'learnAndReview';
     const activeCollectionId = settings?.activeCollectionId;
 
+    const cards = await getUpcomingCardsForMode(
+      ctx,
+      deck._id,
+      schedulingMode,
+      Date.now(),
+    );
+
+    return scheduleContentForUpcomingCards(
+      ctx,
+      userId,
+      active,
+      cards,
+      activeCollectionId,
+    );
+  },
+});
+
+// Scheduling modes whose upcoming card sets differ for content purposes.
+// `radio` shares `learnAndReview`'s due-card selection, so warming these two
+// covers all three modes.
+const WARMABLE_SCHEDULING_MODES: SchedulingMode[] = ['learn_new', 'learnAndReview'];
+
+/**
+ * Ensure content for the upcoming cards across *all* scheduling modes, so any
+ * mode the user picks starts instantly. Called from the home screen (with no
+ * args) to pre-warm content before the user enters a learning session.
+ *
+ * Unlike `ensureUpcomingCardsContent`, which only warms the user's currently
+ * saved mode, this merges the upcoming cards from each mode's selection branch
+ * (deduped by card id) so neither mode is left with missing content.
+ */
+export const ensureUpcomingCardsContentAllModes = mutation({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const userId = await requireAuthUserId(ctx);
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return 0;
+    const deck = await getDeckByCourseId(ctx, active.course._id);
+    if (!deck) return 0;
+
+    const settings = await getCourseSettings(ctx, active.course._id);
+    const activeCollectionId = settings?.activeCollectionId;
+
     const now = Date.now();
-    let cards;
-    if (schedulingMode === 'learn_new') {
-      cards = await ctx.db
-        .query('cards')
-        .withIndex('by_deck_hidden_mastered_graduated_due', (q) =>
-          q
-            .eq('deckId', deck._id)
-            .eq('isHidden', false)
-            .eq('isMastered', false)
-            .eq('isGraduated', false)
-            .lte('dueDate', now),
-        )
-        .order('asc')
-        .take(ENSURE_CONTENT_LOOKAHEAD);
-    } else {
-      cards = await ctx.db
-        .query('cards')
-        .withIndex('by_deckId_and_isHidden_and_isMastered_and_dueDate', (q) =>
-          q
-            .eq('deckId', deck._id)
-            .eq('isHidden', false)
-            .eq('isMastered', false)
-            .lte('dueDate', now),
-        )
-        .order('asc')
-        .take(ENSURE_CONTENT_LOOKAHEAD);
-    }
+    const cardLists = await Promise.all(
+      WARMABLE_SCHEDULING_MODES.map((mode) =>
+        getUpcomingCardsForMode(ctx, deck._id, mode, now),
+      ),
+    );
 
-    let processed = 0;
-    for (const card of cards) {
-      const text = await ctx.db.get(card.textId);
-      if (!text) continue;
-      // Bump priority for cards in the user's currently-active collection
-      // so their content jumps to the front of the TTS / LLM queues.
-      // priority: 2 because `ensureUpcomingCardsContent` is the lookahead
-      // path during review — the user will reach these cards within the
-      // current session, so they're effectively blocking.
-      const priority =
-        activeCollectionId &&
-        card.collectionId &&
-        activeCollectionId === card.collectionId
-          ? 2
-          : 0;
-      await scheduleMissingContent(
-        ctx,
-        card.textId,
-        text,
-        active.course.baseLanguages,
-        active.course.targetLanguages,
-        { priority },
-      );
-      processed++;
-    }
-
-    // Pre-prep the next batch of upcoming texts in the active premade
-    // collection — the ones a future addCardsFromCollection call would pull
-    // in. Without this, a user who exhausts due cards and clicks "Add" has
-    // to wait on TTS + translation for the freshly added cards.
-    if (activeCollectionId) {
-      const collection = await ctx.db.get(activeCollectionId);
-      if (collection && isPremadeLevelCollection(collection)) {
-        const progress = await getCollectionProgressHelper(
-          ctx,
-          userId,
-          active.course._id,
-          activeCollectionId,
-        );
-        const lastRank = progress?.lastRankProcessed ?? 0;
-        const upcomingTexts = await getNextTextsFromRank(
-          ctx,
-          activeCollectionId,
-          lastRank,
-          CONTENT_LOOKAHEAD_SIZE,
-          { onlyCurriculum: true },
-        );
-        for (const text of upcomingTexts) {
-          await scheduleMissingContent(
-            ctx,
-            text._id,
-            text,
-            active.course.baseLanguages,
-            active.course.targetLanguages,
-          );
-        }
+    // Merge + dedup by card id so overlapping cards are scheduled once.
+    const byId = new Map<Id<'cards'>, Doc<'cards'>>();
+    for (const list of cardLists) {
+      for (const card of list) {
+        if (!byId.has(card._id)) byId.set(card._id, card);
       }
     }
 
-    return processed;
+    return scheduleContentForUpcomingCards(
+      ctx,
+      userId,
+      active,
+      Array.from(byId.values()),
+      activeCollectionId,
+    );
   },
 });
 
@@ -1653,7 +1752,7 @@ export const processTranslationForCard = internalAction({
           regionVariant,
           priority: args.priority,
           replaceExisting: args.replaceExisting,
-          speakerGender: args.audioSpeakerGender,
+          speakerGender: asVoiceGender(args.audioSpeakerGender),
         },
       );
     } catch (err) {
@@ -1722,13 +1821,14 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      */
     replaceExisting: v.optional(v.boolean()),
     /**
-     * Speaker gender ('male' | 'female') the translation was produced under.
-     * Persisted on the translation row so the gender-mismatch sweep in
-     * `scheduleMissingContent` can invalidate translations whose grammar no
-     * longer agrees with the card's current voice gender. Optional during
-     * rollout so old call sites that haven't been threaded yet still compile.
+     * Speaker gender ('male' | 'female') the translation was produced under
+     * — the card's resolved `audioSpeakerGender`. Persisted on the translation
+     * row so the gender-mismatch sweep in `scheduleMissingContent` can
+     * invalidate translations whose grammar no longer agrees with the card's
+     * current voice gender. Optional during rollout so old call sites that
+     * haven't been threaded yet still compile.
      */
-    speakerGender: v.optional(v.string()),
+    speakerGender: v.optional(voiceGenderValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1775,7 +1875,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         romanizationSource: string | undefined;
         translationSource: string | undefined;
         regionVariant: string | undefined;
-        speakerGender: string;
+        speakerGender: 'male' | 'female';
       }> = {
         translatedText: args.translatedText,
       };
@@ -1805,7 +1905,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         romanizationSource: string;
         translationSource: string;
         regionVariant: string;
-        speakerGender: string;
+        speakerGender: 'male' | 'female';
       }> = {};
       // Same `!== undefined` reasoning: persist the sentinel on first write
       // but never overwrite a previously-stored real value. Source travels

@@ -7,7 +7,7 @@ import {
   MutationCtx,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { Doc, Id } from '../_generated/dataModel';
+import { Id } from '../_generated/dataModel';
 import { translateTextWithLLM, type ReasoningEffort } from './translationLLM';
 import {
   getTranslationConfigForLanguage,
@@ -22,6 +22,7 @@ import {
 } from '../../lib/languages';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
+import { asVoiceGender } from '../types';
 
 /**
  * LLM translation queue. Mirrors the TTS queue pattern in `ttsProcessing.ts`
@@ -155,41 +156,28 @@ export const pumpLlmQueue = internalMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
+    // Priority order drained per pump tick: critical (2, onboarding seed /
+    // placement test) first, then high (1, active collection), then normal
+    // (0), then any pre-priority rows (undefined) left over from a deploy.
+    const QUEUE_PRIORITY_ORDER = [2, 1, 0, undefined] as const;
+
+    // Returns the oldest queued row at the highest non-empty priority, or null
+    // when the queue is empty. FIFO within each level via the queuedAt suffix.
+    const dequeueNext = async () => {
+      for (const priority of QUEUE_PRIORITY_ORDER) {
+        const row = await ctx.db
+          .query('llmTranslationQueue')
+          .withIndex('by_priority_and_queuedAt', (q) => q.eq('priority', priority))
+          .order('asc')
+          .first();
+        if (row) return row;
+      }
+      return null;
+    };
+
     let used = await countLiveSlotsAndReclaimStale(ctx);
     while (used < MAX_LLM_CONCURRENCY) {
-      // Priority drain: critical (2, onboarding seed / placement test) first,
-      // then high (1, active collection), then normal (0), then any
-      // pre-priority rows (undefined) left over from a deploy. FIFO within
-      // each level via the queuedAt suffix in the index.
-      const next =
-        (await ctx.db
-          .query('llmTranslationQueue')
-          .withIndex('by_priority_and_queuedAt', (q) =>
-            q.eq('priority', 2),
-          )
-          .order('asc')
-          .first()) ??
-        (await ctx.db
-          .query('llmTranslationQueue')
-          .withIndex('by_priority_and_queuedAt', (q) =>
-            q.eq('priority', 1),
-          )
-          .order('asc')
-          .first()) ??
-        (await ctx.db
-          .query('llmTranslationQueue')
-          .withIndex('by_priority_and_queuedAt', (q) =>
-            q.eq('priority', 0),
-          )
-          .order('asc')
-          .first()) ??
-        (await ctx.db
-          .query('llmTranslationQueue')
-          .withIndex('by_priority_and_queuedAt', (q) =>
-            q.eq('priority', undefined),
-          )
-          .order('asc')
-          .first());
+      const next = await dequeueNext();
       if (!next) break;
 
       await ctx.db.insert('llmTranslationSlots', {
@@ -570,7 +558,7 @@ export const processLlmTranslationForCard = internalAction({
           regionVariant,
           priority: args.priority,
           replaceExisting: args.replaceExisting,
-          speakerGender: args.audioSpeakerGender,
+          speakerGender: asVoiceGender(args.audioSpeakerGender),
         },
       );
     } catch (err) {
