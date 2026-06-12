@@ -553,13 +553,17 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   el: [...buildChirp3Pool('el-GR', 'Greece'), ...ELEVENLABS_VOICES_EL],
   he: [...buildChirp3Pool('he-IL', 'Israel'), ...AZURE_VOICES_HE],
   ar: [...buildChirp3Pool('ar-XA', 'MSA'), ...ELEVENLABS_VOICES_AR],
-  // Saudi, Iraqi, and Levantine dialects share the Google MSA pool (`ar-XA`)
-  // — none has dedicated Chirp3 voices, and dialect-specific Azure voices
-  // read worse than MSA on these dialects' typical content.
+  // Saudi and Iraqi dialects share the Google MSA pool (`ar-XA`) — neither has
+  // dedicated Chirp3 voices, and dialect-specific Azure voices read worse than
+  // MSA on these dialects' typical content.
   ar_sa: [...buildChirp3Pool('ar-XA', 'MSA')],
   ar_eg: [...activate(AZURE_VOICES_AR_EG)],
   ar_iq: [...buildChirp3Pool('ar-XA', 'MSA')],
-  ar_lev: [...buildChirp3Pool('ar-XA', 'MSA')],
+  // Levantine runs on Gemini TTS via the shared/global Arabic Gemini voice
+  // (GEMINI_CORE + `language_code: ar-001`); the Levantine dialect is conveyed
+  // in the prompt (`ttsPromptName` in lib/languages.ts), since Gemini has no
+  // Levantine locale.
+  ar_lev: [...GEMINI_CORE],
   // Persian runs on Gemini TTS (fa-IR). No Google Chirp3-HD fa voices, so
   // Gemini is the active pool (mirrors pt_pt). Azure fa-IR Neural voices are a
   // verified fallback: wrapped in activate() (createAzureVoice defaults to

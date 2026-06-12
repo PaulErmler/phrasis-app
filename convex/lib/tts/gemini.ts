@@ -26,7 +26,7 @@ const MP3_KBPS = 48;
 
 function buildStyledInput(text: string, languageName: string): string {
   const context =
-    `Speak the following test in a natural way like a native ${languageName} would in a way that fits the sentence.`;
+    `Speak the following text in a natural way like a native ${languageName} speaker would in a way that fits the sentence.`;
   return `## Instruction: ${context}\n\n## Transcript: ${text}`;
 }
 
@@ -173,13 +173,17 @@ export const geminiTts: TTSProvider = {
     // Accent locale comes from the voice apiCode suffix when present (English
     // US/GB/AU); otherwise derive it from the language code.
     const languageCode = locale ?? toGeminiBcp47(input.language);
-    // Natural, region-stripped name of the target language ("English (US)" →
-    // "English"), named in the "## Context" block so Gemini locks pronunciation
-    // to it. The precise accent is already pinned by `language_code` above, so
-    // the prose only needs the base language name. Falls back to the raw code.
-    const languageName = (
-      getLanguageByCode(input.language)?.name ?? input.language
-    ).replace(/\s*\([^)]*\)\s*$/, '');
+    // Name of the target language for the "## Instruction" block so Gemini locks
+    // pronunciation to it. Normally the region-stripped base name ("English
+    // (US)" → "English") since the accent is already pinned by `language_code`
+    // above. But some dialects can't be pinned by the locale (e.g. Levantine
+    // Arabic → `ar-001`, shared with MSA/Saudi/Iraqi), so they set an explicit
+    // `ttsPromptName` ("Levantine Arabic") to name the dialect in the prose —
+    // the only signal Gemini gets to distinguish it. Falls back to the raw code.
+    const lang = getLanguageByCode(input.language);
+    const languageName =
+      lang?.ttsPromptName ??
+      (lang?.name ?? input.language).replace(/\s*\([^)]*\)\s*$/, '');
 
     let pcm = new Uint8Array(0);
     for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {

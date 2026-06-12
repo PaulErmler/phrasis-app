@@ -94,6 +94,29 @@ describe('geminiTts.speak — empty-response retry', () => {
     expect(body.provider.options.google.language_code).toBe('de-DE');
   });
 
+  it('names the Levantine dialect in the prompt while using the global Arabic Gemini voice + ar-001 locale', async () => {
+    // Levantine has no dedicated Gemini locale (collapses to ar-001), so the
+    // dialect can only be conveyed in the prose via `ttsPromptName`, and the
+    // voice is the shared/global Arabic Gemini voice (a bare GEMINI_CORE name).
+    const fetchMock = vi.fn().mockResolvedValue(pcmResponse(4096));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await geminiTts.speak({
+      text: 'كيفك؟',
+      language: 'ar_lev',
+      voiceApiCode: 'Leda', // bare GEMINI_CORE name (no @locale suffix)
+      speed: 1,
+    });
+
+    const body = bodyOf(fetchMock.mock.calls[0]);
+    expect(body.input).toContain('Levantine Arabic'); // dialect named in prompt
+    expect(body.input).not.toMatch(/native Arabic\b/); // NOT the stripped base name
+    expect(body.input).toContain('## Transcript: كيفك؟');
+    // Global Arabic Gemini voice, steered by the shared World-Arabic locale.
+    expect(JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string).voice).toBe('Leda');
+    expect(body.provider.options.google.language_code).toBe('ar-001');
+  });
+
   it('retries with a padded space when the first response is empty', async () => {
     const fetchMock = vi
       .fn()

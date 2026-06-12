@@ -115,6 +115,16 @@ export interface Language {
    */
   translationName?: string;
   /**
+   * Override for the language name used in the Gemini TTS prompt's "speak like
+   * a native X" instruction (convex/lib/tts/gemini.ts). Defaults to `name` with
+   * the region parenthetical stripped ("English (US)" → "English"), since the
+   * accent is normally pinned by `geminiBcp47`. Set this when the dialect can't
+   * be pinned by the locale and must be named in the prose instead — e.g.
+   * Levantine Arabic, whose `geminiBcp47` collapses to `ar-001` (World Arabic),
+   * shared with MSA/Saudi/Iraqi.
+   */
+  ttsPromptName?: string;
+  /**
    * When `true`, this language is excluded from user-facing pickers in
    * onboarding / course creation / settings (`LanguageSelector` and
    * `DualLanguageEditor`). The entry remains in `SUPPORTED_LANGUAGES` so
@@ -956,9 +966,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇱🇧',
     category: 'semitic',
     llmSupportTier: 'tier2',
-    // No dedicated Levantine Chirp3 voices — route through the shared Google
-    // MSA pool (`ar-XA`). See lib/voices.ts for the pool entry.
-    ttsProvider: 'google',
+    // Runs on Gemini TTS. Gemini has no Levantine locale (it collapses to
+    // `ar-001` World Arabic, shared with MSA/Saudi/Iraqi), so the voice is the
+    // shared/global Arabic Gemini voice and the dialect is named in the prompt
+    // via `ttsPromptName`. See lib/voices.ts (`ar_lev: [...GEMINI_CORE, ...]`).
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Levantine Arabic',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
