@@ -105,6 +105,7 @@ const settings = (
   beforeRepPauses: {},
   beforeSpeeds: {},
   pauseT2B: 5,
+  beforeOnlyNewReps: Infinity,
   ...overrides,
 });
 
@@ -273,5 +274,45 @@ describe('mergeCardAudio — sequencing', () => {
       }),
     );
     expect(r).toBeNull();
+  });
+
+  it('mixed split: es plays before-only, fr after-only (per-language group filtering)', async () => {
+    const r = await mergeCardAudio(
+      recs(['en', 'es', 'fr']),
+      ['en'],
+      ['es', 'fr'],
+      settings({
+        playTargetBefore: true,
+        playTargetAfter: true,
+        reps: { en: 1, es: 0, fr: 1 }, // after group: fr only (es filtered out)
+        beforeReps: { es: 1, fr: 0 }, // before group: es only (fr filtered out)
+        pauseT2B: 4,
+        pauseB2T: 5,
+      }),
+    );
+    expect(r!.languageCues).toEqual([
+      cue('es', 0, 1, true), // before-only es reveals (never replayed after base)
+      cue('en', 5, 1, true), // 1.0s es + 4s pauseT2B
+      cue('fr', 11, 1, true), // 5 + 1.0s en + 5s pauseB2T
+    ]);
+    expect(r!.durationSec).toBe(12);
+    expect(r!.speedByLanguage).toEqual({ es: 1, en: 1, fr: 1 });
+  });
+
+  it('plays base only when both target groups are disabled', async () => {
+    // The base group is independent of the Practice Listening / Speaking
+    // toggles, so with both target groups off only the base language plays.
+    const r = await mergeCardAudio(
+      recs(['en', 'es']),
+      ['en'],
+      ['es'],
+      settings({
+        playTargetBefore: false,
+        playTargetAfter: false,
+        reps: { en: 1 },
+      }),
+    );
+    expect(r!.languageCues).toEqual([cue('en', 0, 1, true)]);
+    expect(r!.durationSec).toBe(1);
   });
 });

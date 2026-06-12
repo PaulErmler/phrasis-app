@@ -2,6 +2,8 @@ import { v, ConvexError } from 'convex/values';
 import {
   PLAYBACK_SPEED_MIN,
   PLAYBACK_SPEED_MAX,
+  DEFAULT_PLAY_TARGET_BEFORE_BASE,
+  DEFAULT_PLAY_TARGET_AFTER_BASE,
 } from '../../lib/constants/audioPlayback';
 import { mutation, query, MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
@@ -1086,6 +1088,7 @@ export const updateCourseSettings = mutation({
     targetBeforeRepetitionPauses: v.optional(v.record(v.string(), v.number())),
     targetBeforePlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
     pauseTargetToBase: v.optional(v.number()),
+    targetBeforeOnlyNewReps: v.optional(v.number()),
     showProgressBar: v.optional(v.boolean()),
     progressDisplayEnabled: v.optional(v.boolean()),
     hideTargetLanguages: v.optional(v.boolean()),
@@ -1138,6 +1141,7 @@ export const updateCourseSettings = mutation({
       'targetBeforeRepetitionPauses',
       'targetBeforePlaybackSpeeds',
       'pauseTargetToBase',
+      'targetBeforeOnlyNewReps',
       'showProgressBar',
       'progressDisplayEnabled',
       'hideTargetLanguages',
@@ -1162,6 +1166,10 @@ export const updateCourseSettings = mutation({
       if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
         value = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(value)));
       }
+      // "Only new" Practice-Listening limit: integer 1-10, or 0 for ∞ (always).
+      if (key === 'targetBeforeOnlyNewReps' && typeof value === 'number') {
+        value = Math.max(0, Math.min(10, Math.floor(value)));
+      }
       if (
         (key === 'languagePlaybackSpeeds' ||
           key === 'targetBeforePlaybackSpeeds') &&
@@ -1181,6 +1189,29 @@ export const updateCourseSettings = mutation({
       if (value !== undefined) patch[key] = value;
     }
 
+    // Safety net for the "at least one target play position" invariant. The UI
+    // enforces it (LearningModeSettings auto-enables the other toggle), but a
+    // partial write or non-UI caller could otherwise persist both toggles off —
+    // which drops all target audio in audio mode. If this write touches the
+    // toggles and the resulting pair would be both-false, restore the historical
+    // default (Practice Speaking on). Routed into the insert object below too.
+    if (
+      args.playTargetBeforeBase !== undefined ||
+      args.playTargetAfterBase !== undefined
+    ) {
+      const effectiveBefore =
+        args.playTargetBeforeBase ??
+        existing?.playTargetBeforeBase ??
+        DEFAULT_PLAY_TARGET_BEFORE_BASE;
+      const effectiveAfter =
+        args.playTargetAfterBase ??
+        existing?.playTargetAfterBase ??
+        DEFAULT_PLAY_TARGET_AFTER_BASE;
+      if (!effectiveBefore && !effectiveAfter) {
+        patch.playTargetAfterBase = true;
+      }
+    }
+
     if (existing) {
       await ctx.db.patch(existing._id, patch);
     } else {
@@ -1188,7 +1219,11 @@ export const updateCourseSettings = mutation({
         courseId: args.courseId,
         initialReviewCount:
           args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
-        cardsToAddBatchSize: args.cardsToAddBatchSize,
+        // Use the clamped patch value (set in the loop above) so the insert path
+        // enforces the [1, MAX_CARDS_PER_BATCH] range, not just the patch path.
+        cardsToAddBatchSize:
+          (patch.cardsToAddBatchSize as number | undefined) ??
+          args.cardsToAddBatchSize,
         autoAddCards: args.autoAddCards,
         highlightWords: args.highlightWords,
         autoPlayAudio: args.autoPlayAudio,
@@ -1201,11 +1236,16 @@ export const updateCourseSettings = mutation({
         pauseTargetToTarget: args.pauseTargetToTarget,
         pauseBeforeAutoAdvance: args.pauseBeforeAutoAdvance,
         playTargetBeforeBase: args.playTargetBeforeBase,
-        playTargetAfterBase: args.playTargetAfterBase,
+        // Use the patched value so the both-toggles-off guard above also applies
+        // on first insert, not only on the patch path.
+        playTargetAfterBase:
+          (patch.playTargetAfterBase as boolean | undefined) ??
+          args.playTargetAfterBase,
         targetBeforeRepetitions: args.targetBeforeRepetitions,
         targetBeforeRepetitionPauses: args.targetBeforeRepetitionPauses,
         targetBeforePlaybackSpeeds: (patch.targetBeforePlaybackSpeeds as Record<string, number> | undefined) ?? args.targetBeforePlaybackSpeeds,
         pauseTargetToBase: args.pauseTargetToBase,
+        targetBeforeOnlyNewReps: (patch.targetBeforeOnlyNewReps as number | undefined) ?? args.targetBeforeOnlyNewReps,
         showProgressBar: args.showProgressBar,
         progressDisplayEnabled: args.progressDisplayEnabled,
         hideTargetLanguages: args.hideTargetLanguages,

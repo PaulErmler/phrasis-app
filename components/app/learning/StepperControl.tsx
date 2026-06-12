@@ -8,6 +8,9 @@ interface StepperControlProps {
   min: number;
   max: number;
   onChange: (value: number) => void;
+  /** Render the value as something other than the bare number (e.g. "∞" for a
+   *  sentinel position). Defaults to `String(value)`. */
+  formatValue?: (value: number) => string;
 }
 
 export function StepperControl({
@@ -15,6 +18,7 @@ export function StepperControl({
   min,
   max,
   onChange,
+  formatValue,
 }: StepperControlProps) {
   const decrement = () => onChange(Math.max(min, value - 1));
   const increment = () => onChange(Math.min(max, value + 1));
@@ -31,7 +35,7 @@ export function StepperControl({
         <Minus className="h-3 w-3" />
       </Button>
       <span className="tabular-nums text-sm font-medium w-8 text-center">
-        {value}
+        {formatValue ? formatValue(value) : value}
       </span>
       <Button
         variant="outline"

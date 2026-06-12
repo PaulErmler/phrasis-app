@@ -38,6 +38,10 @@ export interface ResolvedAudioSettings {
   beforeSpeeds: Record<string, number>;
   // Transition pause between the before-base target group and the base group.
   pauseT2B: number;
+  // "Only new" limit: play the before-base target group only on a card's initial
+  // N reviews. `Infinity` (the default) = always. Applied per-card via
+  // `applyOnlyNewListening` before the merge — `mergeCardAudio` itself ignores it.
+  beforeOnlyNewReps: number;
 }
 
 /**
@@ -93,7 +97,48 @@ export function resolveAudioSettings(
     // Card-level speed overrides apply to the before-base group too (same language).
     beforeSpeeds: mergeSpeeds(cs?.targetBeforePlaybackSpeeds ?? {}, cardOverrides),
     pauseT2B: cs?.pauseTargetToBase ?? DEFAULT_PAUSE_TARGET_TO_BASE,
+    // Stored 0 / undefined means "always" (∞); 1-10 limits to that many initial reviews.
+    beforeOnlyNewReps:
+      cs?.targetBeforeOnlyNewReps && cs.targetBeforeOnlyNewReps > 0
+        ? cs.targetBeforeOnlyNewReps
+        : Infinity,
   };
+}
+
+/**
+ * Apply the "Only new" limit for a single card. With BOTH Practice Listening
+ * (before-base) and Practice Speaking (after-base) on, Practice Listening plays
+ * only on a card's initial `beforeOnlyNewReps` reviews; once the card has been
+ * reviewed at least that many times it graduates to Practice Speaking alone.
+ *
+ * `reviewCount` is the card's active-review count (preReviewCount + FSRS reps).
+ * In radio mode also pass `radioReviewCount` (the card's radioPlayCount):
+ * radio plays don't bump the active-review count, so we take the max of the two
+ * to decide whether the card is still "new".
+ *
+ * "Only new" only makes sense when there's a Practice Speaking flow to graduate
+ * into, so it no-ops (treated as `Infinity` — Practice Listening always plays)
+ * when Practice Speaking is off, when Practice Listening is off, or when the
+ * limit is `Infinity` (the default). On graduation it disables `playTargetBefore`;
+ * `playTargetAfter` is already on, so the card switches to Practice Speaking.
+ */
+export function applyOnlyNewListening(
+  settings: ResolvedAudioSettings,
+  opts: { reviewCount: number; radioReviewCount?: number },
+): ResolvedAudioSettings {
+  if (
+    !settings.playTargetBefore ||
+    !settings.playTargetAfter ||
+    settings.beforeOnlyNewReps === Infinity
+  ) {
+    return settings;
+  }
+  const count =
+    opts.radioReviewCount != null
+      ? Math.max(opts.reviewCount, opts.radioReviewCount)
+      : opts.reviewCount;
+  if (count < settings.beforeOnlyNewReps) return settings;
+  return { ...settings, playTargetBefore: false };
 }
 
 export interface LanguageCue {

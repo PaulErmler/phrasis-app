@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { useAudioPlayer } from '@/hooks/use-audio-player';
-import { resolveAudioSettings } from '@/lib/audio/mergeAudio';
+import { resolveAudioSettings, applyOnlyNewListening } from '@/lib/audio/mergeAudio';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
 import type { LearningState } from './useLearningMode';
 
@@ -56,6 +56,15 @@ export function useLearningAudio(
 
   const cardSpeedOverrides =
     state.status === 'reviewing' ? state.audioSpeedOverrides : undefined;
+  // Per-card review counts for the "Only new" Practice-Listening limit. Active
+  // reviews (preReviewCount + FSRS reps) are bumped in audio/full mode; radio
+  // plays bump radioPlayCount instead, so radio counts max(active, radio).
+  const cardReviewCount =
+    state.status === 'reviewing'
+      ? state.preReviewCount + (state.fsrsState?.reps ?? 0)
+      : 0;
+  const cardRadioReviewCount =
+    state.status === 'reviewing' ? state.radioPlayCount : 0;
   const audioSettings = useMemo(() => {
     const resolved = resolveAudioSettings(cs, cardSpeedOverrides);
     // The "Practice Listening / Speaking" (target before/after base) toggles
@@ -65,8 +74,20 @@ export function useLearningAudio(
     if (reviewMode !== 'audio' && !isRadio) {
       return { ...resolved, playTargetBefore: false, playTargetAfter: true };
     }
-    return resolved;
-  }, [cs, cardSpeedOverrides, reviewMode, isRadio]);
+    // "Only new": drop Practice Listening once this card has graduated past its
+    // initial N reviews (counting radio plays in radio mode).
+    return applyOnlyNewListening(resolved, {
+      reviewCount: cardReviewCount,
+      radioReviewCount: isRadio ? cardRadioReviewCount : undefined,
+    });
+  }, [
+    cs,
+    cardSpeedOverrides,
+    reviewMode,
+    isRadio,
+    cardReviewCount,
+    cardRadioReviewCount,
+  ]);
 
   const handleNextFromAudio = useCallback(() => {
     if (state.status === 'reviewing') state.handleNext();

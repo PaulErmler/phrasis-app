@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { resolveAudioSettings } from '@/lib/audio/mergeAudio';
+import {
+  resolveAudioSettings,
+  applyOnlyNewListening,
+} from '@/lib/audio/mergeAudio';
 import type { CourseSettings } from '@/components/app/learning/types';
 import {
   DEFAULT_PLAY_TARGET_BEFORE_BASE,
@@ -91,5 +94,86 @@ describe('resolveAudioSettings — target before/after base', () => {
     );
     expect(r.beforeReps).toEqual({ es: 3, fr: 0 });
     expect(r.beforeRepPauses).toEqual({ es: 4, fr: 1.5 });
+  });
+});
+
+describe('resolveAudioSettings — "Only new" limit mapping', () => {
+  it('maps undefined / 0 to Infinity (always), and 1-10 to the number', () => {
+    expect(resolveAudioSettings(null).beforeOnlyNewReps).toBe(Infinity);
+    expect(
+      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 0 })).beforeOnlyNewReps,
+    ).toBe(Infinity);
+    expect(
+      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 3 })).beforeOnlyNewReps,
+    ).toBe(3);
+  });
+});
+
+describe('applyOnlyNewListening', () => {
+  // Build a resolved settings object with Practice Listening on and a limit.
+  const withLimit = (limit: number, playTargetBefore = true) => ({
+    ...resolveAudioSettings(
+      cs({
+        playTargetBeforeBase: playTargetBefore,
+        targetBeforeOnlyNewReps: limit,
+      }),
+    ),
+  });
+
+  it('no-ops when Practice Listening is off', () => {
+    const s = withLimit(2, false);
+    expect(applyOnlyNewListening(s, { reviewCount: 99 })).toBe(s);
+  });
+
+  it('no-ops when the limit is Infinity (always)', () => {
+    const s = withLimit(0); // 0 → Infinity
+    expect(s.beforeOnlyNewReps).toBe(Infinity);
+    expect(applyOnlyNewListening(s, { reviewCount: 99 })).toBe(s);
+  });
+
+  it('keeps Practice Listening on while the card is still new (count < limit)', () => {
+    const s = withLimit(3);
+    expect(applyOnlyNewListening(s, { reviewCount: 0 }).playTargetBefore).toBe(true);
+    expect(applyOnlyNewListening(s, { reviewCount: 2 }).playTargetBefore).toBe(true);
+  });
+
+  it('graduates the card once count reaches the limit (before off, after unchanged)', () => {
+    const s = withLimit(3); // Practice Speaking defaults to on
+    const g = applyOnlyNewListening(s, { reviewCount: 3 });
+    expect(g.playTargetBefore).toBe(false);
+    // Speaking was on (default) and is left as-is — not forced.
+    expect(g.playTargetAfter).toBe(true);
+  });
+
+  it('no-ops when Practice Speaking is off ("Only new" needs both groups on)', () => {
+    const s = {
+      ...resolveAudioSettings(
+        cs({
+          playTargetBeforeBase: true,
+          playTargetAfterBase: false,
+          targetBeforeOnlyNewReps: 2,
+        }),
+      ),
+    };
+    expect(s.playTargetAfter).toBe(false);
+    // "Only new" graduates Listening → Speaking, so with Speaking off it is
+    // inert (treated as ∞): Practice Listening keeps playing on every review.
+    expect(applyOnlyNewListening(s, { reviewCount: 99 })).toBe(s);
+  });
+
+  it('counts max(active reviews, radio plays) in radio mode', () => {
+    const s = withLimit(4);
+    // Active reviews 0 but 5 radio plays → graduated (radio plays count).
+    const radio = applyOnlyNewListening(s, {
+      reviewCount: 0,
+      radioReviewCount: 5,
+    });
+    expect(radio.playTargetBefore).toBe(false);
+    // Active reviews 1 and 2 radio plays → max is 2 < 4 → still new.
+    const stillNew = applyOnlyNewListening(s, {
+      reviewCount: 1,
+      radioReviewCount: 2,
+    });
+    expect(stillNew.playTargetBefore).toBe(true);
   });
 });

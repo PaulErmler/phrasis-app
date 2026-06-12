@@ -506,6 +506,8 @@
       "practiceListeningDescription": "Die Zielsprache vor der Ausgangssprache abspielen",
       "practiceSpeaking": "Sprechen üben",
       "practiceSpeakingDescription": "Die Zielsprache nach der Ausgangssprache abspielen",
+      "onlyNew": "Nur neue Karten",
+      "onlyNewDescription": "Hörverstehen nur bei neuen Karten üben – lege eine Anzahl anfänglicher Wiederholungen fest",
       "uiSettings": "Anzeigeeinstellungen",
       "showProgressBar": "Fortschrittsbalken",
       "showProgressBarDescription": "Audio-Fortschrittsbalken und Wiedergabesteuerung anzeigen",

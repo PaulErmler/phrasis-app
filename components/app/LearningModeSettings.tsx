@@ -351,6 +351,16 @@ export function LearningModeSettings({
     });
   };
 
+  // "Only new": limit Practice Listening to a card's initial N reviews. Stored
+  // as 0 (= ∞ / always) or 1-10; the stepper's ∞ position maps to 0.
+  const handleTargetBeforeOnlyNewChange = async (value: number) => {
+    const clamped = value <= 0 ? 0 : Math.min(10, Math.max(1, Math.floor(value)));
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      targetBeforeOnlyNewReps: clamped,
+    });
+  };
+
   // ---- review mode handlers ----
 
   const handleReviewModeChange = async (mode: 'audio' | 'full') => {
@@ -405,6 +415,12 @@ export function LearningModeSettings({
   const beforeRepPauses = courseSettings.targetBeforeRepetitionPauses ?? {};
   const beforeSpeeds = courseSettings.targetBeforePlaybackSpeeds ?? {};
   const pauseT2B = courseSettings.pauseTargetToBase ?? DEFAULT_PAUSE_TARGET_TO_BASE;
+  // "Only new" stepper: stored 0/undefined = ∞ (always), shown at the BOTTOM
+  // position (UI value 0) so "+" steps ∞ → 1 and "−" steps 1 → ∞. 1-10 map to
+  // themselves. The stored value already uses 0 for ∞, so no remapping needed.
+  const onlyNewStored = courseSettings.targetBeforeOnlyNewReps;
+  const onlyNewUiValue =
+    onlyNewStored && onlyNewStored > 0 ? Math.min(10, onlyNewStored) : 0;
   // The after-base target section shows in audio mode only when "Practice
   // Speaking" is on; full mode keeps its existing "always" gating (the
   // before/after toggles don't apply there — see useLearningAudio).
@@ -690,6 +706,26 @@ export function LearningModeSettings({
               <div className="settings-row">
                 <div className="space-y-0.5">
                   <Label
+                    htmlFor="playTargetAfterBase"
+                    className="text-sm font-medium"
+                  >
+                    {t('practiceSpeaking')}
+                  </Label>
+                  <p className="text-muted-xs">
+                    {t('practiceSpeakingDescription')}
+                  </p>
+                </div>
+                <Switch
+                  id="playTargetAfterBase"
+                  checked={playTargetAfter}
+                  onCheckedChange={handlePlayTargetAfterBaseChange}
+                  className="mt-0.5"
+                />
+              </div>
+
+              <div className="settings-row">
+                <div className="space-y-0.5">
+                  <Label
                     htmlFor="playTargetBeforeBase"
                     className="text-sm font-medium"
                   >
@@ -707,25 +743,30 @@ export function LearningModeSettings({
                 />
               </div>
 
-              <div className="settings-row">
-                <div className="space-y-0.5">
-                  <Label
-                    htmlFor="playTargetAfterBase"
-                    className="text-sm font-medium"
-                  >
-                    {t('practiceSpeaking')}
-                  </Label>
-                  <p className="text-muted-xs">
-                    {t('practiceSpeakingDescription')}
-                  </p>
+              {/* "Only new" — graduates a card from Practice Listening to
+                  Practice Speaking after its initial N reviews, so it only shows
+                  (and only takes effect) when BOTH are on. ∞ (default) keeps
+                  Practice Listening on every review. */}
+              {playTargetBefore && playTargetAfter && (
+                <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="targetBeforeOnlyNewReps"
+                      className="text-sm font-medium"
+                    >
+                      {t('onlyNew')}
+                    </Label>
+                    <p className="text-muted-xs">{t('onlyNewDescription')}</p>
+                  </div>
+                  <StepperControl
+                    value={onlyNewUiValue}
+                    min={0}
+                    max={10}
+                    onChange={handleTargetBeforeOnlyNewChange}
+                    formatValue={(v) => (v <= 0 ? '∞' : String(v))}
+                  />
                 </div>
-                <Switch
-                  id="playTargetAfterBase"
-                  checked={playTargetAfter}
-                  onCheckedChange={handlePlayTargetAfterBaseChange}
-                  className="mt-0.5"
-                />
-              </div>
+              )}
             </>
           )}
 

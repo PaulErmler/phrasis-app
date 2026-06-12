@@ -71,6 +71,9 @@ export interface CourseSettings {
   targetBeforeRepetitionPauses?: Record<string, number>;
   targetBeforePlaybackSpeeds?: Record<string, number>;
   pauseTargetToBase?: number;
+  // "Only new": Practice Listening only on a card's initial N reviews.
+  // 0 / undefined = always (∞); 1-10 = limit.
+  targetBeforeOnlyNewReps?: number;
   showProgressBar?: boolean;
   progressDisplayEnabled?: boolean;
   hideTargetLanguages?: boolean;

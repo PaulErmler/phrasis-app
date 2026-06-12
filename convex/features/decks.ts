@@ -949,6 +949,7 @@ export async function createCardsFromTexts(
         schedulingPhase: 'preReview' as const,
         preReviewCount: 0,
         radioRoundCounter: 0,
+        radioPlayCount: 0,
         // Random tiebreak so that even brand-new cards inserted in a single
         // batch (which would otherwise share creation time + counter) end up
         // in a shuffled radio order rather than insertion order.

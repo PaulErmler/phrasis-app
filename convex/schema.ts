@@ -45,6 +45,15 @@ export const courseSettingsFields = {
   targetBeforeRepetitionPauses: v.optional(v.record(v.string(), v.number())), // between-rep pause per target lang, before-base group
   targetBeforePlaybackSpeeds: v.optional(v.record(v.string(), v.number())), // playback speed per target lang, before-base group; clamped PLAYBACK_SPEED_MIN-MAX
   pauseTargetToBase: v.optional(v.number()), // seconds between the before-base target group and the base group (mirror of pauseBaseToTarget)
+  // "Only new": with BOTH Practice Listening and Practice Speaking on, play
+  // target-before-base ("Practice Listening") only on a card's initial N reviews,
+  // then graduate it to target-after-base ("Practice Speaking"). Only takes
+  // effect when both are on; with Speaking off it's treated as ∞ (Listening
+  // always plays) and the sub-setting is hidden in the UI.
+  // 0 / undefined = always (∞, the default); 1-10 = limit. The review count is
+  // preReviewCount + FSRS reps in audio mode, and max(that, radioPlayCount)
+  // in radio mode (radio plays don't bump the FSRS review count).
+  targetBeforeOnlyNewReps: v.optional(v.number()),
   showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
   progressDisplayEnabled: v.optional(v.boolean()), // celebrate every PROGRESS_DISPLAY_INTERVAL reviews (default true)
   hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
@@ -421,6 +430,7 @@ export default defineSchema({
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
     radioRoundCounter: v.optional(v.number()), // Radio mode: # of times this card has been played in radio mode. Lowest counter plays next; new cards default to 0 so they play first. Optional for backward compat — undefined treated as 0.
     radioOrderKey: v.optional(v.number()), // Radio mode: random tiebreak within equal `radioRoundCounter`. Re-rolled on each play so the round-robin order shuffles every loop and never matches the review (`dueDate`-driven) order. Optional for backward compat.
+    radioPlayCount: v.optional(v.number()), // Radio mode: true count of radio plays (+1 per play, NOT subject to radioRoundCounter's catch-up jump). Drives the "Only new" Practice-Listening limit. Optional/undefined for pre-existing cards — treated as the card's review count (preReviewCount + FSRS reps) so they don't reset to "new".
   })
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_dueDate', ['deckId', 'dueDate'])

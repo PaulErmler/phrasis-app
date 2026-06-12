@@ -129,6 +129,10 @@ interface ReviewingState extends BaseState {
   phase: SchedulingPhase;
   preReviewCount: number;
   fsrsState: { reps: number } | null;
+  /** True radio-mode play count for this card (0 when never played in radio).
+   *  Feeds the "Only new" Practice-Listening limit, which in radio counts
+   *  max(active reviews, radio plays). */
+  radioPlayCount: number;
   sourceText: string;
   sourceLanguage: string;
   translations: CardTranslation[];
@@ -1249,6 +1253,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     phase,
     preReviewCount: displayCard.preReviewCount,
     fsrsState: displayCard.fsrsState,
+    radioPlayCount: displayCard.radioPlayCount ?? 0,
     sourceText: displayCard.sourceText,
     sourceLanguage: displayCard.sourceLanguage,
     translations: sortedTranslations,
