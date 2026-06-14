@@ -79,8 +79,8 @@ describe('voice pools completeness', () => {
   });
 
   it('getAllVoicesByLanguageCode includes dormant voices (settings UI surface)', () => {
-    // English has dormant ElevenLabs voices in the curated pool.
-    const all = getAllVoicesByLanguageCode('en');
+    // Mandarin has dormant Azure Dragon HD voices in the curated pool.
+    const all = getAllVoicesByLanguageCode('zh');
     const hasDormant = all.some((v) => v.active === false);
     expect(hasDormant).toBe(true);
   });

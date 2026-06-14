@@ -1,5 +1,5 @@
 /**
- * Per-clip peak loudness cache used to normalize ElevenLabs audio to a
+ * Per-clip peak loudness cache used to normalize TTS audio to a
  * consistent level across merged playback and single-clip playback.
  *
  * Peak is the max absolute sample value of a decoded audio buffer (channel 0).

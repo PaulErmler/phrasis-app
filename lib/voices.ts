@@ -3,7 +3,7 @@
  *
  * This file owns:
  *   - The Voice type
- *   - Per-language voice pools (Google Chirp3 + ElevenLabs)
+ *   - Per-language voice pools (Google Chirp3 + Azure + Gemini)
  *   - The VOICE_POOLS map keyed by language code
  *   - All voice-selection helpers (getVoiceForLanguage, etc.)
  *
@@ -18,13 +18,13 @@ export type { TtsProvider };
 
 /**
  * apiCode format depends on provider:
- *   - google:     "{locale}-Chirp3-HD-{name}"   e.g. "en-US-Chirp3-HD-Leda"
- *   - elevenlabs: raw voice_id (UUID)           e.g. "21m00Tcm4TlvDq8ikWAM"
+ *   - google: "{locale}-Chirp3-HD-{name}"   e.g. "en-US-Chirp3-HD-Leda"
+ *   - azure:  Azure voice short name        e.g. "sv-SE-SofieNeural"
  *
  * `active` gates whether a voice is eligible for selection. Dormant voices
  * stay in VOICE_POOLS (so re-enabling is a one-line flip) but are filtered
- * out of `getVoicesByLanguageCode`. ElevenLabs voices are currently dormant
- * — TTS runs Google-only. See convex/lib/tts/index.ts for the provider wiring.
+ * out of `getVoicesByLanguageCode`. See convex/lib/tts/index.ts for the
+ * provider wiring.
  */
 export interface Voice {
   provider: TtsProvider;
@@ -52,24 +52,6 @@ function createChirp3Voice(
     displayName: `${name} (${gender === 'female' ? 'Female' : 'Male'}) - ${accentLabel}`,
     apiCode: `${locale}-Chirp3-HD-${name}`,
     gender,
-  };
-}
-
-function createElevenLabsVoice(
-  name: string,
-  gender: 'female' | 'male',
-  voiceId: string,
-): Voice {
-  return {
-    provider: 'elevenlabs',
-    name,
-    displayName: `${name} (${gender === 'female' ? 'Female' : 'Male'}) - ElevenLabs`,
-    apiCode: voiceId,
-    gender,
-    // Default ElevenLabs voices to dormant. Pools for languages currently
-    // running on ElevenLabs run their list through `activate(...)` below to
-    // flip this back on.
-    active: false,
   };
 }
 
@@ -158,9 +140,10 @@ const GEMINI_EN_MIXED: Voice[] = [
 ];
 
 /**
- * Mark a voice list as selectable. Used by pools for languages whose
- * `ttsProvider` is currently `'elevenlabs'` — wraps the list so every
- * entry becomes `active: true` without touching the per-voice definitions.
+ * Mark a voice list as selectable. Used by pools whose voices default to
+ * dormant (e.g. Azure) but are the active provider for that language — wraps
+ * the list so every entry becomes `active: true` without touching the
+ * per-voice definitions.
  */
 function activate(voices: Voice[]): Voice[] {
   return voices.map((v) => ({ ...v, active: true }));
@@ -192,137 +175,6 @@ function buildChirp3Pool(
     ...males.map((n) => createChirp3Voice(n, 'male', locale, accentLabel)),
   ];
 }
-
-// ---------------------------------------------------------------------------
-// Shared ElevenLabs multilingual voices
-// ---------------------------------------------------------------------------
-
-const EL_MARK = createElevenLabsVoice('Mark', 'male', 'UgBBYS2sOqTuMpoF3BR0');
-const EL_JAMES = createElevenLabsVoice('James', 'male', 'EkK5I93UQWFDigLMpZcX');
-const EL_JUNIPER = createElevenLabsVoice('Juniper', 'female', 'aMSt68OGf4xUZAnLpTU8');
-const EL_CHRISTINA = createElevenLabsVoice('Christina', 'female', 'X03mvPuTfprif8QBAVeJ');
-// Camille Martin — multilingual female used across fr / pt.
-
-// ---------------------------------------------------------------------------
-// Per-language ElevenLabs voice pools
-// ---------------------------------------------------------------------------
-
-// English — 4 original + 4 added natives (US + UK mix)
-const ELEVENLABS_VOICES_EN: Voice[] = [
-  EL_JUNIPER,
-  EL_CHRISTINA,
-  createElevenLabsVoice('Adrea', 'female', 'ji8lGJ0ZLrpJ5KY4NwOd'),
-  createElevenLabsVoice('Lauren', 'female', 'DODLEQrClDo8wCz460ld'),
-  EL_MARK,
-  EL_JAMES,
-  createElevenLabsVoice('Alistair (UK)', 'male', 'l30f87tf05uxyknGdDw6'),
-];
-
-// Spanish (Spain / Castilian) — Clara + Carolina (native Castilian females);
-// James + Emilio (native Spanish male).
-const ELEVENLABS_VOICES_ES: Voice[] = [
-  createElevenLabsVoice('Eva', 'female', 'RgXx32WYOGrd7gFNifSf'),
-  createElevenLabsVoice('Lydia', 'female', 'SDVJaMLoJa7wc3s2sn7d'),
-  createElevenLabsVoice('David' ,'male', "Nh2zY9kknu6z4pZy6FhD"), 
-  createElevenLabsVoice('Emilio', 'male', 'ZCh4e9eZSUf41K4cmCEL'),
-];
-
-// Spanish (Latin America) — Kate + Alma (native LATAM females);
-// Beto + Alessio (native LATAM males).
-const ELEVENLABS_VOICES_ES_LATAM: Voice[] = [
-  createElevenLabsVoice('Kate', 'female', 'imFXYz8XIletRKLZZQaA'),
-  createElevenLabsVoice('Alma', 'female', '3ttovAt5bt3Kk38UGIob'),
-  createElevenLabsVoice('Antonio', 'male', 'htFfPSZGJwjBv1CL0aMD'),
-  createElevenLabsVoice('Mario', 'male', 'tomkxGQGz4b1kE0EM722'),
-];
-
-// French (France) — all 4 native French speakers
-const ELEVENLABS_VOICES_FR: Voice[] = [
-  createElevenLabsVoice('Camille', 'female', 'hFgOzpmS0CMtL2to8sAl'),
-  createElevenLabsVoice('Claire', 'female', 'HuLbOdhRlvQQN8oPP0AJ'),
-  createElevenLabsVoice('Marcel', 'male', 'kENkNtk0xyzG09WW40xE'),
-  createElevenLabsVoice('Yann', 'male', 'nr2EGJNe96rzn9FRlTId'),
-  createElevenLabsVoice('Celian', 'male', 'DGTOOUoGpoP6UZ9uSWfA'),
-  createElevenLabsVoice('Anna', 'female', 'nVPCtAFzgyMX3FZKNzH0'),
-];
-
-// German (Germany) — native German speakers (2F + 2M).
-const ELEVENLABS_VOICES_DE: Voice[] = [
-  createElevenLabsVoice('Ben', 'male', 'aTTiK3YzK3dXETpuDE2h'),
-  createElevenLabsVoice('Irene', 'female', '8wPhfH9uUzEMHTmRkoAR'),
-  createElevenLabsVoice('Carla', 'female', 'rKiu7lQ4c5P3az3745s3'),
-  createElevenLabsVoice('Leo', 'male', 'f64OyGck4gc2zk7QOs55'),
-];
-
-// Italian — 4 native Italian speakers
-const ELEVENLABS_VOICES_IT: Voice[] = [
-  createElevenLabsVoice('Tiziana', 'female', 'RXoaSpLaWTEckJgPUBG3'),
-  createElevenLabsVoice('Violette', 'female', 'gfKKsLN1k0oYYN9n2dXX'),
-  createElevenLabsVoice('Brando', 'male', 'o4b57JYAECRMJyCEXyIE'),
-  createElevenLabsVoice('Marco', 'male', '13Cuh3NuYvWOVQtLbRN8'),
-];
-
-// Portuguese (Brazilian) — 4 native Brazilian speakers + Camille (multilingual).
-const ELEVENLABS_VOICES_PT: Voice[] = [
-  createElevenLabsVoice('Andrea', 'female', 'HOfBIVLhom4mc9WvXfyH'),
-  createElevenLabsVoice('Carla', 'female', 'oJebhZNaPllxk6W0LSBA'),
-  createElevenLabsVoice('Eduardo', 'male', '4J31DrhygVjvFsoj7BsM'),
-  createElevenLabsVoice('Marcio', 'male', 'Zk0wRqIFBWGMu2lIk7hw'),
-];
-
-// Russian — James + native Ivan; Russian females (verify before production).
-const ELEVENLABS_VOICES_RU: Voice[] = [
-  createElevenLabsVoice('Ekaterina', 'female', 'GN4wbsbejSnGSa1AzjH5'),
-  createElevenLabsVoice('Mariia', 'female', 'EDpEYNf6XIeKYRzYcx4I'),
-  createElevenLabsVoice('Alex', 'male', 'txnCCHHGKmYIwrn7HfHQ'),
-  createElevenLabsVoice('Ivan', 'male', 'rQOBu7YxCDxGiFdTm28w'),
-];
-
-// Hindi — 4 native Indian speakers.
-const ELEVENLABS_VOICES_HI: Voice[] = [
-  createElevenLabsVoice('Monika', 'female', '1qEiC6qsybMkmnNdVMbK'),
-  createElevenLabsVoice('Devi', 'female', 'MF4J4IDTRo0AxOO4dpFR'),
-  createElevenLabsVoice('Niraj', 'male', 'zgqefOY5FPQ3bB7OZTVR'),
-  createElevenLabsVoice('Leo', 'male', 'IvLWq57RKibBrqZGpQrC'),
-];
-
-// Chinese (Mandarin) — Stacy (native) + Jane (multilingual); Martin Li + Haytham.
-const ELEVENLABS_VOICES_ZH: Voice[] = [
-  createElevenLabsVoice('Amy', 'female', 'bhJUNIXWQQ94l8eI2VUf'),
-  createElevenLabsVoice('Jane', 'female', 'RILOU7YmBhvwJGDGjNmP'),
-  createElevenLabsVoice('Jin', 'male', 'vZZLclMx4wouUtKBRfZn'),
-  createElevenLabsVoice('Haytham', 'male', 'IES4nrmZdUBHByLBde0P'),
-];
-
-// Japanese — 4 native Japanese speakers.
-const ELEVENLABS_VOICES_JA: Voice[] = [
-  createElevenLabsVoice('Satomi', 'female', 'wcs09USXSN5Bl7FXohVZ'),
-  createElevenLabsVoice('Shizuka', 'female', 'WQz3clzUdMqvBf0jswZQ'),
-  createElevenLabsVoice('Otani', 'male', '3JDquces8E8bkmvbh6Bc'),
-  createElevenLabsVoice('Kozy', 'male', 'GxxMAMfQkDlnqjpzjLHH'),
-];
-
-// Korean — native JiYoung (F) + native KKC (M).
-const ELEVENLABS_VOICES_KO: Voice[] = [
-  createElevenLabsVoice('Han', 'female', '8jHHF8rMqMlg8if2mOUe'),
-  createElevenLabsVoice('Hyuk', 'male', 'ZJCNdZEjYwkOElxugmW2'),
-];
-
-// Vietnamese — 2 native Vietnamese speakers. 1F + 1M.
-const ELEVENLABS_VOICES_VI: Voice[] = [
-  createElevenLabsVoice('Nhu', 'female', 'A5w1fw5x0uXded1LDvZp'),
-  createElevenLabsVoice('Ninh', 'male', 'aN7cv9yXNrfIR87bDmyD'),
-  createElevenLabsVoice('Chris', 'male', 'PDoCXqBQFGsvfO0hNkEs'),
-  createElevenLabsVoice('Seo', 'female', 'o2sPqaz4lRxUCRm2QqQK'),
-];
-
-// Swedish — Jane + native Sanna/Louise (F); native Peter/Martin (M).
-const ELEVENLABS_VOICES_SV: Voice[] = [
-  createElevenLabsVoice('Jane', 'female', 'RILOU7YmBhvwJGDGjNmP'),
-  createElevenLabsVoice('Louise', 'female', 'QLfvbukvQvrPOx9HXQ3x'),
-  createElevenLabsVoice('Martin', 'male', 'CuaAIFbkzX2kaNH5EtHZ'),
-  createElevenLabsVoice('Andres', 'male', 'hMTrLL2ZiyJiyKrdg2z4'),
-];
 
 // Swedish — native sv-SE Azure Neural voices. Catalog only ships 1 male
 // (Mattias) and 2 female (Sofie, Hillevi) at the time of this change.
@@ -438,41 +290,12 @@ const AZURE_DRAGON_HD_VOICES_ZH: Voice[] = [
   createAzureVoice('Yunfan', 'male', 'zh-CN-Yunfan:DragonHDLatestNeural'),
 ];
 
-// Finnish — 4 native speakers.
-const ELEVENLABS_VOICES_FI: Voice[] = [
-  createElevenLabsVoice('Aurora', 'female', 'YSabzCJMvEHDduIDMdwV'),
-  createElevenLabsVoice('Miika', 'male', 'fC33e0BIKA7wWK2MeARj'),
-];
-
-// Dutch (Netherlands) — 4 native Dutch speakers.
-const ELEVENLABS_VOICES_NL: Voice[] = [
-  createElevenLabsVoice('Ruth', 'female', 'yO6w2xlECAQRFP6pX7Hw'),
-  createElevenLabsVoice('Melanie', 'female', 'SXBL9NbvTrjsJQYay2kT'),
-  createElevenLabsVoice('Serge', 'male', 'UNBIyLbtFB9k7FKW8wJv'),
-  createElevenLabsVoice('Peter', 'male', '60CwgZt94Yf7yYIXMDDe'),
-];
-
-// Greek — 4 native Greek speakers.
-const ELEVENLABS_VOICES_EL: Voice[] = [
-  createElevenLabsVoice('Sophie', 'female', '7smwXrU3C1PfaspIIUZB'),
-  createElevenLabsVoice('Eugene', 'male', '5DAtyqt3LGjv9jkjNVFd'),
-  createElevenLabsVoice('Christos', 'male', 'PaZ8laODC1yRxHTPYJFh'),
-];
-
-// Arabic — 4 native Arabic speakers.
-const ELEVENLABS_VOICES_AR: Voice[] = [
-  createElevenLabsVoice('Sara', 'female', 'XTa3iQyMA6f1qrI4F6kZ'),
-  createElevenLabsVoice('Sara2', 'female', 'gMB389pj77Qe5nErWNjd'),
-  createElevenLabsVoice('Mohammed', 'male', 'Qp2PG6sgef1EHtrNQKnf'),
-  createElevenLabsVoice('Mazen', 'male', 'rPNcQ53R703tTmtue1AT'),
-];
-
 // ---------------------------------------------------------------------------
 // Per-language unified voice pools
 //
 // Each entry contains the full curated set — Google Chirp3 voices first (so a
 // language can be switched back to `ttsProvider: 'google'` without touching
-// voice config), then the ElevenLabs pool.
+// voice config), then any Azure / Gemini pools.
 // ---------------------------------------------------------------------------
 
 // English "Mixed" pool — pooled US + GB + AU Chirp3 voices.
@@ -484,38 +307,34 @@ const CHIRP3_EN_MIXED: Voice[] = [
 
 export const VOICE_POOLS: Record<string, Voice[]> = {
   // English runs on Gemini (mixed US/GB/AU accents on the default `en`, pinned
-  // accent on the dialect codes). Google Chirp3 + ElevenLabs voices stay listed
-  // but go dormant — the `ttsProvider: 'gemini'` filter excludes them — so a
-  // revert is a one-line `ttsProvider` flip in lib/languages.ts.
-  en: [...CHIRP3_EN_MIXED, ...ELEVENLABS_VOICES_EN, ...GEMINI_EN_MIXED],
+  // accent on the dialect codes). Google Chirp3 voices stay listed but go
+  // dormant — the `ttsProvider: 'gemini'` filter excludes them — so a revert
+  // is a one-line `ttsProvider` flip in lib/languages.ts.
+  en: [...CHIRP3_EN_MIXED, ...GEMINI_EN_MIXED],
   en_gb: [...buildChirp3Pool('en-GB', 'UK'), ...GEMINI_EN_GB],
   en_us: [...buildChirp3Pool('en-US', 'US'), ...GEMINI_EN_US],
   en_au: [...buildChirp3Pool('en-AU', 'Australia'), ...GEMINI_EN_AU],
-  es: [...buildChirp3Pool('es-ES', 'Spain'), ...activate(ELEVENLABS_VOICES_ES)],
-  es_latam: [
-    ...buildChirp3Pool('es-US', 'Latin America'),
-    ...activate(ELEVENLABS_VOICES_ES_LATAM),
-  ],
+  es: [...buildChirp3Pool('es-ES', 'Spain')],
+  es_latam: [...buildChirp3Pool('es-US', 'Latin America')],
   // Spanish Mixed — union of Spain + LatAm Google voice pools. The audio-player
   // picks by the persisted translation `regionVariant` (see
-  // `getVoiceForLanguageVariant` below); ElevenLabs voices stay out of the
-  // mixed pool because they aren't tagged with a Spanish region prefix.
+  // `getVoiceForLanguageVariant` below).
   es_mixed: [
     ...buildChirp3Pool('es-ES', 'Spain'),
     ...buildChirp3Pool('es-US', 'Latin America'),
   ],
-  fr: [...buildChirp3Pool('fr-FR', 'France'), ...ELEVENLABS_VOICES_FR],
-  de: [...buildChirp3Pool('de-DE', 'Germany'), ...ELEVENLABS_VOICES_DE, ...GEMINI_CORE],
-  it: [...buildChirp3Pool('it-IT', 'Italy'), ...ELEVENLABS_VOICES_IT],
-  pt: [...buildChirp3Pool('pt-BR', 'Brazil'), ...ELEVENLABS_VOICES_PT],
+  fr: [...buildChirp3Pool('fr-FR', 'France')],
+  de: [...buildChirp3Pool('de-DE', 'Germany'), ...GEMINI_CORE],
+  it: [...buildChirp3Pool('it-IT', 'Italy')],
+  pt: [...buildChirp3Pool('pt-BR', 'Brazil')],
   // European Portuguese runs on Gemini. Google ships no Chirp3-HD pt-PT voices
   // (verified against /v1/voices), so there's no Google fallback to list —
   // Gemini is the only pool.
   pt_pt: [...GEMINI_CORE],
-  ru: [...buildChirp3Pool('ru-RU', 'Russia', 'core'), ...ELEVENLABS_VOICES_RU],
+  ru: [...buildChirp3Pool('ru-RU', 'Russia', 'core')],
   pl: [...buildChirp3Pool('pl-PL', 'Poland')],
   sk: [...buildChirp3Pool('sk-SK', 'Slovakia'), ...AZURE_VOICES_SK],
-  hi: [...buildChirp3Pool('hi-IN', 'India'), ...ELEVENLABS_VOICES_HI],
+  hi: [...buildChirp3Pool('hi-IN', 'India')],
   bn: [...buildChirp3Pool('bn-IN', 'Bengali'), ...AZURE_VOICES_BN],
   tr: [...buildChirp3Pool('tr-TR', 'Türkiye'), ...AZURE_VOICES_TR],
   hu: [...buildChirp3Pool('hu-HU', 'Hungary'), ...AZURE_VOICES_HU],
@@ -523,7 +342,6 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   cs: [...buildChirp3Pool('cs-CZ', 'Czechia'), ...AZURE_VOICES_CS],
   zh: [
     ...buildChirp3Pool('cmn-CN', 'Mandarin'),
-    ...ELEVENLABS_VOICES_ZH,
     // Dormant Dragon HD pool — activate by switching the language to Azure.
     ...AZURE_DRAGON_HD_VOICES_ZH,
   ],
@@ -531,9 +349,9 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   zh_traditional: [...activate(AZURE_VOICES_ZH_TW)],
   yue: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
   yue_traditional: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
-  ja: [...buildChirp3Pool('ja-JP', 'Japan'), ...ELEVENLABS_VOICES_JA],
-  ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...ELEVENLABS_VOICES_KO],
-  vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...ELEVENLABS_VOICES_VI],
+  ja: [...buildChirp3Pool('ja-JP', 'Japan')],
+  ko: [...buildChirp3Pool('ko-KR', 'Korea')],
+  vi: [...buildChirp3Pool('vi-VN', 'Vietnam')],
   th: [...buildChirp3Pool('th-TH', 'Thailand'), ...AZURE_VOICES_TH],
   id: [...buildChirp3Pool('id-ID', 'Indonesia')],
   // Filipino runs on Gemini TTS (fil-PH). No Google Chirp3-HD fil voices, so
@@ -542,17 +360,16 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   fil: [...GEMINI_CORE, ...AZURE_VOICES_FIL_PH],
   sv: [
     ...buildChirp3Pool('sv-SE', 'Sweden'),
-    ...ELEVENLABS_VOICES_SV,
     ...AZURE_VOICES_SV,
     ...GEMINI_CORE,
   ],
   // nb: [...buildChirp3Pool('nb-NO', 'Norway')], // disabled — see SUPPORTED_LANGUAGES
   da: [...buildChirp3Pool('da-DK', 'Denmark')],
-  fi: [...buildChirp3Pool('fi-FI', 'Finland'), ...ELEVENLABS_VOICES_FI],
-  nl: [...buildChirp3Pool('nl-NL', 'Netherlands'), ...ELEVENLABS_VOICES_NL],
-  el: [...buildChirp3Pool('el-GR', 'Greece'), ...ELEVENLABS_VOICES_EL],
+  fi: [...buildChirp3Pool('fi-FI', 'Finland')],
+  nl: [...buildChirp3Pool('nl-NL', 'Netherlands')],
+  el: [...buildChirp3Pool('el-GR', 'Greece')],
   he: [...buildChirp3Pool('he-IL', 'Israel'), ...AZURE_VOICES_HE],
-  ar: [...buildChirp3Pool('ar-XA', 'MSA'), ...ELEVENLABS_VOICES_AR],
+  ar: [...buildChirp3Pool('ar-XA', 'MSA')],
   // Saudi and Iraqi dialects share the Google MSA pool (`ar-XA`) — neither has
   // dedicated Chirp3 voices, and dialect-specific Azure voices read worse than
   // MSA on these dialects' typical content.
@@ -728,7 +545,7 @@ export function getVoiceForLanguageVariant(
 
 /**
  * Extract locale from a Google Chirp3 voice apiCode (e.g.
- * "en-US-Chirp3-HD-Leda" → "en-US"). Returns null for ElevenLabs voice IDs.
+ * "en-US-Chirp3-HD-Leda" → "en-US"). Returns null for non-Chirp3 voice IDs.
  */
 export function getLocaleFromApiCode(apiCode: string): string | null {
   if (!apiCode.includes('-Chirp3-HD-')) return null;
@@ -737,8 +554,8 @@ export function getLocaleFromApiCode(apiCode: string): string | null {
 }
 
 /**
- * Unique locales for a language (Google voices only; ElevenLabs voices are
- * multilingual and carry no locale).
+ * Unique locales for a language (Google voices only; other providers' voices
+ * are multilingual and carry no locale).
  */
 export function getLocalesByLanguageCode(code: string): string[] {
   const locales = getAllVoicesByLanguageCode(code)

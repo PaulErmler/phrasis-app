@@ -17,13 +17,6 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 150,
     shards: 8,
   },
-  elevenlabsTts: {
-    kind: 'token bucket',
-    rate: 60,
-    period: MINUTE,
-    capacity: 60,
-    shards: 3,
-  },
   azureTts: {
     kind: 'token bucket',
     rate: 200,
@@ -55,12 +48,13 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   },
 });
 
-export const TTS_RATE_LIMIT_BY_PROVIDER: Record<
-  TtsProvider,
-  'googleTts' | 'elevenlabsTts' | 'azureTts' | 'geminiTts'
+// Partial because 'elevenlabs' lingers in `TtsProvider` only as a stored-value
+// tombstone — it is never dispatched, so it needs no rate-limit bucket. The
+// dispatch lookup falls back to 'googleTts' for any unmapped provider.
+export const TTS_RATE_LIMIT_BY_PROVIDER: Partial<
+  Record<TtsProvider, 'googleTts' | 'azureTts' | 'geminiTts'>
 > = {
   google: 'googleTts',
-  elevenlabs: 'elevenlabsTts',
   azure: 'azureTts',
   gemini: 'geminiTts',
 };

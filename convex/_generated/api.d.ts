@@ -74,7 +74,6 @@ import type * as lib_stt_index from "../lib/stt/index.js";
 import type * as lib_stt_languageCodes from "../lib/stt/languageCodes.js";
 import type * as lib_textComparison from "../lib/textComparison.js";
 import type * as lib_tts_azure from "../lib/tts/azure.js";
-import type * as lib_tts_elevenlabs from "../lib/tts/elevenlabs.js";
 import type * as lib_tts_gemini from "../lib/tts/gemini.js";
 import type * as lib_tts_google from "../lib/tts/google.js";
 import type * as lib_tts_index from "../lib/tts/index.js";
@@ -168,7 +167,6 @@ declare const fullApi: ApiFromModules<{
   "lib/stt/languageCodes": typeof lib_stt_languageCodes;
   "lib/textComparison": typeof lib_textComparison;
   "lib/tts/azure": typeof lib_tts_azure;
-  "lib/tts/elevenlabs": typeof lib_tts_elevenlabs;
   "lib/tts/gemini": typeof lib_tts_gemini;
   "lib/tts/google": typeof lib_tts_google;
   "lib/tts/index": typeof lib_tts_index;

@@ -198,7 +198,6 @@ describe("features/decks", () => {
       vi.useFakeTimers();
       vi.stubEnv("GOOGLE_TTS_API_KEY", "dummy");
       vi.stubEnv("GOOGLE_TRANSLATE_API_KEY", "dummy");
-      vi.stubEnv("ELEVENLABS_API_KEY", "dummy");
       vi.stubEnv("AZURE_SPEECH_API_KEY", "dummy");
       vi.stubEnv("AZURE_SPEECH_REGION", "westeurope");
 
@@ -219,7 +218,6 @@ describe("features/decks", () => {
           },
         ],
       });
-      const elevenTtsBytes = new Uint8Array([0, 1, 2, 3]);
       const googleTtsBody = JSON.stringify({
         audioContent: Buffer.from("fake-mp3-bytes").toString("base64"),
       });
@@ -236,12 +234,6 @@ describe("features/decks", () => {
           return new Response(azureSttBody, {
             status: 200,
             headers: { "Content-Type": "application/json" },
-          });
-        }
-        if (u.includes("api.elevenlabs.io/v1/text-to-speech")) {
-          return new Response(elevenTtsBytes, {
-            status: 200,
-            headers: { "Content-Type": "audio/mpeg" },
           });
         }
         if (u.includes("texttospeech.googleapis.com")) {

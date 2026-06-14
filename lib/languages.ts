@@ -16,6 +16,11 @@
  * with `ttsProviderValidator` in `convex/types.ts` (the Convex-side source of
  * truth used for stored `audioRecordings.ttsProvider`). 'gemini' = Gemini 3.1
  * Flash TTS via OpenRouter (distinct from 'google' = Google Cloud Chirp3).
+ *
+ * 'elevenlabs' is a retired provider kept only as a tombstone so historical
+ * stored `ttsProvider` values still validate — no language routes to it and it
+ * is no longer dispatchable (see convex/lib/tts/index.ts). Do not remove it
+ * from this array without first migrating any stored rows that use it.
  */
 export const TTS_PROVIDERS = ['google', 'elevenlabs', 'azure', 'gemini'] as const;
 export type TtsProvider = (typeof TTS_PROVIDERS)[number];

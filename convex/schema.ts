@@ -637,8 +637,8 @@ export default defineSchema({
   }).index('by_text_and_language', ['textId', 'language']),
 
   // Global concurrency slots per TTS provider. Each row = one in-flight API
-  // call. Used to stay under provider concurrency caps (e.g. ElevenLabs'
-  // 3-parallel limit). Stale rows are reclaimed after SLOT_STALE_MS.
+  // call. Used to stay under provider concurrency caps (e.g. Azure's
+  // 8-parallel limit). Stale rows are reclaimed after SLOT_STALE_MS.
   ttsProviderSlots: defineTable({
     provider: ttsProviderValidator,
     claimedAt: v.number(),

@@ -23,7 +23,6 @@ vi.mock("../../rateLimiter", () => ({
   },
   TTS_RATE_LIMIT_BY_PROVIDER: {
     google: "googleTts",
-    elevenlabs: "elevenlabsTts",
     azure: "azureTts",
   },
 }));

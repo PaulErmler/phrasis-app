@@ -34,10 +34,10 @@ describe('getLanguageByCode', () => {
 describe('SUPPORTED_LANGUAGES ttsProvider', () => {
   // Derived from SUPPORTED_LANGUAGES (not hardcoded) so the test can never
   // silently drift from lib/languages.ts when a language flips provider.
-  const NON_GOOGLE_PROVIDERS: Record<string, 'elevenlabs' | 'azure'> =
+  const NON_GOOGLE_PROVIDERS: Record<string, 'azure' | 'gemini'> =
     Object.fromEntries(
       SUPPORTED_LANGUAGES.filter((l) => l.ttsProvider !== 'google').map(
-        (l) => [l.code, l.ttsProvider as 'elevenlabs' | 'azure'],
+        (l) => [l.code, l.ttsProvider as 'azure' | 'gemini'],
       ),
     );
 
@@ -137,7 +137,7 @@ describe('getLocaleFromApiCode', () => {
     expect(getLocaleFromApiCode('cmn-CN-Chirp3-HD-Foo')).toBe('cmn-CN');
   });
 
-  it('returns null for non-Google apiCodes (e.g., ElevenLabs voice IDs)', () => {
+  it('returns null for non-Google apiCodes (e.g., raw provider voice IDs)', () => {
     expect(getLocaleFromApiCode('weird')).toBeNull();
     expect(getLocaleFromApiCode('21m00Tcm4TlvDq8ikWAM')).toBeNull();
   });
