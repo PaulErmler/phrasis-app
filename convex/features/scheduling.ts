@@ -29,7 +29,7 @@ import {
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import { getTodayInTimezone } from '../lib/dateUtils';
-import { getAudioForText } from '../lib/audio';
+import { getAudioForText, deleteAudioRow } from '../lib/audio';
 import {
   ROMANIZATION_LANGUAGES,
   USER_PROVIDED_TRANSLATION_SOURCE,
@@ -787,9 +787,59 @@ export const hideCard = mutation({
 });
 
 /**
+ * Delete a text's translations + audio (rows AND storage blobs) and the text
+ * row itself — but ONLY when the text is user-created AND no card references it
+ * any more. Shared premade/dataset texts (and texts still referenced by another
+ * card) are left untouched. Call after deleting/replacing a card so a custom or
+ * chat sentence the user removed doesn't leave orphaned translations/audio/blobs.
+ *
+ * Bounded: a single text has at most a course's worth of languages, so the
+ * per-text `.collect()`s read a small, bounded set. Audio goes through
+ * `deleteAudioRow` so a blob shared via an `editCard` copy isn't dropped.
+ *
+ * Invariant relied on: a user-created text is never referenced by another user's
+ * card. Every userCreated text is stamped with the acting user's `userId` and
+ * lives in that user's own per-course collection, and `authorizeCardAccess`
+ * enforces course ownership — so the `userCreated` guard below is sufficient and
+ * no `text.userId === userId` check is needed. If cross-user sharing of
+ * user-created texts is ever introduced, add an owner check here.
+ */
+async function cascadeCleanupTextIfOrphaned(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+): Promise<void> {
+  const text = await ctx.db.get(textId);
+  // Never delete shared premade/dataset content.
+  if (!text || !text.userCreated) return;
+  // Still referenced by another card → leave everything in place.
+  const referencingCard = await ctx.db
+    .query('cards')
+    .withIndex('by_textId', (q) => q.eq('textId', textId))
+    .first();
+  if (referencingCard) return;
+
+  const translations = await ctx.db
+    .query('translations')
+    .withIndex('by_textId', (q) => q.eq('textId', textId))
+    .collect();
+  for (const tr of translations) {
+    await ctx.db.delete(tr._id);
+  }
+  const audioRows = await ctx.db
+    .query('audioRecordings')
+    .withIndex('by_textId', (q) => q.eq('textId', textId))
+    .collect();
+  for (const audio of audioRows) {
+    await deleteAudioRow(ctx, audio);
+  }
+  await ctx.db.delete(textId);
+}
+
+/**
  * Permanently delete a card. Unlike `hideCard`, this removes the card row
- * entirely (and its aggregate entries). Shared text/translations/audio rows
- * stay because other cards may reference them.
+ * entirely (and its aggregate entries). For user-created (custom/chat) texts
+ * that no other card references, the text + its translations + audio (and
+ * storage blobs) are cascade-deleted; shared premade/dataset rows stay.
  */
 export const deleteCardPermanently = mutation({
   args: {
@@ -797,8 +847,10 @@ export const deleteCardPermanently = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    await authorizeCardAccess(ctx, args.cardId);
+    const { card } = await authorizeCardAccess(ctx, args.cardId);
+    const textId = card.textId;
     await deleteCard(ctx, args.cardId);
+    await cascadeCleanupTextIfOrphaned(ctx, textId);
     return null;
   },
 });
@@ -1142,12 +1194,12 @@ export const flagTranslation = mutation({
     for (const { tr } of enqueueable) {
       const lang = tr.targetLanguage;
 
-      const claimed = await claimLlmTranslationIfAvailable(
+      const claimId = await claimLlmTranslationIfAvailable(
         ctx,
         card.textId,
         lang,
       );
-      if (!claimed) continue;
+      if (!claimId) continue;
 
       // Charge quota once total — on the first successful claim. If the
       // user is depleted, this throws USAGE_LIMIT and the whole mutation
@@ -1167,7 +1219,8 @@ export const flagTranslation = mutation({
         )
         .take(10);
       for (const audioRow of audioRows) {
-        await ctx.db.delete(audioRow._id);
+        // Reference-aware: drops the blob only when no other row references it.
+        await deleteAudioRow(ctx, audioRow);
       }
 
       await ctx.runMutation(
@@ -1183,6 +1236,7 @@ export const flagTranslation = mutation({
             // Deliberate retranslation — overwrite the existing translation
             // row (and its romanization) once the LLM lands.
             replaceExisting: true,
+            claimId,
           },
           priority: 1,
         },
@@ -1232,7 +1286,8 @@ export const regenerateCardAudio = mutation({
         )
         .take(10);
       for (const row of audioRows) {
-        await ctx.db.delete(row._id);
+        // Reference-aware: drops the blob only when no other row references it.
+        await deleteAudioRow(ctx, row);
       }
     }
 
@@ -1405,7 +1460,8 @@ export const editCard = mutation({
           )
           .take(10);
         for (const row of audioRows) {
-          await ctx.db.delete(row._id);
+          // Reference-aware: drops the blob only when no other row references it.
+          await deleteAudioRow(ctx, row);
         }
       }
     } else {
@@ -1486,6 +1542,15 @@ export const editCard = mutation({
             : existing?.speakerGender
               ? { speakerGender: existing.speakerGender }
               : {}),
+          // Carry the source row's translationVersion on the unchanged carry-over
+          // branch so the logical copy is faithful (matching the audio copy and
+          // the stamping done everywhere else). User-edited rows are tagged
+          // user-provided and left unstamped (user-owned). Benign today since the
+          // version sweep exempts userCreated + user-provided rows, but this keeps
+          // the copy honest if those exemptions ever change.
+          ...(!changed && existing?.translationVersion !== undefined
+            ? { translationVersion: existing.translationVersion }
+            : {}),
         });
       }
 
@@ -1509,6 +1574,13 @@ export const editCard = mutation({
             voiceGender: row.voiceGender,
             speed: row.speed,
             wordTimings: row.wordTimings,
+            // Carry the SOURCE row's ttsVersion stamp on the copy. Without it the
+            // copy lands undefined ("=== current, never stale") and permanently
+            // escapes the version sweep — so genuinely-stale source audio (e.g. a
+            // pt_pt row stamped below the bumped ttsVersion) would be laundered
+            // onto the new text and never regenerate. Copying the source stamp
+            // (not the current version) preserves staleness so it regenerates.
+            ...(row.ttsVersion !== undefined ? { ttsVersion: row.ttsVersion } : {}),
           });
         }
       }
@@ -1556,6 +1628,10 @@ export const editCard = mutation({
 
     // Delete old card
     await deleteCard(ctx, args.cardId);
+    // Defensive cleanup: if the edit left the old text orphaned and user-created
+    // (path A reuses the textId, so the new card normally still references it —
+    // this is a no-op then), drop its now-unreferenced translations/audio/blobs.
+    await cascadeCleanupTextIfOrphaned(ctx, card.textId);
 
     // Update word-text links for changed languages (only if words were previously tracked)
     if (card.wordsTrackedLanguages && card.wordsTrackedLanguages.length > 0) {

@@ -184,9 +184,10 @@ const AZURE_VOICES_SV: Voice[] = [
   createAzureVoice('Mattias', 'male', 'sv-SE-MattiasNeural'),
 ];
 
-// Arabic Egyptian — Azure Neural M+F. Saudi and Iraqi route through the
-// shared Google MSA pool (`ar-XA`); Egyptian stays on Azure for now since
-// Egyptian dialect diverges enough from MSA that MSA voices read unnaturally.
+// Arabic Egyptian — Azure Neural M+F. All Arabic dialects now run on Gemini TTS
+// (see VOICE_POOLS below); this Azure Egyptian pool and the Google MSA (`ar-XA`)
+// pool are kept only as dormant one-line-revert fallbacks (filtered out by
+// `getVoicesByLanguageCode` while ttsProvider is gemini).
 const AZURE_VOICES_AR_EG: Voice[] = [
   createAzureVoice('Salma', 'female', 'ar-EG-SalmaNeural'),
   createAzureVoice('Shakir', 'male', 'ar-EG-ShakirNeural'),
@@ -314,12 +315,19 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   en_gb: [...buildChirp3Pool('en-GB', 'UK'), ...GEMINI_EN_GB],
   en_us: [...buildChirp3Pool('en-US', 'US'), ...GEMINI_EN_US],
   en_au: [...buildChirp3Pool('en-AU', 'Australia'), ...GEMINI_EN_AU],
-  es: [...buildChirp3Pool('es-ES', 'Spain')],
-  es_latam: [...buildChirp3Pool('es-US', 'Latin America')],
-  // Spanish Mixed — union of Spain + LatAm Google voice pools. The audio-player
-  // picks by the persisted translation `regionVariant` (see
-  // `getVoiceForLanguageVariant` below).
+  // Spanish runs on Gemini TTS: Spain via `es-ES`, Latin America via `es-US`,
+  // with the accent named in the prompt (lib/languages.ts `ttsPromptName`).
+  // Google Chirp3 voices stay listed but dormant (filtered out by
+  // `getVoicesByLanguageCode` while ttsProvider is gemini) for a one-line revert.
+  es: [...GEMINI_CORE, ...buildChirp3Pool('es-ES', 'Spain')],
+  es_latam: [...GEMINI_CORE, ...buildChirp3Pool('es-US', 'Latin America')],
+  // Spanish Mixed — accent-tagged Gemini voices (`@es-ES` + `@es-US`, like the
+  // English accent pools) so the audio-player can pick by the persisted
+  // translation `regionVariant` via `getVoiceForLanguageVariant`. The dormant
+  // Google Chirp3 pools are kept for revert.
   es_mixed: [
+    ...buildGeminiAccentPool('es-ES'),
+    ...buildGeminiAccentPool('es-US'),
     ...buildChirp3Pool('es-ES', 'Spain'),
     ...buildChirp3Pool('es-US', 'Latin America'),
   ],
@@ -369,17 +377,17 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   nl: [...buildChirp3Pool('nl-NL', 'Netherlands')],
   el: [...buildChirp3Pool('el-GR', 'Greece')],
   he: [...buildChirp3Pool('he-IL', 'Israel'), ...AZURE_VOICES_HE],
-  ar: [...buildChirp3Pool('ar-XA', 'MSA')],
-  // Saudi and Iraqi dialects share the Google MSA pool (`ar-XA`) — neither has
-  // dedicated Chirp3 voices, and dialect-specific Azure voices read worse than
-  // MSA on these dialects' typical content.
-  ar_sa: [...buildChirp3Pool('ar-XA', 'MSA')],
-  ar_eg: [...activate(AZURE_VOICES_AR_EG)],
-  ar_iq: [...buildChirp3Pool('ar-XA', 'MSA')],
-  // Levantine runs on Gemini TTS via the shared/global Arabic Gemini voice
-  // (GEMINI_CORE + `language_code: ar-001`); the Levantine dialect is conveyed
-  // in the prompt (`ttsPromptName` in lib/languages.ts), since Gemini has no
-  // Levantine locale.
+  // All Arabic dialects run on Gemini TTS: the global Arabic Gemini voice
+  // (GEMINI_CORE) steered by `geminiBcp47` — `ar-001` for MSA/Saudi/Iraqi/
+  // Levantine and the dedicated `ar-EG` for Egyptian — with each dialect named
+  // in the prompt via `ttsPromptName` (lib/languages.ts). The prior Google MSA
+  // (`ar-XA`) and Azure Egyptian pools stay listed as a dormant one-line-revert
+  // fallback (filtered out by `getVoicesByLanguageCode` while ttsProvider is
+  // gemini); switching a dialect's `ttsProvider` back re-activates them.
+  ar: [...GEMINI_CORE, ...buildChirp3Pool('ar-XA', 'MSA')],
+  ar_sa: [...GEMINI_CORE, ...buildChirp3Pool('ar-XA', 'MSA')],
+  ar_eg: [...GEMINI_CORE, ...AZURE_VOICES_AR_EG],
+  ar_iq: [...GEMINI_CORE, ...buildChirp3Pool('ar-XA', 'MSA')],
   ar_lev: [...GEMINI_CORE],
   // Persian runs on Gemini TTS (fa-IR). No Google Chirp3-HD fa voices, so
   // Gemini is the active pool (mirrors pt_pt). Azure fa-IR Neural voices are a
@@ -485,6 +493,72 @@ export function resolveAudioSpeakerGender(
   return Math.random() < 0.5 ? 'male' : 'female';
 }
 
+/** Minimal view of a `texts` row needed to resolve its speaker genders. */
+export interface SpeakerGenderInput {
+  /** Linguistic speaker gender: 'male' | 'female' | 'neutral' | undefined. */
+  speakerGender?: string;
+  /** Previously-resolved voice gender: 'male' | 'female' | undefined. */
+  audioSpeakerGender?: string;
+  /** Whether the text is user-created (custom/chat) vs premade dataset. */
+  userCreated: boolean;
+}
+
+/**
+ * Resolve the voice gender (`audioSpeakerGender`) a card's audio should use, and
+ * the patch (if any) to write back to the text so the translation prompt's
+ * `<speaker_gender>` tag and the audio voice agree.
+ *
+ * Three cases (`seed` is the text id, used for a deterministic coin-flip):
+ *   1. Definitive `speakerGender` ('male'/'female') — the source of truth; mirror
+ *      it into `audioSpeakerGender`, never overwrite `speakerGender`.
+ *   2. Custom + neutral/undefined — preserve the LLM's `speakerGender` verdict;
+ *      only resolve `audioSpeakerGender` (preferring a prior resolution).
+ *   3. Premade + neutral/undefined — coin-flip BOTH fields to the same value so
+ *      the prompt and the voice agree.
+ * Prior `audioSpeakerGender` is preserved when present so two runs don't re-roll.
+ */
+export function resolveCardSpeakerGenders(
+  text: SpeakerGenderInput,
+  seed: string,
+): {
+  audioSpeakerGender: 'male' | 'female';
+  genderPatch: { speakerGender?: 'male' | 'female'; audioSpeakerGender?: 'male' | 'female' };
+} {
+  let audioSpeakerGender: 'male' | 'female';
+  const genderPatch: {
+    speakerGender?: 'male' | 'female';
+    audioSpeakerGender?: 'male' | 'female';
+  } = {};
+
+  if (text.speakerGender === 'male' || text.speakerGender === 'female') {
+    audioSpeakerGender = text.speakerGender;
+    if (text.audioSpeakerGender !== audioSpeakerGender) {
+      genderPatch.audioSpeakerGender = audioSpeakerGender;
+    }
+  } else if (text.userCreated) {
+    audioSpeakerGender =
+      text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female'
+        ? text.audioSpeakerGender
+        : resolveAudioSpeakerGender(text.speakerGender, seed);
+    if (text.audioSpeakerGender !== audioSpeakerGender) {
+      genderPatch.audioSpeakerGender = audioSpeakerGender;
+    }
+  } else {
+    audioSpeakerGender =
+      text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female'
+        ? text.audioSpeakerGender
+        : resolveAudioSpeakerGender(undefined, seed);
+    if (text.speakerGender !== audioSpeakerGender) {
+      genderPatch.speakerGender = audioSpeakerGender;
+    }
+    if (text.audioSpeakerGender !== audioSpeakerGender) {
+      genderPatch.audioSpeakerGender = audioSpeakerGender;
+    }
+  }
+
+  return { audioSpeakerGender, genderPatch };
+}
+
 /**
  * Get a voice apiCode for a language, optionally matching a speaker gender.
  * Falls back to random-from-pool when gender filtering yields nothing.
@@ -511,13 +585,15 @@ export function getVoiceForLanguage(
 /**
  * Variant-aware voice picker. Used for languages whose pool spans multiple
  * regional accents (today: `es_mixed`). Filters the active-provider pool to
- * voices whose apiCode starts with `regionVariant` before applying the same
- * gender preference logic as `getVoiceForLanguage`. Falls back to the full
- * pool when no voice matches the variant prefix.
+ * voices matching `regionVariant` before applying the same gender preference
+ * logic as `getVoiceForLanguage`. Falls back to the full pool when no voice
+ * matches the variant.
  *
- * `regionVariant` is a Google locale prefix such as `"es-ES"` or `"es-US"`
- * (the prefix matches the leading segment of the Chirp3 apiCode, e.g.
- * `es-ES-Chirp3-HD-Leda`). Pass it through verbatim from the persisted
+ * `regionVariant` is a Google locale such as `"es-ES"` or `"es-US"`, matched
+ * against the apiCode in BOTH provider encodings: as a Chirp3 apiCode prefix
+ * (`es-ES-Chirp3-HD-Leda`) and as a Gemini `@locale` suffix (`Leda@es-ES`). The
+ * Gemini suffix path is the live one for es_mixed today (it runs on Gemini); the
+ * Chirp3 prefix path is dormant. Pass it through verbatim from the persisted
  * translation `regionVariant` column.
  */
 export function getVoiceForLanguageVariant(
@@ -532,7 +608,14 @@ export function getVoiceForLanguageVariant(
       `No voices available for language "${code}" with active provider. Add voices in lib/voices.ts.`,
     );
   }
-  const variantPool = all.filter((v) => v.apiCode.startsWith(`${regionVariant}-`));
+  // Match the regional voice across providers: Google Chirp3 encodes the locale
+  // as an apiCode PREFIX ("es-ES-Chirp3-HD-Leda"), while Gemini encodes it as an
+  // `@locale` SUFFIX ("Leda@es-ES"). Handle both so es_mixed works on Gemini.
+  const variantPool = all.filter(
+    (v) =>
+      v.apiCode.startsWith(`${regionVariant}-`) ||
+      v.apiCode.endsWith(`@${regionVariant}`),
+  );
   const pool = variantPool.length > 0 ? variantPool : all;
   if (speakerGender === 'male' || speakerGender === 'female') {
     const matching = pool.filter((v) => v.gender === speakerGender);

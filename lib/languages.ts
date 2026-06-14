@@ -130,6 +130,22 @@ export interface Language {
    */
   ttsPromptName?: string;
   /**
+   * Translation-method version (defaults to 1 via `getCurrentTranslationVersion`).
+   * Bump when changing the model/prompt for this language to lazily regenerate
+   * its existing non-custom translations (and their audio) on next view. See the
+   * content-versioning helpers below and `translations.translationVersion` in
+   * convex/schema.ts.
+   */
+  translationVersion?: number;
+  /**
+   * TTS-setup version (defaults to 1 via `getCurrentTtsVersion`). Bump when
+   * changing this language's voice pool, Gemini `ttsPromptName`, or provider so
+   * existing audio regenerates lazily — needed for prompt-only changes on an
+   * already-Gemini language where the provider-mismatch regen wouldn't fire
+   * (e.g. pt_pt). See `audioRecordings.ttsVersion` in convex/schema.ts.
+   */
+  ttsVersion?: number;
+  /**
    * When `true`, this language is excluded from user-facing pickers in
    * onboarding / course creation / settings (`LanguageSelector` and
    * `DualLanguageEditor`). The entry remains in `SUPPORTED_LANGUAGES` so
@@ -232,6 +248,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'germanic',
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
+    // Pin the accent in the prompt too — `geminiBcp47: 'en-GB'` alone can drift
+    // toward Gemini's default American English. ttsVersion bump regenerates
+    // existing en_gb audio (prompt-only change on an already-Gemini language).
+    ttsPromptName: 'British English',
+    ttsVersion: 2,
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -272,6 +293,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'germanic',
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
+    // Pin the accent in the prompt too — `geminiBcp47: 'en-AU'` alone can drift
+    // toward Gemini's default American English. ttsVersion bump regenerates
+    // existing en_au audio (prompt-only change on an already-Gemini language).
+    ttsPromptName: 'Australian English',
+    ttsVersion: 2,
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -289,7 +315,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇪🇸',
     category: 'romance',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    // Runs on Gemini TTS (`geminiBcp47: 'es-ES'`), with the Castilian accent
+    // named in the prompt so it doesn't drift toward Latin American Spanish.
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Castilian Spanish',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -298,7 +327,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     code: 'es_latam',
     displayCode: 'es-419',
     regionLabel: 'Latin America',
-    geminiBcp47: 'es-419',
+    // Gemini TTS locale: `es-US` is Gemini's American-Spanish locale (it has no
+    // `es-419` macro locale); the Latin American accent is reinforced in the
+    // prompt. This mirrors the `es-US` voiceLocalePrefix `es_mixed` already uses
+    // for the es_latam sub-variant.
+    geminiBcp47: 'es-US',
     azureSttLocale: 'es-MX',
     googleTranslateCode: 'es',
     compareLocale: 'es-419',
@@ -308,7 +341,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇲🇽',
     category: 'romance',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Latin American Spanish',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -333,7 +367,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🌎',
     category: 'romance',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    // Runs on Gemini TTS. The per-text accent (Spain vs Latin America) is pinned
+    // by the chosen voice's `@es-ES` / `@es-US` locale suffix (see the es_mixed
+    // Gemini pool in lib/voices.ts and `getVoiceForLanguageVariant`), so no
+    // single `ttsPromptName` applies here — the locale on the voice carries it.
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -415,6 +453,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'romance',
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
+    // Name the dialect in the Gemini prompt. `geminiBcp47: 'pt-PT'` alone let
+    // Gemini drift to Brazilian (reported); "native European Portuguese speaker"
+    // pins it. ttsVersion bump regenerates existing pt_pt audio (provider is
+    // unchanged, so the provider-mismatch regen path wouldn't fire).
+    ttsPromptName: 'European Portuguese',
+    ttsVersion: 2,
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -885,7 +929,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🌎',
     category: 'semitic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    // Runs on Gemini global Arabic (`geminiBcp47: 'ar-001'`); the dialect is
+    // conveyed in the prompt via `ttsPromptName`. Switching off Google triggers
+    // the provider-mismatch regen (lib/ttsPrecedence.ts) for existing audio.
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Modern Standard Arabic',
     needsRomanization: true,
     // Karaoke disabled for Arabic: ligatures + clitics don't align to STT
     // word timings, producing flickery/mis-positioned per-word highlights.
@@ -907,9 +955,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇦',
     category: 'semitic',
     llmSupportTier: 'tier2',
-    // No dedicated Saudi Chirp3 voices — route through the shared Google MSA
-    // pool (`ar-XA`). See lib/voices.ts for the pool entry.
-    ttsProvider: 'google',
+    // Runs on Gemini global Arabic (`ar-001`); Saudi dialect named in the prompt.
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Saudi Arabic',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
@@ -929,7 +977,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇪🇬',
     category: 'semitic',
     llmSupportTier: 'tier2',
-    ttsProvider: 'azure',
+    // Egyptian uses Gemini's dedicated Egyptian locale (`geminiBcp47: 'ar-EG'`)
+    // plus an explicit prompt. Switching off Azure triggers the provider-mismatch
+    // regen (gemini overrides azure) for existing audio.
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Egyptian Arabic',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
@@ -949,9 +1001,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇶',
     category: 'semitic',
     llmSupportTier: 'tier2',
-    // No dedicated Iraqi Chirp3 voices — route through the shared Google MSA
-    // pool (`ar-XA`). See lib/voices.ts for the pool entry.
-    ttsProvider: 'google',
+    // Runs on Gemini global Arabic (`ar-001`); Iraqi dialect named in the prompt.
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Iraqi Arabic',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
@@ -1098,6 +1150,68 @@ export function getLanguageByCode(code: string): Language | undefined {
  */
 export function getTtsProviderForLanguage(code: string): TtsProvider {
   return getLanguageByCode(code)?.ttsProvider ?? 'google';
+}
+
+// ---------------------------------------------------------------------------
+// Content versioning — per-language method/setup versions.
+//
+// Each version defaults to 1. Bumping a language's `translationVersion` (a new
+// model/prompt) or `ttsVersion` (a new voice pool / Gemini prompt / provider)
+// in SUPPORTED_LANGUAGES makes `scheduleMissingContent` treat already-stored
+// rows whose stamped version is strictly LOWER than the current value as stale
+// and regenerate them lazily on next view. The stamp is "undefined === current"
+// at the comparison sites (only a number strictly < current is stale), so rows
+// written before the field existed never mass-regenerate — the one-time
+// `backfillContentVersions` migration stamps them explicitly. See convex/schema.ts.
+// ---------------------------------------------------------------------------
+
+/** Baseline version for both translation and TTS when a Language omits it. */
+export const DEFAULT_CONTENT_VERSION = 1;
+
+/** Current translation-method version for a language (1 when unset). */
+export function getCurrentTranslationVersion(code: string): number {
+  return getLanguageByCode(code)?.translationVersion ?? DEFAULT_CONTENT_VERSION;
+}
+
+/** Current TTS-setup version for a language (1 when unset). */
+export function getCurrentTtsVersion(code: string): number {
+  return getLanguageByCode(code)?.ttsVersion ?? DEFAULT_CONTENT_VERSION;
+}
+
+/**
+ * Whether a stored content row is STALE versus the current config version, and
+ * should be regenerated. The single source of truth for the comparison so the
+ * translation and TTS regen sweeps can't drift apart.
+ *
+ * Treats `undefined` (a row written before the version field existed, or never
+ * backfilled) as "current/unknown — NOT stale". Only a concrete number strictly
+ * below `current` is stale. This is what prevents a database-wide regeneration
+ * storm the first time a card is viewed after the feature ships — the deciding
+ * detail of the whole versioning system.
+ */
+export function isContentVersionStale(
+  stamped: number | undefined,
+  current: number,
+): boolean {
+  return stamped !== undefined && stamped < current;
+}
+
+/** True iff this language's stored audio at `stampedVersion` is below the
+ * current `ttsVersion` config and should be re-synthesized. */
+export function isTtsVersionStale(
+  code: string,
+  stampedVersion: number | undefined,
+): boolean {
+  return isContentVersionStale(stampedVersion, getCurrentTtsVersion(code));
+}
+
+/** True iff this language's stored translation at `stampedVersion` is below the
+ * current `translationVersion` config and should be re-translated. */
+export function isTranslationVersionStale(
+  code: string,
+  stampedVersion: number | undefined,
+): boolean {
+  return isContentVersionStale(stampedVersion, getCurrentTranslationVersion(code));
 }
 
 // ---------------------------------------------------------------------------
@@ -1658,4 +1772,5 @@ export {
   getLocaleFromApiCode,
   getLocalesByLanguageCode,
   resolveAudioSpeakerGender,
+  resolveCardSpeakerGenders,
 } from './voices';

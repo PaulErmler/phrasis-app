@@ -14,7 +14,7 @@ import {
   getVoiceForLanguage,
   getVoiceForLanguageVariant,
   getVoiceGenderByApiCode,
-  resolveAudioSpeakerGender,
+  resolveCardSpeakerGenders,
   getTtsProviderForLanguage,
   getTranslationConfigForLanguage,
   resolveMixedVariant,
@@ -39,7 +39,12 @@ import {
   GOOGLE_TRANSLATE_SOURCE,
   ROMANIZATION_LANGUAGES,
   USER_PROVIDED_TRANSLATION_SOURCE,
+  getCurrentTranslationVersion,
+  getCurrentTtsVersion,
+  isTtsVersionStale,
+  isTranslationVersionStale,
 } from '../../lib/languages';
+import { deleteAudioRow, deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   translationValidator,
@@ -94,72 +99,15 @@ export async function scheduleMissingContent(
   const sourceLanguage = text.language;
 
   // Resolve gender for both the voice (audioSpeakerGender) and the translation
-  // prompt's <speaker_gender> tag (read from text.speakerGender). They must
-  // agree on the grammatical gender for the audio voice to match the
-  // translation grammar; otherwise we hit the user-facing "voice is the
-  // opposite gender" bug.
-  //
-  // `speakerGender` is the definitive answer for what `audioSpeakerGender`
-  // should be — when it's `'male'`/`'female'`, audio mirrors it. The two
-  // fields diverge in semantics for `'neutral'`/undefined:
-  //
-  //   - Custom sentences (`userCreated === true`): `speakerGender` is owned
-  //     by the LLM metadata pipeline (`generateSentenceMetadata`). A `'neutral'`
-  //     verdict means the LLM looked at every supplied translation and found
-  //     no morphology that forces a gender — overwriting that with a
-  //     coin-flipped `'male'`/`'female'` would force gendered grammar where
-  //     none is appropriate. So we preserve `speakerGender` as-is and only
-  //     resolve `audioSpeakerGender` (the voice still has to be one of
-  //     `'male'`/`'female'`).
-  //
-  //   - Pre-made dataset sentences (`userCreated === false`): no LLM gender
-  //     analysis ever runs, so `speakerGender` is always undefined unless a
-  //     future dataset/curator sets it. We coin-flip a definitive gender
-  //     (deterministic per textId) and write it to BOTH fields so the
-  //     translation prompt and the audio voice agree. If a future dataset
-  //     does set `speakerGender` to `'male'`/`'female'`, the first branch
-  //     below honors it.
-  let audioSpeakerGender: 'male' | 'female';
-  const genderPatch: {
-    speakerGender?: 'male' | 'female';
-    audioSpeakerGender?: 'male' | 'female';
-  } = {};
-
-  if (text.speakerGender === 'male' || text.speakerGender === 'female') {
-    // Definitive (LLM for custom, dataset for pre-made if ever set).
-    // Source of truth — never overwrite; mirror into audioSpeakerGender.
-    audioSpeakerGender = text.speakerGender;
-    if (text.audioSpeakerGender !== audioSpeakerGender) {
-      genderPatch.audioSpeakerGender = audioSpeakerGender;
-    }
-  } else if (text.userCreated) {
-    // Custom + neutral/undefined: preserve the LLM's call on `speakerGender`,
-    // only resolve `audioSpeakerGender`. Prior coin-flip preserved when
-    // present so two runs don't disagree; else seeded by textId so the
-    // resolution is deterministic and stable across retries.
-    audioSpeakerGender =
-      text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female'
-        ? text.audioSpeakerGender
-        : resolveAudioSpeakerGender(text.speakerGender, textId);
-    if (text.audioSpeakerGender !== audioSpeakerGender) {
-      genderPatch.audioSpeakerGender = audioSpeakerGender;
-    }
-  } else {
-    // Pre-made + neutral/undefined: coin-flip BOTH fields to the same value
-    // so the translation prompt's <speaker_gender> tag and the audio voice
-    // agree. Prior `audioSpeakerGender` preserved when present so the
-    // resolution doesn't re-roll between runs.
-    audioSpeakerGender =
-      text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female'
-        ? text.audioSpeakerGender
-        : resolveAudioSpeakerGender(undefined, textId);
-    if (text.speakerGender !== audioSpeakerGender) {
-      genderPatch.speakerGender = audioSpeakerGender;
-    }
-    if (text.audioSpeakerGender !== audioSpeakerGender) {
-      genderPatch.audioSpeakerGender = audioSpeakerGender;
-    }
-  }
+  // prompt's <speaker_gender> tag so they agree (otherwise we hit the
+  // user-facing "voice is the opposite gender" bug). The full case logic
+  // (definitive vs custom-neutral vs premade-neutral) lives in
+  // `resolveCardSpeakerGenders` (lib/voices.ts), seeded by textId for a
+  // deterministic, retry-stable coin-flip.
+  const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
+    text,
+    textId,
+  );
 
   if (Object.keys(genderPatch).length > 0) {
     await ctx.db.patch(textId, genderPatch);
@@ -280,12 +228,18 @@ export async function scheduleMissingContent(
           currentProvider,
           existingProvider,
         );
+        // Version-stale audio: the language's `ttsVersion` config was bumped
+        // above what this row was stamped with (a new voice pool / Gemini prompt
+        // / provider). Regenerate. `isTtsVersionStale` encodes the "undefined ===
+        // current" rule so un-backfilled rows never storm.
+        const versionMismatch = isTtsVersionStale(lang, audio.ttsVersion);
         if (genderMismatch) {
           langsWithAudioGenderDrift.add(lang);
         }
-        if (genderMismatch || providerMismatch) {
-          await ctx.storage.delete(audio.storageId);
-          await ctx.db.delete(audio._id);
+        if (genderMismatch || providerMismatch || versionMismatch) {
+          // Reference-aware delete: drops the blob only if no other row (e.g. an
+          // `editCard` copy on another text) still points at it.
+          await deleteAudioRow(ctx, audio);
           audioMap.set(lang, null);
         }
       }
@@ -328,21 +282,31 @@ export async function scheduleMissingContent(
     const isLegacy = translation.speakerGender === undefined;
     const isDrifted = !isLegacy && translation.speakerGender !== audioSpeakerGender;
     const isLegacyAlongsideDriftedAudio = isLegacy && langsWithAudioGenderDrift.has(lang);
+    // Version-stale translation: the language's `translationVersion` config was
+    // bumped above this row's stamp (a new model/prompt). Regenerate — but NEVER
+    // for user-created (custom/chat) texts, whose translations are user-owned.
+    // `isTranslationVersionStale` encodes the "undefined === current" rule.
+    const isVersionStale =
+      !text.userCreated &&
+      isTranslationVersionStale(lang, translation.translationVersion);
 
-    if (!isDrifted && !isLegacyAlongsideDriftedAudio) continue;
+    if (!isDrifted && !isLegacyAlongsideDriftedAudio && !isVersionStale) continue;
     if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
+    // Defer while an LLM retranslation is in flight — it will overwrite the row
+    // anyway, so deleting now just races the pending write.
+    const llmClaim = llmClaimMap.get(lang) ?? null;
+    if (llmClaim && Date.now() - llmClaim.claimedAt < LLM_CLAIM_STALE_MS) continue;
 
     await ctx.db.delete(translation._id);
     translationMap.set(lang, null);
     // Audio for the legacy-alongside-drifted case was already deleted by the
     // validity loop. The block below only fires when the sweep itself owns
-    // the delete — i.e. post-PR drift where the audio looked fine to the
-    // validity loop (correct voiceGender) but the translation row was
-    // produced under a stale `text.speakerGender`.
+    // the delete — i.e. post-PR drift / version bump where the audio looked fine
+    // to the validity loop but the translation row is now stale. Reference-aware
+    // delete so a blob shared via an `editCard` copy isn't dropped.
     const staleAudio = audioMap.get(lang);
-    if (staleAudio?.storageId) {
-      await ctx.storage.delete(staleAudio.storageId);
-      await ctx.db.delete(staleAudio._id);
+    if (staleAudio) {
+      await deleteAudioRow(ctx, staleAudio);
       audioMap.set(lang, null);
     }
   }
@@ -433,8 +397,8 @@ export async function scheduleMissingContent(
         // so downstream (romanization, TTS) doesn't care which provider ran.
         const tCfg = getTranslationConfigForLanguage(lang);
         if (tCfg.provider === 'openrouter') {
-          const claimed = await claimLlmTranslationIfAvailable(ctx, textId, lang);
-          if (claimed) {
+          const claimId = await claimLlmTranslationIfAvailable(ctx, textId, lang);
+          if (claimId) {
             await ctx.runMutation(
               internal.features.llmTranslationQueue.enqueueLlmTranslation,
               {
@@ -444,6 +408,7 @@ export async function scheduleMissingContent(
                   targetLanguage: lang,
                   text: text.text,
                   audioSpeakerGender,
+                  claimId,
                 },
                 priority,
               },
@@ -1756,7 +1721,13 @@ export const processTranslationForCard = internalAction({
         },
       );
     } catch (err) {
-      console.error('[translateCard] Translation error:', {
+      // Terminal: this is the Google last-resort path (reached only after the
+      // LLM was retried MAX_LLM_RETRIES times). Both quality and fallback have
+      // now failed, so no translation row is written and no audio is scheduled.
+      // We intentionally do NOT release the LLM claim here — letting it expire
+      // via CLAIM_STALE_MS gives a ~30s backoff before the next reconcile
+      // re-drives this (textId, lang), preventing a tight retry hot-loop.
+      console.error('[translateCard] terminal translation failure (LLM retries + Google both failed):', {
         textId: args.textId,
         sourceLanguage: args.sourceLanguage,
         targetLanguage: args.targetLanguage,
@@ -1829,9 +1800,37 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      * haven't been threaded yet still compile.
      */
     speakerGender: v.optional(voiceGenderValidator),
+    /**
+     * Ownership token (an `llmTranslationClaims` `_id`) passed by the LLM worker.
+     * When set, this mutation only writes if that claim is still the current one
+     * for (textId, targetLanguage) — atomically, in this transaction. If a
+     * concurrent reconcile reclaimed the claim mid-call (delete+reinsert → new
+     * `_id`), the worker lost ownership and we skip the write + TTS so the new
+     * owner is the single writer (no double-write, no claim clobber). Undefined
+     * for the Google fallback path and legacy callers (check disabled).
+     */
+    expectedClaimId: v.optional(v.id('llmTranslationClaims')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Read the LLM claim once up front — used both for the ownership gate below
+    // and the claim release after the write.
+    const llmClaim = await ctx.db
+      .query('llmTranslationClaims')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
+      )
+      .first();
+    // Ownership gate: if the caller passed the claim it was dispatched under and
+    // that claim is no longer current (reclaimed by a concurrent reconcile, or
+    // already released), bail without writing — another job now owns this row.
+    if (
+      args.expectedClaimId !== undefined &&
+      llmClaim?._id !== args.expectedClaimId
+    ) {
+      return null;
+    }
+
     const existing = await ctx.db
       .query('translations')
       .withIndex('by_text_and_language', (q) =>
@@ -1861,6 +1860,8 @@ export const storeTranslationAndScheduleTTS = internalMutation({
           : {}),
         ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
         ...(args.speakerGender ? { speakerGender: args.speakerGender } : {}),
+        // Freshly produced row → stamp the language's current method version.
+        translationVersion: getCurrentTranslationVersion(args.targetLanguage),
       });
     } else if (args.replaceExisting) {
       // Deliberate retranslation: overwrite the translation and its matched
@@ -1876,8 +1877,11 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         translationSource: string | undefined;
         regionVariant: string | undefined;
         speakerGender: 'male' | 'female';
+        translationVersion: number;
       }> = {
         translatedText: args.translatedText,
+        // A retranslation is freshly produced → stamp the current method version.
+        translationVersion: getCurrentTranslationVersion(args.targetLanguage),
       };
       if (args.romanizedText !== undefined) {
         patch.romanizedText = args.romanizedText;
@@ -1906,6 +1910,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         translationSource: string;
         regionVariant: string;
         speakerGender: 'male' | 'female';
+        translationVersion: number;
       }> = {};
       // Same `!== undefined` reasoning: persist the sentinel on first write
       // but never overwrite a previously-stored real value. Source travels
@@ -1937,22 +1942,21 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       if (args.speakerGender && existing.speakerGender === undefined) {
         patch.speakerGender = args.speakerGender;
       }
+      // Fill-if-missing: stamp legacy rows (written before the field existed) so
+      // the version sweep doesn't loop on them; never overwrite a real stamp.
+      if (existing.translationVersion === undefined) {
+        patch.translationVersion = getCurrentTranslationVersion(args.targetLanguage);
+      }
       if (Object.keys(patch).length > 0) {
         await ctx.db.patch(existing._id, patch);
       }
     }
 
-    // Release any LLM translation claim now that the translation row exists.
-    // The LLM worker keeps the claim alive across a Google fallback so a
-    // concurrent scheduleMissingContent can't re-route the same (textId, lang)
-    // through the LLM mid-fallback. Calls from the pure-Google path (which
-    // never held a claim) see no row and no-op.
-    const llmClaim = await ctx.db
-      .query('llmTranslationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-      )
-      .first();
+    // Release the LLM translation claim now that the translation row exists
+    // (read once at the top of this handler). The LLM worker keeps the claim
+    // alive across a Google fallback so a concurrent scheduleMissingContent
+    // can't re-route the same (textId, lang) through the LLM mid-fallback. Calls
+    // from the pure-Google path (which never held a claim) see no row and no-op.
     if (llmClaim) {
       await ctx.db.delete(llmClaim._id);
     }
@@ -2179,6 +2183,9 @@ export const storeAudioRecording = internalMutation({
         q.eq('textId', args.textId).eq('language', args.language),
       )
       .first();
+    // Freshly synthesized audio is always produced under the language's CURRENT
+    // TTS setup, so stamp the current ttsVersion unconditionally.
+    const ttsVersion = getCurrentTtsVersion(args.language);
     if (!existingForVoice && !existingAnyVoice) {
       await ctx.db.insert('audioRecordings', {
         textId: args.textId,
@@ -2190,6 +2197,7 @@ export const storeAudioRecording = internalMutation({
         voiceGender: args.voiceGender,
         speed: args.speed,
         wordTimings: args.wordTimings,
+        ttsVersion,
       });
       return null;
     }
@@ -2206,9 +2214,12 @@ export const storeAudioRecording = internalMutation({
       voiceGender: args.voiceGender,
       speed: args.speed,
       wordTimings: args.wordTimings,
+      ttsVersion,
     });
     if (previousStorageId !== args.storageId) {
-      await ctx.storage.delete(previousStorageId);
+      // Reference-aware: drop the old blob only if no other row (e.g. an
+      // `editCard` copy on another text) still points at it.
+      await deleteStorageBlobIfUnreferenced(ctx, previousStorageId);
     }
     return null;
   },

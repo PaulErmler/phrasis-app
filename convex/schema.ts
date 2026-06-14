@@ -183,7 +183,6 @@ export default defineSchema({
     // arc. Undefined for legacy rows and user-created texts (custom/chat).
     arcId: v.optional(v.string()),
   })
-    .index('by_text', ['text'])
     .index('by_datasetSentenceId', ['datasetSentenceId'])
     .index('by_dataset_and_externalId', ['datasetId', 'externalId'])
     .index('by_collection_and_rank', ['collectionId', 'collectionRank'])
@@ -237,6 +236,18 @@ export default defineSchema({
     // coin-flip). Undefined on legacy rows written before this field existed —
     // treated as "unknown, regenerate on next sweep."
     speakerGender: v.optional(voiceGenderValidator),
+    // Version of the translation METHOD this row was produced under, per the
+    // language's `translationVersion` in lib/languages.ts (single source of
+    // truth). Bumping a language's config version makes `scheduleMissingContent`
+    // treat rows with a strictly-lower stamped version as stale and regenerate
+    // them lazily on next view. Optional + "undefined === current" semantics:
+    // a missing stamp is NEVER treated as stale (only a number strictly < the
+    // current version is), so un-backfilled rows don't mass-regenerate. The
+    // one-time `backfillContentVersions` migration stamps existing rows to the
+    // baseline (v1) — they all predate the versioning system, so a later bump
+    // correctly marks them stale. User-provided / userCreated translations are
+    // skipped by the regen sweep regardless.
+    translationVersion: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),
@@ -263,6 +274,17 @@ export default defineSchema({
         }),
       ),
     ),
+    // Version of the TTS setup (voice pool + Gemini prompt + provider) this
+    // audio was produced under, per the language's `ttsVersion` in
+    // lib/languages.ts. Bumping a language's config version makes
+    // `scheduleMissingContent` delete + re-synthesize rows with a strictly-lower
+    // stamped version. This is what regenerates audio after a prompt-only change
+    // on an already-Gemini language (e.g. pt_pt's `ttsPromptName`), where the
+    // provider-mismatch path wouldn't fire. Same "undefined === current"
+    // semantics as `translations.translationVersion`; backfilled to baseline
+    // (v1) by the one-time `backfillContentVersions` migration, so a later
+    // ttsVersion bump correctly regenerates pre-existing audio.
+    ttsVersion: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'language'])
@@ -270,7 +292,12 @@ export default defineSchema({
       'textId',
       'language',
       'voiceName',
-    ]),
+    ])
+    // Reverse lookup from a storage blob to the rows that reference it. Used by
+    // the reference-aware `deleteAudioRow` helper so a blob is deleted only when
+    // it is the LAST audioRecordings row pointing at it — blobs can be shared
+    // across texts because `editCard` copies audio by reusing `storageId`.
+    .index('by_storageId', ['storageId']),
 
   // Placement-test sentence index. The actual English source text lives in
   // `texts` (so it gets translations/audio from the standard pipelines); this
@@ -433,7 +460,6 @@ export default defineSchema({
     radioPlayCount: v.optional(v.number()), // Radio mode: true count of radio plays (+1 per play, NOT subject to radioRoundCounter's catch-up jump). Drives the "Only new" Practice-Listening limit. Optional/undefined for pre-existing cards — treated as the card's review count (preReviewCount + FSRS reps) so they don't reset to "new".
   })
     .index('by_deckId', ['deckId'])
-    .index('by_deckId_and_dueDate', ['deckId', 'dueDate'])
     .index('by_deckId_and_textId', ['deckId', 'textId'])
     .index('by_textId', ['textId'])
     .index('by_deckId_and_isHidden_and_isMastered', ['deckId', 'isHidden', 'isMastered'])
@@ -450,9 +476,9 @@ export default defineSchema({
       'radioRoundCounter',
       'radioOrderKey',
     ])
-    .index('by_deckId_and_lastReviewedAt', ['deckId', 'lastReviewedAt'])
     .index('by_deckId_and_isHidden_and_lastReviewedAt', ['deckId', 'isHidden', 'lastReviewedAt'])
     .index('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', ['deckId', 'isHidden', 'isMastered', 'lastReviewedAt'])
+    .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
     .index('by_deck_hidden_mastered_graduated_due', [
       'deckId',
       'isHidden',
@@ -484,7 +510,6 @@ export default defineSchema({
       'radioRoundCounter',
       'radioOrderKey',
     ])
-    .index('by_deckId_and_isHidden_and_isFavorite_and_lastReviewedAt', ['deckId', 'isHidden', 'isFavorite', 'lastReviewedAt'])
     // Library source-filter variants — origin appended to each state-aware
     // library index so every (state × origin) combo resolves via a pure index
     // query (no post-filter). For 'custom' (= origin ∈ {'custom','chat'}) the
@@ -611,7 +636,6 @@ export default defineSchema({
     textId: v.optional(v.id('texts')),
     cardId: v.optional(v.id('cards')),
   })
-    .index('by_toolCallId', ['toolCallId'])
     .index('by_thread_and_user', ['threadId', 'userId']),
 
   // TTS mismatches — stores audio that failed validation for later analysis
@@ -624,8 +648,7 @@ export default defineSchema({
     transcribedText: v.string(),
     attempt: v.number(), // 1-based attempt number
   })
-    .index('by_textId', ['textId'])
-    .index('by_language', ['language']),
+    .index('by_textId', ['textId']),
 
   // TTS generation claims — prevents duplicate processTTSForCard scheduling.
   // Mutations atomically check-and-insert before scheduling; Convex OCC
@@ -672,7 +695,6 @@ export default defineSchema({
     queuedAt: v.number(),
     priority: v.optional(v.number()),
   })
-    .index('by_provider_and_queuedAt', ['provider', 'queuedAt'])
     .index('by_provider_priority_and_queuedAt', [
       'provider',
       'priority',
@@ -706,11 +728,22 @@ export default defineSchema({
       // storeTranslationAndScheduleTTS docstring for replacement semantics.
       // Optional so pre-flag queue rows still validate.
       replaceExisting: v.optional(v.boolean()),
+      // Number of prior failed LLM attempts for this job. On an LLM failure the
+      // worker re-enqueues with this incremented (up to MAX_LLM_RETRIES) before
+      // falling back to Google Translate — so a transient LLM hiccup is retried
+      // on the quality path rather than immediately downgrading to Google.
+      // Mirrors `ttsQueue.args.failureCount`. Optional so pre-existing rows validate.
+      failureCount: v.optional(v.number()),
+      // Ownership token: the `llmTranslationClaims` `_id` this job was dispatched
+      // under. The worker uses it to detect a concurrent reclaim (claim reissued
+      // with a new `_id`) and skip its write/finalize so it can't clobber the new
+      // owner. Mirrors the queue module's `llmJobArgsValidator.claimId`. Optional
+      // so pre-existing / pre-flag queue rows still validate.
+      claimId: v.optional(v.id('llmTranslationClaims')),
     }),
     queuedAt: v.number(),
     priority: v.optional(v.number()),
   })
-    .index('by_queuedAt', ['queuedAt'])
     .index('by_priority_and_queuedAt', ['priority', 'queuedAt']),
 
   // Global concurrency slots — one row per in-flight LLM API call. Stale rows
@@ -781,8 +814,6 @@ export default defineSchema({
   })
     .index('by_userId_courseId_language_word',
       ['userId', 'courseId', 'language', 'word'])
-    .index('by_userId_courseId_language_word_textId',
-      ['userId', 'courseId', 'language', 'word', 'textId'])
     .index('by_userId_courseId_textId',
       ['userId', 'courseId', 'textId']),
 

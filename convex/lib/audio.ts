@@ -1,5 +1,55 @@
-import { QueryCtx } from '../_generated/server';
-import { Id } from '../_generated/dataModel';
+import { MutationCtx, QueryCtx } from '../_generated/server';
+import { Doc, Id } from '../_generated/dataModel';
+
+/**
+ * Delete an `audioRecordings` row and, only when it is the LAST row referencing
+ * its storage blob, delete the blob too.
+ *
+ * Blobs can be shared across rows/texts: `editCard` (convex/features/scheduling.ts)
+ * copies a text's audio into a new text by reusing the same `storageId` instead
+ * of re-synthesizing. Deleting a blob whenever any one row goes away would
+ * corrupt the other text's audio. The reverse lookup uses the `by_storageId`
+ * index; because the row is deleted first, the query naturally excludes it and
+ * a remaining match means the blob is still referenced.
+ *
+ * This is the safe audio-delete path — route `audioRecordings` deletions through
+ * it (reconcile invalidation, regen, retranslation, manual regenerate, and orphan
+ * cascade) so no blob is ever dropped while still in use. The one exception is a
+ * row whose blob is already known to be gone (`storage.getUrl` returned null), as
+ * in `scheduleMissingContent`'s stale-file cleanup: there is no blob left to
+ * reference-protect, so a plain `ctx.db.delete(row._id)` is correct there.
+ */
+export async function deleteAudioRow(
+  ctx: MutationCtx,
+  row: Doc<'audioRecordings'>,
+): Promise<void> {
+  await ctx.db.delete(row._id);
+  const stillReferenced = await ctx.db
+    .query('audioRecordings')
+    .withIndex('by_storageId', (q) => q.eq('storageId', row.storageId))
+    .first();
+  if (!stillReferenced) {
+    await ctx.storage.delete(row.storageId);
+  }
+}
+
+/**
+ * Reference-aware blob delete by `storageId` for callers that no longer hold the
+ * row (e.g. `storeAudioRecording` after patching a row to a NEW blob). Deletes
+ * the old blob only when no `audioRecordings` row references it any more.
+ */
+export async function deleteStorageBlobIfUnreferenced(
+  ctx: MutationCtx,
+  storageId: Id<'_storage'>,
+): Promise<void> {
+  const stillReferenced = await ctx.db
+    .query('audioRecordings')
+    .withIndex('by_storageId', (q) => q.eq('storageId', storageId))
+    .first();
+  if (!stillReferenced) {
+    await ctx.storage.delete(storageId);
+  }
+}
 
 export interface AudioWordTiming {
   word: string;

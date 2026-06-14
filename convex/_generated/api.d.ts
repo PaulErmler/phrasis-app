@@ -80,6 +80,7 @@ import type * as lib_tts_index from "../lib/tts/index.js";
 import type * as lib_tts_languageCodes from "../lib/tts/languageCodes.js";
 import type * as lib_tts_types from "../lib/tts/types.js";
 import type * as lib_ttsSemanticValidation from "../lib/ttsSemanticValidation.js";
+import type * as migrations_backfillContentVersions from "../migrations/backfillContentVersions.js";
 import type * as migrations_datasetMigration_backfillCardsMastered from "../migrations/datasetMigration_backfillCardsMastered.js";
 import type * as migrations_datasetMigration_backfillLegacyCarry from "../migrations/datasetMigration_backfillLegacyCarry.js";
 import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
@@ -173,6 +174,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tts/languageCodes": typeof lib_tts_languageCodes;
   "lib/tts/types": typeof lib_tts_types;
   "lib/ttsSemanticValidation": typeof lib_ttsSemanticValidation;
+  "migrations/backfillContentVersions": typeof migrations_backfillContentVersions;
   "migrations/datasetMigration_backfillCardsMastered": typeof migrations_datasetMigration_backfillCardsMastered;
   "migrations/datasetMigration_backfillLegacyCarry": typeof migrations_datasetMigration_backfillLegacyCarry;
   "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;

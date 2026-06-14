@@ -12,7 +12,9 @@ import { SUPPORTED_LANGUAGES } from '../../../lib/languages';
  * and fall through unchanged — Gemini then relies on text auto-detection.
  * Regional variants for which Gemini has no dedicated locale collapse onto the
  * nearest documented one (Arabic dialects → `ar-001` World Arabic, except
- * Egyptian which has `ar-EG`; `sw_tz` → `sw-KE`; `es_mixed` → `es-ES`).
+ * Egyptian which has `ar-EG`; `sw_tz` → `sw-KE`; `es_mixed` → `es-ES`;
+ * `es_latam` → `es-US`, Gemini's American-Spanish locale, since it has no
+ * `es-419` macro locale).
  */
 // Derived from each Language's `geminiBcp47` field (single source of truth in
 // lib/languages.ts). Codes without one (Cantonese `yue`/`yue_traditional`) are

@@ -11,6 +11,8 @@ import {
   VOICE_POOLS,
   getVoicesByLanguageCode,
   getAllVoicesByLanguageCode,
+  getVoiceForLanguageVariant,
+  resolveCardSpeakerGenders,
 } from '../../../lib/voices';
 
 describe('voice pools completeness', () => {
@@ -147,5 +149,93 @@ describe('Arabic dialects on the global Gemini voice name the dialect in the pro
       missing,
       `Arabic languages served by the global Gemini voice (locale collapses to ar-001) must set ttsPromptName so the dialect is named in the TTS prompt: ${missing.join(', ') || '(none)'}`,
     ).toEqual([]);
+  });
+});
+
+describe('Spanish runs on Gemini TTS', () => {
+  it('es and es_latam resolve to bare Gemini voices', () => {
+    for (const code of ['es', 'es_latam']) {
+      const active = getVoicesByLanguageCode(code);
+      expect(active.length).toBeGreaterThan(0);
+      expect(active.every((v) => v.provider === 'gemini')).toBe(true);
+      // Single-accent → bare voice name (locale comes from geminiBcp47).
+      expect(active.every((v) => !v.apiCode.includes('@'))).toBe(true);
+    }
+  });
+
+  it('es_mixed uses accent-tagged Gemini voices for both es-ES and es-US', () => {
+    const active = getVoicesByLanguageCode('es_mixed');
+    expect(active.every((v) => v.provider === 'gemini')).toBe(true);
+    expect(active.some((v) => v.apiCode.endsWith('@es-ES'))).toBe(true);
+    expect(active.some((v) => v.apiCode.endsWith('@es-US'))).toBe(true);
+  });
+
+  it('getVoiceForLanguageVariant picks the matching Gemini accent for es_mixed', () => {
+    // Repeat a few times since selection is random within the matched pool.
+    for (let i = 0; i < 10; i++) {
+      expect(getVoiceForLanguageVariant('es_mixed', 'es-ES')).toMatch(/@es-ES$/);
+      expect(getVoiceForLanguageVariant('es_mixed', 'es-US')).toMatch(/@es-US$/);
+    }
+  });
+});
+
+describe('resolveCardSpeakerGenders', () => {
+  it('definitive speakerGender is the source of truth and mirrors into audio', () => {
+    const r = resolveCardSpeakerGenders(
+      { speakerGender: 'female', audioSpeakerGender: undefined, userCreated: false },
+      'seed1',
+    );
+    expect(r.audioSpeakerGender).toBe('female');
+    // Mirrors into audioSpeakerGender; never patches speakerGender.
+    expect(r.genderPatch).toEqual({ audioSpeakerGender: 'female' });
+  });
+
+  it('definitive + already-matching audio writes no patch', () => {
+    const r = resolveCardSpeakerGenders(
+      { speakerGender: 'male', audioSpeakerGender: 'male', userCreated: true },
+      'seed1',
+    );
+    expect(r.audioSpeakerGender).toBe('male');
+    expect(r.genderPatch).toEqual({});
+  });
+
+  it('custom + neutral preserves speakerGender and only resolves audio', () => {
+    const r = resolveCardSpeakerGenders(
+      { speakerGender: 'neutral', audioSpeakerGender: undefined, userCreated: true },
+      'seed-custom',
+    );
+    expect(['male', 'female']).toContain(r.audioSpeakerGender);
+    // Never patches speakerGender for custom (LLM owns it); only audio.
+    expect(r.genderPatch.speakerGender).toBeUndefined();
+    expect(r.genderPatch.audioSpeakerGender).toBe(r.audioSpeakerGender);
+  });
+
+  it('premade + undefined coin-flips BOTH fields to the same value', () => {
+    const r = resolveCardSpeakerGenders(
+      { speakerGender: undefined, audioSpeakerGender: undefined, userCreated: false },
+      'seed-premade',
+    );
+    expect(r.genderPatch.speakerGender).toBe(r.audioSpeakerGender);
+    expect(r.genderPatch.audioSpeakerGender).toBe(r.audioSpeakerGender);
+  });
+
+  it('is deterministic per seed (retry-stable, no re-roll)', () => {
+    const a = resolveCardSpeakerGenders(
+      { speakerGender: undefined, audioSpeakerGender: undefined, userCreated: false },
+      'stable-seed',
+    );
+    const b = resolveCardSpeakerGenders(
+      { speakerGender: undefined, audioSpeakerGender: undefined, userCreated: false },
+      'stable-seed',
+    );
+    expect(a.audioSpeakerGender).toBe(b.audioSpeakerGender);
+  });
+
+  it('preserves a prior audioSpeakerGender instead of re-rolling', () => {
+    const r = resolveCardSpeakerGenders(
+      { speakerGender: undefined, audioSpeakerGender: 'female', userCreated: false },
+      'seed-x',
+    );
+    expect(r.audioSpeakerGender).toBe('female');
   });
 });

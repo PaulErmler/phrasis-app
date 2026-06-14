@@ -19,7 +19,9 @@ const EXPECTED_GEMINI: Record<string, string> = {
   en_us: 'en-US',
   en_au: 'en-AU',
   es: 'es-ES',
-  es_latam: 'es-419',
+  // es_latam now routes through Gemini, which has no `es-419` macro locale —
+  // it uses `es-US` (American Spanish), matching the es_mixed es_latam variant.
+  es_latam: 'es-US',
   es_mixed: 'es-ES',
   fr: 'fr-FR',
   de: 'de-DE',

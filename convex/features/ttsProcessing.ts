@@ -16,6 +16,7 @@ import {
 import { languageSupportsStt } from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
 import { textsMatchSemantic } from '../lib/ttsSemanticValidation';
+import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import { rateLimiter, TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import {
   ttsQualityValidator,
@@ -403,7 +404,9 @@ export const updateAudioRecordingQuality = internalMutation({
       patch.storageId = args.storageId;
       await ctx.db.patch(record._id, patch);
       if (!args.preserveOldStorage) {
-        await ctx.storage.delete(previousStorageId);
+        // Reference-aware: drop the old blob only if no other row (e.g. an
+        // `editCard` copy on another text) still references it.
+        await deleteStorageBlobIfUnreferenced(ctx, previousStorageId);
       }
     } else {
       await ctx.db.patch(record._id, patch);
