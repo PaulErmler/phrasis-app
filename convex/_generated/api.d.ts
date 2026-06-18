@@ -78,6 +78,7 @@ import type * as lib_tts_gemini from "../lib/tts/gemini.js";
 import type * as lib_tts_google from "../lib/tts/google.js";
 import type * as lib_tts_index from "../lib/tts/index.js";
 import type * as lib_tts_languageCodes from "../lib/tts/languageCodes.js";
+import type * as lib_tts_tailTrim from "../lib/tts/tailTrim.js";
 import type * as lib_tts_types from "../lib/tts/types.js";
 import type * as lib_ttsSemanticValidation from "../lib/ttsSemanticValidation.js";
 import type * as migrations_backfillContentVersions from "../migrations/backfillContentVersions.js";
@@ -85,6 +86,8 @@ import type * as migrations_datasetMigration_backfillCardsMastered from "../migr
 import type * as migrations_datasetMigration_backfillLegacyCarry from "../migrations/datasetMigration_backfillLegacyCarry.js";
 import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
 import type * as migrations_recalcUserCardAggregates from "../migrations/recalcUserCardAggregates.js";
+import type * as migrations_recleanGeminiTailHiccup from "../migrations/recleanGeminiTailHiccup.js";
+import type * as migrations_recleanGeminiTailHiccupNode from "../migrations/recleanGeminiTailHiccupNode.js";
 import type * as migrations_seedMockStats from "../migrations/seedMockStats.js";
 import type * as migrations_seedPlacementTestSentences from "../migrations/seedPlacementTestSentences.js";
 import type * as rateLimiter from "../rateLimiter.js";
@@ -172,6 +175,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tts/google": typeof lib_tts_google;
   "lib/tts/index": typeof lib_tts_index;
   "lib/tts/languageCodes": typeof lib_tts_languageCodes;
+  "lib/tts/tailTrim": typeof lib_tts_tailTrim;
   "lib/tts/types": typeof lib_tts_types;
   "lib/ttsSemanticValidation": typeof lib_ttsSemanticValidation;
   "migrations/backfillContentVersions": typeof migrations_backfillContentVersions;
@@ -179,6 +183,8 @@ declare const fullApi: ApiFromModules<{
   "migrations/datasetMigration_backfillLegacyCarry": typeof migrations_datasetMigration_backfillLegacyCarry;
   "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;
   "migrations/recalcUserCardAggregates": typeof migrations_recalcUserCardAggregates;
+  "migrations/recleanGeminiTailHiccup": typeof migrations_recleanGeminiTailHiccup;
+  "migrations/recleanGeminiTailHiccupNode": typeof migrations_recleanGeminiTailHiccupNode;
   "migrations/seedMockStats": typeof migrations_seedMockStats;
   "migrations/seedPlacementTestSentences": typeof migrations_seedPlacementTestSentences;
   rateLimiter: typeof rateLimiter;

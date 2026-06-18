@@ -115,6 +115,7 @@
     "kysely": "^0.28.17",
     "lucide-react": "^0.555.0",
     "motion": "^12.40.0",
+    "mpg123-decoder": "^1.0.3",
     "nanoid": "^5.1.11",
     "next": "^16.2.9",
     "next-intl": "^4.13.0",
