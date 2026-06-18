@@ -1,20 +1,6 @@
 import { SUPPORTED_LANGUAGES } from '../../../lib/languages';
 
 /**
- * Map our internal language codes to ISO 639-1 codes that ElevenLabs APIs
- * accept. App-internal codes like `es_latam` and `cmn` aren't valid ISO 639-1
- * and must be folded to their base form. Used by both the Scribe STT path
- * (features/tts.ts) and the ElevenLabs TTS provider (lib/tts/elevenlabs.ts).
- */
-export function toElevenLabsLanguageCode(internalCode: string): string {
-  const map: Record<string, string> = {
-    es_latam: 'es',
-    cmn: 'zh',
-  };
-  return map[internalCode] ?? internalCode;
-}
-
-/**
  * Map our internal language codes to the BCP-47 locale Gemini 3.1 Flash TTS
  * expects in `provider.options.google.language_code` (sent through OpenRouter).
  * Gemini auto-detects language from the text, but an explicit locale steers
@@ -26,7 +12,9 @@ export function toElevenLabsLanguageCode(internalCode: string): string {
  * and fall through unchanged — Gemini then relies on text auto-detection.
  * Regional variants for which Gemini has no dedicated locale collapse onto the
  * nearest documented one (Arabic dialects → `ar-001` World Arabic, except
- * Egyptian which has `ar-EG`; `sw_tz` → `sw-KE`; `es_mixed` → `es-ES`).
+ * Egyptian which has `ar-EG`; `sw_tz` → `sw-KE`; `es_mixed` → `es-ES`;
+ * `es_latam` → `es-US`, Gemini's American-Spanish locale, since it has no
+ * `es-419` macro locale).
  */
 // Derived from each Language's `geminiBcp47` field (single source of truth in
 // lib/languages.ts). Codes without one (Cantonese `yue`/`yue_traditional`) are

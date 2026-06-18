@@ -2,6 +2,7 @@ import type { SpeakInput, SpeakResult, TTSProvider } from './types';
 import { Mp3Encoder } from '@breezystack/lamejs';
 import { toGeminiBcp47 } from './languageCodes';
 import { getLanguageByCode } from '../../../lib/languages';
+import { trimTailHiccup } from './tailTrim';
 
 // Gemini 3.1 Flash TTS, reached through OpenRouter's OpenAI-compatible speech
 // endpoint. OpenRouter emits ONLY raw PCM for this model — its response_format
@@ -234,11 +235,22 @@ export const geminiTts: TTSProvider = {
       throw new Error('No audio content returned from Gemini TTS API');
     }
 
+    // Gemini intermittently appends a short, loud "hiccup" after the sentence,
+    // separated by a silence gap (~10% of clips). Strip it on the raw PCM using
+    // only the energy envelope — no STT/word-timings — before transcoding. No-op
+    // for the ~90% of clips without one (returns the same bytes). See tailTrim.ts.
+    const { pcm: cleaned, trimmed } = trimTailHiccup(pcm, PCM_SAMPLE_RATE);
+    if (trimmed) {
+      console.log(
+        `[geminiTts] trimmed tail hiccup for "${input.text.slice(0, 40)}"`,
+      );
+    }
+
     // Gemini emits headerless PCM; transcode to MP3 so the stored Blob matches
     // the other providers' output (google/azure both label it 'audio/mp3') and
     // plays in the browser.
     return {
-      audio: new Blob([pcmToMp3(pcm)], { type: 'audio/mp3' }),
+      audio: new Blob([pcmToMp3(cleaned)], { type: 'audio/mp3' }),
       provider: 'gemini',
     };
   },

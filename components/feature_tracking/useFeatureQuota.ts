@@ -12,37 +12,37 @@ export interface FeatureQuotaInfo {
   isLoading: boolean;
 }
 
+/** Zeroed quota fields shared by the two "no feature data" return paths. */
+const EMPTY_QUOTA = { balance: 0, included: 0, used: 0, unlimited: false };
+
 /**
  * Reactive hook for a single feature's quota state, powered by the Convex
- * `usageQuotas` table. Defaults to available while loading so the UI doesn't
- * flash a false "locked" state -- the server mutation is the authoritative gate.
+ * `usageQuotas` table.
  *
- * Note: `getMyQuotas` returns `null` both when the user is unauthenticated and
- * when their `usageQuotas` row hasn't been synced yet (syncQuotas runs as a
- * side effect on app mount and can take hundreds of ms). The same goes for a
- * feature that just isn't in the synced map yet. We treat both as transient
- * loading so the +Add / call-to-action button doesn't flash from gated to
- * enabled while sync completes.
+ * `getMyQuotas` returns `null` while the query is in flight, when the user is
+ * unauthenticated, or when their `usageQuotas` row hasn't been synced yet
+ * (syncQuotas runs as a side effect on app mount and can take hundreds of ms).
+ * That is the only genuinely transient state, so we stay optimistic there to
+ * avoid flashing a false "locked" state during the brief on-mount sync.
+ *
+ * Once the doc IS loaded, an absent feature is NOT mid-sync: `syncAllFeatures`
+ * overwrites the entire `features` map in a single write, so every granted
+ * feature is present together. An absent key therefore means the plan simply
+ * doesn't grant the feature -- we mirror the backend `hasFeatureAccess`
+ * (absent + synced => unavailable). Returning the optimistic fallback here was
+ * the bug that let free users see un-granted boolean features (e.g.
+ * `multiple_languages`) as available and hit a server-side rejection.
  */
 export function useFeatureQuota(featureId: string): FeatureQuotaInfo {
   const quotas = useQuery(api.usage.queries.getMyQuotas);
 
-  const loadingFallback: FeatureQuotaInfo = {
-    balance: 0,
-    included: 0,
-    used: 0,
-    unlimited: false,
-    isAvailable: true,
-    isLoading: true,
-  };
-
   if (quotas === undefined || quotas === null) {
-    return loadingFallback;
+    return { ...EMPTY_QUOTA, isAvailable: true, isLoading: true };
   }
 
   const feature = quotas.features[featureId];
   if (!feature) {
-    return loadingFallback;
+    return { ...EMPTY_QUOTA, isAvailable: false, isLoading: false };
   }
 
   return {

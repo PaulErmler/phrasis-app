@@ -1,5 +1,6 @@
 import { v } from 'convex/values';
 import { internalMutation } from '../_generated/server';
+import { deleteAudioRow } from '../lib/audio';
 
 const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es: 'es-ES',
@@ -118,8 +119,7 @@ export const batchUpsertTranslations = internalMutation({
           )
           .first();
         if (enAudio) {
-          await ctx.storage.delete(enAudio.storageId);
-          await ctx.db.delete(enAudio._id);
+          await deleteAudioRow(ctx, enAudio);
           stats.audioInvalidated++;
         }
       }
@@ -167,8 +167,7 @@ export const batchUpsertTranslations = internalMutation({
             )
             .first();
           if (audio) {
-            await ctx.storage.delete(audio.storageId);
-            await ctx.db.delete(audio._id);
+            await deleteAudioRow(ctx, audio);
             stats.audioInvalidated++;
           }
         } else {
@@ -185,8 +184,7 @@ export const batchUpsertTranslations = internalMutation({
             )
             .first();
           if (audioForLang && !audioForLang.voiceName.startsWith(expectedPrefix)) {
-            await ctx.storage.delete(audioForLang.storageId);
-            await ctx.db.delete(audioForLang._id);
+            await deleteAudioRow(ctx, audioForLang);
             stats.audioInvalidated++;
           }
         }

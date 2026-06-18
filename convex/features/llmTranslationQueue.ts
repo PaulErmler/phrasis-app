@@ -38,14 +38,37 @@ import { asVoiceGender } from '../types';
  *   4. The action calls `translateTextWithLLM`. On success it writes via
  *      `storeTranslationAndScheduleTTS` (the same mutation the Google path
  *      uses, so romanization/TTS downstream is unchanged). On failure
- *      (truncation, empty output, HTTP error) it falls back to
- *      `processTranslationForCard` (the Google path) for the same row.
+ *      (truncation, empty output, HTTP error) it re-enqueues the LLM with an
+ *      incremented `failureCount` (quality-first retry, see `handleLlmFailure`)
+ *      and only falls back to `processTranslationForCard` (the Google path)
+ *      once `MAX_LLM_RETRIES` is exhausted.
  *   5. `finalizeLlmTranslationJob` drops the slot + claim and pumps the next
  *      waiter, atomically.
  */
 
 const MAX_LLM_CONCURRENCY = 64;
 const SLOT_STALE_MS = 60 * 1000; // 1 minute — longer than the longest API call
+
+/**
+ * Quality-first retry policy: the LLM (the high-quality path) is retried up to
+ * MAX_LLM_RETRIES times on failure before the worker resorts to the legacy
+ * Google Translate fallback. A transient LLM failure (rate limit, truncation,
+ * empty output, HTTP error) should NOT immediately downgrade the translation to
+ * Google quality. Mirrors the TTS queue's bounded `failureCount` retry.
+ */
+const MAX_LLM_RETRIES = 20;
+/** Capped exponential backoff between LLM retries. A short backoff keeps the
+ * claim fresh across the BACKOFF window (backoff < CLAIM_STALE_MS), minimizing
+ * reclaim churn. Correctness does NOT depend on the claim never going stale,
+ * though: a long API call (up to ~SLOT_STALE_MS) between refreshes can still
+ * exceed CLAIM_STALE_MS and let a concurrent reconcile reclaim the row — the
+ * `claimId` ownership token (checked in `storeTranslationAndScheduleTTS` and
+ * `finalizeLlmTranslationJob`) makes the superseded attempt no-op safely. */
+const RETRY_BASE_MS = 1_500;
+const RETRY_MAX_MS = 20_000;
+function llmRetryBackoffMs(failureCount: number): number {
+  return Math.min(RETRY_BASE_MS * 2 ** failureCount, RETRY_MAX_MS);
+}
 /**
  * Per-(textId, language) LLM claim freshness window. Claims older than this
  * are treated as stale and reclaimable. Exported so callers like
@@ -64,15 +87,21 @@ const SLOT_READ_LIMIT = MAX_LLM_CONCURRENCY * 3;
 const SLOT_LEAK_WARN_THRESHOLD = MAX_LLM_CONCURRENCY * 2;
 
 /**
- * Atomically check-and-insert an LLM translation claim. Returns true iff the
- * caller acquired the claim and should enqueue the job. Stale claims (older
- * than CLAIM_STALE_MS) are reclaimed.
+ * Atomically check-and-insert an LLM translation claim. Returns the new claim's
+ * `_id` iff the caller acquired the claim (and should enqueue the job), or null
+ * when a fresh claim already holds the slot. Stale claims (older than
+ * CLAIM_STALE_MS) are reclaimed.
+ *
+ * The returned `_id` is the ownership token: thread it into the enqueued job
+ * (`llmJobArgsValidator.claimId`) so the worker and `finalizeLlmTranslationJob`
+ * can detect a concurrent reclaim — a reclaim deletes+reinserts the row, so the
+ * `_id` changes, while a same-owner refresh only patches `claimedAt`.
  */
 export async function claimLlmTranslationIfAvailable(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   targetLanguage: string,
-): Promise<boolean> {
+): Promise<Id<'llmTranslationClaims'> | null> {
   const existing = await ctx.db
     .query('llmTranslationClaims')
     .withIndex('by_text_and_language', (q) =>
@@ -82,17 +111,16 @@ export async function claimLlmTranslationIfAvailable(
 
   if (existing) {
     if (Date.now() - existing.claimedAt < CLAIM_STALE_MS) {
-      return false;
+      return null;
     }
     await ctx.db.delete(existing._id);
   }
 
-  await ctx.db.insert('llmTranslationClaims', {
+  return await ctx.db.insert('llmTranslationClaims', {
     textId,
     targetLanguage,
     claimedAt: Date.now(),
   });
-  return true;
 }
 
 /**
@@ -144,6 +172,17 @@ const llmJobArgsValidator = v.object({
   // the language's normal routing. Worker validates against TRANSLATION_RULES
   // and silently falls back to the language's rule on unknown values.
   ruleOverride: v.optional(v.string()),
+  // Count of prior failed LLM attempts for this job. The worker re-enqueues
+  // with this incremented (up to MAX_LLM_RETRIES) before falling back to Google.
+  failureCount: v.optional(v.number()),
+  // Ownership token: the `_id` of the llmTranslationClaims row this job was
+  // dispatched under (from `claimLlmTranslationIfAvailable`). The worker passes
+  // it to `storeTranslationAndScheduleTTS` (expectedClaimId) and to
+  // `finalizeLlmTranslationJob` so a job whose claim was reclaimed by a
+  // concurrent reconcile (new `_id`) skips its write and doesn't clobber the new
+  // owner's claim. Optional so pre-flag queue rows still validate; an undefined
+  // token disables the check (best-effort, legacy behavior).
+  claimId: v.optional(v.id('llmTranslationClaims')),
 });
 
 /**
@@ -187,7 +226,14 @@ export const pumpLlmQueue = internalMutation({
       await ctx.scheduler.runAfter(
         0,
         internal.features.llmTranslationQueue.processLlmTranslationForCard,
-        next.args,
+        // Forward the queue row's stored priority into the worker args. The inner
+        // `args.priority` is never populated by the enqueue sites, so without this
+        // the worker, its LLM-retry re-enqueue (handleLlmFailure), and the
+        // downstream TTS hand-off all default to priority 0 — dropping a flagged
+        // (priority-1) retranslation to the back of the queue. Stored priority is
+        // always 0|1|2 (enqueueLlmTranslation normalizes) or undefined for legacy
+        // pre-priority rows, so the assertion is safe.
+        { ...next.args, priority: next.priority as 0 | 1 | 2 | undefined },
       );
       used++;
     }
@@ -244,6 +290,8 @@ export const finalizeLlmTranslationJob = internalMutation({
     textId: v.id('texts'),
     targetLanguage: v.string(),
     keepClaim: v.optional(v.boolean()),
+    // Ownership token this attempt was dispatched under (see llmJobArgsValidator).
+    claimId: v.optional(v.id('llmTranslationClaims')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -254,14 +302,27 @@ export const finalizeLlmTranslationJob = internalMutation({
       await ctx.db.delete(slot._id);
     }
 
-    if (!args.keepClaim) {
-      const claim = await ctx.db
-        .query('llmTranslationClaims')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-        )
-        .first();
-      if (claim) {
+    const claim = await ctx.db
+      .query('llmTranslationClaims')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
+      )
+      .first();
+    // Ownership gate: only touch the claim this attempt actually owns. If a
+    // concurrent reconcile reclaimed it during a long API call, the current row
+    // has a different `_id` and belongs to the new owner — leave it untouched so
+    // we don't delete (or refresh) someone else's live claim. Legacy jobs with
+    // no token fall back to the original by-key behavior.
+    const ownsClaim =
+      claim !== null &&
+      (args.claimId === undefined || claim._id === args.claimId);
+    if (claim && ownsClaim) {
+      if (args.keepClaim) {
+        // An LLM retry or Google fallback is scheduled for this row — keep the
+        // claim but refresh its timestamp so a concurrent reconcile can't
+        // reclaim it during the backoff window.
+        await ctx.db.patch(claim._id, { claimedAt: Date.now() });
+      } else {
         await ctx.db.delete(claim._id);
       }
     }
@@ -282,7 +343,8 @@ export const finalizeLlmTranslationJob = internalMutation({
 /**
  * Worker action: read the texts row for metadata, call the LLM, write the
  * result via `storeTranslationAndScheduleTTS` (same path as Google), and on
- * any failure schedule the legacy Google path for the same row.
+ * any failure retry the LLM (up to MAX_LLM_RETRIES) before scheduling the
+ * legacy Google path for the same row — see `handleLlmFailure`.
  *
  * `finally` always calls `finalizeLlmTranslationJob` so slot/claim state stays
  * in sync with the queue.
@@ -291,11 +353,11 @@ export const processLlmTranslationForCard = internalAction({
   args: llmJobArgsValidator.fields,
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Tracks whether we handed the row off to the Google fallback. When true,
-    // `finalize` keeps the LLM claim alive so a concurrent scheduleMissingContent
-    // can't re-route the same (textId, lang) through the LLM before the Google
-    // action's storeTranslationAndScheduleTTS lands.
-    let scheduledFallback = false;
+    // Tracks whether the LLM claim must outlive this attempt — true while an LLM
+    // retry OR a Google fallback is scheduled for this row, so `finalize` keeps
+    // (and refreshes) the claim and a concurrent scheduleMissingContent can't
+    // re-route the same (textId, lang) before the scheduled work writes its row.
+    let keepClaim = false;
     try {
       // Read metadata off the texts row — the worker is the single source of
       // truth for "what speaker/addressee/referent fields land in the prompt".
@@ -340,8 +402,10 @@ export const processLlmTranslationForCard = internalAction({
           resolvedSubCode: cfgLanguageCode,
           stageCount: stages.length,
         });
+        // Config error, not a transient failure — retrying the LLM won't help,
+        // so go straight to Google.
         await scheduleGoogleFallback(ctx, args);
-        scheduledFallback = true;
+        keepClaim = true;
         return null;
       }
 
@@ -491,15 +555,17 @@ export const processLlmTranslationForCard = internalAction({
       if (!result) throw new Error('Unreachable: stages.length >= 1');
 
       if (!result.ok) {
-        // Truncation / empty / HTTP error — fall back to Google for this row.
-        console.warn('[llmTranslationQueue] LLM result not ok — falling back to Google', {
+        // Truncation / empty / HTTP error. Retry the LLM (quality path) before
+        // ever downgrading to Google — see handleLlmFailure.
+        console.warn('[llmTranslationQueue] LLM result not ok', {
           textId: args.textId,
           targetLanguage: args.targetLanguage,
           reason: result.reason,
           detail: result.detail,
+          failureCount: args.failureCount ?? 0,
         });
-        await scheduleGoogleFallback(ctx, args);
-        scheduledFallback = true;
+        await handleLlmFailure(ctx, args);
+        keepClaim = true;
         return null;
       }
 
@@ -559,6 +625,11 @@ export const processLlmTranslationForCard = internalAction({
           priority: args.priority,
           replaceExisting: args.replaceExisting,
           speakerGender: asVoiceGender(args.audioSpeakerGender),
+          // Ownership gate (atomic, inside the mutation): if our claim was
+          // reclaimed mid-call by a concurrent reconcile, skip the write/TTS so
+          // the new owner's job is the single writer. No-op for legacy jobs
+          // (undefined token).
+          expectedClaimId: args.claimId,
         },
       );
     } catch (err) {
@@ -567,16 +638,17 @@ export const processLlmTranslationForCard = internalAction({
         targetLanguage: args.targetLanguage,
         error: err instanceof Error ? err.message : String(err),
       });
-      // Try to fall back to Google so the user still gets a translation.
+      // Retry the LLM (or fall back to Google once retries are exhausted) so the
+      // card never gets stuck without a translation.
       try {
-        await scheduleGoogleFallback(ctx, args);
-        scheduledFallback = true;
-      } catch (fallbackErr) {
-        console.error('[llmTranslationQueue] fallback scheduling also failed', {
+        await handleLlmFailure(ctx, args);
+        keepClaim = true;
+      } catch (retryErr) {
+        console.error('[llmTranslationQueue] retry/fallback scheduling also failed', {
           error:
-            fallbackErr instanceof Error
-              ? fallbackErr.message
-              : String(fallbackErr),
+            retryErr instanceof Error
+              ? retryErr.message
+              : String(retryErr),
         });
       }
     } finally {
@@ -585,13 +657,71 @@ export const processLlmTranslationForCard = internalAction({
         {
           textId: args.textId,
           targetLanguage: args.targetLanguage,
-          keepClaim: scheduledFallback,
+          keepClaim,
+          claimId: args.claimId,
         },
       );
     }
     return null;
   },
 });
+
+/**
+ * Handle an LLM translation failure: retry the LLM (the quality path) up to
+ * MAX_LLM_RETRIES times with backoff before resorting to the Google Translate
+ * fallback. Re-enqueues the SAME job with an incremented `failureCount`; the
+ * held+refreshed claim (see `finalizeLlmTranslationJob`) keeps a concurrent
+ * reconcile from double-enqueuing during the backoff window.
+ */
+async function handleLlmFailure(
+  ctx: ActionCtx,
+  args: {
+    textId: Id<'texts'>;
+    sourceLanguage: string;
+    targetLanguage: string;
+    text: string;
+    audioSpeakerGender?: string;
+    priority?: 0 | 1 | 2;
+    replaceExisting?: boolean;
+    ruleOverride?: string;
+    failureCount?: number;
+    claimId?: Id<'llmTranslationClaims'>;
+  },
+): Promise<void> {
+  const failureCount = args.failureCount ?? 0;
+  if (failureCount < MAX_LLM_RETRIES) {
+    await ctx.scheduler.runAfter(
+      llmRetryBackoffMs(failureCount),
+      internal.features.llmTranslationQueue.enqueueLlmTranslation,
+      {
+        args: {
+          textId: args.textId,
+          sourceLanguage: args.sourceLanguage,
+          targetLanguage: args.targetLanguage,
+          text: args.text,
+          audioSpeakerGender: args.audioSpeakerGender,
+          ruleOverride: args.ruleOverride,
+          replaceExisting: args.replaceExisting,
+          failureCount: failureCount + 1,
+          // Carry the SAME ownership token across retries. The claim is kept +
+          // refreshed (not reclaimed) for our own retry chain, so its `_id` is
+          // stable; a different `_id` later means a concurrent reconcile took
+          // over and this chain will correctly no-op at its store/finalize.
+          claimId: args.claimId,
+        },
+        priority: args.priority,
+      },
+    );
+    return;
+  }
+  // LLM retries exhausted — last resort: Google Translate.
+  console.warn('[llmTranslationQueue] LLM retries exhausted — falling back to Google', {
+    textId: args.textId,
+    targetLanguage: args.targetLanguage,
+    attempts: failureCount,
+  });
+  await scheduleGoogleFallback(ctx, args);
+}
 
 async function scheduleGoogleFallback(
   ctx: ActionCtx,

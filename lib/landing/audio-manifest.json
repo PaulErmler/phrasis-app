@@ -1,48 +1,48 @@
 {
   "de": {
-    "Die Rechnung, bitte.": "/audio/landing/de/22641d40280398d6.mp3",
-    "Guten Morgen zusammen, wie geht es euch?": "/audio/landing/de/d0fa5af79e67e16c.mp3",
-    "Guten Morgen, wie geht es Ihnen?": "/audio/landing/de/8b5b434f22f0fb26.mp3",
-    "Ich hätte gern einen Tisch für zwei.": "/audio/landing/de/8828c9ced69b1610.mp3",
-    "Ich trage diese Schuhe zum ersten Mal.": "/audio/landing/de/1b6cea748b67d2de.mp3",
-    "Könnten wir die Speisekarte sehen?": "/audio/landing/de/49093948e94504a6.mp3",
-    "Lass uns nach dem Essen noch ein bisschen quatschen.": "/audio/landing/de/64c88ff6bf6bde45.mp3"
+    "Die Rechnung, bitte.": "/audio/landing/de/e13a4046d6bf2bf8.mp3",
+    "Guten Morgen zusammen, wie geht es euch?": "/audio/landing/de/03b6811470d3a358.mp3",
+    "Guten Morgen, wie geht es Ihnen?": "/audio/landing/de/fccdf50eb48738cb.mp3",
+    "Ich hätte gern einen Tisch für zwei.": "/audio/landing/de/b8b98434266c9554.mp3",
+    "Ich trage diese Schuhe zum ersten Mal.": "/audio/landing/de/fd0f72e9fe4eaeae.mp3",
+    "Könnten wir die Speisekarte sehen?": "/audio/landing/de/aab64d494b5ef557.mp3",
+    "Lass uns nach dem Essen noch ein bisschen quatschen.": "/audio/landing/de/c1370e3ea46bfe57.mp3"
   },
   "en": {
-    "Could we see the menu?": "/audio/landing/en/92e51149468128a2.mp3",
-    "Good morning everyone, how are you all?": "/audio/landing/en/4e826ca7e4015fe1.mp3",
-    "Good morning, how are you?": "/audio/landing/en/930292ca6c98039d.mp3",
-    "I would like a table for two.": "/audio/landing/en/98f1080a7186298d.mp3",
-    "I'm wearing these shoes for the first time.": "/audio/landing/en/c1d054533e427f99.mp3",
-    "Let's stay and chat after dinner.": "/audio/landing/en/eca2686f8a14be8b.mp3",
-    "The bill, please.": "/audio/landing/en/fbd930fddc0a7d48.mp3"
+    "Could we see the menu?": "/audio/landing/en/538a245b9327f756.mp3",
+    "Good morning everyone, how are you all?": "/audio/landing/en/25421fa8115d307d.mp3",
+    "Good morning, how are you?": "/audio/landing/en/191c23124379d64e.mp3",
+    "I would like a table for two.": "/audio/landing/en/704ce52e4c8a9139.mp3",
+    "I'm wearing these shoes for the first time.": "/audio/landing/en/575c0cc528adbc6e.mp3",
+    "Let's stay and chat after dinner.": "/audio/landing/en/dc6a7599c78abded.mp3",
+    "The bill, please.": "/audio/landing/en/c30f839bc778df7b.mp3"
   },
   "es": {
-    "Buenos días ¿cómo está usted?": "/audio/landing/es/c796dfa9ed7edcbd.mp3",
-    "Buenos días ¿cómo está?": "/audio/landing/es/bdc3b8caed429bae.mp3",
-    "Buenos días ¿cómo están?": "/audio/landing/es/831a259cddbf1279.mp3",
-    "Estoy estrenando estos zapatos.": "/audio/landing/es/580d63581c9bda44.mp3",
-    "Hagamos sobremesa.": "/audio/landing/es/b94c5b5bbbc1bbf2.mp3",
-    "La cuenta, por favor.": "/audio/landing/es/5e272efe6296a209.mp3",
-    "Quisiera una mesa para dos.": "/audio/landing/es/1aa1a0ec2f32cd58.mp3",
-    "¿Podemos ver el menú?": "/audio/landing/es/c27ce32d6b96e42f.mp3"
+    "Buenos días ¿cómo está usted?": "/audio/landing/es/1b0a4413ca36a136.mp3",
+    "Buenos días ¿cómo está?": "/audio/landing/es/f0b6426292656318.mp3",
+    "Buenos días ¿cómo están?": "/audio/landing/es/7232583ae52659db.mp3",
+    "Estoy estrenando estos zapatos.": "/audio/landing/es/3576eacee2f84216.mp3",
+    "Hagamos sobremesa.": "/audio/landing/es/991d1965e5e210e3.mp3",
+    "La cuenta, por favor.": "/audio/landing/es/ade3d7434aabfb07.mp3",
+    "Quisiera una mesa para dos.": "/audio/landing/es/41600231603b75b2.mp3",
+    "¿Podemos ver el menú?": "/audio/landing/es/24a009ab5e43a9bd.mp3"
   },
   "fr": {
-    "Bonjour à tous, comment allez-vous ?": "/audio/landing/fr/44b1a45e03b21412.mp3",
-    "Bonjour, comment allez-vous ?": "/audio/landing/fr/cd8bc45c4497e735.mp3",
-    "J'étrenne ces chaussures.": "/audio/landing/fr/5abefc2f4fe2249c.mp3",
-    "L'addition, s'il vous plaît.": "/audio/landing/fr/b81c418e9711ab67.mp3",
-    "Pourrions-nous voir le menu ?": "/audio/landing/fr/d787b6a19cc594b0.mp3",
-    "Restons discuter après le dîner.": "/audio/landing/fr/afac8b9f0290fb4c.mp3",
-    "Une table pour deux, s'il vous plaît.": "/audio/landing/fr/f67f41273f61a24d.mp3"
+    "Bonjour à tous, comment allez-vous ?": "/audio/landing/fr/12fa8a28154366de.mp3",
+    "Bonjour, comment allez-vous ?": "/audio/landing/fr/f8b44a442ae65e51.mp3",
+    "J'étrenne ces chaussures.": "/audio/landing/fr/401702d5870bfc0b.mp3",
+    "L'addition, s'il vous plaît.": "/audio/landing/fr/608d658180d1ae09.mp3",
+    "Pourrions-nous voir le menu ?": "/audio/landing/fr/2c7f9d3c3f8eb997.mp3",
+    "Restons discuter après le dîner.": "/audio/landing/fr/a3b416eb66d902db.mp3",
+    "Une table pour deux, s'il vous plaît.": "/audio/landing/fr/ed3c5855f991c62c.mp3"
   },
   "hi": {
-    "क्या हम मेनू देख सकते हैं?": "/audio/landing/hi/4b3fc7b911609fef.mp3",
-    "बिल दीजिए, कृपया।": "/audio/landing/hi/d0444bad90d19324.mp3",
-    "मुझे दो लोगों के लिए मेज़ चाहिए।": "/audio/landing/hi/1809d8e3456e7225.mp3",
-    "मैं पहली बार ये जूते पहन रहा हूँ।": "/audio/landing/hi/d8defd7843af0e02.mp3",
-    "रात के खाने के बाद थोड़ी और बातें करते हैं।": "/audio/landing/hi/8077436f23bc53e9.mp3",
-    "सुप्रभात, आप कैसे हैं?": "/audio/landing/hi/de2a0e8ca3352d37.mp3",
-    "सुप्रभात, आप सब कैसे हैं?": "/audio/landing/hi/99cdf52474a43b1a.mp3"
+    "क्या हम मेनू देख सकते हैं?": "/audio/landing/hi/51d1aa129ab9aaef.mp3",
+    "बिल दीजिए, कृपया।": "/audio/landing/hi/f486fd09f92e3090.mp3",
+    "मुझे दो लोगों के लिए मेज़ चाहिए।": "/audio/landing/hi/7a12f89e10f66c7c.mp3",
+    "मैं पहली बार ये जूते पहन रहा हूँ।": "/audio/landing/hi/3088245630ed53ac.mp3",
+    "रात के खाने के बाद थोड़ी और बातें करते हैं।": "/audio/landing/hi/ce28ba7e035aa394.mp3",
+    "सुप्रभात, आप कैसे हैं?": "/audio/landing/hi/69ab5be2947ef883.mp3",
+    "सुप्रभात, आप सब कैसे हैं?": "/audio/landing/hi/3716b105fce29e9a.mp3"
   }
 }

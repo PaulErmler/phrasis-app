@@ -248,6 +248,65 @@ describe("features/llmTranslationQueue", () => {
       );
       expect(t2claims.length).toBe(1);
     });
+
+    it("with keepClaim=true refreshes (not deletes) the owned claim", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const staleAt = Date.now() - 10_000;
+      const claimId = await t.run(async (ctx) =>
+        ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: staleAt,
+        }),
+      );
+
+      await t.mutation(
+        internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
+        { textId, targetLanguage: "de", keepClaim: true, claimId },
+      );
+
+      const claim = await t.run(async (ctx) => ctx.db.get(claimId));
+      // Claim survives (held across the retry/fallback) and its timestamp is
+      // refreshed so a concurrent reconcile can't reclaim it during backoff.
+      expect(claim).not.toBeNull();
+      expect(claim!.claimedAt).toBeGreaterThan(staleAt);
+    });
+
+    it("leaves a FOREIGN claim (reclaimed mid-call → different _id) untouched", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      // Simulate: this attempt was dispatched under `staleClaimId`, but a
+      // concurrent reconcile deleted+reinserted the claim, so the current row
+      // has a new _id. finalize must NOT delete the new owner's claim.
+      const { staleClaimId, currentClaimId } = await t.run(async (ctx) => {
+        const staleClaimId = await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: Date.now() - 10_000,
+        });
+        await ctx.db.delete(staleClaimId);
+        const currentClaimId = await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: Date.now(),
+        });
+        return { staleClaimId, currentClaimId };
+      });
+
+      await t.mutation(
+        internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
+        {
+          textId,
+          targetLanguage: "de",
+          keepClaim: false,
+          claimId: staleClaimId,
+        },
+      );
+
+      const current = await t.run(async (ctx) => ctx.db.get(currentClaimId));
+      expect(current).not.toBeNull();
+    });
   });
 
   describe("pumpLlmQueue", () => {
@@ -399,18 +458,37 @@ describe("features/llmTranslationQueue", () => {
       expect(slots.length).toBe(0);
     });
 
-    it("on truncation (finishReason=length): falls back to Google path", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
+    // Helpers for inspecting what the worker scheduled on failure. The worker
+    // re-enqueues the LLM (enqueueLlmTranslation) on a transient failure and only
+    // schedules the Google fallback (processTranslationForCard) once retries are
+    // exhausted.
+    const readScheduled = (t: ReturnType<typeof convexTest>) =>
+      t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+    const llmRetries = (scheduled: any[]) =>
+      scheduled.filter((s) => s.name.includes("enqueueLlmTranslation"));
+    const googleFallbacks = (scheduled: any[]) =>
+      scheduled.filter((s) => s.name.includes("processTranslationForCard"));
 
-      await t.run(async (ctx) => {
+    async function seedSlotAndClaim(
+      t: ReturnType<typeof convexTest>,
+      textId: any,
+    ) {
+      return t.run(async (ctx) => {
         await ctx.db.insert("llmTranslationSlots", { claimedAt: Date.now() });
-        await ctx.db.insert("llmTranslationClaims", {
+        return ctx.db.insert("llmTranslationClaims", {
           textId,
           targetLanguage: "de",
           claimedAt: Date.now(),
         });
       });
+    }
+
+    it("on truncation (finishReason=length): retries the LLM and does NOT fall back to Google yet", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await seedSlotAndClaim(t, textId);
 
       vi.mocked(generateText).mockResolvedValue({
         text: "",
@@ -429,12 +507,17 @@ describe("features/llmTranslationQueue", () => {
         },
       );
 
-      // The action should have scheduled the Google-translate fallback. We
-      // can't directly inspect scheduled jobs through convex-test in this
-      // version, but we can verify:
-      //   - No translations row was written by the LLM path (the fallback
-      //     hasn't actually run since it's scheduled async)
-      //   - Slot + claim were finalized so the queue can keep moving
+      const scheduled = await readScheduled(t);
+      // First failure → an LLM retry is scheduled with failureCount incremented
+      // to 1, NOT the Google fallback.
+      const retries = llmRetries(scheduled);
+      expect(retries.length).toBe(1);
+      expect((retries[0].args[0] as any).args.failureCount).toBe(1);
+      expect(googleFallbacks(scheduled).length).toBe(0);
+
+      // No translation written yet; the slot is freed so the queue keeps moving;
+      // the claim is KEPT (held across the retry) so a concurrent reconcile can't
+      // re-route the same row.
       const translations = await t.run(async (ctx) =>
         ctx.db
           .query("translations")
@@ -448,20 +531,16 @@ describe("features/llmTranslationQueue", () => {
         ctx.db.query("llmTranslationSlots").collect(),
       );
       expect(slots.length).toBe(0);
+      const claims = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationClaims").collect(),
+      );
+      expect(claims.length).toBe(1);
     });
 
-    it("on empty response: falls back to Google path", async () => {
+    it("on empty response: retries the LLM", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
-
-      await t.run(async (ctx) => {
-        await ctx.db.insert("llmTranslationSlots", { claimedAt: Date.now() });
-        await ctx.db.insert("llmTranslationClaims", {
-          textId,
-          targetLanguage: "de",
-          claimedAt: Date.now(),
-        });
-      });
+      await seedSlotAndClaim(t, textId);
 
       vi.mocked(generateText).mockResolvedValue({
         text: "",
@@ -480,25 +559,19 @@ describe("features/llmTranslationQueue", () => {
         },
       );
 
-      // Slot + claim were finalized (regardless of fallback timing).
+      const scheduled = await readScheduled(t);
+      expect(llmRetries(scheduled).length).toBe(1);
+      expect(googleFallbacks(scheduled).length).toBe(0);
       const slots = await t.run(async (ctx) =>
         ctx.db.query("llmTranslationSlots").collect(),
       );
       expect(slots.length).toBe(0);
     });
 
-    it("on HTTP error: falls back to Google path", async () => {
+    it("on HTTP error: retries the LLM", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
-
-      await t.run(async (ctx) => {
-        await ctx.db.insert("llmTranslationSlots", { claimedAt: Date.now() });
-        await ctx.db.insert("llmTranslationClaims", {
-          textId,
-          targetLanguage: "de",
-          claimedAt: Date.now(),
-        });
-      });
+      await seedSlotAndClaim(t, textId);
 
       vi.mocked(generateText).mockRejectedValue(
         new Error("status=500 internal server error"),
@@ -515,7 +588,9 @@ describe("features/llmTranslationQueue", () => {
         },
       );
 
-      // No translations row from the LLM path; slot/claim cleaned up.
+      const scheduled = await readScheduled(t);
+      expect(llmRetries(scheduled).length).toBe(1);
+      expect(googleFallbacks(scheduled).length).toBe(0);
       const translations = await t.run(async (ctx) =>
         ctx.db
           .query("translations")
@@ -525,6 +600,41 @@ describe("features/llmTranslationQueue", () => {
           .collect(),
       );
       expect(translations.length).toBe(0);
+      const slots = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationSlots").collect(),
+      );
+      expect(slots.length).toBe(0);
+    });
+
+    it("after the LLM retry budget is exhausted: falls back to Google (no further LLM retry)", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await seedSlotAndClaim(t, textId);
+
+      vi.mocked(generateText).mockResolvedValue({
+        text: "",
+        finishReason: "length",
+        usage: { inputTokens: 120, outputTokens: 5000, totalTokens: 5120 },
+      } as any);
+
+      await t.action(
+        internal.features.llmTranslationQueue.processLlmTranslationForCard,
+        {
+          textId,
+          sourceLanguage: "en",
+          targetLanguage: "de",
+          text: "Have you looked in the glove compartment?",
+          audioSpeakerGender: "male",
+          // Far above MAX_LLM_RETRIES so handleLlmFailure takes the terminal
+          // Google branch regardless of the exact cap value.
+          failureCount: 999,
+        },
+      );
+
+      const scheduled = await readScheduled(t);
+      // Terminal: Google fallback scheduled, no more LLM retries.
+      expect(googleFallbacks(scheduled).length).toBe(1);
+      expect(llmRetries(scheduled).length).toBe(0);
       const slots = await t.run(async (ctx) =>
         ctx.db.query("llmTranslationSlots").collect(),
       );

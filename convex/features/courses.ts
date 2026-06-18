@@ -91,11 +91,23 @@ async function validateLanguageLimits(
   const maxTotal = Math.max(planMaxTotal, existingBase + existingTarget);
 
   if (baseLanguages.length > maxPerBase)
-    throw new ConvexError(`Maximum ${maxPerBase} base languages allowed`);
+    throw new ConvexError({
+      code: 'LANGUAGE_LIMIT',
+      message: `Maximum ${maxPerBase} base languages allowed`,
+      featureId: FEATURE_IDS.MULTIPLE_LANGUAGES,
+    });
   if (targetLanguages.length > maxPerTarget)
-    throw new ConvexError(`Maximum ${maxPerTarget} target languages allowed`);
+    throw new ConvexError({
+      code: 'LANGUAGE_LIMIT',
+      message: `Maximum ${maxPerTarget} target languages allowed`,
+      featureId: FEATURE_IDS.MULTIPLE_LANGUAGES,
+    });
   if (baseLanguages.length + targetLanguages.length > maxTotal)
-    throw new ConvexError(`Maximum ${maxTotal} languages total allowed`);
+    throw new ConvexError({
+      code: 'LANGUAGE_LIMIT',
+      message: `Maximum ${maxTotal} languages total allowed`,
+      featureId: FEATURE_IDS.MULTIPLE_LANGUAGES,
+    });
 }
 
 /** Independent hard cap safeguard, separate from plan quota accounting. */
