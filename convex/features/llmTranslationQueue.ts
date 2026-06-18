@@ -226,7 +226,14 @@ export const pumpLlmQueue = internalMutation({
       await ctx.scheduler.runAfter(
         0,
         internal.features.llmTranslationQueue.processLlmTranslationForCard,
-        next.args,
+        // Forward the queue row's stored priority into the worker args. The inner
+        // `args.priority` is never populated by the enqueue sites, so without this
+        // the worker, its LLM-retry re-enqueue (handleLlmFailure), and the
+        // downstream TTS hand-off all default to priority 0 — dropping a flagged
+        // (priority-1) retranslation to the back of the queue. Stored priority is
+        // always 0|1|2 (enqueueLlmTranslation normalizes) or undefined for legacy
+        // pre-priority rows, so the assertion is safe.
+        { ...next.args, priority: next.priority as 0 | 1 | 2 | undefined },
       );
       used++;
     }

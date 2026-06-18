@@ -39,6 +39,7 @@ import {
   GOOGLE_TRANSLATE_SOURCE,
   ROMANIZATION_LANGUAGES,
   USER_PROVIDED_TRANSLATION_SOURCE,
+  DEFAULT_CONTENT_VERSION,
   getCurrentTranslationVersion,
   getCurrentTtsVersion,
   isTtsVersionStale,
@@ -1831,6 +1832,16 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       return null;
     }
 
+    // Guard: the text may have been cascade-deleted (deleteCardPermanently /
+    // editCard cleanup) while this job was in flight. Don't write an orphan
+    // translation row (and schedule orphan TTS) against a now-deleted text;
+    // release the now-dead claim and bail. Placed after the ownership gate so a
+    // reclaimed-claim skip still wins. No-op in normal flow (text always exists).
+    if ((await ctx.db.get(args.textId)) === null) {
+      if (llmClaim) await ctx.db.delete(llmClaim._id);
+      return null;
+    }
+
     const existing = await ctx.db
       .query('translations')
       .withIndex('by_text_and_language', (q) =>
@@ -1942,10 +1953,15 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       if (args.speakerGender && existing.speakerGender === undefined) {
         patch.speakerGender = args.speakerGender;
       }
-      // Fill-if-missing: stamp legacy rows (written before the field existed) so
-      // the version sweep doesn't loop on them; never overwrite a real stamp.
+      // Fill-if-missing: stamp legacy rows (written before the field existed) at
+      // BASELINE, not the current version. This branch keeps the row's OLD
+      // translatedText, so it must stay regenerable by a future translationVersion
+      // bump — matching backfillContentVersions, which stamps legacy rows at v1 so
+      // `baseline < bumped = stale`. Stamping the current version here would mark
+      // stale content as already up-to-date and silently defeat the bump. Only the
+      // insert and replaceExisting branches (fresh content) stamp the current version.
       if (existing.translationVersion === undefined) {
-        patch.translationVersion = getCurrentTranslationVersion(args.targetLanguage);
+        patch.translationVersion = DEFAULT_CONTENT_VERSION;
       }
       if (Object.keys(patch).length > 0) {
         await ctx.db.patch(existing._id, patch);
@@ -2168,6 +2184,15 @@ export const storeAudioRecording = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Guard: the text may have been cascade-deleted (deleteCardPermanently /
+    // editCard cleanup) while this TTS job was in flight. Don't write an orphan
+    // audio row against a deleted text; drop the freshly-stored blob (reference-
+    // safe, so a shared blob is left untouched) so it isn't leaked. No-op in
+    // normal flow (text always exists).
+    if ((await ctx.db.get(args.textId)) === null) {
+      await deleteStorageBlobIfUnreferenced(ctx, args.storageId);
+      return null;
+    }
     const existingForVoice = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language_and_voiceName', (q) =>

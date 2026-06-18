@@ -217,7 +217,11 @@ export const generateSentenceMetadata = internalAction({
     );
 
     await retrier.run(
-      ctx,
+      // Convex 1.41 widened `ActionCtx.runMutation` with an optional
+      // `transactionLimits` arg, so the ctx no longer structurally matches the
+      // older `RunMutationCtx` that @convex-dev/action-retrier@0.3.0 declares.
+      // Runtime is compatible; this cast bridges the component's type lag.
+      ctx as unknown as Parameters<typeof retrier.run>[0],
       internal.features.sentenceMetadata.fetchSentenceMetadata,
       {
         textId: args.textId,
