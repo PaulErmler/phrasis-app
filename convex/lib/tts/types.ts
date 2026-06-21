@@ -1,5 +1,5 @@
 /**
- * TTS provider interface. One class per provider (Google, ElevenLabs, …);
+ * TTS provider interface. One class per provider (Google, Azure, Gemini);
  * all synthesis flows through `getTtsProvider(id).speak(...)` so callers
  * never touch provider-specific HTTP calls.
  */
@@ -9,7 +9,7 @@ export interface SpeakInput {
   text: string;
   /** Internal language code (e.g. `'en'`, `'es_latam'`, `'zh'`). */
   language: string;
-  /** Provider-specific voice id — Google voice name or ElevenLabs voice_id. */
+  /** Provider-specific voice id — e.g. Google voice name or Azure short name. */
   voiceApiCode: string;
   /** Playback speed; 1.0 = normal. */
   speed: number;

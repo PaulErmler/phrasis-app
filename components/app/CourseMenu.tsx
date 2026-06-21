@@ -150,6 +150,19 @@ export function CourseMenu({ open, onOpenChange }: CourseMenuProps) {
         <SheetContent
           side="left"
           className="w-full sm:max-w-md flex flex-col p-0"
+          onInteractOutside={(e) => {
+            // Nested dialogs (unarchive confirm, course alert, paywall) are
+            // portaled outside the Sheet, so interacting with them registers
+            // as an outside click. Keep the Sheet open in that case; only true
+            // outside clicks should dismiss it.
+            if (
+              (e.target as HTMLElement | null)?.closest(
+                '[role="dialog"], [role="alertdialog"]',
+              )
+            ) {
+              e.preventDefault();
+            }
+          }}
         >
           <SheetTitle className="sr-only">{t('courses.title')}</SheetTitle>
           <SheetDescription className="sr-only">

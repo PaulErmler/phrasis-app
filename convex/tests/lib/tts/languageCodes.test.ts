@@ -1,9 +1,6 @@
 /// <reference types="vite/client" />
 import { describe, it, expect } from 'vitest';
-import {
-  toGeminiBcp47,
-  toElevenLabsLanguageCode,
-} from '../../../lib/tts/languageCodes';
+import { toGeminiBcp47 } from '../../../lib/tts/languageCodes';
 import { SUPPORTED_LANGUAGES } from '../../../../lib/languages';
 
 /**
@@ -22,7 +19,9 @@ const EXPECTED_GEMINI: Record<string, string> = {
   en_us: 'en-US',
   en_au: 'en-AU',
   es: 'es-ES',
-  es_latam: 'es-419',
+  // es_latam now routes through Gemini, which has no `es-419` macro locale —
+  // it uses `es-US` (American Spanish), matching the es_mixed es_latam variant.
+  es_latam: 'es-US',
   es_mixed: 'es-ES',
   fr: 'fr-FR',
   de: 'de-DE',
@@ -83,18 +82,5 @@ describe('toGeminiBcp47', () => {
 
   it('passes unknown codes through unchanged', () => {
     expect(toGeminiBcp47('xx-unknown')).toBe('xx-unknown');
-  });
-});
-
-describe('toElevenLabsLanguageCode', () => {
-  it('folds internal/variant codes to ISO 639-1', () => {
-    expect(toElevenLabsLanguageCode('es_latam')).toBe('es');
-    expect(toElevenLabsLanguageCode('cmn')).toBe('zh');
-  });
-
-  it('passes already-valid codes through unchanged', () => {
-    expect(toElevenLabsLanguageCode('en')).toBe('en');
-    expect(toElevenLabsLanguageCode('de')).toBe('de');
-    expect(toElevenLabsLanguageCode('zz')).toBe('zz');
   });
 });

@@ -30,6 +30,36 @@ async function seedQuota(t: ReturnType<typeof convexTest>, userId: string) {
   );
 }
 
+// Seed a quota doc with a custom `courses` feature, leaving the other features
+// generous. Used to exercise the plan-aware unarchive cooldown.
+async function seedCoursesQuota(
+  t: ReturnType<typeof convexTest>,
+  userId: string,
+  courses: { balance: number; included: number; unlimited?: boolean },
+) {
+  await t.run(async (ctx) =>
+    ctx.db.insert("usageQuotas", {
+      userId,
+      features: {
+        courses: {
+          balance: courses.balance,
+          included: courses.included,
+          used: Math.max(0, courses.included - courses.balance),
+          unlimited: courses.unlimited ?? false,
+        },
+        sentences: { balance: 100, included: 100, used: 0, unlimited: false },
+        multiple_languages: { balance: 1, included: 1, used: 0, unlimited: true },
+        chat_messages: { balance: 100, included: 100, used: 0, unlimited: false },
+        custom_sentences: { balance: 100, included: 100, used: 0, unlimited: false },
+        transcriptions: { balance: 100, included: 100, used: 0, unlimited: false },
+        card_edits: { balance: 100, included: 100, used: 0, unlimited: false },
+        translation_auto_fill: { balance: 100, included: 100, used: 0, unlimited: false },
+      },
+      lastSyncedAt: Date.now(),
+    }),
+  );
+}
+
 describe("features/courses", () => {
   describe("getUserSettings", () => {
     it("returns null when unauthenticated", async () => {
@@ -167,9 +197,9 @@ describe("features/courses", () => {
       expect(course?.isArchived).toBe(true);
     });
 
-    it("returns cooldown when archived recently", async () => {
+    it("returns cooldown when archived recently on a single-course (free/basic) plan", async () => {
       const t = convexTest(schema, modules);
-      await seedQuota(t, "user_A");
+      await seedCoursesQuota(t, "user_A", { balance: 1, included: 1 });
       const courseId = await t.run(async (ctx) =>
         ctx.db.insert("courses", {
           userId: "user_A",
@@ -185,6 +215,48 @@ describe("features/courses", () => {
         { courseId },
       );
       expect(result.status).toBe("cooldown");
+    });
+
+    it("unarchives immediately on a multi-course plan even when archived recently", async () => {
+      const t = convexTest(schema, modules);
+      await seedCoursesQuota(t, "user_A", { balance: 4, included: 5 });
+      const courseId = await t.run(async (ctx) =>
+        ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+          isArchived: true,
+          archivedAt: Date.now(),
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const result = await asUser.mutation(
+        api.features.courses.unarchiveCourse,
+        { courseId },
+      );
+      expect(result.status).toBe("success");
+      const course = await t.run(async (ctx) => ctx.db.get(courseId));
+      expect(course?.isArchived).toBeUndefined();
+    });
+
+    it("returns usage_limit when no course quota remains", async () => {
+      const t = convexTest(schema, modules);
+      await seedCoursesQuota(t, "user_A", { balance: 0, included: 5 });
+      const courseId = await t.run(async (ctx) =>
+        ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+          isArchived: true,
+          archivedAt: Date.now(),
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const result = await asUser.mutation(
+        api.features.courses.unarchiveCourse,
+        { courseId },
+      );
+      expect(result.status).toBe("usage_limit");
     });
   });
 

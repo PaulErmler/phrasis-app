@@ -336,7 +336,7 @@ describe("features/scheduling", () => {
       expect(card).not.toBeNull();
     });
 
-    it("permanently removes the card row", async () => {
+    it("permanently removes the card row and cascade-cleans an orphaned user-created text", async () => {
       const t = convexTest(schema, modules);
       const { cardId, textId } = await seedCardWithCourse(t);
       const asUser = t.withIdentity({ subject: "user_A" });
@@ -345,9 +345,122 @@ describe("features/scheduling", () => {
       });
       const card = await t.run(async (ctx) => ctx.db.get(cardId));
       expect(card).toBeNull();
-      // Shared text survives — other cards may reference it.
+      // The text is user-created (custom) and no other card references it, so it
+      // is cascade-cleaned along with any translations/audio (orphan cleanup).
       const text = await t.run(async (ctx) => ctx.db.get(textId));
-      expect(text).not.toBeNull();
+      expect(text).toBeNull();
+    });
+
+    it("keeps a shared (premade) text on deleteCardPermanently", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await seedCardWithCourse(t);
+      // A shared/premade text (userCreated: false) must never be cascade-deleted
+      // — other users' cards may reference it.
+      await t.run(async (ctx) => ctx.db.patch(textId, { userCreated: false }));
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.deleteCardPermanently, {
+        cardId,
+      });
+      expect(await t.run(async (ctx) => ctx.db.get(cardId))).toBeNull();
+      expect(await t.run(async (ctx) => ctx.db.get(textId))).not.toBeNull();
+    });
+
+    it("keeps a user-created text still referenced by another card", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, deckId } = await seedCardWithCourse(t);
+      // A second card on the same text means it is NOT orphaned.
+      await t.run(async (ctx) => {
+        const first = await ctx.db.get(cardId);
+        await ctx.db.insert("cards", {
+          deckId,
+          textId,
+          collectionId: first!.collectionId,
+          dueDate: Date.now() - 1000,
+          isMastered: false,
+          isHidden: false,
+          schedulingPhase: "preReview",
+          preReviewCount: 0,
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.deleteCardPermanently, {
+        cardId,
+      });
+      expect(await t.run(async (ctx) => ctx.db.get(cardId))).toBeNull();
+      // Still referenced by the second card → text survives.
+      expect(await t.run(async (ctx) => ctx.db.get(textId))).not.toBeNull();
+    });
+
+    it("cascade-deletes the orphan's translations + audio rows but keeps a blob shared with a surviving text", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, deckId } = await seedCardWithCourse(t);
+
+      // Seed the orphaned text with a real translation + audio row, and a SECOND
+      // surviving text (with its own card so it isn't orphaned) whose audio
+      // reuses the SAME storageId — the editCard copy-by-storageId shape. The
+      // cascade must delete the orphan's rows but keep the shared blob alive.
+      const { trId, audioId, sharedBlob, otherTextId, otherAudioId } =
+        await t.run(async (ctx) => {
+          const trId = await ctx.db.insert("translations", {
+            textId,
+            targetLanguage: "es",
+            translatedText: "Hola",
+          });
+          const sharedBlob = await ctx.storage.store(
+            new Blob([new Uint8Array([1, 2, 3])]),
+          );
+          const audioId = await ctx.db.insert("audioRecordings", {
+            textId,
+            language: "es",
+            voiceName: "es-test-voice",
+            storageId: sharedBlob,
+            voiceGender: "female",
+          });
+          // Second text + card sharing the same blob.
+          const otherTextId = await ctx.db.insert("texts", {
+            text: "Hola dos",
+            language: "es",
+            userCreated: true,
+            userId: "user_A",
+            collectionId: (await ctx.db.get(textId))!.collectionId,
+            collectionRank: 2,
+          });
+          await ctx.db.insert("cards", {
+            deckId,
+            textId: otherTextId,
+            collectionId: (await ctx.db.get(textId))!.collectionId,
+            dueDate: Date.now() - 1000,
+            isMastered: false,
+            isHidden: false,
+            schedulingPhase: "preReview",
+            preReviewCount: 0,
+          });
+          const otherAudioId = await ctx.db.insert("audioRecordings", {
+            textId: otherTextId,
+            language: "es",
+            voiceName: "es-test-voice",
+            storageId: sharedBlob,
+            voiceGender: "female",
+          });
+          return { trId, audioId, sharedBlob, otherTextId, otherAudioId };
+        });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.deleteCardPermanently, {
+        cardId,
+      });
+
+      await t.run(async (ctx) => {
+        // Orphaned text + its translation + its audio row are gone.
+        expect(await ctx.db.get(textId)).toBeNull();
+        expect(await ctx.db.get(trId)).toBeNull();
+        expect(await ctx.db.get(audioId)).toBeNull();
+        // The surviving text and its audio row remain.
+        expect(await ctx.db.get(otherTextId)).not.toBeNull();
+        expect(await ctx.db.get(otherAudioId)).not.toBeNull();
+        // Shared blob survives — the surviving text's row still references it.
+        expect(await ctx.storage.getUrl(sharedBlob)).not.toBeNull();
+      });
     });
 
     it("getCardForReview skips a deleted card and returns null when nothing is left", async () => {

@@ -16,6 +16,7 @@ import {
 import { languageSupportsStt } from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
 import { textsMatchSemantic } from '../lib/ttsSemanticValidation';
+import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import { rateLimiter, TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import {
   ttsQualityValidator,
@@ -33,13 +34,15 @@ const TTS_CLAIM_STALE_MS = 30 * 1000; // 30 seconds
  * `pumpQueue` consults these caps and the `countLiveSlotsAndReclaimStale`
  * helper below to gate dispatch.
  */
-const PROVIDER_MAX_CONCURRENCY: Record<TtsProvider, number> = {
+const PROVIDER_MAX_CONCURRENCY: Partial<Record<TtsProvider, number>> = {
   google: 64,
-  elevenlabs: 3,
   azure: 8,
   // Conservative start for OpenRouter-hosted Gemini TTS; tune after first runs.
   gemini: 8,
 };
+// Fallback cap for any provider missing from the map above (e.g. the
+// 'elevenlabs' tombstone, which is never dispatched).
+const DEFAULT_MAX_CONCURRENCY = 8;
 const SLOT_STALE_MS = 60 * 1000; // 1 minute — longer than the longest API call
 
 /**
@@ -401,7 +404,9 @@ export const updateAudioRecordingQuality = internalMutation({
       patch.storageId = args.storageId;
       await ctx.db.patch(record._id, patch);
       if (!args.preserveOldStorage) {
-        await ctx.storage.delete(previousStorageId);
+        // Reference-aware: drop the old blob only if no other row (e.g. an
+        // `editCard` copy on another text) still references it.
+        await deleteStorageBlobIfUnreferenced(ctx, previousStorageId);
       }
     } else {
       await ctx.db.patch(record._id, patch);
@@ -637,7 +642,7 @@ export const pumpQueue = internalMutation({
     // placement test) first, then high (1, active collection), then normal
     // (0), then any pre-priority rows (undefined) left over from a deploy.
     const QUEUE_PRIORITY_ORDER = [2, 1, 0, undefined] as const;
-    const cap = PROVIDER_MAX_CONCURRENCY[args.provider];
+    const cap = PROVIDER_MAX_CONCURRENCY[args.provider] ?? DEFAULT_MAX_CONCURRENCY;
     let used = await countLiveSlotsAndReclaimStale(ctx, args.provider);
 
     // Returns the oldest queued row at the highest non-empty priority, or null
@@ -668,7 +673,7 @@ export const pumpQueue = internalMutation({
       // reservation is ~10s — comfortably inside `TTS_CLAIM_STALE_MS`.
       const limit = await rateLimiter.limit(
         ctx,
-        TTS_RATE_LIMIT_BY_PROVIDER[args.provider],
+        TTS_RATE_LIMIT_BY_PROVIDER[args.provider] ?? 'googleTts',
         { reserve: true },
       );
       if (!limit.ok) {

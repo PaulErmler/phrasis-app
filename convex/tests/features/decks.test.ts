@@ -198,7 +198,6 @@ describe("features/decks", () => {
       vi.useFakeTimers();
       vi.stubEnv("GOOGLE_TTS_API_KEY", "dummy");
       vi.stubEnv("GOOGLE_TRANSLATE_API_KEY", "dummy");
-      vi.stubEnv("ELEVENLABS_API_KEY", "dummy");
       vi.stubEnv("AZURE_SPEECH_API_KEY", "dummy");
       vi.stubEnv("AZURE_SPEECH_REGION", "westeurope");
 
@@ -219,7 +218,6 @@ describe("features/decks", () => {
           },
         ],
       });
-      const elevenTtsBytes = new Uint8Array([0, 1, 2, 3]);
       const googleTtsBody = JSON.stringify({
         audioContent: Buffer.from("fake-mp3-bytes").toString("base64"),
       });
@@ -236,12 +234,6 @@ describe("features/decks", () => {
           return new Response(azureSttBody, {
             status: 200,
             headers: { "Content-Type": "application/json" },
-          });
-        }
-        if (u.includes("api.elevenlabs.io/v1/text-to-speech")) {
-          return new Response(elevenTtsBytes, {
-            status: 200,
-            headers: { "Content-Type": "audio/mpeg" },
           });
         }
         if (u.includes("texttospeech.googleapis.com")) {
@@ -525,6 +517,115 @@ describe("features/decks", () => {
       expect(row?.romanizationSource).toBeUndefined();
       expect(row?.translationSource).toBe("new-source");
     });
+
+    it("skips the write when expectedClaimId no longer matches the current claim (reclaimed)", async () => {
+      const t = convexTest(schema, modules);
+      const { textId, foreignClaimId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        // The claim that currently owns (textId, es).
+        await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "es",
+          claimedAt: Date.now(),
+        });
+        // A different, valid claim id the worker thinks it owns — simulates a
+        // concurrent reconcile having reclaimed the row under a new _id.
+        const foreignClaimId = await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "zz",
+          claimedAt: Date.now(),
+        });
+        return { textId, foreignClaimId };
+      });
+
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "es",
+          translatedText: "Hola",
+          voiceName: TEST_VOICE,
+          expectedClaimId: foreignClaimId,
+        },
+      );
+
+      // The ownership gate must short-circuit before writing.
+      const rows = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("targetLanguage", "es"),
+          )
+          .collect(),
+      );
+      expect(rows.length).toBe(0);
+    });
+
+    it("writes when expectedClaimId matches the current claim", async () => {
+      const t = convexTest(schema, modules);
+      const { textId, claimId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        const claimId = await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "es",
+          claimedAt: Date.now(),
+        });
+        // Pre-seed audio for the voice so the write path short-circuits the TTS
+        // enqueue (which would validate the test voice against the curated list).
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        await ctx.db.insert("audioRecordings", {
+          textId,
+          language: "es",
+          voiceName: TEST_VOICE,
+          storageId,
+        });
+        return { textId, claimId };
+      });
+
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "es",
+          translatedText: "Hola",
+          voiceName: TEST_VOICE,
+          expectedClaimId: claimId,
+        },
+      );
+
+      const rows = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("targetLanguage", "es"),
+          )
+          .collect(),
+      );
+      expect(rows.length).toBe(1);
+      expect(rows[0].translatedText).toBe("Hola");
+    });
   });
 
   describe("scheduleMissingContent — gender-drift translation sweep", () => {
@@ -647,6 +748,186 @@ describe("features/decks", () => {
         },
       });
       expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
+    });
+  });
+
+  describe("scheduleMissingContent — TTS version regen", () => {
+    // `pt_pt` is bumped to ttsVersion 2 in lib/languages.ts (the European
+    // Portuguese prompt fix). Audio stamped below that should be deleted +
+    // re-synthesized; audio stamped at/above current — or unstamped — survives.
+    // Provider + gender are kept matching so ONLY the version check can fire.
+    async function seedPtPtAudio(
+      t: ReturnType<typeof convexTest>,
+      ttsVersion: number | undefined,
+    ) {
+      return t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: true,
+          speakerGender: "female",
+          audioSpeakerGender: "female",
+          collectionId,
+          collectionRank: 1,
+        });
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        await ctx.db.insert("audioRecordings", {
+          textId,
+          language: "pt_pt",
+          voiceName: "Leda",
+          storageId,
+          ttsProvider: "gemini", // matches current → no provider-mismatch regen
+          voiceGender: "female", // matches card → no gender-drift regen
+          ...(ttsVersion !== undefined ? { ttsVersion } : {}),
+        });
+        return { textId };
+      });
+    }
+
+    async function getPtPtAudio(
+      t: ReturnType<typeof convexTest>,
+      textId: Id<"texts">,
+    ) {
+      return t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        const result = await scheduleMissingContent(
+          ctx,
+          textId,
+          text,
+          ["en"],
+          ["pt_pt"],
+        );
+        const audio = await ctx.db
+          .query("audioRecordings")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("language", "pt_pt"),
+          )
+          .first();
+        return { audio, result };
+      });
+    }
+
+    it("deletes audio stamped below the current ttsVersion AND schedules regeneration", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedPtPtAudio(t, 1); // pt_pt current is 2
+      const { audio, result } = await getPtPtAudio(t, textId);
+      expect(audio).toBeNull();
+      // Guard against a "delete but never regenerate" regression: the deleted
+      // pt_pt audio needs a (missing) translation first, so the sweep must
+      // schedule a replacement rather than just dropping the row.
+      expect(result.translationsScheduled).toBeGreaterThan(0);
+    });
+
+    it("keeps audio stamped at the current ttsVersion", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedPtPtAudio(t, 2);
+      expect((await getPtPtAudio(t, textId)).audio).toBeTruthy();
+    });
+
+    it("keeps unstamped (undefined) audio — undefined === current, no storm", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedPtPtAudio(t, undefined);
+      expect((await getPtPtAudio(t, textId)).audio).toBeTruthy();
+    });
+  });
+
+  describe("scheduleMissingContent — translation version regen", () => {
+    // No language sets `translationVersion` today, so a row stamped at 0 (strictly
+    // below the default current version 1) is the only way to exercise the stale
+    // branch. `speakerGender` matches `audioSpeakerGender` so ONLY the version
+    // check fires (no gender drift), and the audio matches provider+gender+version
+    // so it is deleted purely as the cascade of the stale translation.
+    async function seedStaleTranslation(
+      t: ReturnType<typeof convexTest>,
+      userCreated: boolean,
+    ) {
+      return t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated,
+          speakerGender: "female",
+          audioSpeakerGender: "female",
+          collectionId,
+          collectionRank: 1,
+        });
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        const trId = await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "es",
+          translatedText: "Hola",
+          speakerGender: "female", // matches audioSpeakerGender → no drift
+          translationVersion: 0, // strictly below current (1) → stale
+        });
+        const audioId = await ctx.db.insert("audioRecordings", {
+          textId,
+          language: "es",
+          voiceName: "es-test-voice",
+          storageId,
+          ttsProvider: "gemini", // matches current → no provider-mismatch regen
+          voiceGender: "female", // matches card → no gender-drift regen
+        });
+        return { textId, trId, audioId };
+      });
+    }
+
+    async function runSweep(
+      t: ReturnType<typeof convexTest>,
+      textId: Id<"texts">,
+    ) {
+      return t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        const result = await scheduleMissingContent(
+          ctx,
+          textId,
+          text,
+          ["en"],
+          ["es"],
+        );
+        const tr = await ctx.db
+          .query("translations")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("targetLanguage", "es"),
+          )
+          .first();
+        const audio = await ctx.db
+          .query("audioRecordings")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("language", "es"),
+          )
+          .first();
+        return { result, tr, audio };
+      });
+    }
+
+    it("deletes a premade stale translation + its audio and schedules regeneration", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedStaleTranslation(t, false);
+      const { result, tr, audio } = await runSweep(t, textId);
+      expect(tr).toBeNull(); // version-stale translation deleted
+      expect(audio).toBeNull(); // its audio cascade-deleted
+      expect(result.translationsScheduled).toBeGreaterThan(0); // regen scheduled
+    });
+
+    it("keeps a user-created stale translation (the !userCreated guard) and its audio", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedStaleTranslation(t, true);
+      const { tr, audio } = await runSweep(t, textId);
+      // userCreated translations are user-owned → never version-regenerated.
+      expect(tr).not.toBeNull();
+      expect(audio).not.toBeNull();
     });
   });
 });

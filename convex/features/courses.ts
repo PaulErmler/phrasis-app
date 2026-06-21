@@ -91,11 +91,23 @@ async function validateLanguageLimits(
   const maxTotal = Math.max(planMaxTotal, existingBase + existingTarget);
 
   if (baseLanguages.length > maxPerBase)
-    throw new ConvexError(`Maximum ${maxPerBase} base languages allowed`);
+    throw new ConvexError({
+      code: 'LANGUAGE_LIMIT',
+      message: `Maximum ${maxPerBase} base languages allowed`,
+      featureId: FEATURE_IDS.MULTIPLE_LANGUAGES,
+    });
   if (targetLanguages.length > maxPerTarget)
-    throw new ConvexError(`Maximum ${maxPerTarget} target languages allowed`);
+    throw new ConvexError({
+      code: 'LANGUAGE_LIMIT',
+      message: `Maximum ${maxPerTarget} target languages allowed`,
+      featureId: FEATURE_IDS.MULTIPLE_LANGUAGES,
+    });
   if (baseLanguages.length + targetLanguages.length > maxTotal)
-    throw new ConvexError(`Maximum ${maxTotal} languages total allowed`);
+    throw new ConvexError({
+      code: 'LANGUAGE_LIMIT',
+      message: `Maximum ${maxTotal} languages total allowed`,
+      featureId: FEATURE_IDS.MULTIPLE_LANGUAGES,
+    });
 }
 
 /** Independent hard cap safeguard, separate from plan quota accounting. */
@@ -544,7 +556,13 @@ export const archiveCourse = mutation({
 });
 
 /**
- * Unarchive a course after the 30-day cooldown if quota allows.
+ * Unarchive a course if quota allows.
+ *
+ * Quota is the gate on every plan. The 30-day archive cooldown only applies to
+ * single-course plans (free/basic, course allowance <= 1), where it guards
+ * against archive/unarchive churn. Multi-course plans (Pro) skip the cooldown
+ * entirely — having a free course slot is enough to reactivate immediately,
+ * even right after archiving.
  */
 export const unarchiveCourse = mutation({
   args: { courseId: v.id('courses') },
@@ -566,7 +584,14 @@ export const unarchiveCourse = mutation({
     if (course.isArchived !== true)
       throw new ConvexError('Course is not archived');
 
-    if (course.archivedAt) {
+    // Cooldown is anti-churn protection only for single-course plans
+    // (free/basic). Multi-course plans gate on quota alone, so they can
+    // unarchive a recently-archived course immediately if a slot is free.
+    const snapshot = await getCourseQuotaSnapshot(ctx, userId);
+    const cooldownApplies =
+      snapshot !== null && !snapshot.unlimited && snapshot.included <= 1;
+
+    if (cooldownApplies && course.archivedAt) {
       const elapsed = Date.now() - course.archivedAt;
       if (elapsed < ARCHIVE_COOLDOWN_MS) {
         return {

@@ -13,6 +13,7 @@ import {
   Loader2,
   X,
 } from 'lucide-react';
+import { ConvexError } from 'convex/values';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -134,7 +135,22 @@ export function CourseLanguageSettings({
       setSavedCodes([...draftBase, ...draftTarget]);
       setHasChanges(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('saveFailed'));
+      // The server is the authoritative gate. If it rejects because this plan
+      // doesn't allow more languages, surface the upgrade path instead of a
+      // raw error string (defense-in-depth for the on-mount sync window where
+      // the quota isn't known yet).
+      const code =
+        e instanceof ConvexError &&
+        typeof e.data === 'object' &&
+        e.data !== null &&
+        'code' in e.data
+          ? (e.data as { code?: string }).code
+          : undefined;
+      if (code === 'LANGUAGE_LIMIT') {
+        setPaywallOpen(true);
+      } else {
+        setError(t('saveFailed'));
+      }
     } finally {
       setSaving(false);
     }
