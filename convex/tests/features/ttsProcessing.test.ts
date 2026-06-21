@@ -508,9 +508,10 @@ describe("features/ttsProcessing", () => {
   });
 
   describe("scheduleMissingContent sweep", () => {
-    // Swahili (Kenya) currently runs on Azure. Per lib/ttsPrecedence.ts, Azure
-    // overrides ElevenLabs rows but leaves Google rows untouched. These tests
-    // drive both branches via `prepareCardContent`.
+    // Swahili (sw) runs on Gemini, which per lib/ttsPrecedence.ts overrides
+    // Google/Azure/ElevenLabs rows. Swahili-Tanzania (sw_tz) runs on Azure,
+    // which overrides only ElevenLabs and leaves Google rows untouched. These
+    // tests drive both branches via `prepareCardContent`.
     it("deletes a row whose ttsProvider is in the current provider's override list", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
@@ -556,7 +557,7 @@ describe("features/ttsProcessing", () => {
       const audioId = await t.run(async (ctx) =>
         ctx.db.insert("audioRecordings", {
           textId,
-          language: "sw",
+          language: "sw_tz",
           voiceName: "sw-KE-Chirp3-HD-Leda",
           storageId,
           ttsQuality: "validated",
@@ -568,8 +569,8 @@ describe("features/ttsProcessing", () => {
 
       await t.mutation(internal.features.decks.prepareCardContent, {
         textId,
-        baseLanguages: ["sw"],
-        targetLanguages: ["sw"],
+        baseLanguages: ["sw_tz"],
+        targetLanguages: ["sw_tz"],
       });
 
       const left = await t.run(async (ctx) => ctx.db.get(audioId));
