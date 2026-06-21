@@ -177,11 +177,16 @@ test.describe("learning settings", () => {
     ).toBeVisible({ timeout: 5_000 });
 
     const initial = await sw.getAttribute("aria-checked");
+    // The sheet is position:fixed and re-animates on open, so `force: true`
+    // alone can't bring the switch into the viewport — wait for it to settle
+    // (same guard the mode-toggle test uses on its buttons).
+    await waitForInViewport(page, sw);
     await sw.click({ force: true });
     await page.waitForTimeout(300);
     const afterFirst = await sw.getAttribute("aria-checked");
     expect(afterFirst).not.toBe(initial);
 
+    await waitForInViewport(page, sw);
     await sw.click({ force: true });
     await page.waitForTimeout(300);
   });
