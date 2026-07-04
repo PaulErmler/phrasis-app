@@ -13,10 +13,10 @@ import PricingTable from '@/components/autumn/pricing-table';
  * paid tier (the auto-enabled free plan remains available later via
  * settings if they need it).
  *
- * The 21-day free trial is configured in the Autumn dashboard for Basic +
- * Pro products; the client just calls `checkout({productId})`. If the user
- * closes the checkout dialog without purchasing, "Maybe later" leaves them
- * on the auto-enabled Free plan.
+ * The 7-day free trial is configured in autumn.config.ts for Basic + Pro
+ * (and their annual variants); the client just calls `checkout({productId})`.
+ * If the user closes the checkout dialog without purchasing, "Maybe later"
+ * leaves them on the auto-enabled Free plan.
  */
 interface Props {
   onContinue: () => void;
@@ -43,7 +43,10 @@ export function PlanPickStep({ onContinue }: Props) {
           <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto">{t('subtitle')}</p>
         </div>
         <div className="flex-1 min-h-0 px-2 md:px-4">
-          <PricingTable excludeFreePlan />
+          <PricingTable
+            excludeFreePlan
+            recommendedProductIds={['pro', 'pro_annual']}
+          />
         </div>
         <div className="shrink-0 text-center py-4 px-4">
           <Button

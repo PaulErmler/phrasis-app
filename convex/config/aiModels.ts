@@ -27,8 +27,12 @@ export const OPENROUTER_MODELS = {
  *  for GLM, and the chat agent needs the createCard tool — letting
  *  OpenRouter silently fall back to a non-tool provider would break
  *  createCard. preferred_* deprioritize endpoints slower than 2s p50 /
- *  under 50 tok/s p50. */
+ *  under 50 tok/s p50.
+ *  `usage.include` makes OpenRouter report the actual USD cost of each
+ *  request (providerMetadata.openrouter.usage.cost), which drives the
+ *  per-message credit charge in chat. */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
+  usage: { include: true },
   provider: {
     order: ['io-net/fp8', 'io-net', 'together'],
     allow_fallbacks: false,

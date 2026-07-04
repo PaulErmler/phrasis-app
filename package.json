@@ -87,7 +87,7 @@
     "@xyflow/react": "^12.11.0",
     "ai": "^5.0.204",
     "arabic-transliterate": "^1.0.1",
-    "atmn": "^1.1.10",
+    "atmn": "^1.1.12",
     "audiobuffer-to-wav": "^1.0.0",
     "autumn-js": "^0.1.85",
     "axios": "^1.18.0",

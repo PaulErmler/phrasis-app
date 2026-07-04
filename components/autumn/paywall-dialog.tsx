@@ -12,6 +12,7 @@ import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePaywall, useCustomer, usePricingTable } from "autumn-js/react";
 import { findUpgradeProductFromPricingTable } from "@/lib/autumn/find-upgrade-product";
+import { hasPaidPlanHistory, type CustomerProductLite } from "@/lib/autumn/trial-eligibility";
 import { getPaywallTitle, getPaywallMessage, filterProductsByFeatureIncrease } from "@/lib/autumn/paywall-content";
 import { getFeatureI18nKey, isFeatureConsumable, getFeaturePaywallKey } from "@/lib/features/feature-meta";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
@@ -33,7 +34,7 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
     entityId: params?.entityId,
   });
   const { products: pricingTableProducts } = usePricingTable();
-  const { checkout } = useCustomer();
+  const { checkout, customer } = useCustomer();
   const [upgrading, setUpgrading] = useState(false);
   const filterFeatureId = params?.featureId ?? "";
   const consumable = isFeatureConsumable(filterFeatureId);
@@ -137,6 +138,11 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
       await checkout({
         productId: nextProduct.id,
         dialog: CheckoutDialog,
+        ...(hasPaidPlanHistory(
+          customer?.products as CustomerProductLite[] | undefined,
+        )
+          ? { freeTrial: false }
+          : {}),
       });
       setOpen(false);
     } catch (e) {

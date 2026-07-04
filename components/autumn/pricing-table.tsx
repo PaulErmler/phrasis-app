@@ -2,13 +2,14 @@ import React from "react";
 
 import { useCustomer, usePricingTable, ProductDetails } from "autumn-js/react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
-import { FEATURE_META, getFeatureI18nKey, getFeatureDisplayCount, isFeatureHidden, isFeatureDisplayedAsUnlimited } from "@/lib/features/feature-meta";
+import { hasPaidPlanHistory, type CustomerProductLite } from "@/lib/autumn/trial-eligibility";
+import { FEATURE_META, getFeatureI18nKey, getFeatureDisplayCount, isFeatureHidden, isFeatureDisplayedAsUnlimited, isFeatureConsumable } from "@/lib/features/feature-meta";
 import type { Product, ProductItem } from "autumn-js";
 import { Loader2 } from "lucide-react";
 import {
@@ -19,23 +20,79 @@ import {
 } from "@/components/ui/carousel";
 import { CarouselDots } from "@/components/ui/carousel-dots";
 
+/** Sort key for plan cards: Free first, then paid plans by ascending price. */
+function productSortPrice(product: Product): number {
+  if (product.properties?.is_free) return -1;
+  const price = product.items[0]?.price;
+  return typeof price === "number" ? price : 0;
+}
+
+/**
+ * Rank of a paid plan within its own interval group (0 = cheapest tier).
+ * Used to compare tiers ACROSS billing intervals, where raw prices mislead:
+ * Basic Annual (€72) costs more than a month of Pro (€16), so Autumn labels
+ * it an "upgrade" — but tier-wise it is a downgrade.
+ */
+function paidTierRank(product: Product, products: Product[]): number {
+  return products
+    .filter(
+      (p) =>
+        !p.properties?.is_free &&
+        p.properties?.interval_group === product.properties?.interval_group,
+    )
+    .sort((a, b) => productSortPrice(a) - productSortPrice(b))
+    .findIndex((p) => p.id === product.id);
+}
+
 export default function PricingTable({
   productDetails,
   excludeFreePlan = false,
+  recommendedProductIds,
 }: {
   productDetails?: ProductDetails[];
   /** When true, drop products whose `properties.is_free` is set. Used by the
    *  onboarding flow where the user must commit to a paid tier to finish. */
   excludeFreePlan?: boolean;
+  /** Product ids to mark with the localized "Most Popular" badge (e.g. the
+   *  onboarding plan picker highlights Pro). Injected after the fetch —
+   *  `productDetails` cannot be used for this because passing it FILTERS
+   *  the table to only the listed products. */
+  recommendedProductIds?: string[];
 }) {
   const t = useTranslations("Pricing");
   const { customer, checkout, isLoading: isCustomerLoading } = useCustomer({ errorOnNotFound: false });
 
-  const [isAnnual, setIsAnnual] = useState(false);
+  // NOTE: passing `productDetails` to usePricingTable FILTERS the table to
+  // only the listed products — don't use it for display tweaks.
   const { products: rawProducts, isLoading: isProductsLoading, error, refetch } = usePricingTable({ productDetails });
-  const products = excludeFreePlan
-    ? rawProducts?.filter((p) => !p.properties?.is_free)
-    : rawProducts;
+
+  // Stable display order: Free first, then paid plans by ascending price.
+  // Autumn returns products in dashboard order, which is not guaranteed
+  // to be Free → Basic → Pro.
+  const products = rawProducts
+    ?.filter((p) => !excludeFreePlan || !p.properties?.is_free)
+    .map((p) =>
+      recommendedProductIds?.includes(p.id) && !p.display?.recommend_text
+        ? { ...p, display: { ...p.display, recommend_text: t("mostPopular") } }
+        : p,
+    )
+    .sort((a, b) => productSortPrice(a) - productSortPrice(b));
+
+  // The interval toggle defaults to the billing interval of the plan the
+  // user is currently on (monthly plan → Monthly view, annual plan →
+  // Annual view), and to Annual for users without a paid plan. The user's
+  // manual toggle always wins. Only renders when both month and year
+  // products exist (see `multiInterval` below).
+  const currentPaidProduct = (
+    customer?.products as CustomerProductLite[] | undefined
+  )?.find((cp) => !cp.is_default && !cp.is_add_on && cp.status !== "expired");
+  const currentIntervalGroup = rawProducts?.find(
+    (p) => p.id === currentPaidProduct?.id,
+  )?.properties?.interval_group;
+  const [isAnnualOverride, setIsAnnualOverride] = useState<boolean | null>(null);
+  const isAnnual =
+    isAnnualOverride ??
+    (currentIntervalGroup ? currentIntervalGroup === "year" : true);
 
   const hasRefetchedRef = useRef(false);
   const [isRefetching, setIsRefetching] = useState(false);
@@ -120,7 +177,7 @@ export default function PricingTable({
             (customer?.products ?? []) as CustomerProductLite[]
           }
           isAnnualToggle={isAnnual}
-          setIsAnnualToggle={setIsAnnual}
+          setIsAnnualToggle={setIsAnnualOverride}
           multiInterval={multiInterval}
         >
           {products.filter(intervalFilter).map((product, index) => (
@@ -138,6 +195,14 @@ export default function PricingTable({
                     await checkout({
                       productId: product.id,
                       dialog: CheckoutDialog,
+                      // Paying (or previously paying) customers never get
+                      // another trial, on any plan. Autumn only dedupes
+                      // trials per-plan, so this closes the cross-plan hole.
+                      ...(hasPaidPlanHistory(
+                        customer.products as CustomerProductLite[] | undefined,
+                      )
+                        ? { freeTrial: false }
+                        : {}),
                     });
                   } else if (product.display?.button_url) {
                     window.open(product.display?.button_url, "_blank");
@@ -151,19 +216,6 @@ export default function PricingTable({
     </div>
   );
 }
-
-// Minimal subset of Autumn's CustomerProduct that the badge-gating logic
-// needs. Avoids depending on the (non-exported) full CustomerProduct type;
-// the fields here match what `useCustomer().customer.products[number]` ships.
-// `is_default` marks Autumn's auto-assigned free plan that every customer
-// has — we need to ignore it when asking "has the user subscribed to
-// anything?".
-type CustomerProductLite = {
-  id: string;
-  status: string;
-  is_default: boolean;
-  is_add_on: boolean;
-};
 
 const PricingTableContext = createContext<{
   isAnnualToggle: boolean;
@@ -218,7 +270,6 @@ export const PricingTableContainer = ({
     return <></>;
   }
 
-  const hasRecommended = products?.some((p) => p.display?.recommend_text);
   return (
     <PricingTableContext.Provider
       value={{
@@ -229,24 +280,12 @@ export const PricingTableContainer = ({
         showFeatures,
       }}
     >
-      <div
-        className={cn(
-          "flex items-center flex-col",
-          hasRecommended && "!py-10",
-          className
-        )}
-      >
+      <div className={cn("flex items-center flex-col", className)}>
         {multiInterval && (
-          <div
-            className={cn(
-              products.some((p) => p.display?.recommend_text) && "mb-8"
-            )}
-          >
-            <AnnualSwitch
-              isAnnualToggle={isAnnualToggle}
-              setIsAnnualToggle={setIsAnnualToggle}
-            />
-          </div>
+          <AnnualSwitch
+            isAnnualToggle={isAnnualToggle}
+            setIsAnnualToggle={setIsAnnualToggle}
+          />
         )}
         <div className="w-full">
           <Carousel
@@ -284,21 +323,18 @@ export const PricingCard = ({
 }: PricingCardProps) => {
   const t = useTranslations("Pricing");
   const tFeatures = useTranslations("Features");
+  const locale = useLocale();
   const { products, showFeatures, customerProducts } =
     usePricingTableContext("PricingCard");
 
   const product = products.find((p) => p.id === productId);
 
-  // Trial badge gating: hide once the user has a real paid relationship,
-  // but keep showing it to trialing users so e.g. a Basic-trial customer
-  // can still start a Pro trial. `is_default: true` is Autumn's auto-
-  // assigned free plan, `is_add_on: true` is a bolt-on usage product —
-  // neither counts as a subscription. Trial entries (`status:
-  // "trialing"`) are skipped on purpose so trial-stacking stays open.
-  const userHasNonTrialSubscription = customerProducts.some(
-    (cp) =>
-      !cp.is_default && !cp.is_add_on && cp.status !== "trialing",
-  );
+  // Trial badge gating: hide as soon as the user has ANY paid plan
+  // attached, including one they are still trialing — someone already on
+  // a plan must never be offered a trial on another plan. The same
+  // predicate gates `freeTrial: false` on every checkout/attach call
+  // (see lib/autumn/trial-eligibility.ts).
+  const userHasPaidPlan = hasPaidPlanHistory(customerProducts);
 
   if (!product) {
     throw new Error(`Product with id ${productId} not found`);
@@ -309,14 +345,57 @@ export const PricingCard = ({
   const { buttonText } = getPricingTableContent(
     product,
     t,
-    userHasNonTrialSubscription,
+    userHasPaidPlan,
   );
+
+  // Autumn labels plan switches by comparing raw prices, which misfires
+  // across billing intervals (monthly Pro → Basic Annual reads as
+  // "upgrade" because €72 > €16). When the tiers actually differ, relabel
+  // the button from the tier comparison instead.
+  const currentPaidProduct = customerProducts.find(
+    (cp) => !cp.is_default && !cp.is_add_on && cp.status !== "expired",
+  );
+  const currentProduct = currentPaidProduct
+    ? products.find((p) => p.id === currentPaidProduct.id)
+    : undefined;
+  let finalButtonText = buttonText;
+  if (
+    currentProduct &&
+    currentProduct.id !== product.id &&
+    !product.properties?.is_free &&
+    (product.scenario === "upgrade" || product.scenario === "downgrade")
+  ) {
+    const cardTier = paidTierRank(product, products);
+    const currentTier = paidTierRank(currentProduct, products);
+    if (cardTier !== -1 && currentTier !== -1 && cardTier !== currentTier) {
+      finalButtonText = t(cardTier > currentTier ? "upgrade" : "downgrade");
+    }
+  }
 
   const isRecommended = productDisplay?.recommend_text ? true : false;
   const intervalGroup = product.properties?.interval_group;
+
+  // Annual plans are displayed as their effective per-month price, with
+  // the billed-annually total as a subline.
+  const annualBasePrice =
+    !product.properties?.is_free && intervalGroup === "year"
+      ? product.items[0]?.price
+      : undefined;
+  const formatEur = (amount: number) =>
+    new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  const annualMonthlyPrice =
+    typeof annualBasePrice === "number"
+      ? formatEur(annualBasePrice / 12)
+      : undefined;
+
   const periodLabel =
     !product.properties?.is_free && intervalGroup
-      ? intervalGroup === "year"
+      ? intervalGroup === "year" && !annualMonthlyPrice
         ? t("perYear")
         : t("perMonth")
       : undefined;
@@ -325,7 +404,9 @@ export const PricingCard = ({
     ? {
       primary_text: t("free"),
     }
-    : product.items[0].display;
+    : annualMonthlyPrice
+      ? { primary_text: annualMonthlyPrice }
+      : product.items[0].display;
 
   const featureItems = product.properties?.is_free
     ? product.items
@@ -334,21 +415,20 @@ export const PricingCard = ({
   return (
     <div
       className={cn(
-        " w-full h-full py-6 text-foreground border rounded-lg shadow-sm max-w-xl",
+        // `relative` anchors the absolutely-positioned RecommendedBadge to
+        // this card. The recommended emphasis must not shift layout
+        // (translate/height tricks get clipped inside the Carousel), so it
+        // is border/shadow only.
+        "relative w-full h-full py-6 text-foreground border rounded-lg shadow-sm max-w-xl overflow-hidden",
         isRecommended &&
-          "lg:-translate-y-6 lg:shadow-lg dark:shadow-zinc-800/80 lg:h-[calc(100%+48px)] bg-secondary/40",
+          "border-primary/50 shadow-lg dark:shadow-zinc-800/80 bg-secondary/40",
         className
       )}
     >
       {productDisplay?.recommend_text && (
         <RecommendedBadge recommended={productDisplay?.recommend_text} />
       )}
-      <div
-        className={cn(
-          "flex flex-col h-full flex-grow",
-          isRecommended && "lg:translate-y-6"
-        )}
-      >
+      <div className="flex flex-col h-full flex-grow">
         <div className="h-full">
           <div className="flex flex-col">
             <div className="pb-4">
@@ -364,7 +444,7 @@ export const PricingCard = ({
               )}
             </div>
             <div className="mb-2">
-              <h3 className="font-semibold h-16 flex px-6 items-center border-y mb-4 bg-secondary/40">
+              <h3 className="font-semibold h-16 flex flex-col justify-center px-6 border-y mb-4 bg-secondary/40">
                 <div className="line-clamp-2">
                   {mainPriceDisplay?.primary_text}{" "}
                   {(periodLabel ?? mainPriceDisplay?.secondary_text) && (
@@ -373,6 +453,11 @@ export const PricingCard = ({
                     </span>
                   )}
                 </div>
+                {typeof annualBasePrice === "number" && (
+                  <p className="text-xs font-normal text-muted-foreground">
+                    {t("billedAnnually", { price: formatEur(annualBasePrice) })}
+                  </p>
+                )}
               </h3>
             </div>
             {/* Trial badge only when:
@@ -384,22 +469,23 @@ export const PricingCard = ({
                    this card"; "active"/"scheduled"/"renew"/"cancel"
                    indicate the viewer is on or scheduled-onto this
                    card and should NOT see the trial promo), AND
-                 - the viewer has no committed paid plan (trials don't
-                   count, so a Basic-trial user can still see the Pro
-                   trial badge).
-                The `userHasNonTrialSubscription` guard is the safety
-                net: a paid Pro viewer looking at Basic could see
-                `scenario === "downgrade"` (also non-current), so the
-                third condition prevents the trial promo leaking on
-                paid users regardless of how Autumn labels the other
-                card. */}
+                 - the viewer has no paid plan at all (trialing counts
+                   as having one — no trial offers while already on a
+                   plan).
+                The `userHasPaidPlan` guard is the safety net: a Pro
+                viewer looking at Basic could see `scenario ===
+                "downgrade"` (also non-current), so the third condition
+                prevents the trial promo leaking regardless of how
+                Autumn labels the other card. */}
             {product.properties?.has_trial &&
               (product.scenario === "new" ||
                 product.scenario === "upgrade") &&
-              !userHasNonTrialSubscription && (
+              !userHasPaidPlan && (
               <div className="px-6 mb-4">
                 <div className="rounded-md bg-primary/10 text-primary border border-primary/20 px-3 py-2 text-sm font-semibold text-center">
-                  21-day free trial
+                  {t("freeTrialBadge", {
+                    days: product.free_trial?.length ?? 7,
+                  })}
                 </div>
               </div>
             )}
@@ -414,14 +500,12 @@ export const PricingCard = ({
             </div>
           )}
         </div>
-        <div
-          className={cn(" px-6 ", isRecommended && "lg:-translate-y-12")}
-        >
+        <div className="px-6">
           <PricingCardButton
             recommended={productDisplay?.recommend_text ? true : false}
             {...buttonProps}
           >
-            {productDisplay?.button_text || buttonText}
+            {productDisplay?.button_text || finalButtonText}
           </PricingCardButton>
         </div>
       </div>
@@ -453,6 +537,11 @@ export const PricingFeatureList = ({
         (isFeatureDisplayedAsUnlimited(item.feature_id) && Number(item.included_usage ?? 0) >= 19000);
       if (isUnlimited) {
         return tFeatures(`${i18nKey}.pricingLabelUnlimited`);
+      }
+      // Consumable items without a reset interval are one-off starter
+      // grants (e.g. "300 sentences to start", "200 credits to start").
+      if (isFeatureConsumable(item.feature_id) === true && item.interval == null) {
+        return tFeatures(`${i18nKey}.pricingLabelOneOff`, { count: Number(included) });
       }
       return tFeatures(`${i18nKey}.pricingLabel`, { count: Number(included) });
     }
@@ -565,6 +654,9 @@ export const AnnualSwitch = ({
         onCheckedChange={setIsAnnualToggle}
       />
       <span className="text-sm text-muted-foreground">{t("annual")}</span>
+      <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 text-xs font-semibold">
+        {t("annualSaveHint")}
+      </span>
     </div>
   );
 };

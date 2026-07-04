@@ -8,7 +8,7 @@ import { components } from '../../_generated/api';
 import { requireAuthUserId, getAuthUserId } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
 import { consumeQuota } from '../../usage/helpers';
-import { FEATURE_IDS } from '../featureIds';
+import { CHAT_CREDIT_USD_STEP, FEATURE_IDS } from '../featureIds';
 import { agent } from './agent';
 import type { MutationCtx } from '../../_generated/server';
 import type { Id } from '../../_generated/dataModel';
@@ -351,6 +351,17 @@ export const generateResponse = internalAction({
 
       const system = parts.join('\n\n');
 
+      // Dynamic chat billing: 1 credit was consumed up-front in
+      // `sendMessage`; here we accumulate the actual OpenRouter cost across
+      // all LLM steps (tool loops included) and charge the remainder — 1
+      // credit per additional started CHAT_CREDIT_USD_STEP. The handler
+      // runs (awaited) per step while the stream is consumed, and
+      // `agent.streamText` only resolves after the stream finishes, so the
+      // accumulator is complete after the await. Thread-title generation is
+      // deliberately not billed (flash-lite, ~4 words — negligible).
+      let totalCostUsd = 0;
+      let billedUserId: string | undefined;
+
       await agent.streamText(
         ctx,
         { threadId: args.threadId },
@@ -358,8 +369,28 @@ export const generateResponse = internalAction({
           promptMessageId: args.promptMessageId,
           system,
         },
-        { saveStreamDeltas: { chunking: "word", throttleMs: 500 } },
+        {
+          saveStreamDeltas: { chunking: "word", throttleMs: 500 },
+          usageHandler: async (_usageCtx, { userId, providerMetadata }) => {
+            const openrouterUsage = (
+              providerMetadata as
+                | { openrouter?: { usage?: { cost?: number } } }
+                | undefined
+            )?.openrouter?.usage;
+            totalCostUsd += openrouterUsage?.cost ?? 0;
+            billedUserId = userId ?? billedUserId;
+          },
+        },
       );
+
+      const totalCredits = Math.ceil(totalCostUsd / CHAT_CREDIT_USD_STEP);
+      const extraCredits = Math.max(0, totalCredits - 1);
+      if (extraCredits > 0 && billedUserId) {
+        await ctx.runMutation(internal.usage.helpers.chargeExtraChatCredits, {
+          userId: billedUserId,
+          extraCredits,
+        });
+      }
     } catch (error) {
       console.error('Failed to generate AI response:', error);
     }

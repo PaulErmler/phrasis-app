@@ -27,6 +27,7 @@ import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getCheckoutContent } from "@/lib/autumn/checkout-content";
+import { hasPaidPlanHistory, type CustomerProductLite } from "@/lib/autumn/trial-eligibility";
 
 export interface CheckoutDialogProps {
 	open: boolean;
@@ -52,7 +53,13 @@ const formatCurrency = ({
 
 export default function CheckoutDialog(params: CheckoutDialogProps) {
   const t = useTranslations("Checkout");
-  const { attach } = useCustomer();
+  const { attach, customer } = useCustomer();
+  // Safety net in case this dialog is opened from a checkout() call that
+  // didn't set `freeTrial: false` itself — previous purchasers never get
+  // another trial (Autumn only dedupes trials per-plan).
+  const skipTrial = hasPaidPlanHistory(
+    customer?.products as CustomerProductLite[] | undefined,
+  );
   const [checkoutResult, setCheckoutResult] = useState<
 		CheckoutResult | undefined
 	>(params?.checkoutResult);
@@ -116,6 +123,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
                 await attach({
                   productId: checkoutResult.product.id,
                   ...(params.checkoutParams || {}),
+                  ...(skipTrial ? { freeTrial: false } : {}),
                   options,
                 });
                 setOpen(false);
@@ -354,10 +362,13 @@ const PrepaidItem = ({
   const [quantityInput, setQuantityInput] = useState<string>(
     (quantity / billingUnits).toString(),
   );
-  const { checkout } = useCustomer();
+  const { checkout, customer } = useCustomer();
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const scenario = checkoutResult.product.scenario;
+  const skipTrial = hasPaidPlanHistory(
+    customer?.products as CustomerProductLite[] | undefined,
+  );
 
   const handleSave = async () => {
     setLoading(true);
@@ -380,6 +391,7 @@ const PrepaidItem = ({
         productId: checkoutResult.product.id,
         options: newOptions,
         dialog: CheckoutDialog,
+        ...(skipTrial ? { freeTrial: false } : {}),
       });
 
       if (error) {

@@ -2,6 +2,8 @@
 
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
+import { Mail } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ReviewModesDemo } from '@/components/landing/review-modes-demo';
 
 export function ReviewModesSection() {
@@ -39,6 +41,32 @@ export function ReviewModesSection() {
           className="min-w-0 max-w-4xl mx-auto"
         >
           <ReviewModesDemo />
+        </motion.div>
+
+        {/* "Missing a way to learn?" — invites users to request new modes. */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, ease: 'easeOut' as const }}
+          className="mt-12 md:mt-16 flex flex-col items-center gap-4 rounded-2xl border border-border/40 bg-card/50 px-6 py-8 text-center"
+        >
+          <div className="space-y-1.5">
+            <h3 className="text-lg md:text-xl font-semibold text-foreground">
+              {t('missingTitle')}
+            </h3>
+            <p className="text-sm md:text-base text-muted-foreground max-w-md">
+              {t('missingBody')}
+            </p>
+          </div>
+          <Button asChild variant="outline" size="sm" className="gap-2 rounded-lg">
+            <a
+              href={`mailto:support@flexling.com?subject=${encodeURIComponent(t('emailSubjects.requestMode'))}`}
+            >
+              <Mail className="w-4 h-4" />
+              {t('missingCta')}
+            </a>
+          </Button>
         </motion.div>
       </div>
     </section>

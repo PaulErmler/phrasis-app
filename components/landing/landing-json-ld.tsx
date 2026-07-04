@@ -45,7 +45,7 @@ export async function LandingJsonLd({ siteUrl }: LandingJsonLdProps) {
       applicationCategory: 'EducationalApplication',
       operatingSystem: 'Web, iOS, Android',
       description:
-        'Learn languages your way with audio flashcards, spaced repetition, and AI-powered chat. Bring your own content, practice pronunciation, and build fluency fast.',
+        'Learn languages by shadowing real sentences, writing them, and passive listening — with spaced repetition and a built-in AI tutor. Bring your own content and build fluency fast.',
       offers: [
         {
           '@type': 'Offer',
@@ -63,10 +63,24 @@ export async function LandingJsonLd({ siteUrl }: LandingJsonLdProps) {
         },
         {
           '@type': 'Offer',
+          price: '72',
+          priceCurrency: 'EUR',
+          name: 'Basic Annual',
+          description: 'Everything you need to learn one language, billed annually.',
+        },
+        {
+          '@type': 'Offer',
           price: '16',
           priceCurrency: 'EUR',
           name: 'Pro',
           description: 'For maximum flexibility and polyglots.',
+        },
+        {
+          '@type': 'Offer',
+          price: '144',
+          priceCurrency: 'EUR',
+          name: 'Pro Annual',
+          description: 'For maximum flexibility and polyglots, billed annually.',
         },
       ],
     },

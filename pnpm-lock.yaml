@@ -214,8 +214,8 @@ importers:
         specifier: ^1.0.1
         version: 1.0.1
       atmn:
-        specifier: ^1.1.10
-        version: 1.1.10(@types/node@20.19.43)(@types/react@19.2.14)(typescript@5.9.3)
+        specifier: ^1.1.12
+        version: 1.1.12(@types/node@20.19.43)(@types/react@19.2.14)(typescript@5.9.3)
       audiobuffer-to-wav:
         specifier: ^1.0.0
         version: 1.0.0
@@ -4395,8 +4395,8 @@ packages:
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
-  atmn@1.1.10:
-    resolution: {integrity: sha512-yKeh/uIujaZglWeX7In11E2IVydPtiYa8Fsci6K+X8o5BmijskSCllAySIEEfOxuHNrUXpTo6fsmCfk/5f8U9Q==}
+  atmn@1.1.12:
+    resolution: {integrity: sha512-SmzLK5Dttf++B0oW7NgNHeWdaZ9uP+i8Lr0d8hrhwC6mkorq7LR+KyfcnN0zUTy7OOOfpeNlpURpje62je8eYg==}
     engines: {node: '>=16'}
     hasBin: true
 
@@ -12593,7 +12593,7 @@ snapshots:
 
   asynckit@0.4.0: {}
 
-  atmn@1.1.10(@types/node@20.19.43)(@types/react@19.2.14)(typescript@5.9.3):
+  atmn@1.1.12(@types/node@20.19.43)(@types/react@19.2.14)(typescript@5.9.3):
     dependencies:
       '@inquirer/prompts': 7.10.1(@types/node@20.19.43)
       '@mishieck/ink-titled-box': 0.3.0(ink@6.8.0(@types/react@19.2.14)(react@19.2.4))(react@19.2.4)(typescript@5.9.3)

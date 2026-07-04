@@ -77,6 +77,20 @@ export const translation_flags = feature({
 	consumable: true,
 });
 
+// Credit system: chat messages, custom sentence creation, and translation
+// auto-fill draw from a shared credit pool instead of separate meters.
+// Always check/track the underlying feature ids — Autumn converts usage
+// into credit deductions via this schema. Keep the costs in sync with
+// CREDIT_COSTS in convex/features/featureIds.ts. Chat cost is dynamic: the
+// app tracks 1 chat_messages unit up-front plus 1 more per additional
+// started $0.005 of LLM cost (see convex/features/chat/messages.ts).
+export const credits = feature({
+	id: 'credits',
+	name: 'Credits',
+	type: 'credit_system',
+	creditSchema: [{ meteredFeatureId: 'custom_sentences', creditCost: 1 }, { meteredFeatureId: 'translation_auto_fill', creditCost: 1 }, { meteredFeatureId: 'chat_messages', creditCost: 1 }],
+});
+
 // Plans
 export const free = plan({
 	id: 'free',
@@ -98,26 +112,33 @@ export const free = plan({
 			},
 		}),
 		item({
-			featureId: chat_messages.id,
-			included: 5,
-			reset: {
-				interval: 'month',
-			},
-		}),
-		item({
 			featureId: courses.id,
 			included: 1,
 		}),
 		item({
-			featureId: custom_sentences.id,
-			included: 10,
+			featureId: credits.id,
+			included: 200,
+			reset: {
+				interval: 'one_off',
+			},
+		}),
+		item({
+			featureId: credits.id,
+			included: 30,
 			reset: {
 				interval: 'month',
 			},
 		}),
 		item({
 			featureId: sentences.id,
-			included: 150,
+			included: 300,
+			reset: {
+				interval: 'one_off',
+			},
+		}),
+		item({
+			featureId: sentences.id,
+			included: 50,
 			reset: {
 				interval: 'month',
 			},
@@ -125,13 +146,6 @@ export const free = plan({
 		item({
 			featureId: transcriptions.id,
 			included: 10,
-			reset: {
-				interval: 'month',
-			},
-		}),
-		item({
-			featureId: translation_auto_fill.id,
-			included: 50,
 			reset: {
 				interval: 'month',
 			},
@@ -169,19 +183,12 @@ export const basic = plan({
 			},
 		}),
 		item({
-			featureId: chat_messages.id,
-			included: 100,
-			reset: {
-				interval: 'month',
-			},
-		}),
-		item({
 			featureId: courses.id,
 			included: 1,
 		}),
 		item({
-			featureId: custom_sentences.id,
-			included: 300,
+			featureId: credits.id,
+			included: 400,
 			reset: {
 				interval: 'month',
 			},
@@ -201,13 +208,6 @@ export const basic = plan({
 			},
 		}),
 		item({
-			featureId: translation_auto_fill.id,
-			included: 350,
-			reset: {
-				interval: 'month',
-			},
-		}),
-		item({
 			featureId: translation_flags.id,
 			included: 500,
 			reset: {
@@ -215,7 +215,18 @@ export const basic = plan({
 			},
 		}),
 	],
-	freeTrial: { durationLength: 21, durationType: 'day', cardRequired: true },
+	freeTrial: { durationLength: 7, durationType: 'day', cardRequired: true },
+});
+
+// Annual variants: same entitlements as the base plan (items inherited,
+// monthly resets included), priced 25% below 12x monthly. The 7-day
+// card-required trial is inherited from the base plans.
+export const basic_annual = basic.variant({
+	id: 'basic_annual',
+	name: 'Basic Annual',
+	customize: {
+		price: { amount: 72, interval: 'year' },
+	},
 });
 
 export const pro = plan({
@@ -241,19 +252,12 @@ export const pro = plan({
 			},
 		}),
 		item({
-			featureId: chat_messages.id,
-			included: 400,
-			reset: {
-				interval: 'month',
-			},
-		}),
-		item({
 			featureId: courses.id,
 			included: 10,
 		}),
 		item({
-			featureId: custom_sentences.id,
-			included: 1000,
+			featureId: credits.id,
+			included: 1200,
 			reset: {
 				interval: 'month',
 			},
@@ -273,23 +277,21 @@ export const pro = plan({
 			},
 		}),
 		item({
-			featureId: translation_auto_fill.id,
-			included: 1100,
-			reset: {
-				interval: 'month',
-			},
-		}),
-		item({
 			featureId: translation_flags.id,
 			included: 800,
 			reset: {
 				interval: 'month',
 			},
 		}),
-		item({
-			featureId: multiple_languages.id,
-			included: 0,
-		}),
+		item({ featureId: multiple_languages.id }),
 	],
-	freeTrial: { durationLength: 21, durationType: 'day', cardRequired: true },
+	freeTrial: { durationLength: 7, durationType: 'day', cardRequired: true },
+});
+
+export const pro_annual = pro.variant({
+	id: 'pro_annual',
+	name: 'Pro Annual',
+	customize: {
+		price: { amount: 144, interval: 'year' },
+	},
 });
