@@ -77,7 +77,7 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
 
 describe("lib/languages — resolveTranslationStages", () => {
   it("returns the default_hybrid chain (primary + one fallback) for an unruled language", () => {
-    const stages = resolveTranslationStages("de", 50);
+    const stages = resolveTranslationStages("fr", 50);
     expect(stages.length).toBe(2);
     expect(stages[0].model).toBe("google/gemini-3-flash-preview");
     expect(stages[0].reasoning).toBe("minimal");
@@ -86,9 +86,21 @@ describe("lib/languages — resolveTranslationStages", () => {
   });
 
   it("is length-agnostic (length-hybrid branching was retired)", () => {
-    expect(resolveTranslationStages("de", 5)).toEqual(
-      resolveTranslationStages("de", 500),
+    expect(resolveTranslationStages("fr", 5)).toEqual(
+      resolveTranslationStages("fr", 500),
     );
+  });
+
+  it("de uses gemini_35_flash_nitro_low (primary + one fallback)", () => {
+    const stages = resolveTranslationStages("de", 50);
+    expect(stages.length).toBe(2);
+    const nitroLow = {
+      model: "google/gemini-3.5-flash:nitro",
+      reasoning: "low",
+      maxOutputTokens: 4_000,
+    };
+    expect(stages[0]).toEqual(nitroLow);
+    expect(stages[1]).toEqual(nitroLow);
   });
 
   it("ruleOverride forces the retranslation_high chain regardless of language", () => {

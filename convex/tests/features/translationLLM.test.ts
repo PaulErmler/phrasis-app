@@ -23,11 +23,11 @@ import { resolveTranslationStages } from "../../../lib/languages";
 describe("features/translationLLM", () => {
   describe("translation rules", () => {
     it("default_hybrid: Gemini 3 Flash (minimal) primary AND fallback", () => {
-      // 'de' has no `translationRule` set → defaults to `default_hybrid`.
+      // 'fr' has no `translationRule` set → defaults to `default_hybrid`.
       // Length-hybrid branching was retired — every source length runs
       // the same chain. Fallback is the same config as primary; it only
       // exists to retry once on transient HTTP errors before Google.
-      const stages = resolveTranslationStages("de", 12);
+      const stages = resolveTranslationStages("fr", 12);
       expect(stages.length).toBe(2);
       const flashMinimal = {
         model: "google/gemini-3-flash-preview",
@@ -41,9 +41,21 @@ describe("features/translationLLM", () => {
     it("default_hybrid is length-agnostic — same chain for short and long inputs", () => {
       // Lengths are arbitrary — length-hybrid branching was retired, so any
       // short vs long pair must resolve to the same chain.
-      const short = resolveTranslationStages("de", 5);
-      const long = resolveTranslationStages("de", 200);
+      const short = resolveTranslationStages("fr", 5);
+      const long = resolveTranslationStages("fr", 200);
       expect(short).toEqual(long);
+    });
+
+    it("de uses gemini_35_flash_nitro_low (low thinking, primary + fallback)", () => {
+      const stages = resolveTranslationStages("de", 12);
+      expect(stages.length).toBe(2);
+      const nitroLow = {
+        model: "google/gemini-3.5-flash:nitro",
+        reasoning: "low",
+        maxOutputTokens: 4_000,
+      };
+      expect(stages[0]).toEqual(nitroLow);
+      expect(stages[1]).toEqual(nitroLow);
     });
 
     it("retranslation_high: forced via ruleOverride uses Gemini 3.1 Pro (medium) as a second opinion", () => {

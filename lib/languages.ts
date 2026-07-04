@@ -322,6 +322,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_low',
+    translationVersion: 2,
   },
   {
     code: 'es_latam',
@@ -346,6 +348,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_low',
+    translationVersion: 2,
   },
   {
     code: 'es_mixed',
@@ -405,6 +409,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_low',
+    translationVersion: 2,
   },
   {
     code: 'it',
@@ -437,6 +443,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_low',
+    translationVersion: 2,
   },
   {
     code: 'pt_pt',
@@ -459,6 +467,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // unchanged, so the provider-mismatch regen path wouldn't fire).
     ttsPromptName: 'European Portuguese',
     ttsVersion: 2,
+    translationRule: 'gemini_35_flash_nitro_low',
+    translationVersion: 2,
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -571,6 +581,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_low',
+    translationVersion: 2,
   },
   // Norwegian (Bokmål) — disabled for now. The provider-locale fields the derived
   // maps need (regionLabel, azureSttLocale `nb-NO`, googleTranslateCode `no`) are
@@ -1352,6 +1364,14 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
   reasoning: 'medium',
   maxOutputTokens: 8_000,
 };
+// Gemini 3.5 Flash via OpenRouter Nitro routing with `low` reasoning —
+// default for de / pt / pt_pt / sv. Nitro prioritizes throughput/latency;
+// low thinking gives a modest reasoning pass without Pro-tier cost.
+const GEMINI_35_FLASH_NITRO_LOW: ModelStage = {
+  model: 'google/gemini-3.5-flash:nitro',
+  reasoning: 'low',
+  maxOutputTokens: 4_000,
+};
 
 /**
  * Maximum number of auto-retranslations triggered by user flags on a single
@@ -1389,6 +1409,22 @@ export const TRANSLATION_RULES = {
         // Google safety net kicks in. Truncation is rare at this thinking
         // level / token cap, so retrying the same config is cheap insurance.
         fallbacks: [GEMINI_3_FLASH_MINIMAL],
+      },
+    ],
+  },
+  /**
+   * Per-language default for German, Castilian Spanish, Latin American
+   * Spanish, both Portuguese variants, and Swedish. Routes through Gemini 3.5 Flash (Nitro) with
+   * `low` reasoning; one same-config retry before the Google safety net.
+   */
+  gemini_35_flash_nitro_low: {
+    id: 'gemini_35_flash_nitro_low',
+    label: 'Gemini 3.5 Flash Nitro (low) → Gemini 3.5 Flash Nitro (low, retry) → Google',
+    branches: [
+      {
+        maxChars: Infinity,
+        primary: GEMINI_35_FLASH_NITRO_LOW,
+        fallbacks: [GEMINI_35_FLASH_NITRO_LOW],
       },
     ],
   },
