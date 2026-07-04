@@ -50,6 +50,7 @@ Test files are excluded from `tsconfig.json` (they are type-checked by vite duri
 - **Playwright** — `playwright.config.ts` has a `setup` project that runs `e2e/auth.setup.ts` to produce `e2e/.auth/user.json`; the main `chromium` project loads that storageState. The `webServer` entry assumes a reachable dev server and `reuseExistingServer: true` outside CI.
 - **Fresh user per run** — `e2e/auth.setup.ts` signs up a new `e2e-<timestamp>-<random>@test.de` account and walks it through all 5 onboarding steps on every full run. No stale cookies; onboarding is exercised every time.
 - **Live tagging** — any test that hits real OpenRouter / Google TTS / OpenAI is tagged `@live`. Run `--grep @live` for live only, `--grep-invert @live` for the fast tier. Live `describe`s pin `retries: 0` so a flake doesn't silently spend a second chat message or TTS call.
+- **Billing spec** — `e2e/billing.spec.ts` (@live, chromium-serial) walks the trial lifecycle: Stripe test-mode checkout starts a card-required trial, then upgrade/downgrade during the trial assert the trial is carried over (same end date) rather than restarted, skipped, or re-offered. It signs up its own fresh `e2e-billing-*` user in `beforeAll` (billing state lives in Autumn/Stripe and survives suite runs, so a shared fixture user would break the never-trialed premise on any rerun); this also means it can be re-run standalone (`--no-deps`) without the setup project. It leaves the account and its Autumn/Stripe test customer behind on purpose — the app has no user-deletion logic yet (same accumulation as the auth fixture users).
 - **`data-testid` convention** — Playwright specs locate UI elements via `page.getByTestId("…")`. Production components expose stable testids rather than matching on visible text or CSS classes. See the "Test selectors" section below.
 
 ## Test selectors (`data-testid`)
@@ -76,6 +77,7 @@ We tag production components with `data-testid` attributes so Playwright selecto
 | Learning settings | `settings-mode-audio`, `settings-mode-full` (switches use role=switch) |
 | Library | `library-search`, `library-filter-{mastered,hidden,favorites}`, `library-card` |
 | Courses | `course-menu-trigger`, `course-menu-create`, `course-menu-entry`, `course-settings`, `course-archive`, `course-confirm-archive`, `course-dialog-{next,back,create}` |
+| Billing | `pricing-card-cta-${productId}` (e.g. `pricing-card-cta-basic_annual`), `pricing-trial-badge`, `checkout-dialog-{title,message,confirm}`, `checkout-due-today` |
 
 **Not tagged (and why):**
 

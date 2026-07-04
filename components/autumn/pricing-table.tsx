@@ -8,7 +8,11 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
-import { hasPaidPlanHistory, type CustomerProductLite } from "@/lib/autumn/trial-eligibility";
+import {
+  checkoutTrialParams,
+  getTrialState,
+  type CustomerProductLite,
+} from "@/lib/autumn/trial-eligibility";
 import { FEATURE_META, getFeatureI18nKey, getFeatureDisplayCount, isFeatureHidden, isFeatureDisplayedAsUnlimited, isFeatureConsumable } from "@/lib/features/feature-meta";
 import type { Product, ProductItem } from "autumn-js";
 import { Loader2 } from "lucide-react";
@@ -60,7 +64,11 @@ export default function PricingTable({
   recommendedProductIds?: string[];
 }) {
   const t = useTranslations("Pricing");
-  const { customer, checkout, isLoading: isCustomerLoading } = useCustomer({ errorOnNotFound: false });
+  const { customer, checkout, isLoading: isCustomerLoading } = useCustomer({
+    errorOnNotFound: false,
+    expand: ["trials_used"],
+  });
+  const trialState = getTrialState(customer);
 
   // NOTE: passing `productDetails` to usePricingTable FILTERS the table to
   // only the listed products — don't use it for display tweaks.
@@ -176,6 +184,7 @@ export default function PricingTable({
           customerProducts={
             (customer?.products ?? []) as CustomerProductLite[]
           }
+          trialEligible={trialState.trialEligible}
           isAnnualToggle={isAnnual}
           setIsAnnualToggle={setIsAnnualOverride}
           multiInterval={multiInterval}
@@ -195,14 +204,13 @@ export default function PricingTable({
                     await checkout({
                       productId: product.id,
                       dialog: CheckoutDialog,
-                      // Paying (or previously paying) customers never get
-                      // another trial, on any plan. Autumn only dedupes
-                      // trials per-plan, so this closes the cross-plan hole.
-                      ...(hasPaidPlanHistory(
-                        customer.products as CustomerProductLite[] | undefined,
-                      )
-                        ? { freeTrial: false }
-                        : {}),
+                      // Autumn only dedupes trials per-plan; this passes
+                      // `freeTrial: false` for everyone who ever trialed
+                      // or pays (closing the cross-plan hole), and nothing
+                      // for trial-eligible or currently-trialing users —
+                      // the dialog routes trialing switches through
+                      // convex/billing.ts to keep the running trial.
+                      ...checkoutTrialParams(trialState),
                     });
                   } else if (product.display?.button_url) {
                     window.open(product.display?.button_url, "_blank");
@@ -222,12 +230,14 @@ const PricingTableContext = createContext<{
   setIsAnnualToggle: (isAnnual: boolean) => void;
   products: Product[];
   customerProducts: CustomerProductLite[];
+  trialEligible: boolean;
   showFeatures: boolean;
     }>({
       isAnnualToggle: false,
       setIsAnnualToggle: () => {},
       products: [],
       customerProducts: [],
+      trialEligible: false,
       showFeatures: true,
     });
 
@@ -245,6 +255,7 @@ export const PricingTableContainer = ({
   children,
   products,
   customerProducts = [],
+  trialEligible = false,
   showFeatures = true,
   className,
   isAnnualToggle,
@@ -254,6 +265,7 @@ export const PricingTableContainer = ({
   children?: React.ReactNode;
   products?: Product[];
   customerProducts?: CustomerProductLite[];
+  trialEligible?: boolean;
   showFeatures?: boolean;
   className?: string;
   isAnnualToggle: boolean;
@@ -277,6 +289,7 @@ export const PricingTableContainer = ({
         setIsAnnualToggle,
         products,
         customerProducts,
+        trialEligible,
         showFeatures,
       }}
     >
@@ -324,17 +337,10 @@ export const PricingCard = ({
   const t = useTranslations("Pricing");
   const tFeatures = useTranslations("Features");
   const locale = useLocale();
-  const { products, showFeatures, customerProducts } =
+  const { products, showFeatures, customerProducts, trialEligible } =
     usePricingTableContext("PricingCard");
 
   const product = products.find((p) => p.id === productId);
-
-  // Trial badge gating: hide as soon as the user has ANY paid plan
-  // attached, including one they are still trialing — someone already on
-  // a plan must never be offered a trial on another plan. The same
-  // predicate gates `freeTrial: false` on every checkout/attach call
-  // (see lib/autumn/trial-eligibility.ts).
-  const userHasPaidPlan = hasPaidPlanHistory(customerProducts);
 
   if (!product) {
     throw new Error(`Product with id ${productId} not found`);
@@ -345,7 +351,7 @@ export const PricingCard = ({
   const { buttonText } = getPricingTableContent(
     product,
     t,
-    userHasPaidPlan,
+    trialEligible,
   );
 
   // Autumn labels plan switches by comparing raw prices, which misfires
@@ -469,20 +475,19 @@ export const PricingCard = ({
                    this card"; "active"/"scheduled"/"renew"/"cancel"
                    indicate the viewer is on or scheduled-onto this
                    card and should NOT see the trial promo), AND
-                 - the viewer has no paid plan at all (trialing counts
-                   as having one — no trial offers while already on a
-                   plan).
-                The `userHasPaidPlan` guard is the safety net: a Pro
-                viewer looking at Basic could see `scenario ===
-                "downgrade"` (also non-current), so the third condition
-                prevents the trial promo leaking regardless of how
-                Autumn labels the other card. */}
+                 - the viewer is trial-eligible: never trialed any plan
+                   (per Autumn's trials_used record) and not on a paid
+                   plan — no trial promos while trialing, paying, or
+                   after a past trial. */}
             {product.properties?.has_trial &&
               (product.scenario === "new" ||
                 product.scenario === "upgrade") &&
-              !userHasPaidPlan && (
+              trialEligible && (
               <div className="px-6 mb-4">
-                <div className="rounded-md bg-primary/10 text-primary border border-primary/20 px-3 py-2 text-sm font-semibold text-center">
+                <div
+                  data-testid="pricing-trial-badge"
+                  className="rounded-md bg-primary/10 text-primary border border-primary/20 px-3 py-2 text-sm font-semibold text-center"
+                >
                   {t("freeTrialBadge", {
                     days: product.free_trial?.length ?? 7,
                   })}
@@ -502,6 +507,7 @@ export const PricingCard = ({
         </div>
         <div className="px-6">
           <PricingCardButton
+            data-testid={`pricing-card-cta-${productId}`}
             recommended={productDisplay?.recommend_text ? true : false}
             {...buttonProps}
           >

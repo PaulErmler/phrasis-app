@@ -5,7 +5,7 @@ export type PricingTranslateFn = (key: string) => string;
 export const getPricingTableContent = (
   product: Product,
   t: PricingTranslateFn,
-  userHasPaidPlan: boolean,
+  trialEligible: boolean,
 ) => {
   const { scenario, properties } = product;
   const { is_one_off, updateable, has_trial } = properties;
@@ -14,13 +14,13 @@ export const getPricingTableContent = (
   // show "Start free trial" only when the viewer can actually start one
   // — the product offers a trial, this card isn't their current plan
   // (Autumn returns "new" for users with no plan record, "upgrade" for
-  // users on the auto-default free tier), and the viewer has no paid
-  // plan at all (trialing counts as having one — no trial offers while
-  // already on a plan).
+  // users on the auto-default free tier), and the viewer is
+  // trial-eligible (never trialed any plan and not on a paid plan; see
+  // lib/autumn/trial-eligibility.ts).
   const canStartTrial =
     has_trial &&
     (scenario === "new" || scenario === "upgrade") &&
-    !userHasPaidPlan;
+    trialEligible;
 
   if (canStartTrial) {
     return {

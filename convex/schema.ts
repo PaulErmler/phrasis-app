@@ -188,6 +188,9 @@ export default defineSchema({
     .index('by_collection_and_rank', ['collectionId', 'collectionRank'])
     .index('by_collection_and_userCreated_and_rank', ['collectionId', 'userCreated', 'collectionRank'])
     .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank'])
+    // Admin dashboard: enumerate a user's custom texts (userId is only set
+    // on user-created rows, so premade texts never appear under a real key)
+    .index('by_userId', ['userId'])
     // Sliding-window arc-context lookup: equality on (collectionId, arcId)
     // followed by `.lt('collectionRank', X).order('desc').take(5)` for the
     // preceding window and `.gt('collectionRank', X).order('asc').take(3)` for
@@ -596,7 +599,10 @@ export default defineSchema({
     chatCardsApproved: v.optional(v.number()),
     cardsEdited: v.optional(v.number()),
     cardsAddedManually: v.optional(v.number()),
-  }).index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date']),
+  })
+    .index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date'])
+    // Admin dashboard: per-day DAU scan across all users
+    .index('by_date', ['date']),
 
   // Collection progress table - per (user, course, collection) monotonic
   // counters used by the home view. Counters are strictly monotonic: incremented
@@ -910,6 +916,39 @@ export default defineSchema({
       }),
     ),
     lastSyncedAt: v.number(),
+    // Current Autumn product (plan), captured during sync. Optional — rows
+    // synced before this field existed (or users with no product) have none.
+    planId: v.optional(v.string()),
+    planName: v.optional(v.string()),
+    planStatus: v.optional(v.string()),
   }).index('by_userId', ['userId']),
+
+  // Admin allowlist for the /app/admin dashboard. The gate (requireAdmin in
+  // convex/admin/lib.ts) requires BOTH fields to match the caller's Better
+  // Auth user. Manage rows via `npx convex run admin/manage:setAdmin` (or the
+  // dashboard function runner), which resolves the userId from the email.
+  admins: defineTable({
+    email: v.string(), // Better Auth user email, lowercase
+    userId: v.string(), // Better Auth user._id === identity.subject
+  })
+    .index('by_email', ['email'])
+    .index('by_userId', ['userId']),
+
+  // App-owned mirror of Better Auth users (email/name live in the betterAuth
+  // component tables, which can't be indexed/searched from app queries).
+  // Kept in sync by user triggers in convex/auth.ts; historical rows come
+  // from migrations/backfillUserProfiles. Powers the admin user list/search.
+  userProfiles: defineTable({
+    userId: v.string(), // Better Auth user._id === identity.subject
+    email: v.string(),
+    name: v.string(),
+    image: v.optional(v.string()),
+    createdAt: v.number(), // Better Auth user.createdAt (signup time; _creationTime is the mirror-row time)
+    searchText: v.string(), // `${email} ${name}`.toLowerCase()
+  })
+    .index('by_userId', ['userId'])
+    .index('by_email', ['email'])
+    .index('by_createdAt', ['createdAt'])
+    .searchIndex('search_users', { searchField: 'searchText' }),
 
 });

@@ -74,6 +74,10 @@ export default defineConfig({
       // Specs that mutate shared user state — chat quota, threads, card
       // ratings, review mode, locale, etc. These must not race each other,
       // and must run after the read-only phase has completed.
+      // billing.spec.ts (@live) signs up its own fresh e2e-billing-* user
+      // (billing state lives in Autumn/Stripe and survives suite runs, so
+      // it cannot reuse a shared fixture) and walks the trial → upgrade →
+      // downgrade journey against Stripe test mode.
       name: "chromium-serial",
       testMatch: [
         /chat-live\.spec\.ts/,
@@ -82,6 +86,7 @@ export default defineConfig({
         /settings\.spec\.ts/,
         /add-cards-import-live\.spec\.ts/,
         /content-filter-live\.spec\.ts/,
+        /billing\.spec\.ts/,
       ],
       dependencies: ["chromium-parallel"],
       fullyParallel: false,

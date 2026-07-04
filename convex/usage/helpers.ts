@@ -293,6 +293,11 @@ export const syncAllFeatures = internalMutation({
   args: {
     userId: v.string(),
     features: v.record(v.string(), featureStateValidator),
+    // Current Autumn plan, when derivable from the customer response.
+    // Omitted → existing plan fields on the doc are left untouched.
+    planId: v.optional(v.string()),
+    planName: v.optional(v.string()),
+    planStatus: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -301,16 +306,27 @@ export const syncAllFeatures = internalMutation({
 
     const newIncluded = args.features[FEATURE_IDS.COURSES]?.included;
 
+    const planFields =
+      args.planId !== undefined
+        ? {
+          planId: args.planId,
+          planName: args.planName,
+          planStatus: args.planStatus,
+        }
+        : {};
+
     if (doc) {
       await ctx.db.patch(doc._id, {
         features: args.features,
         lastSyncedAt: now,
+        ...planFields,
       });
     } else {
       await ctx.db.insert('usageQuotas', {
         userId: args.userId,
         features: args.features,
         lastSyncedAt: now,
+        ...planFields,
       });
     }
 

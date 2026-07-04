@@ -31,11 +31,57 @@ type AutumnFlagEntry = {
   feature_id: string;
 };
 
+/** Entry in `subscriptions` / `purchases` on the v1 `GET /customers/:id` payload. */
+type AutumnPlanEntry = {
+  plan_id: string;
+  status: string; // 'active' | 'trialing' | ...
+  add_on: boolean;
+  past_due: boolean;
+  started_at: number;
+};
+
 type AutumnCustomerResponse = {
   id: string;
   balances?: Record<string, AutumnBalanceEntry>;
   flags?: Record<string, AutumnFlagEntry>;
+  subscriptions?: AutumnPlanEntry[];
+  purchases?: AutumnPlanEntry[];
 };
+
+/** "pro_yearly" → "Pro Yearly" — the v1 payload carries no display name. */
+function humanizePlanId(planId: string): string {
+  return planId
+    .split(/[_-]/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+/**
+ * Derive the customer's current plan from subscriptions (+ one-time
+ * purchases as fallback). Add-ons are excluded; an active plan wins over
+ * a trialing one; past_due is surfaced via planStatus. Returns undefined
+ * when nothing is attached — plan fields are then left untouched on the
+ * local quota doc.
+ */
+export function derivePlan(
+  data: AutumnCustomerResponse,
+): { planId: string; planName: string; planStatus: string } | undefined {
+  const candidates = [
+    ...(data.subscriptions ?? []),
+    ...(data.purchases ?? []),
+  ].filter((p) => !p.add_on);
+  const plan =
+    candidates.find((p) => p.status === 'active' && !p.past_due) ??
+    candidates.find((p) => p.status === 'active') ??
+    candidates.find((p) => p.status === 'trialing') ??
+    candidates[0];
+  if (!plan) return undefined;
+  return {
+    planId: plan.plan_id,
+    planName: humanizePlanId(plan.plan_id),
+    planStatus: plan.past_due ? 'past_due' : plan.status,
+  };
+}
 
 /**
  * Track usage with Autumn and sync the tracked feature back to Convex.
@@ -76,6 +122,7 @@ export const trackUsage = internalAction({
     await ctx.runMutation(internal.usage.helpers.syncAllFeatures, {
       userId: args.userId,
       features: toFeaturesRecord(customerData),
+      ...(derivePlan(customerData) ?? {}),
     });
 
     return null;
@@ -187,5 +234,6 @@ export async function syncQuotasForUser(
   await ctx.runMutation(internal.usage.helpers.syncAllFeatures, {
     userId,
     features,
+    ...(derivePlan(customerData) ?? {}),
   });
 }

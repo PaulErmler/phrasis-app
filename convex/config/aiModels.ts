@@ -21,21 +21,15 @@ export const OPENROUTER_MODELS = {
   ttsValidation: 'google/gemini-3.1-flash-lite',
 } as const;
 
-/** Provider routing for the chat agent via OpenRouter.
- *  `order` soft-forces io-net fp8 first, then together. `allow_fallbacks`
- *  is false because io-net/together don't expose tool-calling endpoints
- *  for GLM, and the chat agent needs the createCard tool — letting
- *  OpenRouter silently fall back to a non-tool provider would break
- *  createCard. preferred_* deprioritize endpoints slower than 2s p50 /
- *  under 50 tok/s p50.
+/** Extra OpenRouter body for the chat agent.
  *  `usage.include` makes OpenRouter report the actual USD cost of each
  *  request (providerMetadata.openrouter.usage.cost), which drives the
- *  per-message credit charge in chat. */
+ *  per-message credit charge in chat. preferred_* deprioritize endpoints
+ *  slower than 2s p50 / under 50 tok/s p50. */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
   usage: { include: true },
   provider: {
-    order: ['io-net/fp8', 'io-net', 'together'],
-    allow_fallbacks: false,
+    allow_fallbacks: true,
     preferred_max_latency: 2,
     preferred_min_throughput: 50,
   },

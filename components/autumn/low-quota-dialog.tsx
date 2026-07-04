@@ -12,7 +12,7 @@ import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCustomer, usePricingTable } from "autumn-js/react";
 import { findUpgradeProductFromPricingTable } from "@/lib/autumn/find-upgrade-product";
-import { hasPaidPlanHistory, type CustomerProductLite } from "@/lib/autumn/trial-eligibility";
+import { checkoutTrialParams, getTrialState } from "@/lib/autumn/trial-eligibility";
 import { getFeatureI18nKey, isFeatureConsumable } from "@/lib/features/feature-meta";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
@@ -32,7 +32,8 @@ export default function LowQuotaDialog({
 }: LowQuotaDialogProps) {
   const t = useTranslations("LowQuota");
   const tFeatures = useTranslations("Features");
-  const { checkout, customer } = useCustomer();
+  const { checkout, customer } = useCustomer({ expand: ["trials_used"] });
+  const trialState = getTrialState(customer);
   const { products } = usePricingTable();
   const [upgrading, setUpgrading] = useState(false);
 
@@ -56,11 +57,7 @@ export default function LowQuotaDialog({
       await checkout({
         productId: upgradeProduct.id,
         dialog: CheckoutDialog,
-        ...(hasPaidPlanHistory(
-          customer?.products as CustomerProductLite[] | undefined,
-        )
-          ? { freeTrial: false }
-          : {}),
+        ...checkoutTrialParams(trialState),
       });
       setOpen(false);
     } catch (e) {

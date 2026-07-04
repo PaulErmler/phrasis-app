@@ -42,12 +42,16 @@ export type PaywallTranslateFn = (
 export function getPaywallTitle(
   preview: CheckFeaturePreview,
   t: PaywallTranslateFn,
+  trialEligible: boolean,
 ): string {
   const { products } = preview;
   if (products.length === 0) return t("featureUnavailable");
 
+  // "Start trial" only for viewers who can actually get one — the
+  // product offering a trial is not enough (Autumn only dedupes trials
+  // per-plan; see lib/autumn/trial-eligibility.ts).
   const nextProduct = products[0];
-  return nextProduct.free_trial
+  return nextProduct.free_trial && trialEligible
     ? t("startTrial", { productName: nextProduct.name })
     : nextProduct.is_add_on
       ? t("purchaseAddOn", { productName: nextProduct.name })
