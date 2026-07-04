@@ -1205,13 +1205,18 @@ export function LearningModeSettings({
           </div>
 
         </div>
-      </SheetContent>
 
-      <CourseLanguageSettings
-        course={courseSettingsOpen ? courseData : null}
-        onClose={() => setCourseSettingsOpen(false)}
-        showArchiveButton={false}
-      />
+        {/* Rendered INSIDE SheetContent so its portal events bubble through
+            this Sheet's React tree — otherwise Radix sees focus moving into
+            the nested course-settings Sheet as a focus-outside and dismisses
+            this Sheet behind it (the whole settings view then appears to
+            close when the nested sheet is closed). */}
+        <CourseLanguageSettings
+          course={courseSettingsOpen ? courseData : null}
+          onClose={() => setCourseSettingsOpen(false)}
+          showArchiveButton={false}
+        />
+      </SheetContent>
     </Sheet>
   );
 }

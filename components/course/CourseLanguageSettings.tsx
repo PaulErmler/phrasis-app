@@ -318,42 +318,46 @@ export function CourseLanguageSettings({
             )}
           </>
         )}
+
+        {/* Nested overlays live INSIDE SheetContent so their portal events
+            bubble through this Sheet's React tree — otherwise opening them
+            registers as a focus/interaction outside this Sheet and Radix
+            dismisses it underneath them. */}
+        {paywallOpen && (
+          <PaywallDialog
+            open={paywallOpen}
+            setOpen={setPaywallOpen}
+            featureId={FEATURE_IDS.MULTIPLE_LANGUAGES}
+          />
+        )}
+
+        <AlertDialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('archiveConfirmTitle')}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t('archiveConfirmDescription')}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={archiving}>
+                {t('archiveCancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleArchive}
+                disabled={archiving}
+                className={buttonVariants({ variant: 'destructive' })}
+                data-testid="course-confirm-archive"
+              >
+                {archiving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : null}
+                {t('archiveConfirmButton')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
-
-      {paywallOpen && (
-        <PaywallDialog
-          open={paywallOpen}
-          setOpen={setPaywallOpen}
-          featureId={FEATURE_IDS.MULTIPLE_LANGUAGES}
-        />
-      )}
-
-      <AlertDialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('archiveConfirmTitle')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('archiveConfirmDescription')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={archiving}>
-              {t('archiveCancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleArchive}
-              disabled={archiving}
-              className={buttonVariants({ variant: 'destructive' })}
-              data-testid="course-confirm-archive"
-            >
-              {archiving ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : null}
-              {t('archiveConfirmButton')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </Sheet>
   );
 }
