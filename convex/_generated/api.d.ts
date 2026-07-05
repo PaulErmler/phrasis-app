@@ -77,6 +77,7 @@ import type * as lib_collections from "../lib/collections.js";
 import type * as lib_dateUtils from "../lib/dateUtils.js";
 import type * as lib_fsrsStates from "../lib/fsrsStates.js";
 import type * as lib_localRomanization from "../lib/localRomanization.js";
+import type * as lib_queuePump from "../lib/queuePump.js";
 import type * as lib_stt_azure from "../lib/stt/azure.js";
 import type * as lib_stt_index from "../lib/stt/index.js";
 import type * as lib_stt_languageCodes from "../lib/stt/languageCodes.js";
@@ -184,6 +185,7 @@ declare const fullApi: ApiFromModules<{
   "lib/dateUtils": typeof lib_dateUtils;
   "lib/fsrsStates": typeof lib_fsrsStates;
   "lib/localRomanization": typeof lib_localRomanization;
+  "lib/queuePump": typeof lib_queuePump;
   "lib/stt/azure": typeof lib_stt_azure;
   "lib/stt/index": typeof lib_stt_index;
   "lib/stt/languageCodes": typeof lib_stt_languageCodes;

@@ -22,6 +22,7 @@ import {
 } from '../../lib/languages';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
+import { clearPumpScheduled, schedulePumpIfNeeded } from '../lib/queuePump';
 import { asVoiceGender } from '../types';
 
 /**
@@ -47,6 +48,8 @@ import { asVoiceGender } from '../types';
  */
 
 const MAX_LLM_CONCURRENCY = 64;
+// queuePumpStates key for this queue's pump-dedup flag (see convex/lib/queuePump.ts).
+const LLM_PUMP_KEY = 'llm';
 const SLOT_STALE_MS = 60 * 1000; // 1 minute — longer than the longest API call
 
 /**
@@ -195,6 +198,11 @@ export const pumpLlmQueue = internalMutation({
   args: {},
   returns: v.null(),
   handler: async (ctx) => {
+    // Mark the pending pump as started BEFORE reading the queue: any enqueue
+    // serialized after this clear sees the flag down and schedules a fresh
+    // pump, so nothing enqueued mid-run is ever lost.
+    await clearPumpScheduled(ctx, LLM_PUMP_KEY);
+
     // Priority order drained per pump tick: critical (2, onboarding seed /
     // placement test) first, then high (1, active collection), then normal
     // (0), then any pre-priority rows (undefined) left over from a deploy.
@@ -219,7 +227,7 @@ export const pumpLlmQueue = internalMutation({
       const next = await dequeueNext();
       if (!next) break;
 
-      await ctx.db.insert('llmTranslationSlots', {
+      const slotId = await ctx.db.insert('llmTranslationSlots', {
         claimedAt: Date.now(),
       });
       await ctx.db.delete(next._id);
@@ -233,7 +241,9 @@ export const pumpLlmQueue = internalMutation({
         // (priority-1) retranslation to the back of the queue. Stored priority is
         // always 0|1|2 (enqueueLlmTranslation normalizes) or undefined for legacy
         // pre-priority rows, so the assertion is safe.
-        { ...next.args, priority: next.priority as 0 | 1 | 2 | undefined },
+        // `slotId` identifies the slot this dispatch holds so the finalizer
+        // releases exactly this row (mirrors the TTS pump).
+        { ...next.args, priority: next.priority as 0 | 1 | 2 | undefined, slotId },
       );
       used++;
     }
@@ -263,8 +273,11 @@ export const enqueueLlmTranslation = internalMutation({
       queuedAt: Date.now(),
       priority: args.priority ?? 0,
     });
-    await ctx.scheduler.runAfter(
-      0,
+    // Deduped: no-op when a pump is already pending, so a batch of enqueues
+    // schedules exactly one pump instead of one per row.
+    await schedulePumpIfNeeded(
+      ctx,
+      LLM_PUMP_KEY,
       internal.features.llmTranslationQueue.pumpLlmQueue,
       {},
     );
@@ -292,14 +305,30 @@ export const finalizeLlmTranslationJob = internalMutation({
     keepClaim: v.optional(v.boolean()),
     // Ownership token this attempt was dispatched under (see llmJobArgsValidator).
     claimId: v.optional(v.id('llmTranslationClaims')),
+    // Slot this attempt held (assigned by pumpLlmQueue). Optional only for
+    // actions scheduled before the field existed — those take the legacy
+    // oldest-slot release below.
+    slotId: v.optional(v.id('llmTranslationSlots')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Release one slot — pick the oldest. With MAX_LLM_CONCURRENCY in-flight
-    // calls this is bounded reading, so `.first()` is fine.
-    const slot = await ctx.db.query('llmTranslationSlots').first();
-    if (slot) {
-      await ctx.db.delete(slot._id);
+    if (args.slotId !== undefined) {
+      // Release exactly the slot this attempt held. A point-get keeps
+      // concurrent finalizers' read/write sets disjoint — releasing "the
+      // oldest" via `.first()` made every finalizer fight over the same head
+      // row and exhaust OCC retries under load. The row may already be gone
+      // if a pump stale-reclaimed it mid-flight; that's fine.
+      const slot = await ctx.db.get(args.slotId);
+      if (slot) {
+        await ctx.db.delete(args.slotId);
+      }
+    } else {
+      // Legacy fallback for jobs dispatched before `slotId` existed: release
+      // the oldest slot so pre-deploy in-flight work still frees capacity.
+      const slot = await ctx.db.query('llmTranslationSlots').first();
+      if (slot) {
+        await ctx.db.delete(slot._id);
+      }
     }
 
     const claim = await ctx.db
@@ -327,12 +356,13 @@ export const finalizeLlmTranslationJob = internalMutation({
       }
     }
 
-    // Schedule the pump in a separate transaction. Inlining it here would
-    // re-read `llmTranslationSlots`, and many concurrent finalizers all doing
-    // a read-modify-write on the same table is the primary source of OCC
-    // retries. Pump is idempotent and runs on the next scheduler tick.
-    await ctx.scheduler.runAfter(
-      0,
+    // Schedule the pump in a separate transaction (inlining it here would
+    // re-read `llmTranslationSlots` inside every finalizer), and deduped —
+    // with up to MAX_LLM_CONCURRENCY concurrent finalizers, only the first
+    // one past a pump start actually schedules; the rest no-op on the flag.
+    await schedulePumpIfNeeded(
+      ctx,
+      LLM_PUMP_KEY,
       internal.features.llmTranslationQueue.pumpLlmQueue,
       {},
     );
@@ -350,7 +380,16 @@ export const finalizeLlmTranslationJob = internalMutation({
  * in sync with the queue.
  */
 export const processLlmTranslationForCard = internalAction({
-  args: llmJobArgsValidator.fields,
+  args: {
+    ...llmJobArgsValidator.fields,
+    // Slot this dispatch holds (assigned by pumpLlmQueue, not stored on queue
+    // rows). Threaded to finalizeLlmTranslationJob so it releases exactly this
+    // row instead of "the oldest" — concurrent finalizers deleting the same
+    // head row was the top OCC-failure source. Optional so actions scheduled
+    // before this field existed still validate (finalize then falls back to
+    // the legacy oldest-slot release).
+    slotId: v.optional(v.id('llmTranslationSlots')),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     // Tracks whether the LLM claim must outlive this attempt — true while an LLM
@@ -659,6 +698,7 @@ export const processLlmTranslationForCard = internalAction({
           targetLanguage: args.targetLanguage,
           keepClaim,
           claimId: args.claimId,
+          slotId: args.slotId,
         },
       );
     }

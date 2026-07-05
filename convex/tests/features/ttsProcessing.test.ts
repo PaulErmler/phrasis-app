@@ -903,6 +903,142 @@ describe("features/ttsProcessing", () => {
     });
   });
 
+  describe('pump scheduling dedup (queuePumpStates)', () => {
+    const readPumpState = (t: ReturnType<typeof convexTest>, key: string) =>
+      t.run(async (ctx) =>
+        ctx.db
+          .query('queuePumpStates')
+          .withIndex('by_key', (q) => q.eq('key', key))
+          .first(),
+      );
+    const scheduledPumps = async (t: ReturnType<typeof convexTest>) => {
+      const scheduled = await t.run((ctx) =>
+        ctx.db.system.query('_scheduled_functions').collect(),
+      );
+      return scheduled.filter((s) => s.name.includes('pumpQueue'));
+    };
+    const enqueue = (
+      t: ReturnType<typeof convexTest>,
+      textId: any,
+      provider: 'google' | 'azure' = 'google',
+    ) =>
+      t.mutation(internal.features.ttsProcessing.enqueueTtsJob, {
+        provider,
+        args: {
+          textId,
+          text: 'Hola',
+          language: 'es',
+          voiceName: 'es-ES-Chirp3-HD-Leda',
+          voiceGender: 'female',
+          speed: 1,
+        },
+      });
+
+    it('N same-provider enqueues schedule exactly ONE pump', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+
+      await enqueue(t, textId);
+      await enqueue(t, textId);
+      await enqueue(t, textId);
+
+      expect((await scheduledPumps(t)).length).toBe(1);
+      const state = await readPumpState(t, 'tts:google');
+      expect(state?.pumpScheduled).toBe(true);
+    });
+
+    it('per-provider isolation: a pending google pump does not block azure', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert('queuePumpStates', {
+          key: 'tts:google',
+          pumpScheduled: true,
+          pumpScheduledFor: Date.now() + 1_000,
+        });
+      });
+
+      await enqueue(t, textId, 'azure');
+
+      const pumps = await scheduledPumps(t);
+      expect(pumps.length).toBe(1);
+      expect((pumps[0].args[0] as any).provider).toBe('azure');
+    });
+
+    it('finalizeTtsJob schedules through the flag: first sets it, second no-ops', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const { slotA, slotB } = await t.run(async (ctx) => {
+        const slotA = await ctx.db.insert('ttsProviderSlots', {
+          provider: 'google' as const,
+          claimedAt: Date.now(),
+        });
+        const slotB = await ctx.db.insert('ttsProviderSlots', {
+          provider: 'google' as const,
+          claimedAt: Date.now(),
+        });
+        return { slotA, slotB };
+      });
+
+      await t.mutation(internal.features.ttsProcessing.finalizeTtsJob, {
+        slotId: slotA,
+        provider: 'google',
+        textId,
+        language: 'es',
+      });
+      await t.mutation(internal.features.ttsProcessing.finalizeTtsJob, {
+        slotId: slotB,
+        provider: 'google',
+        textId,
+        language: 'es',
+      });
+
+      // Both slots released, but only the FIRST finalize scheduled a pump —
+      // the second saw the fresh pending flag and no-oped.
+      const slots = await t.run((ctx) =>
+        ctx.db.query('ttsProviderSlots').collect(),
+      );
+      expect(slots.length).toBe(0);
+      expect((await scheduledPumps(t)).length).toBe(1);
+    });
+
+    it('rate-limit denial keeps the flag held so waiting enqueues do not pile on pumps', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert('ttsQueue', {
+          provider: 'google',
+          args: {
+            textId,
+            text: 'Hola',
+            language: 'es',
+            voiceName: 'es-ES-Chirp3-HD-Leda',
+            voiceGender: 'female',
+            speed: 1,
+          },
+          queuedAt: 0,
+          priority: 0,
+        });
+      });
+
+      mockLimit.mockResolvedValueOnce({ ok: false, retryAfter: 30_000 });
+      await t.mutation(internal.features.ttsProcessing.pumpQueue, {
+        provider: 'google',
+      });
+
+      // The denied pump left the flag held for its delayed self-reschedule.
+      const state = await readPumpState(t, 'tts:google');
+      expect(state?.pumpScheduled).toBe(true);
+      expect(state?.pumpScheduledFor).toBeGreaterThan(Date.now() + 25_000);
+      expect((await scheduledPumps(t)).length).toBe(1);
+
+      // An enqueue during the wait window rides the pending pump instead of
+      // scheduling another one.
+      await enqueue(t, textId);
+      expect((await scheduledPumps(t)).length).toBe(1);
+    });
+  });
+
   describe('persistBackfilledWordTimings', () => {
     it('no-ops when no audio row exists', async () => {
       const t = convexTest(schema, modules);

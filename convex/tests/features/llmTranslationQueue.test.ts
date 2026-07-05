@@ -174,6 +174,80 @@ describe("features/llmTranslationQueue", () => {
   });
 
   describe("finalizeLlmTranslationJob", () => {
+    it("with slotId: deletes exactly that slot, leaving others untouched", async () => {
+      // Regression test for the OCC-failure hotspot: releasing "the oldest"
+      // slot made every concurrent finalizer read+delete the same head row.
+      // With slotId, each finalizer's write set is its own row.
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const { mine, other } = await t.run(async (ctx) => {
+        const mine = await ctx.db.insert("llmTranslationSlots", {
+          // Newer than `other` — the legacy behavior would have deleted
+          // `other` (the oldest); by-id must delete `mine`.
+          claimedAt: Date.now(),
+        });
+        const other = await ctx.db.insert("llmTranslationSlots", {
+          claimedAt: Date.now() - 5_000,
+        });
+        return { mine, other };
+      });
+
+      await t.mutation(
+        internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
+        { textId, targetLanguage: "de", slotId: mine },
+      );
+
+      const mineAfter = await t.run(async (ctx) => ctx.db.get(mine));
+      const otherAfter = await t.run(async (ctx) => ctx.db.get(other));
+      expect(mineAfter).toBeNull();
+      expect(otherAfter).not.toBeNull();
+    });
+
+    it("with an already-reclaimed slotId: deletes no other slot", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      const { gone, survivor } = await t.run(async (ctx) => {
+        const gone = await ctx.db.insert("llmTranslationSlots", {
+          claimedAt: Date.now(),
+        });
+        // Simulate a pump stale-reclaiming the slot mid-flight.
+        await ctx.db.delete(gone);
+        const survivor = await ctx.db.insert("llmTranslationSlots", {
+          claimedAt: Date.now(),
+        });
+        return { gone, survivor };
+      });
+
+      await expect(
+        t.mutation(
+          internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
+          { textId, targetLanguage: "de", slotId: gone },
+        ),
+      ).resolves.toBeNull();
+
+      const survivorAfter = await t.run(async (ctx) => ctx.db.get(survivor));
+      expect(survivorAfter).not.toBeNull();
+    });
+
+    it("without slotId (legacy pre-deploy job): still releases one slot", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("llmTranslationSlots", { claimedAt: Date.now() });
+        await ctx.db.insert("llmTranslationSlots", { claimedAt: Date.now() });
+      });
+
+      await t.mutation(
+        internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
+        { textId, targetLanguage: "de" },
+      );
+
+      const slots = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationSlots").collect(),
+      );
+      expect(slots.length).toBe(1);
+    });
+
     it("deletes one slot and removes the matching claim", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
@@ -385,6 +459,131 @@ describe("features/llmTranslationQueue", () => {
       expect(slots.length).toBe(1);
       expect(slots[0].claimedAt).toBeGreaterThan(TWO_MINUTES_AGO);
     });
+
+    it("threads the inserted slot's _id into the dispatched worker args", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("llmTranslationQueue", {
+          args: {
+            textId,
+            sourceLanguage: "en",
+            targetLanguage: "de",
+            text: "Hi.",
+            audioSpeakerGender: "male",
+          },
+          queuedAt: Date.now(),
+        });
+      });
+
+      await t.mutation(internal.features.llmTranslationQueue.pumpLlmQueue, {});
+
+      const slots = await t.run(async (ctx) =>
+        ctx.db.query("llmTranslationSlots").collect(),
+      );
+      expect(slots.length).toBe(1);
+      const scheduled = await t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      const dispatched = scheduled.filter((s) =>
+        s.name.includes("processLlmTranslationForCard"),
+      );
+      expect(dispatched.length).toBe(1);
+      // The worker (and through it the finalizer) releases exactly this slot.
+      expect((dispatched[0].args[0] as any).slotId).toBe(slots[0]._id);
+    });
+  });
+
+  describe("pump scheduling dedup (queuePumpStates)", () => {
+    const readPumpState = (t: ReturnType<typeof convexTest>) =>
+      t.run(async (ctx) =>
+        ctx.db
+          .query("queuePumpStates")
+          .withIndex("by_key", (q) => q.eq("key", "llm"))
+          .first(),
+      );
+    const countScheduledPumps = async (t: ReturnType<typeof convexTest>) => {
+      const scheduled = await t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      return scheduled.filter((s) => s.name.includes("pumpLlmQueue")).length;
+    };
+    const enqueue = (t: ReturnType<typeof convexTest>, textId: any) =>
+      t.mutation(internal.features.llmTranslationQueue.enqueueLlmTranslation, {
+        args: {
+          textId,
+          sourceLanguage: "en",
+          targetLanguage: "de",
+          text: "Hi.",
+          audioSpeakerGender: "male",
+        },
+      });
+
+    it("N enqueues schedule exactly ONE pump", async () => {
+      // The pump storm: every enqueue used to schedule its own pump, and the
+      // concurrent pumps' overlapping slot-table scans OCC-retried by the
+      // hundreds. Now the 2nd..Nth enqueues no-op on the pending flag.
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+
+      await enqueue(t, textId);
+      await enqueue(t, textId);
+      await enqueue(t, textId);
+
+      expect(await countScheduledPumps(t)).toBe(1);
+      const state = await readPumpState(t);
+      expect(state?.pumpScheduled).toBe(true);
+    });
+
+    it("no lost wakeups: an enqueue after a pump ran schedules a fresh pump", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+
+      await enqueue(t, textId);
+      expect(await countScheduledPumps(t)).toBe(1);
+
+      // The pump clears the flag as its first write, so work enqueued after
+      // it started is picked up by a NEW pump rather than silently dropped.
+      await t.mutation(internal.features.llmTranslationQueue.pumpLlmQueue, {});
+      expect((await readPumpState(t))?.pumpScheduled).toBe(false);
+
+      await enqueue(t, textId);
+      expect(await countScheduledPumps(t)).toBe(2);
+    });
+
+    it("the pump clears the flag even when the queue is empty", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("queuePumpStates", {
+          key: "llm",
+          pumpScheduled: true,
+          pumpScheduledFor: Date.now(),
+        });
+      });
+
+      await t.mutation(internal.features.llmTranslationQueue.pumpLlmQueue, {});
+
+      expect((await readPumpState(t))?.pumpScheduled).toBe(false);
+    });
+
+    it("wedge recovery: a stale flag (dead scheduled pump) doesn't block scheduling", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      // Flag says a pump is pending, but its run time is a minute in the past
+      // (beyond PUMP_WEDGE_MS) — the scheduled invocation died. The next
+      // enqueue must schedule anyway instead of wedging the queue forever.
+      await t.run(async (ctx) => {
+        await ctx.db.insert("queuePumpStates", {
+          key: "llm",
+          pumpScheduled: true,
+          pumpScheduledFor: Date.now() - 60_000,
+        });
+      });
+
+      await enqueue(t, textId);
+
+      expect(await countScheduledPumps(t)).toBe(1);
+    });
   });
 
   describe("processLlmTranslationForCard (action)", () => {
@@ -456,6 +655,46 @@ describe("features/llmTranslationQueue", () => {
         ctx.db.query("llmTranslationSlots").collect(),
       );
       expect(slots.length).toBe(0);
+    });
+
+    it("releases exactly the slot it was dispatched under (slotId)", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+
+      const { mine, other } = await t.run(async (ctx) => {
+        const mine = await ctx.db.insert("llmTranslationSlots", {
+          claimedAt: Date.now(),
+        });
+        // A concurrent job's slot — must survive this worker's finalize.
+        const other = await ctx.db.insert("llmTranslationSlots", {
+          claimedAt: Date.now() - 5_000,
+        });
+        await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "de",
+          claimedAt: Date.now(),
+        });
+        return { mine, other };
+      });
+
+      mockGenerateTextOk("Haben Sie ins Handschuhfach geschaut?");
+
+      await t.action(
+        internal.features.llmTranslationQueue.processLlmTranslationForCard,
+        {
+          textId,
+          sourceLanguage: "en",
+          targetLanguage: "de",
+          text: "Have you looked in the glove compartment?",
+          audioSpeakerGender: "male",
+          slotId: mine,
+        },
+      );
+
+      const mineAfter = await t.run(async (ctx) => ctx.db.get(mine));
+      const otherAfter = await t.run(async (ctx) => ctx.db.get(other));
+      expect(mineAfter).toBeNull();
+      expect(otherAfter).not.toBeNull();
     });
 
     // Helpers for inspecting what the worker scheduled on failure. The worker

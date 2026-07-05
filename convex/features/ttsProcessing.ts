@@ -17,6 +17,7 @@ import { languageSupportsStt } from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
 import { textsMatchSemantic } from '../lib/ttsSemanticValidation';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
+import { clearPumpScheduled, schedulePumpIfNeeded } from '../lib/queuePump';
 import { rateLimiter, TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import {
   ttsQualityValidator,
@@ -44,6 +45,12 @@ const PROVIDER_MAX_CONCURRENCY: Partial<Record<TtsProvider, number>> = {
 // 'elevenlabs' tombstone, which is never dispatched).
 const DEFAULT_MAX_CONCURRENCY = 8;
 const SLOT_STALE_MS = 60 * 1000; // 1 minute — longer than the longest API call
+
+// queuePumpStates key for a provider's pump-dedup flag (see convex/lib/queuePump.ts).
+// Per-provider so one provider's pending pump doesn't block another's.
+function ttsPumpKey(provider: TtsProvider): string {
+  return `tts:${provider}`;
+}
 
 /**
  * Atomically check-and-insert a TTS generation claim.
@@ -638,6 +645,11 @@ export const pumpQueue = internalMutation({
   args: { provider: ttsProviderValidator },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Mark the pending pump as started BEFORE reading the queue: any enqueue
+    // serialized after this clear sees the flag down and schedules a fresh
+    // pump, so nothing enqueued mid-run is ever lost.
+    await clearPumpScheduled(ctx, ttsPumpKey(args.provider));
+
     // Priority order drained per pump tick: critical (2, onboarding seed /
     // placement test) first, then high (1, active collection), then normal
     // (0), then any pre-priority rows (undefined) left over from a deploy.
@@ -678,12 +690,17 @@ export const pumpQueue = internalMutation({
       );
       if (!limit.ok) {
         // Reservation pool is full (only reachable if a future `maxReserved`
-        // gets configured). Stop dispatching this tick and wake the pump
-        // when capacity is expected to free up.
-        await ctx.scheduler.runAfter(
-          Math.max(0, limit.retryAfter ?? 0),
+        // gets configured). Stop dispatching this tick and wake the pump when
+        // capacity is expected to free up. Goes through the dedup flag so the
+        // net committed state of this run is "pump pending at now+retryAfter"
+        // (the start-of-run clear and this set are one transaction) and
+        // enqueues during the wait window don't pile on extra pumps.
+        await schedulePumpIfNeeded(
+          ctx,
+          ttsPumpKey(args.provider),
           internal.features.ttsProcessing.pumpQueue,
           { provider: args.provider },
+          Math.max(0, limit.retryAfter ?? 0),
         );
         break;
       }
@@ -733,38 +750,11 @@ export const enqueueTtsJob = internalMutation({
     // Pump runs in its own transaction (scheduler.runAfter, not runMutation):
     // with the provider cap re-enabled, the pump reads `ttsProviderSlots`, and
     // many concurrent enqueues all doing read-modify-write on the same table
-    // would OCC-retry until they converge. Same reasoning as
-    // `enqueueLlmTranslation` — see its docstring for the full rationale.
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.ttsProcessing.pumpQueue,
-      { provider: args.provider },
-    );
-    return null;
-  },
-});
-
-/**
- * Release a provider concurrency slot and immediately dispatch the next
- * queued waiter (if any). Combining both into one mutation closes the race
- * window where a concurrent enqueue could observe "at capacity" just after
- * the slot was deleted but before the pump ran.
- */
-export const releaseSlotAndPump = internalMutation({
-  args: {
-    slotId: v.id('ttsProviderSlots'),
-    provider: ttsProviderValidator,
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const row = await ctx.db.get(args.slotId);
-    if (row) {
-      await ctx.db.delete(args.slotId);
-    }
-    // Pump in a separate transaction to avoid OCC contention with concurrent
-    // releases/enqueues all reading `ttsProviderSlots`.
-    await ctx.scheduler.runAfter(
-      0,
+    // would OCC-retry until they converge. Deduped via the pump flag so a
+    // batch of enqueues schedules exactly one pump instead of one per row.
+    await schedulePumpIfNeeded(
+      ctx,
+      ttsPumpKey(args.provider),
       internal.features.ttsProcessing.pumpQueue,
       { provider: args.provider },
     );
@@ -808,9 +798,11 @@ export const finalizeTtsJob = internalMutation({
       }
     }
     // Pump in a separate transaction to avoid OCC contention with concurrent
-    // finalizers/enqueues all reading `ttsProviderSlots`.
-    await ctx.scheduler.runAfter(
-      0,
+    // finalizers/enqueues all reading `ttsProviderSlots` — and deduped, so of
+    // many concurrent finalizers only the first past a pump start schedules.
+    await schedulePumpIfNeeded(
+      ctx,
+      ttsPumpKey(args.provider),
       internal.features.ttsProcessing.pumpQueue,
       { provider: args.provider },
     );

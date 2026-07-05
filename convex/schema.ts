@@ -817,6 +817,24 @@ export default defineSchema({
     claimedAt: v.number(),
   }).index('by_text_and_language', ['textId', 'targetLanguage']),
 
+  // Pump-scheduling dedup flag, one row per queue key ('llm' | 'tts:<provider>').
+  // Enqueue/finalize only schedule a pump when no pump is already pending
+  // (see convex/lib/queuePump.ts) — without this, every enqueue and every
+  // finalize scheduled its own pump, and the concurrent pumps' overlapping
+  // slot-table scans OCC-retried against each other by the hundreds.
+  // Rows are created lazily on first use.
+  queuePumpStates: defineTable({
+    key: v.string(),
+    // True from the moment a pump is scheduled until that pump starts running
+    // (the pump clears it as its first write, so a later enqueue schedules a
+    // fresh pump rather than being lost).
+    pumpScheduled: v.boolean(),
+    // When the scheduled pump is expected to run (now + delay). A flag whose
+    // pumpScheduledFor is far in the past means the scheduled pump died
+    // (deploy removed it / it kept throwing); callers then schedule anyway.
+    pumpScheduledFor: v.number(),
+  }).index('by_key', ['key']),
+
   // Daily per-language stats
   dailyLanguageStats: defineTable({
     userId: v.string(),
