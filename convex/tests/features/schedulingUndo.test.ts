@@ -735,16 +735,18 @@ describe("features/scheduling — record/reverse drift guard", () => {
     const asUser = t.withIdentity({ subject: "user_A" });
 
     const tables = Object.keys(UNREVERSED_STAT_FIELDS) as TableNames[];
+    // Plain nested objects (table -> _id -> row): t.run results must be
+    // Convex-serializable, so no Maps.
     const snapshot = () =>
       t.run(async (ctx) => {
-        const out = new Map<string, Map<string, Record<string, unknown>>>();
+        const out: Record<
+          string,
+          Record<string, Record<string, unknown>>
+        > = {};
         for (const table of tables) {
           const rows = await ctx.db.query(table).collect();
-          out.set(
-            table,
-            new Map(
-              rows.map((r) => [String(r._id), r as Record<string, unknown>]),
-            ),
+          out[table] = Object.fromEntries(
+            rows.map((r) => [String(r._id), r as Record<string, unknown>]),
           );
         }
         return out;
@@ -778,16 +780,31 @@ describe("features/scheduling — record/reverse drift guard", () => {
       (typeof v === "object" &&
         Object.values(v as object).every(isZeroed));
 
+    // The only numeric field that is a row KEY rather than a counter
+    // (reviewDepthAccuracy rows are keyed by userId/courseId/reviewNumber).
+    const numericKeyFields = new Set(["reviewNumber"]);
+
     const violations: string[] = [];
     for (const table of tables) {
       const keep = new Set(UNREVERSED_STAT_FIELDS[table]);
-      for (const [id, row] of after.get(table)!) {
-        const prev = before.get(table)!.get(id);
+      for (const [id, row] of Object.entries(after[table])) {
+        const prev = before[table][id];
         for (const [field, value] of Object.entries(row)) {
-          if (field === "_id" || field === "_creationTime" || keep.has(field))
+          if (
+            field === "_id" ||
+            field === "_creationTime" ||
+            keep.has(field) ||
+            numericKeyFields.has(field)
+          )
             continue;
           if (prev) {
-            if (JSON.stringify(value) !== JSON.stringify(prev[field])) {
+            // Reversal may write an explicit zero where the field was absent
+            // before (undefined -> 0, undefined -> {audio:0,full:0}) — that
+            // still counts as restored.
+            if (
+              JSON.stringify(value) !== JSON.stringify(prev[field]) &&
+              !(isZeroed(value) && isZeroed(prev[field]))
+            ) {
               violations.push(
                 `${table}.${field}: ${JSON.stringify(prev[field])} -> ${JSON.stringify(value)}`,
               );

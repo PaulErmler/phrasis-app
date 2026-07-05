@@ -5,6 +5,7 @@ import {
   type PropertyValidators,
   type Validator,
 } from 'convex/values';
+import type { RegisteredQuery } from 'convex/server';
 import { query, QueryCtx } from '../_generated/server';
 import { authComponent } from '../auth';
 
@@ -62,13 +63,25 @@ export function adminQuery<
     args: ObjectType<ArgsValidator>,
     admin: AdminContext,
   ) => Promise<Infer<ReturnsValidator>>;
-}) {
-  return query({
+}): RegisteredQuery<
+  'public',
+  ObjectType<ArgsValidator>,
+  Promise<Infer<ReturnsValidator>>
+> {
+  const gated = {
     args: def.args,
     returns: def.returns,
     handler: async (ctx: QueryCtx, args: ObjectType<ArgsValidator>) => {
       const admin = await requireAdmin(ctx);
       return def.handler(ctx, args, admin);
     },
-  });
+  };
+  // Cast at the query() boundary: TS cannot resolve Convex's conditional
+  // handler-return type while the validators are still generic. `gated` is
+  // fully typed above and the runtime `returns` validator is unaffected.
+  return query(gated as never) as RegisteredQuery<
+    'public',
+    ObjectType<ArgsValidator>,
+    Promise<Infer<ReturnsValidator>>
+  >;
 }
