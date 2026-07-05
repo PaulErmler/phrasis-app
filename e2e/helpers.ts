@@ -339,3 +339,50 @@ export async function pasteImport(page: Page, text: string): Promise<void> {
     timeout: 10_000,
   });
 }
+
+/**
+ * True when the testid'd button reads as selected (aria-pressed or the
+ * ring/bg-primary selection classes the settings mode buttons use).
+ */
+export async function isSelectedTestId(
+  page: Page,
+  testId: string,
+): Promise<boolean> {
+  const btn = page.getByTestId(testId).first();
+  const pressed = await btn.getAttribute("aria-pressed").catch(() => null);
+  if (pressed === "true") return true;
+  const cls = (await btn.getAttribute("class").catch(() => "")) || "";
+  return /ring-primary|bg-primary/.test(cls);
+}
+
+/**
+ * Poll until a locator's bounding box is fully inside the viewport.
+ * Necessary for elements inside fixed-position Sheets: while the sheet
+ * (re-)animates, the element is mid-transform for ~500ms. `force: true`
+ * doesn't bypass Playwright's viewport check, and `position: fixed` defeats
+ * auto-scroll — polling the bounding box waits the animation out
+ * deterministically.
+ */
+export async function waitForInViewport(
+  page: Page,
+  locator: Locator,
+  timeoutMs = 5_000,
+): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport) return;
+  await expect
+    .poll(
+      async () => {
+        const box = await locator.boundingBox();
+        if (!box) return false;
+        return (
+          box.x >= 0 &&
+          box.y >= 0 &&
+          box.x + box.width <= viewport.width &&
+          box.y + box.height <= viewport.height
+        );
+      },
+      { timeout: timeoutMs, intervals: [100, 200, 400] },
+    )
+    .toBe(true);
+}

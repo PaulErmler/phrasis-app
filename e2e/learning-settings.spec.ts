@@ -1,5 +1,9 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
-import { dismissTour } from "./helpers";
+import {
+  dismissTour,
+  isSelectedTestId,
+  waitForInViewport,
+} from "./helpers";
 
 /**
  * Learning settings sheet — mode toggle + boolean switch round-trip.
@@ -28,50 +32,6 @@ async function openSettingsSheet(page: Page): Promise<void> {
   ).toBeVisible({ timeout: 8_000 });
   // Wait out the 500ms slide-in animation so clicks don't race stability.
   await page.waitForTimeout(550);
-}
-
-async function isSelectedTestId(
-  page: Page,
-  testId: string,
-): Promise<boolean> {
-  const btn = page.getByTestId(testId).first();
-  const pressed = await btn.getAttribute("aria-pressed").catch(() => null);
-  if (pressed === "true") return true;
-  const cls = (await btn.getAttribute("class").catch(() => "")) || "";
-  return /ring-primary|bg-primary/.test(cls);
-}
-
-/**
- * Poll until a locator's bounding box is fully inside the viewport.
- * Necessary for elements inside the Sheet: between mode-button clicks the
- * Sheet briefly re-animates (likely Radix focus-management round-tripping
- * the `data-state` attribute), leaving the next mode button mid-transform
- * for ~500ms. `force: true` doesn't bypass the viewport check, and the
- * element is `position: fixed` so Playwright's auto-scroll can't bring it
- * in. Polling the bounding box lets us wait out the animation deterministically.
- */
-async function waitForInViewport(
-  page: Page,
-  locator: ReturnType<Page["getByTestId"]>,
-  timeoutMs = 5_000,
-): Promise<void> {
-  const viewport = page.viewportSize();
-  if (!viewport) return;
-  await expect
-    .poll(
-      async () => {
-        const box = await locator.boundingBox();
-        if (!box) return false;
-        return (
-          box.x >= 0 &&
-          box.y >= 0 &&
-          box.x + box.width <= viewport.width &&
-          box.y + box.height <= viewport.height
-        );
-      },
-      { timeout: timeoutMs, intervals: [100, 200, 400] },
-    )
-    .toBe(true);
 }
 
 /** Ensure the settings sheet is in Audio review mode (the Practice Listening /
@@ -117,6 +77,20 @@ async function expectSwitch(
   await expect.poll(() => isSwitchOn(page, which), { timeout: 8_000 }).toBe(on);
 }
 
+/** Scroll a practice switch into the sheet's visible area, then click it.
+ *  The sheet is position:fixed with an inner overflow scroll; when both
+ *  toggles are on the audio-playback section grows and pushes these switches
+ *  above the fold (especially after the Shadowing/Writing mode blurbs). */
+async function clickPracticeSwitch(
+  page: Page,
+  which: "before" | "after",
+): Promise<void> {
+  const sw = practiceSwitch(page, which);
+  await sw.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await waitForInViewport(page, sw);
+  await sw.click({ force: true });
+}
+
 /** Click the switch and wait until it reaches the desired checked state. Turning
  *  a switch ON never disables the other, so this is safe for normalization. */
 async function setSwitch(
@@ -125,7 +99,7 @@ async function setSwitch(
   on: boolean,
 ): Promise<void> {
   if ((await isSwitchOn(page, which)) === on) return;
-  await practiceSwitch(page, which).click({ force: true });
+  await clickPracticeSwitch(page, which);
   await expectSwitch(page, which, on);
 }
 
@@ -211,7 +185,7 @@ test.describe("learning settings", () => {
     await setSwitch(page, "before", false);
 
     // Enable Practice Listening, then confirm it survives a sheet close/reopen.
-    await practiceSwitch(page, "before").click({ force: true });
+    await clickPracticeSwitch(page, "before");
     await expectSwitch(page, "before", true);
 
     await page.keyboard.press("Escape").catch(() => {});
@@ -221,7 +195,7 @@ test.describe("learning settings", () => {
     await expectSwitch(page, "before", true);
 
     // Restore the default so later serial specs start clean.
-    await practiceSwitch(page, "before").click({ force: true });
+    await clickPracticeSwitch(page, "before");
     await expectSwitch(page, "before", false);
     await expectSwitch(page, "after", true);
 
@@ -251,12 +225,12 @@ test.describe("learning settings", () => {
 
     // Turn Speaking off while Listening is already off → Listening auto-enables
     // (the invariant: the two can never both be off).
-    await practiceSwitch(page, "after").click({ force: true });
+    await clickPracticeSwitch(page, "after");
     await expectSwitch(page, "after", false);
     await expectSwitch(page, "before", true);
 
     // And the mirror: turning the now-last-on Listening off re-enables Speaking.
-    await practiceSwitch(page, "before").click({ force: true });
+    await clickPracticeSwitch(page, "before");
     await expectSwitch(page, "before", false);
     await expectSwitch(page, "after", true); // back to the default → clean state
 

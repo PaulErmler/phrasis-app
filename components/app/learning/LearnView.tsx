@@ -133,6 +133,14 @@ interface LearnViewProps {
       dailyNewWordsToday: number;
     },
   ) => void;
+  /** Mirror of `onCardRated` for the undo direction — fires after an undo
+   *  actually reverted a review, so the wizard can decrement its counter. */
+  onCardUndone?: (snapshot: {
+    sessionId: string;
+    dailyReviewsToday: number;
+    dailyTimeMsToday: number;
+    dailyNewWordsToday: number;
+  }) => void;
   /** External autoplay override (onboarding-mode only). When true, autoplay
    *  stays gated regardless of course settings — used by the wizard to keep
    *  card audio silent while the first-lesson coachmarks are running so the
@@ -186,6 +194,7 @@ function LearnViewInner({
   mode = 'normal',
   onboardingHeader,
   onCardRated,
+  onCardUndone,
   forceDisableAutoPlay = false,
   initialSessionId,
   initialSessionCardCount,
@@ -338,6 +347,7 @@ function LearnViewInner({
         onGoHome={goHome}
         mode={mode}
         onCardRated={onCardRated}
+        onCardUndone={onCardUndone}
         onNavigateToChat={onNavigateToChat}
         onNavigateToAddCustomCards={onNavigateToAddCustomCards}
       />

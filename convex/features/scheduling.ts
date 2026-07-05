@@ -12,6 +12,13 @@ import { trackEvent } from '../db/stats/dailyStats';
 import { updateWordTextsForEdit } from '../db/stats/wordTracking';
 import { recordReviewStats } from '../db/stats/recordReviewStats';
 import { recordRadioPlayStats } from '../db/stats/recordRadioPlayStats';
+import {
+  reverseReviewStats,
+  reverseRadioPlayStats,
+  readTodayCounters,
+} from '../db/stats/reverseReviewStats';
+import { logReview, takeUndoableLogs } from '../db/reviewLogs';
+import { getDailyStats } from '../db/stats/dailyStats';
 import { patchCard, insertCard, deleteCard } from '../db/stats/cardAggregates';
 import {
   scheduleCard,
@@ -25,6 +32,8 @@ import {
   translationValidator,
   audioRecordingValidator,
   schedulingPhaseValidator,
+  reviewRatingValidator,
+  reviewModeValidator,
   asVoiceGender,
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
@@ -415,9 +424,14 @@ export const getCardForReview = query({
           q.eq('userId', userId).eq('courseId', course._id).eq('date', today),
         )
         .unique();
-      dailyReviewsToday =
+      // Floored to the celebration high-water mark so an undo past a
+      // milestone doesn't wind the progress bar back (matches reviewCard's
+      // returned count).
+      dailyReviewsToday = Math.max(
         (todayStats?.reviewsByMode?.audio ?? 0) +
-        (todayStats?.reviewsByMode?.full ?? 0);
+          (todayStats?.reviewsByMode?.full ?? 0),
+        todayStats?.lastCelebratedAtCount ?? 0,
+      );
     }
 
     return { ...current, nextCard: next, dailyReviewsToday };
@@ -586,18 +600,11 @@ export const getCardForReviewEmptyReason = query({
 export const reviewCard = mutation({
   args: {
     cardId: v.id('cards'),
-    rating: v.union(
-      v.literal('stillLearning'),
-      v.literal('understood'),
-      v.literal('again'),
-      v.literal('hard'),
-      v.literal('good'),
-      v.literal('easy'),
-    ),
+    rating: reviewRatingValidator,
     timeSpentMs: v.optional(v.number()),
     timezone: v.string(),
     forceReviewPhase: v.optional(v.boolean()),
-    reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))),
+    reviewMode: v.optional(reviewModeValidator),
     accuracy: v.optional(v.number()),
     wasDefaultRating: v.optional(v.boolean()),
     sessionId: v.optional(v.string()),
@@ -698,6 +705,11 @@ export const reviewCard = mutation({
       dailyReviewsToday,
       dailyTimeMsToday,
       dailyNewWordsToday,
+      todayDate,
+      hourOfDay,
+      languages,
+      wasFirstReview,
+      lastCelebratedAtCount,
     } = await recordReviewStats(ctx, {
       userId,
       card,
@@ -733,14 +745,68 @@ export const reviewCard = mutation({
       card,
     );
 
+    // Log the review for the learn-mode undo stack: the pre-patch card
+    // snapshot plus the keys `reverseReviewStats` needs to decrement the
+    // right stat buckets. The study context stamps scope undo to the settings
+    // the review happened under.
+    await logReview(ctx, {
+      userId,
+      courseId: deck.courseId,
+      cardId: args.cardId,
+      reviewedAt: Date.now(),
+      timezone: args.timezone,
+      kind: 'review',
+      date: todayDate,
+      schedulingMode: reviewSettings?.schedulingMode ?? 'learnAndReview',
+      studyContentFilter: reviewSettings?.studyContentFilter ?? 'both',
+      prevCard: {
+        dueDate: card.dueDate,
+        schedulingPhase: card.schedulingPhase,
+        preReviewCount: card.preReviewCount,
+        fsrsState: card.fsrsState,
+        isGraduated: card.isGraduated,
+        lastReviewedAt: card.lastReviewedAt,
+      },
+      statsReversal: {
+        hourOfDay,
+        rating: args.rating,
+        reviewModeForStats: args.reviewMode ?? 'audio',
+        reviewModeRaw: args.reviewMode,
+        wasFirstReview,
+        wasDefaultRating: args.wasDefaultRating,
+        accuracy: args.accuracy,
+        reviewDepth:
+          args.accuracy != null
+            ? card.preReviewCount + (card.fsrsState?.reps ?? 0) + 1
+            : undefined,
+        languages,
+        collectionId: card.collectionId,
+      },
+    });
+
     // Server-side milestone verdict: client just respects this. Opt-out
     // setting defaults to enabled when undefined (matches the UI check
-    // `progressDisplayEnabled !== false`).
+    // `progressDisplayEnabled !== false`). The `lastCelebratedAtCount`
+    // high-water mark keeps an undo + re-review from replaying a celebration:
+    // the count must EXCEED the mark, and undo never lowers it.
     const progressDisplayEnabled = reviewSettings?.progressDisplayEnabled !== false;
-    const triggerCelebration =
+    let celebrationHighWater = lastCelebratedAtCount;
+    let triggerCelebration =
       progressDisplayEnabled &&
       dailyReviewsToday > 0 &&
-      dailyReviewsToday % PROGRESS_DISPLAY_INTERVAL === 0;
+      dailyReviewsToday % PROGRESS_DISPLAY_INTERVAL === 0 &&
+      dailyReviewsToday > lastCelebratedAtCount;
+    if (triggerCelebration) {
+      const todayStats = await getDailyStats(ctx, userId, deck.courseId, todayDate);
+      if (todayStats) {
+        await ctx.db.patch(todayStats._id, {
+          lastCelebratedAtCount: dailyReviewsToday,
+        });
+        celebrationHighWater = dailyReviewsToday;
+      } else {
+        triggerCelebration = false;
+      }
+    }
 
     return {
       schedulingPhase: result.schedulingPhase,
@@ -748,11 +814,150 @@ export const reviewCard = mutation({
       dueDate: dueDateWithJitter,
       phaseTransitioned: result.phaseTransitioned,
       fsrsState: result.fsrsState,
-      dailyReviewsToday,
+      // Displayed count is floored to the celebration high-water mark so an
+      // undo past a milestone never winds the progress bar back and
+      // re-reviewing those cards doesn't visibly advance it again.
+      dailyReviewsToday: Math.max(dailyReviewsToday, celebrationHighWater),
       dailyTimeMsToday,
       dailyNewWordsToday,
       triggerCelebration,
     };
+  },
+});
+
+/**
+ * Undo the most recent card review (or radio play) for the active course.
+ *
+ * Pops the newest `reviewLogs` entry whose study context matches the CURRENT
+ * course settings (see `takeUndoableLogs`), restores the card's pre-review
+ * scheduling/rotation state from the snapshot, and reverses the review's
+ * counting stats — time spent, streak, and word tracking stay (the learning
+ * genuinely happened; see `reverseReviewStats`). Restoring the snapshot
+ * `dueDate` (or radio counters) deterministically makes the card the next one
+ * served, since it was at the front of the queue when it was reviewed and
+ * reviews only ever push cards backward.
+ *
+ * Cards hidden or mastered since the review are still undone (so the user can
+ * unhide/unmaster and continue where they were) — only deleted cards are
+ * skipped. Returns `nothing_to_undo` instead of throwing when the stack is
+ * empty: two devices racing over the same stack is expected, not an error.
+ */
+export const undoLastReview = mutation({
+  args: { timezone: v.string() },
+  returns: v.union(
+    v.object({
+      status: v.literal('undone'),
+      cardId: v.id('cards'),
+      dailyReviewsToday: v.number(),
+      dailyTimeMsToday: v.number(),
+      dailyNewWordsToday: v.number(),
+    }),
+    v.object({ status: v.literal('nothing_to_undo') }),
+  ),
+  handler: async (ctx, args) => {
+    const userId = await requireAuthUserId(ctx);
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return { status: 'nothing_to_undo' as const };
+    const { course } = active;
+
+    const settings = await getCourseSettings(ctx, course._id);
+    const schedulingMode: SchedulingMode = settings?.schedulingMode ?? 'learnAndReview';
+    const studyContentFilter: StudyContentFilter = settings?.studyContentFilter ?? 'both';
+
+    const undoable = await takeUndoableLogs(
+      ctx,
+      userId,
+      course._id,
+      schedulingMode,
+      studyContentFilter,
+    );
+
+    for (const log of undoable) {
+      const card = await ctx.db.get(log.cardId);
+      if (!card) {
+        // Card deleted since the review — nothing to restore, and deletion
+        // never reverses stat contributions elsewhere either. Discard and
+        // fall through to the next entry.
+        await ctx.db.delete(log._id);
+        continue;
+      }
+
+      if (log.kind === 'review' && log.prevCard) {
+        // `undefined` snapshot values (e.g. fsrsState before the card entered
+        // FSRS) correctly unset the field again via patchCard → ctx.db.patch.
+        await patchCard(
+          ctx,
+          log.cardId,
+          {
+            dueDate: log.prevCard.dueDate,
+            schedulingPhase: log.prevCard.schedulingPhase,
+            preReviewCount: log.prevCard.preReviewCount,
+            fsrsState: log.prevCard.fsrsState,
+            isGraduated: log.prevCard.isGraduated,
+            lastReviewedAt: log.prevCard.lastReviewedAt,
+          },
+          card,
+        );
+        await reverseReviewStats(ctx, { userId, courseId: course._id, log });
+      } else if (log.kind === 'radio' && log.prevRadio) {
+        await patchCard(
+          ctx,
+          log.cardId,
+          {
+            radioRoundCounter: log.prevRadio.radioRoundCounter,
+            radioOrderKey: log.prevRadio.radioOrderKey,
+            radioPlayCount: log.prevRadio.radioPlayCount,
+            lastReviewedAt: log.prevRadio.lastReviewedAt,
+          },
+          card,
+        );
+        await reverseRadioPlayStats(ctx, { userId, courseId: course._id, log });
+      } else {
+        // Malformed entry (kind without its snapshot) — discard defensively.
+        await ctx.db.delete(log._id);
+        continue;
+      }
+
+      // Consume the entry so it can't be undone twice.
+      await ctx.db.delete(log._id);
+
+      const counters = await readTodayCounters(ctx, {
+        userId,
+        courseId: course._id,
+        timezone: args.timezone,
+        targetLanguages: course.targetLanguages,
+      });
+      return { status: 'undone' as const, cardId: log.cardId, ...counters };
+    }
+
+    return { status: 'nothing_to_undo' as const };
+  },
+});
+
+/**
+ * How many reviews the learn-mode undo button can currently take back
+ * (0..UNDO_DEPTH): the newest-first run of review-log entries matching the
+ * current study context. Reactive on courseSettings, so switching mode/filter
+ * greys the button out immediately.
+ */
+export const getUndoableReviewCount = query({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return 0;
+
+    const settings = await getCourseSettings(ctx, active.course._id);
+    const undoable = await takeUndoableLogs(
+      ctx,
+      userId,
+      active.course._id,
+      settings?.schedulingMode ?? 'learnAndReview',
+      settings?.studyContentFilter ?? 'both',
+    );
+    return undoable.length;
   },
 });
 
@@ -965,6 +1170,28 @@ export const advanceRadioCard = mutation({
       courseId: deck.courseId,
       timezone: args.timezone,
       timeSpentMs: args.timeSpentMs,
+    });
+
+    // Log the play for the learn-mode undo stack. Restoring the pre-play
+    // rotation state puts this card back at the front (advancing only ever
+    // raises counters, so nothing can have slotted in below it since).
+    const radioSettings = await getCourseSettings(ctx, deck.courseId);
+    await logReview(ctx, {
+      userId,
+      courseId: deck.courseId,
+      cardId: args.cardId,
+      reviewedAt: Date.now(),
+      timezone: args.timezone,
+      kind: 'radio',
+      date: getTodayInTimezone(args.timezone),
+      schedulingMode: 'radio',
+      studyContentFilter: radioSettings?.studyContentFilter ?? 'both',
+      prevRadio: {
+        radioRoundCounter: card.radioRoundCounter,
+        radioOrderKey: card.radioOrderKey,
+        radioPlayCount: card.radioPlayCount,
+        lastReviewedAt: card.lastReviewedAt,
+      },
     });
 
     return { nextRadioRoundCounter: newCounter };

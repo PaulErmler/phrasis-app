@@ -388,6 +388,7 @@
       "easy": "Easy"
     },
     "actions": {
+      "undo": "Undo last review",
       "favorite": "Favorite",
       "master": "Master",
       "unmaster": "Unmaster",
@@ -1153,7 +1154,7 @@
       },
       "audioControls": {
         "title": "Audio plays automatically",
-        "description": "Audio plays the base language first, pauses for you to think, then plays the target. Restart, play / pause, or skip to the next card here."
+        "description": "Audio plays the base language first, pauses for you to think, then plays the target. Restart, play / pause, or skip to the next card here. The undo button on the far left takes back your last rating and brings the previous card back."
       },
       "audioPlay": {
         "title": "Press play to start",
@@ -1252,6 +1253,10 @@
         "title": "Audio Playing",
         "description": "By default the audio is played automatically. First the base audio, then there is a pause for you to think and then the target audio is played before automatically proceeding to the next sentence."
       },
+      "undoRestart": {
+        "title": "Undo & Restart",
+        "description": "The left button takes back your last rating and brings the previous sentence back — useful after a mis-tap. The restart button next to it replays the current sentence's audio from the beginning. Your listening time is always kept."
+      },
       "settings": {
         "title": "Settings",
         "description": "Here you can change playback speed, language order, auto-advance, whether to hide or blur the target text, how many initial reviews each sentence gets and more."
@@ -1273,6 +1278,10 @@
       "rating": {
         "title": "Rate Your Answer",
         "description": "After viewing the feedback, rate how well you recalled: Again, Hard, Good, or Easy. This drives the spaced repetition schedule."
+      },
+      "undoRestart": {
+        "title": "Undo & Restart",
+        "description": "The left button takes back your last rating and brings the previous sentence back — useful after a mis-tap. The restart button next to it replays the sentence audio from the beginning. Your practice time is always kept."
       },
       "settings": {
         "title": "Settings",

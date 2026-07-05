@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { completeOnboardingFresh, dismissTour } from "./helpers";
+import { completeOnboardingFresh } from "./helpers";
 
 /**
  * Billing / trial lifecycle — drives the REAL upgrade/downgrade-during-trial
@@ -100,6 +100,32 @@ function planCta(page: Page, productId: string) {
 }
 
 /**
+ * Neutralize driver.js tours for every document this page loads.
+ *
+ * The billing user has never completed the one-shot tours, and a tour can
+ * mount at ANY moment after hydration — including while the checkout
+ * dialog is open. While active, driver.js puts `driver-active` on <body>,
+ * which disables pointer events on the ENTIRE page (removing the
+ * overlay/popover nodes is not enough — clicks then resolve to <body> or
+ * the dialog container and Playwright reports an interception).
+ * Dismissing the popover properly isn't schedulable either: its close
+ * click lands outside the Radix dialog and closes it. Injecting CSS
+ * before every document load wins all of these races at once.
+ */
+async function neutralizeTours(page: Page) {
+  await page.addInitScript(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+      .driver-overlay, .driver-popover { display: none !important; }
+      body.driver-active, body.driver-active * { pointer-events: auto !important; }
+    `;
+    document.addEventListener("DOMContentLoaded", () =>
+      document.head.appendChild(style),
+    );
+  });
+}
+
+/**
  * Open /app/settings and wait for the pricing table to finish loading
  * (the annual view is the default for users without a monthly plan, so
  * the annual plan cards are the ones rendered).
@@ -107,29 +133,7 @@ function planCta(page: Page, productId: string) {
 async function openPricingTable(page: Page) {
   await page.goto("/app/settings");
   await page.waitForURL("**/app/settings", { timeout: 20_000 });
-  // Safety net on top of the beforeEach home-tour dismissal: this runs on
-  // a page WITHOUT an open dialog, so a proper dismissal is safe here.
-  await dismissTour(page, undefined, 1_000);
   await expect(planCta(page, BASIC_ANNUAL)).toBeVisible({ timeout: 30_000 });
-}
-
-/**
- * The driver.js tour launches asynchronously after hydration, so it can
- * pop AFTER `openPricingTable`'s dismissal — with its overlay landing on
- * top of the checkout dialog. Strip any driver DOM so the confirm click
- * cannot be intercepted. This must be a pure DOM removal: dismissTour()
- * clicks the popover (or presses Escape), and with the checkout dialog
- * open either lands OUTSIDE the Radix dialog and closes it — the confirm
- * button then never becomes clickable again.
- */
-async function clearTourArtifacts(page: Page) {
-  await page
-    .evaluate(() => {
-      document
-        .querySelectorAll(".driver-overlay, .driver-popover")
-        .forEach((el) => el.remove());
-    })
-    .catch(() => {});
 }
 
 /**
@@ -268,18 +272,8 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     await context.close();
   });
 
-  // The billing user has never dismissed the one-shot home tour, which
-  // fires on the first authenticated page load — and keeps re-firing on
-  // every navigation until it is PROPERLY closed (only the X persists
-  // completion to userSettings; stripping the overlay DOM does not).
-  // Close it once up front so its overlay can never intercept pricing or
-  // dialog clicks below.
-  let tourHandled = false;
   test.beforeEach(async ({ page }) => {
-    if (tourHandled) return;
-    await page.goto("/app");
-    await dismissTour(page, "home_tour", 12_000);
-    tourHandled = true;
+    await neutralizeTours(page);
   });
 
   // Captured in the upgrade dialog (step 3) and asserted identical in the
@@ -343,7 +337,6 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     trialEndDate = /still ends on (.+?),/.exec(messageText)?.[1];
     expect(trialEndDate, `trial end date parsed from: ${messageText}`).toBeTruthy();
 
-    await clearTourArtifacts(page);
     await page.getByTestId("checkout-dialog-confirm").click();
     await expect(title).toBeHidden({ timeout: 60_000 });
 
@@ -385,7 +378,6 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
 
     await expect(page.getByTestId("checkout-due-today")).toHaveText("€0.00");
 
-    await clearTourArtifacts(page);
     await page.getByTestId("checkout-dialog-confirm").click();
     await expect(title).toBeHidden({ timeout: 60_000 });
 

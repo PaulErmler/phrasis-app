@@ -1,5 +1,9 @@
 import { test, expect } from "@playwright/test";
-import { dismissTour } from "./helpers";
+import {
+  dismissTour,
+  isSelectedTestId,
+  waitForInViewport,
+} from "./helpers";
 
 /**
  * Learning journey (LIVE) — the critical end-to-end chain:
@@ -226,8 +230,29 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
 
     const fullBtn = page.getByTestId("settings-mode-full").first();
     await expect(fullBtn).toBeVisible({ timeout: 10_000 });
-    // force: true bypasses Radix's aria-hidden quirk on the sheet content.
-    await fullBtn.click({ force: true });
+    // The fixed-position sheet re-animates after opening; a click
+    // mid-transform either throws ("outside of viewport" — force doesn't
+    // bypass that check) or lands on stale coordinates and silently misses,
+    // leaving the mode unswitched. Wait for the button to settle inside the
+    // viewport, click (force bypasses Radix's aria-hidden quirk on the sheet
+    // content), and confirm the mode actually flipped — one retry covers a
+    // click that raced a late re-animation.
+    let switched = false;
+    for (let attempt = 0; attempt < 2 && !switched; attempt++) {
+      await waitForInViewport(page, fullBtn, 10_000);
+      await fullBtn.click({ force: true }).catch(() => {});
+      switched = await expect
+        .poll(() => isSelectedTestId(page, "settings-mode-full"), {
+          timeout: 5_000,
+        })
+        .toBe(true)
+        .then(() => true)
+        .catch(() => false);
+    }
+    expect(
+      switched,
+      "settings-mode-full should read as selected after clicking it",
+    ).toBe(true);
 
     await page.keyboard.press("Escape").catch(() => {});
     await sheet.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});

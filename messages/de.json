@@ -385,6 +385,7 @@
       "easy": "Leicht"
     },
     "actions": {
+      "undo": "Letzte Bewertung rückgängig machen",
       "favorite": "Favorit",
       "master": "Gemeistert",
       "unmaster": "Nicht mehr gemeistert",
@@ -1150,7 +1151,7 @@
       },
       "audioControls": {
         "title": "Audio läuft automatisch",
-        "description": "Audio spielt zuerst die Basissprache ab, pausiert zum Nachdenken und spielt dann die Zielsprache. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen."
+        "description": "Audio spielt zuerst die Basissprache ab, pausiert zum Nachdenken und spielt dann die Zielsprache. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen. Die Rückgängig-Taste ganz links nimmt deine letzte Bewertung zurück und holt die vorherige Karte zurück."
       },
       "audioPlay": {
         "title": "Drücke Play zum Starten",
@@ -1249,6 +1250,10 @@
         "title": "Audio-Wiedergabe",
         "description": "Standardmäßig wird das Audio automatisch abgespielt. Zuerst die Ausgangssprache, dann eine Pause zum Nachdenken, dann die Zielsprache, bevor automatisch zum nächsten Satz gewechselt wird."
       },
+      "undoRestart": {
+        "title": "Rückgängig & Neu starten",
+        "description": "Die linke Taste nimmt deine letzte Bewertung zurück und holt den vorherigen Satz zurück — praktisch nach einem Vertipper. Die Taste daneben spielt das Audio des aktuellen Satzes von vorne ab. Deine Lernzeit bleibt immer erhalten."
+      },
       "settings": {
         "title": "Einstellungen",
         "description": "Hier kannst du Wiedergabegeschwindigkeit, Sprachreihenfolge, automatisches Weiterschalten, Ausblenden des Zieltextes, die Anzahl der anfänglichen Wiederholungen und mehr ändern."
@@ -1270,6 +1275,10 @@
       "rating": {
         "title": "Bewerte deine Antwort",
         "description": "Nach dem Feedback bewerte, wie gut du dich erinnert hast: Nochmal, Schwer, Gut oder Leicht. Dies steuert den Wiederholungsplan."
+      },
+      "undoRestart": {
+        "title": "Rückgängig & Neu starten",
+        "description": "Die linke Taste nimmt deine letzte Bewertung zurück und holt den vorherigen Satz zurück — praktisch nach einem Vertipper. Die Taste daneben spielt das Satz-Audio von vorne ab. Deine Übungszeit bleibt immer erhalten."
       },
       "settings": {
         "title": "Einstellungen",

@@ -28,6 +28,10 @@ export const MAX_IMPORT_BATCH = 500;
  * theoretical worst case of MAX_IMPORT_BATCH * MAX_CARD_TEXT_LENGTH per language. */
 export const MAX_IMPORT_FILE_BYTES = 5 * 1024 * 1024;
 
+/** How many of the most recent reviews can be undone in learning mode.
+ * Bounds the per-(user, course) `reviewLogs` undo stack. */
+export const UNDO_DEPTH = 3;
+
 /** Interrupt the learning flow with a celebration screen every N reviews (per day). */
 export const PROGRESS_DISPLAY_INTERVAL = 20;
 

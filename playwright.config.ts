@@ -83,6 +83,7 @@ export default defineConfig({
         /chat-live\.spec\.ts/,
         /learning-journey\.spec\.ts/,
         /learning-settings\.spec\.ts/,
+        /learning-undo\.spec\.ts/,
         /settings\.spec\.ts/,
         /add-cards-import-live\.spec\.ts/,
         /content-filter-live\.spec\.ts/,

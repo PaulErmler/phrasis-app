@@ -50,6 +50,10 @@ export async function upsertDailyStats(
    * celebration milestone and the in-learn progress bar so radio plays don't
    * inflate either. */
   activeReviewsAfter: number;
+  /** High-water mark of the count when a celebration last fired today (0 when
+   * none). Callers floor the DISPLAYED review count with it so undoing past a
+   * milestone doesn't wind the progress bar back. */
+  lastCelebratedAtCount: number;
 }> {
   const existing = await ctx.db
     .query('dailyStats')
@@ -133,7 +137,13 @@ export async function upsertDailyStats(
     });
     const modeAfter = reviewsByMode ?? existing.reviewsByMode;
     const activeReviewsAfter = (modeAfter?.audio ?? 0) + (modeAfter?.full ?? 0);
-    return { isFirstActivityToday: false, repsAfter, timeMsAfter, activeReviewsAfter };
+    return {
+      isFirstActivityToday: false,
+      repsAfter,
+      timeMsAfter,
+      activeReviewsAfter,
+      lastCelebratedAtCount: existing.lastCelebratedAtCount ?? 0,
+    };
   }
 
   // Insert new document
@@ -187,6 +197,7 @@ export async function upsertDailyStats(
     repsAfter: 1,
     timeMsAfter: args.timeMs,
     activeReviewsAfter,
+    lastCelebratedAtCount: 0,
   };
 }
 

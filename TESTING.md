@@ -73,7 +73,7 @@ We tag production components with `data-testid` attributes so Playwright selecto
 | Chat | `chat-new-input`, `chat-input`, `chat-submit`, `chat-toggle-conversations`, `chat-new-thread`, `chat-messages-log`, `chat-user-message`, `chat-assistant-message`, `chat-thread-entry` (+ `data-thread-id`) |
 | Feature quota | `feature-quota-${featureId}` (e.g. `feature-quota-chat_messages`, `feature-quota-custom_sentences`) |
 | Card approval | `card-approval`, `card-approve`, `card-reject`, `card-approved-indicator` |
-| Learn | `learn-rating-{again,hard,good,easy,still-learning,understood}`, `learn-submit-translation`, `learn-translation-input`, `learn-settings`, `clickable-word`, `ask-ai-button` |
+| Learn | `learn-rating-{again,hard,good,easy,still-learning,understood}`, `learn-undo`, `learn-reveal`, `learn-next`, `learn-submit-translation`, `learn-translation-input`, `learn-settings`, `clickable-word`, `ask-ai-button` |
 | Learning settings | `settings-mode-audio`, `settings-mode-full` (switches use role=switch) |
 | Library | `library-search`, `library-filter-{mastered,hidden,favorites}`, `library-card` |
 | Courses | `course-menu-trigger`, `course-menu-create`, `course-menu-entry`, `course-settings`, `course-archive`, `course-confirm-archive`, `course-dialog-{next,back,create}` |

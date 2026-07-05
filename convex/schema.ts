@@ -4,9 +4,12 @@ import {
   learningStyleValidator,
   currentLevelValidator,
   reviewModeValidator,
-  fsrsStateValidator,
   cardApprovalStatusValidator,
-  schedulingPhaseValidator,
+  schedulingModeValidator,
+  studyContentFilterValidator,
+  reviewRatingValidator,
+  cardSchedulingSnapshotFields,
+  cardRadioSnapshotFields,
   ttsQualityValidator,
   ttsProviderValidator,
   voiceGenderValidator,
@@ -68,14 +71,14 @@ export const courseSettingsFields = {
   instantProceedAudio: v.optional(v.boolean()), // auto-advance when rating is clicked (audio mode, default false)
   instantProceedFull: v.optional(v.boolean()), // auto-advance when rating is clicked (full mode, default true)
   // Review mode
-  reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
+  reviewMode: v.optional(reviewModeValidator), // 'audio' (default) or 'full'
   // Daily study-time goal in minutes. Seeded from the user's onboarding
   // answer when the course is created by `completeOnboarding`. Lives
   // here rather than `userSettings` because the goal is per-course
   // (different courses can have different pacing targets).
   dailyTimeGoalMinutes: v.optional(v.number()),
   // Scheduling mode
-  schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))), // 'learnAndReview' (default), 'learn_new', or 'radio' (round-robin playback, no FSRS)
+  schedulingMode: v.optional(schedulingModeValidator), // 'learnAndReview' (default), 'learn_new', or 'radio' (round-robin playback, no FSRS)
   fullReviewTargetAudioMode: v.optional(
     v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
   ), // When to play target audio in full review mode
@@ -83,12 +86,8 @@ export const courseSettingsFields = {
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
   reconciledDatasetId: v.optional(v.id('datasets')), // Dataset version this course's progress has been cutover to (idempotency gate for datasetMigration_cutoverUser)
-  // Source-of-content filter. `undefined` and 'both' behave identically (no filter).
-  // 'custom' = study/auto-add only cards from collections with origin !== 'premade' (custom + chat).
-  // 'course' = study/auto-add only cards from collections with origin === 'premade'.
-  studyContentFilter: v.optional(
-    v.union(v.literal('custom'), v.literal('course'), v.literal('both')),
-  ),
+  // Source-of-content filter — see studyContentFilterValidator in types.ts.
+  studyContentFilter: v.optional(studyContentFilterValidator),
   // Current "between celebrations" bucket id. Rotated by the client on
   // celebration dismiss (via `setCurrentSessionId`). Stored server-side so
   // the bucket survives the user closing the learn view OR moving to a
@@ -445,22 +444,18 @@ export default defineSchema({
     collectionOrigin: v.optional(
       v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
     ),
-    dueDate: v.number(), // Timestamp for spaced repetition scheduling (driven by scheduler)
+    // Scheduling + radio state mutated by reviewCard / advanceRadioCard.
+    // Shared with the `reviewLogs` undo snapshots — definitions and field
+    // comments live in convex/types.ts.
+    ...cardSchedulingSnapshotFields,
+    ...cardRadioSnapshotFields,
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
     isFavorite: v.optional(v.boolean()), // Whether the card is marked as a favorite
-    schedulingPhase: schedulingPhaseValidator,
-    preReviewCount: v.number(), // How many pre-review rounds completed
-    fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
     searchableText: v.optional(v.string()), // Denormalized source text + translations for full-text search
     searchableTextLanguages: v.optional(v.array(v.string())), // Language codes included in searchableText; used to detect staleness when course languages change
-    isGraduated: v.optional(v.boolean()), // One-way flag: true once card graduates from initial learning (FSRS state >= Review)
-    lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review and FSRS phases)
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
-    radioRoundCounter: v.optional(v.number()), // Radio mode: # of times this card has been played in radio mode. Lowest counter plays next; new cards default to 0 so they play first. Optional for backward compat — undefined treated as 0.
-    radioOrderKey: v.optional(v.number()), // Radio mode: random tiebreak within equal `radioRoundCounter`. Re-rolled on each play so the round-robin order shuffles every loop and never matches the review (`dueDate`-driven) order. Optional for backward compat.
-    radioPlayCount: v.optional(v.number()), // Radio mode: true count of radio plays (+1 per play, NOT subject to radioRoundCounter's catch-up jump). Drives the "Only new" Practice-Listening limit. Optional/undefined for pre-existing cards — treated as the card's review count (preReviewCount + FSRS reps) so they don't reset to "new".
   })
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_textId', ['deckId', 'textId'])
@@ -599,10 +594,66 @@ export default defineSchema({
     chatCardsApproved: v.optional(v.number()),
     cardsEdited: v.optional(v.number()),
     cardsAddedManually: v.optional(v.number()),
+    // High-water mark: today's review count when a celebration last fired.
+    // A milestone only triggers when the count EXCEEDS this, and undoing a
+    // review never lowers it — so undo + re-review can't replay a celebration.
+    lastCelebratedAtCount: v.optional(v.number()),
   })
     .index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date'])
     // Admin dashboard: per-day DAU scan across all users
     .index('by_date', ['date']),
+
+  // Review log table — one entry per card review / radio play, capped at
+  // UNDO_DEPTH newest entries per (user, course) by logReview's trim. Each
+  // entry snapshots the card state the review overwrote plus the keys needed
+  // to reverse its stat increments, powering the learn-mode undo button.
+  // Snapshot-based because reviews aren't recomputable: dueDate carries
+  // random jitter and ts-fsrs transitions aren't invertible.
+  reviewLogs: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    cardId: v.id('cards'),
+    reviewedAt: v.number(),
+    timezone: v.string(), // timezone the review's stats were recorded under
+    kind: v.union(v.literal('review'), v.literal('radio')),
+    date: v.string(), // "YYYY-MM-DD" day key of the stats rows the review incremented; week/month/year keys derived
+    // Study context at review time. Undo only applies while the CURRENT
+    // course settings match — the undoable stack is the newest-first
+    // consecutive run of matching entries, so entries logged under another
+    // mode/filter block everything older beneath them.
+    schedulingMode: schedulingModeValidator,
+    studyContentFilter: studyContentFilterValidator,
+
+    // kind === 'review': pre-review card scheduling state (shared field set
+    // with the cards table — see convex/types.ts). undefined = field was absent.
+    prevCard: v.optional(v.object(cardSchedulingSnapshotFields)),
+    // kind === 'review': stat increments to reverse, keyed as computed at
+    // review time (hour bucket, resolved mode, languages) since they are not
+    // recomputable later.
+    statsReversal: v.optional(
+      v.object({
+        hourOfDay: v.number(),
+        rating: reviewRatingValidator,
+        reviewModeForStats: reviewModeValidator, // resolved (?? 'audio') — dailyStats buckets use this
+        reviewModeRaw: v.optional(reviewModeValidator), // as passed — courseStats/weekly/monthly/yearly gate on presence
+        wasFirstReview: v.boolean(), // pre-patch schedulingPhase === 'preReview' && preReviewCount === 0
+        wasDefaultRating: v.optional(v.boolean()),
+        accuracy: v.optional(v.number()),
+        reviewDepth: v.optional(v.number()), // reviewDepthAccuracy bucket, only when accuracy present
+        languages: v.array(v.string()), // course languages whose per-language stats were incremented
+        collectionId: v.optional(v.id('collections')),
+      }),
+    ),
+
+    // kind === 'radio': pre-play radio rotation state (shared field set with
+    // the cards table) + lastReviewedAt, which advanceRadioCard also stamps.
+    prevRadio: v.optional(
+      v.object({
+        ...cardRadioSnapshotFields,
+        lastReviewedAt: v.optional(v.number()),
+      }),
+    ),
+  }).index('by_userId_and_courseId', ['userId', 'courseId']),
 
   // Collection progress table - per (user, course, collection) monotonic
   // counters used by the home view. Counters are strictly monotonic: incremented
