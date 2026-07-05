@@ -131,7 +131,7 @@ describe("backfillContentVersions migration", () => {
       textId,
       BUMPED_TRANSLATION_LANG,
     );
-    const plainTranslation = await insertTranslation(t, textId, "fr");
+    const plainTranslation = await insertTranslation(t, textId, "it");
 
     await t.mutation(
       internal.migrations.backfillContentVersions.processTranslationsBatch,
@@ -148,9 +148,9 @@ describe("backfillContentVersions migration", () => {
     expect(getCurrentTranslationVersion(BUMPED_TRANSLATION_LANG)).toBeGreaterThan(
       DEFAULT_CONTENT_VERSION,
     );
-    // fr has no translationVersion bump — baseline === current, no storm.
+    // it has no translationVersion bump — baseline === current, no storm.
     expect(
-      isTranslationVersionStale("fr", rows.plain?.translationVersion),
+      isTranslationVersionStale("it", rows.plain?.translationVersion),
     ).toBe(false);
   });
 

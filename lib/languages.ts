@@ -322,7 +322,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_low',
+    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   {
@@ -348,7 +348,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_low',
+    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   {
@@ -394,6 +394,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'de',
@@ -409,7 +411,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_low',
+    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   {
@@ -443,7 +445,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_low',
+    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   {
@@ -467,7 +469,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // unchanged, so the provider-mismatch regen path wouldn't fire).
     ttsPromptName: 'European Portuguese',
     ttsVersion: 2,
-    translationRule: 'gemini_35_flash_nitro_low',
+    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
     needsRomanization: false,
     supportsKaraoke: true,
@@ -581,7 +583,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_low',
+    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   // Norwegian (Bokmål) — disabled for now. The provider-locale fields the derived
@@ -1364,12 +1366,12 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
   reasoning: 'medium',
   maxOutputTokens: 8_000,
 };
-// Gemini 3.5 Flash via OpenRouter Nitro routing with `low` reasoning —
-// default for de / pt / pt_pt / sv. Nitro prioritizes throughput/latency;
-// low thinking gives a modest reasoning pass without Pro-tier cost.
-const GEMINI_35_FLASH_NITRO_LOW: ModelStage = {
+// Gemini 3.5 Flash via OpenRouter Nitro routing with `minimal` reasoning —
+// default for de / fr / pt / pt_pt / sv. Nitro prioritizes throughput/latency;
+// minimal thinking keeps quality on par with `low` at much lower cost/latency.
+const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
   model: 'google/gemini-3.5-flash:nitro',
-  reasoning: 'low',
+  reasoning: 'minimal',
   maxOutputTokens: 4_000,
 };
 
@@ -1413,18 +1415,18 @@ export const TRANSLATION_RULES = {
     ],
   },
   /**
-   * Per-language default for German, Castilian Spanish, Latin American
+   * Per-language default for German, French, Castilian Spanish, Latin American
    * Spanish, both Portuguese variants, and Swedish. Routes through Gemini 3.5 Flash (Nitro) with
-   * `low` reasoning; one same-config retry before the Google safety net.
+   * `minimal` reasoning; one same-config retry before the Google safety net.
    */
-  gemini_35_flash_nitro_low: {
-    id: 'gemini_35_flash_nitro_low',
-    label: 'Gemini 3.5 Flash Nitro (low) → Gemini 3.5 Flash Nitro (low, retry) → Google',
+  gemini_35_flash_nitro_minimal: {
+    id: 'gemini_35_flash_nitro_minimal',
+    label: 'Gemini 3.5 Flash Nitro (minimal) → Gemini 3.5 Flash Nitro (minimal, retry) → Google',
     branches: [
       {
         maxChars: Infinity,
-        primary: GEMINI_35_FLASH_NITRO_LOW,
-        fallbacks: [GEMINI_35_FLASH_NITRO_LOW],
+        primary: GEMINI_35_FLASH_NITRO_MINIMAL,
+        fallbacks: [GEMINI_35_FLASH_NITRO_MINIMAL],
       },
     ],
   },

@@ -104,7 +104,7 @@ Creating flashcards
 - Cards must contain example sentences, not definitions. If the user asks about a concept, illustrate it with sentences. Unless the user explicitly asks for single words, use full sentences.
 - Create variations across cards; do not repeat the same sentence. Include questions as well. 
 - Focus on making your examples relevant for everyday conversations. 
-- End every flashcard sentence with punctutation. Include correct diacritics and accents.
+- End every flashcard sentence with punctutaion. Include correct diacritics and accents.
 - Flashcard text must contain no emojis and no bracketed content of any kind — no (...), [...], or {...}, and no parenthetical notes.
 - You can also create more than 2-4 cards if appropriate. For instance if your grammar explanation contains example sentences, create cards for all of those and then some additional ones for variety. Make sure to always create cards for your explanation examples. 
 
