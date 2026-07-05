@@ -18,7 +18,11 @@ import {
   readTodayCounters,
 } from '../db/stats/reverseReviewStats';
 import { logReview, takeUndoableLogs } from '../db/reviewLogs';
-import { getDailyStats } from '../db/stats/dailyStats';
+import {
+  getDailyStats,
+  floorToCelebration,
+  displayedActiveReviews,
+} from '../db/stats/dailyStats';
 import { patchCard, insertCard, deleteCard } from '../db/stats/cardAggregates';
 import {
   scheduleCard,
@@ -424,14 +428,7 @@ export const getCardForReview = query({
           q.eq('userId', userId).eq('courseId', course._id).eq('date', today),
         )
         .unique();
-      // Floored to the celebration high-water mark so an undo past a
-      // milestone doesn't wind the progress bar back (matches reviewCard's
-      // returned count).
-      dailyReviewsToday = Math.max(
-        (todayStats?.reviewsByMode?.audio ?? 0) +
-          (todayStats?.reviewsByMode?.full ?? 0),
-        todayStats?.lastCelebratedAtCount ?? 0,
-      );
+      dailyReviewsToday = displayedActiveReviews(todayStats);
     }
 
     return { ...current, nextCard: next, dailyReviewsToday };
@@ -814,10 +811,7 @@ export const reviewCard = mutation({
       dueDate: dueDateWithJitter,
       phaseTransitioned: result.phaseTransitioned,
       fsrsState: result.fsrsState,
-      // Displayed count is floored to the celebration high-water mark so an
-      // undo past a milestone never winds the progress bar back and
-      // re-reviewing those cards doesn't visibly advance it again.
-      dailyReviewsToday: Math.max(dailyReviewsToday, celebrationHighWater),
+      dailyReviewsToday: floorToCelebration(dailyReviewsToday, celebrationHighWater),
       dailyTimeMsToday,
       dailyNewWordsToday,
       triggerCelebration,

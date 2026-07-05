@@ -383,7 +383,13 @@ export const generateResponse = internalAction({
         },
       );
 
-      const totalCredits = Math.ceil(totalCostUsd / CHAT_CREDIT_USD_STEP);
+      // Integer micro-USD math: IEEE-754 division can land an exact multiple
+      // of the step an epsilon above an integer (0.035 / 0.005 → 7.000…001),
+      // which ceil would then overcharge by a full credit.
+      const stepMicroUsd = Math.round(CHAT_CREDIT_USD_STEP * 1e6);
+      const totalCredits = Math.ceil(
+        Math.round(totalCostUsd * 1e6) / stepMicroUsd,
+      );
       const extraCredits = Math.max(0, totalCredits - 1);
       if (extraCredits > 0 && billedUserId) {
         await ctx.runMutation(internal.usage.helpers.chargeExtraChatCredits, {

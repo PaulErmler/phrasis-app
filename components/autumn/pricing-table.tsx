@@ -10,6 +10,7 @@ import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
 import {
   checkoutTrialParams,
+  findCurrentPaidProduct,
   getTrialState,
   type CustomerProductLite,
 } from "@/lib/autumn/trial-eligibility";
@@ -91,9 +92,9 @@ export default function PricingTable({
   // Annual view), and to Annual for users without a paid plan. The user's
   // manual toggle always wins. Only renders when both month and year
   // products exist (see `multiInterval` below).
-  const currentPaidProduct = (
-    customer?.products as CustomerProductLite[] | undefined
-  )?.find((cp) => !cp.is_default && !cp.is_add_on && cp.status !== "expired");
+  const currentPaidProduct = findCurrentPaidProduct(
+    customer?.products as CustomerProductLite[] | undefined,
+  );
   const currentIntervalGroup = rawProducts?.find(
     (p) => p.id === currentPaidProduct?.id,
   )?.properties?.interval_group;
@@ -358,9 +359,7 @@ export const PricingCard = ({
   // across billing intervals (monthly Pro → Basic Annual reads as
   // "upgrade" because €72 > €16). When the tiers actually differ, relabel
   // the button from the tier comparison instead.
-  const currentPaidProduct = customerProducts.find(
-    (cp) => !cp.is_default && !cp.is_add_on && cp.status !== "expired",
-  );
+  const currentPaidProduct = findCurrentPaidProduct(customerProducts);
   const currentProduct = currentPaidProduct
     ? products.find((p) => p.id === currentPaidProduct.id)
     : undefined;

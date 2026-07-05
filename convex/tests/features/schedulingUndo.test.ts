@@ -20,7 +20,8 @@ vi.mock("@convex-dev/aggregate", () => {
 
 import schema from "../../schema";
 import { api } from "../../_generated/api";
-import type { Id } from "../../_generated/dataModel";
+import type { Id, TableNames } from "../../_generated/dataModel";
+import { UNREVERSED_STAT_FIELDS } from "../../db/stats/reverseReviewStats";
 import {
   PROGRESS_DISPLAY_INTERVAL,
   UNDO_DEPTH,
@@ -718,5 +719,94 @@ describe("features/scheduling — undoLastReview", () => {
     expect(
       await asUserA.query(api.features.scheduling.getUndoableReviewCount, {}),
     ).toBe(1);
+  });
+});
+
+describe("features/scheduling — record/reverse drift guard", () => {
+  // Generic mirror check: snapshot every stat table, run a review + undo
+  // through the real mutations, and require every field to be back at its
+  // pre-review value unless UNREVERSED_STAT_FIELDS (the keep-list exported
+  // by reverseReviewStats.ts) names it as deliberately kept. A stat added to
+  // recordReviewStats without a matching reversal (or keep-list entry) fails
+  // here — hand-picked field assertions can't catch that.
+  it("undo restores every stat field a review changed, except the documented keep-list", async () => {
+    const t = convexTest(schema, modules);
+    const { cardId } = await seed(t);
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    const tables = Object.keys(UNREVERSED_STAT_FIELDS) as TableNames[];
+    const snapshot = () =>
+      t.run(async (ctx) => {
+        const out = new Map<string, Map<string, Record<string, unknown>>>();
+        for (const table of tables) {
+          const rows = await ctx.db.query(table).collect();
+          out.set(
+            table,
+            new Map(
+              rows.map((r) => [String(r._id), r as Record<string, unknown>]),
+            ),
+          );
+        }
+        return out;
+      });
+
+    const before = await snapshot();
+    // Exercise every optional counter path: mode counts, accuracy fields,
+    // default-rating counters, hour buckets, first-review (new-card) fields.
+    await asUser.mutation(api.features.scheduling.reviewCard, {
+      cardId,
+      rating: "understood",
+      timezone: "UTC",
+      timeSpentMs: 4_000,
+      reviewMode: "full",
+      accuracy: 0.8,
+      wasDefaultRating: true,
+    });
+    await asUser.mutation(api.features.scheduling.undoLastReview, {
+      timezone: "UTC",
+    });
+    const after = await snapshot();
+
+    // "Reversed" for a row the review itself created means every counter is
+    // back at zero (recursively — arrays like hourBuckets, nested objects
+    // like reviewsByMode). Strings/booleans on new rows are identity fields
+    // (userId, date, week, ...), not counters.
+    const isZeroed = (v: unknown): boolean =>
+      v == null ||
+      (typeof v === "number" && v === 0) ||
+      (Array.isArray(v) && v.every(isZeroed)) ||
+      (typeof v === "object" &&
+        Object.values(v as object).every(isZeroed));
+
+    const violations: string[] = [];
+    for (const table of tables) {
+      const keep = new Set(UNREVERSED_STAT_FIELDS[table]);
+      for (const [id, row] of after.get(table)!) {
+        const prev = before.get(table)!.get(id);
+        for (const [field, value] of Object.entries(row)) {
+          if (field === "_id" || field === "_creationTime" || keep.has(field))
+            continue;
+          if (prev) {
+            if (JSON.stringify(value) !== JSON.stringify(prev[field])) {
+              violations.push(
+                `${table}.${field}: ${JSON.stringify(prev[field])} -> ${JSON.stringify(value)}`,
+              );
+            }
+          } else if (
+            typeof value !== "string" &&
+            typeof value !== "boolean" &&
+            !isZeroed(value)
+          ) {
+            violations.push(
+              `${table}.${field} (review-created row): ${JSON.stringify(value)}`,
+            );
+          }
+        }
+      }
+    }
+    expect(
+      violations,
+      "fields changed by reviewCard that undoLastReview neither restored nor UNREVERSED_STAT_FIELDS documents as kept",
+    ).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 import { MutationCtx } from '../../_generated/server';
 import { Doc, Id } from '../../_generated/dataModel';
 import { getCourseStatsForMutation } from '../courseStats';
-import { getDailyStats } from './dailyStats';
+import { getDailyStats, displayedActiveReviews } from './dailyStats';
 import {
   getTodayInTimezone,
   getISOWeekString,
@@ -29,6 +29,37 @@ import { FSRS_STATE_LABELS } from '../../lib/fsrsStates';
  * All decrements clamp at 0 and tolerate missing rows/fields (a stats row can
  * predate an optional field, or theoretically have been swept).
  */
+
+/**
+ * Manifest of the stat fields a card review may change that undo
+ * DELIBERATELY leaves in place (see the module doc above for why), keyed by
+ * table. This is the contract between `recordReviewStats` and the reversal
+ * functions here: the drift-guard test in
+ * convex/tests/features/schedulingUndo.test.ts snapshots every table listed
+ * here, runs a review + undo through the real mutations, and fails on any
+ * field that changed and is neither restored nor named below. Adding a new
+ * stat to the record path therefore forces a decision — reverse it, or add
+ * it here explicitly.
+ */
+export const UNREVERSED_STAT_FIELDS: Record<string, readonly string[]> = {
+  courseStats: [
+    'totalTimeMs',
+    'currentStreak',
+    'lastActivityDate',
+    'timezone',
+    'streakFreezeCount',
+    'streakFreezeUsedDate',
+    'totalWordCount',
+  ],
+  dailyStats: ['timeMs', 'timeMsByMode', 'lastCelebratedAtCount'],
+  weeklyStats: ['totalTimeMs', 'activeDays'],
+  monthlyStats: ['totalTimeMs', 'activeDays', 'activeWeeks'],
+  yearlyStats: ['totalTimeMs', 'activeDays', 'activeWeeks', 'activeMonths'],
+  dailyLanguageStats: ['timeMs', 'newWordsCount'],
+  languageStats: ['totalTimeMs', 'totalWords'],
+  reviewDepthAccuracy: [],
+  collectionProgress: [],
+};
 
 const dec = (value: number | undefined, by = 1): number =>
   Math.max(0, (value ?? 0) - by);
@@ -308,13 +339,7 @@ export async function readTodayCounters(
 }> {
   const today = getTodayInTimezone(args.timezone);
   const daily = await getDailyStats(ctx, args.userId, args.courseId, today);
-  // Floored to the celebration high-water mark (which undo deliberately does
-  // NOT lower): after undoing past a milestone the progress bar stays put,
-  // and re-reviewing those cards doesn't visibly advance it again.
-  const dailyReviewsToday = Math.max(
-    (daily?.reviewsByMode?.audio ?? 0) + (daily?.reviewsByMode?.full ?? 0),
-    daily?.lastCelebratedAtCount ?? 0,
-  );
+  const dailyReviewsToday = displayedActiveReviews(daily);
   const dailyTimeMsToday = daily?.timeMs ?? 0;
 
   // Target-only new-word count — mirrors `recordReviewStats`'s definition of

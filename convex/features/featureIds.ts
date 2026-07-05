@@ -19,10 +19,12 @@ export const FEATURE_IDS = {
 export type FeatureId = (typeof FEATURE_IDS)[keyof typeof FEATURE_IDS];
 
 /**
- * Credit cost per unit of each credit-consuming feature. Must mirror the
- * `creditSchema` of the `credits` feature in autumn.config.ts: quota checks
- * and local balance updates convert feature amounts into credits with these
- * costs, while Autumn tracking still receives the underlying feature id.
+ * Credit cost per unit of each credit-consuming feature. Single source of
+ * truth: autumn.config.ts derives the `credits` feature's `creditSchema`
+ * from this table, and quota checks / local balance updates convert feature
+ * amounts into credits with these costs, while Autumn tracking still
+ * receives the underlying feature id. Changing a cost requires an
+ * `atmn push` for Autumn to pick up the new schema.
  *
  * Users on legacy (pre-credits) plan versions have per-feature balances and
  * no `credits` balance; gating falls back to the per-feature path for them.

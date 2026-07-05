@@ -51,6 +51,21 @@ export function hasPaidPlanHistory(
 }
 
 /**
+ * The paid product the customer is currently on: non-default, non-add-on,
+ * not expired. A `scheduled` entry (a pending plan change that hasn't taken
+ * effect yet) never wins over the currently active/trialing one, regardless
+ * of the order Autumn returns the array in.
+ */
+export function findCurrentPaidProduct(
+  products: CustomerProductLite[] | null | undefined,
+): CustomerProductLite | undefined {
+  const candidates = (products ?? []).filter(
+    (cp) => !cp.is_default && !cp.is_add_on && cp.status !== "expired",
+  );
+  return candidates.find((cp) => cp.status !== "scheduled") ?? candidates[0];
+}
+
+/**
  * Derives the trial state from an Autumn customer fetched with
  * `expand: ["trials_used"]`.
  *

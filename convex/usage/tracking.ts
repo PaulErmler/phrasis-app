@@ -56,12 +56,17 @@ function humanizePlanId(planId: string): string {
     .join(' ');
 }
 
+/** The auto-attached default plan (`autoEnable` in autumn.config.ts). */
+const FREE_PLAN_ID = 'free';
+
 /**
  * Derive the customer's current plan from subscriptions (+ one-time
  * purchases as fallback). Add-ons are excluded; an active plan wins over
- * a trialing one; past_due is surfaced via planStatus. Returns undefined
- * when nothing is attached — plan fields are then left untouched on the
- * local quota doc.
+ * a trialing one; past_due is surfaced via planStatus. The auto-attached
+ * default free plan is always listed as active, so paid plans are ranked
+ * first — otherwise a trialing paid customer would be recorded as 'free'.
+ * Returns undefined when nothing is attached — plan fields are then left
+ * untouched on the local quota doc.
  */
 export function derivePlan(
   data: AutumnCustomerResponse,
@@ -70,11 +75,13 @@ export function derivePlan(
     ...(data.subscriptions ?? []),
     ...(data.purchases ?? []),
   ].filter((p) => !p.add_on);
-  const plan =
-    candidates.find((p) => p.status === 'active' && !p.past_due) ??
-    candidates.find((p) => p.status === 'active') ??
-    candidates.find((p) => p.status === 'trialing') ??
-    candidates[0];
+  const pick = (list: AutumnPlanEntry[]) =>
+    list.find((p) => p.status === 'active' && !p.past_due) ??
+    list.find((p) => p.status === 'active') ??
+    list.find((p) => p.status === 'trialing') ??
+    list[0];
+  const paid = candidates.filter((p) => p.plan_id !== FREE_PLAN_ID);
+  const plan = pick(paid) ?? pick(candidates);
   if (!plan) return undefined;
   return {
     planId: plan.plan_id,

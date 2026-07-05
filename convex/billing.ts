@@ -130,14 +130,16 @@ export const switchPlanDuringTrial = action({
       );
       mode = 'scheduled';
     } else if (scenario === 'upgrade' || scenario === 'new') {
-      // Nearest whole day: the v2 API only takes whole-day durations, and
-      // Autumn anchors Stripe-checkout trials a few minutes PAST the day
-      // boundary (7d + ~10min) — ceil would then hand out an extra day and
-      // move the calendar end date; rounding keeps it stable (±minutes).
-      const remainingDays = Math.max(
-        1,
-        Math.round((trialEndsAt - Date.now()) / 86_400_000),
-      );
+      // The v2 API only takes whole-day durations, so compute the remainder
+      // in hours and take the largest whole-day count that never EXTENDS the
+      // trial (+1h tolerance because Autumn anchors Stripe-checkout trials a
+      // few minutes past the day boundary, e.g. 7d + ~10min). Rounding would
+      // let a trial with 2h left become a fresh 24h trial. The one remaining
+      // exception is a trial in its final <24h: the API minimum of 1 day
+      // still applies there, since the alternative (no trial) would end the
+      // trial and bill immediately.
+      const remainingHours = (trialEndsAt - Date.now()) / 3_600_000;
+      const remainingDays = Math.max(1, Math.floor((remainingHours + 1) / 24));
       const result = await autumnFetch<{ payment_url?: string | null }>(
         'POST',
         '/billing.attach',

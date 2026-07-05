@@ -7,6 +7,7 @@ import type { FunctionReturnType } from 'convex/server';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { useEnsureContent } from '@/hooks/use-ensure-content';
+import { useDebounce } from '@/hooks/use-debounce';
 import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
 import { Search, Star, EyeOff, CircleCheck, X, Loader2, PenLine, BookOpen } from 'lucide-react';
@@ -41,15 +42,6 @@ type StickyEntry = {
   isMastered: boolean;
   isHidden: boolean;
 };
-
-function useDebounce<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return debounced;
-}
 
 export function LibraryView({
   hasActiveCourse,

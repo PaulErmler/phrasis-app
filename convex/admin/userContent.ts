@@ -1,9 +1,8 @@
 import { v } from 'convex/values';
 import { paginationOptsValidator } from 'convex/server';
-import { query } from '../_generated/server';
 import { components } from '../_generated/api';
 import { listUIMessages } from '@convex-dev/agent';
-import { requireAdmin } from './lib';
+import { adminQuery } from './lib';
 
 const agentComponent = components.agent;
 
@@ -13,7 +12,7 @@ const agentComponent = components.agent;
  * features/chat/threads.ts) and are surfaced with their status so the UI
  * can label them.
  */
-export const listUserThreads = query({
+export const listUserThreads = adminQuery({
   args: {
     userId: v.string(),
     paginationOpts: paginationOptsValidator,
@@ -32,7 +31,6 @@ export const listUserThreads = query({
     continueCursor: v.string(),
   }),
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
     const result = await ctx.runQuery(
       agentComponent.threads.listThreadsByUserId,
       {
@@ -60,7 +58,7 @@ export const listUserThreads = query({
  * to the given user — defense-in-depth so a stray threadId can't cross
  * users in the admin UI.
  */
-export const listThreadMessages = query({
+export const listThreadMessages = adminQuery({
   args: {
     userId: v.string(),
     threadId: v.string(),
@@ -72,7 +70,6 @@ export const listThreadMessages = query({
     continueCursor: v.string(),
   }),
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {
       threadId: args.threadId,
     });
@@ -95,7 +92,7 @@ export const listThreadMessages = query({
  * Custom texts (sentences) a user created — via manual card creation or
  * chat approval — newest first, with translations and origin badge.
  */
-export const listUserTexts = query({
+export const listUserTexts = adminQuery({
   args: {
     userId: v.string(),
     paginationOpts: paginationOptsValidator,
@@ -117,7 +114,6 @@ export const listUserTexts = query({
     continueCursor: v.string(),
   }),
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
     const result = await ctx.db
       .query('texts')
       .withIndex('by_userId', (q) => q.eq('userId', args.userId))

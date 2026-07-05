@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useDebounce } from '@/hooks/use-debounce';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -49,15 +50,6 @@ const SORT_OPTIONS: Array<{ value: SortBy; label: string }> = [
   { value: 'streak', label: 'Highest streak' },
   { value: 'last_active', label: 'Recently active' },
 ];
-
-function useDebounced(value: string, delayMs: number): string {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const handle = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(handle);
-  }, [value, delayMs]);
-  return debounced;
-}
 
 export function StreakBadge({
   streak,
@@ -108,7 +100,7 @@ export function UsersTable() {
   const [activity, setActivity] = useState<Activity | 'all'>('all');
   const [sortBy, setSortBy] = useState<SortBy>('newest');
   const [limit, setLimit] = useState(PAGE_SIZE);
-  const debouncedSearch = useDebounced(search, 300);
+  const debouncedSearch = useDebounce(search, 300);
 
   // Reset the page size when any filter changes.
   useEffect(() => {

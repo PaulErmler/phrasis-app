@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 import { query } from '../_generated/server';
-import { getAdminContext, requireAdmin } from './lib';
+import { adminQuery, getAdminContext } from './lib';
 import { authComponent } from '../auth';
 import { deriveStreakDisplay } from '../db/courseStats';
 import { getTodayInTimezone, getPreviousDay, daysSince } from '../lib/dateUtils';
@@ -69,7 +69,8 @@ function summarizeCourseStats(
 
 /**
  * Frontend gate for the /app/admin routes. Never throws — non-admins just
- * get `false`. Real protection is requireAdmin inside every data query.
+ * get `false`. Real protection is the `adminQuery` builder every data
+ * query is registered through.
  */
 export const isAdmin = query({
   args: {},
@@ -85,7 +86,7 @@ export const isAdmin = query({
  * Dates are the users' local calendar days as written by the stats
  * pipeline. Also sums review volume and study time per day for free.
  */
-export const getDauSeries = query({
+export const getDauSeries = adminQuery({
   args: { days: v.number() },
   returns: v.array(
     v.object({
@@ -96,7 +97,6 @@ export const getDauSeries = query({
     }),
   ),
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
     const days = Math.max(1, Math.min(120, Math.floor(args.days)));
     // Split a fixed read budget across the window so days × cap stays under
     // the 16,384-doc scan limit (30d → 400 rows/day, 120d → 100 rows/day).
@@ -134,14 +134,13 @@ export const getDauSeries = query({
  * New-user registrations per day over the trailing `days` window (UTC
  * bucketing of Better Auth signup timestamps), plus the total user count.
  */
-export const getSignupSeries = query({
+export const getSignupSeries = adminQuery({
   args: { days: v.number() },
   returns: v.object({
     totalUsers: v.number(),
     series: v.array(v.object({ date: v.string(), signups: v.number() })),
   }),
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
     const days = Math.max(1, Math.min(120, Math.floor(args.days)));
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
 
@@ -175,7 +174,7 @@ export const getSignupSeries = query({
  * product) fall into the 'unknown' bucket until their next sync — run
  * migrations/backfillPlanNames to eliminate it.
  */
-export const getPlanDistribution = query({
+export const getPlanDistribution = adminQuery({
   args: {},
   returns: v.object({
     totalWithQuotas: v.number(),
@@ -188,7 +187,6 @@ export const getPlanDistribution = query({
     ),
   }),
   handler: async (ctx) => {
-    await requireAdmin(ctx);
     const docs = await ctx.db.query('usageQuotas').take(MAX_SCAN);
     const byPlan = new Map<string, { planName: string; count: number }>();
     for (const doc of docs) {
@@ -211,7 +209,7 @@ export const getPlanDistribution = query({
  * Which languages users are learning (target) and learning from (base),
  * plus the level distribution — active (non-archived) courses only.
  */
-export const getLanguageStats = query({
+export const getLanguageStats = adminQuery({
   args: {},
   returns: v.object({
     targetLanguages: v.array(v.object({ language: v.string(), count: v.number() })),
@@ -219,7 +217,6 @@ export const getLanguageStats = query({
     levels: v.array(v.object({ level: v.string(), count: v.number() })),
   }),
   handler: async (ctx) => {
-    await requireAdmin(ctx);
     const courses = await ctx.db.query('courses').take(MAX_SCAN);
     const target = new Map<string, number>();
     const base = new Map<string, number>();
@@ -251,7 +248,7 @@ export const getLanguageStats = query({
  * Onboarding funnel: how many users completed onboarding, where the
  * in-progress ones are stuck, and where completed users came from.
  */
-export const getOnboardingFunnel = query({
+export const getOnboardingFunnel = adminQuery({
   args: {},
   returns: v.object({
     total: v.number(),
@@ -261,7 +258,6 @@ export const getOnboardingFunnel = query({
     learningGoals: v.array(v.object({ goal: v.string(), count: v.number() })),
   }),
   handler: async (ctx) => {
-    await requireAdmin(ctx);
     const rows = await ctx.db.query('onboardingProgress').take(MAX_SCAN);
     let completed = 0;
     const steps = new Map<number, number>();
@@ -304,7 +300,7 @@ export const getOnboardingFunnel = query({
  * applied in memory — heavier joins (courses) run only for the returned
  * rows. `limit` grows for "load more"; `total` is the filtered match count.
  */
-export const listUsers = query({
+export const listUsers = adminQuery({
   args: {
     limit: v.number(),
     search: v.optional(v.string()),
@@ -344,7 +340,6 @@ export const listUsers = query({
     hasMore: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
     const limit = Math.max(1, Math.min(200, Math.floor(args.limit)));
 
     const search = args.search?.trim().toLowerCase();
@@ -459,7 +454,7 @@ const courseDetailValidator = v.object({
  * full feature usage, per-course stats with live streaks, onboarding
  * answers.
  */
-export const getUserDetail = query({
+export const getUserDetail = adminQuery({
   args: { userId: v.string() },
   returns: v.union(
     v.null(),
@@ -487,7 +482,6 @@ export const getUserDetail = query({
     }),
   ),
   handler: async (ctx, args) => {
-    await requireAdmin(ctx);
 
     const profile = await ctx.db
       .query('userProfiles')

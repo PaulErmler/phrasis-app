@@ -19,6 +19,38 @@ export async function getDailyStats(
 }
 
 
+/**
+ * Floor a displayed review count to the celebration high-water mark (which
+ * undo deliberately never lowers): after undoing past a milestone the
+ * progress bar stays put, and re-reviewing those cards doesn't visibly
+ * advance it or replay the celebration. Single owner of the formula —
+ * `getCardForReview`, `reviewCard`, and `readTodayCounters` must all agree
+ * or the bar jumps between initial load, post-review, and post-undo syncs.
+ */
+export function floorToCelebration(
+  activeReviews: number,
+  lastCelebratedAtCount: number | null | undefined,
+): number {
+  return Math.max(activeReviews, lastCelebratedAtCount ?? 0);
+}
+
+/**
+ * The review count shown in the progress bar for a day: active (non-radio)
+ * reviews floored to the celebration high-water mark. Tolerates a missing
+ * row (no activity today yet).
+ */
+export function displayedActiveReviews(
+  daily:
+    | Pick<Doc<'dailyStats'>, 'reviewsByMode' | 'lastCelebratedAtCount'>
+    | null
+    | undefined,
+): number {
+  return floorToCelebration(
+    (daily?.reviewsByMode?.audio ?? 0) + (daily?.reviewsByMode?.full ?? 0),
+    daily?.lastCelebratedAtCount,
+  );
+}
+
 const EMPTY_HOUR_BUCKETS = () => Array.from({ length: 24 }, () => 0);
 const EMPTY_RATING_COUNTS = () => ({
   stillLearning: 0, understood: 0,

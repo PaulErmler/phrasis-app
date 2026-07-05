@@ -29,11 +29,16 @@ export const OPENROUTER_CHAT_REASONING = 'high' as const;
  *  request (providerMetadata.openrouter.usage.cost), which drives the
  *  per-message credit charge in chat. `max_price.completion` caps output
  *  at $5/M tokens; requests fail if no provider qualifies. preferred_*
- *  deprioritize endpoints slower than 2s p50 / under 50 tok/s p50. */
+ *  deprioritize endpoints slower than 2s p50 / under 50 tok/s p50.
+ *  `require_parameters` restricts routing to providers that support every
+ *  request parameter — critically `tools`, which createCard depends on;
+ *  without it a fallback provider without tool calling silently breaks
+ *  flashcard proposals. */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
   usage: { include: true },
   provider: {
     allow_fallbacks: true,
+    require_parameters: true,
     max_price: {
       completion: 5,
     },

@@ -1,6 +1,6 @@
 import { feature, item, plan } from 'atmn';
 
-import { FEATURE_IDS } from './convex/features/featureIds';
+import { CREDIT_COSTS, FEATURE_IDS } from './convex/features/featureIds';
 
 // Features
 export const multiple_languages = feature({
@@ -80,15 +80,16 @@ export const translation_flags = feature({
 // Credit system: chat messages, custom sentence creation, and translation
 // auto-fill draw from a shared credit pool instead of separate meters.
 // Always check/track the underlying feature ids — Autumn converts usage
-// into credit deductions via this schema. Keep the costs in sync with
-// CREDIT_COSTS in convex/features/featureIds.ts. Chat cost is dynamic: the
+// into credit deductions via this schema. The schema is derived from
+// CREDIT_COSTS in convex/features/featureIds.ts, so that single table also
+// drives quota checks and local balance math. Chat cost is dynamic: the
 // app tracks 1 chat_messages unit up-front plus 1 more per additional
 // started $0.005 of LLM cost (see convex/features/chat/messages.ts).
 export const credits = feature({
 	id: 'credits',
 	name: 'Credits',
 	type: 'credit_system',
-	creditSchema: [{ meteredFeatureId: 'custom_sentences', creditCost: 1 }, { meteredFeatureId: 'translation_auto_fill', creditCost: 1 }, { meteredFeatureId: 'chat_messages', creditCost: 1 }],
+	creditSchema: Object.entries(CREDIT_COSTS).map(([meteredFeatureId, creditCost]) => ({ meteredFeatureId, creditCost })),
 });
 
 // Plans

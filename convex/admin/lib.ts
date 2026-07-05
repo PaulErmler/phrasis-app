@@ -1,5 +1,11 @@
-import { ConvexError } from 'convex/values';
-import { QueryCtx } from '../_generated/server';
+import {
+  ConvexError,
+  type Infer,
+  type ObjectType,
+  type PropertyValidators,
+  type Validator,
+} from 'convex/values';
+import { query, QueryCtx } from '../_generated/server';
 import { authComponent } from '../auth';
 
 export type AdminContext = { userId: string; email: string };
@@ -34,4 +40,35 @@ export async function requireAdmin(ctx: QueryCtx): Promise<AdminContext> {
   const admin = await getAdminContext(ctx);
   if (!admin) throw new ConvexError('Not authorized');
   return admin;
+}
+
+/**
+ * Query builder for admin endpoints: registers a public query whose handler
+ * only runs after `requireAdmin` passes. Every data-exposing function in
+ * convex/admin/ MUST be declared with this instead of `query` — the gate is
+ * then structural rather than a first-line call each handler has to
+ * remember. The resolved AdminContext is passed as the handler's third
+ * argument. (`isAdmin` stays a plain query on purpose: it returns only a
+ * boolean and must not throw for regular users.)
+ */
+export function adminQuery<
+  ArgsValidator extends PropertyValidators,
+  ReturnsValidator extends Validator<unknown, 'required', string>,
+>(def: {
+  args: ArgsValidator;
+  returns: ReturnsValidator;
+  handler: (
+    ctx: QueryCtx,
+    args: ObjectType<ArgsValidator>,
+    admin: AdminContext,
+  ) => Promise<Infer<ReturnsValidator>>;
+}) {
+  return query({
+    args: def.args,
+    returns: def.returns,
+    handler: async (ctx: QueryCtx, args: ObjectType<ArgsValidator>) => {
+      const admin = await requireAdmin(ctx);
+      return def.handler(ctx, args, admin);
+    },
+  });
 }
