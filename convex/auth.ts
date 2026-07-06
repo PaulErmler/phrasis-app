@@ -1,17 +1,45 @@
-import { createClient, type GenericCtx } from '@convex-dev/better-auth';
+import {
+  createClient,
+  type AuthFunctions,
+  type GenericCtx,
+} from '@convex-dev/better-auth';
 import { convex } from '@convex-dev/better-auth/plugins';
-import { components } from './_generated/api';
+import { components, internal } from './_generated/api';
 import { DataModel } from './_generated/dataModel';
 import { query } from './_generated/server';
 import { betterAuth } from 'better-auth';
 import authConfig from './auth.config';
+import { upsertUserProfile, deleteUserProfile } from './db/userProfiles';
 
 const siteUrl = process.env.SITE_URL;
 if (!siteUrl) throw new Error('Missing required Convex environment variable: SITE_URL');
 
 // The component client has methods needed for integrating Convex with Better Auth,
 // as well as helper methods for general use.
-export const authComponent = createClient<DataModel>(components.betterAuth);
+// User triggers keep the app-owned `userProfiles` mirror (admin dashboard
+// user list/search) in sync with the component's user table.
+// Cast breaks the type-level circularity: internal.auth's type includes the
+// triggersApi() exports below, which are derived from authComponent itself.
+const authFunctions = internal.auth as unknown as AuthFunctions;
+
+export const authComponent = createClient<DataModel>(components.betterAuth, {
+  authFunctions,
+  triggers: {
+    user: {
+      onCreate: async (ctx, doc) => {
+        await upsertUserProfile(ctx, doc);
+      },
+      onUpdate: async (ctx, newDoc) => {
+        await upsertUserProfile(ctx, newDoc);
+      },
+      onDelete: async (ctx, doc) => {
+        await deleteUserProfile(ctx, doc._id);
+      },
+    },
+  },
+});
+
+export const { onCreate, onUpdate, onDelete } = authComponent.triggersApi();
 
 // Use the safe (non-throwing) version so the AuthBoundary's ErrorBoundary
 // doesn't trigger during transient JWT refresh windows. True logout is

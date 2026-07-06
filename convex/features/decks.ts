@@ -62,6 +62,7 @@ import {
   claimLlmTranslationIfAvailable,
   CLAIM_STALE_MS as LLM_CLAIM_STALE_MS,
 } from './llmTranslationQueue';
+import { llmPool } from '../lib/workpools';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
   CONTENT_LOOKAHEAD_SIZE,
@@ -90,13 +91,7 @@ export async function scheduleMissingContent(
   text: Doc<'texts'>,
   baseLanguages: string[],
   targetLanguages: string[],
-  options?: { priority?: 0 | 1 | 2 },
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
-  // Default to 0 (normal). Priority tiers: 2 = critical (onboarding seed /
-  // placement test — the user is blocked on this content right now),
-  // 1 = active collection (foreground drilling, lookahead, retranslation),
-  // 0 = background warmup (cross-level first-5 prewarm, opportunistic sync).
-  const priority = options?.priority ?? 0;
   const sourceLanguage = text.language;
 
   // Resolve gender for both the voice (audioSpeakerGender) and the translation
@@ -380,7 +375,6 @@ export async function scheduleMissingContent(
                 voiceGender,
                 speed: 1,
               },
-              priority,
             },
           );
           audioScheduled++;
@@ -409,18 +403,17 @@ export async function scheduleMissingContent(
                   targetLanguage: lang,
                   text: text.text,
                   audioSpeakerGender,
-                  claimId,
                 },
-                priority,
               },
             );
             translationsScheduled++;
           }
         } else {
-          // Legacy Google Translate path — priority carries through to the
-          // downstream TTS enqueue via storeTranslationAndScheduleTTS.
-          await ctx.scheduler.runAfter(
-            0,
+          // Legacy Google Translate path. Runs through the llmPool too (for
+          // retries + slot bounding); holds no LLM claim, so its onComplete's
+          // claim lookup no-ops.
+          await llmPool.enqueueAction(
+            ctx,
             internal.features.decks.processTranslationForCard,
             {
               textId,
@@ -428,7 +421,11 @@ export async function scheduleMissingContent(
               targetLanguage: lang,
               text: text.text,
               audioSpeakerGender,
-              priority,
+            },
+            {
+              onComplete:
+                internal.features.llmTranslationQueue.onGoogleFallbackComplete,
+              context: { textId, targetLanguage: lang },
             },
           );
           translationsScheduled++;
@@ -494,7 +491,6 @@ export async function scheduleMissingContent(
                     speed: 1,
                     regionVariant,
                   },
-                  priority,
                 },
               );
               audioScheduled++;
@@ -1007,12 +1003,6 @@ export const addCardsFromCollection = mutation({
     // When the requested collection is a custom collection (collection detail "add" button),
     // only add from that specific collection.
     const courseSettings = await getCourseSettings(ctx, courseId);
-    const activeCollectionId = courseSettings?.activeCollectionId;
-    // Snapshot whether each prepareCardContent we schedule below should be
-    // marked high-priority. Comparing by `===` is enough since both sides are
-    // Convex Id strings (or undefined).
-    const priorityForCollection = (collectionId: Id<'collections'>): 0 | 1 | 2 =>
-      activeCollectionId && activeCollectionId === collectionId ? 1 : 0;
     const requestedCollection = await ctx.db.get(args.collectionId);
     const isLevelCollection = requestedCollection
       ? isPremadeLevelCollection(requestedCollection)
@@ -1100,7 +1090,6 @@ export const addCardsFromCollection = mutation({
             ctx, userId, courseId, entry.id, texts.length, newLastRank,
           );
 
-          const phase1Priority = priorityForCollection(entry.id);
           for (const text of texts) {
             await ctx.scheduler.runAfter(
               0, internal.features.decks.prepareCardContent,
@@ -1108,7 +1097,6 @@ export const addCardsFromCollection = mutation({
                 textId: text._id,
                 baseLanguages: course.baseLanguages,
                 targetLanguages: course.targetLanguages,
-                priority: phase1Priority,
               },
             );
           }
@@ -1124,7 +1112,6 @@ export const addCardsFromCollection = mutation({
                 textId: text._id,
                 baseLanguages: course.baseLanguages,
                 targetLanguages: course.targetLanguages,
-                priority: phase1Priority,
               },
             );
           }
@@ -1193,7 +1180,6 @@ export const addCardsFromCollection = mutation({
           newLastRank,
         );
 
-        const phase2Priority = priorityForCollection(args.collectionId);
         for (const text of textsToAdd) {
           await ctx.scheduler.runAfter(
             0,
@@ -1202,7 +1188,6 @@ export const addCardsFromCollection = mutation({
               textId: text._id,
               baseLanguages: course.baseLanguages,
               targetLanguages: course.targetLanguages,
-              priority: phase2Priority,
             },
           );
         }
@@ -1224,7 +1209,6 @@ export const addCardsFromCollection = mutation({
               textId: text._id,
               baseLanguages: course.baseLanguages,
               targetLanguages: course.targetLanguages,
-              priority: phase2Priority,
             },
           );
         }
@@ -1299,27 +1283,12 @@ export const ensureCardContent = mutation({
     const text = await ctx.db.get(args.textId);
     if (!text) return { translationsScheduled: 0, audioScheduled: 0 };
 
-    // Prioritize when this card is from the user's currently-active
-    // collection. priority: 2 because `ensureCardContent` fires during
-    // review/study — the user is staring at the card right now and is
-    // blocked on its content. Same tier as placement test / onboarding
-    // seed. Comparing IDs by string keeps the check resilient if either
-    // field is undefined.
-    const settings = await getCourseSettings(ctx, active.course._id);
-    const priority =
-      settings?.activeCollectionId &&
-      card.collectionId &&
-      settings.activeCollectionId === card.collectionId
-        ? 2
-        : 0;
-
     return scheduleMissingContent(
       ctx,
       args.textId,
       text,
       active.course.baseLanguages,
       active.course.targetLanguages,
-      { priority },
     );
   },
 });
@@ -1385,24 +1354,12 @@ async function scheduleContentForUpcomingCards(
     const card = cards[i];
     const text = texts[i];
     if (!text) continue;
-    // Bump priority for cards in the user's currently-active collection
-    // so their content jumps to the front of the TTS / LLM queues.
-    // priority: 2 because these are the lookahead cards the user will reach
-    // within the current (or an imminent) session, so they're effectively
-    // blocking.
-    const priority =
-      activeCollectionId &&
-      card.collectionId &&
-      activeCollectionId === card.collectionId
-        ? 2
-        : 0;
     await scheduleMissingContent(
       ctx,
       card.textId,
       text,
       active.course.baseLanguages,
       active.course.targetLanguages,
-      { priority },
     );
     processed++;
   }
@@ -1543,11 +1500,9 @@ export const prepareCardContent = internalMutation({
     textId: v.id('texts'),
     baseLanguages: v.array(v.string()),
     targetLanguages: v.array(v.string()),
-    // Priority is set by the caller at enqueue time — typically by
-    // `addCardsFromCollection` which compares the target collection against
-    // the user's `activeCollectionId`. We snapshot intent here instead of
-    // re-reading the active collection at run time so a user switching
-    // collections mid-batch doesn't reshuffle work that's already queued.
+    // DEPRECATED (pre-workpool): the pools are FIFO, priority tiers are gone.
+    // Accepted so invocations scheduled before the migration still validate;
+    // ignored.
     priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
   },
   returns: v.null(),
@@ -1561,7 +1516,6 @@ export const prepareCardContent = internalMutation({
       text,
       args.baseLanguages,
       args.targetLanguages,
-      { priority: args.priority },
     );
     return null;
   },
@@ -1607,6 +1561,9 @@ export const processTranslationForCard = internalAction({
     targetLanguage: v.string(),
     text: v.string(),
     audioSpeakerGender: v.optional(v.string()),
+    // DEPRECATED (pre-workpool): pools are FIFO, priority tiers are gone.
+    // Accepted so invocations scheduled before the migration still validate;
+    // ignored.
     priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
     /**
      * Retranslation flag. Set when this action is dispatched as the
@@ -1616,12 +1573,25 @@ export const processTranslationForCard = internalAction({
      * then forwards the flag to `storeTranslationAndScheduleTTS` so the
      * existing row is actually overwritten. False/absent → historical
      * behavior (reuse existing translation if present).
+     *
+     * Failure contract: THROWS on translation/store errors. This action runs
+     * as an llmPool job (both the direct Google path and the LLM fallback),
+     * so the pool retries with backoff and terminal failures land in
+     * `onGoogleFallbackComplete`, which logs and leaves the claim to expire
+     * as a re-drive backoff.
      */
     replaceExisting: v.optional(v.boolean()),
+    /**
+     * Single-writer token, forwarded to `storeTranslationAndScheduleTTS` as
+     * `expectedClaimId`. Set by the LLM-fallback dispatch (the claim the
+     * failed LLM job owned, re-pointed at this job); absent on the direct
+     * Google path, which holds no claim.
+     */
+    claimId: v.optional(v.id('llmTranslationClaims')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    try {
+    {
       const existingRow = await ctx.runQuery(
         internal.features.decks.getTranslationForTextLanguage,
         {
@@ -1716,24 +1686,11 @@ export const processTranslationForCard = internalAction({
           // to `translationProvider: 'google'`).
           translationSource: GOOGLE_TRANSLATE_SOURCE,
           regionVariant,
-          priority: args.priority,
           replaceExisting: args.replaceExisting,
           speakerGender: asVoiceGender(args.audioSpeakerGender),
+          expectedClaimId: args.claimId,
         },
       );
-    } catch (err) {
-      // Terminal: this is the Google last-resort path (reached only after the
-      // LLM was retried MAX_LLM_RETRIES times). Both quality and fallback have
-      // now failed, so no translation row is written and no audio is scheduled.
-      // We intentionally do NOT release the LLM claim here — letting it expire
-      // via CLAIM_STALE_MS gives a ~30s backoff before the next reconcile
-      // re-drives this (textId, lang), preventing a tight retry hot-loop.
-      console.error('[translateCard] terminal translation failure (LLM retries + Google both failed):', {
-        textId: args.textId,
-        sourceLanguage: args.sourceLanguage,
-        targetLanguage: args.targetLanguage,
-        error: err,
-      });
     }
 
     return null;
@@ -1771,7 +1728,6 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      * can pick a voice in the matching locale.
      */
     regionVariant: v.optional(v.string()),
-    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
     /**
      * Retranslation flag. Set by callers that deliberately want to overwrite
      * an existing translation — today only `flagTranslation` (the user
@@ -1802,44 +1758,42 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      */
     speakerGender: v.optional(voiceGenderValidator),
     /**
-     * Ownership token (an `llmTranslationClaims` `_id`) passed by the LLM worker.
-     * When set, this mutation only writes if that claim is still the current one
-     * for (textId, targetLanguage) — atomically, in this transaction. If a
-     * concurrent reconcile reclaimed the claim mid-call (delete+reinsert → new
-     * `_id`), the worker lost ownership and we skip the write + TTS so the new
-     * owner is the single writer (no double-write, no claim clobber). Undefined
-     * for the Google fallback path and legacy callers (check disabled).
+     * Single-writer token: the `llmTranslationClaims` row the calling job was
+     * enqueued under. When supplied, the write only proceeds if that exact
+     * claim doc still exists — a reclaim deletes + reinserts the claim under
+     * a new `_id`, so a mismatch means another job now owns this
+     * (textId, targetLanguage) and this result is stale. Absent on the
+     * claimless direct-Google path (`scheduleMissingContent`'s non-openrouter
+     * branch), which then keeps its historical no-overwrite semantics only.
      */
     expectedClaimId: v.optional(v.id('llmTranslationClaims')),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Read the LLM claim once up front — used both for the ownership gate below
-    // and the claim release after the write.
-    const llmClaim = await ctx.db
-      .query('llmTranslationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-      )
-      .first();
-    // Ownership gate: if the caller passed the claim it was dispatched under and
-    // that claim is no longer current (reclaimed by a concurrent reconcile, or
-    // already released), bail without writing — another job now owns this row.
-    if (
-      args.expectedClaimId !== undefined &&
-      llmClaim?._id !== args.expectedClaimId
-    ) {
+    // Guard: the text may have been cascade-deleted (deleteCardPermanently /
+    // editCard cleanup) while this job was in flight. Don't write an orphan
+    // translation row (and schedule orphan TTS) against a now-deleted text.
+    // The LLM claim (if any) is released by the pool job's onComplete.
+    // No-op in normal flow (text always exists).
+    if ((await ctx.db.get(args.textId)) === null) {
       return null;
     }
 
-    // Guard: the text may have been cascade-deleted (deleteCardPermanently /
-    // editCard cleanup) while this job was in flight. Don't write an orphan
-    // translation row (and schedule orphan TTS) against a now-deleted text;
-    // release the now-dead claim and bail. Placed after the ownership gate so a
-    // reclaimed-claim skip still wins. No-op in normal flow (text always exists).
-    if ((await ctx.db.get(args.textId)) === null) {
-      if (llmClaim) await ctx.db.delete(llmClaim._id);
-      return null;
+    // Single-writer gate: a job whose claim was reclaimed mid-flight (it ran
+    // past CLAIM_STALE_MS and a concurrent scheduler re-enqueued the row) must
+    // not write — the reclaiming job owns the row now, and a late stale result
+    // landing after the owner's would silently revert it (worst case: a
+    // flag-retranslation's text overwritten while its audio survives).
+    if (args.expectedClaimId !== undefined) {
+      const llmClaim = await ctx.db
+        .query('llmTranslationClaims')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
+        )
+        .first();
+      if (llmClaim?._id !== args.expectedClaimId) {
+        return null;
+      }
     }
 
     const existing = await ctx.db
@@ -1968,15 +1922,6 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       }
     }
 
-    // Release the LLM translation claim now that the translation row exists
-    // (read once at the top of this handler). The LLM worker keeps the claim
-    // alive across a Google fallback so a concurrent scheduleMissingContent
-    // can't re-route the same (textId, lang) through the LLM mid-fallback. Calls
-    // from the pure-Google path (which never held a claim) see no row and no-op.
-    if (llmClaim) {
-      await ctx.db.delete(llmClaim._id);
-    }
-
     const existingAudioForVoice = await ctx.db
       .query('audioRecordings')
       .withIndex('by_text_and_language_and_voiceName', (q) =>
@@ -2009,7 +1954,6 @@ export const storeTranslationAndScheduleTTS = internalMutation({
               speed: 1,
               regionVariant: args.regionVariant,
             },
-            priority: args.priority,
           },
         );
       }

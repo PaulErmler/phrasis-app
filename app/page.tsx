@@ -7,9 +7,9 @@ import { LandingPageClient } from '@/components/landing/landing-page-client';
 const siteUrl = process.env.SITE_URL ?? 'https://flexling.com';
 
 export const metadata: Metadata = {
-  title: 'Flexling — The Language App That Grows With You',
+  title: 'Flexling — Language Learning on Autopilot',
   description:
-    'Learn languages your way with audio flashcards, spaced repetition, and AI-powered chat. Bring your own content, practice pronunciation, and build fluency fast. Free to start.',
+    'Get fluent by shadowing real sentences, writing them, and listening all day — powered by spaced repetition (the same algorithm as Anki) and a built-in AI tutor. Just 15 minutes a day. Free to start.',
   alternates: {
     canonical: '/',
   },

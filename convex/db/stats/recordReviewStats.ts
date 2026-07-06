@@ -50,6 +50,16 @@ export async function recordReviewStats(
   dailyReviewsToday: number;
   dailyTimeMsToday: number;
   dailyNewWordsToday: number;
+  // Keys the review's stat increments were bucketed under — captured for the
+  // reviewLogs undo entry, since they aren't recomputable later (clock moves
+  // on, course languages can change).
+  todayDate: string;
+  hourOfDay: number;
+  languages: string[];
+  wasFirstReview: boolean;
+  /** See `upsertDailyStats` — floors the displayed review count so undo can't
+   * wind the progress bar back past an already-shown celebration. */
+  lastCelebratedAtCount: number;
 }> {
   const { userId, card, deck, course } = args;
   const nonNegativeTime = Math.max(args.timeSpentMs ?? 0, 0);
@@ -123,6 +133,7 @@ export async function recordReviewStats(
     isFirstActivityToday,
     activeReviewsAfter: dailyReviewsToday,
     timeMsAfter: dailyTimeMsToday,
+    lastCelebratedAtCount,
   } = await upsertDailyStats(ctx, {
     userId,
     courseId: deck.courseId,
@@ -295,5 +306,10 @@ export async function recordReviewStats(
     dailyReviewsToday,
     dailyTimeMsToday,
     dailyNewWordsToday,
+    todayDate,
+    hourOfDay,
+    languages: allLanguages,
+    wasFirstReview: isFirstReview,
+    lastCelebratedAtCount,
   };
 }

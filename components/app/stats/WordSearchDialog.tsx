@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useDebounce } from '@/hooks/use-debounce';
 import {
   CommandDialog,
   CommandInput,
@@ -14,15 +15,6 @@ import {
 } from '@/components/ui/command';
 import { WordSentencesDialog } from './WordSentencesDialog';
 import { useLangName } from './WordCloudCard';
-
-function useDebounce<T>(value: T, delay: number): T {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
-  }, [value, delay]);
-  return debounced;
-}
 
 function groupByLanguage(
   items: Array<{ word: string; displayWord: string; language: string }>,

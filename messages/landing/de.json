@@ -18,9 +18,9 @@
     "themeSystem": "System"
   },
   "hero": {
-    "sectionLabel": "Sprachenlernen, aber effizient",
-    "tagline": "Die Sprach-App, die <highlight>mit dir wächst</highlight>.",
-    "subtitle": "Audiobasiertes Sprachenlernen mit Spaced Repetition und Anpassung an dich.",
+    "sectionLabel": "Vom ersten Tag an sprechen",
+    "tagline": "Flüssig sprechen — auf <highlight>Autopilot</highlight>.",
+    "subtitle": "Flexling plant jeden Satz genau für den Moment, in dem du ihn dir merken musst — du hörst nur zu, sprichst nach und siehst zu, wie du flüssiger wirst.",
     "cta": {
       "start": "Kostenlos starten",
       "howItWorks": "So funktioniert's",
@@ -29,28 +29,54 @@
     }
   },
   "philosophy": {
-    "title": "Was lässt Sprache sitzen?",
-    "titleHighlight": "Wiederholung, personalisierter Input und Motivation.",
-    "lead": "Beständige Wiederholung, Input, der zu deinem Niveau und deinen Interessen passt, und die Motivation dranzubleiben — Flexling baut genau auf diesen drei Säulen.",
-    "pillar1Title": "Wiederholung, die in den Tag passt",
-    "pillar1Body": "Kurze, häufige Kontakte mit denselben Sätzen schlagen seltenes Pauken und Wiederholung ist der Schlüssel, aber konsequent zu bleiben ist schwer. Flexling ermöglicht es dir, die wichtigsten Dinge mit modernster Spaced Repetition zu wiederholen und der Audio-Modus lässt dich flexibel üben, um in deinen vollen Tag zu passen.",
-    "pillar2Title": "Personalisierter Input",
-    "pillar2Body": "Anstatt Dinge zu lernen, die dich nicht interessieren, kannst du deinen Lehrplan anpassen. Füge eigene Sätze hinzu, importiere eine CSV Datei, oder lass die KI sie für dich erstellen. Jeder lernt anders – dein Lernmaterial sollte sich anpassen.",
-    "pillar3Title": "Motivation und Fortschrittsverfolgung",
-    "pillar3Body": "Eine Sprache zu lernen ist schwer und manchmal ist es auch schwer, motiviert zu bleiben. Flexling erstellt detaillierte Statistiken über deinen Lernfortschritt, z.B. wie viele Wörter du bereits gelernt hast. Das hält dich motiviert."
+    "title": "Aufgebaut auf dem, was",
+    "titleHighlight": "wirklich funktioniert.",
+    "lead": "Aktives Erinnern, Shadowing und Spaced Repetition sorgen nachweislich dafür, dass Sprachen haften — Flexling ist ganz auf diese Prinzipien ausgelegt.",
+    "cards": {
+      "activeRecall": {
+        "title": "Aktives Erinnern",
+        "body": "Übersetze echte Sätze aus deiner Sprache, überprüfe dich selbst und wiederhole, bis es sitzt. Spaced Repetition — derselbe Algorithmus wie bei Anki — bringt jeden Satz genau dann zurück, bevor du ihn vergisst."
+      },
+      "grammar": {
+        "title": "Grammatik ohne Pauken",
+        "body": "Vergiss Regeln und Arbeitsblätter. Indem du echte Sätze sprichst und schreibst, nimmst du Grammatik so auf, wie du deine Muttersprache gelernt hast — durch Anwenden."
+      },
+      "daily": {
+        "title": "Nur 15 Minuten am Tag",
+        "body": "Beständiges tägliches Üben schlägt Marathon-Sessions. Flexling plant genau das, was du heute wiederholen musst — ganz ohne eigene Planung."
+      },
+      "practical": {
+        "title": "Praktisch statt theoretisch",
+        "body": "Lerne die Sätze, die du wirklich sagen wirst. Jede Karte ist für echte Kommunikation gemacht, nicht für Grammatik-Arbeitsblätter."
+      },
+      "customisation": {
+        "title": "Mach es zu deinem",
+        "body": "Bring eigene Sätze mit, importiere eine Tabelle oder lass die KI sie erstellen. Dein Material, dein Weg."
+      },
+      "feedback": {
+        "title": "Sofortiges Feedback",
+        "body": "Erhalte bei jedem Satz sofortiges Feedback zu Rechtschreibung und Erinnerung — plus einen KI-Tutor, der jede Frage beantwortet und daraus eine Lernkarte macht."
+      }
+    }
   },
   "reviewModes": {
-    "title": "Zwei Wege zum Wiederholen.",
-    "titleHighlight": "Wähle, wie du am besten lernst.",
-    "subtitle": "Dieselben Sätze, anderes Training — wechsle jederzeit zwischen Audio-Wiederholung und vollständiger Texteingabe.",
-    "audioTitle": "Audio-Wiederholung",
-    "audioBody": "Hör den Satz in einer Sprache, die du schon verstehst, denk an die Übersetzung — jede Zielzeile startet unscharf und wird nach und nach scharf, so als wäre das Audio gerade zu Ende. In der App passiert das nach dem Abspielen. Mit Wiederholen siehst du die Demo erneut. Bewerte, wie gut du dich erinnerst — ideal für Pendeln und freihändiges Üben.",
-    "fullTitle": "Vollständige Wiederholung",
-    "fullBody": "Tippe die Übersetzung für jede Zielsprache. Nach dem Absenden siehst du einen Zeichen-für-Zeichen-Vergleich: Richtiges in Grün, Fehler markiert, Ausgelassenes gedämpft — plus eine Genauigkeit in Prozent.",
-    "reviewModeTitle": "Wiederholungsmodus",
-    "reviewModeBody": "Nutze Spaced Repetition in Kombination mit audio-basiertem Lernen",
-    "radioTitle": "Radio-Modus",
-    "radioBody": "Hör den ganzen Tag Sätze mit dem Radio-Modus, ohne den Spaced-Repetition-Algorithmus zu beeinflussen. Perfekt, um dein Hörverständnis den ganzen Tag über zu schärfen.",
+    "title": "Drei Wege, Flexling",
+    "titleHighlight": "zu nutzen.",
+    "subtitle": "Dieselben Sätze, drei Arten zu üben. Sprich sie laut nach, schreib sie aus dem Gedächtnis oder lass sie im Hintergrund laufen — wechsle jederzeit.",
+    "audioTitle": "Shadowing",
+    "audioBody": "Das Herzstück von Flexling. Hör einen Satz, übersetze ihn im Kopf und sprich ihn dann laut nach, um deine Aussprache zu üben — sprich vom ersten Tag an, freihändig oder mit den Händen. Jede Zielzeile startet unscharf und wird nach und nach scharf, genau wie nach dem Abspielen in der App.",
+    "fullTitle": "Schreiben",
+    "fullBody": "Tippe jeden Satz in deiner Zielsprache und erhalte sofortiges Feedback zur Rechtschreibung, Zeichen für Zeichen — der schnellste Weg, das Schreiben zu meistern. Was richtig ist, erscheint grün, alles Abweichende wird markiert, damit du aus jedem Fehler lernst.",
+    "reviewModeTitle": "Wiederholung",
+    "reviewModeBody": "Sprich die fälligen Karten nach, und Spaced Repetition plant jede einzelne für den perfekten Moment, sie dir zu merken.",
+    "radioTitle": "Radio",
+    "radioBody": "Lass Sätze und ihre Übersetzungen den ganzen Tag laufen — passives Hören, das dir die Sprache ins Ohr bringt, ohne deinen Spaced-Repetition-Plan zu beeinflussen.",
+    "missingTitle": "Fehlt dir eine Lernart?",
+    "missingBody": "Sag uns Bescheid und wir versuchen unser Bestes, Flexling an deine Bedürfnisse anzupassen.",
+    "missingCta": "Lernart vorschlagen",
+    "emailSubjects": {
+      "requestMode": "Vorschlag für Lernmodus"
+    },
     "multiLabel": "Mehrere Sprachen",
     "replay": "Demo erneut abspielen",
     "mock": {
@@ -178,7 +204,7 @@
     "multiLangTitle": "Vergleiche über Sprachen hinweg",
     "multiLangBody": "Lernst du mehr als eine Sprache? Sieh den Fortschritt für jede Sprache nebeneinander und erkenne, welche mehr Aufmerksamkeit braucht.",
     "accuracyTitle": "Miss dein Erinnerungsvermögen",
-    "accuracyBody": "Verfolge deine Genauigkeit über alle Wiederholungssitzungen. Beobachte, wie sie steigt, während Spaced Repetition dein Gedächtnis über die Zeit stärkt.",
+    "accuracyBody": "Verfolge deine Genauigkeit über alle Schreiben-Sitzungen. Beobachte, wie sie steigt, während Spaced Repetition dein Gedächtnis über die Zeit stärkt.",
     "streakTitle": "Bleib am Ball",
     "streakBody": "Deine Serie zählt jeden aufeinanderfolgenden Tag, an dem du übst. Ein einfacher, kraftvoller Motivator — und Streak-Freezes sichern dich ab, wenn das Leben dazwischenkommt.",
     "feedbackTitle": "Sofortiges Feedback",
@@ -190,16 +216,16 @@
     "subtitle": "Flexling kombiniert das Beste aus audio-basiertem Lernen, KI-Tutoring und Gedächtnisforschung zu einem nahtlosen Erlebnis, das sich deinem vollen Alltag anpasst.",
     "items": {
       "audioBased": {
-        "title": "Audio-basiert",
-        "description": "Lerne während du pendelst, trainierst oder kochst. Kein Bildschirm nötig — einfach zuhören, wiederholen und lernen."
+        "title": "Lernen unterwegs",
+        "description": "Hör zu und sprich Sätze laut nach, während du pendelst, trainierst oder kochst. Kein Bildschirm nötig — einfach zuhören, wiederholen und lernen."
       },
       "selfDriven": {
         "title": "Selbstbestimmt und flexibel",
         "description": "Tippe eigene Sätze, importiere sie per CSV oder Tabelle, oder lass die KI welche erstellen. Oder nicht — smarte Voreinstellungen sind bereit, falls du einfach loslegen willst."
       },
       "instantFeedback": {
-        "title": "Sofortiges Feedback",
-        "description": "Stelle jederzeit Fragen zu Vokabeln oder Grammatik. Unser KI-Tutor erklärt Nuancen, Alternativen und Verwendung. Und für jede Frage, die du stellst, werden automatisch Lernkarten erstellt, damit du dir die Antwort merkst."
+        "title": "Integrierter KI-Tutor",
+        "description": "Stelle jederzeit Fragen zu Vokabeln oder Grammatik. Unser KI-Tutor erklärt Nuancen, Alternativen und Verwendung — und macht aus allem, was du fragst, automatisch neue Lernkarten."
       },
       "allInOne": {
         "title": "Alles-in-Einem",
@@ -219,6 +245,11 @@
     "title": "Flexible",
     "titleHighlight": "Preise",
     "mostPopular": "Am beliebtesten",
+    "billing": {
+      "monthly": "Monatlich",
+      "yearly": "Jährlich",
+      "save": "25 % sparen"
+    },
     "comparison": {
       "comparedWith": "Im Vergleich zu:",
       "traditionalCourses": "Traditionelle Kurse",
@@ -240,40 +271,44 @@
         "period": "für immer",
         "cta": "Jetzt starten",
         "features": {
-          "sentences": "150 Sätze pro Monat",
-          "customSentences": "10 eigene Sätze pro Monat",
+          "sentences": "300 Sätze zum Start, danach 50 pro Monat",
+          "credits": "200 Credits zum Start, danach 30 pro Monat",
+          "creditsHint": "Credits können für Chat-Nachrichten, eigene Karten und mehr genutzt werden",
           "courses": "1 Kurs",
-          "chatMessages": "5 Chat-Nachrichten pro Monat",
           "detailedStatistics": "Detaillierte Statistiken"
         }
       },
       "basic": {
         "name": "Basic",
         "description": "Alles was du brauchst, um eine Sprache zu lernen.",
-        "price": "8€",
-        "period": "pro Monat",
-        "trial": "21 Tage kostenlos testen",
+        "priceMonthly": "8€",
+        "priceYearlyPerMonth": "6€",
+        "period": "Monat",
+        "billedAnnually": "72€ jährlich abgerechnet",
+        "trial": "7 Tage kostenlos testen",
         "cta": "Jetzt starten",
         "features": {
           "sentences": "Unbegrenzt viele vorgefertigte Sätze",
-          "customSentences": "300 eigene Sätze pro Monat",
+          "credits": "400 Credits pro Monat",
+          "creditsHint": "Credits können für Chat-Nachrichten, eigene Karten und mehr genutzt werden",
           "courses": "1 Kurs",
-          "chatMessages": "100 Chat-Nachrichten pro Monat",
           "detailedStatistics": "Detaillierte Statistiken"
         }
       },
       "pro": {
         "name": "Pro",
         "description": "Für maximale Flexibilität und Polyglotte.",
-        "price": "16€",
-        "period": "pro Monat",
-        "trial": "21 Tage kostenlos testen",
+        "priceMonthly": "16€",
+        "priceYearlyPerMonth": "12€",
+        "period": "Monat",
+        "billedAnnually": "144€ jährlich abgerechnet",
+        "trial": "7 Tage kostenlos testen",
         "cta": "Jetzt starten",
         "features": {
           "sentences": "Unbegrenzt viele vorgefertigte Sätze",
-          "customSentences": "1.000 eigene Sätze pro Monat",
+          "credits": "1.200 Credits pro Monat",
+          "creditsHint": "Credits können für Chat-Nachrichten, eigene Karten und mehr genutzt werden",
           "courses": "Bis zu 10 Kurse",
-          "chatMessages": "400 Chat-Nachrichten pro Monat",
           "multipleLanguages": "Bis zu 3 Sprachen pro Kurs",
           "detailedStatistics": "Detaillierte Statistiken"
         }
@@ -309,16 +344,16 @@
       {
         "question": "Was ist Flexling?",
         "answer": [
-          "Flexling ist eine Sprachlern-App, die sich deinen Bedürfnissen anpasst. Anders als viele traditionelle Apps kannst du mit dem Audio-Modus freihändig lernen — beim Pendeln, beim Sport oder im Haushalt.",
-          "Du kannst außerdem eigene Inhalte hinzufügen."
+          "Flexling ist eine Sprachlern-App, die auf echten Sätzen und Spaced Repetition aufbaut — demselben Algorithmus wie Anki. Anders als viele traditionelle Apps kannst du mit Shadowing freihändig lernen — beim Pendeln, beim Sport oder im Haushalt.",
+          "Du kannst außerdem eigene Inhalte hinzufügen und so genau die Sätze lernen, die dir wichtig sind."
         ]
       },
       {
         "question": "Wie funktioniert Flexling?",
         "answer": [
-          "Flexling hat zwei Lernmodi: einen Audio-Modus und einen vollständigen Wiederholungsmodus.",
-          "Im Audio-Modus werden Lernkarten automatisch abgespielt: Zuerst hörst du einen Satz in einer Sprache, die du schon gut verstehst, dann hast du Zeit, dir die Übersetzung zu überlegen, danach spielt die App den Satz in der Sprache ab, die du lernen möchtest.",
-          "Im Wiederholungsmodus übst du, Übersetzungen einzutippen, und bekommst sofort Feedback zu deiner Rechtschreibung.",
+          "Flexling bietet dir drei Wege, dieselben Sätze zu lernen: Shadowing, Schreiben und Radio.",
+          "Beim Shadowing hörst du einen Satz in einer Sprache, die du schon verstehst, hast einen Moment, ihn im Kopf zu übersetzen, und hörst und sprichst dann den Zielsatz laut nach — freihändig, wenn du magst.",
+          "Beim Schreiben tippst du deine Übersetzung und bekommst sofort zeichengenaues Feedback zur Rechtschreibung. Radio spielt Sätze und ihre Übersetzungen einfach im Hintergrund zum passiven Hören.",
           "Das Besondere an Flexling: Wenn du einen Satz nicht verstehst oder eine Frage hast, kannst du die KI fragen — etwa „Wie kann ich das höflicher sagen?“ oder „Gib mir drei weitere Beispiele mit diesem Verb in einer anderen Zeitform.“ — und sie erstellt automatisch neue Lernkarten mit Audio für dich.",
           "Hinweis: Wir erzeugen natürlich klingendes Audio mit modernster Text-zu-Sprache-Technologie."
         ]

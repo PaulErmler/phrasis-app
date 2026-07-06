@@ -17,6 +17,10 @@ export default defineConfig({
           name: "convex",
           environment: "edge-runtime",
           include: ["convex/tests/**/*.test.ts"],
+          // Lives OUTSIDE convex/ on purpose: the Convex bundler analyzes
+          // every non-test module under convex/, and a top-level vi.mock
+          // crashes that analysis (InvalidModules on push).
+          setupFiles: ["./tests/convexTestSetup.ts"],
           server: { deps: { inline: ["convex-test"] } },
         },
       },

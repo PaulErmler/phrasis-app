@@ -343,9 +343,15 @@ describe('content versioning', () => {
 
   describe('getCurrent*Version defaults', () => {
     it('defaults to DEFAULT_CONTENT_VERSION for a language without an explicit version', () => {
-      // `de` (German) has no translationVersion/ttsVersion override.
-      expect(getCurrentTranslationVersion('de')).toBe(DEFAULT_CONTENT_VERSION);
-      expect(getCurrentTtsVersion('de')).toBe(DEFAULT_CONTENT_VERSION);
+      // `it` has no translationVersion/ttsVersion override.
+      expect(getCurrentTranslationVersion('it')).toBe(DEFAULT_CONTENT_VERSION);
+      expect(getCurrentTtsVersion('it')).toBe(DEFAULT_CONTENT_VERSION);
+    });
+    it('returns bumped translationVersion for de (Gemini 3.5 Flash Nitro rollout)', () => {
+      expect(getCurrentTranslationVersion('de')).toBe(2);
+    });
+    it('returns bumped translationVersion for fr (Gemini 3.5 Flash Nitro rollout)', () => {
+      expect(getCurrentTranslationVersion('fr')).toBe(2);
     });
     it('defaults to 1 for an unknown code', () => {
       expect(getCurrentTtsVersion('xx')).toBe(1);
@@ -410,8 +416,15 @@ describe('content versioning', () => {
   });
 
   it('isTranslationVersionStale mirrors the config version per language', () => {
-    // de has no bump → a v1 stamp is current, not stale.
-    expect(isTranslationVersionStale('de', 1)).toBe(false);
+    // de bumped to v2 — a v1 stamp is stale; undefined is still not stale.
+    expect(getCurrentTranslationVersion('de')).toBe(2);
+    expect(isTranslationVersionStale('de', 2)).toBe(false);
+    expect(isTranslationVersionStale('de', 1)).toBe(true);
     expect(isTranslationVersionStale('de', undefined)).toBe(false);
+    // fr bumped to v2 — same semantics as de.
+    expect(getCurrentTranslationVersion('fr')).toBe(2);
+    expect(isTranslationVersionStale('fr', 2)).toBe(false);
+    expect(isTranslationVersionStale('fr', 1)).toBe(true);
+    expect(isTranslationVersionStale('fr', undefined)).toBe(false);
   });
 });

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
-import { Play, Pause, ChevronsLeft, ChevronRight, Eye, Loader2 } from 'lucide-react';
+import { Play, Pause, SkipBack, ChevronRight, Eye, Loader2, Undo2 } from 'lucide-react';
 import type { ReviewRating } from '@/lib/scheduling';
 
 interface LearningControlsProps {
@@ -19,6 +19,10 @@ interface LearningControlsProps {
   onSeek: (seconds: number) => void;
   /** Pass `ratingOverride` when advancing in the same tick as a rating pick (instant proceed). */
   onNext: (ratingOverride?: ReviewRating) => void;
+  /** Undo the last review and bring its card back. */
+  onUndo: () => void;
+  /** True when the undo stack is empty or an undo/review is in flight. */
+  undoDisabled: boolean;
   isReviewing: boolean;
   instantProceed?: boolean;
   isFullReview?: boolean;
@@ -45,6 +49,8 @@ export function LearningControls({
   durationSec,
   onSeek,
   onNext,
+  onUndo,
+  undoDisabled,
   isReviewing,
   instantProceed = false,
   isFullReview = false,
@@ -201,17 +207,31 @@ export function LearningControls({
             </div>
           )}
 
-          {/* Restart + Play + Next row */}
+          {/* Undo + Restart + Play + Next row */}
           <div className="flex gap-2" data-tutorial="audio-controls">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => onSeek(0)}
-              disabled={isMerging || durationSec === 0}
-              className="h-9 w-9 shrink-0"
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
+            <div className="flex gap-2" data-tutorial="undo-restart">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={onUndo}
+                disabled={undoDisabled}
+                data-testid="learn-undo"
+                aria-label={t('actions.undo')}
+                title={t('actions.undo')}
+                className="h-9 w-9 shrink-0"
+              >
+                <Undo2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => onSeek(0)}
+                disabled={isMerging || durationSec === 0}
+                className="h-9 w-9 shrink-0"
+              >
+                <SkipBack className="h-4 w-4" />
+              </Button>
+            </div>
             <Button
               variant="outline"
               size="icon"
@@ -230,6 +250,7 @@ export function LearningControls({
               <Button
                 size="sm"
                 onClick={onReveal}
+                data-testid="learn-reveal"
                 className="flex-[1] gap-2"
               >
                 {t('actions.reveal')}
@@ -241,6 +262,7 @@ export function LearningControls({
                 <Button
                   size="sm"
                   onClick={onRevealAllAudioTargets}
+                  data-testid="learn-reveal"
                   className="flex-[1] gap-2"
                 >
                   {t('actions.reveal')}
@@ -251,6 +273,7 @@ export function LearningControls({
                   size="sm"
                   onClick={() => onNext()}
                   disabled={isReviewing}
+                  data-testid="learn-next"
                   className="flex-[1] gap-2"
                 >
                   {t('actions.next')}

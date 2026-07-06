@@ -1,9 +1,11 @@
 import { type CheckFeaturePreview, type Product } from "autumn-js";
+import { toBillableFeature } from "@/lib/autumn/find-upgrade-product";
 
 /**
  * Filters Autumn upgrade products to only those that actually increase the
  * quota for `featureId` beyond `currentIncluded`. This prevents recommending
  * a plan that has the same (or lower) limit for the feature in question.
+ * Credit-consuming features are compared via the shared `credits` item.
  *
  * For boolean / non-metered features (`consumable === undefined`), Convex
  * `included` often reflects a display cap (e.g. 2 languages) while Autumn
@@ -16,14 +18,17 @@ export function filterProductsByFeatureIncrease(
   currentIncluded: number,
   consumable?: boolean,
 ): Product[] {
+  const billable = toBillableFeature(featureId, currentIncluded);
   return products.filter((product) => {
-    const featureItem = product.items.find((i) => i.feature_id === featureId);
+    const featureItem = product.items.find(
+      (i) => i.feature_id === billable.featureId,
+    );
     if (!featureItem) return false;
     if (consumable === undefined) return true;
     if (featureItem.included_usage === "inf") return true;
     return (
       typeof featureItem.included_usage === "number" &&
-      featureItem.included_usage > currentIncluded
+      featureItem.included_usage > billable.included
     );
   });
 }
@@ -37,12 +42,16 @@ export type PaywallTranslateFn = (
 export function getPaywallTitle(
   preview: CheckFeaturePreview,
   t: PaywallTranslateFn,
+  trialEligible: boolean,
 ): string {
   const { products } = preview;
   if (products.length === 0) return t("featureUnavailable");
 
+  // "Start trial" only for viewers who can actually get one — the
+  // product offering a trial is not enough (Autumn only dedupes trials
+  // per-plan; see lib/autumn/trial-eligibility.ts).
   const nextProduct = products[0];
-  return nextProduct.free_trial
+  return nextProduct.free_trial && trialEligible
     ? t("startTrial", { productName: nextProduct.name })
     : nextProduct.is_add_on
       ? t("purchaseAddOn", { productName: nextProduct.name })

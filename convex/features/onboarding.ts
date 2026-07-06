@@ -140,7 +140,6 @@ async function enqueueMissingPlacementTranslationsImpl(
       text,
       [text.language],
       targetLanguages,
-      { priority: 2 }, // placement test — user is on the screen waiting
     );
     translationsScheduled += result.translationsScheduled;
   }
@@ -206,9 +205,6 @@ async function ensureAudioForTestTranslationsImpl(
       text,
       [text.language],
       targetLanguages,
-      // Critical — user just finished placement and we're patching a hole
-      // that already cost them the initial audio.
-      { priority: 2 },
     );
     translationsScheduled += result.translationsScheduled;
     audioScheduled += result.audioScheduled;

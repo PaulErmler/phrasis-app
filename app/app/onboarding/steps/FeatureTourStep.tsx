@@ -7,12 +7,12 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ChevronLeft, ChevronRight, Footprints, Pencil, FileUp, Radio, BarChart3, Globe } from 'lucide-react';
 
 /**
- * Feature tour. Each slide highlights something the user will find useful
- * but won't discover unprompted. Slide 1 frames the "audio mode anywhere"
- * usage pattern; the rest are concrete feature shortcuts.
+ * Feature tour. Slide 1 recaps the three ways to use Flexling (Shadowing,
+ * Writing, Radio); the rest are concrete feature shortcuts the user is
+ * unlikely to discover unprompted.
  */
 
-const SLIDE_KEYS = ['custom', 'import', 'radio', 'stats', 'multilang', 'audioMode'] as const;
+const SLIDE_KEYS = ['audioMode', 'custom', 'import', 'radio', 'stats', 'multilang'] as const;
 const SLIDE_ICONS: Record<typeof SLIDE_KEYS[number], React.ComponentType<{ className?: string }>> = {
   audioMode: Footprints,
   custom: Pencil,

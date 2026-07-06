@@ -4,7 +4,13 @@ import { describe, it, expect } from "vitest";
 import schema from "../../schema";
 import { api } from "../../_generated/api";
 
+import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+
 const modules = import.meta.glob("/convex/**/*.ts");
+
+// Tests here schedule content work on 0ms timers - drain it inside the test
+// context so its logs don't race vitest teardown.
+drainSchedulerAfterEach();
 
 describe("features/collections", () => {
   describe("getCollectionTextsWithContent", () => {

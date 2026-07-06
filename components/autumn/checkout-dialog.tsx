@@ -23,10 +23,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useCustomer } from "autumn-js/react";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { getCheckoutContent } from "@/lib/autumn/checkout-content";
+import {
+  checkoutTrialParams,
+  getTrialState,
+} from "@/lib/autumn/trial-eligibility";
 
 export interface CheckoutDialogProps {
 	open: boolean;
@@ -52,7 +58,11 @@ const formatCurrency = ({
 
 export default function CheckoutDialog(params: CheckoutDialogProps) {
   const t = useTranslations("Checkout");
-  const { attach } = useCustomer();
+  const { attach, customer, refetch } = useCustomer({
+    expand: ["trials_used"],
+  });
+  const switchPlanDuringTrial = useAction(api.billing.switchPlanDuringTrial);
+  const trialState = getTrialState(customer);
   const [checkoutResult, setCheckoutResult] = useState<
 		CheckoutResult | undefined
 	>(params?.checkoutResult);
@@ -82,16 +92,33 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
   }
 
   const { open, setOpen } = params;
-  const { title, message } = getCheckoutContent(checkoutResult, t);
+  const { title, message } = getCheckoutContent(checkoutResult, t, trialState);
 
   const isFree = checkoutResult?.product.properties?.is_free;
   const isPaid = isFree === false;
 
+  // A currently-trialing user switching between paid plans keeps their
+  // running trial — confirm routes through the Convex action (which
+  // schedules downgrades at trial end and carries the trial over on
+  // immediate switches) instead of a plain attach. Must mirror the
+  // scenarios accepted by convex/billing.ts switchPlanDuringTrial.
+  const scenario = checkoutResult.product.scenario;
+  const isTrialSwitch =
+    trialState.onTrial &&
+    isPaid &&
+    !checkoutResult.product.properties?.is_one_off &&
+    (scenario === "upgrade" || scenario === "downgrade" || scenario === "new");
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="p-0 pt-4 gap-0 text-foreground text-sm">
-        <DialogTitle className="px-6 mb-1">{title}</DialogTitle>
-        <div className="px-6 mt-1 mb-4 text-muted-foreground">
+        <DialogTitle data-testid="checkout-dialog-title" className="px-6 mb-1">
+          {title}
+        </DialogTitle>
+        <div
+          data-testid="checkout-dialog-message"
+          className="px-6 mt-1 mb-4 text-muted-foreground"
+        >
           {message}
         </div>
 
@@ -99,6 +126,9 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
           <PriceInformation
             checkoutResult={checkoutResult}
             setCheckoutResult={setCheckoutResult}
+            trialSwitchEndsAt={
+              isTrialSwitch ? trialState.trialEndsAt : undefined
+            }
           />
         )}
 
@@ -108,16 +138,30 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
             onClick={async () => {
               setLoading(true);
               try {
-                const options = checkoutResult.options.map((option) => ({
-                  featureId: option.feature_id,
-                  quantity: option.quantity,
-                }));
+                if (isTrialSwitch) {
+                  const result = await switchPlanDuringTrial({
+                    productId: checkoutResult.product.id,
+                  });
+                  // Card is normally on file during a trial; if Autumn
+                  // still needs payment action, send the user there.
+                  if (result.paymentUrl) {
+                    window.location.href = result.paymentUrl;
+                    return;
+                  }
+                  await refetch();
+                } else {
+                  const options = checkoutResult.options.map((option) => ({
+                    featureId: option.feature_id,
+                    quantity: option.quantity,
+                  }));
 
-                await attach({
-                  productId: checkoutResult.product.id,
-                  ...(params.checkoutParams || {}),
-                  options,
-                });
+                  await attach({
+                    productId: checkoutResult.product.id,
+                    ...(params.checkoutParams || {}),
+                    ...checkoutTrialParams(trialState),
+                    options,
+                  });
+                }
                 setOpen(false);
               } catch (e) {
                 console.error("Checkout failed:", e);
@@ -126,6 +170,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
               }
             }}
             disabled={loading}
+            data-testid="checkout-dialog-confirm"
             className="min-w-16 flex items-center gap-2"
           >
             {loading ? (
@@ -145,9 +190,11 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
 function PriceInformation({
   checkoutResult,
   setCheckoutResult,
+  trialSwitchEndsAt,
 }: {
 	checkoutResult: CheckoutResult;
 	setCheckoutResult: (checkoutResult: CheckoutResult) => void;
+	trialSwitchEndsAt?: number;
 }) {
   return (
     <div className="px-6 mb-4 flex flex-col gap-4">
@@ -157,25 +204,75 @@ function PriceInformation({
       />
 
       <div className="flex flex-col gap-2">
-        {checkoutResult?.has_prorations && checkoutResult.lines.length > 0 && (
+        {!trialSwitchEndsAt &&
+          checkoutResult?.has_prorations &&
+          checkoutResult.lines.length > 0 && (
           <CheckoutLines checkoutResult={checkoutResult} />
         )}
-        <DueAmounts checkoutResult={checkoutResult} />
+        <DueAmounts
+          checkoutResult={checkoutResult}
+          trialSwitchEndsAt={trialSwitchEndsAt}
+        />
       </div>
     </div>
   );
 }
 
-function DueAmounts({ checkoutResult }: { checkoutResult: CheckoutResult }) {
+function DueAmounts({
+  checkoutResult,
+  trialSwitchEndsAt,
+}: {
+	checkoutResult: CheckoutResult;
+	trialSwitchEndsAt?: number;
+}) {
   const t = useTranslations("Checkout");
   const { next_cycle, product } = checkoutResult;
-  const nextCycleAtStr = next_cycle
-    ? new Date(next_cycle.starts_at).toLocaleDateString()
-    : undefined;
 
   const hasUsagePrice = product.items.some(
     (item) => item.usage_model === "pay_per_use",
   );
+
+  // Plan switch during a running trial: nothing is charged now — the
+  // preview's totals/next_cycle can reflect a phantom fresh trial or an
+  // immediate charge that won't happen. Billing starts at the (kept)
+  // trial end, at the target plan's own price.
+  if (trialSwitchEndsAt) {
+    const planPrice =
+      product.items.find((item) => item.type === "price")?.price ??
+      next_cycle?.total ??
+      checkoutResult.total;
+    return (
+      <div className="flex flex-col gap-1">
+        <div className="flex justify-between">
+          <p className="font-medium text-md">{t("totalDueToday")}</p>
+          <p data-testid="checkout-due-today" className="font-medium text-md">
+            {formatCurrency({
+              amount: 0,
+              currency: checkoutResult?.currency,
+            })}
+          </p>
+        </div>
+        <div className="flex justify-between text-muted-foreground">
+          <p className="text-md">
+            {t("dueNextCycle", {
+              date: new Date(trialSwitchEndsAt).toLocaleDateString(),
+            })}
+          </p>
+          <p className="text-md">
+            {formatCurrency({
+              amount: planPrice,
+              currency: checkoutResult?.currency,
+            })}
+            {hasUsagePrice && <span> {t("plusUsagePrices")}</span>}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const nextCycleAtStr = next_cycle
+    ? new Date(next_cycle.starts_at).toLocaleDateString()
+    : undefined;
 
   const showNextCycle = next_cycle && next_cycle.total !== checkoutResult.total;
 
@@ -186,7 +283,7 @@ function DueAmounts({ checkoutResult }: { checkoutResult: CheckoutResult }) {
           <p className="font-medium text-md">{t("totalDueToday")}</p>
         </div>
 
-        <p className="font-medium text-md">
+        <p data-testid="checkout-due-today" className="font-medium text-md">
           {formatCurrency({
             amount: checkoutResult?.total,
             currency: checkoutResult?.currency,
@@ -354,10 +451,11 @@ const PrepaidItem = ({
   const [quantityInput, setQuantityInput] = useState<string>(
     (quantity / billingUnits).toString(),
   );
-  const { checkout } = useCustomer();
+  const { checkout, customer } = useCustomer({ expand: ["trials_used"] });
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const scenario = checkoutResult.product.scenario;
+  const trialState = getTrialState(customer);
 
   const handleSave = async () => {
     setLoading(true);
@@ -380,6 +478,7 @@ const PrepaidItem = ({
         productId: checkoutResult.product.id,
         options: newOptions,
         dialog: CheckoutDialog,
+        ...checkoutTrialParams(trialState),
       });
 
       if (error) {

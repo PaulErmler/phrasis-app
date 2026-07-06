@@ -2,6 +2,7 @@
 
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { CREDIT_COSTS, FEATURE_IDS, type FeatureId } from '@/convex/features/featureIds';
 
 export interface FeatureQuotaInfo {
   balance: number;
@@ -38,6 +39,24 @@ export function useFeatureQuota(featureId: string): FeatureQuotaInfo {
 
   if (quotas === undefined || quotas === null) {
     return { ...EMPTY_QUOTA, isAvailable: true, isLoading: true };
+  }
+
+  // Credit-consuming features draw from the shared `credits` balance when
+  // the user's plan grants one (mirrors `resolveQuotaTarget` in
+  // convex/usage/helpers.ts), expressed in feature units (credits / cost).
+  // Legacy plan versions have per-feature balances and no `credits` entry,
+  // so they fall through to the direct lookup below.
+  const creditCost = CREDIT_COSTS[featureId as FeatureId];
+  const credits = quotas.features[FEATURE_IDS.CREDITS];
+  if (creditCost !== undefined && credits) {
+    return {
+      balance: Math.floor(credits.balance / creditCost),
+      included: Math.floor(credits.included / creditCost),
+      used: Math.floor(credits.used / creditCost),
+      unlimited: credits.unlimited ?? false,
+      isAvailable: credits.unlimited === true || credits.balance >= creditCost,
+      isLoading: false,
+    };
   }
 
   const feature = quotas.features[featureId];

@@ -217,6 +217,31 @@ export function OnboardingFirstLesson({
     ],
   );
 
+  // Mirror of handleCardRated for the undo button: keep the wizard's
+  // lesson-progress counter in sync when a rating is taken back. Never fires
+  // `onLessonComplete` — undo only ever moves the count away from the
+  // threshold. The staged coachmarks are unaffected: `firedStagesRef` in
+  // useOnboardingLessonTutorial claims each stage once, so dropping back
+  // below a stage's card count can't re-trigger it.
+  const handleCardUndone = useCallback(
+    (snapshot: {
+      sessionId: string;
+      dailyReviewsToday: number;
+      dailyTimeMsToday: number;
+      dailyNewWordsToday: number;
+    }) => {
+      setCardsRated((n) => {
+        const next = Math.max(0, n - 1);
+        queueMicrotask(() => {
+          onCardsRatedChange?.(next);
+          onSnapshotUpdate?.({ cardsRated: next, ...snapshot });
+        });
+        return next;
+      });
+    },
+    [onCardsRatedChange, onSnapshotUpdate],
+  );
+
   const tLesson = useTranslations('Onboarding.firstLesson');
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -229,6 +254,7 @@ export function OnboardingFirstLesson({
           onboardingHeader={<OnboardingHeader onAbort={onAbort} />}
           onBack={onAbort}
           onCardRated={handleCardRated}
+          onCardUndone={handleCardUndone}
           forceDisableAutoPlay={!coreTutorialDone || tutorialActive}
           initialSessionId={initialSessionId}
           initialSessionCardCount={initialCardsRated}

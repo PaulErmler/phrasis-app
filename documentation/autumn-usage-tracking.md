@@ -8,15 +8,16 @@ This document describes how feature gating, usage quotas, and the Autumn billing
 
 1. [Architecture Overview](#architecture-overview)
 2. [Feature IDs](#feature-ids)
-3. [Backend – Convex Usage Module](#backend--convex-usage-module)
-4. [Backend – Autumn Component](#backend--autumn-component)
-5. [Quota Sync Lifecycle](#quota-sync-lifecycle)
-6. [Backend Enforcement (Mutations)](#backend-enforcement-mutations)
-7. [Frontend – Quota Hook](#frontend--quota-hook)
-8. [Frontend – UI Components](#frontend--ui-components)
-9. [Frontend – Error Handling](#frontend--error-handling)
-10. [Adding a New Gated Feature](#adding-a-new-gated-feature)
-11. [Common Pitfalls](#common-pitfalls)
+3. [Credit System](#credit-system)
+4. [Backend – Convex Usage Module](#backend--convex-usage-module)
+5. [Backend – Autumn Component](#backend--autumn-component)
+6. [Quota Sync Lifecycle](#quota-sync-lifecycle)
+7. [Backend Enforcement (Mutations)](#backend-enforcement-mutations)
+8. [Frontend – Quota Hook](#frontend--quota-hook)
+9. [Frontend – UI Components](#frontend--ui-components)
+10. [Frontend – Error Handling](#frontend--error-handling)
+11. [Adding a New Gated Feature](#adding-a-new-gated-feature)
+12. [Common Pitfalls](#common-pitfalls)
 
 ---
 
@@ -65,6 +66,11 @@ export const FEATURE_IDS = {
   CUSTOM_SENTENCES: 'custom_sentences',
   MULTIPLE_LANGUAGES: 'multiple_languages',
   TRANSCRIPTIONS: 'transcriptions',
+  CARD_EDITS: 'card_edits',
+  TRANSLATION_AUTO_FILL: 'translation_auto_fill',
+  AUDIO_REGENERATIONS: 'audio_regenerations',
+  TRANSLATION_FLAGS: 'translation_flags',
+  CREDITS: 'credits',
 } as const;
 ```
 
@@ -74,19 +80,41 @@ These IDs **must** match the feature IDs configured in Autumn's dashboard and `a
 
 | Feature ID | Type | Description |
 |---|---|---|
-| `chat_messages` | Usage (metered, consumable) | Messages sent in chat, resets monthly |
+| `chat_messages` | Usage (metered, consumable) | Messages sent in chat — billed in credits (see Credit System) |
 | `courses` | Usage (metered, non-consumable) | Number of active courses |
-| `sentences` | Usage (metered, consumable) | Number of sentences added from collections, resets monthly |
-| `custom_sentences` | Usage (metered, consumable) | Number of custom cards approved via chat, resets monthly |
-| `transcriptions` | Usage (metered, consumable) | Number of transcription uses, resets monthly |
+| `sentences` | Usage (metered, consumable) | Sentences added from collections (free tier: 300 one-off + 50/month) |
+| `custom_sentences` | Usage (metered, consumable) | Custom cards created/approved — billed in credits |
+| `translation_auto_fill` | Usage (metered, consumable) | Auto-translate on custom card creation — billed in credits |
+| `transcriptions` | Usage (metered, consumable) | Transcription uses, resets monthly |
+| `card_edits` / `audio_regenerations` / `translation_flags` | Usage (metered, consumable, hidden) | Internal meters, resets monthly |
 | `multiple_languages` | Boolean (feature flag) | Whether the user can add >2 languages per course (Pro only) |
+| `credits` | Credit system | Shared pool consumed by the three credit-billed features above |
 
 **How types map to the Autumn API response:**
 
-- Metered features appear in the `balances` object of the customer response with fields `granted`, `remaining`, `usage`, `unlimited`.
+- Metered features appear in the `balances` object of the customer response with fields `granted`, `remaining`, `usage`, `unlimited`. The `credits` credit-system feature also appears as a `balances` entry and syncs into the local cache like any other metered feature.
 - Boolean features appear in the `flags` object with fields `id`, `plan_id`, `expires_at`, `feature_id`.
 
 In the local `usageQuotas` cache, boolean features are stored as `{ balance: 1, included: 1, used: 0, unlimited: true }`. The `isAvailable` check (`balance > 0 || unlimited`) works for both types.
+
+---
+
+## Credit System
+
+Since the credits rollout, `custom_sentences`, `translation_auto_fill`, and `chat_messages` are no longer granted as separate plan items. Instead, plans grant a shared `credits` pool (Free: 200 one-off + 30/month; Basic: 400/month; Pro: 1,200/month) and the `credits` feature in `autumn.config.ts` declares a `creditSchema` mapping each of those features to a credit cost (currently 1 credit per unit each). Monthly credits reset with the billing cycle (no rollover); one-off grants persist.
+
+**Golden rule (from Autumn's docs): always check/track the UNDERLYING feature id, never `credits`.** Autumn converts tracked usage into credit deductions server-side via the `creditSchema`.
+
+Client + server mirror this rule:
+
+- `CREDIT_COSTS` in `convex/features/featureIds.ts` mirrors the `creditSchema` and is the single source of truth for conversions in app code.
+- `resolveQuotaTarget` in `convex/usage/helpers.ts` redirects `checkQuota` / `decrementQuota` / `incrementQuota` (and therefore `consumeQuota` / `releaseQuota`) to the local `credits` balance (amount × credit cost) whenever the user's quota doc has a `credits` entry. The scheduled `trackUsage` still sends the underlying feature id.
+- `useFeatureQuota` applies the same redirect on the client, returning balances in feature units (`credits / cost`).
+- `toBillableFeature` in `lib/autumn/find-upgrade-product.ts` maps credit-billed features to the `credits` product item when searching for upgrade products (paywall / low-quota dialogs).
+
+**Dynamic chat pricing:** a chat message costs 1 credit per started $0.005 (`CHAT_CREDIT_USD_STEP`) of actual LLM cost. `sendMessage` consumes 1 credit up-front via `consumeQuota(CHAT_MESSAGES, 1)`. `generateResponse` accumulates the real OpenRouter cost across all LLM steps (via a per-call `usageHandler` reading `providerMetadata.openrouter.usage.cost`; requires `usage: { include: true }` in `OPENROUTER_CHAT_EXTRA_BODY`) and then charges the remainder through the `chargeExtraChatCredits` internal mutation. The remainder is billed in whole `chat_messages` units (`ceil(cost / (step × creditCost)) - 1`), never in raw credits — `resolveQuotaTarget` and Autumn's `creditSchema` each multiply a `chat_messages` amount by its credit cost once, so passing credits would double-convert. That charge is applied without a balance check — the balance may go negative, which blocks the next message. Stream failures charge nothing extra; thread-title generation is intentionally not billed.
+
+**Grandfathering:** existing subscribers stay on their old plan version (Autumn plan versioning — config pushes used `create_version` / no migration). Their customers have per-feature balances and no `credits` entry, so every code path above falls back to the legacy per-feature behavior automatically. Chat costs them a flat 1 `chat_messages` unit per message (`chargeExtraChatCredits` is a no-op without a `credits` balance).
 
 ---
 

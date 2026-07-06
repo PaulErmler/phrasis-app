@@ -35,6 +35,7 @@ import {
   deriveStreakDisplay,
 } from '../db/courseStats';
 import { getDailyStats } from '../db/stats/dailyStats';
+import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
 import { consumeQuota, hasFeatureAccess, releaseQuota } from '../usage/helpers';
 import { MAX_COURSES_PER_USER, ARCHIVE_COOLDOWN_MS } from '../../lib/constants/courses';
 import { FEATURE_IDS } from './featureIds';
@@ -410,6 +411,13 @@ export const getCourseStats = query({
         stats.streakFreezeUsedDate,
       );
 
+      const languageWordCounts = await getTargetLanguageWordCounts(ctx, {
+        userId,
+        courseId: active.course._id,
+        targetLanguages: active.course.targetLanguages,
+      });
+      const totalWordCount = languageWordCounts.reduce((sum, lw) => sum + lw.words, 0);
+
       return {
         totalRepetitions: stats.totalRepetitions,
         totalTimeMs: stats.totalTimeMs,
@@ -418,7 +426,7 @@ export const getCourseStats = query({
         streakFreezeCount: derived.freezeAvailable ? 1 : 0,
         streakFrozenToday: derived.state === 'frozen',
         streakState: derived.state,
-        totalWordCount: stats.totalWordCount,
+        totalWordCount,
         totalChatMessages: stats.totalChatMessages,
         totalChatCardsApproved: stats.totalChatCardsApproved,
         totalCardsEdited: stats.totalCardsEdited,

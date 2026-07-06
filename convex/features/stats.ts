@@ -14,6 +14,7 @@ import { getDailyStats } from '../db/stats/dailyStats';
 import { EXTENDED_STATE_LABELS as STATE_LABELS } from '../lib/fsrsStates';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 import { normalizeLanguageCode } from '../../lib/languages';
+import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
 
 // Convention: query handlers return [] for array results and null for object results when unauthenticated.
 
@@ -135,28 +136,12 @@ export const getStatsPageData = query({
       }));
     }
 
-    // Per-language word counts
-    const langStatsRows = await ctx.db
-      .query('languageStats')
-      .withIndex('by_userId_and_courseId', (q) =>
-        q.eq('userId', userId).eq('courseId', courseId),
-      )
-      .take(20);
-    // Only include target languages, merging variants (e.g. es + es_latam)
     const targetLanguages = active.course.targetLanguages ?? [];
-    const targetSet = new Set(targetLanguages.map((l) => normalizeLanguageCode(l)));
-    const wordsByLang = new Map<string, number>();
-    for (const r of langStatsRows) {
-      if (r.totalWords <= 0) continue;
-      const key = normalizeLanguageCode(r.language);
-      if (!targetSet.has(key)) continue;
-      wordsByLang.set(key, (wordsByLang.get(key) ?? 0) + r.totalWords);
-    }
-    const languageWordCounts = Array.from(wordsByLang.entries())
-      .map(([language, words]) => ({ language, words }))
-      .sort((a, b) => b.words - a.words);
-
-    // Derive total from the filtered per-language counts (target languages only)
+    const languageWordCounts = await getTargetLanguageWordCounts(ctx, {
+      userId,
+      courseId,
+      targetLanguages,
+    });
     const totalWordCount = languageWordCounts.reduce((sum, lw) => sum + lw.words, 0);
 
     // Re-derive the live streak at read time (see getCourseStats) so a lapsed

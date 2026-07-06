@@ -41,6 +41,12 @@ export function getPreviousDay(dateStr: string): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+/** Whole days since a "YYYY-MM-DD" date, relative to now (UTC). */
+export function daysSince(dateStr: string): number {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return Math.floor((Date.now() - Date.UTC(y, m - 1, d)) / (24 * 60 * 60 * 1000));
+}
+
 /** Extract month string "YYYY-MM" from a "YYYY-MM-DD" date string. */
 export function getMonthString(dateStr: string): string {
   return dateStr.substring(0, 7);

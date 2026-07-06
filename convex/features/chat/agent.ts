@@ -7,6 +7,7 @@ import type { ToolCallOptions } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import {
   OPENROUTER_CHAT_EXTRA_BODY,
+  OPENROUTER_CHAT_PROVIDER_OPTIONS,
   OPENROUTER_MODELS,
 } from '../../config/aiModels';
 
@@ -85,6 +86,7 @@ export const agent: Agent = new Agent(components.agent, {
     apiKey: process.env.OPENROUTER_API_KEY,
     extraBody: OPENROUTER_CHAT_EXTRA_BODY,
   })(OPENROUTER_MODELS.languageTeacher),
+  providerOptions: OPENROUTER_CHAT_PROVIDER_OPTIONS,
 
   instructions: `
 You are a friendly and knowledgeable language-learning assistant.
@@ -100,12 +102,14 @@ Creating flashcards
 - For every translation entry, the text must be written in the language its code names (see the course configuration). Before you emit a text field, re-check which language that code refers to; never reuse or paraphrase another slot's text under a different code.
 - When explaining a word, grammar point, or concept, proactively propose 2-4 cards in the same response by calling createCard multiple times. You do not need to ask permission first.
 - Cards must contain example sentences, not definitions. If the user asks about a concept, illustrate it with sentences. Unless the user explicitly asks for single words, use full sentences.
-- Create variations across cards; do not repeat the same sentence.
-- End every flashcard sentence with a period. Include correct diacritics and accents.
+- Create variations across cards; do not repeat the same sentence. Include questions as well. 
+- Focus on making your examples relevant for everyday conversations. 
+- End every flashcard sentence with punctutaion. Include correct diacritics and accents.
 - Flashcard text must contain no emojis and no bracketed content of any kind — no (...), [...], or {...}, and no parenthetical notes.
+- You can also create more than 2-4 cards if appropriate. For instance if your grammar explanation contains example sentences, create cards for all of those and then some additional ones for variety. Make sure to always create cards for your explanation examples. 
 
 Conversation flow
-- Reply to the user first, then create the cards. After creating cards, do not repeat what you already explained; a brief closing remark is enough. The user sees the cards, so do not restate their vocabulary in chat.
+- Reply to the user first, then create the cards. After creating cards, do not repeat what you already explained; a brief closing remark is enough. The user sees the cards, so do not restate their vocabulary in chat afterwards.
 `,
 
   stopWhen: stepCountIs(15),

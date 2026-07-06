@@ -191,8 +191,16 @@ interface ReviewingState extends BaseState {
   handleUpdatePinnedActions: (actions: readonly string[]) => Promise<void>;
   handleNext: (ratingOverride?: ReviewRating, accuracy?: number) => void;
   setSelectedRating: (rating: ReviewRating) => void;
+  /** Undo the most recent review (server-side; works across devices). The
+   * restored card arrives via the reactive card query. Resolves true when a
+   * review was actually undone (false on an empty stack or error). */
+  handleUndo: () => Promise<boolean>;
+  /** False when the undo stack is empty (or holds only entries from another
+   * study mode/filter) — the undo button greys out. */
+  canUndo: boolean;
   // Status flags
   isReviewing: boolean;
+  isUndoing: boolean;
   isExiting: boolean;
   animationKey: number;
   // Cross-tab audio coordination
@@ -261,6 +269,15 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // `loading` status branch.
   const courseSettingsQuery = useQuery(api.features.courses.getActiveCourseSettings, {});
   const activeCourseQuery = useQuery(api.features.courses.getActiveCourse, {});
+
+  // How many reviews the undo button can take back (0 = greyed out). Reactive
+  // on both the review-log stack and courseSettings, so reviews from another
+  // device or a mode/filter switch update the button without local plumbing.
+  const undoableReviewCount =
+    useQuery(
+      api.features.scheduling.getUndoableReviewCount,
+      isAuthenticated ? {} : 'skip',
+    ) ?? 0;
 
   const lastCardRef = useRef<
     Exclude<typeof cardForReviewQuery, undefined> | undefined
@@ -339,6 +356,9 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
   const advanceRadioCardMutation = useMutation(
     api.features.scheduling.advanceRadioCard,
+  );
+  const undoLastReviewMutation = useMutation(
+    api.features.scheduling.undoLastReview,
   );
 
   const masterCardMutation = useMutation(api.features.scheduling.masterCard);
@@ -430,6 +450,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const [isPendingMaster, setIsPendingMaster] = useState(false);
   const [isPendingHide, setIsPendingHide] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
+  const [isUndoing, setIsUndoing] = useState(false);
   const [cardAnimationKey, setCardAnimationKey] = useState(0);
 
   // Client-only session record of cards the viewer has flagged this session.
@@ -797,6 +818,41 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
       sessionId,
     ],
   );
+
+  // Undo the last review: the mutation restores the card's pre-review state
+  // server-side and the restored card arrives via the reactive
+  // `getCardForReview` subscription — same flow as advancing, just backwards.
+  const handleUndo = useCallback(async (): Promise<boolean> => {
+    if (isReviewing || isUndoing) return false;
+    setIsUndoing(true);
+    reviewInitiatedByThisTabRef.current = true;
+    try {
+      const result = await undoLastReviewMutation({
+        timezone: getUserTimezone(),
+      });
+      if (result.status === 'undone') {
+        setDailyReviewsToday(result.dailyReviewsToday);
+        setDailyTimeMsToday(result.dailyTimeMsToday);
+        setDailyNewWordsToday(result.dailyNewWordsToday);
+        setSessionCardCount((n) => Math.max(0, n - 1));
+        // The card-change effect keyed on `cardForReview?._id` won't fire when
+        // the restored card is the same document as the one on screen (e.g.
+        // after an "again" rating on a small deck), so reset the per-card
+        // state here explicitly.
+        setSelectedRating(null);
+        setIsExiting(false);
+        cardShownAtRef.current = Date.now();
+        setCardAnimationKey((k) => k + 1);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Failed to undo review:', error);
+      return false;
+    } finally {
+      setIsUndoing(false);
+    }
+  }, [isReviewing, isUndoing, undoLastReviewMutation]);
 
   const handleMaster = useCallback(() => {
     setIsPendingMaster((prev) => !prev);
@@ -1297,7 +1353,10 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     handleUpdatePinnedActions,
     handleNext,
     setSelectedRating,
+    handleUndo,
+    canUndo: undoableReviewCount > 0,
     isReviewing,
+    isUndoing,
     isExiting,
     animationKey: cardAnimationKey,
     getReviewInitiatedByThisTab,

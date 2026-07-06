@@ -2,7 +2,7 @@ import { v, ConvexError } from 'convex/values';
 import { MutationCtx, QueryCtx, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Doc } from '../_generated/dataModel';
-import { FEATURE_IDS } from '../features/featureIds';
+import { CREDIT_COSTS, FEATURE_IDS, type FeatureId } from '../features/featureIds';
 import { getActiveCourses } from '../db/courses';
 import { getUserSettings } from '../db/users';
 
@@ -33,6 +33,35 @@ async function getQuotaDoc(
 }
 
 /**
+ * Resolve which local balance a feature consumption applies to.
+ *
+ * Credit-consuming features (see CREDIT_COSTS) draw from the shared
+ * `credits` balance when the user's plan grants one — the amount is
+ * converted via the feature's credit cost. Users on legacy (pre-credits)
+ * plan versions have per-feature balances instead, so we fall back to the
+ * feature's own entry when no `credits` balance exists.
+ *
+ * Note: Autumn tracking always receives the UNDERLYING feature id — only
+ * the local mirror is credit-aware. If a user somehow holds both a direct
+ * feature balance and credits, Autumn consumes the direct balance first;
+ * the post-track sync re-converges the local cache in that case.
+ */
+function resolveQuotaTarget(
+  doc: Doc<'usageQuotas'>,
+  featureId: string,
+  amount: number,
+): { targetFeatureId: string; targetAmount: number } {
+  const creditCost = CREDIT_COSTS[featureId as FeatureId];
+  if (creditCost !== undefined && doc.features[FEATURE_IDS.CREDITS]) {
+    return {
+      targetFeatureId: FEATURE_IDS.CREDITS,
+      targetAmount: amount * creditCost,
+    };
+  }
+  return { targetFeatureId: featureId, targetAmount: amount };
+}
+
+/**
  * Check whether the user has enough quota for the given feature.
  * Returns { allowed, balance } without modifying anything.
  * If no quota doc or feature entry exists, returns allowed=false.
@@ -47,7 +76,12 @@ export async function checkQuota(
   if (!doc) {
     return { allowed: false, balance: 0, synced: false };
   }
-  const feature = doc.features[featureId];
+  const { targetFeatureId, targetAmount } = resolveQuotaTarget(
+    doc,
+    featureId,
+    amount,
+  );
+  const feature = doc.features[targetFeatureId];
   if (!feature) {
     return { allowed: false, balance: 0, synced: true };
   }
@@ -55,7 +89,7 @@ export async function checkQuota(
     return { allowed: true, balance: feature.balance, synced: true };
   }
   return {
-    allowed: feature.balance >= amount,
+    allowed: feature.balance >= targetAmount,
     balance: feature.balance,
     synced: true,
   };
@@ -99,15 +133,20 @@ export async function decrementQuota(
   if (!doc) {
     throw new ConvexError(`No quota doc for user. Sync quotas first.`);
   }
-  const feature = doc.features[featureId];
+  const { targetFeatureId, targetAmount } = resolveQuotaTarget(
+    doc,
+    featureId,
+    amount,
+  );
+  const feature = doc.features[targetFeatureId];
   if (!feature) {
-    throw new ConvexError(`No quota entry for feature "${featureId}". Sync quotas first.`);
+    throw new ConvexError(`No quota entry for feature "${targetFeatureId}". Sync quotas first.`);
   }
-  const newBalance = feature.balance - amount;
-  const newUsed = feature.used + amount;
+  const newBalance = feature.balance - targetAmount;
+  const newUsed = feature.used + targetAmount;
   const updatedFeatures = {
     ...doc.features,
-    [featureId]: { ...feature, balance: newBalance, used: newUsed },
+    [targetFeatureId]: { ...feature, balance: newBalance, used: newUsed },
   };
   await ctx.db.patch(doc._id, { features: updatedFeatures });
   return newBalance;
@@ -127,15 +166,20 @@ export async function incrementQuota(
   if (!doc) {
     throw new ConvexError(`No quota doc for user. Sync quotas first.`);
   }
-  const feature = doc.features[featureId];
+  const { targetFeatureId, targetAmount } = resolveQuotaTarget(
+    doc,
+    featureId,
+    amount,
+  );
+  const feature = doc.features[targetFeatureId];
   if (!feature) {
-    throw new ConvexError(`No quota entry for feature "${featureId}". Sync quotas first.`);
+    throw new ConvexError(`No quota entry for feature "${targetFeatureId}". Sync quotas first.`);
   }
-  const newBalance = feature.balance + amount;
-  const newUsed = Math.max(feature.used - amount, 0);
+  const newBalance = feature.balance + targetAmount;
+  const newUsed = Math.max(feature.used - targetAmount, 0);
   const updatedFeatures = {
     ...doc.features,
-    [featureId]: { ...feature, balance: newBalance, used: newUsed },
+    [targetFeatureId]: { ...feature, balance: newBalance, used: newUsed },
   };
   await ctx.db.patch(doc._id, { features: updatedFeatures });
   return newBalance;
@@ -203,6 +247,48 @@ export async function releaseQuota(
 }
 
 /**
+ * Charge the post-generation remainder of a chat message's dynamic credit
+ * cost (1 chat_messages unit is consumed up-front in `sendMessage`; this adds
+ * the extra units `generateResponse` derived from the actual LLM cost).
+ * `extraMessageUnits` is denominated in chat_messages UNITS — decrementQuota
+ * (via resolveQuotaTarget) and Autumn's credit schema each convert it into
+ * credits exactly once, so a credit-denominated amount here would be
+ * double-multiplied by CREDIT_COSTS[CHAT_MESSAGES]. Applied without a balance
+ * check — the work is already done, so the balance may go negative and block
+ * the next message instead.
+ *
+ * No-op for users on legacy plan versions (no `credits` balance): their
+ * chat costs a flat 1 chat_messages unit per message.
+ */
+export const chargeExtraChatCredits = internalMutation({
+  args: {
+    userId: v.string(),
+    extraMessageUnits: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (args.extraMessageUnits <= 0) return null;
+    const doc = await getQuotaDoc(ctx, args.userId);
+    if (!doc || !doc.features[FEATURE_IDS.CREDITS]) return null;
+
+    await decrementQuota(
+      ctx,
+      args.userId,
+      FEATURE_IDS.CHAT_MESSAGES,
+      args.extraMessageUnits,
+    );
+
+    await ctx.scheduler.runAfter(0, internal.usage.tracking.trackUsage, {
+      userId: args.userId,
+      featureId: FEATURE_IDS.CHAT_MESSAGES,
+      value: args.extraMessageUnits,
+    });
+
+    return null;
+  },
+});
+
+/**
  * Overwrite all features in the user's quota doc at once.
  * Called during full sync from Autumn's GET /customers response.
  * Auto-archives excess active courses when plan limits are exceeded.
@@ -211,6 +297,11 @@ export const syncAllFeatures = internalMutation({
   args: {
     userId: v.string(),
     features: v.record(v.string(), featureStateValidator),
+    // Current Autumn plan, when derivable from the customer response.
+    // Omitted → existing plan fields on the doc are left untouched.
+    planId: v.optional(v.string()),
+    planName: v.optional(v.string()),
+    planStatus: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -219,16 +310,27 @@ export const syncAllFeatures = internalMutation({
 
     const newIncluded = args.features[FEATURE_IDS.COURSES]?.included;
 
+    const planFields =
+      args.planId !== undefined
+        ? {
+          planId: args.planId,
+          planName: args.planName,
+          planStatus: args.planStatus,
+        }
+        : {};
+
     if (doc) {
       await ctx.db.patch(doc._id, {
         features: args.features,
         lastSyncedAt: now,
+        ...planFields,
       });
     } else {
       await ctx.db.insert('usageQuotas', {
         userId: args.userId,
         features: args.features,
         lastSyncedAt: now,
+        ...planFields,
       });
     }
 
