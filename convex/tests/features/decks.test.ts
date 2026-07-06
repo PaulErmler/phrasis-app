@@ -23,7 +23,13 @@ import type { Id } from "../../_generated/dataModel";
 import { scheduleMissingContent } from "../../features/decks";
 import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
 
+import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+
 const modules = import.meta.glob("/convex/**/*.ts");
+
+// Tests here schedule content work on 0ms timers - drain it inside the test
+// context so its logs don't race vitest teardown.
+drainSchedulerAfterEach();
 
 async function seedCourse(t: ReturnType<typeof convexTest>) {
   return t.run(async (ctx) => {
@@ -518,34 +524,31 @@ describe("features/decks", () => {
       expect(row?.translationSource).toBe("new-source");
     });
 
-    it("skips the write when expectedClaimId no longer matches the current claim (reclaimed)", async () => {
+    // Single-writer gate: a job carries the claim `_id` it was enqueued under
+    // (`expectedClaimId`); a reclaim deletes + reinserts the claim with a new
+    // _id, so a mismatch means the job was superseded mid-flight and its
+    // (possibly stale) result must not overwrite the current owner's write.
+    it("skips the write when expectedClaimId no longer matches (claim reclaimed mid-flight)", async () => {
       const t = convexTest(schema, modules);
-      const { textId, foreignClaimId } = await t.run(async (ctx) => {
-        const collectionId = await ctx.db.insert("collections", {
-          name: "A1",
-          textCount: 0,
+      const { textId, translationId } = await seedTextWithTaggedTranslation(t, {
+        existingSource: "openrouter/gemini-flash-lite-low",
+      });
+      // Job was enqueued under claim A; it went stale and was reclaimed
+      // (delete + reinsert) by a newer job B before this write landed.
+      const staleClaimId = await t.run(async (ctx) => {
+        const id = await ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "es",
+          claimedAt: Date.now() - 11 * 60 * 1000,
         });
-        const textId = await ctx.db.insert("texts", {
-          text: "Hello",
-          language: "en",
-          userCreated: false,
-          collectionId,
-          collectionRank: 1,
-        });
-        // The claim that currently owns (textId, es).
+        await ctx.db.delete(id);
         await ctx.db.insert("llmTranslationClaims", {
           textId,
           targetLanguage: "es",
           claimedAt: Date.now(),
+          workId: "newer-owner",
         });
-        // A different, valid claim id the worker thinks it owns — simulates a
-        // concurrent reconcile having reclaimed the row under a new _id.
-        const foreignClaimId = await ctx.db.insert("llmTranslationClaims", {
-          textId,
-          targetLanguage: "zz",
-          claimedAt: Date.now(),
-        });
-        return { textId, foreignClaimId };
+        return id;
       });
 
       await t.mutation(
@@ -553,55 +556,30 @@ describe("features/decks", () => {
         {
           textId,
           targetLanguage: "es",
-          translatedText: "Hola",
+          translatedText: "Hola (stale retranslation)",
           voiceName: TEST_VOICE,
-          expectedClaimId: foreignClaimId,
+          replaceExisting: true,
+          expectedClaimId: staleClaimId,
         },
       );
 
-      // The ownership gate must short-circuit before writing.
-      const rows = await t.run(async (ctx) =>
-        ctx.db
-          .query("translations")
-          .withIndex("by_text_and_language", (q) =>
-            q.eq("textId", textId).eq("targetLanguage", "es"),
-          )
-          .collect(),
-      );
-      expect(rows.length).toBe(0);
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.translatedText).toBe("Hola");
     });
 
-    it("writes when expectedClaimId matches the current claim", async () => {
+    it("skips the write when expectedClaimId is supplied but the claim is gone", async () => {
       const t = convexTest(schema, modules);
-      const { textId, claimId } = await t.run(async (ctx) => {
-        const collectionId = await ctx.db.insert("collections", {
-          name: "A1",
-          textCount: 0,
-        });
-        const textId = await ctx.db.insert("texts", {
-          text: "Hello",
-          language: "en",
-          userCreated: false,
-          collectionId,
-          collectionRank: 1,
-        });
-        const claimId = await ctx.db.insert("llmTranslationClaims", {
+      const { textId, translationId } = await seedTextWithTaggedTranslation(t, {
+        existingSource: "openrouter/gemini-flash-lite-low",
+      });
+      const releasedClaimId = await t.run(async (ctx) => {
+        const id = await ctx.db.insert("llmTranslationClaims", {
           textId,
           targetLanguage: "es",
           claimedAt: Date.now(),
         });
-        // Pre-seed audio for the voice so the write path short-circuits the TTS
-        // enqueue (which would validate the test voice against the curated list).
-        const storageId = await ctx.storage.store(
-          new Blob([new Uint8Array([1, 2, 3])]),
-        );
-        await ctx.db.insert("audioRecordings", {
-          textId,
-          language: "es",
-          voiceName: TEST_VOICE,
-          storageId,
-        });
-        return { textId, claimId };
+        await ctx.db.delete(id);
+        return id;
       });
 
       await t.mutation(
@@ -609,22 +587,45 @@ describe("features/decks", () => {
         {
           textId,
           targetLanguage: "es",
-          translatedText: "Hola",
+          translatedText: "Hola (orphan write)",
           voiceName: TEST_VOICE,
+          replaceExisting: true,
+          expectedClaimId: releasedClaimId,
+        },
+      );
+
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.translatedText).toBe("Hola");
+    });
+
+    it("writes when expectedClaimId matches the live claim", async () => {
+      const t = convexTest(schema, modules);
+      const { textId, translationId } = await seedTextWithTaggedTranslation(t, {
+        existingSource: "openrouter/gemini-flash-lite-low",
+      });
+      const claimId = await t.run(async (ctx) =>
+        ctx.db.insert("llmTranslationClaims", {
+          textId,
+          targetLanguage: "es",
+          claimedAt: Date.now(),
+          workId: "this-job",
+        }),
+      );
+
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "es",
+          translatedText: "Hola nueva",
+          voiceName: TEST_VOICE,
+          replaceExisting: true,
           expectedClaimId: claimId,
         },
       );
 
-      const rows = await t.run(async (ctx) =>
-        ctx.db
-          .query("translations")
-          .withIndex("by_text_and_language", (q) =>
-            q.eq("textId", textId).eq("targetLanguage", "es"),
-          )
-          .collect(),
-      );
-      expect(rows.length).toBe(1);
-      expect(rows[0].translatedText).toBe("Hola");
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.translatedText).toBe("Hola nueva");
     });
   });
 

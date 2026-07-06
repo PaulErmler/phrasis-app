@@ -91,6 +91,9 @@ importers:
       '@convex-dev/rate-limiter':
         specifier: ^0.3.2
         version: 0.3.2(convex@1.42.1(react@19.2.4))(react@19.2.4)
+      '@convex-dev/workpool':
+        specifier: ^0.4.7
+        version: 0.4.7(convex-helpers@0.1.119(@standard-schema/spec@1.1.0)(convex@1.42.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.4.3))(convex@1.42.1(react@19.2.4))
       '@daveyplate/better-auth-ui':
         specifier: ^3.4.0
         version: 3.4.0(c519d11d19a3b732685be04a492fb7ec)
@@ -831,6 +834,12 @@ packages:
     peerDependenciesMeta:
       react:
         optional: true
+
+  '@convex-dev/workpool@0.4.7':
+    resolution: {integrity: sha512-4O3VKcJXqYZ9icDgKdVPxjDGUAFK3oG0hbUwLcyYMYgsvVKlZDhvZRmczqSBZHLyrCGPpf925byh0dBigCfAGA==}
+    peerDependencies:
+      convex: ^1.31.7
+      convex-helpers: ^0.1.94
 
   '@csstools/color-helpers@6.0.2':
     resolution: {integrity: sha512-LMGQLS9EuADloEFkcTBR3BwV/CGHV7zyDxVRtVDTwdI2Ca4it0CCVTT9wCkxSgokjE5Ho41hEPgb8OEUwoXr6Q==}
@@ -9034,6 +9043,11 @@ snapshots:
       convex: 1.42.1(react@19.2.4)
     optionalDependencies:
       react: 19.2.4
+
+  '@convex-dev/workpool@0.4.7(convex-helpers@0.1.119(@standard-schema/spec@1.1.0)(convex@1.42.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.4.3))(convex@1.42.1(react@19.2.4))':
+    dependencies:
+      convex: 1.42.1(react@19.2.4)
+      convex-helpers: 0.1.119(@standard-schema/spec@1.1.0)(convex@1.42.1(react@19.2.4))(react@19.2.4)(typescript@5.9.3)(zod@4.4.3)
 
   '@csstools/color-helpers@6.0.2': {}
 

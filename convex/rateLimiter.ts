@@ -24,21 +24,27 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 200,
     shards: 10,
   },
-  // Gemini 3.1 Flash TTS via OpenRouter (/audio/speech). Conservative starting
-  // budget — OpenRouter per-key limits vary by credit balance; raise once we've
-  // observed real throughput without 429s.
+  // Gemini 3.1 Flash TTS via OpenRouter (/audio/speech). Capped BELOW the
+  // azureStt budget (200/min), not at OpenRouter's ceiling: every gemini
+  // synthesis is STT-validated, so gemini demand converts 1:1 (2:1 on a
+  // validation retry) into azureStt demand, and that bucket is shared with
+  // google/azure validation, word-timing backfill, and chat voice. 180
+  // leaves headroom for those. If more gemini throughput is ever needed,
+  // raise azureStt first — Microsoft's documented Fast Transcription cap on
+  // S0 is 600 req/min per resource (learn.microsoft.com Speech quotas,
+  // 2026-06), so the current 200 is a self-imposed third of the real limit.
   geminiTts: {
     kind: 'token bucket',
-    rate: 240,
+    rate: 180,
     period: MINUTE,
-    capacity: 240,
+    capacity: 180,
     shards: 32,
   },
-  // Azure Speech-to-Text Fast Transcription S0 tier — same 200 req/min cap as
-  // azureTts. Hit by TTS validation (synthesizeAndValidate), word-timing
-  // backfill, and chat voice transcription. If 429s persist after this lands,
-  // consider dropping rate to ~180 — clock drift + parallel retries can push
-  // instantaneous load over the cap, same reasoning as googleTts → 150.
+  // Azure Speech-to-Text Fast Transcription S0 tier. Hit by TTS validation
+  // (synthesizeAndValidate), word-timing backfill, and chat voice
+  // transcription. Microsoft's documented S0 cap is 600 req/min per resource
+  // (adjustable via support ticket); 200 keeps us at a third of that because
+  // Azure autoscaling can 429 below the cap during sharp ramps.
   azureStt: {
     kind: 'token bucket',
     rate: 200,

@@ -1457,9 +1457,7 @@ export const flagTranslation = mutation({
             // Deliberate retranslation — overwrite the existing translation
             // row (and its romanization) once the LLM lands.
             replaceExisting: true,
-            claimId,
           },
-          priority: 1,
         },
       );
       anyEnqueued = true;
@@ -1518,7 +1516,6 @@ export const regenerateCardAudio = mutation({
       text,
       course.baseLanguages,
       course.targetLanguages,
-      { priority: 1 },
     );
 
     return null;

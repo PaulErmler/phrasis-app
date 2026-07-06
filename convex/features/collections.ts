@@ -186,12 +186,6 @@ export const ensureContentForCollection = mutation({
 
     // Parallel over texts — each text writes only to its own (textId, language)
     // keyed rows, so no cross-text contention within this transaction.
-    //
-    // priority: 1 — opening a collection preview is a direct user signal that
-    // they're considering this collection. Jump ahead of background warmup
-    // (priority 0, e.g. cross-level prewarm from onboarding) so the preview
-    // populates promptly, while still yielding to onboarding-critical work
-    // (priority 2) like placement test or chosen-level seeding.
     const results = await Promise.all(
       texts.map((text) =>
         scheduleMissingContent(
@@ -200,7 +194,6 @@ export const ensureContentForCollection = mutation({
           text,
           course.baseLanguages,
           course.targetLanguages,
-          { priority: 1 },
         ),
       ),
     );

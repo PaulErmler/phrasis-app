@@ -709,27 +709,32 @@ export default defineSchema({
 
   // TTS generation claims — prevents duplicate processTTSForCard scheduling.
   // Mutations atomically check-and-insert before scheduling; Convex OCC
-  // guarantees only one claim per (textId, language) wins.
+  // guarantees only one claim per (textId, language) wins. The claim lives
+  // from enqueue until the pool job's onComplete deletes it; `claimedAt`
+  // staleness is only a catastrophic backstop (see TTS_CLAIM_STALE_MS).
   ttsGenerationClaims: defineTable({
     textId: v.id('texts'),
     language: v.string(),
     claimedAt: v.number(),
+    // Workpool work id of the pool job holding this claim. Set by the enqueue
+    // (same transaction); the job's onComplete only releases the claim when
+    // its workId matches, so a stale-reclaimed claim can't be deleted by the
+    // superseded job's completion. Optional: claims created for non-pool work
+    // (word-timing backfills) and legacy rows carry none.
+    workId: v.optional(v.string()),
   }).index('by_text_and_language', ['textId', 'language']),
 
-  // Global concurrency slots per TTS provider. Each row = one in-flight API
-  // call. Used to stay under provider concurrency caps (e.g. Azure's
-  // 8-parallel limit). Stale rows are reclaimed after SLOT_STALE_MS.
+  // LEGACY (phase-2 removal): superseded by the ttsPool workpool. Kept only
+  // so pre-migration rows keep validating until `drainLegacyQueues` has run
+  // and a cleanup deploy drops the table.
   ttsProviderSlots: defineTable({
     provider: ttsProviderValidator,
     claimedAt: v.number(),
   }).index('by_provider', ['provider']),
 
-  // Priority/FIFO queue of pending TTS jobs. Enqueued by scheduling mutations;
-  // drained by `pumpQueue` which dispatches the highest `priority` first,
-  // FIFO within each level. Rows are deleted at dispatch time.
-  // `priority` is optional only so a deploy can land without a one-shot
-  // backfill of in-flight rows; new enqueues always set it (0 = normal,
-  // 1 = active collection for the requesting user — see scheduleMissingContent).
+  // LEGACY (phase-2 removal): superseded by the ttsPool workpool. Remaining
+  // rows are moved into the pool by `drainLegacyQueues`; a cleanup deploy
+  // then drops the table.
   ttsQueue: defineTable({
     provider: ttsProviderValidator,
     args: v.object({
@@ -758,15 +763,9 @@ export default defineSchema({
       'queuedAt',
     ]),
 
-  // ── LLM translation queue (mirrors the TTS queue structure) ──────────────
-  // OpenRouter rate-limits aggressively, so concurrent LLM translation calls
-  // are capped at MAX_LLM_CONCURRENCY (currently 64; see lib constant in
-  // convex/features/llmTranslationQueue.ts). Active from day one, unlike the
-  // dormant TTS gate. Same three-table pattern: queue + slots + claims.
-
-  // Priority/FIFO queue of pending LLM translation jobs. Drained by
-  // `pumpLlmQueue` highest-priority first, FIFO within each level. See the
-  // ttsQueue comment above for the `priority` field semantics.
+  // LEGACY (phase-2 removal): superseded by the llmPool workpool. Remaining
+  // rows are moved into the pool by `drainLegacyQueues`; a cleanup deploy
+  // then drops the table.
   llmTranslationQueue: defineTable({
     args: v.object({
       textId: v.id('texts'),
@@ -803,35 +802,29 @@ export default defineSchema({
   })
     .index('by_priority_and_queuedAt', ['priority', 'queuedAt']),
 
-  // Global concurrency slots — one row per in-flight LLM API call. Stale rows
-  // are reclaimed after SLOT_STALE_MS so a crashed action doesn't leak slots.
+  // LEGACY (phase-2 removal): superseded by the llmPool workpool.
   llmTranslationSlots: defineTable({
     claimedAt: v.number(),
   }),
 
   // Per-(textId, language) dedup claim. Atomically check-and-insert before
   // scheduling so two mutations can't enqueue the same translation twice.
+  // Lives from enqueue until the pool job's onComplete deletes it (the
+  // Google-fallback handoff re-points `workId` at the fallback job first).
   llmTranslationClaims: defineTable({
     textId: v.id('texts'),
     targetLanguage: v.string(),
     claimedAt: v.number(),
+    // Workpool work id of the pool job holding this claim — see the
+    // ttsGenerationClaims.workId comment.
+    workId: v.optional(v.string()),
   }).index('by_text_and_language', ['textId', 'targetLanguage']),
 
-  // Pump-scheduling dedup flag, one row per queue key ('llm' | 'tts:<provider>').
-  // Enqueue/finalize only schedule a pump when no pump is already pending
-  // (see convex/lib/queuePump.ts) — without this, every enqueue and every
-  // finalize scheduled its own pump, and the concurrent pumps' overlapping
-  // slot-table scans OCC-retried against each other by the hundreds.
-  // Rows are created lazily on first use.
+  // LEGACY (phase-2 removal): the workpools own their scheduling; no pump
+  // flags remain. Rows are wiped by `drainLegacyQueues`.
   queuePumpStates: defineTable({
     key: v.string(),
-    // True from the moment a pump is scheduled until that pump starts running
-    // (the pump clears it as its first write, so a later enqueue schedules a
-    // fresh pump rather than being lost).
     pumpScheduled: v.boolean(),
-    // When the scheduled pump is expected to run (now + delay). A flag whose
-    // pumpScheduledFor is far in the past means the scheduled pump died
-    // (deploy removed it / it kept throwing); callers then schedule anyway.
     pumpScheduledFor: v.number(),
   }).index('by_key', ['key']),
 

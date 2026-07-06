@@ -13,7 +13,13 @@ import {
   getCurrentTranslationVersion,
 } from "../../../lib/languages";
 
+import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+
 const modules = import.meta.glob("/convex/**/*.ts");
+
+// Tests here schedule content work on 0ms timers - drain it inside the test
+// context so its logs don't race vitest teardown.
+drainSchedulerAfterEach();
 
 // pt_pt carries `ttsVersion: 2` in lib/languages.ts (an accent-fix bump). It is
 // the canonical case the backfill must get right: legacy audio for it was
