@@ -8,7 +8,7 @@ import { components } from '../../_generated/api';
 import { requireAuthUserId, getAuthUserId } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
 import { consumeQuota } from '../../usage/helpers';
-import { CHAT_CREDIT_USD_STEP, FEATURE_IDS } from '../featureIds';
+import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
 import { agent } from './agent';
 import type { MutationCtx } from '../../_generated/server';
 import type { Id } from '../../_generated/dataModel';
@@ -386,15 +386,23 @@ export const generateResponse = internalAction({
       // Integer micro-USD math: IEEE-754 division can land an exact multiple
       // of the step an epsilon above an integer (0.035 / 0.005 → 7.000…001),
       // which ceil would then overcharge by a full credit.
+      //
+      // Billed in whole chat_messages UNITS, not credits: decrementQuota and
+      // Autumn's credit schema each multiply a chat_messages amount by
+      // CREDIT_COSTS[CHAT_MESSAGES], so passing credits through them would
+      // double-convert. One unit deducts `unitCredits` credits, so it covers
+      // `unitCredits` billing steps — the effective rate stays 1 credit per
+      // CHAT_CREDIT_USD_STEP regardless of the configured cost.
       const stepMicroUsd = Math.round(CHAT_CREDIT_USD_STEP * 1e6);
-      const totalCredits = Math.ceil(
-        Math.round(totalCostUsd * 1e6) / stepMicroUsd,
+      const unitCredits = CREDIT_COSTS[FEATURE_IDS.CHAT_MESSAGES] ?? 1;
+      const totalUnits = Math.ceil(
+        Math.round(totalCostUsd * 1e6) / (stepMicroUsd * unitCredits),
       );
-      const extraCredits = Math.max(0, totalCredits - 1);
-      if (extraCredits > 0 && billedUserId) {
+      const extraMessageUnits = Math.max(0, totalUnits - 1);
+      if (extraMessageUnits > 0 && billedUserId) {
         await ctx.runMutation(internal.usage.helpers.chargeExtraChatCredits, {
           userId: billedUserId,
-          extraCredits,
+          extraMessageUnits,
         });
       }
     } catch (error) {

@@ -134,7 +134,7 @@ describe("usage/credits", () => {
       });
       await t.mutation(internal.usage.helpers.chargeExtraChatCredits, {
         userId: "user_A",
-        extraCredits: 3,
+        extraMessageUnits: 3,
       });
       const quota = await getQuotas(t);
       expect(quota?.features.credits.balance).toBe(-1);
@@ -148,7 +148,7 @@ describe("usage/credits", () => {
       });
       await t.mutation(internal.usage.helpers.chargeExtraChatCredits, {
         userId: "user_A",
-        extraCredits: 3,
+        extraMessageUnits: 3,
       });
       const quota = await getQuotas(t);
       expect(quota?.features.chat_messages.balance).toBe(5);
@@ -161,7 +161,7 @@ describe("usage/credits", () => {
       });
       await t.mutation(internal.usage.helpers.chargeExtraChatCredits, {
         userId: "user_A",
-        extraCredits: 0,
+        extraMessageUnits: 0,
       });
       const quota = await getQuotas(t);
       expect(quota?.features.credits.balance).toBe(10);

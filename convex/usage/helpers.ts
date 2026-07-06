@@ -248,10 +248,14 @@ export async function releaseQuota(
 
 /**
  * Charge the post-generation remainder of a chat message's dynamic credit
- * cost (1 credit is consumed up-front in `sendMessage`; this adds 1 credit
- * per additional started CHAT_CREDIT_USD_STEP of actual LLM cost). Applied
- * without a balance check — the work is already done, so the balance may go
- * negative and block the next message instead.
+ * cost (1 chat_messages unit is consumed up-front in `sendMessage`; this adds
+ * the extra units `generateResponse` derived from the actual LLM cost).
+ * `extraMessageUnits` is denominated in chat_messages UNITS — decrementQuota
+ * (via resolveQuotaTarget) and Autumn's credit schema each convert it into
+ * credits exactly once, so a credit-denominated amount here would be
+ * double-multiplied by CREDIT_COSTS[CHAT_MESSAGES]. Applied without a balance
+ * check — the work is already done, so the balance may go negative and block
+ * the next message instead.
  *
  * No-op for users on legacy plan versions (no `credits` balance): their
  * chat costs a flat 1 chat_messages unit per message.
@@ -259,11 +263,11 @@ export async function releaseQuota(
 export const chargeExtraChatCredits = internalMutation({
   args: {
     userId: v.string(),
-    extraCredits: v.number(),
+    extraMessageUnits: v.number(),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (args.extraCredits <= 0) return null;
+    if (args.extraMessageUnits <= 0) return null;
     const doc = await getQuotaDoc(ctx, args.userId);
     if (!doc || !doc.features[FEATURE_IDS.CREDITS]) return null;
 
@@ -271,13 +275,13 @@ export const chargeExtraChatCredits = internalMutation({
       ctx,
       args.userId,
       FEATURE_IDS.CHAT_MESSAGES,
-      args.extraCredits,
+      args.extraMessageUnits,
     );
 
     await ctx.scheduler.runAfter(0, internal.usage.tracking.trackUsage, {
       userId: args.userId,
       featureId: FEATURE_IDS.CHAT_MESSAGES,
-      value: args.extraCredits,
+      value: args.extraMessageUnits,
     });
 
     return null;

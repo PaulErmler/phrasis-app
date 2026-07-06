@@ -36,8 +36,11 @@ export const CREDIT_COSTS: Partial<Record<FeatureId, number>> = {
 };
 
 /**
- * Chat billing step: 1 credit per started USD 0.005 of LLM cost. One credit
- * is consumed before generation; the remainder is charged after the
- * response based on actual OpenRouter cost.
+ * Chat billing step: 1 credit per started USD 0.005 of LLM cost. One
+ * chat_messages unit is consumed before generation; the remainder is charged
+ * after the response based on actual OpenRouter cost, in whole chat_messages
+ * units (each covering CREDIT_COSTS[CHAT_MESSAGES] steps) so the amount is
+ * credit-converted exactly once — see generateResponse in
+ * features/chat/messages.ts.
  */
 export const CHAT_CREDIT_USD_STEP = 0.005;
