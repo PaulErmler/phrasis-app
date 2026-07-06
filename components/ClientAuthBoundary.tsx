@@ -2,7 +2,7 @@
 
 import { type PropsWithChildren } from 'react';
 import { useRouter } from 'next/navigation';
-import { AuthBoundary } from '@convex-dev/better-auth/react';
+import { AuthBoundary, type AuthClient } from '@convex-dev/better-auth/react';
 
 import { authClient } from '@/lib/auth-client';
 import { isAuthError } from '@/lib/utils';
@@ -13,7 +13,10 @@ export function ClientAuthBoundary({ children }: PropsWithChildren) {
   const router = useRouter();
   return (
     <AuthBoundary
-      authClient={authClient}
+      // Cast: @convex-dev/better-auth 0.12.5's AuthClient type collapses
+      // useSession().data to `never` under better-auth 1.6.23, so no real
+      // client is assignable. Drop when a fixed release exists.
+      authClient={authClient as unknown as AuthClient}
       onUnauth={() => router.replace('/auth/sign-in')}
       getAuthUserFn={api.auth.getAuthUser}
       isAuthError={isAuthError}

@@ -53,7 +53,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Flexling',
     description:
-      'Master languages with audio flashcards, spaced repetition, and AI chat. Bring your own content.',
+      'Get fluent by shadowing real sentences, writing them, and listening all day — with spaced repetition and a built-in AI tutor. Free to start.',
     url: siteUrl,
     siteName: 'Flexling',
     type: 'website',
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     card: 'summary',
     title: 'Flexling',
     description:
-      'Master languages with audio flashcards, spaced repetition, and AI chat. Bring your own content.',
+      'Get fluent by shadowing real sentences, writing them, and listening all day — with spaced repetition and a built-in AI tutor. Free to start.',
   },
   appleWebApp: {
     capable: true,

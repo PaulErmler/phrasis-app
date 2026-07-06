@@ -94,6 +94,47 @@ export const schedulingModeValidator = v.union(
   v.literal('radio'),
 );
 
+// Source-of-content filter. `undefined` and 'both' behave identically (no filter).
+// 'custom' = study/auto-add only cards from collections with origin !== 'premade' (custom + chat).
+// 'course' = study/auto-add only cards from collections with origin === 'premade'.
+export const studyContentFilterValidator = v.union(
+  v.literal('custom'),
+  v.literal('course'),
+  v.literal('both'),
+);
+
+// The six grades a card review can receive: stillLearning/understood in the
+// preReview phase, again/hard/good/easy once the card is FSRS-scheduled.
+export const reviewRatingValidator = v.union(
+  v.literal('stillLearning'),
+  v.literal('understood'),
+  v.literal('again'),
+  v.literal('hard'),
+  v.literal('good'),
+  v.literal('easy'),
+);
+
+// The card fields that `reviewCard` mutates (scheduling state). Single source
+// of truth shared by the `cards` table definition and the `reviewLogs.prevCard`
+// undo snapshot so the two can never drift.
+export const cardSchedulingSnapshotFields = {
+  dueDate: v.number(), // Timestamp for spaced repetition scheduling (driven by scheduler)
+  schedulingPhase: schedulingPhaseValidator,
+  preReviewCount: v.number(), // How many pre-review rounds completed
+  fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
+  isGraduated: v.optional(v.boolean()), // One-way flag: true once card graduates from initial learning (FSRS state >= Review)
+  lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review, FSRS, and radio plays)
+} as const;
+
+// The card fields that `advanceRadioCard` mutates (minus `lastReviewedAt`,
+// which lives in the scheduling set above). Shared by the `cards` table and
+// the `reviewLogs.prevRadio` undo snapshot.
+export const cardRadioSnapshotFields = {
+  radioRoundCounter: v.optional(v.number()), // Radio mode: # of times this card has been played in radio mode. Lowest counter plays next; new cards default to 0 so they play first. Optional for backward compat — undefined treated as 0.
+  radioOrderKey: v.optional(v.number()), // Radio mode: random tiebreak within equal `radioRoundCounter`. Re-rolled on each play so the round-robin order shuffles every loop and never matches the review (`dueDate`-driven) order. Optional for backward compat.
+  radioPlayCount: v.optional(v.number()), // Radio mode: true count of radio plays (+1 per play, NOT subject to radioRoundCounter's catch-up jump). Drives the "Only new" Practice-Listening limit. Optional/undefined for pre-existing cards — treated as the card's review count (preReviewCount + FSRS reps) so they don't reset to "new".
+} as const;
+
 export const ttsQualityValidator = v.union(
   v.literal('unknown'),
   v.literal('validated'),
@@ -138,6 +179,8 @@ export const cardApprovalStatusValidator = v.union(
 );
 
 export type LearningStyle = Infer<typeof learningStyleValidator>;
+export type StudyContentFilter = Infer<typeof studyContentFilterValidator>;
+export type ReviewRating = Infer<typeof reviewRatingValidator>;
 export type CurrentLevel = Infer<typeof currentLevelValidator>;
 export type ReviewMode = Infer<typeof reviewModeValidator>;
 export type SchedulingMode = Infer<typeof schedulingModeValidator>;

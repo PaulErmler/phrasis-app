@@ -4,9 +4,12 @@ import {
   learningStyleValidator,
   currentLevelValidator,
   reviewModeValidator,
-  fsrsStateValidator,
   cardApprovalStatusValidator,
-  schedulingPhaseValidator,
+  schedulingModeValidator,
+  studyContentFilterValidator,
+  reviewRatingValidator,
+  cardSchedulingSnapshotFields,
+  cardRadioSnapshotFields,
   ttsQualityValidator,
   ttsProviderValidator,
   voiceGenderValidator,
@@ -68,14 +71,14 @@ export const courseSettingsFields = {
   instantProceedAudio: v.optional(v.boolean()), // auto-advance when rating is clicked (audio mode, default false)
   instantProceedFull: v.optional(v.boolean()), // auto-advance when rating is clicked (full mode, default true)
   // Review mode
-  reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))), // 'audio' (default) or 'full'
+  reviewMode: v.optional(reviewModeValidator), // 'audio' (default) or 'full'
   // Daily study-time goal in minutes. Seeded from the user's onboarding
   // answer when the course is created by `completeOnboarding`. Lives
   // here rather than `userSettings` because the goal is per-course
   // (different courses can have different pacing targets).
   dailyTimeGoalMinutes: v.optional(v.number()),
   // Scheduling mode
-  schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))), // 'learnAndReview' (default), 'learn_new', or 'radio' (round-robin playback, no FSRS)
+  schedulingMode: v.optional(schedulingModeValidator), // 'learnAndReview' (default), 'learn_new', or 'radio' (round-robin playback, no FSRS)
   fullReviewTargetAudioMode: v.optional(
     v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
   ), // When to play target audio in full review mode
@@ -83,12 +86,8 @@ export const courseSettingsFields = {
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
   reconciledDatasetId: v.optional(v.id('datasets')), // Dataset version this course's progress has been cutover to (idempotency gate for datasetMigration_cutoverUser)
-  // Source-of-content filter. `undefined` and 'both' behave identically (no filter).
-  // 'custom' = study/auto-add only cards from collections with origin !== 'premade' (custom + chat).
-  // 'course' = study/auto-add only cards from collections with origin === 'premade'.
-  studyContentFilter: v.optional(
-    v.union(v.literal('custom'), v.literal('course'), v.literal('both')),
-  ),
+  // Source-of-content filter — see studyContentFilterValidator in types.ts.
+  studyContentFilter: v.optional(studyContentFilterValidator),
   // Current "between celebrations" bucket id. Rotated by the client on
   // celebration dismiss (via `setCurrentSessionId`). Stored server-side so
   // the bucket survives the user closing the learn view OR moving to a
@@ -188,6 +187,9 @@ export default defineSchema({
     .index('by_collection_and_rank', ['collectionId', 'collectionRank'])
     .index('by_collection_and_userCreated_and_rank', ['collectionId', 'userCreated', 'collectionRank'])
     .index('by_collection_and_userId_and_rank', ['collectionId', 'userId', 'collectionRank'])
+    // Admin dashboard: enumerate a user's custom texts (userId is only set
+    // on user-created rows, so premade texts never appear under a real key)
+    .index('by_userId', ['userId'])
     // Sliding-window arc-context lookup: equality on (collectionId, arcId)
     // followed by `.lt('collectionRank', X).order('desc').take(5)` for the
     // preceding window and `.gt('collectionRank', X).order('asc').take(3)` for
@@ -442,22 +444,18 @@ export default defineSchema({
     collectionOrigin: v.optional(
       v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
     ),
-    dueDate: v.number(), // Timestamp for spaced repetition scheduling (driven by scheduler)
+    // Scheduling + radio state mutated by reviewCard / advanceRadioCard.
+    // Shared with the `reviewLogs` undo snapshots — definitions and field
+    // comments live in convex/types.ts.
+    ...cardSchedulingSnapshotFields,
+    ...cardRadioSnapshotFields,
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
     isFavorite: v.optional(v.boolean()), // Whether the card is marked as a favorite
-    schedulingPhase: schedulingPhaseValidator,
-    preReviewCount: v.number(), // How many pre-review rounds completed
-    fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
     searchableText: v.optional(v.string()), // Denormalized source text + translations for full-text search
     searchableTextLanguages: v.optional(v.array(v.string())), // Language codes included in searchableText; used to detect staleness when course languages change
-    isGraduated: v.optional(v.boolean()), // One-way flag: true once card graduates from initial learning (FSRS state >= Review)
-    lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review and FSRS phases)
     wordsTrackedLanguages: v.optional(v.array(v.string())), // Languages for which words have been counted in stats
     audioSpeedOverrides: v.optional(v.record(v.string(), v.number())), // Per-card per-language playback speed override (range CARD_OVERRIDE_SPEED_MIN-CARD_OVERRIDE_SPEED_MAX, see lib/constants/audioPlayback). Missing entry = use general courseSettings.languagePlaybackSpeeds.
-    radioRoundCounter: v.optional(v.number()), // Radio mode: # of times this card has been played in radio mode. Lowest counter plays next; new cards default to 0 so they play first. Optional for backward compat — undefined treated as 0.
-    radioOrderKey: v.optional(v.number()), // Radio mode: random tiebreak within equal `radioRoundCounter`. Re-rolled on each play so the round-robin order shuffles every loop and never matches the review (`dueDate`-driven) order. Optional for backward compat.
-    radioPlayCount: v.optional(v.number()), // Radio mode: true count of radio plays (+1 per play, NOT subject to radioRoundCounter's catch-up jump). Drives the "Only new" Practice-Listening limit. Optional/undefined for pre-existing cards — treated as the card's review count (preReviewCount + FSRS reps) so they don't reset to "new".
   })
     .index('by_deckId', ['deckId'])
     .index('by_deckId_and_textId', ['deckId', 'textId'])
@@ -596,7 +594,66 @@ export default defineSchema({
     chatCardsApproved: v.optional(v.number()),
     cardsEdited: v.optional(v.number()),
     cardsAddedManually: v.optional(v.number()),
-  }).index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date']),
+    // High-water mark: today's review count when a celebration last fired.
+    // A milestone only triggers when the count EXCEEDS this, and undoing a
+    // review never lowers it — so undo + re-review can't replay a celebration.
+    lastCelebratedAtCount: v.optional(v.number()),
+  })
+    .index('by_userId_and_courseId_and_date', ['userId', 'courseId', 'date'])
+    // Admin dashboard: per-day DAU scan across all users
+    .index('by_date', ['date']),
+
+  // Review log table — one entry per card review / radio play, capped at
+  // UNDO_DEPTH newest entries per (user, course) by logReview's trim. Each
+  // entry snapshots the card state the review overwrote plus the keys needed
+  // to reverse its stat increments, powering the learn-mode undo button.
+  // Snapshot-based because reviews aren't recomputable: dueDate carries
+  // random jitter and ts-fsrs transitions aren't invertible.
+  reviewLogs: defineTable({
+    userId: v.string(),
+    courseId: v.id('courses'),
+    cardId: v.id('cards'),
+    reviewedAt: v.number(),
+    timezone: v.string(), // timezone the review's stats were recorded under
+    kind: v.union(v.literal('review'), v.literal('radio')),
+    date: v.string(), // "YYYY-MM-DD" day key of the stats rows the review incremented; week/month/year keys derived
+    // Study context at review time. Undo only applies while the CURRENT
+    // course settings match — the undoable stack is the newest-first
+    // consecutive run of matching entries, so entries logged under another
+    // mode/filter block everything older beneath them.
+    schedulingMode: schedulingModeValidator,
+    studyContentFilter: studyContentFilterValidator,
+
+    // kind === 'review': pre-review card scheduling state (shared field set
+    // with the cards table — see convex/types.ts). undefined = field was absent.
+    prevCard: v.optional(v.object(cardSchedulingSnapshotFields)),
+    // kind === 'review': stat increments to reverse, keyed as computed at
+    // review time (hour bucket, resolved mode, languages) since they are not
+    // recomputable later.
+    statsReversal: v.optional(
+      v.object({
+        hourOfDay: v.number(),
+        rating: reviewRatingValidator,
+        reviewModeForStats: reviewModeValidator, // resolved (?? 'audio') — dailyStats buckets use this
+        reviewModeRaw: v.optional(reviewModeValidator), // as passed — courseStats/weekly/monthly/yearly gate on presence
+        wasFirstReview: v.boolean(), // pre-patch schedulingPhase === 'preReview' && preReviewCount === 0
+        wasDefaultRating: v.optional(v.boolean()),
+        accuracy: v.optional(v.number()),
+        reviewDepth: v.optional(v.number()), // reviewDepthAccuracy bucket, only when accuracy present
+        languages: v.array(v.string()), // course languages whose per-language stats were incremented
+        collectionId: v.optional(v.id('collections')),
+      }),
+    ),
+
+    // kind === 'radio': pre-play radio rotation state (shared field set with
+    // the cards table) + lastReviewedAt, which advanceRadioCard also stamps.
+    prevRadio: v.optional(
+      v.object({
+        ...cardRadioSnapshotFields,
+        lastReviewedAt: v.optional(v.number()),
+      }),
+    ),
+  }).index('by_userId_and_courseId', ['userId', 'courseId']),
 
   // Collection progress table - per (user, course, collection) monotonic
   // counters used by the home view. Counters are strictly monotonic: incremented
@@ -652,27 +709,32 @@ export default defineSchema({
 
   // TTS generation claims — prevents duplicate processTTSForCard scheduling.
   // Mutations atomically check-and-insert before scheduling; Convex OCC
-  // guarantees only one claim per (textId, language) wins.
+  // guarantees only one claim per (textId, language) wins. The claim lives
+  // from enqueue until the pool job's onComplete deletes it; `claimedAt`
+  // staleness is only a catastrophic backstop (see TTS_CLAIM_STALE_MS).
   ttsGenerationClaims: defineTable({
     textId: v.id('texts'),
     language: v.string(),
     claimedAt: v.number(),
+    // Workpool work id of the pool job holding this claim. Set by the enqueue
+    // (same transaction); the job's onComplete only releases the claim when
+    // its workId matches, so a stale-reclaimed claim can't be deleted by the
+    // superseded job's completion. Optional: claims created for non-pool work
+    // (word-timing backfills) and legacy rows carry none.
+    workId: v.optional(v.string()),
   }).index('by_text_and_language', ['textId', 'language']),
 
-  // Global concurrency slots per TTS provider. Each row = one in-flight API
-  // call. Used to stay under provider concurrency caps (e.g. Azure's
-  // 8-parallel limit). Stale rows are reclaimed after SLOT_STALE_MS.
+  // LEGACY (phase-2 removal): superseded by the ttsPool workpool. Kept only
+  // so pre-migration rows keep validating until `drainLegacyQueues` has run
+  // and a cleanup deploy drops the table.
   ttsProviderSlots: defineTable({
     provider: ttsProviderValidator,
     claimedAt: v.number(),
   }).index('by_provider', ['provider']),
 
-  // Priority/FIFO queue of pending TTS jobs. Enqueued by scheduling mutations;
-  // drained by `pumpQueue` which dispatches the highest `priority` first,
-  // FIFO within each level. Rows are deleted at dispatch time.
-  // `priority` is optional only so a deploy can land without a one-shot
-  // backfill of in-flight rows; new enqueues always set it (0 = normal,
-  // 1 = active collection for the requesting user — see scheduleMissingContent).
+  // LEGACY (phase-2 removal): superseded by the ttsPool workpool. Remaining
+  // rows are moved into the pool by `drainLegacyQueues`; a cleanup deploy
+  // then drops the table.
   ttsQueue: defineTable({
     provider: ttsProviderValidator,
     args: v.object({
@@ -701,15 +763,9 @@ export default defineSchema({
       'queuedAt',
     ]),
 
-  // ── LLM translation queue (mirrors the TTS queue structure) ──────────────
-  // OpenRouter rate-limits aggressively, so concurrent LLM translation calls
-  // are capped at MAX_LLM_CONCURRENCY (currently 64; see lib constant in
-  // convex/features/llmTranslationQueue.ts). Active from day one, unlike the
-  // dormant TTS gate. Same three-table pattern: queue + slots + claims.
-
-  // Priority/FIFO queue of pending LLM translation jobs. Drained by
-  // `pumpLlmQueue` highest-priority first, FIFO within each level. See the
-  // ttsQueue comment above for the `priority` field semantics.
+  // LEGACY (phase-2 removal): superseded by the llmPool workpool. Remaining
+  // rows are moved into the pool by `drainLegacyQueues`; a cleanup deploy
+  // then drops the table.
   llmTranslationQueue: defineTable({
     args: v.object({
       textId: v.id('texts'),
@@ -746,19 +802,31 @@ export default defineSchema({
   })
     .index('by_priority_and_queuedAt', ['priority', 'queuedAt']),
 
-  // Global concurrency slots — one row per in-flight LLM API call. Stale rows
-  // are reclaimed after SLOT_STALE_MS so a crashed action doesn't leak slots.
+  // LEGACY (phase-2 removal): superseded by the llmPool workpool.
   llmTranslationSlots: defineTable({
     claimedAt: v.number(),
   }),
 
   // Per-(textId, language) dedup claim. Atomically check-and-insert before
   // scheduling so two mutations can't enqueue the same translation twice.
+  // Lives from enqueue until the pool job's onComplete deletes it (the
+  // Google-fallback handoff re-points `workId` at the fallback job first).
   llmTranslationClaims: defineTable({
     textId: v.id('texts'),
     targetLanguage: v.string(),
     claimedAt: v.number(),
+    // Workpool work id of the pool job holding this claim — see the
+    // ttsGenerationClaims.workId comment.
+    workId: v.optional(v.string()),
   }).index('by_text_and_language', ['textId', 'targetLanguage']),
+
+  // LEGACY (phase-2 removal): the workpools own their scheduling; no pump
+  // flags remain. Rows are wiped by `drainLegacyQueues`.
+  queuePumpStates: defineTable({
+    key: v.string(),
+    pumpScheduled: v.boolean(),
+    pumpScheduledFor: v.number(),
+  }).index('by_key', ['key']),
 
   // Daily per-language stats
   dailyLanguageStats: defineTable({
@@ -910,6 +978,39 @@ export default defineSchema({
       }),
     ),
     lastSyncedAt: v.number(),
+    // Current Autumn product (plan), captured during sync. Optional — rows
+    // synced before this field existed (or users with no product) have none.
+    planId: v.optional(v.string()),
+    planName: v.optional(v.string()),
+    planStatus: v.optional(v.string()),
   }).index('by_userId', ['userId']),
+
+  // Admin allowlist for the /app/admin dashboard. The gate (requireAdmin in
+  // convex/admin/lib.ts) requires BOTH fields to match the caller's Better
+  // Auth user. Manage rows via `npx convex run admin/manage:setAdmin` (or the
+  // dashboard function runner), which resolves the userId from the email.
+  admins: defineTable({
+    email: v.string(), // Better Auth user email, lowercase
+    userId: v.string(), // Better Auth user._id === identity.subject
+  })
+    .index('by_email', ['email'])
+    .index('by_userId', ['userId']),
+
+  // App-owned mirror of Better Auth users (email/name live in the betterAuth
+  // component tables, which can't be indexed/searched from app queries).
+  // Kept in sync by user triggers in convex/auth.ts; historical rows come
+  // from migrations/backfillUserProfiles. Powers the admin user list/search.
+  userProfiles: defineTable({
+    userId: v.string(), // Better Auth user._id === identity.subject
+    email: v.string(),
+    name: v.string(),
+    image: v.optional(v.string()),
+    createdAt: v.number(), // Better Auth user.createdAt (signup time; _creationTime is the mirror-row time)
+    searchText: v.string(), // `${email} ${name}`.toLowerCase()
+  })
+    .index('by_userId', ['userId'])
+    .index('by_email', ['email'])
+    .index('by_createdAt', ['createdAt'])
+    .searchIndex('search_users', { searchField: 'searchText' }),
 
 });

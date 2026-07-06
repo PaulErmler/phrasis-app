@@ -5,8 +5,8 @@
 
 /** OpenRouter model IDs by agent or task */
 export const OPENROUTER_MODELS = {
-  /** Main language-tutor chat (tools, streaming) */
-  languageTeacher: 'z-ai/glm-5.1:nitro',
+  /** Main language-tutor chat (tools, streaming) — high thinking */
+  languageTeacher: 'z-ai/glm-5.2:nitro',
   /** Bulk translation JSON for custom card auto-fill */
   translationAutoFill: 'google/gemini-3.1-flash-lite',
   /** Linguistic metadata inference (register, gender, addresseeNumber) for
@@ -21,18 +21,35 @@ export const OPENROUTER_MODELS = {
   ttsValidation: 'google/gemini-3.1-flash-lite',
 } as const;
 
-/** Provider routing for the chat agent via OpenRouter.
- *  `order` soft-forces io-net fp8 first, then together. `allow_fallbacks`
- *  is false because io-net/together don't expose tool-calling endpoints
- *  for GLM, and the chat agent needs the createCard tool — letting
- *  OpenRouter silently fall back to a non-tool provider would break
- *  createCard. preferred_* deprioritize endpoints slower than 2s p50 /
- *  under 50 tok/s p50. */
+/** Reasoning effort for the language-tutor chat agent (GLM 5.2: `high` | `xhigh`). */
+export const OPENROUTER_CHAT_REASONING = 'high' as const;
+
+/** Extra OpenRouter body for the chat agent.
+ *  `usage.include` makes OpenRouter report the actual USD cost of each
+ *  request (providerMetadata.openrouter.usage.cost), which drives the
+ *  per-message credit charge in chat. `max_price.completion` caps output
+ *  at $5/M tokens; requests fail if no provider qualifies. preferred_*
+ *  deprioritize endpoints slower than 2s p50 / under 50 tok/s p50.
+ *  `require_parameters` restricts routing to providers that support every
+ *  request parameter — critically `tools`, which createCard depends on;
+ *  without it a fallback provider without tool calling silently breaks
+ *  flashcard proposals. */
 export const OPENROUTER_CHAT_EXTRA_BODY = {
+  usage: { include: true },
   provider: {
-    order: ['io-net/fp8', 'io-net', 'together'],
-    allow_fallbacks: false,
+    allow_fallbacks: true,
+    require_parameters: true,
+    max_price: {
+      completion: 5,
+    },
     preferred_max_latency: 2,
     preferred_min_throughput: 50,
+  },
+} as const;
+
+/** Default OpenRouter provider options for the chat agent. */
+export const OPENROUTER_CHAT_PROVIDER_OPTIONS = {
+  openrouter: {
+    reasoning: { effort: OPENROUTER_CHAT_REASONING },
   },
 } as const;

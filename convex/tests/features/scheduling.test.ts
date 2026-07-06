@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Stub the aggregate component — production code instantiates
 // `new TableAggregate(components.cardsByState, ...)` at module-load, and
@@ -21,8 +21,31 @@ vi.mock("@convex-dev/aggregate", () => {
 import schema from "../../schema";
 import { api } from "../../_generated/api";
 import { PROGRESS_DISPLAY_INTERVAL } from "../../../lib/constants/learning";
+import { llmPool } from "@/convex/lib/workpools";
+
+import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 
 const modules = import.meta.glob("/convex/**/*.ts");
+
+// Tests here enqueue content work whose scheduled chains fire on 0ms timers —
+// drain them inside the test context so their logs don't race vitest teardown.
+drainSchedulerAfterEach();
+
+// The workpools are module-mocked globally (convex/tests/setup.ts). The
+// flagTranslation tests assert against the LLM pool's enqueue calls; each
+// call's third argument is the worker's fnArgs.
+const llmEnqueues = () =>
+  vi.mocked(llmPool.enqueueAction).mock.calls.map(
+    (c) =>
+      c[2] as {
+        targetLanguage: string;
+        ruleOverride?: string;
+        replaceExisting?: boolean;
+      },
+  );
+beforeEach(() => {
+  vi.mocked(llmPool.enqueueAction).mockClear();
+});
 
 async function seedCardWithCourseAndStats(t: ReturnType<typeof convexTest>) {
   return t.run(async (ctx) => {
@@ -1858,17 +1881,14 @@ describe("features/scheduling", () => {
       );
       expect(audioRows).toHaveLength(0);
 
-      // Queue row inserted with the retranslation_high override + priority 1.
-      // `replaceExisting: true` ensures storeTranslationAndScheduleTTS will
-      // overwrite the existing translatedText when the LLM lands.
-      const queueRows = await t.run(async (ctx) =>
-        ctx.db.query("llmTranslationQueue").collect(),
-      );
-      expect(queueRows).toHaveLength(1);
-      expect(queueRows[0].args.ruleOverride).toBe("retranslation_high");
-      expect(queueRows[0].args.replaceExisting).toBe(true);
-      expect(queueRows[0].args.targetLanguage).toBe("en");
-      expect(queueRows[0].priority).toBe(1);
+      // Retranslation enqueued into the LLM pool with the retranslation_high
+      // override. `replaceExisting: true` ensures storeTranslationAndScheduleTTS
+      // will overwrite the existing translatedText when the LLM lands.
+      const enqueues = llmEnqueues();
+      expect(enqueues).toHaveLength(1);
+      expect(enqueues[0].ruleOverride).toBe("retranslation_high");
+      expect(enqueues[0].replaceExisting).toBe(true);
+      expect(enqueues[0].targetLanguage).toBe("en");
 
       // Quota debited by exactly 1 — single charge per flag click,
       // regardless of how many languages got retranslated.
@@ -1895,10 +1915,7 @@ describe("features/scheduling", () => {
       });
       expect(res).toEqual({ retranslated: false });
 
-      const queueRows = await t.run(async (ctx) =>
-        ctx.db.query("llmTranslationQueue").collect(),
-      );
-      expect(queueRows).toHaveLength(0);
+      expect(llmEnqueues()).toHaveLength(0);
 
       // Counter still bumped so the "Flagged" pill surfaces in the UI.
       const translations = await t.run(async (ctx) =>
@@ -2001,14 +2018,10 @@ describe("features/scheduling", () => {
         expect(tr.flagCount).toBe(1);
       }
 
-      // Both languages got a queue row.
-      const queueRows = await t.run(async (ctx) =>
-        ctx.db.query("llmTranslationQueue").collect(),
-      );
-      expect(queueRows).toHaveLength(2);
-      const enqueuedLangs = queueRows
-        .map((r) => r.args.targetLanguage)
-        .sort();
+      // Both languages got a pool enqueue.
+      const enqueues = llmEnqueues();
+      expect(enqueues).toHaveLength(2);
+      const enqueuedLangs = enqueues.map((r) => r.targetLanguage).sort();
       expect(enqueuedLangs).toEqual(["en", "fr"]);
 
       // Single quota charge regardless of language count.
@@ -2039,10 +2052,7 @@ describe("features/scheduling", () => {
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(3);
 
-      const queueRows = await t.run(async (ctx) =>
-        ctx.db.query("llmTranslationQueue").collect(),
-      );
-      expect(queueRows).toHaveLength(0);
+      expect(llmEnqueues()).toHaveLength(0);
 
       const quota = await t.run(async (ctx) =>
         ctx.db
@@ -2076,10 +2086,7 @@ describe("features/scheduling", () => {
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(1);
 
-      const queueRows = await t.run(async (ctx) =>
-        ctx.db.query("llmTranslationQueue").collect(),
-      );
-      expect(queueRows).toHaveLength(0);
+      expect(llmEnqueues()).toHaveLength(0);
 
       const quota = await t.run(async (ctx) =>
         ctx.db
@@ -2118,10 +2125,8 @@ describe("features/scheduling", () => {
       );
       expect(claims).toHaveLength(0);
 
-      const queueRows = await t.run(async (ctx) =>
-        ctx.db.query("llmTranslationQueue").collect(),
-      );
-      expect(queueRows).toHaveLength(0);
+      // consumeQuota throws before the enqueue is reached.
+      expect(llmEnqueues()).toHaveLength(0);
     });
   });
 

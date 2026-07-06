@@ -29,6 +29,7 @@ export const FEATURE_META: Record<
   [FEATURE_IDS.TRANSLATION_AUTO_FILL]: { i18nKey: 'translationAutoFill', consumable: true, hidden: true },
   [FEATURE_IDS.AUDIO_REGENERATIONS]: { i18nKey: 'audioRegenerations', consumable: true, hidden: true },
   [FEATURE_IDS.TRANSLATION_FLAGS]: { i18nKey: 'translationFlags', consumable: true, hidden: true },
+  [FEATURE_IDS.CREDITS]: { i18nKey: 'credits', consumable: true },
 };
 
 export function getFeatureI18nKey(featureId: string): string {

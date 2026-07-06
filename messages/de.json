@@ -334,8 +334,8 @@
     "changeCourse": "Kurs wechseln",
     "currentCourseWithLanguages": "Kurs: {targetLanguages}",
     "startLearning": "Lernen starten",
-    "fullReview": "Voll-Übung",
-    "audioReview": "Audio-Übung",
+    "fullReview": "Schreiben",
+    "audioReview": "Shadowing",
     "learnNew": "Neues lernen",
     "learnAndReview": "Wiederholen",
     "radioMode": "Radio",
@@ -385,6 +385,7 @@
       "easy": "Leicht"
     },
     "actions": {
+      "undo": "Letzte Bewertung rückgängig machen",
       "favorite": "Favorit",
       "master": "Gemeistert",
       "unmaster": "Nicht mehr gemeistert",
@@ -489,7 +490,7 @@
       "shortcutRating": "Tasten 1–4 zum Bewerten.",
       "shortcutPause": "Leertaste zum Pausieren der Audio-Wiedergabe.",
       "shortcutReveal": "Eingabetaste oder Pfeil nach rechts zum Aufdecken oder zum nächsten Satz.",
-      "shortcutRevertSubmission": "Pfeil nach links: zuletzt abgeschickte Übersetzung zurücknehmen (Voll-Übung).",
+      "shortcutRevertSubmission": "Pfeil nach links: zuletzt abgeschickte Übersetzung zurücknehmen (Schreiben).",
       "cardsPerBatch": "Sätze pro Stapel",
       "cardsPerBatchDescription": "Anzahl der Sätze, die auf einmal hinzugefügt werden",
       "reviewSettings": "Wiederholungseinstellungen",
@@ -546,11 +547,11 @@
       "seconds": "s",
       "timesPlayed": "{count}x",
       "pauseBetweenPlays": "{seconds}s dazwischen",
-      "reviewModeAudio": "Audio",
-      "reviewModeFull": "Voll-Übung",
-      "reviewModeAudioDescription": "Höre dir die Audio-Wiedergabe deiner Phrasen an. Kein Blick auf den Bildschirm nötig, Sätze werden automatisch bewertet. Ideal zum Lernen unterwegs — beim Spazieren, Pendeln oder Entspannen.",
+      "reviewModeAudio": "Shadowing",
+      "reviewModeFull": "Schreiben",
+      "reviewModeAudioDescription": "Hör zu, übersetze im Kopf und sprich dann jeden Satz laut nach, um deine Aussprache zu üben. Freihändig — perfekt zum Lernen beim Spazieren, Pendeln oder Entspannen.",
       "reviewModeFullDescription": "Tippe die Übersetzungen ein und sieh einen zeichengenauen Vergleich mit der richtigen Antwort. Ideal für aktives Üben — fördert Erinnerung und Rechtschreibung.",
-      "fullReviewSettings": "Vollständige Wiederholung",
+      "fullReviewSettings": "Schreiben-Einstellungen",
       "fullReviewTargetAudio": "Zielsprache automatisch abspielen",
       "fullReviewTargetAudioDescription": "Wann soll das Audio der Zielsprache abgespielt werden",
       "fullReviewTargetAudio_always": "Nach Basis-Audio",
@@ -687,7 +688,14 @@
     "sentences": {
       "name": "Vorgefertigte Sätze",
       "pricingLabel": "{count, plural, one {# vorgefertigter Satz} other {# vorgefertigte Sätze}} pro Monat",
+      "pricingLabelOneOff": "{count, plural, one {# vorgefertigter Satz} other {# vorgefertigte Sätze}} zum Start",
       "pricingLabelUnlimited": "Unbegrenzt viele vorgefertigte Sätze"
+    },
+    "credits": {
+      "name": "Credits",
+      "pricingLabel": "{count, plural, one {# Credit} other {# Credits}} pro Monat",
+      "pricingLabelOneOff": "{count, plural, one {# Credit} other {# Credits}} zum Start",
+      "pricingLabelUnlimited": "Unbegrenzte Credits"
     },
     "customSentences": {
       "name": "Eigene Sätze",
@@ -782,7 +790,11 @@
     "perYear": "pro Jahr",
     "everythingFrom": "Alles aus {planName}, plus:",
     "error": "Fehler beim Laden der Preistabelle.",
-    "retry": "Erneut laden"
+    "retry": "Erneut laden",
+    "freeTrialBadge": "{days} Tage kostenlos testen",
+    "billedAnnually": "{price} jährlich abgerechnet",
+    "annualSaveHint": "25 % sparen",
+    "mostPopular": "Am beliebtesten"
   },
   "Checkout": {
     "confirm": "Bestätigen",
@@ -800,6 +812,10 @@
     "updatePlanMessage": "Aktualisiere deine Prepaid-Menge. Du erhältst eine anteilige Gutschrift oder Nachbelastung basierend auf deinem aktuellen Abrechnungszyklus.",
     "startTrialTitle": "Testversion für {productName} starten",
     "startTrialMessage": "Mit Bestätigung startest du eine kostenlose Testversion von {productName}, die am {date} endet.",
+    "trialContinueScheduledTitle": "Zu {productName} wechseln",
+    "trialContinueScheduledMessage": "Deine kostenlose Testversion läuft unverändert bis zum {date} weiter. {productName} startet an diesem Datum, dann beginnt auch die Abrechnung.",
+    "trialContinueSwitchNowTitle": "Zu {productName} wechseln",
+    "trialContinueSwitchNowMessage": "Mit Bestätigung wechselt dein Tarif sofort zu {productName}. Deine kostenlose Testversion endet weiterhin am {date}, dann beginnt die Abrechnung.",
     "scheduledTitle": "{productName} bereits geplant",
     "scheduledMessage": "Du nutzt aktuell {currentProduct} und wechselst am {date} zu {productName}.",
     "alreadyActiveTitle": "Bereits aktiv",
@@ -980,13 +996,13 @@
       },
       "modes": {
         "audio": {
-          "title": "Audio-Review",
-          "description": "Höre den Satz, versuche ihn zu übersetzen und höre dann die richtige Übersetzung.",
+          "title": "Shadowing",
+          "description": "Hör einen Satz, übersetze ihn im Kopf und sprich ihn dann laut nach, um deine Aussprache zu üben. Sprich vom ersten Tag an — freihändig, wo immer du willst.",
           "footnote": "Am besten mit Kopfhörern · Empfohlen"
         },
         "full": {
-          "title": "Full-Review",
-          "description": "Übersetze Sätze und erhalte sofortiges, detailliertes Feedback zur Rechtschreibung."
+          "title": "Schreiben",
+          "description": "Tippe deine Übersetzung und erhalte sofortiges, zeichengenaues Feedback zur Rechtschreibung. Der schnellste Weg, das Schreiben zu meistern."
         }
       },
       "duration": "Etwa 10 Minuten",
@@ -1043,20 +1059,20 @@
       "subtitle": "Eine kurze Tour durch Funktionen, die du kennen solltest.",
       "slides": {
         "audioMode": {
-          "title": "Wie du Flexling nutzt",
-          "body": "Flexlings Audio-Modus wurde entwickelt, damit du Sprachen flexibel im Alltag lernen kannst. Viele Nutzer:innen lernen in kurzen Pausen, beim Kochen oder bei einem Spaziergang. Gerade ein Spaziergang in der Natur ohne Bildschirm hilft dir, dich zu konzentrieren, und macht das Sprachenlernen mehr Spaß. Probier es einfach mal aus!"
+          "title": "Drei Wege, Flexling zu nutzen",
+          "body": "Shadowing ist das Herzstück von Flexling — hören, übersetzen und dann jeden Satz laut nachsprechen, überall freihändig. Lieber tippen? Beim Schreiben bekommst du sofortiges Feedback zur Rechtschreibung. Und Radio spielt Sätze den ganzen Tag im Hintergrund. Kombiniere ganz nach Belieben."
         },
         "custom": {
           "title": "Eigene Karten hinzufügen",
-          "body": "Du kannst eigene Sätze hinzufügen, die du lernen möchtest. Audio und Übersetzung werden in Sekunden automatisch erzeugt."
+          "body": "Füge beliebige Sätze hinzu, die du lernen möchtest — Audio und Übersetzungen erzeugen wir in Sekunden für dich."
         },
         "import": {
           "title": "Massenimport aus CSV",
-          "body": "Zieh eine Liste von Sätzen rein und wir erzeugen Übersetzungen + Audio für jede Sprache in deinem Kurs."
+          "body": "Zieh eine Liste von Sätzen rein und wir erzeugen Übersetzungen und Audio für jede Sprache in deinem Kurs."
         },
         "radio": {
-          "title": "Radio-Modus zum passiven Hören",
-          "body": "Einmal aktivieren und vergessen — deine Karten laufen im Hintergrund in Schleife, ohne deinen Spaced-Repetition-Plan zu stören."
+          "title": "Radio zum passiven Hören",
+          "body": "Einmal aktivieren und vergessen — deine Sätze laufen im Hintergrund in Schleife, ohne deinen Spaced-Repetition-Plan zu stören."
         },
         "stats": {
           "title": "Detaillierte Statistiken behalten alles im Blick",
@@ -1073,7 +1089,7 @@
     },
     "planPick": {
       "title": "Danke, dass du dabei bist",
-      "subtitle": "Probiere Basic oder Pro 21 Tage kostenlos — ohne Verpflichtung. Du kannst jederzeit wechseln oder kündigen.",
+      "subtitle": "Probiere Basic oder Pro 7 Tage kostenlos — ohne Verpflichtung. Du kannst jederzeit wechseln oder kündigen.",
       "skip": "Vielleicht später — weiter testen"
     },
     "difficulty": {
@@ -1113,11 +1129,11 @@
   "OnboardingTutorial": {
     "core": {
       "welcomeAudio": {
-        "title": "Willkommen beim Audio-Review",
+        "title": "Willkommen beim Shadowing",
         "description": "In diesem Modus kannst du Sätze ohne Bildschirmkontakt wiederholen. Die Texte werden automatisch vorgelesen. Lass uns durchgehen, wie es funktioniert."
       },
       "welcomeFull": {
-        "title": "Willkommen beim Full-Review",
+        "title": "Willkommen beim Schreiben",
         "description": "In diesem Modus übst du aktiv das Schreiben und bekommst sofortiges Feedback. Lass uns durchgehen, wie es funktioniert."
       },
       "card": {
@@ -1135,7 +1151,7 @@
       },
       "audioControls": {
         "title": "Audio läuft automatisch",
-        "description": "Audio spielt zuerst die Basissprache ab, pausiert zum Nachdenken und spielt dann die Zielsprache. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen."
+        "description": "Audio spielt zuerst die Basissprache ab, pausiert zum Nachdenken und spielt dann die Zielsprache. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen. Die Rückgängig-Taste ganz links nimmt deine letzte Bewertung zurück und holt die vorherige Karte zurück."
       },
       "audioPlay": {
         "title": "Drücke Play zum Starten",
@@ -1154,13 +1170,13 @@
     "modeSwitch": {
       "audio": {
         "welcome": {
-          "title": "Zu Audio-Review gewechselt",
+          "title": "Zu Shadowing gewechselt",
           "description": "Du hörst zuerst und deckst die Übersetzung danach auf. Das ändert sich:"
         }
       },
       "full": {
         "welcome": {
-          "title": "Zu Full-Review gewechselt",
+          "title": "Zu Schreiben gewechselt",
           "description": "Du tippst die Übersetzung selbst ein und bekommst sofortiges Feedback. Das ändert sich:"
         }
       }
@@ -1194,11 +1210,11 @@
       },
       "radioMode": {
         "title": "Radio",
-        "description": "Audio-only Hintergrund-Wiedergabe – deine Karten laufen freihändig in Schleife und beeinflussen den Wiederholungsplan nicht. Nur im Audio-Modus verfügbar."
+        "description": "Audio-only Hintergrund-Wiedergabe – deine Karten laufen freihändig in Schleife und beeinflussen den Wiederholungsplan nicht. Nur beim Shadowing verfügbar."
       },
       "reviewModeToggle": {
-        "title": "Audio vs. Voll-Review",
-        "description": "Wechsle zwischen Audio (Satz hören und im Kopf übersetzen) und Voll (Übersetzung eintippen und direkt Rückmeldung erhalten)."
+        "title": "Shadowing vs. Schreiben",
+        "description": "Wechsle zwischen Shadowing (Satz hören und laut nachsprechen) und Schreiben (Übersetzung eintippen und direkt Rückmeldung erhalten)."
       },
       "contentSource": {
         "title": "Wähle deine Quelle",
@@ -1215,7 +1231,7 @@
     },
     "audioReview": {
       "welcome": {
-        "title": "Willkommen zur Audio-Übung",
+        "title": "Willkommen beim Shadowing",
         "description": "In diesem Modus kannst du Sätze freihändig wiederholen. Die Texte werden automatisch vorgelesen und es geht automatisch zum nächsten Satz weiter. Du kannst das Timing in den Einstellungen anpassen."
       },
       "card": {
@@ -1234,6 +1250,10 @@
         "title": "Audio-Wiedergabe",
         "description": "Standardmäßig wird das Audio automatisch abgespielt. Zuerst die Ausgangssprache, dann eine Pause zum Nachdenken, dann die Zielsprache, bevor automatisch zum nächsten Satz gewechselt wird."
       },
+      "undoRestart": {
+        "title": "Rückgängig & Neu starten",
+        "description": "Die linke Taste nimmt deine letzte Bewertung zurück und holt den vorherigen Satz zurück — praktisch nach einem Vertipper. Die Taste daneben spielt das Audio des aktuellen Satzes von vorne ab. Deine Lernzeit bleibt immer erhalten."
+      },
       "settings": {
         "title": "Einstellungen",
         "description": "Hier kannst du Wiedergabegeschwindigkeit, Sprachreihenfolge, automatisches Weiterschalten, Ausblenden des Zieltextes, die Anzahl der anfänglichen Wiederholungen und mehr ändern."
@@ -1241,7 +1261,7 @@
     },
     "fullReview": {
       "welcome": {
-        "title": "Willkommen zur Voll-Übung",
+        "title": "Willkommen beim Schreiben",
         "description": "In diesem Modus übst du aktiv das Schreiben und bekommst sofort Feedback."
       },
       "card": {
@@ -1255,6 +1275,10 @@
       "rating": {
         "title": "Bewerte deine Antwort",
         "description": "Nach dem Feedback bewerte, wie gut du dich erinnert hast: Nochmal, Schwer, Gut oder Leicht. Dies steuert den Wiederholungsplan."
+      },
+      "undoRestart": {
+        "title": "Rückgängig & Neu starten",
+        "description": "Die linke Taste nimmt deine letzte Bewertung zurück und holt den vorherigen Satz zurück — praktisch nach einem Vertipper. Die Taste daneben spielt das Satz-Audio von vorne ab. Deine Übungszeit bleibt immer erhalten."
       },
       "settings": {
         "title": "Einstellungen",

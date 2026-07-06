@@ -1,4 +1,5 @@
 import { type CheckoutResult } from "autumn-js";
+import { type TrialState } from "@/lib/autumn/trial-eligibility";
 
 export type CheckoutTranslateFn = (
   key: string,
@@ -7,7 +8,8 @@ export type CheckoutTranslateFn = (
 
 export const getCheckoutContent = (
   checkoutResult: CheckoutResult,
-  t: CheckoutTranslateFn
+  t: CheckoutTranslateFn,
+  trialState: TrialState
 ) => {
   const { product, current_product, next_cycle } = checkoutResult;
   const { is_one_off, is_free, has_trial, updateable } = product.properties;
@@ -33,7 +35,33 @@ export const getCheckoutContent = (
     };
   }
 
-  if (has_trial) {
+  // Currently-trialing user switching between paid plans: the running
+  // trial is kept (see convex/billing.ts switchPlanDuringTrial), so the
+  // copy must not promise a fresh trial or an immediate charge. The date
+  // comes from the customer's own trial end — the preview's next_cycle
+  // can reflect a phantom fresh trial. Downgrades are scheduled at trial
+  // end; everything else switches now with the trial carried over.
+  if (
+    trialState.onTrial &&
+    !is_free &&
+    (scenario === "upgrade" || scenario === "downgrade" || scenario === "new")
+  ) {
+    const trialEndStr = trialState.trialEndsAt
+      ? new Date(trialState.trialEndsAt).toLocaleDateString()
+      : (nextCycleAtStr ?? "");
+    const key =
+      scenario === "downgrade" ? "trialContinueScheduled" : "trialContinueSwitchNow";
+    return {
+      title: t(`${key}Title`, { productName }),
+      message: t(`${key}Message`, { productName, date: trialEndStr }),
+    };
+  }
+
+  // Only trial-eligible users get trial copy. For everyone else the
+  // checkout preview was requested with `freeTrial: false`, so has_trial
+  // should already be false — this gate is the safety net for previews
+  // opened without it (falls through to the scenario copy below).
+  if (has_trial && trialState.trialEligible) {
     return {
       title: t("startTrialTitle", { productName }),
       message: t("startTrialMessage", {

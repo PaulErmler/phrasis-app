@@ -1,4 +1,5 @@
-import { v } from 'convex/values';
+import { v, Infer } from 'convex/values';
+import { vOnCompleteArgs } from '@convex-dev/workpool';
 import {
   internalAction,
   internalMutation,
@@ -17,7 +18,9 @@ import { languageSupportsStt } from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
 import { textsMatchSemantic } from '../lib/ttsSemanticValidation';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
-import { rateLimiter, TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
+import { TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
+import { reserveRateLimitToken } from '../lib/rateLimitReserve';
+import { ttsPool } from '../lib/workpools';
 import {
   ttsQualityValidator,
   ttsProviderValidator,
@@ -25,32 +28,63 @@ import {
 } from '../types';
 import type { TtsProvider, VoiceGender } from '../types';
 
-const MAX_TTS_VALIDATION_ATTEMPTS = 2;
-const TTS_CLAIM_STALE_MS = 30 * 1000; // 30 seconds
-
 /**
- * Per-provider concurrency caps. With the LLM queue capped at 64, translations
- * complete in waves and TTS would otherwise burst against provider quotas.
- * `pumpQueue` consults these caps and the `countLiveSlotsAndReclaimStale`
- * helper below to gate dispatch.
+ * TTS pipeline, built on the `ttsPool` workpool (convex/lib/workpools.ts).
+ * Per audio row:
+ *
+ *   1. `claimTtsIfAvailable` (called by scheduling mutations) atomically
+ *      reserves the (textId, language) slot.
+ *   2. `enqueueTtsJob` enqueues `processTTSForCard` into the pool and stamps
+ *      the pool's workId onto the claim — the claim now lives exactly as long
+ *      as the pool job.
+ *   3. The worker synthesizes + validates. Provider request pacing happens
+ *      here: every synthesis reserves a token from the provider's bucket
+ *      (`reserveRateLimitToken`), so validation re-synthesis is metered too.
+ *      On any failure (429s included) the worker THROWS and the pool retries
+ *      with jittered exponential backoff.
+ *   4. `onTtsJobComplete` (guaranteed on success, failure, and cancellation)
+ *      releases the claim.
  */
-const PROVIDER_MAX_CONCURRENCY: Partial<Record<TtsProvider, number>> = {
-  google: 64,
-  azure: 8,
-  // Conservative start for OpenRouter-hosted Gemini TTS; tune after first runs.
-  gemini: 8,
-};
-// Fallback cap for any provider missing from the map above (e.g. the
-// 'elevenlabs' tombstone, which is never dispatched).
-const DEFAULT_MAX_CONCURRENCY = 8;
-const SLOT_STALE_MS = 60 * 1000; // 1 minute — longer than the longest API call
+
+const MAX_TTS_VALIDATION_ATTEMPTS = 2;
 
 /**
- * Atomically check-and-insert a TTS generation claim.
- * Returns true if the claim was acquired (caller should schedule the action).
- * Returns false if a fresh claim already exists (another mutation already
- * scheduled this work). Claims older than `TTS_CLAIM_STALE_MS` are removed
- * and treated as expired so work can be retried.
+ * Per-(textId, language) TTS claim freshness window. The claim is released by
+ * the pool job's onComplete (guaranteed), so staleness is only a catastrophic
+ * backstop — e.g. the onComplete handler itself failing. Generous on purpose:
+ * a pool job (retries included) can legitimately run for minutes, and a
+ * premature "stale" verdict makes a concurrent `scheduleMissingContent`
+ * double-enqueue the same synthesis.
+ */
+const TTS_CLAIM_STALE_MS = 10 * 60 * 1000;
+
+/**
+ * Longest synthesis-token refill wait a worker rides out in-place. This MUST
+ * sit below the worst full-pool wait (24 workers stacked on the slowest
+ * bucket, 150/min, project ~10s) or the throw path is unreachable and a
+ * single saturated provider parks sleeping workers on all 24 shared slots,
+ * starving the other providers' jobs queued behind it. At 5s one bucket can
+ * pin at most ~rate×5s slots (google ~12, gemini ~15, azure ~16); workers
+ * past that threshold throw, free their slot, and the pool's backoff retries.
+ */
+const TTS_TOKEN_MAX_WAIT_MS = 5_000;
+
+/**
+ * Longest azureStt refill wait a caller rides out before an STT call
+ * (validation roundtrip, word-timing backfill). Deliberately looser than the
+ * synthesis cap: a mid-validation throw wastes the synthesis that just
+ * happened, and in-pool demand alone can only project ~7s (24 workers on a
+ * 200/min bucket) — so 15s never fires on ordinary pool contention and only
+ * trips when out-of-pool consumers (backfills, chat voice) genuinely
+ * oversubscribe the bucket, which previously slept workers indefinitely.
+ */
+const STT_TOKEN_MAX_WAIT_MS = 15_000;
+
+/**
+ * Atomically check-and-insert a TTS generation claim. Returns the new claim's
+ * `_id` iff the caller acquired the claim (and should enqueue the job), or
+ * null when a fresh claim already exists (another mutation already scheduled
+ * this work). Claims older than `TTS_CLAIM_STALE_MS` are reclaimed.
  *
  * Must be called inside a mutation context so Convex OCC prevents duplicates.
  */
@@ -58,7 +92,7 @@ export async function claimTtsIfAvailable(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
-): Promise<boolean> {
+): Promise<Id<'ttsGenerationClaims'> | null> {
   const existing = await ctx.db
     .query('ttsGenerationClaims')
     .withIndex('by_text_and_language', (q) =>
@@ -68,17 +102,16 @@ export async function claimTtsIfAvailable(
 
   if (existing) {
     if (Date.now() - existing.claimedAt < TTS_CLAIM_STALE_MS) {
-      return false;
+      return null;
     }
     await ctx.db.delete(existing._id);
   }
 
-  await ctx.db.insert('ttsGenerationClaims', {
+  return await ctx.db.insert('ttsGenerationClaims', {
     textId,
     language,
     claimedAt: Date.now(),
   });
-  return true;
 }
 
 /**
@@ -105,6 +138,10 @@ export async function hasActiveTtsClaim(
  * Retries up to `maxAttempts` times, storing each attempt's audio and
  * logging mismatches. Returns whether the final audio was validated and the
  * last stored blob id (for upserting the DB row if it was removed mid-flight).
+ *
+ * EVERY synthesis reserves a provider token first — including validation
+ * re-synthesis, which used to run unmetered and pushed real request rates
+ * above the configured budgets (the source of provider 429 bursts).
  */
 async function synthesizeAndValidate(
   ctx: ActionCtx,
@@ -137,8 +174,14 @@ async function synthesizeAndValidate(
   // straight to unvalidated — wordTimings are unavailable here too.
   const canValidate = languageSupportsStt(args.language);
 
+  const rateLimitName =
+    TTS_RATE_LIMIT_BY_PROVIDER[args.provider] ?? 'googleTts';
+
   let lastStorageId: Id<'_storage'> | null = null;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await reserveRateLimitToken(ctx, rateLimitName, {
+      maxWaitMs: TTS_TOKEN_MAX_WAIT_MS,
+    });
     const blob = await synthesizeSpeech(
       args.text,
       args.voiceName,
@@ -177,8 +220,14 @@ async function synthesizeAndValidate(
       return { validated: false, lastStorageId, wordTimings: null };
     }
 
+    // Backpressure, not an STT failure — kept OUTSIDE the try/catch below so
+    // a saturated azureStt bucket throws out of the worker (the pool's
+    // backoff retries the whole job once the bucket drains) instead of being
+    // swallowed as a transcription error and accepting unvalidated audio
+    // over a transient queue spike.
+    await reserveAzureSttSlot(ctx, { maxWaitMs: STT_TOKEN_MAX_WAIT_MS });
+
     try {
-      await reserveAzureSttSlot(ctx);
       const { text: transcribed, wordTimings } = await transcribeAudio(
         blob,
         args.language,
@@ -235,43 +284,63 @@ async function synthesizeAndValidate(
 }
 
 /**
- * Internal action to process TTS for a card with validation.
+ * Shape of the job payload passed from an enqueue into the worker action.
+ */
+const ttsJobArgsValidator = v.object({
+  textId: v.id('texts'),
+  text: v.string(),
+  language: v.string(),
+  voiceName: v.string(),
+  voiceGender: voiceGenderValidator,
+  speed: v.number(),
+  // Forwarded to `processTTSForCard` for mixed-dialect rows so the validation
+  // STT call uses the same locale the voice was synthesized in. Plumbed
+  // through enqueueTtsJob from `storeTranslationAndScheduleTTS`.
+  regionVariant: v.optional(v.string()),
+  // DEPRECATED (pre-workpool): retries are pool-owned now. Accepted so
+  // in-flight retry enqueues scheduled before the migration still validate;
+  // ignored.
+  failureCount: v.optional(v.number()),
+});
+
+type TtsJobArgs = Infer<typeof ttsJobArgsValidator>;
+
+// Explicit handler param types throughout this file: handlers reference
+// same-file functions via `internal.…` (enqueue → worker → onComplete), and
+// letting TS infer their types through the generated `internal` object is
+// circular — inference collapses to `any` for every handler in the module.
+type PoolRunResult =
+  | { kind: 'success'; returnValue: unknown }
+  | { kind: 'failed'; error: string }
+  | { kind: 'canceled' };
+
+/**
+ * Worker action: synthesize + validate + persist audio for one
+ * (textId, language).
  *
- * Generates speech, transcribes it back via OpenAI, and compares to
- * the original text.  Retries up to MAX_TTS_VALIDATION_ATTEMPTS times
- * before falling back to "unvalidated".
+ * Failure contract: THROW on any failure (synthesis HTTP error — 429s
+ * included —, storage error, saturated rate-limit bucket). The pool retries
+ * with jittered exponential backoff; the final failure lands in
+ * `onTtsJobComplete`, which logs and releases the claim so the next
+ * self-heal sweep can re-drive the row.
  */
 export const processTTSForCard = internalAction({
   args: {
-    textId: v.id('texts'),
-    text: v.string(),
-    language: v.string(),
-    voiceName: v.string(),
+    ...ttsJobArgsValidator.fields,
     provider: ttsProviderValidator,
-    voiceGender: voiceGenderValidator,
-    speed: v.number(),
-    // Slot ID pre-assigned by pumpQueue. The action always holds a slot for
-    // the full duration of its API work; it never self-schedules or polls.
-    slotId: v.id('ttsProviderSlots'),
-    // Azure STT locale persisted on the translation row for mixed-dialect
-    // languages (today: es_mixed → `es-ES` or `es-US`). Plumbed end-to-end
-    // so the validation roundtrip transcribes against the same locale the
-    // voice was synthesized in instead of falling back to the mixed code's
-    // default Azure locale.
-    regionVariant: v.optional(v.string()),
-    // Forwarded from the queue row. Undefined / 0 = first attempt.
-    // Incremented on each thrown exception and re-enqueued up to
-    // `MAX_TTS_RETRY_ATTEMPTS` so transient synthesis / storage failures
-    // self-heal without an external sweep.
-    failureCount: v.optional(v.number()),
+    // DEPRECATED (pre-workpool): slot bookkeeping is pool-owned now. Present
+    // only on in-flight jobs scheduled before the migration; when set, the
+    // legacy finalizer below releases the old slot row + claim.
+    slotId: v.optional(v.id('ttsProviderSlots')),
   },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    // Tracks whether the catch block re-enqueued this job. When true,
-    // `finalize` must NOT drop the TTS claim — the requeue depends on it
-    // being held so a concurrent `scheduleMissingContent` can't see "no
-    // claim, no audio" and enqueue a duplicate.
-    let scheduledRetry = false;
+  handler: async (
+    ctx: ActionCtx,
+    args: TtsJobArgs & {
+      provider: TtsProvider;
+      slotId?: Id<'ttsProviderSlots'>;
+    },
+  ) => {
     try {
       const { validated, lastStorageId, wordTimings } =
         await synthesizeAndValidate(ctx, args, MAX_TTS_VALIDATION_ATTEMPTS);
@@ -306,69 +375,142 @@ export const processTTSForCard = internalAction({
           language: args.language,
         });
       }
-    } catch (err) {
-      const prior = args.failureCount ?? 0;
-      console.error('[ttsProcess] TTS processing error:', {
-        textId: args.textId,
-        language: args.language,
-        failureCount: prior,
-        error: err,
-      });
-
-      if (prior < MAX_TTS_RETRY_ATTEMPTS) {
-        try {
-          await ctx.runMutation(
-            internal.features.ttsProcessing.enqueueTtsJob,
-            {
-              provider: args.provider,
-              args: {
-                textId: args.textId,
-                text: args.text,
-                language: args.language,
-                voiceName: args.voiceName,
-                voiceGender: args.voiceGender,
-                speed: args.speed,
-                regionVariant: args.regionVariant,
-                failureCount: prior + 1,
-              },
-              // Retries inherit no caller priority context; default to 0.
-              // The original priority is lost on retry — acceptable since
-              // a thrown TTS exception is rare and the retry tail latency
-              // matters less than not getting an audio row at all.
-            },
-          );
-          scheduledRetry = true;
-        } catch (reEnqueueErr) {
-          console.error(
-            '[ttsProcess] Failed to re-enqueue TTS job after error',
-            {
-              textId: args.textId,
-              language: args.language,
-              error: reEnqueueErr,
-            },
-          );
-        }
-      } else {
-        console.error(
-          `[ttsProcess] Giving up after ${MAX_TTS_RETRY_ATTEMPTS} retries — no audio row will be written`,
-          { textId: args.textId, language: args.language },
-        );
-      }
     } finally {
-      // Release slot + claim + wake next queued waiter in one transaction
-      // so an action retry can't leave slot/claim state drifted from queue
-      // depth. When a retry is scheduled, keep the claim alive so the
-      // retry's enqueue doesn't race against `scheduleMissingContent`
-      // seeing "no claim, no audio" and double-enqueueing.
-      await ctx.runMutation(internal.features.ttsProcessing.finalizeTtsJob, {
-        slotId: args.slotId,
-        provider: args.provider,
-        textId: args.textId,
-        language: args.language,
-        keepClaim: scheduledRetry,
-      });
+      // LEGACY: jobs scheduled before the workpool migration carry a slotId
+      // and have no pool onComplete — release their slot row + claim here so
+      // they don't strand state. Pool jobs (no slotId) skip this; their claim
+      // is released by onTtsJobComplete.
+      if (args.slotId !== undefined) {
+        await ctx.runMutation(internal.features.ttsProcessing.finalizeTtsJob, {
+          slotId: args.slotId,
+          provider: args.provider,
+          textId: args.textId,
+          language: args.language,
+        });
+      }
     }
 
+    return null;
+  },
+});
+
+/**
+ * Enqueue a TTS job into the pool and stamp the pool's workId onto the
+ * (textId, language) claim — enqueue and claim update commit atomically, so
+ * the claim is released exactly when THIS job's onComplete runs and a
+ * superseded job's completion can't delete a newer owner's claim.
+ *
+ * No-ops when a live pool job already owns the claim (fresh + foreign
+ * workId) — see the guard below.
+ *
+ * The caller is expected to hold the claim already (via `claimTtsIfAvailable`,
+ * usually in the same transaction).
+ */
+export const enqueueTtsJob = internalMutation({
+  args: {
+    provider: ttsProviderValidator,
+    args: ttsJobArgsValidator,
+    // DEPRECATED (pre-workpool): pools are FIFO, priority tiers are gone.
+    // Accepted so in-flight retry enqueues scheduled before the migration
+    // still validate; ignored.
+    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
+  },
+  returns: v.null(),
+  handler: async (
+    ctx: MutationCtx,
+    {
+      provider,
+      args,
+    }: { provider: TtsProvider; args: TtsJobArgs; priority?: 0 | 1 | 2 },
+  ) => {
+    const claim = await ctx.db
+      .query('ttsGenerationClaims')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('language', args.language),
+      )
+      .first();
+    // A fresh claim already stamped with another job's workId means a live
+    // pool job owns this (textId, language): enqueueing again would synthesize
+    // twice and hijack that job's claim. Unreachable from the claim-then-
+    // enqueue callers (their fresh claim is workId-less); guards
+    // `drainLegacyQueues`, which re-enqueues legacy rows without re-claiming.
+    if (
+      claim &&
+      claim.workId !== undefined &&
+      Date.now() - claim.claimedAt < TTS_CLAIM_STALE_MS
+    ) {
+      return null;
+    }
+
+    const workId: string = await ttsPool.enqueueAction(
+      ctx,
+      internal.features.ttsProcessing.processTTSForCard,
+      {
+        textId: args.textId,
+        text: args.text,
+        language: args.language,
+        voiceName: args.voiceName,
+        voiceGender: args.voiceGender,
+        speed: args.speed,
+        regionVariant: args.regionVariant,
+        provider,
+      },
+      {
+        onComplete: internal.features.ttsProcessing.onTtsJobComplete,
+        context: { textId: args.textId, language: args.language },
+      },
+    );
+
+    if (claim) {
+      await ctx.db.patch(claim._id, { workId, claimedAt: Date.now() });
+    }
+    return null;
+  },
+});
+
+/**
+ * Pool onComplete for `processTTSForCard`. Guaranteed to run on success,
+ * failure, and cancellation. Releases the claim (ownership-gated on `workId`,
+ * so a superseded job's completion can't delete a newer owner's claim) —
+ * releasing on failure too is deliberate: the next self-heal sweep sees
+ * "no claim, no audio" and re-drives the row.
+ */
+export const onTtsJobComplete = internalMutation({
+  args: vOnCompleteArgs(
+    v.object({ textId: v.id('texts'), language: v.string() }),
+  ),
+  returns: v.null(),
+  handler: async (
+    ctx: MutationCtx,
+    {
+      workId,
+      context,
+      result,
+    }: {
+      workId: string;
+      context: { textId: Id<'texts'>; language: string };
+      result: PoolRunResult;
+    },
+  ) => {
+    if (result.kind === 'failed') {
+      console.error(
+        '[ttsProcess] Giving up — pool retries exhausted, no audio row will be written',
+        {
+          textId: context.textId,
+          language: context.language,
+          error: result.error,
+        },
+      );
+    }
+    const claim = await ctx.db
+      .query('ttsGenerationClaims')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', context.textId).eq('language', context.language),
+      )
+      .first();
+    if (claim && (claim.workId === undefined || claim.workId === workId)) {
+      await ctx.db.delete(claim._id);
+    }
     return null;
   },
 });
@@ -481,7 +623,7 @@ export const backfillWordTimings = internalAction({
         });
         return null;
       }
-      await reserveAzureSttSlot(ctx);
+      await reserveAzureSttSlot(ctx, { maxWaitMs: STT_TOKEN_MAX_WAIT_MS });
       const { wordTimings } = await transcribeAudio(blob, args.language, {
         regionVariant: args.regionVariant,
       });
@@ -545,8 +687,12 @@ export const persistBackfilledWordTimings = internalMutation({
 });
 
 /**
- * Release a TTS generation claim so the slot can be retried if needed.
- * Called from the processTTSForCard action's finally block.
+ * Release a TTS generation claim. Called from the `backfillWordTimings`
+ * action's finally block (timing backfills hold a claim but aren't pool jobs,
+ * so they have no onComplete). Backfill claims are workId-less; a claim
+ * carrying a workId belongs to a pool job (a stale backfill's claim was
+ * reclaimed and stamped mid-flight) and is released by that job's onComplete
+ * — deleting it here would let a scheduler double-enqueue the synthesis.
  */
 export const releaseTtsClaim = internalMutation({
   args: {
@@ -561,223 +707,30 @@ export const releaseTtsClaim = internalMutation({
         q.eq('textId', args.textId).eq('language', args.language),
       )
       .first();
-    if (claim) {
+    if (claim && claim.workId === undefined) {
       await ctx.db.delete(claim._id);
     }
     return null;
   },
 });
 
-/**
- * Shape of the job payload passed from an enqueue into the action.
- */
-const ttsJobArgsValidator = v.object({
-  textId: v.id('texts'),
-  text: v.string(),
-  language: v.string(),
-  voiceName: v.string(),
-  voiceGender: voiceGenderValidator,
-  speed: v.number(),
-  // Forwarded to `processTTSForCard` for mixed-dialect rows so the validation
-  // STT call uses the same locale the voice was synthesized in. Plumbed
-  // through enqueueTtsJob from `storeTranslationAndScheduleTTS`.
-  regionVariant: v.optional(v.string()),
-  // Number of prior `processTTSForCard` failures for this (textId, language).
-  // Incremented and re-enqueued on each thrown exception, up to
-  // `MAX_TTS_RETRY_ATTEMPTS`, then dropped. Absent = first attempt.
-  failureCount: v.optional(v.number()),
-});
+// ─── Legacy stubs (phase-2 removal) ─────────────────────────────────────────
+// The pre-workpool queue scheduled these by reference. They must keep
+// existing (and validating) until no scheduled invocation from before the
+// migration can still fire; a cleanup deploy then deletes them.
 
-// Number of times `processTTSForCard` is allowed to re-enqueue itself after
-// a thrown exception before giving up. Validation-mismatch retries are
-// separate (governed by `MAX_TTS_VALIDATION_ATTEMPTS` inside a single run);
-// this cap covers harder failure modes — synthesis API throws, storage
-// timeouts, transcription crashes — that today leave a translation row
-// without audio. 2 retries → up to 3 total invocations per job.
-const MAX_TTS_RETRY_ATTEMPTS = 2;
-
-/**
- * Count live slots for a provider and reclaim any stale rows (from crashed
- * actions) in-place. Returns the up-to-date live count. Called by `pumpQueue`
- * to enforce `PROVIDER_MAX_CONCURRENCY`.
- */
-export async function countLiveSlotsAndReclaimStale(
-  ctx: MutationCtx,
-  provider: TtsProvider,
-): Promise<number> {
-  // Bounded: legitimate slot count is capped by provider concurrency (tens).
-  // 500 is well above that, so hitting the cap means something upstream is
-  // leaking slots — surface it instead of blowing up the mutation.
-  const rows = await ctx.db
-    .query('ttsProviderSlots')
-    .withIndex('by_provider', (q) => q.eq('provider', provider))
-    .take(500);
-  const now = Date.now();
-  let fresh = 0;
-  for (const row of rows) {
-    if (now - row.claimedAt > SLOT_STALE_MS) {
-      await ctx.db.delete(row._id);
-    } else {
-      fresh++;
-    }
-  }
-  return fresh;
-}
-
-/**
- * Dispatch as many queued jobs as the provider's concurrency cap allows.
- * Called from `enqueueTtsJob` (to kick off new work) and after every slot
- * release (to wake the next FIFO waiter). Safe to call when the queue is
- * empty or the provider is at capacity — both are no-ops.
- *
- * Within a single mutation the loop is atomic: slot insertion + scheduler
- * insert + queue row deletion all commit together, so we never dispatch
- * more than `cap` and never lose a queue row to a partial dispatch.
- */
+/** LEGACY no-op: the workpool owns dispatch now. */
 export const pumpQueue = internalMutation({
   args: { provider: ttsProviderValidator },
   returns: v.null(),
-  handler: async (ctx, args) => {
-    // Priority order drained per pump tick: critical (2, onboarding seed /
-    // placement test) first, then high (1, active collection), then normal
-    // (0), then any pre-priority rows (undefined) left over from a deploy.
-    const QUEUE_PRIORITY_ORDER = [2, 1, 0, undefined] as const;
-    const cap = PROVIDER_MAX_CONCURRENCY[args.provider] ?? DEFAULT_MAX_CONCURRENCY;
-    let used = await countLiveSlotsAndReclaimStale(ctx, args.provider);
-
-    // Returns the oldest queued row at the highest non-empty priority, or null
-    // when the queue is empty. FIFO within each level via the queuedAt suffix.
-    const dequeueNext = async () => {
-      for (const priority of QUEUE_PRIORITY_ORDER) {
-        const row = await ctx.db
-          .query('ttsQueue')
-          .withIndex('by_provider_priority_and_queuedAt', (q) =>
-            q.eq('provider', args.provider).eq('priority', priority),
-          )
-          .order('asc')
-          .first();
-        if (row) return row;
-      }
-      return null;
-    };
-
-    while (used < cap) {
-      const next = await dequeueNext();
-      if (!next) break;
-
-      // Reserve one provider request from the per-minute budget. `reserve:
-      // true` lets the limiter schedule us into a future slot when the
-      // bucket is empty rather than failing; `retryAfter` is the delay
-      // (in ms) before the HTTP call may fire. With our concurrency cap
-      // of `cap` jobs per pump and Google's 190/min budget, the worst-case
-      // reservation is ~10s — comfortably inside `TTS_CLAIM_STALE_MS`.
-      const limit = await rateLimiter.limit(
-        ctx,
-        TTS_RATE_LIMIT_BY_PROVIDER[args.provider] ?? 'googleTts',
-        { reserve: true },
-      );
-      if (!limit.ok) {
-        // Reservation pool is full (only reachable if a future `maxReserved`
-        // gets configured). Stop dispatching this tick and wake the pump
-        // when capacity is expected to free up.
-        await ctx.scheduler.runAfter(
-          Math.max(0, limit.retryAfter ?? 0),
-          internal.features.ttsProcessing.pumpQueue,
-          { provider: args.provider },
-        );
-        break;
-      }
-      const dispatchDelayMs = Math.max(0, limit.retryAfter ?? 0);
-
-      const slotId = await ctx.db.insert('ttsProviderSlots', {
-        provider: args.provider,
-        claimedAt: Date.now(),
-      });
-      await ctx.db.delete(next._id);
-      await ctx.scheduler.runAfter(
-        dispatchDelayMs,
-        internal.features.ttsProcessing.processTTSForCard,
-        {
-          ...next.args,
-          provider: args.provider,
-          slotId,
-        },
-      );
-      used++;
-    }
-
-    return null;
-  },
+  handler: async () => null,
 });
 
 /**
- * Insert a TTS job into the priority queue and immediately try to dispatch.
- * Higher-priority jobs jump in front of lower ones; same priority is FIFO.
- * `priority` defaults to 0 (normal). Callers scheduling for the requesting
- * user's currently-active collection should pass 1.
- */
-export const enqueueTtsJob = internalMutation({
-  args: {
-    provider: ttsProviderValidator,
-    args: ttsJobArgsValidator,
-    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    await ctx.db.insert('ttsQueue', {
-      provider: args.provider,
-      args: args.args,
-      queuedAt: Date.now(),
-      priority: args.priority ?? 0,
-    });
-    // Pump runs in its own transaction (scheduler.runAfter, not runMutation):
-    // with the provider cap re-enabled, the pump reads `ttsProviderSlots`, and
-    // many concurrent enqueues all doing read-modify-write on the same table
-    // would OCC-retry until they converge. Same reasoning as
-    // `enqueueLlmTranslation` — see its docstring for the full rationale.
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.ttsProcessing.pumpQueue,
-      { provider: args.provider },
-    );
-    return null;
-  },
-});
-
-/**
- * Release a provider concurrency slot and immediately dispatch the next
- * queued waiter (if any). Combining both into one mutation closes the race
- * window where a concurrent enqueue could observe "at capacity" just after
- * the slot was deleted but before the pump ran.
- */
-export const releaseSlotAndPump = internalMutation({
-  args: {
-    slotId: v.id('ttsProviderSlots'),
-    provider: ttsProviderValidator,
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const row = await ctx.db.get(args.slotId);
-    if (row) {
-      await ctx.db.delete(args.slotId);
-    }
-    // Pump in a separate transaction to avoid OCC contention with concurrent
-    // releases/enqueues all reading `ttsProviderSlots`.
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.ttsProcessing.pumpQueue,
-      { provider: args.provider },
-    );
-    return null;
-  },
-});
-
-/**
- * End-of-job cleanup: drop the provider slot, drop the dedupe claim, and
- * pump the next queued waiter — all in one transaction. Called from the
- * `processTTSForCard` action's `finally` block so an action retry can't
- * commit a partial cleanup that leaves slot/claim state drifted from queue
- * depth. Idempotent: missing slot or claim rows are silently skipped.
+ * LEGACY: cleanup callback of pre-migration in-flight worker jobs. Frees the
+ * old slot row and the claim, so pre-deploy jobs finishing after the deploy
+ * don't strand state. Only claims without a `workId` are released — pool
+ * claims belong to their job's onComplete.
  */
 export const finalizeTtsJob = internalMutation({
   args: {
@@ -785,9 +738,6 @@ export const finalizeTtsJob = internalMutation({
     provider: ttsProviderValidator,
     textId: v.id('texts'),
     language: v.string(),
-    // Set true when the worker scheduled a retry. Keeps the claim alive so
-    // a concurrent `scheduleMissingContent` can't observe "no claim, no
-    // audio" and double-enqueue before the retry runs.
     keepClaim: v.optional(v.boolean()),
   },
   returns: v.null(),
@@ -796,24 +746,16 @@ export const finalizeTtsJob = internalMutation({
     if (slot) {
       await ctx.db.delete(args.slotId);
     }
-    if (!args.keepClaim) {
-      const claim = await ctx.db
-        .query('ttsGenerationClaims')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', args.textId).eq('language', args.language),
-        )
-        .first();
-      if (claim) {
-        await ctx.db.delete(claim._id);
-      }
+    if (args.keepClaim) return null;
+    const claim = await ctx.db
+      .query('ttsGenerationClaims')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('language', args.language),
+      )
+      .first();
+    if (claim && claim.workId === undefined) {
+      await ctx.db.delete(claim._id);
     }
-    // Pump in a separate transaction to avoid OCC contention with concurrent
-    // finalizers/enqueues all reading `ttsProviderSlots`.
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.ttsProcessing.pumpQueue,
-      { provider: args.provider },
-    );
     return null;
   },
 });

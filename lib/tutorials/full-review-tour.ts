@@ -37,6 +37,15 @@ export function createFullReviewTour(t: TranslateFn): TutorialDefinition {
       },
     },
     {
+      element: '[data-tutorial="undo-restart"]',
+      popover: {
+        title: t('fullReview.undoRestart.title'),
+        description: t('fullReview.undoRestart.description'),
+        side: 'top',
+        align: 'center',
+      },
+    },
+    {
       element: '[data-tutorial="settings-button"]',
       popover: {
         title: t('fullReview.settings.title'),

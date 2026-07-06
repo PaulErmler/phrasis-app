@@ -331,37 +331,38 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
     ...buildChirp3Pool('es-ES', 'Spain'),
     ...buildChirp3Pool('es-US', 'Latin America'),
   ],
-  fr: [...buildChirp3Pool('fr-FR', 'France')],
+  fr: [...buildChirp3Pool('fr-FR', 'France'), ...GEMINI_CORE],
   de: [...buildChirp3Pool('de-DE', 'Germany'), ...GEMINI_CORE],
-  it: [...buildChirp3Pool('it-IT', 'Italy')],
-  pt: [...buildChirp3Pool('pt-BR', 'Brazil')],
+  it: [...buildChirp3Pool('it-IT', 'Italy'), ...GEMINI_CORE],
+  pt: [...buildChirp3Pool('pt-BR', 'Brazil'), ...GEMINI_CORE],
   // European Portuguese runs on Gemini. Google ships no Chirp3-HD pt-PT voices
   // (verified against /v1/voices), so there's no Google fallback to list —
   // Gemini is the only pool.
   pt_pt: [...GEMINI_CORE],
-  ru: [...buildChirp3Pool('ru-RU', 'Russia', 'core')],
-  pl: [...buildChirp3Pool('pl-PL', 'Poland')],
-  sk: [...buildChirp3Pool('sk-SK', 'Slovakia'), ...AZURE_VOICES_SK],
-  hi: [...buildChirp3Pool('hi-IN', 'India')],
+  ru: [...buildChirp3Pool('ru-RU', 'Russia', 'core'), ...GEMINI_CORE],
+  pl: [...buildChirp3Pool('pl-PL', 'Poland'), ...GEMINI_CORE],
+  sk: [...buildChirp3Pool('sk-SK', 'Slovakia'), ...AZURE_VOICES_SK, ...GEMINI_CORE],
+  hi: [...buildChirp3Pool('hi-IN', 'India'), ...GEMINI_CORE],
   bn: [...buildChirp3Pool('bn-IN', 'Bengali'), ...AZURE_VOICES_BN],
-  tr: [...buildChirp3Pool('tr-TR', 'Türkiye'), ...AZURE_VOICES_TR],
-  hu: [...buildChirp3Pool('hu-HU', 'Hungary'), ...AZURE_VOICES_HU],
-  ro: [...buildChirp3Pool('ro-RO', 'Romania'), ...AZURE_VOICES_RO],
-  cs: [...buildChirp3Pool('cs-CZ', 'Czechia'), ...AZURE_VOICES_CS],
+  tr: [...buildChirp3Pool('tr-TR', 'Türkiye'), ...AZURE_VOICES_TR, ...GEMINI_CORE],
+  hu: [...buildChirp3Pool('hu-HU', 'Hungary'), ...AZURE_VOICES_HU, ...GEMINI_CORE],
+  ro: [...buildChirp3Pool('ro-RO', 'Romania'), ...AZURE_VOICES_RO, ...GEMINI_CORE],
+  cs: [...buildChirp3Pool('cs-CZ', 'Czechia'), ...AZURE_VOICES_CS, ...GEMINI_CORE],
   zh: [
     ...buildChirp3Pool('cmn-CN', 'Mandarin'),
     // Dormant Dragon HD pool — activate by switching the language to Azure.
     ...AZURE_DRAGON_HD_VOICES_ZH,
+    ...GEMINI_CORE,
   ],
   // No Google Chirp3-HD voices for cmn-TW — use Azure Neural zh-TW instead.
   zh_traditional: [...activate(AZURE_VOICES_ZH_TW)],
   yue: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
   yue_traditional: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
-  ja: [...buildChirp3Pool('ja-JP', 'Japan')],
-  ko: [...buildChirp3Pool('ko-KR', 'Korea')],
-  vi: [...buildChirp3Pool('vi-VN', 'Vietnam')],
-  th: [...buildChirp3Pool('th-TH', 'Thailand'), ...AZURE_VOICES_TH],
-  id: [...buildChirp3Pool('id-ID', 'Indonesia')],
+  ja: [...buildChirp3Pool('ja-JP', 'Japan'), ...GEMINI_CORE],
+  ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...GEMINI_CORE],
+  vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...GEMINI_CORE],
+  th: [...buildChirp3Pool('th-TH', 'Thailand'), ...AZURE_VOICES_TH, ...GEMINI_CORE],
+  id: [...buildChirp3Pool('id-ID', 'Indonesia'), ...GEMINI_CORE],
   // Filipino runs on Gemini TTS (fil-PH). No Google Chirp3-HD fil voices, so
   // Gemini is the active pool (mirrors fa); Azure fil-PH Neural voices are
   // listed dormant as a verified fallback (flip ttsProvider to 'azure').
@@ -372,11 +373,11 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
     ...GEMINI_CORE,
   ],
   // nb: [...buildChirp3Pool('nb-NO', 'Norway')], // disabled — see SUPPORTED_LANGUAGES
-  da: [...buildChirp3Pool('da-DK', 'Denmark')],
-  fi: [...buildChirp3Pool('fi-FI', 'Finland')],
-  nl: [...buildChirp3Pool('nl-NL', 'Netherlands')],
-  el: [...buildChirp3Pool('el-GR', 'Greece')],
-  he: [...buildChirp3Pool('he-IL', 'Israel'), ...AZURE_VOICES_HE],
+  da: [...buildChirp3Pool('da-DK', 'Denmark'), ...GEMINI_CORE],
+  fi: [...buildChirp3Pool('fi-FI', 'Finland'), ...GEMINI_CORE],
+  nl: [...buildChirp3Pool('nl-NL', 'Netherlands'), ...GEMINI_CORE],
+  el: [...buildChirp3Pool('el-GR', 'Greece'), ...GEMINI_CORE],
+  he: [...buildChirp3Pool('he-IL', 'Israel'), ...AZURE_VOICES_HE, ...GEMINI_CORE],
   // All Arabic dialects run on Gemini TTS: the global Arabic Gemini voice
   // (GEMINI_CORE) steered by `geminiBcp47` — `ar-001` for MSA/Saudi/Iraqi/
   // Levantine and the dedicated `ar-EG` for Egyptian — with each dialect named
@@ -397,7 +398,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   // empty pool. They stay dormant while ttsProvider is 'gemini' because
   // getVoicesForLanguage also filters by provider.
   fa: [...GEMINI_CORE, ...activate(AZURE_VOICES_FA_IR)],
-  sw: [...activate(AZURE_VOICES_SW_KE)],
+  sw: [...activate(AZURE_VOICES_SW_KE), ...GEMINI_CORE],
   sw_tz: [...activate(AZURE_VOICES_SW_TZ)],
 };
 

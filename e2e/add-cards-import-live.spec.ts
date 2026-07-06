@@ -15,6 +15,12 @@ import { dismissTour, openCardImport, pasteImport } from "./helpers";
 test.describe.configure({ mode: "serial", retries: 0 });
 test.describe("add cards — import (live)", { tag: "@live" }, () => {
   test("imports 3 cards and surfaces them in the library", async ({ page }) => {
+    // The default 30s test budget can't cover this test's own internal waits
+    // (dialog-hidden wait up to 30s + the library poll below) — under @live
+    // load the poll was getting only the seconds left over from the wizard
+    // steps and timing out at 0 cards. Budget generously; every wait inside
+    // is still individually bounded, so a true hang fails early regardless.
+    test.setTimeout(150_000);
     const marker = `e2eImport${Date.now().toString(36)}`;
 
     await openCardImport(page);
@@ -71,9 +77,15 @@ test.describe("add cards — import (live)", { tag: "@live" }, () => {
     await expect(search).toBeVisible({ timeout: 20_000 });
     await search.fill(marker);
 
+    // The import mutation only inserts the *texts* synchronously — the cards
+    // are created by scheduled background functions (generateSentenceMetadata
+    // → prepareCardContent, one LLM metadata call per sentence), so under
+    // @live load they can land well after the confirm dialog closes. The
+    // library search is a reactive Convex subscription — cards appear in the
+    // still-open results the moment they exist — so a long poll is safe.
     const cards = page.getByTestId("library-card");
     await expect
-      .poll(async () => cards.count(), { timeout: 30_000 })
+      .poll(async () => cards.count(), { timeout: 90_000 })
       .toBeGreaterThanOrEqual(3);
   });
 });

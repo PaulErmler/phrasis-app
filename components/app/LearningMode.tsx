@@ -70,6 +70,17 @@ interface LearningModeProps {
       dailyNewWordsToday: number;
     },
   ) => void;
+  /**
+   * Fires after an undo actually reverted a review — the mirror image of
+   * `onCardRated`, so the onboarding wizard can decrement its rated-card
+   * counter and keep the lesson progress accurate.
+   */
+  onCardUndone?: (snapshot: {
+    sessionId: string;
+    dailyReviewsToday: number;
+    dailyTimeMsToday: number;
+    dailyNewWordsToday: number;
+  }) => void;
 }
 
 /**
@@ -84,6 +95,7 @@ export function LearningMode({
   onNavigateToAddCustomCards,
   mode = 'normal',
   onCardRated,
+  onCardUndone,
 }: LearningModeProps) {
   const t = useTranslations('LearningMode');
   const chatContext = useLearningChatToggle();
@@ -222,6 +234,13 @@ export function LearningMode({
     },
     [state, fullReviewAccuracy, onCardRated],
   );
+  // Mirror of handleNextWithAccuracy for the undo direction — only notifies
+  // when a review was actually reverted (empty stack / races resolve false).
+  const handleUndoWithNotify = useCallback(async () => {
+    if (state.status !== 'reviewing') return;
+    const undone = await state.handleUndo();
+    if (undone) onCardUndone?.(buildSessionSnapshot(state));
+  }, [state, onCardUndone]);
   const handleRevealAllAudioTargets = useCallback(() => {
     setAudioRevealNonce((n) => n + 1);
   }, []);
@@ -292,6 +311,8 @@ export function LearningMode({
           durationSec={audio.durationSec}
           onSeek={audio.seekTo}
           onNext={() => {}}
+          onUndo={() => {}}
+          undoDisabled={true}
           isReviewing={true}
           shortcutsDisabled={state.settingsOpen}
         />
@@ -533,6 +554,8 @@ export function LearningMode({
         durationSec={audio.durationSec}
         onSeek={audio.seekTo}
         onNext={handleNextWithAccuracy}
+        onUndo={handleUndoWithNotify}
+        undoDisabled={!state.canUndo || state.isReviewing || state.isUndoing}
         isReviewing={state.isReviewing}
         instantProceed={instantProceed}
         isFullReview={reviewMode === 'full'}

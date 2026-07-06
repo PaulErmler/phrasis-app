@@ -233,6 +233,38 @@ export async function completeOnboardingFresh(
     (url) => /\/app(\/|$)/.test(url.pathname) && !/onboarding/.test(url.pathname),
     { timeout: 30_000 },
   );
+
+  // 13. Confirm the server actually committed finalizeOnboarding before
+  // returning. The redirect above is driven by the mutation's OPTIMISTIC
+  // update (see app/app/onboarding/page.tsx), so at this point the server may
+  // not have the write yet — and callers immediately save storageState and
+  // close the context, which kills the websocket and DROPS any un-acked
+  // mutation. A dropped finalize leaves the user onboarding-incomplete, and
+  // the next session bounces every /app route back into the wizard.
+  //
+  // Probe from a SECOND page (fresh Convex client → reads server truth) while
+  // this page stays alive so its websocket can still deliver the mutation:
+  // cold-load /app and see whether OnboardingGuard bounces it to the wizard.
+  const probe = await page.context().newPage();
+  try {
+    await expect
+      .poll(
+        async () => {
+          await probe.goto("/app");
+          await probe.waitForLoadState("domcontentloaded");
+          return probe
+            .waitForURL(/\/app\/onboarding/, { timeout: 2_500 })
+            .then(
+              () => "bounced-to-onboarding",
+              () => "stayed-on-app",
+            );
+        },
+        { timeout: 30_000, intervals: [500, 1_000, 2_000] },
+      )
+      .toBe("stayed-on-app");
+  } finally {
+    await probe.close();
+  }
 }
 
 // Re-exported so spec files can reach in for individual testid locators if
@@ -338,4 +370,51 @@ export async function pasteImport(page: Page, text: string): Promise<void> {
   await expect(page.getByTestId("import-step-1")).toBeEnabled({
     timeout: 10_000,
   });
+}
+
+/**
+ * True when the testid'd button reads as selected (aria-pressed or the
+ * ring/bg-primary selection classes the settings mode buttons use).
+ */
+export async function isSelectedTestId(
+  page: Page,
+  testId: string,
+): Promise<boolean> {
+  const btn = page.getByTestId(testId).first();
+  const pressed = await btn.getAttribute("aria-pressed").catch(() => null);
+  if (pressed === "true") return true;
+  const cls = (await btn.getAttribute("class").catch(() => "")) || "";
+  return /ring-primary|bg-primary/.test(cls);
+}
+
+/**
+ * Poll until a locator's bounding box is fully inside the viewport.
+ * Necessary for elements inside fixed-position Sheets: while the sheet
+ * (re-)animates, the element is mid-transform for ~500ms. `force: true`
+ * doesn't bypass Playwright's viewport check, and `position: fixed` defeats
+ * auto-scroll — polling the bounding box waits the animation out
+ * deterministically.
+ */
+export async function waitForInViewport(
+  page: Page,
+  locator: Locator,
+  timeoutMs = 5_000,
+): Promise<void> {
+  const viewport = page.viewportSize();
+  if (!viewport) return;
+  await expect
+    .poll(
+      async () => {
+        const box = await locator.boundingBox();
+        if (!box) return false;
+        return (
+          box.x >= 0 &&
+          box.y >= 0 &&
+          box.x + box.width <= viewport.width &&
+          box.y + box.height <= viewport.height
+        );
+      },
+      { timeout: timeoutMs, intervals: [100, 200, 400] },
+    )
+    .toBe(true);
 }

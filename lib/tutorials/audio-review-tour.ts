@@ -46,6 +46,15 @@ export function createAudioReviewTour(t: TranslateFn): TutorialDefinition {
       },
     },
     {
+      element: '[data-tutorial="undo-restart"]',
+      popover: {
+        title: t('audioReview.undoRestart.title'),
+        description: t('audioReview.undoRestart.description'),
+        side: 'top',
+        align: 'center',
+      },
+    },
+    {
       element: '[data-tutorial="settings-button"]',
       popover: {
         title: t('audioReview.settings.title'),

@@ -322,6 +322,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'es_latam',
@@ -346,6 +348,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'es_mixed',
@@ -386,10 +390,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇫🇷',
     category: 'romance',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'de',
@@ -405,6 +411,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'it',
@@ -416,7 +424,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇹',
     category: 'romance',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -433,10 +441,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇧🇷',
     category: 'romance',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'pt_pt',
@@ -459,6 +469,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // unchanged, so the provider-mismatch regen path wouldn't fire).
     ttsPromptName: 'European Portuguese',
     ttsVersion: 2,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -473,7 +485,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇷🇴',
     category: 'romance',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -489,7 +501,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇷🇺',
     category: 'slavic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: true,
     // Cyrillic — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
@@ -505,7 +517,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇵🇱',
     category: 'slavic',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -520,7 +532,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇸🇰',
     category: 'slavic',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -536,7 +548,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇨🇿',
     category: 'slavic',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -551,7 +563,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇳🇱',
     category: 'germanic',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -571,6 +583,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   // Norwegian (Bokmål) — disabled for now. The provider-locale fields the derived
   // maps need (regionLabel, azureSttLocale `nb-NO`, googleTranslateCode `no`) are
@@ -603,7 +617,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇩🇰',
     category: 'germanic',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -620,7 +634,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // consistent with Hungarian (the only other Uralic entry in the catalog).
     category: 'other',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -637,7 +651,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇬🇷',
     category: 'other',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: true,
     supportsKaraoke: false,
     // Azure Fast Transcription doesn't support el-GR; without STT we can't
@@ -656,7 +670,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇳',
     category: 'other',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: true,
     // Devanagari — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
@@ -692,7 +706,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇹🇷',
     category: 'other',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -709,7 +723,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // grouped with 'other' rather than forced into Germanic.
     category: 'other',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -728,7 +742,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇨🇳',
     category: 'asian-east',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: true,
     // Disabled along with other CJK + Thai languages: word-level segmentation
     // produces per-character tokens that flicker too fast to read. Revisit
@@ -815,7 +829,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇯🇵',
     category: 'asian-east',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: true,
     // Japanese tokenizes per-morpheme; karaoke flickers too fast to read.
     // Click-to-explain popovers still work — only the current-word colour
@@ -835,7 +849,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇰🇷',
     category: 'asian-east',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: true,
     // Hangul — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
@@ -852,7 +866,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇻🇳',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -868,7 +882,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇹🇭',
     category: 'asian-southeast',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     // Romanization disabled — Google v3 doesn't support Thai, and the
     // available pure-JS Thai libraries have not yet been evaluated for
     // learner-grade quality. Re-enable once a good lib is wired up.
@@ -888,7 +902,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇮🇩',
     category: 'asian-southeast',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -1045,7 +1059,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🌎',
     category: 'semitic',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    ttsProvider: 'gemini',
     // Romanization via the `hebrew-transliteration` package (SBL Academic
     // style), wired in convex/lib/localRomanization.ts.
     needsRomanization: true,
@@ -1094,7 +1108,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇰🇪',
     category: 'african',
     llmSupportTier: 'tier2',
-    ttsProvider: 'azure',
+    ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
@@ -1352,6 +1366,14 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
   reasoning: 'medium',
   maxOutputTokens: 8_000,
 };
+// Gemini 3.5 Flash via OpenRouter Nitro routing with `minimal` reasoning —
+// default for de / fr / pt / pt_pt / sv. Nitro prioritizes throughput/latency;
+// minimal thinking keeps quality on par with `low` at much lower cost/latency.
+const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
+  model: 'google/gemini-3.5-flash:nitro',
+  reasoning: 'minimal',
+  maxOutputTokens: 4_000,
+};
 
 /**
  * Maximum number of auto-retranslations triggered by user flags on a single
@@ -1389,6 +1411,22 @@ export const TRANSLATION_RULES = {
         // Google safety net kicks in. Truncation is rare at this thinking
         // level / token cap, so retrying the same config is cheap insurance.
         fallbacks: [GEMINI_3_FLASH_MINIMAL],
+      },
+    ],
+  },
+  /**
+   * Per-language default for German, French, Castilian Spanish, Latin American
+   * Spanish, both Portuguese variants, and Swedish. Routes through Gemini 3.5 Flash (Nitro) with
+   * `minimal` reasoning; one same-config retry before the Google safety net.
+   */
+  gemini_35_flash_nitro_minimal: {
+    id: 'gemini_35_flash_nitro_minimal',
+    label: 'Gemini 3.5 Flash Nitro (minimal) → Gemini 3.5 Flash Nitro (minimal, retry) → Google',
+    branches: [
+      {
+        maxChars: Infinity,
+        primary: GEMINI_35_FLASH_NITRO_MINIMAL,
+        fallbacks: [GEMINI_35_FLASH_NITRO_MINIMAL],
       },
     ],
   },

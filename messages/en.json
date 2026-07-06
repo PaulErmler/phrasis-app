@@ -337,8 +337,8 @@
     "changeCourse": "Change Course",
     "currentCourseWithLanguages": "Course: {targetLanguages}",
     "startLearning": "Start Learning",
-    "fullReview": "Full Review",
-    "audioReview": "Audio Review",
+    "fullReview": "Writing",
+    "audioReview": "Shadowing",
     "learnNew": "Learn New",
     "learnAndReview": "Learn & Review",
     "radioMode": "Radio",
@@ -388,6 +388,7 @@
       "easy": "Easy"
     },
     "actions": {
+      "undo": "Undo last review",
       "favorite": "Favorite",
       "master": "Master",
       "unmaster": "Unmaster",
@@ -492,7 +493,7 @@
       "shortcutRating": "Keys 1–4 for rating.",
       "shortcutPause": "Space bar to pause audio.",
       "shortcutReveal": "Enter or right arrow to reveal hidden content or go to the next sentence.",
-      "shortcutRevertSubmission": "Left arrow to undo your last submitted translation (full review).",
+      "shortcutRevertSubmission": "Left arrow to undo your last submitted translation (Writing).",
       "cardsPerBatch": "Sentences per batch",
       "cardsPerBatchDescription": "Number of sentences to add at once",
       "reviewSettings": "Review Settings",
@@ -549,11 +550,11 @@
       "seconds": "s",
       "timesPlayed": "{count}x",
       "pauseBetweenPlays": "{seconds}s between",
-      "reviewModeAudio": "Audio",
-      "reviewModeFull": "Full Review",
-      "reviewModeAudioDescription": "Listen to audio playback of your phrases. No need to look at the screen and manually rate sentences. Ideal for learning without looking at the screen — practice on the go while walking, commuting, or relaxing.",
+      "reviewModeAudio": "Shadowing",
+      "reviewModeFull": "Writing",
+      "reviewModeAudioDescription": "Listen, translate in your head, then say each sentence aloud to practice your pronunciation. Hands-free — perfect for learning while walking, commuting, or relaxing.",
       "reviewModeFullDescription": "Type the translations and see a character-level comparison with the correct answer. Best for active practice — engages recall and spelling.",
-      "fullReviewSettings": "Full Review Settings",
+      "fullReviewSettings": "Writing Settings",
       "fullReviewTargetAudio": "Auto-play target audio",
       "fullReviewTargetAudioDescription": "When to play target language audio",
       "fullReviewTargetAudio_always": "After base audio",
@@ -690,7 +691,14 @@
     "sentences": {
       "name": "ready-made sentences",
       "pricingLabel": "{count, plural, one {# ready-made sentence} other {# ready-made sentences}} per month",
+      "pricingLabelOneOff": "{count, plural, one {# ready-made sentence} other {# ready-made sentences}} to start",
       "pricingLabelUnlimited": "Unlimited ready-made sentences"
+    },
+    "credits": {
+      "name": "credits",
+      "pricingLabel": "{count, plural, one {# credit} other {# credits}} per month",
+      "pricingLabelOneOff": "{count, plural, one {# credit} other {# credits}} to start",
+      "pricingLabelUnlimited": "Unlimited credits"
     },
     "customSentences": {
       "name": "custom sentences",
@@ -785,7 +793,11 @@
     "perYear": "per year",
     "everythingFrom": "Everything from {planName}, plus:",
     "error": "Error loading pricing table.",
-    "retry": "Load again"
+    "retry": "Load again",
+    "freeTrialBadge": "{days}-day free trial",
+    "billedAnnually": "{price} billed annually",
+    "annualSaveHint": "Save 25%",
+    "mostPopular": "Most Popular"
   },
   "Checkout": {
     "confirm": "Confirm",
@@ -803,6 +815,10 @@
     "updatePlanMessage": "Update your prepaid quantity. You'll be charged or credited the prorated difference based on your current billing cycle.",
     "startTrialTitle": "Start trial for {productName}",
     "startTrialMessage": "By clicking confirm, you will start a free trial of {productName} which ends on {date}.",
+    "trialContinueScheduledTitle": "Switch to {productName}",
+    "trialContinueScheduledMessage": "Your free trial continues unchanged until {date}. {productName} will start on that date, and billing begins then.",
+    "trialContinueSwitchNowTitle": "Change to {productName}",
+    "trialContinueSwitchNowMessage": "By clicking confirm, your plan changes to {productName} now. Your free trial still ends on {date}, and billing begins then.",
     "scheduledTitle": "{productName} already scheduled",
     "scheduledMessage": "You are currently on {currentProduct} and are scheduled to start {productName} on {date}.",
     "alreadyActiveTitle": "Already active",
@@ -983,13 +999,13 @@
       },
       "modes": {
         "audio": {
-          "title": "Audio Review",
-          "description": "Hear the sentence, try to translate it and then hear the correct translation.",
+          "title": "Shadowing",
+          "description": "Listen to a sentence, translate it in your head, then say it aloud to practice your pronunciation. Speak from day one — hands-free anywhere.",
           "footnote": "Best with headphones · Recommended"
         },
         "full": {
-          "title": "Full Review",
-          "description": "Translate sentences and get instant and detailed spelling feedback."
+          "title": "Writing",
+          "description": "Type your translation and get instant, character-level spelling feedback. The fastest way to master writing."
         }
       },
       "duration": "About 10 minutes",
@@ -1046,20 +1062,20 @@
       "subtitle": "Quick tour of features you'll want to know about.",
       "slides": {
         "audioMode": {
-          "title": "How to use Flexling",
-          "body": "Flexling's audio mode is designed to help you learn languages flexibly throughout your day. A lot of users learn during short breaks, while cooking, or when taking a walk. Walking through nature without a screen can help you focus and make learning a language more fun. Try it sometime!"
+          "title": "Three ways to use Flexling",
+          "body": "Shadowing is the heart of Flexling — listen, translate, then say each sentence aloud, hands-free anywhere. Prefer typing? Writing gives you instant spelling feedback. And Radio plays sentences in the background all day. Mix and match however you like."
         },
         "custom": {
           "title": "Add custom cards",
-          "body": "You have the option to add custom sentences you want to learn. You can also auto generate audio and translation in seconds."
+          "body": "Add any sentence you want to learn — we generate the audio and translations for you in seconds."
         },
         "import": {
           "title": "Bulk import from CSV",
-          "body": "Drag in a list of sentences and we'll fan them out into translations + audio for every language in your course."
+          "body": "Drag in a list of sentences and we'll fan them out into translations and audio for every language in your course."
         },
         "radio": {
-          "title": "Radio mode for passive listening",
-          "body": "Set it and forget it — your cards play on loop in the background, without affecting your spaced-repetition schedule."
+          "title": "Radio for passive listening",
+          "body": "Set it and forget it — your sentences play on loop in the background, without affecting your spaced-repetition schedule."
         },
         "stats": {
           "title": "Detailed stats track everything",
@@ -1076,7 +1092,7 @@
     },
     "planPick": {
       "title": "Thank you for joining",
-      "subtitle": "Try Basic or Pro free for 21 days — no commitment. You can change or cancel anytime.",
+      "subtitle": "Try Basic or Pro free for 7 days — no commitment. You can change or cancel anytime.",
       "skip": "Maybe later — continue testing"
     },
     "difficulty": {
@@ -1116,11 +1132,11 @@
   "OnboardingTutorial": {
     "core": {
       "welcomeAudio": {
-        "title": "Welcome to Audio Review",
+        "title": "Welcome to Shadowing",
         "description": "In this mode you can review sentences hands-off. The texts are read aloud automatically. Let's walk through how it works."
       },
       "welcomeFull": {
-        "title": "Welcome to Full Review",
+        "title": "Welcome to Writing",
         "description": "In this mode you actively practise writing and get instant feedback. Let's walk through how it works."
       },
       "card": {
@@ -1138,7 +1154,7 @@
       },
       "audioControls": {
         "title": "Audio plays automatically",
-        "description": "Audio plays the base language first, pauses for you to think, then plays the target. Restart, play / pause, or skip to the next card here."
+        "description": "Audio plays the base language first, pauses for you to think, then plays the target. Restart, play / pause, or skip to the next card here. The undo button on the far left takes back your last rating and brings the previous card back."
       },
       "audioPlay": {
         "title": "Press play to start",
@@ -1157,13 +1173,13 @@
     "modeSwitch": {
       "audio": {
         "welcome": {
-          "title": "Switched to Audio Review",
+          "title": "Switched to Shadowing",
           "description": "You'll listen first and reveal the translation after. Here's what changes."
         }
       },
       "full": {
         "welcome": {
-          "title": "Switched to Full Review",
+          "title": "Switched to Writing",
           "description": "You'll type the translation yourself and get instant feedback. Here's what changes."
         }
       }
@@ -1197,11 +1213,11 @@
       },
       "radioMode": {
         "title": "Radio",
-        "description": "Audio-only background playback — your cards loop hands-free without affecting their spaced-repetition schedule. Only available in audio mode."
+        "description": "Audio-only background playback — your cards loop hands-free without affecting their spaced-repetition schedule. Only available in Shadowing."
       },
       "reviewModeToggle": {
-        "title": "Audio vs Full Review",
-        "description": "Switch between Audio (hear the sentence and translate in your head) and Full (type the translation and get instant feedback)."
+        "title": "Shadowing vs Writing",
+        "description": "Switch between Shadowing (hear the sentence and say it aloud) and Writing (type the translation and get instant feedback)."
       },
       "contentSource": {
         "title": "Pick your source",
@@ -1218,7 +1234,7 @@
     },
     "audioReview": {
       "welcome": {
-        "title": "Welcome to Audio Review",
+        "title": "Welcome to Shadowing",
         "description": "In this mode you can review sentences hands-off. The texts are read aloud automatically and it proceeds to the next sentence automatically. You can adjust the timing in the settings."
       },
       "card": {
@@ -1237,6 +1253,10 @@
         "title": "Audio Playing",
         "description": "By default the audio is played automatically. First the base audio, then there is a pause for you to think and then the target audio is played before automatically proceeding to the next sentence."
       },
+      "undoRestart": {
+        "title": "Undo & Restart",
+        "description": "The left button takes back your last rating and brings the previous sentence back — useful after a mis-tap. The restart button next to it replays the current sentence's audio from the beginning. Your listening time is always kept."
+      },
       "settings": {
         "title": "Settings",
         "description": "Here you can change playback speed, language order, auto-advance, whether to hide or blur the target text, how many initial reviews each sentence gets and more."
@@ -1244,7 +1264,7 @@
     },
     "fullReview": {
       "welcome": {
-        "title": "Welcome to Full Review",
+        "title": "Welcome to Writing",
         "description": "In this mode you actively practice writing and get instant feedback."
       },
       "card": {
@@ -1258,6 +1278,10 @@
       "rating": {
         "title": "Rate Your Answer",
         "description": "After viewing the feedback, rate how well you recalled: Again, Hard, Good, or Easy. This drives the spaced repetition schedule."
+      },
+      "undoRestart": {
+        "title": "Undo & Restart",
+        "description": "The left button takes back your last rating and brings the previous sentence back — useful after a mis-tap. The restart button next to it replays the sentence audio from the beginning. Your practice time is always kept."
       },
       "settings": {
         "title": "Settings",
