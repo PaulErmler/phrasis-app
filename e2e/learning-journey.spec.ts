@@ -162,6 +162,9 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
   test("user switches to full review and submits a translation", async ({
     page,
   }) => {
+    // Headroom for the mode-switch retry loop below: its backoff path alone
+    // can spend ~25s outlasting a JWT refresh window.
+    test.setTimeout(60_000);
     // The `(main)` layout now mounts LearnView as an overlay when the URL
     // becomes `/app/learn` via `history.pushState` from the home view's
     // Learn buttons (see app/app/(main)/layout.tsx:handleLearnOpen). A
@@ -235,23 +238,37 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     // bypass that check) or lands on stale coordinates and silently misses,
     // leaving the mode unswitched. Wait for the button to settle inside the
     // viewport, click (force bypasses Radix's aria-hidden quirk on the sheet
-    // content), and confirm the mode actually flipped — one retry covers a
-    // click that raced a late re-animation.
+    // content), and confirm the mode actually flipped.
+    //
+    // The confirmation must SETTLE, not just read once: the sheet renders
+    // from an optimistic cache (`updateSettings` in LearningModeSettings
+    // carries a `withOptimisticUpdate`), so the poll can pass on a value the
+    // server then rejects/rolls back — the mode silently snaps back to audio
+    // after the sheet closes and the translation input never mounts. Require
+    // the selection to survive a window covering the server round-trip and
+    // re-click when it snaps back. Retries back off across ~15s to outlast a
+    // transient JWT refresh window (see ClientAuthBoundary), during which
+    // every authenticated mutation is rejected and rolled back.
+    const backoffsMs = [0, 500, 1_000, 2_000, 4_000, 6_000];
     let switched = false;
-    for (let attempt = 0; attempt < 2 && !switched; attempt++) {
+    for (let attempt = 0; attempt < backoffsMs.length && !switched; attempt++) {
+      await page.waitForTimeout(backoffsMs[attempt]);
       await waitForInViewport(page, fullBtn, 10_000);
       await fullBtn.click({ force: true }).catch(() => {});
-      switched = await expect
+      const selected = await expect
         .poll(() => isSelectedTestId(page, "settings-mode-full"), {
           timeout: 5_000,
         })
         .toBe(true)
         .then(() => true)
         .catch(() => false);
+      if (!selected) continue;
+      await page.waitForTimeout(600);
+      switched = await isSelectedTestId(page, "settings-mode-full");
     }
     expect(
       switched,
-      "settings-mode-full should read as selected after clicking it",
+      "settings-mode-full should read as selected (and stay selected across the server round-trip) after clicking it",
     ).toBe(true);
 
     await page.keyboard.press("Escape").catch(() => {});

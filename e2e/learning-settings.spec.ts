@@ -35,18 +35,41 @@ async function openSettingsSheet(page: Page): Promise<void> {
 }
 
 /** Ensure the settings sheet is in Audio review mode (the Practice Listening /
- *  Speaking toggles only render there). No-op if already selected. */
+ *  Speaking toggles only render there) and that the mode has SETTLED there.
+ *
+ *  The sheet renders from an optimistic cache (`updateSettings` in
+ *  LearningModeSettings carries a `withOptimisticUpdate`), so a single
+ *  "audio selected" reading can be a value the server later rolls back to
+ *  'full' — unmounting the practice switches mid-test. Require the selection
+ *  to survive a settle window (covering the server round-trip) and re-click
+ *  when it snaps back.
+ *
+ *  Retries back off across ~15s: the known cause of a persistent snap-back is
+ *  a transient JWT refresh window (see ClientAuthBoundary), during which every
+ *  authenticated mutation is rejected and its optimistic update rolled back —
+ *  the loop must outlast the window, not just re-click inside it. */
 async function ensureAudioMode(page: Page): Promise<void> {
   const audioBtn = page.getByTestId("settings-mode-audio").first();
   await expect(audioBtn).toBeVisible({ timeout: 10_000 });
-  if (!(await isSelectedTestId(page, "settings-mode-audio"))) {
-    await waitForInViewport(page, audioBtn);
-    await audioBtn.click({ force: true });
-    await expect
-      .poll(() => isSelectedTestId(page, "settings-mode-audio"), {
-        timeout: 5_000,
-      })
-      .toBe(true);
+  const backoffsMs = [0, 500, 1_000, 2_000, 4_000, 6_000];
+  for (let attempt = 0; ; attempt++) {
+    if (!(await isSelectedTestId(page, "settings-mode-audio"))) {
+      if (attempt >= backoffsMs.length) {
+        throw new Error(
+          "settings-mode-audio kept snapping back to full — reviewMode write rejected across every retry (auth refresh window should have passed by now)",
+        );
+      }
+      await page.waitForTimeout(backoffsMs[attempt]);
+      await waitForInViewport(page, audioBtn);
+      await audioBtn.click({ force: true });
+      await expect
+        .poll(() => isSelectedTestId(page, "settings-mode-audio"), {
+          timeout: 5_000,
+        })
+        .toBe(true);
+    }
+    await page.waitForTimeout(600);
+    if (await isSelectedTestId(page, "settings-mode-audio")) return;
   }
 }
 
@@ -80,11 +103,17 @@ async function expectSwitch(
 /** Scroll a practice switch into the sheet's visible area, then click it.
  *  The sheet is position:fixed with an inner overflow scroll; when both
  *  toggles are on the audio-playback section grows and pushes these switches
- *  above the fold (especially after the Shadowing/Writing mode blurbs). */
+ *  above the fold (especially after the Shadowing/Writing mode blurbs).
+ *
+ *  Re-asserts Audio mode first: the switches unmount whenever the sheet
+ *  leaves it, and the optimistic reviewMode value can roll back to the
+ *  persisted 'full' mid-test (see ensureAudioMode) — clicking a vanished
+ *  switch then fails on a null bounding box. */
 async function clickPracticeSwitch(
   page: Page,
   which: "before" | "after",
 ): Promise<void> {
+  await ensureAudioMode(page);
   const sw = practiceSwitch(page, which);
   await sw.evaluate((el) => el.scrollIntoView({ block: "center" }));
   await waitForInViewport(page, sw);
@@ -98,6 +127,9 @@ async function setSwitch(
   which: "before" | "after",
   on: boolean,
 ): Promise<void> {
+  // Mode guard before isSwitchOn: on a mode snap-back the switch is unmounted
+  // and getAttribute would hang until the test timeout instead of failing fast.
+  await ensureAudioMode(page);
   if ((await isSwitchOn(page, which)) === on) return;
   await clickPracticeSwitch(page, which);
   await expectSwitch(page, which, on);
