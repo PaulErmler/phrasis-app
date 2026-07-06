@@ -337,54 +337,67 @@ test.describe("chat (live)", { tag: "@live" }, () => {
         "No reviewable card with clickable words — prior test did not seed a usable deck.",
       );
 
-      // (4) Capture the word text so we can assert the prompt template
-      // receives the right argument. ClickableWords strips surrounding
-      // punctuation before injecting into the template (e.g. "Haus," →
-      // "Haus") — mirror that here so the regex matches.
-      const rawWord = (await firstWord.innerText()).trim();
-      const cleanedWord = rawWord.replace(
-        /^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu,
-        "",
-      );
-      expect(
-        cleanedWord.length,
-        "Clickable word should have a non-empty display after stripping punctuation.",
-      ).toBeGreaterThan(0);
-
-      // (5) Pause audio if it's playing. In audio review mode, karaoke
-      // re-renders the ClickableWords parent on every `localTime` tick and
-      // the audio-mode auto-advance fires when the schedule completes —
-      // both can detach the Ask AI button from the DOM between
-      // `expect(...).toBeVisible()` and `askBtn.click()`. Pausing
-      // stabilizes the popover for the duration of the click.
+      // (4-6) Open the popover on the first clickable word and capture the
+      // word's text for the prompt assertion below.
+      //
+      // Retried as one unit: in audio review mode, karaoke re-renders the
+      // ClickableWords parent on every `localTime` tick and the audio-mode
+      // auto-advance can swap the CARD between the click and the popover
+      // mount — the popover then never opens (or unmounts instantly), and
+      // the first word may be a different word on the next attempt. Each
+      // attempt re-pauses audio (playback can have resumed on a card
+      // advance) and re-reads the current first word before clicking it.
       //
       // The play/pause button is the same physical element regardless of
       // state — only the inner Lucide icon swaps (`lucide-pause` vs
       // `lucide-play`). Click ONLY if the Pause icon is showing, so we
       // don't accidentally start playback on a paused card.
+      //
+      // ClickableWords strips surrounding punctuation before injecting into
+      // the prompt template (e.g. "Haus," → "Haus") — mirror that here so
+      // the regex below matches.
       const playPauseBtn = page.locator('[data-tutorial="audio-play"]').first();
-      const pauseIconVisible = await playPauseBtn
-        .locator("svg.lucide-pause")
-        .isVisible()
-        .catch(() => false);
-      if (pauseIconVisible) {
-        await playPauseBtn.click().catch(() => {});
-        // Give React one tick to settle so the karaoke render loop stops
-        // before we open the popover.
-        await page.waitForTimeout(150);
-      }
-
-      // (6) Open the popover and confirm the Ask AI action. Use a forced
-      // click on the Ask AI button as a belt-and-suspenders measure — even
-      // with audio paused the popover can re-position briefly when first
-      // appearing; force skips the stability poll once we've confirmed the
-      // button is rendered.
-      await firstWord.click();
       const askBtn = page.getByTestId("ask-ai-button").first();
-      await expect(
-        askBtn,
+      let cleanedWord = "";
+      let popoverOpen = false;
+      for (let attempt = 0; attempt < 4 && !popoverOpen; attempt++) {
+        const pauseIconVisible = await playPauseBtn
+          .locator("svg.lucide-pause")
+          .isVisible()
+          .catch(() => false);
+        if (pauseIconVisible) {
+          await playPauseBtn.click().catch(() => {});
+          // Give React one tick to settle so the karaoke render loop stops
+          // before we open the popover.
+          await page.waitForTimeout(150);
+        }
+
+        const word = page.getByTestId("clickable-word").first();
+        const rawWord = ((await word.innerText().catch(() => "")) || "").trim();
+        cleanedWord = rawWord.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, "");
+        if (!cleanedWord) {
+          await page.waitForTimeout(500);
+          continue;
+        }
+        await word.click({ force: true }).catch(() => {});
+        popoverOpen = await askBtn
+          .waitFor({ state: "visible", timeout: 3_000 })
+          .then(() => true)
+          .catch(() => false);
+      }
+      expect(
+        popoverOpen,
         "Ask AI button should appear inside the word popover after clicking a clickable-word",
-      ).toBeVisible({ timeout: 5_000 });
+      ).toBe(true);
+      expect(
+        cleanedWord.length,
+        "Clickable word should have a non-empty display after stripping punctuation.",
+      ).toBeGreaterThan(0);
+
+      // Use a forced click on the Ask AI button as a belt-and-suspenders
+      // measure — even with audio paused the popover can re-position briefly
+      // when first appearing; force skips the stability poll once we've
+      // confirmed the button is rendered.
       await askBtn.click({ force: true });
 
       // (7) Auto-submit fires from ChatPanel's initialTextNonce effect —

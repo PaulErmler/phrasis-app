@@ -162,9 +162,9 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
   test("user switches to full review and submits a translation", async ({
     page,
   }) => {
-    // Headroom for the mode-switch retry loop below: its backoff path alone
-    // can spend ~25s outlasting a JWT refresh window.
-    test.setTimeout(60_000);
+    // Headroom for the mode-switch retry loops below: the backoff path plus
+    // the input-verify retries can spend ~80s outlasting a JWT refresh window.
+    test.setTimeout(120_000);
     // The `(main)` layout now mounts LearnView as an overlay when the URL
     // becomes `/app/learn` via `history.pushState` from the home view's
     // Learn buttons (see app/app/(main)/layout.tsx:handleLearnOpen). A
@@ -180,11 +180,18 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     // A prior @live test (`content-filter-live`) can leave `Source: Custom
     // only` active on the course; with no custom cards seeded that filter
     // makes the deck look empty downstream. Reset to "Both" via the
-    // dropdown if it isn't already.
+    // dropdown if it isn't already. WAIT for the trigger rather than an
+    // instant isVisible() — right after domcontentloaded the home view's
+    // queries are still loading, and an instant check silently skips the
+    // reset under suite load (the full-review card then never mounts).
     const sourceTrigger = page
       .getByTestId("content-filter-trigger")
       .first();
-    if (await sourceTrigger.isVisible().catch(() => false)) {
+    const sourceTriggerVisible = await sourceTrigger
+      .waitFor({ state: "visible", timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (sourceTriggerVisible) {
       const label = (await sourceTrigger.innerText().catch(() => "")).trim();
       if (!/both/i.test(label)) {
         await sourceTrigger.click().catch(() => {});
@@ -277,11 +284,49 @@ test.describe("learning journey (live)", { tag: "@live" }, () => {
     // Switching to Full review can trigger the full-review intro tour.
     await dismissTour(page, "full_review_intro", 1_500);
 
+    // The settle check above still reads the OPTIMISTIC overlay — under load
+    // the mutation can stay pending well past the settle window and only then
+    // resolve as rejected (transient auth-refresh window), rolling the mode
+    // back to audio AFTER the sheet is closed. The only trustworthy
+    // acceptance signal is the full-review input actually mounting, so treat
+    // it as such and retry the whole switch cycle when it rolls back. Also
+    // recover from a filter-blocked empty deck (a prior spec's `Custom only`
+    // source filter) via its "Include course content" CTA.
     const input = page.getByTestId("learn-translation-input").first();
-    await expect(
-      input,
+    const includeOther = page
+      .getByTestId("filter-blocked-include-other")
+      .first();
+    const waitForInput = () =>
+      input
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false);
+    let inputVisible = await waitForInput();
+    for (let retry = 0; retry < 2 && !inputVisible; retry++) {
+      if (await includeOther.isVisible().catch(() => false)) {
+        // Deck is filter-blocked, not mode-rolled-back: flip the source
+        // filter to Both and re-check.
+        await includeOther.click().catch(() => {});
+        inputVisible = await waitForInput();
+        continue;
+      }
+      // Mode rolled back — reopen the sheet, re-switch, and give the
+      // mutation time to actually resolve before closing the sheet.
+      await settings.click().catch(() => {});
+      await sheet.waitFor({ state: "visible", timeout: 8_000 }).catch(() => {});
+      await page.waitForTimeout(550);
+      await waitForInViewport(page, fullBtn, 10_000).catch(() => {});
+      await fullBtn.click({ force: true }).catch(() => {});
+      await page.waitForTimeout(1_500);
+      await page.keyboard.press("Escape").catch(() => {});
+      await sheet.waitFor({ state: "hidden", timeout: 5_000 }).catch(() => {});
+      await dismissTour(page, "full_review_intro", 1_000);
+      inputVisible = await waitForInput();
+    }
+    expect(
+      inputVisible,
       "Full-review translation textbox should appear after switching to full review",
-    ).toBeVisible({ timeout: 20_000 });
+    ).toBe(true);
 
     await input.fill("asdf placeholder answer");
     await input.press("Enter");
