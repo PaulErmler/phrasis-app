@@ -18,7 +18,21 @@ import {
 } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { isValidElement } from 'react';
-import { CodeBlock } from './code-block';
+import dynamic from 'next/dynamic';
+
+// Lazy: shiki (and its grammars) only loads when a tool result actually
+// renders code, instead of shipping in every chat/learn chunk.
+const CodeBlock = dynamic(
+  () => import('./code-block').then((m) => m.CodeBlock),
+  {
+    ssr: false,
+    loading: () => (
+      <pre className="overflow-x-auto rounded-md bg-muted/50 p-4 text-xs text-muted-foreground">
+        …
+      </pre>
+    ),
+  },
+);
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 

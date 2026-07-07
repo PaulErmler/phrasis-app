@@ -1,13 +1,24 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { AnimatePresence, motion } from 'motion/react';
 import { useMutation, useQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
-import { LearningModeSettings } from '@/components/app/LearningModeSettings';
+
+// Lazy-loaded: a 1,200+ line settings sheet that's rarely opened — keeping it
+// out of the learn chunk. Mounted on first open (latch in LearningMode); the
+// chunk is prefetched a few seconds after mount so the first open is instant.
+const LearningModeSettings = dynamic(
+  () =>
+    import('@/components/app/LearningModeSettings').then(
+      (m) => m.LearningModeSettings,
+    ),
+  { ssr: false },
+);
 import {
   LearningCardContent,
   FullReviewCardContent,
@@ -108,6 +119,22 @@ export function LearningMode({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [flagConfirmOpen, setFlagConfirmOpen] = useState(false);
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
+
+  // Mount the (lazy) settings sheet on first open only; keep it mounted
+  // afterwards so the Radix close animation plays on subsequent toggles.
+  const [hasOpenedSettings, setHasOpenedSettings] = useState(false);
+  useEffect(() => {
+    if (state.settingsOpen) setHasOpenedSettings(true);
+  }, [state.settingsOpen]);
+
+  // Warm the settings chunk off the critical path so first open is instant.
+  useEffect(() => {
+    if (mode === 'onboarding') return;
+    const id = window.setTimeout(() => {
+      void import('@/components/app/LearningModeSettings');
+    }, 3000);
+    return () => window.clearTimeout(id);
+  }, [mode]);
   const [allSubmitted, setAllSubmitted] = useState(false);
   const [fullReviewAccuracy, setFullReviewAccuracy] = useState<number | null>(null);
   const [audioAllTargetsRevealed, setAudioAllTargetsRevealed] = useState(true);
@@ -324,7 +351,7 @@ export function LearningMode({
     return (
       <div className="flex flex-col h-full">
         <NoCollectionState onGoHome={onGoHome} />
-        {mode === 'onboarding' ? null : (
+        {mode === 'onboarding' || !hasOpenedSettings ? null : (
           <LearningModeSettings
             open={state.settingsOpen}
             onOpenChange={state.setSettingsOpen}
@@ -351,7 +378,7 @@ export function LearningMode({
           onNavigateToChat={onNavigateToChat}
           onNavigateToAddCustomCards={onNavigateToAddCustomCards}
         />
-        {mode === 'onboarding' ? null : (
+        {mode === 'onboarding' || !hasOpenedSettings ? null : (
           <LearningModeSettings
             open={state.settingsOpen}
             onOpenChange={state.setSettingsOpen}
@@ -567,7 +594,7 @@ export function LearningMode({
         onRevealAllAudioTargets={handleRevealAllAudioTargets}
       />
 
-      {mode === 'onboarding' ? null : (
+      {mode === 'onboarding' || !hasOpenedSettings ? null : (
         <LearningModeSettings
           open={state.settingsOpen}
           onOpenChange={state.setSettingsOpen}

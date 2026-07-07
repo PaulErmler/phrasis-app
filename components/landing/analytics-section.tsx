@@ -7,9 +7,19 @@ import {
   Flame, RotateCcw, Clock,
   TrendingUp, BookOpen, Zap, MessageSquare,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { LandingSquircleIcon } from '@/components/landing/landing-squircle-icon';
-import { LandingWordCloud } from '@/components/landing/LandingWordCloud';
 import { cn } from '@/lib/utils';
+
+// Lazy: keeps @isoterik/react-word-cloud out of the landing page's initial
+// chunk; the cloud sits below the fold and hydrates in after load.
+const LandingWordCloud = dynamic(
+  () =>
+    import('@/components/landing/LandingWordCloud').then(
+      (m) => m.LandingWordCloud,
+    ),
+  { ssr: false, loading: () => <div className="h-[200px]" /> },
+);
 
 const fadeInUp = {
   initial: { opacity: 0, y: 30 },
