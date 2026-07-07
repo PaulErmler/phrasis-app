@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { AnimatePresence, motion } from 'motion/react';
 import { useMutation, useQuery } from 'convex/react';
@@ -119,6 +119,19 @@ export function LearningMode({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [flagConfirmOpen, setFlagConfirmOpen] = useState(false);
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
+
+  // Stable merged-playback surface for the card content. Identity only
+  // changes on play/pause or a re-merge — NOT per frame; per-frame time
+  // lives in audio.clock (see useActiveCue / useKaraokeIndex).
+  const mergedPlayback = useMemo(
+    () => ({
+      isPlaying: audio.isPlaying,
+      clock: audio.clock,
+      languageCues: audio.languageCues,
+      speedByLanguage: audio.speedByLanguage,
+    }),
+    [audio.isPlaying, audio.clock, audio.languageCues, audio.speedByLanguage],
+  );
 
   // Mount the (lazy) settings sheet on first open only; keep it mounted
   // afterwards so the Radix close animation plays on subsequent toggles.
@@ -454,12 +467,7 @@ export function LearningMode({
         shortcutsDisabled={state.settingsOpen || editDialogOpen}
         highlightEnabled={state.courseSettings.highlightWords === true}
         flaggedInSession={state.flaggedInSession}
-        mergedPlayback={{
-          isPlaying: audio.isPlaying,
-          currentTime: audio.currentTime,
-          languageCues: audio.languageCues,
-          speedByLanguage: audio.speedByLanguage,
-        }}
+        mergedPlayback={mergedPlayback}
         languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
         audioSpeedOverrides={state.audioSpeedOverrides}
         onSpeedCycle={handleSpeedCycle}
@@ -502,12 +510,7 @@ export function LearningMode({
         onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
         highlightEnabled={state.courseSettings.highlightWords === true}
         flaggedInSession={state.flaggedInSession}
-        mergedPlayback={{
-          isPlaying: audio.isPlaying,
-          currentTime: audio.currentTime,
-          languageCues: audio.languageCues,
-          speedByLanguage: audio.speedByLanguage,
-        }}
+        mergedPlayback={mergedPlayback}
         languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
         audioSpeedOverrides={state.audioSpeedOverrides}
         onSpeedCycle={handleSpeedCycle}

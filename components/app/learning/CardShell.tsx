@@ -11,6 +11,7 @@ import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
+import type { ClockBinding } from '@/hooks/use-karaoke-index';
 import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import type { PinnableCardAction } from '@/lib/cardActions';
@@ -43,6 +44,12 @@ interface CardShellProps {
   highlightEnabled?: boolean;
   /** Active per-language playback from an AudioButton; null when none. */
   activeClip?: ButtonPlaybackActive | null;
+  /**
+   * Frame-rate word-position source for merged playback — passed to the
+   * active row's karaoke leaf so highlights tick without re-rendering the
+   * card (see useKaraokeIndex).
+   */
+  clockBinding?: ClockBinding;
   /** AudioButton time callback; plumbed from the parent's useButtonPlayback. */
   onButtonTimeUpdate?: (language: string, localTime: number) => void;
   /** AudioButton stop callback. */
@@ -114,6 +121,7 @@ export function CardShell({
   showRomanization = true,
   highlightEnabled = false,
   activeClip = null,
+  clockBinding,
   onButtonTimeUpdate,
   onButtonStop,
   languagePlaybackSpeeds,
@@ -246,6 +254,7 @@ export function CardShell({
                     language={translation.language}
                     wordTimings={audio?.wordTimings ?? null}
                     localTime={activeClip?.localTime ?? 0}
+                    clockBinding={isActive ? clockBinding : undefined}
                     isActive={!!isActive}
                     enabled={highlightEnabled}
                     interactive={!isBlurred}

@@ -5,10 +5,11 @@ import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
-import { resolveActiveClip } from '@/lib/audio/activeClip';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
+import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
+import { useActiveCue, type MergedPlayback } from '@/hooks/use-active-cue';
+import type { ClockBinding } from '@/hooks/use-karaoke-index';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
-import type { LanguageCue } from '@/lib/audio/mergeAudio';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { PinnableCardAction } from '@/lib/cardActions';
 
@@ -53,14 +54,9 @@ interface LearningCardContentProps {
   /**
    * Merged-audio playback state from useAudioPlayer. When present and playing,
    * takes priority over per-language AudioButton playback for highlight timing.
+   * Per-frame time lives in `clock`, not React state — see useActiveCue.
    */
-  mergedPlayback?: {
-    isPlaying: boolean;
-    currentTime: number;
-    languageCues: ReadonlyArray<LanguageCue>;
-    /** Speeds each clip was stretched to at merge time, for word-timing scaling. */
-    speedByLanguage: Record<string, number>;
-  };
+  mergedPlayback?: MergedPlayback;
   /** Course-level per-language general speed (used by both CardShell base rows and target rows here). */
   languagePlaybackSpeeds?: Record<string, number>;
   /** Per-card per-language override stored on the card. Absent = no override. */
@@ -132,16 +128,23 @@ export function LearningCardContent({
   // whichever per-language AudioButton is running (for library previews /
   // individual replays). When nothing is playing, activeClip stays null and
   // <HighlightedText> renders neutral words.
-  const activeClip = useMemo(() => {
-    if (mergedPlayback?.isPlaying) {
-      return resolveActiveClip(
-        mergedPlayback.languageCues,
-        mergedPlayback.currentTime,
-        mergedPlayback.speedByLanguage,
-      );
-    }
+  //
+  // The merged path updates only on cue changes; per-frame word positions are
+  // derived inside the highlight leaves from `clockBinding` (useKaraokeIndex),
+  // so playback no longer re-renders this card 60×/second.
+  const mergedCue = useActiveCue(mergedPlayback);
+  const activeClip = useMemo<ButtonPlaybackActive | null>(() => {
+    if (mergedCue) return { language: mergedCue.language, localTime: 0 };
     return buttonPlayback.active;
-  }, [mergedPlayback, buttonPlayback.active]);
+  }, [mergedCue, buttonPlayback.active]);
+  const clockBinding = useMemo<ClockBinding | undefined>(() => {
+    if (!mergedCue || !mergedPlayback) return undefined;
+    return {
+      clock: mergedPlayback.clock,
+      cueStartSec: mergedCue.cueStartSec,
+      speed: mergedCue.speed,
+    };
+  }, [mergedCue, mergedPlayback]);
   const displayReviewCount =
     schedulingPhase === 'review' && fsrsState != null
       ? preReviewCount + fsrsState.reps
@@ -230,6 +233,7 @@ export function LearningCardContent({
         showRomanization={showRomanization}
         highlightEnabled={highlightEnabled}
         activeClip={activeClip}
+        clockBinding={clockBinding}
         onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
         onButtonStop={buttonPlayback.onStop}
         languagePlaybackSpeeds={languagePlaybackSpeeds}
@@ -281,6 +285,7 @@ export function LearningCardContent({
                       language={translation.language}
                       wordTimings={audio?.wordTimings ?? null}
                       localTime={activeClip?.localTime ?? 0}
+                      clockBinding={isActive ? clockBinding : undefined}
                       isActive={!!isActive}
                       enabled={highlightEnabled}
                       interactive={!isBlurred}

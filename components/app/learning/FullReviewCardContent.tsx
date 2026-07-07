@@ -17,10 +17,10 @@ import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import { DiffDisplay, computeAccuracy } from './DiffDisplay';
 import { HighlightedText } from './HighlightedText';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
-import { resolveActiveClip } from '@/lib/audio/activeClip';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
-import type { LanguageCue } from '@/lib/audio/mergeAudio';
+import { useActiveCue, type MergedPlayback } from '@/hooks/use-active-cue';
+import type { ClockBinding } from '@/hooks/use-karaoke-index';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { Id } from '@/convex/_generated/dataModel';
 import type { PinnableCardAction } from '@/lib/cardActions';
@@ -69,14 +69,11 @@ interface FullReviewCardContentProps {
   highlightEnabled?: boolean;
   /** Client-only session flag: did the viewer click flag on this card? */
   flaggedInSession?: boolean;
-  /** Merged-audio state from useAudioPlayer; used when merged playback is active. */
-  mergedPlayback?: {
-    isPlaying: boolean;
-    currentTime: number;
-    languageCues: ReadonlyArray<LanguageCue>;
-    /** Speeds each clip was stretched to at merge time, for word-timing scaling. */
-    speedByLanguage: Record<string, number>;
-  };
+  /**
+   * Merged-audio state from useAudioPlayer; used when merged playback is
+   * active. Per-frame time lives in `clock`, not React state.
+   */
+  mergedPlayback?: MergedPlayback;
   /** Course-level per-language general speed. */
   languagePlaybackSpeeds?: Record<string, number>;
   /** Per-card per-language speed override. Absent entry = use general. */
@@ -138,16 +135,22 @@ export function FullReviewCardContent({
   const locale = useLocale();
 
   const buttonPlayback = useButtonPlayback();
-  const activeClip = useMemo(() => {
-    if (mergedPlayback?.isPlaying) {
-      return resolveActiveClip(
-        mergedPlayback.languageCues,
-        mergedPlayback.currentTime,
-        mergedPlayback.speedByLanguage,
-      );
-    }
+  // Merged playback resolves to the active cue at cue-change frequency; the
+  // per-frame word position ticks inside the highlight leaves via
+  // clockBinding (useKaraokeIndex) — no 60 fps re-render of this card.
+  const mergedCue = useActiveCue(mergedPlayback);
+  const activeClip = useMemo<ButtonPlaybackActive | null>(() => {
+    if (mergedCue) return { language: mergedCue.language, localTime: 0 };
     return buttonPlayback.active;
-  }, [mergedPlayback, buttonPlayback.active]);
+  }, [mergedCue, buttonPlayback.active]);
+  const clockBinding = useMemo<ClockBinding | undefined>(() => {
+    if (!mergedCue || !mergedPlayback) return undefined;
+    return {
+      clock: mergedPlayback.clock,
+      cueStartSec: mergedCue.cueStartSec,
+      speed: mergedCue.speed,
+    };
+  }, [mergedCue, mergedPlayback]);
 
   // Reveal-sweep / post-submit auto-play uses raw <Audio> elements; route their
   // progress through the shared button-playback channel so <HighlightedText>
@@ -418,6 +421,7 @@ export function FullReviewCardContent({
         highlightEnabled={highlightEnabled}
         flaggedInSession={flaggedInSession}
         activeClip={activeClip}
+        clockBinding={clockBinding}
         onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
         onButtonStop={buttonPlayback.onStop}
         languagePlaybackSpeeds={languagePlaybackSpeeds}
@@ -475,6 +479,7 @@ export function FullReviewCardContent({
                   showRomanization={showRomanization}
                   highlightEnabled={highlightEnabled}
                   activeClip={activeClip}
+                  clockBinding={clockBinding}
                   onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
                   onButtonStop={buttonPlayback.onStop}
                   speed={effectiveSpeed}
@@ -519,6 +524,7 @@ interface TargetLanguageInputProps {
   showRomanization?: boolean;
   highlightEnabled: boolean;
   activeClip: ButtonPlaybackActive | null;
+  clockBinding?: ClockBinding;
   onButtonTimeUpdate: (language: string, localTime: number) => void;
   onButtonStop: (language: string) => void;
   /** Effective playback speed (override ?? general ?? 1). */
@@ -555,6 +561,7 @@ function TargetLanguageInput({
   showRomanization = true,
   highlightEnabled,
   activeClip,
+  clockBinding,
   onButtonTimeUpdate,
   onButtonStop,
   speed,
@@ -735,6 +742,7 @@ function TargetLanguageInput({
             language={translation.language}
             wordTimings={wordTimings}
             localTime={activeClip?.localTime ?? 0}
+            clockBinding={isActive ? clockBinding : undefined}
             isActive={isActive}
             enabled={highlightEnabled}
             className="body-large text-muted-foreground"
@@ -815,6 +823,7 @@ function TargetLanguageInput({
                 language={translation.language}
                 wordTimings={wordTimings}
                 localTime={activeClip?.localTime ?? 0}
+                clockBinding={isActive ? clockBinding : undefined}
                 isActive={isActive}
                 enabled={highlightEnabled}
                 className="body-large text-muted-foreground"
