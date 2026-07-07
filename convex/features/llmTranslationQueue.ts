@@ -120,14 +120,8 @@ const llmJobArgsValidator = v.object({
   // by `enqueueLlmTranslation` from its own claim lookup). The worker forwards
   // it to `storeTranslationAndScheduleTTS` as `expectedClaimId`, so a job
   // whose claim was reclaimed mid-flight (delete + reinsert → new _id) skips
-  // its write instead of clobbering the new owner's result. Legacy
-  // pre-migration jobs carry it too (their old ownership token) — same
-  // semantics, and `finalizeLlmTranslationJob` still reads it.
+  // its write instead of clobbering the new owner's result.
   claimId: v.optional(v.id('llmTranslationClaims')),
-  // DEPRECATED (pre-workpool): retries are pool-owned now. Accepted so
-  // in-flight jobs scheduled before the migration still validate; ignored.
-  priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
-  failureCount: v.optional(v.number()),
 });
 
 /** onComplete context: everything the Google fallback needs to run. */
@@ -168,16 +162,9 @@ type PoolRunResult =
 export const enqueueLlmTranslation = internalMutation({
   args: {
     args: llmJobArgsValidator,
-    // DEPRECATED (pre-workpool): pools are FIFO, priority tiers are gone.
-    // Accepted so in-flight retry enqueues scheduled before the migration
-    // still validate; ignored.
-    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
   },
   returns: v.null(),
-  handler: async (
-    ctx: MutationCtx,
-    { args }: { args: LlmJobArgs; priority?: 0 | 1 | 2 },
-  ) => {
+  handler: async (ctx: MutationCtx, { args }: { args: LlmJobArgs }) => {
     const claim = await ctx.db
       .query('llmTranslationClaims')
       .withIndex('by_text_and_language', (q) =>
@@ -187,8 +174,8 @@ export const enqueueLlmTranslation = internalMutation({
     // A fresh claim already stamped with another job's workId means a live
     // pool job owns this (textId, language): enqueueing again would run the
     // translation twice and hijack that job's claim. Unreachable from the
-    // claim-then-enqueue callers (their fresh claim is workId-less); guards
-    // `drainLegacyQueues`, which re-enqueues legacy rows without re-claiming.
+    // claim-then-enqueue callers (their fresh claim is workId-less); kept as
+    // a guard against callers that enqueue without re-claiming.
     if (
       claim &&
       claim.workId !== undefined &&
@@ -243,37 +230,10 @@ export const enqueueLlmTranslation = internalMutation({
  * to the fallback instead of burning retries on a deterministic failure.
  */
 export const processLlmTranslationForCard = internalAction({
-  args: {
-    ...llmJobArgsValidator.fields,
-    // DEPRECATED (pre-workpool): slot bookkeeping is pool-owned now. Accepted
-    // so in-flight jobs scheduled before the migration still validate; ignored.
-    slotId: v.optional(v.id('llmTranslationSlots')),
-  },
+  args: llmJobArgsValidator.fields,
   returns: v.null(),
-  handler: async (
-    ctx: ActionCtx,
-    args: LlmJobArgs & { slotId?: Id<'llmTranslationSlots'> },
-  ) => {
-    try {
-      await runLlmTranslation(ctx, args);
-    } finally {
-      // LEGACY: jobs scheduled before the workpool migration carry a slotId
-      // and have no pool onComplete — release their slot row + workId-less
-      // claim so they don't strand state (mirrors processTTSForCard). Pool
-      // jobs (no slotId) skip this; their claim is released by
-      // onLlmTranslationComplete.
-      if (args.slotId !== undefined) {
-        await ctx.runMutation(
-          internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
-          {
-            textId: args.textId,
-            targetLanguage: args.targetLanguage,
-            slotId: args.slotId,
-            claimId: args.claimId,
-          },
-        );
-      }
-    }
+  handler: async (ctx: ActionCtx, args: LlmJobArgs) => {
+    await runLlmTranslation(ctx, args);
     return null;
   },
 });
@@ -692,66 +652,15 @@ export const onGoogleFallbackComplete = internalMutation({
   },
 });
 
-// ─── Legacy stubs (phase-2 removal) ─────────────────────────────────────────
-// The pre-workpool queue scheduled these by reference. They must keep
-// existing (and validating) until no scheduled invocation from before the
-// migration can still fire; a cleanup deploy then deletes them.
-
-/** LEGACY no-op: the workpool owns dispatch now. */
-export const pumpLlmQueue = internalMutation({
-  args: {},
-  returns: v.null(),
-  handler: async () => null,
-});
-
-/**
- * LEGACY: cleanup callback of pre-migration in-flight worker actions. Frees
- * the old slot row and (unless the old action scheduled its own retry) the
- * claim, so pre-deploy jobs finishing after the deploy don't strand state.
- */
-export const finalizeLlmTranslationJob = internalMutation({
-  args: {
-    textId: v.id('texts'),
-    targetLanguage: v.string(),
-    keepClaim: v.optional(v.boolean()),
-    claimId: v.optional(v.id('llmTranslationClaims')),
-    slotId: v.optional(v.id('llmTranslationSlots')),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    if (args.slotId !== undefined) {
-      const slot = await ctx.db.get(args.slotId);
-      if (slot) await ctx.db.delete(args.slotId);
-    }
-    if (args.keepClaim) return null;
-    const claim = await ctx.db
-      .query('llmTranslationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-      )
-      .first();
-    // Only release claims the old job plausibly owns: pre-migration claims
-    // carry no workId (pool claims do), and the old ownership token must
-    // match when supplied.
-    if (
-      claim &&
-      claim.workId === undefined &&
-      (args.claimId === undefined || claim._id === args.claimId)
-    ) {
-      await ctx.db.delete(claim._id);
-    }
-    return null;
-  },
-});
-
 /**
  * Stable male/female pick for legacy rows missing `referentGender`.
  *
- * MUST match the backfill's seeding rule in
- * `convex/admin/backfillTextMetadata.ts:stableCoinFlip(pickSeedKey(doc), 'referent')`
- * so a row translated pre-backfill and re-translated post-backfill (with a
- * persisted value) lines up on the same gender. The seed key is the row's
- * `externalId` when present (stable across dataset re-uploads), else its `_id`.
+ * MUST match the seeding rule of the (since-removed) one-time metadata
+ * backfill — `stableCoinFlip(pickSeedKey(doc), 'referent')` in
+ * `convex/admin/backfillTextMetadata.ts`, see git history — so a row
+ * translated pre-backfill and re-translated post-backfill (with a persisted
+ * value) lines up on the same gender. The seed key is the row's `externalId`
+ * when present (stable across dataset re-uploads), else its `_id`.
  */
 function legacyReferentGenderFallback(
   externalId: string | undefined,

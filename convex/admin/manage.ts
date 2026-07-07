@@ -25,7 +25,7 @@ export const setAdmin = internalMutation({
         .first();
       if (!profile) {
         throw new Error(
-          `No userProfiles row for "${email}" — check the email, run migrations/backfillUserProfiles, or pass userId explicitly.`,
+          `No userProfiles row for "${email}" — check the email or pass userId explicitly (profiles are synced by the auth user triggers).`,
         );
       }
       resolvedUserId = profile.userId;

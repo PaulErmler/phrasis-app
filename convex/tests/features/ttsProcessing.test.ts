@@ -324,26 +324,6 @@ describe("features/ttsProcessing", () => {
       expect(claim?.claimedAt).toBeGreaterThan(claimedBefore);
     });
 
-    it("writes no legacy queue row and schedules no pump", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      await t.mutation(internal.features.ttsProcessing.enqueueTtsJob, {
-        provider: "google",
-        args: baseJobArgs(textId),
-      });
-
-      const queueRows = await t.run((ctx) => ctx.db.query("ttsQueue").collect());
-      expect(queueRows.length).toBe(0);
-      const scheduled = await t.run((ctx) =>
-        ctx.db.system.query("_scheduled_functions").collect(),
-      );
-      expect(
-        scheduled.filter(
-          (s) => s.name.includes("pumpQueue") || s.name.includes("requestPump"),
-        ).length,
-      ).toBe(0);
-    });
-
     it("still enqueues when no claim row exists (nothing to stamp)", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
@@ -353,17 +333,6 @@ describe("features/ttsProcessing", () => {
       });
       expect(mockEnqueue).toHaveBeenCalledTimes(1);
       expect(await getClaim(t, textId)).toBeNull();
-    });
-
-    it("accepts and ignores the deprecated priority arg", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      await t.mutation(internal.features.ttsProcessing.enqueueTtsJob, {
-        provider: "google",
-        args: baseJobArgs(textId),
-        priority: 1,
-      });
-      expect(mockEnqueue).toHaveBeenCalledTimes(1);
     });
 
     it("skips enqueueing when a fresh claim is owned by another live job", async () => {
@@ -385,8 +354,8 @@ describe("features/ttsProcessing", () => {
       });
 
       // No duplicate synthesis, and the live owner keeps its claim —
-      // drainLegacyQueues re-enqueues rows without re-claiming, so this guard
-      // is what stops it hijacking an in-flight job's claim.
+      // this guard stops an enqueue that doesn't re-claim from hijacking an
+      // in-flight job's claim.
       expect(mockEnqueue).not.toHaveBeenCalled();
       const claim = await getClaim(t, textId);
       expect(claim?.workId).toBe("live-owner");
@@ -518,14 +487,12 @@ describe("features/ttsProcessing", () => {
     /**
      * Run the worker action against fully mocked provider HTTP: Google TTS
      * returns fake audio, Azure STT returns `opts.transcribed` (default:
-     * the exact source text, i.e. validation passes strictly). Pool jobs
-     * carry no slotId; pass `opts.slotId` to exercise the legacy finalize
-     * path of pre-migration jobs.
+     * the exact source text, i.e. validation passes strictly).
      */
     async function runPipeline(
       t: ReturnType<typeof convexTest>,
       textId: Id<"texts">,
-      opts: { transcribed?: string; slotId?: Id<"ttsProviderSlots"> } = {},
+      opts: { transcribed?: string } = {},
     ) {
       vi.stubEnv("GOOGLE_TTS_API_KEY", "dummy");
       vi.stubEnv("AZURE_SPEECH_API_KEY", "dummy");
@@ -580,7 +547,6 @@ describe("features/ttsProcessing", () => {
           provider: "google" as const,
           voiceGender: "female" as const,
           speed: 1,
-          ...(opts.slotId !== undefined ? { slotId: opts.slotId } : {}),
         });
       } finally {
         vi.unstubAllGlobals();
@@ -615,7 +581,7 @@ describe("features/ttsProcessing", () => {
       );
     }
 
-    it("full pipeline (pool job, no slotId): synthesizes, transcribes, validates and stores audio row", async () => {
+    it("full pipeline: synthesizes, transcribes, validates and stores audio row", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       mockSemantic.mockReset();
@@ -652,32 +618,6 @@ describe("features/ttsProcessing", () => {
       const claim = await getClaim(t, textId);
       expect(claim).not.toBeNull();
       expect(claim?.workId).toBe("test-owner");
-    });
-
-    it("legacy pre-migration job (slotId set): releases the slot row and the workId-less claim", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      mockSemantic.mockReset();
-      const slotId = await t.run(async (ctx) =>
-        ctx.db.insert("ttsProviderSlots", {
-          provider: "google" as const,
-          claimedAt: Date.now(),
-        }),
-      );
-      await t.run(async (ctx) => {
-        await ctx.db.insert("ttsGenerationClaims", {
-          textId,
-          language: "es",
-          claimedAt: Date.now(),
-        });
-      });
-
-      await runPipeline(t, textId, { slotId });
-
-      expect(await t.run((ctx) => ctx.db.get(slotId))).toBeNull();
-      expect(await getClaim(t, textId)).toBeNull();
-      const audio = await getAudio(t, textId);
-      expect(audio?.ttsQuality).toBe("validated");
     });
 
     describe("validation retries", () => {
@@ -921,7 +861,7 @@ describe("features/ttsProcessing", () => {
         expect(limitBuckets.filter((b) => b === "azureStt").length).toBe(0);
       });
 
-      it("a provider 429 propagates to the pool — no self-re-enqueue, no legacy queue writes", async () => {
+      it("a provider 429 propagates to the pool — no self-re-enqueue", async () => {
         const t = convexTest(schema, modules);
         const { textId } = await seedText(t);
 
@@ -942,138 +882,16 @@ describe("features/ttsProcessing", () => {
           vi.unstubAllEnvs();
         }
 
-        // Retries are pool-owned now: the worker neither schedules its own
-        // retry (old failureCount chain) nor enqueues a new pool job.
+        // Retries are pool-owned: the worker neither schedules its own retry
+        // nor enqueues a new pool job.
         const scheduled = await t.run((ctx) =>
           ctx.db.system.query("_scheduled_functions").collect(),
         );
         expect(
           scheduled.filter((s) => s.name.includes("enqueueTtsJob")).length,
         ).toBe(0);
-        expect(await t.run((ctx) => ctx.db.query("ttsQueue").collect())).toEqual(
-          [],
-        );
         expect(mockEnqueue).not.toHaveBeenCalled();
       });
-    });
-  });
-
-  describe("finalizeTtsJob (legacy stub)", () => {
-    it("deletes the slot row and a workId-less claim", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      const slotId = await t.run(async (ctx) => {
-        await ctx.db.insert("ttsGenerationClaims", {
-          textId,
-          language: "es",
-          claimedAt: Date.now(),
-        });
-        return ctx.db.insert("ttsProviderSlots", {
-          provider: "google" as const,
-          claimedAt: Date.now(),
-        });
-      });
-
-      await t.mutation(internal.features.ttsProcessing.finalizeTtsJob, {
-        slotId,
-        provider: "google",
-        textId,
-        language: "es",
-      });
-
-      expect(await t.run((ctx) => ctx.db.get(slotId))).toBeNull();
-      expect(await getClaim(t, textId)).toBeNull();
-    });
-
-    it("leaves a pool-owned claim (workId set) for its job's onComplete", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      const slotId = await t.run(async (ctx) => {
-        await ctx.db.insert("ttsGenerationClaims", {
-          textId,
-          language: "es",
-          claimedAt: Date.now(),
-          workId: "pool-owner",
-        });
-        return ctx.db.insert("ttsProviderSlots", {
-          provider: "google" as const,
-          claimedAt: Date.now(),
-        });
-      });
-
-      await t.mutation(internal.features.ttsProcessing.finalizeTtsJob, {
-        slotId,
-        provider: "google",
-        textId,
-        language: "es",
-      });
-
-      expect(await t.run((ctx) => ctx.db.get(slotId))).toBeNull();
-      const claim = await getClaim(t, textId);
-      expect(claim).not.toBeNull();
-      expect(claim?.workId).toBe("pool-owner");
-    });
-
-    it("keepClaim=true releases the slot but keeps the claim", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      const slotId = await t.run(async (ctx) => {
-        await ctx.db.insert("ttsGenerationClaims", {
-          textId,
-          language: "es",
-          claimedAt: Date.now(),
-        });
-        return ctx.db.insert("ttsProviderSlots", {
-          provider: "google" as const,
-          claimedAt: Date.now(),
-        });
-      });
-
-      await t.mutation(internal.features.ttsProcessing.finalizeTtsJob, {
-        slotId,
-        provider: "google",
-        textId,
-        language: "es",
-        keepClaim: true,
-      });
-
-      expect(await t.run((ctx) => ctx.db.get(slotId))).toBeNull();
-      expect(await getClaim(t, textId)).not.toBeNull();
-    });
-  });
-
-  describe("pumpQueue (legacy no-op stub)", () => {
-    it("dispatches nothing and leaves legacy queue rows untouched", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      await t.run(async (ctx) => {
-        await ctx.db.insert("ttsQueue", {
-          provider: "google",
-          args: baseJobArgs(textId),
-          queuedAt: 0,
-          priority: 0,
-        });
-      });
-
-      const res = await t.mutation(
-        internal.features.ttsProcessing.pumpQueue,
-        { provider: "google" },
-      );
-      expect(res).toBeNull();
-
-      const queueRows = await t.run((ctx) => ctx.db.query("ttsQueue").collect());
-      const slots = await t.run((ctx) =>
-        ctx.db.query("ttsProviderSlots").collect(),
-      );
-      expect(queueRows.length).toBe(1);
-      expect(slots.length).toBe(0);
-      const scheduled = await t.run((ctx) =>
-        ctx.db.system.query("_scheduled_functions").collect(),
-      );
-      expect(
-        scheduled.filter((s) => s.name.includes("processTTSForCard")).length,
-      ).toBe(0);
-      expect(mockEnqueue).not.toHaveBeenCalled();
     });
   });
 

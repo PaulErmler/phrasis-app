@@ -935,11 +935,6 @@ export const completeOnboarding = mutation({
             textId: text._id,
             baseLanguages,
             targetLanguages,
-            // priority: 2 — user is blocked on this content. Beats the
-            // cross-level warmup fanned out by
-            // `ensureFirstSentencesAcrossLevelCollections` below
-            // (which runs at default priority 0).
-            priority: 2,
           });
         }
       }

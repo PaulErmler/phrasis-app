@@ -105,12 +105,11 @@ export const cutoverUser = internalMutation({
     });
 
     // --- Live-compute fallback for cardsMastered --------------------------
-    // `cardsMastered` was introduced in this PR, so existing rows have it set
-    // to `undefined` until `datasetMigration_backfillCardsMastered` runs. If
-    // we naively did `legacyProgress.cardsMastered ?? 0` and cutover ran first,
-    // we'd roll 0 forward and the destination row would block backfill from
-    // ever populating it (backfill only patches rows where the value is still
-    // undefined). To remove that ordering hazard entirely, recompute the count
+    // Rows written before `cardsMastered` existed have it set to `undefined`
+    // (a one-time backfill stamped most of them, but any row it missed stays
+    // undefined). If we naively did `legacyProgress.cardsMastered ?? 0`,
+    // we'd roll 0 forward and the destination row would never get a real
+    // count. To remove that hazard entirely, recompute the count
     // live from the cards table whenever the legacy row hasn't been backfilled
     // yet. This is a one-time read per (course, legacy collection) at cutover.
     const deck = await ctx.db

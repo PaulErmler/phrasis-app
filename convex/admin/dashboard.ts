@@ -171,8 +171,7 @@ export const getSignupSeries = adminQuery({
 /**
  * How many users are currently on each plan, from the local Autumn mirror.
  * Users whose quota doc predates plan capture (or who have no attached
- * product) fall into the 'unknown' bucket until their next sync — run
- * migrations/backfillPlanNames to eliminate it.
+ * product) fall into the 'unknown' bucket until their next quota sync.
  */
 export const getPlanDistribution = adminQuery({
   args: {},
