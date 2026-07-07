@@ -11,10 +11,10 @@ import {
 import { Button } from '@/components/ui/button';
 import {
   alignWordTimings,
-  findCurrentIndex,
   matchRatio,
 } from '@/lib/audio/alignTimings';
 import { languageSupportsKaraoke } from '@/lib/languages';
+import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
 import { useLearningChatToggle } from './LearningChatLayout';
 import type { WordTiming } from './types';
 
@@ -24,6 +24,12 @@ interface Props {
   language: string;
   wordTimings: WordTiming[] | null | undefined;
   localTime: number;
+  /**
+   * Merged-playback word-position source. When set (and active), the word
+   * index ticks from a clock subscription inside this leaf instead of the
+   * `localTime` prop — no parent re-renders per frame.
+   */
+  clockBinding?: ClockBinding;
   isActive: boolean;
   /** User setting — when false, karaoke is off but words remain clickable. */
   enabled: boolean;
@@ -56,6 +62,7 @@ export function ClickableWords({
   language,
   wordTimings,
   localTime,
+  clockBinding,
   isActive,
   enabled,
   className,
@@ -79,8 +86,12 @@ export function ClickableWords({
     );
   }, [language, enabled, wordTimings, aligned]);
 
-  const currentIndex =
-    isActive && canKaraoke ? findCurrentIndex(aligned, localTime) : -1;
+  const currentIndex = useKaraokeIndex(
+    aligned,
+    isActive && canKaraoke,
+    localTime,
+    clockBinding,
+  );
 
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
