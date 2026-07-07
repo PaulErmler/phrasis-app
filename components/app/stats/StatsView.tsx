@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useScrollMemory } from '@/hooks/use-scroll-memory';
 import { getUserTimezone } from '@/lib/timezone';
 import { normalizeLanguageCode } from '@/lib/languages';
 import { NumbersRow } from './NumbersRow';
@@ -51,6 +52,7 @@ function weeksAgoStr(n: number): string {
 }
 
 export function StatsView() {
+  const scrollRef = useScrollMemory('stats');
   const tz = getUserTimezone();
   const todayStr = today(tz);
   const yearStartStr = yearStart();
@@ -133,7 +135,7 @@ export function StatsView() {
   }
 
   return (
-    <div className="scroll-view">
+    <div ref={scrollRef} className="scroll-view">
       <div className="app-view">
         <NumbersRow
           streak={cs?.currentStreak ?? 0}

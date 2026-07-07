@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useScrollMemory } from '@/hooks/use-scroll-memory';
 import { Preloaded, usePreloadedQuery, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { HomeChatInput } from '@/components/chat/HomeChatInput';
@@ -29,7 +30,6 @@ export function HomeView({
   onEnterTexts,
   onTutorialReady,
   animateEntrance,
-  isHidden,
   hasActiveCourse,
   onOpenCourseMenu,
 }: {
@@ -41,13 +41,13 @@ export function HomeView({
   onNavigateToContent: () => void;
   onNavigateToChat: () => void;
   onEnterTexts: () => void;
-  onTutorialReady?: (restart: () => void) => void;
+  onTutorialReady?: (restart: (() => void) | null) => void;
   animateEntrance?: boolean;
-  isHidden?: boolean;
   hasActiveCourse: boolean;
   onOpenCourseMenu: () => void;
 }) {
   const t = useTranslations('AppPage');
+  const scrollRef = useScrollMemory('home');
 
   const { restartTutorial } = useTutorial(TUTORIAL_IDS.HOME_TOUR, {
     delayMs: 1200,
@@ -56,18 +56,16 @@ export function HomeView({
 
   useEffect(() => {
     onTutorialReady?.(restartTutorial);
+    return () => onTutorialReady?.(null);
   }, [onTutorialReady, restartTutorial]);
 
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   // Drives the disabled state of the Radio button on the home screen — radio
-  // mode is meaningless on an empty deck. Skipped while HomeView is hidden
-  // (e.g. user is mid-LearnView) so the subscription doesn't refire on every
-  // radio-mode card advance. While loading we leave the button enabled so the
-  // click path falls back to the toast.
-  const hasPlayableCards = useQuery(
-    api.features.scheduling.hasPlayableCards,
-    isHidden ? 'skip' : {},
-  );
+  // mode is meaningless on an empty deck. The home route unmounts while the
+  // user is mid-LearnView, so the subscription can't refire on radio-mode
+  // card advances. While loading we leave the button enabled so the click
+  // path falls back to the toast.
+  const hasPlayableCards = useQuery(api.features.scheduling.hasPlayableCards, {});
   const updateCourseSettings = useMutation(
     api.features.courses.updateCourseSettings,
   ).withOptimisticUpdate((localStore, args) => {
@@ -91,11 +89,10 @@ export function HomeView({
 
   // Pre-warm card content (translations + TTS) for the upcoming cards of every
   // scheduling mode while the user is on Home, so whichever mode they pick
-  // starts without waiting on content generation. Skipped while HomeView is
-  // hidden (user mid-LearnView, where useLearningMode already warms content).
+  // starts without waiting on content generation. (Mid-LearnView this route is
+  // unmounted; useLearningMode warms content there.)
   const courseId = courseSettings?.courseId;
   useEffect(() => {
-    if (isHidden) return;
     if (!courseId) return;
     if (warmedCourseIds.has(courseId)) return;
 
@@ -104,7 +101,7 @@ export function HomeView({
       console.error('Failed to ensure upcoming cards content:', error);
       warmedCourseIds.delete(courseId);
     });
-  }, [isHidden, courseId, ensureAllModesContent]);
+  }, [courseId, ensureAllModesContent]);
 
   const getOrCreateEmptyThread = useMutation(
     api.features.chat.threads.getOrCreateEmptyThread,
@@ -180,6 +177,7 @@ export function HomeView({
 
   return (
     <div
+      ref={scrollRef}
       className="scroll-view"
       style={{ scrollbarGutter: 'stable' }}
     >
@@ -190,7 +188,6 @@ export function HomeView({
           reviewMode={courseSettings?.reviewMode ?? 'audio'}
           onReviewModeChange={handleReviewModeChange}
           animateEntrance={animateEntrance}
-          skipLiveStats={isHidden}
           courseId={courseSettings?.courseId}
           hasPlayableCards={hasPlayableCards ?? true}
         />

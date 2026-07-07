@@ -1,11 +1,9 @@
 'use client';
 
-import { useLayoutEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import type { View } from '@/components/app/BottomNav';
 import { Card, CardContent } from '@/components/ui/card';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { Button } from '@/components/ui/button';
@@ -16,30 +14,17 @@ import PricingTable from '@/components/autumn/pricing-table';
 
 const SUPPORT_EMAIL = 'support@flexling.com';
 
-export function SettingsView({ activeView }: { activeView: View }) {
+export function SettingsView() {
   const t = useTranslations('AppPage');
   const tFooter = useTranslations('Footer');
   const tAuth = useTranslations('Auth');
   const authUser = useQuery(api.auth.getAuthUser);
   const userEmail = (authUser as Record<string, unknown> | null | undefined)?.email as string | undefined;
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const prevViewRef = useRef<View | null>(null);
-
-  useLayoutEffect(() => {
-    if (
-      activeView === 'settings' &&
-      prevViewRef.current !== 'settings' &&
-      scrollRef.current
-    ) {
-      scrollRef.current.scrollTop = 0;
-    }
-    prevViewRef.current = activeView;
-  }, [activeView]);
-
+  // The settings route mounts fresh on every visit, so scroll starts at the
+  // top — the old activeView-based scroll reset is no longer needed.
   return (
     <div
-      ref={scrollRef}
       className="scroll-view"
       style={{ scrollbarGutter: 'stable' }}
     >

@@ -1,4 +1,9 @@
-/** Route segment for /app/content/add-cards — UI is rendered by MainLayout from pathname. */
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { AddCardsView } from '@/components/app/AddCardsView';
+
 export default function AddCardsPage() {
-  return null;
+  const router = useRouter();
+  return <AddCardsView onBack={() => router.push('/app')} />;
 }

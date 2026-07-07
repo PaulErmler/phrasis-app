@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, usePreloadedQuery } from 'convex/react';
+import { useScrollMemory } from '@/hooks/use-scroll-memory';
 import type { FunctionReturnType } from 'convex/server';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
@@ -35,6 +37,37 @@ import { buttonVariants } from '@/components/ui/button';
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
 type SourceFilter = 'custom' | 'premade' | null;
 
+function parseActiveFilter(value: string | null | undefined): ActiveFilter {
+  return value === 'mastered' || value === 'hidden' || value === 'favorites'
+    ? value
+    : null;
+}
+
+function parseSourceFilter(value: string | null | undefined): SourceFilter {
+  return value === 'custom' || value === 'premade' ? value : null;
+}
+
+// Filters survive tab switches (which unmount this route) via sessionStorage
+// and are deep-linkable via ?q=&filter=&source= search params.
+const FILTERS_STORAGE_KEY = 'phrasis:library-filters';
+
+type StoredFilters = { q: string; filter: ActiveFilter; source: SourceFilter };
+
+function readStoredFilters(): StoredFilters | null {
+  try {
+    const stored = sessionStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as Partial<StoredFilters>;
+    return {
+      q: typeof parsed.q === 'string' ? parsed.q : '',
+      filter: parseActiveFilter(parsed.filter),
+      source: parseSourceFilter(parsed.source),
+    };
+  } catch {
+    return null;
+  }
+}
+
 type LibraryCard = FunctionReturnType<typeof api.features.library.getLibraryCards>[number];
 
 type StickyEntry = {
@@ -52,6 +85,7 @@ export function LibraryView({
 }) {
   const t = useTranslations('AppPage.library');
   const tLearn = useTranslations('LearningMode');
+  const scrollRef = useScrollMemory('library');
 
   const { preloadedCourseSettings, preloadedSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
@@ -89,11 +123,69 @@ export function LibraryView({
     ],
   );
 
-  const [searchInput, setSearchInput] = useState('');
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>(null);
-  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(null);
+  const searchParams = useSearchParams();
+  // URL params seed the initial state (hydration-safe — the server sees the
+  // same params on dynamic renders). Captured once; afterwards the state is
+  // the source of truth and is mirrored back to the URL below.
+  const [initial] = useState(() => ({
+    q: searchParams.get('q') ?? '',
+    filter: parseActiveFilter(searchParams.get('filter')),
+    source: parseSourceFilter(searchParams.get('source')),
+    fromUrl:
+      searchParams.get('q') !== null ||
+      searchParams.get('filter') !== null ||
+      searchParams.get('source') !== null,
+  }));
+  const [searchInput, setSearchInput] = useState(initial.q);
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>(initial.filter);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>(initial.source);
+
+  // Without URL params, restore the session's last filters (post-mount:
+  // sessionStorage is client-only, reading it during render would break
+  // hydration).
+  useEffect(() => {
+    if (initial.fromUrl) return;
+    const stored = readStoredFilters();
+    if (!stored) return;
+    setSearchInput(stored.q);
+    setActiveFilter(stored.filter);
+    setSourceFilter(stored.source);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const debouncedSearch = useDebounce(searchInput, 300);
+
+  // Mirror filters to the URL (deep-linkable, no server round-trip, no
+  // history entries — Next syncs useSearchParams with replaceState) and to
+  // sessionStorage for the next mount.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const apply = (key: string, value: string | null) => {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    };
+    apply('q', debouncedSearch || null);
+    apply('filter', activeFilter);
+    apply('source', sourceFilter);
+    const qs = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+    );
+    try {
+      sessionStorage.setItem(
+        FILTERS_STORAGE_KEY,
+        JSON.stringify({
+          q: debouncedSearch,
+          filter: activeFilter,
+          source: sourceFilter,
+        } satisfies StoredFilters),
+      );
+    } catch {
+      // Storage unavailable — filters just don't survive the next remount.
+    }
+  }, [debouncedSearch, activeFilter, sourceFilter]);
 
   const result = useQuery(api.features.library.getLibraryCards, {
     searchQuery: debouncedSearch || undefined,
@@ -397,7 +489,7 @@ export function LibraryView({
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-20" style={{ scrollbarGutter: 'stable' }}>
+    <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 pb-20" style={{ scrollbarGutter: 'stable' }}>
       {/* Sticky search + filters card */}
       <div className="sticky top-0 z-10 bg-background">
         <div className="max-w-xl mx-auto w-full pt-6">

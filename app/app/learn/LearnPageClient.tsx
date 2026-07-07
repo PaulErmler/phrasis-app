@@ -1,35 +1,34 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useMutation } from 'convex/react';
-import { api } from '@/convex/_generated/api';
 import { LearnView } from '@/components/app/learning/LearnView';
+import { useChatPrefetch, useNavigateToChat } from '@/components/app/AppWarmup';
+import { useInAppBack } from '@/hooks/use-in-app-back';
+import { setReturningFromLearnFlag } from '@/lib/navigationFlags';
 
 export function LearnPageClient() {
   const router = useRouter();
-  const getOrCreateEmptyThread = useMutation(
-    api.features.chat.threads.getOrCreateEmptyThread,
-  );
+  const { prefetchedThreadId, refreshPrefetchedThread } = useChatPrefetch();
+  const navigateToChat = useNavigateToChat();
+  const inAppBack = useInAppBack();
 
-  // Standalone learn page is rendered outside the (main) layout, so it has
-  // no in-app chat overlay to fall back on. Create / fetch a thread, then
-  // push directly to the chat route — the main layout picks the thread up
-  // via `viewFromPathname` and renders the chat view.
-  const handleNavigateToChat = useCallback(async () => {
-    try {
-      const threadId = await getOrCreateEmptyThread({});
-      router.push(`/app/chat/${threadId}`);
-    } catch (err) {
-      console.error('Failed to open chat from standalone learn page:', err);
-      router.push('/app');
-    }
-  }, [getOrCreateEmptyThread, router]);
+  // The in-learn chat may have consumed the prefetched thread; refresh on
+  // exit so the next chat entry gets an empty one (parity with the old
+  // shell's refresh-on-learn-close).
+  useEffect(() => () => refreshPrefetchedThread(), [refreshPrefetchedThread]);
+
+  const handleBack = useCallback(() => {
+    // Tells the home page to play its entrance animation on return.
+    setReturningFromLearnFlag();
+    inAppBack();
+  }, [inAppBack]);
 
   return (
     <LearnView
-      onBack={() => router.push('/app')}
-      onNavigateToChat={handleNavigateToChat}
+      onBack={handleBack}
+      prefetchedThreadId={prefetchedThreadId ?? undefined}
+      onNavigateToChat={navigateToChat}
       onNavigateToAddCustomCards={() => router.push('/app/content/add-cards')}
     />
   );
