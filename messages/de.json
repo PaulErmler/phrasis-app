@@ -592,8 +592,10 @@
       "germanic": "Germanisch & Nordisch",
       "romance": "Romanisch",
       "slavic": "Slawisch",
+      "baltic": "Baltisch",
       "asian-east": "Ostasien",
       "asian-southeast": "Südostasien",
+      "south-asian": "Südasiatisch",
       "semitic": "Semitisch & Naher Osten",
       "african": "Afrikanisch",
       "other": "Sonstige"

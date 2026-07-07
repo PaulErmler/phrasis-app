@@ -241,6 +241,12 @@
       }
     }
   },
+  "languages": {
+    "title": "Eine Methode,",
+    "titleHighlight": "{count}+ Sprachen",
+    "lead": "Jede Sprache kommt mit KI-Audio in Muttersprachler-Qualität und satzgenauen Übersetzungen. Lerne eine Sprache oder mehrere parallel.",
+    "missingPill": "Deine Sprache fehlt? Sag uns Bescheid"
+  },
   "pricing": {
     "title": "Flexible",
     "titleHighlight": "Preise",
@@ -377,7 +383,7 @@
       {
         "question": "Welche Sprachen unterstützt Flexling?",
         "answer": [
-          "In Flexling kannst du folgende Sprachen lernen: Englisch, Spanisch (Spanien, Lateinamerika und eine gemischte Spanien-+-Lateinamerika-Variante), Französisch, Deutsch, Italienisch, Rumänisch, Portugiesisch (Brasilien und Portugal), Niederländisch, Schwedisch, Dänisch, Finnisch, Griechisch, Polnisch, Tschechisch, Slowakisch, Ungarisch, Russisch, Hindi, Bengalisch, Hebräisch, Türkisch, Persisch, Arabisch (Hocharabisch sowie saudische, ägyptische, irakische und levantinische Dialekte), Chinesisch (vereinfacht und traditionell), Kantonesisch (vereinfacht und traditionell), Japanisch, Koreanisch, Vietnamesisch, Thai, Indonesisch, Filipino und Swahili (Kenia und Tansania) – weitere Sprachen kommen regelmäßig dazu.",
+          "In Flexling kannst du folgende Sprachen lernen: Englisch, Spanisch (Spanien, Lateinamerika und eine gemischte Spanien-+-Lateinamerika-Variante), Katalanisch, Französisch, Deutsch, Italienisch, Rumänisch, Portugiesisch (Brasilien und Portugal), Niederländisch, Schwedisch, Norwegisch (Bokmål), Dänisch, Finnisch, Estnisch, Lettisch, Litauisch, Griechisch, Polnisch, Tschechisch, Slowakisch, Ukrainisch, Kroatisch, Serbisch, Slowenisch, Ungarisch, Russisch, Hindi, Bengalisch, Tamil, Telugu, Hebräisch, Türkisch, Persisch, Arabisch (Hocharabisch sowie saudische, ägyptische, irakische und levantinische Dialekte), Chinesisch (vereinfacht und traditionell), Kantonesisch (vereinfacht und traditionell), Japanisch, Koreanisch, Vietnamesisch, Thai, Indonesisch, Malaiisch, Filipino und Swahili (Kenia und Tansania) – weitere Sprachen kommen regelmäßig dazu.",
           "Wird deine Sprache nicht unterstützt? Lass es uns wissen und wir werden versuchen, sie zu priorisieren."
         ]
       },

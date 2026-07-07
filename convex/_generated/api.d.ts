@@ -15,6 +15,7 @@ import type * as admin_manage from "../admin/manage.js";
 import type * as admin_uploadDataset from "../admin/uploadDataset.js";
 import type * as admin_userContent from "../admin/userContent.js";
 import type * as admin_warmupCourseLevels from "../admin/warmupCourseLevels.js";
+import type * as admin_warmupLanguages from "../admin/warmupLanguages.js";
 import type * as admin_warmupPlacementTranslations from "../admin/warmupPlacementTranslations.js";
 import type * as admin_warmupSingleLanguage from "../admin/warmupSingleLanguage.js";
 import type * as auth from "../auth.js";
@@ -113,6 +114,7 @@ declare const fullApi: ApiFromModules<{
   "admin/uploadDataset": typeof admin_uploadDataset;
   "admin/userContent": typeof admin_userContent;
   "admin/warmupCourseLevels": typeof admin_warmupCourseLevels;
+  "admin/warmupLanguages": typeof admin_warmupLanguages;
   "admin/warmupPlacementTranslations": typeof admin_warmupPlacementTranslations;
   "admin/warmupSingleLanguage": typeof admin_warmupSingleLanguage;
   auth: typeof auth;

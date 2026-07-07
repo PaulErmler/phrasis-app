@@ -221,12 +221,25 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   // Gemini is the only pool (mirrors fa / pt_pt).
   fil: [...GEMINI_CORE],
   sv: [...buildChirp3Pool('sv-SE', 'Sweden'), ...GEMINI_CORE],
-  // nb: [...buildChirp3Pool('nb-NO', 'Norway')], // disabled — see SUPPORTED_LANGUAGES
+  nb: [...buildChirp3Pool('nb-NO', 'Norway'), ...GEMINI_CORE],
   da: [...buildChirp3Pool('da-DK', 'Denmark'), ...GEMINI_CORE],
   fi: [...buildChirp3Pool('fi-FI', 'Finland'), ...GEMINI_CORE],
   nl: [...buildChirp3Pool('nl-NL', 'Netherlands'), ...GEMINI_CORE],
   el: [...buildChirp3Pool('el-GR', 'Greece'), ...GEMINI_CORE],
   he: [...buildChirp3Pool('he-IL', 'Israel'), ...GEMINI_CORE],
+  // Jul 2026 expansion wave — all Gemini-only pools (locale pinned via each
+  // language's `geminiBcp47`; no Google Chirp3 pools were verified for these).
+  ca: [...GEMINI_CORE],
+  hr: [...GEMINI_CORE],
+  sl: [...GEMINI_CORE],
+  uk: [...GEMINI_CORE],
+  sr: [...GEMINI_CORE],
+  lt: [...GEMINI_CORE],
+  lv: [...GEMINI_CORE],
+  et: [...GEMINI_CORE],
+  ms: [...GEMINI_CORE],
+  ta: [...GEMINI_CORE],
+  te: [...GEMINI_CORE],
   // All Arabic dialects run on Gemini TTS: the global Arabic Gemini voice
   // (GEMINI_CORE) steered by `geminiBcp47` — `ar-001` for MSA/Saudi/Iraqi/
   // Levantine and the dedicated `ar-EG` for Egyptian — with each dialect named

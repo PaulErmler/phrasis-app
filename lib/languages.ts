@@ -47,13 +47,21 @@ function regionLabelFromDisplayCode(displayCode: string): string {
   return dash >= 0 ? displayCode.slice(dash + 1) : displayCode;
 }
 
-/** Coarse grouping for the grouped language picker. */
+/**
+ * Coarse grouping for the grouped language picker. Groupings are a UX
+ * compromise between linguistics and geography: 'baltic' bundles Estonian
+ * (Uralic) with Lithuanian/Latvian because learners look for it next to its
+ * neighbours, and 'south-asian' collects the Indic + Dravidian languages
+ * (hi/bn/ta/te) that previously drowned in 'other'.
+ */
 export type LanguageCategory =
   | 'germanic'
   | 'romance'
   | 'slavic'
+  | 'baltic'
   | 'asian-east'
   | 'asian-southeast'
+  | 'south-asian'
   | 'semitic'
   | 'african'
   | 'other';
@@ -497,6 +505,24 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationVersion: 2,
   },
   {
+    code: 'ca',
+    displayCode: 'ca',
+    regionLabel: 'Catalonia',
+    geminiBcp47: 'ca-ES',
+    azureSttLocale: 'ca-ES',
+    name: 'Catalan',
+    nativeName: 'Català',
+    // Catalonia has no emoji flag; Andorra's flag is the conventional stand-in
+    // (Catalan is Andorra's sole official language).
+    flag: '🇦🇩',
+    category: 'romance',
+    llmSupportTier: 'tier1',
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+  },
+  {
     code: 'ru',
     displayCode: 'ru',
     regionLabel: 'Russia',
@@ -565,6 +591,125 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationVersion: 2,
   },
   {
+    code: 'hr',
+    displayCode: 'hr',
+    regionLabel: 'Croatia',
+    geminiBcp47: 'hr-HR',
+    azureSttLocale: 'hr-HR',
+    name: 'Croatian',
+    nativeName: 'Hrvatski',
+    flag: '🇭🇷',
+    category: 'slavic',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+  },
+  {
+    code: 'sl',
+    displayCode: 'sl',
+    regionLabel: 'Slovenia',
+    geminiBcp47: 'sl-SI',
+    azureSttLocale: 'sl-SI',
+    name: 'Slovenian',
+    nativeName: 'Slovenščina',
+    flag: '🇸🇮',
+    category: 'slavic',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+  },
+  {
+    code: 'uk',
+    displayCode: 'uk',
+    regionLabel: 'Ukraine',
+    geminiBcp47: 'uk-UA',
+    azureSttLocale: 'uk-UA',
+    romanizationBackend: 'google-v3',
+    name: 'Ukrainian',
+    nativeName: 'Українська',
+    flag: '🇺🇦',
+    category: 'slavic',
+    llmSupportTier: 'tier1',
+    ttsProvider: 'gemini',
+    needsRomanization: true,
+    // Cyrillic — karaoke off (non-Latin script policy, matches Russian).
+    supportsKaraoke: false,
+    supportsStt: true,
+  },
+  {
+    code: 'sr',
+    displayCode: 'sr',
+    regionLabel: 'Serbia',
+    geminiBcp47: 'sr-RS',
+    azureSttLocale: 'sr-RS',
+    romanizationBackend: 'google-v3',
+    // Cyrillic-script Serbian: Azure's sr-RS STT locale and Google
+    // romanize-v3's `sr` are both Cyrillic-oriented, so the catalog standard
+    // is Cyrillic (romanization gives learners the Latin rendering anyway).
+    name: 'Serbian',
+    nativeName: 'Српски',
+    flag: '🇷🇸',
+    category: 'slavic',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    needsRomanization: true,
+    // Cyrillic — karaoke off (non-Latin script policy).
+    supportsKaraoke: false,
+    supportsStt: true,
+  },
+  {
+    code: 'lt',
+    displayCode: 'lt',
+    regionLabel: 'Lithuania',
+    geminiBcp47: 'lt-LT',
+    name: 'Lithuanian',
+    nativeName: 'Lietuvių',
+    flag: '🇱🇹',
+    category: 'baltic',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+  },
+  {
+    code: 'lv',
+    displayCode: 'lv',
+    regionLabel: 'Latvia',
+    geminiBcp47: 'lv-LV',
+    name: 'Latvian',
+    nativeName: 'Latviešu',
+    flag: '🇱🇻',
+    category: 'baltic',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+  },
+  {
+    code: 'et',
+    displayCode: 'et',
+    regionLabel: 'Estonia',
+    geminiBcp47: 'et-EE',
+    azureSttLocale: 'et-EE',
+    name: 'Estonian',
+    nativeName: 'Eesti',
+    flag: '🇪🇪',
+    // Uralic linguistically (like Finnish), but grouped with its Baltic
+    // neighbours in the picker — learners look for it next to lt/lv.
+    category: 'baltic',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+  },
+  {
     code: 'nl',
     displayCode: 'nl',
     regionLabel: 'Netherlands',
@@ -598,26 +743,24 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
-  // Norwegian (Bokmål) — disabled for now. The provider-locale fields the derived
-  // maps need (regionLabel, azureSttLocale `nb-NO`, googleTranslateCode `no`) are
-  // baked into the commented record below, and the voice pool / textCompare entry
-  // are still in place, so re-enabling is just uncommenting this block.
-  // {
-  //   code: 'nb',
-  //   displayCode: 'nb',
-  //   regionLabel: 'Norway',
-  //   azureSttLocale: 'nb-NO',
-  //   googleTranslateCode: 'no',
-  //   name: 'Norwegian (Bokmål)',
-  //   nativeName: 'Norsk bokmål',
-  //   flag: '🇳🇴',
-  //   category: 'germanic',
-  //   llmSupportTier: 'tier2',
-  //   ttsProvider: 'google',
-  //   needsRomanization: false,
-  //   supportsKaraoke: true,
-  //   supportsStt: true,
-  // },
+  {
+    // Re-enabled Jul 2026 on Gemini TTS (the pre-staged entry was Google-era).
+    code: 'nb',
+    displayCode: 'nb',
+    regionLabel: 'Norway',
+    geminiBcp47: 'nb-NO',
+    azureSttLocale: 'nb-NO',
+    googleTranslateCode: 'no',
+    name: 'Norwegian (Bokmål)',
+    nativeName: 'Norsk bokmål',
+    flag: '🇳🇴',
+    category: 'germanic',
+    llmSupportTier: 'tier1',
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+  },
   {
     code: 'da',
     displayCode: 'da',
@@ -684,7 +827,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     name: 'Hindi',
     nativeName: 'हिन्दी',
     flag: '🇮🇳',
-    category: 'other',
+    category: 'south-asian',
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
@@ -705,7 +848,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Flag is India, not Bangladesh: STT infra is bn-IN (Azure Fast
     // Transcription only supports bn-IN, not bn-BD).
     flag: '🇮🇳',
-    category: 'other',
+    category: 'south-asian',
     llmSupportTier: 'tier2',
     // Gemini 3.1 Flash TTS supports Bengali (`geminiBcp47: 'bn-BD'`).
     // Switching off Google triggers the provider-mismatch regen for existing
@@ -716,6 +859,42 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: false,
     supportsStt: true,
     translationVersion: 2,
+  },
+  {
+    code: 'ta',
+    displayCode: 'ta',
+    regionLabel: 'India',
+    geminiBcp47: 'ta-IN',
+    azureSttLocale: 'ta-IN',
+    romanizationBackend: 'google-v3',
+    name: 'Tamil',
+    nativeName: 'தமிழ்',
+    flag: '🇮🇳',
+    category: 'south-asian',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    needsRomanization: true,
+    // Tamil script — karaoke off (non-Latin script policy).
+    supportsKaraoke: false,
+    supportsStt: true,
+  },
+  {
+    code: 'te',
+    displayCode: 'te',
+    regionLabel: 'India',
+    geminiBcp47: 'te-IN',
+    azureSttLocale: 'te-IN',
+    romanizationBackend: 'google-v3',
+    name: 'Telugu',
+    nativeName: 'తెలుగు',
+    flag: '🇮🇳',
+    category: 'south-asian',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    needsRomanization: true,
+    // Telugu script — karaoke off (non-Latin script policy).
+    supportsKaraoke: false,
+    supportsStt: true,
   },
   {
     code: 'tr',
@@ -949,6 +1128,22 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
+  },
+  {
+    code: 'ms',
+    displayCode: 'ms',
+    regionLabel: 'Malaysia',
+    geminiBcp47: 'ms-MY',
+    azureSttLocale: 'ms-MY',
+    name: 'Malay',
+    nativeName: 'Bahasa Melayu',
+    flag: '🇲🇾',
+    category: 'asian-southeast',
+    llmSupportTier: 'tier1',
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
   },
   {
     code: 'fil',

@@ -30,7 +30,8 @@
     "tts:prototype": "tsx --env-file=.env.local scripts/tts-prototype.ts",
     "tts:probe": "tsx --env-file=.env.local scripts/tts-openrouter-format-probe.ts",
     "tts:prompt-test": "tsx --env-file=.env.local scripts/tts-prompt-test.ts",
-    "tts:levantine": "tsx --env-file=.env.local scripts/tts-levantine-probe.mts"
+    "tts:levantine": "tsx --env-file=.env.local scripts/tts-levantine-probe.mts",
+    "probe:languages": "tsx --env-file=.env.local scripts/probe-new-languages.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.76",
