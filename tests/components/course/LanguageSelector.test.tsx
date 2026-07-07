@@ -38,14 +38,14 @@ const messages = {
   LanguageSelector: {
     searchPlaceholder: "Search languages…",
     noResults: "No languages match.",
-    tierBadge: "Experimental",
-    tierBadgeTooltip: "Newly added — quality is still being tuned.",
     categories: {
       germanic: "Germanic & Nordic",
       romance: "Romance",
       slavic: "Slavic",
+      baltic: "Baltic",
       "asian-east": "East Asian",
       "asian-southeast": "Southeast Asian",
+      "south-asian": "South Asian",
       semitic: "Semitic & Middle Eastern",
       african: "African",
       other: "Other",

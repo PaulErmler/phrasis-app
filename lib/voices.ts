@@ -3,7 +3,7 @@
  *
  * This file owns:
  *   - The Voice type
- *   - Per-language voice pools (Google Chirp3 + Azure + Gemini)
+ *   - Per-language voice pools (Google Chirp3 + Gemini)
  *   - The VOICE_POOLS map keyed by language code
  *   - All voice-selection helpers (getVoiceForLanguage, etc.)
  *
@@ -19,12 +19,13 @@ export type { TtsProvider };
 /**
  * apiCode format depends on provider:
  *   - google: "{locale}-Chirp3-HD-{name}"   e.g. "en-US-Chirp3-HD-Leda"
- *   - azure:  Azure voice short name        e.g. "sv-SE-SofieNeural"
+ *   - gemini: "{name}" or "{name}@{locale}" e.g. "Leda", "Leda@en-GB"
  *
  * `active` gates whether a voice is eligible for selection. Dormant voices
  * stay in VOICE_POOLS (so re-enabling is a one-line flip) but are filtered
  * out of `getVoicesByLanguageCode`. See convex/lib/tts/index.ts for the
- * provider wiring.
+ * provider wiring. (Azure TTS was retired in Jul 2026 — its voice pools were
+ * removed with it; Azure Speech remains for STT only.)
  */
 export interface Voice {
   provider: TtsProvider;
@@ -52,27 +53,6 @@ function createChirp3Voice(
     displayName: `${name} (${gender === 'female' ? 'Female' : 'Male'}) - ${accentLabel}`,
     apiCode: `${locale}-Chirp3-HD-${name}`,
     gender,
-  };
-}
-
-/**
- * Azure Speech (Cognitive Services) voices. apiCode is the Azure voice
- * short name, e.g. "sv-SE-SofieNeural" — the provider extracts the locale
- * from the prefix at synthesis time. Defaults to dormant; pools wrap with
- * `activate(...)` when their language is currently routed through Azure.
- */
-function createAzureVoice(
-  name: string,
-  gender: 'female' | 'male',
-  voiceShortName: string,
-): Voice {
-  return {
-    provider: 'azure',
-    name,
-    displayName: `${name} (${gender === 'female' ? 'Female' : 'Male'}) - Azure`,
-    apiCode: voiceShortName,
-    gender,
-    active: false,
   };
 }
 
@@ -139,16 +119,6 @@ const GEMINI_EN_MIXED: Voice[] = [
   ...GEMINI_EN_AU,
 ];
 
-/**
- * Mark a voice list as selectable. Used by pools whose voices default to
- * dormant (e.g. Azure) but are the active provider for that language — wraps
- * the list so every entry becomes `active: true` without touching the
- * per-voice definitions.
- */
-function activate(voices: Voice[]): Voice[] {
-  return voices.map((v) => ({ ...v, active: true }));
-}
-
 // Every Chirp3 HD locale ships the same 16 voice names (8 female + 8 male),
 // except some languages Google only offers the 8-voice core set. We build
 // per-language pools from these shared name lists so the file stays readable.
@@ -176,127 +146,12 @@ function buildChirp3Pool(
   ];
 }
 
-// Swedish — native sv-SE Azure Neural voices. Catalog only ships 1 male
-// (Mattias) and 2 female (Sofie, Hillevi) at the time of this change.
-const AZURE_VOICES_SV: Voice[] = [
-  createAzureVoice('Sofie', 'female', 'sv-SE-SofieNeural'),
-  createAzureVoice('Hillevi', 'female', 'sv-SE-HilleviNeural'),
-  createAzureVoice('Mattias', 'male', 'sv-SE-MattiasNeural'),
-];
-
-// Arabic Egyptian — Azure Neural M+F. All Arabic dialects now run on Gemini TTS
-// (see VOICE_POOLS below); this Azure Egyptian pool and the Google MSA (`ar-XA`)
-// pool are kept only as dormant one-line-revert fallbacks (filtered out by
-// `getVoicesByLanguageCode` while ttsProvider is gemini).
-const AZURE_VOICES_AR_EG: Voice[] = [
-  createAzureVoice('Salma', 'female', 'ar-EG-SalmaNeural'),
-  createAzureVoice('Shakir', 'male', 'ar-EG-ShakirNeural'),
-];
-
-// Thai — Azure Neural M+F. No Dragon HD voices for Thai (May 2026).
-const AZURE_VOICES_TH: Voice[] = [
-  createAzureVoice('Premwadee', 'female', 'th-TH-PremwadeeNeural'),
-  createAzureVoice('Niwat', 'male', 'th-TH-NiwatNeural'),
-];
-
-// Hebrew — Azure Neural fallback (Google Chirp3-HD he-IL is primary).
-const AZURE_VOICES_HE: Voice[] = [
-  createAzureVoice('Hila', 'female', 'he-IL-HilaNeural'),
-  createAzureVoice('Avri', 'male', 'he-IL-AvriNeural'),
-];
-
-// Persian (Iran) — Azure Neural fallback (Gemini fa-IR is the active provider).
-// Verified against Azure's language-support docs: fa-IR ships two neural voices
-// and is supported by Fast Transcription.
-const AZURE_VOICES_FA_IR: Voice[] = [
-  createAzureVoice('Dilara', 'female', 'fa-IR-DilaraNeural'),
-  createAzureVoice('Farid', 'male', 'fa-IR-FaridNeural'),
-];
-
-// Filipino (Philippines) — Azure Neural fallback (Gemini fil-PH is the active
-// provider). Verified against Azure's language-support docs: fil-PH ships two
-// neural voices and is supported by Fast Transcription.
-const AZURE_VOICES_FIL_PH: Voice[] = [
-  createAzureVoice('Blessica', 'female', 'fil-PH-BlessicaNeural'),
-  createAzureVoice('Angelo', 'male', 'fil-PH-AngeloNeural'),
-];
-
-// Slovak — Azure Neural fallback (Google Chirp3-HD sk-SK is primary).
-const AZURE_VOICES_SK: Voice[] = [
-  createAzureVoice('Viktoria', 'female', 'sk-SK-ViktoriaNeural'),
-  createAzureVoice('Lukas', 'male', 'sk-SK-LukasNeural'),
-];
-
-// Swahili (Kenya) — Azure Neural M+F. Google has no Chirp3-HD sw-KE voices
-// at the time of this change, so Azure is the active provider.
-const AZURE_VOICES_SW_KE: Voice[] = [
-  createAzureVoice('Zuri', 'female', 'sw-KE-ZuriNeural'),
-  createAzureVoice('Rafiki', 'male', 'sw-KE-RafikiNeural'),
-];
-
-// Swahili (Tanzania) — Azure Neural M+F. Fast Transcription rejects sw-TZ,
-// so the language is configured with supportsStt: false (Greek pattern).
-const AZURE_VOICES_SW_TZ: Voice[] = [
-  createAzureVoice('Rehema', 'female', 'sw-TZ-RehemaNeural'),
-  createAzureVoice('Daudi', 'male', 'sw-TZ-DaudiNeural'),
-];
-
-// Turkish — Azure Neural fallback (Google Chirp3-HD tr-TR is primary).
-const AZURE_VOICES_TR: Voice[] = [
-  createAzureVoice('Emel', 'female', 'tr-TR-EmelNeural'),
-  createAzureVoice('Ahmet', 'male', 'tr-TR-AhmetNeural'),
-];
-
-// Romanian — Azure Neural fallback.
-const AZURE_VOICES_RO: Voice[] = [
-  createAzureVoice('Alina', 'female', 'ro-RO-AlinaNeural'),
-  createAzureVoice('Emil', 'male', 'ro-RO-EmilNeural'),
-];
-
-// Czech — Azure Neural fallback.
-const AZURE_VOICES_CS: Voice[] = [
-  createAzureVoice('Vlasta', 'female', 'cs-CZ-VlastaNeural'),
-  createAzureVoice('Antonin', 'male', 'cs-CZ-AntoninNeural'),
-];
-
-// Hungarian — Azure Neural fallback.
-const AZURE_VOICES_HU: Voice[] = [
-  createAzureVoice('Noemi', 'female', 'hu-HU-NoemiNeural'),
-  createAzureVoice('Tamas', 'male', 'hu-HU-TamasNeural'),
-];
-
-// Bengali (India) — Azure Neural fallback.
-const AZURE_VOICES_BN: Voice[] = [
-  createAzureVoice('Tanishaa', 'female', 'bn-IN-TanishaaNeural'),
-  createAzureVoice('Bashkar', 'male', 'bn-IN-BashkarNeural'),
-];
-
-// Mandarin Traditional (zh-TW) — Azure Neural M+F. Google ships no Chirp3-HD
-// voices for cmn-TW (only legacy Standard/WaveNet), so Azure is the active
-// provider for the `zh_traditional` language. Catalog: 2F (HsiaoChen, HsiaoYu)
-// and 1M (YunJhe).
-const AZURE_VOICES_ZH_TW: Voice[] = [
-  createAzureVoice('HsiaoChen', 'female', 'zh-TW-HsiaoChenNeural'),
-  createAzureVoice('HsiaoYu', 'female', 'zh-TW-HsiaoYuNeural'),
-  createAzureVoice('YunJhe', 'male', 'zh-TW-YunJheNeural'),
-];
-
-// Mandarin zh-CN — Microsoft DragonHDLatestNeural voices. Highest-tier
-// Microsoft voices among the catalog at the time of this change. Stored
-// dormant (active: false) so they don't affect existing zh courses; activate
-// by switching the language's ttsProvider to 'azure' or by surfacing them
-// through a per-course voice-set switch (TBD).
-const AZURE_DRAGON_HD_VOICES_ZH: Voice[] = [
-  createAzureVoice('Xiaochen', 'female', 'zh-CN-Xiaochen:DragonHDLatestNeural'),
-  createAzureVoice('Yunfan', 'male', 'zh-CN-Yunfan:DragonHDLatestNeural'),
-];
-
 // ---------------------------------------------------------------------------
 // Per-language unified voice pools
 //
 // Each entry contains the full curated set — Google Chirp3 voices first (so a
 // language can be switched back to `ttsProvider: 'google'` without touching
-// voice config), then any Azure / Gemini pools.
+// voice config), then any Gemini pools.
 // ---------------------------------------------------------------------------
 
 // English "Mixed" pool — pooled US + GB + AU Chirp3 voices.
@@ -341,43 +196,50 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   pt_pt: [...GEMINI_CORE],
   ru: [...buildChirp3Pool('ru-RU', 'Russia', 'core'), ...GEMINI_CORE],
   pl: [...buildChirp3Pool('pl-PL', 'Poland'), ...GEMINI_CORE],
-  sk: [...buildChirp3Pool('sk-SK', 'Slovakia'), ...AZURE_VOICES_SK, ...GEMINI_CORE],
+  sk: [...buildChirp3Pool('sk-SK', 'Slovakia'), ...GEMINI_CORE],
   hi: [...buildChirp3Pool('hi-IN', 'India'), ...GEMINI_CORE],
-  bn: [...buildChirp3Pool('bn-IN', 'Bengali'), ...AZURE_VOICES_BN],
-  tr: [...buildChirp3Pool('tr-TR', 'Türkiye'), ...AZURE_VOICES_TR, ...GEMINI_CORE],
-  hu: [...buildChirp3Pool('hu-HU', 'Hungary'), ...AZURE_VOICES_HU, ...GEMINI_CORE],
-  ro: [...buildChirp3Pool('ro-RO', 'Romania'), ...AZURE_VOICES_RO, ...GEMINI_CORE],
-  cs: [...buildChirp3Pool('cs-CZ', 'Czechia'), ...AZURE_VOICES_CS, ...GEMINI_CORE],
-  zh: [
-    ...buildChirp3Pool('cmn-CN', 'Mandarin'),
-    // Dormant Dragon HD pool — activate by switching the language to Azure.
-    ...AZURE_DRAGON_HD_VOICES_ZH,
-    ...GEMINI_CORE,
-  ],
-  // No Google Chirp3-HD voices for cmn-TW — use Azure Neural zh-TW instead.
-  zh_traditional: [...activate(AZURE_VOICES_ZH_TW)],
+  // Bengali runs on Gemini TTS (bn-BD via `geminiBcp47`). The Chirp3 bn-IN
+  // pool stays listed dormant for a one-line revert.
+  bn: [...GEMINI_CORE, ...buildChirp3Pool('bn-IN', 'Bengali')],
+  tr: [...buildChirp3Pool('tr-TR', 'Türkiye'), ...GEMINI_CORE],
+  hu: [...buildChirp3Pool('hu-HU', 'Hungary'), ...GEMINI_CORE],
+  ro: [...buildChirp3Pool('ro-RO', 'Romania'), ...GEMINI_CORE],
+  cs: [...buildChirp3Pool('cs-CZ', 'Czechia'), ...GEMINI_CORE],
+  zh: [...buildChirp3Pool('cmn-CN', 'Mandarin'), ...GEMINI_CORE],
+  // Mandarin-Traditional runs on Gemini TTS (cmn-TW via `geminiBcp47`, accent
+  // reinforced by `ttsPromptName: 'Taiwanese Mandarin'`). Azure TTS is retired
+  // and Google ships no Chirp3-HD voices for cmn-TW, so Gemini is the only pool.
+  zh_traditional: [...GEMINI_CORE],
   yue: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
   yue_traditional: [...buildChirp3Pool('yue-HK', 'Hong Kong')],
   ja: [...buildChirp3Pool('ja-JP', 'Japan'), ...GEMINI_CORE],
   ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...GEMINI_CORE],
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...GEMINI_CORE],
-  th: [...buildChirp3Pool('th-TH', 'Thailand'), ...AZURE_VOICES_TH, ...GEMINI_CORE],
+  th: [...buildChirp3Pool('th-TH', 'Thailand'), ...GEMINI_CORE],
   id: [...buildChirp3Pool('id-ID', 'Indonesia'), ...GEMINI_CORE],
   // Filipino runs on Gemini TTS (fil-PH). No Google Chirp3-HD fil voices, so
-  // Gemini is the active pool (mirrors fa); Azure fil-PH Neural voices are
-  // listed dormant as a verified fallback (flip ttsProvider to 'azure').
-  fil: [...GEMINI_CORE, ...AZURE_VOICES_FIL_PH],
-  sv: [
-    ...buildChirp3Pool('sv-SE', 'Sweden'),
-    ...AZURE_VOICES_SV,
-    ...GEMINI_CORE,
-  ],
-  // nb: [...buildChirp3Pool('nb-NO', 'Norway')], // disabled — see SUPPORTED_LANGUAGES
+  // Gemini is the only pool (mirrors fa / pt_pt).
+  fil: [...GEMINI_CORE],
+  sv: [...buildChirp3Pool('sv-SE', 'Sweden'), ...GEMINI_CORE],
+  nb: [...buildChirp3Pool('nb-NO', 'Norway'), ...GEMINI_CORE],
   da: [...buildChirp3Pool('da-DK', 'Denmark'), ...GEMINI_CORE],
   fi: [...buildChirp3Pool('fi-FI', 'Finland'), ...GEMINI_CORE],
   nl: [...buildChirp3Pool('nl-NL', 'Netherlands'), ...GEMINI_CORE],
   el: [...buildChirp3Pool('el-GR', 'Greece'), ...GEMINI_CORE],
-  he: [...buildChirp3Pool('he-IL', 'Israel'), ...AZURE_VOICES_HE, ...GEMINI_CORE],
+  he: [...buildChirp3Pool('he-IL', 'Israel'), ...GEMINI_CORE],
+  // Jul 2026 expansion wave — all Gemini-only pools (locale pinned via each
+  // language's `geminiBcp47`; no Google Chirp3 pools were verified for these).
+  ca: [...GEMINI_CORE],
+  hr: [...GEMINI_CORE],
+  sl: [...GEMINI_CORE],
+  uk: [...GEMINI_CORE],
+  sr: [...GEMINI_CORE],
+  lt: [...GEMINI_CORE],
+  lv: [...GEMINI_CORE],
+  et: [...GEMINI_CORE],
+  ms: [...GEMINI_CORE],
+  ta: [...GEMINI_CORE],
+  te: [...GEMINI_CORE],
   // All Arabic dialects run on Gemini TTS: the global Arabic Gemini voice
   // (GEMINI_CORE) steered by `geminiBcp47` — `ar-001` for MSA/Saudi/Iraqi/
   // Levantine and the dedicated `ar-EG` for Egyptian — with each dialect named
@@ -387,19 +249,16 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   // gemini); switching a dialect's `ttsProvider` back re-activates them.
   ar: [...GEMINI_CORE, ...buildChirp3Pool('ar-XA', 'MSA')],
   ar_sa: [...GEMINI_CORE, ...buildChirp3Pool('ar-XA', 'MSA')],
-  ar_eg: [...GEMINI_CORE, ...AZURE_VOICES_AR_EG],
+  ar_eg: [...GEMINI_CORE],
   ar_iq: [...GEMINI_CORE, ...buildChirp3Pool('ar-XA', 'MSA')],
   ar_lev: [...GEMINI_CORE],
   // Persian runs on Gemini TTS (fa-IR). No Google Chirp3-HD fa voices, so
-  // Gemini is the active pool (mirrors pt_pt). Azure fa-IR Neural voices are a
-  // verified fallback: wrapped in activate() (createAzureVoice defaults to
-  // active:false) so flipping the language's ttsProvider to 'azure' actually
-  // surfaces them — without activate() the provider filter would resolve to an
-  // empty pool. They stay dormant while ttsProvider is 'gemini' because
-  // getVoicesForLanguage also filters by provider.
-  fa: [...GEMINI_CORE, ...activate(AZURE_VOICES_FA_IR)],
-  sw: [...activate(AZURE_VOICES_SW_KE), ...GEMINI_CORE],
-  sw_tz: [...activate(AZURE_VOICES_SW_TZ)],
+  // Gemini is the only pool (mirrors pt_pt).
+  fa: [...GEMINI_CORE],
+  sw: [...GEMINI_CORE],
+  // Tanzanian Swahili runs on Gemini TTS (sw-KE locale + 'Tanzanian Swahili'
+  // named in the prompt — Gemini has no sw-TZ locale).
+  sw_tz: [...GEMINI_CORE],
 };
 
 // ---------------------------------------------------------------------------

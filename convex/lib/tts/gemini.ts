@@ -18,8 +18,8 @@ const MODEL = 'google/gemini-3.1-flash-tts-preview';
 const ENDPOINT = 'https://openrouter.ai/api/v1/audio/speech';
 
 // Gemini PCM is 24 kHz / 16-bit / mono. 48 kbps mono MP3 keeps speech clear and
-// matches the azure provider's setting (lib/tts/azure.ts), which already passes
-// the same Azure STT validation roundtrip — ~25% smaller than 64 kbps and a
+// matches what the retired Azure TTS provider used, which already passed the
+// same Azure STT validation roundtrip — ~25% smaller than 64 kbps and a
 // fraction of the equivalent WAV.
 const PCM_SAMPLE_RATE = 24000;
 const MP3_KBPS = 48;

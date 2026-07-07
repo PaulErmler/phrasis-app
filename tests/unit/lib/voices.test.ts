@@ -80,11 +80,12 @@ describe('voice pools completeness', () => {
     }
   });
 
-  it('getAllVoicesByLanguageCode includes dormant voices (settings UI surface)', () => {
-    // Mandarin has dormant Azure Dragon HD voices in the curated pool.
+  it('getAllVoicesByLanguageCode includes non-active-provider voices (settings UI surface)', () => {
+    // Mandarin runs on Gemini but keeps its Google Chirp3 pool listed for a
+    // one-line revert; the full curated set must surface both providers.
     const all = getAllVoicesByLanguageCode('zh');
-    const hasDormant = all.some((v) => v.active === false);
-    expect(hasDormant).toBe(true);
+    expect(all.some((v) => v.provider === 'google')).toBe(true);
+    expect(all.some((v) => v.provider === 'gemini')).toBe(true);
   });
 
   it('every language has at least one active Google voice after dormancy filter', () => {
@@ -105,19 +106,6 @@ describe('Persian (fa) voice pool', () => {
     const active = getVoicesByLanguageCode('fa');
     expect(active.length).toBeGreaterThan(0);
     expect(active.every((v) => v.provider === 'gemini')).toBe(true);
-    // The Azure fallback must NOT surface while ttsProvider is 'gemini'.
-    expect(active.some((v) => v.provider === 'azure')).toBe(false);
-  });
-
-  it('keeps the Azure fa-IR fallback in the full curated set', () => {
-    const all = getAllVoicesByLanguageCode('fa');
-    const azure = all.filter((v) => v.provider === 'azure');
-    expect(azure.map((v) => v.apiCode).sort()).toEqual([
-      'fa-IR-DilaraNeural',
-      'fa-IR-FaridNeural',
-    ]);
-    // Wrapped in activate() so flipping ttsProvider to 'azure' would surface them.
-    expect(azure.every((v) => v.active === true)).toBe(true);
   });
 });
 

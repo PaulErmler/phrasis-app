@@ -62,6 +62,18 @@ const EXPECTED_GEMINI: Record<string, string> = {
   fil: 'fil-PH',
   sw: 'sw-KE',
   sw_tz: 'sw-KE',
+  nb: 'nb-NO',
+  ca: 'ca-ES',
+  ms: 'ms-MY',
+  hr: 'hr-HR',
+  sl: 'sl-SI',
+  uk: 'uk-UA',
+  sr: 'sr-RS',
+  lt: 'lt-LT',
+  lv: 'lv-LV',
+  et: 'et-EE',
+  ta: 'ta-IN',
+  te: 'te-IN',
 };
 
 describe('toGeminiBcp47', () => {

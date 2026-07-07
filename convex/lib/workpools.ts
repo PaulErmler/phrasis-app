@@ -35,7 +35,7 @@ export const llmPool = new Workpool(components.llmPool, {
 });
 
 /**
- * TTS synthesis pool, shared by all providers (google / azure / gemini).
+ * TTS synthesis pool, shared by all providers (google / gemini).
  * Throughput is rate-limiter-bound, not parallelism-bound, so a single pool
  * suffices; a throttled provider can't starve the others because workers
  * THROW (freeing the slot) instead of sleeping when the projected token wait

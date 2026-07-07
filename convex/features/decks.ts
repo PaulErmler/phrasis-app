@@ -1500,10 +1500,6 @@ export const prepareCardContent = internalMutation({
     textId: v.id('texts'),
     baseLanguages: v.array(v.string()),
     targetLanguages: v.array(v.string()),
-    // DEPRECATED (pre-workpool): the pools are FIFO, priority tiers are gone.
-    // Accepted so invocations scheduled before the migration still validate;
-    // ignored.
-    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1561,10 +1557,6 @@ export const processTranslationForCard = internalAction({
     targetLanguage: v.string(),
     text: v.string(),
     audioSpeakerGender: v.optional(v.string()),
-    // DEPRECATED (pre-workpool): pools are FIFO, priority tiers are gone.
-    // Accepted so invocations scheduled before the migration still validate;
-    // ignored.
-    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
     /**
      * Retranslation flag. Set when this action is dispatched as the
      * Google fallback for a deliberate LLM retranslation (flagTranslation
@@ -1910,8 +1902,9 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       // Fill-if-missing: stamp legacy rows (written before the field existed) at
       // BASELINE, not the current version. This branch keeps the row's OLD
       // translatedText, so it must stay regenerable by a future translationVersion
-      // bump — matching backfillContentVersions, which stamps legacy rows at v1 so
-      // `baseline < bumped = stale`. Stamping the current version here would mark
+      // bump — matching the one-time content-version backfill, which stamped
+      // legacy rows at v1 so `baseline < bumped = stale`. Stamping the current
+      // version here would mark
       // stale content as already up-to-date and silently defeat the bump. Only the
       // insert and replaceExisting branches (fresh content) stamp the current version.
       if (existing.translationVersion === undefined) {

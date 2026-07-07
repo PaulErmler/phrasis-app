@@ -244,10 +244,9 @@ export default defineSchema({
     // treat rows with a strictly-lower stamped version as stale and regenerate
     // them lazily on next view. Optional + "undefined === current" semantics:
     // a missing stamp is NEVER treated as stale (only a number strictly < the
-    // current version is), so un-backfilled rows don't mass-regenerate. The
-    // one-time `backfillContentVersions` migration stamps existing rows to the
-    // baseline (v1) — they all predate the versioning system, so a later bump
-    // correctly marks them stale. User-provided / userCreated translations are
+    // current version is), so un-backfilled rows don't mass-regenerate. Rows
+    // predating the versioning system were stamped to the baseline (v1) by a
+    // one-time backfill, so a later bump correctly marks them stale. User-provided / userCreated translations are
     // skipped by the regen sweep regardless.
     translationVersion: v.optional(v.number()),
   })
@@ -283,8 +282,8 @@ export default defineSchema({
     // stamped version. This is what regenerates audio after a prompt-only change
     // on an already-Gemini language (e.g. pt_pt's `ttsPromptName`), where the
     // provider-mismatch path wouldn't fire. Same "undefined === current"
-    // semantics as `translations.translationVersion`; backfilled to baseline
-    // (v1) by the one-time `backfillContentVersions` migration, so a later
+    // semantics as `translations.translationVersion`; pre-versioning rows were
+    // backfilled to baseline (v1) by a one-time migration, so a later
     // ttsVersion bump correctly regenerates pre-existing audio.
     ttsVersion: v.optional(v.number()),
   })
@@ -724,89 +723,6 @@ export default defineSchema({
     workId: v.optional(v.string()),
   }).index('by_text_and_language', ['textId', 'language']),
 
-  // LEGACY (phase-2 removal): superseded by the ttsPool workpool. Kept only
-  // so pre-migration rows keep validating until `drainLegacyQueues` has run
-  // and a cleanup deploy drops the table.
-  ttsProviderSlots: defineTable({
-    provider: ttsProviderValidator,
-    claimedAt: v.number(),
-  }).index('by_provider', ['provider']),
-
-  // LEGACY (phase-2 removal): superseded by the ttsPool workpool. Remaining
-  // rows are moved into the pool by `drainLegacyQueues`; a cleanup deploy
-  // then drops the table.
-  ttsQueue: defineTable({
-    provider: ttsProviderValidator,
-    args: v.object({
-      textId: v.id('texts'),
-      text: v.string(),
-      language: v.string(),
-      voiceName: v.string(),
-      voiceGender: voiceGenderValidator,
-      speed: v.number(),
-      // Azure STT locale forwarded to `processTTSForCard` for mixed-dialect
-      // rows. Optional; set when the translation row has a `regionVariant`.
-      regionVariant: v.optional(v.string()),
-      // Number of prior `processTTSForCard` failures for this job. When the
-      // action throws (synthesis / storage / transcription error), it
-      // re-enqueues with this incremented. Bounded retries prevent silent
-      // permanent failures (translation lands, audio never does) without
-      // requiring an external cron sweep.
-      failureCount: v.optional(v.number()),
-    }),
-    queuedAt: v.number(),
-    priority: v.optional(v.number()),
-  })
-    .index('by_provider_priority_and_queuedAt', [
-      'provider',
-      'priority',
-      'queuedAt',
-    ]),
-
-  // LEGACY (phase-2 removal): superseded by the llmPool workpool. Remaining
-  // rows are moved into the pool by `drainLegacyQueues`; a cleanup deploy
-  // then drops the table.
-  llmTranslationQueue: defineTable({
-    args: v.object({
-      textId: v.id('texts'),
-      sourceLanguage: v.string(),
-      targetLanguage: v.string(),
-      text: v.string(),
-      audioSpeakerGender: v.optional(v.string()),
-      // Optional translation-rule override forwarded by `flagTranslation` to
-      // force the `retranslation_high` chain. Worker validates the string
-      // against `TRANSLATION_RULES` and falls back to the language's normal
-      // rule on unknown values. Must be optional so existing queue rows
-      // (and the standard `scheduleMissingContent` enqueue path) keep
-      // validating.
-      ruleOverride: v.optional(v.string()),
-      // Retranslation flag for deliberate overwrites. See the
-      // storeTranslationAndScheduleTTS docstring for replacement semantics.
-      // Optional so pre-flag queue rows still validate.
-      replaceExisting: v.optional(v.boolean()),
-      // Number of prior failed LLM attempts for this job. On an LLM failure the
-      // worker re-enqueues with this incremented (up to MAX_LLM_RETRIES) before
-      // falling back to Google Translate — so a transient LLM hiccup is retried
-      // on the quality path rather than immediately downgrading to Google.
-      // Mirrors `ttsQueue.args.failureCount`. Optional so pre-existing rows validate.
-      failureCount: v.optional(v.number()),
-      // Ownership token: the `llmTranslationClaims` `_id` this job was dispatched
-      // under. The worker uses it to detect a concurrent reclaim (claim reissued
-      // with a new `_id`) and skip its write/finalize so it can't clobber the new
-      // owner. Mirrors the queue module's `llmJobArgsValidator.claimId`. Optional
-      // so pre-existing / pre-flag queue rows still validate.
-      claimId: v.optional(v.id('llmTranslationClaims')),
-    }),
-    queuedAt: v.number(),
-    priority: v.optional(v.number()),
-  })
-    .index('by_priority_and_queuedAt', ['priority', 'queuedAt']),
-
-  // LEGACY (phase-2 removal): superseded by the llmPool workpool.
-  llmTranslationSlots: defineTable({
-    claimedAt: v.number(),
-  }),
-
   // Per-(textId, language) dedup claim. Atomically check-and-insert before
   // scheduling so two mutations can't enqueue the same translation twice.
   // Lives from enqueue until the pool job's onComplete deletes it (the
@@ -819,14 +735,6 @@ export default defineSchema({
     // ttsGenerationClaims.workId comment.
     workId: v.optional(v.string()),
   }).index('by_text_and_language', ['textId', 'targetLanguage']),
-
-  // LEGACY (phase-2 removal): the workpools own their scheduling; no pump
-  // flags remain. Rows are wiped by `drainLegacyQueues`.
-  queuePumpStates: defineTable({
-    key: v.string(),
-    pumpScheduled: v.boolean(),
-    pumpScheduledFor: v.number(),
-  }).index('by_key', ['key']),
 
   // Daily per-language stats
   dailyLanguageStats: defineTable({
@@ -998,8 +906,8 @@ export default defineSchema({
 
   // App-owned mirror of Better Auth users (email/name live in the betterAuth
   // component tables, which can't be indexed/searched from app queries).
-  // Kept in sync by user triggers in convex/auth.ts; historical rows come
-  // from migrations/backfillUserProfiles. Powers the admin user list/search.
+  // Kept in sync by user triggers in convex/auth.ts; historical rows were
+  // seeded by a one-time backfill. Powers the admin user list/search.
   userProfiles: defineTable({
     userId: v.string(), // Better Auth user._id === identity.subject
     email: v.string(),

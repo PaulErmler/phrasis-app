@@ -54,6 +54,18 @@ const EXPECTED_COMPARE: Record<string, { locale: string; hasWordBoundaries: bool
   fil: { locale: 'fil', hasWordBoundaries: true },
   sw: { locale: 'sw-KE', hasWordBoundaries: true },
   sw_tz: { locale: 'sw-TZ', hasWordBoundaries: true },
+  nb: { locale: 'nb', hasWordBoundaries: true },
+  ca: { locale: 'ca', hasWordBoundaries: true },
+  ms: { locale: 'ms', hasWordBoundaries: true },
+  hr: { locale: 'hr', hasWordBoundaries: true },
+  sl: { locale: 'sl', hasWordBoundaries: true },
+  uk: { locale: 'uk', hasWordBoundaries: true },
+  sr: { locale: 'sr', hasWordBoundaries: true },
+  lt: { locale: 'lt', hasWordBoundaries: true },
+  lv: { locale: 'lv', hasWordBoundaries: true },
+  et: { locale: 'et', hasWordBoundaries: true },
+  ta: { locale: 'ta', hasWordBoundaries: true },
+  te: { locale: 'te', hasWordBoundaries: true },
 };
 
 describe('getCompareConfig', () => {

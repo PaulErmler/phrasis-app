@@ -343,9 +343,10 @@ describe('content versioning', () => {
 
   describe('getCurrent*Version defaults', () => {
     it('defaults to DEFAULT_CONTENT_VERSION for a language without an explicit version', () => {
-      // `it` has no translationVersion/ttsVersion override.
-      expect(getCurrentTranslationVersion('it')).toBe(DEFAULT_CONTENT_VERSION);
-      expect(getCurrentTtsVersion('it')).toBe(DEFAULT_CONTENT_VERSION);
+      // `en` has no translationVersion/ttsVersion override (English is
+      // source-only, so it never got the 3.5 Flash translationVersion bump).
+      expect(getCurrentTranslationVersion('en')).toBe(DEFAULT_CONTENT_VERSION);
+      expect(getCurrentTtsVersion('en')).toBe(DEFAULT_CONTENT_VERSION);
     });
     it('returns bumped translationVersion for de (Gemini 3.5 Flash Nitro rollout)', () => {
       expect(getCurrentTranslationVersion('de')).toBe(2);
