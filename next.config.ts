@@ -25,6 +25,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // `pnpm analyze` builds with browser source maps so chunk composition can be
+  // inspected (e.g. `pnpm dlx source-map-explorer '.next/static/chunks/*.js'`).
+  productionBrowserSourceMaps: process.env.ANALYZE === '1',
   async headers() {
     return [
       {
