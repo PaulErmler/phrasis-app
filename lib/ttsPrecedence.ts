@@ -13,12 +13,15 @@
  */
 import type { TtsProvider } from './languages';
 
+// 'azure' and 'elevenlabs' are retired (tombstones in TtsProvider); their rows
+// only appear as EXISTING audio, never as the current provider. Their entries
+// stay because this Record is keyed by the full TtsProvider union, and 'azure'
+// must stay in gemini's list so legacy Azure audio regenerates on Gemini.
 export const TTS_PROVIDER_OVERRIDES: Record<TtsProvider, readonly TtsProvider[]> = {
   google: ['azure'],
   elevenlabs: [],
   azure: ['elevenlabs'],
-  // Gemini is the top provider for every language routed to it (a growing set —
-  // English/Spanish/Arabic variants, pt_pt, de, sv, fil, fa, …): a switch to
+  // Gemini is the top provider for every language routed to it: a switch to
   // Gemini deletes + re-synthesizes any prior audio from every other provider.
   // Nothing lists 'gemini' as overridable, so Gemini audio is never clobbered by
   // google/azure/elevenlabs.

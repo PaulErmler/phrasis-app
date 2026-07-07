@@ -2,7 +2,7 @@ import type { ActionCtx } from '../_generated/server';
 import { rateLimiter } from '../rateLimiter';
 
 /** Names of the token buckets configured on the shared rate limiter. */
-export type RateLimitName = 'googleTts' | 'azureTts' | 'geminiTts' | 'azureStt';
+export type RateLimitName = 'googleTts' | 'geminiTts' | 'azureStt';
 
 /**
  * Reserve one token from `name`'s bucket before a provider HTTP call, waiting

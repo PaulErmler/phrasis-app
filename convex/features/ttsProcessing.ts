@@ -297,10 +297,6 @@ const ttsJobArgsValidator = v.object({
   // STT call uses the same locale the voice was synthesized in. Plumbed
   // through enqueueTtsJob from `storeTranslationAndScheduleTTS`.
   regionVariant: v.optional(v.string()),
-  // DEPRECATED (pre-workpool): retries are pool-owned now. Accepted so
-  // in-flight retry enqueues scheduled before the migration still validate;
-  // ignored.
-  failureCount: v.optional(v.number()),
 });
 
 type TtsJobArgs = Infer<typeof ttsJobArgsValidator>;
@@ -328,66 +324,44 @@ export const processTTSForCard = internalAction({
   args: {
     ...ttsJobArgsValidator.fields,
     provider: ttsProviderValidator,
-    // DEPRECATED (pre-workpool): slot bookkeeping is pool-owned now. Present
-    // only on in-flight jobs scheduled before the migration; when set, the
-    // legacy finalizer below releases the old slot row + claim.
-    slotId: v.optional(v.id('ttsProviderSlots')),
   },
   returns: v.null(),
   handler: async (
     ctx: ActionCtx,
-    args: TtsJobArgs & {
-      provider: TtsProvider;
-      slotId?: Id<'ttsProviderSlots'>;
-    },
+    args: TtsJobArgs & { provider: TtsProvider },
   ) => {
-    try {
-      const { validated, lastStorageId, wordTimings } =
-        await synthesizeAndValidate(ctx, args, MAX_TTS_VALIDATION_ATTEMPTS);
+    const { validated, lastStorageId, wordTimings } =
+      await synthesizeAndValidate(ctx, args, MAX_TTS_VALIDATION_ATTEMPTS);
 
-      if (!validated) {
-        console.error(
-          `[ttsProcess] Validation failed after ${MAX_TTS_VALIDATION_ATTEMPTS} attempts — marking as unvalidated`,
-          { textId: args.textId, language: args.language, text: args.text },
-        );
-      }
+    if (!validated) {
+      console.error(
+        `[ttsProcess] Validation failed after ${MAX_TTS_VALIDATION_ATTEMPTS} attempts — marking as unvalidated`,
+        { textId: args.textId, language: args.language, text: args.text },
+      );
+    }
 
-      // Use storeAudioRecording (upsert) so that if the row was deleted mid-flight
-      // by the stale-storage cleanup, it gets recreated rather than silently lost.
-      // lastStorageId is the blob already in the row, so no old blob is deleted.
-      if (lastStorageId !== null) {
-        await ctx.runMutation(internal.features.decks.storeAudioRecording, {
-          textId: args.textId,
-          language: args.language,
-          voiceName: args.voiceName,
-          storageId: lastStorageId,
-          ttsQuality: validated ? ('validated' as const) : ('unvalidated' as const),
-          ttsProvider: args.provider,
-          voiceGender: args.voiceGender,
-          speed: args.speed,
-          // Only persist timings alongside validated audio — mismatched
-          // transcriptions point to the wrong words.
-          wordTimings: validated && wordTimings ? wordTimings : undefined,
-        });
-      } else {
-        console.error('[ttsProcess] No storageId produced, audio will be missing', {
-          textId: args.textId,
-          language: args.language,
-        });
-      }
-    } finally {
-      // LEGACY: jobs scheduled before the workpool migration carry a slotId
-      // and have no pool onComplete — release their slot row + claim here so
-      // they don't strand state. Pool jobs (no slotId) skip this; their claim
-      // is released by onTtsJobComplete.
-      if (args.slotId !== undefined) {
-        await ctx.runMutation(internal.features.ttsProcessing.finalizeTtsJob, {
-          slotId: args.slotId,
-          provider: args.provider,
-          textId: args.textId,
-          language: args.language,
-        });
-      }
+    // Use storeAudioRecording (upsert) so that if the row was deleted mid-flight
+    // by the stale-storage cleanup, it gets recreated rather than silently lost.
+    // lastStorageId is the blob already in the row, so no old blob is deleted.
+    if (lastStorageId !== null) {
+      await ctx.runMutation(internal.features.decks.storeAudioRecording, {
+        textId: args.textId,
+        language: args.language,
+        voiceName: args.voiceName,
+        storageId: lastStorageId,
+        ttsQuality: validated ? ('validated' as const) : ('unvalidated' as const),
+        ttsProvider: args.provider,
+        voiceGender: args.voiceGender,
+        speed: args.speed,
+        // Only persist timings alongside validated audio — mismatched
+        // transcriptions point to the wrong words.
+        wordTimings: validated && wordTimings ? wordTimings : undefined,
+      });
+    } else {
+      console.error('[ttsProcess] No storageId produced, audio will be missing', {
+        textId: args.textId,
+        language: args.language,
+      });
     }
 
     return null;
@@ -410,18 +384,11 @@ export const enqueueTtsJob = internalMutation({
   args: {
     provider: ttsProviderValidator,
     args: ttsJobArgsValidator,
-    // DEPRECATED (pre-workpool): pools are FIFO, priority tiers are gone.
-    // Accepted so in-flight retry enqueues scheduled before the migration
-    // still validate; ignored.
-    priority: v.optional(v.union(v.literal(0), v.literal(1), v.literal(2))),
   },
   returns: v.null(),
   handler: async (
     ctx: MutationCtx,
-    {
-      provider,
-      args,
-    }: { provider: TtsProvider; args: TtsJobArgs; priority?: 0 | 1 | 2 },
+    { provider, args }: { provider: TtsProvider; args: TtsJobArgs },
   ) => {
     const claim = await ctx.db
       .query('ttsGenerationClaims')
@@ -432,8 +399,8 @@ export const enqueueTtsJob = internalMutation({
     // A fresh claim already stamped with another job's workId means a live
     // pool job owns this (textId, language): enqueueing again would synthesize
     // twice and hijack that job's claim. Unreachable from the claim-then-
-    // enqueue callers (their fresh claim is workId-less); guards
-    // `drainLegacyQueues`, which re-enqueues legacy rows without re-claiming.
+    // enqueue callers (their fresh claim is workId-less); kept as a guard
+    // against callers that enqueue without re-claiming.
     if (
       claim &&
       claim.workId !== undefined &&
@@ -701,52 +668,6 @@ export const releaseTtsClaim = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const claim = await ctx.db
-      .query('ttsGenerationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', args.language),
-      )
-      .first();
-    if (claim && claim.workId === undefined) {
-      await ctx.db.delete(claim._id);
-    }
-    return null;
-  },
-});
-
-// ─── Legacy stubs (phase-2 removal) ─────────────────────────────────────────
-// The pre-workpool queue scheduled these by reference. They must keep
-// existing (and validating) until no scheduled invocation from before the
-// migration can still fire; a cleanup deploy then deletes them.
-
-/** LEGACY no-op: the workpool owns dispatch now. */
-export const pumpQueue = internalMutation({
-  args: { provider: ttsProviderValidator },
-  returns: v.null(),
-  handler: async () => null,
-});
-
-/**
- * LEGACY: cleanup callback of pre-migration in-flight worker jobs. Frees the
- * old slot row and the claim, so pre-deploy jobs finishing after the deploy
- * don't strand state. Only claims without a `workId` are released — pool
- * claims belong to their job's onComplete.
- */
-export const finalizeTtsJob = internalMutation({
-  args: {
-    slotId: v.id('ttsProviderSlots'),
-    provider: ttsProviderValidator,
-    textId: v.id('texts'),
-    language: v.string(),
-    keepClaim: v.optional(v.boolean()),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const slot = await ctx.db.get(args.slotId);
-    if (slot) {
-      await ctx.db.delete(args.slotId);
-    }
-    if (args.keepClaim) return null;
     const claim = await ctx.db
       .query('ttsGenerationClaims')
       .withIndex('by_text_and_language', (q) =>

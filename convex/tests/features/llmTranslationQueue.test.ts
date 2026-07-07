@@ -130,29 +130,6 @@ describe("features/llmTranslationQueue", () => {
       expect(claim?.claimedAt).toBeGreaterThan(claimedBefore);
     });
 
-    it("writes no legacy queue row and schedules no pump relay", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      await t.mutation(
-        internal.features.llmTranslationQueue.enqueueLlmTranslation,
-        { args: baseArgs(textId) },
-      );
-
-      const queueRows = await t.run(async (ctx) =>
-        ctx.db.query("llmTranslationQueue").collect(),
-      );
-      expect(queueRows.length).toBe(0);
-      const scheduled = await t.run(async (ctx) =>
-        ctx.db.system.query("_scheduled_functions").collect(),
-      );
-      expect(
-        scheduled.filter(
-          (s) =>
-            s.name.includes("pumpLlmQueue") || s.name.includes("requestPump"),
-        ).length,
-      ).toBe(0);
-    });
-
     it("still enqueues when no claim is held (nothing to stamp)", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
@@ -162,16 +139,6 @@ describe("features/llmTranslationQueue", () => {
       );
       expect(mockEnqueue).toHaveBeenCalledTimes(1);
       expect(await getClaim(t, textId)).toBeNull();
-    });
-
-    it("accepts and ignores the deprecated priority tier", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      await t.mutation(
-        internal.features.llmTranslationQueue.enqueueLlmTranslation,
-        { args: baseArgs(textId), priority: 1 },
-      );
-      expect(mockEnqueue).toHaveBeenCalledTimes(1);
     });
 
     it("skips enqueueing when a fresh claim is owned by another live job", async () => {
@@ -193,8 +160,8 @@ describe("features/llmTranslationQueue", () => {
       );
 
       // No duplicate job, and the live owner keeps its claim untouched —
-      // the drainLegacyQueues path re-enqueues rows without re-claiming, so
-      // this guard is what stops it hijacking an in-flight job's claim.
+      // this guard stops an enqueue that doesn't re-claim from hijacking an
+      // in-flight job's claim.
       expect(mockEnqueue).not.toHaveBeenCalled();
       const claim = await getClaim(t, textId);
       expect(claim?.workId).toBe("live-owner");
@@ -722,32 +689,6 @@ describe("features/llmTranslationQueue", () => {
       expect(vi.mocked(generateText)).not.toHaveBeenCalled();
     });
 
-    it("legacy pre-migration job (slotId set): releases the slot row and the workId-less claim", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      const slotId = await t.run(async (ctx) => {
-        await ctx.db.insert("llmTranslationClaims", {
-          textId,
-          targetLanguage: "de",
-          claimedAt: Date.now(),
-        });
-        return ctx.db.insert("llmTranslationSlots", { claimedAt: Date.now() });
-      });
-
-      mockGenerateTextOk("Haben Sie ins Handschuhfach geschaut?");
-
-      await t.action(
-        internal.features.llmTranslationQueue.processLlmTranslationForCard,
-        { ...baseArgs(textId), slotId },
-      );
-
-      // Legacy jobs have no pool onComplete — the worker's finally releases
-      // their slot row + workId-less claim via the legacy finalizer (mirrors
-      // processTTSForCard). Pool jobs (no slotId) skip this.
-      expect(await t.run((ctx) => ctx.db.get(slotId))).toBeNull();
-      expect(await getClaim(t, textId)).toBeNull();
-    });
-
     it("omits <addressee_gender> and <register> from the prompt when addressesSomeone=false", async () => {
       const t = convexTest(schema, modules);
       // Seed a descriptive sentence — addressesSomeone=false.
@@ -791,235 +732,4 @@ describe("features/llmTranslationQueue", () => {
     });
   });
 
-  describe("finalizeLlmTranslationJob (legacy stub)", () => {
-    it("with slotId: deletes exactly that slot, leaving others untouched", async () => {
-      // Regression test for the OCC-failure hotspot: releasing "the oldest"
-      // slot made every concurrent finalizer read+delete the same head row.
-      // With slotId, each finalizer's write set is its own row.
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      const { mine, other } = await t.run(async (ctx) => {
-        const mine = await ctx.db.insert("llmTranslationSlots", {
-          claimedAt: Date.now(),
-        });
-        const other = await ctx.db.insert("llmTranslationSlots", {
-          claimedAt: Date.now() - 5_000,
-        });
-        return { mine, other };
-      });
-
-      await t.mutation(
-        internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
-        { textId, targetLanguage: "de", slotId: mine },
-      );
-
-      expect(await t.run(async (ctx) => ctx.db.get(mine))).toBeNull();
-      expect(await t.run(async (ctx) => ctx.db.get(other))).not.toBeNull();
-    });
-
-    it("with an already-reclaimed slotId: deletes no other slot", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      const { gone, survivor } = await t.run(async (ctx) => {
-        const gone = await ctx.db.insert("llmTranslationSlots", {
-          claimedAt: Date.now(),
-        });
-        // Simulate a pump stale-reclaiming the slot mid-flight.
-        await ctx.db.delete(gone);
-        const survivor = await ctx.db.insert("llmTranslationSlots", {
-          claimedAt: Date.now(),
-        });
-        return { gone, survivor };
-      });
-
-      await expect(
-        t.mutation(
-          internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
-          { textId, targetLanguage: "de", slotId: gone },
-        ),
-      ).resolves.toBeNull();
-
-      expect(await t.run(async (ctx) => ctx.db.get(survivor))).not.toBeNull();
-    });
-
-    it("without slotId: touches no slot rows but releases the workId-less claim", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      await t.run(async (ctx) => {
-        await ctx.db.insert("llmTranslationSlots", { claimedAt: Date.now() });
-        await ctx.db.insert("llmTranslationSlots", { claimedAt: Date.now() });
-        await ctx.db.insert("llmTranslationClaims", {
-          textId,
-          targetLanguage: "de",
-          claimedAt: Date.now(),
-        });
-      });
-
-      await t.mutation(
-        internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
-        { textId, targetLanguage: "de" },
-      );
-
-      const slots = await t.run(async (ctx) =>
-        ctx.db.query("llmTranslationSlots").collect(),
-      );
-      expect(slots.length).toBe(2);
-      expect(await getClaim(t, textId)).toBeNull();
-    });
-
-    it("does NOT release a pool-owned claim (workId set)", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      await t.run(async (ctx) => {
-        await ctx.db.insert("llmTranslationClaims", {
-          textId,
-          targetLanguage: "de",
-          claimedAt: Date.now(),
-          workId: "pool-owner",
-        });
-      });
-
-      await t.mutation(
-        internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
-        { textId, targetLanguage: "de" },
-      );
-
-      expect((await getClaim(t, textId))?.workId).toBe("pool-owner");
-    });
-
-    it("is idempotent — no slot, no claim → no-op (no throw)", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      await expect(
-        t.mutation(
-          internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
-          { textId, targetLanguage: "de" },
-        ),
-      ).resolves.toBeNull();
-    });
-
-    it("leaves a claim for a DIFFERENT (textId, lang) untouched", async () => {
-      const t = convexTest(schema, modules);
-      const { textId: t1 } = await seedText(t);
-      const { textId: t2 } = await seedText(t);
-      await t.run(async (ctx) => {
-        await ctx.db.insert("llmTranslationClaims", {
-          textId: t1,
-          targetLanguage: "de",
-          claimedAt: Date.now(),
-        });
-        await ctx.db.insert("llmTranslationClaims", {
-          textId: t2,
-          targetLanguage: "de",
-          claimedAt: Date.now(),
-        });
-      });
-      await t.mutation(
-        internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
-        { textId: t1, targetLanguage: "de" },
-      );
-      expect(await getClaim(t, t2)).not.toBeNull();
-    });
-
-    it("with keepClaim=true leaves the claim untouched (no delete, no refresh)", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      const staleAt = Date.now() - 10_000;
-      const claimId = await t.run(async (ctx) =>
-        ctx.db.insert("llmTranslationClaims", {
-          textId,
-          targetLanguage: "de",
-          claimedAt: staleAt,
-        }),
-      );
-
-      await t.mutation(
-        internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
-        { textId, targetLanguage: "de", keepClaim: true, claimId },
-      );
-
-      const claim = await t.run(async (ctx) => ctx.db.get(claimId));
-      expect(claim).not.toBeNull();
-      expect(claim!.claimedAt).toBe(staleAt);
-    });
-
-    it("leaves a FOREIGN claim (reclaimed mid-call → different _id) untouched", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      // Simulate: this attempt was dispatched under `staleClaimId`, but a
-      // concurrent reconcile deleted+reinserted the claim, so the current row
-      // has a new _id. finalize must NOT delete the new owner's claim.
-      const { staleClaimId, currentClaimId } = await t.run(async (ctx) => {
-        const staleClaimId = await ctx.db.insert("llmTranslationClaims", {
-          textId,
-          targetLanguage: "de",
-          claimedAt: Date.now() - 10_000,
-        });
-        await ctx.db.delete(staleClaimId);
-        const currentClaimId = await ctx.db.insert("llmTranslationClaims", {
-          textId,
-          targetLanguage: "de",
-          claimedAt: Date.now(),
-        });
-        return { staleClaimId, currentClaimId };
-      });
-
-      await t.mutation(
-        internal.features.llmTranslationQueue.finalizeLlmTranslationJob,
-        {
-          textId,
-          targetLanguage: "de",
-          keepClaim: false,
-          claimId: staleClaimId,
-        },
-      );
-
-      expect(
-        await t.run(async (ctx) => ctx.db.get(currentClaimId)),
-      ).not.toBeNull();
-    });
-  });
-
-  describe("pumpLlmQueue (legacy no-op stub)", () => {
-    it("dispatches nothing and leaves legacy tables untouched", async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      await t.run(async (ctx) => {
-        await ctx.db.insert("llmTranslationSlots", { claimedAt: Date.now() });
-        await ctx.db.insert("llmTranslationQueue", {
-          args: {
-            textId,
-            sourceLanguage: "en",
-            targetLanguage: "de",
-            text: "Hi.",
-            audioSpeakerGender: "male",
-          },
-          queuedAt: Date.now(),
-        });
-      });
-
-      const res = await t.mutation(
-        internal.features.llmTranslationQueue.pumpLlmQueue,
-        {},
-      );
-      expect(res).toBeNull();
-
-      const queue = await t.run(async (ctx) =>
-        ctx.db.query("llmTranslationQueue").collect(),
-      );
-      const slots = await t.run(async (ctx) =>
-        ctx.db.query("llmTranslationSlots").collect(),
-      );
-      expect(queue.length).toBe(1);
-      expect(slots.length).toBe(1);
-      const scheduled = await t.run(async (ctx) =>
-        ctx.db.system.query("_scheduled_functions").collect(),
-      );
-      expect(
-        scheduled.filter((s) => s.name.includes("processLlmTranslationForCard"))
-          .length,
-      ).toBe(0);
-      expect(mockEnqueue).not.toHaveBeenCalled();
-    });
-  });
 });

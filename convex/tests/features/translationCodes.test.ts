@@ -55,6 +55,20 @@ const EXPECTED_GOOGLE: Record<string, string> = {
   fil: 'tl',
   sw: 'sw',
   sw_tz: 'sw',
+  // Jul 2026 expansion — all pass-through except Norwegian (Google Translate
+  // v2 catalogs Bokmål under 'no').
+  nb: 'no',
+  ca: 'ca',
+  ms: 'ms',
+  hr: 'hr',
+  sl: 'sl',
+  uk: 'uk',
+  sr: 'sr',
+  lt: 'lt',
+  lv: 'lv',
+  et: 'et',
+  ta: 'ta',
+  te: 'te',
 };
 
 describe('toGoogleTranslateCode', () => {
