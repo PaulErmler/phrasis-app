@@ -965,6 +965,11 @@
       "loading": "Loading…",
       "noSentence": "No sentence at this level.",
       "translationNotReady": "Translation not ready yet for this language. Try answering anyway.",
+      "contentRetry": {
+        "message": "Some content couldn't be prepared for this language.",
+        "button": "Retry",
+        "failed": "Preparing content failed. Please retry."
+      },
       "tapReveal": "Tap reveal below to see the translation.",
       "reveal": "Reveal translation",
       "iDidntKnow": "I didn't know",

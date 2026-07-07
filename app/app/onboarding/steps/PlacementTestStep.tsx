@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Volume2, EyeOff } from 'lucide-react';
+import { Volume2, EyeOff, RefreshCw } from 'lucide-react';
+import { toast } from 'sonner';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import {
   createStrategy,
@@ -179,22 +180,54 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
 
   // Safety-net: if the placement sentence resolved but any of (translation,
   // source audio, target audio) is missing, fire `ensurePlacementTranslations`
-  // once per language. The mutation now routes through `scheduleMissingContent`,
+  // once per language. The mutation routes through `scheduleMissingContent`,
   // so it covers all three content kinds for every placement sentence in one
   // pass. Fully idempotent on the server.
+  //
+  // Failure handling: one silent automatic retry after 3s, then a visible
+  // inline retry row + toast — previously a failure was swallowed and never
+  // retried for the language, leaving the placement test content-less with
+  // zero feedback.
   const ensureTranslations = useMutation(api.features.onboarding.ensurePlacementTranslations);
   const ensuredForLanguageRef = useRef<string | null>(null);
+  const [ensureStatus, setEnsureStatus] = useState<
+    'idle' | 'pending' | 'retry-scheduled' | 'error'
+  >('idle');
+  const autoRetriedRef = useRef(false);
   const contentMissing =
     sentence != null &&
     (!sentence.targetText ||
       !sentence.sourceAudioUrl ||
       !sentence.targetAudioUrl);
+
+  const runEnsureTranslations = useCallback(() => {
+    setEnsureStatus('pending');
+    ensureTranslations({ targetLanguage, sourceLanguage })
+      .then(() => setEnsureStatus('idle'))
+      .catch(() => {
+        if (!autoRetriedRef.current) {
+          autoRetriedRef.current = true;
+          setEnsureStatus('retry-scheduled');
+        } else {
+          setEnsureStatus('error');
+          toast.error(t('contentRetry.failed'));
+        }
+      });
+  }, [ensureTranslations, targetLanguage, sourceLanguage, t]);
+
   useEffect(() => {
     if (!contentMissing) return;
     if (ensuredForLanguageRef.current === targetLanguage) return;
     ensuredForLanguageRef.current = targetLanguage;
-    ensureTranslations({ targetLanguage, sourceLanguage }).catch(() => {});
-  }, [contentMissing, targetLanguage, sourceLanguage, ensureTranslations]);
+    autoRetriedRef.current = false;
+    runEnsureTranslations();
+  }, [contentMissing, targetLanguage, runEnsureTranslations]);
+
+  useEffect(() => {
+    if (ensureStatus !== 'retry-scheduled') return;
+    const id = setTimeout(runEnsureTranslations, 3000);
+    return () => clearTimeout(id);
+  }, [ensureStatus, runEnsureTranslations]);
 
   // Auto-play target audio on reveal.
   const targetAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -348,6 +381,24 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
                 </button>
               )}
             </div>
+
+            {contentMissing && ensureStatus === 'error' ? (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
+                <span className="text-xs text-muted-foreground text-left">
+                  {t('contentRetry.message')}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={runEnsureTranslations}
+                  data-testid="placement-content-retry"
+                >
+                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  {t('contentRetry.button')}
+                </Button>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       </div>

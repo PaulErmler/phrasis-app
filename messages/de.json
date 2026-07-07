@@ -962,6 +962,11 @@
       "loading": "Lädt…",
       "noSentence": "Auf diesem Level gibt es keinen Satz.",
       "translationNotReady": "Die Übersetzung für diese Sprache ist noch nicht bereit. Versuche es trotzdem.",
+      "contentRetry": {
+        "message": "Einige Inhalte für diese Sprache konnten nicht vorbereitet werden.",
+        "button": "Erneut versuchen",
+        "failed": "Inhalte konnten nicht vorbereitet werden. Bitte versuche es erneut."
+      },
       "tapReveal": "Tippe unten auf Aufdecken, um die Übersetzung zu sehen.",
       "reveal": "Übersetzung aufdecken",
       "iDidntKnow": "Ich wusste es nicht",
