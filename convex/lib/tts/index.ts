@@ -6,12 +6,13 @@
 import type { TtsProvider } from '../../types';
 import type { TTSProvider } from './types';
 import { googleTts } from './google';
-import { azureTts } from './azure';
 import { geminiTts } from './gemini';
 
+// 'azure' and 'elevenlabs' are retired: they linger in `TtsProvider` only as
+// stored-value tombstones (historical `audioRecordings.ttsProvider` rows) and
+// are not dispatchable. Azure Speech is still used for STT (convex/lib/stt).
 const providers: Partial<Record<TtsProvider, TTSProvider>> = {
   google: googleTts,
-  azure: azureTts,
   gemini: geminiTts,
 };
 

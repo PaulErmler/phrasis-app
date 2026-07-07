@@ -38,8 +38,6 @@ const messages = {
   LanguageSelector: {
     searchPlaceholder: "Search languages…",
     noResults: "No languages match.",
-    tierBadge: "Experimental",
-    tierBadgeTooltip: "Newly added — quality is still being tuned.",
     categories: {
       germanic: "Germanic & Nordic",
       romance: "Romance",

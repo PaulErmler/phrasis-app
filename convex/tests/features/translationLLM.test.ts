@@ -22,27 +22,27 @@ import { resolveTranslationStages } from "../../../lib/languages";
 
 describe("features/translationLLM", () => {
   describe("translation rules", () => {
-    it("default_hybrid: Gemini 3 Flash (minimal) primary AND fallback", () => {
-      // 'it' has no `translationRule` set → defaults to `default_hybrid`.
+    it("default_hybrid: Gemini 3.5 Flash Nitro (minimal) primary AND fallback", () => {
+      // 'nl' has no `translationRule` set → defaults to `default_hybrid`.
       // Length-hybrid branching was retired — every source length runs
       // the same chain. Fallback is the same config as primary; it only
       // exists to retry once on transient HTTP errors before Google.
-      const stages = resolveTranslationStages("it", 12);
+      const stages = resolveTranslationStages("nl", 12);
       expect(stages.length).toBe(2);
-      const flashMinimal = {
-        model: "google/gemini-3-flash-preview",
+      const nitroMinimal = {
+        model: "google/gemini-3.5-flash:nitro",
         reasoning: "minimal",
         maxOutputTokens: 4_000,
       };
-      expect(stages[0]).toEqual(flashMinimal);
-      expect(stages[1]).toEqual(flashMinimal);
+      expect(stages[0]).toEqual(nitroMinimal);
+      expect(stages[1]).toEqual(nitroMinimal);
     });
 
     it("default_hybrid is length-agnostic — same chain for short and long inputs", () => {
       // Lengths are arbitrary — length-hybrid branching was retired, so any
       // short vs long pair must resolve to the same chain.
-      const short = resolveTranslationStages("it", 5);
-      const long = resolveTranslationStages("it", 200);
+      const short = resolveTranslationStages("nl", 5);
+      const long = resolveTranslationStages("nl", 200);
       expect(short).toEqual(long);
     });
 
@@ -100,21 +100,21 @@ describe("features/translationLLM", () => {
       });
     });
 
-    it("zh resolves through default_hybrid (no language-specific override)", () => {
+    it("zh is pinned to gemini_35_flash_nitro_minimal (with a translationVersion bump)", () => {
       const stages = resolveTranslationStages("zh", 12);
       expect(stages.length).toBe(2);
-      expect(stages[0].model).toBe("google/gemini-3-flash-preview");
+      expect(stages[0].model).toBe("google/gemini-3.5-flash:nitro");
       expect(stages[0].reasoning).toBe("minimal");
-      expect(stages[1].model).toBe("google/gemini-3-flash-preview");
+      expect(stages[1].model).toBe("google/gemini-3.5-flash:nitro");
       expect(stages[1].reasoning).toBe("minimal");
     });
 
     it("unknown language code falls through to default_hybrid", () => {
       const stages = resolveTranslationStages("zz", 100);
       expect(stages.length).toBe(2);
-      expect(stages[0].model).toBe("google/gemini-3-flash-preview");
+      expect(stages[0].model).toBe("google/gemini-3.5-flash:nitro");
       expect(stages[0].reasoning).toBe("minimal");
-      expect(stages[1].model).toBe("google/gemini-3-flash-preview");
+      expect(stages[1].model).toBe("google/gemini-3.5-flash:nitro");
       expect(stages[1].reasoning).toBe("minimal");
     });
   });

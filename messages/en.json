@@ -591,8 +591,6 @@
   "LanguageSelector": {
     "searchPlaceholder": "Search languages…",
     "noResults": "No languages match.",
-    "tierBadge": "Experimental",
-    "tierBadgeTooltip": "Newly added — translation and voice quality are still being tuned. Please report issues.",
     "categories": {
       "germanic": "Germanic & Nordic",
       "romance": "Romance",

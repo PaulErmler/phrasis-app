@@ -77,17 +77,17 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
 
 describe("lib/languages — resolveTranslationStages", () => {
   it("returns the default_hybrid chain (primary + one fallback) for an unruled language", () => {
-    const stages = resolveTranslationStages("it", 50);
+    const stages = resolveTranslationStages("nl", 50);
     expect(stages.length).toBe(2);
-    expect(stages[0].model).toBe("google/gemini-3-flash-preview");
+    expect(stages[0].model).toBe("google/gemini-3.5-flash:nitro");
     expect(stages[0].reasoning).toBe("minimal");
     // The single fallback retries the same config before the Google safety net.
     expect(stages[1]).toEqual(stages[0]);
   });
 
   it("is length-agnostic (length-hybrid branching was retired)", () => {
-    expect(resolveTranslationStages("it", 5)).toEqual(
-      resolveTranslationStages("it", 500),
+    expect(resolveTranslationStages("nl", 5)).toEqual(
+      resolveTranslationStages("nl", 500),
     );
   });
 

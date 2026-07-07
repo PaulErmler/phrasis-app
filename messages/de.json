@@ -588,8 +588,6 @@
   "LanguageSelector": {
     "searchPlaceholder": "Sprachen suchen…",
     "noResults": "Keine Sprache passt.",
-    "tierBadge": "Experimentell",
-    "tierBadgeTooltip": "Neu hinzugefügt – Übersetzungs- und Stimmqualität werden noch optimiert. Bitte melde Probleme.",
     "categories": {
       "germanic": "Germanisch & Nordisch",
       "romance": "Romanisch",

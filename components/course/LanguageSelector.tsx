@@ -156,18 +156,12 @@ export function LanguageSelector({
                   >
                     <span className="text-2xl shrink-0">{language.flag}</span>
                     <div className="flex-1 min-w-0">
+                      {/* `llmSupportTier` stays internal-only — tier2 languages
+                          no longer get a user-facing "Experimental" badge. */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-sm leading-tight break-words">
                           {localizedName}
                         </p>
-                        {language.llmSupportTier === 'tier2' && (
-                          <span
-                            className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground"
-                            title={t('tierBadgeTooltip')}
-                          >
-                            {t('tierBadge')}
-                          </span>
-                        )}
                       </div>
                       {language.nativeName.toLowerCase() !== localizedName.toLowerCase() ? (
                         <p className="text-muted-xs break-words">

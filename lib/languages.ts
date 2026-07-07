@@ -17,10 +17,12 @@
  * truth used for stored `audioRecordings.ttsProvider`). 'gemini' = Gemini 3.1
  * Flash TTS via OpenRouter (distinct from 'google' = Google Cloud Chirp3).
  *
- * 'elevenlabs' is a retired provider kept only as a tombstone so historical
- * stored `ttsProvider` values still validate — no language routes to it and it
- * is no longer dispatchable (see convex/lib/tts/index.ts). Do not remove it
- * from this array without first migrating any stored rows that use it.
+ * 'elevenlabs' and 'azure' are retired providers kept only as tombstones so
+ * historical stored `ttsProvider` values still validate — no language routes
+ * to them and neither is dispatchable (see convex/lib/tts/index.ts). Azure
+ * Speech is still used for STT (convex/lib/stt), just not for synthesis. Do
+ * not remove either from this array without first migrating any stored rows
+ * that use it.
  */
 export const TTS_PROVIDERS = ['google', 'elevenlabs', 'azure', 'gemini'] as const;
 export type TtsProvider = (typeof TTS_PROVIDERS)[number];
@@ -379,6 +381,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'fr',
@@ -428,6 +431,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'pt',
@@ -489,6 +494,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'ru',
@@ -506,6 +512,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Cyrillic — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'pl',
@@ -521,6 +529,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'sk',
@@ -536,6 +545,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'cs',
@@ -552,6 +562,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'nl',
@@ -567,6 +578,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'sv',
@@ -621,6 +633,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'fi',
@@ -638,6 +651,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'el',
@@ -657,6 +671,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Azure Fast Transcription doesn't support el-GR; without STT we can't
     // produce per-word timings, so karaoke highlighting will no-op for Greek.
     supportsStt: false,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'hi',
@@ -675,6 +691,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Devanagari — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'bn',
@@ -685,16 +702,20 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     romanizationBackend: 'google-v3',
     name: 'Bengali',
     nativeName: 'বাংলা',
-    // Flag is India, not Bangladesh: voice + STT infra is bn-IN (Google
-    // Chirp3-HD and Azure Fast Transcription only support bn-IN, not bn-BD).
+    // Flag is India, not Bangladesh: STT infra is bn-IN (Azure Fast
+    // Transcription only supports bn-IN, not bn-BD).
     flag: '🇮🇳',
     category: 'other',
     llmSupportTier: 'tier2',
-    ttsProvider: 'google',
+    // Gemini 3.1 Flash TTS supports Bengali (`geminiBcp47: 'bn-BD'`).
+    // Switching off Google triggers the provider-mismatch regen for existing
+    // audio; the Chirp3 bn-IN pool stays listed dormant for a one-line revert.
+    ttsProvider: 'gemini',
     needsRomanization: true,
     // Bengali script — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'tr',
@@ -710,6 +731,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'hu',
@@ -727,6 +749,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'zh',
@@ -749,6 +772,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // when we have a learner-grade segmenter.
     supportsKaraoke: false,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'zh_traditional',
@@ -766,12 +791,17 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇹🇼',
     category: 'asian-east',
     llmSupportTier: 'tier2',
-    // Google has no Chirp3-HD voices for cmn-TW (only legacy Standard/WaveNet),
-    // so we use Azure Neural for Mandarin-Traditional courses.
-    ttsProvider: 'azure',
+    // Gemini 3.1 Flash TTS supports Mandarin; its docs list the bare `cmn`
+    // code (no Taiwan regional variant), so the Taiwanese accent is pinned in
+    // the prompt via `ttsPromptName` alongside `geminiBcp47: 'cmn-TW'`.
+    // Switching off the (now-retired) Azure provider triggers the
+    // provider-mismatch regen for existing audio.
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Taiwanese Mandarin',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'yue',
@@ -787,6 +817,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇰',
     category: 'asian-east',
     llmSupportTier: 'tier2',
+    // Stays on Google Chirp3: Cantonese (`yue`) is not in Gemini 3.1 Flash
+    // TTS's supported-language list (only Mandarin `cmn` is).
     ttsProvider: 'google',
     // Romanization disabled — the cantonese-romanisation (LSHK / Jyutping)
     // lookup table is traditional-script oriented, so simplified Cantonese
@@ -795,6 +827,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'yue_traditional',
@@ -811,10 +844,13 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇭🇰',
     category: 'asian-east',
     llmSupportTier: 'tier2',
+    // Stays on Google Chirp3: Cantonese (`yue`) is not in Gemini 3.1 Flash
+    // TTS's supported-language list (only Mandarin `cmn` is).
     ttsProvider: 'google',
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'ja',
@@ -836,6 +872,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // is gated off.
     supportsKaraoke: false,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'ko',
@@ -854,6 +892,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Hangul — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'vi',
@@ -870,6 +910,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'th',
@@ -891,6 +932,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // alongside CJK; revisit with a learner-grade Thai segmenter.
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'id',
@@ -906,6 +948,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'fil',
@@ -921,14 +964,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇵🇭',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
-    // Gemini 3 Flash TTS (fil-PH, Preview). See VOICE_POOLS in lib/voices.ts
-    // (`fil: [...GEMINI_CORE, ...AZURE_VOICES_FIL_PH]`). Latin script, so no
-    // romanization; Azure fil-PH supports Fast Transcription, so STT + karaoke
-    // stay on.
+    // Gemini TTS (fil-PH). See VOICE_POOLS in lib/voices.ts
+    // (`fil: [...GEMINI_CORE]`). Latin script, so no romanization; Azure
+    // fil-PH supports Fast Transcription, so STT + karaoke stay on.
     ttsProvider: 'gemini',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'ar',
@@ -953,6 +996,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // word timings, producing flickery/mis-positioned per-word highlights.
     supportsKaraoke: false,
     supportsStt: true,
+    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationVersion: 2,
   },
   {
     code: 'ar_sa',
@@ -975,6 +1020,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'ar_eg',
@@ -999,6 +1045,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'ar_iq',
@@ -1021,6 +1068,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'ar_lev',
@@ -1046,6 +1094,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'he',
@@ -1068,6 +1117,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     // Disambiguates from Biblical Hebrew in the translation prompt.
     translationName: 'Modern Hebrew',
+    translationVersion: 2,
   },
   {
     code: 'fa',
@@ -1094,6 +1144,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Non-Latin script — karaoke highlighting off (matches Arabic/Hebrew).
     supportsKaraoke: false,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'sw',
@@ -1112,6 +1163,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationVersion: 2,
   },
   {
     code: 'sw_tz',
@@ -1127,13 +1179,20 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     flag: '🇹🇿',
     category: 'african',
     llmSupportTier: 'tier2',
-    ttsProvider: 'azure',
+    // Gemini 3.1 Flash TTS supports Swahili at the language level only, and
+    // Gemini has no sw-TZ locale (`geminiBcp47` collapses to sw-KE), so the
+    // Tanzanian dialect is named in the prompt via `ttsPromptName` (the
+    // ar_lev pattern). Switching off the (now-retired) Azure provider
+    // triggers the provider-mismatch regen for existing audio.
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Tanzanian Swahili',
     needsRomanization: false,
     supportsKaraoke: false,
     // Azure Fast Transcription rejects sw-TZ (May 2026). sw-KE is supported;
     // sw_tz courses inherit the Greek pattern — no validation roundtrips,
     // no per-word timings, no karaoke.
     supportsStt: false,
+    translationVersion: 2,
   },
 ];
 
@@ -1175,8 +1234,8 @@ export function getTtsProviderForLanguage(code: string): TtsProvider {
 // rows whose stamped version is strictly LOWER than the current value as stale
 // and regenerate them lazily on next view. The stamp is "undefined === current"
 // at the comparison sites (only a number strictly < current is stale), so rows
-// written before the field existed never mass-regenerate — the one-time
-// `backfillContentVersions` migration stamps them explicitly. See convex/schema.ts.
+// written before the field existed never mass-regenerate — a one-time backfill
+// stamped them explicitly. See convex/schema.ts.
 // ---------------------------------------------------------------------------
 
 /** Baseline version for both translation and TTS when a Language omits it. */
@@ -1330,18 +1389,6 @@ export type TranslationRule = {
 
 // --- Shared model stages (referenced by multiple rules) --------------------
 
-// Gemini 3 Flash preview with `minimal` reasoning — primary AND fallback
-// for `default_hybrid`. Used for the initial LLM translation of premade
-// curriculum sentences and placement-test material. `effort: 'minimal'`
-// maps to Gemini's `thinkingLevel: 'minimal'` (strictly lower than
-// `'low'`) — the cheapest reasoning tier OpenRouter exposes for Gemini 3.
-// Used as the fallback too so the worker still gets a real LLM retry on
-// transient HTTP errors before dropping to the Google safety net.
-const GEMINI_3_FLASH_MINIMAL: ModelStage = {
-  model: 'google/gemini-3-flash-preview',
-  reasoning: 'minimal',
-  maxOutputTokens: 4_000,
-};
 // Gemini 3.1 Flash Lite with `minimal` reasoning — primary for
 // `retranslation_custom` (flagged retranslations of user-created texts).
 // Kept on the cheaper Flash Lite tier (vs. Pro Medium for curriculum) on
@@ -1367,8 +1414,11 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
   maxOutputTokens: 8_000,
 };
 // Gemini 3.5 Flash via OpenRouter Nitro routing with `minimal` reasoning —
-// default for de / fr / pt / pt_pt / sv. Nitro prioritizes throughput/latency;
-// minimal thinking keeps quality on par with `low` at much lower cost/latency.
+// the translation workhorse: primary + retry for `default_hybrid` (every
+// language without an explicit rule) and for the high-traffic languages
+// pinned to `gemini_35_flash_nitro_minimal`. Nitro prioritizes
+// throughput/latency; minimal thinking keeps quality on par with `low` at
+// much lower cost/latency.
 const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
   model: 'google/gemini-3.5-flash:nitro',
   reasoning: 'minimal',
@@ -1395,29 +1445,35 @@ export const TRANSLATION_RULES = {
    * for the initial LLM translation of premade curriculum sentences and
    * placement-test material. Single branch — length-hybrid branching was
    * retired so the model + reasoning level is identical regardless of
-   * input length. One LLM fallback (cheap no-thinking Flash Lite) before
-   * the Google safety net catches truncation / HTTP errors without forcing
-   * an immediate drop to Google.
+   * input length. Runs the same Gemini 3.5 Flash (Nitro) stage as the
+   * languages pinned to `gemini_35_flash_nitro_minimal` (swapped in from
+   * Gemini 3 Flash in Jul 2026). Every translated language carries a
+   * `translationVersion: 2` bump for that swap, so existing translations
+   * lazily regenerate on 3.5 Flash.
    */
   default_hybrid: {
     id: 'default_hybrid',
-    label: 'Gemini 3 Flash (minimal) → Gemini 3 Flash (minimal, retry) → Google',
+    label: 'Gemini 3.5 Flash Nitro (minimal) → Gemini 3.5 Flash Nitro (minimal, retry) → Google',
     branches: [
       {
         maxChars: Infinity,
-        primary: GEMINI_3_FLASH_MINIMAL,
+        primary: GEMINI_35_FLASH_NITRO_MINIMAL,
         // Same model + reasoning + cap as the primary — the fallback
         // exists only to retry once on transient HTTP errors before the
         // Google safety net kicks in. Truncation is rare at this thinking
         // level / token cap, so retrying the same config is cheap insurance.
-        fallbacks: [GEMINI_3_FLASH_MINIMAL],
+        fallbacks: [GEMINI_35_FLASH_NITRO_MINIMAL],
       },
     ],
   },
   /**
-   * Per-language default for German, French, Castilian Spanish, Latin American
-   * Spanish, both Portuguese variants, and Swedish. Routes through Gemini 3.5 Flash (Nitro) with
-   * `minimal` reasoning; one same-config retry before the Google safety net.
+   * Pinned rule for the high-traffic languages (both Spanish variants, both
+   * Portuguese variants, German, French, Italian, Swedish, Russian, Greek,
+   * Chinese Simplified, Japanese, Korean, and Arabic MSA). Same stages as
+   * `default_hybrid` — kept as a distinct id so these languages can be
+   * routed independently of the default if 3.5 Flash ever regresses on one
+   * of them. Routes through Gemini 3.5 Flash (Nitro) with `minimal`
+   * reasoning; one same-config retry before the Google safety net.
    */
   gemini_35_flash_nitro_minimal: {
     id: 'gemini_35_flash_nitro_minimal',

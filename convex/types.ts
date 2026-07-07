@@ -146,8 +146,9 @@ export const ttsQualityValidator = v.union(
 // is built from it so the two can't drift. Indexed access keeps the exact
 // string-literal union for `Infer`. 'gemini' = Gemini 3.1 Flash TTS via
 // OpenRouter's /audio/speech endpoint (distinct from 'google' = Cloud Chirp3).
-// 'elevenlabs' (index 1) is a retired provider retained only so historical
-// stored values still validate — it is no longer dispatchable.
+// 'elevenlabs' (index 1) and 'azure' (index 2) are retired providers retained
+// only so historical stored values still validate — neither is dispatchable
+// (Azure Speech remains in use for STT only; see convex/lib/stt).
 export const ttsProviderValidator = v.union(
   v.literal(TTS_PROVIDERS[0]),
   v.literal(TTS_PROVIDERS[1]),

@@ -1115,7 +1115,11 @@ describe("features/ttsProcessing", () => {
       expect(left).toBeNull();
     });
 
-    it("keeps a Google row when the language's active provider doesn't override Google", async () => {
+    it("keeps an existing row when the language's active provider doesn't override its provider", async () => {
+      // yue is on Google, and Google's override list never includes Gemini —
+      // so a stray Gemini row for a Google-routed language must be kept as-is.
+      // (Since bn / zh_traditional / sw_tz moved to Gemini there is no active
+      // Azure language left, so this is the remaining cross-provider keep case.)
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
       await t.run(async (ctx) =>
@@ -1127,11 +1131,11 @@ describe("features/ttsProcessing", () => {
       const audioId = await t.run(async (ctx) =>
         ctx.db.insert("audioRecordings", {
           textId,
-          language: "sw_tz",
-          voiceName: "sw-KE-Chirp3-HD-Leda",
+          language: "yue",
+          voiceName: "Leda",
           storageId,
           ttsQuality: "validated",
-          ttsProvider: "google",
+          ttsProvider: "gemini",
           voiceGender: "female",
           speed: 0.9,
         }),
@@ -1139,8 +1143,8 @@ describe("features/ttsProcessing", () => {
 
       await t.mutation(internal.features.decks.prepareCardContent, {
         textId,
-        baseLanguages: ["sw_tz"],
-        targetLanguages: ["sw_tz"],
+        baseLanguages: ["yue"],
+        targetLanguages: ["yue"],
       });
 
       const left = await t.run(async (ctx) => ctx.db.get(audioId));
