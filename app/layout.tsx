@@ -7,6 +7,7 @@ import { ServiceWorkerRegistration } from '@/components/ServiceWorkerRegistratio
 import { PWAInstallGlobal } from '@/components/PWAInstallGlobal';
 import { getUserLocale } from '@/i18n/locale';
 import { getMessages, getTimeZone } from 'next-intl/server';
+import { pickMessages, SHARED_NAMESPACES } from '@/i18n/namespaces';
 import { Toaster } from '@/components/ui/sonner';
 import { ConsentManager } from './consent-manager';
 import { getToken } from '@/lib/auth-server';
@@ -78,7 +79,10 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const locale = await getUserLocale();
-  const messages = await getMessages();
+  // Only the shared namespaces cross the server→client boundary here (they
+  // get serialized into every page's HTML). Route areas add their own
+  // subsets via ScopedMessages — see i18n/namespaces.ts.
+  const messages = pickMessages(await getMessages(), SHARED_NAMESPACES);
   const timeZone = await getTimeZone();
   const initialToken = await getToken();
 

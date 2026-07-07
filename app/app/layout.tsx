@@ -4,6 +4,8 @@ import { AppDataProvider } from '@/components/app/AppDataProvider';
 import { AppWarmup } from '@/components/app/AppWarmup';
 import { ClientAuthBoundary } from '@/components/ClientAuthBoundary';
 import { OnboardingGuard } from '@/components/app/OnboardingGuard';
+import { ScopedMessages } from '@/components/i18n/ScopedMessages';
+import { APP_NAMESPACES, SHARED_NAMESPACES } from '@/i18n/namespaces';
 
 export default async function AppLayout({
   children,
@@ -23,19 +25,21 @@ export default async function AppLayout({
   ]);
 
   return (
-    <AppDataProvider
-      preloadedSettings={preloadedSettings}
-      preloadedActiveCourse={preloadedActiveCourse}
-      preloadedCourseSettings={preloadedCourseSettings}
-      preloadedHomeSummary={preloadedHomeSummary}
-    >
-      <ClientAuthBoundary>
-        <OnboardingGuard>
-          <AppWarmup>
-            {children}
-          </AppWarmup>
-        </OnboardingGuard>
-      </ClientAuthBoundary>
-    </AppDataProvider>
+    <ScopedMessages namespaces={[...SHARED_NAMESPACES, ...APP_NAMESPACES]}>
+      <AppDataProvider
+        preloadedSettings={preloadedSettings}
+        preloadedActiveCourse={preloadedActiveCourse}
+        preloadedCourseSettings={preloadedCourseSettings}
+        preloadedHomeSummary={preloadedHomeSummary}
+      >
+        <ClientAuthBoundary>
+          <OnboardingGuard>
+            <AppWarmup>
+              {children}
+            </AppWarmup>
+          </OnboardingGuard>
+        </ClientAuthBoundary>
+      </AppDataProvider>
+    </ScopedMessages>
   );
 }

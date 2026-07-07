@@ -5,12 +5,12 @@ import { ThemeProvider } from 'next-themes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { NextIntlClientProvider } from 'next-intl';
 
 import { authClient } from '@/lib/auth-client';
 import { AutumnProvider } from "autumn-js/react";
 import { api } from "../convex/_generated/api";
 import { useConvex } from "convex/react";
+import { ScopedIntlProvider } from '@/components/i18n/ScopedIntlProvider';
 
 type AuthMessages = Record<string, string>;
 
@@ -36,7 +36,7 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
   const authLocalization = (messages.Auth as AuthMessages) || {};
 
   return (
-    <NextIntlClientProvider
+    <ScopedIntlProvider
       locale={locale}
       messages={messages}
       timeZone={timeZone}
@@ -64,6 +64,6 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
           {children}
         </AuthUIProvider>
       </ThemeProvider>
-    </NextIntlClientProvider>
+    </ScopedIntlProvider>
   );
 }

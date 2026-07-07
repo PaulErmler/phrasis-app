@@ -3,6 +3,8 @@ import './landing-page.css';
 import { getToken } from '@/lib/auth-server';
 import { LandingJsonLd } from '@/components/landing/landing-json-ld';
 import { LandingPageClient } from '@/components/landing/landing-page-client';
+import { ScopedMessages } from '@/components/i18n/ScopedMessages';
+import { LANDING_NAMESPACES, SHARED_NAMESPACES } from '@/i18n/namespaces';
 
 const siteUrl = process.env.SITE_URL ?? 'https://flexling.com';
 
@@ -23,7 +25,11 @@ export default async function Home() {
     <div className="min-h-screen flex flex-col">
       <LandingJsonLd siteUrl={siteUrl} />
       <main className="flex-1">
-        <LandingPageClient isAuthenticated={isAuthenticated} />
+        <ScopedMessages
+          namespaces={[...SHARED_NAMESPACES, ...LANDING_NAMESPACES]}
+        >
+          <LandingPageClient isAuthenticated={isAuthenticated} />
+        </ScopedMessages>
       </main>
     </div>
   );
