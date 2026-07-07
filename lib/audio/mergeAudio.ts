@@ -1,4 +1,4 @@
-import toWav from 'audiobuffer-to-wav';
+import { encodeWav } from '@/lib/audio/audioWorkerClient';
 import type { CardAudioRecording, CourseSettings } from '@/components/app/learning/types';
 import {
   DEFAULT_REPETITIONS_BASE,
@@ -380,8 +380,12 @@ export async function mergeCardAudio(
 
     if (signal?.aborted) return null;
 
-    // --- 5. Encode to WAV and create blob URL ---
-    const blob = new Blob([toWav(rendered)], { type: 'audio/wav' });
+    // --- 5. Encode to WAV (in the audio worker when available) ---
+    const wavData = await encodeWav(rendered);
+
+    if (signal?.aborted) return null;
+
+    const blob = new Blob([wavData], { type: 'audio/wav' });
     const blobUrl = URL.createObjectURL(blob);
 
     return { blobUrl, durationSec: totalDuration, languageCues, speedByLanguage };
