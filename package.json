@@ -8,6 +8,7 @@
     "dev:backend": "convex dev",
     "predev": "convex dev --until-success",
     "build": "next build",
+    "build:deploy": "convex deploy --cmd 'pnpm run build' && convex run migrations:runAll --prod",
     "start": "next start",
     "seed-texts": "node scripts/uploadTexts.mjs",
     "update-translations": "node scripts/updateTranslations.mjs",
