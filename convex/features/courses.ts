@@ -927,7 +927,8 @@ export const completeOnboarding = mutation({
 
         await consumeQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
         await updateCollectionProgress(
-          ctx, userId, courseId, collection._id, textsToAdd.length, newLastRank,
+          ctx, userId, courseId, collection._id,
+          { addedDelta: cardsInserted, frontierRank: newLastRank },
         );
 
         for (const text of textsToAdd) {

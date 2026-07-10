@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,41 +9,41 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Toggle } from '@/components/ui/toggle';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Check, Plus, Loader2, CheckCircle2, Lock, Layers, BookOpen } from 'lucide-react';
+import {
+  ArrowUpCircle,
+  Check,
+  CheckCircle2,
+  Eye,
+  EyeOff,
+  Layers,
+  Loader2,
+  Lock,
+  Plus,
+  BookOpen,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCollectionDescription } from './CollectionCarouselUI';
 import { AudioButton } from '@/components/app/learning/AudioButton';
+import {
+  PREVIEW_ACTION_ICON_CLASS,
+  PREVIEW_ACTION_PANEL_CLASS,
+} from '@/components/app/previewIconRail';
 import { HighlightedText } from '@/components/app/learning/HighlightedText';
 import { useTranslations } from 'next-intl';
 import { usePreloadedQuery } from 'convex/react';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
-import type { WordTiming } from '@/components/app/learning/types';
-
-interface Translation {
-  language: string;
-  text: string;
-  isBaseLanguage: boolean;
-  isTargetLanguage: boolean;
-  romanization?: string;
-}
-
-interface AudioRecording {
-  language: string;
-  voiceName: string | null;
-  url: string | null;
-  wordTimings: WordTiming[] | null;
-}
-
-export interface PreviewText {
-  _id: string;
-  text: string;
-  sourceLanguage: string;
-  translations: Translation[];
-  audioRecordings: AudioRecording[];
-}
+import {
+  COLLECTION_PREVIEW_SIZE,
+  collectionRemaining,
+} from '@/convex/lib/collections';
+import type {
+  BrowseTextRow,
+  CollectionBrowse,
+} from './useCollectionDetail';
 
 interface CollectionDetailDialogProps {
   open: boolean;
@@ -53,10 +54,14 @@ interface CollectionDetailDialogProps {
   displayName?: string | null;
   totalTexts: number;
   cardsAdded: number;
+  /** Texts the user ignored — excluded from remaining/auto-add. */
+  ignoredCount: number;
+  /** Texts the user marked as prioritized in the collection preview. */
+  prioritizedCount: number;
   isActive: boolean;
   isComplete: boolean;
-  texts: PreviewText[];
-  isLoadingTexts: boolean;
+  /** Paginated browse state + row actions from useCollectionDetail. */
+  browse: CollectionBrowse;
   isAdding: boolean;
   onSelect: () => void;
   onAddCards: () => void;
@@ -77,10 +82,11 @@ export function CollectionDetailDialog({
   displayName,
   totalTexts,
   cardsAdded,
+  ignoredCount,
+  prioritizedCount,
   isActive,
   isComplete,
-  texts,
-  isLoadingTexts,
+  browse,
   isAdding,
   onSelect,
   onAddCards,
@@ -96,12 +102,42 @@ export function CollectionDetailDialog({
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const earlierBlockRef = useRef<HTMLDivElement>(null);
+  const earlierBlockHeightRef = useRef(0);
+
+  // Scroll preservation: content revealed/loaded ABOVE the main stream (the
+  // added-history block) grows or shrinks the scroll height above the
+  // viewport. Compensate scrollTop by the height delta so the sentences the
+  // user is looking at stay exactly where they are — toggling "show added"
+  // and paging earlier history never jump the view.
+  useLayoutEffect(() => {
+    const container = scrollRef.current;
+    const block = earlierBlockRef.current;
+    const height = block?.offsetHeight ?? 0;
+    const prev = earlierBlockHeightRef.current;
+    if (container && height !== prev) {
+      container.scrollTop += height - prev;
+    }
+    earlierBlockHeightRef.current = height;
+  });
+
+  // Reset the compensation baseline when the dialog closes so a reopen
+  // doesn't apply a stale delta.
+  useEffect(() => {
+    if (!open) earlierBlockHeightRef.current = 0;
+  }, [open]);
+
+  // Paging is deliberately button-only — nothing loads from scrolling alone.
+  // "Show earlier" (top) and "Show more" (bottom) are the sole fetch triggers.
+  const canLoadEarlier = browse.showAdded && browse.earlierStatus === 'CanLoadMore';
+
   if (!collectionName) return null;
 
   const titleText = displayName ?? collectionName;
   const progress = totalTexts > 0 ? (cardsAdded / totalTexts) * 100 : 0;
-  const remaining = totalTexts - cardsAdded;
-  const isCompleteProgress = cardsAdded >= totalTexts && totalTexts > 0;
+  const remaining = collectionRemaining(totalTexts, { cardsAdded, ignoredCount });
+  const isCompleteProgress = isComplete && totalTexts > 0;
   // Description is keyed by the raw collection name; the localized display
   // title (e.g. "Manually Added") is for rendering only.
   const description = getCollectionDescription(
@@ -109,6 +145,19 @@ export function CollectionDetailDialog({
     (key) => tDesc(key),
     (key) => tDesc.has(key),
   );
+
+  const isInitialLoading = browse.status === 'LoadingFirstPage';
+  const isLoadingMore = browse.status === 'LoadingMore' || browse.isPreparingMore;
+  const isLoadingEarlier = browse.earlierStatus === 'LoadingMore';
+
+  const visibleRows = browse.rows.filter(browse.isRowVisible);
+  const visibleEarlierRows = browse.earlierRows.filter(browse.isRowVisible);
+  const mainExhausted = browse.status === 'Exhausted';
+  const showEmptyState =
+    !isInitialLoading &&
+    mainExhausted &&
+    visibleRows.length === 0 &&
+    visibleEarlierRows.length === 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -126,24 +175,34 @@ export function CollectionDetailDialog({
 
         {/* Static header section */}
         <div className="flex-shrink-0 p-6 pb-4 space-y-4">
-          <DialogHeader>
+          <DialogHeader className="text-left">
             <div className="flex items-center justify-between">
               <DialogTitle className="heading-dialog">{titleText}</DialogTitle>
               <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                 {cardsAdded} / {totalTexts} {t('sentences')}
               </span>
             </div>
-            <DialogDescription className="text-sm leading-relaxed">
+            <DialogDescription className="text-sm leading-relaxed text-left">
               {description}
             </DialogDescription>
           </DialogHeader>
 
           {/* Stats row */}
-          <div className="flex gap-3 text-xs">
+          <div className="flex flex-wrap gap-3 text-xs">
             <div className="flex items-center gap-1">
               <Layers className="h-3 w-3 text-muted-foreground" />
               <span>{cardsAdded} {t('added')}</span>
             </div>
+            <div className="flex items-center gap-1">
+              <ArrowUpCircle className="h-3 w-3 text-muted-foreground" />
+              <span>{prioritizedCount} {t('prioritizedCount')}</span>
+            </div>
+            {ignoredCount > 0 && (
+              <div className="flex items-center gap-1">
+                <EyeOff className="h-3 w-3 text-muted-foreground" />
+                <span>{ignoredCount} {t('ignoredCount')}</span>
+              </div>
+            )}
             <div className="flex items-center gap-1">
               <BookOpen className="h-3 w-3 text-muted-foreground" />
               <span>{remaining} {t('remaining')}</span>
@@ -192,8 +251,8 @@ export function CollectionDetailDialog({
                       <Plus className="h-4 w-4" />
                       {t('addN', {
                         count: Math.min(
-                          texts.length,
-                          Math.max(0, totalTexts - cardsAdded),
+                          COLLECTION_PREVIEW_SIZE,
+                          remaining,
                           ...(sentencesRemaining != null ? [sentencesRemaining] : []),
                         ),
                       })}
@@ -203,40 +262,135 @@ export function CollectionDetailDialog({
               )
             )}
           </div>
+
+          {/* Browse controls */}
+          <div className="flex items-center justify-end gap-1.5">
+            <Toggle
+              variant="outline"
+              size="sm"
+              pressed={browse.showAdded}
+              onPressedChange={browse.setShowAdded}
+              className="h-7 gap-1.5 px-2 text-xs"
+              data-testid="collection-show-added-toggle"
+            >
+              <Eye className="h-3.5 w-3.5" />
+              {t('showAdded')}
+            </Toggle>
+            <Toggle
+              variant="outline"
+              size="sm"
+              pressed={browse.showIgnored}
+              onPressedChange={browse.setShowIgnored}
+              className="h-7 gap-1.5 px-2 text-xs"
+              data-testid="collection-show-ignored-toggle"
+            >
+              <EyeOff className="h-3.5 w-3.5" />
+              {t('showIgnored')}
+            </Toggle>
+          </div>
         </div>
 
         {/* Scrollable sentences section */}
-        <div className="flex-1 overflow-y-auto px-6 pb-6">
-          {isComplete ? (
-            <div className="text-center py-6 space-y-2">
-              <CheckCircle2 className="h-10 w-10 text-success mx-auto" />
-              <p className="text-sm font-medium">{t('allCardsAdded')}</p>
-            </div>
-          ) : isLoadingTexts ? (
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 pb-6">
+          {isInitialLoading ? (
             <div className="space-y-4">
               {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="content-box p-4 space-y-2">
-                  <Skeleton className="h-5 w-3/4 rounded" />
-                  <Separator />
-                  <Skeleton className="h-5 w-2/3 rounded" />
+                <div key={i} className="content-box flex overflow-hidden p-0">
+                  <div className="flex flex-1 items-center p-3 min-w-0">
+                    <div className="w-full space-y-2">
+                      <Skeleton className="h-5 w-3/4 rounded" />
+                      <Separator />
+                      <Skeleton className="h-5 w-2/3 rounded" />
+                    </div>
+                  </div>
+                  <div className={PREVIEW_ACTION_PANEL_CLASS}>
+                    <Skeleton className="size-7 rounded-md" />
+                    <Skeleton className="size-7 rounded-md" />
+                    <Skeleton className="size-7 rounded-md" />
+                  </div>
                 </div>
               ))}
             </div>
-          ) : texts.length === 0 ? (
-            <div className="text-center py-6 space-y-2">
-              <CheckCircle2 className="h-10 w-10 text-success mx-auto" />
-              <p className="text-sm font-medium">{t('noMoreCards')}</p>
-            </div>
           ) : (
-            <div className="space-y-4">
-              {texts.map((text) => (
-                <PreviewTextRow
-                  key={text._id}
-                  text={text}
-                  highlightEnabled={highlightEnabled}
-                />
-              ))}
-            </div>
+            <>
+              {/* Added-history feed (ranks at/below the anchor). Wrapped in a
+                  measured block so growth above the viewport is compensated
+                  and the user's position never jumps. */}
+              <div ref={earlierBlockRef}>
+                {browse.showAdded && (
+                  <div className="space-y-4 pb-4">
+                    {(canLoadEarlier || isLoadingEarlier) && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full text-muted-foreground"
+                        disabled={isLoadingEarlier}
+                        onClick={browse.loadEarlier}
+                        data-testid="collection-load-earlier"
+                      >
+                        {isLoadingEarlier ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            {t('loadingMore')}
+                          </>
+                        ) : (
+                          t('loadEarlier')
+                        )}
+                      </Button>
+                    )}
+                    {visibleEarlierRows.map((row) => (
+                      <PreviewTextRow
+                        key={row._id}
+                        row={row}
+                        highlightEnabled={highlightEnabled}
+                        browse={browse}
+                        sentencesRemaining={sentencesRemaining}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {showEmptyState ? (
+                <div className="text-center py-6 space-y-2">
+                  <CheckCircle2 className="h-10 w-10 text-success mx-auto" />
+                  <p className="text-sm font-medium">
+                    {isComplete ? t('allCardsAdded') : t('noMoreCards')}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {visibleRows.map((row) => (
+                    <PreviewTextRow
+                      key={row._id}
+                      row={row}
+                      highlightEnabled={highlightEnabled}
+                      browse={browse}
+                      sentencesRemaining={sentencesRemaining}
+                    />
+                  ))}
+                  {(browse.status === 'CanLoadMore' || isLoadingMore) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-muted-foreground"
+                      disabled={isLoadingMore}
+                      onClick={browse.loadMore}
+                      data-testid="collection-load-more"
+                    >
+                      {isLoadingMore ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          {t('loadingMore')}
+                        </>
+                      ) : (
+                        t('loadMore')
+                      )}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </DialogContent>
@@ -249,97 +403,160 @@ export function CollectionDetailDialog({
 // single shared hook at the dialog level would highlight every row that
 // happens to share the active language.
 function PreviewTextRow({
-  text,
+  row,
   highlightEnabled,
+  browse,
+  sentencesRemaining,
 }: {
-  text: PreviewText;
+  row: BrowseTextRow;
   highlightEnabled: boolean;
+  browse: CollectionBrowse;
+  sentencesRemaining?: number | null;
 }) {
+  const t = useTranslations('AppPage.collections.carousel.detail');
   const buttonPlayback = useButtonPlayback();
-  const baseTranslations = text.translations.filter((tr) => tr.isBaseLanguage);
-  const targetTranslations = text.translations.filter(
+  const baseTranslations = row.translations.filter((tr) => tr.isBaseLanguage);
+  const targetTranslations = row.translations.filter(
     (tr) => tr.isTargetLanguage,
   );
 
+  const isAdded = row.status === 'added';
+  const isPrioritized = row.status === 'prioritized';
+  const isIgnored = row.status === 'ignored';
+  const isAddPending = browse.pendingAddTextIds.has(row._id);
+  const addLocked = sentencesRemaining === 0;
+
+  const renderLine = (translation: BrowseTextRow['translations'][number], isBase: boolean) => {
+    const audio = row.audioRecordings.find(
+      (a) => a.language === translation.language,
+    );
+    const isActiveLine =
+      buttonPlayback.active?.language === translation.language;
+    // Audio can only be generated once there is text to synthesize — for a
+    // still-translating line the button stays in the passive spinner state.
+    const hasText = translation.text.length > 0;
+    return (
+      <div key={translation.language} className="flex items-start gap-2">
+        <div className="flex-1">
+          <HighlightedText
+            text={translation.text || '...'}
+            language={translation.language}
+            wordTimings={audio?.wordTimings ?? null}
+            localTime={buttonPlayback.active?.localTime ?? 0}
+            isActive={isActiveLine}
+            enabled={highlightEnabled}
+            className={cn(
+              'text-sm leading-relaxed',
+              isBase && 'font-medium',
+            )}
+          />
+          {translation.romanization && (
+            <p className="text-romanization">{translation.romanization}</p>
+          )}
+        </div>
+        <AudioButton
+          url={audio?.url ?? null}
+          language={translation.language}
+          onTimeUpdate={buttonPlayback.onTimeUpdate}
+          onStop={buttonPlayback.onStop}
+          onRequestGenerate={
+            hasText
+              ? () => browse.onRequestAudio(row._id, translation.language)
+              : undefined
+          }
+        />
+      </div>
+    );
+  };
+
   return (
-    <div className="content-box p-4 space-y-2">
-      <div className="space-y-1">
-        {baseTranslations.map((translation) => {
-          const audio = text.audioRecordings.find(
-            (a) => a.language === translation.language,
-          );
-          const isActive =
-            buttonPlayback.active?.language === translation.language;
-          return (
-            <div
-              key={translation.language}
-              className="flex items-start gap-2"
-            >
-              <div className="flex-1">
-                <HighlightedText
-                  text={translation.text || '...'}
-                  language={translation.language}
-                  wordTimings={audio?.wordTimings ?? null}
-                  localTime={buttonPlayback.active?.localTime ?? 0}
-                  isActive={isActive}
-                  enabled={highlightEnabled}
-                  className="text-sm font-medium leading-relaxed"
-                />
-                {translation.romanization && (
-                  <p className="text-romanization">{translation.romanization}</p>
-                )}
-              </div>
-              <AudioButton
-                url={audio?.url ?? null}
-                language={translation.language}
-                onTimeUpdate={buttonPlayback.onTimeUpdate}
-                onStop={buttonPlayback.onStop}
-              />
-            </div>
-          );
-        })}
-        {baseTranslations.length === 0 && (
-          <p className="text-sm font-medium leading-relaxed">{text.text}</p>
-        )}
+    <div
+      className={cn(
+        'content-box flex overflow-hidden p-0',
+        isAdded &&
+          'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950',
+        isPrioritized && 'border-primary bg-primary/5',
+        isIgnored && 'bg-muted/30',
+      )}
+      data-testid={`collection-text-${row.status}`}
+    >
+      <div className={cn('flex flex-1 items-center p-3 min-w-0', isIgnored && 'opacity-50')}>
+        <div className="w-full">
+          <div className="space-y-1">
+            {baseTranslations.map((translation) => renderLine(translation, true))}
+            {baseTranslations.length === 0 && (
+              <p className="text-sm font-medium leading-relaxed">{row.text}</p>
+            )}
+          </div>
+
+          <Separator className="my-2" />
+
+          <div className="space-y-1">
+            {targetTranslations.map((translation) => renderLine(translation, false))}
+          </div>
+        </div>
       </div>
 
-      <Separator />
-
-      <div className="space-y-1">
-        {targetTranslations.map((translation) => {
-          const audio = text.audioRecordings.find(
-            (a) => a.language === translation.language,
-          );
-          const isActive =
-            buttonPlayback.active?.language === translation.language;
-          return (
-            <div
-              key={translation.language}
-              className="flex items-start gap-2"
+      <div className={PREVIEW_ACTION_PANEL_CLASS}>
+        {isAdded ? (
+          <div
+            className="flex items-center justify-center text-success"
+            title={t('addedOne')}
+          >
+            <CheckCircle2 className="size-4" />
+          </div>
+        ) : (
+          <>
+            <Button
+              size="icon"
+              variant="outline"
+              className={cn(
+                PREVIEW_ACTION_ICON_CLASS,
+                isPrioritized &&
+                  'border-primary bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary',
+              )}
+              title={isPrioritized ? t('prioritized') : t('prioritize')}
+              onClick={() =>
+                browse.onSetMark(row._id, isPrioritized ? null : 'prioritized')
+              }
+              data-testid="collection-text-prioritize"
             >
-              <div className="flex-1">
-                <HighlightedText
-                  text={translation.text || '...'}
-                  language={translation.language}
-                  wordTimings={audio?.wordTimings ?? null}
-                  localTime={buttonPlayback.active?.localTime ?? 0}
-                  isActive={isActive}
-                  enabled={highlightEnabled}
-                  className="text-sm leading-relaxed"
-                />
-                {translation.romanization && (
-                  <p className="text-romanization">{translation.romanization}</p>
-                )}
-              </div>
-              <AudioButton
-                url={audio?.url ?? null}
-                language={translation.language}
-                onTimeUpdate={buttonPlayback.onTimeUpdate}
-                onStop={buttonPlayback.onStop}
-              />
-            </div>
-          );
-        })}
+              <ArrowUpCircle className="size-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              className={PREVIEW_ACTION_ICON_CLASS}
+              title={t('addOne')}
+              disabled={isAddPending || addLocked}
+              onClick={() => browse.onAddSingle(row._id)}
+              data-testid="collection-text-add"
+            >
+              {isAddPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : addLocked ? (
+                <Lock className="size-3.5" />
+              ) : (
+                <Plus className="size-3.5" />
+              )}
+            </Button>
+            <Button
+              size="icon"
+              variant="outline"
+              className={cn(
+                PREVIEW_ACTION_ICON_CLASS,
+                'text-muted-foreground',
+                isIgnored && 'bg-muted text-foreground',
+              )}
+              title={isIgnored ? t('ignored') : t('ignore')}
+              onClick={() =>
+                browse.onSetMark(row._id, isIgnored ? null : 'ignored')
+              }
+              data-testid="collection-text-ignore"
+            >
+              <EyeOff className="size-3.5" />
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );

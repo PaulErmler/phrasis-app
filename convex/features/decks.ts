@@ -66,19 +66,140 @@ import {
 import { llmPool } from '../lib/workpools';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
 import {
-  CONTENT_LOOKAHEAD_SIZE,
   LEGACY_LEVEL_ORDER,
+  collectionRemaining,
   isPremadeLevelCollection,
+  settledCount,
 } from '../lib/collections';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { consumeQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 import { isCollectionAccessible } from './collections';
+import {
+  applyMarkCounterDelta,
+  clearMarkForAddedText,
+  counterDeltaForMark,
+  listMarksForCollection,
+} from '../db/collectionTextMarks';
 
 // ============================================================================
 // HELPERS
 // ============================================================================
+
+/**
+ * Claim + enqueue a translation job for (text, targetLanguage) — the routing
+ * slice shared by `scheduleMissingContent` and the collection-preview
+ * generation path (`requestPreviewTranslations`). OpenRouter languages go
+ * through the LLM queue under a claim; the rest take the legacy Google path
+ * (still pool-bounded, claimless). Returns true iff a job was enqueued.
+ */
+export async function scheduleTranslationForLanguage(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  targetLanguage: string,
+  opts: {
+    audioSpeakerGender?: string;
+    preferredRegionVariant?: string;
+    /** Translation-only mode — the landing translation won't enqueue TTS. */
+    skipTts?: boolean;
+  },
+): Promise<boolean> {
+  const tCfg = getTranslationConfigForLanguage(targetLanguage);
+  if (tCfg.provider === 'openrouter') {
+    const claimId = await claimLlmTranslationIfAvailable(
+      ctx,
+      text._id,
+      targetLanguage,
+    );
+    if (!claimId) return false;
+    await ctx.runMutation(
+      internal.features.llmTranslationQueue.enqueueLlmTranslation,
+      {
+        args: {
+          textId: text._id,
+          sourceLanguage: text.language,
+          targetLanguage,
+          text: text.text,
+          audioSpeakerGender: opts.audioSpeakerGender,
+          preferredRegionVariant: opts.preferredRegionVariant,
+          skipTts: opts.skipTts,
+        },
+      },
+    );
+    return true;
+  }
+  // Legacy Google Translate path. Runs through the llmPool too (for
+  // retries + slot bounding); holds no LLM claim, so its onComplete's
+  // claim lookup no-ops.
+  await llmPool.enqueueAction(
+    ctx,
+    internal.features.decks.processTranslationForCard,
+    {
+      textId: text._id,
+      sourceLanguage: text.language,
+      targetLanguage,
+      text: text.text,
+      audioSpeakerGender: opts.audioSpeakerGender,
+      preferredRegionVariant: opts.preferredRegionVariant,
+      skipTts: opts.skipTts,
+    },
+    {
+      onComplete:
+        internal.features.llmTranslationQueue.onGoogleFallbackComplete,
+      context: { textId: text._id, targetLanguage },
+    },
+  );
+  return true;
+}
+
+/**
+ * Claim + enqueue a TTS job for (text, language) — the enqueue slice shared
+ * by `scheduleMissingContent`, `storeTranslationAndScheduleTTS`'s siblings,
+ * and the preview audio-icon click (`requestPreviewAudio`). For the text's
+ * own language the source text is synthesized; for any other language the
+ * caller must pass the stored translation row (synthesis text + variant
+ * pin). Returns true iff a job was enqueued (false when a fresh TTS claim
+ * already owns the slot, or the translation is missing).
+ */
+export async function scheduleAudioForLanguage(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  language: string,
+  audioSpeakerGender: string | undefined,
+  translation: Doc<'translations'> | null,
+): Promise<boolean> {
+  const isSource = language === text.language;
+  if (!isSource && !translation) return false;
+  const claimed = await claimTtsIfAvailable(ctx, text._id, language);
+  if (!claimed) return false;
+  // For mixed-dialect rows, prefer a voice in the same locale that was
+  // picked at translation time and forward the variant to TTS so the
+  // validation roundtrip uses the matching STT locale.
+  const regionVariant = isSource ? undefined : translation!.regionVariant;
+  const voiceName = regionVariant
+    ? getVoiceForLanguageVariant(language, regionVariant, audioSpeakerGender)
+    : getVoiceForLanguage(language, audioSpeakerGender);
+  const voiceGender = getVoiceGenderByApiCode(voiceName);
+  if (voiceGender === undefined) {
+    throw new Error(
+      `Cannot enqueue TTS: voice "${voiceName}" for language "${language}" is not in the curated voice list.`,
+    );
+  }
+  await ctx.runMutation(internal.features.ttsProcessing.enqueueTtsJob, {
+    provider: getTtsProviderForLanguage(language),
+    args: {
+      textId: text._id,
+      text: isSource ? text.text : translation!.translatedText,
+      language,
+      voiceName,
+      voiceGender,
+      speed: 1,
+      regionVariant,
+    },
+  });
+  return true;
+}
 
 /**
  * Schedule missing translations and audio for a text.
@@ -363,29 +484,9 @@ export async function scheduleMissingContent(
     if (lang === sourceLanguage) {
       // Source language — no translation needed, maybe TTS
       if (!hasAudio) {
-        const claimed = await claimTtsIfAvailable(ctx, textId, lang);
-        if (claimed) {
-          const voiceName = getVoiceForLanguage(lang, audioSpeakerGender);
-          const voiceGender = getVoiceGenderByApiCode(voiceName);
-          if (voiceGender === undefined) {
-            throw new Error(
-              `Cannot enqueue TTS: voice "${voiceName}" for language "${lang}" is not in the curated voice list.`,
-            );
-          }
-          await ctx.runMutation(
-            internal.features.ttsProcessing.enqueueTtsJob,
-            {
-              provider: getTtsProviderForLanguage(lang),
-              args: {
-                textId,
-                text: text.text,
-                language: lang,
-                voiceName,
-                voiceGender,
-                speed: 1,
-              },
-            },
-          );
+        if (
+          await scheduleAudioForLanguage(ctx, text, lang, audioSpeakerGender, null)
+        ) {
           audioScheduled++;
         }
       } else {
@@ -399,46 +500,12 @@ export async function scheduleMissingContent(
         // the per-language config in lib/languages.ts. Both paths terminate
         // by writing the `translations` row via storeTranslationAndScheduleTTS,
         // so downstream (romanization, TTS) doesn't care which provider ran.
-        const tCfg = getTranslationConfigForLanguage(lang);
-        if (tCfg.provider === 'openrouter') {
-          const claimId = await claimLlmTranslationIfAvailable(ctx, textId, lang);
-          if (claimId) {
-            await ctx.runMutation(
-              internal.features.llmTranslationQueue.enqueueLlmTranslation,
-              {
-                args: {
-                  textId,
-                  sourceLanguage,
-                  targetLanguage: lang,
-                  text: text.text,
-                  audioSpeakerGender,
-                  preferredRegionVariant: sweptRegionVariants.get(lang),
-                },
-              },
-            );
-            translationsScheduled++;
-          }
-        } else {
-          // Legacy Google Translate path. Runs through the llmPool too (for
-          // retries + slot bounding); holds no LLM claim, so its onComplete's
-          // claim lookup no-ops.
-          await llmPool.enqueueAction(
-            ctx,
-            internal.features.decks.processTranslationForCard,
-            {
-              textId,
-              sourceLanguage,
-              targetLanguage: lang,
-              text: text.text,
-              audioSpeakerGender,
-              preferredRegionVariant: sweptRegionVariants.get(lang),
-            },
-            {
-              onComplete:
-                internal.features.llmTranslationQueue.onGoogleFallbackComplete,
-              context: { textId, targetLanguage: lang },
-            },
-          );
+        if (
+          await scheduleTranslationForLanguage(ctx, text, lang, {
+            audioSpeakerGender,
+            preferredRegionVariant: sweptRegionVariants.get(lang),
+          })
+        ) {
           translationsScheduled++;
         }
       } else {
@@ -473,39 +540,16 @@ export async function scheduleMissingContent(
             Date.now() - existingLlmClaim.claimedAt < LLM_CLAIM_STALE_MS;
           if (llmRetranslationInFlight) {
             // Skip — the LLM worker owns the next TTS enqueue for this row.
-          } else {
-            const claimed = await claimTtsIfAvailable(ctx, textId, lang);
-            if (claimed) {
-              // For mixed-dialect rows, prefer a voice in the same locale that
-              // was picked at translation time and forward the variant to TTS
-              // so the validation roundtrip uses the matching STT locale.
-              const regionVariant = translation.regionVariant;
-              const voiceName = regionVariant
-                ? getVoiceForLanguageVariant(lang, regionVariant, audioSpeakerGender)
-                : getVoiceForLanguage(lang, audioSpeakerGender);
-              const voiceGender = getVoiceGenderByApiCode(voiceName);
-              if (voiceGender === undefined) {
-                throw new Error(
-                  `Cannot enqueue TTS: voice "${voiceName}" for language "${lang}" is not in the curated voice list.`,
-                );
-              }
-              await ctx.runMutation(
-                internal.features.ttsProcessing.enqueueTtsJob,
-                {
-                  provider: getTtsProviderForLanguage(lang),
-                  args: {
-                    textId,
-                    text: translation.translatedText,
-                    language: lang,
-                    voiceName,
-                    voiceGender,
-                    speed: 1,
-                    regionVariant,
-                  },
-                },
-              );
-              audioScheduled++;
-            }
+          } else if (
+            await scheduleAudioForLanguage(
+              ctx,
+              text,
+              lang,
+              audioSpeakerGender,
+              translation,
+            )
+          ) {
+            audioScheduled++;
           }
         } else {
           await scheduleTimingsBackfillIfNeeded(lang);
@@ -627,6 +671,8 @@ export const getCollectionProgress = query({
       collectionId: v.id('collections'),
       collectionName: v.string(),
       cardsAdded: v.number(),
+      ignoredCount: v.number(),
+      prioritizedCount: v.number(),
       totalTexts: v.number(),
       order: v.optional(v.number()),
     }),
@@ -679,6 +725,8 @@ export const getCollectionProgress = query({
           collectionId: collection._id,
           collectionName: collection.name,
           cardsAdded: progress?.cardsAdded ?? 0,
+          ignoredCount: progress?.ignoredCount ?? 0,
+          prioritizedCount: progress?.prioritizedCount ?? 0,
           totalTexts: collection.textCount,
           order: collection.order,
         };
@@ -802,7 +850,8 @@ export const setActiveCollection = mutation({
       args.collectionId,
     );
 
-    if (progress && progress.cardsAdded >= collection.textCount) {
+    // Complete = every text either added or deliberately ignored.
+    if (progress && settledCount(progress) >= collection.textCount) {
       throw new ConvexError('This collection is already complete');
     }
 
@@ -939,14 +988,23 @@ export async function createCardsFromTexts(
 
 /**
  * Updates collection progress after adding cards.
+ *
+ * `addedDelta` must be the number of cards actually INSERTED (not texts
+ * scanned): direct-adds from the collection preview create cards ahead of the
+ * sequential frontier, and the later scan passing over them must not count
+ * them a second time.
+ *
+ * `frontierRank` advances `lastRankProcessed` (monotonic via Math.max).
+ * Omit it for out-of-order adds (preview direct-add, prioritized drain) —
+ * those must NOT move the frontier, or every unscanned text between the old
+ * frontier and the added rank would be silently skipped forever.
  */
 export async function updateCollectionProgress(
   ctx: MutationCtx,
   userId: string,
   courseId: Id<'courses'>,
   collectionId: Id<'collections'>,
-  textsProcessed: number,
-  newLastRank: number,
+  update: { addedDelta: number; frontierRank?: number },
 ): Promise<void> {
   const progress = await getCollectionProgressHelper(
     ctx,
@@ -957,18 +1015,293 @@ export async function updateCollectionProgress(
 
   if (progress) {
     await ctx.db.patch(progress._id, {
-      cardsAdded: progress.cardsAdded + textsProcessed,
-      lastRankProcessed: Math.max(progress.lastRankProcessed ?? 0, newLastRank),
+      cardsAdded: progress.cardsAdded + update.addedDelta,
+      ...(update.frontierRank !== undefined
+        ? {
+          lastRankProcessed: Math.max(
+            progress.lastRankProcessed ?? 0,
+            update.frontierRank,
+          ),
+        }
+        : {}),
     });
   } else {
     await ctx.db.insert('collectionProgress', {
       userId,
       courseId,
       collectionId,
-      cardsAdded: textsProcessed,
-      lastRankProcessed: newLastRank,
+      cardsAdded: update.addedDelta,
+      ...(update.frontierRank !== undefined
+        ? { lastRankProcessed: update.frontierRank }
+        : {}),
     });
   }
+}
+
+async function getOrCreateDeck(
+  ctx: MutationCtx,
+  course: Doc<'courses'>,
+): Promise<Doc<'decks'>> {
+  const existing = await getDeckByCourseId(ctx, course._id);
+  if (existing) return existing;
+  const deckId = await ctx.db.insert('decks', {
+    courseId: course._id,
+    name: `Learning ${course.targetLanguages.join(', ')}`,
+    cardCount: 0,
+  });
+  const deck = await ctx.db.get(deckId);
+  if (!deck) throw new ConvexError('Failed to create deck');
+  return deck;
+}
+
+/**
+ * Per-call bound on how many texts the sequential add scan may walk over.
+ * Keeps one mutation's reads bounded when the frontier sits at the start of a
+ * long ignored/direct-added streak: each scanned text costs ~2 reads (text
+ * doc + card point-read), so 1500 ≈ 3k document reads — well inside Convex's
+ * per-transaction limits. The frontier advance is persisted even when nothing
+ * addable was found, so the caller can signal `scanIncomplete` and the client
+ * re-calls — each retry resumes past the already-scanned stretch (guaranteed
+ * progress). Exported for the scan-continuation test.
+ */
+export const ADD_SCAN_CAP = 1500;
+
+/**
+ * The next texts from a collection that can actually become cards: walks the
+ * rank index from `afterRank`, passing over ignored-marked texts and texts
+ * that already have a card (preview direct-adds ahead of the frontier).
+ *
+ * Returns the picked texts plus the new frontier (rank of the last text
+ * processed — every text at or below it is added-or-ignored). `exhausted`
+ * means the index range ran dry; `capped` means the ADD_SCAN_CAP was hit
+ * before filling `limit` with more texts possibly remaining.
+ */
+async function getNextAddableTextsFromRank(
+  ctx: MutationCtx,
+  params: {
+    collectionId: Id<'collections'>;
+    afterRank: number;
+    limit: number;
+    deckId: Id<'decks'>;
+    userId: string;
+    courseId: Id<'courses'>;
+    options?: { onlyCurriculum?: boolean; forUserId?: string };
+    /** Texts already selected by the prioritized drain in this call. */
+    excludeTextIds?: Set<string>;
+  },
+): Promise<{
+  picked: Doc<'texts'>[];
+  newFrontier: number;
+  exhausted: boolean;
+  capped: boolean;
+}> {
+  const { collectionId, afterRank, limit, deckId, userId, courseId } = params;
+  if (limit <= 0) {
+    return { picked: [], newFrontier: afterRank, exhausted: false, capped: false };
+  }
+
+  const picked: Doc<'texts'>[] = [];
+  let cursor = afterRank;
+  let scanned = 0;
+  let exhausted = false;
+
+  while (picked.length < limit && scanned < ADD_SCAN_CAP) {
+    // Floor of 50 keeps the skip-heavy worst case at ≤ 30 loop rounds while
+    // costing at most ~45 extra text reads in the common instant-hit case.
+    const batchSize = Math.min(Math.max(limit * 2, 50), ADD_SCAN_CAP - scanned);
+    const batch = await getNextTextsFromRank(
+      ctx,
+      collectionId,
+      cursor,
+      batchSize,
+      params.options,
+    );
+    if (batch.length === 0) {
+      exhausted = true;
+      break;
+    }
+    // Ignore set scoped to exactly this batch's rank window — bounded by the
+    // batch size no matter how many marks the user has in total (a global
+    // read would need an unbounded collect and silently miss marks past any
+    // fixed cap).
+    const [cards, ignoredMarks] = await Promise.all([
+      Promise.all(batch.map((t) => getCardByDeckAndText(ctx, deckId, t._id))),
+      listMarksForCollection(ctx, userId, courseId, collectionId, 'ignored', {
+        minRank: batch[0].collectionRank,
+        maxRank: batch[batch.length - 1].collectionRank,
+        limit: batch.length,
+      }),
+    ]);
+    const ignoredTextIds = new Set(ignoredMarks.map((m) => m.textId.toString()));
+    for (let i = 0; i < batch.length; i++) {
+      if (picked.length >= limit) break; // don't pass unprocessed texts
+      const text = batch[i];
+      cursor = text.collectionRank;
+      scanned++;
+      if (ignoredTextIds.has(text._id.toString())) continue;
+      if (params.excludeTextIds?.has(text._id.toString())) continue;
+      if (cards[i]) continue; // direct-added earlier: pass, don't re-count
+      picked.push(text);
+    }
+    // Short batch fully consumed → the range is dry.
+    if (picked.length < limit && batch.length < batchSize) {
+      exhausted = true;
+      break;
+    }
+  }
+
+  return {
+    picked,
+    newFrontier: cursor,
+    exhausted,
+    capped: !exhausted && picked.length < limit && scanned >= ADD_SCAN_CAP,
+  };
+}
+
+/**
+ * Load the texts behind one type of the user's marks for a collection, rank
+ * order, up to `limit`. Orphan marks (text deleted, or a card already exists)
+ * are cleaned up here without counting toward the batch. The kept marks are
+ * NOT deleted yet — `addTextsAsCards` clears them in the same transaction
+ * that inserts the cards.
+ */
+async function drainMarkedTexts(
+  ctx: MutationCtx,
+  userId: string,
+  courseId: Id<'courses'>,
+  collectionId: Id<'collections'>,
+  deckId: Id<'decks'>,
+  mark: 'prioritized' | 'readd',
+  limit: number,
+): Promise<Doc<'texts'>[]> {
+  if (limit <= 0) return [];
+  const marks = await listMarksForCollection(
+    ctx,
+    userId,
+    courseId,
+    collectionId,
+    mark,
+    { limit },
+  );
+  const texts: Doc<'texts'>[] = [];
+  for (const markDoc of marks) {
+    const text = await ctx.db.get(markDoc.textId);
+    const existingCard = text
+      ? await getCardByDeckAndText(ctx, deckId, text._id)
+      : null;
+    if (!text || existingCard) {
+      await ctx.db.delete(markDoc._id);
+      await applyMarkCounterDelta(
+        ctx,
+        userId,
+        courseId,
+        markDoc.collectionId,
+        counterDeltaForMark(markDoc.mark, -1),
+      );
+      continue;
+    }
+    texts.push(text);
+  }
+  return texts;
+}
+
+/**
+ * The out-of-band texts an add call must take before its sequential scan:
+ * 'prioritized' marks jump the queue by design; 'readd' marks are un-marked
+ * texts the frontier already passed (they'd otherwise be unreachable, since
+ * the scan never looks backwards). Rank-ordered within each type,
+ * prioritized first.
+ */
+async function drainQueuedMarkTexts(
+  ctx: MutationCtx,
+  userId: string,
+  courseId: Id<'courses'>,
+  collectionId: Id<'collections'>,
+  deckId: Id<'decks'>,
+  limit: number,
+): Promise<Doc<'texts'>[]> {
+  const prioritized = await drainMarkedTexts(
+    ctx, userId, courseId, collectionId, deckId, 'prioritized', limit,
+  );
+  const readd = await drainMarkedTexts(
+    ctx, userId, courseId, collectionId, deckId, 'readd',
+    limit - prioritized.length,
+  );
+  return [...prioritized, ...readd];
+}
+
+/**
+ * Turn texts into cards: insert (deduped), clear any marks (keeps the
+ * "marks exist only for card-less texts" invariant + counters), and schedule
+ * full content (translations + audio) per text. Returns cards inserted.
+ */
+async function addTextsAsCards(
+  ctx: MutationCtx,
+  texts: Doc<'texts'>[],
+  deck: Doc<'decks'>,
+  collectionId: Id<'collections'>,
+  course: Doc<'courses'>,
+  userId: string,
+): Promise<number> {
+  if (texts.length === 0) return 0;
+  const { cardsInserted } = await createCardsFromTexts(
+    ctx,
+    texts,
+    deck,
+    collectionId,
+    course,
+  );
+  for (const text of texts) {
+    await clearMarkForAddedText(ctx, userId, course._id, text._id);
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.decks.prepareCardContent,
+      {
+        textId: text._id,
+        baseLanguages: course.baseLanguages,
+        targetLanguages: course.targetLanguages,
+      },
+    );
+  }
+  return cardsInserted;
+}
+
+/**
+ * If `collectionId` is the active premade collection and is now complete —
+ * every text either added or deliberately ignored — advance the active
+ * collection to the next incomplete one (or clear it when none remain).
+ * Walks forward within the same collection generation — new-dataset
+ * collections advance by `order + 1`, legacy collections walk
+ * LEGACY_LEVEL_ORDER. See findNextIncompleteCollection / getNextCollection.
+ */
+async function maybeAutoAdvanceActiveCollection(
+  ctx: MutationCtx,
+  userId: string,
+  courseId: Id<'courses'>,
+  collectionId: Id<'collections'>,
+): Promise<void> {
+  const collection = await ctx.db.get(collectionId);
+  if (!collection || !isPremadeLevelCollection(collection)) return;
+  const progress = await getCollectionProgressHelper(
+    ctx,
+    userId,
+    courseId,
+    collectionId,
+  );
+  if (settledCount(progress) < collection.textCount) return;
+  const latestSettings = await getCourseSettings(ctx, courseId);
+  if (
+    latestSettings?.activeCollectionId?.toString() !== collectionId.toString()
+  ) {
+    return;
+  }
+  // Start the search at the collection AFTER the one we just completed, so a
+  // partially-filled current row can't be picked.
+  const startCollection = await getNextCollection(ctx, collection);
+  const next = startCollection
+    ? await findNextIncompleteCollection(ctx, startCollection, userId, courseId)
+    : null;
+  await setActiveCollectionOnSettings(ctx, courseId, next?._id);
 }
 
 /**
@@ -985,6 +1318,14 @@ export const addCardsFromCollection = mutation({
   returns: v.object({
     cardsAdded: v.number(),
     totalCardsInDeck: v.number(),
+    /**
+     * True when the sequential scan hit its per-call read cap before filling
+     * the batch and the collection wasn't exhausted — addable texts may exist
+     * beyond the scanned window. The frontier advance is already persisted,
+     * so the caller should simply re-call to continue (each retry makes
+     * guaranteed progress).
+     */
+    scanIncomplete: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const { userId, course } = await requireActiveCourse(ctx);
@@ -992,21 +1333,11 @@ export const addCardsFromCollection = mutation({
 
     const clampedBatchSize = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(args.batchSize)));
 
-    // Get or create deck
-    let deck = await getDeckByCourseId(ctx, courseId);
-    if (!deck) {
-      const deckId = await ctx.db.insert('decks', {
-        courseId,
-        name: `Learning ${course.targetLanguages.join(', ')}`,
-        cardCount: 0,
-      });
-      deck = await ctx.db.get(deckId);
-      if (!deck) throw new ConvexError('Failed to create deck');
-    }
+    const deck = await getOrCreateDeck(ctx, course);
 
     let totalCardsInserted = 0;
-    let totalTextsProcessed = 0;
     let remainingBatch = clampedBatchSize;
+    let scanIncomplete = false;
 
     // --- Phase 1: Add from custom collection(s) ---
     // When the requested collection is a level collection (learning mode auto-add),
@@ -1055,8 +1386,9 @@ export const addCardsFromCollection = mutation({
         if (!coll) continue;
         const prog = await getCollectionProgressHelper(ctx, userId, courseId, collId);
         const lastRank = prog?.lastRankProcessed ?? 0;
-        const cardsAdded = prog?.cardsAdded ?? 0;
-        const pending = coll.textCount - cardsAdded;
+        // Ignored texts are deliberately excluded from auto-add, so they
+        // don't count as pending.
+        const pending = collectionRemaining(coll.textCount, prog);
         if (pending > 0) {
           collectionsWithPending.push({
             id: collId,
@@ -1086,45 +1418,37 @@ export const addCardsFromCollection = mutation({
           const count = allocations.get(entry.id.toString()) ?? 0;
           if (count === 0) continue;
 
-          const texts = await getNextTextsFromRank(ctx, entry.id, entry.lastRank, count, { forUserId: userId });
-          if (texts.length === 0) continue;
+          // Prioritized/readd marks jump the queue (rank-ordered, frontier
+          // untouched); the sequential scan fills the rest, skipping ignored
+          // and already-carded texts.
+          const queuedTexts = await drainQueuedMarkTexts(
+            ctx, userId, courseId, entry.id, deck._id, count,
+          );
+          const scan = await getNextAddableTextsFromRank(ctx, {
+            collectionId: entry.id,
+            afterRank: entry.lastRank,
+            limit: count - queuedTexts.length,
+            deckId: deck._id,
+            userId,
+            courseId,
+            options: { forUserId: userId },
+            excludeTextIds: new Set(queuedTexts.map((t) => t._id.toString())),
+          });
+          if (scan.capped) scanIncomplete = true;
 
-          const { cardsInserted, newLastRank } = await createCardsFromTexts(
-            ctx, texts, deck, entry.id, course,
+          const texts = [...queuedTexts, ...scan.picked];
+          const cardsInserted = await addTextsAsCards(
+            ctx, texts, deck, entry.id, course, userId,
           );
 
           totalCardsInserted += cardsInserted;
-          totalTextsProcessed += texts.length;
           remainingBatch -= texts.length;
 
-          await updateCollectionProgress(
-            ctx, userId, courseId, entry.id, texts.length, newLastRank,
-          );
-
-          for (const text of texts) {
-            await ctx.scheduler.runAfter(
-              0, internal.features.decks.prepareCardContent,
-              {
-                textId: text._id,
-                baseLanguages: course.baseLanguages,
-                targetLanguages: course.targetLanguages,
-              },
-            );
-          }
-
-          const customFinalRank = Math.max(entry.lastRank, newLastRank);
-          const upcomingCustomTexts = await getNextTextsFromRank(
-            ctx, entry.id, customFinalRank, CONTENT_LOOKAHEAD_SIZE, { forUserId: userId },
-          );
-          for (const text of upcomingCustomTexts) {
-            await ctx.scheduler.runAfter(
-              0, internal.features.decks.prepareCardContent,
-              {
-                textId: text._id,
-                baseLanguages: course.baseLanguages,
-                targetLanguages: course.targetLanguages,
-              },
-            );
+          if (cardsInserted > 0 || scan.newFrontier > entry.lastRank) {
+            await updateCollectionProgress(ctx, userId, courseId, entry.id, {
+              addedDelta: cardsInserted,
+              frontierRank: scan.newFrontier,
+            });
           }
         }
       }
@@ -1144,8 +1468,9 @@ export const addCardsFromCollection = mutation({
             await ctx.db.patch(deck._id, { cardCount: deck.cardCount + totalCardsInserted });
           }
           return {
-            cardsAdded: totalTextsProcessed,
+            cardsAdded: totalCardsInserted,
             totalCardsInDeck: deck.cardCount + totalCardsInserted,
+            scanIncomplete,
           };
         }
       }
@@ -1156,101 +1481,54 @@ export const addCardsFromCollection = mutation({
         courseId,
         args.collectionId,
       );
-
-      const cardsAlreadyAdded = progress?.cardsAdded ?? 0;
       const lastRankProcessed = progress?.lastRankProcessed ?? 0;
 
-      const textsToAdd = await getNextTextsFromRank(
-        ctx,
-        args.collectionId,
-        lastRankProcessed,
-        remainingBatch,
-        { onlyCurriculum: true },
+      // Prioritized/readd marks jump the queue (rank-ordered, frontier
+      // untouched); the sequential scan fills the rest, skipping ignored
+      // texts and cards direct-added ahead of the frontier.
+      const queuedTexts = await drainQueuedMarkTexts(
+        ctx, userId, courseId, args.collectionId, deck._id, remainingBatch,
       );
+      const scan = await getNextAddableTextsFromRank(ctx, {
+        collectionId: args.collectionId,
+        afterRank: lastRankProcessed,
+        limit: remainingBatch - queuedTexts.length,
+        deckId: deck._id,
+        userId,
+        courseId,
+        options: { onlyCurriculum: true },
+        excludeTextIds: new Set(queuedTexts.map((t) => t._id.toString())),
+      });
+      if (scan.capped) scanIncomplete = true;
+
+      const textsToAdd = [...queuedTexts, ...scan.picked];
 
       if (textsToAdd.length > 0) {
         await consumeQuota(ctx, userId, FEATURE_IDS.SENTENCES, textsToAdd.length);
 
-        const { cardsInserted, newLastRank } = await createCardsFromTexts(
-          ctx,
-          textsToAdd,
-          deck,
-          args.collectionId,
-          course,
+        const cardsInserted = await addTextsAsCards(
+          ctx, textsToAdd, deck, args.collectionId, course, userId,
         );
-
         totalCardsInserted += cardsInserted;
-        totalTextsProcessed += textsToAdd.length;
 
-        await updateCollectionProgress(
-          ctx,
-          userId,
-          courseId,
-          args.collectionId,
-          textsToAdd.length,
-          newLastRank,
-        );
+        await updateCollectionProgress(ctx, userId, courseId, args.collectionId, {
+          addedDelta: cardsInserted,
+          frontierRank: scan.newFrontier,
+        });
 
-        for (const text of textsToAdd) {
-          await ctx.scheduler.runAfter(
-            0,
-            internal.features.decks.prepareCardContent,
-            {
-              textId: text._id,
-              baseLanguages: course.baseLanguages,
-              targetLanguages: course.targetLanguages,
-            },
-          );
-        }
-
-        const finalLastRank = Math.max(lastRankProcessed, newLastRank);
-        const upcomingTexts = await getNextTextsFromRank(
-          ctx,
-          args.collectionId,
-          finalLastRank,
-          CONTENT_LOOKAHEAD_SIZE,
-          { onlyCurriculum: true },
-        );
-
-        for (const text of upcomingTexts) {
-          await ctx.scheduler.runAfter(
-            0,
-            internal.features.decks.prepareCardContent,
-            {
-              textId: text._id,
-              baseLanguages: course.baseLanguages,
-              targetLanguages: course.targetLanguages,
-            },
-          );
-        }
-
-        // Auto-advance: if the collection is now complete and is the active one,
-        // move to the next incomplete collection (or clear if last).
-        // Walks forward within the same collection generation — new-dataset
-        // collections advance by `order + 1`, legacy collections walk
-        // LEGACY_LEVEL_ORDER. See findNextIncompleteCollection / getNextCollection.
-        const newCardsAdded = cardsAlreadyAdded + textsToAdd.length;
-        const collection = await ctx.db.get(args.collectionId);
-        if (collection && newCardsAdded >= collection.textCount) {
-          const latestSettings = await getCourseSettings(ctx, courseId);
-          if (
-            latestSettings?.activeCollectionId?.toString() ===
-            args.collectionId.toString()
-          ) {
-            // Start the search at the collection AFTER the one we just
-            // completed, so a partially-filled current row can't be picked.
-            const startCollection = await getNextCollection(ctx, collection);
-            const next = startCollection
-              ? await findNextIncompleteCollection(
-                ctx,
-                startCollection,
-                userId,
-                courseId,
-              )
-              : null;
-            await setActiveCollectionOnSettings(ctx, courseId, next?._id);
-          }
-        }
+        // Auto-advance: if the collection is now complete (every text added
+        // or deliberately ignored) and is the active one, move to the next
+        // incomplete collection (or clear if last).
+        await maybeAutoAdvanceActiveCollection(ctx, userId, courseId, args.collectionId);
+      } else if (scan.newFrontier > lastRankProcessed) {
+        // Nothing addable in the scanned window (an ignored/direct-added
+        // streak) — persist the frontier advance so the next call continues
+        // past it instead of re-scanning the same stretch.
+        await updateCollectionProgress(ctx, userId, courseId, args.collectionId, {
+          addedDelta: 0,
+          frontierRank: scan.newFrontier,
+        });
+        await maybeAutoAdvanceActiveCollection(ctx, userId, courseId, args.collectionId);
       }
     }
 
@@ -1260,9 +1538,72 @@ export const addCardsFromCollection = mutation({
     }
 
     return {
-      cardsAdded: totalTextsProcessed,
+      cardsAdded: totalCardsInserted,
       totalCardsInDeck: deck.cardCount + totalCardsInserted,
+      scanIncomplete,
     };
+  },
+});
+
+/**
+ * Add ONE specific text from a collection to the user's deck — the collection
+ * preview's per-card "Add" button. The card is created ahead of the
+ * sequential frontier; the frontier is deliberately NOT advanced (the scan
+ * later passes over the card via its dedup check without re-counting it).
+ * Premade curriculum texts consume 1 SENTENCES quota, mirroring the batch
+ * add; custom/chat texts were already paid for at creation.
+ */
+export const addSingleTextFromCollection = mutation({
+  args: {
+    textId: v.id('texts'),
+  },
+  returns: v.object({
+    added: v.boolean(),
+    alreadyAdded: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const { userId, course } = await requireActiveCourse(ctx);
+    const courseId = course._id;
+
+    const text = await ctx.db.get(args.textId);
+    if (!text) throw new ConvexError('Text not found');
+    if (!(await isCollectionAccessible(ctx, text.collectionId, courseId))) {
+      throw new ConvexError('Collection not accessible');
+    }
+    const collection = await ctx.db.get(text.collectionId);
+    if (!collection) throw new ConvexError('Collection not found');
+    // Mirror getNextTextsFromRank's scoping: premade collections only serve
+    // curriculum rows; custom/chat collections only the owner's texts.
+    const isLevelCollection = isPremadeLevelCollection(collection);
+    if (isLevelCollection ? text.userCreated : text.userId !== userId) {
+      throw new ConvexError('Text not accessible');
+    }
+
+    const deck = await getOrCreateDeck(ctx, course);
+
+    const existingCard = await getCardByDeckAndText(ctx, deck._id, args.textId);
+    if (existingCard) {
+      // Already in the deck — just make sure no stale mark survives.
+      await clearMarkForAddedText(ctx, userId, courseId, args.textId);
+      return { added: false, alreadyAdded: true };
+    }
+
+    if (isLevelCollection) {
+      await consumeQuota(ctx, userId, FEATURE_IDS.SENTENCES, 1);
+    }
+
+    const cardsInserted = await addTextsAsCards(
+      ctx, [text], deck, text.collectionId, course, userId,
+    );
+    if (cardsInserted > 0) {
+      await updateCollectionProgress(ctx, userId, courseId, text.collectionId, {
+        addedDelta: cardsInserted,
+      });
+      await ctx.db.patch(deck._id, { cardCount: deck.cardCount + cardsInserted });
+      await maybeAutoAdvanceActiveCollection(ctx, userId, courseId, text.collectionId);
+    }
+
+    return { added: cardsInserted > 0, alreadyAdded: false };
   },
 });
 
@@ -1343,18 +1684,15 @@ async function getUpcomingCardsForMode(
 }
 
 /**
- * Schedule missing content (translations + TTS) for the supplied due cards,
- * then pre-prep the active premade collection's upcoming texts. Shared by the
- * per-mode (`ensureUpcomingCardsContent`) and all-modes
+ * Schedule missing content (translations + TTS) for the supplied due cards.
+ * Shared by the per-mode (`ensureUpcomingCardsContent`) and all-modes
  * (`ensureUpcomingCardsContentAllModes`) ensure mutations. Returns the number
  * of due cards processed.
  */
 async function scheduleContentForUpcomingCards(
   ctx: MutationCtx,
-  userId: string,
   active: { settings: Doc<'userSettings'>; course: Doc<'courses'> },
   cards: Doc<'cards'>[],
-  activeCollectionId: Id<'collections'> | undefined,
 ): Promise<number> {
   let processed = 0;
   // Batch-load the texts for all due cards up front (one concurrent read
@@ -1375,39 +1713,13 @@ async function scheduleContentForUpcomingCards(
     processed++;
   }
 
-  // Pre-prep the next batch of upcoming texts in the active premade
-  // collection — the ones a future addCardsFromCollection call would pull
-  // in. Without this, a user who exhausts due cards and clicks "Add" has
-  // to wait on TTS + translation for the freshly added cards.
-  if (activeCollectionId) {
-    const collection = await ctx.db.get(activeCollectionId);
-    if (collection && isPremadeLevelCollection(collection)) {
-      const progress = await getCollectionProgressHelper(
-        ctx,
-        userId,
-        active.course._id,
-        activeCollectionId,
-      );
-      const lastRank = progress?.lastRankProcessed ?? 0;
-      const upcomingTexts = await getNextTextsFromRank(
-        ctx,
-        activeCollectionId,
-        lastRank,
-        CONTENT_LOOKAHEAD_SIZE,
-        { onlyCurriculum: true },
-      );
-      for (const text of upcomingTexts) {
-        await scheduleMissingContent(
-          ctx,
-          text._id,
-          text,
-          active.course.baseLanguages,
-          active.course.targetLanguages,
-        );
-      }
-    }
-  }
-
+  // NOTE: this used to also pre-generate full content (translations + audio)
+  // for the next CONTENT_LOOKAHEAD_SIZE not-yet-added texts of the active
+  // premade collection. Deliberately removed: audio is the dominant
+  // generation cost, the prioritized-marks drain makes the "next N by rank"
+  // prediction unreliable, and content for cards that ARE added is scheduled
+  // at add time (`prepareCardContent`). Preview browsing generates
+  // translations lazily and audio only on an explicit audio-icon click.
   return processed;
 }
 
@@ -1428,7 +1740,6 @@ export const ensureUpcomingCardsContent = mutation({
 
     const settings = await getCourseSettings(ctx, active.course._id);
     const schedulingMode = settings?.schedulingMode ?? 'learnAndReview';
-    const activeCollectionId = settings?.activeCollectionId;
 
     const cards = await getUpcomingCardsForMode(
       ctx,
@@ -1437,13 +1748,7 @@ export const ensureUpcomingCardsContent = mutation({
       Date.now(),
     );
 
-    return scheduleContentForUpcomingCards(
-      ctx,
-      userId,
-      active,
-      cards,
-      activeCollectionId,
-    );
+    return scheduleContentForUpcomingCards(ctx, active, cards);
   },
 });
 
@@ -1471,9 +1776,6 @@ export const ensureUpcomingCardsContentAllModes = mutation({
     const deck = await getDeckByCourseId(ctx, active.course._id);
     if (!deck) return 0;
 
-    const settings = await getCourseSettings(ctx, active.course._id);
-    const activeCollectionId = settings?.activeCollectionId;
-
     const now = Date.now();
     const cardLists = await Promise.all(
       WARMABLE_SCHEDULING_MODES.map((mode) =>
@@ -1489,13 +1791,7 @@ export const ensureUpcomingCardsContentAllModes = mutation({
       }
     }
 
-    return scheduleContentForUpcomingCards(
-      ctx,
-      userId,
-      active,
-      Array.from(byId.values()),
-      activeCollectionId,
-    );
+    return scheduleContentForUpcomingCards(ctx, active, Array.from(byId.values()));
   },
 });
 
@@ -1600,6 +1896,12 @@ export const processTranslationForCard = internalAction({
      * over a fresh `resolveMixedVariant` pick so the dialect never flips.
      */
     preferredRegionVariant: v.optional(v.string()),
+    /**
+     * Translation-only mode, forwarded to `storeTranslationAndScheduleTTS`
+     * so the landing translation does not auto-enqueue TTS. Set by the
+     * collection-preview generation path (directly or via the LLM fallback).
+     */
+    skipTts: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1713,6 +2015,7 @@ export const processTranslationForCard = internalAction({
           replaceExisting: args.replaceExisting,
           speakerGender: asVoiceGender(args.audioSpeakerGender),
           expectedClaimId: args.claimId,
+          skipTts: args.skipTts,
         },
       );
     }
@@ -1791,6 +2094,14 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      * branch), which then keeps its historical no-overwrite semantics only.
      */
     expectedClaimId: v.optional(v.id('llmTranslationClaims')),
+    /**
+     * Translation-only mode: store the translation but do NOT auto-enqueue
+     * TTS. Used by the collection-preview generation path, where audio is
+     * deliberately deferred to an explicit audio-icon click (or to the normal
+     * ensure path once the text becomes a card). Absent/false → historical
+     * behavior (translation landing schedules its TTS).
+     */
+    skipTts: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1945,6 +2256,10 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       if (Object.keys(patch).length > 0) {
         await ctx.db.patch(existing._id, patch);
       }
+    }
+
+    if (args.skipTts) {
+      return null;
     }
 
     const existingAudioForVoice = await ctx.db

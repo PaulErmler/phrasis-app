@@ -170,6 +170,9 @@ function PremadeTab({
         collectionId: l.collectionId,
         collectionName: l.displayName ?? l.code,
         cardsAdded: l.cardsAdded,
+        ignoredCount: l.ignoredCount,
+        prioritizedCount: l.prioritizedCount,
+        browseAnchor: l.browseAnchor,
         totalTexts: l.totalTexts,
       })),
     [summary.levels],
@@ -180,7 +183,7 @@ function PremadeTab({
     setOpenCollectionId,
     openedCollection,
     isOpenedComplete,
-    contentData,
+    browse,
     isAdding,
     handleAddCards,
     sentencesRemaining,
@@ -244,10 +247,11 @@ function PremadeTab({
         collectionName={openedCollection?.collectionName ?? null}
         totalTexts={openedCollection?.totalTexts ?? 0}
         cardsAdded={openedCollection?.cardsAdded ?? 0}
+        ignoredCount={openedCollection?.ignoredCount ?? 0}
+        prioritizedCount={openedCollection?.prioritizedCount ?? 0}
         isActive={activeCollectionId === openCollectionId}
         isComplete={isOpenedComplete}
-        texts={contentData?.texts ?? []}
-        isLoadingTexts={contentData === undefined && !isOpenedComplete}
+        browse={browse}
         isAdding={isAdding}
         onSelect={() => {
           if (openCollectionId) handleSelect(openCollectionId as Id<'collections'>);
@@ -501,6 +505,9 @@ function CustomTab({
     collectionName: c.name,
     displayName: localizedName(c),
     cardsAdded: c.cardsAdded,
+    ignoredCount: c.ignoredCount,
+    prioritizedCount: c.prioritizedCount,
+    browseAnchor: c.browseAnchor,
     totalTexts: c.totalTexts,
   }));
 
@@ -517,7 +524,7 @@ function CustomTab({
     setOpenCollectionId,
     openedCollection,
     isOpenedComplete,
-    contentData,
+    browse,
     isAdding,
     handleAddCards,
   } = useCollectionDetail({ collections: items, activeCourseId });
@@ -633,12 +640,13 @@ function CustomTab({
         displayName={openedCollection?.displayName ?? null}
         totalTexts={openedCollection?.totalTexts ?? 0}
         cardsAdded={openedCollection?.cardsAdded ?? 0}
+        ignoredCount={openedCollection?.ignoredCount ?? 0}
+        prioritizedCount={openedCollection?.prioritizedCount ?? 0}
         isActive={
           openCollectionId !== null && selectedIds.has(openCollectionId)
         }
         isComplete={isOpenedComplete}
-        texts={contentData?.texts ?? []}
-        isLoadingTexts={contentData === undefined && !isOpenedComplete}
+        browse={browse}
         isAdding={isAdding}
         onSelect={() => {
           if (openCollectionId) handleToggleCollection(openCollectionId);

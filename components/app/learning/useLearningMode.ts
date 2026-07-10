@@ -34,6 +34,7 @@ import {
   PROGRESS_DISPLAY_INTERVAL,
 } from '@/lib/constants/learning';
 import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
+import { collectionRemaining } from '@/convex/lib/collections';
 import { useCelebration } from './useCelebration';
 
 /**
@@ -676,8 +677,15 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // --------------------------------------------------------------------------
   // Add cards
   // --------------------------------------------------------------------------
+  // Collection a completed add run proved drained (0 cards, scan not capped).
+  // Read by the auto-add effect and the noCardsDue/loading status computation
+  // so neither re-fires a no-op mutation nor strands the user on the loading
+  // screen for a collection that has nothing left to add.
+  const autoAddExhaustedForRef = useRef<string | null>(null);
+
   const handleAddCards = useCallback(async () => {
     if (!courseSettings?.activeCollectionId || isAddingCards) return;
+    const collectionId = courseSettings.activeCollectionId;
     const configuredBatch =
       batchSizeOverride ??
       courseSettings.cardsToAddBatchSize ??
@@ -687,10 +695,24 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
       : Math.min(configuredBatch, Math.max(1, sentencesQuota.balance));
     setIsAddingCards(true);
     try {
-      await addCardsMutation({
-        collectionId: courseSettings.activeCollectionId,
-        batchSize: effectiveBatch,
-      });
+      const args = { collectionId, batchSize: effectiveBatch };
+      let result = await addCardsMutation(args);
+      // A 0-card result with scanIncomplete means the scan burned its
+      // per-call read budget on an ignored/direct-added streak; the frontier
+      // already advanced, so re-calling continues past it. Bounded retries —
+      // mirrors the collection dialog's handleAddCards.
+      let attempts = 1;
+      while (result.cardsAdded === 0 && result.scanIncomplete && attempts < 5) {
+        result = await addCardsMutation(args);
+        attempts++;
+      }
+      if (result.cardsAdded > 0) {
+        autoAddExhaustedForRef.current = null;
+      } else if (!result.scanIncomplete) {
+        // Proven drained (not just capped). Remembering it here is what lets
+        // the auto-add effect safely depend on isAddingCards without looping.
+        autoAddExhaustedForRef.current = collectionId.toString();
+      }
     } catch (error) {
       console.error('Failed to add cards:', error);
     } finally {
@@ -698,17 +720,24 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     }
   }, [courseSettings, isAddingCards, addCardsMutation, sentencesQuota, batchSizeOverride]);
 
-  // Auto-add cards when enabled and no cards due
+  // Auto-add cards when enabled and no cards due. isAddingCards and
+  // activeCollectionId are deliberate deps: a run that adds 0 cards while
+  // auto-advance moves the active collection (ignore-completed level), or one
+  // that merely hit the scan cap, must re-evaluate when the run finishes —
+  // otherwise the user is stranded on the loading screen. The exhausted-ref
+  // guard is what keeps this from looping on a truly drained collection.
   useEffect(() => {
     // Auto-add default is `true` — only opt out when explicitly false.
     const autoAddEnabled = courseSettings?.autoAddCards !== false;
+    const activeCollectionId = courseSettings?.activeCollectionId;
     if (
       cardForReview === null &&
       autoAddEnabled &&
-      courseSettings?.activeCollectionId &&
+      activeCollectionId &&
       courseSettings?.studyContentFilter !== 'custom' &&
       !isAddingCards &&
-      !settingsOpen
+      !settingsOpen &&
+      autoAddExhaustedForRef.current !== activeCollectionId.toString()
     ) {
       handleAddCards();
     }
@@ -716,7 +745,9 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   }, [
     cardForReview,
     courseSettings?.autoAddCards,
+    courseSettings?.activeCollectionId,
     courseSettings?.studyContentFilter,
+    isAddingCards,
     settingsOpen,
   ]);
 
@@ -1216,8 +1247,12 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     const activeEntry = collectionProgress?.find(
       (c) => c.collectionId === courseSettings.activeCollectionId,
     );
+    // Ignored texts are excluded from auto-add — with them counted, auto-add
+    // would look like it "will run" on a collection whose only unadded texts
+    // are ignored, and the user would sit on the loading screen instead of
+    // the noCardsDue screen.
     const remainingInCollection = activeEntry
-      ? Math.max(0, activeEntry.totalTexts - activeEntry.cardsAdded)
+      ? collectionRemaining(activeEntry.totalTexts, activeEntry)
       : null;
 
     // When auto-add is enabled and will actually add cards, suppress the
@@ -1229,7 +1264,11 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
       !settingsOpen &&
       courseSettings.studyContentFilter !== 'custom' &&
       (sentencesQuota.unlimited || sentencesQuota.balance > 0) &&
-      (remainingInCollection === null || remainingInCollection > 0);
+      (remainingInCollection === null || remainingInCollection > 0) &&
+      // A completed run proved this collection drained — the effect won't
+      // re-fire for it, so don't promise a load that will never happen.
+      autoAddExhaustedForRef.current !==
+        courseSettings.activeCollectionId?.toString();
 
     if (autoAddWillRun && lastReviewingCardRef.current) {
       // Keep the previously shown card on screen until the next card arrives,

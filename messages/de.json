@@ -258,7 +258,24 @@
           "adding": "Wird hinzugefügt...",
           "addN": "{count} hinzufügen",
           "upgrade": "Upgrade",
-          "noMoreCards": "Keine weiteren Sätze hinzuzufügen"
+          "noMoreCards": "Keine weiteren Sätze hinzuzufügen",
+          "sentences": "Sätze",
+          "added": "hinzugefügt",
+          "remaining": "verbleibend",
+          "ignoredCount": "ignoriert",
+          "prioritizedCount": "priorisiert",
+          "showAdded": "Hinzugefügte anzeigen",
+          "showIgnored": "Ignorierte anzeigen",
+          "loadMore": "Mehr anzeigen",
+          "loadEarlier": "Frühere anzeigen",
+          "loadingMore": "Wird geladen...",
+          "prioritize": "Priorisieren",
+          "prioritized": "Priorisiert",
+          "ignore": "Ignorieren",
+          "ignored": "Ignoriert",
+          "addOne": "Hinzufügen",
+          "addedOne": "Hinzugefügt",
+          "failedToMark": "Satz konnte nicht aktualisiert werden"
         }
       }
     },

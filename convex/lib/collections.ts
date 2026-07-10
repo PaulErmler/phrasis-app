@@ -53,15 +53,44 @@ export const LEGACY_TO_NEW_CODE: Record<string, string> = {
  */
 export const LEVEL_ORDER = LEGACY_LEVEL_ORDER;
 
-/** How many upcoming texts to fetch for collection previews. */
+/**
+ * Default batch size for the collection "Add N" button (and the course-
+ * creation first-sentences warmup).
+ */
 export const COLLECTION_PREVIEW_SIZE = 5;
 
 /**
- * How many upcoming texts (after current collection progress) to pre-generate
- * content for. Should be at least 2× {@link COLLECTION_PREVIEW_SIZE} so a +5 add
- * still leaves the next preview batch (and one more) covered.
+ * Max page size for the paginated collection browse view. Also caps the
+ * per-call batch of `requestPreviewTranslations`.
  */
-export const CONTENT_LOOKAHEAD_SIZE = 10;
+export const MAX_PREVIEW_PAGE_SIZE = 25;
+
+/**
+ * The user's collectionProgress counters that define "settled": every text
+ * that is either added as a card or deliberately ignored. Shared by frontend
+ * and backend so completion/remaining semantics can't drift between the UI
+ * badges and auto-add/auto-advance gating. Accepts any progress-shaped
+ * object (Convex doc with optional fields, or UI items with required ones);
+ * null/undefined means "no progress yet" = 0.
+ */
+export function settledCount(
+  progress?: { cardsAdded?: number; ignoredCount?: number } | null,
+): number {
+  return (progress?.cardsAdded ?? 0) + (progress?.ignoredCount ?? 0);
+}
+
+/**
+ * Texts still available to add from a collection (never negative). NOTE:
+ * "complete" checks deliberately differ between UI and backend — UI requires
+ * `totalTexts > 0`, backend treats an empty collection as complete — so
+ * completeness stays expressed at the call sites via `settledCount`/this.
+ */
+export function collectionRemaining(
+  totalTexts: number,
+  progress?: { cardsAdded?: number; ignoredCount?: number } | null,
+): number {
+  return Math.max(0, totalTexts - settledCount(progress));
+}
 
 /**
  * Maps the onboarding `currentLevel` value to a starting collection in BOTH

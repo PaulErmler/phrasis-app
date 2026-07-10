@@ -261,7 +261,21 @@
           "noMoreCards": "No more sentences to add",
           "sentences": "sentences",
           "added": "added",
-          "remaining": "remaining"
+          "remaining": "remaining",
+          "ignoredCount": "ignored",
+          "prioritizedCount": "prioritized",
+          "showAdded": "Show added",
+          "showIgnored": "Show ignored",
+          "loadMore": "Show more",
+          "loadEarlier": "Show earlier",
+          "loadingMore": "Loading...",
+          "prioritize": "Prioritize",
+          "prioritized": "Prioritized",
+          "ignore": "Ignore",
+          "ignored": "Ignored",
+          "addOne": "Add",
+          "addedOne": "Added",
+          "failedToMark": "Failed to update sentence"
         }
       }
     },

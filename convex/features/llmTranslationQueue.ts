@@ -129,6 +129,12 @@ const llmJobArgsValidator = v.object({
   // captures it pre-delete). The worker prefers it over a fresh
   // `resolveMixedVariant` pick so a card's dialect never flips on regen.
   preferredRegionVariant: v.optional(v.string()),
+  // Translation-only mode: forwarded to `storeTranslationAndScheduleTTS` so
+  // the landing translation does NOT auto-enqueue TTS. Set by the collection
+  // preview (`requestPreviewTranslations`) — audio there is generated only on
+  // an explicit audio-icon click, or by the normal ensure path once the text
+  // becomes a card.
+  skipTts: v.optional(v.boolean()),
 });
 
 /** onComplete context: everything the Google fallback needs to run. */
@@ -140,6 +146,7 @@ const llmCompletionContextValidator = v.object({
   audioSpeakerGender: v.optional(v.string()),
   replaceExisting: v.optional(v.boolean()),
   preferredRegionVariant: v.optional(v.string()),
+  skipTts: v.optional(v.boolean()),
 });
 
 type LlmJobArgs = Infer<typeof llmJobArgsValidator>;
@@ -205,6 +212,7 @@ export const enqueueLlmTranslation = internalMutation({
         ruleOverride: args.ruleOverride,
         claimId: claim?._id,
         preferredRegionVariant: args.preferredRegionVariant,
+        skipTts: args.skipTts,
       },
       {
         onComplete:
@@ -217,6 +225,7 @@ export const enqueueLlmTranslation = internalMutation({
           audioSpeakerGender: args.audioSpeakerGender,
           replaceExisting: args.replaceExisting,
           preferredRegionVariant: args.preferredRegionVariant,
+          skipTts: args.skipTts,
         },
       },
     );
@@ -539,6 +548,7 @@ async function runLlmTranslation(
         // Single-writer gate: skip the write if the claim this job was
         // enqueued under has been reclaimed by a newer job mid-flight.
         expectedClaimId: args.claimId,
+        skipTts: args.skipTts,
       },
     );
   }
@@ -619,6 +629,7 @@ export const onLlmTranslationComplete = internalMutation({
         audioSpeakerGender: context.audioSpeakerGender,
         replaceExisting: context.replaceExisting,
         preferredRegionVariant: context.preferredRegionVariant,
+        skipTts: context.skipTts,
         // The claim keeps its _id across the re-point below, so the fallback
         // inherits the same single-writer token.
         claimId: claim._id,

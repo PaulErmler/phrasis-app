@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
+import { collectionRemaining, settledCount } from '@/convex/lib/collections';
 
 export interface CollectionProgressItem {
   collectionId: string;
@@ -35,6 +36,19 @@ export interface CollectionProgressItem {
    */
   displayName?: string;
   cardsAdded: number;
+  /**
+   * Texts the user marked as ignored in the collection preview. Excluded
+   * from auto-add, so `remaining = totalTexts - cardsAdded - ignoredCount`
+   * and completion counts them as settled.
+   */
+  ignoredCount: number;
+  prioritizedCount: number;
+  /**
+   * Sequential-add frontier (`collectionProgress.lastRankProcessed`) at query
+   * time. The preview dialog snapshots it once when it opens and anchors its
+   * paginated browse range to it for the whole session.
+   */
+  browseAnchor: number;
   totalTexts: number;
 }
 
@@ -148,7 +162,7 @@ export function CollectionCarouselUI({
               ? (collection.cardsAdded / collection.totalTexts) * 100
               : 0;
           const isComplete =
-            collection.cardsAdded >= collection.totalTexts &&
+            settledCount(collection) >= collection.totalTexts &&
             collection.totalTexts > 0;
           const isActive = activeCollectionIds.includes(collection.collectionId);
           const isFocused = focusedId === collection.collectionId;
@@ -258,9 +272,11 @@ export function InlineCollectionDetail({
     collection.totalTexts > 0
       ? (collection.cardsAdded / collection.totalTexts) * 100
       : 0;
+  // Complete = every text either added or deliberately ignored.
   const isComplete =
-    collection.cardsAdded >= collection.totalTexts && collection.totalTexts > 0;
-  const remaining = collection.totalTexts - collection.cardsAdded;
+    settledCount(collection) >= collection.totalTexts &&
+    collection.totalTexts > 0;
+  const remaining = collectionRemaining(collection.totalTexts, collection);
   const addCount = Math.min(
     5,
     remaining,

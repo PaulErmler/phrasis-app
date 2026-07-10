@@ -22,6 +22,7 @@ import type * as auth from "../auth.js";
 import type * as autumn from "../autumn.js";
 import type * as billing from "../billing.js";
 import type * as config_aiModels from "../config/aiModels.js";
+import type * as db_collectionTextMarks from "../db/collectionTextMarks.js";
 import type * as db_collections from "../db/collections.js";
 import type * as db_courseSettings from "../db/courseSettings.js";
 import type * as db_courseStats from "../db/courseStats.js";
@@ -122,6 +123,7 @@ declare const fullApi: ApiFromModules<{
   autumn: typeof autumn;
   billing: typeof billing;
   "config/aiModels": typeof config_aiModels;
+  "db/collectionTextMarks": typeof db_collectionTextMarks;
   "db/collections": typeof db_collections;
   "db/courseSettings": typeof db_courseSettings;
   "db/courseStats": typeof db_courseStats;

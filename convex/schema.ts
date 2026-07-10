@@ -712,12 +712,53 @@ export default defineSchema({
     // they're starting from scratch on the first level of each new tier.
     legacyCarryAdded: v.optional(v.number()),
     lastRankProcessed: v.optional(v.number()), // Last collectionRank processed (for efficient pagination)
+    // Live counts of this user's collectionTextMarks rows for this collection,
+    // by mark type. NOT monotonic (unlike the counters above): incremented and
+    // decremented in the same transaction as every mark-row write, so
+    // `remaining = textCount - cardsAdded - ignoredCount` stays O(1) for every
+    // consumer that already reads this row. Absent = 0.
+    prioritizedCount: v.optional(v.number()),
+    ignoredCount: v.optional(v.number()),
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])
     .index('by_userId_and_courseId_and_collectionId', [
       'userId',
       'courseId',
       'collectionId',
+    ]),
+
+  // Per-(user, course, text) browse marks from the collection preview.
+  // 'prioritized' texts are drained FIRST by addCardsFromCollection (in rank
+  // order, independent of the sequential frontier); 'ignored' texts are
+  // skipped by the sequential scan and count toward collection completion.
+  // 'readd' is internal-only (never set directly by the client): un-marking a
+  // text the frontier already passed flips its row to 'readd' instead of
+  // deleting it, so the text stays discoverable (browse injection) and
+  // addable (drained like 'prioritized', after it) without rolling the
+  // frontier back. Counter-neutral — not part of prioritizedCount/ignoredCount.
+  // Marks exist only for texts WITHOUT a card — every add path clears the
+  // mark in the same transaction that inserts the card.
+  collectionTextMarks: defineTable({
+    userId: v.string(), // Links to auth user
+    courseId: v.id('courses'),
+    collectionId: v.id('collections'), // Denormalized from the text
+    textId: v.id('texts'),
+    mark: v.union(
+      v.literal('prioritized'),
+      v.literal('ignored'),
+      v.literal('readd'),
+    ),
+    collectionRank: v.number(), // Denormalized from the text (rank-ordered drain)
+  })
+    .index('by_userId_and_courseId_and_textId', ['userId', 'courseId', 'textId'])
+    // Abbreviated (full field spelling exceeds Convex's 64-char index-name cap):
+    // fields are [userId, courseId, collectionId, mark, collectionRank].
+    .index('by_user_course_collection_mark_rank', [
+      'userId',
+      'courseId',
+      'collectionId',
+      'mark',
+      'collectionRank',
     ]),
 
   // Card approval requests from the AI chat
