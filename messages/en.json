@@ -627,6 +627,7 @@
     "emptyBullet1": "Ask about vocabulary, grammar, or any sentence.",
     "emptyBullet2": "The chat knows the sentence you are currently learning.",
     "emptyBullet3": "It can create sentences for you — you just confirm them.",
+    "emptyCreditsNote": "A message uses 1–2 credits depending on its length. The longer the conversation gets, the more credits a message uses.",
     "input": {
       "placeholder": "What would you like to say?",
       "prompts": {
@@ -751,11 +752,14 @@
   },
   "LowQuota": {
     "title": "Running Low on {featureName}",
+    "titleCredits": "Running low on credits",
     "description": "You only have {balance, plural, one {# use} other {# uses}} of {featureName} left. Upgrade your plan to get more.",
+    "descriptionCredits": "You only have {balance, plural, one {# credit} other {# credits}} left. Upgrade your plan to get more.",
     "descriptionCap": "You can only create {balance, plural, one {# more} other {# more}} {featureName}. Upgrade your plan to create more.",
     "dismiss": "Not now",
     "upgrade": "Upgrade to {productName}",
     "noUpgradeAvailable": "You've used most of your {featureName}. Contact us at support@flexling.com for additional usage.",
+    "noUpgradeAvailableCredits": "You've used most of your credits. Contact us at support@flexling.com for additional usage.",
     "noUpgradeAvailableCap": "You've almost reached your maximum number of {featureName}. Contact us at support@flexling.com for additional capacity.",
     "contactUs": "Contact Us"
   },
@@ -813,6 +817,7 @@
   },
   "Checkout": {
     "confirm": "Confirm",
+    "noCommitment": "No commitment — cancel anytime.",
     "price": "Price",
     "subscription": "Subscription",
     "totalDueToday": "Total due today",
@@ -1407,14 +1412,14 @@
       "valid": "ready",
       "warnings": "warnings",
       "errors": "issues",
-      "quotaRemaining": "custom cards left",
-      "quotaUnlimited": "Unlimited custom cards"
+      "quotaRemaining": "credits left",
+      "quotaUnlimited": "Unlimited credits"
     },
     "importButton": "Import {count} cards",
     "importButtonEmpty": "Import cards",
     "importing": "Importing…",
     "quota": {
-      "insufficient": "You have {balance} custom cards left this period but are trying to import {count}.",
+      "insufficient": "You have {balance, plural, one {# credit} other {# credits}} left this period, but importing {count} cards needs {count, plural, one {# credit} other {# credits}}.",
       "insufficientCta": "Get more",
       "unlimited": "Unlimited plan"
     },

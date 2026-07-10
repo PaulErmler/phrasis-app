@@ -624,6 +624,7 @@
     "emptyBullet1": "Stelle Fragen zu Vokabeln, Grammatik oder beliebigen Sätzen.",
     "emptyBullet2": "Der Chat kennt den Satz, den du gerade lernst.",
     "emptyBullet3": "Er kann Sätze für dich erstellen — du bestätigst sie einfach.",
+    "emptyCreditsNote": "Eine Nachricht kostet je nach Länge 1–2 Credits. Je länger die Unterhaltung wird, desto mehr Credits kostet eine Nachricht.",
     "input": {
       "placeholder": "Was möchtest du sagen?",
       "prompts": {
@@ -748,11 +749,14 @@
   },
   "LowQuota": {
     "title": "{featureName} fast aufgebraucht",
+    "titleCredits": "Deine Credits sind fast aufgebraucht",
     "description": "Du hast nur noch {balance, plural, one {# Nutzung} other {# Nutzungen}} für {featureName} übrig. Upgrade deinen Plan für mehr.",
+    "descriptionCredits": "Du hast nur noch {balance, plural, one {# Credit} other {# Credits}} übrig. Upgrade deinen Plan für mehr.",
     "descriptionCap": "Du kannst nur noch {balance, plural, one {# weiteren} other {# weitere}} {featureName} erstellen. Upgrade deinen Plan, um mehr zu erstellen.",
     "dismiss": "Nicht jetzt",
     "upgrade": "Upgrade auf {productName}",
     "noUpgradeAvailable": "Du hast den Großteil deiner {featureName} aufgebraucht. Kontaktiere uns unter support@flexling.com für zusätzliche Nutzung.",
+    "noUpgradeAvailableCredits": "Du hast den Großteil deiner Credits aufgebraucht. Kontaktiere uns unter support@flexling.com für zusätzliche Nutzung.",
     "noUpgradeAvailableCap": "Du hast fast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Kapazität.",
     "contactUs": "Kontakt"
   },
@@ -810,6 +814,7 @@
   },
   "Checkout": {
     "confirm": "Bestätigen",
+    "noCommitment": "Keine Verpflichtung — jederzeit kündbar.",
     "price": "Preis",
     "subscription": "Abonnement",
     "totalDueToday": "Heute fällig",
@@ -1404,14 +1409,14 @@
       "valid": "bereit",
       "warnings": "Warnungen",
       "errors": "Probleme",
-      "quotaRemaining": "eigene Karten übrig",
-      "quotaUnlimited": "Unbegrenzte eigene Karten"
+      "quotaRemaining": "Credits übrig",
+      "quotaUnlimited": "Unbegrenzte Credits"
     },
     "importButton": "{count} Karten importieren",
     "importButtonEmpty": "Karten importieren",
     "importing": "Importiere…",
     "quota": {
-      "insufficient": "Du hast {balance} eigene Karten in dieser Periode übrig, versuchst aber {count} zu importieren.",
+      "insufficient": "Du hast in dieser Periode noch {balance, plural, one {# Credit} other {# Credits}} übrig, aber der Import von {count} Karten kostet {count, plural, one {# Credit} other {# Credits}}.",
       "insufficientCta": "Mehr erhalten",
       "unlimited": "Unbegrenzter Plan"
     },

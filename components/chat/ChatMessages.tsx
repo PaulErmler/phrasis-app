@@ -327,6 +327,9 @@ export function ChatMessages({
                   </li>
                 ))}
               </ul>
+              <p className="text-xs text-muted-foreground/80 text-left">
+                {t('emptyCreditsNote')}
+              </p>
             </ConversationEmptyState>
           ) : null}
         </ConversationContent>

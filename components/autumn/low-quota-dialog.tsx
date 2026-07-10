@@ -14,6 +14,7 @@ import { useCustomer, usePricingTable } from "autumn-js/react";
 import { findUpgradeProductFromPricingTable } from "@/lib/autumn/find-upgrade-product";
 import { checkoutTrialParams, getTrialState } from "@/lib/autumn/trial-eligibility";
 import { getFeatureI18nKey, isFeatureConsumable } from "@/lib/features/feature-meta";
+import { isCreditBackedFeature } from "@/convex/features/featureIds";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 
@@ -42,6 +43,7 @@ export default function LowQuotaDialog({
   const featureI18nKey = getFeatureI18nKey(featureId);
   const featureName = tFeatures(`${featureI18nKey}.name`);
   const consumable = isFeatureConsumable(featureId);
+  const creditBacked = isCreditBackedFeature(featureId);
 
   const upgradeProduct = findUpgradeProductFromPricingTable(
     products ?? undefined,
@@ -71,12 +73,16 @@ export default function LowQuotaDialog({
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="p-0 pt-4 gap-0 text-foreground overflow-hidden text-sm">
         <DialogTitle className="font-bold text-xl px-6">
-          {t("title", { featureName })}
+          {creditBacked ? t("titleCredits") : t("title", { featureName })}
         </DialogTitle>
         <p className="px-6 mt-1 mb-2 text-muted-foreground">
-          {upgradeProduct
-            ? t(consumable === false ? "descriptionCap" : "description", { balance, featureName })
-            : t(consumable === false ? "noUpgradeAvailableCap" : "noUpgradeAvailable", { featureName })}
+          {creditBacked
+            ? upgradeProduct
+              ? t("descriptionCredits", { balance })
+              : t("noUpgradeAvailableCredits")
+            : upgradeProduct
+              ? t(consumable === false ? "descriptionCap" : "description", { balance, featureName })
+              : t(consumable === false ? "noUpgradeAvailableCap" : "noUpgradeAvailable", { featureName })}
         </p>
 
         <DialogFooter className="dialog-footer-bar">
