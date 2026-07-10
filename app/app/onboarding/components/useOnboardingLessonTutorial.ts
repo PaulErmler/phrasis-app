@@ -41,6 +41,9 @@ import type { TranslateFn } from '@/lib/tutorials/types';
 export interface OnboardingTutorialOptions {
   t: TranslateFn;
   reviewMode: 'audio' | 'full';
+  /** Writing style is Transcribe (type what you hear) — swaps the full-mode
+   *  card/input coachmark copy. */
+  transcribe?: boolean;
   /** Card count — used to gate the staged tutorials. */
   cardsRated: number;
   /** Pause audio whenever a tutorial step appears so the spoken card audio
@@ -67,6 +70,7 @@ const CARDS_FOR_CHAT = CARDS_FOR_WORD_TAP + 3;
 export function useOnboardingLessonTutorial({
   t,
   reviewMode,
+  transcribe = false,
   cardsRated,
   onStepShow,
   onCoreComplete,
@@ -121,6 +125,10 @@ export function useOnboardingLessonTutorial({
   useEffect(() => {
     tRef.current = t;
   });
+  // Same for the writing style: read at drive time, but never re-fire the
+  // core walkthrough just because the style setting changed mid-lesson.
+  const transcribeRef = useRef(transcribe);
+  transcribeRef.current = transcribe;
 
   const runStage = (
     stage: Stage,
@@ -211,9 +219,15 @@ export function useOnboardingLessonTutorial({
       // window can still re-pick the original walkthrough.
       seenCoreModesRef.current.add(teachingMode);
       if (isModeSwitch) {
-        runStage('mode-switch', buildModeSwitchSteps(tRef.current, teachingMode));
+        runStage(
+          'mode-switch',
+          buildModeSwitchSteps(tRef.current, teachingMode, transcribeRef.current),
+        );
       } else {
-        runStage('core', buildCoreSteps(tRef.current, teachingMode));
+        runStage(
+          'core',
+          buildCoreSteps(tRef.current, teachingMode, transcribeRef.current),
+        );
       }
     }, 600);
     return () => {
@@ -285,7 +299,11 @@ function pauseAllAudioNow(): void {
 
 // ─── Step builders (exported for testing) ───────────────────────────────────
 
-export function buildCoreSteps(t: TranslateFn, reviewMode: 'audio' | 'full'): DriveStep[] {
+export function buildCoreSteps(
+  t: TranslateFn,
+  reviewMode: 'audio' | 'full',
+  transcribe = false,
+): DriveStep[] {
   // Full review shows Again/Hard/Good/Easy from the very first card, while
   // audio review starts in the 2-button "still learning / understood"
   // warm-up. The rating-step copy differs accordingly.
@@ -313,7 +331,11 @@ export function buildCoreSteps(t: TranslateFn, reviewMode: 'audio' | 'full'): Dr
       title: t('core.card.title'),
       description:
         reviewMode === 'full'
-          ? t('core.card.descriptionFull')
+          ? t(
+            transcribe
+              ? 'core.card.descriptionFullTranscribe'
+              : 'core.card.descriptionFull',
+          )
           : t('core.card.descriptionAudio'),
       side: 'bottom',
       align: 'center',
@@ -328,11 +350,12 @@ export function buildCoreSteps(t: TranslateFn, reviewMode: 'audio' | 'full'): Dr
       align: 'center',
     },
   };
+  const inputKey = transcribe ? 'core.inputTranscribe' : 'core.input';
   const input: DriveStep = {
     element: '[data-tutorial="target-input-and-submit"]',
     popover: {
-      title: t('core.input.title'),
-      description: t('core.input.description'),
+      title: t(`${inputKey}.title`),
+      description: t(`${inputKey}.description`),
       side: 'top',
       align: 'center',
     },
@@ -387,6 +410,7 @@ export function buildCoreSteps(t: TranslateFn, reviewMode: 'audio' | 'full'): Dr
 export function buildModeSwitchSteps(
   t: TranslateFn,
   reviewMode: 'audio' | 'full',
+  transcribe = false,
 ): DriveStep[] {
   const ratingKey = reviewMode === 'full'
     ? 'core.rating.descriptionFull'
@@ -416,11 +440,12 @@ export function buildModeSwitchSteps(
       align: 'center',
     },
   };
+  const inputKey = transcribe ? 'core.inputTranscribe' : 'core.input';
   const input: DriveStep = {
     element: '[data-tutorial="target-input-and-submit"]',
     popover: {
-      title: t('core.input.title'),
-      description: t('core.input.description'),
+      title: t(`${inputKey}.title`),
+      description: t(`${inputKey}.description`),
       side: 'top',
       align: 'center',
     },

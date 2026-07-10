@@ -19,7 +19,7 @@ import {
   getLanguageShortLabel,
   getLocalizedLanguageNameByCode,
 } from '@/lib/languages';
-import { Check, MousePointer2, Radio, RefreshCw } from 'lucide-react';
+import { Check, Ear, Languages, MousePointer2, Radio, RefreshCw } from 'lucide-react';
 import { useLandingDemo } from '@/components/landing/landing-demo-context';
 
 function usePrefersReducedMotion() {
@@ -317,6 +317,25 @@ export function ReviewModesDemo() {
             <>
               <h3 className="text-lg font-semibold">{t('fullTitle')}</h3>
               <p className="text-muted-foreground leading-relaxed">{t('fullBody')}</p>
+              {/* Two callouts framing the writing styles that pair with the
+                  typing exercise: Translate (base audio → type the
+                  translation) and Transcribe (target audio → type what you
+                  hear). Same framing as the Review/Radio callouts in the
+                  audio panel. */}
+              <p className="text-muted-foreground leading-relaxed border-l-2 border-primary/40 pl-4 mt-4">
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                  <Languages className="h-4 w-4 text-primary" />
+                  {t('translateTitle')}:
+                </span>{' '}
+                {t('translateBody')}
+              </p>
+              <p className="text-muted-foreground leading-relaxed border-l-2 border-primary/40 pl-4">
+                <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                  <Ear className="h-4 w-4 text-primary" />
+                  {t('transcribeTitle')}:
+                </span>{' '}
+                {t('transcribeBody')}
+              </p>
             </>
           )}
         </div>

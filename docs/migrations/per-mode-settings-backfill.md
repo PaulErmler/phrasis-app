@@ -38,9 +38,9 @@ explicitly at courseSettings insert time in `convex/db/courseSettings.ts`
 
 ## What the migration does
 
-`convex/migrations/perModeSettingsBackfill.ts` walks all `courseSettings` docs
-in self-scheduling batches of 100 and stamps, per doc (only where currently
-`undefined`):
+`perModeSettingsBackfill` in `convex/migrations.ts` (built on
+`@convex-dev/migrations` — batched, resumable, state-tracked) walks all
+`courseSettings` docs and stamps, per doc (only where currently `undefined`):
 
 1. Every `*Full` field from the doc's current effective audio value.
 2. `playTargetBeforeBase: false`, `playTargetAfterBase: true`,
@@ -50,17 +50,32 @@ in self-scheduling batches of 100 and stamps, per doc (only where currently
 It is idempotent and safely re-runnable (per-field `undefined` guards; user
 writes are never overwritten).
 
-## How to run it
+## How it runs
+
+Migrations run automatically as part of the deploy command:
 
 ```
-npx convex run migrations/perModeSettingsBackfill:run
+npx convex deploy --cmd "pnpm run build" && npx convex run migrations:runAll --prod
 ```
 
-(add `--prod` for the production deployment). It self-continues via the
-scheduler; the return value of each batch reports `processed` / `patched` /
-`isDone`.
+`migrations:runAll` (convex/migrations.ts) runs every registered migration in
+order; completed ones are skipped, and a failed one stops the chain and
+resumes from its cursor on the next invocation. Useful one-offs:
 
-## Cleanup enabled after it has completed
+```
+npx convex run migrations:perModeSettingsBackfill '{"dryRun": true}'   # preview
+npx convex run --component migrations lib:getStatus --watch           # progress
+```
+
+Already run to completion on the dev deployment (2026-07-10, 241 docs).
+
+## Cleanup enabled after it has completed IN PRODUCTION
+
+Do NOT remove the fallbacks in the same deploy that first ships this feature:
+`runAll` executes *after* `convex deploy` finishes, so there is a window where
+the new code serves not-yet-stamped docs (and an indefinite one if the
+migration errors). One deploy after the migration has reported `success` in
+prod (`lib:getStatus --prod`), the unmigrated-doc compatibility code can go:
 
 Once every doc is stamped, the unmigrated-doc compatibility code can be
 removed:

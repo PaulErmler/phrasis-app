@@ -1022,7 +1022,17 @@
         },
         "full": {
           "title": "Writing",
-          "description": "Type your translation and get instant, character-level spelling feedback. The fastest way to master writing."
+          "description": "Type your translation and get instant, character-level spelling feedback. The fastest way to master writing.",
+          "styles": {
+            "translate": {
+              "title": "Translate",
+              "description": "Hear your language, type the translation."
+            },
+            "transcribe": {
+              "title": "Transcribe",
+              "description": "Hear only the target language, type what you hear."
+            }
+          }
         }
       },
       "duration": "About 10 minutes",
@@ -1159,19 +1169,24 @@
       "card": {
         "title": "The card",
         "descriptionAudio": "Each card shows a sentence in the languages you're learning. The target language is hidden until you reveal it.",
-        "descriptionFull": "Each card shows a sentence in the languages you're learning. You'll type the translation and check yourself."
+        "descriptionFull": "Each card shows a sentence in the languages you're learning. You'll type the translation and check yourself.",
+        "descriptionFullTranscribe": "Each card plays a sentence in your target language. You'll type what you hear and check yourself."
       },
       "reveal": {
         "title": "Reveal the translation",
-        "description": "The target translation is hidden by default. Tap it to reveal, or just listen to the audio — after a short pause it reveals automatically. Try answering from memory first."
+        "description": "The target translation is hidden by default. Tap it to reveal, or just listen — it reveals automatically once the target plays after the base. New cards play the target once at the start; when it's your turn to answer, try to recall it from memory."
       },
       "input": {
         "title": "Type your translation",
         "description": "Type the target-language translation here and hit submit. You'll get instant feedback on each word."
       },
+      "inputTranscribe": {
+        "title": "Type what you hear",
+        "description": "Type exactly what you hear in the target language and hit submit. You'll get instant feedback on each word."
+      },
       "audioControls": {
         "title": "Audio plays automatically",
-        "description": "Audio plays the base language first, pauses for you to think, then plays the target. Restart, play / pause, or skip to the next card here. The undo button on the far left takes back your last rating and brings the previous card back."
+        "description": "When a card is new, the target language plays once at the beginning so you hear what you're aiming for. Then the base language plays, pauses for you to think, and the target follows. Restart, play / pause, or skip to the next card here. The undo button on the far left takes back your last rating and brings the previous card back."
       },
       "audioPlay": {
         "title": "Press play to start",
@@ -1268,7 +1283,7 @@
       },
       "audioControls": {
         "title": "Audio Playing",
-        "description": "By default the audio is played automatically. First the base audio, then there is a pause for you to think and then the target audio is played before automatically proceeding to the next sentence."
+        "description": "By default the audio is played automatically. On new sentences the target audio plays once at the beginning to train your listening. Then the base audio plays, there is a pause for you to think, and the target audio follows before automatically proceeding to the next sentence."
       },
       "undoRestart": {
         "title": "Undo & Restart",

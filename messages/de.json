@@ -1019,7 +1019,17 @@
         },
         "full": {
           "title": "Schreiben",
-          "description": "Tippe deine Übersetzung und erhalte sofortiges, zeichengenaues Feedback zur Rechtschreibung. Der schnellste Weg, das Schreiben zu meistern."
+          "description": "Tippe deine Übersetzung und erhalte sofortiges, zeichengenaues Feedback zur Rechtschreibung. Der schnellste Weg, das Schreiben zu meistern.",
+          "styles": {
+            "translate": {
+              "title": "Übersetzen",
+              "description": "Höre deine Sprache und tippe die Übersetzung ein."
+            },
+            "transcribe": {
+              "title": "Transkribieren",
+              "description": "Höre nur die Zielsprache und tippe ein, was du hörst."
+            }
+          }
         }
       },
       "duration": "Etwa 10 Minuten",
@@ -1156,19 +1166,24 @@
       "card": {
         "title": "Die Karte",
         "descriptionAudio": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Die Zielsprache ist verdeckt, bis du sie aufdeckst.",
-        "descriptionFull": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Du tippst die Übersetzung ein und kontrollierst dich selbst."
+        "descriptionFull": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Du tippst die Übersetzung ein und kontrollierst dich selbst.",
+        "descriptionFullTranscribe": "Jede Karte spielt einen Satz in deiner Zielsprache ab. Du tippst ein, was du hörst, und kontrollierst dich selbst."
       },
       "reveal": {
         "title": "Übersetzung aufdecken",
-        "description": "Die Übersetzung ist standardmäßig verdeckt. Tippe darauf, um sie aufzudecken, oder höre einfach das Audio — nach einer kurzen Pause wird sie automatisch aufgedeckt. Versuch zuerst, aus dem Gedächtnis zu antworten."
+        "description": "Die Übersetzung ist standardmäßig verdeckt. Tippe darauf, um sie aufzudecken, oder höre einfach zu — sie wird automatisch aufgedeckt, sobald die Zielsprache nach der Basissprache spielt. Bei neuen Karten spielt die Zielsprache einmal am Anfang; wenn du an der Reihe bist, versuch sie aus dem Gedächtnis abzurufen."
       },
       "input": {
         "title": "Übersetzung eintippen",
         "description": "Tippe die Übersetzung in der Zielsprache hier ein und drücke Senden. Du bekommst sofortiges Feedback zu jedem Wort."
       },
+      "inputTranscribe": {
+        "title": "Tippe ein, was du hörst",
+        "description": "Tippe genau ein, was du in der Zielsprache hörst, und drücke Senden. Du bekommst sofortiges Feedback zu jedem Wort."
+      },
       "audioControls": {
         "title": "Audio läuft automatisch",
-        "description": "Audio spielt zuerst die Basissprache ab, pausiert zum Nachdenken und spielt dann die Zielsprache. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen. Die Rückgängig-Taste ganz links nimmt deine letzte Bewertung zurück und holt die vorherige Karte zurück."
+        "description": "Bei einer neuen Karte wird die Zielsprache einmal am Anfang abgespielt, damit du hörst, worauf du hinarbeitest. Danach spielt die Basissprache, pausiert zum Nachdenken, und die Zielsprache folgt. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen. Die Rückgängig-Taste ganz links nimmt deine letzte Bewertung zurück und holt die vorherige Karte zurück."
       },
       "audioPlay": {
         "title": "Drücke Play zum Starten",
@@ -1265,7 +1280,7 @@
       },
       "audioControls": {
         "title": "Audio-Wiedergabe",
-        "description": "Standardmäßig wird das Audio automatisch abgespielt. Zuerst die Ausgangssprache, dann eine Pause zum Nachdenken, dann die Zielsprache, bevor automatisch zum nächsten Satz gewechselt wird."
+        "description": "Standardmäßig wird das Audio automatisch abgespielt. Bei neuen Sätzen spielt die Zielsprache einmal am Anfang, um dein Hörverständnis zu trainieren. Danach spielt die Ausgangssprache, dann eine Pause zum Nachdenken, dann die Zielsprache, bevor automatisch zum nächsten Satz gewechselt wird."
       },
       "undoRestart": {
         "title": "Rückgängig & Neu starten",
