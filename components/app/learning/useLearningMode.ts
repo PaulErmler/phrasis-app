@@ -736,6 +736,18 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     cardShownAtRef.current = Date.now();
   }, [cardForReview?._id]);
 
+  // Recovery: when a forward review resolves and the SAME card document comes
+  // back (e.g. "again" on a one-card deck), the id-keyed reset effect above
+  // never fires and isExiting would stay true forever, leaving the card pane
+  // blank. Clear it whenever a real card is present and no mutation is in
+  // flight. The auto-add gap (cardForReview === null) intentionally stays
+  // blank — see the comment above.
+  useEffect(() => {
+    if (isExiting && !isReviewing && !isUndoing && cardForReview?._id != null) {
+      setIsExiting(false);
+    }
+  }, [isExiting, isReviewing, isUndoing, cardForReview?._id]);
+
   // --------------------------------------------------------------------------
   // Review / master / hide
   // --------------------------------------------------------------------------

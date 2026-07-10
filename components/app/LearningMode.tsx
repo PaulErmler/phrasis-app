@@ -388,6 +388,20 @@ export function LearningMode({
   const instantProceed = reviewMode === 'full'
     ? (state.courseSettings.instantProceedFull ?? true)
     : (state.courseSettings.instantProceedAudio ?? false);
+  const isTranscribe =
+    reviewMode === 'full' &&
+    (state.courseSettings.writingInputMode ?? 'translate') === 'transcribe';
+  // Transcribe: the post-submit replay rides the same per-language afterSubmit
+  // machinery as Translate, gated by the transcribe auto-play setting
+  // (chained `*Transcribe ?? *Full ?? audio`).
+  const writingAutoPlay = isTranscribe
+    ? (state.courseSettings.autoPlayAudioTranscribe ??
+      state.courseSettings.autoPlayAudioFull ??
+      state.courseSettings.autoPlayAudio ??
+      DEFAULT_AUTO_PLAY)
+    : (state.courseSettings.autoPlayAudioFull ??
+      state.courseSettings.autoPlayAudio ??
+      DEFAULT_AUTO_PLAY);
 
   // Flagging acts at the card level — the mutation retranslates every
   // non-source-language translation on the card. We hide the button when
@@ -431,17 +445,63 @@ export function LearningMode({
         onUpdatePinnedActions={state.handleUpdatePinnedActions}
         quotaState={state.cardActionQuotas}
         onAudioPlay={audio.stop}
-        targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
+        // Transcribe: the merged blob plays the target as the prompt; the
+        // per-language afterSubmit playback doubles as the post-submit
+        // replay, gated by the writing-mode auto-play setting.
+        targetAudioMode={
+          isTranscribe
+            ? writingAutoPlay
+              ? 'afterSubmit'
+              : 'never'
+            : (state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit')
+        }
+        transcribeMode={isTranscribe}
+        afterSubmitRepetitions={
+          isTranscribe
+            ? state.courseSettings.transcribeAfterRepetitions
+            : (state.courseSettings.languageRepetitionsFull ??
+              state.courseSettings.languageRepetitions)
+        }
+        afterSubmitRepetitionPauses={
+          isTranscribe
+            ? state.courseSettings.transcribeAfterRepetitionPauses
+            : (state.courseSettings.languageRepetitionPausesFull ??
+              state.courseSettings.languageRepetitionPauses)
+        }
+        afterSubmitPlaybackSpeeds={
+          isTranscribe
+            ? state.courseSettings.transcribeAfterPlaybackSpeeds
+            : undefined
+        }
+        hideBaseLanguages={state.courseSettings.hideBaseLanguagesFull === true}
+        autoRevealBaseOnSubmit={
+          state.courseSettings.autoRevealBaseOnSubmit ?? true
+        }
+        suppressAutoPlay={state.settingsOpen}
         allRevealed={fullReviewRevealed}
         onAllSubmittedChange={setAllSubmitted}
         onAccuracyChange={setFullReviewAccuracy}
         showRomanization={state.courseSettings.showRomanization ?? true}
         cardId={state.cardId}
         shortcutsDisabled={state.settingsOpen || editDialogOpen}
-        highlightEnabled={state.courseSettings.highlightWords === true}
+        highlightEnabled={
+          (isTranscribe
+            ? (state.courseSettings.highlightWordsTranscribe ??
+              state.courseSettings.highlightWordsFull ??
+              state.courseSettings.highlightWords)
+            : (state.courseSettings.highlightWordsFull ??
+              state.courseSettings.highlightWords)) === true
+        }
         flaggedInSession={state.flaggedInSession}
         mergedPlayback={mergedPlayback}
-        languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
+        languagePlaybackSpeeds={
+          isTranscribe
+            ? (state.courseSettings.languagePlaybackSpeedsTranscribe ??
+              state.courseSettings.languagePlaybackSpeedsFull ??
+              state.courseSettings.languagePlaybackSpeeds)
+            : (state.courseSettings.languagePlaybackSpeedsFull ??
+              state.courseSettings.languagePlaybackSpeeds)
+        }
         audioSpeedOverrides={state.audioSpeedOverrides}
         onSpeedCycle={handleSpeedCycle}
         audioRef={audio.audioRef}

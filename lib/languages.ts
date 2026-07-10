@@ -2035,6 +2035,26 @@ export function resolveMixedVariant(
 }
 
 /**
+ * Look up a mixed-dialect language's variant by a previously persisted
+ * `regionVariant` (voice-locale prefix, e.g. `'es-US'`). Regeneration paths
+ * use this to pin a translation to the variant already stored on its row —
+ * matching by locale prefix instead of re-hashing keeps the pick immune to
+ * reordering or extension of the `variants` array. Returns `null` when `code`
+ * isn't a mixed language or the prefix no longer exists; callers fall back to
+ * `resolveMixedVariant`.
+ */
+export function getMixedVariantByRegion(
+  code: string,
+  regionVariant: string,
+): { subCode: string; regionVariant: string } | null {
+  const variants = MIXED_LANGUAGE_VARIANTS[code];
+  if (!variants) return null;
+  const match = variants.find((p) => p.voiceLocalePrefix === regionVariant);
+  if (!match) return null;
+  return { subCode: match.subCode, regionVariant: match.voiceLocalePrefix };
+}
+
+/**
  * Normalize a language code by stripping regional variant suffixes (e.g.
  * `"es_latam"` → `"es"`, `"ar_iq"` → `"ar"`). Single source of truth for
  * variant collapsing across stats, search, and UI.

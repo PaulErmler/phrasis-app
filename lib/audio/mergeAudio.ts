@@ -3,6 +3,7 @@ import type { CardAudioRecording, CourseSettings } from '@/components/app/learni
 import {
   DEFAULT_REPETITIONS_BASE,
   DEFAULT_REPETITIONS_TARGET,
+  DEFAULT_REPETITIONS_TARGET_WRITING,
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   DEFAULT_AUTO_ADVANCE,
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
@@ -24,6 +25,11 @@ export interface ResolvedAudioSettings {
   reps: Record<string, number>;
   repPauses: Record<string, number>;
   speeds: Record<string, number>;
+  /**
+   * Fallback repetition count for a target language with no stored entry:
+   * DEFAULT_REPETITIONS_TARGET in audio mode, once in the writing modes.
+   */
+  defaultTargetReps: number;
   pauseB2B: number;
   pauseB2T: number;
   pauseT2T: number;
@@ -79,17 +85,68 @@ function mergeSpeeds(
 export function resolveAudioSettings(
   cs: CourseSettings | null,
   cardOverrides?: Record<string, number>,
+  mode: 'audio' | 'full' | 'transcribe' = 'audio',
 ): ResolvedAudioSettings {
+  // Each mode has its own copy of the playback settings, resolved along the
+  // chain `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*` — undefined means
+  // "same as the previous mode in the chain", so unmigrated/untweaked docs
+  // behave identically (see docs/migrations/per-mode-settings-backfill.md).
+  // Transcribe only copies the settings it uses; the rest resolves like full.
+  const pick = <T,>(
+    transcribe: T | undefined,
+    full: T | undefined,
+    audio: T | undefined,
+  ): T | undefined =>
+      mode === 'transcribe'
+        ? (transcribe ?? full ?? audio)
+        : mode === 'full'
+          ? (full ?? audio)
+          : audio;
   const autoAdvance = cs?.autoAdvance ?? DEFAULT_AUTO_ADVANCE;
   return {
-    reps: cs?.languageRepetitions ?? {},
-    repPauses: cs?.languageRepetitionPauses ?? {},
-    speeds: resolveLanguageSpeeds(cs, cardOverrides),
-    pauseB2B: cs?.pauseBaseToBase ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES,
-    pauseB2T: cs?.pauseBaseToTarget ?? DEFAULT_PAUSE_BASE_TO_TARGET,
-    pauseT2T: cs?.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+    reps:
+      pick(
+        cs?.languageRepetitionsTranscribe,
+        cs?.languageRepetitionsFull,
+        cs?.languageRepetitions,
+      ) ?? {},
+    repPauses:
+      pick(
+        cs?.languageRepetitionPausesTranscribe,
+        cs?.languageRepetitionPausesFull,
+        cs?.languageRepetitionPauses,
+      ) ?? {},
+    speeds: mergeSpeeds(
+      pick(
+        cs?.languagePlaybackSpeedsTranscribe,
+        cs?.languagePlaybackSpeedsFull,
+        cs?.languagePlaybackSpeeds,
+      ) ?? {},
+      cardOverrides,
+    ),
+    defaultTargetReps:
+      mode === 'audio'
+        ? DEFAULT_REPETITIONS_TARGET
+        : DEFAULT_REPETITIONS_TARGET_WRITING,
+    pauseB2B:
+      pick(undefined, cs?.pauseBaseToBaseFull, cs?.pauseBaseToBase) ??
+      DEFAULT_PAUSE_BETWEEN_LANGUAGES,
+    pauseB2T:
+      pick(undefined, cs?.pauseBaseToTargetFull, cs?.pauseBaseToTarget) ??
+      DEFAULT_PAUSE_BASE_TO_TARGET,
+    pauseT2T:
+      pick(
+        cs?.pauseTargetToTargetTranscribe,
+        cs?.pauseTargetToTargetFull,
+        cs?.pauseTargetToTarget,
+      ) ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES,
     autoAdvance,
-    pauseBeforeAdvance: cs?.pauseBeforeAutoAdvance ?? DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
+    pauseBeforeAdvance:
+      pick(
+        undefined,
+        cs?.pauseBeforeAutoAdvanceFull,
+        cs?.pauseBeforeAutoAdvance,
+      ) ?? DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
     playTargetBefore: cs?.playTargetBeforeBase ?? DEFAULT_PLAY_TARGET_BEFORE_BASE,
     playTargetAfter: cs?.playTargetAfterBase ?? DEFAULT_PLAY_TARGET_AFTER_BASE,
     beforeReps: cs?.targetBeforeRepetitions ?? {},
@@ -222,7 +279,7 @@ export async function mergeCardAudio(
     }
     if (settings.playTargetAfter) {
       for (const lang of orderedTarget) {
-        const reps = settings.reps[lang] ?? DEFAULT_REPETITIONS_TARGET;
+        const reps = settings.reps[lang] ?? settings.defaultTargetReps;
         if (reps <= 0) continue;
         const rec = audioRecordings.find((a) => a.language === lang);
         if (rec?.url) afterTargetEntries.push({ language: lang, url: rec.url, reps, speed: speedFor(lang) });

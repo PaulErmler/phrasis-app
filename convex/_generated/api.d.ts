@@ -89,6 +89,7 @@ import type * as lib_tts_types from "../lib/tts/types.js";
 import type * as lib_ttsSemanticValidation from "../lib/ttsSemanticValidation.js";
 import type * as lib_workpools from "../lib/workpools.js";
 import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
+import type * as migrations_perModeSettingsBackfill from "../migrations/perModeSettingsBackfill.js";
 import type * as migrations_recalcUserCardAggregates from "../migrations/recalcUserCardAggregates.js";
 import type * as migrations_seedPlacementTestSentences from "../migrations/seedPlacementTestSentences.js";
 import type * as rateLimiter from "../rateLimiter.js";
@@ -188,6 +189,7 @@ declare const fullApi: ApiFromModules<{
   "lib/ttsSemanticValidation": typeof lib_ttsSemanticValidation;
   "lib/workpools": typeof lib_workpools;
   "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;
+  "migrations/perModeSettingsBackfill": typeof migrations_perModeSettingsBackfill;
   "migrations/recalcUserCardAggregates": typeof migrations_recalcUserCardAggregates;
   "migrations/seedPlacementTestSentences": typeof migrations_seedPlacementTestSentences;
   rateLimiter: typeof rateLimiter;

@@ -17,6 +17,7 @@ import {
   resolveCardSpeakerGenders,
   getTtsProviderForLanguage,
   getTranslationConfigForLanguage,
+  getMixedVariantByRegion,
   resolveMixedVariant,
 } from '../../lib/languages';
 import {
@@ -271,6 +272,11 @@ export async function scheduleMissingContent(
   // Skip when TTS is in flight: deleting now would race the pending write
   // and leave an audio row pointing at no translation. Defer to the next
   // `scheduleMissingContent` pass.
+  //
+  // regionVariant of each swept row, captured BEFORE the delete (the row is
+  // gone by the time the regen enqueue below runs) so mixed-dialect cards
+  // keep their dialect across regeneration instead of re-rolling it.
+  const sweptRegionVariants = new Map<string, string>();
   for (const [lang, translation] of translationMap) {
     if (!translation) continue;
     if (translation.translationSource === USER_PROVIDED_TRANSLATION_SOURCE) continue;
@@ -293,6 +299,9 @@ export async function scheduleMissingContent(
     const llmClaim = llmClaimMap.get(lang) ?? null;
     if (llmClaim && Date.now() - llmClaim.claimedAt < LLM_CLAIM_STALE_MS) continue;
 
+    if (translation.regionVariant) {
+      sweptRegionVariants.set(lang, translation.regionVariant);
+    }
     await ctx.db.delete(translation._id);
     translationMap.set(lang, null);
     // Audio for the legacy-alongside-drifted case was already deleted by the
@@ -403,6 +412,7 @@ export async function scheduleMissingContent(
                   targetLanguage: lang,
                   text: text.text,
                   audioSpeakerGender,
+                  preferredRegionVariant: sweptRegionVariants.get(lang),
                 },
               },
             );
@@ -421,6 +431,7 @@ export async function scheduleMissingContent(
               targetLanguage: lang,
               text: text.text,
               audioSpeakerGender,
+              preferredRegionVariant: sweptRegionVariants.get(lang),
             },
             {
               onComplete:
@@ -1530,6 +1541,7 @@ export const getTranslationForTextLanguage = internalQuery({
     v.object({
       translatedText: v.string(),
       romanizedText: v.optional(v.string()),
+      regionVariant: v.optional(v.string()),
     }),
   ),
   handler: async (ctx, args) => {
@@ -1543,6 +1555,7 @@ export const getTranslationForTextLanguage = internalQuery({
     return {
       translatedText: row.translatedText,
       romanizedText: row.romanizedText,
+      regionVariant: row.regionVariant,
     };
   },
 });
@@ -1580,6 +1593,13 @@ export const processTranslationForCard = internalAction({
      * Google path, which holds no claim.
      */
     claimId: v.optional(v.id('llmTranslationClaims')),
+    /**
+     * Mixed-dialect pin: the `regionVariant` of a translation row deleted
+     * before this regeneration was enqueued (captured pre-delete by the
+     * version-stale sweep, or forwarded through the LLM fallback). Preferred
+     * over a fresh `resolveMixedVariant` pick so the dialect never flips.
+     */
+    preferredRegionVariant: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1596,7 +1616,19 @@ export const processTranslationForCard = internalAction({
       // sub-variant per text. The Google translate target is the sub-code so
       // we get regional spelling/vocab; the persisted row keeps the mixed
       // code as `targetLanguage` and records the chosen variant.
-      const mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
+      //
+      // Variant pin: prefer the existing row's persisted regionVariant, then
+      // the pre-delete capture (`preferredRegionVariant`), then a fresh
+      // deterministic pick — regeneration must not flip the card's dialect.
+      // All three resolve to null for non-mixed targets.
+      const mixed =
+        (existingRow?.regionVariant
+          ? getMixedVariantByRegion(args.targetLanguage, existingRow.regionVariant)
+          : null) ??
+        (args.preferredRegionVariant
+          ? getMixedVariantByRegion(args.targetLanguage, args.preferredRegionVariant)
+          : null) ??
+        resolveMixedVariant(args.targetLanguage, args.textId as string);
       const translateTarget = mixed ? mixed.subCode : args.targetLanguage;
       const regionVariant = mixed?.regionVariant;
 

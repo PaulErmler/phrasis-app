@@ -12,10 +12,12 @@ import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import { translateTextWithLLM, type ReasoningEffort } from './translationLLM';
 import {
+  getMixedVariantByRegion,
   getTranslationConfigForLanguage,
   getTranslationSourceFromStage,
   getVoiceForLanguage,
   getVoiceForLanguageVariant,
+  isMixedLanguage,
   resolveMixedVariant,
   resolveTranslationStages,
   ROMANIZATION_LANGUAGES,
@@ -122,6 +124,11 @@ const llmJobArgsValidator = v.object({
   // whose claim was reclaimed mid-flight (delete + reinsert → new _id) skips
   // its write instead of clobbering the new owner's result.
   claimId: v.optional(v.id('llmTranslationClaims')),
+  // Mixed-dialect pin: the `regionVariant` of a translation row that was
+  // deleted before this regeneration was enqueued (the version-stale sweep
+  // captures it pre-delete). The worker prefers it over a fresh
+  // `resolveMixedVariant` pick so a card's dialect never flips on regen.
+  preferredRegionVariant: v.optional(v.string()),
 });
 
 /** onComplete context: everything the Google fallback needs to run. */
@@ -132,6 +139,7 @@ const llmCompletionContextValidator = v.object({
   text: v.string(),
   audioSpeakerGender: v.optional(v.string()),
   replaceExisting: v.optional(v.boolean()),
+  preferredRegionVariant: v.optional(v.string()),
 });
 
 type LlmJobArgs = Infer<typeof llmJobArgsValidator>;
@@ -196,6 +204,7 @@ export const enqueueLlmTranslation = internalMutation({
         replaceExisting: args.replaceExisting,
         ruleOverride: args.ruleOverride,
         claimId: claim?._id,
+        preferredRegionVariant: args.preferredRegionVariant,
       },
       {
         onComplete:
@@ -207,6 +216,7 @@ export const enqueueLlmTranslation = internalMutation({
           text: args.text,
           audioSpeakerGender: args.audioSpeakerGender,
           replaceExisting: args.replaceExisting,
+          preferredRegionVariant: args.preferredRegionVariant,
         },
       },
     );
@@ -263,7 +273,34 @@ async function runLlmTranslation(
     // config so the model gets accurate region instructions, and the
     // persisted regionVariant lets the audio player synthesize with the
     // matching accent.
-    const mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
+    //
+    // Variant pin: prefer (a) the regionVariant already persisted on the
+    // existing translation row, then (b) the one captured before a sweep
+    // deleted the row (`preferredRegionVariant`), then (c) a fresh
+    // deterministic pick — so a regeneration can never flip the card's
+    // dialect out from under existing audio.
+    let mixed: ReturnType<typeof resolveMixedVariant> = null;
+    if (isMixedLanguage(args.targetLanguage)) {
+      const existingRow = await ctx.runQuery(
+        internal.features.decks.getTranslationForTextLanguage,
+        { textId: args.textId, targetLanguage: args.targetLanguage },
+      );
+      if (existingRow?.regionVariant) {
+        mixed = getMixedVariantByRegion(
+          args.targetLanguage,
+          existingRow.regionVariant,
+        );
+      }
+      if (!mixed && args.preferredRegionVariant) {
+        mixed = getMixedVariantByRegion(
+          args.targetLanguage,
+          args.preferredRegionVariant,
+        );
+      }
+      if (!mixed) {
+        mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
+      }
+    }
     const cfgLanguageCode = mixed ? mixed.subCode : args.targetLanguage;
     const regionVariant = mixed?.regionVariant;
 
@@ -581,6 +618,7 @@ export const onLlmTranslationComplete = internalMutation({
         text: context.text,
         audioSpeakerGender: context.audioSpeakerGender,
         replaceExisting: context.replaceExisting,
+        preferredRegionVariant: context.preferredRegionVariant,
         // The claim keeps its _id across the re-point below, so the fallback
         // inherits the same single-writer token.
         claimId: claim._id,
