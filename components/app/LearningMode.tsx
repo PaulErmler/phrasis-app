@@ -135,10 +135,6 @@ export function LearningMode({
     state.status === 'reviewing'
       ? (state.courseSettings.writingInputMode ?? 'translate')
       : null;
-  const reviewingHideTargets =
-    state.status === 'reviewing'
-      ? (state.courseSettings.hideTargetLanguages ?? true)
-      : null;
   // Reset on a mode/style switch too (not just on card change) so toggling
   // shadowing ↔ writing (or translate ↔ transcribe) brings the card back to
   // its initial hidden state.
@@ -195,11 +191,14 @@ export function LearningMode({
     }
   }, [progressDisplayActive]);
 
-  useEffect(() => {
-    if (reviewingReviewMode !== 'audio' || reviewingHideTargets === null) return;
-    setAudioAllTargetsRevealed(!reviewingHideTargets);
-    setAudioRevealNonce(0);
-  }, [cardId, reviewingReviewMode, reviewingHideTargets]);
+  // `audioAllTargetsRevealed` is driven entirely by LearningCardContent's
+  // report (it fires on mount and on every change of its computed value,
+  // which matches the actual blur state). Forcing it back to "hidden" here on
+  // card/mode changes could contradict the child's unchanged computed value —
+  // the child then never re-reports, leaving the button stuck on "Reveal"
+  // while every target is already visible (so pressing it did nothing).
+  // The reveal nonce is likewise monotonic — never reset — so the child can
+  // treat any change as a fresh "reveal all" request.
 
   const handleReveal = useCallback(() => setFullReviewRevealed(true), []);
 
