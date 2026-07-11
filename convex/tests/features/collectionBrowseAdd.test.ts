@@ -396,6 +396,66 @@ describe("collection browse add flows", () => {
     });
   });
 
+  it("quota-empty batch add reports quotaLimited; a truly drained collection does not", async () => {
+    const t = convexTest(schema, modules);
+    const { collId, courseId, textIds } = await seedCourseWithTexts(t, 3, 2);
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await withContentChainMocks(async () => {
+      // Balance 2 clamps the batch: 2 cards added, not quota-limited.
+      const first = await asUser.mutation(api.features.decks.addCardsFromCollection, {
+        collectionId: collId,
+        batchSize: 5,
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(first.cardsAdded).toBe(2);
+      expect(first.quotaLimited).toBe(false);
+
+      // Balance 0: Phase 2 is skipped before any scan — the 0-card result
+      // must be distinguishable from a drained collection, or clients latch
+      // the collection as exhausted and never retry after a refill.
+      const second = await asUser.mutation(api.features.decks.addCardsFromCollection, {
+        collectionId: collId,
+        batchSize: 5,
+      });
+      expect(second.cardsAdded).toBe(0);
+      expect(second.scanIncomplete).toBe(false);
+      expect(second.quotaLimited).toBe(true);
+      // No frontier movement, no quota burned by the skipped phase.
+      expect((await getProgress(t, courseId, collId))?.cardsAdded).toBe(2);
+      expect(textIds.length).toBe(3);
+
+      // Refill → the remaining text is added; drained follow-up is NOT
+      // quota-limited (that 0-card result is the real exhausted signal).
+      await t.run(async (ctx) => {
+        const quota = await ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .unique();
+        await ctx.db.patch(quota!._id, {
+          features: {
+            sentences: { balance: 10, included: 10, used: 2, unlimited: false },
+          },
+        });
+      });
+      const third = await asUser.mutation(api.features.decks.addCardsFromCollection, {
+        collectionId: collId,
+        batchSize: 5,
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      expect(third.cardsAdded).toBe(1);
+      expect(third.quotaLimited).toBe(false);
+
+      const drained = await asUser.mutation(api.features.decks.addCardsFromCollection, {
+        collectionId: collId,
+        batchSize: 5,
+      });
+      expect(drained.cardsAdded).toBe(0);
+      expect(drained.scanIncomplete).toBe(false);
+      expect(drained.quotaLimited).toBe(false);
+    });
+  });
+
   it("scan cap: an all-ignored streak returns scanIncomplete with the frontier advanced (no quota burned), and a re-call continues", async () => {
     const t = convexTest(schema, modules);
     // Ranks 1..CAP+5 ignored → the first scan (bounded by ADD_SCAN_CAP)

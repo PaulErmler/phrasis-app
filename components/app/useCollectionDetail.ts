@@ -171,6 +171,18 @@ export function useCollectionDetail({
     () => new Set(),
   );
   const sessionStatusRef = useRef<Map<string, BrowseTextRow['status']>>(new Map());
+  // Below-anchor rows are only in the forward feed because their mark row is
+  // injected into page 1 — adding one deletes that mark in-transaction, so
+  // the reactive re-run drops the row entirely instead of flipping it to
+  // 'added' in place like above-anchor rows. Keep a snapshot of every row
+  // seen, plus the resurrected copies of rows that vanished, so acted rows
+  // honor the stay-visible contract regardless of which side of the anchor
+  // they live on.
+  const rowSnapshotsRef = useRef<Map<string, BrowseTextRow>>(new Map());
+  const forwardIdsRef = useRef<Set<string> | null>(null);
+  const [resurrectedRows, setResurrectedRows] = useState<
+    Map<string, BrowseTextRow>
+  >(() => new Map());
   // Reveal gate for "show more": index into the raw forward rows below which
   // rows are shown. null = show everything loaded.
   const [revealBoundary, setRevealBoundary] = useState<number | null>(null);
@@ -231,6 +243,9 @@ export function useCollectionDetail({
     if (openCollectionId === lastOpenedRef.current) return;
     lastOpenedRef.current = openCollectionId;
     sessionStatusRef.current = new Map();
+    rowSnapshotsRef.current = new Map();
+    forwardIdsRef.current = null;
+    setResurrectedRows(new Map());
     setSessionActedIds(new Set());
     setRevealBoundary(null);
     if (revealTimeoutRef.current) clearTimeout(revealTimeoutRef.current);
@@ -309,6 +324,41 @@ export function useCollectionDetail({
       });
     }
   }, [forwardRowsRaw, earlierRowsRaw]);
+
+  // Resurrect injected rows the moment they vanish from the forward feed.
+  // Adding is the only thing that removes a below-anchor row mid-session
+  // (mark clears flip to the internal 'readd' mark, which stays injected;
+  // above-anchor rows are range-selected and never leave), so a vanished id
+  // means "added": pin its last snapshot as a green row. This covers batch
+  // "Add N" drains too, which never produce an observable status transition.
+  useEffect(() => {
+    if (!anchorReady) {
+      forwardIdsRef.current = null;
+      return;
+    }
+    const currentIds = new Set<string>(forwardRowsRaw.map((row) => row._id));
+    for (const row of forwardRowsRaw) rowSnapshotsRef.current.set(row._id, row);
+    const prevIds = forwardIdsRef.current;
+    forwardIdsRef.current = currentIds;
+    if (!prevIds) return;
+    const vanished: BrowseTextRow[] = [];
+    for (const id of prevIds) {
+      if (currentIds.has(id)) continue;
+      const snapshot = rowSnapshotsRef.current.get(id);
+      if (snapshot) vanished.push({ ...snapshot, status: 'added' });
+    }
+    if (vanished.length === 0) return;
+    setResurrectedRows((prev) => {
+      const next = new Map(prev);
+      for (const row of vanished) next.set(row._id, row);
+      return next;
+    });
+    setSessionActedIds((prev) => {
+      const next = new Set(prev);
+      for (const row of vanished) next.add(row._id);
+      return next;
+    });
+  }, [forwardRowsRaw, anchorReady]);
 
   // Generate missing translations for every fetched non-added row (page 1 on
   // open, each revealed page, and the earlier feed's stragglers). Audio is
@@ -428,7 +478,14 @@ export function useCollectionDetail({
       }
 
       if (result.cardsAdded === 0) {
-        toast.info(t('noCardsToAdd'));
+        if (result.quotaLimited) {
+          // Out of sentences, not out of collection — "nothing left to add"
+          // would be wrong. Surface the same quota dialog as a thrown
+          // USAGE_LIMIT does.
+          setUsageLimitHit(true);
+        } else {
+          toast.info(t('noCardsToAdd'));
+        }
       } else {
         toast.success(t('cardsAdded', { count: result.cardsAdded }));
       }
@@ -509,15 +566,30 @@ export function useCollectionDetail({
   );
 
   const browse: CollectionBrowse = useMemo(() => {
-    const rows =
+    const visibleForward =
       revealBoundary === null
         ? forwardRowsRaw
         : forwardRowsRaw.slice(0, revealBoundary);
-    // Below-anchor marked texts exist in BOTH feeds: injected into the
-    // forward first page and returned by the 'upTo' history query (which has
-    // no status filter). The forward copy is the actionable one — drop the
-    // history duplicate so the same sentence never renders twice.
     const forwardIds = new Set(forwardRowsRaw.map((row) => row._id));
+    // Merge resurrected rows (added below-anchor rows the server dropped)
+    // back in AFTER the reveal slice, so they don't shift the gate's index
+    // math. The feed is globally rank-ascending (injected ranks ≤ anchor,
+    // then page ranks > anchor), so a rank sort restores each row's spot.
+    const resurrected = [...resurrectedRows.values()].filter(
+      (row) => !forwardIds.has(row._id),
+    );
+    const rows =
+      resurrected.length > 0
+        ? [...resurrected, ...visibleForward].sort(
+          (a, b) => a.collectionRank - b.collectionRank,
+        )
+        : visibleForward;
+    // Below-anchor marked texts exist in BOTH feeds: injected into the
+    // forward first page (or resurrected above) and returned by the 'upTo'
+    // history query (which has no status filter). The forward copy is the
+    // actionable one — drop the history duplicate so the same sentence never
+    // renders twice.
+    const mainIds = new Set([...forwardIds, ...resurrectedRows.keys()]);
     return {
       rows,
       status: forward.status,
@@ -525,7 +597,7 @@ export function useCollectionDetail({
       isPreparingMore: revealBoundary !== null,
       // 'upTo' pages descend from the anchor; display order is ascending.
       earlierRows: showAdded
-        ? [...earlierRowsRaw].reverse().filter((row) => !forwardIds.has(row._id))
+        ? [...earlierRowsRaw].reverse().filter((row) => !mainIds.has(row._id))
         : [],
       earlierStatus: earlier.status,
       loadEarlier: handleLoadEarlier,
@@ -545,6 +617,7 @@ export function useCollectionDetail({
     forward.status,
     handleLoadMore,
     revealBoundary,
+    resurrectedRows,
     earlierRowsRaw,
     earlier.status,
     handleLoadEarlier,

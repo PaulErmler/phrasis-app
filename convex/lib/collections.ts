@@ -124,3 +124,24 @@ export function isPremadeLevelCollection(collection: Doc<'collections'>): boolea
   return (LEGACY_LEVEL_ORDER as readonly string[]).includes(collection.name);
 }
 
+/**
+ * Whether `text` is within `userId`'s scope inside its collection. Mirrors
+ * getNextTextsFromRank's scoping: premade level collections only serve
+ * curriculum rows (a user fork living in a shared level collection is another
+ * user's text); custom/chat collections only the owner's texts.
+ *
+ * Security-relevant: every endpoint that surfaces or acts on a browse text
+ * (mark, preview translation/audio, single add) must apply this exact
+ * predicate — see `requireAccessibleText` in features/collections.ts for the
+ * throwing fetch-and-check wrapper.
+ */
+export function canUserAccessCollectionText(
+  collection: Doc<'collections'>,
+  text: Doc<'texts'>,
+  userId: string,
+): boolean {
+  return isPremadeLevelCollection(collection)
+    ? !text.userCreated
+    : text.userId === userId;
+}
+

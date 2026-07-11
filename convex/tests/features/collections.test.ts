@@ -8,6 +8,7 @@ import type { Id } from "../../_generated/dataModel";
 // Mocked globally in tests/convexTestSetup.ts — imported here to assert on
 // the enqueue boundary (the pools never run jobs under convex-test).
 import { llmPool, ttsPool } from "../../lib/workpools";
+import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 
@@ -332,7 +333,9 @@ describe("features/collections", () => {
       expect(res.page.length).toBe(MARK_READ_LIMIT);
       expect(res.page[0].collectionRank).toBe(1);
       expect(res.page.every((r) => r.status === "ignored")).toBe(true);
-    });
+      // 1000+ rows through the convex-test interpreter hovers around the 5s
+      // default timeout (same reason the scan-cap test raises it).
+    }, 120_000);
 
     it("pages the added history DESCENDING from the anchor with direction upTo", async () => {
       const t = convexTest(schema, modules);
@@ -596,6 +599,100 @@ describe("features/collections", () => {
       }));
       expect(audio).toEqual([]);
       expect(ttsClaims).toEqual([]);
+    });
+
+    it("regenerates version-stale translations while browsing (marked missing, then deleted + rescheduled)", async () => {
+      const t = convexTest(schema, modules);
+      const { collId } = await seedCourseWithTexts(t, 1);
+      // An en curriculum text whose es translation is stamped below the
+      // language's current translationVersion (es is at 2 since the
+      // 3.5flash bump), plus paired audio synthesized from the old wording,
+      // plus a user-provided sibling row that must never be swept.
+      const { enTextId, userTextId } = await t.run(async (ctx) => {
+        const enTextId = await ctx.db.insert("texts", {
+          text: "Hello there",
+          language: "en",
+          userCreated: false,
+          collectionId: collId,
+          collectionRank: 2,
+        });
+        await ctx.db.insert("translations", {
+          textId: enTextId,
+          targetLanguage: "es",
+          translatedText: "Hola viejo",
+          translationVersion: 1,
+        });
+        await ctx.db.insert("audioRecordings", {
+          textId: enTextId,
+          language: "es",
+          voiceName: "es-ES-test-voice",
+          storageId: await ctx.storage.store(new Blob(["fake-mp3"])),
+        });
+        const userTextId = await ctx.db.insert("texts", {
+          text: "Hello again",
+          language: "en",
+          userCreated: false,
+          collectionId: collId,
+          collectionRank: 3,
+        });
+        await ctx.db.insert("translations", {
+          textId: userTextId,
+          targetLanguage: "es",
+          translatedText: "Hola de nuevo",
+          translationVersion: 1,
+          translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
+        });
+        return { enTextId, userTextId };
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      // Browse reports the stale language as missing (while still shipping
+      // the old text for display) so the client requests regeneration.
+      const browsed = await asUser.query(
+        api.features.collections.browseCollectionTexts,
+        {
+          collectionId: collId,
+          anchorRank: 0,
+          direction: "after",
+          paginationOpts: firstPage,
+        },
+      );
+      const staleRow = browsed.page.find((r) => r._id === enTextId)!;
+      expect(staleRow.missingTranslationLanguages).toContain("es");
+      expect(
+        staleRow.translations.find((tr) => tr.language === "es")?.text,
+      ).toBe("Hola viejo");
+      // User-provided rows are exempt.
+      const userRow = browsed.page.find((r) => r._id === userTextId)!;
+      expect(userRow.missingTranslationLanguages).not.toContain("es");
+
+      // The preview mutation deletes the stale row + its paired audio and
+      // reschedules the translation.
+      const res = await asUser.mutation(
+        api.features.collections.requestPreviewTranslations,
+        { collectionId: collId, textIds: [enTextId, userTextId] },
+      );
+      expect(res.translationsScheduled).toBe(1);
+      const { translations, audio } = await t.run(async (ctx) => ({
+        translations: await ctx.db.query("translations").collect(),
+        audio: await ctx.db.query("audioRecordings").collect(),
+      }));
+      expect(
+        translations.filter((tr) => tr.textId === enTextId),
+      ).toEqual([]);
+      expect(audio.filter((a) => a.textId === enTextId)).toEqual([]);
+      // The user-provided sibling survived untouched.
+      expect(
+        translations.find((tr) => tr.textId === userTextId)?.translatedText,
+      ).toBe("Hola de nuevo");
+
+      // Re-requesting while the regen claim is in flight is a no-op — the
+      // row is gone but the LLM claim gates a duplicate enqueue.
+      const again = await asUser.mutation(
+        api.features.collections.requestPreviewTranslations,
+        { collectionId: collId, textIds: [enTextId] },
+      );
+      expect(again.translationsScheduled).toBe(0);
     });
 
     it("is a no-op for texts outside the given collection", async () => {

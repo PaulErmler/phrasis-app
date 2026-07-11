@@ -28,9 +28,17 @@ import {
   COLLECTION_PREVIEW_SIZE,
   MAX_PREVIEW_PAGE_SIZE,
   LEGACY_LEVEL_ORDER,
+  canUserAccessCollectionText,
   isPremadeLevelCollection,
 } from '../lib/collections';
-import { resolveCardSpeakerGenders } from '../../lib/languages';
+import {
+  USER_PROVIDED_TRANSLATION_SOURCE,
+  isTranslationVersionStale,
+  resolveCardSpeakerGenders,
+} from '../../lib/languages';
+import { deleteAudioRow } from '../lib/audio';
+import { hasActiveTtsClaim } from './ttsProcessing';
+import { CLAIM_STALE_MS as LLM_CLAIM_STALE_MS } from './llmTranslationQueue';
 import { getCourseSettings } from '../db/courseSettings';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
@@ -58,6 +66,40 @@ export async function isCollectionAccessible(
     return true;
 
   return false;
+}
+
+/**
+ * Fetch a text and enforce the full access chain for user-facing text
+ * endpoints: the text exists, its collection is accessible to the course, and
+ * the text itself is within the user's scope (`canUserAccessCollectionText` —
+ * curriculum rows for premade collections, the owner's texts for custom/chat).
+ * Throws the same ConvexErrors the previously-inlined checks did.
+ */
+export async function requireAccessibleText(
+  ctx: QueryCtx,
+  textId: Id<'texts'>,
+  courseId: Id<'courses'>,
+  userId: string,
+): Promise<{
+  text: Doc<'texts'>;
+  collection: Doc<'collections'>;
+  isLevelCollection: boolean;
+}> {
+  const text = await ctx.db.get(textId);
+  if (!text) throw new ConvexError('Text not found');
+  if (!(await isCollectionAccessible(ctx, text.collectionId, courseId))) {
+    throw new ConvexError('Collection not accessible');
+  }
+  const collection = await ctx.db.get(text.collectionId);
+  if (!collection) throw new ConvexError('Collection not found');
+  if (!canUserAccessCollectionText(collection, text, userId)) {
+    throw new ConvexError('Text not accessible');
+  }
+  return {
+    text,
+    collection,
+    isLevelCollection: isPremadeLevelCollection(collection),
+  };
 }
 
 // ============================================================================
@@ -204,12 +246,24 @@ export const browseCollectionTexts = query({
       inputs,
       course.baseLanguages,
       course.targetLanguages,
+      { markVersionStale: true },
     );
 
     const page = rows.map((row, i) => {
       const content = contentMap.get(String(i))!;
+      // Version-stale rows count as missing too (except on user-created
+      // texts, which are never version-swept): the client then routes them
+      // through requestPreviewTranslations, which regenerates them — so
+      // browsing already upgrades translations to the current version
+      // instead of deferring the delete+regen to the card-add sweep. The
+      // stale text still ships in `translations` for display until the
+      // regenerated row lands.
       const missingTranslationLanguages = content.translations
-        .filter((tr) => tr.language !== row.text.language && !tr.text)
+        .filter(
+          (tr) =>
+            tr.language !== row.text.language &&
+            (!tr.text || (!row.text.userCreated && tr.versionStale === true)),
+        )
         .map((tr) => tr.language);
       return {
         _id: row.text._id,
@@ -255,22 +309,9 @@ export const setCollectionTextMark = mutation({
     const { userId, course } = await requireActiveCourse(ctx);
     const courseId = course._id;
 
-    const text = await ctx.db.get(args.textId);
-    if (!text) throw new ConvexError('Text not found');
-    if (!(await isCollectionAccessible(ctx, text.collectionId, courseId))) {
-      throw new ConvexError('Collection not accessible');
-    }
-    const markCollection = await ctx.db.get(text.collectionId);
-    if (!markCollection) throw new ConvexError('Collection not found');
-    // Same scoping as the browse stream — without this, prioritizing another
+    // Full access chain — without the scope check, prioritizing another
     // user's fork text would later make the drain add it to this user's deck.
-    if (
-      isPremadeLevelCollection(markCollection)
-        ? text.userCreated
-        : text.userId !== userId
-    ) {
-      throw new ConvexError('Text not accessible');
-    }
+    const { text } = await requireAccessibleText(ctx, args.textId, courseId, userId);
 
     // Marks exist only for texts that aren't cards yet — the preview hides
     // these buttons on added rows; this guards direct calls.
@@ -330,7 +371,9 @@ export const setCollectionTextMark = mutation({
 
 /**
  * Schedule skipTts translation jobs for every course language this text is
- * missing. Resolves + persists speaker gender BEFORE translating (same as
+ * missing OR whose stored translation is version-stale (regenerated in place,
+ * with the same exemptions and claim deferrals as scheduleMissingContent's
+ * sweep). Resolves + persists speaker gender BEFORE translating (same as
  * scheduleMissingContent) so the translation's grammar agrees with the voice
  * that will eventually read it — otherwise the gender sweep would invalidate
  * these rows the moment audio is generated. Shared by the on-reveal and
@@ -357,10 +400,51 @@ async function scheduleMissingTranslationsForText(
         q.eq('textId', text._id).eq('targetLanguage', lang),
       )
       .first();
-    if (existing) continue;
+    let preferredRegionVariant: string | undefined;
+    if (existing) {
+      // Version-stale rows regenerate here too, so browsing a collection
+      // already upgrades its translations to the current version — otherwise
+      // the card-add sweep (scheduleMissingContent) deletes exactly what the
+      // preview just showed. Same exemptions as that sweep: user-created
+      // texts and user-provided translations are never version-swept.
+      const isStale =
+        !text.userCreated &&
+        existing.translationSource !== USER_PROVIDED_TRANSLATION_SOURCE &&
+        isTranslationVersionStale(lang, existing.translationVersion);
+      if (!isStale) continue;
+      // Mirror the sweep's deferrals: never delete under an active TTS claim
+      // (races the pending audio write) or a fresh LLM claim (the in-flight
+      // retranslation overwrites the row anyway).
+      if (await hasActiveTtsClaim(ctx, text._id, lang)) continue;
+      const llmClaim = await ctx.db
+        .query('llmTranslationClaims')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', text._id).eq('targetLanguage', lang),
+        )
+        .first();
+      if (llmClaim && Date.now() - llmClaim.claimedAt < LLM_CLAIM_STALE_MS) {
+        continue;
+      }
+      // Keep mixed-dialect rows on their pinned dialect across regeneration.
+      preferredRegionVariant = existing.regionVariant;
+      await ctx.db.delete(existing._id);
+      // The old audio was synthesized from the deleted wording — drop it so
+      // the new translation can't pair with mismatched audio (reference-aware,
+      // like the card sweep's delete).
+      const staleAudio = await ctx.db
+        .query('audioRecordings')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', text._id).eq('language', lang),
+        )
+        .first();
+      if (staleAudio) {
+        await deleteAudioRow(ctx, staleAudio);
+      }
+    }
     if (
       await scheduleTranslationForLanguage(ctx, text, lang, {
         audioSpeakerGender,
+        preferredRegionVariant,
         skipTts: true,
       })
     ) {
@@ -392,7 +476,6 @@ export const requestPreviewTranslations = mutation({
     }
     const collection = await ctx.db.get(args.collectionId);
     if (!collection) return { translationsScheduled: 0 };
-    const isLevelCollection = isPremadeLevelCollection(collection);
 
     const textIds = args.textIds.slice(0, MAX_PREVIEW_PAGE_SIZE);
     const languages = getCourseLanguages(
@@ -406,10 +489,7 @@ export const requestPreviewTranslations = mutation({
       if (!text || text.collectionId.toString() !== args.collectionId.toString()) {
         continue;
       }
-      // Mirror getNextTextsFromRank's scoping: premade collections only serve
-      // curriculum rows (a user fork living in a shared level collection is
-      // another user's text); custom/chat only the owner's texts.
-      if (isLevelCollection ? text.userCreated : text.userId !== userId) {
+      if (!canUserAccessCollectionText(collection, text, userId)) {
         continue;
       }
       translationsScheduled += await scheduleMissingTranslationsForText(
@@ -491,22 +571,12 @@ export const requestPreviewAudio = mutation({
   handler: async (ctx, args) => {
     const { userId, course } = await requireActiveCourse(ctx);
 
-    const text = await ctx.db.get(args.textId);
-    if (!text) throw new ConvexError('Text not found');
-    if (!(await isCollectionAccessible(ctx, text.collectionId, course._id))) {
-      throw new ConvexError('Collection not accessible');
-    }
-    const audioCollection = await ctx.db.get(text.collectionId);
-    if (!audioCollection) throw new ConvexError('Collection not found');
-    // Same scoping as the browse stream: curriculum rows for premade
-    // collections, the owner's texts for custom/chat.
-    if (
-      isPremadeLevelCollection(audioCollection)
-        ? text.userCreated
-        : text.userId !== userId
-    ) {
-      throw new ConvexError('Text not accessible');
-    }
+    const { text } = await requireAccessibleText(
+      ctx,
+      args.textId,
+      course._id,
+      userId,
+    );
     const courseLanguages = new Set([
       text.language,
       ...course.baseLanguages,

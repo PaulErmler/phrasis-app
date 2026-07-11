@@ -75,7 +75,7 @@ import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { consumeQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
-import { isCollectionAccessible } from './collections';
+import { isCollectionAccessible, requireAccessibleText } from './collections';
 import {
   applyMarkCounterDelta,
   clearMarkForAddedText,
@@ -1326,6 +1326,14 @@ export const addCardsFromCollection = mutation({
      * guaranteed progress).
      */
     scanIncomplete: v.boolean(),
+    /**
+     * True when Phase 2 was skipped because the SENTENCES quota is exhausted.
+     * Distinguishes "0 cards because out of quota" from "collection drained"
+     * — without it the two are byte-identical and clients would latch a
+     * quota-limited collection as permanently exhausted. Optional so replies
+     * from a not-yet-redeployed backend still validate.
+     */
+    quotaLimited: v.optional(v.boolean()),
   }),
   handler: async (ctx, args) => {
     const { userId, course } = await requireActiveCourse(ctx);
@@ -1471,6 +1479,7 @@ export const addCardsFromCollection = mutation({
             cardsAdded: totalCardsInserted,
             totalCardsInDeck: deck.cardCount + totalCardsInserted,
             scanIncomplete,
+            quotaLimited: true,
           };
         }
       }
@@ -1541,6 +1550,7 @@ export const addCardsFromCollection = mutation({
       cardsAdded: totalCardsInserted,
       totalCardsInDeck: deck.cardCount + totalCardsInserted,
       scanIncomplete,
+      quotaLimited: false,
     };
   },
 });
@@ -1565,19 +1575,12 @@ export const addSingleTextFromCollection = mutation({
     const { userId, course } = await requireActiveCourse(ctx);
     const courseId = course._id;
 
-    const text = await ctx.db.get(args.textId);
-    if (!text) throw new ConvexError('Text not found');
-    if (!(await isCollectionAccessible(ctx, text.collectionId, courseId))) {
-      throw new ConvexError('Collection not accessible');
-    }
-    const collection = await ctx.db.get(text.collectionId);
-    if (!collection) throw new ConvexError('Collection not found');
-    // Mirror getNextTextsFromRank's scoping: premade collections only serve
-    // curriculum rows; custom/chat collections only the owner's texts.
-    const isLevelCollection = isPremadeLevelCollection(collection);
-    if (isLevelCollection ? text.userCreated : text.userId !== userId) {
-      throw new ConvexError('Text not accessible');
-    }
+    const { text, isLevelCollection } = await requireAccessibleText(
+      ctx,
+      args.textId,
+      courseId,
+      userId,
+    );
 
     const deck = await getOrCreateDeck(ctx, course);
 
