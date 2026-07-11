@@ -11,6 +11,7 @@ import {
   type AlignedWord,
   type CharChunk,
 } from '@/lib/textCompare';
+import { AskAboutWord, ClickableWords } from './ClickableWords';
 
 interface WordDiffProps {
   expected: string;
@@ -201,7 +202,18 @@ export function WordDiff({
   if (hideErrors) {
     return (
       <div>
-        <p className="leading-relaxed text-foreground">{expected}</p>
+        {/* Clean revealed sentence — words are clickable (ask-AI popover),
+            matching the shadowing-mode card. Karaoke props are off; this is
+            a static reveal. */}
+        <ClickableWords
+          text={expected}
+          language={language}
+          wordTimings={null}
+          localTime={0}
+          isActive={false}
+          enabled={false}
+          className="leading-relaxed text-foreground"
+        />
         <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
           {t('accuracy')}: {accuracy}%
         </p>
@@ -213,11 +225,17 @@ export function WordDiff({
     <div>
       <p className="leading-relaxed flex flex-wrap items-baseline gap-x-1 gap-y-3 pt-3">
         {words.map((w, i) => (
-          <WordChip
+          // Chips whose baseline shows a sentence word (equal / missing /
+          // typo / wrong) get the ask-AI popover for it. `expected` is ''
+          // exactly for `extra` chips (the user's stray word isn't part of
+          // the sentence), and punctuation-only chips fall back to a plain
+          // wrapper inside AskAboutWord.
+          <AskAboutWord
             key={`${i}-${w.tag}-${w.expected ?? ''}-${w.actual ?? ''}`}
-            word={w}
-            language={language}
-          />
+            word={w.expected}
+          >
+            <WordChip word={w} language={language} />
+          </AskAboutWord>
         ))}
       </p>
       <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>

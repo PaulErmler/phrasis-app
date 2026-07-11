@@ -33,6 +33,7 @@ import {
   DEFAULT_AUTO_ADVANCE,
   DEFAULT_REPETITIONS_BASE,
   DEFAULT_REPETITIONS_TARGET,
+  DEFAULT_REPETITIONS_TARGET_BEFORE,
   DEFAULT_REPETITIONS_TARGET_WRITING,
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
@@ -1082,12 +1083,12 @@ export function LearningModeSettings({
             {showBeforeTarget && targetLanguages.length > 0 && (
               <>
                 {targetLanguages.map((code, idx) => {
-                  const plays = beforeReps[code] ?? DEFAULT_REPETITIONS_TARGET;
+                  const plays = beforeReps[code] ?? DEFAULT_REPETITIONS_TARGET_BEFORE;
                   const repPause =
                     beforeRepPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
                   const nextCode = targetLanguages[idx + 1];
                   const nextPlays = nextCode
-                    ? (beforeReps[nextCode] ?? DEFAULT_REPETITIONS_TARGET)
+                    ? (beforeReps[nextCode] ?? DEFAULT_REPETITIONS_TARGET_BEFORE)
                     : 0;
 
                   return (

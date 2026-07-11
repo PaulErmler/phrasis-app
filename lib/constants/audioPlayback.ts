@@ -13,8 +13,14 @@
 /** Default repetitions for every base language */
 export const DEFAULT_REPETITIONS_BASE = 1;
 
-/** Default repetitions for every target language (audio/Shadowing mode) */
-export const DEFAULT_REPETITIONS_TARGET = 1;
+/** Default repetitions for every target language (audio/Shadowing mode, after-base group) */
+export const DEFAULT_REPETITIONS_TARGET = 2;
+
+/**
+ * Default target repetitions for the before-base group ("Practice Listening")
+ * in audio/Shadowing mode — the prompt only needs to play once.
+ */
+export const DEFAULT_REPETITIONS_TARGET_BEFORE = 1;
 
 /**
  * Default target repetitions in the writing modes (Translate merged playback
