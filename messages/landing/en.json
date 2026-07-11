@@ -67,6 +67,10 @@
     "audioBody": "The heart of Flexling. Listen to a sentence, translate it in your head, then say it aloud to practice your pronunciation — start speaking from day one, hands-free or hands-on. Each target line starts blurred and eases into focus, just like it does after playback in the app.",
     "fullTitle": "Writing",
     "fullBody": "Type each sentence in your target language and get instant, character-level spelling feedback — the fastest way to master writing. What you get right shows in green, and anything off is highlighted so you learn from every mistake.",
+    "translateTitle": "Translate",
+    "translateBody": "Hear a sentence in your language and type its translation in the target language — active recall for vocabulary, grammar, and spelling in one exercise.",
+    "transcribeTitle": "Transcribe",
+    "transcribeBody": "Hear only the target language and type exactly what you hear — dictation-style practice that trains your listening comprehension.",
     "reviewModeTitle": "Review",
     "reviewModeBody": "Shadow the cards that are due and spaced repetition schedules each one for the perfect moment to remember it.",
     "radioTitle": "Radio",
@@ -244,7 +248,7 @@
   "languages": {
     "title": "One method,",
     "titleHighlight": "{count}+ languages",
-    "lead": "Every language comes with native-quality AI audio and sentence-level translations. Pick one or learn several side by side.",
+    "lead": "Every language comes with high quality audio. Pick one or learn several side by side.",
     "missingPill": "Missing a language? Let us know"
   },
   "pricing": {
@@ -359,7 +363,7 @@
         "answer": [
           "Flexling gives you three ways to learn the same sentences: Shadowing, Writing, and Radio.",
           "With Shadowing, you hear a sentence in a language you already know, get a moment to translate it in your head, then hear and say the target sentence aloud — hands-free if you like.",
-          "With Writing, you type your translation and get instant, character-level feedback on spelling. Radio simply plays sentences and their translations in the background for passive listening.",
+          "With Writing, you type and get instant, character-level feedback on spelling — either translating a sentence you hear in your language, or transcribing exactly what you hear in the target language to train listening comprehension. Radio simply plays sentences and their translations in the background for passive listening.",
           "What makes Flexling special is that if you don't understand a sentence or have any question, you can ask the AI — like \"How can I say this more politely?\" or \"Give me 3 more examples with this verb in a different tense.\" — and it automatically creates new flashcards with audio for you.",
           "Note: We generate natural-sounding audio using state of the art text-to-speech technology."
         ]

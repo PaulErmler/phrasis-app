@@ -34,6 +34,7 @@ import {
   PROGRESS_DISPLAY_INTERVAL,
 } from '@/lib/constants/learning';
 import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
+import { collectionRemaining } from '@/convex/lib/collections';
 import { useCelebration } from './useCelebration';
 
 /**
@@ -676,8 +677,24 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // --------------------------------------------------------------------------
   // Add cards
   // --------------------------------------------------------------------------
+  // Collection a completed add run proved drained (0 cards, scan not capped,
+  // not merely out of quota) — or whose last run threw. Read by the auto-add
+  // effect and the noCardsDue/loading status computation so neither re-fires
+  // a doomed mutation in a loop nor strands the user on the loading screen.
+  // Cleared by any run that adds cards; the manual Add button is not gated by
+  // it, so it doubles as the recovery path after a failure.
+  const autoAddExhaustedForRef = useRef<string | null>(null);
+  // Quota-empty is deliberately NOT the exhausted latch: the collection still
+  // has addable texts, so it must un-stick when the balance refills (below)
+  // instead of staying dead until remount. It still needs to stop the effect,
+  // though — a graceful `quotaLimited` result doesn't latch exhausted, and
+  // without this the effect would re-fire the no-op mutation on every
+  // isAddingCards flip.
+  const autoAddQuotaEmptyRef = useRef(false);
+
   const handleAddCards = useCallback(async () => {
     if (!courseSettings?.activeCollectionId || isAddingCards) return;
+    const collectionId = courseSettings.activeCollectionId;
     const configuredBatch =
       batchSizeOverride ??
       courseSettings.cardsToAddBatchSize ??
@@ -687,28 +704,71 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
       : Math.min(configuredBatch, Math.max(1, sentencesQuota.balance));
     setIsAddingCards(true);
     try {
-      await addCardsMutation({
-        collectionId: courseSettings.activeCollectionId,
-        batchSize: effectiveBatch,
-      });
+      const args = { collectionId, batchSize: effectiveBatch };
+      let result = await addCardsMutation(args);
+      // A 0-card result with scanIncomplete means the scan burned its
+      // per-call read budget on an ignored/direct-added streak; the frontier
+      // already advanced, so re-calling continues past it. Bounded retries —
+      // mirrors the collection dialog's handleAddCards.
+      let attempts = 1;
+      while (result.cardsAdded === 0 && result.scanIncomplete && attempts < 5) {
+        result = await addCardsMutation(args);
+        attempts++;
+      }
+      if (result.cardsAdded > 0) {
+        autoAddExhaustedForRef.current = null;
+        autoAddQuotaEmptyRef.current = false;
+      } else if (result.quotaLimited) {
+        autoAddQuotaEmptyRef.current = true;
+      } else if (!result.scanIncomplete) {
+        // Proven drained (not just capped, not out of quota). Remembering it
+        // here is what lets the auto-add effect safely depend on
+        // isAddingCards without looping.
+        autoAddExhaustedForRef.current = collectionId.toString();
+      }
     } catch (error) {
       console.error('Failed to add cards:', error);
+      // Latch failures too: the effect re-fires when isAddingCards flips
+      // back, so a persistent rejection (e.g. QUOTA_NOT_SYNCED before the
+      // quota doc exists) would otherwise retry the mutation in a tight
+      // loop. The noCardsDue screen's manual Add button bypasses the latch
+      // and clears it on the next successful run.
+      autoAddExhaustedForRef.current = collectionId.toString();
     } finally {
       setIsAddingCards(false);
     }
   }, [courseSettings, isAddingCards, addCardsMutation, sentencesQuota, batchSizeOverride]);
 
-  // Auto-add cards when enabled and no cards due
+  // Un-stick the quota latch the moment the reactive balance shows headroom
+  // again. Runs before the auto-add effect below (definition order), so the
+  // same commit that delivers the refill also resumes auto-add.
+  useEffect(() => {
+    if (sentencesQuota.unlimited || sentencesQuota.balance > 0) {
+      autoAddQuotaEmptyRef.current = false;
+    }
+  }, [sentencesQuota.unlimited, sentencesQuota.balance]);
+
+  // Auto-add cards when enabled and no cards due. isAddingCards and
+  // activeCollectionId are deliberate deps: a run that adds 0 cards while
+  // auto-advance moves the active collection (ignore-completed level), or one
+  // that merely hit the scan cap, must re-evaluate when the run finishes —
+  // otherwise the user is stranded on the loading screen. The exhausted-ref
+  // guard (set on drained and on error) and the quota latch (set on
+  // quota-empty, cleared on refill) are what keep this from looping on a
+  // drained collection, a persistently failing mutation, or an empty balance.
   useEffect(() => {
     // Auto-add default is `true` — only opt out when explicitly false.
     const autoAddEnabled = courseSettings?.autoAddCards !== false;
+    const activeCollectionId = courseSettings?.activeCollectionId;
     if (
       cardForReview === null &&
       autoAddEnabled &&
-      courseSettings?.activeCollectionId &&
+      activeCollectionId &&
       courseSettings?.studyContentFilter !== 'custom' &&
       !isAddingCards &&
-      !settingsOpen
+      !settingsOpen &&
+      !autoAddQuotaEmptyRef.current &&
+      autoAddExhaustedForRef.current !== activeCollectionId.toString()
     ) {
       handleAddCards();
     }
@@ -716,8 +776,12 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   }, [
     cardForReview,
     courseSettings?.autoAddCards,
+    courseSettings?.activeCollectionId,
     courseSettings?.studyContentFilter,
+    isAddingCards,
     settingsOpen,
+    sentencesQuota.unlimited,
+    sentencesQuota.balance,
   ]);
 
   // Reset selectedRating, pending master/hide state, exit flag, and card timer when card changes.
@@ -735,6 +799,18 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     setIsExiting(false);
     cardShownAtRef.current = Date.now();
   }, [cardForReview?._id]);
+
+  // Recovery: when a forward review resolves and the SAME card document comes
+  // back (e.g. "again" on a one-card deck), the id-keyed reset effect above
+  // never fires and isExiting would stay true forever, leaving the card pane
+  // blank. Clear it whenever a real card is present and no mutation is in
+  // flight. The auto-add gap (cardForReview === null) intentionally stays
+  // blank — see the comment above.
+  useEffect(() => {
+    if (isExiting && !isReviewing && !isUndoing && cardForReview?._id != null) {
+      setIsExiting(false);
+    }
+  }, [isExiting, isReviewing, isUndoing, cardForReview?._id]);
 
   // --------------------------------------------------------------------------
   // Review / master / hide
@@ -1204,8 +1280,12 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     const activeEntry = collectionProgress?.find(
       (c) => c.collectionId === courseSettings.activeCollectionId,
     );
+    // Ignored texts are excluded from auto-add — with them counted, auto-add
+    // would look like it "will run" on a collection whose only unadded texts
+    // are ignored, and the user would sit on the loading screen instead of
+    // the noCardsDue screen.
     const remainingInCollection = activeEntry
-      ? Math.max(0, activeEntry.totalTexts - activeEntry.cardsAdded)
+      ? collectionRemaining(activeEntry.totalTexts, activeEntry)
       : null;
 
     // When auto-add is enabled and will actually add cards, suppress the
@@ -1217,7 +1297,11 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
       !settingsOpen &&
       courseSettings.studyContentFilter !== 'custom' &&
       (sentencesQuota.unlimited || sentencesQuota.balance > 0) &&
-      (remainingInCollection === null || remainingInCollection > 0);
+      (remainingInCollection === null || remainingInCollection > 0) &&
+      // A completed run proved this collection drained — the effect won't
+      // re-fire for it, so don't promise a load that will never happen.
+      autoAddExhaustedForRef.current !==
+        courseSettings.activeCollectionId?.toString();
 
     if (autoAddWillRun && lastReviewingCardRef.current) {
       // Keep the previously shown card on screen until the next card arrives,

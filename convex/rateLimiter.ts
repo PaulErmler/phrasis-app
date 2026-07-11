@@ -1,4 +1,4 @@
-import { RateLimiter, MINUTE } from '@convex-dev/rate-limiter';
+import { RateLimiter, MINUTE, SECOND } from '@convex-dev/rate-limiter';
 import { components } from './_generated/api';
 import type { TtsProvider } from './types';
 
@@ -18,14 +18,11 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     shards: 8,
   },
   // Gemini 3.1 Flash TTS via OpenRouter (/audio/speech). Capped BELOW the
-  // azureStt budget (200/min), not at OpenRouter's ceiling: every gemini
-  // synthesis is STT-validated, so gemini demand converts 1:1 (2:1 on a
-  // validation retry) into azureStt demand, and that bucket is shared with
-  // google validation, word-timing backfill, and chat voice. 180
-  // leaves headroom for those. If more gemini throughput is ever needed,
-  // raise azureStt first — Microsoft's documented Fast Transcription cap on
-  // S0 is 600 req/min per resource (learn.microsoft.com Speech quotas,
-  // 2026-06), so the current 200 is a self-imposed third of the real limit.
+  // azureStt budget (100 per 10s ≈ 600/min), not at OpenRouter's ceiling:
+  // every gemini synthesis is STT-validated, so gemini demand converts 1:1
+  // (2:1 on a validation retry) into azureStt demand, and that bucket is
+  // shared with google validation, word-timing backfill, and chat voice.
+  // 180 leaves headroom for those.
   geminiTts: {
     kind: 'token bucket',
     rate: 180,
@@ -35,14 +32,15 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   },
   // Azure Speech-to-Text Fast Transcription S0 tier. Hit by TTS validation
   // (synthesizeAndValidate), word-timing backfill, and chat voice
-  // transcription. Microsoft's documented S0 cap is 600 req/min per resource
-  // (adjustable via support ticket); 200 keeps us at a third of that because
-  // Azure autoscaling can 429 below the cap during sharp ramps.
+  // transcription. 100 per 10s matches Microsoft's documented S0 cap of
+  // 600 req/min per resource (adjustable via support ticket); the short
+  // period keeps bursts smooth so Azure autoscaling doesn't 429 during
+  // sharp ramps.
   azureStt: {
     kind: 'token bucket',
-    rate: 200,
-    period: MINUTE,
-    capacity: 200,
+    rate: 100,
+    period: 10 * SECOND,
+    capacity: 100,
     shards: 10,
   },
 });

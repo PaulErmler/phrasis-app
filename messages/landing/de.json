@@ -67,6 +67,10 @@
     "audioBody": "Das Herzstück von Flexling. Hör einen Satz, übersetze ihn im Kopf und sprich ihn dann laut nach, um deine Aussprache zu üben — sprich vom ersten Tag an, freihändig oder mit den Händen. Jede Zielzeile startet unscharf und wird nach und nach scharf, genau wie nach dem Abspielen in der App.",
     "fullTitle": "Schreiben",
     "fullBody": "Tippe jeden Satz in deiner Zielsprache und erhalte sofortiges Feedback zur Rechtschreibung, Zeichen für Zeichen — der schnellste Weg, das Schreiben zu meistern. Was richtig ist, erscheint grün, alles Abweichende wird markiert, damit du aus jedem Fehler lernst.",
+    "translateTitle": "Übersetzen",
+    "translateBody": "Höre einen Satz in deiner Sprache und tippe die Übersetzung in der Zielsprache ein — aktives Abrufen von Vokabeln, Grammatik und Rechtschreibung in einer Übung.",
+    "transcribeTitle": "Transkribieren",
+    "transcribeBody": "Höre nur die Zielsprache und tippe genau ein, was du hörst — Diktat-Übung, die dein Hörverständnis trainiert.",
     "reviewModeTitle": "Wiederholung",
     "reviewModeBody": "Sprich die fälligen Karten nach, und Spaced Repetition plant jede einzelne für den perfekten Moment, sie dir zu merken.",
     "radioTitle": "Radio",
@@ -244,7 +248,7 @@
   "languages": {
     "title": "Eine Methode,",
     "titleHighlight": "{count}+ Sprachen",
-    "lead": "Jede Sprache kommt mit KI-Audio in Muttersprachler-Qualität und satzgenauen Übersetzungen. Lerne eine Sprache oder mehrere parallel.",
+    "lead": "Jede Sprache kommt mit hochwertigem Audio. Lerne eine Sprache oder mehrere parallel.",
     "missingPill": "Deine Sprache fehlt? Sag uns Bescheid"
   },
   "pricing": {
@@ -359,7 +363,7 @@
         "answer": [
           "Flexling bietet dir drei Wege, dieselben Sätze zu lernen: Shadowing, Schreiben und Radio.",
           "Beim Shadowing hörst du einen Satz in einer Sprache, die du schon verstehst, hast einen Moment, ihn im Kopf zu übersetzen, und hörst und sprichst dann den Zielsatz laut nach — freihändig, wenn du magst.",
-          "Beim Schreiben tippst du deine Übersetzung und bekommst sofort zeichengenaues Feedback zur Rechtschreibung. Radio spielt Sätze und ihre Übersetzungen einfach im Hintergrund zum passiven Hören.",
+          "Beim Schreiben tippst du und bekommst sofort zeichengenaues Feedback zur Rechtschreibung — entweder übersetzt du einen Satz, den du in deiner Sprache hörst, oder du transkribierst genau, was du in der Zielsprache hörst, um dein Hörverständnis zu trainieren. Radio spielt Sätze und ihre Übersetzungen einfach im Hintergrund zum passiven Hören.",
           "Das Besondere an Flexling: Wenn du einen Satz nicht verstehst oder eine Frage hast, kannst du die KI fragen — etwa „Wie kann ich das höflicher sagen?“ oder „Gib mir drei weitere Beispiele mit diesem Verb in einer anderen Zeitform.“ — und sie erstellt automatisch neue Lernkarten mit Audio für dich.",
           "Hinweis: Wir erzeugen natürlich klingendes Audio mit modernster Text-zu-Sprache-Technologie."
         ]

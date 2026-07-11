@@ -2,7 +2,7 @@ import { QueryCtx, MutationCtx } from '../_generated/server';
 import { Id, Doc } from '../_generated/dataModel';
 import { getCourseSettings } from './courseSettings';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
-import { LEGACY_LEVEL_ORDER, LEVEL_TO_COLLECTION } from '../lib/collections';
+import { LEGACY_LEVEL_ORDER, LEVEL_TO_COLLECTION, settledCount } from '../lib/collections';
 
 /**
  * Get the globally active dataset, or null if none is active (i.e. before the
@@ -72,8 +72,9 @@ export async function getNextCollection(
 
 /**
  * Walk forward from `current` (inclusive) and return the first collection
- * with `cardsAdded < textCount` for the given user/course. Used by auto-advance
- * to pick the next incomplete level after the active one is finished.
+ * that is not yet complete for the given user/course — complete meaning every
+ * text either added (`cardsAdded`) or deliberately ignored (`ignoredCount`).
+ * Used by auto-advance to pick the next level after the active one finishes.
  */
 export async function findNextIncompleteCollection(
   ctx: QueryCtx,
@@ -89,7 +90,7 @@ export async function findNextIncompleteCollection(
         q.eq('userId', userId).eq('courseId', courseId).eq('collectionId', cursor!._id),
       )
       .first();
-    if ((progress?.cardsAdded ?? 0) < cursor.textCount) return cursor;
+    if (settledCount(progress) < cursor.textCount) return cursor;
     cursor = await getNextCollection(ctx, cursor);
   }
   return null;

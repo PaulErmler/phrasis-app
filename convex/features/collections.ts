@@ -1,4 +1,5 @@
-import { v } from 'convex/values';
+import { v, ConvexError } from 'convex/values';
+import { paginationOptsValidator } from 'convex/server';
 import { query, mutation, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { getAuthUserId } from '../db/users';
@@ -8,18 +9,39 @@ import {
   getCollectionProgress,
   getNextTextsFromRank,
 } from '../db/collections';
-import { translationValidator, audioRecordingValidator } from '../types';
-import { buildTextContentBatchForLanguages } from '../lib/cardContent';
-import { scheduleMissingContent } from './decks';
+import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
+import {
+  applyMarkCounterDelta,
+  collectionTextMarkValidator,
+  counterDeltaForMark,
+  getMark,
+  listMarksForCollection,
+  MARK_READ_LIMIT,
+} from '../db/collectionTextMarks';
+import { buildTextContentBatchForLanguages, getCourseLanguages } from '../lib/cardContent';
+import {
+  scheduleMissingContent,
+  scheduleTranslationForLanguage,
+  scheduleAudioForLanguage,
+} from './decks';
 import {
   COLLECTION_PREVIEW_SIZE,
-  CONTENT_LOOKAHEAD_SIZE,
+  MAX_PREVIEW_PAGE_SIZE,
   LEGACY_LEVEL_ORDER,
+  canUserAccessCollectionText,
   isPremadeLevelCollection,
 } from '../lib/collections';
+import {
+  USER_PROVIDED_TRANSLATION_SOURCE,
+  isTranslationVersionStale,
+  resolveCardSpeakerGenders,
+} from '../../lib/languages';
+import { deleteAudioRow } from '../lib/audio';
+import { hasActiveTtsClaim } from './ttsProcessing';
+import { CLAIM_STALE_MS as LLM_CLAIM_STALE_MS } from './llmTranslationQueue';
 import { getCourseSettings } from '../db/courseSettings';
 import type { Doc, Id } from '../_generated/dataModel';
-import type { QueryCtx } from '../_generated/server';
+import type { MutationCtx, QueryCtx } from '../_generated/server';
 
 export async function isCollectionAccessible(
   ctx: QueryCtx,
@@ -46,40 +68,88 @@ export async function isCollectionAccessible(
   return false;
 }
 
+/**
+ * Fetch a text and enforce the full access chain for user-facing text
+ * endpoints: the text exists, its collection is accessible to the course, and
+ * the text itself is within the user's scope (`canUserAccessCollectionText` —
+ * curriculum rows for premade collections, the owner's texts for custom/chat).
+ * Throws the same ConvexErrors the previously-inlined checks did.
+ */
+export async function requireAccessibleText(
+  ctx: QueryCtx,
+  textId: Id<'texts'>,
+  courseId: Id<'courses'>,
+  userId: string,
+): Promise<{
+  text: Doc<'texts'>;
+  collection: Doc<'collections'>;
+  isLevelCollection: boolean;
+}> {
+  const text = await ctx.db.get(textId);
+  if (!text) throw new ConvexError('Text not found');
+  if (!(await isCollectionAccessible(ctx, text.collectionId, courseId))) {
+    throw new ConvexError('Collection not accessible');
+  }
+  const collection = await ctx.db.get(text.collectionId);
+  if (!collection) throw new ConvexError('Collection not found');
+  if (!canUserAccessCollectionText(collection, text, userId)) {
+    throw new ConvexError('Text not accessible');
+  }
+  return {
+    text,
+    collection,
+    isLevelCollection: isPremadeLevelCollection(collection),
+  };
+}
+
 // ============================================================================
 // QUERIES
 // ============================================================================
 
 /**
- * Get the next COLLECTION_PREVIEW_SIZE texts from a collection with
- * translations and audio for all course languages.
+ * Paginated browse of a collection's sentences for the preview dialog.
+ *
+ * The client snapshots the sequential frontier
+ * (`collectionProgress.lastRankProcessed`) once when the dialog opens and
+ * passes it as `anchorRank` on every request, so the range NEVER shifts
+ * while the dialog is open. Rows are returned with their live status and no
+ * server-side filtering — a row the user adds or ignores mid-session flips
+ * to 'added'/'ignored' in place (the client decides visibility) instead of
+ * vanishing from the page. Reopening the dialog captures a fresh anchor,
+ * which is what makes the session's green/grey rows disappear.
+ *
+ * - `direction: 'after'` — ranks > anchor, ascending: the main stream (the
+ *   not-yet-added zone plus this session's activity). The user's marked
+ *   texts at/below the anchor are injected at the top of the first page
+ *   (rank-ordered) so passed-over ignored/prioritized sentences stay
+ *   visible and manageable.
+ * - `direction: 'upTo'` — ranks ≤ anchor, DESCENDING: the added-history
+ *   feed the "show added" toggle reveals above the list, paged further as
+ *   the user scrolls up.
+ *
+ * Each row carries `missingTranslationLanguages` — the client batches those
+ * into `requestPreviewTranslations` as pages are revealed. Audio is never
+ * generated here; rows expose whatever exists (`requestPreviewAudio` handles
+ * the on-click generation).
  */
-export const getCollectionTextsWithContent = query({
+export const browseCollectionTexts = query({
   args: {
     collectionId: v.id('collections'),
+    anchorRank: v.number(),
+    direction: v.union(v.literal('after'), v.literal('upTo')),
+    paginationOpts: paginationOptsValidator,
   },
-  returns: v.object({
-    texts: v.array(
-      v.object({
-        _id: v.id('texts'),
-        text: v.string(),
-        sourceLanguage: v.string(),
-        translations: v.array(translationValidator),
-        audioRecordings: v.array(audioRecordingValidator),
-      }),
-    ),
-    hasMissingContent: v.boolean(),
-  }),
   handler: async (ctx, args) => {
+    const emptyPage = { page: [], isDone: true, continueCursor: '' };
     const userId = await getAuthUserId(ctx);
-    if (!userId) return { texts: [], hasMissingContent: false };
+    if (!userId) return emptyPage;
 
     const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return { texts: [], hasMissingContent: false };
+    if (!active) return emptyPage;
     const { course } = active;
 
     if (!(await isCollectionAccessible(ctx, args.collectionId, course._id))) {
-      return { texts: [], hasMissingContent: false };
+      return emptyPage;
     }
 
     const collection = await ctx.db.get(args.collectionId);
@@ -87,55 +157,133 @@ export const getCollectionTextsWithContent = query({
       ? isPremadeLevelCollection(collection)
       : false;
 
-    const progress = await getCollectionProgress(
-      ctx,
-      userId,
-      course._id,
-      args.collectionId,
-    );
-    const lastRankProcessed = progress?.lastRankProcessed ?? 0;
+    const paginationOpts = {
+      ...args.paginationOpts,
+      numItems: Math.max(
+        1,
+        Math.min(args.paginationOpts.numItems, MAX_PREVIEW_PAGE_SIZE),
+      ),
+    };
 
-    const texts = await getNextTextsFromRank(
-      ctx,
-      args.collectionId,
-      lastRankProcessed,
-      COLLECTION_PREVIEW_SIZE,
-      isLevelCollection ? { onlyCurriculum: true } : { forUserId: userId },
-    );
+    const isAfter = args.direction === 'after';
+    const result = isLevelCollection
+      ? await ctx.db
+        .query('texts')
+        .withIndex('by_collection_and_userCreated_and_rank', (q) => {
+          const base = q
+            .eq('collectionId', args.collectionId)
+            .eq('userCreated', false);
+          return isAfter
+            ? base.gt('collectionRank', args.anchorRank)
+            : base.lte('collectionRank', args.anchorRank);
+        })
+        .order(isAfter ? 'asc' : 'desc')
+        .paginate(paginationOpts)
+      : await ctx.db
+        .query('texts')
+        .withIndex('by_collection_and_userId_and_rank', (q) => {
+          const base = q
+            .eq('collectionId', args.collectionId)
+            .eq('userId', userId);
+          return isAfter
+            ? base.gt('collectionRank', args.anchorRank)
+            : base.lte('collectionRank', args.anchorRank);
+        })
+        .order(isAfter ? 'asc' : 'desc')
+        .paginate(paginationOpts);
 
-    if (texts.length === 0) {
-      return { texts: [], hasMissingContent: false };
+    // First page of the main stream: surface the user's marked texts that
+    // sit at/below the anchor (the scan passed over them; the range above
+    // won't reach them). Bounded to MARK_READ_LIMIT injected rows total —
+    // mark counts are user-writable and uncapped, and every injected row
+    // costs a text read + card/mark point-reads + full content assembly, so
+    // an unbounded injection would blow Convex's per-execution read limits.
+    let injectedTexts: Doc<'texts'>[] = [];
+    if (isAfter && args.paginationOpts.cursor === null && args.anchorRank > 0) {
+      const markTypes = ['ignored', 'prioritized', 'readd'] as const;
+      const perType = await Promise.all(
+        markTypes.map((mark) =>
+          listMarksForCollection(ctx, userId, course._id, args.collectionId, mark, {
+            maxRank: args.anchorRank,
+            limit: MARK_READ_LIMIT,
+          }),
+        ),
+      );
+      const markDocs = perType
+        .flat()
+        .sort((a, b) => a.collectionRank - b.collectionRank)
+        .slice(0, MARK_READ_LIMIT);
+      const texts = await Promise.all(markDocs.map((m) => ctx.db.get(m.textId)));
+      injectedTexts = texts.filter((t): t is Doc<'texts'> => t !== null);
     }
 
-    const inputs = texts.map((text, i) => ({
-      key: String(i),
-      textId: text._id,
-      sourceText: text.text,
-      sourceLanguage: text.language,
-      sourceRomanization: text.romanizedText ?? undefined,
-    }));
+    const combined = [...injectedTexts, ...result.page];
 
+    const deck = await getDeckByCourseId(ctx, course._id);
+    const [cards, marks] = await Promise.all([
+      Promise.all(
+        combined.map((t) =>
+          deck ? getCardByDeckAndText(ctx, deck._id, t._id) : Promise.resolve(null),
+        ),
+      ),
+      Promise.all(combined.map((t) => getMark(ctx, userId, course._id, t._id))),
+    ]);
+
+    // No server-side filtering — every row ships with its status and the
+    // client decides visibility (session persistence + the show-added /
+    // show-ignored toggles are pure client concerns).
+    const rows = combined.map((text, i) => ({ text, card: cards[i], mark: marks[i] }));
+
+    const inputs = rows.map((row, i) => ({
+      key: String(i),
+      textId: row.text._id,
+      sourceText: row.text.text,
+      sourceLanguage: row.text.language,
+      sourceRomanization: row.text.romanizedText ?? undefined,
+    }));
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
       inputs,
       course.baseLanguages,
       course.targetLanguages,
+      { markVersionStale: true },
     );
 
-    let anyMissing = false;
-    const enrichedTexts = texts.map((text, i) => {
+    const page = rows.map((row, i) => {
       const content = contentMap.get(String(i))!;
-      if (content.hasMissingContent) anyMissing = true;
+      // Version-stale rows count as missing too (except on user-created
+      // texts, which are never version-swept): the client then routes them
+      // through requestPreviewTranslations, which regenerates them — so
+      // browsing already upgrades translations to the current version
+      // instead of deferring the delete+regen to the card-add sweep. The
+      // stale text still ships in `translations` for display until the
+      // regenerated row lands.
+      const missingTranslationLanguages = content.translations
+        .filter(
+          (tr) =>
+            tr.language !== row.text.language &&
+            (!tr.text || (!row.text.userCreated && tr.versionStale === true)),
+        )
+        .map((tr) => tr.language);
       return {
-        _id: text._id,
-        text: text.text,
-        sourceLanguage: text.language,
+        _id: row.text._id,
+        text: row.text.text,
+        sourceLanguage: row.text.language,
+        collectionRank: row.text.collectionRank,
+        // 'readd' is internal bookkeeping (un-marked below the frontier,
+        // waiting for the drain) — the client sees it as a plain unmarked row.
+        status: (row.card
+          ? 'added'
+          : row.mark?.mark === 'readd'
+            ? 'none'
+            : row.mark?.mark ?? 'none') as 'added' | 'prioritized' | 'ignored' | 'none',
         translations: content.translations,
         audioRecordings: content.audioRecordings,
+        missingTranslationLanguages,
       };
     });
 
-    return { texts: enrichedTexts, hasMissingContent: anyMissing };
+    return { ...result, page };
   },
 });
 
@@ -144,23 +292,236 @@ export const getCollectionTextsWithContent = query({
 // ============================================================================
 
 /**
- * Ensure translations and audio exist for the next preview texts in a
- * collection.  The server determines which texts to process based on the
- * user's collection progress — the frontend only passes a collectionId.
+ * Set (or clear, with `mark: null`) the user's browse mark on a text.
+ * 'prioritized' texts are drained first by addCardsFromCollection;
+ * 'ignored' texts are skipped by it and count toward collection completion.
+ * Counter deltas land on the same collectionProgress row in the same
+ * transaction, so `remaining = textCount - cardsAdded - ignoredCount` is
+ * always O(1)-consistent.
  */
-export const ensureContentForCollection = mutation({
+export const setCollectionTextMark = mutation({
+  args: {
+    textId: v.id('texts'),
+    mark: v.union(collectionTextMarkValidator, v.null()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId, course } = await requireActiveCourse(ctx);
+    const courseId = course._id;
+
+    // Full access chain — without the scope check, prioritizing another
+    // user's fork text would later make the drain add it to this user's deck.
+    const { text } = await requireAccessibleText(ctx, args.textId, courseId, userId);
+
+    // Marks exist only for texts that aren't cards yet — the preview hides
+    // these buttons on added rows; this guards direct calls.
+    const deck = await getDeckByCourseId(ctx, courseId);
+    if (deck) {
+      const card = await getCardByDeckAndText(ctx, deck._id, args.textId);
+      if (card) throw new ConvexError('Text is already in the deck');
+    }
+
+    const existing = await getMark(ctx, userId, courseId, args.textId);
+    const prev = existing?.mark ?? null;
+    if (prev === args.mark) return null;
+    // A 'readd' row already means "unmarked, back in the queue" — clearing it
+    // again is a no-op (the row must survive so the drain can still reach the
+    // text; it renders as 'none' either way).
+    if (prev === 'readd' && args.mark === null) return null;
+
+    if (args.mark === null) {
+      if (!existing) return null; // unreachable (prev === null early-returns)
+      const progress = await getCollectionProgress(
+        ctx,
+        userId,
+        courseId,
+        text.collectionId,
+      );
+      if ((progress?.lastRankProcessed ?? 0) >= text.collectionRank) {
+        // The scan already passed this rank; deleting the row would strand
+        // the text (injection only surfaces marked texts and the scan never
+        // looks backwards). Flip it to the internal 'readd' mark instead: it
+        // stays visible via the browse injection and is drained like
+        // 'prioritized' by the next add — the frontier stays monotonic, so
+        // no rescan of the added stretch and no browseAnchor regression.
+        await ctx.db.patch(existing._id, { mark: 'readd' });
+      } else {
+        await ctx.db.delete(existing._id);
+      }
+    } else {
+      if (existing) {
+        await ctx.db.delete(existing._id);
+      }
+      await ctx.db.insert('collectionTextMarks', {
+        userId,
+        courseId,
+        collectionId: text.collectionId,
+        textId: args.textId,
+        mark: args.mark,
+        collectionRank: text.collectionRank,
+      });
+    }
+    await applyMarkCounterDelta(ctx, userId, courseId, text.collectionId, {
+      ...(prev ? counterDeltaForMark(prev, -1) : {}),
+      ...(args.mark ? { [args.mark]: 1 } : {}),
+    });
+    return null;
+  },
+});
+
+/**
+ * Schedule skipTts translation jobs for every course language this text is
+ * missing OR whose stored translation is version-stale (regenerated in place,
+ * with the same exemptions and claim deferrals as scheduleMissingContent's
+ * sweep). Resolves + persists speaker gender BEFORE translating (same as
+ * scheduleMissingContent) so the translation's grammar agrees with the voice
+ * that will eventually read it — otherwise the gender sweep would invalidate
+ * these rows the moment audio is generated. Shared by the on-reveal and
+ * prewarm preview-generation mutations.
+ */
+async function scheduleMissingTranslationsForText(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  languages: string[],
+): Promise<number> {
+  const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
+    text,
+    text._id,
+  );
+  if (Object.keys(genderPatch).length > 0) {
+    await ctx.db.patch(text._id, genderPatch);
+  }
+  let scheduled = 0;
+  for (const lang of languages) {
+    if (lang === text.language) continue;
+    const existing = await ctx.db
+      .query('translations')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', text._id).eq('targetLanguage', lang),
+      )
+      .first();
+    let preferredRegionVariant: string | undefined;
+    if (existing) {
+      // Version-stale rows regenerate here too, so browsing a collection
+      // already upgrades its translations to the current version — otherwise
+      // the card-add sweep (scheduleMissingContent) deletes exactly what the
+      // preview just showed. Same exemptions as that sweep: user-created
+      // texts and user-provided translations are never version-swept.
+      const isStale =
+        !text.userCreated &&
+        existing.translationSource !== USER_PROVIDED_TRANSLATION_SOURCE &&
+        isTranslationVersionStale(lang, existing.translationVersion);
+      if (!isStale) continue;
+      // Mirror the sweep's deferrals: never delete under an active TTS claim
+      // (races the pending audio write) or a fresh LLM claim (the in-flight
+      // retranslation overwrites the row anyway).
+      if (await hasActiveTtsClaim(ctx, text._id, lang)) continue;
+      const llmClaim = await ctx.db
+        .query('llmTranslationClaims')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', text._id).eq('targetLanguage', lang),
+        )
+        .first();
+      if (llmClaim && Date.now() - llmClaim.claimedAt < LLM_CLAIM_STALE_MS) {
+        continue;
+      }
+      // Keep mixed-dialect rows on their pinned dialect across regeneration.
+      preferredRegionVariant = existing.regionVariant;
+      await ctx.db.delete(existing._id);
+      // The old audio was synthesized from the deleted wording — drop it so
+      // the new translation can't pair with mismatched audio (reference-aware,
+      // like the card sweep's delete).
+      const staleAudio = await ctx.db
+        .query('audioRecordings')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', text._id).eq('language', lang),
+        )
+        .first();
+      if (staleAudio) {
+        await deleteAudioRow(ctx, staleAudio);
+      }
+    }
+    if (
+      await scheduleTranslationForLanguage(ctx, text, lang, {
+        audioSpeakerGender,
+        preferredRegionVariant,
+        skipTts: true,
+      })
+    ) {
+      scheduled++;
+    }
+  }
+  return scheduled;
+}
+
+/**
+ * Generate missing translations (NO audio) for up to MAX_PREVIEW_PAGE_SIZE
+ * texts of a collection — called by the preview as pages are revealed.
+ * Dedup comes from the existing per-(textId, language) claims, so re-calls
+ * while jobs are in flight are cheap no-ops. Deliberately not quota-gated:
+ * translations are the cheap part; audio (the dominant cost) only happens on
+ * an explicit audio-icon click or once a text becomes a card.
+ */
+export const requestPreviewTranslations = mutation({
   args: {
     collectionId: v.id('collections'),
+    textIds: v.array(v.id('texts')),
   },
-  returns: v.object({
-    totalTranslationsScheduled: v.number(),
-    totalAudioScheduled: v.number(),
-  }),
+  returns: v.object({ translationsScheduled: v.number() }),
   handler: async (ctx, args) => {
     const { userId, course } = await requireActiveCourse(ctx);
 
     if (!(await isCollectionAccessible(ctx, args.collectionId, course._id))) {
-      return { totalTranslationsScheduled: 0, totalAudioScheduled: 0 };
+      return { translationsScheduled: 0 };
+    }
+    const collection = await ctx.db.get(args.collectionId);
+    if (!collection) return { translationsScheduled: 0 };
+
+    const textIds = args.textIds.slice(0, MAX_PREVIEW_PAGE_SIZE);
+    const languages = getCourseLanguages(
+      course.baseLanguages,
+      course.targetLanguages,
+    );
+
+    let translationsScheduled = 0;
+    for (const textId of textIds) {
+      const text = await ctx.db.get(textId);
+      if (!text || text.collectionId.toString() !== args.collectionId.toString()) {
+        continue;
+      }
+      if (!canUserAccessCollectionText(collection, text, userId)) {
+        continue;
+      }
+      translationsScheduled += await scheduleMissingTranslationsForText(
+        ctx,
+        text,
+        languages,
+      );
+    }
+
+    return { translationsScheduled };
+  },
+});
+
+/**
+ * Prewarm the NEXT page of translations (NO audio): schedules skipTts
+ * translation jobs for the next MAX_PREVIEW_PAGE_SIZE texts after `afterRank`
+ * in rank order. The client calls this whenever a page finishes loading
+ * (dialog open included), so by the time the user clicks "show more" the next
+ * page's translations are usually already stored and the rows render
+ * instantly. Claim-deduped like all preview generation; never quota-gated.
+ */
+export const prewarmPreviewTranslations = mutation({
+  args: {
+    collectionId: v.id('collections'),
+    afterRank: v.number(),
+  },
+  returns: v.object({ translationsScheduled: v.number() }),
+  handler: async (ctx, args) => {
+    const { userId, course } = await requireActiveCourse(ctx);
+
+    if (!(await isCollectionAccessible(ctx, args.collectionId, course._id))) {
+      return { translationsScheduled: 0 };
     }
 
     const collection = await ctx.db.get(args.collectionId);
@@ -168,46 +529,102 @@ export const ensureContentForCollection = mutation({
       ? isPremadeLevelCollection(collection)
       : false;
 
-    const progress = await getCollectionProgress(
-      ctx,
-      userId,
-      course._id,
-      args.collectionId,
-    );
-    const lastRankProcessed = progress?.lastRankProcessed ?? 0;
-
     const texts = await getNextTextsFromRank(
       ctx,
       args.collectionId,
-      lastRankProcessed,
-      CONTENT_LOOKAHEAD_SIZE,
+      args.afterRank,
+      MAX_PREVIEW_PAGE_SIZE,
       isLevelCollection ? { onlyCurriculum: true } : { forUserId: userId },
     );
-
-    // Parallel over texts — each text writes only to its own (textId, language)
-    // keyed rows, so no cross-text contention within this transaction.
-    const results = await Promise.all(
-      texts.map((text) =>
-        scheduleMissingContent(
-          ctx,
-          text._id,
-          text,
-          course.baseLanguages,
-          course.targetLanguages,
-        ),
-      ),
+    const languages = getCourseLanguages(
+      course.baseLanguages,
+      course.targetLanguages,
     );
 
-    const totalTranslationsScheduled = results.reduce(
-      (sum, r) => sum + r.translationsScheduled,
-      0,
-    );
-    const totalAudioScheduled = results.reduce(
-      (sum, r) => sum + r.audioScheduled,
-      0,
-    );
+    let translationsScheduled = 0;
+    for (const text of texts) {
+      translationsScheduled += await scheduleMissingTranslationsForText(
+        ctx,
+        text,
+        languages,
+      );
+    }
 
-    return { totalTranslationsScheduled, totalAudioScheduled };
+    return { translationsScheduled };
+  },
+});
+
+/**
+ * Generate audio for ONE (text, language) — the preview's audio-icon click.
+ * No-ops when the audio already exists or a TTS claim is in flight; returns
+ * `scheduled: false` when the language's translation hasn't landed yet (the
+ * client keeps the spinner and the reactive page query delivers the URL when
+ * TTS completes). Free, like the regular ensure path — the click is the cost
+ * control.
+ */
+export const requestPreviewAudio = mutation({
+  args: {
+    textId: v.id('texts'),
+    language: v.string(),
+  },
+  returns: v.object({ scheduled: v.boolean() }),
+  handler: async (ctx, args) => {
+    const { userId, course } = await requireActiveCourse(ctx);
+
+    const { text } = await requireAccessibleText(
+      ctx,
+      args.textId,
+      course._id,
+      userId,
+    );
+    const courseLanguages = new Set([
+      text.language,
+      ...course.baseLanguages,
+      ...course.targetLanguages,
+    ]);
+    if (!courseLanguages.has(args.language)) {
+      throw new ConvexError('Language not in course');
+    }
+
+    const existingAudio = await ctx.db
+      .query('audioRecordings')
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', args.textId).eq('language', args.language),
+      )
+      .first();
+    if (existingAudio) return { scheduled: false };
+
+    const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
+      text,
+      args.textId,
+    );
+    if (Object.keys(genderPatch).length > 0) {
+      await ctx.db.patch(args.textId, genderPatch);
+    }
+
+    const translation =
+      args.language === text.language
+        ? null
+        : await ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', args.textId).eq('targetLanguage', args.language),
+          )
+          .first();
+    if (args.language !== text.language && !translation) {
+      // Translation still generating — the click raced it. Nothing to
+      // synthesize yet; the client retries once the translation row lands.
+      return { scheduled: false };
+    }
+
+    const scheduled = await scheduleAudioForLanguage(
+      ctx,
+      text,
+      args.language,
+      audioSpeakerGender,
+      translation,
+    );
+    return { scheduled };
   },
 });
 

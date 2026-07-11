@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useMutation, useQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
@@ -108,6 +108,19 @@ export function LearningMode({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [flagConfirmOpen, setFlagConfirmOpen] = useState(false);
   const [fullReviewRevealed, setFullReviewRevealed] = useState(false);
+
+  // Stable merged-playback surface for the card content. Identity only
+  // changes on play/pause or a re-merge — NOT per frame; per-frame time
+  // lives in audio.clock (see useActiveCue / useKaraokeIndex).
+  const mergedPlayback = useMemo(
+    () => ({
+      isPlaying: audio.isPlaying,
+      clock: audio.clock,
+      languageCues: audio.languageCues,
+      speedByLanguage: audio.speedByLanguage,
+    }),
+    [audio.isPlaying, audio.clock, audio.languageCues, audio.speedByLanguage],
+  );
   const [allSubmitted, setAllSubmitted] = useState(false);
   const [fullReviewAccuracy, setFullReviewAccuracy] = useState<number | null>(null);
   const [audioAllTargetsRevealed, setAudioAllTargetsRevealed] = useState(true);
@@ -375,6 +388,20 @@ export function LearningMode({
   const instantProceed = reviewMode === 'full'
     ? (state.courseSettings.instantProceedFull ?? true)
     : (state.courseSettings.instantProceedAudio ?? false);
+  const isTranscribe =
+    reviewMode === 'full' &&
+    (state.courseSettings.writingInputMode ?? 'translate') === 'transcribe';
+  // Transcribe: the post-submit replay rides the same per-language afterSubmit
+  // machinery as Translate, gated by the transcribe auto-play setting
+  // (chained `*Transcribe ?? *Full ?? audio`).
+  const writingAutoPlay = isTranscribe
+    ? (state.courseSettings.autoPlayAudioTranscribe ??
+      state.courseSettings.autoPlayAudioFull ??
+      state.courseSettings.autoPlayAudio ??
+      DEFAULT_AUTO_PLAY)
+    : (state.courseSettings.autoPlayAudioFull ??
+      state.courseSettings.autoPlayAudio ??
+      DEFAULT_AUTO_PLAY);
 
   // Flagging acts at the card level — the mutation retranslates every
   // non-source-language translation on the card. We hide the button when
@@ -418,22 +445,63 @@ export function LearningMode({
         onUpdatePinnedActions={state.handleUpdatePinnedActions}
         quotaState={state.cardActionQuotas}
         onAudioPlay={audio.stop}
-        targetAudioMode={state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit'}
+        // Transcribe: the merged blob plays the target as the prompt; the
+        // per-language afterSubmit playback doubles as the post-submit
+        // replay, gated by the writing-mode auto-play setting.
+        targetAudioMode={
+          isTranscribe
+            ? writingAutoPlay
+              ? 'afterSubmit'
+              : 'never'
+            : (state.courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit')
+        }
+        transcribeMode={isTranscribe}
+        afterSubmitRepetitions={
+          isTranscribe
+            ? state.courseSettings.transcribeAfterRepetitions
+            : (state.courseSettings.languageRepetitionsFull ??
+              state.courseSettings.languageRepetitions)
+        }
+        afterSubmitRepetitionPauses={
+          isTranscribe
+            ? state.courseSettings.transcribeAfterRepetitionPauses
+            : (state.courseSettings.languageRepetitionPausesFull ??
+              state.courseSettings.languageRepetitionPauses)
+        }
+        afterSubmitPlaybackSpeeds={
+          isTranscribe
+            ? state.courseSettings.transcribeAfterPlaybackSpeeds
+            : undefined
+        }
+        hideBaseLanguages={state.courseSettings.hideBaseLanguagesFull === true}
+        autoRevealBaseOnSubmit={
+          state.courseSettings.autoRevealBaseOnSubmit ?? true
+        }
+        suppressAutoPlay={state.settingsOpen}
         allRevealed={fullReviewRevealed}
         onAllSubmittedChange={setAllSubmitted}
         onAccuracyChange={setFullReviewAccuracy}
         showRomanization={state.courseSettings.showRomanization ?? true}
         cardId={state.cardId}
         shortcutsDisabled={state.settingsOpen || editDialogOpen}
-        highlightEnabled={state.courseSettings.highlightWords === true}
+        highlightEnabled={
+          (isTranscribe
+            ? (state.courseSettings.highlightWordsTranscribe ??
+              state.courseSettings.highlightWordsFull ??
+              state.courseSettings.highlightWords)
+            : (state.courseSettings.highlightWordsFull ??
+              state.courseSettings.highlightWords)) === true
+        }
         flaggedInSession={state.flaggedInSession}
-        mergedPlayback={{
-          isPlaying: audio.isPlaying,
-          currentTime: audio.currentTime,
-          languageCues: audio.languageCues,
-          speedByLanguage: audio.speedByLanguage,
-        }}
-        languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
+        mergedPlayback={mergedPlayback}
+        languagePlaybackSpeeds={
+          isTranscribe
+            ? (state.courseSettings.languagePlaybackSpeedsTranscribe ??
+              state.courseSettings.languagePlaybackSpeedsFull ??
+              state.courseSettings.languagePlaybackSpeeds)
+            : (state.courseSettings.languagePlaybackSpeedsFull ??
+              state.courseSettings.languagePlaybackSpeeds)
+        }
         audioSpeedOverrides={state.audioSpeedOverrides}
         onSpeedCycle={handleSpeedCycle}
         audioRef={audio.audioRef}
@@ -475,12 +543,7 @@ export function LearningMode({
         onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
         highlightEnabled={state.courseSettings.highlightWords === true}
         flaggedInSession={state.flaggedInSession}
-        mergedPlayback={{
-          isPlaying: audio.isPlaying,
-          currentTime: audio.currentTime,
-          languageCues: audio.languageCues,
-          speedByLanguage: audio.speedByLanguage,
-        }}
+        mergedPlayback={mergedPlayback}
         languagePlaybackSpeeds={state.courseSettings.languagePlaybackSpeeds}
         audioSpeedOverrides={state.audioSpeedOverrides}
         onSpeedCycle={handleSpeedCycle}

@@ -22,6 +22,7 @@ import type * as auth from "../auth.js";
 import type * as autumn from "../autumn.js";
 import type * as billing from "../billing.js";
 import type * as config_aiModels from "../config/aiModels.js";
+import type * as db_collectionTextMarks from "../db/collectionTextMarks.js";
 import type * as db_collections from "../db/collections.js";
 import type * as db_courseSettings from "../db/courseSettings.js";
 import type * as db_courseStats from "../db/courseStats.js";
@@ -88,6 +89,7 @@ import type * as lib_tts_tailTrim from "../lib/tts/tailTrim.js";
 import type * as lib_tts_types from "../lib/tts/types.js";
 import type * as lib_ttsSemanticValidation from "../lib/ttsSemanticValidation.js";
 import type * as lib_workpools from "../lib/workpools.js";
+import type * as migrations from "../migrations.js";
 import type * as migrations_datasetMigration_cutoverUser from "../migrations/datasetMigration_cutoverUser.js";
 import type * as migrations_recalcUserCardAggregates from "../migrations/recalcUserCardAggregates.js";
 import type * as migrations_seedPlacementTestSentences from "../migrations/seedPlacementTestSentences.js";
@@ -121,6 +123,7 @@ declare const fullApi: ApiFromModules<{
   autumn: typeof autumn;
   billing: typeof billing;
   "config/aiModels": typeof config_aiModels;
+  "db/collectionTextMarks": typeof db_collectionTextMarks;
   "db/collections": typeof db_collections;
   "db/courseSettings": typeof db_courseSettings;
   "db/courseStats": typeof db_courseStats;
@@ -187,6 +190,7 @@ declare const fullApi: ApiFromModules<{
   "lib/tts/types": typeof lib_tts_types;
   "lib/ttsSemanticValidation": typeof lib_ttsSemanticValidation;
   "lib/workpools": typeof lib_workpools;
+  migrations: typeof migrations;
   "migrations/datasetMigration_cutoverUser": typeof migrations_datasetMigration_cutoverUser;
   "migrations/recalcUserCardAggregates": typeof migrations_recalcUserCardAggregates;
   "migrations/seedPlacementTestSentences": typeof migrations_seedPlacementTestSentences;
@@ -237,4 +241,5 @@ export declare const components: {
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
   llmPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"llmPool">;
   ttsPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"ttsPool">;
+  migrations: import("@convex-dev/migrations/_generated/component.js").ComponentApi<"migrations">;
 };

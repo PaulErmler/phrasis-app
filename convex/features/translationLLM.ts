@@ -70,7 +70,7 @@ export type LlmTranslationResult =
  * 'neutral' register is intentionally treated as informal in the instructions
  * so German doesn't default to Sie, French to vous, etc.
  */
-const PROMPT_B_INSTRUCTIONS = `Use the supplied speaker, referent, and (if present) addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice, gendered noun forms) the target language requires. The referent_gender drives third-party noun forms like German Übersetzer/-in, French traducteur/-rice, Spanish profesor/-a. Use the requested register: 'informal' and 'neutral' both mean the casual T-form (du/tú/tu/おまえ); only 'formal' means the polite V-form or honorific (Sie/usted/vous/敬語 ます-form). DO NOT default to the polite form when the register is neutral. If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word.`;
+const PROMPT_B_INSTRUCTIONS = `Use the supplied speaker, referent, and (if present) addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice, gendered noun forms) the target language requires. The referent_gender drives third-party noun forms like German Übersetzer/-in, French traducteur/-rice, Spanish profesor/-a. Use the requested register: 'informal' and 'neutral' both mean the casual T-form (du/tú/tu/おまえ); only 'formal' means the polite V-form or honorific (Sie/usted/vous/敬語 ます-form). DO NOT default to the polite form when the register is neutral. If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word. Only return one translation. Do not return multiple alternative translations or explanations — when several renderings are possible, silently pick the single most natural one.`;
 
 export type TranslationPromptArgs = {
   text: string;
@@ -180,7 +180,7 @@ export function buildPrompt(args: TranslationPromptArgs): string {
     ``,
     `<source>${args.text}</source>`,
     ``,
-    `Output only the ${fullName} translation of the text inside <source>. No commentary, no tags, no quotation marks, no alternatives.`,
+    `Output only the ${fullName} translation of the text inside <source>, as exactly ONE translation. No commentary, no explanations, no tags, no quotation marks, no alternative renderings.`,
   ].join('\n');
 }
 

@@ -13,14 +13,17 @@ import {
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
 import { CardSpeedBadge } from './CardSpeedBadge';
-import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
+import {
+  DEFAULT_PAUSE_BETWEEN_REPETITIONS,
+  DEFAULT_PLAYBACK_SPEED,
+} from '@/lib/constants/audioPlayback';
 import { DiffDisplay, computeAccuracy } from './DiffDisplay';
 import { HighlightedText } from './HighlightedText';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
-import { resolveActiveClip } from '@/lib/audio/activeClip';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
-import type { LanguageCue } from '@/lib/audio/mergeAudio';
+import { useActiveCue, type MergedPlayback } from '@/hooks/use-active-cue';
+import type { ClockBinding } from '@/hooks/use-karaoke-index';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { Id } from '@/convex/_generated/dataModel';
 import type { PinnableCardAction } from '@/lib/cardActions';
@@ -56,6 +59,30 @@ interface FullReviewCardContentProps {
   quotaState?: import('./CardActionsMenu').CardActionsMenuProps['quotaState'];
   onAudioPlay?: () => void;
   targetAudioMode: TargetAudioMode;
+  /**
+   * Transcribe writing style: the merged target audio is the prompt and the
+   * user types what they hear (vs. translating the base text).
+   */
+  transcribeMode?: boolean;
+  /** Blur base-language text ("Hide base languages", writing-mode setting). */
+  hideBaseLanguages?: boolean;
+  /** Un-blur base text once every target translation is submitted. */
+  autoRevealBaseOnSubmit?: boolean;
+  /**
+   * Post-submit playback settings ("Translation Entered" timeline group), per
+   * language. Missing entry = 1 play; speed falls back to the per-language
+   * effective speed.
+   */
+  afterSubmitRepetitions?: Record<string, number>;
+  afterSubmitRepetitionPauses?: Record<string, number>;
+  afterSubmitPlaybackSpeeds?: Record<string, number>;
+  /**
+   * Never auto-start clip playback (e.g. while the settings sheet is open).
+   * A settings change (writing style / target-audio mode) can otherwise make
+   * an already-submitted input qualify for after-submit playback and blast
+   * audio behind the sheet.
+   */
+  suppressAutoPlay?: boolean;
   allRevealed?: boolean;
   onAllSubmittedChange?: (allSubmitted: boolean) => void;
   onAccuracyChange?: (accuracy: number | null) => void;
@@ -69,14 +96,11 @@ interface FullReviewCardContentProps {
   highlightEnabled?: boolean;
   /** Client-only session flag: did the viewer click flag on this card? */
   flaggedInSession?: boolean;
-  /** Merged-audio state from useAudioPlayer; used when merged playback is active. */
-  mergedPlayback?: {
-    isPlaying: boolean;
-    currentTime: number;
-    languageCues: ReadonlyArray<LanguageCue>;
-    /** Speeds each clip was stretched to at merge time, for word-timing scaling. */
-    speedByLanguage: Record<string, number>;
-  };
+  /**
+   * Merged-audio state from useAudioPlayer; used when merged playback is
+   * active. Per-frame time lives in `clock`, not React state.
+   */
+  mergedPlayback?: MergedPlayback;
   /** Course-level per-language general speed. */
   languagePlaybackSpeeds?: Record<string, number>;
   /** Per-card per-language speed override. Absent entry = use general. */
@@ -114,6 +138,13 @@ export function FullReviewCardContent({
   quotaState,
   onAudioPlay,
   targetAudioMode,
+  transcribeMode = false,
+  hideBaseLanguages = false,
+  autoRevealBaseOnSubmit = true,
+  afterSubmitRepetitions,
+  afterSubmitRepetitionPauses,
+  afterSubmitPlaybackSpeeds,
+  suppressAutoPlay = false,
   allRevealed = false,
   onAllSubmittedChange,
   onAccuracyChange,
@@ -138,16 +169,22 @@ export function FullReviewCardContent({
   const locale = useLocale();
 
   const buttonPlayback = useButtonPlayback();
-  const activeClip = useMemo(() => {
-    if (mergedPlayback?.isPlaying) {
-      return resolveActiveClip(
-        mergedPlayback.languageCues,
-        mergedPlayback.currentTime,
-        mergedPlayback.speedByLanguage,
-      );
-    }
+  // Merged playback resolves to the active cue at cue-change frequency; the
+  // per-frame word position ticks inside the highlight leaves via
+  // clockBinding (useKaraokeIndex) — no 60 fps re-render of this card.
+  const mergedCue = useActiveCue(mergedPlayback);
+  const activeClip = useMemo<ButtonPlaybackActive | null>(() => {
+    if (mergedCue) return { language: mergedCue.language, localTime: 0 };
     return buttonPlayback.active;
-  }, [mergedPlayback, buttonPlayback.active]);
+  }, [mergedCue, buttonPlayback.active]);
+  const clockBinding = useMemo<ClockBinding | undefined>(() => {
+    if (!mergedCue || !mergedPlayback) return undefined;
+    return {
+      clock: mergedPlayback.clock,
+      cueStartSec: mergedCue.cueStartSec,
+      speed: mergedCue.speed,
+    };
+  }, [mergedCue, mergedPlayback]);
 
   // Reveal-sweep / post-submit auto-play uses raw <Audio> elements; route their
   // progress through the shared button-playback channel so <HighlightedText>
@@ -170,6 +207,11 @@ export function FullReviewCardContent({
   );
 
   const [submissionOrder, setSubmissionOrder] = useState<string[]>([]);
+  // Base languages the viewer manually un-blurred by tapping (only relevant
+  // with "Hide base languages" on).
+  const [manuallyRevealedBase, setManuallyRevealedBase] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   const autoPlayedRef = useRef<Set<string>>(new Set());
   const revealAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -187,6 +229,7 @@ export function FullReviewCardContent({
       new Map(targetTranslations.map((tr) => [tr.language, { submitted: false, userText: '' }])),
     );
     setSubmissionOrder([]);
+    setManuallyRevealedBase(new Set());
     autoPlayedRef.current = new Set();
   }
 
@@ -223,6 +266,8 @@ export function FullReviewCardContent({
 
   const onAudioPlayRef = useRef(onAudioPlay);
   onAudioPlayRef.current = onAudioPlay;
+  const suppressAutoPlayRef = useRef(suppressAutoPlay);
+  suppressAutoPlayRef.current = suppressAutoPlay;
 
   useEffect(() => {
     if (!allRevealed) return;
@@ -239,6 +284,16 @@ export function FullReviewCardContent({
       .filter((entry): entry is { language: string; url: string } => entry.url != null);
 
     if (unsubmittedAudio.length === 0) return;
+
+    // Settings change mid-card (e.g. switching target audio to 'always'
+    // behind the open sheet): never start the sweep, and mark the entries
+    // played so it doesn't fire when the sheet closes either.
+    if (suppressAutoPlayRef.current) {
+      for (const entry of unsubmittedAudio) {
+        autoPlayedRef.current.add(entry.language);
+      }
+      return;
+    }
 
     revealAbortedRef.current = false;
     onAudioPlayRef.current?.();
@@ -371,6 +426,31 @@ export function FullReviewCardContent({
     return () => window.removeEventListener('keydown', handler);
   }, [shortcutsDisabled, revertLastSubmitted]);
 
+  // "Hide base languages" (writing mode): blur base rows until every target is
+  // submitted (when auto-reveal-on-submit is on), the post-rating reveal fires,
+  // or the viewer taps a row. Revealing per submitted language would hand the
+  // remaining inputs the meaning for free, so the signal is all-or-nothing.
+  const revealBaseAll = (autoRevealBaseOnSubmit && allSubmitted) || allRevealed;
+  const revealedBaseLanguages = useMemo<ReadonlySet<string>>(
+    () =>
+      revealBaseAll
+        ? new Set(
+          translations
+            .filter((tr) => tr.isBaseLanguage)
+            .map((tr) => tr.language),
+        )
+        : new Set<string>(),
+    [revealBaseAll, translations],
+  );
+  const handleRevealBase = useCallback((language: string) => {
+    setManuallyRevealedBase((prev) => {
+      if (prev.has(language)) return prev;
+      const next = new Set(prev);
+      next.add(language);
+      return next;
+    });
+  }, []);
+
   const handleSubmit = useCallback((language: string) => {
     setInputs((prev) => {
       const current = prev.get(language);
@@ -418,6 +498,7 @@ export function FullReviewCardContent({
         highlightEnabled={highlightEnabled}
         flaggedInSession={flaggedInSession}
         activeClip={activeClip}
+        clockBinding={clockBinding}
         onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
         onButtonStop={buttonPlayback.onStop}
         languagePlaybackSpeeds={languagePlaybackSpeeds}
@@ -430,6 +511,11 @@ export function FullReviewCardContent({
         onSeek={onSeek}
         showProgressBar={showProgressBar}
         languageCues={mergedPlayback?.languageCues}
+        hideBaseLanguages={hideBaseLanguages}
+        autoRevealBaseLanguages={true}
+        revealedLanguages={revealedBaseLanguages}
+        manuallyRevealedLanguages={manuallyRevealedBase}
+        onRevealLanguage={handleRevealBase}
       >
         {({ targetTranslations: targets }) => (
           <div className="space-y-4">
@@ -448,6 +534,17 @@ export function FullReviewCardContent({
                 languagePlaybackSpeeds?.[translation.language] ??
                 DEFAULT_PLAYBACK_SPEED;
               const effectiveSpeed = override ?? generalSpeed;
+              // Post-submit playback ("Translation Entered" group): missing
+              // entry = play once at the effective speed.
+              const afterSubmitPlayback = {
+                reps: afterSubmitRepetitions?.[translation.language] ?? 1,
+                pauseSec:
+                  afterSubmitRepetitionPauses?.[translation.language] ??
+                  DEFAULT_PAUSE_BETWEEN_REPETITIONS,
+                speed:
+                  afterSubmitPlaybackSpeeds?.[translation.language] ??
+                  effectiveSpeed,
+              };
 
               return (
                 <TargetLanguageInput
@@ -463,7 +560,9 @@ export function FullReviewCardContent({
                   onRevert={() => revertLanguage(translation.language)}
                   onAudioPlay={onAudioPlay}
                   submitLabel={t('submitAnswer')}
-                  placeholder={t('typeTranslation')}
+                  placeholder={t(
+                    transcribeMode ? 'typeTranscription' : 'typeTranslation',
+                  )}
                   revertLabel={t('revertSubmission')}
                   revertTooltip={t('revertSubmissionTooltip')}
                   showLanguageLabel={showLanguageLabel}
@@ -475,9 +574,12 @@ export function FullReviewCardContent({
                   showRomanization={showRomanization}
                   highlightEnabled={highlightEnabled}
                   activeClip={activeClip}
+                  clockBinding={clockBinding}
                   onButtonTimeUpdate={buttonPlayback.onTimeUpdate}
                   onButtonStop={buttonPlayback.onStop}
                   speed={effectiveSpeed}
+                  afterSubmitPlayback={afterSubmitPlayback}
+                  suppressAutoPlay={suppressAutoPlay}
                   speedOverride={override}
                   generalSpeed={generalSpeed}
                   onSpeedCycle={
@@ -519,10 +621,15 @@ interface TargetLanguageInputProps {
   showRomanization?: boolean;
   highlightEnabled: boolean;
   activeClip: ButtonPlaybackActive | null;
+  clockBinding?: ClockBinding;
   onButtonTimeUpdate: (language: string, localTime: number) => void;
   onButtonStop: (language: string) => void;
   /** Effective playback speed (override ?? general ?? 1). */
   speed: number;
+  /** Reps/pause/speed for the post-submit auto-play of this language. */
+  afterSubmitPlayback: { reps: number; pauseSec: number; speed: number };
+  /** Never auto-start after-submit playback (settings sheet open). */
+  suppressAutoPlay?: boolean;
   /** Stored override value, or null when none is stored. */
   speedOverride: number | null;
   /** Course-level general speed for this language. */
@@ -555,9 +662,12 @@ function TargetLanguageInput({
   showRomanization = true,
   highlightEnabled,
   activeClip,
+  clockBinding,
   onButtonTimeUpdate,
   onButtonStop,
   speed,
+  afterSubmitPlayback,
+  suppressAutoPlay = false,
   speedOverride,
   generalSpeed,
   onSpeedCycle,
@@ -566,6 +676,10 @@ function TargetLanguageInput({
   const t = useTranslations('LearningMode');
   const [showClean, setShowClean] = useState(false);
   const autoPlayAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Read via ref inside the playback effect: the object is rebuilt each
+  // render, and putting it in the deps would tear down a running clip.
+  const afterSubmitPlaybackRef = useRef(afterSubmitPlayback);
+  afterSubmitPlaybackRef.current = afterSubmitPlayback;
 
   useEffect(() => {
     if (!state.submitted) {
@@ -583,6 +697,14 @@ function TargetLanguageInput({
       return;
     }
 
+    // A settings change (writing style / target-audio mode) can make an
+    // already-submitted input qualify here while the sheet is open — never
+    // start audio behind the sheet, and don't queue it for sheet-close.
+    if (suppressAutoPlay) {
+      autoPlayedRef.current.add(translation.language);
+      return;
+    }
+
     autoPlayedRef.current.add(translation.language);
     onAudioPlay?.();
     const audio = new Audio(audioUrl);
@@ -591,10 +713,12 @@ function TargetLanguageInput({
       webkitPreservesPitch?: boolean;
     };
     audioEl.webkitPreservesPitch = true;
-    audio.playbackRate = speed;
+    audio.playbackRate = afterSubmitPlaybackRef.current.speed;
     autoPlayAudioRef.current = audio;
 
     let raf = 0;
+    let playsDone = 0;
+    let pauseTimer: ReturnType<typeof setTimeout> | null = null;
     const tick = () => {
       onButtonTimeUpdate(translation.language, audio.currentTime);
       raf = requestAnimationFrame(tick);
@@ -603,6 +727,26 @@ function TargetLanguageInput({
       if (raf) cancelAnimationFrame(raf);
       raf = 0;
       onButtonStop(translation.language);
+      playsDone++;
+      // Re-read reps/pause from the ref so timeline edits made mid-playback
+      // apply to the remaining repetitions.
+      const { reps, pauseSec } = afterSubmitPlaybackRef.current;
+      if (playsDone < reps) {
+        pauseTimer = setTimeout(() => {
+          pauseTimer = null;
+          audio.currentTime = 0;
+          audio.playbackRate = afterSubmitPlaybackRef.current.speed;
+          audio
+            .play()
+            .then(() => {
+              raf = requestAnimationFrame(tick);
+            })
+            .catch((err) => {
+              if (err.name !== 'AbortError')
+                console.error('Auto-play failed:', err);
+            });
+        }, pauseSec * 1000);
+      }
     };
     audio
       .play()
@@ -615,20 +759,21 @@ function TargetLanguageInput({
 
     return () => {
       if (raf) cancelAnimationFrame(raf);
+      if (pauseTimer) clearTimeout(pauseTimer);
       audio.pause();
       audio.currentTime = 0;
       onButtonStop(translation.language);
     };
-  }, [state.submitted, targetAudioMode, audioUrl, translation.language, autoPlayedRef, onButtonTimeUpdate, onButtonStop]);
+  }, [state.submitted, targetAudioMode, audioUrl, translation.language, autoPlayedRef, suppressAutoPlay, onButtonTimeUpdate, onButtonStop]);
 
-  // Keep an already-running afterSubmit auto-play element in sync when `speed`
-  // changes mid-playback. Mirrors the pattern in AudioButton; without this the
-  // rate set at element creation is sticky for the life of that clip.
+  // Keep an already-running afterSubmit auto-play element in sync when its
+  // speed changes mid-playback. Mirrors the pattern in AudioButton; without
+  // this the rate set at element creation is sticky for the life of that clip.
   useEffect(() => {
     if (autoPlayAudioRef.current) {
-      autoPlayAudioRef.current.playbackRate = speed;
+      autoPlayAudioRef.current.playbackRate = afterSubmitPlayback.speed;
     }
-  }, [speed]);
+  }, [afterSubmitPlayback.speed]);
 
   useEffect(() => {
     return () => {
@@ -735,6 +880,7 @@ function TargetLanguageInput({
             language={translation.language}
             wordTimings={wordTimings}
             localTime={activeClip?.localTime ?? 0}
+            clockBinding={isActive ? clockBinding : undefined}
             isActive={isActive}
             enabled={highlightEnabled}
             className="body-large text-muted-foreground"
@@ -815,6 +961,7 @@ function TargetLanguageInput({
                 language={translation.language}
                 wordTimings={wordTimings}
                 localTime={activeClip?.localTime ?? 0}
+                clockBinding={isActive ? clockBinding : undefined}
                 isActive={isActive}
                 enabled={highlightEnabled}
                 className="body-large text-muted-foreground"

@@ -41,8 +41,16 @@ export async function upsertCourseSettings(
     return existing._id;
   }
 
+  // New-course defaults, stamped explicitly on first insert only. Existing
+  // courses keep resolving undefined via the legacy read-side DEFAULT_*
+  // constants, so changing behavior for new users here never flips it for
+  // current ones. Practice Listening starts ON, limited to a card's first
+  // initial review ("Only new" = 1).
   return ctx.db.insert('courseSettings', {
     courseId,
+    playTargetBeforeBase: true,
+    playTargetAfterBase: true,
+    targetBeforeOnlyNewReps: 1,
     ...values,
   });
 }

@@ -28,6 +28,7 @@ import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
 import { HelpDialog } from '@/components/app/HelpDialog';
 import { AppLoadingSplash } from '@/components/LogoSpinner';
+import { ViewErrorBoundary } from '@/components/app/ViewErrorBoundary';
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
   home: '/app',
@@ -360,26 +361,30 @@ export default function MainLayout({
                   : 'none',
           }}
         >
-          <HomeView
-            preloadedCourseSettings={preloadedCourseSettings}
-            onLearnOpen={handleLearnOpen}
-            onChatOpen={handleOpenChat}
-            onNavigateToContent={handleNavigateToAddCards}
-            onNavigateToChat={handleNavigateToChat}
-            onEnterTexts={handleNavigateToAddCards}
-            onTutorialReady={handleTutorialReady}
-            animateEntrance={justReturnedFromLearn}
-            isHidden={isLearnOpen || activeView !== 'home' || isAddCardsRoute}
-            hasActiveCourse={hasActiveCourse}
-            onOpenCourseMenu={handleOpenCourseMenu}
-          />
+          <ViewErrorBoundary>
+            <HomeView
+              preloadedCourseSettings={preloadedCourseSettings}
+              onLearnOpen={handleLearnOpen}
+              onChatOpen={handleOpenChat}
+              onNavigateToContent={handleNavigateToAddCards}
+              onNavigateToChat={handleNavigateToChat}
+              onEnterTexts={handleNavigateToAddCards}
+              onTutorialReady={handleTutorialReady}
+              animateEntrance={justReturnedFromLearn}
+              isHidden={isLearnOpen || activeView !== 'home' || isAddCardsRoute}
+              hasActiveCourse={hasActiveCourse}
+              onOpenCourseMenu={handleOpenCourseMenu}
+            />
+          </ViewErrorBoundary>
         </div>
         {isAddCardsRoute && (
           <div style={{ display: !isLearnOpen ? 'contents' : 'none' }}>
-            <AddCardsView onBack={() => {
-              setActiveView('home');
-              router.push('/app');
-            }} />
+            <ViewErrorBoundary>
+              <AddCardsView onBack={() => {
+                setActiveView('home');
+                router.push('/app');
+              }} />
+            </ViewErrorBoundary>
           </div>
         )}
         {hasVisitedLibrary && (
@@ -391,10 +396,12 @@ export default function MainLayout({
                     : 'none',
             }}
           >
-            <LibraryView
-              hasActiveCourse={hasActiveCourse}
-              onOpenCourseMenu={handleOpenCourseMenu}
-            />
+            <ViewErrorBoundary>
+              <LibraryView
+                hasActiveCourse={hasActiveCourse}
+                onOpenCourseMenu={handleOpenCourseMenu}
+              />
+            </ViewErrorBoundary>
           </div>
         )}
         {hasVisitedStats && (
@@ -406,7 +413,9 @@ export default function MainLayout({
                     : 'none',
             }}
           >
-            <StatsView />
+            <ViewErrorBoundary>
+              <StatsView />
+            </ViewErrorBoundary>
           </div>
         )}
         <div
@@ -417,17 +426,21 @@ export default function MainLayout({
                   : 'none',
           }}
         >
-          <SettingsView activeView={activeView} />
+          <ViewErrorBoundary>
+            <SettingsView activeView={activeView} />
+          </ViewErrorBoundary>
         </div>
         {!isLearnOpen && activeView === 'chat' && chatThreadId && (
-          <SimplifiedChatView
-            threadId={chatThreadId}
-            onNewChat={handleNewChat}
-            onThreadSelect={handleOpenChat}
-            threads={threads}
-            sidebarOpen={chatSidebarOpen}
-            onSidebarOpenChange={setChatSidebarOpen}
-          />
+          <ViewErrorBoundary>
+            <SimplifiedChatView
+              threadId={chatThreadId}
+              onNewChat={handleNewChat}
+              onThreadSelect={handleOpenChat}
+              threads={threads}
+              sidebarOpen={chatSidebarOpen}
+              onSidebarOpenChange={setChatSidebarOpen}
+            />
+          </ViewErrorBoundary>
         )}
       </main>
 
@@ -446,12 +459,14 @@ export default function MainLayout({
 
       {isLearnOpen && (
         <div className="fixed inset-0 z-50 bg-background">
-          <LearnView
-            onBack={handleLearnClose}
-            prefetchedThreadId={prefetchedThreadId ?? undefined}
-            onNavigateToChat={handleNavigateToChat}
-            onNavigateToAddCustomCards={handleNavigateToAddCards}
-          />
+          <ViewErrorBoundary>
+            <LearnView
+              onBack={handleLearnClose}
+              prefetchedThreadId={prefetchedThreadId ?? undefined}
+              onNavigateToChat={handleNavigateToChat}
+              onNavigateToAddCustomCards={handleNavigateToAddCards}
+            />
+          </ViewErrorBoundary>
         </div>
       )}
     </div>

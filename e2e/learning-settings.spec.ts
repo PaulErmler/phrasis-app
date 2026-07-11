@@ -60,6 +60,9 @@ async function ensureAudioMode(page: Page): Promise<void> {
         );
       }
       await page.waitForTimeout(backoffsMs[attempt]);
+      // The sheet may be scrolled down to a lower section; the mode switcher
+      // sits at the top, so bring it back into view before waiting on it.
+      await audioBtn.evaluate((el) => el.scrollIntoView({ block: "center" }));
       await waitForInViewport(page, audioBtn);
       await audioBtn.click({ force: true });
       await expect
@@ -71,6 +74,87 @@ async function ensureAudioMode(page: Page): Promise<void> {
     await page.waitForTimeout(600);
     if (await isSelectedTestId(page, "settings-mode-audio")) return;
   }
+}
+
+/** Mirror of ensureAudioMode for the Writing ("full") review mode — the
+ *  writing-style sub-switcher and writing-only settings render there. Same
+ *  optimistic-rollback/backoff rationale, see ensureAudioMode. */
+async function ensureFullMode(page: Page): Promise<void> {
+  const fullBtn = page.getByTestId("settings-mode-full").first();
+  await expect(fullBtn).toBeVisible({ timeout: 10_000 });
+  const backoffsMs = [0, 500, 1_000, 2_000, 4_000, 6_000];
+  for (let attempt = 0; ; attempt++) {
+    if (!(await isSelectedTestId(page, "settings-mode-full"))) {
+      if (attempt >= backoffsMs.length) {
+        throw new Error(
+          "settings-mode-full kept snapping back to audio — reviewMode write rejected across every retry",
+        );
+      }
+      await page.waitForTimeout(backoffsMs[attempt]);
+      await fullBtn.evaluate((el) => el.scrollIntoView({ block: "center" }));
+      await waitForInViewport(page, fullBtn);
+      await fullBtn.click({ force: true });
+      await expect
+        .poll(() => isSelectedTestId(page, "settings-mode-full"), {
+          timeout: 5_000,
+        })
+        .toBe(true);
+    }
+    await page.waitForTimeout(600);
+    if (await isSelectedTestId(page, "settings-mode-full")) return;
+  }
+}
+
+/** Ensure the Writing style sub-toggle is on the given style. The sheet must
+ *  already be in Writing mode (call ensureFullMode first). */
+async function ensureWritingStyle(
+  page: Page,
+  style: "translate" | "transcribe",
+): Promise<void> {
+  const btn = page.getByTestId(`settings-writing-${style}`).first();
+  await expect(btn).toBeVisible({ timeout: 8_000 });
+  if (await isSelectedTestId(page, `settings-writing-${style}`)) return;
+  await btn.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await waitForInViewport(page, btn);
+  await btn.click({ force: true });
+  await expect
+    .poll(() => isSelectedTestId(page, `settings-writing-${style}`), {
+      timeout: 8_000,
+    })
+    .toBe(true);
+}
+
+// Generic switch access by DOM id (CSS selectors ignore the aria-hidden Radix
+// sometimes sets on the sheet). Used for the per-mode auto-play switch and the
+// writing-mode hide-base pair.
+function switchById(page: Page, id: string): Locator {
+  return page.locator(`#${id}`);
+}
+
+async function isSwitchOnById(page: Page, id: string): Promise<boolean> {
+  return (
+    (await switchById(page, id).getAttribute("aria-checked")) === "true"
+  );
+}
+
+async function clickSwitchById(page: Page, id: string): Promise<void> {
+  const sw = switchById(page, id);
+  await sw.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await waitForInViewport(page, sw);
+  await sw.click({ force: true });
+}
+
+/** Click the switch until it reaches (and keeps) the desired checked state. */
+async function setSwitchById(
+  page: Page,
+  id: string,
+  on: boolean,
+): Promise<void> {
+  if ((await isSwitchOnById(page, id)) === on) return;
+  await clickSwitchById(page, id);
+  await expect
+    .poll(() => isSwitchOnById(page, id), { timeout: 8_000 })
+    .toBe(on);
 }
 
 // The two Practice toggles are Radix switches; target them by their `id`
@@ -266,6 +350,299 @@ test.describe("learning settings", () => {
     await expectSwitch(page, "before", false);
     await expectSwitch(page, "after", true); // back to the default → clean state
 
+    await page.keyboard.press("Escape").catch(() => {});
+  });
+
+  test("writing style sub-toggle renders in Writing mode and persists", async ({
+    page,
+  }) => {
+    await page.goto("/app/learn");
+    await page.waitForLoadState("domcontentloaded");
+    await dismissTour(page, "audio_review_intro", 500);
+    await dismissTour(page, "full_review_intro", 500);
+
+    await openSettingsSheet(page);
+
+    // Not rendered in audio mode.
+    await ensureAudioMode(page);
+    await expect(
+      page.getByTestId("settings-writing-transcribe"),
+    ).toHaveCount(0);
+
+    // Renders in Writing mode.
+    await ensureFullMode(page);
+    const translateBtn = page
+      .getByTestId("settings-writing-translate")
+      .first();
+    const transcribeBtn = page
+      .getByTestId("settings-writing-transcribe")
+      .first();
+    await expect(translateBtn).toBeVisible({ timeout: 8_000 });
+    await expect(transcribeBtn).toBeVisible();
+
+    // Normalize to Translate first — a previously failed spec can leave the
+    // shared user on Transcribe, and the assertions below assume the
+    // Translate starting point.
+    await translateBtn.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await waitForInViewport(page, translateBtn);
+    await translateBtn.click({ force: true });
+    await expect
+      .poll(() => isSelectedTestId(page, "settings-writing-translate"), {
+        timeout: 8_000,
+      })
+      .toBe(true);
+    // Translate mode shows the target-audio setting; Transcribe hides it
+    // (the merged target audio IS the prompt there).
+    await expect(switchById(page, "targetAudioEnabled")).toBeVisible();
+    // With target audio in its default 'afterSubmit' mode, the playback
+    // timeline shows the post-submit target group behind the
+    // "Translation Entered" pill (normalize the sub-switch first — a prior
+    // run may have left 'always' selected).
+    await setSwitchById(page, "targetAudioEnabled", true);
+    await setSwitchById(page, "targetAudio_afterSubmit", true);
+    await expect(
+      page.getByText(/translation entered/i).first(),
+    ).toBeVisible({ timeout: 8_000 });
+
+    await transcribeBtn.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await waitForInViewport(page, transcribeBtn);
+    await transcribeBtn.click({ force: true });
+    await expect
+      .poll(() => isSelectedTestId(page, "settings-writing-transcribe"), {
+        timeout: 8_000,
+      })
+      .toBe(true);
+    await expect(switchById(page, "targetAudioEnabled")).toHaveCount(0);
+
+    // Survives a sheet close/reopen.
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(400);
+    await openSettingsSheet(page);
+    await ensureFullMode(page);
+    await expect
+      .poll(() => isSelectedTestId(page, "settings-writing-transcribe"), {
+        timeout: 8_000,
+      })
+      .toBe(true);
+
+    // Restore Translate + audio mode so later specs start clean.
+    await translateBtn.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await waitForInViewport(page, translateBtn);
+    await translateBtn.click({ force: true });
+    await expect
+      .poll(() => isSelectedTestId(page, "settings-writing-translate"), {
+        timeout: 8_000,
+      })
+      .toBe(true);
+    await ensureAudioMode(page);
+    await page.keyboard.press("Escape").catch(() => {});
+  });
+
+  test("playback settings are independent between Shadowing and Writing", async ({
+    page,
+  }) => {
+    await page.goto("/app/learn");
+    await page.waitForLoadState("domcontentloaded");
+    await dismissTour(page, "audio_review_intro", 500);
+    await dismissTour(page, "full_review_intro", 500);
+
+    await openSettingsSheet(page);
+
+    // Note the audio-mode auto-play state (one of the split settings). No
+    // assertion on the initial writing-mode value: it mirrors audio only
+    // while the Full field has never been written for this user, which a
+    // prior run of this spec already did.
+    await ensureAudioMode(page);
+    const audioAutoPlay = await isSwitchOnById(page, "autoPlayAudio");
+
+    // Editing auto-play in Writing/Translate must NOT touch the audio-mode
+    // value. Normalize the style first — within Writing, Translate and
+    // Transcribe each have their own copy too.
+    await ensureFullMode(page);
+    await ensureWritingStyle(page, "translate");
+    const fullAutoPlay = await isSwitchOnById(page, "autoPlayAudio");
+    await clickSwitchById(page, "autoPlayAudio");
+    await expect
+      .poll(() => isSwitchOnById(page, "autoPlayAudio"), { timeout: 8_000 })
+      .toBe(!fullAutoPlay);
+
+    await ensureAudioMode(page);
+    await expect
+      .poll(() => isSwitchOnById(page, "autoPlayAudio"), { timeout: 8_000 })
+      .toBe(audioAutoPlay);
+
+    // The writing-mode edit persisted independently.
+    await ensureFullMode(page);
+    await expect
+      .poll(() => isSwitchOnById(page, "autoPlayAudio"), { timeout: 8_000 })
+      .toBe(!fullAutoPlay);
+
+    // And the mirror direction: toggling audio-mode auto-play leaves the
+    // writing-mode value alone.
+    await ensureAudioMode(page);
+    await clickSwitchById(page, "autoPlayAudio");
+    await expect
+      .poll(() => isSwitchOnById(page, "autoPlayAudio"), { timeout: 8_000 })
+      .toBe(!audioAutoPlay);
+    await ensureFullMode(page);
+    await expect
+      .poll(() => isSwitchOnById(page, "autoPlayAudio"), { timeout: 8_000 })
+      .toBe(!fullAutoPlay);
+
+    // Transcribe carries its own copy: toggling auto-play there leaves the
+    // Translate value alone.
+    await ensureWritingStyle(page, "transcribe");
+    const transcribeAutoPlay = await isSwitchOnById(page, "autoPlayAudio");
+    await clickSwitchById(page, "autoPlayAudio");
+    await expect
+      .poll(() => isSwitchOnById(page, "autoPlayAudio"), { timeout: 8_000 })
+      .toBe(!transcribeAutoPlay);
+    await ensureWritingStyle(page, "translate");
+    await expect
+      .poll(() => isSwitchOnById(page, "autoPlayAudio"), { timeout: 8_000 })
+      .toBe(!fullAutoPlay);
+    // …and the transcribe edit persisted independently.
+    await ensureWritingStyle(page, "transcribe");
+    await expect
+      .poll(() => isSwitchOnById(page, "autoPlayAudio"), { timeout: 8_000 })
+      .toBe(!transcribeAutoPlay);
+    await setSwitchById(page, "autoPlayAudio", transcribeAutoPlay);
+    await ensureWritingStyle(page, "translate");
+
+    // Restore all modes to their starting values, sheet back to audio mode.
+    await setSwitchById(page, "autoPlayAudio", fullAutoPlay);
+    await ensureAudioMode(page);
+    await setSwitchById(page, "autoPlayAudio", audioAutoPlay);
+    await page.keyboard.press("Escape").catch(() => {});
+  });
+
+  test("transcribe style drives the writing card: prompt, hidden base, reveal on submit", async ({
+    page,
+  }) => {
+    await page.goto("/app/learn");
+    await page.waitForLoadState("domcontentloaded");
+    await dismissTour(page, "audio_review_intro", 500);
+    await dismissTour(page, "full_review_intro", 500);
+
+    await openSettingsSheet(page);
+    await ensureFullMode(page);
+
+    // Transcribe + hide base languages (reveal-on-submit stays default ON).
+    const transcribeBtn = page
+      .getByTestId("settings-writing-transcribe")
+      .first();
+    await transcribeBtn.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await waitForInViewport(page, transcribeBtn);
+    await transcribeBtn.click({ force: true });
+    await expect
+      .poll(() => isSelectedTestId(page, "settings-writing-transcribe"), {
+        timeout: 8_000,
+      })
+      .toBe(true);
+    await setSwitchById(page, "hideBaseLanguagesFull", true);
+    await setSwitchById(page, "autoRevealBaseOnSubmit", true);
+
+    await page.keyboard.press("Escape").catch(() => {});
+    await page
+      .getByTestId("learning-settings-sheet")
+      .first()
+      .waitFor({ state: "hidden", timeout: 5_000 })
+      .catch(() => {});
+    await dismissTour(page, "full_review_intro", 1_000);
+
+    // Wait for the writing card's input, recovering from a filter-blocked
+    // deck the same way learning-journey.spec.ts does.
+    const input = page.getByTestId("learn-translation-input").first();
+    const includeOther = page
+      .getByTestId("filter-blocked-include-other")
+      .first();
+    const waitForInput = () =>
+      input
+        .waitFor({ state: "visible", timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false);
+    let inputVisible = await waitForInput();
+    if (!inputVisible && (await includeOther.isVisible().catch(() => false))) {
+      await includeOther.click().catch(() => {});
+      inputVisible = await waitForInput();
+    }
+    expect(
+      inputVisible,
+      "Writing-card input should mount in transcribe style",
+    ).toBe(true);
+
+    // Transcribe swaps the placeholder from "Type the translation..." to
+    // "Type what you hear...".
+    await expect(input).toHaveAttribute("placeholder", /what you hear/i);
+
+    // Hide-base blurs the base row until every translation is submitted.
+    const blurred = page.locator(".blur-sm");
+    await expect
+      .poll(() => blurred.count(), { timeout: 8_000 })
+      .toBeGreaterThan(0);
+
+    await input.fill("asdf transcription answer");
+    await input.press("Enter");
+
+    // Reveal-on-submit: once all inputs are submitted the base un-blurs.
+    await expect.poll(() => blurred.count(), { timeout: 8_000 }).toBe(0);
+
+    // Restore: Translate style, hide-base off, audio mode.
+    await openSettingsSheet(page);
+    await ensureFullMode(page);
+    await setSwitchById(page, "hideBaseLanguagesFull", false);
+    const translateBtn = page
+      .getByTestId("settings-writing-translate")
+      .first();
+    await translateBtn.evaluate((el) => el.scrollIntoView({ block: "center" }));
+    await waitForInViewport(page, translateBtn);
+    await translateBtn.click({ force: true });
+    await expect
+      .poll(() => isSelectedTestId(page, "settings-writing-translate"), {
+        timeout: 8_000,
+      })
+      .toBe(true);
+    await ensureAudioMode(page);
+    await page.keyboard.press("Escape").catch(() => {});
+  });
+
+  test("writing-mode hide base languages with reveal-on-submit sub-setting", async ({
+    page,
+  }) => {
+    await page.goto("/app/learn");
+    await page.waitForLoadState("domcontentloaded");
+    await dismissTour(page, "audio_review_intro", 500);
+    await dismissTour(page, "full_review_intro", 500);
+
+    await openSettingsSheet(page);
+
+    // The writing-mode pair only renders in Writing mode.
+    await ensureAudioMode(page);
+    await expect(switchById(page, "hideBaseLanguagesFull")).toHaveCount(0);
+
+    await ensureFullMode(page);
+    await expect(switchById(page, "hideBaseLanguagesFull")).toBeVisible({
+      timeout: 8_000,
+    });
+    // Sub-setting is hidden until the main switch is on.
+    await setSwitchById(page, "hideBaseLanguagesFull", false);
+    await expect(switchById(page, "autoRevealBaseOnSubmit")).toHaveCount(0);
+
+    await setSwitchById(page, "hideBaseLanguagesFull", true);
+    await expect(switchById(page, "autoRevealBaseOnSubmit")).toBeVisible({
+      timeout: 8_000,
+    });
+
+    // Sub-setting round-trips.
+    await setSwitchById(page, "autoRevealBaseOnSubmit", false);
+    await setSwitchById(page, "autoRevealBaseOnSubmit", true);
+
+    // Turning the main switch off hides the sub-setting again.
+    await setSwitchById(page, "hideBaseLanguagesFull", false);
+    await expect(switchById(page, "autoRevealBaseOnSubmit")).toHaveCount(0);
+
+    // Restore audio mode so later specs start clean.
+    await ensureAudioMode(page);
     await page.keyboard.press("Escape").catch(() => {});
   });
 });

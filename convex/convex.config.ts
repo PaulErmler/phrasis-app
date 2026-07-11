@@ -6,6 +6,7 @@ import aggregate from '@convex-dev/aggregate/convex.config';
 import actionRetrier from '@convex-dev/action-retrier/convex.config';
 import rateLimiter from '@convex-dev/rate-limiter/convex.config';
 import workpool from '@convex-dev/workpool/convex.config';
+import migrations from '@convex-dev/migrations/convex.config';
 
 const app = defineApp();
 app.use(betterAuth);
@@ -20,5 +21,8 @@ app.use(rateLimiter);
 // instances because each pool needs its own parallelism cap.
 app.use(workpool, { name: 'llmPool' });
 app.use(workpool, { name: 'ttsPool' });
+// Batched, resumable data migrations. Chained after every deploy via
+// `npx convex run migrations:runAll --prod` (completed ones are skipped).
+app.use(migrations);
 
 export default app;

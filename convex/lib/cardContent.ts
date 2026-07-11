@@ -1,6 +1,10 @@
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
-import { ROMANIZATION_LANGUAGES } from '../../lib/languages';
+import {
+  ROMANIZATION_LANGUAGES,
+  USER_PROVIDED_TRANSLATION_SOURCE,
+  isTranslationVersionStale,
+} from '../../lib/languages';
 import { CLAIM_STALE_MS as LLM_CLAIM_STALE_MS } from '../features/llmTranslationQueue';
 
 type ContentCtx = QueryCtx | MutationCtx;
@@ -18,6 +22,14 @@ export interface CardTranslationContent {
    * Drives the warning-color "Retranslating" pill in the card header.
    */
   retranslating?: boolean;
+  /**
+   * True iff the stored row's `translationVersion` is below the language's
+   * current config version (and the row isn't user-provided) — i.e. the
+   * card-add sweep in `scheduleMissingContent` would delete + regenerate it.
+   * Only populated when the caller opts in via `markVersionStale`; the
+   * caller applies its own `text.userCreated` exemption on top.
+   */
+  versionStale?: boolean;
 }
 
 export interface CardAudioContent {
@@ -61,6 +73,10 @@ export async function buildTextContentBatchForLanguages(
   inputs: TextContentInput[],
   baseLanguages: string[],
   targetLanguages: string[],
+  opts?: {
+    /** Stamp `versionStale` on translation entries (see CardTranslationContent). */
+    markVersionStale?: boolean;
+  },
 ): Promise<Map<string, TextContentResult>> {
   const allLanguages = getCourseLanguages(baseLanguages, targetLanguages);
   const translationFetches: Array<{ key: string; lang: string; textId: Id<'texts'> }> = [];
@@ -114,7 +130,12 @@ export async function buildTextContentBatchForLanguages(
 
   const translationMap = new Map<
     string,
-    { text: string; romanization?: string; llmClaimedAt: number | null }
+    {
+      text: string;
+      romanization?: string;
+      llmClaimedAt: number | null;
+      versionStale: boolean;
+    }
   >();
   translationFetches.forEach((item, idx) => {
     const row = translationResults[idx];
@@ -123,6 +144,10 @@ export async function buildTextContentBatchForLanguages(
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
       llmClaimedAt: claim?.claimedAt ?? null,
+      versionStale:
+        row != null &&
+        row.translationSource !== USER_PROVIDED_TRANSLATION_SOURCE &&
+        isTranslationVersionStale(item.lang, row.translationVersion),
     });
   });
 
@@ -197,6 +222,9 @@ export async function buildTextContentBatchForLanguages(
         // prior translatedText exists (i.e. this is a *re*translation, not
         // the first-time translation of a new card).
         retranslating: llmClaimHeld && translatedText.length > 0,
+        ...(opts?.markVersionStale
+          ? { versionStale: entry?.versionStale ?? false }
+          : {}),
       };
     });
 

@@ -1,4 +1,4 @@
-import 'react';
+import { memo } from 'react';
 import { useTranslations } from 'next-intl';
 import { BotIcon } from 'lucide-react';
 import { MessageErrorBoundary } from '@/components/chat/MessageErrorBoundary';
@@ -142,6 +142,119 @@ function PlainTextContent({ text }: { text: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Memoized message row
+// ---------------------------------------------------------------------------
+
+interface ChatMessageRowProps {
+  message: ExtendedUIMessage;
+  toolRenderers?: Record<string, ToolRenderer>;
+  messageFooter?: MessageFooterRenderer;
+  errorFallback: string;
+  errorRetryLabel: string;
+  thinkingLabel: string;
+}
+
+/**
+ * Cheap per-part signature for the row comparator: text length captures
+ * streaming growth, tool state/id capture tool lifecycle transitions.
+ */
+function partsSignature(message: ExtendedUIMessage): string {
+  const parts = message.parts;
+  if (!parts || parts.length === 0) return '';
+  let sig = '';
+  for (const part of parts) {
+    if (part.type === 'text') {
+      sig += `t${(part as { text?: string }).text?.length ?? 0};`;
+    } else if (part.type.startsWith('tool-')) {
+      const toolPart = part as ToolUIPart;
+      sig += `${toolPart.type}:${toolPart.state}:${getToolCallId(toolPart) ?? ''};`;
+    } else {
+      sig += `${part.type};`;
+    }
+  }
+  return sig;
+}
+
+/**
+ * useUIMessages rebuilds every message object on each streamed delta, so
+ * object identity is useless — compare the fields that affect rendering by
+ * value instead. Completed rows then bail out and only the streaming row
+ * re-renders (and re-parses markdown) per token.
+ */
+function areRowPropsEqual(
+  prev: ChatMessageRowProps,
+  next: ChatMessageRowProps,
+): boolean {
+  const a = prev.message;
+  const b = next.message;
+  return (
+    (a.key ?? a.id) === (b.key ?? b.id) &&
+    a.status === b.status &&
+    a.role === b.role &&
+    (a.content ?? a.text ?? '') === (b.content ?? b.text ?? '') &&
+    partsSignature(a) === partsSignature(b) &&
+    prev.toolRenderers === next.toolRenderers &&
+    prev.messageFooter === next.messageFooter &&
+    prev.errorFallback === next.errorFallback &&
+    prev.errorRetryLabel === next.errorRetryLabel &&
+    prev.thinkingLabel === next.thinkingLabel
+  );
+}
+
+const ChatMessageRow = memo(function ChatMessageRow({
+  message,
+  toolRenderers,
+  messageFooter,
+  errorFallback,
+  errorRetryLabel,
+  thinkingLabel,
+}: ChatMessageRowProps) {
+  const messageText = message.content ?? message.text ?? '';
+  const isAssistantStreaming =
+    message.role === 'assistant' &&
+    (message.status === 'streaming' || message.status === 'pending');
+
+  const hasParts = message.parts && message.parts.length > 0;
+  const hasVisibleParts =
+    hasParts &&
+    message.parts!.some(
+      (p) =>
+        (p.type === 'text' && (p as { text: string }).text?.trim()) ||
+        p.type.startsWith('tool-'),
+    );
+
+  return (
+    <MessageBranch defaultBranch={0}>
+      <MessageBranchContent>
+        <MessageErrorBoundary
+          fallbackMessage={errorFallback}
+          retryLabel={errorRetryLabel}
+        >
+          <Message from={message.role}>
+            <MessageContent>
+              {isAssistantStreaming && !messageText && !hasVisibleParts ? (
+                <Shimmer>{thinkingLabel}</Shimmer>
+              ) : hasParts ? (
+                <MessageParts
+                  message={message}
+                  isStreaming={isAssistantStreaming}
+                  toolRenderers={toolRenderers}
+                />
+              ) : (
+                <PlainTextContent text={messageText} />
+              )}
+            </MessageContent>
+          </Message>
+          {messageFooter &&
+            message.role === 'assistant' &&
+            messageFooter(message)}
+        </MessageErrorBoundary>
+      </MessageBranchContent>
+    </MessageBranch>
+  );
+}, areRowPropsEqual);
+
+// ---------------------------------------------------------------------------
 // Public types & main component
 // ---------------------------------------------------------------------------
 
@@ -188,50 +301,17 @@ export function ChatMessages({
         <ConversationContent className={`px-4 ${contentClassName ?? ''}`}>
           {displayMessages.length > 0 ? (
             <>
-              {displayMessages.map((message: ExtendedUIMessage) => {
-                const messageText = message.content ?? message.text ?? '';
-                const isAssistantStreaming =
-                  message.role === 'assistant' &&
-                  (message.status === 'streaming' ||
-                    message.status === 'pending');
-
-                const hasParts = message.parts && message.parts.length > 0;
-                const hasVisibleParts = hasParts && message.parts!.some(
-                  (p) =>
-                    (p.type === 'text' && (p as { text: string }).text?.trim()) ||
-                    p.type.startsWith('tool-'),
-                );
-
-                return (
-                  <MessageBranch key={message.key ?? message.id} defaultBranch={0}>
-                    <MessageBranchContent>
-                      <MessageErrorBoundary
-                        fallbackMessage={t('messageError.title')}
-                        retryLabel={t('messageError.retry')}
-                      >
-                        <Message from={message.role}>
-                          <MessageContent>
-                            {isAssistantStreaming && !messageText && !hasVisibleParts ? (
-                              <Shimmer>{t('thinking')}</Shimmer>
-                            ) : hasParts ? (
-                              <MessageParts
-                                message={message}
-                                isStreaming={isAssistantStreaming}
-                                toolRenderers={toolRenderers}
-                              />
-                            ) : (
-                              <PlainTextContent text={messageText} />
-                            )}
-                          </MessageContent>
-                        </Message>
-                        {messageFooter &&
-                          message.role === 'assistant' &&
-                          messageFooter(message)}
-                      </MessageErrorBoundary>
-                    </MessageBranchContent>
-                  </MessageBranch>
-                );
-              })}
+              {displayMessages.map((message: ExtendedUIMessage) => (
+                <ChatMessageRow
+                  key={message.key ?? message.id}
+                  message={message}
+                  toolRenderers={toolRenderers}
+                  messageFooter={messageFooter}
+                  errorFallback={t('messageError.title')}
+                  errorRetryLabel={t('messageError.retry')}
+                  thinkingLabel={t('thinking')}
+                />
+              ))}
             </>
           ) : !isLoading ? (
             <ConversationEmptyState title={t('emptyTitle')}>
@@ -247,6 +327,9 @@ export function ChatMessages({
                   </li>
                 ))}
               </ul>
+              <p className="text-xs text-muted-foreground/80 text-left">
+                {t('emptyCreditsNote')}
+              </p>
             </ConversationEmptyState>
           ) : null}
         </ConversationContent>

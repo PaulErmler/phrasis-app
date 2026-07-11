@@ -64,6 +64,30 @@ export interface CourseSettings {
   pauseBaseToTarget?: number;
   pauseTargetToTarget?: number;
   pauseBeforeAutoAdvance?: number;
+  // Writing ("full") mode counterparts — undefined falls back to the
+  // unsuffixed audio-mode field (see courseSettingsFields in convex/schema.ts).
+  highlightWordsFull?: boolean;
+  autoPlayAudioFull?: boolean;
+  languageRepetitionsFull?: Record<string, number>;
+  languageRepetitionPausesFull?: Record<string, number>;
+  languagePlaybackSpeedsFull?: Record<string, number>;
+  pauseBaseToBaseFull?: number;
+  pauseBaseToTargetFull?: number;
+  pauseTargetToTargetFull?: number;
+  pauseBeforeAutoAdvanceFull?: number;
+  // Transcribe style: own playback-settings copy, resolved
+  // `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*`.
+  highlightWordsTranscribe?: boolean;
+  autoPlayAudioTranscribe?: boolean;
+  languageRepetitionsTranscribe?: Record<string, number>;
+  languageRepetitionPausesTranscribe?: Record<string, number>;
+  languagePlaybackSpeedsTranscribe?: Record<string, number>;
+  pauseTargetToTargetTranscribe?: number;
+  // Transcribe style: post-submit target replay settings (missing entry =
+  // 1 repetition at the prompt speed).
+  transcribeAfterRepetitions?: Record<string, number>;
+  transcribeAfterRepetitionPauses?: Record<string, number>;
+  transcribeAfterPlaybackSpeeds?: Record<string, number>;
   // Target-before-base ("Practice Listening") / target-after-base ("Practice Speaking")
   playTargetBeforeBase?: boolean;
   playTargetAfterBase?: boolean;
@@ -80,6 +104,8 @@ export interface CourseSettings {
   autoRevealLanguages?: boolean;
   hideBaseLanguages?: boolean;
   autoRevealBaseLanguages?: boolean;
+  hideBaseLanguagesFull?: boolean;
+  autoRevealBaseOnSubmit?: boolean;
   showRomanization?: boolean;
   // Instant proceed on rating
   instantProceedAudio?: boolean;
@@ -87,6 +113,7 @@ export interface CourseSettings {
   // Review mode
   reviewMode?: 'audio' | 'full';
   fullReviewTargetAudioMode?: 'always' | 'afterSubmit' | 'never';
+  writingInputMode?: 'translate' | 'transcribe';
   // Scheduling mode
   schedulingMode?: 'learn_new' | 'learnAndReview' | 'radio';
   // Language order overrides

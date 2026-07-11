@@ -16,6 +16,10 @@ import {
   updateMediaSessionPosition,
   setMediaSessionPlaybackState,
 } from '@/lib/audio/mediaSession';
+import {
+  createPlaybackClock,
+  type PlaybackClock,
+} from '@/lib/audio/playbackClock';
 import type { CardAudioRecording } from '@/components/app/learning/types';
 
 export interface UseAudioPlayerOptions {
@@ -52,12 +56,13 @@ export interface AudioPlayerState {
   durationSec: number;
   revealedLanguages: ReadonlySet<string>;
   /**
-   * Position on the merged-audio timeline, in seconds. Updated ~60 Hz via
-   * requestAnimationFrame while playing (the native `timeupdate` event fires
-   * too slowly for smooth per-word highlighting). Callers should translate
-   * this into per-clip time via `resolveActiveClip(languageCues, currentTime)`.
+   * Frame-rate position source on the merged-audio timeline. NOT React
+   * state — ~60 Hz updates would re-render the whole card tree. Leaves that
+   * need per-frame time (karaoke word index) subscribe via
+   * `clock.subscribe()` and setState only when their derived value changes;
+   * coarse consumers use `useActiveCue` for the active language cue.
    */
-  currentTime: number;
+  clock: PlaybackClock;
   /** Language-clip boundaries in the merged blob. Stable per card. */
   languageCues: ReadonlyArray<LanguageCue>;
   /**
@@ -93,9 +98,13 @@ export function useAudioPlayer(
   const [isMerging, setIsMerging] = useState(false);
   const [durationSec, setDurationSec] = useState(0);
   const [revealedLanguages, setRevealedLanguages] = useState<ReadonlySet<string>>(new Set());
-  const [currentTime, setCurrentTime] = useState(0);
   const [languageCues, setLanguageCues] = useState<ReadonlyArray<LanguageCue>>([]);
   const [speedByLanguage, setSpeedByLanguage] = useState<Record<string, number>>({});
+
+  // Stable per-hook-instance clock; attached to the audio element on creation.
+  const clockRef = useRef<PlaybackClock | null>(null);
+  if (clockRef.current === null) clockRef.current = createPlaybackClock();
+  const clock = clockRef.current;
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -133,6 +142,7 @@ export function useAudioPlayer(
   const getAudio = useCallback((): HTMLAudioElement => {
     if (!audioRef.current) {
       audioRef.current = new Audio();
+      clock.attach(audioRef.current);
       audioRef.current.preload = 'auto';
       // Defensive: modern browsers default preservesPitch to true, but set it
       // explicitly (plus the webkit prefix for older Safari) so any future
@@ -144,7 +154,7 @@ export function useAudioPlayer(
       el.webkitPreservesPitch = true;
     }
     return audioRef.current;
-  }, []);
+  }, [clock]);
 
   // --------------------------------------------------------------------------
   // Playback controls
@@ -159,12 +169,12 @@ export function useAudioPlayer(
     // rAF loop never re-subscribes, so no word highlighting on the replay.
     //
     // .pause() + currentTime=0 first forces a clean "paused at 0" state;
-    // the subsequent .play() then reliably fires 'play' and our reactive
-    // currentTime snaps back so the highlight starts from the first word.
+    // the subsequent .play() then reliably fires 'play' and the clock snaps
+    // back so the highlight starts from the first word.
     if (audio.ended || (audio.duration && audio.currentTime >= audio.duration - 0.05)) {
       audio.pause();
       audio.currentTime = 0;
-      setCurrentTime(0);
+      clock.notifyOnce();
       setIsPlaying(false);
     }
     audio
@@ -179,7 +189,7 @@ export function useAudioPlayer(
         if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
         console.error('Audio play failed:', err);
       });
-  }, [getAudio]);
+  }, [getAudio, clock]);
 
   const pause = useCallback(() => {
     hasAutoPlayedForCardRef.current = true; // suppress pending auto-play
@@ -203,10 +213,12 @@ export function useAudioPlayer(
     const audio = audioRef.current;
     if (audio && audio.duration) {
       audio.currentTime = Math.max(0, Math.min(seconds, audio.duration));
-      setCurrentTime(audio.currentTime);
+      // Paused seeks won't tick the rAF loop — push one update so word
+      // highlights track the new position immediately.
+      clock.notifyOnce();
       updateMediaSessionPosition(audio.duration, audio.currentTime);
     }
-  }, []);
+  }, [clock]);
 
   const clearCurrentAudio = useCallback(() => {
     const audio = getAudio();
@@ -224,11 +236,11 @@ export function useAudioPlayer(
     setDurationSec(0);
     setIsPlaying(false);
     setRevealedLanguages(new Set());
-    setCurrentTime(0);
+    clock.notifyOnce();
     setLanguageCues([]);
     setSpeedByLanguage({});
     setMediaSessionPlaybackState('none');
-  }, [getAudio]);
+  }, [getAudio, clock]);
 
   // --------------------------------------------------------------------------
   // Wire audio element events
@@ -316,20 +328,17 @@ export function useAudioPlayer(
   }, [getAudio]);
 
   // --------------------------------------------------------------------------
-  // rAF-driven currentTime for smooth word highlighting. The native
-  // `timeupdate` event fires ~4 Hz which is visibly laggy for karaoke.
+  // Drive the playback clock from the playing state. The clock runs its own
+  // rAF loop (only while playing AND subscribed) and notifies subscribers
+  // outside React — no per-frame re-renders here.
   // --------------------------------------------------------------------------
   useEffect(() => {
-    if (!isPlaying) return;
-    let raf = 0;
-    const tick = () => {
-      const audio = audioRef.current;
-      if (audio) setCurrentTime(audio.currentTime);
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [isPlaying]);
+    if (isPlaying) {
+      clock.start();
+      return () => clock.stop();
+    }
+    clock.stop();
+  }, [isPlaying, clock]);
 
   // --------------------------------------------------------------------------
   // Merge audio when card changes, audio URLs arrive, or settings change
@@ -616,7 +625,7 @@ export function useAudioPlayer(
               );
               try {
                 audio.currentTime = clamped;
-                setCurrentTime(clamped);
+                clock.notifyOnce();
                 updateMediaSessionPosition(result.durationSec, clamped);
               } catch {
                 // readyState edge — safe to ignore; seek was best-effort.
@@ -848,7 +857,7 @@ export function useAudioPlayer(
     isMerging,
     durationSec,
     revealedLanguages,
-    currentTime,
+    clock,
     languageCues,
     speedByLanguage,
   };

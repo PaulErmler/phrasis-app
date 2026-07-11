@@ -41,6 +41,7 @@ import {
   asVoiceGender,
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
+import { settledCount } from '../lib/collections';
 import { getTodayInTimezone } from '../lib/dateUtils';
 import { getAudioForText, deleteAudioRow } from '../lib/audio';
 import {
@@ -476,8 +477,8 @@ async function hasPendingCustomCardsToAdd(
     const coll = await ctx.db.get(collId);
     if (!coll) continue;
     const prog = await getCollectionProgress(ctx, userId, courseId, collId);
-    const cardsAdded = prog?.cardsAdded ?? 0;
-    if (coll.textCount > cardsAdded) return true;
+    // Ignored texts are excluded from auto-add, so they aren't pending.
+    if (coll.textCount > settledCount(prog)) return true;
   }
   return false;
 }

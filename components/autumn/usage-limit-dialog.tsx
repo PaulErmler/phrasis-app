@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { getFeatureI18nKey } from "@/lib/features/feature-meta";
+import { isCreditBackedFeature } from "@/convex/features/featureIds";
 
 export interface UsageLimitDialogProps {
   open: boolean;
@@ -30,7 +31,9 @@ export default function UsageLimitDialog({
   const t = useTranslations("Paywall");
   const tFeatures = useTranslations("Features");
 
-  const featureName = tFeatures(`${getFeatureI18nKey(featureId)}.name`);
+  const featureName = tFeatures(
+    `${isCreditBackedFeature(featureId) ? "credits" : getFeatureI18nKey(featureId)}.name`,
+  );
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

@@ -14,14 +14,18 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { X, Headphones, PenLine, Settings2 } from 'lucide-react';
+import { X, Headphones, PenLine, Settings2, Languages, Ear } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   DEFAULT_BATCH_SIZE,
   type CourseSettings,
 } from '@/components/app/learning/types';
 import { StepperControl } from '@/components/app/learning/StepperControl';
 import { TimelineLanguageCard } from '@/components/app/learning/TimelineLanguageCard';
-import { StepperPauseConnector } from '@/components/app/learning/StepperPauseConnector';
+import {
+  StepperPauseConnector,
+  TimelineEventConnector,
+} from '@/components/app/learning/StepperPauseConnector';
 import { ReviewModeSwitcher } from '@/components/app/learning/ReviewModeSwitcher';
 import { CourseLanguageSettings } from '@/components/course/CourseLanguageSettings';
 import {
@@ -29,6 +33,7 @@ import {
   DEFAULT_AUTO_ADVANCE,
   DEFAULT_REPETITIONS_BASE,
   DEFAULT_REPETITIONS_TARGET,
+  DEFAULT_REPETITIONS_TARGET_WRITING,
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   DEFAULT_PAUSE_BETWEEN_LANGUAGES,
   DEFAULT_PAUSE_BASE_TO_TARGET,
@@ -113,18 +118,31 @@ export function LearningModeSettings({
   };
 
   // ---- audio playback setting handlers ----
+  // In writing ("full") mode these write the `*Full` counterpart fields so the
+  // two modes stay independent. Record handlers spread the *effective* map
+  // (mode-resolved, see the resolved-values section below), so the first
+  // writing-mode edit snapshots the audio values for every language instead of
+  // dropping them.
 
   const handleAutoPlayChange = async (checked: boolean) => {
     await updateSettings({
       courseId: courseSettings.courseId,
-      autoPlayAudio: checked,
+      ...(isTranscribe
+        ? { autoPlayAudioTranscribe: checked }
+        : isFull
+          ? { autoPlayAudioFull: checked }
+          : { autoPlayAudio: checked }),
     });
   };
 
   const handleHighlightWordsChange = async (checked: boolean) => {
     await updateSettings({
       courseId: courseSettings.courseId,
-      highlightWords: checked,
+      ...(isTranscribe
+        ? { highlightWordsTranscribe: checked }
+        : isFull
+          ? { highlightWordsFull: checked }
+          : { highlightWords: checked }),
     });
   };
 
@@ -188,10 +206,14 @@ export function LearningModeSettings({
 
   const handleRepetitionChange = async (language: string, value: number) => {
     if (value < 0 || value > 10) return;
-    const current = courseSettings.languageRepetitions ?? {};
+    const next = { ...reps, [language]: value };
     await updateSettings({
       courseId: courseSettings.courseId,
-      languageRepetitions: { ...current, [language]: value },
+      ...(isTranscribe
+        ? { languageRepetitionsTranscribe: next }
+        : isFull
+          ? { languageRepetitionsFull: next }
+          : { languageRepetitions: next }),
     });
   };
 
@@ -200,10 +222,14 @@ export function LearningModeSettings({
     value: number,
   ) => {
     if (value < 0 || value > 30) return;
-    const current = courseSettings.languageRepetitionPauses ?? {};
+    const next = { ...repPauses, [language]: value };
     await updateSettings({
       courseId: courseSettings.courseId,
-      languageRepetitionPauses: { ...current, [language]: value },
+      ...(isTranscribe
+        ? { languageRepetitionPausesTranscribe: next }
+        : isFull
+          ? { languageRepetitionPausesFull: next }
+          : { languageRepetitionPauses: next }),
     });
   };
 
@@ -212,10 +238,14 @@ export function LearningModeSettings({
       PLAYBACK_SPEED_MIN,
       Math.min(PLAYBACK_SPEED_MAX, Math.round(value * 10) / 10),
     );
-    const current = courseSettings.languagePlaybackSpeeds ?? {};
+    const next = { ...speeds, [language]: clamped };
     await updateSettings({
       courseId: courseSettings.courseId,
-      languagePlaybackSpeeds: { ...current, [language]: clamped },
+      ...(isTranscribe
+        ? { languagePlaybackSpeedsTranscribe: next }
+        : isFull
+          ? { languagePlaybackSpeedsFull: next }
+          : { languagePlaybackSpeeds: next }),
     });
   };
 
@@ -223,7 +253,7 @@ export function LearningModeSettings({
     if (value < 0 || value > 30) return;
     await updateSettings({
       courseId: courseSettings.courseId,
-      pauseBaseToBase: value,
+      ...(isFull ? { pauseBaseToBaseFull: value } : { pauseBaseToBase: value }),
     });
   };
 
@@ -231,7 +261,9 @@ export function LearningModeSettings({
     if (value < 0 || value > 30) return;
     await updateSettings({
       courseId: courseSettings.courseId,
-      pauseBaseToTarget: value,
+      ...(isFull
+        ? { pauseBaseToTargetFull: value }
+        : { pauseBaseToTarget: value }),
     });
   };
 
@@ -239,7 +271,11 @@ export function LearningModeSettings({
     if (value < 0 || value > 30) return;
     await updateSettings({
       courseId: courseSettings.courseId,
-      pauseTargetToTarget: value,
+      ...(isTranscribe
+        ? { pauseTargetToTargetTranscribe: value }
+        : isFull
+          ? { pauseTargetToTargetFull: value }
+          : { pauseTargetToTarget: value }),
     });
   };
 
@@ -247,7 +283,9 @@ export function LearningModeSettings({
     if (value < 0 || value > 10) return;
     await updateSettings({
       courseId: courseSettings.courseId,
-      pauseBeforeAutoAdvance: value,
+      ...(isFull
+        ? { pauseBeforeAutoAdvanceFull: value }
+        : { pauseBeforeAutoAdvance: value }),
     });
   };
 
@@ -351,6 +389,47 @@ export function LearningModeSettings({
     });
   };
 
+  // ---- transcribe post-submit replay group ("Translation Entered") ----
+
+  const handleTranscribeAfterRepetitionChange = async (
+    language: string,
+    value: number,
+  ) => {
+    if (value < 0 || value > 10) return;
+    const current = courseSettings.transcribeAfterRepetitions ?? {};
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      transcribeAfterRepetitions: { ...current, [language]: value },
+    });
+  };
+
+  const handleTranscribeAfterRepetitionPauseChange = async (
+    language: string,
+    value: number,
+  ) => {
+    if (value < 0 || value > 30) return;
+    const current = courseSettings.transcribeAfterRepetitionPauses ?? {};
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      transcribeAfterRepetitionPauses: { ...current, [language]: value },
+    });
+  };
+
+  const handleTranscribeAfterSpeedChange = async (
+    language: string,
+    value: number,
+  ) => {
+    const clamped = Math.max(
+      PLAYBACK_SPEED_MIN,
+      Math.min(PLAYBACK_SPEED_MAX, Math.round(value * 10) / 10),
+    );
+    const current = courseSettings.transcribeAfterPlaybackSpeeds ?? {};
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      transcribeAfterPlaybackSpeeds: { ...current, [language]: clamped },
+    });
+  };
+
   // "Only new": limit Practice Listening to a card's initial N reviews. Stored
   // as 0 (= ∞ / always) or 1-10; the stepper's ∞ position maps to 0.
   const handleTargetBeforeOnlyNewChange = async (value: number) => {
@@ -379,6 +458,32 @@ export function LearningModeSettings({
     });
   };
 
+  const handleWritingInputModeChange = async (
+    mode: 'translate' | 'transcribe',
+  ) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      writingInputMode: mode,
+    });
+  };
+
+  // Writing-mode "Hide base languages" — independent of the audio-mode pair;
+  // its sub-setting reveals on submit (not on audio playback).
+  const handleHideBaseLanguagesFullChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      hideBaseLanguagesFull: checked,
+      ...(!checked && { autoRevealBaseOnSubmit: false }),
+    });
+  };
+
+  const handleAutoRevealBaseOnSubmitChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      autoRevealBaseOnSubmit: checked,
+    });
+  };
+
   const handleInstantProceedChange = async (checked: boolean) => {
     if (reviewMode === 'full') {
       await updateSettings({
@@ -396,17 +501,75 @@ export function LearningModeSettings({
   // ---- resolved values (with defaults) ----
 
   const reviewMode = courseSettings.reviewMode ?? 'audio';
+  const isFull = reviewMode === 'full';
   const fullReviewTargetAudioMode =
     courseSettings.fullReviewTargetAudioMode ?? 'afterSubmit';
-  const reps = courseSettings.languageRepetitions ?? {};
-  const repPauses = courseSettings.languageRepetitionPauses ?? {};
-  const speeds = courseSettings.languagePlaybackSpeeds ?? {};
+  const writingInputMode = courseSettings.writingInputMode ?? 'translate';
+  const isTranscribe = isFull && writingInputMode === 'transcribe';
+  // Each mode edits its own copy of the playback settings; the effective
+  // value resolves `*Transcribe ?? *Full ?? unsuffixed` so an untweaked mode
+  // shows (and seeds its first write from) the previous mode in the chain.
+  // Audio mode keeps reading the unsuffixed fields.
+  const pick = <T,>(
+    transcribe: T | undefined,
+    full: T | undefined,
+    audio: T | undefined,
+  ): T | undefined =>
+      isTranscribe ? (transcribe ?? full ?? audio) : isFull ? (full ?? audio) : audio;
+  const reps =
+    pick(
+      courseSettings.languageRepetitionsTranscribe,
+      courseSettings.languageRepetitionsFull,
+      courseSettings.languageRepetitions,
+    ) ?? {};
+  const repPauses =
+    pick(
+      courseSettings.languageRepetitionPausesTranscribe,
+      courseSettings.languageRepetitionPausesFull,
+      courseSettings.languageRepetitionPauses,
+    ) ?? {};
+  const speeds =
+    pick(
+      courseSettings.languagePlaybackSpeedsTranscribe,
+      courseSettings.languagePlaybackSpeedsFull,
+      courseSettings.languagePlaybackSpeeds,
+    ) ?? {};
   const pauseB2B =
-    courseSettings.pauseBaseToBase ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+    pick(
+      undefined,
+      courseSettings.pauseBaseToBaseFull,
+      courseSettings.pauseBaseToBase,
+    ) ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
   const pauseB2T =
-    courseSettings.pauseBaseToTarget ?? DEFAULT_PAUSE_BASE_TO_TARGET;
+    pick(
+      undefined,
+      courseSettings.pauseBaseToTargetFull,
+      courseSettings.pauseBaseToTarget,
+    ) ?? DEFAULT_PAUSE_BASE_TO_TARGET;
   const pauseT2T =
-    courseSettings.pauseTargetToTarget ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+    pick(
+      courseSettings.pauseTargetToTargetTranscribe,
+      courseSettings.pauseTargetToTargetFull,
+      courseSettings.pauseTargetToTarget,
+    ) ?? DEFAULT_PAUSE_BETWEEN_LANGUAGES;
+  const autoPlay =
+    pick(
+      courseSettings.autoPlayAudioTranscribe,
+      courseSettings.autoPlayAudioFull,
+      courseSettings.autoPlayAudio,
+    ) ?? DEFAULT_AUTO_PLAY;
+  const highlightWords =
+    pick(
+      courseSettings.highlightWordsTranscribe,
+      courseSettings.highlightWordsFull,
+      courseSettings.highlightWords,
+    ) === true;
+  // Target cards with no stored reps default to 2x in audio mode but 1x in
+  // the writing modes (once is enough when the learner is typing) — mirrors
+  // resolveAudioSettings.defaultTargetReps.
+  const defaultTargetReps = isFull
+    ? DEFAULT_REPETITIONS_TARGET_WRITING
+    : DEFAULT_REPETITIONS_TARGET;
   const playTargetBefore =
     courseSettings.playTargetBeforeBase ?? DEFAULT_PLAY_TARGET_BEFORE_BASE;
   const playTargetAfter =
@@ -414,6 +577,12 @@ export function LearningModeSettings({
   const beforeReps = courseSettings.targetBeforeRepetitions ?? {};
   const beforeRepPauses = courseSettings.targetBeforeRepetitionPauses ?? {};
   const beforeSpeeds = courseSettings.targetBeforePlaybackSpeeds ?? {};
+  // Transcribe post-submit replay group (independent of the pre-submit prompt).
+  const transcribeAfterReps = courseSettings.transcribeAfterRepetitions ?? {};
+  const transcribeAfterRepPauses =
+    courseSettings.transcribeAfterRepetitionPauses ?? {};
+  const transcribeAfterSpeeds =
+    courseSettings.transcribeAfterPlaybackSpeeds ?? {};
   const pauseT2B = courseSettings.pauseTargetToBase ?? DEFAULT_PAUSE_TARGET_TO_BASE;
   // "Only new" stepper: stored 0/undefined = ∞ (always), shown at the BOTTOM
   // position (UI value 0) so "+" steps ∞ → 1 and "−" steps 1 → ∞. 1-10 map to
@@ -423,12 +592,23 @@ export function LearningModeSettings({
     onlyNewStored && onlyNewStored > 0 ? Math.min(10, onlyNewStored) : 0;
   // The after-base target section shows in audio mode only when "Practice
   // Speaking" is on; full mode keeps its existing "always" gating (the
-  // before/after toggles don't apply there — see useLearningAudio).
+  // before/after toggles don't apply there — see useLearningAudio). Transcribe
+  // always shows the targets: the merged target audio is the prompt.
   const showAfterTarget =
     reviewMode === 'audio'
       ? playTargetAfter
-      : fullReviewTargetAudioMode === 'always';
+      : isTranscribe || fullReviewTargetAudioMode === 'always';
   const showBeforeTarget = reviewMode === 'audio' && playTargetBefore;
+  // Transcribe never plays base audio, so its timeline has no base cards.
+  const showBaseTimeline = !isTranscribe;
+  // Post-submit target playback group ("Translation Entered"): in Translate
+  // it's the per-language clip that plays after submitting text
+  // (fullReviewTargetAudioMode 'afterSubmit', bound to the writing-set
+  // records); in Transcribe it's the replay gated by auto-play (bound to the
+  // independent transcribeAfter* records).
+  const showAfterSubmitGroup =
+    isFull &&
+    (isTranscribe ? autoPlay : fullReviewTargetAudioMode === 'afterSubmit');
   const autoAdvance = courseSettings.autoAdvance ?? DEFAULT_AUTO_ADVANCE;
   const instantProceed =
     reviewMode === 'full'
@@ -534,6 +714,54 @@ export function LearningModeSettings({
               </div>
             </div>
           </div>
+
+          {/* Writing style — sub-switcher shown when Writing is selected:
+              Translate (base audio plays, type the translation) vs Transcribe
+              (target audio plays alone, type what you hear). */}
+          {isFull && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                {t('writingInputMode')}
+              </p>
+              <div className="flex w-full rounded-lg border bg-muted/50 p-1">
+                <button
+                  type="button"
+                  onClick={() => handleWritingInputModeChange('translate')}
+                  data-testid="settings-writing-translate"
+                  className={cn(
+                    'flex-1 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all whitespace-nowrap',
+                    writingInputMode === 'translate'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Languages className="h-4 w-4" />
+                  {t('writingInputModeTranslate')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleWritingInputModeChange('transcribe')}
+                  data-testid="settings-writing-transcribe"
+                  className={cn(
+                    'flex-1 inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-all whitespace-nowrap',
+                    writingInputMode === 'transcribe'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <Ear className="h-4 w-4" />
+                  {t('writingInputModeTranscribe')}
+                </button>
+              </div>
+              <p className="text-muted-xs">
+                {t(
+                  isTranscribe
+                    ? 'writingInputModeTranscribeDescription'
+                    : 'writingInputModeTranslateDescription',
+                )}
+              </p>
+            </div>
+          )}
 
           <Separator />
 
@@ -676,7 +904,7 @@ export function LearningModeSettings({
             </div>
             <Switch
               id="highlightWords"
-              checked={courseSettings.highlightWords === true}
+              checked={highlightWords}
               onCheckedChange={handleHighlightWordsChange}
               className="mt-0.5"
             />
@@ -688,11 +916,17 @@ export function LearningModeSettings({
               <Label htmlFor="autoPlayAudio" className="text-sm font-medium">
                 {t('autoPlay')}
               </Label>
-              <p className="text-muted-xs">{t('autoPlayDescription')}</p>
+              <p className="text-muted-xs">
+                {t(
+                  isTranscribe
+                    ? 'autoPlayDescriptionTranscribe'
+                    : 'autoPlayDescription',
+                )}
+              </p>
             </div>
             <Switch
               id="autoPlayAudio"
-              checked={courseSettings.autoPlayAudio ?? DEFAULT_AUTO_PLAY}
+              checked={autoPlay}
               onCheckedChange={handleAutoPlayChange}
               className="mt-0.5"
             />
@@ -770,8 +1004,10 @@ export function LearningModeSettings({
             </>
           )}
 
-          {/* Target language audio — full review mode only */}
-          {reviewMode === 'full' && (
+          {/* Target language audio — full review mode only. Hidden in
+              transcribe, where the merged target audio IS the prompt and this
+              setting is ignored. */}
+          {reviewMode === 'full' && !isTranscribe && (
             <div className="space-y-0">
               <div className="settings-row">
                 <div className="space-y-0.5">
@@ -909,7 +1145,7 @@ export function LearningModeSettings({
             )}
 
             {/* Base languages */}
-            {baseLanguages.map((code, idx) => {
+            {showBaseTimeline && baseLanguages.map((code, idx) => {
               const plays = reps[code] ?? DEFAULT_REPETITIONS_BASE;
               const repPause =
                 repPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
@@ -961,7 +1197,7 @@ export function LearningModeSettings({
             {showAfterTarget && (
               <>
                 {/* Base → Target Pause connector */}
-                {baseLanguages.length > 0 && targetLanguages.length > 0 && (
+                {showBaseTimeline && baseLanguages.length > 0 && targetLanguages.length > 0 && (
                   <StepperPauseConnector
                     label={t('pause')}
                     seconds={pauseB2T}
@@ -972,12 +1208,12 @@ export function LearningModeSettings({
 
                 {/* Target languages */}
                 {targetLanguages.map((code, idx) => {
-                  const plays = reps[code] ?? DEFAULT_REPETITIONS_TARGET;
+                  const plays = reps[code] ?? defaultTargetReps;
                   const repPause =
                     repPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
                   const nextCode = targetLanguages[idx + 1];
                   const nextPlays = nextCode
-                    ? (reps[nextCode] ?? DEFAULT_REPETITIONS_TARGET)
+                    ? (reps[nextCode] ?? defaultTargetReps)
                     : 0;
 
                   return (
@@ -1013,6 +1249,82 @@ export function LearningModeSettings({
                           onChange={handlePauseTargetToTargetChange}
                           lineOnly={plays === 0 || nextPlays === 0}
                         />
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Post-submit target playback, separated by the "Translation
+                Entered" pill. Translate: the per-language clip that plays
+                after submitting text (bound to the writing-set records).
+                Transcribe: the auto-play-gated replay with its own
+                independent records. Each language plays on its own submit,
+                so there are no between-language pause connectors here. */}
+            {showAfterSubmitGroup && targetLanguages.length > 0 && (
+              <>
+                <TimelineEventConnector
+                  label={t('translationEntered')}
+                  accent
+                />
+
+                {targetLanguages.map((code, idx) => {
+                  const plays = isTranscribe
+                    ? (transcribeAfterReps[code] ?? 1)
+                    : (reps[code] ?? 1);
+                  const repPause = isTranscribe
+                    ? (transcribeAfterRepPauses[code] ??
+                      DEFAULT_PAUSE_BETWEEN_REPETITIONS)
+                    : (repPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS);
+                  const speed = isTranscribe
+                    ? (transcribeAfterSpeeds[code] ??
+                      speeds[code] ??
+                      DEFAULT_PLAYBACK_SPEED)
+                    : (speeds[code] ?? DEFAULT_PLAYBACK_SPEED);
+
+                  return (
+                    <div
+                      key={`after-submit-${code}`}
+                      className="w-full flex flex-col items-center"
+                    >
+                      <TimelineLanguageCard
+                        code={code}
+                        type="target"
+                        plays={plays}
+                        repPause={repPause}
+                        speed={speed}
+                        onPlaysChange={(v) =>
+                          isTranscribe
+                            ? handleTranscribeAfterRepetitionChange(code, v)
+                            : handleRepetitionChange(code, v)
+                        }
+                        onRepPauseChange={(v) =>
+                          isTranscribe
+                            ? handleTranscribeAfterRepetitionPauseChange(
+                              code,
+                              v,
+                            )
+                            : handleRepetitionPauseChange(code, v)
+                        }
+                        onSpeedChange={(v) =>
+                          isTranscribe
+                            ? handleTranscribeAfterSpeedChange(code, v)
+                            : handleLanguageSpeedChange(code, v)
+                        }
+                        repPauseLabel={t('pauseBetweenRepetitions')}
+                        speedLabel={t('playbackSpeed')}
+                        showReorderButtons={false}
+                        canMoveUp={false}
+                        canMoveDown={false}
+                        onMoveUp={() => {}}
+                        onMoveDown={() => {}}
+                      />
+
+                      {idx < targetLanguages.length - 1 && (
+                        <div className="flex flex-col items-center py-0.5">
+                          <div className="w-px h-5 bg-border" />
+                        </div>
                       )}
                     </div>
                   );
@@ -1163,6 +1475,55 @@ export function LearningModeSettings({
                     id="autoRevealBaseLanguages"
                     checked={courseSettings.autoRevealBaseLanguages ?? true}
                     onCheckedChange={handleAutoRevealBaseLanguagesChange}
+                    className="mt-0.5"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Hide base languages + reveal-on-submit sub-setting — writing mode
+              only (independent of the audio-mode pair above) */}
+          {reviewMode === 'full' && (
+            <div className="space-y-0">
+              <div className="settings-row">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="hideBaseLanguagesFull"
+                    className="text-sm font-medium"
+                  >
+                    {t('hideBaseLanguages')}
+                  </Label>
+                  <p className="text-muted-xs">
+                    {t('hideBaseLanguagesDescription')}
+                  </p>
+                </div>
+                <Switch
+                  id="hideBaseLanguagesFull"
+                  checked={courseSettings.hideBaseLanguagesFull === true}
+                  onCheckedChange={handleHideBaseLanguagesFullChange}
+                  className="mt-0.5"
+                />
+              </div>
+
+              {/* Auto-reveal on submit — visually indented as a sub-setting */}
+              {courseSettings.hideBaseLanguagesFull === true && (
+                <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="autoRevealBaseOnSubmit"
+                      className="text-sm font-medium"
+                    >
+                      {t('autoRevealBaseOnSubmit')}
+                    </Label>
+                    <p className="text-muted-xs">
+                      {t('autoRevealBaseOnSubmitDescription')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="autoRevealBaseOnSubmit"
+                    checked={courseSettings.autoRevealBaseOnSubmit ?? true}
+                    onCheckedChange={handleAutoRevealBaseOnSubmitChange}
                     className="mt-0.5"
                   />
                 </div>

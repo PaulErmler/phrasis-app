@@ -13,8 +13,14 @@
 /** Default repetitions for every base language */
 export const DEFAULT_REPETITIONS_BASE = 1;
 
-/** Default repetitions for every target language */
+/** Default repetitions for every target language (audio/Shadowing mode) */
 export const DEFAULT_REPETITIONS_TARGET = 2;
+
+/**
+ * Default target repetitions in the writing modes (Translate merged playback
+ * and the Transcribe prompt) — once is enough when the learner is typing.
+ */
+export const DEFAULT_REPETITIONS_TARGET_WRITING = 1;
 
 // ---------------------------------------------------------------------------
 // Pauses (in whole seconds, step = 1)

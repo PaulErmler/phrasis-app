@@ -86,6 +86,9 @@ export function OnboardingFirstLesson({
   // user's pick (made on the first-lesson intro) so they see the right copy.
   const courseSettings = useQuery(api.features.courses.getActiveCourseSettings, {});
   const reviewMode: ReviewMode = courseSettings?.reviewMode ?? 'audio';
+  const transcribe =
+    reviewMode === 'full' &&
+    (courseSettings?.writingInputMode ?? 'translate') === 'transcribe';
 
   // Pause audio whenever a tutorial step appears so the spoken card audio
   // doesn't compete with the popover.
@@ -160,6 +163,7 @@ export function OnboardingFirstLesson({
   useOnboardingLessonTutorial({
     t,
     reviewMode,
+    transcribe,
     cardsRated,
     onStepShow: pauseAllAudio,
     onCoreComplete: () => setCoreTutorialDone(true),
