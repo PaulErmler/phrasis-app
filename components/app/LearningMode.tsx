@@ -127,11 +127,26 @@ export function LearningMode({
   const [audioRevealNonce, setAudioRevealNonce] = useState(0);
 
   const cardId = state.status === 'reviewing' ? state.cardId : null;
+  const reviewingReviewMode =
+    state.status === 'reviewing'
+      ? (state.courseSettings.reviewMode ?? 'audio')
+      : null;
+  const reviewingWritingInputMode =
+    state.status === 'reviewing'
+      ? (state.courseSettings.writingInputMode ?? 'translate')
+      : null;
+  const reviewingHideTargets =
+    state.status === 'reviewing'
+      ? (state.courseSettings.hideTargetLanguages ?? true)
+      : null;
+  // Reset on a mode/style switch too (not just on card change) so toggling
+  // shadowing ↔ writing (or translate ↔ transcribe) brings the card back to
+  // its initial hidden state.
   useEffect(() => {
     setFullReviewRevealed(false);
     setAllSubmitted(false);
     setFullReviewAccuracy(null);
-  }, [cardId]);
+  }, [cardId, reviewingReviewMode, reviewingWritingInputMode]);
 
   // Warm the celebration sound's HTTP cache at session start so the very
   // first celebration's animation timeline (hardcoded peaks at 1290/1610/
@@ -179,15 +194,6 @@ export function LearningMode({
       if (autoPlayAudioRef.current) audioRef.current.play();
     }
   }, [progressDisplayActive]);
-
-  const reviewingReviewMode =
-    state.status === 'reviewing'
-      ? (state.courseSettings.reviewMode ?? 'audio')
-      : null;
-  const reviewingHideTargets =
-    state.status === 'reviewing'
-      ? (state.courseSettings.hideTargetLanguages ?? true)
-      : null;
 
   useEffect(() => {
     if (reviewingReviewMode !== 'audio' || reviewingHideTargets === null) return;
@@ -425,6 +431,11 @@ export function LearningMode({
   const cardContent =
     reviewMode === 'full' ? (
       <FullReviewCardContent
+        // Remount on a translate ↔ transcribe switch so typed text,
+        // submissions, and manual base reveals reset to the card's initial
+        // state (shadowing ↔ writing already resets via the conditional
+        // render swapping the component out).
+        key={isTranscribe ? 'transcribe' : 'translate'}
         preReviewCount={state.preReviewCount}
         schedulingPhase={state.phase}
         fsrsState={state.fsrsState}
@@ -473,7 +484,10 @@ export function LearningMode({
             ? state.courseSettings.transcribeAfterPlaybackSpeeds
             : undefined
         }
-        hideBaseLanguages={state.courseSettings.hideBaseLanguagesFull === true}
+        // Blur the base by default in Transcribe (the prompt is the target
+        // audio, so a visible base gives the answer away); Translate needs
+        // the base text visible and defaults to off.
+        hideBaseLanguages={state.courseSettings.hideBaseLanguagesFull ?? isTranscribe}
         autoRevealBaseOnSubmit={
           state.courseSettings.autoRevealBaseOnSubmit ?? true
         }

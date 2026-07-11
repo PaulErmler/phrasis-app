@@ -1500,14 +1500,14 @@ export function LearningModeSettings({
                 </div>
                 <Switch
                   id="hideBaseLanguagesFull"
-                  checked={courseSettings.hideBaseLanguagesFull === true}
+                  checked={courseSettings.hideBaseLanguagesFull ?? isTranscribe}
                   onCheckedChange={handleHideBaseLanguagesFullChange}
                   className="mt-0.5"
                 />
               </div>
 
               {/* Auto-reveal on submit — visually indented as a sub-setting */}
-              {courseSettings.hideBaseLanguagesFull === true && (
+              {(courseSettings.hideBaseLanguagesFull ?? isTranscribe) && (
                 <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
                   <div className="space-y-0.5">
                     <Label

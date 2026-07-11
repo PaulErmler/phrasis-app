@@ -95,7 +95,7 @@ export const courseSettingsFields = {
   autoRevealLanguages: v.optional(v.boolean()), // unblur target text when its audio starts playing
   hideBaseLanguages: v.optional(v.boolean()), // blur base language text by default (default off)
   autoRevealBaseLanguages: v.optional(v.boolean()), // unblur base text when its audio starts playing
-  hideBaseLanguagesFull: v.optional(v.boolean()), // writing mode: blur base language text by default (default off; independent of the audio-mode hideBaseLanguages)
+  hideBaseLanguagesFull: v.optional(v.boolean()), // writing mode: blur base language text by default (default: on in Transcribe, off in Translate; independent of the audio-mode hideBaseLanguages)
   autoRevealBaseOnSubmit: v.optional(v.boolean()), // writing mode: unblur base text once all translations are submitted (default on; sub-setting of hideBaseLanguagesFull)
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
   // Language order overrides

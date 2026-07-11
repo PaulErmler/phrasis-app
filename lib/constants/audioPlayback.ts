@@ -14,7 +14,7 @@
 export const DEFAULT_REPETITIONS_BASE = 1;
 
 /** Default repetitions for every target language (audio/Shadowing mode) */
-export const DEFAULT_REPETITIONS_TARGET = 2;
+export const DEFAULT_REPETITIONS_TARGET = 1;
 
 /**
  * Default target repetitions in the writing modes (Translate merged playback
@@ -33,7 +33,7 @@ export const DEFAULT_PAUSE_BETWEEN_REPETITIONS = 2;
 export const DEFAULT_PAUSE_BETWEEN_LANGUAGES = 3;
 
 /** Gap between the last base-language play and the first (after-base) target-language play */
-export const DEFAULT_PAUSE_BASE_TO_TARGET = 5;
+export const DEFAULT_PAUSE_BASE_TO_TARGET = 4;
 
 /** Gap between the last before-base target-language play and the first base-language play */
 export const DEFAULT_PAUSE_TARGET_TO_BASE = DEFAULT_PAUSE_BASE_TO_TARGET;
