@@ -132,6 +132,15 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
           />
         )}
 
+        {isPaid && !checkoutResult.product.properties?.is_one_off && (
+          <p
+            data-testid="checkout-no-commitment"
+            className="px-6 mb-4 text-xs text-muted-foreground"
+          >
+            {t("noCommitment")}
+          </p>
+        )}
+
         <DialogFooter className="flex flex-col sm:flex-row justify-between gap-x-4 py-2 pl-6 pr-3 bg-secondary border-t shadow-inner">
           <Button
             size="sm"

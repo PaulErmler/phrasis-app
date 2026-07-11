@@ -4,12 +4,12 @@ import { Fragment, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import {
   alignWordTimings,
-  findCurrentIndex,
   matchRatio,
   normalise,
 } from '@/lib/audio/alignTimings';
 import { highlightWord } from '@/lib/wordCloud';
 import { languageSupportsKaraoke } from '@/lib/languages';
+import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
 import type { WordTiming } from './types';
 
 interface Props {
@@ -21,6 +21,12 @@ interface Props {
   wordTimings: WordTiming[] | null | undefined;
   /** Time in seconds within THIS clip (already offset by the clip's cue start). */
   localTime: number;
+  /**
+   * Merged-playback word-position source. When set (and active), the word
+   * index ticks from a clock subscription inside this leaf instead of the
+   * `localTime` prop — no parent re-renders per frame.
+   */
+  clockBinding?: ClockBinding;
   /** True when the merged audio is currently playing THIS clip. */
   isActive: boolean;
   /** User setting — when false, always render plain text. */
@@ -57,6 +63,7 @@ export function HighlightedText({
   language,
   wordTimings,
   localTime,
+  clockBinding,
   isActive,
   enabled,
   className,
@@ -75,9 +82,11 @@ export function HighlightedText({
     );
   }, [language, wordTimings, aligned]);
 
-  const currentIndex = useMemo(
-    () => (isActive && canHighlight ? findCurrentIndex(aligned, localTime) : -1),
-    [isActive, canHighlight, aligned, localTime],
+  const currentIndex = useKaraokeIndex(
+    aligned,
+    isActive && canHighlight,
+    localTime,
+    clockBinding,
   );
 
   // Indices of aligned tokens that match the search term (case-insensitive,

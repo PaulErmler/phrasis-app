@@ -37,6 +37,38 @@ export const courseSettingsFields = {
   pauseBaseToTarget: v.optional(v.number()), // seconds between base and (after) target sections
   pauseTargetToTarget: v.optional(v.number()), // seconds between different target languages (both before- and after-base groups)
   pauseBeforeAutoAdvance: v.optional(v.number()), // seconds to wait before auto-advancing to next card
+  // Writing ("full") mode counterparts of the audio-playback settings above.
+  // The unsuffixed fields remain authoritative for audio/Shadowing mode (and
+  // radio); writing mode resolves `*Full ?? unsuffixed ?? DEFAULT_*`, so
+  // undefined means "same as audio" for unmigrated docs. See
+  // docs/migrations/per-mode-settings-backfill.md.
+  highlightWordsFull: v.optional(v.boolean()),
+  autoPlayAudioFull: v.optional(v.boolean()),
+  languageRepetitionsFull: v.optional(v.record(v.string(), v.number())),
+  languageRepetitionPausesFull: v.optional(v.record(v.string(), v.number())),
+  languagePlaybackSpeedsFull: v.optional(v.record(v.string(), v.number())),
+  pauseBaseToBaseFull: v.optional(v.number()),
+  pauseBaseToTargetFull: v.optional(v.number()),
+  pauseTargetToTargetFull: v.optional(v.number()),
+  pauseBeforeAutoAdvanceFull: v.optional(v.number()),
+  // Transcribe writing style: its own copy of the playback settings, so
+  // Translate and Transcribe tweak independently. Resolution chain:
+  // `*Transcribe ?? *Full ?? unsuffixed ?? DEFAULT_*` — undefined means
+  // "same as Translate". Only the settings transcribe actually uses get a
+  // copy (target reps/pauses/speeds, target↔target pause, auto-play,
+  // highlighting); base-group pauses and auto-advance don't apply there.
+  highlightWordsTranscribe: v.optional(v.boolean()),
+  autoPlayAudioTranscribe: v.optional(v.boolean()),
+  languageRepetitionsTranscribe: v.optional(v.record(v.string(), v.number())),
+  languageRepetitionPausesTranscribe: v.optional(v.record(v.string(), v.number())),
+  languagePlaybackSpeedsTranscribe: v.optional(v.record(v.string(), v.number())),
+  pauseTargetToTargetTranscribe: v.optional(v.number()),
+  // Transcribe writing style: independent settings for the post-submit target
+  // replay (the pre-submit prompt uses the `*Transcribe` records above).
+  // Missing entry = 1 repetition at the prompt speed.
+  transcribeAfterRepetitions: v.optional(v.record(v.string(), v.number())),
+  transcribeAfterRepetitionPauses: v.optional(v.record(v.string(), v.number())),
+  transcribeAfterPlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
   // Target-before-base ("Practice Listening") vs target-after-base ("Practice Speaking").
   // At least one must be enabled; the client enforces this. Defaults reproduce the
   // historical base→target sequence (after on, before off).
@@ -63,6 +95,8 @@ export const courseSettingsFields = {
   autoRevealLanguages: v.optional(v.boolean()), // unblur target text when its audio starts playing
   hideBaseLanguages: v.optional(v.boolean()), // blur base language text by default (default off)
   autoRevealBaseLanguages: v.optional(v.boolean()), // unblur base text when its audio starts playing
+  hideBaseLanguagesFull: v.optional(v.boolean()), // writing mode: blur base language text by default (default off; independent of the audio-mode hideBaseLanguages)
+  autoRevealBaseOnSubmit: v.optional(v.boolean()), // writing mode: unblur base text once all translations are submitted (default on; sub-setting of hideBaseLanguagesFull)
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
   // Language order overrides
   baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
@@ -82,6 +116,12 @@ export const courseSettingsFields = {
   fullReviewTargetAudioMode: v.optional(
     v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
   ), // When to play target audio in full review mode
+  // Writing-mode input style: 'translate' (default — base audio plays, user
+  // types the translation) or 'transcribe' (target audio plays alone, user
+  // types what they hear). Ignored in audio mode.
+  writingInputMode: v.optional(
+    v.union(v.literal('translate'), v.literal('transcribe')),
+  ),
   chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
@@ -672,12 +712,53 @@ export default defineSchema({
     // they're starting from scratch on the first level of each new tier.
     legacyCarryAdded: v.optional(v.number()),
     lastRankProcessed: v.optional(v.number()), // Last collectionRank processed (for efficient pagination)
+    // Live counts of this user's collectionTextMarks rows for this collection,
+    // by mark type. NOT monotonic (unlike the counters above): incremented and
+    // decremented in the same transaction as every mark-row write, so
+    // `remaining = textCount - cardsAdded - ignoredCount` stays O(1) for every
+    // consumer that already reads this row. Absent = 0.
+    prioritizedCount: v.optional(v.number()),
+    ignoredCount: v.optional(v.number()),
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])
     .index('by_userId_and_courseId_and_collectionId', [
       'userId',
       'courseId',
       'collectionId',
+    ]),
+
+  // Per-(user, course, text) browse marks from the collection preview.
+  // 'prioritized' texts are drained FIRST by addCardsFromCollection (in rank
+  // order, independent of the sequential frontier); 'ignored' texts are
+  // skipped by the sequential scan and count toward collection completion.
+  // 'readd' is internal-only (never set directly by the client): un-marking a
+  // text the frontier already passed flips its row to 'readd' instead of
+  // deleting it, so the text stays discoverable (browse injection) and
+  // addable (drained like 'prioritized', after it) without rolling the
+  // frontier back. Counter-neutral — not part of prioritizedCount/ignoredCount.
+  // Marks exist only for texts WITHOUT a card — every add path clears the
+  // mark in the same transaction that inserts the card.
+  collectionTextMarks: defineTable({
+    userId: v.string(), // Links to auth user
+    courseId: v.id('courses'),
+    collectionId: v.id('collections'), // Denormalized from the text
+    textId: v.id('texts'),
+    mark: v.union(
+      v.literal('prioritized'),
+      v.literal('ignored'),
+      v.literal('readd'),
+    ),
+    collectionRank: v.number(), // Denormalized from the text (rank-ordered drain)
+  })
+    .index('by_userId_and_courseId_and_textId', ['userId', 'courseId', 'textId'])
+    // Abbreviated (full field spelling exceeds Convex's 64-char index-name cap):
+    // fields are [userId, courseId, collectionId, mark, collectionRank].
+    .index('by_user_course_collection_mark_rank', [
+      'userId',
+      'courseId',
+      'collectionId',
+      'mark',
+      'collectionRank',
     ]),
 
   // Card approval requests from the AI chat

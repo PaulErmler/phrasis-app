@@ -35,6 +35,11 @@ export const CREDIT_COSTS: Partial<Record<FeatureId, number>> = {
   [FEATURE_IDS.TRANSLATION_AUTO_FILL]: 1,
 };
 
+/** Whether a feature draws from the shared `credits` balance. */
+export function isCreditBackedFeature(featureId: string): boolean {
+  return CREDIT_COSTS[featureId as FeatureId] !== undefined;
+}
+
 /**
  * Chat billing step: 1 credit per started USD 0.005 of LLM cost. One
  * chat_messages unit is consumed before generation; the remainder is charged

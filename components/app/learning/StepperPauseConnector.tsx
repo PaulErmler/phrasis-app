@@ -76,3 +76,35 @@ export function StepperPauseConnector({
     </div>
   );
 }
+
+/**
+ * Non-interactive timeline divider: same connector lines as
+ * StepperPauseConnector but with a plain event pill (e.g. "Translation
+ * Entered") instead of a pause stepper — for groups whose playback is
+ * triggered by a user action rather than a timed pause.
+ */
+export function TimelineEventConnector({
+  label,
+  accent,
+}: {
+  label: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center py-0.5">
+      <div className={`w-px h-3 ${accent ? 'bg-primary' : 'bg-border'}`} />
+
+      <div
+        className={`flex items-center rounded-full px-3 py-0.5 text-xs ${
+          accent
+            ? 'bg-primary/10 text-primary border border-primary/30'
+            : 'bg-muted text-muted-foreground border border-border'
+        }`}
+      >
+        <span className="whitespace-nowrap">{label}</span>
+      </div>
+
+      <div className={`w-px h-3 ${accent ? 'bg-primary' : 'bg-border'}`} />
+    </div>
+  );
+}

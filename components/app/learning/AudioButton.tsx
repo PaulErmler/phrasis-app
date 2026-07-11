@@ -6,6 +6,16 @@ import { Volume2, VolumeX, Loader2 } from 'lucide-react';
 import { getLanguageShortLabel } from '@/lib/languages';
 import { computeAttenuation, getPeak } from '@/lib/audio/peakCache';
 
+/**
+ * How long a generate click may hold the spinner while waiting for the URL.
+ * TTS can fail terminally without any signal reaching this component (the
+ * claim is just released; no audio row is ever written), so the spinner must
+ * never be permanent. If generation is merely slow, reverting to the
+ * clickable state is safe: a re-click is a claim-deduped backend no-op and
+ * the [url] effect still auto-plays whenever the URL lands.
+ */
+const GENERATE_TIMEOUT_MS = 10_000;
+
 export interface AudioButtonProps {
   url: string | null;
   /** Canonical language code (e.g. "en", "es_latam"). Broadcast verbatim through onTimeUpdate/onStop so consumers can match against translation.language. The visible label is derived via getLanguageShortLabel. */
@@ -26,6 +36,13 @@ export interface AudioButtonProps {
    * care about speed (e.g. collection previews) get native speed automatically.
    */
   speed?: number;
+  /**
+   * Click-to-generate: when `url` is null and this is provided, the button
+   * renders ENABLED and a click invokes it to kick off audio generation
+   * (spinner until the reactive query delivers the URL, then auto-play).
+   * Without it, the historical behavior stays: null url = disabled spinner.
+   */
+  onRequestGenerate?: () => Promise<unknown> | void;
 }
 
 export function AudioButton({
@@ -37,9 +54,15 @@ export function AudioButton({
   onTimeUpdate,
   onStop,
   speed = 1,
+  onRequestGenerate,
 }: AudioButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  // Set when the user clicked generate: the URL arriving should start
+  // playback without a second tap (best effort — see the autoplay note).
+  const pendingPlayRef = useRef(false);
+  const generateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const onTimeUpdateRef = useRef(onTimeUpdate);
   onTimeUpdateRef.current = onTimeUpdate;
@@ -91,6 +114,43 @@ export function AudioButton({
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [isPlaying, language]);
+
+  const resetGenerating = () => {
+    if (generateTimeoutRef.current) {
+      clearTimeout(generateTimeoutRef.current);
+      generateTimeoutRef.current = null;
+    }
+    setIsGenerating(false);
+    pendingPlayRef.current = false;
+  };
+
+  const handleRequestGenerate = async () => {
+    if (!onRequestGenerate || isGenerating) return;
+    setIsGenerating(true);
+    pendingPlayRef.current = true;
+    if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+    generateTimeoutRef.current = setTimeout(resetGenerating, GENERATE_TIMEOUT_MS);
+    try {
+      const result = await onRequestGenerate();
+      // `{scheduled: false}` means this click enqueued nothing (translation
+      // not landed yet, or a previous job's claim still holds the slot) — no
+      // URL is coming from it, so don't hold the spinner.
+      if (
+        result &&
+        typeof result === 'object' &&
+        'scheduled' in result &&
+        (result as { scheduled?: unknown }).scheduled === false
+      ) {
+        resetGenerating();
+      }
+    } catch (error) {
+      console.error('Error requesting audio generation:', error);
+      resetGenerating();
+    }
+    // On success we stay in the generating state — the reactive query
+    // delivers the URL and the effect below flips us out of it (or the
+    // GENERATE_TIMEOUT_MS guard does, if the job dies without a trace).
+  };
 
   const handlePlay = async () => {
     if (!url) return;
@@ -154,9 +214,49 @@ export function AudioButton({
     }
   };
 
+  const handlePlayRef = useRef(handlePlay);
+  handlePlayRef.current = handlePlay;
+
+  // Generated audio arrived (url flipped non-null after a generate click):
+  // leave the generating state and auto-play. `play()` may be rejected by
+  // strict autoplay policies (iOS Safari — the gesture is long gone by now);
+  // handlePlay already swallows that, leaving the button in the normal ready
+  // state for a second tap.
+  useEffect(() => {
+    if (!url) return;
+    if (generateTimeoutRef.current) {
+      clearTimeout(generateTimeoutRef.current);
+      generateTimeoutRef.current = null;
+    }
+    setIsGenerating(false);
+    if (pendingPlayRef.current) {
+      pendingPlayRef.current = false;
+      void handlePlayRef.current();
+    }
+  }, [url]);
+
+  useEffect(
+    () => () => {
+      if (generateTimeoutRef.current) clearTimeout(generateTimeoutRef.current);
+    },
+    [],
+  );
+
   // Icon-only variant (learning mode)
   if (!showLabel) {
     if (!url) {
+      if (onRequestGenerate && !isGenerating) {
+        return (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleRequestGenerate}
+            className="h-7 w-7"
+          >
+            <Volume2 className="h-4 w-4" />
+          </Button>
+        );
+      }
       return (
         <Button
           variant="ghost"

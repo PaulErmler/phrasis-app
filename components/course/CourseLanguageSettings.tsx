@@ -183,8 +183,10 @@ export function CourseLanguageSettings({
       .join(', ');
 
   const editorLabels = {
-    baseLanguages: t('baseLanguages'),
-    targetLanguages: t('targetLanguages'),
+    baseLanguages: t(draftBase.length === 1 ? 'baseLanguage' : 'baseLanguages'),
+    targetLanguages: t(
+      draftTarget.length === 1 ? 'targetLanguage' : 'targetLanguages',
+    ),
     addLanguage: t('addLanguage'),
     noMoreAvailable: t('noMoreAvailable'),
     cancel: t('cancelButton'),

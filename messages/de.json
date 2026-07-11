@@ -258,7 +258,24 @@
           "adding": "Wird hinzugefügt...",
           "addN": "{count} hinzufügen",
           "upgrade": "Upgrade",
-          "noMoreCards": "Keine weiteren Sätze hinzuzufügen"
+          "noMoreCards": "Keine weiteren Sätze hinzuzufügen",
+          "sentences": "Sätze",
+          "added": "hinzugefügt",
+          "remaining": "verbleibend",
+          "ignoredCount": "ignoriert",
+          "prioritizedCount": "priorisiert",
+          "showAdded": "Hinzugefügte anzeigen",
+          "showIgnored": "Ignorierte anzeigen",
+          "loadMore": "Mehr anzeigen",
+          "loadEarlier": "Frühere anzeigen",
+          "loadingMore": "Wird geladen...",
+          "prioritize": "Priorisieren",
+          "prioritized": "Priorisiert",
+          "ignore": "Ignorieren",
+          "ignored": "Ignoriert",
+          "addOne": "Hinzufügen",
+          "addedOne": "Hinzugefügt",
+          "failedToMark": "Satz konnte nicht aktualisiert werden"
         }
       }
     },
@@ -298,6 +315,8 @@
         "title": "Kurseinstellungen",
         "targetLanguages": "Zielsprachen",
         "baseLanguages": "Basissprachen",
+        "targetLanguage": "Zielsprache",
+        "baseLanguage": "Basissprache",
         "addLanguage": "Sprache hinzufügen",
         "noMoreAvailable": "Keine weiteren Sprachen verfügbar",
         "infoText": "Ziehe Sprachen per Drag-and-Drop, um sie neu anzuordnen. Einmal gespeichert, können Sprachen nicht entfernt werden. Du kannst bis zu {max} Sprachen insgesamt hinzufügen.",
@@ -439,6 +458,7 @@
     "revertSubmission": "Eingabe zurücknehmen",
     "revertSubmissionTooltip": "Eingabe zurücknehmen. Tastenkürzel: Pfeil links.",
     "typeTranslation": "Übersetzung eingeben...",
+    "typeTranscription": "Tippe ein, was du hörst...",
     "empty": {
       "noCardsDue": "Keine Sätze zur Wiederholung fällig",
       "deckEmptyTitle": "Noch keine Sätze in deinem Deck",
@@ -500,7 +520,7 @@
       "initialReviewsDescription": "Anzahl der anfänglichen Wiederholungen für neue Sätze",
       "audioPlayback": "Audio-Wiedergabe",
       "highlightWords": "Wörter hervorheben",
-      "highlightWordsDescription": "Wörter während der Audiowiedergabe hervorheben",
+      "highlightWordsDescription": "Wörter während der Audiowiedergabe hervorheben (nicht für alle Sprachen unterstützt)",
       "autoPlay": "Audio automatisch abspielen",
       "autoPlayDescription": "Audio automatisch abspielen, wenn ein Satz angezeigt wird",
       "practiceListening": "Hörverstehen üben",
@@ -556,6 +576,15 @@
       "fullReviewTargetAudioDescription": "Wann soll das Audio der Zielsprache abgespielt werden",
       "fullReviewTargetAudio_always": "Nach Basis-Audio",
       "fullReviewTargetAudio_afterSubmit": "Nach dem Absenden",
+      "writingInputMode": "Schreibstil",
+      "writingInputModeTranslate": "Übersetzen",
+      "writingInputModeTranscribe": "Transkribieren",
+      "writingInputModeTranslateDescription": "Höre die Basissprache und tippe die Übersetzung in der Zielsprache ein.",
+      "writingInputModeTranscribeDescription": "Höre die Zielsprache und tippe genau ein, was du hörst. Das trainiert dein Hörverständnis.",
+      "translationEntered": "Übersetzung eingegeben",
+      "autoPlayDescriptionTranscribe": "Audio automatisch abspielen, sobald die Übersetzung eingegeben ist",
+      "autoRevealBaseOnSubmit": "Automatisch einblenden nach Absenden",
+      "autoRevealBaseOnSubmitDescription": "Basistext einblenden, sobald alle Übersetzungen abgesendet sind",
       "instantProceed": "Sofort weiter bei Bewertung",
       "instantProceedDescription": "Zum nächsten Satz wechseln, sobald eine Bewertung angeklickt wird"
     }
@@ -612,6 +641,7 @@
     "emptyBullet1": "Stelle Fragen zu Vokabeln, Grammatik oder beliebigen Sätzen.",
     "emptyBullet2": "Der Chat kennt den Satz, den du gerade lernst.",
     "emptyBullet3": "Er kann Sätze für dich erstellen — du bestätigst sie einfach.",
+    "emptyCreditsNote": "Eine Nachricht kostet je nach Länge 1–2 Credits. Je länger die Unterhaltung wird, desto mehr Credits kostet eine Nachricht.",
     "input": {
       "placeholder": "Was möchtest du sagen?",
       "prompts": {
@@ -736,11 +766,14 @@
   },
   "LowQuota": {
     "title": "{featureName} fast aufgebraucht",
+    "titleCredits": "Deine Credits sind fast aufgebraucht",
     "description": "Du hast nur noch {balance, plural, one {# Nutzung} other {# Nutzungen}} für {featureName} übrig. Upgrade deinen Plan für mehr.",
+    "descriptionCredits": "Du hast nur noch {balance, plural, one {# Credit} other {# Credits}} übrig. Upgrade deinen Plan für mehr.",
     "descriptionCap": "Du kannst nur noch {balance, plural, one {# weiteren} other {# weitere}} {featureName} erstellen. Upgrade deinen Plan, um mehr zu erstellen.",
     "dismiss": "Nicht jetzt",
     "upgrade": "Upgrade auf {productName}",
     "noUpgradeAvailable": "Du hast den Großteil deiner {featureName} aufgebraucht. Kontaktiere uns unter support@flexling.com für zusätzliche Nutzung.",
+    "noUpgradeAvailableCredits": "Du hast den Großteil deiner Credits aufgebraucht. Kontaktiere uns unter support@flexling.com für zusätzliche Nutzung.",
     "noUpgradeAvailableCap": "Du hast fast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Kapazität.",
     "contactUs": "Kontakt"
   },
@@ -798,6 +831,7 @@
   },
   "Checkout": {
     "confirm": "Bestätigen",
+    "noCommitment": "Keine Verpflichtung — jederzeit kündbar.",
     "price": "Preis",
     "subscription": "Abonnement",
     "totalDueToday": "Heute fällig",
@@ -962,6 +996,11 @@
       "loading": "Lädt…",
       "noSentence": "Auf diesem Level gibt es keinen Satz.",
       "translationNotReady": "Die Übersetzung für diese Sprache ist noch nicht bereit. Versuche es trotzdem.",
+      "contentRetry": {
+        "message": "Einige Inhalte für diese Sprache konnten nicht vorbereitet werden.",
+        "button": "Erneut versuchen",
+        "failed": "Inhalte konnten nicht vorbereitet werden. Bitte versuche es erneut."
+      },
       "tapReveal": "Tippe unten auf Aufdecken, um die Übersetzung zu sehen.",
       "reveal": "Übersetzung aufdecken",
       "iDidntKnow": "Ich wusste es nicht",
@@ -1002,7 +1041,17 @@
         },
         "full": {
           "title": "Schreiben",
-          "description": "Tippe deine Übersetzung und erhalte sofortiges, zeichengenaues Feedback zur Rechtschreibung. Der schnellste Weg, das Schreiben zu meistern."
+          "description": "Tippe deine Übersetzung und erhalte sofortiges, zeichengenaues Feedback zur Rechtschreibung. Der schnellste Weg, das Schreiben zu meistern.",
+          "styles": {
+            "translate": {
+              "title": "Übersetzen",
+              "description": "Höre deine Sprache und tippe die Übersetzung ein."
+            },
+            "transcribe": {
+              "title": "Transkribieren",
+              "description": "Höre nur die Zielsprache und tippe ein, was du hörst."
+            }
+          }
         }
       },
       "duration": "Etwa 10 Minuten",
@@ -1139,19 +1188,24 @@
       "card": {
         "title": "Die Karte",
         "descriptionAudio": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Die Zielsprache ist verdeckt, bis du sie aufdeckst.",
-        "descriptionFull": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Du tippst die Übersetzung ein und kontrollierst dich selbst."
+        "descriptionFull": "Jede Karte zeigt einen Satz in den Sprachen, die du lernst. Du tippst die Übersetzung ein und kontrollierst dich selbst.",
+        "descriptionFullTranscribe": "Jede Karte spielt einen Satz in deiner Zielsprache ab. Du tippst ein, was du hörst, und kontrollierst dich selbst."
       },
       "reveal": {
         "title": "Übersetzung aufdecken",
-        "description": "Die Übersetzung ist standardmäßig verdeckt. Tippe darauf, um sie aufzudecken, oder höre einfach das Audio — nach einer kurzen Pause wird sie automatisch aufgedeckt. Versuch zuerst, aus dem Gedächtnis zu antworten."
+        "description": "Die Übersetzung ist standardmäßig verdeckt. Tippe darauf, um sie aufzudecken, oder höre einfach zu — sie wird automatisch aufgedeckt, sobald die Zielsprache nach der Basissprache spielt. Bei neuen Karten spielt die Zielsprache einmal am Anfang; wenn du an der Reihe bist, versuch sie aus dem Gedächtnis abzurufen."
       },
       "input": {
         "title": "Übersetzung eintippen",
         "description": "Tippe die Übersetzung in der Zielsprache hier ein und drücke Senden. Du bekommst sofortiges Feedback zu jedem Wort."
       },
+      "inputTranscribe": {
+        "title": "Tippe ein, was du hörst",
+        "description": "Tippe genau ein, was du in der Zielsprache hörst, und drücke Senden. Du bekommst sofortiges Feedback zu jedem Wort."
+      },
       "audioControls": {
         "title": "Audio läuft automatisch",
-        "description": "Audio spielt zuerst die Basissprache ab, pausiert zum Nachdenken und spielt dann die Zielsprache. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen. Die Rückgängig-Taste ganz links nimmt deine letzte Bewertung zurück und holt die vorherige Karte zurück."
+        "description": "Bei einer neuen Karte wird die Zielsprache einmal am Anfang abgespielt, damit du hörst, worauf du hinarbeitest. Danach spielt die Basissprache, pausiert zum Nachdenken, und die Zielsprache folgt. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen. Die Rückgängig-Taste ganz links nimmt deine letzte Bewertung zurück und holt die vorherige Karte zurück."
       },
       "audioPlay": {
         "title": "Drücke Play zum Starten",
@@ -1248,7 +1302,7 @@
       },
       "audioControls": {
         "title": "Audio-Wiedergabe",
-        "description": "Standardmäßig wird das Audio automatisch abgespielt. Zuerst die Ausgangssprache, dann eine Pause zum Nachdenken, dann die Zielsprache, bevor automatisch zum nächsten Satz gewechselt wird."
+        "description": "Standardmäßig wird das Audio automatisch abgespielt. Bei neuen Sätzen spielt die Zielsprache einmal am Anfang, um dein Hörverständnis zu trainieren. Danach spielt die Ausgangssprache, dann eine Pause zum Nachdenken, dann die Zielsprache, bevor automatisch zum nächsten Satz gewechselt wird."
       },
       "undoRestart": {
         "title": "Rückgängig & Neu starten",
@@ -1372,14 +1426,14 @@
       "valid": "bereit",
       "warnings": "Warnungen",
       "errors": "Probleme",
-      "quotaRemaining": "eigene Karten übrig",
-      "quotaUnlimited": "Unbegrenzte eigene Karten"
+      "quotaRemaining": "Credits übrig",
+      "quotaUnlimited": "Unbegrenzte Credits"
     },
     "importButton": "{count} Karten importieren",
     "importButtonEmpty": "Karten importieren",
     "importing": "Importiere…",
     "quota": {
-      "insufficient": "Du hast {balance} eigene Karten in dieser Periode übrig, versuchst aber {count} zu importieren.",
+      "insufficient": "Du hast in dieser Periode noch {balance, plural, one {# Credit} other {# Credits}} übrig, aber der Import von {count} Karten kostet {count, plural, one {# Credit} other {# Credits}}.",
       "insufficientCta": "Mehr erhalten",
       "unlimited": "Unbegrenzter Plan"
     },

@@ -15,6 +15,7 @@ import { findUpgradeProductFromPricingTable } from "@/lib/autumn/find-upgrade-pr
 import { checkoutTrialParams, getTrialState } from "@/lib/autumn/trial-eligibility";
 import { getPaywallTitle, getPaywallMessage, filterProductsByFeatureIncrease } from "@/lib/autumn/paywall-content";
 import { getFeatureI18nKey, isFeatureConsumable, getFeaturePaywallKey } from "@/lib/features/feature-meta";
+import { isCreditBackedFeature } from "@/convex/features/featureIds";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
 import { cn } from "@/lib/utils";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
@@ -70,7 +71,9 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
 
   const { open, setOpen, featureId } = params;
 
-  const featureI18nKey = getFeatureI18nKey(featureId);
+  const featureI18nKey = isCreditBackedFeature(featureId)
+    ? "credits"
+    : getFeatureI18nKey(featureId);
   const featureName = tFeatures(`${featureI18nKey}.name`);
 
   if (isLoading) {

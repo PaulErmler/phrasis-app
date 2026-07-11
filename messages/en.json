@@ -261,7 +261,21 @@
           "noMoreCards": "No more sentences to add",
           "sentences": "sentences",
           "added": "added",
-          "remaining": "remaining"
+          "remaining": "remaining",
+          "ignoredCount": "ignored",
+          "prioritizedCount": "prioritized",
+          "showAdded": "Show added",
+          "showIgnored": "Show ignored",
+          "loadMore": "Show more",
+          "loadEarlier": "Show earlier",
+          "loadingMore": "Loading...",
+          "prioritize": "Prioritize",
+          "prioritized": "Prioritized",
+          "ignore": "Ignore",
+          "ignored": "Ignored",
+          "addOne": "Add",
+          "addedOne": "Added",
+          "failedToMark": "Failed to update sentence"
         }
       }
     },
@@ -301,6 +315,8 @@
         "title": "Course Settings",
         "targetLanguages": "Target Languages",
         "baseLanguages": "Base Languages",
+        "targetLanguage": "Target Language",
+        "baseLanguage": "Base Language",
         "addLanguage": "Add Language",
         "noMoreAvailable": "No more languages available",
         "infoText": "Drag and drop languages to reorder them. Once saved, languages cannot be removed. You can add up to {max} languages total.",
@@ -442,6 +458,7 @@
     "revertSubmission": "Revert submission",
     "revertSubmissionTooltip": "Undo submit. Shortcut: Left Arrow.",
     "typeTranslation": "Type the translation...",
+    "typeTranscription": "Type what you hear...",
     "empty": {
       "noCardsDue": "No sentences due for review",
       "deckEmptyTitle": "No sentences in your deck yet",
@@ -503,7 +520,7 @@
       "initialReviewsDescription": "Number of initial reviews for new sentences",
       "audioPlayback": "Audio Playback",
       "highlightWords": "Highlight words",
-      "highlightWordsDescription": "Highlight words when playing audio",
+      "highlightWordsDescription": "Highlight words when playing audio (not supported for all languages)",
       "autoPlay": "Auto-play audio",
       "autoPlayDescription": "Auto-play audio when a sentence is shown",
       "practiceListening": "Practice Listening",
@@ -559,6 +576,15 @@
       "fullReviewTargetAudioDescription": "When to play target language audio",
       "fullReviewTargetAudio_always": "After base audio",
       "fullReviewTargetAudio_afterSubmit": "After submitting text",
+      "writingInputMode": "Writing style",
+      "writingInputModeTranslate": "Translate",
+      "writingInputModeTranscribe": "Transcribe",
+      "writingInputModeTranslateDescription": "Hear the base language and type the translation in the target language.",
+      "writingInputModeTranscribeDescription": "Hear the target language and type exactly what you hear. This practices your listening comprehension.",
+      "translationEntered": "Translation Entered",
+      "autoPlayDescriptionTranscribe": "Auto-play audio when translation is entered",
+      "autoRevealBaseOnSubmit": "Auto-reveal on submit",
+      "autoRevealBaseOnSubmitDescription": "Unblur base text once all translations are submitted",
       "instantProceed": "Instant proceed on rating",
       "instantProceedDescription": "Advance to the next sentence immediately when a rating button is clicked"
     }
@@ -615,6 +641,7 @@
     "emptyBullet1": "Ask about vocabulary, grammar, or any sentence.",
     "emptyBullet2": "The chat knows the sentence you are currently learning.",
     "emptyBullet3": "It can create sentences for you — you just confirm them.",
+    "emptyCreditsNote": "A message uses 1–2 credits depending on its length. The longer the conversation gets, the more credits a message uses.",
     "input": {
       "placeholder": "What would you like to say?",
       "prompts": {
@@ -739,11 +766,14 @@
   },
   "LowQuota": {
     "title": "Running Low on {featureName}",
+    "titleCredits": "Running low on credits",
     "description": "You only have {balance, plural, one {# use} other {# uses}} of {featureName} left. Upgrade your plan to get more.",
+    "descriptionCredits": "You only have {balance, plural, one {# credit} other {# credits}} left. Upgrade your plan to get more.",
     "descriptionCap": "You can only create {balance, plural, one {# more} other {# more}} {featureName}. Upgrade your plan to create more.",
     "dismiss": "Not now",
     "upgrade": "Upgrade to {productName}",
     "noUpgradeAvailable": "You've used most of your {featureName}. Contact us at support@flexling.com for additional usage.",
+    "noUpgradeAvailableCredits": "You've used most of your credits. Contact us at support@flexling.com for additional usage.",
     "noUpgradeAvailableCap": "You've almost reached your maximum number of {featureName}. Contact us at support@flexling.com for additional capacity.",
     "contactUs": "Contact Us"
   },
@@ -801,6 +831,7 @@
   },
   "Checkout": {
     "confirm": "Confirm",
+    "noCommitment": "No commitment — cancel anytime.",
     "price": "Price",
     "subscription": "Subscription",
     "totalDueToday": "Total due today",
@@ -965,6 +996,11 @@
       "loading": "Loading…",
       "noSentence": "No sentence at this level.",
       "translationNotReady": "Translation not ready yet for this language. Try answering anyway.",
+      "contentRetry": {
+        "message": "Some content couldn't be prepared for this language.",
+        "button": "Retry",
+        "failed": "Preparing content failed. Please retry."
+      },
       "tapReveal": "Tap reveal below to see the translation.",
       "reveal": "Reveal translation",
       "iDidntKnow": "I didn't know",
@@ -1005,7 +1041,17 @@
         },
         "full": {
           "title": "Writing",
-          "description": "Type your translation and get instant, character-level spelling feedback. The fastest way to master writing."
+          "description": "Type your translation and get instant, character-level spelling feedback. The fastest way to master writing.",
+          "styles": {
+            "translate": {
+              "title": "Translate",
+              "description": "Hear your language, type the translation."
+            },
+            "transcribe": {
+              "title": "Transcribe",
+              "description": "Hear only the target language, type what you hear."
+            }
+          }
         }
       },
       "duration": "About 10 minutes",
@@ -1142,19 +1188,24 @@
       "card": {
         "title": "The card",
         "descriptionAudio": "Each card shows a sentence in the languages you're learning. The target language is hidden until you reveal it.",
-        "descriptionFull": "Each card shows a sentence in the languages you're learning. You'll type the translation and check yourself."
+        "descriptionFull": "Each card shows a sentence in the languages you're learning. You'll type the translation and check yourself.",
+        "descriptionFullTranscribe": "Each card plays a sentence in your target language. You'll type what you hear and check yourself."
       },
       "reveal": {
         "title": "Reveal the translation",
-        "description": "The target translation is hidden by default. Tap it to reveal, or just listen to the audio — after a short pause it reveals automatically. Try answering from memory first."
+        "description": "The target translation is hidden by default. Tap it to reveal, or just listen — it reveals automatically once the target plays after the base. New cards play the target once at the start; when it's your turn to answer, try to recall it from memory."
       },
       "input": {
         "title": "Type your translation",
         "description": "Type the target-language translation here and hit submit. You'll get instant feedback on each word."
       },
+      "inputTranscribe": {
+        "title": "Type what you hear",
+        "description": "Type exactly what you hear in the target language and hit submit. You'll get instant feedback on each word."
+      },
       "audioControls": {
         "title": "Audio plays automatically",
-        "description": "Audio plays the base language first, pauses for you to think, then plays the target. Restart, play / pause, or skip to the next card here. The undo button on the far left takes back your last rating and brings the previous card back."
+        "description": "When a card is new, the target language plays once at the beginning so you hear what you're aiming for. Then the base language plays, pauses for you to think, and the target follows. Restart, play / pause, or skip to the next card here. The undo button on the far left takes back your last rating and brings the previous card back."
       },
       "audioPlay": {
         "title": "Press play to start",
@@ -1251,7 +1302,7 @@
       },
       "audioControls": {
         "title": "Audio Playing",
-        "description": "By default the audio is played automatically. First the base audio, then there is a pause for you to think and then the target audio is played before automatically proceeding to the next sentence."
+        "description": "By default the audio is played automatically. On new sentences the target audio plays once at the beginning to train your listening. Then the base audio plays, there is a pause for you to think, and the target audio follows before automatically proceeding to the next sentence."
       },
       "undoRestart": {
         "title": "Undo & Restart",
@@ -1375,14 +1426,14 @@
       "valid": "ready",
       "warnings": "warnings",
       "errors": "issues",
-      "quotaRemaining": "custom cards left",
-      "quotaUnlimited": "Unlimited custom cards"
+      "quotaRemaining": "credits left",
+      "quotaUnlimited": "Unlimited credits"
     },
     "importButton": "Import {count} cards",
     "importButtonEmpty": "Import cards",
     "importing": "Importing…",
     "quota": {
-      "insufficient": "You have {balance} custom cards left this period but are trying to import {count}.",
+      "insufficient": "You have {balance, plural, one {# credit} other {# credits}} left this period, but importing {count} cards needs {count, plural, one {# credit} other {# credits}}.",
       "insufficientCta": "Get more",
       "unlimited": "Unlimited plan"
     },

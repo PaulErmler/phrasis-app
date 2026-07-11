@@ -55,6 +55,30 @@ describe('buildCoreSteps', () => {
     expect(steps[4].popover?.title).toBe('t:core.autoAdd.title');
   });
 
+  it('swaps the card + input copy for the transcribe writing style', () => {
+    const t = makeMockTranslator();
+    const steps = buildCoreSteps(t, 'full', true);
+    expect(steps[1].popover?.description).toBe(
+      't:core.card.descriptionFullTranscribe',
+    );
+    const input = steps.find(
+      (s) => s.element === '[data-tutorial="target-input-and-submit"]',
+    );
+    expect(input?.popover?.title).toBe('t:core.inputTranscribe.title');
+    expect(input?.popover?.description).toBe(
+      't:core.inputTranscribe.description',
+    );
+  });
+
+  it('keeps the translate copy when transcribe is off', () => {
+    const t = makeMockTranslator();
+    const steps = buildCoreSteps(t, 'full', false);
+    const input = steps.find(
+      (s) => s.element === '[data-tutorial="target-input-and-submit"]',
+    );
+    expect(input?.popover?.title).toBe('t:core.input.title');
+  });
+
   it('uses t.markup with the audio-mode key for the rating description', () => {
     const t = makeMockTranslator();
     const steps = buildCoreSteps(t, 'audio');
@@ -117,6 +141,15 @@ describe('buildModeSwitchSteps', () => {
     expect(steps[0].popover?.title).toBe('t:modeSwitch.full.welcome.title');
     expect(steps[1].element).toBe('[data-tutorial="target-input-and-submit"]');
     expect(steps[2].element).toBe('[data-tutorial="rating-buttons"]');
+  });
+
+  it('swaps the input copy for the transcribe writing style', () => {
+    const t = makeMockTranslator();
+    const steps = buildModeSwitchSteps(t, 'full', true);
+    const input = steps.find(
+      (s) => s.element === '[data-tutorial="target-input-and-submit"]',
+    );
+    expect(input?.popover?.title).toBe('t:core.inputTranscribe.title');
   });
 
   it('reuses the mode-specific rating markup key', () => {

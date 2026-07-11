@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Button } from '@/components/ui/button';
-import { Play, Clock, Headphones, BookOpen } from 'lucide-react';
+import { Play, Clock, Headphones, BookOpen, Languages, Ear } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConfettiBurst } from '@/components/effects/ConfettiBurst';
 import {
@@ -67,6 +67,13 @@ export function FirstLessonContainer({
     initialCardsRated && initialCardsRated > 0 ? 'lesson' : 'intro',
   );
   const [mode, setMode] = useState<ReviewMode>(initialReviewMode);
+  // Writing style sub-choice, shown when Writing is selected. Persisted to
+  // courseSettings as `writingInputMode` on start (translate = hear your
+  // language and type the translation; transcribe = hear the target and type
+  // what you hear).
+  const [writingStyle, setWritingStyle] = useState<'translate' | 'transcribe'>(
+    'translate',
+  );
 
   const activeCourse = useQuery(api.features.courses.getActiveCourse, {});
   const updateCourseSettings = useMutation(api.features.courses.updateCourseSettings);
@@ -78,12 +85,14 @@ export function FirstLessonContainer({
 
   const handleStart = async () => {
     // Sync the picked mode into courseSettings before starting — the lesson
-    // reads `state.courseSettings.reviewMode` to decide audio vs full flow.
+    // reads `state.courseSettings.reviewMode` to decide audio vs full flow
+    // (and `writingInputMode` for the writing style).
     if (activeCourse?._id) {
       try {
         await updateCourseSettings({
           courseId: activeCourse._id,
           reviewMode: mode,
+          ...(mode === 'full' ? { writingInputMode: writingStyle } : {}),
         });
       } catch (err) {
         console.error('Failed to persist review mode before lesson:', err);
@@ -146,6 +155,30 @@ export function FirstLessonContainer({
             title={t('modes.full.title')}
             description={t('modes.full.description')}
           />
+
+          {/* Writing style sub-choice — only relevant once Writing is picked.
+              Rendered outside the ModeRow (it's a <button>, so nesting more
+              buttons inside would be invalid HTML). */}
+          {mode === 'full' && (
+            <div className="ml-4 pl-3 border-l-2 border-border space-y-1.5 animate-in fade-in duration-200">
+              <StyleRow
+                testId="first-lesson-style-translate"
+                selected={writingStyle === 'translate'}
+                onClick={() => setWritingStyle('translate')}
+                Icon={Languages}
+                title={t('modes.full.styles.translate.title')}
+                description={t('modes.full.styles.translate.description')}
+              />
+              <StyleRow
+                testId="first-lesson-style-transcribe"
+                selected={writingStyle === 'transcribe'}
+                onClick={() => setWritingStyle('transcribe')}
+                Icon={Ear}
+                title={t('modes.full.styles.transcribe.title')}
+                description={t('modes.full.styles.transcribe.description')}
+              />
+            </div>
+          )}
         </div>
 
         <div className="inline-flex items-center gap-1.5 text-sm text-muted-foreground bg-muted/50 rounded-full px-3 py-1">
@@ -176,6 +209,47 @@ export function FirstLessonContainer({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Compact variant of ModeRow for the writing-style sub-choice. */
+function StyleRow({
+  selected,
+  onClick,
+  Icon,
+  title,
+  description,
+  testId,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  Icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-testid={testId}
+      className={cn(
+        'w-full rounded-lg border px-3 py-2 text-left transition-all flex items-center gap-2.5',
+        'hover:bg-accent',
+        selected && 'border-primary bg-primary/5 ring-1 ring-primary/20',
+      )}
+    >
+      <Icon
+        className={cn(
+          'h-4 w-4 shrink-0',
+          selected ? 'text-primary' : 'text-muted-foreground',
+        )}
+      />
+      <span className="flex-1 min-w-0">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="block text-xs text-muted-foreground">{description}</span>
+      </span>
+    </button>
   );
 }
 

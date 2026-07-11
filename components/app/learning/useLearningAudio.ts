@@ -45,14 +45,30 @@ export function useLearningAudio(
   // (e.g. while a tutorial is starting) still wins so we don't start audio at
   // the wrong moment.
   const isRadio = cs?.schedulingMode === 'radio';
+  const reviewMode = cs?.reviewMode ?? 'audio';
+  // Writing ("full") mode resolves its own playback settings, falling back to
+  // the audio-mode values while a doc is unmigrated. Radio always uses the
+  // audio set.
+  const isFullMode = reviewMode !== 'audio' && !isRadio;
+  const fullReviewTargetAudioMode = cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
+  // Transcribe: writing-mode variant where the target audio is the prompt —
+  // the merged blob contains only the target group and the base stays silent.
+  // It carries its own settings copy, chained `*Transcribe ?? *Full ?? audio`.
+  const isTranscribe =
+    isFullMode && (cs?.writingInputMode ?? 'translate') === 'transcribe';
   const autoPlay =
     disableAutoPlay || settingsOpen
       ? false
       : isRadio
         ? true
-        : (cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY);
-  const reviewMode = cs?.reviewMode ?? 'audio';
-  const fullReviewTargetAudioMode = cs?.fullReviewTargetAudioMode ?? 'afterSubmit';
+        : isTranscribe
+          ? (cs?.autoPlayAudioTranscribe ??
+            cs?.autoPlayAudioFull ??
+            cs?.autoPlayAudio ??
+            DEFAULT_AUTO_PLAY)
+          : isFullMode
+            ? (cs?.autoPlayAudioFull ?? cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY)
+            : (cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY);
 
   const cardSpeedOverrides =
     state.status === 'reviewing' ? state.audioSpeedOverrides : undefined;
@@ -66,13 +82,24 @@ export function useLearningAudio(
   const cardRadioReviewCount =
     state.status === 'reviewing' ? state.radioPlayCount : 0;
   const audioSettings = useMemo(() => {
-    const resolved = resolveAudioSettings(cs, cardSpeedOverrides);
+    const resolved = resolveAudioSettings(
+      cs,
+      cardSpeedOverrides,
+      isTranscribe ? 'transcribe' : isFullMode ? 'full' : 'audio',
+    );
     // The "Practice Listening / Speaking" (target before/after base) toggles
     // only apply to the merged-audio practice path — audio review mode and
     // radio. Full (typing) review mode keeps the historical base→target
-    // sequence regardless of the stored toggles.
-    if (reviewMode !== 'audio' && !isRadio) {
-      return { ...resolved, playTargetBefore: false, playTargetAfter: true };
+    // sequence regardless of the stored toggles. Full mode never auto-advances
+    // (handleScheduleComplete below no-ops), so also drop the trailing
+    // pause-before-advance silence from the merged blob.
+    if (isFullMode) {
+      return {
+        ...resolved,
+        playTargetBefore: false,
+        playTargetAfter: true,
+        autoAdvance: false,
+      };
     }
     // "Only new": drop Practice Listening once this card has graduated past its
     // initial N reviews (counting radio plays in radio mode).
@@ -83,7 +110,8 @@ export function useLearningAudio(
   }, [
     cs,
     cardSpeedOverrides,
-    reviewMode,
+    isFullMode,
+    isTranscribe,
     isRadio,
     cardReviewCount,
     cardRadioReviewCount,
@@ -117,17 +145,20 @@ export function useLearningAudio(
   }, [state]);
 
   // In full review mode, only include target languages in merged audio
-  // if the setting is 'always'. Otherwise, individual clips are played
-  // per-language inside FullReviewCardContent.
+  // if the setting is 'always' — except transcribe, where the target IS the
+  // prompt (and the base is dropped entirely). Otherwise, individual clips
+  // are played per-language inside FullReviewCardContent.
   const includeTargetInMerge =
-    reviewMode === 'audio' || fullReviewTargetAudioMode === 'always';
+    reviewMode === 'audio' ||
+    isTranscribe ||
+    fullReviewTargetAudioMode === 'always';
 
   const audio = useAudioPlayer({
     cardId: isReviewing ? state.cardId : null,
     audioRecordings: isReviewing ? state.audioRecordings : [],
     nextCard: isReviewing ? state.nextCard : null,
     settings: audioSettings,
-    orderedBase: isReviewing ? state.baseLanguages : [],
+    orderedBase: isReviewing && !isTranscribe ? state.baseLanguages : [],
     orderedTarget: isReviewing && includeTargetInMerge ? state.targetLanguages : [],
     sourceText: isReviewing
       ? state.translations.filter((tr) => tr.isBaseLanguage).map((tr) => tr.text).filter(Boolean).join(' / ')
