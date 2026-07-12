@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -103,30 +103,48 @@ export function CollectionDetailDialog({
   const highlightEnabled = courseSettings?.highlightWords === true;
 
   const scrollRef = useRef<HTMLDivElement>(null);
-  const earlierBlockRef = useRef<HTMLDivElement>(null);
-  const earlierBlockHeightRef = useRef(0);
+  // Scroll preservation: remember which row sits at the top of the viewport
+  // (and where), then after every commit scroll by however far that row
+  // moved. Unlike compensating only for the earlier-history block, this
+  // keeps the visible cards pinned no matter what appears or collapses above
+  // them — the added-history feed, its "show earlier" button, or previously
+  // hidden added/ignored rows revealed mid-stream by the toggles.
+  const scrollAnchorRef = useRef<{ id: string; top: number } | null>(null);
 
-  // Scroll preservation: content revealed/loaded ABOVE the main stream (the
-  // added-history block) grows or shrinks the scroll height above the
-  // viewport. Compensate scrollTop by the height delta so the sentences the
-  // user is looking at stay exactly where they are — toggling "show added"
-  // and paging earlier history never jump the view.
+  const rowTopInContainer = (row: HTMLElement, container: HTMLElement) =>
+    row.getBoundingClientRect().top - container.getBoundingClientRect().top;
+
+  const captureScrollAnchor = useCallback(() => {
+    const container = scrollRef.current;
+    if (!container) {
+      scrollAnchorRef.current = null;
+      return;
+    }
+    for (const row of container.querySelectorAll<HTMLElement>('[data-row-id]')) {
+      const top = rowTopInContainer(row, container);
+      // First row whose bottom edge is inside the viewport.
+      if (top + row.offsetHeight > 0) {
+        scrollAnchorRef.current = { id: row.dataset.rowId!, top };
+        return;
+      }
+    }
+    scrollAnchorRef.current = null;
+  }, []);
+
   useLayoutEffect(() => {
     const container = scrollRef.current;
-    const block = earlierBlockRef.current;
-    const height = block?.offsetHeight ?? 0;
-    const prev = earlierBlockHeightRef.current;
-    if (container && height !== prev) {
-      container.scrollTop += height - prev;
+    const anchor = scrollAnchorRef.current;
+    if (container && anchor) {
+      const row = container.querySelector<HTMLElement>(
+        `[data-row-id="${anchor.id}"]`,
+      );
+      if (row) {
+        const delta = rowTopInContainer(row, container) - anchor.top;
+        if (delta !== 0) container.scrollTop += delta;
+      }
     }
-    earlierBlockHeightRef.current = height;
+    captureScrollAnchor();
   });
-
-  // Reset the compensation baseline when the dialog closes so a reopen
-  // doesn't apply a stale delta.
-  useEffect(() => {
-    if (!open) earlierBlockHeightRef.current = 0;
-  }, [open]);
 
   // Paging is deliberately button-only — nothing loads from scrolling alone.
   // "Show earlier" (top) and "Show more" (bottom) are the sole fetch triggers.
@@ -290,8 +308,13 @@ export function CollectionDetailDialog({
           </div>
         </div>
 
-        {/* Scrollable sentences section */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 pb-6">
+        {/* Scrollable sentences section. Native scroll anchoring is disabled
+            so it can't stack on top of the manual anchor compensation. */}
+        <div
+          ref={scrollRef}
+          onScroll={captureScrollAnchor}
+          className="flex-1 overflow-y-auto px-6 pb-6 [overflow-anchor:none]"
+        >
           {isInitialLoading ? (
             <div className="space-y-4">
               {[1, 2, 3, 4, 5].map((i) => (
@@ -313,43 +336,41 @@ export function CollectionDetailDialog({
             </div>
           ) : (
             <>
-              {/* Added-history feed (ranks at/below the anchor). Wrapped in a
-                  measured block so growth above the viewport is compensated
-                  and the user's position never jumps. */}
-              <div ref={earlierBlockRef}>
-                {browse.showAdded && (
-                  <div className="space-y-4 pb-4">
-                    {(canLoadEarlier || isLoadingEarlier) && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full text-muted-foreground"
-                        disabled={isLoadingEarlier}
-                        onClick={browse.loadEarlier}
-                        data-testid="collection-load-earlier"
-                      >
-                        {isLoadingEarlier ? (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                            {t('loadingMore')}
-                          </>
-                        ) : (
-                          t('loadEarlier')
-                        )}
-                      </Button>
-                    )}
-                    {visibleEarlierRows.map((row) => (
-                      <PreviewTextRow
-                        key={row._id}
-                        row={row}
-                        highlightEnabled={highlightEnabled}
-                        browse={browse}
-                        sentencesRemaining={sentencesRemaining}
-                      />
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Added-history feed (ranks at/below the anchor). Growth above
+                  the viewport is absorbed by the scroll-anchor compensation,
+                  so the user's position never jumps. */}
+              {browse.showAdded && (
+                <div className="space-y-4 pb-4">
+                  {(canLoadEarlier || isLoadingEarlier) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-muted-foreground"
+                      disabled={isLoadingEarlier}
+                      onClick={browse.loadEarlier}
+                      data-testid="collection-load-earlier"
+                    >
+                      {isLoadingEarlier ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          {t('loadingMore')}
+                        </>
+                      ) : (
+                        t('loadEarlier')
+                      )}
+                    </Button>
+                  )}
+                  {visibleEarlierRows.map((row) => (
+                    <PreviewTextRow
+                      key={row._id}
+                      row={row}
+                      highlightEnabled={highlightEnabled}
+                      browse={browse}
+                      sentencesRemaining={sentencesRemaining}
+                    />
+                  ))}
+                </div>
+              )}
 
               {showEmptyState ? (
                 <div className="text-center py-6 space-y-2">
@@ -478,6 +499,7 @@ function PreviewTextRow({
         isPrioritized && 'border-primary bg-primary/5',
         isIgnored && 'bg-muted/30',
       )}
+      data-row-id={row._id}
       data-testid={`collection-text-${row.status}`}
     >
       <div className={cn('flex flex-1 items-center p-3 min-w-0', isIgnored && 'opacity-50')}>
