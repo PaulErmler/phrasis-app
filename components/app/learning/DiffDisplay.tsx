@@ -10,6 +10,7 @@ import {
   toDiffOptions,
 } from '@/lib/textCompare';
 import { WordDiff } from './WordDiff';
+import { ClickableWords } from './ClickableWords';
 
 interface DiffDisplayProps {
   expected: string;
@@ -97,12 +98,34 @@ function CharDiffView({
   );
   const accuracyPct = Math.round(accuracy * 100);
 
+  // Clean revealed sentence — the char chunks reassemble to exactly
+  // `expected` once 'added' runs are hidden, so render it via
+  // ClickableWords instead: locale-aware segmentation makes each word
+  // clickable (ask-AI popover), matching the shadowing-mode card.
+  if (hideErrors) {
+    return (
+      <div>
+        <ClickableWords
+          text={expected}
+          language={language}
+          wordTimings={null}
+          localTime={0}
+          isActive={false}
+          enabled={false}
+          className="leading-relaxed text-foreground"
+        />
+        <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
+          {accuracyLabel}: {accuracyPct}%
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <p className="leading-relaxed">
         {chunks.map((chunk, i) => {
           if (chunk.kind === 'added') {
-            if (hideErrors) return null;
             return (
               <span
                 key={i}
@@ -116,25 +139,14 @@ function CharDiffView({
             return (
               <span
                 key={i}
-                className={
-                  hideErrors
-                    ? 'text-foreground'
-                    : 'text-foreground bg-muted rounded-sm px-0.5'
-                }
+                className="text-foreground bg-muted rounded-sm px-0.5"
               >
                 {chunk.text}
               </span>
             );
           }
           return (
-            <span
-              key={i}
-              className={
-                hideErrors
-                  ? 'text-foreground'
-                  : 'bg-success/15 text-success rounded-sm px-0.5'
-              }
-            >
+            <span key={i} className="bg-success/15 text-success rounded-sm px-0.5">
               {chunk.text}
             </span>
           );

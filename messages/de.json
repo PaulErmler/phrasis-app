@@ -1208,8 +1208,8 @@
         "description": "Bei einer neuen Karte wird die Zielsprache einmal am Anfang abgespielt, damit du hörst, worauf du hinarbeitest. Danach spielt die Basissprache, pausiert zum Nachdenken, und die Zielsprache folgt. Hier kannst du neu starten, abspielen / pausieren oder zur nächsten Karte springen. Die Rückgängig-Taste ganz links nimmt deine letzte Bewertung zurück und holt die vorherige Karte zurück."
       },
       "audioPlay": {
-        "title": "Drücke Play zum Starten",
-        "description": "Audio ist gerade pausiert, während wir dich durch die Lektion führen. Drücke Play, sobald du bereit bist, den ersten Satz zu hören."
+        "title": "Audio startet, wenn du das schließt",
+        "description": "Audio ist pausiert, während wir dich durch die Lektion führen. Sobald du dieses Fenster schließt, wird der erste Satz automatisch abgespielt — mit diesen Reglern kannst du jederzeit pausieren oder neu starten."
       },
       "rating": {
         "title": "Bewerte, wie gut du es wusstest",

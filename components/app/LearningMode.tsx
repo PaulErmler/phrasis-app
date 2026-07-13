@@ -127,11 +127,22 @@ export function LearningMode({
   const [audioRevealNonce, setAudioRevealNonce] = useState(0);
 
   const cardId = state.status === 'reviewing' ? state.cardId : null;
+  const reviewingReviewMode =
+    state.status === 'reviewing'
+      ? (state.courseSettings.reviewMode ?? 'audio')
+      : null;
+  const reviewingWritingInputMode =
+    state.status === 'reviewing'
+      ? (state.courseSettings.writingInputMode ?? 'translate')
+      : null;
+  // Reset on a mode/style switch too (not just on card change) so toggling
+  // shadowing ↔ writing (or translate ↔ transcribe) brings the card back to
+  // its initial hidden state.
   useEffect(() => {
     setFullReviewRevealed(false);
     setAllSubmitted(false);
     setFullReviewAccuracy(null);
-  }, [cardId]);
+  }, [cardId, reviewingReviewMode, reviewingWritingInputMode]);
 
   // Warm the celebration sound's HTTP cache at session start so the very
   // first celebration's animation timeline (hardcoded peaks at 1290/1610/
@@ -180,20 +191,14 @@ export function LearningMode({
     }
   }, [progressDisplayActive]);
 
-  const reviewingReviewMode =
-    state.status === 'reviewing'
-      ? (state.courseSettings.reviewMode ?? 'audio')
-      : null;
-  const reviewingHideTargets =
-    state.status === 'reviewing'
-      ? (state.courseSettings.hideTargetLanguages ?? true)
-      : null;
-
-  useEffect(() => {
-    if (reviewingReviewMode !== 'audio' || reviewingHideTargets === null) return;
-    setAudioAllTargetsRevealed(!reviewingHideTargets);
-    setAudioRevealNonce(0);
-  }, [cardId, reviewingReviewMode, reviewingHideTargets]);
+  // `audioAllTargetsRevealed` is driven entirely by LearningCardContent's
+  // report (it fires on mount and on every change of its computed value,
+  // which matches the actual blur state). Forcing it back to "hidden" here on
+  // card/mode changes could contradict the child's unchanged computed value —
+  // the child then never re-reports, leaving the button stuck on "Reveal"
+  // while every target is already visible (so pressing it did nothing).
+  // The reveal nonce is likewise monotonic — never reset — so the child can
+  // treat any change as a fresh "reveal all" request.
 
   const handleReveal = useCallback(() => setFullReviewRevealed(true), []);
 
@@ -425,6 +430,11 @@ export function LearningMode({
   const cardContent =
     reviewMode === 'full' ? (
       <FullReviewCardContent
+        // Remount on a translate ↔ transcribe switch so typed text,
+        // submissions, and manual base reveals reset to the card's initial
+        // state (shadowing ↔ writing already resets via the conditional
+        // render swapping the component out).
+        key={isTranscribe ? 'transcribe' : 'translate'}
         preReviewCount={state.preReviewCount}
         schedulingPhase={state.phase}
         fsrsState={state.fsrsState}
@@ -473,7 +483,10 @@ export function LearningMode({
             ? state.courseSettings.transcribeAfterPlaybackSpeeds
             : undefined
         }
-        hideBaseLanguages={state.courseSettings.hideBaseLanguagesFull === true}
+        // Blur the base by default in Transcribe (the prompt is the target
+        // audio, so a visible base gives the answer away); Translate needs
+        // the base text visible and defaults to off.
+        hideBaseLanguages={state.courseSettings.hideBaseLanguagesFull ?? isTranscribe}
         autoRevealBaseOnSubmit={
           state.courseSettings.autoRevealBaseOnSubmit ?? true
         }

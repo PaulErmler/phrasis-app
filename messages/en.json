@@ -1208,8 +1208,8 @@
         "description": "When a card is new, the target language plays once at the beginning so you hear what you're aiming for. Then the base language plays, pauses for you to think, and the target follows. Restart, play / pause, or skip to the next card here. The undo button on the far left takes back your last rating and brings the previous card back."
       },
       "audioPlay": {
-        "title": "Press play to start",
-        "description": "Audio is paused right now while we walk you through the lesson. Press play whenever you're ready to hear the first sentence."
+        "title": "Audio starts when you close this",
+        "description": "Audio is paused while we walk you through the lesson. As soon as you close this, the first sentence plays automatically — use these controls to pause or replay it anytime."
       },
       "rating": {
         "title": "Rate how well you knew it",

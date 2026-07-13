@@ -442,6 +442,15 @@ export function useAudioPlayer(
       hasAutoPlayedForCardRef.current = false;
     }
 
+    // A composition change re-bakes the blob under a new language layout and
+    // restarts playback from the top (no resume seek below) — so the reveal
+    // state must restart with it. Without this, a target language revealed
+    // by earlier playback stays visible after switching into audio/Shadowing
+    // mode instead of returning to its blurred initial state.
+    if (isCompositionChange) {
+      setRevealedLanguages(new Set());
+    }
+
     const audioBefore = audioRef.current;
     const wasPlayingSameCard =
       !!audioBefore &&
@@ -454,11 +463,14 @@ export function useAudioPlayer(
     // otherwise `audio.src = newBlob` implicitly resets `currentTime` to 0 and
     // a mid-playback speed change restarts playback from the top.
     //
-    // Exception: a remerge driven from the open settings sheet (a speed/rep/
-    // pause tweak or a language reorder) intentionally resets to the start, so
-    // we skip the resume capture and let `currentTime` fall back to 0.
+    // Exceptions that intentionally reset to the start (no resume capture,
+    // `currentTime` falls back to 0): a remerge driven from the open settings
+    // sheet (a speed/rep/pause tweak or a language reorder), and a
+    // composition change (a review-mode flip is "hear this card fresh under
+    // the new layout", not "continue where the other mode left off").
     const resumePos =
       !isCardChange &&
+      !isCompositionChange &&
       !settingsOpenRef.current &&
       audioBefore &&
       languageCuesRef.current.length > 0
@@ -636,8 +648,11 @@ export function useAudioPlayer(
           // only resume if playback was running AND the caller hasn't gated
           // autoplay since. Resume-after-async-merge isn't "user-initiated at
           // the moment of play" — the user clicked Play 100s of ms ago and an
-          // onboarding tutorial may have opened in between.
-          const shouldResumePlay = wasPlayingSameCard && autoPlayRef.current;
+          // onboarding tutorial may have opened in between. A composition
+          // change never "resumes": it restarts from the top via the
+          // auto-play branch below, even when audio was mid-playback.
+          const shouldResumePlay =
+            wasPlayingSameCard && !isCompositionChange && autoPlayRef.current;
           // Composition change is a user-initiated mode toggle in this tab —
           // bypass the `hasAutoPlayed` and `reviewInitiatedByThisTab` gates.
           // Those exist to stop spurious auto-plays from URL refreshes and to
@@ -646,10 +661,12 @@ export function useAudioPlayer(
           // stuck at false. We still honor `autoPlayRef.current` so callers
           // (the onboarding tutorial gate) can suppress mid-flight plays.
           const shouldAutoPlay =
-            !wasPlayingSameCard &&
+            !shouldResumePlay &&
             autoPlayRef.current &&
             (isCompositionChange ||
-              (!hasAutoPlayedForCardRef.current && initiatedByThisTab));
+              (!wasPlayingSameCard &&
+                !hasAutoPlayedForCardRef.current &&
+                initiatedByThisTab));
           if (shouldResumePlay) {
             audio.play().catch((err) => {
               if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;

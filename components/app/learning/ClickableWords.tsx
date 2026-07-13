@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import {
@@ -46,6 +46,76 @@ interface Props {
 /** Strip leading/trailing punctuation/symbols so "Haus," → "Haus". */
 function cleanWord(display: string): string {
   return display.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, '');
+}
+
+interface AskAboutWordProps {
+  /** The sentence word the popover asks about (punctuation is stripped). */
+  word: string;
+  className?: string;
+  children: ReactNode;
+}
+
+/**
+ * Per-word "Ask AI" popover for content that renders its own word visuals
+ * (e.g. the writing-mode diff chips), sharing ClickableWords' chat prompt.
+ * Falls back to a plain span when there's no chat context (landing demo)
+ * or the word is punctuation-only.
+ */
+export function AskAboutWord({ word, className, children }: AskAboutWordProps) {
+  const chatContext = useLearningChatToggle();
+  const t = useTranslations('Chat');
+  const [open, setOpen] = useState(false);
+  const cleaned = cleanWord(word);
+
+  if (!chatContext || !cleaned) {
+    // No wrapper span in the bare case — e.g. punctuation chips rely on
+    // being direct flex children (their -ml-1 cancels the parent's gap).
+    return className ? (
+      <span className={className}>{children}</span>
+    ) : (
+      <>{children}</>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={t('askAboutWord', { word: cleaned })}
+          data-testid="clickable-word"
+          className={cn('cursor-pointer', className)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setOpen((prev) => !prev);
+            }
+          }}
+        >
+          {children}
+        </span>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-auto p-1"
+        side="top"
+        align="center"
+        sideOffset={6}
+      >
+        <Button
+          size="sm"
+          variant="secondary"
+          data-testid="ask-ai-button"
+          onClick={() => {
+            chatContext.openChatWithPrompt(t('explainWord', { word: cleaned }));
+            setOpen(false);
+          }}
+        >
+          {t('askAI')}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 const MIN_MATCH_RATIO = 0.5;

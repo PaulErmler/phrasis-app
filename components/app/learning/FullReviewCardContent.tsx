@@ -18,7 +18,7 @@ import {
   DEFAULT_PLAYBACK_SPEED,
 } from '@/lib/constants/audioPlayback';
 import { DiffDisplay, computeAccuracy } from './DiffDisplay';
-import { HighlightedText } from './HighlightedText';
+import { ClickableWords } from './ClickableWords';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
@@ -187,7 +187,7 @@ export function FullReviewCardContent({
   }, [mergedCue, mergedPlayback]);
 
   // Reveal-sweep / post-submit auto-play uses raw <Audio> elements; route their
-  // progress through the shared button-playback channel so <HighlightedText>
+  // progress through the shared button-playback channel so <ClickableWords>
   // lights up just like it does for manual AudioButton clicks.
   const buttonTimeUpdateRef = useRef(buttonPlayback.onTimeUpdate);
   buttonTimeUpdateRef.current = buttonPlayback.onTimeUpdate;
@@ -875,7 +875,7 @@ function TargetLanguageInput({
             </div>
           </div>
         ) : (
-          <HighlightedText
+          <ClickableWords
             text={translation.text || '...'}
             language={translation.language}
             wordTimings={wordTimings}
@@ -956,7 +956,7 @@ function TargetLanguageInput({
                 hideErrors={showClean}
               />
             ) : (
-              <HighlightedText
+              <ClickableWords
                 text={translation.text || '...'}
                 language={translation.language}
                 wordTimings={wordTimings}

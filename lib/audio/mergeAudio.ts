@@ -3,6 +3,7 @@ import type { CardAudioRecording, CourseSettings } from '@/components/app/learni
 import {
   DEFAULT_REPETITIONS_BASE,
   DEFAULT_REPETITIONS_TARGET,
+  DEFAULT_REPETITIONS_TARGET_BEFORE,
   DEFAULT_REPETITIONS_TARGET_WRITING,
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   DEFAULT_AUTO_ADVANCE,
@@ -271,7 +272,7 @@ export async function mergeCardAudio(
     }
     if (settings.playTargetBefore) {
       for (const lang of orderedTarget) {
-        const reps = settings.beforeReps[lang] ?? DEFAULT_REPETITIONS_TARGET;
+        const reps = settings.beforeReps[lang] ?? DEFAULT_REPETITIONS_TARGET_BEFORE;
         if (reps <= 0) continue;
         const rec = audioRecordings.find((a) => a.language === lang);
         if (rec?.url) beforeTargetEntries.push({ language: lang, url: rec.url, reps, speed: beforeSpeedFor(lang) });
