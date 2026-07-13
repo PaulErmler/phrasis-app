@@ -82,7 +82,7 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
 });
 
 describe("lib/languages — resolveTranslationStages", () => {
-  it("returns the default_hybrid chain (primary + one fallback) for an unruled language", () => {
+  it("returns the default gemini_35_flash_nitro_minimal chain (primary + one fallback) for an unruled language", () => {
     const stages = resolveTranslationStages("nl", 50);
     expect(stages.length).toBe(2);
     expect(stages[0].model).toBe("google/gemini-3.5-flash:nitro");

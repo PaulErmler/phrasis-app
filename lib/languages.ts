@@ -115,21 +115,39 @@ export interface Language {
   /**
    * Named pipeline that decides which OpenRouter model(s) + reasoning levels
    * the translation worker uses for this language, with optional fallbacks
-   * on truncation. Defined in TRANSLATION_RULES below. Unset → `default_hybrid`
-   * (Gemini Flash Lite with length-based reasoning, no fallback).
+   * on truncation. Defined in TRANSLATION_RULES below. Unset →
+   * `gemini_35_flash_nitro_minimal` (Gemini 3.5 Flash Nitro, minimal
+   * reasoning, one same-config retry). No language currently pins a rule —
+   * set one here only to route a language off the default.
    */
   translationRule?: TranslationRuleId;
   /**
    * Override for the language name that appears in the LLM translation
    * prompt's "English-to-X" line. Falls back to `name` when unset.
    *
-   * Used today for Hebrew (`'Modern Hebrew'`) and Thai (`'Standard Thai'`) —
-   * the bare labels are ambiguous (Biblical vs Modern Hebrew; colloquial vs
-   * Standard Thai), so the prompt pins the register explicitly. The UI
-   * continues to use `name` because the qualifier is implicit in a
-   * contemporary language-learning context.
+   * Set wherever the bare `name` leaves register, dialect, or script
+   * ambiguous: register pinning (Modern Hebrew, Standard Thai, Modern
+   * Greek, Colloquial Cantonese), canonical dialect phrasing (the Arabic
+   * dialects, Taiwanese Mandarin), script pinning (Serbian Cyrillic), and
+   * training-data naming (Filipino → Tagalog). The UI continues to use
+   * `name` because the qualifier is implicit in a contemporary
+   * language-learning context.
+   *
+   * Consumed by both translation prompts: the single-sentence pipeline
+   * (convex/features/translationLLM.ts) and the batch autofill
+   * (convex/features/customTexts.ts).
    */
   translationName?: string;
+  /**
+   * Per-language requirements injected into the batch autofill translation
+   * prompt (convex/features/customTexts.ts) on the line naming this
+   * language — register mappings, script constraints, and vocabulary
+   * steering that don't fit in a language *name*. Only emitted when the
+   * language is part of the request, so keep each note self-contained.
+   * The single-sentence pipeline doesn't use this; it pins register/gender
+   * via explicit prompt tags instead (see translationLLM.ts).
+   */
+  translationPromptNotes?: string;
   /**
    * Override for the language name used in the Gemini TTS prompt's "speak like
    * a native X" instruction (convex/lib/tts/gemini.ts). Defaults to `name` with
@@ -243,6 +261,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationPromptNotes: 'No strong British or American spelling bias.',
   },
   {
     code: 'en_gb',
@@ -268,6 +287,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
+    translationPromptNotes: 'British spelling and vocabulary (colour, lift, queue).',
   },
   {
     code: 'en_us',
@@ -288,6 +308,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
+    translationPromptNotes: 'American spelling and vocabulary (color, elevator, line).',
   },
   {
     code: 'en_au',
@@ -313,6 +334,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     hiddenFromPicker: true,
+    translationPromptNotes: 'Closer to British spelling; Australian vocabulary where natural.',
   },
   {
     code: 'es',
@@ -333,7 +355,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationPromptNotes: 'vosotros for the informal plural, peninsular vocabulary.',
     translationVersion: 2,
   },
   {
@@ -359,7 +381,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationPromptNotes: 'ustedes for the plural, regionally neutral Latin American vocabulary.',
     translationVersion: 2,
   },
   {
@@ -406,7 +428,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   {
@@ -423,7 +444,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   {
@@ -440,7 +460,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   {
@@ -459,7 +478,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   {
@@ -483,7 +501,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // unchanged, so the provider-mismatch regen path wouldn't fire).
     ttsPromptName: 'European Portuguese',
     ttsVersion: 2,
-    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationPromptNotes: 'European Portuguese vocabulary, spelling, and phonetics.',
     translationVersion: 2,
     needsRomanization: false,
     supportsKaraoke: true,
@@ -539,7 +557,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Cyrillic — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   {
@@ -661,6 +678,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Cyrillic — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
+    // Serbian is bidigraphic and Latin script dominates web training data —
+    // pin Cyrillic in the prompt, since the whole pipeline (STT locale,
+    // romanization, catalog standard above) assumes Cyrillic output.
+    translationName: 'Serbian (Cyrillic script)',
+    translationPromptNotes: 'Use Cyrillic (ћирилица) exclusively; never the Latin alphabet.',
   },
   {
     code: 'lt',
@@ -741,7 +763,6 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
     translationVersion: 2,
   },
   {
@@ -795,6 +816,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationPromptNotes: 'The formal/informal distinction is minimal; focus on naturalness.',
     translationVersion: 2,
   },
   {
@@ -815,7 +837,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Azure Fast Transcription doesn't support el-GR; without STT we can't
     // produce per-word timings, so karaoke highlighting will no-op for Greek.
     supportsStt: false,
-    translationRule: 'gemini_35_flash_nitro_minimal',
+    // Disambiguates from Ancient/Koine Greek in the translation prompt
+    // (same rationale as Hebrew's 'Modern Hebrew').
+    translationName: 'Modern Greek',
     translationVersion: 2,
   },
   {
@@ -835,6 +859,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Devanagari — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
+    translationPromptNotes: 'Informal → तुम form; formal → आप form.',
     translationVersion: 2,
   },
   {
@@ -952,7 +977,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // when we have a learner-grade segmenter.
     supportsKaraoke: false,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationPromptNotes: 'Simplified Chinese characters, Mainland Mandarin vocabulary.',
     translationVersion: 2,
   },
   {
@@ -981,6 +1006,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    // Traditional script is also Hong Kong's — name Taiwanese Mandarin
+    // outright so Taiwan-specific vocabulary (軟體, not 软件/軟件 HK-style)
+    // is cued, mirroring ttsPromptName.
+    translationName: 'Taiwanese Mandarin (Traditional characters)',
     translationVersion: 2,
   },
   {
@@ -1007,6 +1036,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: false,
     supportsStt: true,
+    // Pins BOTH the register (spoken vernacular — 係/唔/嘅, not Standard
+    // Written Chinese) and the script; a bare "Cantonese" often yields
+    // written Chinese that is effectively Mandarin.
+    translationName: 'Cantonese (written in Simplified Chinese characters)',
+    translationPromptNotes: 'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
     translationVersion: 2,
   },
   {
@@ -1030,6 +1064,11 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    // Pins BOTH the register (spoken vernacular — 係/唔/嘅, not Standard
+    // Written Chinese) and the script; a bare "Cantonese" often yields
+    // written Chinese that is effectively Mandarin.
+    translationName: 'Cantonese (written in Traditional Chinese characters)',
+    translationPromptNotes: 'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
     translationVersion: 2,
   },
   {
@@ -1052,7 +1091,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // is gated off.
     supportsKaraoke: false,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationPromptNotes: 'Match the source formality: informal → plain form (だ／する), formal → polite form (です／ます).',
     translationVersion: 2,
   },
   {
@@ -1072,7 +1111,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Hangul — karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
+    translationPromptNotes: 'Informal → 반말; formal → 해요체 or 합쇼체 as appropriate.',
     translationVersion: 2,
   },
   {
@@ -1114,6 +1153,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     // Disambiguates from regional/colloquial Thai in the translation prompt.
     translationName: 'Standard Thai',
+    translationPromptNotes: 'Polite particles (ครับ/ค่ะ) only when the source register is formal.',
     translationVersion: 3,
   },
   {
@@ -1169,6 +1209,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    // Models index far more data under "Tagalog" than "Filipino" — same
+    // collapse the legacy path does via `googleTranslateCode: 'tl'`.
+    translationName: 'Filipino (Tagalog)',
     translationVersion: 2,
   },
   {
@@ -1194,7 +1237,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // word timings, producing flickery/mis-positioned per-word highlights.
     supportsKaraoke: false,
     supportsStt: true,
-    translationRule: 'gemini_35_flash_nitro_minimal',
+    // Canonical name in the translation prompt — "Arabic (Modern Standard)"
+    // is a UI label, not how the register appears in training data.
+    translationName: 'Modern Standard Arabic',
+    translationPromptNotes: 'MSA grammar; when the source does not specify gender, pick a grammatically valid form without letting that choice influence any gender metadata.',
     translationVersion: 2,
   },
   {
@@ -1218,6 +1264,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
+    // so the model produces actual dialect, not MSA with a region hint.
+    translationName: 'Saudi Arabic',
+    translationPromptNotes: 'MSA-leaning but with Hejazi/Najdi colloquial markers where natural.',
     translationVersion: 2,
   },
   {
@@ -1243,6 +1293,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
+    // so the model produces actual dialect, not MSA with a region hint.
+    translationName: 'Egyptian Arabic',
+    translationPromptNotes: 'Colloquial Cairene Arabic, not MSA.',
     translationVersion: 2,
   },
   {
@@ -1266,6 +1320,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
+    // so the model produces actual dialect, not MSA with a region hint.
+    translationName: 'Iraqi Arabic',
+    translationPromptNotes: 'Colloquial Iraqi Arabic, not MSA.',
     translationVersion: 2,
   },
   {
@@ -1292,6 +1350,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: true,
     supportsKaraoke: false,
     supportsStt: true,
+    // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
+    // so the model produces actual dialect, not MSA with a region hint.
+    translationName: 'Levantine Arabic',
+    translationPromptNotes: 'Colloquial register, not MSA.',
     translationVersion: 2,
   },
   {
@@ -1315,6 +1377,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsStt: true,
     // Disambiguates from Biblical Hebrew in the translation prompt.
     translationName: 'Modern Hebrew',
+    translationPromptNotes: 'Match speaker gender to the verb form.',
     translationVersion: 2,
   },
   {
@@ -1361,6 +1424,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    translationPromptNotes: 'Standard Kiswahili as spoken in Kenya, Sheng-free.',
     translationVersion: 2,
   },
   {
@@ -1390,6 +1454,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // sw_tz courses inherit the Greek pattern — no validation roundtrips,
     // no per-word timings, no karaoke.
     supportsStt: false,
+    translationPromptNotes: 'Standard Kiswahili sanifu, Tanzanian vocabulary.',
     translationVersion: 2,
   },
 ];
@@ -1499,7 +1564,8 @@ export function isTranslationVersionStale(
 // To add a new pipeline:
 //   1. Define a new entry in TRANSLATION_RULES below.
 //   2. Set `translationRule: '<id>'` on the Language entries that should use it.
-//   3. If a language has no `translationRule`, it falls back to `default_hybrid`.
+//   3. If a language has no `translationRule` (currently: all of them), it
+//      falls back to `gemini_35_flash_nitro_minimal`.
 // ---------------------------------------------------------------------------
 
 /** One leg of a translation rule — an OpenRouter model + optional reasoning. */
@@ -1612,11 +1678,10 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
   maxOutputTokens: 8_000,
 };
 // Gemini 3.5 Flash via OpenRouter Nitro routing with `minimal` reasoning —
-// the translation workhorse: primary + retry for `default_hybrid` (every
-// language without an explicit rule) and for the high-traffic languages
-// pinned to `gemini_35_flash_nitro_minimal`. Nitro prioritizes
-// throughput/latency; minimal thinking keeps quality on par with `low` at
-// much lower cost/latency.
+// the translation workhorse: primary + retry for
+// `gemini_35_flash_nitro_minimal`, the default rule for every language.
+// Nitro prioritizes throughput/latency; minimal thinking keeps quality on
+// par with `low` at much lower cost/latency.
 const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
   model: 'google/gemini-3.5-flash:nitro',
   reasoning: 'minimal',
@@ -1639,18 +1704,18 @@ export const FLAG_AUTO_RETRANSLATION_MAX = 1;
 
 export const TRANSLATION_RULES = {
   /**
-   * Default for every language without an explicit `translationRule`. Used
-   * for the initial LLM translation of premade curriculum sentences and
-   * placement-test material. Single branch — length-hybrid branching was
-   * retired so the model + reasoning level is identical regardless of
-   * input length. Runs the same Gemini 3.5 Flash (Nitro) stage as the
-   * languages pinned to `gemini_35_flash_nitro_minimal` (swapped in from
-   * Gemini 3 Flash in Jul 2026). Every translated language carries a
-   * `translationVersion: 2` bump for that swap, so existing translations
-   * lazily regenerate on 3.5 Flash.
+   * Default for every language — no entry sets an explicit
+   * `translationRule` anymore (set one only to route a language off this
+   * default, e.g. if 3.5 Flash regresses on it). Used for the initial LLM
+   * translation of premade curriculum sentences and placement-test
+   * material. Single branch — length-hybrid branching was retired so the
+   * model + reasoning level is identical regardless of input length.
+   * Swapped in from Gemini 3 Flash in Jul 2026; every translated language
+   * carries a `translationVersion: 2` bump for that swap, so existing
+   * translations lazily regenerate on 3.5 Flash.
    */
-  default_hybrid: {
-    id: 'default_hybrid',
+  gemini_35_flash_nitro_minimal: {
+    id: 'gemini_35_flash_nitro_minimal',
     label: 'Gemini 3.5 Flash Nitro (minimal) → Gemini 3.5 Flash Nitro (minimal, retry) → Google',
     branches: [
       {
@@ -1660,26 +1725,6 @@ export const TRANSLATION_RULES = {
         // exists only to retry once on transient HTTP errors before the
         // Google safety net kicks in. Truncation is rare at this thinking
         // level / token cap, so retrying the same config is cheap insurance.
-        fallbacks: [GEMINI_35_FLASH_NITRO_MINIMAL],
-      },
-    ],
-  },
-  /**
-   * Pinned rule for the high-traffic languages (both Spanish variants, both
-   * Portuguese variants, German, French, Italian, Swedish, Russian, Greek,
-   * Chinese Simplified, Japanese, Korean, and Arabic MSA). Same stages as
-   * `default_hybrid` — kept as a distinct id so these languages can be
-   * routed independently of the default if 3.5 Flash ever regresses on one
-   * of them. Routes through Gemini 3.5 Flash (Nitro) with `minimal`
-   * reasoning; one same-config retry before the Google safety net.
-   */
-  gemini_35_flash_nitro_minimal: {
-    id: 'gemini_35_flash_nitro_minimal',
-    label: 'Gemini 3.5 Flash Nitro (minimal) → Gemini 3.5 Flash Nitro (minimal, retry) → Google',
-    branches: [
-      {
-        maxChars: Infinity,
-        primary: GEMINI_35_FLASH_NITRO_MINIMAL,
         fallbacks: [GEMINI_35_FLASH_NITRO_MINIMAL],
       },
     ],
@@ -1725,8 +1770,8 @@ export type TranslationRuleId = keyof typeof TRANSLATION_RULES;
 /**
  * Resolve the ordered stages the translation worker should try for a given
  * (language, source-text-length) pair. Returns `[primary, ...fallbacks]` from
- * the matching branch of the language's rule (or `default_hybrid` when the
- * language doesn't set one).
+ * the matching branch of the language's rule (or the
+ * `gemini_35_flash_nitro_minimal` default when the language doesn't set one).
  *
  * `opts.ruleOverride` bypasses the per-language rule lookup — used by
  * `flagTranslation` to force the `retranslation_high` chain regardless of the
@@ -1739,7 +1784,7 @@ export function resolveTranslationStages(
 ): ModelStage[] {
   const lang = getLanguageByCode(code);
   const ruleId: TranslationRuleId =
-    opts?.ruleOverride ?? lang?.translationRule ?? 'default_hybrid';
+    opts?.ruleOverride ?? lang?.translationRule ?? 'gemini_35_flash_nitro_minimal';
   // Cast through `TranslationRule` so each branch is typed as the union with
   // optional `fallbacks`. `satisfies` above narrows literals (some branches
   // don't declare `fallbacks`), which would otherwise drop that property

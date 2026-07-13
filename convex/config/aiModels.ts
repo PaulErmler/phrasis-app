@@ -7,8 +7,11 @@
 export const OPENROUTER_MODELS = {
   /** Main language-tutor chat (tools, streaming) — high thinking */
   languageTeacher: 'z-ai/glm-5.2:nitro',
-  /** Bulk translation JSON for custom card auto-fill */
-  translationAutoFill: 'google/gemini-3.1-flash-lite',
+  /** Bulk translation JSON for custom card auto-fill. Same Gemini 3.5
+   *  Flash (Nitro) + `minimal` reasoning as the single-sentence pipeline
+   *  (lib/languages.ts → GEMINI_35_FLASH_NITRO_MINIMAL); the reasoning
+   *  effort is set at the call site in customTexts.ts. */
+  translationAutoFill: 'google/gemini-3.5-flash:nitro',
   /** Linguistic metadata inference (register, gender, addresseeNumber) for
    *  newly-created cards. Runs once per row, including during bulk import,
    *  so we pick the cheaper/faster lite tier. */

@@ -47,6 +47,13 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
   },
 });
 
+/**
+ * Reasoning effort for the autofill call — `minimal`, matching the
+ * single-sentence pipeline's GEMINI_35_FLASH_NITRO_MINIMAL stage
+ * (lib/languages.ts). Also baked into each row's `translationSource` tag.
+ */
+const AUTOFILL_REASONING = 'minimal' as const;
+
 const TRANSLATION_SYSTEM_PROMPT = `You are an expert multilingual translator for a language-learning app. You will receive one or more sentences that the user has already written in specific languages, plus a list of target language codes that still need translations.
 
 Translate the given sentence(s) into every requested target language AND return linguistic metadata describing the sentence.
@@ -61,36 +68,7 @@ TRANSLATION RULES:
 
 4. CONSISTENCY — All translations must express the exact same meaning, register, and tone. No translation may add or remove nuance.
 
-5. REGIONAL VARIANTS (use exactly these — match the code to the variant):
-   - es: Castilian Spanish as spoken in Spain (vosotros for informal plural, peninsular vocabulary)
-   - es_latam: Latin American Spanish (ustedes for plural, regionally neutral LatAm vocabulary)
-   - fr: Metropolitan French (France)
-   - pt: Brazilian Portuguese
-   - pt_pt: European Portuguese as spoken in Portugal (European vocabulary, spelling, and phonetics)
-   - en: neutral English (no strong British/American spelling bias)
-   - en_gb: British English spelling and vocabulary (colour, lift, queue)
-   - en_us: American English spelling and vocabulary (color, elevator, line)
-   - en_au: Australian English (closer to British spelling, Australian vocab where natural)
-   - zh: Simplified Chinese characters, Mainland Mandarin
-   - zh_traditional: Traditional Chinese characters, Taiwanese Mandarin (Taiwan vocabulary)
-   - yue: Cantonese in simplified Chinese script (Hong Kong dialect, written as one would read it aloud in Cantonese)
-   - yue_traditional: Cantonese in traditional Chinese script (Hong Kong)
-   - ar: Modern Standard Arabic (MSA / fuṣḥā)
-   - ar_sa: Saudi Arabic — MSA-leaning but with Hejazi/Najdi colloquial markers where natural
-   - ar_eg: Egyptian Cairene colloquial Arabic
-   - ar_iq: Iraqi colloquial Arabic
-   - ar_lev: Levantine Arabic — colloquial Arabic of Lebanon, Syria, Palestine, and Jordan
-   - sw: Swahili as spoken in Kenya (Sheng-free, standard Kiswahili)
-   - sw_tz: Swahili as spoken in Tanzania (standard Kiswahili sanifu, Tanzanian vocabulary)
-
-6. LANGUAGE-SPECIFIC:
-   - Japanese: match the formality of the source — informal → plain form (だ / する), formal → polite form (です / ます)
-   - Korean: informal → 반말, formal → 해요체 or 합쇼체 as appropriate
-   - Hindi: informal → तुम form, formal → आप form
-   - Thai: use polite particles (ครับ/ค่ะ) only when the source register is formal
-   - Hebrew: use modern Israeli Hebrew; match speaker gender to the verb form
-   - Arabic: MSA grammar; when the input does not specify gender, pick a grammatically valid form but do not let that choice influence the metadata gender fields
-   - Finnish: formal/informal distinction is minimal; focus on naturalness
+5. PER-LANGUAGE REQUIREMENTS — the user message lists every target language as "code: name, region — requirements". The name, region, and requirements pin the exact dialect, script, register conventions, and vocabulary for that code. Follow them exactly.
 
 METADATA RULES:
 
@@ -227,17 +205,37 @@ export const autoFillTranslations = action({
       { userId },
     );
 
-    // Native name is appended in parens so the model sees the language in
-    // both the English label AND its native script — mirrors the single-
-    // sentence prompt in translationLLM.ts. Skipped when both names match
-    // (English variants share a script) to avoid `English (English)` noise.
+    // Prompt name = `translationName ?? name` — the same resolution as the
+    // single-sentence pipeline (see getTranslationConfigForLanguage), so
+    // dialect/script/register qualifiers like 'Taiwanese Mandarin
+    // (Traditional characters)' reach this prompt too. The native-script
+    // name is appended in parens so the model sees the language in the
+    // script it must produce; skipped when it matches the English `name`
+    // (English variants) to avoid `English (English)` noise.
     const formatLangLabel = (code: string): string => {
       const lang = getLanguageByCode(code);
       if (!lang) return code;
+      const promptName = lang.translationName ?? lang.name;
       if (lang.nativeName && lang.nativeName !== lang.name) {
-        return `${lang.name} (${lang.nativeName})`;
+        return `${promptName} (${lang.nativeName})`;
       }
-      return lang.name;
+      return promptName;
+    };
+
+    // One line per target: "code: name, for region — requirements". Region
+    // and requirements come from the language entry (`regionLabel`,
+    // `translationPromptNotes`), so the prompt carries exactly the guidance
+    // relevant to the requested languages and nothing else — the system
+    // prompt's PER-LANGUAGE REQUIREMENTS rule tells the model to obey it.
+    const describeTargetLanguage = (code: string): string => {
+      const lang = getLanguageByCode(code);
+      if (!lang) return code;
+      const label = lang.regionLabel
+        ? `${formatLangLabel(code)}, for ${lang.regionLabel}`
+        : formatLangLabel(code);
+      return lang.translationPromptNotes
+        ? `${code}: ${label} — ${lang.translationPromptNotes}`
+        : `${code}: ${label}`;
     };
 
     // Resolve mixed-dialect targets (today: `es_mixed`) to a concrete
@@ -274,7 +272,7 @@ export const autoFillTranslations = action({
     const targetList = targetLanguages
       .map((code) => {
         const { resolved } = resolutionByRequested.get(code)!;
-        return `${resolved}: ${formatLangLabel(resolved)}`;
+        return describeTargetLanguage(resolved);
       })
       .join('\n');
 
@@ -288,6 +286,17 @@ export const autoFillTranslations = action({
       model: openrouter(OPENROUTER_MODELS.translationAutoFill),
       system: TRANSLATION_SYSTEM_PROMPT,
       prompt: userPrompt,
+      // Cast: the SDK provider's typed enum is `'high' | 'medium' | 'low'`
+      // but OpenRouter accepts `'minimal'` at runtime (mapped to Gemini's
+      // `thinkingLevel: 'minimal'`) — same boundary cast as
+      // translateTextWithLLM in translationLLM.ts.
+      providerOptions: {
+        openrouter: {
+          reasoning: {
+            effort: AUTOFILL_REASONING as 'low' | 'medium' | 'high',
+          },
+        },
+      },
     });
 
     const cleaned = text
@@ -310,9 +319,10 @@ export const autoFillTranslations = action({
     }
 
     // Source identifier for every translation in this batch — single LLM
-    // call, no reasoning, so every row gets the same tag.
+    // call, so every row gets the same tag.
     const translationSource = getTranslationSource(
       OPENROUTER_MODELS.translationAutoFill,
+      AUTOFILL_REASONING,
     );
 
     const results: {

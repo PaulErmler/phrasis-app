@@ -13,7 +13,7 @@
  * `ModelStage` in `lib/languages.ts → TRANSLATION_RULES`). This function
  * just passes the provided `reasoning?: 'low' | 'medium' | 'high'` through
  * to OpenRouter verbatim; if the caller omits it, no reasoning field is
- * sent (the no-thinking path used by `default_hybrid`'s fallback stage).
+ * sent.
  *
  * Truncation handling: if OpenRouter returns finishReason === 'length' (the
  * call hit MAX_OUTPUT_TOKENS — typically because reasoning ate the whole
