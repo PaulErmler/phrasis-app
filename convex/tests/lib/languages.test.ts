@@ -28,6 +28,12 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
     );
   });
 
+  it("uses translationName override when present (Thai → Standard Thai)", () => {
+    expect(getTranslationConfigForLanguage("th").targetLangName).toBe(
+      "Standard Thai",
+    );
+  });
+
   it("populates targetRegion correctly for region-specific variants", () => {
     expect(getTranslationConfigForLanguage("es").targetRegion).toBe("Spain");
     expect(getTranslationConfigForLanguage("es_latam").targetRegion).toBe(

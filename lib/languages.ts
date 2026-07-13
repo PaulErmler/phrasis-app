@@ -123,10 +123,11 @@ export interface Language {
    * Override for the language name that appears in the LLM translation
    * prompt's "English-to-X" line. Falls back to `name` when unset.
    *
-   * Used today only for Hebrew (`'Modern Hebrew'`) — the bare "Hebrew" label
-   * is ambiguous between Modern and Biblical Hebrew, so the prompt pins the
-   * register explicitly. The UI continues to use `name` ("Hebrew") because
-   * "Modern" is implicit in a contemporary language-learning context.
+   * Used today for Hebrew (`'Modern Hebrew'`) and Thai (`'Standard Thai'`) —
+   * the bare labels are ambiguous (Biblical vs Modern Hebrew; colloquial vs
+   * Standard Thai), so the prompt pins the register explicitly. The UI
+   * continues to use `name` because the qualifier is implicit in a
+   * contemporary language-learning context.
    */
   translationName?: string;
   /**
@@ -1111,7 +1112,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // alongside CJK; revisit with a learner-grade Thai segmenter.
     supportsKaraoke: false,
     supportsStt: true,
-    translationVersion: 2,
+    // Disambiguates from regional/colloquial Thai in the translation prompt.
+    translationName: 'Standard Thai',
+    translationVersion: 3,
   },
   {
     code: 'id',
