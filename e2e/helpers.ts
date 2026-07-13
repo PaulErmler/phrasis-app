@@ -394,6 +394,11 @@ export async function isSelectedTestId(
  * doesn't bypass Playwright's viewport check, and `position: fixed` defeats
  * auto-scroll — polling the bounding box waits the animation out
  * deterministically.
+ *
+ * Each iteration re-issues `scrollIntoView` before checking: a settings
+ * re-render (Convex subscription update) can reset the sheet's inner scroll
+ * position after a caller's one-shot scroll, leaving the element below the
+ * fold forever if the poll only reads the bounding box.
  */
 export async function waitForInViewport(
   page: Page,
@@ -405,6 +410,9 @@ export async function waitForInViewport(
   await expect
     .poll(
       async () => {
+        await locator
+          .evaluate((el) => el.scrollIntoView({ block: "center" }))
+          .catch(() => {}); // detached mid-render — next interval retries
         const box = await locator.boundingBox();
         if (!box) return false;
         return (
