@@ -10,7 +10,7 @@ import {
   toDiffOptions,
 } from '@/lib/textCompare';
 import { WordDiff } from './WordDiff';
-import { ClickableWords } from './ClickableWords';
+import { CleanRevealedSentence } from './CleanRevealedSentence';
 
 interface DiffDisplayProps {
   expected: string;
@@ -104,20 +104,12 @@ function CharDiffView({
   // clickable (ask-AI popover), matching the shadowing-mode card.
   if (hideErrors) {
     return (
-      <div>
-        <ClickableWords
-          text={expected}
-          language={language}
-          wordTimings={null}
-          localTime={0}
-          isActive={false}
-          enabled={false}
-          className="leading-relaxed text-foreground"
-        />
-        <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-          {accuracyLabel}: {accuracyPct}%
-        </p>
-      </div>
+      <CleanRevealedSentence
+        text={expected}
+        language={language}
+        accuracy={accuracyPct}
+        hideAccuracy={hideAccuracy}
+      />
     );
   }
 

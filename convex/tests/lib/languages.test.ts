@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { describe, it, expect } from "vitest";
 import {
+  getCurrentTranslationVersion,
   getTranslationConfigForLanguage,
   resolveTranslationStages,
 } from "../../../lib/languages";
@@ -32,6 +33,16 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
     expect(getTranslationConfigForLanguage("th").targetLangName).toBe(
       "Standard Thai",
     );
+  });
+
+  it("bumps translationVersion for languages whose prompt pins script or register", () => {
+    // Serbian: prompt now pins Cyrillic output.
+    expect(getCurrentTranslationVersion("sr")).toBe(2);
+    // Taiwanese Mandarin / Cantonese: prompt now pins vocabulary + register.
+    expect(getCurrentTranslationVersion("zh_traditional")).toBe(3);
+    expect(getCurrentTranslationVersion("yue")).toBe(3);
+    expect(getCurrentTranslationVersion("yue_traditional")).toBe(3);
+    expect(getCurrentTranslationVersion("th")).toBe(3);
   });
 
   it("populates targetRegion correctly for region-specific variants", () => {

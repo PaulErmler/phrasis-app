@@ -11,7 +11,8 @@ import {
   type AlignedWord,
   type CharChunk,
 } from '@/lib/textCompare';
-import { AskAboutWord, ClickableWords } from './ClickableWords';
+import { AskAboutWord } from './ClickableWords';
+import { CleanRevealedSentence } from './CleanRevealedSentence';
 
 interface WordDiffProps {
   expected: string;
@@ -201,23 +202,12 @@ export function WordDiff({
 
   if (hideErrors) {
     return (
-      <div>
-        {/* Clean revealed sentence — words are clickable (ask-AI popover),
-            matching the shadowing-mode card. Karaoke props are off; this is
-            a static reveal. */}
-        <ClickableWords
-          text={expected}
-          language={language}
-          wordTimings={null}
-          localTime={0}
-          isActive={false}
-          enabled={false}
-          className="leading-relaxed text-foreground"
-        />
-        <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-          {t('accuracy')}: {accuracy}%
-        </p>
-      </div>
+      <CleanRevealedSentence
+        text={expected}
+        language={language}
+        accuracy={accuracy}
+        hideAccuracy={hideAccuracy}
+      />
     );
   }
 

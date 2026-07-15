@@ -109,38 +109,64 @@ export function CollectionDetailDialog({
   // keeps the visible cards pinned no matter what appears or collapses above
   // them — the added-history feed, its "show earlier" button, or previously
   // hidden added/ignored rows revealed mid-stream by the toggles.
-  const scrollAnchorRef = useRef<{ id: string; top: number } | null>(null);
+  //
+  // The anchor row itself can unmount (a visibility toggle hiding the very
+  // rows the user is looking at), so the capture keeps the CONSECUTIVE rows
+  // below it as fallbacks — continuing until it has one row that no toggle
+  // can hide (status other than added/ignored), so even a full page of
+  // contiguous added rows can't leave the list without a survivor.
+  const scrollAnchorRef = useRef<Array<{ id: string; top: number }>>([]);
+  // Bounds the capture when every remaining row is toggleable (e.g. the
+  // "Manually Added" collection, where hiding added rows empties the list
+  // anyway) — one "Show more" page plus slack.
+  const MAX_ANCHOR_CANDIDATES = 30;
 
   const rowTopInContainer = (row: HTMLElement, container: HTMLElement) =>
     row.getBoundingClientRect().top - container.getBoundingClientRect().top;
 
   const captureScrollAnchor = useCallback(() => {
     const container = scrollRef.current;
-    if (!container) {
-      scrollAnchorRef.current = null;
-      return;
-    }
-    for (const row of container.querySelectorAll<HTMLElement>('[data-row-id]')) {
-      const top = rowTopInContainer(row, container);
-      // First row whose bottom edge is inside the viewport.
-      if (top + row.offsetHeight > 0) {
-        scrollAnchorRef.current = { id: row.dataset.rowId!, top };
-        return;
+    const anchors: Array<{ id: string; top: number }> = [];
+    if (container) {
+      const containerTop = container.getBoundingClientRect().top;
+      for (const row of container.querySelectorAll<HTMLElement>('[data-row-id]')) {
+        const top = row.getBoundingClientRect().top - containerTop;
+        // Skip rows fully above the viewport; the first row whose bottom
+        // edge is inside it becomes the anchor.
+        if (anchors.length === 0 && top + row.offsetHeight <= 0) continue;
+        anchors.push({ id: row.dataset.rowId!, top });
+        // A row the toggles can't hide is a guaranteed survivor — the
+        // fallback chain is complete (in the common case the very first
+        // row qualifies, so the capture stays a single measurement).
+        const status = row.dataset.rowStatus;
+        if (status !== 'added' && status !== 'ignored') break;
+        if (anchors.length >= MAX_ANCHOR_CANDIDATES) break;
       }
     }
-    scrollAnchorRef.current = null;
+    scrollAnchorRef.current = anchors;
   }, []);
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
-    const anchor = scrollAnchorRef.current;
-    if (container && anchor) {
-      const row = container.querySelector<HTMLElement>(
-        `[data-row-id="${anchor.id}"]`,
-      );
-      if (row) {
-        const delta = rowTopInContainer(row, container) - anchor.top;
+    const anchors = scrollAnchorRef.current;
+    if (container && anchors.length > 0) {
+      // First captured row still mounted → keep it pinned where it was.
+      // Otherwise mirror native scroll anchoring's removal semantics (the
+      // container opts out of the native version via overflow-anchor:none,
+      // and Safari doesn't ship it): the surviving fallback is pinned to
+      // the REMOVED block's start (`anchors[0].top`), so the rows below a
+      // hidden run slide up into its place. Pinning the survivor to its
+      // own old offset instead would drag rows the user had already
+      // scrolled past back into view above it. Both cases are the same
+      // formula because the captured rows are consecutive.
+      for (const anchor of anchors) {
+        const row = container.querySelector<HTMLElement>(
+          `[data-row-id="${anchor.id}"]`,
+        );
+        if (!row) continue;
+        const delta = rowTopInContainer(row, container) - anchors[0].top;
         if (delta !== 0) container.scrollTop += delta;
+        break;
       }
     }
     captureScrollAnchor();
@@ -500,6 +526,7 @@ function PreviewTextRow({
         isIgnored && 'bg-muted/30',
       )}
       data-row-id={row._id}
+      data-row-status={row.status}
       data-testid={`collection-text-${row.status}`}
     >
       <div className={cn('flex flex-1 items-center p-3 min-w-0', isIgnored && 'opacity-50')}>

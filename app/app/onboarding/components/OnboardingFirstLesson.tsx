@@ -160,6 +160,16 @@ export function OnboardingFirstLesson({
     }
   }, [blockingAudio, reviewMode]);
 
+  // Imperative "kick playback" registered by LearnView (its merged card
+  // audio is a detached `new Audio()` element the DOM sweeps above can't
+  // reach). Called synchronously inside the popover-dismiss click so the
+  // `.play()` keeps the user gesture — iOS refuses gesture-less playback
+  // on an element that has never played.
+  const resumeLessonAudioRef = useRef<(() => void) | null>(null);
+  const registerResumeAudio = useCallback((fn: () => void) => {
+    resumeLessonAudioRef.current = fn;
+  }, []);
+
   useOnboardingLessonTutorial({
     t,
     reviewMode,
@@ -170,6 +180,7 @@ export function OnboardingFirstLesson({
     onActiveChange: (active) => {
       setTutorialActive(active);
     },
+    onUserDismiss: () => resumeLessonAudioRef.current?.(),
   });
 
   const handleCardRated = useCallback(
@@ -260,6 +271,7 @@ export function OnboardingFirstLesson({
           onCardRated={handleCardRated}
           onCardUndone={handleCardUndone}
           forceDisableAutoPlay={!coreTutorialDone || tutorialActive}
+          registerResumeAudio={registerResumeAudio}
           initialSessionId={initialSessionId}
           initialSessionCardCount={initialCardsRated}
         />

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TranslateFn } from '@/lib/tutorials/types';
 
@@ -57,6 +57,12 @@ export interface OnboardingTutorialOptions {
    *  Parent uses this to keep audio paused for the lifetime of staged
    *  popovers (card-actions, word-tap) — not just the core stage. */
   onActiveChange?: (active: boolean) => void;
+  /** Fires synchronously inside the click that dismisses a popover — and
+   *  ONLY for user dismissals, never for programmatic teardowns (stage
+   *  replacement, effect cleanup). Use for work that must keep the user
+   *  gesture, e.g. starting the detached card audio (iOS refuses
+   *  `.play()` outside a gesture on an element that has never played). */
+  onUserDismiss?: () => void;
 }
 
 type Stage = 'core' | 'mode-switch' | 'card-actions' | 'word-tap' | 'chat';
@@ -144,6 +150,7 @@ export function useOnboardingLessonTutorial({
   onStepShow,
   onCoreComplete,
   onActiveChange,
+  onUserDismiss,
 }: OnboardingTutorialOptions) {
   const activeDriverRef = useRef<Driver | null>(null);
   const firedStagesRef = useRef<Set<Stage>>(new Set());
@@ -181,10 +188,12 @@ export function useOnboardingLessonTutorial({
   const onStepShowRef = useRef(onStepShow);
   const onCoreCompleteRef = useRef(onCoreComplete);
   const onActiveChangeRef = useRef(onActiveChange);
+  const onUserDismissRef = useRef(onUserDismiss);
   useEffect(() => {
     onStepShowRef.current = onStepShow;
     onCoreCompleteRef.current = onCoreComplete;
     onActiveChangeRef.current = onActiveChange;
+    onUserDismissRef.current = onUserDismiss;
   });
 
   // Hold the translator in a ref so the effects below stay stable across
@@ -199,6 +208,13 @@ export function useOnboardingLessonTutorial({
   const transcribeRef = useRef(transcribe);
   transcribeRef.current = transcribe;
 
+  // `onDestroyStarted` fires for programmatic destroys too (stage
+  // replacement, effect cleanup) — this flag lets it tell those apart from
+  // a real user dismissal so `onUserDismiss` never fires without a gesture.
+  // Torn down via the module-level `teardownActiveDriver(refs)` so the
+  // functions below keep a refs-only closure (stable for exhaustive-deps).
+  const programmaticTeardownRef = useRef(false);
+
   const runStage = (
     stage: Stage,
     steps: DriveStep[],
@@ -211,10 +227,7 @@ export function useOnboardingLessonTutorial({
     firedStagesRef.current.add(stage);
 
     // Tear down any in-flight driver before mounting the next.
-    if (activeDriverRef.current) {
-      activeDriverRef.current.destroy();
-      activeDriverRef.current = null;
-    }
+    teardownActiveDriver(activeDriverRef, programmaticTeardownRef);
 
     const resolved: DriveStep[] = steps.map((step) => {
       if (typeof step.element !== 'string') return step;
@@ -248,6 +261,11 @@ export function useOnboardingLessonTutorial({
         }
         activeDriverRef.current = null;
         onActiveChangeRef.current?.(false);
+        // Still inside the dismissing click's call stack — the one place
+        // gesture-bound work (starting the card audio) can run on iOS.
+        if (!programmaticTeardownRef.current) {
+          onUserDismissRef.current?.();
+        }
         d.destroy();
       },
     });
@@ -301,10 +319,7 @@ export function useOnboardingLessonTutorial({
     }, 600);
     return () => {
       clearTimeout(timer);
-      if (activeDriverRef.current) {
-        activeDriverRef.current.destroy();
-        activeDriverRef.current = null;
-      }
+      teardownActiveDriver(activeDriverRef, programmaticTeardownRef);
     };
   }, [reviewMode]);
 
@@ -354,6 +369,23 @@ export function useOnboardingLessonTutorial({
       });
     }
   }, [cardsRated]);
+}
+
+/** Destroy the in-flight driver (if any) with the programmatic-teardown
+ *  flag raised, so `onDestroyStarted` can tell this apart from a user
+ *  dismissal and skip the gesture-bound `onUserDismiss` work. */
+function teardownActiveDriver(
+  activeDriverRef: RefObject<Driver | null>,
+  programmaticTeardownRef: RefObject<boolean>,
+): void {
+  if (!activeDriverRef.current) return;
+  programmaticTeardownRef.current = true;
+  try {
+    activeDriverRef.current.destroy();
+  } finally {
+    programmaticTeardownRef.current = false;
+  }
+  activeDriverRef.current = null;
 }
 
 /** Pause any playing `<audio>`/`<video>` immediately. Used inside the
