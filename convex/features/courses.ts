@@ -874,9 +874,15 @@ export const completeOnboarding = mutation({
     });
     await createCourseStats(ctx, userId, courseId);
 
-    // Map the user's level to a starting collection (prefers the active OGTE
-    // dataset collection by code, falls back to the legacy CEFR row).
-    const collection = await resolveStartingCollection(ctx, progress.currentLevel ?? 'beginner');
+    // Map the user's level to a starting collection. The precise OGTE level
+    // (slider self-pick / placement-test result) wins when present; the
+    // 6-bucket `currentLevel` is the fallback (prefers the active dataset
+    // collection by code, falls back to the legacy CEFR row).
+    const collection = await resolveStartingCollection(
+      ctx,
+      progress.currentLevel ?? 'beginner',
+      progress.placementTest?.finalLevel,
+    );
 
     // Create course settings in a separate table (with preselected collection and review mode).
     // `autoAddCards: true` is explicit so the default behaviour ships with the

@@ -1,12 +1,17 @@
 import { v } from 'convex/values';
-import { mutation, query, internalMutation } from '../_generated/server';
+import {
+  mutation,
+  query,
+  internalMutation,
+  type MutationCtx,
+} from '../_generated/server';
 import { internal } from '../_generated/api';
 import {
   requireAuthUserId,
   getAuthUserId,
   getOnboardingProgress,
 } from '../db/users';
-import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
+import { PLACEMENT_CONTENT_BATCH_SIZE } from '../../lib/constants/onboarding';
 import { scheduleMissingContent } from './decks';
 
 /**
@@ -66,10 +71,96 @@ export const prepareLanguagePair = mutation({
 });
 
 /**
+ * Shared worker for every placement-test content sweep.
+ *
+ * Processes ONE page of `placementTestSentences` (`PLACEMENT_CONTENT_BATCH_SIZE`
+ * rows) and, if more remain, schedules itself to continue on the next page via
+ * `processPlacementContentBatch`. Sweeping the whole corpus inline used to blow
+ * past Convex's per-mutation system-op ceiling — each sentence runs the heavy
+ * `scheduleMissingContent` (per-language reads, `storage.getUrl` checks, claim
+ * inserts, a nested `enqueueTtsJob` mutation, scheduler enqueues), so ~256
+ * sentences × ~20 ops overflowed one transaction. Batching keeps every
+ * invocation bounded and shrinks its `audioRecordings` write footprint (fewer
+ * OCC conflicts). This mirrors the per-collection fan-out in
+ * `ensureFirstSentencesAcrossLevelCollections` (`convex/features/collections.ts`).
+ *
+ * `scheduleMissingContent` handles source-language audio (the text's own
+ * language) AND translation enqueueing for every additional language AND the
+ * downstream audio trigger via `storeTranslationAndScheduleTTS`, all with
+ * idempotent claim/dedupe — so re-entrant batches do reads-only for rows that
+ * are already covered. We pass the user's chosen base language as an additional
+ * translation target so the placement test can render the source side in that
+ * language; `scheduleMissingContent` filters out the text's own language
+ * internally, so the no-op case (`sourceLanguage === text.language`) is safe.
+ */
+async function runPlacementContentBatch(
+  ctx: MutationCtx,
+  {
+    targetLanguage,
+    sourceLanguage,
+    cursor,
+  }: { targetLanguage: string; sourceLanguage: string; cursor: string | null },
+): Promise<{ translationsScheduled: number; audioScheduled: number }> {
+  const { page, isDone, continueCursor } = await ctx.db
+    .query('placementTestSentences')
+    .paginate({ numItems: PLACEMENT_CONTENT_BATCH_SIZE, cursor });
+
+  let translationsScheduled = 0;
+  let audioScheduled = 0;
+  for (const s of page) {
+    const text = await ctx.db.get(s.textId);
+    if (!text) continue;
+    const targetLanguages = Array.from(
+      new Set([targetLanguage, sourceLanguage].filter((l) => l !== text.language)),
+    );
+    const result = await scheduleMissingContent(
+      ctx,
+      text._id,
+      text,
+      [text.language],
+      targetLanguages,
+    );
+    translationsScheduled += result.translationsScheduled;
+    audioScheduled += result.audioScheduled;
+  }
+
+  if (!isDone) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.onboarding.processPlacementContentBatch,
+      { targetLanguage, sourceLanguage, cursor: continueCursor },
+    );
+  }
+
+  return { translationsScheduled, audioScheduled };
+}
+
+/**
+ * Continuation target for `runPlacementContentBatch` — internal only; each
+ * invocation processes the next page and (re-)schedules itself until the corpus
+ * is exhausted.
+ */
+export const processPlacementContentBatch = internalMutation({
+  args: {
+    targetLanguage: v.string(),
+    sourceLanguage: v.string(),
+    cursor: v.union(v.string(), v.null()),
+  },
+  returns: v.object({
+    translationsScheduled: v.number(),
+    audioScheduled: v.number(),
+  }),
+  handler: async (ctx, args) => runPlacementContentBatch(ctx, args),
+});
+
+/**
  * User-callable safety-net: when the placement test renders a card whose
  * translation isn't ready yet, the client invokes this so we can immediately
  * (re-)enqueue any missing placement-test translations for the target
  * language. Idempotent — won't double-enqueue if a claim already exists.
+ *
+ * Kicks off the batched sweep: processes the first page inline and lets
+ * `runPlacementContentBatch` schedule the rest.
  */
 export const ensurePlacementTranslations = mutation({
   args: {
@@ -80,7 +171,12 @@ export const ensurePlacementTranslations = mutation({
   handler: async (ctx, { targetLanguage, sourceLanguage }) => {
     const userId = await requireAuthUserId(ctx);
     void userId;
-    return enqueueMissingPlacementTranslationsImpl(ctx, { targetLanguage, sourceLanguage });
+    const { translationsScheduled } = await runPlacementContentBatch(ctx, {
+      targetLanguage,
+      sourceLanguage,
+      cursor: null,
+    });
+    return { enqueued: translationsScheduled };
   },
 });
 
@@ -98,53 +194,15 @@ export const enqueueMissingPlacementTranslations = internalMutation({
     sourceLanguage: v.string(),
   },
   returns: v.object({ enqueued: v.number() }),
-  handler: async (ctx, args) => enqueueMissingPlacementTranslationsImpl(ctx, args),
+  handler: async (ctx, { targetLanguage, sourceLanguage }) => {
+    const { translationsScheduled } = await runPlacementContentBatch(ctx, {
+      targetLanguage,
+      sourceLanguage,
+      cursor: null,
+    });
+    return { enqueued: translationsScheduled };
+  },
 });
-
-async function enqueueMissingPlacementTranslationsImpl(
-  ctx: import('../_generated/server').MutationCtx,
-  { targetLanguage, sourceLanguage }: { targetLanguage: string; sourceLanguage: string },
-): Promise<{ enqueued: number }> {
-  // Seed migration caps the corpus at ~100 rows. Use `.take()` with an
-  // explicit safety bound so a future seed bump fails loudly (warning +
-  // capped slice) rather than silently blowing the per-mutation read limit.
-  const sentences = await ctx.db
-    .query('placementTestSentences')
-    .take(PLACEMENT_SENTENCES_QUERY_CAP);
-  if (sentences.length === PLACEMENT_SENTENCES_QUERY_CAP) {
-    console.warn(
-      `placementTestSentences query hit cap ${PLACEMENT_SENTENCES_QUERY_CAP} ` +
-        '— batch the lookup or raise PLACEMENT_SENTENCES_QUERY_CAP.',
-    );
-  }
-
-  // Defer to `scheduleMissingContent` — it handles source-language audio
-  // (the text's own language) AND translation enqueueing for every
-  // additional language AND the downstream audio trigger via
-  // `storeTranslationAndScheduleTTS`, all with idempotent claim/dedupe.
-  //
-  // We pass the user's chosen base language as an additional translation
-  // target so the placement test can render the source side in that
-  // language. `scheduleMissingContent` filters out the text's own language
-  // internally, so the no-op case (sourceLanguage === text.language) is safe.
-  let translationsScheduled = 0;
-  for (const s of sentences) {
-    const text = await ctx.db.get(s.textId);
-    if (!text) continue;
-    const targetLanguages = Array.from(
-      new Set([targetLanguage, sourceLanguage].filter((l) => l !== text.language)),
-    );
-    const result = await scheduleMissingContent(
-      ctx,
-      text._id,
-      text,
-      [text.language],
-      targetLanguages,
-    );
-    translationsScheduled += result.translationsScheduled;
-  }
-  return { enqueued: translationsScheduled };
-}
 
 /**
  * Backstop sweep for placement-test content.
@@ -155,11 +213,11 @@ async function enqueueMissingPlacementTranslationsImpl(
  * incomplete. Nothing else re-enters `scheduleMissingContent` for those
  * texts afterwards.
  *
- * This mutation walks every placement-test sentence and re-runs
- * `scheduleMissingContent` for both the source language (English audio)
- * and the target language (translation + downstream audio). All checks
- * inside `scheduleMissingContent` are idempotent — rows that already have
- * translations + audio do nothing but reads.
+ * This walks every placement-test sentence (batched via
+ * `runPlacementContentBatch`) and re-runs `scheduleMissingContent` for both the
+ * source language (English audio) and the target language (translation +
+ * downstream audio). All checks inside `scheduleMissingContent` are idempotent —
+ * rows that already have translations + audio do nothing but reads.
  *
  * Scheduled 60s after `prepareLanguagePair` so most in-flow translations
  * have had time to land. Also dashboard-callable for re-healing a stuck
@@ -174,43 +232,9 @@ export const ensureAudioForTestTranslations = internalMutation({
     translationsScheduled: v.number(),
     audioScheduled: v.number(),
   }),
-  handler: async (ctx, args) =>
-    ensureAudioForTestTranslationsImpl(ctx, args),
+  handler: async (ctx, { targetLanguage, sourceLanguage }) =>
+    runPlacementContentBatch(ctx, { targetLanguage, sourceLanguage, cursor: null }),
 });
-
-async function ensureAudioForTestTranslationsImpl(
-  ctx: import('../_generated/server').MutationCtx,
-  { targetLanguage, sourceLanguage }: { targetLanguage: string; sourceLanguage: string },
-): Promise<{ translationsScheduled: number; audioScheduled: number }> {
-  const sentences = await ctx.db
-    .query('placementTestSentences')
-    .take(PLACEMENT_SENTENCES_QUERY_CAP);
-  if (sentences.length === PLACEMENT_SENTENCES_QUERY_CAP) {
-    console.warn(
-      `[ensureAudioForTestTranslations] hit cap ${PLACEMENT_SENTENCES_QUERY_CAP} — raise it or paginate.`,
-    );
-  }
-
-  let translationsScheduled = 0;
-  let audioScheduled = 0;
-  for (const s of sentences) {
-    const text = await ctx.db.get(s.textId);
-    if (!text) continue;
-    const targetLanguages = Array.from(
-      new Set([targetLanguage, sourceLanguage].filter((l) => l !== text.language)),
-    );
-    const result = await scheduleMissingContent(
-      ctx,
-      text._id,
-      text,
-      [text.language],
-      targetLanguages,
-    );
-    translationsScheduled += result.translationsScheduled;
-    audioScheduled += result.audioScheduled;
-  }
-  return { translationsScheduled, audioScheduled };
-}
 
 /**
  * Final phase of the onboarding wizard.

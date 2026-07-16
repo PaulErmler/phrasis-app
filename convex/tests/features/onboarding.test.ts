@@ -120,6 +120,49 @@ async function seedEssentialCollection(
 }
 
 /**
+ * Seed an active OGTE dataset with the given level collections (each with a
+ * handful of curriculum texts) so `resolveStartingCollection`'s by-code path
+ * has something to hit. Returns the collection ids keyed by code ("L06" …).
+ */
+async function seedActiveDataset(
+  t: ReturnType<typeof convexTest>,
+  levels: number[],
+): Promise<Record<string, Id<"collections">>> {
+  return t.run(async (ctx) => {
+    const datasetId = await ctx.db.insert("datasets", {
+      slug: "ogte-test",
+      version: "1.0.0",
+      publishedAt: Date.now(),
+      isActive: true,
+    });
+    const byCode: Record<string, Id<"collections">> = {};
+    for (const level of levels) {
+      const code = `L${String(level).padStart(2, "0")}`;
+      const id = await ctx.db.insert("collections", {
+        name: code,
+        textCount: 6,
+        datasetId,
+        code,
+        order: level,
+        origin: "premade",
+      });
+      for (let i = 0; i < 6; i++) {
+        await ctx.db.insert("texts", {
+          text: `${code} sentence ${i}`,
+          language: "en",
+          userCreated: false,
+          collectionId: id,
+          collectionRank: i,
+          datasetId,
+        });
+      }
+      byCode[code] = id;
+    }
+    return byCode;
+  });
+}
+
+/**
  * Seed the `placement-test-pool` collection with 5 English texts.
  */
 async function seedPlacementPool(
@@ -357,6 +400,121 @@ describe("completeOnboarding", () => {
       expect(text!.collectionId).toBe(essentialId);
       expect(text!.collectionId).not.toBe(poolId);
     }
+    await drainScheduled(t);
+  });
+});
+
+describe("completeOnboarding — starting level → collection", () => {
+  async function getActiveCollectionId(
+    t: ReturnType<typeof convexTest>,
+    courseId: Id<"courses">,
+  ): Promise<Id<"collections"> | undefined> {
+    return t.run(async (ctx) => {
+      const settings = await ctx.db
+        .query("courseSettings")
+        .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+        .first();
+      return settings?.activeCollectionId;
+    });
+  }
+
+  it("starts at the exact OGTE level when placementTest.finalLevel is present, and seeds cards from it", async () => {
+    const t = convexTest(schema, modules);
+    const byCode = await seedActiveDataset(t, [1, 6, 8]);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 6,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      // The 6-bucket mapping for `intermediate` is L08 — the precise
+      // finalLevel (6) must win over it.
+      currentLevel: "intermediate",
+      reviewMode: "audio",
+      placementTest: { strategy: "self-pick", history: [], finalLevel: 6 },
+    });
+    const { courseId, deckId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+
+    expect(await getActiveCollectionId(t, courseId)).toBe(byCode.L06);
+
+    const cards = await t.run(async (ctx) =>
+      ctx.db
+        .query("cards")
+        .withIndex("by_deckId", (q) => q.eq("deckId", deckId))
+        .collect(),
+    );
+    expect(cards.length).toBe(ONBOARDING_INITIAL_SEED_CARDS);
+    for (const card of cards) {
+      const text = await t.run(async (ctx) => ctx.db.get(card.textId));
+      expect(text?.collectionId).toBe(byCode.L06);
+    }
+    await drainScheduled(t);
+  });
+
+  it("falls back to the 6-bucket mapping when no finalLevel exists", async () => {
+    const t = convexTest(schema, modules);
+    const byCode = await seedActiveDataset(t, [1, 8]);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 6,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "intermediate",
+      reviewMode: "audio",
+    });
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+    expect(await getActiveCollectionId(t, courseId)).toBe(byCode.L08);
+    await drainScheduled(t);
+  });
+
+  it("defaults to L01 when no level was persisted at all", async () => {
+    const t = convexTest(schema, modules);
+    const byCode = await seedActiveDataset(t, [1, 8]);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 6,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      reviewMode: "audio",
+    });
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+    expect(await getActiveCollectionId(t, courseId)).toBe(byCode.L01);
+    await drainScheduled(t);
+  });
+
+  it("ignores an out-of-range finalLevel and uses the bucket mapping", async () => {
+    const t = convexTest(schema, modules);
+    const byCode = await seedActiveDataset(t, [1, 8]);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 6,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "intermediate",
+      reviewMode: "audio",
+      placementTest: { strategy: "self-pick", history: [], finalLevel: 21 },
+    });
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+    expect(await getActiveCollectionId(t, courseId)).toBe(byCode.L08);
     await drainScheduled(t);
   });
 });

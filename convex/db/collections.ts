@@ -24,13 +24,36 @@ export async function getActiveDataset(
  * Resolve the starting collection for a user's `currentLevel`, preferring the
  * active dataset's level. Falls back to the legacy collection if no active
  * dataset is found.
+ *
+ * When the precise OGTE level is known (self-picked on the slider or produced
+ * by the placement test, both persisted as `placementTest.finalLevel`), it
+ * wins: the course starts at that exact `L01`..`L20` collection instead of
+ * the 6-bucket `currentLevel` mapping (which only reaches L01/05/08/11/14/17).
+ * Out-of-range values and datasets without the exact code fall back to the
+ * bucket path unchanged.
  */
 export async function resolveStartingCollection(
   ctx: QueryCtx,
   currentLevel: string | undefined,
+  ogteLevel?: number,
 ): Promise<Doc<'collections'> | null> {
-  const mapping = LEVEL_TO_COLLECTION[currentLevel ?? 'beginner'] ?? LEVEL_TO_COLLECTION.beginner;
   const activeDataset = await getActiveDataset(ctx);
+  if (
+    activeDataset &&
+    ogteLevel !== undefined &&
+    Number.isInteger(ogteLevel) &&
+    ogteLevel >= 1 &&
+    ogteLevel <= 20
+  ) {
+    const exactCode = `L${String(ogteLevel).padStart(2, '0')}`;
+    const exact = await ctx.db
+      .query('collections')
+      .withIndex('by_datasetId_and_order', (q) => q.eq('datasetId', activeDataset._id))
+      .filter((q) => q.eq(q.field('code'), exactCode))
+      .first();
+    if (exact) return exact;
+  }
+  const mapping = LEVEL_TO_COLLECTION[currentLevel ?? 'beginner'] ?? LEVEL_TO_COLLECTION.beginner;
   if (activeDataset) {
     const byCode = await ctx.db
       .query('collections')

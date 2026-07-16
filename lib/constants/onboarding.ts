@@ -43,3 +43,13 @@ export const ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD = 100;
  * cap is ever bumped past safe single-query territory.
  */
 export const PLACEMENT_SENTENCES_QUERY_CAP = 256;
+
+/**
+ * Placement sentences processed per `runPlacementContentBatch` transaction.
+ * Sized well under Convex's per-mutation system-op ceiling: each sentence runs
+ * the heavy `scheduleMissingContent` (~15–25 system ops), so batches self-
+ * continue via the scheduler instead of sweeping the whole corpus inline.
+ * (`COLLECTION_PREVIEW_SIZE` = 5 is known-safe; ≤15 works-but-strained — 10
+ * leaves comfortable margin.)
+ */
+export const PLACEMENT_CONTENT_BATCH_SIZE = 10;
