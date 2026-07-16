@@ -2,6 +2,7 @@ import { QueryCtx, MutationCtx } from '../_generated/server';
 import { Id, Doc } from '../_generated/dataModel';
 import { getCourseSettings } from './courseSettings';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
+import { ogteLevelToCollectionCode } from '../../lib/constants/onboarding';
 import { LEGACY_LEVEL_ORDER, LEVEL_TO_COLLECTION, settledCount } from '../lib/collections';
 
 /**
@@ -38,18 +39,13 @@ export async function resolveStartingCollection(
   ogteLevel?: number,
 ): Promise<Doc<'collections'> | null> {
   const activeDataset = await getActiveDataset(ctx);
-  if (
-    activeDataset &&
-    ogteLevel !== undefined &&
-    Number.isInteger(ogteLevel) &&
-    ogteLevel >= 1 &&
-    ogteLevel <= 20
-  ) {
-    const exactCode = `L${String(ogteLevel).padStart(2, '0')}`;
+  const exactCode = ogteLevel !== undefined ? ogteLevelToCollectionCode(ogteLevel) : null;
+  if (activeDataset && exactCode) {
     const exact = await ctx.db
       .query('collections')
-      .withIndex('by_datasetId_and_order', (q) => q.eq('datasetId', activeDataset._id))
-      .filter((q) => q.eq(q.field('code'), exactCode))
+      .withIndex('by_datasetId_and_code', (q) =>
+        q.eq('datasetId', activeDataset._id).eq('code', exactCode),
+      )
       .first();
     if (exact) return exact;
   }
@@ -57,8 +53,9 @@ export async function resolveStartingCollection(
   if (activeDataset) {
     const byCode = await ctx.db
       .query('collections')
-      .withIndex('by_datasetId_and_order', (q) => q.eq('datasetId', activeDataset._id))
-      .filter((q) => q.eq(q.field('code'), mapping.code))
+      .withIndex('by_datasetId_and_code', (q) =>
+        q.eq('datasetId', activeDataset._id).eq('code', mapping.code),
+      )
       .first();
     if (byCode) return byCode;
   }

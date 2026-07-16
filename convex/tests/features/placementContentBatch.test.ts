@@ -2,33 +2,25 @@
 import { convexTest } from "convex-test";
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-// Stub the aggregate component — production code instantiates
-// `new TableAggregate(components.cardsByState, ...)` at module-load, and the
-// aggregate component is not registered with convex-test here.
-vi.mock("@convex-dev/aggregate", () => {
-  class TableAggregate {
-    constructor(_component: unknown, _opts: unknown) {}
-    async insertIfDoesNotExist(): Promise<void> {}
-    async replaceOrInsert(): Promise<void> {}
-    async deleteIfExists(): Promise<void> {}
-    async count(): Promise<number> {
-      return 0;
-    }
-  }
-  return { TableAggregate };
-});
-
-// Isolate the batching/self-continuation contract from `scheduleMissingContent`'s
-// heavy internals (workpool enqueues + TTS/LLM/STT network). We only want to
-// assert that the placement sweep bounds each transaction to one page and that
-// the self-scheduled chain covers the whole corpus — the primitive itself is
-// exercised end-to-end in `collectionBrowseAdd.test.ts`.
-const { scheduleMissingContentSpy } = vi.hoisted(() => ({
-  scheduleMissingContentSpy: vi.fn(async () => ({
+// Isolate the fan-out contract from `scheduleMissingContent`'s heavy
+// internals (workpool enqueues + TTS/LLM/STT network). We only want to
+// assert that the placement sweep bounds each transaction to one batch and
+// that the upfront-queued batch workers cover the whole corpus — the
+// primitive itself is exercised end-to-end in `collectionBrowseAdd.test.ts`.
+const { scheduleMissingContentSpy, defaultScheduleMissingContent } = vi.hoisted(() => {
+  const defaultScheduleMissingContent = async () => ({
     translationsScheduled: 1,
     audioScheduled: 1,
-  })),
-}));
+  });
+  return {
+    defaultScheduleMissingContent,
+    // Declared with a rest signature so the poison tests can install
+    // per-textId implementations without fighting the inferred zero-arg type.
+    scheduleMissingContentSpy: vi.fn<
+      (...args: unknown[]) => Promise<{ translationsScheduled: number; audioScheduled: number }>
+        >(defaultScheduleMissingContent),
+  };
+});
 vi.mock("../../features/decks", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../features/decks")>()),
   scheduleMissingContent: scheduleMissingContentSpy,
@@ -44,6 +36,9 @@ const modules = import.meta.glob("/convex/**/*.ts");
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
+  // `clearAllMocks` clears calls but keeps implementations — restore the
+  // default so a test's poisoned impl can't leak into the next one.
+  scheduleMissingContentSpy.mockImplementation(defaultScheduleMissingContent);
 });
 
 /**
@@ -80,19 +75,20 @@ async function seedPlacementCorpus(
   });
 }
 
-describe("placement content sweep — batched self-continuation", () => {
+describe("placement content sweep — upfront batch fan-out", () => {
   // Regression guard for the "too many system operations" timeout: the sweep
   // must NOT run `scheduleMissingContent` over the whole corpus inline.
-  it("bounds each invocation to one page and covers the whole corpus across the chain", async () => {
+  it("bounds the entry invocation to one page and covers the whole corpus via the fanned-out batches", async () => {
     const t = convexTest(schema, modules);
-    const CORPUS = PLACEMENT_CONTENT_BATCH_SIZE + 3; // spans two pages
+    const CORPUS = PLACEMENT_CONTENT_BATCH_SIZE + 3; // spans two batches
     const textIds = await seedPlacementCorpus(t, CORPUS);
 
-    // Fake timers so the self-scheduled continuation can be drained via the
+    // Fake timers so the fanned-out batch workers can be drained via the
     // repo-standard `finishAllScheduledFunctions(vi.runAllTimers)`.
     vi.useFakeTimers();
 
-    // First invocation: exactly one page of work, then it self-schedules.
+    // Entry invocation: exactly one page of inline work; the remaining
+    // batches are queued upfront as independent workers.
     const first = await t.mutation(
       internal.features.onboarding.ensureAudioForTestTranslations,
       { targetLanguage: "es", sourceLanguage: "en" },
@@ -101,15 +97,15 @@ describe("placement content sweep — batched self-continuation", () => {
       PLACEMENT_CONTENT_BATCH_SIZE,
     );
     // Mock returns {1,1} per sentence, so the returned tally reflects exactly
-    // one bounded page — never the full corpus.
+    // the inline page — never the full corpus.
     expect(first.translationsScheduled).toBe(PLACEMENT_CONTENT_BATCH_SIZE);
     expect(first.audioScheduled).toBe(PLACEMENT_CONTENT_BATCH_SIZE);
 
-    // Drain the self-scheduled continuation(s).
+    // Drain the fanned-out batch workers.
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
     // Every placement sentence's text is processed exactly once, no more —
-    // the batch chain covers the corpus without duplicating work.
+    // the disjoint batches cover the corpus without duplicating work.
     expect(scheduleMissingContentSpy).toHaveBeenCalledTimes(CORPUS);
     const processedTextIds = scheduleMissingContentSpy.mock.calls.map(
       (call) => call[1] as Id<"texts">,
@@ -135,5 +131,68 @@ describe("placement content sweep — batched self-continuation", () => {
     // languages become translation targets (text's own language filtered out).
     expect(baseLanguages).toEqual(["en"]);
     expect(new Set(targetLanguages as string[])).toEqual(new Set(["es", "de"]));
+  });
+
+  // The batches are INDEPENDENT — queued upfront by the entry mutation, not
+  // chained — so one failing batch must not orphan the batches after it. (A
+  // self-continuing chain would die at the first failing page: the next
+  // page's enqueue rolls back with the failing transaction and Convex does
+  // not retry failed scheduled mutations.)
+  it("still processes later batches when an earlier scheduled batch fails", async () => {
+    const t = convexTest(schema, modules);
+    const CORPUS = PLACEMENT_CONTENT_BATCH_SIZE * 2 + 3; // inline page + 2 scheduled batches
+    const textIds = await seedPlacementCorpus(t, CORPUS);
+    // First text of the FIRST scheduled batch (the inline page is [0, BATCH)).
+    const poisonedId = textIds[PLACEMENT_CONTENT_BATCH_SIZE];
+    scheduleMissingContentSpy.mockImplementation(async (...args: unknown[]) => {
+      if (args[1] === poisonedId) throw new Error("poisoned placement sentence");
+      return { translationsScheduled: 1, audioScheduled: 1 };
+    });
+
+    vi.useFakeTimers();
+    const first = await t.mutation(
+      internal.features.onboarding.ensureAudioForTestTranslations,
+      { targetLanguage: "es", sourceLanguage: "en" },
+    );
+    // Inline page is unaffected by the downstream poison.
+    expect(first.translationsScheduled).toBe(PLACEMENT_CONTENT_BATCH_SIZE);
+
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    // Every text of the SECOND scheduled batch was processed even though the
+    // first scheduled batch died mid-transaction.
+    const processed = new Set(
+      scheduleMissingContentSpy.mock.calls.map((call) => call[1] as Id<"texts">),
+    );
+    for (const id of textIds.slice(PLACEMENT_CONTENT_BATCH_SIZE * 2)) {
+      expect(processed.has(id)).toBe(true);
+    }
+  });
+
+  // A throw in the INLINE page rejects the client-observed mutation and rolls
+  // back the batch enqueues with it — the placement test's reject-driven
+  // retry path stays intact and no half-scheduled sweep survives.
+  it("rejects the entry mutation (and enqueues nothing) when the inline page fails", async () => {
+    const t = convexTest(schema, modules);
+    const CORPUS = PLACEMENT_CONTENT_BATCH_SIZE + 3;
+    const textIds = await seedPlacementCorpus(t, CORPUS);
+    const poisonedId = textIds[0];
+    scheduleMissingContentSpy.mockImplementation(async (...args: unknown[]) => {
+      if (args[1] === poisonedId) throw new Error("poisoned placement sentence");
+      return { translationsScheduled: 1, audioScheduled: 1 };
+    });
+
+    vi.useFakeTimers();
+    await expect(
+      t.mutation(internal.features.onboarding.ensureAudioForTestTranslations, {
+        targetLanguage: "es",
+        sourceLanguage: "en",
+      }),
+    ).rejects.toThrow("poisoned placement sentence");
+
+    // The rolled-back entry left no scheduled batches behind: the poisoned
+    // first call is the only one that ever happened.
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(scheduleMissingContentSpy).toHaveBeenCalledTimes(1);
   });
 });

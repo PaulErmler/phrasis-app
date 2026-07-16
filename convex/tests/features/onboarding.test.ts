@@ -1,22 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { describe, it, expect, vi } from "vitest";
-
-// Stub the aggregate component — production code instantiates
-// `new TableAggregate(components.cardsByState, ...)` at module-load, and
-// the aggregate component is not registered with convex-test here.
-vi.mock("@convex-dev/aggregate", () => {
-  class TableAggregate {
-    constructor(_component: unknown, _opts: unknown) {}
-    async insertIfDoesNotExist(): Promise<void> {}
-    async replaceOrInsert(): Promise<void> {}
-    async deleteIfExists(): Promise<void> {}
-    async count(): Promise<number> {
-      return 0;
-    }
-  }
-  return { TableAggregate };
-});
+import { describe, it, expect } from "vitest";
 
 import schema from "../../schema";
 import { api } from "../../_generated/api";
@@ -25,6 +9,7 @@ import {
   ONBOARDING_INITIAL_SEED_CARDS,
   ONBOARDING_CARDS_BATCH_SIZE,
   MAX_ONBOARDING_FREE_TEXT_LENGTH,
+  ogteLevelToCollectionCode,
 } from "../../../lib/constants/onboarding";
 
 const modules = import.meta.glob("/convex/**/*.ts");
@@ -137,7 +122,7 @@ async function seedActiveDataset(
     });
     const byCode: Record<string, Id<"collections">> = {};
     for (const level of levels) {
-      const code = `L${String(level).padStart(2, "0")}`;
+      const code = ogteLevelToCollectionCode(level)!;
       const id = await ctx.db.insert("collections", {
         name: code,
         textCount: 6,

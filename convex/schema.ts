@@ -182,7 +182,8 @@ export default defineSchema({
     ),
   })
     .index('by_name', ['name'])
-    .index('by_datasetId_and_order', ['datasetId', 'order']),
+    .index('by_datasetId_and_order', ['datasetId', 'order'])
+    .index('by_datasetId_and_code', ['datasetId', 'code']),
 
   // Texts table - stores the original texts/sentences
   texts: defineTable({

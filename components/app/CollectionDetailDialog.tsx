@@ -75,6 +75,11 @@ interface CollectionDetailDialogProps {
   showToggleWhenComplete?: boolean;
 }
 
+// Bounds the scroll-anchor capture when every remaining row is toggleable
+// (e.g. the "Manually Added" collection, where hiding added rows empties the
+// list anyway) — one "Show more" page plus slack.
+const MAX_ANCHOR_CANDIDATES = 30;
+
 export function CollectionDetailDialog({
   open,
   onOpenChange,
@@ -116,10 +121,6 @@ export function CollectionDetailDialog({
   // can hide (status other than added/ignored), so even a full page of
   // contiguous added rows can't leave the list without a survivor.
   const scrollAnchorRef = useRef<Array<{ id: string; top: number }>>([]);
-  // Bounds the capture when every remaining row is toggleable (e.g. the
-  // "Manually Added" collection, where hiding added rows empties the list
-  // anyway) — one "Show more" page plus slack.
-  const MAX_ANCHOR_CANDIDATES = 30;
 
   const rowTopInContainer = (row: HTMLElement, container: HTMLElement) =>
     row.getBoundingClientRect().top - container.getBoundingClientRect().top;

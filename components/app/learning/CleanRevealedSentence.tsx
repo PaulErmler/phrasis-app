@@ -3,6 +3,28 @@
 import { useTranslations } from 'next-intl';
 import { ClickableWords } from './ClickableWords';
 
+/**
+ * "Accuracy: N%" footer under a diffed/revealed sentence — the single
+ * implementation shared by the clean reveal below and the show-diff branches
+ * of WordDiff and DiffDisplay. `hideAccuracy` keeps the layout height via
+ * `invisible` instead of unmounting.
+ */
+export function AccuracyFooter({
+  accuracy,
+  hideAccuracy = false,
+}: {
+  /** 0–100. */
+  accuracy: number;
+  hideAccuracy?: boolean;
+}) {
+  const t = useTranslations('LearningMode');
+  return (
+    <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
+      {t('accuracy')}: {accuracy}%
+    </p>
+  );
+}
+
 interface CleanRevealedSentenceProps {
   text: string;
   language: string;
@@ -23,7 +45,6 @@ export function CleanRevealedSentence({
   accuracy,
   hideAccuracy = false,
 }: CleanRevealedSentenceProps) {
-  const t = useTranslations('LearningMode');
   return (
     <div>
       <ClickableWords
@@ -35,9 +56,7 @@ export function CleanRevealedSentence({
         enabled={false}
         className="leading-relaxed text-foreground"
       />
-      <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-        {t('accuracy')}: {accuracy}%
-      </p>
+      <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
     </div>
   );
 }

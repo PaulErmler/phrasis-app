@@ -6,12 +6,16 @@ import {
   type MutationCtx,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
+import type { Id } from '../_generated/dataModel';
 import {
   requireAuthUserId,
   getAuthUserId,
   getOnboardingProgress,
 } from '../db/users';
-import { PLACEMENT_CONTENT_BATCH_SIZE } from '../../lib/constants/onboarding';
+import {
+  PLACEMENT_CONTENT_BATCH_SIZE,
+  PLACEMENT_SENTENCES_QUERY_CAP,
+} from '../../lib/constants/onboarding';
 import { scheduleMissingContent } from './decks';
 
 /**
@@ -71,18 +75,7 @@ export const prepareLanguagePair = mutation({
 });
 
 /**
- * Shared worker for every placement-test content sweep.
- *
- * Processes ONE page of `placementTestSentences` (`PLACEMENT_CONTENT_BATCH_SIZE`
- * rows) and, if more remain, schedules itself to continue on the next page via
- * `processPlacementContentBatch`. Sweeping the whole corpus inline used to blow
- * past Convex's per-mutation system-op ceiling — each sentence runs the heavy
- * `scheduleMissingContent` (per-language reads, `storage.getUrl` checks, claim
- * inserts, a nested `enqueueTtsJob` mutation, scheduler enqueues), so ~256
- * sentences × ~20 ops overflowed one transaction. Batching keeps every
- * invocation bounded and shrinks its `audioRecordings` write footprint (fewer
- * OCC conflicts). This mirrors the per-collection fan-out in
- * `ensureFirstSentencesAcrossLevelCollections` (`convex/features/collections.ts`).
+ * Run `scheduleMissingContent` for one batch of placement-test texts.
  *
  * `scheduleMissingContent` handles source-language audio (the text's own
  * language) AND translation enqueueing for every additional language AND the
@@ -93,22 +86,16 @@ export const prepareLanguagePair = mutation({
  * language; `scheduleMissingContent` filters out the text's own language
  * internally, so the no-op case (`sourceLanguage === text.language`) is safe.
  */
-async function runPlacementContentBatch(
+async function processPlacementSentences(
   ctx: MutationCtx,
-  {
-    targetLanguage,
-    sourceLanguage,
-    cursor,
-  }: { targetLanguage: string; sourceLanguage: string; cursor: string | null },
+  textIds: Id<'texts'>[],
+  targetLanguage: string,
+  sourceLanguage: string,
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
-  const { page, isDone, continueCursor } = await ctx.db
-    .query('placementTestSentences')
-    .paginate({ numItems: PLACEMENT_CONTENT_BATCH_SIZE, cursor });
-
   let translationsScheduled = 0;
   let audioScheduled = 0;
-  for (const s of page) {
-    const text = await ctx.db.get(s.textId);
+  for (const textId of textIds) {
+    const text = await ctx.db.get(textId);
     if (!text) continue;
     const targetLanguages = Array.from(
       new Set([targetLanguage, sourceLanguage].filter((l) => l !== text.language)),
@@ -123,34 +110,88 @@ async function runPlacementContentBatch(
     translationsScheduled += result.translationsScheduled;
     audioScheduled += result.audioScheduled;
   }
-
-  if (!isDone) {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.onboarding.processPlacementContentBatch,
-      { targetLanguage, sourceLanguage, cursor: continueCursor },
-    );
-  }
-
   return { translationsScheduled, audioScheduled };
 }
 
 /**
- * Continuation target for `runPlacementContentBatch` — internal only; each
- * invocation processes the next page and (re-)schedules itself until the corpus
- * is exhausted.
+ * Entry point for every placement-test content sweep.
+ *
+ * Enumerates the corpus once (cheap — only the small `placementTestSentences`
+ * rows), processes the first `PLACEMENT_CONTENT_BATCH_SIZE` texts inline, and
+ * queues every remaining batch UPFRONT as an independent
+ * `processPlacementContentBatch` worker — mirroring the per-collection fan-out
+ * in `ensureFirstSentencesAcrossLevelCollections`
+ * (`convex/features/collections.ts`). Sweeping the whole corpus inline used to
+ * blow past Convex's per-mutation system-op ceiling — each sentence runs the
+ * heavy `scheduleMissingContent` (per-language reads, `storage.getUrl` checks,
+ * claim inserts, a nested `enqueueTtsJob` mutation, scheduler enqueues), so
+ * ~256 sentences × ~20 ops overflowed one transaction.
+ *
+ * Failure isolation is the reason the batches are queued upfront rather than
+ * chained: a throw in the inline page rolls back this whole mutation
+ * (including the enqueues), so the awaiting client sees the rejection and can
+ * retry; a throw in one scheduled worker rolls back only that batch — every
+ * other batch was already enqueued here and runs regardless. The returned
+ * tally covers the INLINE FIRST PAGE ONLY; the scheduled batches report via
+ * function logs.
+ */
+async function runPlacementContentSweep(
+  ctx: MutationCtx,
+  { targetLanguage, sourceLanguage }: { targetLanguage: string; sourceLanguage: string },
+): Promise<{ translationsScheduled: number; audioScheduled: number }> {
+  const sentences = await ctx.db
+    .query('placementTestSentences')
+    .take(PLACEMENT_SENTENCES_QUERY_CAP);
+  if (sentences.length === PLACEMENT_SENTENCES_QUERY_CAP) {
+    console.warn(
+      `placementTestSentences query hit cap ${PLACEMENT_SENTENCES_QUERY_CAP} ` +
+        '— raise PLACEMENT_SENTENCES_QUERY_CAP.',
+    );
+  }
+
+  const tally = await processPlacementSentences(
+    ctx,
+    sentences.slice(0, PLACEMENT_CONTENT_BATCH_SIZE).map((s) => s.textId),
+    targetLanguage,
+    sourceLanguage,
+  );
+
+  for (
+    let i = PLACEMENT_CONTENT_BATCH_SIZE;
+    i < sentences.length;
+    i += PLACEMENT_CONTENT_BATCH_SIZE
+  ) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.features.onboarding.processPlacementContentBatch,
+      {
+        textIds: sentences.slice(i, i + PLACEMENT_CONTENT_BATCH_SIZE).map((s) => s.textId),
+        targetLanguage,
+        sourceLanguage,
+      },
+    );
+  }
+
+  return tally;
+}
+
+/**
+ * Independent batch worker fanned out by `runPlacementContentSweep` — internal
+ * only. Each invocation covers its own fixed slice of the corpus in its own
+ * transaction, so one failing batch never affects the others.
  */
 export const processPlacementContentBatch = internalMutation({
   args: {
     targetLanguage: v.string(),
     sourceLanguage: v.string(),
-    cursor: v.union(v.string(), v.null()),
+    textIds: v.array(v.id('texts')),
   },
   returns: v.object({
     translationsScheduled: v.number(),
     audioScheduled: v.number(),
   }),
-  handler: async (ctx, args) => runPlacementContentBatch(ctx, args),
+  handler: async (ctx, { textIds, targetLanguage, sourceLanguage }) =>
+    processPlacementSentences(ctx, textIds, targetLanguage, sourceLanguage),
 });
 
 /**
@@ -159,8 +200,8 @@ export const processPlacementContentBatch = internalMutation({
  * (re-)enqueue any missing placement-test translations for the target
  * language. Idempotent — won't double-enqueue if a claim already exists.
  *
- * Kicks off the batched sweep: processes the first page inline and lets
- * `runPlacementContentBatch` schedule the rest.
+ * Kicks off the batched sweep: processes the first page inline and queues the
+ * remaining batches upfront. `enqueued` counts the inline first page only.
  */
 export const ensurePlacementTranslations = mutation({
   args: {
@@ -171,10 +212,9 @@ export const ensurePlacementTranslations = mutation({
   handler: async (ctx, { targetLanguage, sourceLanguage }) => {
     const userId = await requireAuthUserId(ctx);
     void userId;
-    const { translationsScheduled } = await runPlacementContentBatch(ctx, {
+    const { translationsScheduled } = await runPlacementContentSweep(ctx, {
       targetLanguage,
       sourceLanguage,
-      cursor: null,
     });
     return { enqueued: translationsScheduled };
   },
@@ -187,6 +227,7 @@ export const ensurePlacementTranslations = mutation({
  *
  * Called from `prepareLanguagePair` for new (target) languages as users sign
  * up, and from the seed migration after the initial English rows are inserted.
+ * `enqueued` counts the inline first page only.
  */
 export const enqueueMissingPlacementTranslations = internalMutation({
   args: {
@@ -195,10 +236,9 @@ export const enqueueMissingPlacementTranslations = internalMutation({
   },
   returns: v.object({ enqueued: v.number() }),
   handler: async (ctx, { targetLanguage, sourceLanguage }) => {
-    const { translationsScheduled } = await runPlacementContentBatch(ctx, {
+    const { translationsScheduled } = await runPlacementContentSweep(ctx, {
       targetLanguage,
       sourceLanguage,
-      cursor: null,
     });
     return { enqueued: translationsScheduled };
   },
@@ -213,15 +253,17 @@ export const enqueueMissingPlacementTranslations = internalMutation({
  * incomplete. Nothing else re-enters `scheduleMissingContent` for those
  * texts afterwards.
  *
- * This walks every placement-test sentence (batched via
- * `runPlacementContentBatch`) and re-runs `scheduleMissingContent` for both the
- * source language (English audio) and the target language (translation +
- * downstream audio). All checks inside `scheduleMissingContent` are idempotent —
- * rows that already have translations + audio do nothing but reads.
+ * This covers every placement-test sentence — the first page inline, the rest
+ * via the batch workers `runPlacementContentSweep` queues upfront — and
+ * re-runs `scheduleMissingContent` for both the source language (English
+ * audio) and the target language (translation + downstream audio). All checks
+ * inside `scheduleMissingContent` are idempotent — rows that already have
+ * translations + audio do nothing but reads.
  *
  * Scheduled 60s after `prepareLanguagePair` so most in-flow translations
  * have had time to land. Also dashboard-callable for re-healing a stuck
- * onboarding.
+ * onboarding; the returned tally covers the inline first page only (the
+ * fanned-out batches report via function logs).
  */
 export const ensureAudioForTestTranslations = internalMutation({
   args: {
@@ -233,7 +275,7 @@ export const ensureAudioForTestTranslations = internalMutation({
     audioScheduled: v.number(),
   }),
   handler: async (ctx, { targetLanguage, sourceLanguage }) =>
-    runPlacementContentBatch(ctx, { targetLanguage, sourceLanguage, cursor: null }),
+    runPlacementContentSweep(ctx, { targetLanguage, sourceLanguage }),
 });
 
 /**

@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useTranslations } from 'next-intl';
 import {
   alignWords,
   charDiff,
@@ -12,7 +11,7 @@ import {
   type CharChunk,
 } from '@/lib/textCompare';
 import { AskAboutWord } from './ClickableWords';
-import { CleanRevealedSentence } from './CleanRevealedSentence';
+import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
 
 interface WordDiffProps {
   expected: string;
@@ -186,7 +185,6 @@ export function WordDiff({
   hideAccuracy = false,
   hideErrors = false,
 }: WordDiffProps) {
-  const t = useTranslations('LearningMode');
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language)),
     [language],
@@ -228,9 +226,7 @@ export function WordDiff({
           </AskAboutWord>
         ))}
       </p>
-      <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-        {t('accuracy')}: {accuracy}%
-      </p>
+      <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
     </div>
   );
 }
