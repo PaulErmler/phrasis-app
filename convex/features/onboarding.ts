@@ -13,6 +13,8 @@ import {
   getOnboardingProgress,
 } from '../db/users';
 import {
+  PLACEMENT_BATCH_MAX_ATTEMPTS,
+  PLACEMENT_BATCH_RETRY_BACKOFF_MS,
   PLACEMENT_CONTENT_BATCH_SIZE,
   PLACEMENT_SENTENCES_QUERY_CAP,
 } from '../../lib/constants/onboarding';
@@ -131,9 +133,10 @@ async function processPlacementSentences(
  * chained: a throw in the inline page rolls back this whole mutation
  * (including the enqueues), so the awaiting client sees the rejection and can
  * retry; a throw in one scheduled worker rolls back only that batch — every
- * other batch was already enqueued here and runs regardless. The returned
- * tally covers the INLINE FIRST PAGE ONLY; the scheduled batches report via
- * function logs.
+ * other batch was already enqueued here and runs regardless, and the failed
+ * batch reschedules itself with backoff (see `processPlacementContentBatch`).
+ * The returned tally covers the INLINE FIRST PAGE ONLY; the scheduled batches
+ * report via function logs.
  */
 async function runPlacementContentSweep(
   ctx: MutationCtx,
@@ -179,19 +182,64 @@ async function runPlacementContentSweep(
  * Independent batch worker fanned out by `runPlacementContentSweep` — internal
  * only. Each invocation covers its own fixed slice of the corpus in its own
  * transaction, so one failing batch never affects the others.
+ *
+ * Convex does not retry scheduled mutations that fail with application
+ * errors, so on failure the worker reschedules itself with exponential
+ * backoff (up to `PLACEMENT_BATCH_MAX_ATTEMPTS` total attempts) — the error
+ * is swallowed on purpose: rethrowing would roll back the transaction
+ * *including* the retry enqueue. Retries re-run the full slice; that's safe
+ * because `scheduleMissingContent`'s claim/dedupe checks make already-covered
+ * rows reads-only. Bounded residual (accepted): a throw between a claim
+ * insert and its pool enqueue commits a workId-less claim that blocks
+ * re-enqueue until the claim goes stale (`TTS_CLAIM_STALE_MS`), after which
+ * a later ensure sweep heals it.
  */
 export const processPlacementContentBatch = internalMutation({
   args: {
     targetLanguage: v.string(),
     sourceLanguage: v.string(),
     textIds: v.array(v.id('texts')),
+    /** Retry counter — omitted on the initial fan-out, set on reschedules. */
+    attempt: v.optional(v.number()),
   },
   returns: v.object({
     translationsScheduled: v.number(),
     audioScheduled: v.number(),
   }),
-  handler: async (ctx, { textIds, targetLanguage, sourceLanguage }) =>
-    processPlacementSentences(ctx, textIds, targetLanguage, sourceLanguage),
+  handler: async (
+    ctx,
+    { textIds, targetLanguage, sourceLanguage, attempt = 0 },
+  ): Promise<{ translationsScheduled: number; audioScheduled: number }> => {
+    try {
+      return await processPlacementSentences(
+        ctx,
+        textIds,
+        targetLanguage,
+        sourceLanguage,
+      );
+    } catch (error) {
+      if (attempt + 1 < PLACEMENT_BATCH_MAX_ATTEMPTS) {
+        console.warn(
+          `[processPlacementContentBatch] attempt ${attempt + 1}/${PLACEMENT_BATCH_MAX_ATTEMPTS} ` +
+            `failed for ${textIds.length} texts (${sourceLanguage}→${targetLanguage}); retrying`,
+          error,
+        );
+        await ctx.scheduler.runAfter(
+          PLACEMENT_BATCH_RETRY_BACKOFF_MS * 2 ** attempt,
+          internal.features.onboarding.processPlacementContentBatch,
+          { textIds, targetLanguage, sourceLanguage, attempt: attempt + 1 },
+        );
+      } else {
+        console.error(
+          `[processPlacementContentBatch] giving up after ${PLACEMENT_BATCH_MAX_ATTEMPTS} attempts ` +
+            `for ${textIds.length} texts (${sourceLanguage}→${targetLanguage}) — ` +
+            'these placement sentences stay missing content until the next ensure sweep',
+          error,
+        );
+      }
+      return { translationsScheduled: 0, audioScheduled: 0 };
+    }
+  },
 });
 
 /**

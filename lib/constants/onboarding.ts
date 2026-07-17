@@ -56,6 +56,23 @@ export const PLACEMENT_SENTENCES_QUERY_CAP = 256;
  */
 export const PLACEMENT_CONTENT_BATCH_SIZE = 10;
 
+/**
+ * Total attempts (initial + retries) for one placement-content batch worker.
+ * Convex does NOT retry scheduled mutations that fail with application
+ * errors, so `processPlacementContentBatch` reschedules itself on failure —
+ * without this, a transient error (e.g. a TTS enqueue hiccup) silently
+ * dropped the batch's sentences for the rest of onboarding.
+ */
+export const PLACEMENT_BATCH_MAX_ATTEMPTS = 3;
+
+/**
+ * Base delay for placement-batch retries; attempt N waits
+ * `PLACEMENT_BATCH_RETRY_BACKOFF_MS * 2 ** N` (+10s, +20s). Deliberately
+ * far past the initial fan-out so retries never re-enter the burst of
+ * first-run batches.
+ */
+export const PLACEMENT_BATCH_RETRY_BACKOFF_MS = 10_000;
+
 /** Inclusive bounds of the OGTE difficulty scale (levels L01..L20). */
 export const OGTE_MIN_LEVEL = 1;
 export const OGTE_MAX_LEVEL = 20;

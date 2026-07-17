@@ -75,9 +75,11 @@ interface CollectionDetailDialogProps {
   showToggleWhenComplete?: boolean;
 }
 
-// Bounds the scroll-anchor capture when every remaining row is toggleable
+// Bounds the STORED fallback ids when a long run of rows is toggleable
 // (e.g. the "Manually Added" collection, where hiding added rows empties the
-// list anyway) — one "Show more" page plus slack.
+// list anyway) — one "Show more" page plus slack. The capture keeps scanning
+// past the cap until it finds a survivor row, so the cap never costs the
+// guarantee, only how many hidden-run ids we remember.
 const MAX_ANCHOR_CANDIDATES = 30;
 
 export function CollectionDetailDialog({
@@ -117,55 +119,69 @@ export function CollectionDetailDialog({
   //
   // The anchor row itself can unmount (a visibility toggle hiding the very
   // rows the user is looking at), so the capture keeps the CONSECUTIVE rows
-  // below it as fallbacks — continuing until it has one row that no toggle
-  // can hide (status other than added/ignored), so even a full page of
-  // contiguous added rows can't leave the list without a survivor.
-  const scrollAnchorRef = useRef<Array<{ id: string; top: number }>>([]);
+  // below it as fallback ids — continuing until it has one row that no toggle
+  // can hide (status other than added/ignored), so even a long run of
+  // contiguous added rows can't leave the list without a survivor. Only the
+  // first row's offset is stored: the restore pins whichever row survives to
+  // the removed block's start, so per-fallback offsets are never needed.
+  const scrollAnchorRef = useRef<{ ids: string[]; top: number } | null>(null);
 
-  const rowTopInContainer = (row: HTMLElement, container: HTMLElement) =>
-    row.getBoundingClientRect().top - container.getBoundingClientRect().top;
+  const rowTopInContainer = (row: HTMLElement, containerTop: number) =>
+    row.getBoundingClientRect().top - containerTop;
 
   const captureScrollAnchor = useCallback(() => {
     const container = scrollRef.current;
-    const anchors: Array<{ id: string; top: number }> = [];
+    let anchor: { ids: string[]; top: number } | null = null;
     if (container) {
       const containerTop = container.getBoundingClientRect().top;
       for (const row of container.querySelectorAll<HTMLElement>('[data-row-id]')) {
-        const top = row.getBoundingClientRect().top - containerTop;
-        // Skip rows fully above the viewport; the first row whose bottom
-        // edge is inside it becomes the anchor.
-        if (anchors.length === 0 && top + row.offsetHeight <= 0) continue;
-        anchors.push({ id: row.dataset.rowId!, top });
+        if (anchor === null) {
+          // Skip rows fully above the viewport; the first row whose bottom
+          // edge is inside it becomes the anchor — and the only row that
+          // needs measuring.
+          const top = rowTopInContainer(row, containerTop);
+          if (top + row.offsetHeight <= 0) continue;
+          anchor = { ids: [row.dataset.rowId!], top };
+        } else if (anchor.ids.length < MAX_ANCHOR_CANDIDATES) {
+          anchor.ids.push(row.dataset.rowId!);
+        }
         // A row the toggles can't hide is a guaranteed survivor — the
         // fallback chain is complete (in the common case the very first
-        // row qualifies, so the capture stays a single measurement).
+        // row qualifies, so the capture stays a single measurement). Rows
+        // past the id cap aren't stored but are still scanned so the chain
+        // always ends in a survivor.
         const status = row.dataset.rowStatus;
-        if (status !== 'added' && status !== 'ignored') break;
-        if (anchors.length >= MAX_ANCHOR_CANDIDATES) break;
+        if (status !== 'added' && status !== 'ignored') {
+          if (anchor.ids[anchor.ids.length - 1] !== row.dataset.rowId!) {
+            anchor.ids.push(row.dataset.rowId!);
+          }
+          break;
+        }
       }
     }
-    scrollAnchorRef.current = anchors;
+    scrollAnchorRef.current = anchor;
   }, []);
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
-    const anchors = scrollAnchorRef.current;
-    if (container && anchors.length > 0) {
+    const anchor = scrollAnchorRef.current;
+    if (container && anchor) {
       // First captured row still mounted → keep it pinned where it was.
       // Otherwise mirror native scroll anchoring's removal semantics (the
       // container opts out of the native version via overflow-anchor:none,
       // and Safari doesn't ship it): the surviving fallback is pinned to
-      // the REMOVED block's start (`anchors[0].top`), so the rows below a
+      // the REMOVED block's start (`anchor.top`), so the rows below a
       // hidden run slide up into its place. Pinning the survivor to its
       // own old offset instead would drag rows the user had already
       // scrolled past back into view above it. Both cases are the same
       // formula because the captured rows are consecutive.
-      for (const anchor of anchors) {
+      const containerTop = container.getBoundingClientRect().top;
+      for (const id of anchor.ids) {
         const row = container.querySelector<HTMLElement>(
-          `[data-row-id="${anchor.id}"]`,
+          `[data-row-id="${id}"]`,
         );
         if (!row) continue;
-        const delta = rowTopInContainer(row, container) - anchors[0].top;
+        const delta = rowTopInContainer(row, containerTop) - anchor.top;
         if (delta !== 0) container.scrollTop += delta;
         break;
       }

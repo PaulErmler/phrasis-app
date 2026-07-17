@@ -28,7 +28,10 @@ vi.mock("../../features/decks", async (importOriginal) => ({
 
 import schema from "../../schema";
 import { internal } from "../../_generated/api";
-import { PLACEMENT_CONTENT_BATCH_SIZE } from "../../../lib/constants/onboarding";
+import {
+  PLACEMENT_BATCH_MAX_ATTEMPTS,
+  PLACEMENT_CONTENT_BATCH_SIZE,
+} from "../../../lib/constants/onboarding";
 import type { Id } from "../../_generated/dataModel";
 
 const modules = import.meta.glob("/convex/**/*.ts");
@@ -194,5 +197,84 @@ describe("placement content sweep — upfront batch fan-out", () => {
     // first call is the only one that ever happened.
     await t.finishAllScheduledFunctions(vi.runAllTimers);
     expect(scheduleMissingContentSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("placement content sweep — batch self-retry", () => {
+  // Convex does not retry scheduled mutations on application error; the batch
+  // worker reschedules itself. Without the retry, every sentence of a
+  // transiently-failed batch stayed content-less for the rest of onboarding
+  // (the client's awaited mutation already resolved, so its retry/toast path
+  // never fires for scheduled-batch failures).
+  it("retries a transiently failed batch so the whole corpus is still covered", async () => {
+    const t = convexTest(schema, modules);
+    const CORPUS = PLACEMENT_CONTENT_BATCH_SIZE * 2 + 3; // inline page + 2 scheduled batches
+    const textIds = await seedPlacementCorpus(t, CORPUS);
+    // First text of the FIRST scheduled batch: the throw kills that batch's
+    // transaction, so its remaining texts are only covered if a retry re-runs
+    // the slice.
+    const poisonedId = textIds[PLACEMENT_CONTENT_BATCH_SIZE];
+    let poisonedCalls = 0;
+    scheduleMissingContentSpy.mockImplementation(async (...args: unknown[]) => {
+      if (args[1] === poisonedId && poisonedCalls++ === 0) {
+        throw new Error("transient placement failure");
+      }
+      return { translationsScheduled: 1, audioScheduled: 1 };
+    });
+
+    vi.useFakeTimers();
+    await t.mutation(internal.features.onboarding.ensureAudioForTestTranslations, {
+      targetLanguage: "es",
+      sourceLanguage: "en",
+    });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    // The retried batch re-ran its full slice, so every placement sentence —
+    // including the ones AFTER the poisoned text in the failed batch — was
+    // processed.
+    const processed = new Set(
+      scheduleMissingContentSpy.mock.calls.map((call) => call[1] as Id<"texts">),
+    );
+    expect(processed).toEqual(new Set(textIds));
+    // Exactly one failed attempt + one successful re-run for the poisoned text.
+    expect(poisonedCalls).toBe(2);
+  });
+
+  it("caps the retry chain at PLACEMENT_BATCH_MAX_ATTEMPTS and leaves other batches untouched", async () => {
+    const t = convexTest(schema, modules);
+    const CORPUS = PLACEMENT_CONTENT_BATCH_SIZE * 2 + 3; // inline page + 2 scheduled batches
+    const textIds = await seedPlacementCorpus(t, CORPUS);
+    const poisonedId = textIds[PLACEMENT_CONTENT_BATCH_SIZE];
+    scheduleMissingContentSpy.mockImplementation(async (...args: unknown[]) => {
+      if (args[1] === poisonedId) throw new Error("permanent placement failure");
+      return { translationsScheduled: 1, audioScheduled: 1 };
+    });
+
+    vi.useFakeTimers();
+    await t.mutation(internal.features.onboarding.ensureAudioForTestTranslations, {
+      targetLanguage: "es",
+      sourceLanguage: "en",
+    });
+    // Draining to completion also proves the chain is finite — an unbounded
+    // reschedule loop would never run out of scheduled functions.
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    // The poisoned text was attempted exactly once per attempt, then given up.
+    const poisonedCalls = scheduleMissingContentSpy.mock.calls.filter(
+      (call) => call[1] === poisonedId,
+    ).length;
+    expect(poisonedCalls).toBe(PLACEMENT_BATCH_MAX_ATTEMPTS);
+
+    // Inline page and the second scheduled batch are unaffected by the
+    // doomed batch's retries.
+    const processed = new Set(
+      scheduleMissingContentSpy.mock.calls.map((call) => call[1] as Id<"texts">),
+    );
+    for (const id of [
+      ...textIds.slice(0, PLACEMENT_CONTENT_BATCH_SIZE),
+      ...textIds.slice(PLACEMENT_CONTENT_BATCH_SIZE * 2),
+    ]) {
+      expect(processed.has(id)).toBe(true);
+    }
   });
 });

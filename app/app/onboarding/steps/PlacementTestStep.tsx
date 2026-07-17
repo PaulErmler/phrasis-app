@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Volume2, EyeOff, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import { OGTE_MIN_LEVEL, OGTE_MAX_LEVEL } from '@/lib/constants/onboarding';
 import {
   createStrategy,
   DEFAULT_STRATEGY,
@@ -467,13 +468,13 @@ function PlacementResult({
 }) {
   const t = useTranslations('Onboarding.placementTest.result');
   // Local adjustment — Easier / Harder nudge the level by ±1 within the
-  // 1..20 range without re-running the test. The user confirms with
+  // OGTE range without re-running the test. The user confirms with
   // "Continue" once they're happy with the displayed level.
   const [level, setLevel] = useState(finalLevel);
-  const atFloor = level <= 1;
-  const atCeil = level >= 20;
-  const moveUp = () => setLevel((l) => Math.min(20, l + 1));
-  const moveDown = () => setLevel((l) => Math.max(1, l - 1));
+  const atFloor = level <= OGTE_MIN_LEVEL;
+  const atCeil = level >= OGTE_MAX_LEVEL;
+  const moveUp = () => setLevel((l) => Math.min(OGTE_MAX_LEVEL, l + 1));
+  const moveDown = () => setLevel((l) => Math.max(OGTE_MIN_LEVEL, l - 1));
 
   return (
     <div

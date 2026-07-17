@@ -2,6 +2,7 @@
 
 import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
+import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import { cn } from '@/lib/utils';
 import {
   Popover,
@@ -79,9 +80,11 @@ export function AskAboutWord({
 }: AskAboutWordProps) {
   const chatContext = useLearningChatToggle();
   const t = useTranslations('Chat');
-  const [localOpen, setLocalOpen] = useState(false);
-  const open = openProp ?? localOpen;
-  const setOpen = onOpenChange ?? setLocalOpen;
+  const [open, setOpen] = useControllableState({
+    prop: openProp,
+    defaultProp: false,
+    onChange: onOpenChange,
+  });
   const cleaned = cleanWord(word);
 
   if (!chatContext || !cleaned) {
