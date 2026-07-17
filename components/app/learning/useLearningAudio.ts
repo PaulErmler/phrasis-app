@@ -56,19 +56,20 @@ export function useLearningAudio(
   // It carries its own settings copy, chained `*Transcribe ?? *Full ?? audio`.
   const isTranscribe =
     isFullMode && (cs?.writingInputMode ?? 'translate') === 'transcribe';
-  const autoPlay =
-    disableAutoPlay || settingsOpen
-      ? false
-      : isRadio
-        ? true
-        : isTranscribe
-          ? (cs?.autoPlayAudioTranscribe ??
-            cs?.autoPlayAudioFull ??
-            cs?.autoPlayAudio ??
-            DEFAULT_AUTO_PLAY)
-          : isFullMode
-            ? (cs?.autoPlayAudioFull ?? cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY)
-            : (cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY);
+  // The user's mode-resolved auto-play setting, before the disable gates.
+  // Also returned to callers that need to re-trigger playback after a gate
+  // releases (e.g. a tutorial popover being dismissed).
+  const userAutoPlay = isRadio
+    ? true
+    : isTranscribe
+      ? (cs?.autoPlayAudioTranscribe ??
+        cs?.autoPlayAudioFull ??
+        cs?.autoPlayAudio ??
+        DEFAULT_AUTO_PLAY)
+      : isFullMode
+        ? (cs?.autoPlayAudioFull ?? cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY)
+        : (cs?.autoPlayAudio ?? DEFAULT_AUTO_PLAY);
+  const autoPlay = disableAutoPlay || settingsOpen ? false : userAutoPlay;
 
   const cardSpeedOverrides =
     state.status === 'reviewing' ? state.audioSpeedOverrides : undefined;
@@ -181,5 +182,5 @@ export function useLearningAudio(
     state.setSettingsOpen(true);
   }, [audio, state]);
 
-  return { audio, openSettings };
+  return { audio, openSettings, userAutoPlay };
 }

@@ -44,7 +44,6 @@ import { LearningGoalStep } from './steps/LearningGoalStep';
 import { DailyTimeGoalStep } from './steps/DailyTimeGoalStep';
 import { ProficiencyBranchStep } from './steps/ProficiencyBranchStep';
 import { CefrSelfPickStep } from './steps/CefrSelfPickStep';
-import { CefrConfirmDialog } from './components/CefrConfirmDialog';
 import { PlacementTestStep } from './steps/PlacementTestStep';
 import { CustomizingStep } from './steps/CustomizingStep';
 import { FirstLessonStep } from './steps/FirstLessonStep';
@@ -331,11 +330,8 @@ function OnboardingWizard({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [history, setHistory] = useState<StepId[]>([]);
   // Live OGTE level the user has dialled in on the CEFR slider, kept in
-  // wizard state so the Continue button and confirm dialog can read it.
+  // wizard state so the Continue button can read it.
   const [cefrSlidLevel, setCefrSlidLevel] = useState<number>(8);
-  // Whether the CEFR confirm dialog is open (driven by the wizard's Continue
-  // button on the cefr-pick step).
-  const [cefrDialogOpen, setCefrDialogOpen] = useState(false);
   // Session snapshot from the embedded first lesson — drives the
   // stats-recap + word-projection screens. Reads from `data.firstLessonSummary`
   // (persisted in `onboardingProgress`) so a mid-flow reload doesn't drop
@@ -370,6 +366,15 @@ function OnboardingWizard({
   const persistDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persist = useCallback(
     (partial: Partial<OnboardingData>) => {
+      // Merge into the ref synchronously, not just via the layout effect:
+      // `advance`/`back` fire an immediate save from `dataRef.current` in
+      // the same tick as a preceding `persist(...)` (e.g. the level
+      // handlers do `persist({ currentLevel }); advance(...)`), and the
+      // layout-effect refresh only lands after the next commit. Without
+      // this eager merge that save writes the pre-persist data — dropping
+      // the just-selected field — while also cancelling the debounce that
+      // carried it, so the value never reaches the server.
+      dataRef.current = { ...dataRef.current, ...partial };
       setData((d) => ({ ...d, ...partial }));
       if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current);
       persistDebounceRef.current = setTimeout(() => {
@@ -470,15 +475,10 @@ function OnboardingWizard({
     }
   };
 
-  const onCefrConfirm = () => {
-    // Continue on cefr-pick opens the confirmation dialog rather than
-    // advancing directly. The dialog gives the user the choice between
-    // starting at the picked level or refining via a quick adaptive test.
-    setCefrDialogOpen(true);
-  };
-
-  const onCefrDialogStartHere = useCallback(() => {
-    setCefrDialogOpen(false);
+  // Continue on cefr-pick starts the course at the picked level directly —
+  // no confirmation dialog. Users who want the adaptive test instead reach it
+  // via the proficiency step's "take a test" branch.
+  const onCefrPickContinue = useCallback(() => {
     persist({
       currentLevel: ogteToCurrentLevel(cefrSlidLevel),
       placementTest: {
@@ -489,21 +489,6 @@ function OnboardingWizard({
       },
     });
     advance('customizing');
-  }, [cefrSlidLevel, persist, advance]);
-
-  const onCefrDialogTakeQuickTest = useCallback(() => {
-    setCefrDialogOpen(false);
-    // Seed the placement test with the user's picked level so the first
-    // question lands at their range.
-    persist({
-      placementTest: {
-        strategyVersion: CURRENT_PLACEMENT_STRATEGY_VERSION,
-        strategy: 'self-pick-seed',
-        history: [],
-        finalLevel: cefrSlidLevel,
-      },
-    });
-    advance('placement-test');
   }, [cefrSlidLevel, persist, advance]);
 
   const onPlacementComplete = (result: {
@@ -589,7 +574,7 @@ function OnboardingWizard({
       onProficiencyContinue();
       return;
     case 'cefr-pick':
-      onCefrConfirm();
+      onCefrPickContinue();
       return;
     default:
       return;
@@ -684,14 +669,6 @@ function OnboardingWizard({
           </div>
         </div>
       ) : null}
-
-      <CefrConfirmDialog
-        open={cefrDialogOpen}
-        ogteLevel={cefrSlidLevel}
-        onOpenChange={setCefrDialogOpen}
-        onStartHere={onCefrDialogStartHere}
-        onTakeQuickTest={onCefrDialogTakeQuickTest}
-      />
     </div>
   );
 }

@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery } from 'convex/react';
+import type { FunctionReturnType } from 'convex/server';
 import { api } from '@/convex/_generated/api';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Loader2 } from 'lucide-react';
+import { OGTE_MIN_LEVEL, OGTE_MAX_LEVEL } from '@/lib/constants/onboarding';
 import type { StrategyName } from '../lib/placementStrategies';
 
 interface Props {
@@ -25,9 +27,10 @@ interface Props {
 /**
  * CEFR self-pick — slider variant (live step).
  *
- * Continuous slider over OGTE levels 1..20. The current level's 5 placement-
- * test sentences are queried in the user's *target* language so the preview
- * matches what they'll see during learning.
+ * Continuous slider over OGTE levels 1..20. The preview corpus (5 placement-
+ * test sentences per level, in the user's *target* language so it matches
+ * what they'll see during learning) is fetched once for ALL levels, so
+ * dragging the slider re-renders instantly from memory.
  *
  * This step no longer owns a Continue button — the wizard footer's "Pick
  * this level" button handles confirmation (and opens a follow-up dialog
@@ -89,8 +92,8 @@ export function CefrSelfPickStep({
               </div>
               <Slider
                 value={[ogte]}
-                min={1}
-                max={20}
+                min={OGTE_MIN_LEVEL}
+                max={OGTE_MAX_LEVEL}
                 step={1}
                 onValueChange={handleChange}
                 aria-label={t('ariaLabel')}
@@ -117,6 +120,12 @@ export function CefrSelfPickStep({
   );
 }
 
+type PreviewSentence = FunctionReturnType<
+  typeof api.features.placementTest.getPlacementPreviewSentences
+>[number];
+
+const PREVIEW_POSITIONS = [0, 1, 2, 3, 4];
+
 function SamplePreview({
   ogteLevel,
   sourceLanguage,
@@ -127,64 +136,73 @@ function SamplePreview({
   targetLanguage: string;
 }) {
   const t = useTranslations('Onboarding.cefrPick');
-  const positions = useMemo(() => [0, 1, 2, 3, 4], []);
+  // One subscription for the WHOLE corpus (no per-(level, position) queries):
+  // sliding between levels renders instantly from memory instead of flashing
+  // five loading rows per tick while fresh queries resolve. Translations
+  // landing mid-onboarding still stream in reactively.
+  const corpus = useQuery(
+    api.features.placementTest.getPlacementPreviewSentences,
+    { targetLanguage, sourceLanguage },
+  );
+  const byLevel = useMemo(() => {
+    if (!corpus) return null;
+    const map = new Map<number, PreviewSentence[]>();
+    for (const row of corpus) {
+      const rows = map.get(row.level);
+      if (rows) rows.push(row);
+      else map.set(row.level, [row]);
+    }
+    return map;
+  }, [corpus]);
+
+  const levelRows = byLevel?.get(ogteLevel);
   return (
     <Card>
       <CardContent className="p-4 md:p-6 space-y-2">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">
           {t('samplesHeading', { level: ogteLevel.toString().padStart(2, '0') })}
         </div>
-        {positions.map((p) => (
-          <SampleRow
-            key={`${ogteLevel}-${p}`}
-            level={ogteLevel}
-            position={p}
-            sourceLanguage={sourceLanguage}
-            targetLanguage={targetLanguage}
-          />
-        ))}
+        {byLevel === null
+          ? PREVIEW_POSITIONS.map((p) => <SampleLoadingRow key={p} />)
+          : PREVIEW_POSITIONS.map((p) => (
+            <SampleRow
+              key={p}
+              sentence={levelRows?.find((row) => row.position === p) ?? null}
+              sourceLanguage={sourceLanguage}
+              targetLanguage={targetLanguage}
+            />
+          ))}
       </CardContent>
     </Card>
   );
 }
 
+/** Shown only while the one-time corpus fetch is in flight on step mount. */
+function SampleLoadingRow() {
+  const t = useTranslations('Onboarding.cefrPick');
+  const [showSpinner, setShowSpinner] = useState(false);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSpinner(true), 120);
+    return () => clearTimeout(timer);
+  }, []);
+  return (
+    <div className="rounded bg-muted/40 px-3 py-2 text-sm text-muted-foreground italic flex items-center gap-2">
+      {showSpinner ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+      {t('sampleLoading')}
+    </div>
+  );
+}
+
 function SampleRow({
-  level,
-  position,
+  sentence,
   sourceLanguage,
   targetLanguage,
 }: {
-  level: number;
-  position: number;
+  sentence: PreviewSentence | null;
   sourceLanguage: string;
   targetLanguage: string;
 }) {
   const t = useTranslations('Onboarding.cefrPick');
-  const sentence = useQuery(api.features.placementTest.getPlacementSentence, {
-    level,
-    position,
-    targetLanguage,
-    sourceLanguage,
-  });
-
-  const [showSpinner, setShowSpinner] = useState(false);
-  useEffect(() => {
-    if (sentence !== undefined) {
-      setShowSpinner(false);
-      return;
-    }
-    const timer = setTimeout(() => setShowSpinner(true), 120);
-    return () => clearTimeout(timer);
-  }, [sentence]);
-
-  if (sentence === undefined) {
-    return (
-      <div className="rounded bg-muted/40 px-3 py-2 text-sm text-muted-foreground italic flex items-center gap-2">
-        {showSpinner ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-        {t('sampleLoading')}
-      </div>
-    );
-  }
   if (sentence === null) {
     return (
       <div className="rounded bg-muted/40 px-3 py-2 text-sm text-muted-foreground italic">
@@ -211,8 +229,8 @@ function SampleRow({
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function clampOgte(n: number): number {
-  if (n < 1) return 1;
-  if (n > 20) return 20;
+  if (n < OGTE_MIN_LEVEL) return OGTE_MIN_LEVEL;
+  if (n > OGTE_MAX_LEVEL) return OGTE_MAX_LEVEL;
   return Math.round(n);
 }
 

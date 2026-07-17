@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useTranslations } from 'next-intl';
 import {
   alignWords,
   charDiff,
@@ -11,6 +10,8 @@ import {
   type AlignedWord,
   type CharChunk,
 } from '@/lib/textCompare';
+import { AskAboutWord } from './ClickableWords';
+import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
 
 interface WordDiffProps {
   expected: string;
@@ -184,7 +185,6 @@ export function WordDiff({
   hideAccuracy = false,
   hideErrors = false,
 }: WordDiffProps) {
-  const t = useTranslations('LearningMode');
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language)),
     [language],
@@ -200,12 +200,12 @@ export function WordDiff({
 
   if (hideErrors) {
     return (
-      <div>
-        <p className="leading-relaxed text-foreground">{expected}</p>
-        <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-          {t('accuracy')}: {accuracy}%
-        </p>
-      </div>
+      <CleanRevealedSentence
+        text={expected}
+        language={language}
+        accuracy={accuracy}
+        hideAccuracy={hideAccuracy}
+      />
     );
   }
 
@@ -213,16 +213,20 @@ export function WordDiff({
     <div>
       <p className="leading-relaxed flex flex-wrap items-baseline gap-x-1 gap-y-3 pt-3">
         {words.map((w, i) => (
-          <WordChip
+          // Chips whose baseline shows a sentence word (equal / missing /
+          // typo / wrong) get the ask-AI popover for it. `expected` is ''
+          // exactly for `extra` chips (the user's stray word isn't part of
+          // the sentence), and punctuation-only chips fall back to a plain
+          // wrapper inside AskAboutWord.
+          <AskAboutWord
             key={`${i}-${w.tag}-${w.expected ?? ''}-${w.actual ?? ''}`}
-            word={w}
-            language={language}
-          />
+            word={w.expected}
+          >
+            <WordChip word={w} language={language} />
+          </AskAboutWord>
         ))}
       </p>
-      <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-        {t('accuracy')}: {accuracy}%
-      </p>
+      <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
     </div>
   );
 }

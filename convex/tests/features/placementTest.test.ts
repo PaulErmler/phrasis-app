@@ -1,19 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { describe, it, expect, vi } from "vitest";
-
-vi.mock("@convex-dev/aggregate", () => {
-  class TableAggregate {
-    constructor(_component: unknown, _opts: unknown) {}
-    async insertIfDoesNotExist(): Promise<void> {}
-    async replaceOrInsert(): Promise<void> {}
-    async deleteIfExists(): Promise<void> {}
-    async count(): Promise<number> {
-      return 0;
-    }
-  }
-  return { TableAggregate };
-});
+import { describe, it, expect } from "vitest";
 
 import schema from "../../schema";
 import { api } from "../../_generated/api";
@@ -162,6 +149,79 @@ describe("getPlacementSentence", () => {
     expect(res!.sourceText).toBe("I have a cat.");
     expect(res!.sourceLanguage).toBe("en");
     expect(res!.targetText).toBe("J'ai un chat.");
+  });
+});
+
+describe("getPlacementPreviewSentences", () => {
+  it("returns the whole corpus in one call with translations resolved", async () => {
+    const t = convexTest(schema, modules);
+    await seedPlacementSentence(t, {
+      level: 1,
+      position: 0,
+      text: "A",
+      targetLanguage: "es",
+      targetText: "A-es",
+    });
+    // No translation yet — preview must still include the row.
+    await seedPlacementSentence(t, { level: 1, position: 1, text: "B" });
+    await seedPlacementSentence(t, {
+      level: 2,
+      position: 0,
+      text: "C",
+      targetLanguage: "es",
+      targetText: "C-es",
+    });
+
+    const rows = await t.query(
+      api.features.placementTest.getPlacementPreviewSentences,
+      { targetLanguage: "es", sourceLanguage: "en" },
+    );
+    expect(rows).toHaveLength(3);
+    const byKey = new Map(rows.map((r) => [`${r.level}-${r.position}`, r]));
+    expect(byKey.get("1-0")).toMatchObject({ sourceText: "A", targetText: "A-es" });
+    expect(byKey.get("1-1")).toMatchObject({ sourceText: "B" });
+    expect(byKey.get("1-1")!.targetText).toBeUndefined();
+    expect(byKey.get("2-0")).toMatchObject({ sourceText: "C", targetText: "C-es" });
+  });
+
+  it("renders the source side in the base language when its translation exists, else falls back to English", async () => {
+    const t = convexTest(schema, modules);
+    const { textId } = await seedPlacementSentence(t, {
+      level: 3,
+      position: 1,
+      text: "I have a cat.",
+      targetLanguage: "fr",
+      targetText: "J'ai un chat.",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("translations", {
+        textId,
+        targetLanguage: "es",
+        translatedText: "Tengo un gato.",
+      });
+    });
+    await seedPlacementSentence(t, {
+      level: 3,
+      position: 2,
+      text: "Dogs bark.",
+      targetLanguage: "fr",
+      targetText: "Les chiens aboient.",
+    });
+
+    const rows = await t.query(
+      api.features.placementTest.getPlacementPreviewSentences,
+      { targetLanguage: "fr", sourceLanguage: "es" },
+    );
+    const byPos = new Map(rows.map((r) => [r.position, r]));
+    expect(byPos.get(1)).toMatchObject({
+      sourceText: "Tengo un gato.",
+      targetText: "J'ai un chat.",
+    });
+    // Base-language translation hasn't landed for this row → English fallback.
+    expect(byPos.get(2)).toMatchObject({
+      sourceText: "Dogs bark.",
+      targetText: "Les chiens aboient.",
+    });
   });
 });
 

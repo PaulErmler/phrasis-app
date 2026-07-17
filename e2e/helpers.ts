@@ -37,7 +37,9 @@ export interface OnboardingWalkOptions {
   placementMaxQuestions?: number;
   // First lesson — default skips (faster, doesn't depend on TTS readiness).
   // Set `mode` to drive a real lesson via Audio or Full Review.
-  firstLesson?: "skip" | { mode: "audio" | "full"; cardsToRate?: number };
+  firstLesson?:
+    | "skip"
+    | { mode: "audio" | "translate" | "transcribe"; cardsToRate?: number };
   // Plan pick — default uses the "Maybe later" link (stays on Free).
   planPick?: "skip";
 }
@@ -50,7 +52,7 @@ export interface OnboardingWalkOptions {
  *
  * Step path (see app/app/onboarding/page.tsx for the canonical order):
  *   language-pair → acquisition → goal → daily-time → proficiency →
- *   (cefr-pick + dialog | placement-test + result | none) →
+ *   (cefr-pick | placement-test + result | none) →
  *   customizing (auto) → first-lesson → stats-recap → word-projection →
  *   feature-tour → plan-pick → /app.
  */
@@ -129,12 +131,9 @@ export async function completeOnboardingFresh(
     await expect(page.getByTestId("onboarding-step-cefr-pick")).toBeVisible({
       timeout: 20_000,
     });
-    // Default slider position is fine for the walk — confirm + start.
+    // Default slider position is fine for the walk — Continue starts the
+    // course at the picked level directly (no confirmation dialog).
     await page.getByTestId("onboarding-continue").click();
-    await expect(page.getByTestId("cefr-confirm-dialog")).toBeVisible({
-      timeout: 10_000,
-    });
-    await page.getByTestId("cefr-confirm-start-here").click();
   } else {
     // proficiency === "test" — run the placement test deterministically.
     await expect(page.getByTestId("onboarding-step-placement-test")).toBeVisible({
@@ -394,6 +393,11 @@ export async function isSelectedTestId(
  * doesn't bypass Playwright's viewport check, and `position: fixed` defeats
  * auto-scroll — polling the bounding box waits the animation out
  * deterministically.
+ *
+ * Each iteration re-issues `scrollIntoView` before checking: a settings
+ * re-render (Convex subscription update) can reset the sheet's inner scroll
+ * position after a caller's one-shot scroll, leaving the element below the
+ * fold forever if the poll only reads the bounding box.
  */
 export async function waitForInViewport(
   page: Page,
@@ -405,6 +409,9 @@ export async function waitForInViewport(
   await expect
     .poll(
       async () => {
+        await locator
+          .evaluate((el) => el.scrollIntoView({ block: "center" }))
+          .catch(() => {}); // detached mid-render — next interval retries
         const box = await locator.boundingBox();
         if (!box) return false;
         return (

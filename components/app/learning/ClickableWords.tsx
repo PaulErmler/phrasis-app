@@ -1,7 +1,8 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
+import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import { cn } from '@/lib/utils';
 import {
   Popover,
@@ -48,6 +49,96 @@ function cleanWord(display: string): string {
   return display.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, '');
 }
 
+interface AskAboutWordProps {
+  /** The sentence word the popover asks about (punctuation is stripped). */
+  word: string;
+  className?: string;
+  children: ReactNode;
+  /** Controlled open state — pass both to share open-state across words
+   *  (ClickableWords' single-open `openIndex`). Omit for local state. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Passed through to the trigger span as `data-coachmark-anchor` so
+   *  onboarding's driver.js step can target this word. */
+  coachmarkAnchor?: string;
+}
+
+/**
+ * Per-word "Ask AI" popover — the single implementation of the clickable
+ * word trigger, used both by ClickableWords' word loop and by content that
+ * renders its own word visuals (e.g. the writing-mode diff chips). Falls
+ * back to a plain span when there's no chat context (landing demo) or the
+ * word is punctuation-only.
+ */
+export function AskAboutWord({
+  word,
+  className,
+  children,
+  open: openProp,
+  onOpenChange,
+  coachmarkAnchor,
+}: AskAboutWordProps) {
+  const chatContext = useLearningChatToggle();
+  const t = useTranslations('Chat');
+  const [open, setOpen] = useControllableState({
+    prop: openProp,
+    defaultProp: false,
+    onChange: onOpenChange,
+  });
+  const cleaned = cleanWord(word);
+
+  if (!chatContext || !cleaned) {
+    // No wrapper span in the bare case — e.g. punctuation chips rely on
+    // being direct flex children (their -ml-1 cancels the parent's gap).
+    return className ? (
+      <span className={className}>{children}</span>
+    ) : (
+      <>{children}</>
+    );
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <span
+          role="button"
+          tabIndex={0}
+          aria-label={t('askAboutWord', { word: cleaned })}
+          data-testid="clickable-word"
+          data-coachmark-anchor={coachmarkAnchor}
+          className={cn('cursor-pointer', className)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setOpen(!open);
+            }
+          }}
+        >
+          {children}
+        </span>
+      </PopoverTrigger>
+      <PopoverContent
+        className="w-auto p-1"
+        side="top"
+        align="center"
+        sideOffset={6}
+      >
+        <Button
+          size="sm"
+          variant="secondary"
+          data-testid="ask-ai-button"
+          onClick={() => {
+            chatContext.openChatWithPrompt(t('explainWord', { word: cleaned }));
+            setOpen(false);
+          }}
+        >
+          {t('askAI')}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 const MIN_MATCH_RATIO = 0.5;
 
 /**
@@ -69,7 +160,6 @@ export function ClickableWords({
   interactive = true,
 }: Props) {
   const chatContext = useLearningChatToggle();
-  const t = useTranslations('Chat');
 
   const aligned = useMemo(
     () => alignWordTimings(text, wordTimings, language),
@@ -119,13 +209,6 @@ export function ClickableWords({
     );
   }
 
-  const handleAsk = (word: string) => {
-    const cleaned = cleanWord(word);
-    if (!cleaned) return;
-    chatContext.openChatWithPrompt(t('explainWord', { word: cleaned }));
-    setOpenIndex(null);
-  };
-
   // Tag the longest cleaned word with a `data-coachmark-anchor` *only* when
   // the caller opted in (target-language instance). Without the opt-in, the
   // first ClickableWords in DOM order would win the global query selector —
@@ -150,50 +233,21 @@ export function ClickableWords({
         // the <p> participate directly in the parent bidi context.
         <Fragment key={i}>
           {w.leading}
-          <Popover
+          <AskAboutWord
+            word={w.display}
             open={openIndex === i}
             onOpenChange={(open) => setOpenIndex(open ? i : null)}
+            coachmarkAnchor={
+              i === longestWordIndex ? coachmarkAnchorForLongestWord : undefined
+            }
+            className={cn(
+              'rounded-sm transition-colors duration-200 hover:bg-muted',
+              i === currentIndex && 'text-primary',
+              openIndex === i && 'text-warning hover:bg-transparent',
+            )}
           >
-            <PopoverTrigger asChild>
-              <span
-                role="button"
-                tabIndex={0}
-                aria-label={t('askAboutWord', { word: cleanWord(w.display) })}
-                data-testid="clickable-word"
-                data-coachmark-anchor={
-                  i === longestWordIndex ? coachmarkAnchorForLongestWord : undefined
-                }
-                className={cn(
-                  'cursor-pointer rounded-sm transition-colors duration-200 hover:bg-muted',
-                  i === currentIndex && 'text-primary',
-                  openIndex === i && 'text-warning hover:bg-transparent',
-                )}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    setOpenIndex((prev) => (prev === i ? null : i));
-                  }
-                }}
-              >
-                {w.display}
-              </span>
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-auto p-1"
-              side="top"
-              align="center"
-              sideOffset={6}
-            >
-              <Button
-                size="sm"
-                variant="secondary"
-                data-testid="ask-ai-button"
-                onClick={() => handleAsk(w.display)}
-              >
-                {t('askAI')}
-              </Button>
-            </PopoverContent>
-          </Popover>
+            {w.display}
+          </AskAboutWord>
           {w.trailing}
         </Fragment>
       ))}

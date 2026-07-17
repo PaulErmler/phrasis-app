@@ -152,9 +152,11 @@ export function LearningCardContent({
 
   const [manuallyRevealed, setManuallyRevealed] = useState<Set<string>>(new Set());
 
-  // Capture the signal value at mount so we don't treat a stale non-zero value
-  // (left over from the previous card) as a fresh "reveal all" request.
-  const mountRevealSignalRef = useRef(revealAllSignal);
+  // Last processed reveal signal. Initialized to the mount value so a stale
+  // nonce from before this mount isn't treated as a fresh "reveal all"
+  // request; after that, any change is one (the nonce is monotonic — the
+  // parent never resets it, so no value can collide with an older one).
+  const lastRevealSignalRef = useRef(revealAllSignal);
 
   const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
   const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
@@ -196,7 +198,8 @@ export function LearningCardContent({
   }, [allTargetsRevealed, onAllTargetsRevealedChange]);
 
   useEffect(() => {
-    if (revealAllSignal === 0 || revealAllSignal === mountRevealSignalRef.current) return;
+    if (revealAllSignal === lastRevealSignalRef.current) return;
+    lastRevealSignalRef.current = revealAllSignal;
     setManuallyRevealed((prev) => {
       const next = new Set(prev);
       for (const lang of targetLanguages) {

@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useTranslations } from 'next-intl';
 import {
   charDiff,
   alignWords,
@@ -10,6 +9,7 @@ import {
   toDiffOptions,
 } from '@/lib/textCompare';
 import { WordDiff } from './WordDiff';
+import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
 
 interface DiffDisplayProps {
   expected: string;
@@ -43,7 +43,6 @@ export function DiffDisplay({
   hideAccuracy = false,
   hideErrors = false,
 }: DiffDisplayProps) {
-  const t = useTranslations('LearningMode');
   const cfg = getCompareConfig(language);
 
   if (cfg.hasWordBoundaries) {
@@ -65,7 +64,6 @@ export function DiffDisplay({
       language={language}
       hideAccuracy={hideAccuracy}
       hideErrors={hideErrors}
-      accuracyLabel={t('accuracy')}
     />
   );
 }
@@ -76,7 +74,6 @@ interface CharDiffViewProps {
   language: string;
   hideAccuracy: boolean;
   hideErrors: boolean;
-  accuracyLabel: string;
 }
 
 function CharDiffView({
@@ -85,7 +82,6 @@ function CharDiffView({
   language,
   hideAccuracy,
   hideErrors,
-  accuracyLabel,
 }: CharDiffViewProps) {
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language)),
@@ -97,12 +93,26 @@ function CharDiffView({
   );
   const accuracyPct = Math.round(accuracy * 100);
 
+  // Clean revealed sentence — the char chunks reassemble to exactly
+  // `expected` once 'added' runs are hidden, so render it via
+  // ClickableWords instead: locale-aware segmentation makes each word
+  // clickable (ask-AI popover), matching the shadowing-mode card.
+  if (hideErrors) {
+    return (
+      <CleanRevealedSentence
+        text={expected}
+        language={language}
+        accuracy={accuracyPct}
+        hideAccuracy={hideAccuracy}
+      />
+    );
+  }
+
   return (
     <div>
       <p className="leading-relaxed">
         {chunks.map((chunk, i) => {
           if (chunk.kind === 'added') {
-            if (hideErrors) return null;
             return (
               <span
                 key={i}
@@ -116,33 +126,20 @@ function CharDiffView({
             return (
               <span
                 key={i}
-                className={
-                  hideErrors
-                    ? 'text-foreground'
-                    : 'text-foreground bg-muted rounded-sm px-0.5'
-                }
+                className="text-foreground bg-muted rounded-sm px-0.5"
               >
                 {chunk.text}
               </span>
             );
           }
           return (
-            <span
-              key={i}
-              className={
-                hideErrors
-                  ? 'text-foreground'
-                  : 'bg-success/15 text-success rounded-sm px-0.5'
-              }
-            >
+            <span key={i} className="bg-success/15 text-success rounded-sm px-0.5">
               {chunk.text}
             </span>
           );
         })}
       </p>
-      <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-        {accuracyLabel}: {accuracyPct}%
-      </p>
+      <AccuracyFooter accuracy={accuracyPct} hideAccuracy={hideAccuracy} />
     </div>
   );
 }

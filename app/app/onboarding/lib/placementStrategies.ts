@@ -8,8 +8,13 @@
  * live onboarding uses.
  */
 
-export const MIN_LEVEL = 1;
-export const MAX_LEVEL = 20;
+import { OGTE_MIN_LEVEL, OGTE_MAX_LEVEL } from '@/lib/constants/onboarding';
+
+// Re-exported under the strategy-local names; the canonical bounds live in
+// lib/constants/onboarding.ts so the server's starting-collection resolution
+// and this client-side placement logic can't drift apart.
+export const MIN_LEVEL = OGTE_MIN_LEVEL;
+export const MAX_LEVEL = OGTE_MAX_LEVEL;
 
 /**
  * Schema-version of placement-state rows. Stamped on every

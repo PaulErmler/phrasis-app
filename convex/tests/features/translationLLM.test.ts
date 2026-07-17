@@ -22,11 +22,12 @@ import { resolveTranslationStages } from "../../../lib/languages";
 
 describe("features/translationLLM", () => {
   describe("translation rules", () => {
-    it("default_hybrid: Gemini 3.5 Flash Nitro (minimal) primary AND fallback", () => {
-      // 'nl' has no `translationRule` set → defaults to `default_hybrid`.
-      // Length-hybrid branching was retired — every source length runs
-      // the same chain. Fallback is the same config as primary; it only
-      // exists to retry once on transient HTTP errors before Google.
+    it("default rule: Gemini 3.5 Flash Nitro (minimal) primary AND fallback", () => {
+      // No language sets `translationRule` → all default to
+      // `gemini_35_flash_nitro_minimal`. Length-hybrid branching was
+      // retired — every source length runs the same chain. Fallback is the
+      // same config as primary; it only exists to retry once on transient
+      // HTTP errors before Google.
       const stages = resolveTranslationStages("nl", 12);
       expect(stages.length).toBe(2);
       const nitroMinimal = {
@@ -38,7 +39,7 @@ describe("features/translationLLM", () => {
       expect(stages[1]).toEqual(nitroMinimal);
     });
 
-    it("default_hybrid is length-agnostic — same chain for short and long inputs", () => {
+    it("default rule is length-agnostic — same chain for short and long inputs", () => {
       // Lengths are arbitrary — length-hybrid branching was retired, so any
       // short vs long pair must resolve to the same chain.
       const short = resolveTranslationStages("nl", 5);
@@ -46,7 +47,7 @@ describe("features/translationLLM", () => {
       expect(short).toEqual(long);
     });
 
-    it("de uses gemini_35_flash_nitro_minimal (minimal thinking, primary + fallback)", () => {
+    it("de uses the gemini_35_flash_nitro_minimal default (minimal thinking, primary + fallback)", () => {
       const stages = resolveTranslationStages("de", 12);
       expect(stages.length).toBe(2);
       const nitroMinimal = {
@@ -58,7 +59,7 @@ describe("features/translationLLM", () => {
       expect(stages[1]).toEqual(nitroMinimal);
     });
 
-    it("fr uses gemini_35_flash_nitro_minimal (minimal thinking, primary + fallback)", () => {
+    it("fr uses the gemini_35_flash_nitro_minimal default (minimal thinking, primary + fallback)", () => {
       const stages = resolveTranslationStages("fr", 12);
       expect(stages.length).toBe(2);
       const nitroMinimal = {
@@ -100,7 +101,7 @@ describe("features/translationLLM", () => {
       });
     });
 
-    it("zh is pinned to gemini_35_flash_nitro_minimal (with a translationVersion bump)", () => {
+    it("zh uses the gemini_35_flash_nitro_minimal default (with a translationVersion bump)", () => {
       const stages = resolveTranslationStages("zh", 12);
       expect(stages.length).toBe(2);
       expect(stages[0].model).toBe("google/gemini-3.5-flash:nitro");
@@ -109,7 +110,7 @@ describe("features/translationLLM", () => {
       expect(stages[1].reasoning).toBe("minimal");
     });
 
-    it("unknown language code falls through to default_hybrid", () => {
+    it("unknown language code falls through to the default rule", () => {
       const stages = resolveTranslationStages("zz", 100);
       expect(stages.length).toBe(2);
       expect(stages[0].model).toBe("google/gemini-3.5-flash:nitro");

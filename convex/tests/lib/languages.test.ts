@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { describe, it, expect } from "vitest";
 import {
+  getCurrentTranslationVersion,
   getTranslationConfigForLanguage,
   resolveTranslationStages,
 } from "../../../lib/languages";
@@ -26,6 +27,22 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
     expect(getTranslationConfigForLanguage("he").targetLangName).toBe(
       "Modern Hebrew",
     );
+  });
+
+  it("uses translationName override when present (Thai → Standard Thai)", () => {
+    expect(getTranslationConfigForLanguage("th").targetLangName).toBe(
+      "Standard Thai",
+    );
+  });
+
+  it("bumps translationVersion for languages whose prompt pins script or register", () => {
+    // Serbian: prompt now pins Cyrillic output.
+    expect(getCurrentTranslationVersion("sr")).toBe(2);
+    // Taiwanese Mandarin / Cantonese: prompt now pins vocabulary + register.
+    expect(getCurrentTranslationVersion("zh_traditional")).toBe(3);
+    expect(getCurrentTranslationVersion("yue")).toBe(3);
+    expect(getCurrentTranslationVersion("yue_traditional")).toBe(3);
+    expect(getCurrentTranslationVersion("th")).toBe(3);
   });
 
   it("populates targetRegion correctly for region-specific variants", () => {
@@ -76,7 +93,7 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
 });
 
 describe("lib/languages — resolveTranslationStages", () => {
-  it("returns the default_hybrid chain (primary + one fallback) for an unruled language", () => {
+  it("returns the default gemini_35_flash_nitro_minimal chain (primary + one fallback) for an unruled language", () => {
     const stages = resolveTranslationStages("nl", 50);
     expect(stages.length).toBe(2);
     expect(stages[0].model).toBe("google/gemini-3.5-flash:nitro");

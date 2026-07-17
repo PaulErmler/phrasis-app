@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TranslateFn } from '@/lib/tutorials/types';
 
@@ -57,6 +57,12 @@ export interface OnboardingTutorialOptions {
    *  Parent uses this to keep audio paused for the lifetime of staged
    *  popovers (card-actions, word-tap) — not just the core stage. */
   onActiveChange?: (active: boolean) => void;
+  /** Fires synchronously inside the click that dismisses a popover — and
+   *  ONLY for user dismissals, never for programmatic teardowns (stage
+   *  replacement, effect cleanup). Use for work that must keep the user
+   *  gesture, e.g. starting the detached card audio (iOS refuses
+   *  `.play()` outside a gesture on an element that has never played). */
+  onUserDismiss?: () => void;
 }
 
 type Stage = 'core' | 'mode-switch' | 'card-actions' | 'word-tap' | 'chat';
@@ -67,6 +73,75 @@ const CARDS_FOR_WORD_TAP = 3;
 // popovers don't pile on top of each other on small screens.
 const CARDS_FOR_CHAT = CARDS_FOR_WORD_TAP + 3;
 
+// Anchors each staged tutorial highlights — shared between the settle wait
+// below and the step builders so the two can never drift apart.
+const CARD_ACTIONS_SELECTOR = '[data-coachmark-anchor="card-actions"]';
+const WORD_TAP_SELECTOR = '[data-coachmark-anchor="word-tap"]';
+const CHAT_SELECTOR =
+  '[data-coachmark-anchor="chat-button-desktop"], [data-tutorial="chat-button"]';
+
+/**
+ * Invoke `onSettled` once `selector` resolves to a visible, attached element
+ * whose rect has stopped moving (identical across `stableFrames` consecutive
+ * frames). The staged tutorials fire right after a rating, which also kicks
+ * off the AnimatePresence card swap (~150ms exit + ~150ms enter) — and
+ * driver.js draws its highlight exactly once, so a rect measured mid
+ * slide-in leaves the stage sitting where the element USED to be, or on the
+ * outgoing card's copy that unmounts a frame later. `minDelayMs` keeps the
+ * previous 350ms floor so the check can't latch onto the outgoing card
+ * while it's still stationary pre-exit; `timeoutMs` guarantees the popover
+ * always mounts even if the element never shows up (runStage then falls
+ * back to a centered modal, as before).
+ */
+function whenElementSettled(
+  selector: string,
+  onSettled: () => void,
+  { minDelayMs = 350, timeoutMs = 2000, stableFrames = 3 } = {},
+): void {
+  const startedAt = performance.now();
+  let lastEl: Element | null = null;
+  let lastRect: DOMRect | null = null;
+  let stableCount = 0;
+  const tick = () => {
+    const elapsed = performance.now() - startedAt;
+    if (elapsed >= timeoutMs) {
+      onSettled();
+      return;
+    }
+    if (elapsed >= minDelayMs) {
+      let el: Element | null = null;
+      let rect: DOMRect | null = null;
+      for (const candidate of document.querySelectorAll(selector)) {
+        const r = candidate.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) {
+          el = candidate;
+          rect = r;
+          break;
+        }
+      }
+      const isStable =
+        el !== null &&
+        el === lastEl &&
+        el.isConnected &&
+        rect !== null &&
+        lastRect !== null &&
+        Math.abs(rect.top - lastRect.top) < 0.5 &&
+        Math.abs(rect.left - lastRect.left) < 0.5 &&
+        Math.abs(rect.width - lastRect.width) < 0.5 &&
+        Math.abs(rect.height - lastRect.height) < 0.5;
+      stableCount = isStable ? stableCount + 1 : 0;
+      if (stableCount >= stableFrames) {
+        onSettled();
+        return;
+      }
+      lastEl = el;
+      lastRect = rect;
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 export function useOnboardingLessonTutorial({
   t,
   reviewMode,
@@ -75,6 +150,7 @@ export function useOnboardingLessonTutorial({
   onStepShow,
   onCoreComplete,
   onActiveChange,
+  onUserDismiss,
 }: OnboardingTutorialOptions) {
   const activeDriverRef = useRef<Driver | null>(null);
   const firedStagesRef = useRef<Set<Stage>>(new Set());
@@ -112,10 +188,12 @@ export function useOnboardingLessonTutorial({
   const onStepShowRef = useRef(onStepShow);
   const onCoreCompleteRef = useRef(onCoreComplete);
   const onActiveChangeRef = useRef(onActiveChange);
+  const onUserDismissRef = useRef(onUserDismiss);
   useEffect(() => {
     onStepShowRef.current = onStepShow;
     onCoreCompleteRef.current = onCoreComplete;
     onActiveChangeRef.current = onActiveChange;
+    onUserDismissRef.current = onUserDismiss;
   });
 
   // Hold the translator in a ref so the effects below stay stable across
@@ -130,6 +208,13 @@ export function useOnboardingLessonTutorial({
   const transcribeRef = useRef(transcribe);
   transcribeRef.current = transcribe;
 
+  // `onDestroyStarted` fires for programmatic destroys too (stage
+  // replacement, effect cleanup) — this flag lets it tell those apart from
+  // a real user dismissal so `onUserDismiss` never fires without a gesture.
+  // Torn down via the module-level `teardownActiveDriver(refs)` so the
+  // functions below keep a refs-only closure (stable for exhaustive-deps).
+  const programmaticTeardownRef = useRef(false);
+
   const runStage = (
     stage: Stage,
     steps: DriveStep[],
@@ -142,10 +227,7 @@ export function useOnboardingLessonTutorial({
     firedStagesRef.current.add(stage);
 
     // Tear down any in-flight driver before mounting the next.
-    if (activeDriverRef.current) {
-      activeDriverRef.current.destroy();
-      activeDriverRef.current = null;
-    }
+    teardownActiveDriver(activeDriverRef, programmaticTeardownRef);
 
     const resolved: DriveStep[] = steps.map((step) => {
       if (typeof step.element !== 'string') return step;
@@ -179,6 +261,11 @@ export function useOnboardingLessonTutorial({
         }
         activeDriverRef.current = null;
         onActiveChangeRef.current?.(false);
+        // Still inside the dismissing click's call stack — the one place
+        // gesture-bound work (starting the card audio) can run on iOS.
+        if (!programmaticTeardownRef.current) {
+          onUserDismissRef.current?.();
+        }
         d.destroy();
       },
     });
@@ -232,59 +319,73 @@ export function useOnboardingLessonTutorial({
     }, 600);
     return () => {
       clearTimeout(timer);
-      if (activeDriverRef.current) {
-        activeDriverRef.current.destroy();
-        activeDriverRef.current = null;
-      }
+      teardownActiveDriver(activeDriverRef, programmaticTeardownRef);
     };
   }, [reviewMode]);
 
   // Staged tutorials — fire based on card-count thresholds. Each stage
-  // runs its open-helper (if any) + pauses audio synchronously, then waits
-  // for the card transition + menu animation to settle before mounting
-  // driver.js. A flat ~350ms setTimeout is the simplest reliable signal:
-  // card slide-in is ~300ms, dropdown open is ~150ms.
+  // pauses audio synchronously, then waits for its anchor element to exist
+  // AND stop moving (the card swap animation must finish — see
+  // `whenElementSettled`) before mounting driver.js, so the highlight is
+  // drawn at the element's final position instead of mid slide-in.
   //
-  // CRITICAL: claim the stage in `firedStagesRef` BEFORE the setTimeout
-  // returns, otherwise an effect re-run during the 350ms window (the next
+  // CRITICAL: claim the stage in `firedStagesRef` BEFORE the settle wait
+  // returns, otherwise an effect re-run during that window (the next
   // card rating bumps `cardsRated` again) would see the stage as unfired,
   // re-enter the branch, and skip ahead — leaving the popover unmounted
-  // forever. Don't clean up timers either; once claimed the schedule is
-  // committed and the timer must fire.
+  // forever. Don't cancel the wait either; once claimed the schedule is
+  // committed and the callback must fire.
   useEffect(() => {
     if (cardsRated >= CARDS_FOR_CARD_ACTIONS && !firedStagesRef.current.has('card-actions')) {
       firedStagesRef.current.add('card-actions');
       // Flip `tutorialActive` to true synchronously so the audio
       // play-blocker in `OnboardingFirstLesson` is installed BEFORE the
-      // 350ms scheduling delay — without this, audio could (re)start
-      // during that window because the gate is still open.
+      // scheduling delay — without this, audio could (re)start during
+      // that window because the gate is still open.
       onActiveChangeRef.current?.(true);
       pauseAllAudioNow();
-      setTimeout(() => {
+      whenElementSettled(CARD_ACTIONS_SELECTOR, () => {
         // Highlight the kebab button only — the popover points at it but
         // does NOT auto-open the dropdown menu. Previously we opened it
         // automatically; that surprised users who wanted to read the
         // explanation, then tap the kebab themselves.
         runStage('card-actions', buildCardActionsSteps(tRef.current), { animate: false });
-      }, 350);
+      });
     }
     if (cardsRated >= CARDS_FOR_WORD_TAP && !firedStagesRef.current.has('word-tap')) {
       firedStagesRef.current.add('word-tap');
       onActiveChangeRef.current?.(true);
       pauseAllAudioNow();
-      setTimeout(() => {
+      whenElementSettled(WORD_TAP_SELECTOR, () => {
         runStage('word-tap', buildWordTapSteps(tRef.current));
-      }, 350);
+      });
     }
     if (cardsRated >= CARDS_FOR_CHAT && !firedStagesRef.current.has('chat')) {
       firedStagesRef.current.add('chat');
       onActiveChangeRef.current?.(true);
       pauseAllAudioNow();
-      setTimeout(() => {
+      whenElementSettled(CHAT_SELECTOR, () => {
         runStage('chat', buildChatSteps(tRef.current));
-      }, 350);
+      });
     }
   }, [cardsRated]);
+}
+
+/** Destroy the in-flight driver (if any) with the programmatic-teardown
+ *  flag raised, so `onDestroyStarted` can tell this apart from a user
+ *  dismissal and skip the gesture-bound `onUserDismiss` work. */
+function teardownActiveDriver(
+  activeDriverRef: RefObject<Driver | null>,
+  programmaticTeardownRef: RefObject<boolean>,
+): void {
+  if (!activeDriverRef.current) return;
+  programmaticTeardownRef.current = true;
+  try {
+    activeDriverRef.current.destroy();
+  } finally {
+    programmaticTeardownRef.current = false;
+  }
+  activeDriverRef.current = null;
 }
 
 /** Pause any playing `<audio>`/`<video>` immediately. Used inside the
@@ -486,7 +587,7 @@ export function buildModeSwitchSteps(
 export function buildCardActionsSteps(t: TranslateFn): DriveStep[] {
   return [
     {
-      element: '[data-coachmark-anchor="card-actions"]',
+      element: CARD_ACTIONS_SELECTOR,
       popover: {
         title: t('cardActions.title'),
         description: t('cardActions.description'),
@@ -500,7 +601,7 @@ export function buildCardActionsSteps(t: TranslateFn): DriveStep[] {
 export function buildWordTapSteps(t: TranslateFn): DriveStep[] {
   return [
     {
-      element: '[data-coachmark-anchor="word-tap"]',
+      element: WORD_TAP_SELECTOR,
       popover: {
         title: t('wordTap.title'),
         description: t('wordTap.description'),
@@ -514,8 +615,7 @@ export function buildWordTapSteps(t: TranslateFn): DriveStep[] {
 export function buildChatSteps(t: TranslateFn): DriveStep[] {
   return [
     {
-      element:
-        '[data-coachmark-anchor="chat-button-desktop"], [data-tutorial="chat-button"]',
+      element: CHAT_SELECTOR,
       popover: {
         title: t('chat.title'),
         description: t('chat.description'),

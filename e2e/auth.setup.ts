@@ -31,7 +31,6 @@ import { completeOnboardingFresh, type OnboardingWalkOptions } from "./helpers";
  * `getPlacementSentence`, the placement question loop). The other wizard
  * variants (self-pick, "Other" goal free-text, mid-wizard reload) are
  * covered by unit/component tests — see:
- *   - tests/components/onboarding/CefrConfirmDialog.test.tsx (self-pick)
  *   - tests/components/onboarding/{AcquisitionSourceStep,LearningGoalStep}.test.tsx (free-text)
  *   - convex/tests/features/onboarding.test.ts (server-side resume + idempotency)
  *

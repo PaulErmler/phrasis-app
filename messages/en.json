@@ -982,12 +982,6 @@
       "sampleLoading": "Loading…",
       "sampleEmpty": "No sample available at this level yet."
     },
-    "cefrConfirm": {
-      "title": "Start at level {level}?",
-      "description": "We'll begin your course at <badge></badge>. You can also take a quick test starting from this level — that's the most accurate way to find your exact spot.",
-      "startHere": "Yes, start here",
-      "takeQuickTest": "Take a quick test instead"
-    },
     "placementTest": {
       "questionLabel": "Question {n}",
       "prompt": "Do you know how to translate this?",
@@ -1039,19 +1033,13 @@
           "description": "Listen to a sentence, translate it in your head, then say it aloud to practice your pronunciation. Speak from day one — hands-free anywhere.",
           "footnote": "Best with headphones · Recommended"
         },
-        "full": {
-          "title": "Writing",
-          "description": "Type your translation and get instant, character-level spelling feedback. The fastest way to master writing.",
-          "styles": {
-            "translate": {
-              "title": "Translate",
-              "description": "Hear your language, type the translation."
-            },
-            "transcribe": {
-              "title": "Transcribe",
-              "description": "Hear only the target language, type what you hear."
-            }
-          }
+        "translate": {
+          "title": "Translate",
+          "description": "Hear your language, type the translation — with instant, character-level spelling feedback."
+        },
+        "transcribe": {
+          "title": "Transcribe",
+          "description": "Hear only the target language, type what you hear — with instant, character-level spelling feedback."
         }
       },
       "duration": "About 10 minutes",
@@ -1108,8 +1096,8 @@
       "subtitle": "Quick tour of features you'll want to know about.",
       "slides": {
         "audioMode": {
-          "title": "Three ways to use Flexling",
-          "body": "Shadowing is the heart of Flexling — listen, translate, then say each sentence aloud, hands-free anywhere. Prefer typing? Writing gives you instant spelling feedback. And Radio plays sentences in the background all day. Mix and match however you like."
+          "title": "How to use shadowing?",
+          "body": "Shadowing is the heart of Flexling — listen, translate, then say it aloud. You can also do this while taking a walk. This is my absolute favorite way to learn a language and I really recommend giving it a try!"
         },
         "custom": {
           "title": "Add custom cards",
@@ -1208,8 +1196,8 @@
         "description": "When a card is new, the target language plays once at the beginning so you hear what you're aiming for. Then the base language plays, pauses for you to think, and the target follows. Restart, play / pause, or skip to the next card here. The undo button on the far left takes back your last rating and brings the previous card back."
       },
       "audioPlay": {
-        "title": "Press play to start",
-        "description": "Audio is paused right now while we walk you through the lesson. Press play whenever you're ready to hear the first sentence."
+        "title": "Audio starts when you close this",
+        "description": "Audio is paused while we walk you through the lesson. As soon as you close this, the first sentence plays automatically — use these controls to pause or replay it anytime."
       },
       "rating": {
         "title": "Rate how well you knew it",

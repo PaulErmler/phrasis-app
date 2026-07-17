@@ -146,6 +146,13 @@ interface LearnViewProps {
    *  card audio silent while the first-lesson coachmarks are running so the
    *  spoken sentence doesn't fight the popover. */
   forceDisableAutoPlay?: boolean;
+  /** Onboarding-only: hands the wizard an imperative "kick playback" so it
+   *  can start the card audio synchronously inside the popover-dismiss
+   *  click. The merged audio lives in a detached `new Audio()` element that
+   *  has never played, so iOS Safari rejects any `.play()` issued outside a
+   *  user gesture — a state-driven effect (see the falling-edge fallback
+   *  below) arrives too late to keep the gesture. */
+  registerResumeAudio?: (fn: () => void) => void;
   /** Onboarding-only: seed the underlying session so a mid-lesson reload
    *  resumes the same session — the X/N progress bar continues from where
    *  the user left off, and `getNewWordsForCelebration` keeps returning
@@ -196,6 +203,7 @@ function LearnViewInner({
   onCardRated,
   onCardUndone,
   forceDisableAutoPlay = false,
+  registerResumeAudio,
   initialSessionId,
   initialSessionCardCount,
 }: LearnViewProps) {
@@ -217,6 +225,12 @@ function LearnViewInner({
   const isRadio = schedulingMode === 'radio';
   const isOnboarding = mode === 'onboarding';
   const tutorialId = reviewMode === 'full' ? TUTORIAL_IDS.FULL_REVIEW_INTRO : TUTORIAL_IDS.AUDIO_REVIEW_INTRO;
+  // Autoplay is gated while the tutorial popovers are up, and the audio hook
+  // only auto-plays on card change — so when the user dismisses the tutorial
+  // we have to kick playback off explicitly. `audio` doesn't exist yet at
+  // this point in the render, so the callback goes through a ref assigned
+  // below once `useLearningAudio` has run.
+  const playAfterTutorialRef = useRef<() => void>(() => {});
   const { isActive, isCompleted, restartTutorial } = useTutorial(tutorialId, {
     delayMs: 1000,
     // Radio mode is its own flow — don't trigger the audio-review tutorial
@@ -227,6 +241,7 @@ function LearnViewInner({
       state.status === 'reviewing' &&
       !state.settingsOpen &&
       !isRadio,
+    onComplete: () => playAfterTutorialRef.current(),
   });
   // `progressDisplayActive` lives on BaseState so it persists across status
   // transitions (e.g. milestone hit on the last card → noCardsDue mid-cele).
@@ -243,7 +258,7 @@ function LearnViewInner({
 
   const hasInflightCardAction =
     state.status === 'reviewing' && state.hasInflightCardAction;
-  const { audio, openSettings } = useLearningAudio(state, {
+  const { audio, openSettings, userAutoPlay } = useLearningAudio(state, {
     // Radio mode forces autoplay + auto-advance. The tutorial gates and the
     // celebration pause don't apply (no tutorial in radio, no celebration in
     // radio). In onboarding mode, the in-app `useTutorial` is suppressed so
@@ -263,6 +278,36 @@ function LearnViewInner({
         forceDisableAutoPlay),
     onAutoNext: fireOnCardRated,
   });
+
+  // Assigned every render so the tutorial's onComplete always sees the
+  // current audio object + settings. Mirrors the celebration → card handoff
+  // in LearningMode: replay only when the user has autoplay enabled.
+  playAfterTutorialRef.current = () => {
+    if (state.status !== 'reviewing' || !userAutoPlay) return;
+    audio.play();
+  };
+
+  // Onboarding popups gate audio via `forceDisableAutoPlay` instead of the
+  // in-app tutorial's `isActive`. The merged card audio lives in a detached
+  // `new Audio()` element, so the wizard can't reach it through the DOM —
+  // hand it the kick instead, which it invokes synchronously inside the
+  // popover-dismiss click so iOS gets its user gesture.
+  useEffect(() => {
+    registerResumeAudio?.(() => playAfterTutorialRef.current());
+  }, [registerResumeAudio]);
+
+  // Fallback for gate releases that don't pass through a dismissal click
+  // (and for pre-gesture-fix callers): kick playback on the gate's falling
+  // edge. After a normal dismissal this runs right behind the synchronous
+  // kick — `audio.play()` on an already-playing element is a no-op.
+  const prevForceDisableAutoPlayRef = useRef(forceDisableAutoPlay);
+  useEffect(() => {
+    const wasDisabled = prevForceDisableAutoPlayRef.current;
+    prevForceDisableAutoPlayRef.current = forceDisableAutoPlay;
+    if (wasDisabled && !forceDisableAutoPlay) {
+      playAfterTutorialRef.current();
+    }
+  }, [forceDisableAutoPlay]);
 
   const goHome = useCallback(() => {
     audio.pause();
