@@ -128,6 +128,84 @@ export const getPlacementSentence = query({
 });
 
 /**
+ * The whole preview corpus for the CEFR self-pick slider in one subscription:
+ * every placement sentence's text + translations, deliberately WITHOUT the
+ * audio/storage lookups `getPlacementSentence` does (the slider preview never
+ * plays audio). Fetching all levels upfront (~100 small rows, bounded by
+ * `PLACEMENT_SENTENCES_QUERY_CAP`) lets the slider render any level straight
+ * from memory instead of flashing a loading row per (level, position) query
+ * while the user drags.
+ */
+export const getPlacementPreviewSentences = query({
+  args: {
+    targetLanguage: v.string(),
+    sourceLanguage: v.string(),
+  },
+  returns: v.array(
+    v.object({
+      level: v.number(),
+      position: v.number(),
+      sourceText: v.string(),
+      targetText: v.optional(v.string()),
+      targetRomanization: v.optional(v.string()),
+    }),
+  ),
+  handler: async (ctx, { targetLanguage, sourceLanguage }) => {
+    const indexRows = await ctx.db
+      .query('placementTestSentences')
+      .take(PLACEMENT_SENTENCES_QUERY_CAP);
+    if (indexRows.length === PLACEMENT_SENTENCES_QUERY_CAP) {
+      console.warn(
+        `placementTestSentences query hit cap ${PLACEMENT_SENTENCES_QUERY_CAP} ` +
+          '— raise PLACEMENT_SENTENCES_QUERY_CAP.',
+      );
+    }
+
+    const rows = await Promise.all(
+      indexRows.map(async (indexRow) => {
+        const text = await ctx.db.get(indexRow.textId);
+        if (!text) return null;
+
+        // Same source-side resolution as `getPlacementSentence`: render in
+        // the user's base language once its translation lands, fall back to
+        // the stored English text so a sentence always shows.
+        let resolvedSourceText = text.text;
+        if (sourceLanguage && sourceLanguage !== text.language) {
+          const sourceTranslation = await ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', text._id).eq('targetLanguage', sourceLanguage),
+            )
+            .first();
+          if (sourceTranslation) {
+            resolvedSourceText = sourceTranslation.translatedText;
+          }
+        }
+
+        let translation: Doc<'translations'> | null = null;
+        if (targetLanguage && targetLanguage !== text.language) {
+          translation = await ctx.db
+            .query('translations')
+            .withIndex('by_text_and_language', (q) =>
+              q.eq('textId', text._id).eq('targetLanguage', targetLanguage),
+            )
+            .first();
+        }
+
+        return {
+          level: indexRow.level,
+          position: indexRow.position,
+          sourceText: resolvedSourceText,
+          targetText: translation?.translatedText,
+          targetRomanization: translation?.romanizedText,
+        };
+      }),
+    );
+    return rows.filter((row) => row !== null);
+  },
+});
+
+/**
  * Returns how many of the 100 placement sentences have translations + audio
  * ready for `targetLanguage`. Used to gate the "Start test" button.
  */

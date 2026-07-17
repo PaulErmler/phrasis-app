@@ -59,8 +59,8 @@ export default function MainLayout({
 }) {
   const {
     preloadedSettings,
-    preloadedActiveCourse,
     preloadedCourseSettings,
+    activeCourse,
   } = useAppData();
 
   const [justReturnedFromLearn, setJustReturnedFromLearn] = useState(false);
@@ -76,7 +76,9 @@ export default function MainLayout({
   const locale = useLocale();
 
   const settings = usePreloadedQuery(preloadedSettings);
-  const activeCourse = usePreloadedQuery(preloadedActiveCourse);
+  // activeCourse comes from AppDataProvider's always-mounted subscription —
+  // subscribing here instead would start cold after the onboarding soft nav
+  // and flash the stale preloaded null (no-course empty state).
 
   const [initialView] = useState(() => viewFromPathname(pathname));
   const [activeView, setActiveView] = useState<View>(initialView.view);

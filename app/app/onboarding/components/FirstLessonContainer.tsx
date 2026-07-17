@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Button } from '@/components/ui/button';
-import { Play, Clock, Headphones, BookOpen, Languages, Ear } from 'lucide-react';
+import { Play, Clock, Headphones, Languages, Ear } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConfettiBurst } from '@/components/effects/ConfettiBurst';
 import {
@@ -19,14 +19,21 @@ import type { ReviewMode } from '../types';
  * First-lesson container. Two phases:
  *
  *   1. **Intro + mode picker** — Flexling logo, headline, ~10 min note,
- *      and a two-card mode selector (Audio is preselected). Picking a
- *      different mode is persisted to both `onboardingProgress` (via
- *      `onModeSelected`) and the active course's settings (via
+ *      and a flat three-card mode selector (Shadowing preselected, plus
+ *      Translate and Transcribe as first-class options rather than
+ *      sub-choices behind a "Writing" card). The pick is persisted to both
+ *      `onboardingProgress` (via `onModeSelected`, as the underlying
+ *      `reviewMode`) and the active course's settings (via
  *      `updateCourseSettings`) before the lesson starts.
  *
  *   2. **Lesson** — real `LearningMode` rendered inline via
  *      `OnboardingFirstLesson` with onboarding coachmarks.
  */
+
+/** Flat intro choice — maps onto courseSettings' two fields:
+ *  audio → { reviewMode: 'audio' }; translate/transcribe →
+ *  { reviewMode: 'full', writingInputMode: choice }. */
+type ModeChoice = 'audio' | 'translate' | 'transcribe';
 
 interface Props {
   initialReviewMode: ReviewMode;
@@ -66,21 +73,16 @@ export function FirstLessonContainer({
   const [phase, setPhase] = useState<'intro' | 'lesson'>(
     initialCardsRated && initialCardsRated > 0 ? 'lesson' : 'intro',
   );
-  const [mode, setMode] = useState<ReviewMode>(initialReviewMode);
-  // Writing style sub-choice, shown when Writing is selected. Persisted to
-  // courseSettings as `writingInputMode` on start (translate = hear your
-  // language and type the translation; transcribe = hear the target and type
-  // what you hear).
-  const [writingStyle, setWritingStyle] = useState<'translate' | 'transcribe'>(
-    'translate',
+  const [choice, setChoice] = useState<ModeChoice>(
+    initialReviewMode === 'full' ? 'translate' : 'audio',
   );
 
   const activeCourse = useQuery(api.features.courses.getActiveCourse, {});
   const updateCourseSettings = useMutation(api.features.courses.updateCourseSettings);
 
-  const handlePick = (next: ReviewMode) => {
-    setMode(next);
-    onModeSelected(next);
+  const handlePick = (next: ModeChoice) => {
+    setChoice(next);
+    onModeSelected(next === 'audio' ? 'audio' : 'full');
   };
 
   const handleStart = async () => {
@@ -91,8 +93,8 @@ export function FirstLessonContainer({
       try {
         await updateCourseSettings({
           courseId: activeCourse._id,
-          reviewMode: mode,
-          ...(mode === 'full' ? { writingInputMode: writingStyle } : {}),
+          reviewMode: choice === 'audio' ? 'audio' : 'full',
+          ...(choice !== 'audio' ? { writingInputMode: choice } : {}),
         });
       } catch (err) {
         console.error('Failed to persist review mode before lesson:', err);
@@ -136,11 +138,13 @@ export function FirstLessonContainer({
         <h2 className="text-3xl md:text-4xl font-bold">{t('intro.title')}</h2>
         <p className="text-muted-foreground">{t('intro.subtitle')}</p>
 
-        {/* Mode picker — Audio preselected */}
+        {/* Mode picker — flat list, Shadowing preselected. Translate and
+            Transcribe are first-class options (both map to the 'full' review
+            mode with their writing style). */}
         <div className="space-y-2 text-left">
           <ModeRow
             testId="first-lesson-mode-audio"
-            selected={mode === 'audio'}
+            selected={choice === 'audio'}
             onClick={() => handlePick('audio')}
             Icon={Headphones}
             title={t('modes.audio.title')}
@@ -148,37 +152,21 @@ export function FirstLessonContainer({
             footnote={t('modes.audio.footnote')}
           />
           <ModeRow
-            testId="first-lesson-mode-full"
-            selected={mode === 'full'}
-            onClick={() => handlePick('full')}
-            Icon={BookOpen}
-            title={t('modes.full.title')}
-            description={t('modes.full.description')}
+            testId="first-lesson-mode-translate"
+            selected={choice === 'translate'}
+            onClick={() => handlePick('translate')}
+            Icon={Languages}
+            title={t('modes.translate.title')}
+            description={t('modes.translate.description')}
           />
-
-          {/* Writing style sub-choice — only relevant once Writing is picked.
-              Rendered outside the ModeRow (it's a <button>, so nesting more
-              buttons inside would be invalid HTML). */}
-          {mode === 'full' && (
-            <div className="ml-4 pl-3 border-l-2 border-border space-y-1.5 animate-in fade-in duration-200">
-              <StyleRow
-                testId="first-lesson-style-translate"
-                selected={writingStyle === 'translate'}
-                onClick={() => setWritingStyle('translate')}
-                Icon={Languages}
-                title={t('modes.full.styles.translate.title')}
-                description={t('modes.full.styles.translate.description')}
-              />
-              <StyleRow
-                testId="first-lesson-style-transcribe"
-                selected={writingStyle === 'transcribe'}
-                onClick={() => setWritingStyle('transcribe')}
-                Icon={Ear}
-                title={t('modes.full.styles.transcribe.title')}
-                description={t('modes.full.styles.transcribe.description')}
-              />
-            </div>
-          )}
+          <ModeRow
+            testId="first-lesson-mode-transcribe"
+            selected={choice === 'transcribe'}
+            onClick={() => handlePick('transcribe')}
+            Icon={Ear}
+            title={t('modes.transcribe.title')}
+            description={t('modes.transcribe.description')}
+          />
         </div>
 
         <div className="inline-flex items-center gap-1.5 text-sm text-muted-foreground bg-muted/50 rounded-full px-3 py-1">
@@ -209,47 +197,6 @@ export function FirstLessonContainer({
         </div>
       </div>
     </div>
-  );
-}
-
-/** Compact variant of ModeRow for the writing-style sub-choice. */
-function StyleRow({
-  selected,
-  onClick,
-  Icon,
-  title,
-  description,
-  testId,
-}: {
-  selected: boolean;
-  onClick: () => void;
-  Icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-  testId?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      data-testid={testId}
-      className={cn(
-        'w-full rounded-lg border px-3 py-2 text-left transition-all flex items-center gap-2.5',
-        'hover:bg-accent',
-        selected && 'border-primary bg-primary/5 ring-1 ring-primary/20',
-      )}
-    >
-      <Icon
-        className={cn(
-          'h-4 w-4 shrink-0',
-          selected ? 'text-primary' : 'text-muted-foreground',
-        )}
-      />
-      <span className="flex-1 min-w-0">
-        <span className="text-sm font-medium">{title}</span>
-        <span className="block text-xs text-muted-foreground">{description}</span>
-      </span>
-    </button>
   );
 }
 
