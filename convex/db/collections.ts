@@ -2,6 +2,7 @@ import { QueryCtx, MutationCtx } from '../_generated/server';
 import { Id, Doc } from '../_generated/dataModel';
 import { getCourseSettings } from './courseSettings';
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
+import { ogteLevelToCollectionCode } from '../../lib/constants/onboarding';
 import { LEGACY_LEVEL_ORDER, LEVEL_TO_COLLECTION, settledCount } from '../lib/collections';
 
 /**
@@ -24,18 +25,37 @@ export async function getActiveDataset(
  * Resolve the starting collection for a user's `currentLevel`, preferring the
  * active dataset's level. Falls back to the legacy collection if no active
  * dataset is found.
+ *
+ * When the precise OGTE level is known (self-picked on the slider or produced
+ * by the placement test, both persisted as `placementTest.finalLevel`), it
+ * wins: the course starts at that exact `L01`..`L20` collection instead of
+ * the 6-bucket `currentLevel` mapping (which only reaches L01/05/08/11/14/17).
+ * Out-of-range values and datasets without the exact code fall back to the
+ * bucket path unchanged.
  */
 export async function resolveStartingCollection(
   ctx: QueryCtx,
   currentLevel: string | undefined,
+  ogteLevel?: number,
 ): Promise<Doc<'collections'> | null> {
-  const mapping = LEVEL_TO_COLLECTION[currentLevel ?? 'beginner'] ?? LEVEL_TO_COLLECTION.beginner;
   const activeDataset = await getActiveDataset(ctx);
+  const exactCode = ogteLevel !== undefined ? ogteLevelToCollectionCode(ogteLevel) : null;
+  if (activeDataset && exactCode) {
+    const exact = await ctx.db
+      .query('collections')
+      .withIndex('by_datasetId_and_code', (q) =>
+        q.eq('datasetId', activeDataset._id).eq('code', exactCode),
+      )
+      .first();
+    if (exact) return exact;
+  }
+  const mapping = LEVEL_TO_COLLECTION[currentLevel ?? 'beginner'] ?? LEVEL_TO_COLLECTION.beginner;
   if (activeDataset) {
     const byCode = await ctx.db
       .query('collections')
-      .withIndex('by_datasetId_and_order', (q) => q.eq('datasetId', activeDataset._id))
-      .filter((q) => q.eq(q.field('code'), mapping.code))
+      .withIndex('by_datasetId_and_code', (q) =>
+        q.eq('datasetId', activeDataset._id).eq('code', mapping.code),
+      )
       .first();
     if (byCode) return byCode;
   }

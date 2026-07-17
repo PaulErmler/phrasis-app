@@ -683,6 +683,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // romanization, catalog standard above) assumes Cyrillic output.
     translationName: 'Serbian (Cyrillic script)',
     translationPromptNotes: 'Use Cyrillic (ћирилица) exclusively; never the Latin alphabet.',
+    // v2: prompt pins Cyrillic — regenerate pre-existing (possibly
+    // Latin-script) translations.
+    translationVersion: 2,
   },
   {
     code: 'lt',
@@ -1010,7 +1013,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // outright so Taiwan-specific vocabulary (軟體, not 软件/軟件 HK-style)
     // is cued, mirroring ttsPromptName.
     translationName: 'Taiwanese Mandarin (Traditional characters)',
-    translationVersion: 2,
+    // v3: prompt pins Taiwanese Mandarin — regenerate translations made under
+    // the bare "Chinese (Traditional)" label.
+    translationVersion: 3,
   },
   {
     code: 'yue',
@@ -1041,7 +1046,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // written Chinese that is effectively Mandarin.
     translationName: 'Cantonese (written in Simplified Chinese characters)',
     translationPromptNotes: 'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
-    translationVersion: 2,
+    // v3: prompt pins the spoken-vernacular register — regenerate
+    // translations made under the bare "Cantonese" label.
+    translationVersion: 3,
   },
   {
     code: 'yue_traditional',
@@ -1069,7 +1076,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // written Chinese that is effectively Mandarin.
     translationName: 'Cantonese (written in Traditional Chinese characters)',
     translationPromptNotes: 'Written as one would read it aloud in Cantonese (spoken vernacular), not Standard Written Chinese.',
-    translationVersion: 2,
+    // v3: prompt pins the spoken-vernacular register — regenerate
+    // translations made under the bare "Cantonese" label.
+    translationVersion: 3,
   },
   {
     code: 'ja',
@@ -1682,7 +1691,10 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
 // `gemini_35_flash_nitro_minimal`, the default rule for every language.
 // Nitro prioritizes throughput/latency; minimal thinking keeps quality on
 // par with `low` at much lower cost/latency.
-const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
+// Exported so the batch-autofill pipeline (convex/config/aiModels.ts +
+// convex/features/customTexts.ts) stays on the same model + effort as the
+// single-sentence pipeline by construction rather than by comment.
+export const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
   model: 'google/gemini-3.5-flash:nitro',
   reasoning: 'minimal',
   maxOutputTokens: 4_000,

@@ -370,6 +370,15 @@ function OnboardingWizard({
   const persistDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persist = useCallback(
     (partial: Partial<OnboardingData>) => {
+      // Merge into the ref synchronously, not just via the layout effect:
+      // `advance`/`back` fire an immediate save from `dataRef.current` in
+      // the same tick as a preceding `persist(...)` (e.g. the level
+      // handlers do `persist({ currentLevel }); advance(...)`), and the
+      // layout-effect refresh only lands after the next commit. Without
+      // this eager merge that save writes the pre-persist data — dropping
+      // the just-selected field — while also cancelling the debounce that
+      // carried it, so the value never reaches the server.
+      dataRef.current = { ...dataRef.current, ...partial };
       setData((d) => ({ ...d, ...partial }));
       if (persistDebounceRef.current) clearTimeout(persistDebounceRef.current);
       persistDebounceRef.current = setTimeout(() => {

@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Loader2 } from 'lucide-react';
+import { OGTE_MIN_LEVEL, OGTE_MAX_LEVEL } from '@/lib/constants/onboarding';
 import type { StrategyName } from '../lib/placementStrategies';
 
 interface Props {
@@ -89,8 +90,8 @@ export function CefrSelfPickStep({
               </div>
               <Slider
                 value={[ogte]}
-                min={1}
-                max={20}
+                min={OGTE_MIN_LEVEL}
+                max={OGTE_MAX_LEVEL}
                 step={1}
                 onValueChange={handleChange}
                 aria-label={t('ariaLabel')}
@@ -211,8 +212,8 @@ function SampleRow({
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function clampOgte(n: number): number {
-  if (n < 1) return 1;
-  if (n > 20) return 20;
+  if (n < OGTE_MIN_LEVEL) return OGTE_MIN_LEVEL;
+  if (n > OGTE_MAX_LEVEL) return OGTE_MAX_LEVEL;
   return Math.round(n);
 }
 

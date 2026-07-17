@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useTranslations } from 'next-intl';
 import {
   alignWords,
   charDiff,
@@ -11,7 +10,8 @@ import {
   type AlignedWord,
   type CharChunk,
 } from '@/lib/textCompare';
-import { AskAboutWord, ClickableWords } from './ClickableWords';
+import { AskAboutWord } from './ClickableWords';
+import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
 
 interface WordDiffProps {
   expected: string;
@@ -185,7 +185,6 @@ export function WordDiff({
   hideAccuracy = false,
   hideErrors = false,
 }: WordDiffProps) {
-  const t = useTranslations('LearningMode');
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language)),
     [language],
@@ -201,23 +200,12 @@ export function WordDiff({
 
   if (hideErrors) {
     return (
-      <div>
-        {/* Clean revealed sentence — words are clickable (ask-AI popover),
-            matching the shadowing-mode card. Karaoke props are off; this is
-            a static reveal. */}
-        <ClickableWords
-          text={expected}
-          language={language}
-          wordTimings={null}
-          localTime={0}
-          isActive={false}
-          enabled={false}
-          className="leading-relaxed text-foreground"
-        />
-        <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-          {t('accuracy')}: {accuracy}%
-        </p>
-      </div>
+      <CleanRevealedSentence
+        text={expected}
+        language={language}
+        accuracy={accuracy}
+        hideAccuracy={hideAccuracy}
+      />
     );
   }
 
@@ -238,9 +226,7 @@ export function WordDiff({
           </AskAboutWord>
         ))}
       </p>
-      <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-        {t('accuracy')}: {accuracy}%
-      </p>
+      <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
     </div>
   );
 }

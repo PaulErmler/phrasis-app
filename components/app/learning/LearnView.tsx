@@ -146,6 +146,13 @@ interface LearnViewProps {
    *  card audio silent while the first-lesson coachmarks are running so the
    *  spoken sentence doesn't fight the popover. */
   forceDisableAutoPlay?: boolean;
+  /** Onboarding-only: hands the wizard an imperative "kick playback" so it
+   *  can start the card audio synchronously inside the popover-dismiss
+   *  click. The merged audio lives in a detached `new Audio()` element that
+   *  has never played, so iOS Safari rejects any `.play()` issued outside a
+   *  user gesture — a state-driven effect (see the falling-edge fallback
+   *  below) arrives too late to keep the gesture. */
+  registerResumeAudio?: (fn: () => void) => void;
   /** Onboarding-only: seed the underlying session so a mid-lesson reload
    *  resumes the same session — the X/N progress bar continues from where
    *  the user left off, and `getNewWordsForCelebration` keeps returning
@@ -196,6 +203,7 @@ function LearnViewInner({
   onCardRated,
   onCardUndone,
   forceDisableAutoPlay = false,
+  registerResumeAudio,
   initialSessionId,
   initialSessionCardCount,
 }: LearnViewProps) {
@@ -282,8 +290,16 @@ function LearnViewInner({
   // Onboarding popups gate audio via `forceDisableAutoPlay` instead of the
   // in-app tutorial's `isActive`. The merged card audio lives in a detached
   // `new Audio()` element, so the wizard can't reach it through the DOM —
-  // kick playback off here on the gate's falling edge (i.e. when the user
-  // dismisses the popover).
+  // hand it the kick instead, which it invokes synchronously inside the
+  // popover-dismiss click so iOS gets its user gesture.
+  useEffect(() => {
+    registerResumeAudio?.(() => playAfterTutorialRef.current());
+  }, [registerResumeAudio]);
+
+  // Fallback for gate releases that don't pass through a dismissal click
+  // (and for pre-gesture-fix callers): kick playback on the gate's falling
+  // edge. After a normal dismissal this runs right behind the synchronous
+  // kick — `audio.play()` on an already-playing element is a no-op.
   const prevForceDisableAutoPlayRef = useRef(forceDisableAutoPlay);
   useEffect(() => {
     const wasDisabled = prevForceDisableAutoPlayRef.current;

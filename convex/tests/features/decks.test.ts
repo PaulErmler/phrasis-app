@@ -2,21 +2,6 @@
 import { convexTest } from "convex-test";
 import { describe, it, expect, vi } from "vitest";
 
-// Stub the aggregate component — production code instantiates
-// `new TableAggregate(components.cardsByState, ...)` at module-load.
-vi.mock("@convex-dev/aggregate", () => {
-  class TableAggregate {
-    constructor(_component: unknown, _opts: unknown) {}
-    async insertIfDoesNotExist(): Promise<void> {}
-    async replaceOrInsert(): Promise<void> {}
-    async deleteIfExists(): Promise<void> {}
-    async count(): Promise<number> {
-      return 0;
-    }
-  }
-  return { TableAggregate };
-});
-
 import schema from "../../schema";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";

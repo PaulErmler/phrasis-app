@@ -1,19 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { describe, it, expect, vi } from "vitest";
-
-vi.mock("@convex-dev/aggregate", () => {
-  class TableAggregate {
-    constructor(_component: unknown, _opts: unknown) {}
-    async insertIfDoesNotExist(): Promise<void> {}
-    async replaceOrInsert(): Promise<void> {}
-    async deleteIfExists(): Promise<void> {}
-    async count(): Promise<number> {
-      return 0;
-    }
-  }
-  return { TableAggregate };
-});
+import { describe, it, expect } from "vitest";
 
 import schema from "../../schema";
 import { api } from "../../_generated/api";

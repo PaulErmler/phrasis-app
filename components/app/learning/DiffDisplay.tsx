@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useTranslations } from 'next-intl';
 import {
   charDiff,
   alignWords,
@@ -10,7 +9,7 @@ import {
   toDiffOptions,
 } from '@/lib/textCompare';
 import { WordDiff } from './WordDiff';
-import { ClickableWords } from './ClickableWords';
+import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
 
 interface DiffDisplayProps {
   expected: string;
@@ -44,7 +43,6 @@ export function DiffDisplay({
   hideAccuracy = false,
   hideErrors = false,
 }: DiffDisplayProps) {
-  const t = useTranslations('LearningMode');
   const cfg = getCompareConfig(language);
 
   if (cfg.hasWordBoundaries) {
@@ -66,7 +64,6 @@ export function DiffDisplay({
       language={language}
       hideAccuracy={hideAccuracy}
       hideErrors={hideErrors}
-      accuracyLabel={t('accuracy')}
     />
   );
 }
@@ -77,7 +74,6 @@ interface CharDiffViewProps {
   language: string;
   hideAccuracy: boolean;
   hideErrors: boolean;
-  accuracyLabel: string;
 }
 
 function CharDiffView({
@@ -86,7 +82,6 @@ function CharDiffView({
   language,
   hideAccuracy,
   hideErrors,
-  accuracyLabel,
 }: CharDiffViewProps) {
   const diffOpts = useMemo(
     () => toDiffOptions(getCompareConfig(language)),
@@ -104,20 +99,12 @@ function CharDiffView({
   // clickable (ask-AI popover), matching the shadowing-mode card.
   if (hideErrors) {
     return (
-      <div>
-        <ClickableWords
-          text={expected}
-          language={language}
-          wordTimings={null}
-          localTime={0}
-          isActive={false}
-          enabled={false}
-          className="leading-relaxed text-foreground"
-        />
-        <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-          {accuracyLabel}: {accuracyPct}%
-        </p>
-      </div>
+      <CleanRevealedSentence
+        text={expected}
+        language={language}
+        accuracy={accuracyPct}
+        hideAccuracy={hideAccuracy}
+      />
     );
   }
 
@@ -152,9 +139,7 @@ function CharDiffView({
           );
         })}
       </p>
-      <p className={`text-muted-xs mt-2 ${hideAccuracy ? 'invisible' : ''}`}>
-        {accuracyLabel}: {accuracyPct}%
-      </p>
+      <AccuracyFooter accuracy={accuracyPct} hideAccuracy={hideAccuracy} />
     </div>
   );
 }

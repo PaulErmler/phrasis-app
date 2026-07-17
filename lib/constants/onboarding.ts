@@ -43,3 +43,49 @@ export const ONBOARDING_FREE_TEXT_SHOW_COUNT_REMAINING_THRESHOLD = 100;
  * cap is ever bumped past safe single-query territory.
  */
 export const PLACEMENT_SENTENCES_QUERY_CAP = 256;
+
+/**
+ * Placement sentences processed per placement-content-sweep transaction
+ * (`processPlacementSentences`). Sized well under Convex's per-mutation
+ * system-op ceiling: each sentence runs the heavy `scheduleMissingContent`
+ * (~15–25 system ops), so the sweep entry point processes one batch inline
+ * and fans the remaining batches out as independent scheduled workers instead
+ * of sweeping the whole corpus in one transaction.
+ * (`COLLECTION_PREVIEW_SIZE` = 5 is known-safe; ≤15 works-but-strained — 10
+ * leaves comfortable margin.)
+ */
+export const PLACEMENT_CONTENT_BATCH_SIZE = 10;
+
+/**
+ * Total attempts (initial + retries) for one placement-content batch worker.
+ * Convex does NOT retry scheduled mutations that fail with application
+ * errors, so `processPlacementContentBatch` reschedules itself on failure —
+ * without this, a transient error (e.g. a TTS enqueue hiccup) silently
+ * dropped the batch's sentences for the rest of onboarding.
+ */
+export const PLACEMENT_BATCH_MAX_ATTEMPTS = 3;
+
+/**
+ * Base delay for placement-batch retries; attempt N waits
+ * `PLACEMENT_BATCH_RETRY_BACKOFF_MS * 2 ** N` (+10s, +20s). Deliberately
+ * far past the initial fan-out so retries never re-enter the burst of
+ * first-run batches.
+ */
+export const PLACEMENT_BATCH_RETRY_BACKOFF_MS = 10_000;
+
+/** Inclusive bounds of the OGTE difficulty scale (levels L01..L20). */
+export const OGTE_MIN_LEVEL = 1;
+export const OGTE_MAX_LEVEL = 20;
+
+/**
+ * Collection `code` ("L01".."L20") for an OGTE level, or null when the value
+ * isn't a valid integer level. Single source of truth for the L%02d format —
+ * used by the server's starting-collection resolution and anywhere else a
+ * level must round-trip to a dataset collection code.
+ */
+export function ogteLevelToCollectionCode(level: number): string | null {
+  if (!Number.isInteger(level) || level < OGTE_MIN_LEVEL || level > OGTE_MAX_LEVEL) {
+    return null;
+  }
+  return `L${String(level).padStart(2, '0')}`;
+}

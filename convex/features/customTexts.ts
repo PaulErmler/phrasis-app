@@ -9,6 +9,7 @@ import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARD_TEXT_LENGTH, MAX_IMPORT_BATCH } from '../../lib/constants/learning';
 import {
+  GEMINI_35_FLASH_NITRO_MINIMAL,
   getLanguageByCode,
   getTranslationSource,
   isMixedLanguage,
@@ -48,11 +49,11 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
 });
 
 /**
- * Reasoning effort for the autofill call — `minimal`, matching the
- * single-sentence pipeline's GEMINI_35_FLASH_NITRO_MINIMAL stage
- * (lib/languages.ts). Also baked into each row's `translationSource` tag.
+ * Reasoning effort for the autofill call — taken from the single-sentence
+ * pipeline's GEMINI_35_FLASH_NITRO_MINIMAL stage so the two pipelines
+ * can't drift apart. Also baked into each row's `translationSource` tag.
  */
-const AUTOFILL_REASONING = 'minimal' as const;
+const AUTOFILL_REASONING = GEMINI_35_FLASH_NITRO_MINIMAL.reasoning;
 
 const TRANSLATION_SYSTEM_PROMPT = `You are an expert multilingual translator for a language-learning app. You will receive one or more sentences that the user has already written in specific languages, plus a list of target language codes that still need translations.
 
