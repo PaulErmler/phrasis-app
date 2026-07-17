@@ -227,9 +227,8 @@ export function HomeView({
         </div>
 
         <div className="card-surface space-y-3 p-3">
-          <h2 className="heading-section px-1">
-            {t('collections.carousel.sectionTitle')}
-          </h2>
+          {/* Section title lives inside SegmentedHomeSection now, sharing a
+              row with the compact Course/Custom switcher (top right). */}
           <SegmentedHomeSection
             activeCourseId={courseSettings?.courseId ?? null}
             onNavigateToContent={onNavigateToContent}

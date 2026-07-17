@@ -88,32 +88,35 @@ export function SegmentedHomeSection({
       onValueChange={(v) => setCurrentTab(v as 'premade' | 'custom')}
       className="flex flex-col gap-3"
     >
-      <TabsList className="w-full">
-        <TabsTrigger value="premade" className="flex-1">
-          {/* Invisible mirror on the left so the label stays exactly centered
-              within the trigger; the real badge sits to the right of the text. */}
-          {courseOff && <OffBadgeSpacer label={t('sourceBadgeOff')} />}
-          {t('tabPremade')}
-          {courseOff && (
-            <OffBadge
-              isCurrent={currentTab === 'premade'}
-              onReenable={() => reenable('premade')}
-              sourceLabel={t('tabPremade')}
-            />
-          )}
-        </TabsTrigger>
-        <TabsTrigger value="custom" className="flex-1">
-          {customOff && <OffBadgeSpacer label={t('sourceBadgeOff')} />}
-          {t('tabCustom')}
-          {customOff && (
-            <OffBadge
-              isCurrent={currentTab === 'custom'}
-              onReenable={() => reenable('custom')}
-              sourceLabel={t('tabCustom')}
-            />
-          )}
-        </TabsTrigger>
-      </TabsList>
+      {/* Header row: section title on the left, compact source switcher on
+          the right — the switcher no longer spans the full card width. */}
+      <div className="flex items-center justify-between gap-2 px-1">
+        {/* min-w-0 + truncate: the title yields to the switcher when both
+            don't fit (long locales like German on narrow phones). */}
+        <h2 className="heading-section min-w-0 truncate">{t('sectionTitle')}</h2>
+        <TabsList className="shrink-0">
+          <TabsTrigger value="premade">
+            {t('tabPremade')}
+            {courseOff && (
+              <OffBadge
+                isCurrent={currentTab === 'premade'}
+                onReenable={() => reenable('premade')}
+                sourceLabel={t('tabPremade')}
+              />
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="custom">
+            {t('tabCustom')}
+            {customOff && (
+              <OffBadge
+                isCurrent={currentTab === 'custom'}
+                onReenable={() => reenable('custom')}
+                sourceLabel={t('tabCustom')}
+              />
+            )}
+          </TabsTrigger>
+        </TabsList>
+      </div>
 
       <TabsContent value="premade" className="flex flex-col gap-3">
         <PremadeTab summary={summary} activeCourseId={activeCourseId} />
@@ -808,25 +811,6 @@ function CustomChip({
 // ============================================================================
 
 /**
- * Invisible duplicate of the OffBadge used purely as a layout spacer on
- * the left side of the trigger so that the centered text label doesn't
- * shift when the real badge appears on the right. `aria-hidden` keeps it
- * out of the accessibility tree, `invisible` keeps it out of the paint.
- * Class list mirrors the real badge so widths match exactly.
- */
-function OffBadgeSpacer({ label }: { label: string }) {
-  return (
-    <Badge
-      aria-hidden
-      variant="outline"
-      className="invisible h-4 px-1.5 text-[10px] font-medium"
-    >
-      {label}
-    </Badge>
-  );
-}
-
-/**
  * "Off" pill rendered inside a switcher tab whose source is currently
  * excluded by the content-source filter. Clicking behavior is gated by
  * whether the parent tab is selected:
@@ -923,9 +907,10 @@ function OffBadge({
 function SegmentedSkeleton() {
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex gap-2">
-        <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
-        <div className="h-9 flex-1 animate-pulse rounded-md bg-muted" />
+      {/* Mirrors the header row: title placeholder left, compact switcher right. */}
+      <div className="flex items-center justify-between gap-2 px-1">
+        <div className="h-6 w-32 animate-pulse rounded bg-muted" />
+        <div className="h-9 w-40 animate-pulse rounded-md bg-muted" />
       </div>
       <div className="-mx-3 flex gap-3 overflow-x-auto px-3 pt-2 pb-5">
         {Array.from({ length: 7 }).map((_, i) => (

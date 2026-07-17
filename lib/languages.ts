@@ -1129,15 +1129,24 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'Vietnam',
     geminiBcp47: 'vi-VN',
     azureSttLocale: 'vi-VN',
-    name: 'Vietnamese',
-    nativeName: 'Tiếng Việt',
+    displayNameOverrides: { en: 'Vietnamese (Northern)', de: 'Vietnamesisch (Nord)' },
+    name: 'Vietnamese (Northern)',
+    nativeName: 'Tiếng Việt (miền Bắc)',
     flag: '🇻🇳',
     category: 'asian-southeast',
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
+    // `vi-VN` can't pin the dialect, so it's named in the prompt. Must be set
+    // explicitly: the default strips the "(Northern)" parenthetical from
+    // `name` and would fall back to unpinned "Vietnamese".
+    ttsPromptName: 'Northern Vietnamese',
     needsRomanization: false,
     supportsKaraoke: true,
     supportsStt: true,
+    // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
+    // so the model produces Northern vocabulary/particles, not a regionless mix.
+    translationName: 'Northern Vietnamese',
+    translationPromptNotes: 'Northern (Hanoi) Vietnamese vocabulary and particles.',
     translationVersion: 2,
   },
   {
