@@ -810,4 +810,35 @@ describe("features/scheduling — record/reverse drift guard", () => {
       "fields changed by reviewCard that undoLastReview neither restored nor UNREVERSED_STAT_FIELDS documents as kept",
     ).toEqual([]);
   });
+
+  it("bundles undoableCount into getCardForReview, matching the standalone query", async () => {
+    const t = convexTest(schema, modules);
+    const { cardId, deckId, collectionId } = await seed(t);
+    // Second due card so getCardForReview stays non-null after the first
+    // card's review pushes its dueDate forward.
+    await addCard(t, deckId, collectionId);
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    let card = await asUser.query(api.features.scheduling.getCardForReview, {});
+    expect(card?.undoableCount).toBe(0);
+
+    await asUser.mutation(api.features.scheduling.reviewCard, {
+      cardId,
+      rating: "stillLearning",
+      timezone: "UTC",
+    });
+
+    card = await asUser.query(api.features.scheduling.getCardForReview, {});
+    expect(card).not.toBeNull();
+    expect(card?.undoableCount).toBe(1);
+    expect(card?.undoableCount).toBe(
+      await asUser.query(api.features.scheduling.getUndoableReviewCount, {}),
+    );
+
+    await asUser.mutation(api.features.scheduling.undoLastReview, {
+      timezone: "UTC",
+    });
+    card = await asUser.query(api.features.scheduling.getCardForReview, {});
+    expect(card?.undoableCount).toBe(0);
+  });
 });

@@ -271,15 +271,6 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const courseSettingsQuery = useQuery(api.features.courses.getActiveCourseSettings, {});
   const activeCourseQuery = useQuery(api.features.courses.getActiveCourse, {});
 
-  // How many reviews the undo button can take back (0 = greyed out). Reactive
-  // on both the review-log stack and courseSettings, so reviews from another
-  // device or a mode/filter switch update the button without local plumbing.
-  const undoableReviewCount =
-    useQuery(
-      api.features.scheduling.getUndoableReviewCount,
-      isAuthenticated ? {} : 'skip',
-    ) ?? 0;
-
   const lastCardRef = useRef<
     Exclude<typeof cardForReviewQuery, undefined> | undefined
   >(undefined);
@@ -353,6 +344,20 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
       : isAuthenticated && receivedActiveCourseRef.current
         ? lastActiveCourseRef.current
         : undefined;
+
+  // Undo-button state rides on the getCardForReview payload — one
+  // subscription that invalidates once per review, instead of a parallel
+  // `getUndoableReviewCount` subscription. When the deck empties mid-session
+  // the query goes null while the UI may keep showing the just-reviewed card
+  // (the auto-add fallback on `lastReviewingCardRef` below); that ref's
+  // payload predates the review that emptied the queue, so +1 keeps undo
+  // available in that window. Only positivity matters (`canUndo`).
+  const undoableReviewCount =
+    cardForReview != null
+      ? cardForReview.undoableCount
+      : lastReviewingCardRef.current
+        ? lastReviewingCardRef.current.undoableCount + 1
+        : 0;
 
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
   const advanceRadioCardMutation = useMutation(

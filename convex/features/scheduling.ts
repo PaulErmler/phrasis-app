@@ -277,6 +277,11 @@ export const getCardForReview = query({
        * mirroring what drives `triggerCelebration` in `reviewCard`. 0 when
        * `timezone` is omitted (caller opted out of the side-channel). */
       dailyReviewsToday: v.number(),
+      /** How many reviews the undo button can take back (0..UNDO_DEPTH).
+       * Bundled here so the learn view needs a single subscription that
+       * invalidates once per review — not this query plus a separate
+       * `getUndoableReviewCount`. */
+      undoableCount: v.number(),
     }),
     v.null(),
   ),
@@ -432,7 +437,23 @@ export const getCardForReview = query({
       dailyReviewsToday = displayedActiveReviews(todayStats);
     }
 
-    return { ...current, nextCard: next, dailyReviewsToday };
+    // Undo stack depth under the CURRENT study context — shares
+    // takeUndoableLogs with undoLastReview so the button and the mutation
+    // can't disagree.
+    const undoable = await takeUndoableLogs(
+      ctx,
+      userId,
+      course._id,
+      schedulingMode,
+      studyContentFilter,
+    );
+
+    return {
+      ...current,
+      nextCard: next,
+      dailyReviewsToday,
+      undoableCount: undoable.length,
+    };
   },
 });
 
@@ -930,10 +951,14 @@ export const undoLastReview = mutation({
 });
 
 /**
- * How many reviews the learn-mode undo button can currently take back
+ * How many reviews the undo mechanism can currently take back
  * (0..UNDO_DEPTH): the newest-first run of review-log entries matching the
- * current study context. Reactive on courseSettings, so switching mode/filter
- * greys the button out immediately.
+ * current study context.
+ *
+ * The learn view no longer subscribes to this — it reads the bundled
+ * `undoableCount` field on `getCardForReview` (one invalidation per review
+ * instead of two). Kept as a standalone query for tests, which need to
+ * assert the count in states where `getCardForReview` returns null.
  */
 export const getUndoableReviewCount = query({
   args: {},
