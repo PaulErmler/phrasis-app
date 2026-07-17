@@ -982,12 +982,6 @@
       "sampleLoading": "Lädt…",
       "sampleEmpty": "Auf diesem Level ist noch kein Beispiel verfügbar."
     },
-    "cefrConfirm": {
-      "title": "Auf Level {level} starten?",
-      "description": "Wir starten deinen Kurs bei <badge></badge>. Du kannst auch einen kurzen Test ab diesem Level machen — das ist der genaueste Weg, dein exaktes Niveau zu finden.",
-      "startHere": "Ja, hier starten",
-      "takeQuickTest": "Stattdessen einen Kurztest machen"
-    },
     "placementTest": {
       "questionLabel": "Frage {n}",
       "prompt": "Weißt du, wie man das übersetzt?",
@@ -1039,19 +1033,13 @@
           "description": "Hör einen Satz, übersetze ihn im Kopf und sprich ihn dann laut nach, um deine Aussprache zu üben. Sprich vom ersten Tag an — freihändig, wo immer du willst.",
           "footnote": "Am besten mit Kopfhörern · Empfohlen"
         },
-        "full": {
-          "title": "Schreiben",
-          "description": "Tippe deine Übersetzung und erhalte sofortiges, zeichengenaues Feedback zur Rechtschreibung. Der schnellste Weg, das Schreiben zu meistern.",
-          "styles": {
-            "translate": {
-              "title": "Übersetzen",
-              "description": "Höre deine Sprache und tippe die Übersetzung ein."
-            },
-            "transcribe": {
-              "title": "Transkribieren",
-              "description": "Höre nur die Zielsprache und tippe ein, was du hörst."
-            }
-          }
+        "translate": {
+          "title": "Übersetzen",
+          "description": "Höre deine Sprache und tippe die Übersetzung ein — mit sofortigem, zeichengenauem Feedback zur Rechtschreibung."
+        },
+        "transcribe": {
+          "title": "Transkribieren",
+          "description": "Höre nur die Zielsprache und tippe ein, was du hörst — mit sofortigem, zeichengenauem Feedback zur Rechtschreibung."
         }
       },
       "duration": "Etwa 10 Minuten",

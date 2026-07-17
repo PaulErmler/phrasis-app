@@ -10,8 +10,6 @@ import { test, expect } from "@playwright/test";
  *
  * Coverage that used to live in this file as fresh-user walks now lives at:
  *   - `e2e/auth.setup.ts` — "completely-new" + "placement-test" branches.
- *   - `tests/components/onboarding/CefrConfirmDialog.test.tsx` — self-pick
- *     proficiency dialog (Start here / Take quick test buttons).
  *   - `tests/components/onboarding/AcquisitionSourceStep.test.tsx` and
  *     `LearningGoalStep.test.tsx` — "Other" free-text inputs, char-count
  *     and over-limit behaviour.

@@ -982,12 +982,6 @@
       "sampleLoading": "Loading…",
       "sampleEmpty": "No sample available at this level yet."
     },
-    "cefrConfirm": {
-      "title": "Start at level {level}?",
-      "description": "We'll begin your course at <badge></badge>. You can also take a quick test starting from this level — that's the most accurate way to find your exact spot.",
-      "startHere": "Yes, start here",
-      "takeQuickTest": "Take a quick test instead"
-    },
     "placementTest": {
       "questionLabel": "Question {n}",
       "prompt": "Do you know how to translate this?",
@@ -1039,19 +1033,13 @@
           "description": "Listen to a sentence, translate it in your head, then say it aloud to practice your pronunciation. Speak from day one — hands-free anywhere.",
           "footnote": "Best with headphones · Recommended"
         },
-        "full": {
-          "title": "Writing",
-          "description": "Type your translation and get instant, character-level spelling feedback. The fastest way to master writing.",
-          "styles": {
-            "translate": {
-              "title": "Translate",
-              "description": "Hear your language, type the translation."
-            },
-            "transcribe": {
-              "title": "Transcribe",
-              "description": "Hear only the target language, type what you hear."
-            }
-          }
+        "translate": {
+          "title": "Translate",
+          "description": "Hear your language, type the translation — with instant, character-level spelling feedback."
+        },
+        "transcribe": {
+          "title": "Transcribe",
+          "description": "Hear only the target language, type what you hear — with instant, character-level spelling feedback."
         }
       },
       "duration": "About 10 minutes",
