@@ -615,6 +615,61 @@ describe("features/scheduling", () => {
       expect(audio?.wordTimings).toEqual([{ word: "Hej", start: 0, end: 0.5 }]);
     });
 
+    it("copies audio for a punctuation-only edit (sounds identical) but not for an audible one", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId: oldTextId } = await seedSharedCardWithAudio(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      // "Hej" → "Hej!" — the source text is a changed language for the
+      // text write (new textId stores "Hej!") but sounds identical, so its
+      // audio must be copied like an unchanged language. "en" changes
+      // audibly and gets no copy.
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej!" },
+          { language: "en", text: "Hello there my friend" },
+        ],
+        timezone: "UTC",
+      });
+
+      const allCards = await t.run(async (ctx) =>
+        ctx.db.query("cards").collect(),
+      );
+      const replacement = allCards.find((c) => c.textId !== oldTextId);
+      expect(replacement, "a replacement card should exist").toBeTruthy();
+      const newTextId = replacement!.textId;
+
+      const newText = await t.run(async (ctx) => ctx.db.get(newTextId));
+      expect(newText?.text).toBe("Hej!");
+
+      const svAudio = await t.run(async (ctx) =>
+        ctx.db
+          .query("audioRecordings")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", newTextId).eq("language", "sv"),
+          )
+          .first(),
+      );
+      expect(
+        svAudio,
+        "punctuation-only sv edit must keep (copy) its audio",
+      ).toBeTruthy();
+      expect(svAudio?.wordTimings).toEqual([
+        { word: "Hej", start: 0, end: 0.5 },
+      ]);
+
+      const enAudio = await t.run(async (ctx) =>
+        ctx.db
+          .query("audioRecordings")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", newTextId).eq("language", "en"),
+          )
+          .first(),
+      );
+      expect(enAudio, "audibly-changed en must not carry audio").toBeNull();
+    });
+
     it("carries translationSource on unchanged rows and tags edited rows as user-provided", async () => {
       // Seed a Path-B card whose existing en translation was produced by an
       // LLM stage. Editing the source `sv` (not `en`) keeps `en` unchanged,
@@ -1841,7 +1896,7 @@ describe("features/scheduling", () => {
       });
     }
 
-    it("first flag increments count, enqueues retranslation_high, deletes audio, charges quota", async () => {
+    it("first flag increments count, enqueues retranslation_high, keeps audio for the store to decide, charges quota", async () => {
       const t = convexTest(schema, modules);
       const { cardId, textId, translationId } = await seedFlaggableCard(t);
       const asUser = t.withIdentity({ subject: "user_A" });
@@ -1854,7 +1909,10 @@ describe("features/scheduling", () => {
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(1);
 
-      // Audio row for the flagged language was wiped.
+      // Audio is NOT deleted up front anymore: before the LLM lands we can't
+      // know whether the retranslation is audibly different. The delete/keep
+      // decision moved into storeTranslationAndScheduleTTS's replaceExisting
+      // branch (punctuation-only → keep; audible change → delete + re-TTS).
       const audioRows = await t.run(async (ctx) =>
         ctx.db
           .query("audioRecordings")
@@ -1863,7 +1921,7 @@ describe("features/scheduling", () => {
           )
           .collect(),
       );
-      expect(audioRows).toHaveLength(0);
+      expect(audioRows).toHaveLength(1);
 
       // Retranslation enqueued into the LLM pool with the retranslation_high
       // override. `replaceExisting: true` ensures storeTranslationAndScheduleTTS

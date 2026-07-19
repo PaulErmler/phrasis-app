@@ -4,13 +4,7 @@ import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
 import { RefreshCw, Sprout, Clock, Target, SlidersHorizontal, Zap } from 'lucide-react';
 import { LandingSquircleIcon } from '@/components/landing/landing-squircle-icon';
-
-const fadeInUp = {
-  initial: { opacity: 0, y: 30 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true },
-  transition: { duration: 0.6, ease: 'easeOut' as const },
-};
+import { fadeInUp } from './animations';
 
 const CARDS = [
   { key: 'activeRecall', Icon: RefreshCw },

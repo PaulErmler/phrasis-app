@@ -306,19 +306,35 @@ export const MessageBranchPage = ({
   );
 };
 
-export type MessageResponseProps = ComponentProps<typeof Streamdown>;
+export type MessageResponseProps = ComponentProps<typeof Streamdown> & {
+  /**
+   * Base text direction for the rendered markdown. Default 'auto':
+   * free-form model output has no language code, so first-strong-character
+   * detection makes fully-RTL replies (Arabic, Hebrew, Persian) render
+   * right-to-left while mixed-language replies keep the base direction of
+   * their first run; `text-left` keeps RTL content flush with the LTR
+   * chat layout. Lives on a wrapper div because Streamdown forwards rest
+   * props to the markdown renderer, not its root element.
+   */
+  dir?: 'auto' | 'ltr' | 'rtl';
+};
 
 export const MessageResponse = memo(
-  ({ className, ...props }: MessageResponseProps) => (
-    <Streamdown
-      className={cn(
-        'size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
-        className,
-      )}
-      {...props}
-    />
+  ({ className, dir = 'auto', ...props }: MessageResponseProps) => (
+    <div dir={dir} className="text-left">
+      <Streamdown
+        className={cn(
+          'size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
+          className,
+        )}
+        {...props}
+      />
+    </div>
   ),
-  (prevProps, nextProps) => prevProps.children === nextProps.children && prevProps.mode === nextProps.mode,
+  (prevProps, nextProps) =>
+    prevProps.children === nextProps.children &&
+    prevProps.mode === nextProps.mode &&
+    prevProps.dir === nextProps.dir,
 );
 
 MessageResponse.displayName = 'MessageResponse';

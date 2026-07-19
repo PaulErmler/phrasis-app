@@ -151,6 +151,9 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
             placeholder={t('placeholder')}
             disabled={isProcessing}
             data-testid="chat-new-input"
+            // Learners often type in the target language — dir="auto" makes
+            // RTL input read right-to-left while typing.
+            dir="auto"
             className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-60"
           />
 

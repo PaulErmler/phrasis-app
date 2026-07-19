@@ -22,11 +22,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useCustomer } from "autumn-js/react";
+import { useCustomer, usePricingTable } from "autumn-js/react";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getCheckoutContent } from "@/lib/autumn/checkout-content";
 import {
@@ -61,6 +62,12 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
   const { attach, customer, refetch } = useCustomer({
     expand: ["trials_used"],
   });
+  // The pricing table's CTA labels come from usePricingTable's per-customer
+  // scenarios, cached in SWR. autumn-js's attach() refetches that cache
+  // internally, but the switchPlanDuringTrial path bypasses attach() — so
+  // it must refetch the shared cache itself or the table shows the old
+  // scenario (e.g. "Cancel" instead of "Plan Scheduled") until a reload.
+  const { refetch: refetchPricingTable } = usePricingTable();
   const switchPlanDuringTrial = useAction(api.billing.switchPlanDuringTrial);
   const trialState = getTrialState(customer);
   const [checkoutResult, setCheckoutResult] = useState<
@@ -97,17 +104,26 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
   const isFree = checkoutResult?.product.properties?.is_free;
   const isPaid = isFree === false;
 
-  // A currently-trialing user switching between paid plans keeps their
-  // running trial — confirm routes through the Convex action (which
-  // schedules downgrades at trial end and carries the trial over on
-  // immediate switches) instead of a plain attach. Must mirror the
-  // scenarios accepted by convex/billing.ts switchPlanDuringTrial.
+  // A currently-trialing user switching plans keeps their running trial —
+  // confirm routes through the Convex action (which schedules downgrades
+  // at trial end and carries the trial over on immediate switches) instead
+  // of a plain attach, which the server-side trial gate rejects. This
+  // includes the Free plan — scheduled at trial end like any downgrade
+  // (Autumn classifies a free/default target as "downgrade" or "cancel")
+  // — and "renew", i.e. re-attaching the trialing plan to un-schedule a
+  // pending switch. Must mirror the scenarios accepted by
+  // convex/billing.ts switchPlanDuringTrial.
   const scenario = checkoutResult.product.scenario;
   const isTrialSwitch =
     trialState.onTrial &&
-    isPaid &&
     !checkoutResult.product.properties?.is_one_off &&
-    (scenario === "upgrade" || scenario === "downgrade" || scenario === "new");
+    (isPaid
+      ? scenario === "upgrade" ||
+        scenario === "downgrade" ||
+        scenario === "new" ||
+        scenario === "renew"
+      : isFree === true &&
+        (scenario === "downgrade" || scenario === "cancel"));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -157,7 +173,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
                     window.location.href = result.paymentUrl;
                     return;
                   }
-                  await refetch();
+                  await Promise.all([refetch(), refetchPricingTable()]);
                 } else {
                   const options = checkoutResult.options.map((option) => ({
                     featureId: option.feature_id,
@@ -173,7 +189,10 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
                 }
                 setOpen(false);
               } catch (e) {
+                // Surface the failure — a silently-reset dialog looks like
+                // nothing happened (this hid the trial-gate rejection).
                 console.error("Checkout failed:", e);
+                toast.error(t("confirmError"));
               } finally {
                 setLoading(false);
               }

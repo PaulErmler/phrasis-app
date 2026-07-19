@@ -7,7 +7,7 @@ import type { Id } from '@/convex/_generated/dataModel';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Shimmer } from '@/components/ai-elements/shimmer';
-import { getLanguageShortLabel } from '@/lib/languages';
+import { getLanguageShortLabel, getTextDirection } from '@/lib/languages';
 import type { CreateCardToolPart } from '@/lib/types/tool-parts';
 import type { CardApprovalStatus } from '@/convex/types';
 import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
@@ -40,6 +40,35 @@ function Lang({ code }: { code: string }) {
     <span className="font-medium text-muted-foreground uppercase text-xs">
       {getLanguageShortLabel(code)}
     </span>
+  );
+}
+
+function EntryLines({
+  baseEntries,
+  targetEntries,
+  className,
+}: {
+  baseEntries: { language: string; text: string }[];
+  targetEntries: { language: string; text: string }[];
+  className?: string;
+}) {
+  return (
+    <div className={cn('space-y-1.5 text-sm', className)}>
+      {baseEntries.map((entry, i) => (
+        <p key={`base-${i}`} className="text-sm text-muted-foreground">
+          <Lang code={entry.language} />{' '}
+          {/* Own dir-scoped span: the Latin language label shares this <p>,
+              so the sentence needs its own bidi context for RTL languages. */}
+          <span dir={getTextDirection(entry.language)}>{entry.text}</span>
+        </p>
+      ))}
+      {targetEntries.map((entry, i) => (
+        <p key={`target-${i}`} className="text-base font-semibold">
+          <Lang code={entry.language} />{' '}
+          <span dir={getTextDirection(entry.language)}>{entry.text}</span>
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -130,23 +159,14 @@ export function CardApproval({
   const baseEntries = entries.filter((e) => !targetLanguages.includes(e.language));
 
   if (isWaiting && entries.length > 0) {
-    const waitingContent = (
-      <div className="space-y-1.5 text-sm">
-        {baseEntries.map((entry, i) => (
-          <p key={`base-${i}`} className="text-sm text-muted-foreground">
-            <Lang code={entry.language} /> {entry.text}
-          </p>
-        ))}
-        {targetEntries.map((entry, i) => (
-          <p key={`target-${i}`} className="text-base font-semibold">
-            <Lang code={entry.language} /> {entry.text}
-          </p>
-        ))}
-      </div>
-    );
     return (
       <Alert className="my-3 flex flex-col gap-3 border-muted">
-        <AlertDescription>{waitingContent}</AlertDescription>
+        <AlertDescription>
+          <EntryLines
+            baseEntries={baseEntries}
+            targetEntries={targetEntries}
+          />
+        </AlertDescription>
         <div className="flex items-center justify-end gap-2 h-8">
           <Shimmer duration={1.5}>{t('loading')}</Shimmer>
         </div>
@@ -168,18 +188,11 @@ export function CardApproval({
     return (
       <Alert className="my-3 flex flex-col gap-3 border-muted">
         <AlertDescription>
-          <div className="space-y-1.5 text-sm opacity-60">
-            {baseEntries.map((entry, i) => (
-              <p key={`base-${i}`} className="text-sm text-muted-foreground">
-                <Lang code={entry.language} /> {entry.text}
-              </p>
-            ))}
-            {targetEntries.map((entry, i) => (
-              <p key={`target-${i}`} className="text-base font-semibold">
-                <Lang code={entry.language} /> {entry.text}
-              </p>
-            ))}
-          </div>
+          <EntryLines
+            baseEntries={baseEntries}
+            targetEntries={targetEntries}
+            className="opacity-60"
+          />
           <div className="mt-3">
             <Shimmer duration={1.5}>{t('creatingApproval')}</Shimmer>
           </div>
@@ -187,21 +200,6 @@ export function CardApproval({
       </Alert>
     );
   }
-
-  const cardContent = (
-    <div className="space-y-1.5 text-sm">
-      {baseEntries.map((entry, i) => (
-        <p key={`base-${i}`} className="text-sm text-muted-foreground">
-          <Lang code={entry.language} /> {entry.text}
-        </p>
-      ))}
-      {targetEntries.map((entry, i) => (
-        <p key={`target-${i}`} className="text-base font-semibold">
-          <Lang code={entry.language} /> {entry.text}
-        </p>
-      ))}
-    </div>
-  );
 
   const isPending = approvalState === 'pending';
   const isApproved = approvalState === 'approved';
@@ -215,7 +213,9 @@ export function CardApproval({
         approvalState === 'rejected' && 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950',
       )}
     >
-      <AlertDescription>{cardContent}</AlertDescription>
+      <AlertDescription>
+        <EntryLines baseEntries={baseEntries} targetEntries={targetEntries} />
+      </AlertDescription>
       <div className="flex w-full items-center gap-2 h-8">
         {isPending && <FeatureBadge featureId="custom_sentences" />}
         {isPending && (

@@ -10,13 +10,7 @@ import {
 import { LandingSquircleIcon } from '@/components/landing/landing-squircle-icon';
 import { LandingWordCloud } from '@/components/landing/LandingWordCloud';
 import { cn } from '@/lib/utils';
-
-const fadeInUp = {
-  initial: { opacity: 0, y: 30 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true },
-  transition: { duration: 0.6, ease: 'easeOut' as const },
-};
+import { fadeInUp } from './animations';
 
 /* ── Seeded random for deterministic mock data ── */
 

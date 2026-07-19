@@ -251,6 +251,10 @@
     "lead": "Jede Sprache kommt mit hochwertigem Audio. Lerne eine Sprache oder mehrere parallel.",
     "missingPill": "Deine Sprache fehlt? Sag uns Bescheid"
   },
+  "testimonials": {
+    "title": "Das sagen",
+    "titleHighlight": "unsere Lernenden."
+  },
   "pricing": {
     "title": "Flexible",
     "titleHighlight": "Preise",

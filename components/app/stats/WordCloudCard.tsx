@@ -10,6 +10,7 @@ import { WordSentencesDialog } from './WordSentencesDialog';
 import { WordSearchDialog } from './WordSearchDialog';
 import { ExpandedWordsDialog } from './ExpandedWordsDialog';
 import { WORD_CLOUD_COLORS as COLORS } from '@/lib/wordCloud';
+import { getTextDirection } from '@/lib/languages';
 
 export function useLangName(): (code: string) => string {
   const locale = useLocale();
@@ -99,6 +100,7 @@ function SingleWordCloud({
       </div>
       <div
         ref={containerRef}
+        dir={getTextDirection(language)}
         className="relative w-full aspect-[5/4] sm:aspect-[20/8] overflow-hidden rounded-lg px-1 py-1 leading-5 text-sm"
         style={{ textAlign: 'justify', textAlignLast: 'left' }}
       >

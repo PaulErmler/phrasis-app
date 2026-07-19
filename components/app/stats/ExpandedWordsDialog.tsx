@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useLangName } from './WordCloudCard';
 import { WORD_CLOUD_COLORS as COLORS } from '@/lib/wordCloud';
+import { getTextDirection } from '@/lib/languages';
 
 const PAGE_SIZE = 500;
 const MAX_WORDS = 10000;
@@ -162,6 +163,7 @@ export function ExpandedWordsDialog({
           ) : (
             <>
               <div
+                dir={getTextDirection(language)}
                 className="leading-8 text-sm"
                 style={{ textAlign: 'justify', textAlignLast: 'left' }}
               >

@@ -245,7 +245,11 @@ export function ColumnMappingSelect({
                 <div className="flex flex-col gap-0.5">
                   <span className="font-medium">{columnLabel(i)}</span>
                   {sample ? (
-                    <span className="text-xs text-muted-foreground truncate max-w-[220px]">
+                    <span
+                      // Raw user cell of unknown language → dir="auto".
+                      dir="auto"
+                      className="text-xs text-muted-foreground truncate max-w-[220px] text-left"
+                    >
                       {sample}
                     </span>
                   ) : null}

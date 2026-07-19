@@ -25,6 +25,7 @@
 
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { postProcessTranslation } from '../../lib/languages';
 
 /**
  * Default cap on tokens per response when the caller doesn't supply a
@@ -268,7 +269,12 @@ export async function translateTextWithLLM(
 
   const elapsedMs = Date.now() - startedAt;
   const finishReason = result.finishReason;
-  const mt = stripWrappingQuotes(result.text.trim());
+  // Post-process before the result leaves this module so downstream
+  // romanization and storage both see the cleaned text.
+  const mt = postProcessTranslation(
+    args.targetLang,
+    stripWrappingQuotes(result.text.trim()),
+  );
   const inputTokens = result.usage.inputTokens ?? 0;
   const outputTokens = result.usage.outputTokens ?? 0;
 

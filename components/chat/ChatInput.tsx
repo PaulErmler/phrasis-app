@@ -108,6 +108,9 @@ export function ChatInput({
                 placeholder={t('placeholder')}
                 onChange={(event) => onTextChange(event.target.value)}
                 value={text}
+                // Learners often type in the target language — dir="auto"
+                // makes RTL input read right-to-left while typing.
+                dir="auto"
                 {...(inputTestId ? { 'data-testid': inputTestId } : {})}
               />
             </PromptInputBody>

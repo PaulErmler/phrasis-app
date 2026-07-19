@@ -16,9 +16,13 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import {
+  getLocalizedLanguageNameByCode,
+  getTextDirection,
+} from '@/lib/languages';
 import { MAX_CARD_TEXT_LENGTH } from '@/lib/constants/learning';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
+import { cn } from '@/lib/utils';
 
 interface EditApprovalDialogProps {
   open: boolean;
@@ -131,11 +135,12 @@ export function EditApprovalDialog({
                       [lang]: e.target.value,
                     }))
                   }
-                  className={
-                    isOverLimit
-                      ? 'border-destructive focus-visible:ring-destructive'
-                      : ''
-                  }
+                  dir={getTextDirection(lang)}
+                  className={cn(
+                    'text-left',
+                    isOverLimit &&
+                      'border-destructive focus-visible:ring-destructive',
+                  )}
                 />
               </div>
             );

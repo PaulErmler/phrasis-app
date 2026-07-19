@@ -19,6 +19,15 @@ import { completeOnboardingFresh } from "./helpers";
  *      with the SAME end date as captured in step 3 — the trial is untouched.
  *      This is the reported regression: it used to read "Start trial for
  *      Basic Annual".
+ *   5. Selecting the FREE plan during the trial schedules Free at the same
+ *      unchanged trial end. This is the second reported regression: the
+ *      confirm used to call the raw `attach` action, which the server-side
+ *      trial gate rejects ("Plan switches during a trial must go through
+ *      switchPlanDuringTrial") — the dialog then silently stayed open.
+ *   6. Renewing the still-trialing plan afterwards un-schedules the Free
+ *      switch. Third reported regression: Autumn classifies this as
+ *      "renew", which the dialog's trial routing didn't cover either, so
+ *      confirm hit the same trial gate.
  *
  * The journey signs up its OWN fresh `e2e-billing-*` user in beforeAll
  * instead of borrowing the shared user B: the tests' premise is a
@@ -387,6 +396,102 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // scenario for it is "renew" (offer to un-cancel), not "active".
     await expectPlanState(page, BASIC_ANNUAL, /plan scheduled/i);
     await expect(planCta(page, PRO_ANNUAL)).toHaveText(/renew/i);
+    await expect(page.getByTestId("pricing-trial-badge")).toHaveCount(0);
+  });
+
+  test("switching to Free during the trial schedules Free at the unchanged trial end", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openPricingTable(page);
+
+    // The free product's Autumn id is dashboard config, not in the repo —
+    // but the table sorts Free first, so the first CTA belongs to it.
+    const freeCta = page.locator('[data-testid^="pricing-card-cta-"]').first();
+    const freeTestId = await freeCta.getAttribute("data-testid");
+    const freeProductId = freeTestId!.replace("pricing-card-cta-", "");
+    expect(freeProductId).not.toBe(BASIC_ANNUAL);
+    expect(freeProductId).not.toBe(PRO_ANNUAL);
+
+    // The reported regression: confirming this dialog used to call the raw
+    // `attach` action, which convex/autumn.ts's trial gate rejects — the
+    // dialog then just stayed open with nothing happening.
+    await freeCta.click();
+
+    const title = page.getByTestId("checkout-dialog-title");
+    await expect(title).toBeVisible({ timeout: 30_000 });
+    await expect(title).toHaveText(/switch to/i);
+    await expect(title).not.toHaveText(/start trial/i);
+
+    const message = page.getByTestId("checkout-dialog-message");
+    await expect(message).toContainText(/continues unchanged until/i);
+    await expect(message).not.toContainText(/start a free trial/i);
+
+    // Dropping to Free neither ends the trial early nor extends it — same
+    // end date as captured during the upgrade (step 3).
+    const messageText = (await message.innerText()).trim();
+    const scheduledDate = /continues unchanged until (.+?)\./.exec(
+      messageText,
+    )?.[1];
+    expect(scheduledDate, `date parsed from: ${messageText}`).toBeTruthy();
+    expect(scheduledDate).toBe(trialEndDate);
+
+    // Core regression assertion: confirm routes through
+    // switchPlanDuringTrial and the dialog CLOSES (before the fix the gate
+    // threw and it stayed open).
+    await page.getByTestId("checkout-dialog-confirm").click();
+    await expect(title).toBeHidden({ timeout: 60_000 });
+
+    // The table must update IN PLACE, without a reload: the trial-switch
+    // path refetches the shared SWR caches after confirming (second
+    // user-reported regression — the card kept its old label until a
+    // manual page reload).
+    await expect(freeCta).toHaveText(/plan scheduled/i, { timeout: 20_000 });
+
+    // Free replaces the previously scheduled Basic Annual; the trial keeps
+    // running on Pro Annual, which still lapses at trial end ("renew").
+    await expectPlanState(page, freeProductId, /plan scheduled/i);
+    await expect(planCta(page, PRO_ANNUAL)).toHaveText(/renew/i);
+    await expect(page.getByTestId("pricing-trial-badge")).toHaveCount(0);
+  });
+
+  test("renewing the trialing plan un-schedules the pending Free switch", async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+    await openPricingTable(page);
+
+    const freeCta = page.locator('[data-testid^="pricing-card-cta-"]').first();
+
+    // The reported regression: Autumn classifies re-attaching the trialing
+    // plan as "renew", which the dialog's trial routing didn't divert to
+    // switchPlanDuringTrial — the confirm hit the raw-attach trial gate.
+    await expect(planCta(page, PRO_ANNUAL)).toHaveText(/renew/i);
+    await planCta(page, PRO_ANNUAL).click();
+
+    const title = page.getByTestId("checkout-dialog-title");
+    await expect(title).toBeVisible({ timeout: 30_000 });
+    await expect(title).toHaveText(/renew/i);
+    await expect(title).not.toHaveText(/start trial/i);
+
+    const message = page.getByTestId("checkout-dialog-message");
+    await expect(message).not.toContainText(/start a free trial/i);
+
+    // Confirm must close the dialog (the gate error used to keep it open)…
+    await page.getByTestId("checkout-dialog-confirm").click();
+    await expect(title).toBeHidden({ timeout: 60_000 });
+
+    // …and the table updates in place: Pro Annual is current again, the
+    // scheduled Free switch is gone.
+    await expect(planCta(page, PRO_ANNUAL)).toHaveText(/current plan/i, {
+      timeout: 20_000,
+    });
+    await expect(freeCta).not.toHaveText(/plan scheduled/i);
+
+    // Reload-verify the persisted state; the trial is still running, so
+    // the once-ever trial promo must stay gone.
+    await expectPlanState(page, PRO_ANNUAL, /current plan/i);
+    await expect(freeCta).not.toHaveText(/plan scheduled/i);
     await expect(page.getByTestId("pricing-trial-badge")).toHaveCount(0);
   });
 });

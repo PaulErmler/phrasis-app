@@ -59,7 +59,8 @@ export const {
  *
  * - trial-eligible (never trialed, no paid plan): args pass through and
  *   Autumn starts the plan's configured trial.
- * - currently trialing: `attach` is rejected — plan switches must go
+ * - currently trialing: `attach` is rejected — plan switches (including
+ *   dropping to the Free plan, which is scheduled at trial end) must go
  *   through `switchPlanDuringTrial` (convex/billing.ts), which carries the
  *   running trial over instead of granting a fresh one. `checkout` (the
  *   dialog's preview) proceeds with `freeTrial: false` so no checkout

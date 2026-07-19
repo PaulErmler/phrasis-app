@@ -12,6 +12,8 @@ import {
 } from '@/lib/textCompare';
 import { AskAboutWord } from './ClickableWords';
 import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
+import { getTextDirection } from '@/lib/languages';
+import { cn } from '@/lib/utils';
 
 interface WordDiffProps {
   expected: string;
@@ -198,6 +200,8 @@ export function WordDiff({
     };
   }, [expected, actual, diffOpts]);
 
+  const dir = getTextDirection(language);
+
   if (hideErrors) {
     return (
       <CleanRevealedSentence
@@ -211,7 +215,17 @@ export function WordDiff({
 
   return (
     <div>
-      <p className="leading-relaxed flex flex-wrap items-baseline gap-x-1 gap-y-3 pt-3">
+      {/* dir flips the flex main axis so RTL word chips lay out right-to-left
+          in reading order; justify-end then packs the lines against the LEFT
+          edge (main-axis end in RTL), keeping the block left-aligned like the
+          rest of the layout. */}
+      <p
+        dir={dir}
+        className={cn(
+          'leading-relaxed flex flex-wrap items-baseline gap-x-1 gap-y-3 pt-3',
+          dir === 'rtl' && 'justify-end',
+        )}
+      >
         {words.map((w, i) => (
           // Chips whose baseline shows a sentence word (equal / missing /
           // typo / wrong) get the ask-AI popover for it. `expected` is ''

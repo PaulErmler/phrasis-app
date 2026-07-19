@@ -12,6 +12,7 @@ vi.mock("@/hooks/use-course-languages", () => ({
 }));
 vi.mock("@/lib/languages", () => ({
   getLocalizedLanguageNameByCode: (code: string) => code.toUpperCase(),
+  getTextDirection: () => "ltr",
 }));
 
 import { EditApprovalDialog } from "@/components/chat/EditApprovalDialog";

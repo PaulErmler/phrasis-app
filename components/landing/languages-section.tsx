@@ -8,13 +8,7 @@ import {
   SUPPORTED_LANGUAGES,
   getLocalizedLanguageNameByCode,
 } from '@/lib/languages';
-
-const fadeInUp = {
-  initial: { opacity: 0, y: 30 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true },
-  transition: { duration: 0.6, ease: 'easeOut' as const },
-};
+import { fadeInUp } from './animations';
 
 export function LanguagesSection() {
   const t = useTranslations('LandingPage.languages');

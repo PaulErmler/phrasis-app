@@ -44,6 +44,7 @@ function SmoothMessageResponse({
   // preventing Streamdown from switching rendering paths mid-animation.
   const effectiveMode = isStreaming || isSmoothTextStreaming ? 'streaming' : 'static';
   const displayText = smoothText ?? text ?? '';
+  // Bidi handling (dir="auto" + text-left) lives inside MessageResponse.
   return (
     <MessageResponse mode={effectiveMode}>
       {displayText}
