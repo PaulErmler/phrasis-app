@@ -17,11 +17,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import {
+  getLocalizedLanguageNameByCode,
+  getTextDirection,
+} from '@/lib/languages';
 import { ConvexError } from 'convex/values';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
 import { MAX_CARD_TEXT_LENGTH } from '@/lib/constants/learning';
+import { cn } from '@/lib/utils';
 import type { CardTranslation } from './types';
 
 interface EditCardDialogProps {
@@ -137,7 +141,12 @@ export function EditCardDialog({
                         [lang]: e.target.value,
                       }))
                     }
-                    className={isOverLimit ? 'border-destructive focus-visible:ring-destructive' : ''}
+                    dir={getTextDirection(lang)}
+                    className={cn(
+                      'text-left',
+                      isOverLimit &&
+                        'border-destructive focus-visible:ring-destructive',
+                    )}
                   />
                 </div>
               );

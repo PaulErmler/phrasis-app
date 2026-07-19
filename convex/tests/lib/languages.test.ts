@@ -2,9 +2,69 @@
 import { describe, it, expect } from "vitest";
 import {
   getCurrentTranslationVersion,
+  getTextDirection,
   getTranslationConfigForLanguage,
+  postProcessTranslation,
   resolveTranslationStages,
+  SUPPORTED_LANGUAGES,
 } from "../../../lib/languages";
+
+describe("lib/languages — postProcessTranslation", () => {
+  it("strips trailing underscore runs (the default step, every language)", () => {
+    expect(postProcessTranslation("es", "Hola_")).toBe("Hola");
+    expect(postProcessTranslation("es", "Hola.__")).toBe("Hola.");
+    expect(postProcessTranslation("ar_lev", "أوه، أنا متأسفة._")).toBe(
+      "أوه، أنا متأسفة.",
+    );
+  });
+
+  it("strips whitespace mixed into the trailing run", () => {
+    expect(postProcessTranslation("es", "Hola _ ")).toBe("Hola");
+    expect(postProcessTranslation("es", "Hola. ")).toBe("Hola.");
+  });
+
+  it("keeps interior underscores (could be a deliberate blank)", () => {
+    expect(postProcessTranslation("es", "a_b")).toBe("a_b");
+    expect(postProcessTranslation("es", "fill _ in the blank")).toBe(
+      "fill _ in the blank",
+    );
+  });
+
+  it("is idempotent and safe on clean/empty strings", () => {
+    expect(postProcessTranslation("es", "Hola.")).toBe("Hola.");
+    expect(postProcessTranslation("es", "")).toBe("");
+    expect(
+      postProcessTranslation("es", postProcessTranslation("es", "Hola._")),
+    ).toBe("Hola.");
+  });
+
+  it("applies the default for unknown language codes too", () => {
+    expect(postProcessTranslation("not-a-language", "x_")).toBe("x");
+  });
+});
+
+describe("lib/languages — getTextDirection", () => {
+  it("returns 'rtl' for every Arabic dialect, Hebrew, and Persian", () => {
+    const rtlCodes = SUPPORTED_LANGUAGES.filter(
+      (l) => l.code === "ar" || l.code.startsWith("ar_"),
+    ).map((l) => l.code);
+    expect(rtlCodes.length).toBeGreaterThanOrEqual(5);
+    for (const code of [...rtlCodes, "he", "fa"]) {
+      expect(getTextDirection(code), code).toBe("rtl");
+    }
+  });
+
+  it("falls back to the base code for display-code variants", () => {
+    expect(getTextDirection("ar-EG")).toBe("rtl");
+    expect(getTextDirection("ar-LB")).toBe("rtl");
+  });
+
+  it("returns 'ltr' for LTR and unknown languages", () => {
+    for (const code of ["en", "de", "el", "bn", "hi", "zh", "not-a-language"]) {
+      expect(getTextDirection(code), code).toBe("ltr");
+    }
+  });
+});
 
 describe("lib/languages — getTranslationConfigForLanguage", () => {
   it("returns provider='google' for English (source-only, never translated)", () => {

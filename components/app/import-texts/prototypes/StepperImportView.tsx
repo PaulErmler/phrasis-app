@@ -24,7 +24,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import {
+  getLocalizedLanguageNameByCode,
+  getTextDirection,
+} from '@/lib/languages';
 import { MAX_CARD_TEXT_LENGTH } from '@/lib/constants/learning';
 import {
   FileDropzone,
@@ -150,8 +153,9 @@ function ReviewRow({
                       }
                     }}
                     rows={Math.min(6, Math.max(2, Math.ceil(draft.length / 50)))}
+                    dir={getTextDirection(lang)}
                     className={cn(
-                      'flex-1 min-w-0 rounded-md border bg-background px-2 py-1 text-sm resize-y focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none',
+                      'flex-1 min-w-0 rounded-md border bg-background px-2 py-1 text-sm text-left resize-y focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none',
                       draft.length > MAX_CARD_TEXT_LENGTH
                         ? 'border-destructive'
                         : '',
@@ -189,7 +193,12 @@ function ReviewRow({
                   </div>
                 </div>
               ) : (
-                <span className="block break-words">{cell || '—'}</span>
+                <span
+                  dir={getTextDirection(lang)}
+                  className="block break-words text-left"
+                >
+                  {cell || '—'}
+                </span>
               )}
             </div>
           );
@@ -358,6 +367,9 @@ export function StepperImportView({ c }: { c: ImportController }) {
             <textarea
               value={c.input}
               onChange={(e) => c.setInput(e.target.value)}
+              // Mixed-language raw paste — no single language code exists, so
+              // first-strong-character detection is the best available dir.
+              dir="auto"
               placeholder={t('pastePlaceholder')}
               rows={8}
               data-testid="import-paste"

@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/command';
 import { WordSentencesDialog } from './WordSentencesDialog';
 import { useLangName } from './WordCloudCard';
+import { getTextDirection } from '@/lib/languages';
 
 function groupByLanguage(
   items: Array<{ word: string; displayWord: string; language: string }>,
@@ -96,7 +97,9 @@ export function WordSearchDialog({
                   key={`${item.language}:${item.word}`}
                   onSelect={() => handleSelect(item)}
                 >
-                  {item.displayWord}
+                  <span dir={getTextDirection(item.language)}>
+                    {item.displayWord}
+                  </span>
                 </CommandItem>
               ))}
             </CommandGroup>

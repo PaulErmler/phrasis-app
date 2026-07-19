@@ -27,7 +27,7 @@ import {
 import { Layers, Languages } from 'lucide-react';
 import { AudioButton } from '@/components/app/learning/AudioButton';
 import { CardSpeedBadge } from '@/components/app/learning/CardSpeedBadge';
-import { getLanguageShortLabel } from '@/lib/languages';
+import { getLanguageShortLabel, getTextDirection } from '@/lib/languages';
 import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -160,7 +160,12 @@ export function DeckCardsView() {
                           {index + 1}.
                         </span>
                         <div className="flex-1">
-                          <p className="font-medium text-sm leading-relaxed">
+                          <p
+                            dir={getTextDirection(
+                              baseTranslation?.language || card.sourceLanguage,
+                            )}
+                            className="font-medium text-sm leading-relaxed text-left"
+                          >
                             {baseTranslation?.text || card.sourceText}
                           </p>
                           {baseTranslation?.romanization && (
@@ -169,7 +174,10 @@ export function DeckCardsView() {
                             </p>
                           )}
                           {targetTranslation?.text && (
-                            <p className="text-muted-sm mt-1 leading-relaxed">
+                            <p
+                              dir={getTextDirection(targetTranslation.language)}
+                              className="text-muted-sm mt-1 leading-relaxed text-left"
+                            >
                               {targetTranslation.text}
                             </p>
                           )}

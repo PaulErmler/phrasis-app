@@ -8,7 +8,7 @@ import {
   normalise,
 } from '@/lib/audio/alignTimings';
 import { highlightWord } from '@/lib/wordCloud';
-import { languageSupportsKaraoke } from '@/lib/languages';
+import { getTextDirection, languageSupportsKaraoke } from '@/lib/languages';
 import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
 import type { WordTiming } from './types';
 
@@ -141,9 +141,15 @@ export function HighlightedText({
     });
   }, [aligned, currentIndex, highlightedIndices]);
 
+  // Explicit direction keeps RTL sentence-final punctuation at the sentence
+  // end; `text-left` keeps the sentence flush with the LTR layout (see
+  // ClickableWords for the bidi rationale).
+  const dir = getTextDirection(language);
+  const dirClassName = cn(className, dir === 'rtl' && 'text-left');
+
   if (!enabled || !canHighlight) {
     return (
-      <p className={className}>
+      <p dir={dir} className={dirClassName}>
         {highlightTerm ? highlightWord(text, highlightTerm, language) : text}
       </p>
     );
@@ -153,5 +159,5 @@ export function HighlightedText({
   // still renders per-word spans (currentIndex is -1 so no blue is applied),
   // which keeps the DOM structure identical across an isActive flip — that's
   // what prevents the search-word orange from disappearing at play start.
-  return <p className={className}>{wordSpans}</p>;
+  return <p dir={dir} className={dirClassName}>{wordSpans}</p>;
 }

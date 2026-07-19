@@ -69,6 +69,13 @@ type LegacyCustomerProduct = {
  * - Autumn-classified upgrades switch immediately; `customize.free_trial`
  *   with the remaining duration carries the trial over (it bypasses
  *   per-plan dedup and re-anchors from now, so `ceil` never shortens it).
+ * - The free (default) plan is a valid target too: it takes the scheduled
+ *   path — the trial runs to its end, then the customer drops to Free.
+ *   A free target must never reach the immediate `billing.attach` branch
+ *   (its `customize.free_trial` would be meaningless there).
+ * - Re-attaching the currently-trialing plan while a switch is scheduled
+ *   ("renew") un-schedules that switch via a plain legacy attach — the
+ *   trial keeps running as if nothing was ever scheduled.
  *
  * The direction is decided by Autumn's own classification (a `/checkout`
  * preview), not our tier ranking — attach behavior follows Autumn's
@@ -97,9 +104,6 @@ export const switchPlanDuringTrial = action({
     if (!trialing) {
       throw new Error('No active trial — use the regular checkout flow');
     }
-    if (trialing.id === args.productId) {
-      throw new Error('Already trialing this plan');
-    }
     // The legacy (v1.2) shape reports the trial end via current_period_end
     // and leaves trial_ends_at null while trialing.
     const trialEndsAt =
@@ -109,7 +113,7 @@ export const switchPlanDuringTrial = action({
     }
 
     const preview = await autumnFetch<{
-      product?: { scenario?: string };
+      product?: { scenario?: string; properties?: { is_free?: boolean } };
     }>(
       'POST',
       '/checkout',
@@ -117,11 +121,42 @@ export const switchPlanDuringTrial = action({
       '1.2',
     );
     const scenario = preview?.product?.scenario;
+    const targetIsFree = preview?.product?.properties?.is_free === true;
 
     let mode: 'scheduled' | 'immediate';
     let paymentUrl: string | null = null;
 
-    if (scenario === 'downgrade') {
+    if (trialing.id === args.productId && scenario !== 'renew') {
+      throw new Error('Already trialing this plan');
+    }
+    if (
+      targetIsFree &&
+      scenario !== 'downgrade' &&
+      scenario !== 'cancel' &&
+      scenario !== 'renew'
+    ) {
+      throw new Error(
+        `Plan switch not applicable during trial (scenario: ${scenario ?? 'unknown'})`,
+      );
+    }
+
+    if (scenario === 'renew') {
+      // Re-attaching the currently-trialing plan while another plan (or
+      // Free) is scheduled to replace it: Autumn classifies this as
+      // "renew" and a plain legacy attach just drops the scheduled
+      // switch — the running trial is untouched (per-plan trial dedup
+      // means no fresh trial is granted for a plan already trialed).
+      await autumnFetch(
+        'POST',
+        '/attach',
+        { customer_id: customerId, product_id: args.productId },
+        '1.2',
+      );
+      mode = 'immediate';
+    } else if (
+      scenario === 'downgrade' ||
+      (targetIsFree && scenario === 'cancel')
+    ) {
       await autumnFetch(
         'POST',
         '/attach',

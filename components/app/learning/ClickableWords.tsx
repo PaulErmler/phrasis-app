@@ -14,7 +14,7 @@ import {
   alignWordTimings,
   matchRatio,
 } from '@/lib/audio/alignTimings';
-import { languageSupportsKaraoke } from '@/lib/languages';
+import { getTextDirection, languageSupportsKaraoke } from '@/lib/languages';
 import { useKaraokeIndex, type ClockBinding } from '@/hooks/use-karaoke-index';
 import { useLearningChatToggle } from './LearningChatLayout';
 import type { WordTiming } from './types';
@@ -185,12 +185,21 @@ export function ClickableWords({
 
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
+  // Explicit direction so RTL sentences (Arabic, Hebrew, Persian) keep a
+  // trailing neutral mark (. ! ?) at the sentence END — without it the bidi
+  // algorithm resolves the mark to the page's LTR direction and renders it
+  // at the visual start of the sentence. `text-left` overrides the
+  // right-alignment `dir="rtl"` would otherwise apply, keeping RTL sentences
+  // flush with the rest of the LTR layout.
+  const dir = getTextDirection(language);
+  const dirClassName = cn(className, dir === 'rtl' && 'text-left');
+
   if (!interactive || aligned.length === 0 || !chatContext) {
     if (!canKaraoke || !isActive) {
-      return <p className={className}>{text}</p>;
+      return <p dir={dir} className={dirClassName}>{text}</p>;
     }
     return (
-      <p className={className}>
+      <p dir={dir} className={dirClassName}>
         {aligned.map((w, i) => (
           <Fragment key={i}>
             <span
@@ -224,7 +233,7 @@ export function ClickableWords({
     : -1;
 
   return (
-    <p className={className}>
+    <p dir={dir} className={dirClassName}>
       {aligned.map((w, i) => (
         // Fragment (not wrapper <span>) — wrapping each word in a span made
         // the LAST word's clickable area lose the hit-test in RTL paragraphs:

@@ -25,6 +25,7 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getTextDirection } from '@/lib/languages';
 import { getCollectionDescription } from './CollectionCarouselUI';
 import { AudioButton } from '@/components/app/learning/AudioButton';
 import {
@@ -551,7 +552,12 @@ function PreviewTextRow({
           <div className="space-y-1">
             {baseTranslations.map((translation) => renderLine(translation, true))}
             {baseTranslations.length === 0 && (
-              <p className="text-sm font-medium leading-relaxed">{row.text}</p>
+              <p
+                dir={getTextDirection(row.sourceLanguage)}
+                className="text-sm font-medium leading-relaxed text-left"
+              >
+                {row.text}
+              </p>
             )}
           </div>
 

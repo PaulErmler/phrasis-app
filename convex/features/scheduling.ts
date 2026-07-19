@@ -43,7 +43,12 @@ import {
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import { settledCount } from '../lib/collections';
 import { getTodayInTimezone } from '../lib/dateUtils';
-import { getAudioForText, deleteAudioRow } from '../lib/audio';
+import {
+  getAudioForText,
+  deleteAudioRow,
+  deleteAudioRowsForTextLanguage,
+} from '../lib/audio';
+import { soundsSame } from '../lib/textComparison';
 import {
   ROMANIZATION_LANGUAGES,
   USER_PROVIDED_TRANSLATION_SOURCE,
@@ -1456,19 +1461,12 @@ export const flagTranslation = mutation({
         quotaCharged = true;
       }
 
-      // The new translation will likely differ from the current text, so
-      // existing audio for this language is stale. Drop it; the worker's
-      // storeTranslationAndScheduleTTS path regenerates after the LLM lands.
-      const audioRows = await ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', card.textId).eq('language', lang),
-        )
-        .take(10);
-      for (const audioRow of audioRows) {
-        // Reference-aware: drops the blob only when no other row references it.
-        await deleteAudioRow(ctx, audioRow);
-      }
+      // Audio is deliberately NOT deleted here: before the LLM lands we
+      // can't know whether the retranslation is audibly different. The
+      // decision lives in storeTranslationAndScheduleTTS's replaceExisting
+      // branch, which has old + new text in hand — it keeps the audio when
+      // the change is punctuation-only (`soundsSame`) and deletes + re-
+      // enqueues TTS otherwise.
 
       await ctx.runMutation(
         internal.features.llmTranslationQueue.enqueueLlmTranslation,
@@ -1524,16 +1522,7 @@ export const regenerateCardAudio = mutation({
       ...new Set([...course.baseLanguages, ...course.targetLanguages]),
     ];
     for (const lang of allLanguages) {
-      const audioRows = await ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', card.textId).eq('language', lang),
-        )
-        .take(10);
-      for (const row of audioRows) {
-        // Reference-aware: drops the blob only when no other row references it.
-        await deleteAudioRow(ctx, row);
-      }
+      await deleteAudioRowsForTextLanguage(ctx, card.textId, lang);
     }
 
     await scheduleMissingContent(
@@ -1628,6 +1617,23 @@ export const editCard = mutation({
 
     if (changedLanguages.size === 0) return null;
 
+    // Audio-relevant subset of the diff: an edit that only touches
+    // punctuation/'_' (`soundsSame`) sounds identical spoken aloud, so the
+    // language keeps its audio — Path A skips the delete, Path B copies the
+    // rows like an unchanged language (word timings still align; the words
+    // are the same). Text/romanization writes keep using the full
+    // `changedLanguages` set.
+    const audioChangedLanguages = new Set<string>();
+    for (const lang of changedLanguages) {
+      const oldText =
+        lang === sourceLanguage
+          ? text.text
+          : (existingTranslationMap.get(lang)?.translatedText ?? '');
+      if (!soundsSame(submittedMap.get(lang)!, oldText)) {
+        audioChangedLanguages.add(lang);
+      }
+    }
+
     // Validate text lengths
     for (const { language, text } of args.translations) {
       if (text.length > MAX_CARD_TEXT_LENGTH) {
@@ -1695,18 +1701,10 @@ export const editCard = mutation({
         }
       }
 
-      // Delete audio recordings for changed languages
-      for (const lang of changedLanguages) {
-        const audioRows = await ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', card.textId).eq('language', lang),
-          )
-          .take(10);
-        for (const row of audioRows) {
-          // Reference-aware: drops the blob only when no other row references it.
-          await deleteAudioRow(ctx, row);
-        }
+      // Delete audio recordings for audibly-changed languages only —
+      // punctuation-only edits keep their audio.
+      for (const lang of audioChangedLanguages) {
+        await deleteAudioRowsForTextLanguage(ctx, card.textId, lang);
       }
     } else {
       // Path B: create new textId, copy unchanged content
@@ -1798,9 +1796,10 @@ export const editCard = mutation({
         });
       }
 
-      // Copy audio recordings for unchanged languages
+      // Copy audio recordings for languages whose audio is still valid —
+      // unchanged ones AND punctuation-only edits (audibly identical).
       for (const lang of allLanguages) {
-        if (changedLanguages.has(lang)) continue;
+        if (audioChangedLanguages.has(lang)) continue;
         const audioRows = await ctx.db
           .query('audioRecordings')
           .withIndex('by_text_and_language', (q) =>

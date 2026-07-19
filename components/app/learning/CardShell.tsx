@@ -292,7 +292,10 @@ export function CardShell({
             );
           })}
           {baseTranslations.length === 0 && (
-            <p className="body-large">{sourceText}</p>
+            // dir="auto": no language code in scope for the raw source text;
+            // first-strong-character detection handles RTL sources.
+            // text-left keeps RTL sources flush with the LTR layout.
+            <p dir="auto" className="body-large text-left">{sourceText}</p>
           )}
         </div>
 

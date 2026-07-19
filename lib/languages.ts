@@ -167,6 +167,24 @@ export interface Language {
    */
   translationVersion?: number;
   /**
+   * Post-processing step applied to MACHINE-GENERATED translation output
+   * (LLM single-sentence, Google fallback, batch autofill, chat cards)
+   * before storage — never to user-typed text. Unset ⇒ the `default` step
+   * (strip trailing '_' runs). Set only to route a language onto a
+   * different step; consumed via `postProcessTranslation` below.
+   */
+  translationPostProcess?: TranslationPostProcessId;
+  /**
+   * Script direction. Unset ⇒ 'ltr'. Drives the `dir` attribute on every
+   * element that renders learner-facing sentence text (via
+   * `getTextDirection` below): without an explicit direction, an RTL
+   * sentence ending in a bidi-neutral mark (Latin `.`, `!`, `?`) renders
+   * that mark at the visual START of the sentence under the page's LTR
+   * base direction. Set on every entry of an RTL script family (each
+   * Arabic dialect carries its own flag).
+   */
+  direction?: 'rtl';
+  /**
    * TTS-setup version (defaults to 1 via `getCurrentTtsVersion`). Bump when
    * changing this language's voice pool, Gemini `ttsPromptName`, or provider so
    * existing audio regenerates lazily — needed for prompt-only changes on an
@@ -1234,6 +1252,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar',
+    direction: 'rtl',
     displayCode: 'ar',
     regionLabel: 'the Arab world',
     geminiBcp47: 'ar-001',
@@ -1263,6 +1282,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_sa',
+    direction: 'rtl',
     displayCode: 'ar-SA',
     regionLabel: 'Saudi Arabia',
     geminiBcp47: 'ar-001',
@@ -1290,6 +1310,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_eg',
+    direction: 'rtl',
     displayCode: 'ar-EG',
     regionLabel: 'Egypt',
     geminiBcp47: 'ar-EG',
@@ -1319,6 +1340,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_iq',
+    direction: 'rtl',
     displayCode: 'ar-IQ',
     regionLabel: 'Iraq',
     geminiBcp47: 'ar-001',
@@ -1346,6 +1368,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_lev',
+    direction: 'rtl',
     displayCode: 'ar-LB',
     regionLabel: 'the Levant (Lebanon, Syria, Palestine, Jordan)',
     geminiBcp47: 'ar-001',
@@ -1376,6 +1399,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'he',
+    direction: 'rtl',
     displayCode: 'he',
     regionLabel: 'Israel',
     geminiBcp47: 'he-IL',
@@ -1400,6 +1424,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'fa',
+    direction: 'rtl',
     displayCode: 'fa',
     regionLabel: 'Iran',
     geminiBcp47: 'fa-IR',
@@ -1525,6 +1550,35 @@ export const DEFAULT_CONTENT_VERSION = 1;
 /** Current translation-method version for a language (1 when unset). */
 export function getCurrentTranslationVersion(code: string): number {
   return getLanguageByCode(code)?.translationVersion ?? DEFAULT_CONTENT_VERSION;
+}
+
+/**
+ * Post-processing steps for machine-generated translation output. Every
+ * language runs one (unset `translationPostProcess` ⇒ 'default'); the
+ * per-language field exists as the override hook for future steps.
+ */
+export type TranslationPostProcessId = 'default';
+
+const TRANSLATION_POST_PROCESSORS: Record<
+  TranslationPostProcessId,
+  (text: string) => string
+> = {
+  // LLMs occasionally emit a stray trailing underscore (observed on Arabic:
+  // "…متأسفة._" — the Buckwalter-style romanization then carries the same
+  // "_"). Strip trailing runs of underscores/whitespace; interior
+  // underscores are kept (could be a deliberate blank).
+  default: (text) => text.replace(/[\s_]+$/u, ''),
+};
+
+/**
+ * Apply the language's post-processing step to machine-generated translation
+ * output. Also applied to the derived `romanizedText` (it inherits the same
+ * artifacts) and by the `stripTrailingUnderscores` backfill migration.
+ * Idempotent — safe to run at both the producer and the storage choke point.
+ */
+export function postProcessTranslation(code: string, text: string): string {
+  const id = getLanguageByCode(code)?.translationPostProcess ?? 'default';
+  return TRANSLATION_POST_PROCESSORS[id](text);
 }
 
 /** Current TTS-setup version for a language (1 when unset). */
@@ -1960,6 +2014,24 @@ export function getLocalizedLanguageNameByCode(
   const language = getLanguageByCode(code);
   if (!language) return code;
   return getLocalizedLanguageName(language.displayCode, locale);
+}
+
+/**
+ * Whether the language's script is right-to-left, read from the
+ * per-language `direction` field (see the `Language` interface for the
+ * bidi rationale). Display-code variants (`ar-EG`) that aren't internal
+ * codes fall back to their base code's entry.
+ */
+export function isRtlLanguage(code: string): boolean {
+  const lang = getLanguageByCode(code);
+  if (lang) return lang.direction === 'rtl';
+  const base = code.split(/[-_]/)[0]?.toLowerCase() ?? '';
+  return getLanguageByCode(base)?.direction === 'rtl';
+}
+
+/** `dir` attribute value for text in the given language. */
+export function getTextDirection(code: string): 'rtl' | 'ltr' {
+  return isRtlLanguage(code) ? 'rtl' : 'ltr';
 }
 
 /**

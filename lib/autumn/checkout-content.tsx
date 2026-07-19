@@ -35,22 +35,28 @@ export const getCheckoutContent = (
     };
   }
 
-  // Currently-trialing user switching between paid plans: the running
-  // trial is kept (see convex/billing.ts switchPlanDuringTrial), so the
-  // copy must not promise a fresh trial or an immediate charge. The date
-  // comes from the customer's own trial end — the preview's next_cycle
-  // can reflect a phantom fresh trial. Downgrades are scheduled at trial
-  // end; everything else switches now with the trial carried over.
+  // Currently-trialing user switching plans: the running trial is kept
+  // (see convex/billing.ts switchPlanDuringTrial), so the copy must not
+  // promise a fresh trial or an immediate charge. The date comes from the
+  // customer's own trial end — the preview's next_cycle can reflect a
+  // phantom fresh trial. Downgrades — including to the Free plan, which
+  // Autumn classifies as "downgrade" or "cancel" — are scheduled at trial
+  // end; everything else switches now with the trial carried over. Must
+  // mirror the scenarios accepted by checkout-dialog.tsx isTrialSwitch.
   if (
     trialState.onTrial &&
-    !is_free &&
-    (scenario === "upgrade" || scenario === "downgrade" || scenario === "new")
+    (is_free
+      ? scenario === "downgrade" || scenario === "cancel"
+      : scenario === "upgrade" || scenario === "downgrade" || scenario === "new")
   ) {
     const trialEndStr = trialState.trialEndsAt
       ? new Date(trialState.trialEndsAt).toLocaleDateString()
       : (nextCycleAtStr ?? "");
-    const key =
-      scenario === "downgrade" ? "trialContinueScheduled" : "trialContinueSwitchNow";
+    const key = is_free
+      ? "trialFreeScheduled"
+      : scenario === "downgrade"
+        ? "trialContinueScheduled"
+        : "trialContinueSwitchNow";
     return {
       title: t(`${key}Title`, { productName }),
       message: t(`${key}Message`, { productName, date: trialEndStr }),

@@ -45,8 +45,14 @@ import {
   getCurrentTtsVersion,
   isTtsVersionStale,
   isTranslationVersionStale,
+  postProcessTranslation,
 } from '../../lib/languages';
-import { deleteAudioRow, deleteStorageBlobIfUnreferenced } from '../lib/audio';
+import { soundsSame } from '../lib/textComparison';
+import {
+  deleteAudioRow,
+  deleteAudioRowsForTextLanguage,
+  deleteStorageBlobIfUnreferenced,
+} from '../lib/audio';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   translationValidator,
@@ -1964,10 +1970,11 @@ export const processTranslationForCard = internalAction({
           romanizedText = existingRow!.romanizedText;
         }
       } else {
-        translation = await translateText(
-          args.text,
-          args.sourceLanguage,
+        // Post-process before romanization so the derived romanizedText is
+        // computed from the cleaned text.
+        translation = postProcessTranslation(
           translateTarget,
+          await translateText(args.text, args.sourceLanguage, translateTarget),
         );
         if (ROMANIZATION_LANGUAGES.has(translateTarget)) {
           try {
@@ -2067,9 +2074,13 @@ export const storeTranslationAndScheduleTTS = internalMutation({
      * When `true` AND a translation row already exists, the mutation
      * replaces `translatedText`, `romanizedText` (matched with its source),
      * `translationSource`, and `regionVariant`. `flagCount` is preserved —
-     * it tracks user dissatisfaction history. Audio rows for the language
-     * are not touched here; retranslation callers delete them before
-     * enqueueing so the no-audio guard below schedules a fresh TTS.
+     * it tracks user dissatisfaction history. The audio decision also lives
+     * HERE (not in retranslation callers): when the new text sounds
+     * identical to the old (punctuation/'_'-only diff, `soundsSame`), the
+     * existing audio rows are kept and no TTS is enqueued; otherwise the
+     * stale audio rows are deleted so the no-audio guard below schedules a
+     * fresh TTS. Callers must NOT delete audio up front — before the LLM
+     * lands they can't know whether the change is audible.
      *
      * When `false`/absent, the historical concurrent-write protection
      * stays in place: existing `translatedText` is never overwritten and
@@ -2141,18 +2152,34 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       )
       .first();
 
+    // Choke-point post-processing (idempotent — LLM/Google producers already
+    // apply it upstream; this catches any path that didn't). The empty-string
+    // romanization sentinel maps to itself, so "tried, failed" survives.
+    const translatedText = postProcessTranslation(
+      args.targetLanguage,
+      args.translatedText,
+    );
+    const romanizedText =
+      args.romanizedText !== undefined
+        ? postProcessTranslation(args.targetLanguage, args.romanizedText)
+        : undefined;
+
+    // Set in the replaceExisting branch when the retranslation is a
+    // punctuation-only change — audio is kept and TTS must not be enqueued.
+    let audioUnchangedBySound = false;
+
     if (!existing) {
       await ctx.db.insert('translations', {
         textId: args.textId,
         targetLanguage: args.targetLanguage,
-        translatedText: args.translatedText,
+        translatedText,
         // `!== undefined` so the empty-string sentinel ("tried, failed,
         // leave empty") persists on the new row and ensureContent stops
-        // rescheduling — otherwise `args.romanizedText === ''` would be
+        // rescheduling — otherwise `romanizedText === ''` would be
         // dropped by the truthy spread and look like "never attempted".
-        ...(args.romanizedText !== undefined
+        ...(romanizedText !== undefined
           ? {
-            romanizedText: args.romanizedText,
+            romanizedText,
             ...(args.romanizationSource
               ? { romanizationSource: args.romanizationSource }
               : {}),
@@ -2167,6 +2194,20 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         translationVersion: getCurrentTranslationVersion(args.targetLanguage),
       });
     } else if (args.replaceExisting) {
+      // Audio decision for retranslations, made here where old and new text
+      // are both in hand: a punctuation/'_'-only change sounds identical, so
+      // the existing audio stays valid — deleting + regenerating would spend
+      // real TTS cost on byte-identical speech. Only an audible change drops
+      // the language's audio rows (all voices, reference-aware).
+      audioUnchangedBySound = soundsSame(existing.translatedText, translatedText);
+      if (!audioUnchangedBySound) {
+        await deleteAudioRowsForTextLanguage(
+          ctx,
+          args.textId,
+          args.targetLanguage,
+        );
+      }
+
       // Deliberate retranslation: overwrite the translation and its matched
       // metadata. romanizedText and romanizationSource travel as a unit —
       // both replaced together, including the empty-string sentinel. If the
@@ -2182,12 +2223,12 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         speakerGender: 'male' | 'female';
         translationVersion: number;
       }> = {
-        translatedText: args.translatedText,
+        translatedText,
         // A retranslation is freshly produced → stamp the current method version.
         translationVersion: getCurrentTranslationVersion(args.targetLanguage),
       };
-      if (args.romanizedText !== undefined) {
-        patch.romanizedText = args.romanizedText;
+      if (romanizedText !== undefined) {
+        patch.romanizedText = romanizedText;
         patch.romanizationSource = args.romanizationSource;
       } else {
         // Convex `patch` semantics: `undefined` clears the field.
@@ -2219,10 +2260,10 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       // but never overwrite a previously-stored real value. Source travels
       // with the value — they're written/cleared as a unit.
       if (
-        args.romanizedText !== undefined &&
+        romanizedText !== undefined &&
         existing.romanizedText === undefined
       ) {
-        patch.romanizedText = args.romanizedText;
+        patch.romanizedText = romanizedText;
         if (args.romanizationSource) {
           patch.romanizationSource = args.romanizationSource;
         }
@@ -2261,7 +2302,11 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       }
     }
 
-    if (args.skipTts) {
+    // `audioUnchangedBySound`: the retained audio may live under a different
+    // voiceName than the current pick (e.g. a gender fix changed the voice),
+    // so the per-voice guard below would wrongly enqueue a duplicate — skip
+    // outright.
+    if (args.skipTts || audioUnchangedBySound) {
       return null;
     }
 
@@ -2290,7 +2335,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
             provider: getTtsProviderForLanguage(args.targetLanguage),
             args: {
               textId: args.textId,
-              text: args.translatedText,
+              text: translatedText,
               language: args.targetLanguage,
               voiceName: args.voiceName,
               voiceGender,

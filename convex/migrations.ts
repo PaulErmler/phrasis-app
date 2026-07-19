@@ -8,6 +8,10 @@ import {
   DEFAULT_PAUSE_BASE_TO_TARGET,
   DEFAULT_PAUSE_BEFORE_AUTO_ADVANCE,
 } from '../lib/constants/audioPlayback';
+import {
+  postProcessTranslation,
+  USER_PROVIDED_TRANSLATION_SOURCE,
+} from '../lib/languages';
 
 // App-wide migrations via @convex-dev/migrations: batched, resumable, with
 // state tracking so completed migrations are skipped on re-run. `runAll` is
@@ -80,7 +84,48 @@ export const perModeSettingsBackfill = migrations.define({
   },
 });
 
+/**
+ * Apply the translation post-processing step (default: strip trailing '_'
+ * runs — see `postProcessTranslation` in lib/languages.ts) to all existing
+ * machine-generated translation rows, covering both `translatedText` and the
+ * derived `romanizedText` (Buckwalter-style romanizers map '_' through).
+ *
+ * User-provided rows are skipped — the step only ever applies to machine
+ * output, mirroring the write paths.
+ *
+ * Deliberately does NOT touch audio: a trailing-underscore diff is
+ * punctuation-only, so existing audio stays valid (the same `soundsSame`
+ * rule the live retranslation/edit paths use), and direct patches here
+ * trigger no ensure-sweep — `audioRecordings` stores no source text.
+ */
+export function stripTrailingUnderscoresPatch(
+  doc: Pick<
+    Doc<'translations'>,
+    'targetLanguage' | 'translatedText' | 'romanizedText' | 'translationSource'
+  >,
+): Partial<Doc<'translations'>> | undefined {
+  if (doc.translationSource === USER_PROVIDED_TRANSLATION_SOURCE) {
+    return undefined;
+  }
+  const patch: Partial<Doc<'translations'>> = {};
+  const text = postProcessTranslation(doc.targetLanguage, doc.translatedText);
+  if (text !== doc.translatedText) patch.translatedText = text;
+  // The empty-string "tried, failed" sentinel maps to itself and is left
+  // alone; only real romanizations can change.
+  if (doc.romanizedText !== undefined) {
+    const roman = postProcessTranslation(doc.targetLanguage, doc.romanizedText);
+    if (roman !== doc.romanizedText) patch.romanizedText = roman;
+  }
+  return Object.keys(patch).length > 0 ? patch : undefined;
+}
+
+export const stripTrailingUnderscores = migrations.define({
+  table: 'translations',
+  migrateOne: (_ctx, doc) => stripTrailingUnderscoresPatch(doc),
+});
+
 /** Everything a deploy needs, in order. Completed migrations are skipped. */
 export const runAll = migrations.runner([
   internal.migrations.perModeSettingsBackfill,
+  internal.migrations.stripTrailingUnderscores,
 ]);

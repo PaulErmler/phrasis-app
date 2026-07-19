@@ -388,7 +388,7 @@ describe("features/decks", () => {
     it("with replaceExisting=true overwrites translatedText, romanization, and translationSource on an existing row", async () => {
       const t = convexTest(schema, modules);
       // Seed an existing row with old text + old romanization + old source.
-      const { textId, translationId } = await t.run(async (ctx) => {
+      const { textId, translationId, audioId } = await t.run(async (ctx) => {
         const collectionId = await ctx.db.insert("collections", {
           name: "A1",
           textCount: 0,
@@ -408,11 +408,12 @@ describe("features/decks", () => {
           romanizationSource: "old-romanizer",
           translationSource: "google/gemini-3.1-flash-lite-preview-high",
         });
-        // Pre-seed audio so the TTS-enqueue branch short-circuits.
+        // Seed audio for the OLD text — the audibly-different retranslation
+        // below must delete it (the replace branch now owns that decision).
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
         );
-        await ctx.db.insert("audioRecordings", {
+        const audioId = await ctx.db.insert("audioRecordings", {
           textId,
           language: "de",
           voiceName: TEST_VOICE,
@@ -421,7 +422,7 @@ describe("features/decks", () => {
           ttsProvider: "google",
           voiceGender: "female",
         });
-        return { textId, translationId };
+        return { textId, translationId, audioId };
       });
 
       await t.mutation(
@@ -435,6 +436,10 @@ describe("features/decks", () => {
           romanizationSource: "new-romanizer",
           translationSource: "google/gemini-3-flash-preview-high",
           replaceExisting: true,
+          // The audible change deletes the seeded audio, so without this the
+          // mutation would fall through to the TTS enqueue and reject the
+          // non-curated TEST_VOICE — enqueueing isn't what this test checks.
+          skipTts: true,
         },
       );
 
@@ -445,6 +450,110 @@ describe("features/decks", () => {
       expect(row?.translationSource).toBe(
         "google/gemini-3-flash-preview-high",
       );
+      // Audibly different retranslation → stale audio dropped.
+      expect(await t.run(async (ctx) => ctx.db.get(audioId))).toBeNull();
+    });
+
+    it("with replaceExisting=true keeps audio and skips TTS when the change is punctuation-only", async () => {
+      const t = convexTest(schema, modules);
+      const { textId, translationId, audioId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Oh, I'm sorry.",
+          language: "en",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        // The observed bug shape: LLM output with a stray trailing "_".
+        const translationId = await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "ar_lev",
+          translatedText: "أوه، أنا متأسفة._",
+          romanizedText: "awh, ana mtasft_",
+          romanizationSource: "old-romanizer",
+        });
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        const audioId = await ctx.db.insert("audioRecordings", {
+          textId,
+          language: "ar_lev",
+          voiceName: TEST_VOICE,
+          storageId,
+          ttsQuality: "validated",
+          ttsProvider: "gemini",
+          voiceGender: "female",
+        });
+        return { textId, translationId, audioId };
+      });
+
+      // Deliberately NOT passing skipTts: if the punctuation-only skip failed,
+      // the mutation would delete the audio, hit the enqueue path, and throw
+      // on the non-curated TEST_VOICE — so completing at all proves the skip.
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "ar_lev",
+          translatedText: "أوه، أنا متأسفة.",
+          voiceName: TEST_VOICE,
+          romanizedText: "awh, ana mtasft",
+          romanizationSource: "new-romanizer",
+          replaceExisting: true,
+        },
+      );
+
+      const row = await t.run(async (ctx) => ctx.db.get(translationId));
+      expect(row?.translatedText).toBe("أوه، أنا متأسفة.");
+      expect(row?.romanizedText).toBe("awh, ana mtasft");
+      // Sound-identical → the audio row survives the retranslation.
+      expect(await t.run(async (ctx) => ctx.db.get(audioId))).not.toBeNull();
+    });
+
+    it("post-processes machine output at the choke point (insert branch strips trailing underscores)", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        return { textId };
+      });
+
+      await t.mutation(
+        internal.features.decks.storeTranslationAndScheduleTTS,
+        {
+          textId,
+          targetLanguage: "es",
+          translatedText: "Hola._",
+          voiceName: TEST_VOICE,
+          romanizedText: "Hola_",
+          romanizationSource: "test-romanizer",
+          skipTts: true,
+        },
+      );
+
+      const row = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("targetLanguage", "es"),
+          )
+          .first(),
+      );
+      expect(row?.translatedText).toBe("Hola.");
+      expect(row?.romanizedText).toBe("Hola");
     });
 
     it("with replaceExisting=true clears romanizedText when caller didn't supply one", async () => {
@@ -499,6 +608,9 @@ describe("features/decks", () => {
           // No romanizedText — caller didn't compute one for this language.
           translationSource: "new-source",
           replaceExisting: true,
+          // Audible change deletes the seeded audio; skip the enqueue so the
+          // non-curated TEST_VOICE doesn't throw (not this test's subject).
+          skipTts: true,
         },
       );
 
@@ -606,6 +718,9 @@ describe("features/decks", () => {
           voiceName: TEST_VOICE,
           replaceExisting: true,
           expectedClaimId: claimId,
+          // Audible change deletes the seeded audio; skip the enqueue so the
+          // non-curated TEST_VOICE doesn't throw (not this test's subject).
+          skipTts: true,
         },
       );
 

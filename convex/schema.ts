@@ -773,6 +773,11 @@ export default defineSchema({
     processedAt: v.optional(v.number()),
     textId: v.optional(v.id('texts')),
     cardId: v.optional(v.id('cards')),
+    // Languages whose text the user hand-edited via EditApprovalDialog
+    // (updateApprovalTranslations). On approval these entries are stored
+    // VERBATIM and tagged user-provided — machine post-processing
+    // (postProcessTranslation) must never touch user-typed text.
+    userEditedLanguages: v.optional(v.array(v.string())),
   })
     .index('by_thread_and_user', ['threadId', 'userId']),
 
