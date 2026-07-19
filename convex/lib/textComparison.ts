@@ -23,6 +23,55 @@ export function normalizeForComparison(text: string): string {
 }
 
 /**
+ * Punctuation that is SILENT when a sentence is spoken aloud: sentence
+ * separators/terminators (periods, commas, colons, Arabic ، ؛ ۔, CJK
+ * 。、 and fullwidth forms), quotes, brackets, dashes, and '_' runs.
+ * Any punctuation NOT listed here counts as audible, so unknown marks
+ * fail safe toward "sounds different" (an unneeded audio regeneration)
+ * rather than keeping stale audio — '%' ("Prozent"), '&' ("und"), '#',
+ * '@' are all \p{Po} and must stay audible. Notably absent: '?' '؟'
+ * and friends (statement→question flips intonation) and ';' — U+037E
+ * GREEK QUESTION MARK NFC-normalizes to ';' (U+003B), so listing
+ * semicolons would make Greek questions sound like statements (an
+ * English 'a; b' edit regenerating audio is the cheap trade-off).
+ * '¡'/'¿' ARE listed — the closing mark decides the intonation, so
+ * '¿Cómo estás?' must equal 'Cómo estás?'; '!' is treated as spoken
+ * the same as a period.
+ */
+const INAUDIBLE_PUNCTUATION = /[.,!¡¿،؛۔。、．，…:·'"‘’“”„‚«»‹›()[\]{}\-–—_~]/u;
+
+/**
+ * True when two versions of a sentence sound identical spoken aloud:
+ * they differ only in inaudible punctuation (e.g. '_' runs, commas,
+ * periods, Arabic ، ۔) and/or whitespace runs. Deliberately narrower
+ * than `normalizeForComparison`: keeps case and symbols (`\p{S}` — "€"
+ * is pronounced), keeps punctuation outside the INAUDIBLE allowlist
+ * (question marks change intonation; '%'/'&' are pronounced), and
+ * keeps punctuation between two digits ('3.5' vs '35' reads
+ * differently — the flip side is that '1,000' vs '1000' also counts
+ * as different and regenerates audio it didn't need to, the
+ * cheap-and-safe direction).
+ *
+ * Used to decide whether a translation-text change needs its audio
+ * regenerated (editCard, flagTranslation retranslation, and the
+ * trailing-underscore backfill all produce punctuation-only diffs).
+ */
+export function soundsSame(a: string, b: string): boolean {
+  const normalize = (text: string) =>
+    text
+      .normalize('NFC')
+      .replace(/\p{P}/gu, (mark, i: number, s: string) =>
+        !INAUDIBLE_PUNCTUATION.test(mark) ||
+        (/\d/.test(s[i - 1] ?? '') && /\d/.test(s[i + 1] ?? ''))
+          ? mark
+          : '',
+      )
+      .replace(/\s+/g, ' ')
+      .trim();
+  return normalize(a) === normalize(b);
+}
+
+/**
  * Levenshtein edit-distance between two strings.
  * O(n*m) — fine for short sentences.
  */

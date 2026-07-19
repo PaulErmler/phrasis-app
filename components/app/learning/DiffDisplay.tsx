@@ -10,6 +10,7 @@ import {
 } from '@/lib/textCompare';
 import { WordDiff } from './WordDiff';
 import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
+import { getTextDirection } from '@/lib/languages';
 
 interface DiffDisplayProps {
   expected: string;
@@ -110,7 +111,7 @@ function CharDiffView({
 
   return (
     <div>
-      <p className="leading-relaxed">
+      <p dir={getTextDirection(language)} className="leading-relaxed text-left">
         {chunks.map((chunk, i) => {
           if (chunk.kind === 'added') {
             return (

@@ -343,6 +343,85 @@ describe("features/chat/cardApprovals", () => {
       expect(approval?.translations[0].text.length).toBe(150);
     });
 
+    it("user-edited languages are stored verbatim as user-provided; untouched ones stay machine post-processed", async () => {
+      const t = convexTest(schema, modules);
+      // Two target languages so one can be edited and one left untouched.
+      await t.run(async (ctx) => {
+        const courseId = await ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["es", "de"],
+        });
+        await ctx.db.insert("userSettings", {
+          userId: "user_A",
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert("usageQuotas", {
+          userId: "user_A",
+          features: {
+            custom_sentences: {
+              balance: 5,
+              included: 5,
+              used: 0,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+      });
+      const approvalId = await t.run(async (ctx) =>
+        ctx.db.insert("cardApprovals", {
+          threadId: "thread_1",
+          messageId: "m1",
+          toolCallId: "tc1",
+          translations: [
+            { language: "en", text: "Fill in the blank" },
+            { language: "es", text: "Rellena el hueco._" },
+            { language: "de", text: "Fülle die Lücke._" },
+          ],
+          userId: "user_A",
+          status: "pending",
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      // User deliberately ends the Spanish text with '_' (e.g. a blank);
+      // en and de are passed through unchanged.
+      await asUser.mutation(
+        api.features.chat.cardApprovals.updateApprovalTranslations,
+        {
+          approvalId,
+          translations: [
+            { language: "en", text: "Fill in the blank" },
+            { language: "es", text: "Rellena el _" },
+            { language: "de", text: "Fülle die Lücke._" },
+          ],
+        },
+      );
+      const pending = await t.run(async (ctx) => ctx.db.get(approvalId));
+      expect(pending?.userEditedLanguages).toEqual(["es"]);
+
+      const res = await asUser.mutation(
+        api.features.chat.cardApprovals.approveCard,
+        { approvalId },
+      );
+      const translations = await t.run(async (ctx) =>
+        ctx.db
+          .query("translations")
+          .withIndex("by_textId", (q) => q.eq("textId", res.textId!))
+          .collect(),
+      );
+      const es = translations.find((tr) => tr.targetLanguage === "es");
+      const de = translations.find((tr) => tr.targetLanguage === "de");
+      // User-typed text is stored VERBATIM (trailing '_' kept) and tagged
+      // user-provided so future machine-output backfills skip it.
+      expect(es?.translatedText).toBe("Rellena el _");
+      expect(es?.translationSource).toBe("user-provided");
+      // Untouched chat-model output still gets the post-processing step.
+      expect(de?.translatedText).toBe("Fülle die Lücke.");
+      expect(de?.translationSource).not.toBe("user-provided");
+    });
+
     it("edits flow into approveCard", async () => {
       const t = convexTest(schema, modules);
       await seedCourse(t);

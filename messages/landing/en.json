@@ -251,6 +251,10 @@
     "lead": "Every language comes with high quality audio. Pick one or learn several side by side.",
     "missingPill": "Missing a language? Let us know"
   },
+  "testimonials": {
+    "title": "Loved by",
+    "titleHighlight": "language learners."
+  },
   "pricing": {
     "title": "Flexible",
     "titleHighlight": "Pricing",

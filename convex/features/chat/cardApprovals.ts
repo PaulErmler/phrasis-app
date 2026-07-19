@@ -13,7 +13,11 @@ import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
 import { trackEvent } from '../../db/stats/dailyStats';
-import { getTranslationSource } from '../../../lib/languages';
+import {
+  getTranslationSource,
+  postProcessTranslation,
+  USER_PROVIDED_TRANSLATION_SOURCE,
+} from '../../../lib/languages';
 import { OPENROUTER_CHAT_REASONING, OPENROUTER_MODELS } from '../../config/aiModels';
 
 /**
@@ -70,13 +74,27 @@ async function processApproval(
     OPENROUTER_CHAT_REASONING,
   );
 
+  const userEditedLanguages = new Set(approval.userEditedLanguages ?? []);
+
   for (let i = 1; i < approval.translations.length; i++) {
     const entry = approval.translations[i];
+    // User-edited entries (EditApprovalDialog) are the user's own words:
+    // store VERBATIM and tag user-provided — the machine post-processing
+    // step must never touch user-typed text (a deliberate trailing '_'
+    // would be stripped), and the tag shields the row from future
+    // machine-output backfills. Untouched entries are chat-model output
+    // and get the language's post-processing step (default: strip
+    // trailing '_' runs).
+    const userEdited = userEditedLanguages.has(entry.language);
     await ctx.db.insert('translations', {
       textId,
       targetLanguage: entry.language,
-      translatedText: entry.text,
-      translationSource: chatTranslationSource,
+      translatedText: userEdited
+        ? entry.text
+        : postProcessTranslation(entry.language, entry.text),
+      translationSource: userEdited
+        ? USER_PROVIDED_TRANSLATION_SOURCE
+        : chatTranslationSource,
     });
   }
 
@@ -242,7 +260,24 @@ export const updateApprovalTranslations = mutation({
       text: t.text.slice(0, MAX_CARD_TEXT_LENGTH),
     }));
 
-    await ctx.db.patch(args.approvalId, { translations: cappedTranslations });
+    // Record which languages the user actually changed (union across
+    // repeated edits — the dialog can be reopened). processApproval stores
+    // these verbatim as user-provided instead of running the machine
+    // post-processing step on them.
+    const previousTextByLanguage = new Map(
+      approval.translations.map((t) => [t.language, t.text]),
+    );
+    const userEditedLanguages = new Set(approval.userEditedLanguages ?? []);
+    for (const entry of cappedTranslations) {
+      if (previousTextByLanguage.get(entry.language) !== entry.text) {
+        userEditedLanguages.add(entry.language);
+      }
+    }
+
+    await ctx.db.patch(args.approvalId, {
+      translations: cappedTranslations,
+      userEditedLanguages: [...userEditedLanguages],
+    });
 
     return { success: true };
   },

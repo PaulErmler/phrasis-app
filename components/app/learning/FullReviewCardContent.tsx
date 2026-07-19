@@ -19,7 +19,7 @@ import {
 } from '@/lib/constants/audioPlayback';
 import { DiffDisplay, computeAccuracy } from './DiffDisplay';
 import { ClickableWords } from './ClickableWords';
-import { getLocalizedLanguageNameByCode } from '@/lib/languages';
+import { getLocalizedLanguageNameByCode, getTextDirection } from '@/lib/languages';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
 import { useActiveCue, type MergedPlayback } from '@/hooks/use-active-cue';
@@ -1052,7 +1052,8 @@ function TargetLanguageInput({
           onChange={(e) => onInputChange(translation.language, e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="flex-1"
+          dir={getTextDirection(translation.language)}
+          className="flex-1 text-left"
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="sentences"

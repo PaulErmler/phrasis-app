@@ -34,6 +34,27 @@ export async function deleteAudioRow(
 }
 
 /**
+ * Delete every `audioRecordings` row for one (text, language) via the
+ * reference-aware `deleteAudioRow`. The `take(10)` cap bounds the read; a
+ * language has at most a couple of rows (one per voice) in practice.
+ */
+export async function deleteAudioRowsForTextLanguage(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  language: string,
+): Promise<void> {
+  const rows = await ctx.db
+    .query('audioRecordings')
+    .withIndex('by_text_and_language', (q) =>
+      q.eq('textId', textId).eq('language', language),
+    )
+    .take(10);
+  for (const row of rows) {
+    await deleteAudioRow(ctx, row);
+  }
+}
+
+/**
  * Reference-aware blob delete by `storageId` for callers that no longer hold the
  * row (e.g. `storeAudioRecording` after patching a row to a NEW blob). Deletes
  * the old blob only when no `audioRecordings` row references it any more.

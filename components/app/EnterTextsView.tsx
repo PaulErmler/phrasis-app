@@ -13,6 +13,7 @@ import { ChevronLeft, Loader2, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   getLocalizedLanguageNameByCode,
+  getTextDirection,
   USER_PROVIDED_TRANSLATION_SOURCE,
 } from '@/lib/languages';
 import {
@@ -24,6 +25,7 @@ import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FeatureGatedButton } from '@/components/feature_tracking/FeatureGatedButton';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
+import { cn } from '@/lib/utils';
 
 interface EnterTextsViewProps {
   onBack: () => void;
@@ -357,11 +359,12 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
                         // Any edit invalidates auto-fill metadata; the server will regenerate it.
                         setAutoFillMetadata(null);
                       }}
-                      className={
-                        isOverLimit
-                          ? 'border-destructive focus-visible:ring-destructive'
-                          : ''
-                      }
+                      dir={getTextDirection(lang)}
+                      className={cn(
+                        'text-left',
+                        isOverLimit &&
+                          'border-destructive focus-visible:ring-destructive',
+                      )}
                       disabled={isAutoFilling}
                     />
                   </div>

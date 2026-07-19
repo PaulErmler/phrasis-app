@@ -13,6 +13,7 @@ import {
   getLanguageByCode,
   getTranslationSource,
   isMixedLanguage,
+  postProcessTranslation,
   resolveMixedVariant,
   USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../lib/languages';
@@ -344,7 +345,9 @@ export const autoFillTranslations = action({
       }
       results.push({
         language: lang,
-        text: translation.trim(),
+        // LLM output — run the language's post-processing step (default:
+        // strip trailing '_' runs) before the client round-trip stores it.
+        text: postProcessTranslation(resolved, translation.trim()),
         ...(regionVariant ? { regionVariant } : {}),
         translationSource,
       });
