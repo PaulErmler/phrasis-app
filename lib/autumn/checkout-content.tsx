@@ -9,15 +9,37 @@ export type CheckoutTranslateFn = (
 export const getCheckoutContent = (
   checkoutResult: CheckoutResult,
   t: CheckoutTranslateFn,
-  trialState: TrialState
+  trialState: TrialState,
+  opts?: {
+    /**
+     * The customer's own `current_period_end`. Scenarios that take effect
+     * at the end of the current period (cancel / downgrade / scheduled)
+     * prefer this over the preview's `next_cycle.starts_at`: Autumn's
+     * v1.2 checkout preview returns the period START for annual plans —
+     * exactly one year early (verified July 2026) — while the customer
+     * record carries the correct end.
+     */
+    currentPeriodEndsAt?: number;
+    /** App locale for date formatting; falls back to the browser default. */
+    locale?: string;
+  }
 ) => {
   const { product, current_product, next_cycle } = checkoutResult;
   const { is_one_off, is_free, has_trial, updateable } = product.properties;
   const scenario = product.scenario;
 
+  const formatDate = (ms: number) =>
+    new Date(ms).toLocaleDateString(opts?.locale);
+
   const nextCycleAtStr = next_cycle
-    ? new Date(next_cycle.starts_at).toLocaleDateString()
+    ? formatDate(next_cycle.starts_at)
     : undefined;
+
+  // Effective date for period-end-anchored scenarios (see opts doc).
+  const periodEndAtStr =
+    opts?.currentPeriodEndsAt !== undefined
+      ? formatDate(opts.currentPeriodEndsAt)
+      : nextCycleAtStr;
 
   const productName = product.name;
 
@@ -50,7 +72,7 @@ export const getCheckoutContent = (
       : scenario === "upgrade" || scenario === "downgrade" || scenario === "new")
   ) {
     const trialEndStr = trialState.trialEndsAt
-      ? new Date(trialState.trialEndsAt).toLocaleDateString()
+      ? formatDate(trialState.trialEndsAt)
       : (nextCycleAtStr ?? "");
     const key = is_free
       ? "trialFreeScheduled"
@@ -84,7 +106,7 @@ export const getCheckoutContent = (
       message: t("scheduledMessage", {
         productName,
         currentProduct: current_product.name,
-        date: nextCycleAtStr ?? "",
+        date: periodEndAtStr ?? "",
       }),
     };
 
@@ -124,7 +146,7 @@ export const getCheckoutContent = (
       message: t("downgradeMessage", {
         productName,
         currentProduct: current_product.name,
-        date: nextCycleAtStr ?? "",
+        date: periodEndAtStr ?? "",
       }),
     };
 
@@ -133,7 +155,7 @@ export const getCheckoutContent = (
       title: t("cancelTitle"),
       message: t("cancelMessage", {
         currentProduct: current_product.name,
-        date: nextCycleAtStr ?? "",
+        date: periodEndAtStr ?? "",
       }),
     };
 

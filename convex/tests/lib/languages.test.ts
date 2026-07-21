@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { describe, it, expect } from "vitest";
 import {
+  dominantTextDirection,
   getCurrentTranslationVersion,
   getTextDirection,
   getTranslationConfigForLanguage,
@@ -63,6 +64,37 @@ describe("lib/languages — getTextDirection", () => {
     for (const code of ["en", "de", "el", "bn", "hi", "zh", "not-a-language"]) {
       expect(getTextDirection(code), code).toBe("ltr");
     }
+  });
+});
+
+describe("lib/languages — dominantTextDirection", () => {
+  // Regression: a chat explanation that OPENS with a target-language token
+  // used to flip wholesale to RTL under dir="auto"'s first-strong-character
+  // heuristic, putting English punctuation on the wrong side.
+  it("keeps an English explanation LTR even when it opens with Arabic", () => {
+    const text =
+      '"وإنت" (w-inta / w-inti) means "And you?" in Levantine Arabic. ' +
+      'It is a combination of the conjunction "و" (-w), meaning "and", ' +
+      'and the pronoun "إنت" (inta), meaning "you".\n\n' +
+      "- وإنت (w-inta) for a male.\n" +
+      "- وإنتي (w-inti) for a female.\n" +
+      "- وإنتو (w-intu) for a group or plural.";
+    expect(dominantTextDirection(text)).toBe("ltr");
+  });
+
+  it("returns 'rtl' for a fully Arabic reply (with Latin brand names)", () => {
+    expect(
+      dominantTextDirection("مرحبا! كيف حالك اليوم؟ أنا بخير، شكرا لك (ok)"),
+    ).toBe("rtl");
+  });
+
+  it("returns 'rtl' for Hebrew", () => {
+    expect(dominantTextDirection("שלום, מה שלומך היום?")).toBe("rtl");
+  });
+
+  it("returns 'ltr' for plain English and for empty text", () => {
+    expect(dominantTextDirection("Hello there, how are you?")).toBe("ltr");
+    expect(dominantTextDirection("")).toBe("ltr");
   });
 });
 
@@ -156,7 +188,7 @@ describe("lib/languages — resolveTranslationStages", () => {
   it("returns the default gemini_35_flash_nitro_minimal chain (primary + one fallback) for an unruled language", () => {
     const stages = resolveTranslationStages("nl", 50);
     expect(stages.length).toBe(2);
-    expect(stages[0].model).toBe("google/gemini-3.5-flash:nitro");
+    expect(stages[0].model).toBe("google/gemini-3.6-flash:nitro");
     expect(stages[0].reasoning).toBe("minimal");
     // The single fallback retries the same config before the Google safety net.
     expect(stages[1]).toEqual(stages[0]);
@@ -172,7 +204,7 @@ describe("lib/languages — resolveTranslationStages", () => {
     const stages = resolveTranslationStages("de", 50);
     expect(stages.length).toBe(2);
     const nitroMinimal = {
-      model: "google/gemini-3.5-flash:nitro",
+      model: "google/gemini-3.6-flash:nitro",
       reasoning: "minimal",
       maxOutputTokens: 4_000,
     };
@@ -184,7 +216,7 @@ describe("lib/languages — resolveTranslationStages", () => {
     const stages = resolveTranslationStages("fr", 50);
     expect(stages.length).toBe(2);
     const nitroMinimal = {
-      model: "google/gemini-3.5-flash:nitro",
+      model: "google/gemini-3.6-flash:nitro",
       reasoning: "minimal",
       maxOutputTokens: 4_000,
     };
