@@ -22,7 +22,7 @@ import { resolveTranslationStages } from "../../../lib/languages";
 
 describe("features/translationLLM", () => {
   describe("translation rules", () => {
-    it("default rule: Gemini 3.5 Flash Nitro (minimal) primary AND fallback", () => {
+    it("default rule: Gemini 3.6 Flash Nitro (minimal) primary AND fallback", () => {
       // No language sets `translationRule` → all default to
       // `gemini_35_flash_nitro_minimal`. Length-hybrid branching was
       // retired — every source length runs the same chain. Fallback is the
@@ -31,7 +31,7 @@ describe("features/translationLLM", () => {
       const stages = resolveTranslationStages("nl", 12);
       expect(stages.length).toBe(2);
       const nitroMinimal = {
-        model: "google/gemini-3.5-flash:nitro",
+        model: "google/gemini-3.6-flash:nitro",
         reasoning: "minimal",
         maxOutputTokens: 4_000,
       };
@@ -51,7 +51,7 @@ describe("features/translationLLM", () => {
       const stages = resolveTranslationStages("de", 12);
       expect(stages.length).toBe(2);
       const nitroMinimal = {
-        model: "google/gemini-3.5-flash:nitro",
+        model: "google/gemini-3.6-flash:nitro",
         reasoning: "minimal",
         maxOutputTokens: 4_000,
       };
@@ -63,7 +63,7 @@ describe("features/translationLLM", () => {
       const stages = resolveTranslationStages("fr", 12);
       expect(stages.length).toBe(2);
       const nitroMinimal = {
-        model: "google/gemini-3.5-flash:nitro",
+        model: "google/gemini-3.6-flash:nitro",
         reasoning: "minimal",
         maxOutputTokens: 4_000,
       };
@@ -104,18 +104,18 @@ describe("features/translationLLM", () => {
     it("zh uses the gemini_35_flash_nitro_minimal default (with a translationVersion bump)", () => {
       const stages = resolveTranslationStages("zh", 12);
       expect(stages.length).toBe(2);
-      expect(stages[0].model).toBe("google/gemini-3.5-flash:nitro");
+      expect(stages[0].model).toBe("google/gemini-3.6-flash:nitro");
       expect(stages[0].reasoning).toBe("minimal");
-      expect(stages[1].model).toBe("google/gemini-3.5-flash:nitro");
+      expect(stages[1].model).toBe("google/gemini-3.6-flash:nitro");
       expect(stages[1].reasoning).toBe("minimal");
     });
 
     it("unknown language code falls through to the default rule", () => {
       const stages = resolveTranslationStages("zz", 100);
       expect(stages.length).toBe(2);
-      expect(stages[0].model).toBe("google/gemini-3.5-flash:nitro");
+      expect(stages[0].model).toBe("google/gemini-3.6-flash:nitro");
       expect(stages[0].reasoning).toBe("minimal");
-      expect(stages[1].model).toBe("google/gemini-3.5-flash:nitro");
+      expect(stages[1].model).toBe("google/gemini-3.6-flash:nitro");
       expect(stages[1].reasoning).toBe("minimal");
     });
   });

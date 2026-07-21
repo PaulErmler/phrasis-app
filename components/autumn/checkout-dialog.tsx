@@ -25,13 +25,15 @@ import {
 import { useCustomer, usePricingTable } from "autumn-js/react";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { getCheckoutContent } from "@/lib/autumn/checkout-content";
 import {
   checkoutTrialParams,
+  type CustomerProductLite,
+  findCurrentPaidProduct,
   getTrialState,
 } from "@/lib/autumn/trial-eligibility";
 
@@ -59,6 +61,7 @@ const formatCurrency = ({
 
 export default function CheckoutDialog(params: CheckoutDialogProps) {
   const t = useTranslations("Checkout");
+  const locale = useLocale();
   const { attach, customer, refetch } = useCustomer({
     expand: ["trials_used"],
   });
@@ -99,7 +102,17 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
   }
 
   const { open, setOpen } = params;
-  const { title, message } = getCheckoutContent(checkoutResult, t, trialState);
+  // Autumn's checkout preview reports next_cycle one year early for annual
+  // plans; the customer's own current_period_end is the reliable source
+  // for period-end-anchored dates (see getCheckoutContent opts doc).
+  const currentPeriodEndsAt =
+    findCurrentPaidProduct(
+      customer?.products as CustomerProductLite[] | undefined,
+    )?.current_period_end ?? undefined;
+  const { title, message } = getCheckoutContent(checkoutResult, t, trialState, {
+    currentPeriodEndsAt,
+    locale,
+  });
 
   const isFree = checkoutResult?.product.properties?.is_free;
   const isPaid = isFree === false;
@@ -145,6 +158,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
             trialSwitchEndsAt={
               isTrialSwitch ? trialState.trialEndsAt : undefined
             }
+            currentPeriodEndsAt={currentPeriodEndsAt}
           />
         )}
 
@@ -219,10 +233,12 @@ function PriceInformation({
   checkoutResult,
   setCheckoutResult,
   trialSwitchEndsAt,
+  currentPeriodEndsAt,
 }: {
 	checkoutResult: CheckoutResult;
 	setCheckoutResult: (checkoutResult: CheckoutResult) => void;
 	trialSwitchEndsAt?: number;
+	currentPeriodEndsAt?: number;
 }) {
   return (
     <div className="px-6 mb-4 flex flex-col gap-4">
@@ -240,6 +256,7 @@ function PriceInformation({
         <DueAmounts
           checkoutResult={checkoutResult}
           trialSwitchEndsAt={trialSwitchEndsAt}
+          currentPeriodEndsAt={currentPeriodEndsAt}
         />
       </div>
     </div>
@@ -249,11 +266,14 @@ function PriceInformation({
 function DueAmounts({
   checkoutResult,
   trialSwitchEndsAt,
+  currentPeriodEndsAt,
 }: {
 	checkoutResult: CheckoutResult;
 	trialSwitchEndsAt?: number;
+	currentPeriodEndsAt?: number;
 }) {
   const t = useTranslations("Checkout");
+  const locale = useLocale();
   const { next_cycle, product } = checkoutResult;
 
   const hasUsagePrice = product.items.some(
@@ -283,7 +303,7 @@ function DueAmounts({
         <div className="flex justify-between text-muted-foreground">
           <p className="text-md">
             {t("dueNextCycle", {
-              date: new Date(trialSwitchEndsAt).toLocaleDateString(),
+              date: new Date(trialSwitchEndsAt).toLocaleDateString(locale),
             })}
           </p>
           <p className="text-md">
@@ -298,9 +318,21 @@ function DueAmounts({
     );
   }
 
-  const nextCycleAtStr = next_cycle
-    ? new Date(next_cycle.starts_at).toLocaleDateString()
-    : undefined;
+  // For period-end-anchored scenarios the customer's own period end is
+  // the reliable date — Autumn's preview reports next_cycle one year
+  // early for annual plans (see getCheckoutContent).
+  const periodEndAnchored =
+    product.scenario === "downgrade" ||
+    product.scenario === "cancel" ||
+    product.scenario === "scheduled";
+  const nextCycleAt =
+    periodEndAnchored && currentPeriodEndsAt !== undefined
+      ? currentPeriodEndsAt
+      : next_cycle?.starts_at;
+  const nextCycleAtStr =
+    nextCycleAt !== undefined
+      ? new Date(nextCycleAt).toLocaleDateString(locale)
+      : undefined;
 
   const showNextCycle = next_cycle && next_cycle.total !== checkoutResult.total;
 
