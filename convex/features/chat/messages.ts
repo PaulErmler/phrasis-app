@@ -184,7 +184,7 @@ export const sendMessage = mutation({
       { threadId: args.threadId, order: 'asc', paginationOpts: { cursor: null, numItems: 200 } },
     );
     const userMessageCount = existingMessages.page.filter(
-      (m: any) => m.message?.role === 'user',
+      (m) => m.message?.role === 'user',
     ).length;
     if (userMessageCount >= THREAD_MESSAGE_LIMIT) {
       throw new ConvexError({ code: 'THREAD_MESSAGE_LIMIT', message: 'Thread message limit reached' });

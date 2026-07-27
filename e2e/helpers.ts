@@ -54,7 +54,7 @@ export interface OnboardingWalkOptions {
  *   language-pair → acquisition → goal → daily-time → proficiency →
  *   (cefr-pick | placement-test + result | none) →
  *   customizing (auto) → first-lesson → stats-recap → word-projection →
- *   feature-tour → plan-pick → /app.
+ *   feature-tour → testimonials → plan-pick → /app.
  */
 export async function completeOnboardingFresh(
   page: Page,
@@ -219,7 +219,13 @@ export async function completeOnboardingFresh(
     await page.getByTestId("feature-tour-next").click();
   }
 
-  // 11. Plan pick — skip onto Free.
+  // 11. Testimonials — plain continue.
+  await expect(
+    page.getByTestId("onboarding-step-testimonials"),
+  ).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("onboarding-continue").click();
+
+  // 12. Plan pick — skip onto Free.
   await expect(page.getByTestId("onboarding-step-plan-pick")).toBeVisible({
     timeout: 20_000,
   });
@@ -227,13 +233,13 @@ export async function completeOnboardingFresh(
     await page.getByTestId("plan-pick-skip").click();
   }
 
-  // 12. Wait for the post-wizard redirect to /app.
+  // 13. Wait for the post-wizard redirect to /app.
   await page.waitForURL(
     (url) => /\/app(\/|$)/.test(url.pathname) && !/onboarding/.test(url.pathname),
     { timeout: 30_000 },
   );
 
-  // 13. Confirm the server actually committed finalizeOnboarding before
+  // 14. Confirm the server actually committed finalizeOnboarding before
   // returning. The redirect above is driven by the mutation's OPTIMISTIC
   // update (see app/app/onboarding/page.tsx), so at this point the server may
   // not have the write yet — and callers immediately save storageState and
@@ -347,7 +353,7 @@ export async function openCardImport(page: Page): Promise<void> {
   const individualTab = page.getByTestId("add-cards-mode-individual");
   try {
     await expect(individualTab).toBeVisible({ timeout: 20_000 });
-  } catch (err) {
+  } catch {
     // One retry: in Next dev, the first hit of a route can stall on
     // on-demand compilation under parallel worker load. A hard reload picks
     // up the now-compiled bundle instantly.

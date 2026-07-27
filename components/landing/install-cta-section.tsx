@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
 import { Download } from 'lucide-react';
@@ -18,7 +19,7 @@ export function InstallCtaSection() {
           transition={{ duration: 0.6, ease: 'easeOut' }}
           className="space-y-8"
         >
-          <img
+          <Image
             src="/icons/icon.svg"
             alt="Flexling language learning app logo"
             className="w-16 h-16 sm:w-20 sm:h-20 mx-auto"

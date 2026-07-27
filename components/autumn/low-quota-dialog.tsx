@@ -11,7 +11,10 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCustomer, usePricingTable } from "autumn-js/react";
-import { findUpgradeProductFromPricingTable } from "@/lib/autumn/find-upgrade-product";
+import {
+  findCurrentIntervalGroup,
+  findUpgradeProductFromPricingTable,
+} from "@/lib/autumn/find-upgrade-product";
 import { checkoutTrialParams, getTrialState } from "@/lib/autumn/trial-eligibility";
 import { getFeatureI18nKey, isFeatureConsumable } from "@/lib/features/feature-meta";
 import { isCreditBackedFeature } from "@/convex/features/featureIds";
@@ -50,6 +53,7 @@ export default function LowQuotaDialog({
     featureId,
     included,
     consumable,
+    findCurrentIntervalGroup(customer, products ?? undefined),
   );
 
   const handleUpgrade = async () => {

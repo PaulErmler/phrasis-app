@@ -122,6 +122,10 @@ export const courseSettingsFields = {
   writingInputMode: v.optional(
     v.union(v.literal('translate'), v.literal('transcribe')),
   ),
+  // Writing mode: drop punctuation from the accuracy score, so a missing
+  // comma or full stop costs nothing. Unset = false = punctuation counts
+  // (at PUNCT_WEIGHT, see lib/textCompare/score.ts).
+  ignorePunctuation: v.optional(v.boolean()),
   chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add

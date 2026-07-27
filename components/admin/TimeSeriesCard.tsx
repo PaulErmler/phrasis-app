@@ -39,9 +39,15 @@ export function TimeSeriesCard({
     label: d.date.slice(5), // "MM-DD"
   }));
 
-  const renderTooltip = ({ active, payload }: any) => {
+  const renderTooltip = ({
+    active,
+    payload,
+  }: {
+    active?: boolean;
+    payload?: Array<{ payload?: TimeSeriesPoint & { label: string } }>;
+  }) => {
     if (!active || !payload?.length) return null;
-    const point = payload[0]?.payload as (TimeSeriesPoint & { label: string }) | undefined;
+    const point = payload[0]?.payload;
     if (!point) return null;
     return (
       <div className="rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">

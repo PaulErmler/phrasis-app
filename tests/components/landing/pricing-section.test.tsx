@@ -30,12 +30,35 @@ describe("PricingSection", () => {
     expect(screen.getByText("title")).toBeInTheDocument();
   });
 
-  it("renders three plans", () => {
+  it("renders four plans", () => {
     render(<PricingSection />);
     // Each plan has a CTA button with translation key `plans.<plan>.cta`
     expect(screen.getByText("plans.free.cta")).toBeInTheDocument();
     expect(screen.getByText("plans.basic.cta")).toBeInTheDocument();
     expect(screen.getByText("plans.pro.cta")).toBeInTheDocument();
+    expect(screen.getByText("plans.ultra.cta")).toBeInTheDocument();
+  });
+
+  it("stacks the paid tiers on the one below", () => {
+    render(<PricingSection />);
+    // Every paid tier carries an "Everything from X, plus:" line; Free is
+    // the base and must not.
+    expect(screen.getAllByText("everythingFrom")).toHaveLength(3);
+  });
+
+  it("does not repeat what a tier inherits", () => {
+    render(<PricingSection />);
+    // Free and Basic both cap at 1 course, and only Free spells out the
+    // credit hint — so those bullets appear once, on the base card.
+    expect(screen.getAllByText("plans.free.features.courses")).toHaveLength(1);
+    expect(screen.queryByText("plans.basic.features.courses")).toBeNull();
+    expect(
+      screen.getAllByText("plans.free.features.creditsHint"),
+    ).toHaveLength(1);
+    // Unlimited sentences are introduced by Basic and inherited above it.
+    expect(screen.getByText("plans.basic.features.sentences")).toBeInTheDocument();
+    expect(screen.queryByText("plans.pro.features.sentences")).toBeNull();
+    expect(screen.queryByText("plans.ultra.features.sentences")).toBeNull();
   });
 
   it("renders traditional comparison section", () => {

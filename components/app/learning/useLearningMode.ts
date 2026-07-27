@@ -1131,17 +1131,18 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // --------------------------------------------------------------------------
   // Scheduling mode
   // --------------------------------------------------------------------------
+  const settingsCourseId = courseSettings?.courseId;
   const handleSchedulingModeChange = useCallback(
     (mode: SchedulingMode) => {
-      if (!courseSettings?.courseId) return;
+      if (!settingsCourseId) return;
       void updateCourseSettingsMutation({
-        courseId: courseSettings.courseId,
+        courseId: settingsCourseId,
         schedulingMode: mode,
       }).catch((error) => {
         console.error('Failed to update scheduling mode:', error);
       });
     },
-    [courseSettings?.courseId, updateCourseSettingsMutation],
+    [settingsCourseId, updateCourseSettingsMutation],
   );
 
   // --------------------------------------------------------------------------

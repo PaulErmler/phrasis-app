@@ -259,6 +259,7 @@
     "title": "Flexible",
     "titleHighlight": "Preise",
     "mostPopular": "Am beliebtesten",
+    "everythingFrom": "Alles aus {planName}, plus:",
     "billing": {
       "monthly": "Monatlich",
       "yearly": "Jährlich",
@@ -311,7 +312,7 @@
       },
       "pro": {
         "name": "Pro",
-        "description": "Für maximale Flexibilität und Polyglotte.",
+        "description": "Alles was du brauchst, um mehrere Sprachen zu lernen.",
         "priceMonthly": "16€",
         "priceYearlyPerMonth": "12€",
         "period": "Monat",
@@ -320,11 +321,31 @@
         "cta": "Jetzt starten",
         "features": {
           "sentences": "Unbegrenzt viele vorgefertigte Sätze",
-          "credits": "1.200 Credits pro Monat",
+          "credits": "600 Credits pro Monat",
           "creditsHint": "Credits können für Chat-Nachrichten, eigene Karten und mehr genutzt werden",
           "courses": "Bis zu 10 Kurse",
           "multipleLanguages": "Bis zu 3 Sprachen pro Kurs",
           "detailedStatistics": "Detaillierte Statistiken"
+        }
+      },
+      "ultra": {
+        "name": "Ultra",
+        "description": "Maximale Individualisierung und KI-Funktionen.",
+        "priceMonthly": "32€",
+        "priceYearlyPerMonth": "24€",
+        "period": "Monat",
+        "billedAnnually": "288€ jährlich abgerechnet",
+        "trial": "7 Tage kostenlos testen",
+        "cta": "Jetzt starten",
+        "features": {
+          "sentences": "Unbegrenzt viele vorgefertigte Sätze",
+          "credits": "2.000 Credits pro Monat",
+          "creditsHint": "Credits können für Chat-Nachrichten, eigene Karten und mehr genutzt werden",
+          "courses": "Bis zu 10 Kurse",
+          "multipleLanguages": "Bis zu 3 Sprachen pro Kurs",
+          "detailedStatistics": "Detaillierte Statistiken",
+          "priorityFeatureAccess": "Bevorzugter Zugang zu neuen Funktionen",
+          "prioritySupport": "Bevorzugter Support"
         }
       }
     }

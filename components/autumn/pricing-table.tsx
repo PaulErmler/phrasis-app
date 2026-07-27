@@ -36,26 +36,105 @@ function productSortPrice(product: Product): number {
 }
 
 /**
- * Rank of a paid plan within its own interval group (0 = cheapest tier).
- * Used to compare tiers ACROSS billing intervals, where raw prices mislead:
- * Basic Annual (€72) costs more than a month of Pro (€16), so Autumn labels
- * it an "upgrade" — but tier-wise it is a downgrade.
+ * Extra bullets that are pure marketing copy with no Autumn feature behind
+ * them, so they cannot come from `product.items` and are never metered or
+ * enforced. Keyed by base plan id — the `_annual` variants share their base
+ * plan's copy. Values are keys in the `Pricing` i18n namespace.
  */
-function paidTierRank(product: Product, products: Product[]): number {
+const EXTRA_PLAN_FEATURES: Record<string, string[]> = {
+  ultra: ["priorityFeatureAccess", "prioritySupport"],
+};
+
+/** Paid plans billed on the same interval as `product`, cheapest first. */
+function paidTiersInSameInterval(
+  product: Product,
+  products: Product[],
+): Product[] {
   return products
     .filter(
       (p) =>
         !p.properties?.is_free &&
         p.properties?.interval_group === product.properties?.interval_group,
     )
-    .sort((a, b) => productSortPrice(a) - productSortPrice(b))
-    .findIndex((p) => p.id === product.id);
+    .sort((a, b) => productSortPrice(a) - productSortPrice(b));
+}
+
+/**
+ * Rank of a paid plan within its own interval group (0 = cheapest tier).
+ * Used to compare tiers ACROSS billing intervals, where raw prices mislead:
+ * Basic Annual (€72) costs more than a month of Pro (€16), so Autumn labels
+ * it an "upgrade" — but tier-wise it is a downgrade.
+ */
+function paidTierRank(product: Product, products: Product[]): number {
+  return paidTiersInSameInterval(product, products).findIndex(
+    (p) => p.id === product.id,
+  );
+}
+
+/**
+ * The tier this card builds on: the next cheaper paid plan in the same
+ * billing interval, or Free for the entry tier. Undefined when there is
+ * nothing below it on the table — the free card itself, and every card in the
+ * onboarding picker's entry row, where `excludeFreePlan` removes the base.
+ */
+export function previousTier(
+  product: Product,
+  products: Product[],
+): Product | undefined {
+  if (product.properties?.is_free) return undefined;
+  const rank = paidTierRank(product, products);
+  if (rank > 0) return paidTiersInSameInterval(product, products)[rank - 1];
+  return products.find((p) => p.properties?.is_free);
+}
+
+/**
+ * The items this plan adds on top of `previous` — a bigger allowance, or a
+ * feature the tier below does not grant at all. Everything else is already
+ * covered by the "Everything from X, plus:" line, so repeating it is noise:
+ * Ultra and Pro differ only in credits, and listing seven identical bullets
+ * hides that.
+ *
+ * Consumable pools are rewritten to the INCREMENT, because the card reads as
+ * a sum: Ultra under "Everything from Pro, plus:" must say 2,000 credits, not
+ * 3,000 — Pro's 1,000 is already counted by the line above, and 1,000 + 2,000
+ * is the 3,000 the plan actually grants. Caps (courses) and boolean flags are
+ * not additive — a limit replaces the one below it — so they keep their own
+ * total, which is what "Up to 10 courses" has to mean to be true.
+ *
+ * Items are matched on feature id AND interval so a one-off starter grant
+ * (Free's 200 credits, `interval == null`) never cancels out a recurring one.
+ */
+export function itemsAddedOver(
+  items: ProductItem[],
+  previous: Product | undefined,
+): ProductItem[] {
+  if (!previous) return items;
+  return items.flatMap((item) => {
+    const prior = previous.items.find(
+      (p) => p.feature_id === item.feature_id && p.interval === item.interval,
+    );
+    if (!prior) return [item];
+    if (item.included_usage === "inf") {
+      return prior.included_usage === "inf" ? [] : [item];
+    }
+    if (prior.included_usage === "inf") return [];
+    const total = Number(item.included_usage ?? 0);
+    const alreadyIncluded = Number(prior.included_usage ?? 0);
+    if (total <= alreadyIncluded) return [];
+    return [
+      isFeatureConsumable(item.feature_id ?? "") === true
+        ? { ...item, included_usage: total - alreadyIncluded }
+        : item,
+    ];
+  });
 }
 
 export default function PricingTable({
   productDetails,
   excludeFreePlan = false,
   recommendedProductIds,
+  carouselItemClassName,
+  onFreePlanSelect,
 }: {
   productDetails?: ProductDetails[];
   /** When true, drop products whose `properties.is_free` is set. Used by the
@@ -66,6 +145,15 @@ export default function PricingTable({
    *  `productDetails` cannot be used for this because passing it FILTERS
    *  the table to only the listed products. */
   recommendedProductIds?: string[];
+  /** Overrides the per-card carousel basis classes (how many cards are
+   *  visible side by side at each breakpoint). */
+  carouselItemClassName?: string;
+  /** When set, the Free card's button stays clickable (labelled
+   *  "Continue with Free") and calls this instead of checkout — used by
+   *  onboarding, where picking Free just finishes the wizard on the
+   *  auto-enabled free tier. Without it the Free card shows the default
+   *  disabled "Current Plan" state. */
+  onFreePlanSelect?: () => void;
 }) {
   const t = useTranslations("Pricing");
   const { customer, checkout, isLoading: isCustomerLoading } = useCustomer({
@@ -181,6 +269,14 @@ export default function PricingTable({
     return true;
   };
 
+  const visibleProducts = products?.filter(intervalFilter) ?? [];
+  // Open the carousel on the recommended plan (e.g. Pro) so it isn't
+  // off-screen on viewports that fit fewer cards than there are plans.
+  const startIndex = Math.max(
+    0,
+    visibleProducts.findIndex((p) => p.display?.recommend_text),
+  );
+
   return (
     <div className={cn("root")}>
       {products && (
@@ -191,37 +287,51 @@ export default function PricingTable({
           isAnnualToggle={isAnnual}
           setIsAnnualToggle={setIsAnnualOverride}
           multiInterval={multiInterval}
+          startIndex={startIndex}
+          itemClassName={carouselItemClassName}
         >
-          {products.filter(intervalFilter).map((product, index) => (
-            <PricingCard
-              key={index}
-              productId={product.id}
-              buttonProps={{
-                disabled:
-                  (product.scenario === "active" &&
-                    !product.properties.updateable) ||
-                  product.scenario === "scheduled",
+          {visibleProducts.map((product, index) => {
+            if (product.properties?.is_free && onFreePlanSelect) {
+              return (
+                <PricingCard
+                  key={index}
+                  productId={product.id}
+                  buttonTextOverride={t("continueWithFree")}
+                  buttonProps={{ onClick: onFreePlanSelect }}
+                />
+              );
+            }
+            return (
+              <PricingCard
+                key={index}
+                productId={product.id}
+                buttonProps={{
+                  disabled:
+                    (product.scenario === "active" &&
+                      !product.properties.updateable) ||
+                    product.scenario === "scheduled",
 
-                onClick: async () => {
-                  if (product.id && customer) {
-                    await checkout({
-                      productId: product.id,
-                      dialog: CheckoutDialog,
-                      // Autumn only dedupes trials per-plan; this passes
-                      // `freeTrial: false` for everyone who ever trialed
-                      // or pays (closing the cross-plan hole), and nothing
-                      // for trial-eligible or currently-trialing users —
-                      // the dialog routes trialing switches through
-                      // convex/billing.ts to keep the running trial.
-                      ...checkoutTrialParams(trialState),
-                    });
-                  } else if (product.display?.button_url) {
-                    window.open(product.display?.button_url, "_blank");
-                  }
-                },
-              }}
-            />
-          ))}
+                  onClick: async () => {
+                    if (product.id && customer) {
+                      await checkout({
+                        productId: product.id,
+                        dialog: CheckoutDialog,
+                        // Autumn only dedupes trials per-plan; this passes
+                        // `freeTrial: false` for everyone who ever trialed
+                        // or pays (closing the cross-plan hole), and nothing
+                        // for trial-eligible or currently-trialing users —
+                        // the dialog routes trialing switches through
+                        // convex/billing.ts to keep the running trial.
+                        ...checkoutTrialParams(trialState),
+                      });
+                    } else if (product.display?.button_url) {
+                      window.open(product.display?.button_url, "_blank");
+                    }
+                  },
+                }}
+              />
+            );
+          })}
         </PricingTableContainer>
       )}
     </div>
@@ -264,6 +374,8 @@ export const PricingTableContainer = ({
   isAnnualToggle,
   setIsAnnualToggle,
   multiInterval,
+  startIndex = 0,
+  itemClassName,
 }: {
   children?: React.ReactNode;
   products?: Product[];
@@ -274,6 +386,10 @@ export const PricingTableContainer = ({
   isAnnualToggle: boolean;
   setIsAnnualToggle: (isAnnual: boolean) => void;
   multiInterval: boolean;
+  /** Card the carousel opens on (e.g. the recommended plan). */
+  startIndex?: number;
+  /** Overrides the per-card basis classes (cards visible per breakpoint). */
+  itemClassName?: string;
 }) => {
   const [carouselApi, setCarouselApi] = useState<CarouselApi>();
 
@@ -306,12 +422,17 @@ export const PricingTableContainer = ({
         <div className="w-full">
           <Carousel
             setApi={setCarouselApi}
-            opts={{ align: "start", loop: false }}
+            opts={{ align: "start", loop: false, startIndex }}
             className="w-full"
           >
             <CarouselContent>
               {React.Children.map(children, (child) => (
-                <CarouselItem className="basis-[85%] sm:basis-[70%] md:basis-[50%]">
+                <CarouselItem
+                  className={
+                    itemClassName ??
+                    "basis-[85%] sm:basis-[70%] md:basis-[50%]"
+                  }
+                >
                   {child}
                 </CarouselItem>
               ))}
@@ -330,12 +451,15 @@ interface PricingCardProps {
   className?: string;
   onButtonClick?: (event: React.MouseEvent<HTMLButtonElement>) => void;
   buttonProps?: React.ComponentProps<"button">;
+  /** Replaces the scenario-derived button label (e.g. "Current Plan"). */
+  buttonTextOverride?: string;
 }
 
 export const PricingCard = ({
   productId,
   className,
   buttonProps,
+  buttonTextOverride,
 }: PricingCardProps) => {
   const t = useTranslations("Pricing");
   const tFeatures = useTranslations("Features");
@@ -382,6 +506,16 @@ export const PricingCard = ({
   const isRecommended = productDisplay?.recommend_text ? true : false;
   const intervalGroup = product.properties?.interval_group;
 
+  // Plan taglines come from our own i18n rather than Autumn's
+  // `display.description`, which is a single unlocalized dashboard string and
+  // would differ between a plan and its `_annual` variant. Falls back to
+  // whatever Autumn returns for any plan we have no copy for.
+  const basePlanId = product.id.replace(/_annual$/, "");
+  const descriptionKey = `planDescriptions.${basePlanId}`;
+  const planDescription = t.has(descriptionKey)
+    ? t(descriptionKey)
+    : productDisplay?.description;
+
   // Annual plans are displayed as their effective per-month price, with
   // the billed-annually total as a subline.
   const annualBasePrice =
@@ -415,9 +549,20 @@ export const PricingCard = ({
       ? { primary_text: annualMonthlyPrice }
       : product.items[0].display;
 
-  const featureItems = product.properties?.is_free
+  // Paid plans lead with their price item; the rest are entitlements.
+  const allFeatureItems = product.properties?.is_free
     ? product.items
     : product.items.slice(1);
+
+  // Each card lists only what it adds over the tier below, under an
+  // "Everything from <lower tier>, plus:" line. Autumn's own
+  // `display.everything_from` is a dashboard string that has to be kept in
+  // sync by hand, so it is only a fallback for plans with no tier below them.
+  const lowerTier = previousTier(product, products);
+  const everythingFrom = lowerTier
+    ? lowerTier.display?.name || lowerTier.name
+    : product.display?.everything_from;
+  const featureItems = itemsAddedOver(allFeatureItems, lowerTier);
 
   return (
     <div
@@ -442,11 +587,9 @@ export const PricingCard = ({
               <h2 className="text-2xl font-semibold px-6 truncate">
                 {productDisplay?.name || name}
               </h2>
-              {productDisplay?.description && (
+              {planDescription && (
                 <div className="text-sm text-muted-foreground px-6 h-8">
-                  <p className="line-clamp-2">
-                    {productDisplay?.description}
-                  </p>
+                  <p className="line-clamp-2">{planDescription}</p>
                 </div>
               )}
             </div>
@@ -496,11 +639,12 @@ export const PricingCard = ({
               </div>
             )}
           </div>
-          {showFeatures && featureItems.length > 0 && (
+          {showFeatures && (featureItems.length > 0 || everythingFrom) && (
             <div className="flex-grow px-6 mb-6">
               <PricingFeatureList
                 items={featureItems}
-                everythingFrom={product.display?.everything_from}
+                everythingFrom={everythingFrom}
+                extraFeatureKeys={EXTRA_PLAN_FEATURES[basePlanId]}
                 tFeatures={tFeatures}
               />
             </div>
@@ -512,7 +656,7 @@ export const PricingCard = ({
             recommended={productDisplay?.recommend_text ? true : false}
             {...buttonProps}
           >
-            {productDisplay?.button_text || finalButtonText}
+            {buttonTextOverride ?? (productDisplay?.button_text || finalButtonText)}
           </PricingCardButton>
         </div>
       </div>
@@ -523,11 +667,14 @@ export const PricingCard = ({
 export const PricingFeatureList = ({
   items,
   everythingFrom,
+  extraFeatureKeys,
   className,
   tFeatures,
 }: {
   items: ProductItem[];
   everythingFrom?: string;
+  /** Display-only bullets (see EXTRA_PLAN_FEATURES) — not Autumn features. */
+  extraFeatureKeys?: string[];
   className?: string;
   tFeatures?: ReturnType<typeof useTranslations>;
 }) => {
@@ -581,11 +728,22 @@ export const PricingFeatureList = ({
             </div>
           );
         })}
-        <div className="flex items-start gap-2 text-sm">
-          <div className="flex flex-col">
-            <span>{tFeatures ? tFeatures("detailedStatistics.pricingLabel") : "Detailed statistics"}</span>
+        {extraFeatureKeys?.map((key) => (
+          <div key={key} className="flex items-start gap-2 text-sm">
+            <div className="flex flex-col">
+              <span>{t(key)}</span>
+            </div>
           </div>
-        </div>
+        ))}
+        {/* Not a metered Autumn item — every plan has it, so it only belongs
+            on the base card. Higher tiers inherit it via "Everything from". */}
+        {!everythingFrom && (
+          <div className="flex items-start gap-2 text-sm">
+            <div className="flex flex-col">
+              <span>{tFeatures ? tFeatures("detailedStatistics.pricingLabel") : "Detailed statistics"}</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -670,7 +828,7 @@ export const AnnualSwitch = ({
 
 export const RecommendedBadge = ({ recommended }: { recommended: string }) => {
   return (
-    <div className="bg-secondary absolute border text-muted-foreground text-sm font-medium lg:rounded-full px-3 lg:py-0.5 lg:top-4 lg:right-4 top-[-1px] right-[-1px] rounded-bl-lg">
+    <div className="bg-secondary absolute border text-muted-foreground text-sm font-medium px-3 top-[-1px] right-[-1px] rounded-bl-lg">
       {recommended}
     </div>
   );

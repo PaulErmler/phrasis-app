@@ -8,9 +8,21 @@ import { Check, X, Sprout } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
+/**
+ * Each tier lists only what it ADDS over the one below, under an "Everything
+ * from X, plus:" line — the same structure as the in-app pricing table
+ * (`itemsAddedOver` in components/autumn/pricing-table.tsx). Anything the
+ * lower tier already grants is inherited, not repeated: Basic and Free both
+ * cap at 1 course, Pro and Ultra both give unlimited sentences.
+ *
+ * Credit lines are INCREMENTS, so the card adds up: Free's 30/month +
+ * Basic's 400 + Pro's 600 + Ultra's 2,000 are the 30 / 430 / 1,030 / 3,030
+ * the plans actually grant. Keep in step with autumn.config.ts.
+ */
 const plans = [
   {
     key: 'free' as const,
+    previous: null,
     highlighted: false,
     hasTrial: false,
     paid: false,
@@ -18,23 +30,31 @@ const plans = [
   },
   {
     key: 'basic' as const,
+    previous: 'free' as const,
     highlighted: false,
     hasTrial: true,
     paid: true,
-    features: ['sentences', 'credits', 'creditsHint', 'courses', 'detailedStatistics'],
+    features: ['sentences', 'credits'],
   },
   {
     key: 'pro' as const,
+    previous: 'basic' as const,
     highlighted: true,
     hasTrial: true,
     paid: true,
+    features: ['credits', 'courses', 'multipleLanguages'],
+  },
+  {
+    key: 'ultra' as const,
+    previous: 'pro' as const,
+    highlighted: false,
+    hasTrial: true,
+    paid: true,
     features: [
-      'sentences',
       'credits',
-      'creditsHint',
-      'courses',
-      'multipleLanguages',
-      'detailedStatistics',
+      // Display-only — no Autumn feature backs these.
+      'priorityFeatureAccess',
+      'prioritySupport',
     ],
   },
 ] as const;
@@ -118,7 +138,7 @@ export function PricingSection() {
           <BillingToggle billing={billing} setBilling={setBilling} t={t} />
         </motion.div>
 
-        <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-5 lg:gap-8">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-5 lg:gap-6">
           {plans.map((plan, index) => {
             // Yearly billing shows the effective per-month price as the
             // headline, with the billed-annually total as a subline.
@@ -194,6 +214,14 @@ export function PricingSection() {
                     </p>
                   )}
                 </div>
+
+                {plan.previous && (
+                  <p className="mb-3 text-sm font-medium">
+                    {t('everythingFrom', {
+                      planName: t(`plans.${plan.previous}.name`),
+                    })}
+                  </p>
+                )}
 
                 <ul className="mb-8 flex-1 space-y-3">
                   {plan.features.map((featureKey) => (

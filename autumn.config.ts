@@ -1,6 +1,6 @@
 import { feature, item, plan } from 'atmn';
 
-import { CREDIT_COSTS, FEATURE_IDS } from './convex/features/featureIds';
+import { CREDIT_COSTS } from './convex/features/featureIds';
 
 // Features
 export const multiple_languages = feature({
@@ -187,9 +187,11 @@ export const basic = plan({
 			featureId: courses.id,
 			included: 1,
 		}),
+		// 430 = Free's 30/month + 400, so the pricing table's cumulative
+		// "Everything from Free, plus:" line reads as a round 400.
 		item({
 			featureId: credits.id,
-			included: 400,
+			included: 430,
 			reset: {
 				interval: 'month',
 			},
@@ -256,9 +258,12 @@ export const pro = plan({
 			featureId: courses.id,
 			included: 10,
 		}),
+		// 1030 = Basic's 430 + 600 — see the note on Basic: the pricing table
+		// lists each tier as what it adds over the one below, so the grants
+		// are tuned to make those increments round.
 		item({
 			featureId: credits.id,
-			included: 1200,
+			included: 1030,
 			reset: {
 				interval: 'month',
 			},
@@ -294,5 +299,76 @@ export const pro_annual = pro.variant({
 	name: 'Pro Annual',
 	customize: {
 		price: { amount: 144, interval: 'year' },
+	},
+});
+
+// Ultra is Pro with a bigger credit pool — every other entitlement is
+// deliberately identical, so the only reason to upgrade is credit-hungry
+// AI usage (chat, custom sentences, translation auto-fill).
+export const ultra = plan({
+	id: 'ultra',
+	name: 'Ultra',
+	price: {
+		amount: 32,
+		interval: 'month',
+	},
+	items: [
+		item({
+			featureId: audio_regenerations.id,
+			included: 800,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: card_edits.id,
+			included: 800,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: courses.id,
+			included: 10,
+		}),
+		// 3030 = Pro's 1030 + 2000.
+		item({
+			featureId: credits.id,
+			included: 3030,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: sentences.id,
+			included: 20000,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: transcriptions.id,
+			included: 400,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({
+			featureId: translation_flags.id,
+			included: 800,
+			reset: {
+				interval: 'month',
+			},
+		}),
+		item({ featureId: multiple_languages.id }),
+	],
+	freeTrial: { durationLength: 7, durationType: 'day', cardRequired: true },
+});
+
+export const ultra_annual = ultra.variant({
+	id: 'ultra_annual',
+	name: 'Ultra Annual',
+	customize: {
+		price: { amount: 288, interval: 'year' },
 	},
 });

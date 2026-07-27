@@ -12,7 +12,9 @@ const secretKey = (() => {
 
 export const autumn = new Autumn(components.autumn, {
   secretKey,
-  identify: async (ctx: any) => {
+  identify: async (ctx: {
+    auth: { getUserIdentity: () => Promise<Record<string, unknown> | null> };
+  }) => {
     const user = await ctx.auth.getUserIdentity();
     if (!user) return null
 

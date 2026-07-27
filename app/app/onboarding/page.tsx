@@ -52,9 +52,10 @@ import { WordProjectionStep } from './steps/WordProjectionStep';
 import type { OnboardingSessionSummary } from './components/OnboardingFirstLesson';
 import { FeatureTourStep } from './steps/FeatureTourStep';
 import { PlanPickStep } from './steps/PlanPickStep';
+import { TestimonialsStep } from './steps/TestimonialsStep';
 
 /**
- * New onboarding wizard. 13 steps with branching at the proficiency point.
+ * New onboarding wizard. 14 steps with branching at the proficiency point.
  *
  * Step / id / next:
  *   1.  language-pair         → acquisition
@@ -68,8 +69,9 @@ import { PlanPickStep } from './steps/PlanPickStep';
  *   8.  first-lesson          → stats-recap (or feature-tour on skip)
  *   9.  stats-recap           → word-projection
  *   10. word-projection       → feature-tour
- *   11. feature-tour          → plan-pick
- *   12. plan-pick             → done         (calls finalizeOnboarding)
+ *   11. feature-tour          → testimonials
+ *   12. testimonials          → plan-pick
+ *   13. plan-pick             → done         (calls finalizeOnboarding)
  *
  * `hasCompletedOnboarding` is the single source of truth for the auto-redirect
  * — it stays false until the very last step (`finalizeOnboarding`), so
@@ -89,6 +91,7 @@ type StepId =
   | 'stats-recap'
   | 'word-projection'
   | 'feature-tour'
+  | 'testimonials'
   | 'plan-pick';
 
 const PROGRESS_STEP_ORDER: StepId[] = [
@@ -103,6 +106,7 @@ const PROGRESS_STEP_ORDER: StepId[] = [
   'stats-recap',
   'word-projection',
   'feature-tour',
+  'testimonials',
   'plan-pick',
 ];
 
@@ -116,6 +120,7 @@ const POST_CUSTOMIZING_STEPS: ReadonlySet<StepId> = new Set<StepId>([
   'stats-recap',
   'word-projection',
   'feature-tour',
+  'testimonials',
   'plan-pick',
 ]);
 
@@ -332,22 +337,6 @@ function OnboardingWizard({
   // Live OGTE level the user has dialled in on the CEFR slider, kept in
   // wizard state so the Continue button can read it.
   const [cefrSlidLevel, setCefrSlidLevel] = useState<number>(8);
-  // Session snapshot from the embedded first lesson — drives the
-  // stats-recap + word-projection screens. Reads from `data.firstLessonSummary`
-  // (persisted in `onboardingProgress`) so a mid-flow reload doesn't drop
-  // the numbers; `setLessonSummary` writes to both local state and the
-  // server via `persist`.
-  const lessonSummary: OnboardingSessionSummary | null = data.firstLessonSummary;
-  const setLessonSummary = useCallback(
-    (s: OnboardingSessionSummary | null) => {
-      persist({ firstLessonSummary: s });
-    },
-    // `persist` is defined just below — adding it as a dep is the standard
-    // forward-ref pattern; React still wires the dependency correctly.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
   const dataRef = useRef(data);
   useLayoutEffect(() => {
     dataRef.current = data;
@@ -385,6 +374,19 @@ function OnboardingWizard({
       }, 250);
     },
     [saveProgress],
+  );
+
+  // Session snapshot from the embedded first lesson — drives the
+  // stats-recap + word-projection screens. Reads from `data.firstLessonSummary`
+  // (persisted in `onboardingProgress`) so a mid-flow reload doesn't drop
+  // the numbers; `setLessonSummary` writes to both local state and the
+  // server via `persist`.
+  const lessonSummary: OnboardingSessionSummary | null = data.firstLessonSummary;
+  const setLessonSummary = useCallback(
+    (s: OnboardingSessionSummary | null) => {
+      persist({ firstLessonSummary: s });
+    },
+    [persist],
   );
 
   // Steps excluded from back-history: transient/loading screens the user
@@ -575,6 +577,9 @@ function OnboardingWizard({
       return;
     case 'cefr-pick':
       onCefrPickContinue();
+      return;
+    case 'testimonials':
+      advance('plan-pick');
       return;
     default:
       return;
@@ -814,7 +819,9 @@ function renderStep({
       />
     );
   case 'feature-tour':
-    return <FeatureTourStep onComplete={() => onAdvance('plan-pick')} />;
+    return <FeatureTourStep onComplete={() => onAdvance('testimonials')} />;
+  case 'testimonials':
+    return <TestimonialsStep />;
   case 'plan-pick':
     return <PlanPickStep onContinue={onFinalize} />;
   }

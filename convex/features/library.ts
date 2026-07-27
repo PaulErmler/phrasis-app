@@ -1,5 +1,5 @@
 import { v } from 'convex/values';
-import { query, internalMutation, mutation } from '../_generated/server';
+import { query } from '../_generated/server';
 import { Doc } from '../_generated/dataModel';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';

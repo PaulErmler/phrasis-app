@@ -28,7 +28,6 @@ import {
   scheduleCard,
   getValidRatings,
   DEFAULT_INITIAL_REVIEW_COUNT,
-  type ReviewRating,
   type CardSchedulingState,
 } from '../../lib/scheduling';
 import {

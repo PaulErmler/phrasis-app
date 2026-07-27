@@ -11,7 +11,11 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { usePaywall, useCustomer, usePricingTable } from "autumn-js/react";
-import { findUpgradeProductFromPricingTable } from "@/lib/autumn/find-upgrade-product";
+import {
+  findCurrentIntervalGroup,
+  findUpgradeProductFromPricingTable,
+  preferIntervalGroup,
+} from "@/lib/autumn/find-upgrade-product";
 import { checkoutTrialParams, getTrialState } from "@/lib/autumn/trial-eligibility";
 import { getPaywallTitle, getPaywallMessage, filterProductsByFeatureIncrease } from "@/lib/autumn/paywall-content";
 import { getFeatureI18nKey, isFeatureConsumable, getFeaturePaywallKey } from "@/lib/features/feature-meta";
@@ -42,6 +46,13 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
   const consumable = isFeatureConsumable(filterFeatureId);
   const { balance, included, used } = useFeatureQuota(filterFeatureId);
 
+  // Both suggestion paths are narrowed to the interval the customer already
+  // pays on, so an annual subscriber is never sent to a monthly plan.
+  const intervalGroup = findCurrentIntervalGroup(
+    customer,
+    pricingTableProducts ?? undefined,
+  );
+
   const relevantProducts = useMemo(() => {
     const filtered = filterProductsByFeatureIncrease(
       preview?.products ?? [],
@@ -49,12 +60,13 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
       included,
       consumable,
     );
-    if (filtered.length > 0) return filtered;
+    if (filtered.length > 0) return preferIntervalGroup(filtered, intervalGroup);
     const fallback = findUpgradeProductFromPricingTable(
       pricingTableProducts ?? undefined,
       filterFeatureId,
       included,
       consumable,
+      intervalGroup,
     );
     return fallback ? [fallback] : [];
   }, [
@@ -63,6 +75,7 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
     filterFeatureId,
     included,
     consumable,
+    intervalGroup,
   ]);
 
   if (!params) {

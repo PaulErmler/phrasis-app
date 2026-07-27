@@ -15,6 +15,10 @@ import {
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import {
+  isComposingKeyEvent,
+  isEditableTarget,
+} from '@/hooks/use-ime-safe-enter';
 
 /**
  * Coachmark — spotlight + tooltip used to teach mechanics during the first
@@ -251,6 +255,12 @@ function CoachmarkOverlay({
   // element first — the coachmark is the active UI by visual prominence.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Capture-phase + preventDefault means this listener sees keys before the
+      // focused field does, so it must stand down while the user is typing:
+      // Space/Enter/Escape are all ordinary text-entry keys, and Enter in
+      // particular confirms an IME conversion (ja/zh/ko/vi) rather than
+      // advancing anything. See `useImeSafeEnter`.
+      if (isEditableTarget(e.target) || isComposingKeyEvent(e)) return;
       switch (e.key) {
       case 'Enter':
       case ' ':           // Space
@@ -381,6 +391,9 @@ function Tooltip({
     return () => clearTimeout(t);
   }, []);
 
+  // Deliberately no dep array: re-measure on every render (content/layout can
+  // change without any dep changing); the equality guard prevents update loops.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useLayoutEffect(() => {
     if (!ref.current) return;
     const { width, height } = ref.current.getBoundingClientRect();

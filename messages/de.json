@@ -585,6 +585,8 @@
       "autoPlayDescriptionTranscribe": "Audio automatisch abspielen, sobald die Übersetzung eingegeben ist",
       "autoRevealBaseOnSubmit": "Automatisch einblenden nach Absenden",
       "autoRevealBaseOnSubmitDescription": "Basistext einblenden, sobald alle Übersetzungen abgesendet sind",
+      "ignorePunctuation": "Satzzeichen ignorieren",
+      "ignorePunctuationDescription": "Kommas, Punkte und andere Satzzeichen nicht in die Genauigkeit einrechnen",
       "instantProceed": "Sofort weiter bei Bewertung",
       "instantProceedDescription": "Zum nächsten Satz wechseln, sobald eine Bewertung angeklickt wird"
     }
@@ -825,6 +827,7 @@
     "planScheduled": "Plan geplant",
     "updatePlan": "Plan aktualisieren",
     "currentPlan": "Aktueller Plan",
+    "continueWithFree": "Weiter mit Free",
     "purchase": "Kaufen",
     "getStarted": "Loslegen",
     "renew": "Erneuern",
@@ -844,7 +847,15 @@
     "freeTrialBadge": "{days} Tage kostenlos testen",
     "billedAnnually": "{price} jährlich abgerechnet",
     "annualSaveHint": "25 % sparen",
-    "mostPopular": "Am beliebtesten"
+    "mostPopular": "Am beliebtesten",
+    "priorityFeatureAccess": "Bevorzugter Zugang zu neuen Funktionen",
+    "prioritySupport": "Bevorzugter Support",
+    "planDescriptions": {
+      "free": "Perfekt zum Ausprobieren",
+      "basic": "Alles was du brauchst, um eine Sprache zu lernen.",
+      "pro": "Alles was du brauchst, um mehrere Sprachen zu lernen.",
+      "ultra": "Maximale Individualisierung und KI-Funktionen."
+    }
   },
   "Checkout": {
     "confirm": "Bestätigen",
@@ -1144,10 +1155,14 @@
       "next": "Weiter",
       "done": "Fertig"
     },
+    "testimonials": {
+      "title": "Von Sprachlernern geliebt",
+      "subtitle": "Das sagen andere Lernende über Flexling."
+    },
     "planPick": {
       "title": "Danke, dass du dabei bist",
-      "subtitle": "Probiere Basic oder Pro 7 Tage kostenlos — ohne Verpflichtung. Du kannst jederzeit wechseln oder kündigen.",
-      "skip": "Vielleicht später — weiter testen"
+      "subtitle": "Probiere Basic, Pro oder Ultra 7 Tage kostenlos — ohne Verpflichtung. Du kannst jederzeit wechseln oder kündigen.",
+      "skip": "Vielleicht später — kostenlos weiter"
     },
     "difficulty": {
       "title": "Wie viel kannst du schon?",

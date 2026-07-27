@@ -63,12 +63,12 @@ const ESCALATE_AFTER_MS = devMs(
 );
 
 /**
- * If we reloaded toward a build and came back still running the old one,
- * something upstream is serving a stale document. Stop auto-reloading rather
- * than loop, and let the toast take over.
+ * At most one silent reload per target build per tab. If we reloaded toward a
+ * build and came back still running the old one, something upstream is serving
+ * a stale document and trying again will not fix it — no time window makes that
+ * false, so this is a flat one-shot rather than a cooldown. The toast still
+ * escalates afterwards, so a transiently failed reload is not a dead end.
  */
-const RELOAD_COOLDOWN_MS = 5 * 60 * 1000;
-
 const RELOAD_ATTEMPT_KEY = 'app-update:reload-attempt';
 const CHUNK_RELOAD_KEY = 'app-update:chunk-reload';
 const TOAST_ID = 'app-update';
@@ -107,30 +107,22 @@ export function useReloadBlock(active: boolean) {
   }, [ctx, active]);
 }
 
-function readReloadAttempt(): { toBuildId: string; at: number } | null {
+/** The build a silent reload was already attempted toward in this tab, if any. */
+function readReloadAttempt(): string | null {
   try {
-    const raw = sessionStorage.getItem(RELOAD_ATTEMPT_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { toBuildId?: unknown; at?: unknown };
-    if (typeof parsed.toBuildId !== 'string' || typeof parsed.at !== 'number') {
-      return null;
-    }
-    return { toBuildId: parsed.toBuildId, at: parsed.at };
+    return sessionStorage.getItem(RELOAD_ATTEMPT_KEY);
   } catch {
-    // Private mode, disabled storage, or corrupt value — treat as no attempt.
+    // Private mode or disabled storage — treat as no attempt.
     return null;
   }
 }
 
 function writeReloadAttempt(toBuildId: string) {
   try {
-    sessionStorage.setItem(
-      RELOAD_ATTEMPT_KEY,
-      JSON.stringify({ toBuildId, at: Date.now() }),
-    );
+    sessionStorage.setItem(RELOAD_ATTEMPT_KEY, toBuildId);
   } catch {
-    // Storage unavailable. The reload still happens; we just lose the loop
-    // guard, which is the safer direction to fail in than not reloading.
+    // Storage unavailable, so the loop guard is gone. Reload anyway: an
+    // occasional double reload beats never getting off a stale bundle.
   }
 }
 
@@ -155,6 +147,8 @@ export function AppUpdateGate({ children }: { children: React.ReactNode }) {
   /** When we first saw this update, for the escalation timer. */
   const pendingSinceRef = useRef<number | null>(null);
   const inFlightRef = useRef(false);
+  /** Set once the toast has been shown, so a dismissal sticks. */
+  const escalatedRef = useRef(false);
 
   const [latestBuildId, setLatestBuildId] = useState<string | null>(null);
   const updateAvailable = latestBuildId !== null && latestBuildId !== BUILD_ID;
@@ -201,14 +195,7 @@ export function AppUpdateGate({ children }: { children: React.ReactNode }) {
       if (hiddenForMs < HIDDEN_LONG_ENOUGH_MS) return;
 
       // We already tried to get onto this build and are somehow still here.
-      const attempt = readReloadAttempt();
-      if (
-        attempt &&
-        attempt.toBuildId === buildId &&
-        Date.now() - attempt.at < RELOAD_COOLDOWN_MS
-      ) {
-        return;
-      }
+      if (readReloadAttempt() === buildId) return;
 
       reload(buildId);
     },
@@ -241,12 +228,16 @@ export function AppUpdateGate({ children }: { children: React.ReactNode }) {
 
   // Tier 2: no safe moment arrived, so ask.
   useEffect(() => {
-    if (!updateAvailable) return;
+    if (!updateAvailable || escalatedRef.current) return;
 
     const pendingSince = pendingSinceRef.current ?? Date.now();
     const remaining = Math.max(0, ESCALATE_AFTER_MS - (Date.now() - pendingSince));
 
     const timer = setTimeout(() => {
+      // Once only. This effect re-runs on every re-render of a component that
+      // sits near the root, and re-firing would resurrect a toast the user had
+      // already dismissed.
+      escalatedRef.current = true;
       toast.info(t('title'), {
         id: TOAST_ID,
         description: t('description'),

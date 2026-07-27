@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 
 import { api } from '@/convex/_generated/api';
 import { useVoiceRecording } from '@/hooks/use-voice-recording';
+import { useImeSafeEnter } from '@/hooks/use-ime-safe-enter';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
@@ -49,6 +50,7 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
   const tErrors = useTranslations('Chat.errors');
   const tQuota = useTranslations('FeatureTracking');
   const router = useRouter();
+  const { compositionProps, isComposingEvent } = useImeSafeEnter();
 
   const [text, setText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -149,11 +151,14 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              // isComposingEvent: Enter confirms an IME conversion (ja/zh/ko/vi)
+              // rather than sending. See `useImeSafeEnter`.
+              if (e.key === 'Enter' && !e.shiftKey && !isComposingEvent(e)) {
                 e.preventDefault();
                 void handleSubmit();
               }
             }}
+            {...compositionProps}
             placeholder={t('placeholder')}
             disabled={isProcessing}
             data-testid="chat-new-input"

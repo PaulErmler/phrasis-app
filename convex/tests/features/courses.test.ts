@@ -607,6 +607,55 @@ describe("features/courses", () => {
       expect(settings?.showRomanization).toBe(true);
     });
 
+    // Same class of regression as showRomanization above: a new field has to
+    // land in the validator, PATCHABLE_KEYS *and* the hand-written insert
+    // object. Missing the last one silently drops the very first write.
+    it("persists ignorePunctuation on first insert", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        ignorePunctuation: true,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.ignorePunctuation).toBe(true);
+    });
+
+    it("defaults ignorePunctuation to undefined (punctuation counts)", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        showRomanization: true,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.ignorePunctuation).toBeUndefined();
+    });
+
+    it("toggles ignorePunctuation back off on an existing row", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        ignorePunctuation: true,
+      });
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        ignorePunctuation: false,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.ignorePunctuation).toBe(false);
+    });
+
     it("persists the Practice Listening (target-before-base) fields on insert", async () => {
       const t = convexTest(schema, modules);
       const { asUser, courseId } = await makeActiveCourse(t);

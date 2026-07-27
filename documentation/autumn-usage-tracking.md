@@ -101,7 +101,18 @@ In the local `usageQuotas` cache, boolean features are stored as `{ balance: 1, 
 
 ## Credit System
 
-Since the credits rollout, `custom_sentences`, `translation_auto_fill`, and `chat_messages` are no longer granted as separate plan items. Instead, plans grant a shared `credits` pool (Free: 200 one-off + 30/month; Basic: 400/month; Pro: 1,200/month) and the `credits` feature in `autumn.config.ts` declares a `creditSchema` mapping each of those features to a credit cost (currently 1 credit per unit each). Monthly credits reset with the billing cycle (no rollover); one-off grants persist.
+Since the credits rollout, `custom_sentences`, `translation_auto_fill`, and `chat_messages` are no longer granted as separate plan items. Instead, plans grant a shared `credits` pool (Free: 200 one-off + 30/month; Basic: 430/month; Pro: 1,030/month; Ultra: 3,030/month) and the `credits` feature in `autumn.config.ts` declares a `creditSchema` mapping each of those features to a credit cost (currently 1 credit per unit each). Monthly credits reset with the billing cycle (no rollover); one-off grants persist.
+
+The odd-looking monthly grants are deliberate, not round-number misses. The pricing table lists each tier as what it ADDS over the one below (see `itemsAddedOver` in `components/autumn/pricing-table.tsx`), so the totals are tuned to make those increments round — and they chain, so changing one tier shifts every tier above it:
+
+| Plan | Total/month | Renders as |
+|---|---|---|
+| Free | 30 | 30 credits per month |
+| Basic | 430 | plus **400** credits per month |
+| Pro | 1,030 | plus **600** credits per month |
+| Ultra | 3,030 | plus **2,000** credits per month |
+
+**Starter credits stay on the free plan.** Since `free` is `autoEnable`, every customer is attached to it at creation and receives the 200 one-off grant once. A customer who subscribes to a paid tier no longer holds `free` (verified in sandbox: a `pro_annual` customer's `subscriptions` contains only that plan), so paid-from-day-one subscribers get no starter credits — accepted. Do NOT "fix" this by adding a `one_off` credits item to Basic/Pro/Ultra: switching plans ends one entitlement and creates a new one, so that would grant a fresh 200 on every upgrade.
 
 **Golden rule (from Autumn's docs): always check/track the UNDERLYING feature id, never `credits`.** Autumn converts tracked usage into credit deductions server-side via the `creditSchema`.
 
@@ -114,7 +125,7 @@ Client + server mirror this rule:
 
 **Dynamic chat pricing:** a chat message costs 1 credit per started $0.005 (`CHAT_CREDIT_USD_STEP`) of actual LLM cost. `sendMessage` consumes 1 credit up-front via `consumeQuota(CHAT_MESSAGES, 1)`. `generateResponse` accumulates the real OpenRouter cost across all LLM steps (via a per-call `usageHandler` reading `providerMetadata.openrouter.usage.cost`; requires `usage: { include: true }` in `OPENROUTER_CHAT_EXTRA_BODY`) and then charges the remainder through the `chargeExtraChatCredits` internal mutation. The remainder is billed in whole `chat_messages` units (`ceil(cost / (step × creditCost)) - 1`), never in raw credits — `resolveQuotaTarget` and Autumn's `creditSchema` each multiply a `chat_messages` amount by its credit cost once, so passing credits would double-convert. That charge is applied without a balance check — the balance may go negative, which blocks the next message. Stream failures charge nothing extra; thread-title generation is intentionally not billed.
 
-**Grandfathering:** existing subscribers stay on their old plan version (Autumn plan versioning — config pushes used `create_version` / no migration). Their customers have per-feature balances and no `credits` entry, so every code path above falls back to the legacy per-feature behavior automatically. Chat costs them a flat 1 `chat_messages` unit per message (`chargeExtraChatCredits` is a no-op without a `credits` balance).
+**Grandfathering:** existing subscribers stay on their old plan version (Autumn plan versioning — config pushes used `create_version` / no migration). Pre-credits-rollout customers have per-feature balances and no `credits` entry, so every code path above falls back to the legacy per-feature behavior automatically. Chat costs them a flat 1 `chat_messages` unit per message (`chargeExtraChatCredits` is a no-op without a `credits` balance). The same versioning applies to the Ultra rollout: Pro subscribers from before it keep 1,200 credits/month, and only new Pro subscriptions get 1,030.
 
 ---
 

@@ -485,6 +485,13 @@ export function LearningModeSettings({
     });
   };
 
+  const handleIgnorePunctuationChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      ignorePunctuation: checked,
+    });
+  };
+
   const handleInstantProceedChange = async (checked: boolean) => {
     if (reviewMode === 'full') {
       await updateSettings({
@@ -1529,6 +1536,29 @@ export function LearningModeSettings({
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Ignore punctuation in the accuracy score — writing mode only */}
+          {reviewMode === 'full' && (
+            <div className="settings-row">
+              <div className="space-y-0.5">
+                <Label
+                  htmlFor="ignorePunctuation"
+                  className="text-sm font-medium"
+                >
+                  {t('ignorePunctuation')}
+                </Label>
+                <p className="text-muted-xs">
+                  {t('ignorePunctuationDescription')}
+                </p>
+              </div>
+              <Switch
+                id="ignorePunctuation"
+                checked={courseSettings.ignorePunctuation ?? false}
+                onCheckedChange={handleIgnorePunctuationChange}
+                className="mt-0.5"
+              />
             </div>
           )}
 

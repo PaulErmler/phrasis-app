@@ -108,6 +108,9 @@ export function useAudioPlayer(
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
+  // Declared up here (not next to its sibling prev*Refs by the merge effect)
+  // so it exists before the `pause` callback that also writes it.
+  const hasAutoPlayedForCardRef = useRef(false);
   const mergeAbortRef = useRef<AbortController | null>(null);
   const mediaSessionCleanupRef = useRef<(() => void) | null>(null);
   const languageCuesRef = useRef<LanguageCue[]>([]);
@@ -421,7 +424,6 @@ export function useAudioPlayer(
 
   const prevCardIdRef = useRef<string | null>(null);
   const prevCompositionKeyRef = useRef<string | null>(null);
-  const hasAutoPlayedForCardRef = useRef(false);
 
   useEffect(() => {
     const isCardChange = prevCardIdRef.current !== cardId;

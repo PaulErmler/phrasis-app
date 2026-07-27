@@ -114,6 +114,8 @@ export interface CourseSettings {
   reviewMode?: 'audio' | 'full';
   fullReviewTargetAudioMode?: 'always' | 'afterSubmit' | 'never';
   writingInputMode?: 'translate' | 'transcribe';
+  /** Writing mode: exclude punctuation from the accuracy score. Default false. */
+  ignorePunctuation?: boolean;
   // Scheduling mode
   schedulingMode?: 'learn_new' | 'learnAndReview' | 'radio';
   // Language order overrides

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useMutation, useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -77,10 +77,13 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
 
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  const orderedLanguages = [
-    ...baseLanguages.filter((l) => !targetLanguages.includes(l)),
-    ...targetLanguages,
-  ];
+  const orderedLanguages = useMemo(
+    () => [
+      ...baseLanguages.filter((l) => !targetLanguages.includes(l)),
+      ...targetLanguages,
+    ],
+    [baseLanguages, targetLanguages],
+  );
 
   const hasLanguages = orderedLanguages.length > 0;
 

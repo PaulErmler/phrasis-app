@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useImeSafeEnter } from '@/hooks/use-ime-safe-enter';
 import type { ChatStatus, FileUIPart } from 'ai';
 import {
   CornerDownLeftIcon,
@@ -813,11 +814,11 @@ export const PromptInputTextarea = ({
 }: PromptInputTextareaProps) => {
   const controller = useOptionalPromptInputController();
   const attachments = usePromptInputAttachments();
-  const [isComposing, setIsComposing] = useState(false);
+  const { compositionProps, isComposingEvent } = useImeSafeEnter();
 
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
     if (e.key === 'Enter') {
-      if (isComposing || e.nativeEvent.isComposing) {
+      if (isComposingEvent(e)) {
         return;
       }
       if (e.shiftKey) {
@@ -891,8 +892,7 @@ export const PromptInputTextarea = ({
     <InputGroupTextarea
       className={cn('field-sizing-content max-h-48 min-h-16', className)}
       name="message"
-      onCompositionEnd={() => setIsComposing(false)}
-      onCompositionStart={() => setIsComposing(true)}
+      {...compositionProps}
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       placeholder={placeholder}

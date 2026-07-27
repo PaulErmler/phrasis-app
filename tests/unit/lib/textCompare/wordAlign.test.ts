@@ -163,4 +163,35 @@ describe('alignWords', () => {
       expect(wordScore - combinedScore).toBeLessThan(0.1);
     });
   });
+
+  describe('ignorePunctuation', () => {
+    const OPTS = { ignorePunctuation: true };
+
+    it('scores a missing terminal period as perfect', () => {
+      const r = alignWords('Das ist ein Test.', 'Das ist ein Test', OPTS);
+      expect(scoreWordAlignment(r, OPTS)).toBe(1);
+    });
+
+    it('scores completely different punctuation as perfect', () => {
+      const r = alignWords('Yes, really!', 'Yes really...', OPTS);
+      expect(scoreWordAlignment(r, OPTS)).toBe(1);
+    });
+
+    it('keeps punctuation in the alignment so the diff can render it', () => {
+      const r = alignWords('Das ist ein Test.', 'Das ist ein Test', OPTS);
+      const punct = r.words.filter((w) => w.kind === 'punct');
+      expect(punct).toHaveLength(1);
+      expect(punct[0].expected).toBe('.');
+    });
+
+    it('forgives a missing apostrophe inside a word', () => {
+      const r = alignWords("I don't know", 'I dont know', OPTS);
+      expect(scoreWordAlignment(r, OPTS)).toBe(1);
+    });
+
+    it('still penalizes a wrong word', () => {
+      const r = alignWords('Das ist ein Test.', 'Das ist ein Buch', OPTS);
+      expect(scoreWordAlignment(r, OPTS)).toBeLessThan(1);
+    });
+  });
 });

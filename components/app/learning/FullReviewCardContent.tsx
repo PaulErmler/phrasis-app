@@ -19,8 +19,13 @@ import {
 } from '@/lib/constants/audioPlayback';
 import { DiffDisplay, computeAccuracy } from './DiffDisplay';
 import { ClickableWords } from './ClickableWords';
-import { getLocalizedLanguageNameByCode, getTextDirection } from '@/lib/languages';
+import {
+  getLanguageByCode,
+  getLocalizedLanguageNameByCode,
+  getTextDirection,
+} from '@/lib/languages';
 import { useButtonPlayback } from '@/hooks/use-button-playback';
+import { useImeSafeEnter } from '@/hooks/use-ime-safe-enter';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
 import { useActiveCue, type MergedPlayback } from '@/hooks/use-active-cue';
 import type { ClockBinding } from '@/hooks/use-karaoke-index';
@@ -68,6 +73,8 @@ interface FullReviewCardContentProps {
   hideBaseLanguages?: boolean;
   /** Un-blur base text once every target translation is submitted. */
   autoRevealBaseOnSubmit?: boolean;
+  /** Exclude punctuation from the accuracy score ("Ignore punctuation"). */
+  ignorePunctuation?: boolean;
   /**
    * Post-submit playback settings ("Translation Entered" timeline group), per
    * language. Missing entry = 1 play; speed falls back to the per-language
@@ -141,6 +148,7 @@ export function FullReviewCardContent({
   transcribeMode = false,
   hideBaseLanguages = false,
   autoRevealBaseOnSubmit = true,
+  ignorePunctuation = false,
   afterSubmitRepetitions,
   afterSubmitRepetitionPauses,
   afterSubmitPlaybackSpeeds,
@@ -258,11 +266,16 @@ export function FullReviewCardContent({
     let count = 0;
     for (const tr of targetTranslations) {
       const userText = inputs.get(tr.language)?.userText ?? '';
-      total += computeAccuracy(tr.text, userText, tr.language);
+      total += computeAccuracy(
+        tr.text,
+        userText,
+        tr.language,
+        ignorePunctuation,
+      );
       count++;
     }
     onAccuracyChangeRef.current?.(count > 0 ? Math.round(total / count) : null);
-  }, [allSubmitted, inputs, targetTranslations]);
+  }, [allSubmitted, inputs, targetTranslations, ignorePunctuation]);
 
   const onAudioPlayRef = useRef(onAudioPlay);
   onAudioPlayRef.current = onAudioPlay;
@@ -572,6 +585,7 @@ export function FullReviewCardContent({
                   isFirstTarget={index === 0}
                   allRevealed={allRevealed}
                   showRomanization={showRomanization}
+                  ignorePunctuation={ignorePunctuation}
                   highlightEnabled={highlightEnabled}
                   activeClip={activeClip}
                   clockBinding={clockBinding}
@@ -619,6 +633,7 @@ interface TargetLanguageInputProps {
   isFirstTarget?: boolean;
   allRevealed?: boolean;
   showRomanization?: boolean;
+  ignorePunctuation?: boolean;
   highlightEnabled: boolean;
   activeClip: ButtonPlaybackActive | null;
   clockBinding?: ClockBinding;
@@ -660,6 +675,7 @@ function TargetLanguageInput({
   isFirstTarget = false,
   allRevealed = false,
   showRomanization = true,
+  ignorePunctuation = false,
   highlightEnabled,
   activeClip,
   clockBinding,
@@ -674,6 +690,7 @@ function TargetLanguageInput({
 }: TargetLanguageInputProps) {
   const isActive = activeClip?.language === translation.language;
   const t = useTranslations('LearningMode');
+  const { compositionProps, isComposingEvent } = useImeSafeEnter();
   const [showClean, setShowClean] = useState(false);
   const autoPlayAudioRef = useRef<HTMLAudioElement | null>(null);
   // Read via ref inside the playback effect: the object is rebuilt each
@@ -782,7 +799,9 @@ function TargetLanguageInput({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !state.submitted) {
+    // IME users (ja/zh/ko/vi) press Enter to confirm a conversion — that
+    // keystroke is typing, not a submit. See `useImeSafeEnter`.
+    if (e.key === 'Enter' && !state.submitted && !isComposingEvent(e)) {
       e.preventDefault();
       onSubmit(translation.language);
     }
@@ -791,6 +810,10 @@ function TargetLanguageInput({
   const languageDisplayName = showLanguageLabel
     ? getLocalizedLanguageNameByCode(translation.language, locale)
     : null;
+
+  // BCP-47 tag (not the internal `zh_traditional`-style code) so the OS offers
+  // the right IME / keyboard layout when this field is focused.
+  const inputLang = getLanguageByCode(translation.language)?.displayCode;
 
   const hasUserText = !!state.userText.trim();
 
@@ -853,6 +876,7 @@ function TargetLanguageInput({
                 language={translation.language}
                 hideAccuracy={false}
                 hideErrors={showClean}
+                ignorePunctuation={ignorePunctuation}
               />
             </div>
             <div className="flex shrink-0 gap-2 pt-0.5">
@@ -954,6 +978,7 @@ function TargetLanguageInput({
                 language={translation.language}
                 hideAccuracy={false}
                 hideErrors={showClean}
+                ignorePunctuation={ignorePunctuation}
               />
             ) : (
               <ClickableWords
@@ -1051,7 +1076,9 @@ function TargetLanguageInput({
           value={state.userText}
           onChange={(e) => onInputChange(translation.language, e.target.value)}
           onKeyDown={handleKeyDown}
+          {...compositionProps}
           placeholder={placeholder}
+          lang={inputLang}
           dir={getTextDirection(translation.language)}
           className="flex-1 text-left"
           autoComplete="off"

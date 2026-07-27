@@ -1362,7 +1362,7 @@ describe("features/scheduling", () => {
         // After D plays once and catches up to 100, the next 3 plays should
         // each pick a different one of A/B/C before D could come up again.
         const t = convexTest(schema, modules);
-        const { cardIds } = await seedRadioDeck(t, [
+        await seedRadioDeck(t, [
           { counter: 100, text: "A" },
           { counter: 100, text: "B" },
           { counter: 100, text: "C" },

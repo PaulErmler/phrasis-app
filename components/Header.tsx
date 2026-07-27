@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { LanguageSwitcher } from './LanguageSwitcher';
 
@@ -14,7 +15,7 @@ export function Header() {
             href="/"
             className="flex items-center gap-3 hover:opacity-80 transition-opacity"
           >
-            <img
+            <Image
               src="/icons/icon.svg"
               alt="Flexling Logo"
               className="w-10 h-10"

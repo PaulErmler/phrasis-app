@@ -1163,6 +1163,7 @@ export const updateCourseSettings = mutation({
     writingInputMode: v.optional(
       v.union(v.literal('translate'), v.literal('transcribe')),
     ),
+    ignorePunctuation: v.optional(v.boolean()),
     schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))),
     studyContentFilter: v.optional(v.union(v.literal('custom'), v.literal('course'), v.literal('both'))),
   },
@@ -1235,6 +1236,7 @@ export const updateCourseSettings = mutation({
       'reviewMode',
       'fullReviewTargetAudioMode',
       'writingInputMode',
+      'ignorePunctuation',
       'schedulingMode',
       'studyContentFilter',
     ] as const;
@@ -1363,6 +1365,7 @@ export const updateCourseSettings = mutation({
         reviewMode: args.reviewMode,
         fullReviewTargetAudioMode: args.fullReviewTargetAudioMode,
         writingInputMode: args.writingInputMode,
+        ignorePunctuation: args.ignorePunctuation,
         schedulingMode: args.schedulingMode,
         studyContentFilter: args.studyContentFilter,
       });

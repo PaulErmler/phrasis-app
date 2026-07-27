@@ -490,6 +490,7 @@ export function LearningMode({
         autoRevealBaseOnSubmit={
           state.courseSettings.autoRevealBaseOnSubmit ?? true
         }
+        ignorePunctuation={state.courseSettings.ignorePunctuation ?? false}
         suppressAutoPlay={state.settingsOpen}
         allRevealed={fullReviewRevealed}
         onAllSubmittedChange={setAllSubmitted}
@@ -747,7 +748,6 @@ function NoCardsDueWithFilter({
   );
   const updateSettings = useUpdateStudyContentFilter();
 
-  const isFilteredOut = emptyReason?.reason === 'filtered_out';
   const isDeckEmpty = emptyReason?.reason === 'no_cards';
   const activeFilter = emptyReason?.reason === 'filtered_out'
     ? emptyReason.activeFilter

@@ -79,10 +79,12 @@ beforeEach(() => {
   sessionStorage.clear();
   setVisibility('visible');
 
-  Object.defineProperty(window.location, 'reload', {
+  // jsdom's Location methods are non-configurable, so the whole object has to
+  // be swapped rather than the reload method spied on.
+  Object.defineProperty(window, 'location', {
     configurable: true,
     writable: true,
-    value: reloadMock,
+    value: { ...window.location, reload: reloadMock },
   });
 });
 
@@ -191,6 +193,28 @@ describe('AppUpdateGate', () => {
     });
   });
 
+  it('does not resurrect the toast on later re-renders', async () => {
+    // The gate sits near the root, so it re-renders often. A dismissed toast
+    // must stay dismissed.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(mockVersionResponse(NEWER_BUILD)),
+    );
+
+    const { rerender } = await renderGate();
+    await act(async () => {
+      vi.advanceTimersByTime(ESCALATE_AFTER_MS);
+    });
+    expect(toastInfoMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      rerender(<AppUpdateGate>{null}</AppUpdateGate>);
+      vi.advanceTimersByTime(ESCALATE_AFTER_MS);
+    });
+
+    expect(toastInfoMock).toHaveBeenCalledTimes(1);
+  });
+
   it('fails open when the version endpoint is unreachable', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
 
@@ -217,14 +241,34 @@ describe('AppUpdateGate', () => {
     expect(toastInfoMock).not.toHaveBeenCalled();
   });
 
-  it('stops auto-reloading if a recent attempt at the same build did not stick', async () => {
+  it('stops auto-reloading if an attempt at the same build did not stick', async () => {
     // Simulates coming back from a reload still running the old bundle — the
     // signal that something upstream is serving a stale document. Reloading
-    // again would loop.
-    sessionStorage.setItem(
-      'app-update:reload-attempt',
-      JSON.stringify({ toBuildId: NEWER_BUILD, at: NOW }),
+    // again would loop, and no amount of elapsed time makes a retry sensible,
+    // so the guard is one-shot per build rather than time-windowed.
+    sessionStorage.setItem('app-update:reload-attempt', NEWER_BUILD);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(mockVersionResponse(NEWER_BUILD)),
     );
+
+    await renderGate();
+    await goAwayAndReturn(HIDDEN_LONG_ENOUGH_MS);
+    expect(reloadMock).not.toHaveBeenCalled();
+
+    // Long enough later that any plausible cooldown would have lapsed.
+    await goAwayAndReturn(6 * 60 * MINUTE);
+    expect(reloadMock).not.toHaveBeenCalled();
+
+    // ...and escalates to the toast instead, so the user is not left stranded.
+    await act(async () => {
+      vi.advanceTimersByTime(ESCALATE_AFTER_MS);
+    });
+    expect(toastInfoMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('reloads for a different build even after one attempt did not stick', async () => {
+    sessionStorage.setItem('app-update:reload-attempt', 'some-older-build');
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(mockVersionResponse(NEWER_BUILD)),
@@ -233,13 +277,7 @@ describe('AppUpdateGate', () => {
     await renderGate();
     await goAwayAndReturn(HIDDEN_LONG_ENOUGH_MS);
 
-    expect(reloadMock).not.toHaveBeenCalled();
-
-    // ...and escalates to the toast instead, so the user is not left stranded.
-    await act(async () => {
-      vi.advanceTimersByTime(ESCALATE_AFTER_MS);
-    });
-    expect(toastInfoMock).toHaveBeenCalledTimes(1);
+    expect(reloadMock).toHaveBeenCalledTimes(1);
   });
 
   it('recovers from a chunk load failure exactly once', async () => {

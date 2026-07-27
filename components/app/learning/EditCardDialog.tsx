@@ -26,6 +26,7 @@ import { FEATURE_IDS } from '@/convex/features/featureIds';
 import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
 import { MAX_CARD_TEXT_LENGTH } from '@/lib/constants/learning';
 import { cn, isPaymentPastDueError } from '@/lib/utils';
+import { useReloadBlock } from '@/components/app/AppUpdateGate';
 import type { CardTranslation } from './types';
 
 interface EditCardDialogProps {
@@ -48,6 +49,10 @@ export function EditCardDialog({
   const [editedTexts, setEditedTexts] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
+
+  // The dialog can be opened from LibraryView, outside LearnView's blanket
+  // block, and its draft lives only in this state.
+  useReloadBlock(open);
 
   useLayoutEffect(() => {
     if (open) {

@@ -585,6 +585,8 @@
       "autoPlayDescriptionTranscribe": "Auto-play audio when translation is entered",
       "autoRevealBaseOnSubmit": "Auto-reveal on submit",
       "autoRevealBaseOnSubmitDescription": "Unblur base text once all translations are submitted",
+      "ignorePunctuation": "Ignore punctuation",
+      "ignorePunctuationDescription": "Don't count commas, full stops and other punctuation towards the accuracy score",
       "instantProceed": "Instant proceed on rating",
       "instantProceedDescription": "Advance to the next sentence immediately when a rating button is clicked"
     }
@@ -825,6 +827,7 @@
     "planScheduled": "Plan Scheduled",
     "updatePlan": "Update Plan",
     "currentPlan": "Current Plan",
+    "continueWithFree": "Continue with Free",
     "purchase": "Purchase",
     "getStarted": "Get started",
     "renew": "Renew",
@@ -844,7 +847,15 @@
     "freeTrialBadge": "{days}-day free trial",
     "billedAnnually": "{price} billed annually",
     "annualSaveHint": "Save 25%",
-    "mostPopular": "Most Popular"
+    "mostPopular": "Most Popular",
+    "priorityFeatureAccess": "Priority access to new features",
+    "prioritySupport": "Priority support",
+    "planDescriptions": {
+      "free": "Perfect for getting started",
+      "basic": "Everything you need to learn one language.",
+      "pro": "Everything you need to learn multiple languages.",
+      "ultra": "Maximum customization and AI features."
+    }
   },
   "Checkout": {
     "confirm": "Confirm",
@@ -1144,10 +1155,14 @@
       "next": "Next",
       "done": "Done"
     },
+    "testimonials": {
+      "title": "Loved by language learners",
+      "subtitle": "Here's what other learners say about Flexling."
+    },
     "planPick": {
       "title": "Thank you for joining",
-      "subtitle": "Try Basic or Pro free for 7 days — no commitment. You can change or cancel anytime.",
-      "skip": "Maybe later — continue testing"
+      "subtitle": "Try Basic, Pro or Ultra free for 7 days — no commitment. You can change or cancel anytime.",
+      "skip": "Maybe later — continue free"
     },
     "difficulty": {
       "title": "How much do you already know?",

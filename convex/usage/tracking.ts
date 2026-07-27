@@ -1,7 +1,7 @@
 "use node";
 
 import { v } from 'convex/values';
-import { internalAction } from '../_generated/server';
+import { internalAction, type ActionCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { type FeatureState } from './helpers';
 import {
@@ -238,7 +238,7 @@ export const trackUsage = internalAction({
  * delinquent path, so healthy syncs stay at one request.
  */
 async function pushCustomerState(
-  ctx: { runMutation: (ref: any, args: any) => Promise<any> },
+  ctx: Pick<ActionCtx, 'runMutation'>,
   secretKey: string,
   userId: string,
   customerData: AutumnCustomerResponse,
@@ -378,7 +378,7 @@ export const syncQuotasInternal = internalAction({
 });
 
 export async function syncQuotasForUser(
-  ctx: { runMutation: (ref: any, args: any) => Promise<any> },
+  ctx: Pick<ActionCtx, 'runMutation'>,
   userId: string,
 ): Promise<void> {
   const secretKey = getSecretKey();

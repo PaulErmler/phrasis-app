@@ -65,15 +65,36 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/refs': 'off',
       'import/no-anonymous-default-export': 'off',
-      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
       '@typescript-eslint/no-explicit-any': 'warn',
-      // Add indentation rules
-      indent: ['error', 2], // 2-space indentation for all files
     },
     settings: {
       react: {
         version: 'detect',
       },
+    },
+  },
+
+  // Tests and vendored AI-SDK UI scaffolding: `any` and plain `<img>` are
+  // acceptable there.
+  {
+    files: [
+      'tests/**',
+      'convex/tests/**',
+      '**/*.test.*',
+      'components/ai-elements/**',
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@next/next/no-img-element': 'off',
     },
   },
 ]);

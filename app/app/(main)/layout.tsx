@@ -22,7 +22,6 @@ import { SettingsView } from '@/components/app/SettingsView';
 import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
 import { HelpDialog } from '@/components/app/HelpDialog';
-import { AppLoadingSplash } from '@/components/LogoSpinner';
 import { ViewErrorBoundary } from '@/components/app/ViewErrorBoundary';
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
@@ -70,7 +69,9 @@ export default function MainLayout({
   const t = useTranslations('AppPage');
   const locale = useLocale();
 
-  const settings = usePreloadedQuery(preloadedSettings);
+  // Result unused, but the hook call keeps the preloaded-settings
+  // subscription mounted for the lifetime of the layout.
+  const _settings = usePreloadedQuery(preloadedSettings);
   // activeCourse comes from AppDataProvider's always-mounted subscription —
   // subscribing here instead would start cold after the onboarding soft nav
   // and flash the stale preloaded null (no-course empty state).

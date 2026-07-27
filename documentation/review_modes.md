@@ -30,11 +30,24 @@ A text-input-based review where the user types the translation for each target l
 1. Base language translations are shown (read-only) with audio buttons.
 2. For each target language, a text input is displayed with an audio button and a submit button. When there is only one target language, the language label is hidden. When there are multiple, the full localized language name is shown.
 3. The user types their answer and submits (per-language submit button, or Enter key).
-4. On submit, the input is replaced inline with a diff view powered by [jsdiff](https://github.com/kpdecker/jsdiff) (`diffChars`).
-   - **Green** spans: correct text (matching between expected and actual).
-   - **Red** spans: mistakes (text the user added that is not in the expected text).
-   - **Muted/gray** spans: missing text (expected text the user did not include).
-   - An accuracy percentage is shown below the diff.
+   - Enter is guarded by `useImeSafeEnter` (`hooks/use-ime-safe-enter.ts`): for
+     languages typed through an IME (ja, zh, ko, vi) Enter *confirms a
+     conversion* rather than submitting, so the keystroke is swallowed while a
+     composition is in flight. The next Enter submits.
+4. On submit, the input is replaced inline with a diff view from `lib/textCompare/`.
+   - Languages **with** word boundaries use `alignWords` (Needleman–Wunsch over
+     `Intl.Segmenter` word tokens, Damerau–Levenshtein within a token) rendered
+     by `WordDiff`. Tags: `equal` / `typo` (partial credit) / `wrong` /
+     `missing` / `extra`.
+   - Languages **without** word boundaries (zh, zh_traditional, yue, ja, th —
+     `hasWordBoundaries: false` in `lib/languages.ts`) fall back to a
+     grapheme-level `charDiff` built on [jsdiff](https://github.com/kpdecker/jsdiff).
+   - **Green**: correct. **Amber**: typo. **Red**: wrong or extra.
+     **Dashed**: missing.
+   - An accuracy percentage is shown below the diff (`scoreWordAlignment`, or
+     `1 - distance/length` on the char path). Punctuation counts at
+     `PUNCT_WEIGHT` (0.25 of a word) unless "Ignore punctuation" is on, in
+     which case it is zero-weighted and rendered muted rather than as an error.
 5. The audio play button remains visible after submission. The user rates the card difficulty and advances.
 
 ### Mode-specific settings
@@ -68,7 +81,8 @@ Cards skip the pre-review phase entirely. All cards are rated using FSRS ratings
 |-----------|------|---------|
 | `ReviewModeSwitcher` | `components/app/learning/ReviewModeSwitcher.tsx` | Split button at the top of settings to toggle between Audio and Full Review modes. |
 | `FullReviewCardContent` | `components/app/learning/FullReviewCardContent.tsx` | Card view for full review mode with text inputs and diff display. |
-| `DiffDisplay` | `components/app/learning/DiffDisplay.tsx` | Renders character-level diff between expected and actual text using jsdiff (`diffChars`). |
+| `DiffDisplay` | `components/app/learning/DiffDisplay.tsx` | Picks the word- or character-level diff based on `hasWordBoundaries`, and exports `computeAccuracy`. |
+| `WordDiff` | `components/app/learning/WordDiff.tsx` | Word-aligned diff chips for space-separated scripts. |
 
 ### Data model changes
 
@@ -76,6 +90,7 @@ Two fields added to the `courseSettings` table:
 
 - `reviewMode` (`'audio' | 'full'`, optional, defaults to `'audio'`)
 - `fullReviewTargetAudioMode` (`'always' | 'afterSubmit' | 'never'`, optional, defaults to `'afterSubmit'`)
+- `ignorePunctuation` (`boolean`, optional, defaults to `false`) — exclude punctuation from the accuracy score
 
 ### Backend changes
 
