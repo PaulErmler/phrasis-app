@@ -6,6 +6,7 @@ import { useMutation, useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { ConvexError } from 'convex/values';
 import { getUserTimezone } from '@/lib/timezone';
+import { useReloadBlock } from '@/components/app/AppUpdateGate';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -107,6 +108,10 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
     userEditedLangs.size > 0 ||
     orderedLanguages.some((lang) => (texts[lang] ?? '').trim().length > 0);
   const canReset = hasLanguages && hasAnythingToReset && !isSaving && !isAutoFilling;
+
+  // An unsaved draft lives in component state only — a reload would silently
+  // discard whatever the user has typed.
+  useReloadBlock(hasAnythingToReset || isSaving || isAutoFilling);
 
   const handleReset = useCallback(() => {
     setTexts({});

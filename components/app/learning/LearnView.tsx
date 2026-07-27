@@ -18,6 +18,7 @@ import { ChatPanel } from '@/components/chat/ChatPanel';
 import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
 import { useCardApprovals } from '@/hooks/use-card-approvals';
 import { useScreenWakeLock } from '@/hooks/use-screen-wake-lock';
+import { useReloadBlock } from '@/components/app/AppUpdateGate';
 import { useThread } from '@/hooks/use-thread';
 import { Loader } from '@/components/ai-elements/loader';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
@@ -218,6 +219,11 @@ function LearnViewInner({
     batchSizeOverride: mode === 'onboarding' ? 2 : undefined,
   });
   useScreenWakeLock(state.status === 'reviewing');
+  // Hold off the silent update reload for the whole session, not just while
+  // reviewing: the merged audio plays through a detached `new Audio()` that
+  // keeps going when the tab is hidden ("listen all day"), so a hidden-long-
+  // enough tab is emphatically not idle here.
+  useReloadBlock(true);
   const reviewMode = state.status !== 'loading' ? (state.courseSettings?.reviewMode ?? 'audio') : 'audio';
   const schedulingMode = state.status !== 'loading'
     ? (state.courseSettings?.schedulingMode ?? 'learnAndReview')

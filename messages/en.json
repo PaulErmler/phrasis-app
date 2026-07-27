@@ -1357,6 +1357,11 @@
     "description": "An unexpected error occurred. Please try again.",
     "retry": "Try again"
   },
+  "AppUpdate": {
+    "title": "Update available",
+    "description": "A newer version of Flexling is ready. Reload to get it.",
+    "reload": "Reload"
+  },
   "EditCard": {
     "title": "Edit Sentence",
     "cancel": "Cancel",
