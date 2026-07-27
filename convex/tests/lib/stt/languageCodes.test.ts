@@ -44,6 +44,7 @@ const EXPECTED_AZURE: Record<string, string> = {
   ja: 'ja-JP',
   ko: 'ko-KR',
   vi: 'vi-VN',
+  vi_south: 'vi-VN',
   th: 'th-TH',
   id: 'id-ID',
   sv: 'sv-SE',

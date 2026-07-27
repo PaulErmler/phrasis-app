@@ -6,6 +6,12 @@ import { CREDIT_COSTS, FEATURE_IDS, type FeatureId } from '../features/featureId
 import { getActiveCourses } from '../db/courses';
 import { getUserSettings } from '../db/users';
 
+/**
+ * Thrown by `assertBillingCurrent` while a payment is past due. Same
+ * `error.data.code` contract as USAGE_LIMIT / QUOTA_NOT_SYNCED below.
+ */
+export const PAYMENT_PAST_DUE = 'PAYMENT_PAST_DUE';
+
 export type FeatureState = {
   balance: number;
   included: number;
@@ -61,18 +67,12 @@ function resolveQuotaTarget(
   return { targetFeatureId: featureId, targetAmount: amount };
 }
 
-/**
- * Check whether the user has enough quota for the given feature.
- * Returns { allowed, balance } without modifying anything.
- * If no quota doc or feature entry exists, returns allowed=false.
- */
-export async function checkQuota(
-  ctx: QueryCtx | MutationCtx,
-  userId: string,
+/** `checkQuota` against an already-loaded doc — no further reads. */
+function checkQuotaForDoc(
+  doc: Doc<'usageQuotas'> | null,
   featureId: string,
-  amount: number = 1,
-): Promise<{ allowed: boolean; balance: number; synced: boolean }> {
-  const doc = await getQuotaDoc(ctx, userId);
+  amount: number,
+): { allowed: boolean; balance: number; synced: boolean } {
   if (!doc) {
     return { allowed: false, balance: 0, synced: false };
   }
@@ -93,6 +93,53 @@ export async function checkQuota(
     balance: feature.balance,
     synced: true,
   };
+}
+
+/**
+ * Check whether the user has enough quota for the given feature.
+ * Returns { allowed, balance } without modifying anything.
+ * If no quota doc or feature entry exists, returns allowed=false.
+ */
+export async function checkQuota(
+  ctx: QueryCtx | MutationCtx,
+  userId: string,
+  featureId: string,
+  amount: number = 1,
+): Promise<{ allowed: boolean; balance: number; synced: boolean }> {
+  return checkQuotaForDoc(await getQuotaDoc(ctx, userId), featureId, amount);
+}
+
+/**
+ * Hard gate for anything that spends money. Throws while Autumn reports the
+ * user's plan as past due — there is no grace window.
+ *
+ * Autumn keeps granting entitlements during the (multi-week) Stripe retry
+ * period, so the local balances alone would happily let a delinquent user
+ * keep generating billable work. Checked BEFORE the balance check in
+ * `consumeQuota` so the client gets PAYMENT_PAST_DUE (→ the overdue dialog)
+ * rather than a confusing USAGE_LIMIT upgrade paywall if entitlements have
+ * also been revoked.
+ *
+ * Deliberately not applied to `releaseQuota`/`incrementQuota` (they refund
+ * the user), to `chargeExtraChatCredits` (the work is already done), or to
+ * quota-free actions like card review.
+ *
+ * Takes the already-loaded doc rather than a ctx: the one caller has it in
+ * hand, and a ctx-loading wrapper would silently double the reads.
+ */
+export function assertBillingCurrent(
+  doc: Doc<'usageQuotas'> | null,
+  featureId?: string,
+): void {
+  // `pastDueSince` is the single source of truth: syncAllFeatures sets and
+  // clears it from Autumn's `anyPastDue` on every sync, whereas `planStatus`
+  // is informational and can go stale when the plan identity is unknown.
+  if (doc?.pastDueSince === undefined) return;
+  throw new ConvexError({
+    code: PAYMENT_PAST_DUE,
+    message: 'Access is paused until the outstanding payment is completed.',
+    ...(featureId ? { featureId } : {}),
+  });
 }
 
 /**
@@ -129,7 +176,21 @@ export async function decrementQuota(
   featureId: string,
   amount: number = 1,
 ): Promise<number> {
-  const doc = await getQuotaDoc(ctx, userId);
+  return decrementQuotaForDoc(
+    ctx,
+    await getQuotaDoc(ctx, userId),
+    featureId,
+    amount,
+  );
+}
+
+/** `decrementQuota` against an already-loaded doc — no further reads. */
+async function decrementQuotaForDoc(
+  ctx: MutationCtx,
+  doc: Doc<'usageQuotas'> | null,
+  featureId: string,
+  amount: number,
+): Promise<number> {
   if (!doc) {
     throw new ConvexError(`No quota doc for user. Sync quotas first.`);
   }
@@ -195,7 +256,13 @@ export async function consumeQuota(
   featureId: string,
   amount: number = 1,
 ): Promise<{ balance: number }> {
-  const { allowed, balance, synced } = await checkQuota(ctx, userId, featureId, amount);
+  // Single read, shared by the billing gate, the balance check and the
+  // decrement below.
+  const doc = await getQuotaDoc(ctx, userId);
+
+  assertBillingCurrent(doc, featureId);
+
+  const { allowed, balance, synced } = checkQuotaForDoc(doc, featureId, amount);
 
   if (!synced) {
     throw new ConvexError({
@@ -214,7 +281,7 @@ export async function consumeQuota(
     });
   }
 
-  const newBalance = await decrementQuota(ctx, userId, featureId, amount);
+  const newBalance = await decrementQuotaForDoc(ctx, doc, featureId, amount);
 
   await ctx.scheduler.runAfter(0, internal.usage.tracking.trackUsage, {
     userId,
@@ -302,6 +369,14 @@ export const syncAllFeatures = internalMutation({
     planId: v.optional(v.string()),
     planName: v.optional(v.string()),
     planStatus: v.optional(v.string()),
+    // Whether ANY current plan is delinquent — see derivePlan. This, not
+    // planStatus, drives the payment block.
+    anyPastDue: v.boolean(),
+    // Autumn returned no plans at all, so we don't know the billing state:
+    // leave every plan field (including pastDueSince) untouched.
+    productsMissing: v.boolean(),
+    // Hosted page for the outstanding invoice, when past due.
+    pastDueInvoiceUrl: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -310,31 +385,77 @@ export const syncAllFeatures = internalMutation({
 
     const newIncluded = args.features[FEATURE_IDS.COURSES]?.included;
 
-    const planFields =
-      args.planId !== undefined
-        ? {
-          planId: args.planId,
-          planName: args.planName,
-          planStatus: args.planStatus,
-        }
-        : {};
+    // E2E-only: a billingTestOverrides row forces the effective plan status
+    // (dev/test deployments with E2E_TEST_HOOKS=1 only). Applied here — the
+    // single funnel for both sync paths — so app reloads re-apply the
+    // override on top of real Autumn data instead of clearing it. It must
+    // also drive `anyPastDue`, since that is what the block keys on.
+    let effectiveStatus = args.planStatus;
+    let pastDue = args.anyPastDue;
+    if (process.env.E2E_TEST_HOOKS === '1') {
+      const override = await ctx.db
+        .query('billingTestOverrides')
+        .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+        .first();
+      if (override) {
+        effectiveStatus = override.planStatus;
+        pastDue = override.planStatus === 'past_due';
+      }
+    }
+
+    // First-seen timestamp for the overdue state: set on the transition into
+    // past_due, kept while it lasts, cleared on recovery (undefined in a
+    // patch removes the field). Tracked independently of the plan identity
+    // fields, so a customer whose plans all expire still recovers rather
+    // than staying blocked on a stale status.
+    const billingFields = args.productsMissing
+      ? {}
+      : {
+        ...(args.planId !== undefined
+          ? {
+            planId: args.planId,
+            planName: args.planName,
+            planStatus: effectiveStatus,
+          }
+          : {}),
+        pastDueSince: pastDue ? (doc?.pastDueSince ?? now) : undefined,
+        // Keep the last known URL while still past due — a later sync that
+        // didn't expand invoices shouldn't blank the pay button.
+        pastDueInvoiceUrl: pastDue
+          ? (args.pastDueInvoiceUrl ?? doc?.pastDueInvoiceUrl)
+          : undefined,
+      };
 
     if (doc) {
       await ctx.db.patch(doc._id, {
         features: args.features,
         lastSyncedAt: now,
-        ...planFields,
+        ...billingFields,
       });
     } else {
       await ctx.db.insert('usageQuotas', {
         userId: args.userId,
         features: args.features,
         lastSyncedAt: now,
-        ...planFields,
+        ...billingFields,
       });
     }
 
-    if (newIncluded !== undefined) {
+    // Never auto-archive while the payment is past due. Autumn can revoke
+    // entitlements during dunning (an org-level option), which would shrink
+    // `included` and silently archive the user's courses — and paying the
+    // invoice would not bring them back. Wait until billing is healthy.
+    //
+    // Keyed on the state that is actually persisted, not on `pastDue`: a
+    // `productsMissing` reply leaves `pastDueSince` in place (the user stays
+    // blocked) while carrying `anyPastDue: false`, so trusting the incoming
+    // flag alone would archive courses in exactly the window this guard
+    // exists to protect.
+    const stillPastDue = args.productsMissing
+      ? doc?.pastDueSince !== undefined
+      : pastDue;
+
+    if (newIncluded !== undefined && !stillPastDue) {
       const activeCourses = await getActiveCourses(ctx, args.userId);
       const overLimit = activeCourses.length > newIncluded;
       if (overLimit) {

@@ -23,7 +23,7 @@ import { FEATURE_IDS } from '@/convex/features/featureIds';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import LowQuotaDialog from '@/components/autumn/low-quota-dialog';
 import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
-import { cn } from '@/lib/utils';
+import { cn, isPaymentPastDueError } from '@/lib/utils';
 
 /**
  * Compact single-row chat-input surface used on the home view. Matches the
@@ -96,6 +96,12 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
         router.push(`/app/chat/${threadId}`);
       }
     } catch (error) {
+      // Silent: the reactive payment-overdue dialog is the canonical
+      // surface for this state (see isPaymentPastDueError).
+      if (isPaymentPastDueError(error)) {
+        setIsProcessing(false);
+        return;
+      }
       if (
         error instanceof ConvexError &&
         (error.data as { code?: string })?.code === 'USAGE_LIMIT'

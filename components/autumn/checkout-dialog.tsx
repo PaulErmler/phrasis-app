@@ -32,7 +32,6 @@ import { cn } from "@/lib/utils";
 import { getCheckoutContent } from "@/lib/autumn/checkout-content";
 import {
   checkoutTrialParams,
-  type CustomerProductLite,
   findCurrentPaidProduct,
   getTrialState,
 } from "@/lib/autumn/trial-eligibility";
@@ -106,9 +105,7 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
   // plans; the customer's own current_period_end is the reliable source
   // for period-end-anchored dates (see getCheckoutContent opts doc).
   const currentPeriodEndsAt =
-    findCurrentPaidProduct(
-      customer?.products as CustomerProductLite[] | undefined,
-    )?.current_period_end ?? undefined;
+    findCurrentPaidProduct(customer?.products)?.currentPeriodEnd;
   const { title, message } = getCheckoutContent(checkoutResult, t, trialState, {
     currentPeriodEndsAt,
     locale,

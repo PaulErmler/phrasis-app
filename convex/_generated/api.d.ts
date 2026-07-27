@@ -100,6 +100,7 @@ import type * as types from "../types.js";
 import type * as usage_actions from "../usage/actions.js";
 import type * as usage_helpers from "../usage/helpers.js";
 import type * as usage_queries from "../usage/queries.js";
+import type * as usage_testing from "../usage/testing.js";
 import type * as usage_tracking from "../usage/tracking.js";
 
 import type {
@@ -201,6 +202,7 @@ declare const fullApi: ApiFromModules<{
   "usage/actions": typeof usage_actions;
   "usage/helpers": typeof usage_helpers;
   "usage/queries": typeof usage_queries;
+  "usage/testing": typeof usage_testing;
   "usage/tracking": typeof usage_tracking;
 }>;
 

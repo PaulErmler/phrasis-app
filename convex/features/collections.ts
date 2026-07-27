@@ -460,7 +460,11 @@ async function scheduleMissingTranslationsForText(
  * Dedup comes from the existing per-(textId, language) claims, so re-calls
  * while jobs are in flight are cheap no-ops. Deliberately not quota-gated:
  * translations are the cheap part; audio (the dominant cost) only happens on
- * an explicit audio-icon click or once a text becomes a card.
+ * an explicit audio-icon click or once a text becomes a card. Also
+ * deliberately not gated by `assertBillingCurrent` while past due (decided
+ * 2026-07-26) — same rationale as ensureCardContent in decks.ts: the
+ * pipeline self-heals content, and enforcement lives at the consumeQuota
+ * spend boundary plus the app-wide overdue dialog.
  */
 export const requestPreviewTranslations = mutation({
   args: {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation } from 'convex/react';
 import { ConvexError } from 'convex/values';
+import { isPaymentPastDueError } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTranslations, useLocale } from 'next-intl';
 import { api } from '@/convex/_generated/api';
@@ -311,6 +312,11 @@ export function useImportController(onSuccess?: () => void): ImportController {
         onSuccess?.();
       }
     } catch (err) {
+      // Silent: the reactive payment-overdue dialog is the canonical
+      // surface for this state (see isPaymentPastDueError).
+      if (isPaymentPastDueError(err)) {
+        return;
+      }
       if (
         err instanceof ConvexError &&
         typeof err.data === 'object' &&

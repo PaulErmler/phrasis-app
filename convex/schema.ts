@@ -978,6 +978,28 @@ export default defineSchema({
     planId: v.optional(v.string()),
     planName: v.optional(v.string()),
     planStatus: v.optional(v.string()),
+    // When the billing state first became past due (ms). Set on the
+    // transition into past_due, kept while it lasts, cleared on recovery.
+    // There is deliberately NO grace window: while this field is set,
+    // `assertBillingCurrent` (usage/helpers.ts) fails every quota-consuming
+    // mutation and the dunning dialog hard-blocks the UI. The timestamp
+    // itself only feeds the dialog's "overdue since {date}" copy; its
+    // presence is the single source of truth for the block.
+    pastDueSince: v.optional(v.number()),
+    // Stripe-hosted page for the outstanding invoice (from Autumn's
+    // ?expand=invoices). The overdue dialog's primary CTA — paying this is
+    // what actually settles the debt; the billing portal only swaps cards.
+    pastDueInvoiceUrl: v.optional(v.string()),
+  }).index('by_userId', ['userId']),
+
+  // E2E-only planStatus overrides, applied inside syncAllFeatures when the
+  // deployment has E2E_TEST_HOOKS=1 (dev/test only — see usage/testing.ts).
+  // Needed because a genuine past_due can't be produced synchronously in
+  // Stripe test mode (verified July 2026: a failed attach charge voids the
+  // invoice and drops the products instead of going past_due).
+  billingTestOverrides: defineTable({
+    userId: v.string(),
+    planStatus: v.string(),
   }).index('by_userId', ['userId']),
 
   // Admin allowlist for the /app/admin dashboard. The gate (requireAdmin in

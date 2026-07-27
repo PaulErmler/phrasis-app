@@ -777,6 +777,23 @@
     "noUpgradeAvailableCap": "You've almost reached your maximum number of {featureName}. Contact us at support@flexling.com for additional capacity.",
     "contactUs": "Contact Us"
   },
+  "PaymentOverdue": {
+    "title": "Payment overdue",
+    "description": "Your last payment failed. Please update your payment method to keep your subscription active.",
+    "blockedDescription": "Your payment has been overdue since {date}. Access is paused until your payment is completed.",
+    "payInvoiceButton": "Pay invoice",
+    "payButton": "Update payment method",
+    "portalError": "Could not open the billing portal. Please try again.",
+    "cancelButton": "Cancel subscription",
+    "cancelTitle": "Cancel your subscription?",
+    "cancelWarning": "You'll move to the Free plan straight away and won't be charged. {count, plural, one {# course will be archived} other {# courses will be archived}} — only your active course stays available. You can restore them by subscribing again.",
+    "cancelWarningNoCourses": "You'll move to the Free plan straight away and won't be charged. Your Free plan includes one active course.",
+    "cancelConfirm": "Cancel subscription",
+    "cancelSuccess": "Your subscription was cancelled. You're now on the Free plan.",
+    "cancelError": "Could not cancel your subscription. Please try again.",
+    "paymentReceived": "Payment received — your subscription stays active.",
+    "back": "Back"
+  },
   "Paywall": {
     "loading": "Loading",
     "confirm": "Confirm",

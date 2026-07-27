@@ -1168,6 +1168,37 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationVersion: 2,
   },
   {
+    code: 'vi_south',
+    displayCode: 'vi-VN',
+    regionLabel: 'Southern Vietnam',
+    // Gemini has no southern-specific locale — `vi-VN` is the only Vietnamese
+    // tag it takes — so the dialect is named in the prompt via `ttsPromptName`
+    // (the ar_lev / sw_tz pattern). Azure Fast Transcription likewise only
+    // lists `vi-VN`; it transcribes southern speech fine, so STT stays on.
+    geminiBcp47: 'vi-VN',
+    azureSttLocale: 'vi-VN',
+    googleTranslateCode: 'vi',
+    // Explicit: the default would be the internal code `vi_south`, which is not
+    // a valid Intl locale for the answer comparator's segmenter.
+    compareLocale: 'vi-VN',
+    displayNameOverrides: { en: 'Vietnamese (Southern)', de: 'Vietnamesisch (Süd)' },
+    name: 'Vietnamese (Southern)',
+    nativeName: 'Tiếng Việt (miền Nam)',
+    flag: '🇻🇳',
+    category: 'asian-southeast',
+    llmSupportTier: 'tier1',
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Southern Vietnamese',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+    // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
+    // so the model produces Southern vocabulary/particles, not a regionless mix.
+    translationName: 'Southern Vietnamese',
+    translationPromptNotes:
+      'Southern (Saigon) Vietnamese vocabulary and particles.',
+  },
+  {
     code: 'th',
     displayCode: 'th',
     regionLabel: 'Thailand',

@@ -10,10 +10,13 @@ import CheckoutDialog from "@/components/autumn/checkout-dialog";
 import { getPricingTableContent } from "@/lib/autumn/pricing-table-content";
 import {
   checkoutTrialParams,
-  findCurrentPaidProduct,
   getTrialState,
-  type CustomerProductLite,
 } from "@/lib/autumn/trial-eligibility";
+import {
+  findCurrentPaidPlan,
+  normalizePlans,
+  type AutumnPlan,
+} from "@/lib/autumn/customer-shape";
 import { FEATURE_META, getFeatureI18nKey, getFeatureDisplayCount, isFeatureHidden, isFeatureDisplayedAsUnlimited, isFeatureConsumable } from "@/lib/features/feature-meta";
 import type { Product, ProductItem } from "autumn-js";
 import { Loader2 } from "lucide-react";
@@ -92,11 +95,12 @@ export default function PricingTable({
   // Annual view), and to Annual for users without a paid plan. The user's
   // manual toggle always wins. Only renders when both month and year
   // products exist (see `multiInterval` below).
-  const currentPaidProduct = findCurrentPaidProduct(
-    customer?.products as CustomerProductLite[] | undefined,
-  );
+  // Normalized once here and carried through context, so no component
+  // downstream has to know which Autumn payload family it is holding.
+  const customerPlans = normalizePlans(customer);
+  const currentPaidProduct = findCurrentPaidPlan(customerPlans);
   const currentIntervalGroup = rawProducts?.find(
-    (p) => p.id === currentPaidProduct?.id,
+    (p) => p.id === currentPaidProduct?.planId,
   )?.properties?.interval_group;
   const [isAnnualOverride, setIsAnnualOverride] = useState<boolean | null>(null);
   const isAnnual =
@@ -182,9 +186,7 @@ export default function PricingTable({
       {products && (
         <PricingTableContainer
           products={products}
-          customerProducts={
-            (customer?.products ?? []) as CustomerProductLite[]
-          }
+          customerProducts={customerPlans}
           trialEligible={trialState.trialEligible}
           isAnnualToggle={isAnnual}
           setIsAnnualToggle={setIsAnnualOverride}
@@ -230,7 +232,7 @@ const PricingTableContext = createContext<{
   isAnnualToggle: boolean;
   setIsAnnualToggle: (isAnnual: boolean) => void;
   products: Product[];
-  customerProducts: CustomerProductLite[];
+  customerProducts: AutumnPlan[];
   trialEligible: boolean;
   showFeatures: boolean;
     }>({
@@ -265,7 +267,7 @@ export const PricingTableContainer = ({
 }: {
   children?: React.ReactNode;
   products?: Product[];
-  customerProducts?: CustomerProductLite[];
+  customerProducts?: AutumnPlan[];
   trialEligible?: boolean;
   showFeatures?: boolean;
   className?: string;
@@ -359,9 +361,9 @@ export const PricingCard = ({
   // across billing intervals (monthly Pro → Basic Annual reads as
   // "upgrade" because €72 > €16). When the tiers actually differ, relabel
   // the button from the tier comparison instead.
-  const currentPaidProduct = findCurrentPaidProduct(customerProducts);
+  const currentPaidProduct = findCurrentPaidPlan(customerProducts);
   const currentProduct = currentPaidProduct
-    ? products.find((p) => p.id === currentPaidProduct.id)
+    ? products.find((p) => p.id === currentPaidProduct.planId)
     : undefined;
   let finalButtonText = buttonText;
   if (

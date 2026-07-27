@@ -3,12 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import {
-  usePreloadedQuery,
-  useQuery,
-  useMutation,
-  useAction,
-} from 'convex/react';
+import { usePreloadedQuery, useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { BottomNav, type View } from '@/components/app/BottomNav';
@@ -147,16 +142,9 @@ export default function MainLayout({
     refreshPrefetchedThread();
   }, [refreshPrefetchedThread]);
 
-  const syncQuotas = useAction(api.usage.actions.syncQuotas);
-  const didSyncQuotas = useRef(false);
-
-  useEffect(() => {
-    if (didSyncQuotas.current) return;
-    didSyncQuotas.current = true;
-    syncQuotas().catch((err) => {
-      console.error('Failed to sync quotas on app load:', err);
-    });
-  }, [syncQuotas]);
+  // Quota syncing lives in BillingGate (mounted in the /app layout) so that
+  // routes outside this group — notably the standalone /app/learn page — are
+  // covered too.
 
   // Tab switching — pushState so browser back/forward works between tabs
   const handleViewChange = useCallback((view: View) => {

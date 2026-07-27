@@ -25,7 +25,7 @@ import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FeatureGatedButton } from '@/components/feature_tracking/FeatureGatedButton';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
-import { cn } from '@/lib/utils';
+import { cn, isPaymentPastDueError } from '@/lib/utils';
 
 interface EnterTextsViewProps {
   onBack: () => void;
@@ -187,6 +187,11 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
       });
       setAutoFillMetadata(metadata);
     } catch (err) {
+      // Silent: the reactive payment-overdue dialog is the canonical
+      // surface for this state (see isPaymentPastDueError).
+      if (isPaymentPastDueError(err)) {
+        return;
+      }
       if (
         err instanceof ConvexError &&
         typeof err.data === 'object' &&
@@ -250,6 +255,11 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
       setTranslationSources({});
       firstInputRef.current?.focus();
     } catch (err) {
+      // Silent: the reactive payment-overdue dialog is the canonical
+      // surface for this state (see isPaymentPastDueError).
+      if (isPaymentPastDueError(err)) {
+        return;
+      }
       if (
         err instanceof ConvexError &&
         typeof err.data === 'object' &&

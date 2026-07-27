@@ -2,7 +2,12 @@
 
 import { v } from 'convex/values';
 import { action } from './_generated/server';
-import { syncQuotasForUser } from './usage/tracking';
+import {
+  hasUnpaidInvoice,
+  syncQuotasForUser,
+  type AutumnInvoiceEntry,
+} from './usage/tracking';
+import { normalizePlans, type AutumnPlan } from '../lib/autumn/customer-shape';
 
 const AUTUMN_API = 'https://api.useautumn.com/v1';
 
@@ -43,15 +48,6 @@ async function autumnFetch<T>(
   }
   return json as T;
 }
-
-type LegacyCustomerProduct = {
-  id: string;
-  status: string;
-  is_default: boolean;
-  is_add_on: boolean;
-  trial_ends_at: number | null;
-  current_period_end: number | null;
-};
 
 /**
  * Switch a currently-trialing customer to another paid plan without
@@ -94,20 +90,21 @@ export const switchPlanDuringTrial = action({
     const customerId = identity.subject;
 
     // Server-side verification — never trust the client's trial state.
-    const customer = await autumnFetch<{
-      products?: LegacyCustomerProduct[];
-    }>('GET', `/customers/${encodeURIComponent(customerId)}`, undefined, '1.2');
-    const products = customer?.products ?? [];
-    const trialing = products.find(
-      (p) => !p.is_default && !p.is_add_on && p.status === 'trialing',
+    const customer = await autumnFetch<{ products?: unknown }>(
+      'GET',
+      `/customers/${encodeURIComponent(customerId)}`,
+      undefined,
+      '1.2',
+    );
+    const trialing: AutumnPlan | undefined = normalizePlans(customer).find(
+      (p) => !p.isDefault && !p.isAddOn && p.isTrialing,
     );
     if (!trialing) {
       throw new Error('No active trial — use the regular checkout flow');
     }
-    // The legacy (v1.2) shape reports the trial end via current_period_end
-    // and leaves trial_ends_at null while trialing.
-    const trialEndsAt =
-      trialing.trial_ends_at ?? trialing.current_period_end ?? null;
+    // v1.2 reports the trial end via current_period_end and leaves
+    // trial_ends_at null while trialing; normalizePlans absorbs that.
+    const trialEndsAt = trialing.trialEndsAt ?? null;
     if (!trialEndsAt || trialEndsAt <= Date.now()) {
       throw new Error('Trial end date unavailable or already passed');
     }
@@ -126,7 +123,7 @@ export const switchPlanDuringTrial = action({
     let mode: 'scheduled' | 'immediate';
     let paymentUrl: string | null = null;
 
-    if (trialing.id === args.productId && scenario !== 'renew') {
+    if (trialing.planId === args.productId && scenario !== 'renew') {
       throw new Error('Already trialing this plan');
     }
     if (
@@ -205,5 +202,96 @@ export const switchPlanDuringTrial = action({
     await syncQuotasForUser(ctx, customerId);
 
     return { mode, trialEndsAt, paymentUrl };
+  },
+});
+
+/**
+ * Cancel the delinquent subscription — the "I don't want to pay" exit from
+ * the payment-overdue block.
+ *
+ * Only cancels while genuinely past due, re-derived here from Autumn rather
+ * than trusted from the client. Cancels immediately (the org is configured
+ * to do this for past-due subscriptions anyway) so the customer lands on
+ * Free right away instead of sitting in a cancelled-but-still-overdue limbo.
+ * Stripe voids the outstanding invoice as part of that.
+ *
+ * Outcomes:
+ *  - `cancelled`: the plan was past due with an unsettled invoice and was
+ *    cancelled immediately.
+ *  - `recovered`: nothing needed cancelling. Two ways here: (a) Autumn no
+ *    longer reports a past-due plan (payment landed, Stripe's retry
+ *    succeeded, or a previous partial run already cancelled), or (b) the
+ *    plan still reads past_due but the expanded invoices show NOTHING
+ *    unpaid — i.e. the user just paid the hosted invoice and Autumn's
+ *    subscription state is lagging the Stripe webhook. Cancelling in that
+ *    window would destroy a subscription that was just paid for (the
+ *    invoice is settled, so "Stripe voids it" is a no-op and there is no
+ *    refund path); invoice status is race-free because Stripe flips it to
+ *    `paid` synchronously at payment time. Both branches sync the mirror
+ *    first so a stale block clears instead of stranding the user, then
+ *    report recovery for the dialog's "payment received" copy.
+ *
+ * The follow-on sync is what un-blocks the app, and it is also where the
+ * course auto-archive in syncAllFeatures finally runs — deliberately
+ * suppressed while past due, so it happens here, once, when the plan really
+ * has shrunk to Free. That is the archival the dialog warns about.
+ */
+export const cancelOverdueSubscription = action({
+  args: {},
+  returns: v.object({
+    outcome: v.union(v.literal('cancelled'), v.literal('recovered')),
+    cancelledProductId: v.optional(v.string()),
+  }),
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error('Not authenticated');
+    const customerId = identity.subject;
+
+    // One fetch carries both signals: the plan list (is anything past due?)
+    // and the expanded invoices (has the debt actually been settled?).
+    const customer = await autumnFetch<{
+      products?: unknown;
+      invoices?: AutumnInvoiceEntry[];
+    }>(
+      'GET',
+      `/customers/${encodeURIComponent(customerId)}?expand=invoices`,
+      undefined,
+      '1.2',
+    );
+
+    const overdue = normalizePlans(customer).find(
+      (p) => !p.isDefault && !p.isAddOn && p.isPastDue,
+    );
+    if (!overdue) {
+      await syncQuotasForUser(ctx, customerId);
+      return { outcome: 'recovered' as const };
+    }
+
+    // Cancel-after-pay guard. Only a POSITIVE "invoices expanded and none
+    // unpaid" skips the cancel; a missing array is ambiguous (Autumn didn't
+    // honor the expand), and there we fail toward the user's explicit
+    // request and cancel as before.
+    if (Array.isArray(customer.invoices) && !hasUnpaidInvoice(customer)) {
+      await syncQuotasForUser(ctx, customerId);
+      return { outcome: 'recovered' as const };
+    }
+
+    await autumnFetch(
+      'POST',
+      '/cancel',
+      {
+        customer_id: customerId,
+        product_id: overdue.planId,
+        cancel_immediately: true,
+      },
+      '1.2',
+    );
+
+    await syncQuotasForUser(ctx, customerId);
+
+    return {
+      outcome: 'cancelled' as const,
+      cancelledProductId: overdue.planId,
+    };
   },
 });

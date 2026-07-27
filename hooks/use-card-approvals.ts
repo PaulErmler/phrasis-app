@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useMutation, useQuery } from 'convex/react';
 import { ConvexError } from 'convex/values';
+import { isPaymentPastDueError } from '@/lib/utils';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 
@@ -73,6 +74,11 @@ export function useCardApprovals(
         await approveCard({ approvalId });
         setUsageLimitHit(false);
       } catch (error) {
+        // Silent: the reactive payment-overdue dialog is the canonical
+        // surface for this state (see isPaymentPastDueError).
+        if (isPaymentPastDueError(error)) {
+          return;
+        }
         if (
           error instanceof ConvexError &&
           (error.data as { code?: string })?.code === 'USAGE_LIMIT'

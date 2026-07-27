@@ -493,7 +493,10 @@ export function useCollectionDetail({
       const code = error instanceof ConvexError
         ? (error.data as { code?: string })?.code
         : undefined;
-      if (code === 'USAGE_LIMIT') {
+      if (code === 'PAYMENT_PAST_DUE') {
+        // Silent: the reactive payment-overdue dialog is the canonical
+        // surface for this state.
+      } else if (code === 'USAGE_LIMIT') {
         setUsageLimitHit(true);
       } else if (code === 'QUOTA_NOT_SYNCED') {
         toast.error(t('failedToAdd'));
@@ -528,7 +531,10 @@ export function useCollectionDetail({
         const code = error instanceof ConvexError
           ? (error.data as { code?: string })?.code
           : undefined;
-        if (code === 'USAGE_LIMIT') {
+        if (code === 'PAYMENT_PAST_DUE') {
+          // Silent: the reactive payment-overdue dialog is the canonical
+          // surface for this state.
+        } else if (code === 'USAGE_LIMIT') {
           setUsageLimitHit(true);
         } else {
           console.error('Failed to add sentence:', error);

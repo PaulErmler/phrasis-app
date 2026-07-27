@@ -777,6 +777,23 @@
     "noUpgradeAvailableCap": "Du hast fast die maximale Anzahl an {featureName} erreicht. Kontaktiere uns unter support@flexling.com für zusätzliche Kapazität.",
     "contactUs": "Kontakt"
   },
+  "PaymentOverdue": {
+    "title": "Zahlung überfällig",
+    "description": "Deine letzte Zahlung ist fehlgeschlagen. Bitte aktualisiere deine Zahlungsmethode, um dein Abo aktiv zu halten.",
+    "blockedDescription": "Deine Zahlung ist seit dem {date} überfällig. Der Zugriff ist pausiert, bis die Zahlung abgeschlossen ist.",
+    "payInvoiceButton": "Rechnung bezahlen",
+    "payButton": "Zahlungsmethode aktualisieren",
+    "portalError": "Das Abrechnungsportal konnte nicht geöffnet werden. Bitte versuche es erneut.",
+    "cancelButton": "Abo kündigen",
+    "cancelTitle": "Abo wirklich kündigen?",
+    "cancelWarning": "Du wechselst sofort zum Free-Tarif und es wird nichts abgebucht. {count, plural, one {# Kurs wird archiviert} other {# Kurse werden archiviert}} — nur dein aktiver Kurs bleibt verfügbar. Mit einem neuen Abo kannst du sie wiederherstellen.",
+    "cancelWarningNoCourses": "Du wechselst sofort zum Free-Tarif und es wird nichts abgebucht. Der Free-Tarif enthält einen aktiven Kurs.",
+    "cancelConfirm": "Abo kündigen",
+    "cancelSuccess": "Dein Abo wurde gekündigt. Du bist jetzt im Free-Tarif.",
+    "cancelError": "Dein Abo konnte nicht gekündigt werden. Bitte versuche es erneut.",
+    "paymentReceived": "Zahlung eingegangen — dein Abo bleibt aktiv.",
+    "back": "Zurück"
+  },
   "Paywall": {
     "loading": "Lädt...",
     "confirm": "Bestätigen",

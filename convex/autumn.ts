@@ -27,24 +27,22 @@ export const autumn = new Autumn(components.autumn, {
 });
 
 /**
- * These exports are required for our react hooks and components
+ * Public actions required by our autumn-js react hooks — and ONLY those.
+ *
+ * `autumn.api()` offers the component's full surface (track, cancel, usage,
+ * setupPayment, entities, referrals, ...), but every one of these is a
+ * PUBLIC action scoped to the caller's own Autumn customer. `track` in
+ * particular accepts an unbounded `value: number` — and Autumn credits
+ * negative values (our own refund path relies on that: releaseQuota tracks
+ * `-amount`) — so exporting it let any authenticated user grant themselves
+ * usage from the browser console. No client code ever called the removed
+ * ones (the hooks use exactly the four below plus attach/checkout further
+ * down; all real usage tracking is server-side via
+ * internal.usage.tracking.trackUsage), so they are simply not exported.
+ * autumn-js only dereferences `convexApi.<name>` at call time, so the
+ * missing endpoints are inert unless something actually calls them.
  */
-
-export const {
-  track,
-  cancel,
-  query,
-  check,
-  usage,
-  setupPayment,
-  createCustomer,
-  listProducts,
-  billingPortal,
-  createReferralCode,
-  redeemReferralCode,
-  createEntity,
-  getEntity,
-} = autumn.api();
+export const { createCustomer, listProducts, billingPortal } = autumn.api();
 
 /**
  * Server-side trial gate for `attach` / `checkout`.
@@ -69,7 +67,7 @@ export const {
  * - everyone else: `freeTrial: false` is forced, mirroring what the
  *   well-behaved client already sends.
  */
-async function gateTrialArgs<T extends { freeTrial?: boolean }>(
+export async function gateTrialArgs<T extends { freeTrial?: boolean }>(
   ctx: ActionCtx,
   kind: 'attach' | 'checkout',
   args: T,
@@ -113,6 +111,33 @@ const customerDataValidator = v.object({
   name: v.optional(v.string()),
   email: v.optional(v.string()),
   fingerprint: v.optional(v.string()),
+});
+
+/**
+ * `check` for the paywall preview (usePaywall calls it with
+ * `withPreview: true`). Registered by hand instead of re-exported from
+ * `autumn.api()` so that `sendEvent` is force-disabled: with
+ * `sendEvent: true` the component's check RECORDS a usage event of
+ * `requiredBalance` (an unbounded, sign-free number), which would be the
+ * same self-service balance manipulation as the removed public `track`.
+ * The client only ever previews.
+ */
+export const check = action({
+  args: {
+    // Mirrors the component's CheckArgs (not exported by the package),
+    // minus nothing — sendEvent is accepted but ignored.
+    productId: v.optional(v.string()),
+    featureId: v.optional(v.string()),
+    requiredBalance: v.optional(v.number()),
+    sendEvent: v.optional(v.boolean()),
+    withPreview: v.optional(v.boolean()),
+    entityId: v.optional(v.string()),
+    customerData: v.optional(customerDataValidator),
+    entityData: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    return await autumn.check(ctx, { ...args, sendEvent: false });
+  },
 });
 
 /** Mirrors the component's AttachArgs / CheckoutArgs (not exported by the package). */

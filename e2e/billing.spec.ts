@@ -1,8 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { completeOnboardingFresh } from "./helpers";
+import {
+  completeStripeTestCheckout,
+  neutralizeTours,
+  signUpFreshUser,
+} from "./helpers";
 
 /**
  * Billing / trial lifecycle — drives the REAL upgrade/downgrade-during-trial
@@ -59,79 +62,9 @@ const PRO_ANNUAL = "pro_annual";
 
 test.use({ storageState: STORAGE_STATE_BILLING });
 
-/**
- * Sign up a brand-new user and walk the onboarding wizard (default
- * "completely-new" branch). Mirrors auth.setup.ts, which cannot be
- * imported here because it registers its own test() calls.
- */
-async function signUpFreshBillingUser(page: Page) {
-  const random = crypto.randomBytes(6).toString("hex");
-  const creds = {
-    email: `e2e-billing-${Date.now()}-${random}@test.de`,
-    password: `E2ePass!${random}`,
-    name: `E2E billing ${random}`,
-  };
-
-  await page.goto("/auth/sign-up");
-  await page.waitForLoadState("domcontentloaded");
-  const nameField = page.getByLabel(/^name$/i);
-  if (await nameField.count()) {
-    await nameField.first().fill(creds.name);
-  }
-  await page.getByLabel(/email/i).first().fill(creds.email);
-  const passwordFields = page.getByLabel(/password/i);
-  const passwordCount = await passwordFields.count();
-  for (let i = 0; i < passwordCount; i++) {
-    await passwordFields.nth(i).fill(creds.password);
-  }
-  const acceptCookies = page.getByRole("button", { name: /accept all/i });
-  if (await acceptCookies.count()) {
-    await acceptCookies.first().click().catch(() => {});
-  }
-  await page
-    .getByRole("button", { name: /create an account|create account|^sign\s*up$/i })
-    .click();
-  await page.waitForURL(/\/app\/onboarding/, { timeout: 30_000 });
-
-  await completeOnboardingFresh(page, {});
-
-  fs.mkdirSync(path.dirname(STORAGE_STATE_BILLING), { recursive: true });
-  await page.context().storageState({ path: STORAGE_STATE_BILLING });
-  fs.writeFileSync(
-    CREDENTIALS_BILLING,
-    JSON.stringify({ ...creds, createdAt: new Date().toISOString() }, null, 2),
-  );
-}
-
 /** CTA locator for one plan card in the settings pricing table. */
 function planCta(page: Page, productId: string) {
   return page.getByTestId(`pricing-card-cta-${productId}`);
-}
-
-/**
- * Neutralize driver.js tours for every document this page loads.
- *
- * The billing user has never completed the one-shot tours, and a tour can
- * mount at ANY moment after hydration — including while the checkout
- * dialog is open. While active, driver.js puts `driver-active` on <body>,
- * which disables pointer events on the ENTIRE page (removing the
- * overlay/popover nodes is not enough — clicks then resolve to <body> or
- * the dialog container and Playwright reports an interception).
- * Dismissing the popover properly isn't schedulable either: its close
- * click lands outside the Radix dialog and closes it. Injecting CSS
- * before every document load wins all of these races at once.
- */
-async function neutralizeTours(page: Page) {
-  await page.addInitScript(() => {
-    const style = document.createElement("style");
-    style.textContent = `
-      .driver-overlay, .driver-popover { display: none !important; }
-      body.driver-active, body.driver-active * { pointer-events: auto !important; }
-    `;
-    document.addEventListener("DOMContentLoaded", () =>
-      document.head.appendChild(style),
-    );
-  });
 }
 
 /**
@@ -164,105 +97,6 @@ async function expectPlanState(
   }).toPass({ timeout, intervals: [2_000, 5_000] });
 }
 
-/**
- * Fill Stripe's hosted test-mode checkout with the standard 4242 test card
- * and submit.
- *
- * The current hosted layout offers "Pay with Link" plus a payment-method
- * accordion (Card / Klarna / …) whose card fields only render after the
- * Card option is selected. Depending on the rollout, the card inputs are
- * either plain DOM (`input#cardNumber`) or live inside Stripe element
- * iframes — both variants are handled. Optional fields are filled
- * defensively since their presence varies by account configuration.
- */
-async function completeStripeTestCheckout(page: Page) {
-  await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
-
-  const email = page.locator("input#email");
-  if ((await email.count()) && (await email.isEditable().catch(() => false))) {
-    const creds = JSON.parse(fs.readFileSync(CREDENTIALS_BILLING, "utf8")) as {
-      email: string;
-    };
-    await email.fill(creds.email);
-  }
-
-  // The inline card form only renders once the "Card" payment-method
-  // radio is checked, and the accordion itself renders asynchronously —
-  // so selecting the radio has to be part of the retry loop, not a
-  // one-shot step. Normal clicks on the styled row time out (the Link
-  // iframe overlays the hit area); force-checking the radio input works.
-  // The card inputs are plain DOM in this layout, but the iframe-hosted
-  // payment-element variant is also handled.
-  type CardFields = {
-    number: ReturnType<Page["locator"]>;
-    expiry: ReturnType<Page["locator"]>;
-    cvc: ReturnType<Page["locator"]>;
-  };
-  let fields: CardFields | undefined;
-  await expect(async () => {
-    const domFields = (): CardFields => ({
-      number: page.locator("input#cardNumber"),
-      expiry: page.locator("input#cardExpiry"),
-      cvc: page.locator("input#cardCvc"),
-    });
-    if (await page.locator("input#cardNumber").count()) {
-      fields = domFields();
-      return;
-    }
-    const cardRadio = page.getByRole("radio", { name: /^card$/i }).first();
-    if (await cardRadio.count()) {
-      await cardRadio.check({ force: true, timeout: 2_000 }).catch(() => {});
-      if (await page.locator("input#cardNumber").count()) {
-        fields = domFields();
-        return;
-      }
-    }
-    for (const frame of page.frames()) {
-      const inFrame = frame.locator('input[name="number"]');
-      if (await inFrame.count().catch(() => 0)) {
-        fields = {
-          number: inFrame,
-          expiry: frame.locator('input[name="expiry"]'),
-          cvc: frame.locator('input[name="cvc"]'),
-        };
-        return;
-      }
-    }
-    throw new Error("Stripe card fields not rendered yet");
-  }).toPass({ timeout: 45_000, intervals: [1_000] });
-
-  await fields!.number.fill("4242 4242 4242 4242");
-  await fields!.expiry.fill("12 / 34");
-  await fields!.cvc.fill("123");
-
-  const name = page.locator("input#billingName");
-  if ((await name.count()) && (await name.isVisible().catch(() => false))) {
-    await name.fill("E2E Billing Test");
-  }
-  const country = page.locator("select#billingCountry");
-  if (await country.count()) {
-    await country.selectOption("DE").catch(() => {});
-  }
-  const postal = page.locator("input#billingPostalCode");
-  if ((await postal.count()) && (await postal.isVisible().catch(() => false))) {
-    await postal.fill("10115");
-  }
-
-  // Label varies by locale/legislation (e.g. "Start trial", "Subscribe
-  // with obligation to pay") — match the stable class first.
-  await page
-    .locator("button.SubmitButton, button[type=submit]")
-    .first()
-    .click();
-
-  // Stripe processes the payment and then redirects to the success URL.
-  // Where exactly that lands is Autumn's concern — we only wait to be off
-  // the Stripe domain before returning to the app ourselves.
-  await page.waitForURL((url) => !/checkout\.stripe\.com/.test(url.href), {
-    timeout: 90_000,
-  });
-}
-
 test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
   // Serial: the four tests are consecutive stages of one user journey.
   test.describe.configure({ mode: "serial", retries: 0 });
@@ -277,7 +111,11 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
       storageState: { cookies: [], origins: [] },
     });
     const page = await context.newPage();
-    await signUpFreshBillingUser(page);
+    await signUpFreshUser(page, {
+      prefix: "billing",
+      storageStatePath: STORAGE_STATE_BILLING,
+      credentialsPath: CREDENTIALS_BILLING,
+    });
     await context.close();
   });
 
@@ -310,7 +148,10 @@ test.describe("billing trial lifecycle (live)", { tag: "@live" }, () => {
     // Card-required trial for a customer without a payment method → the
     // checkout() call redirects to Stripe's hosted checkout.
     await planCta(page, BASIC_ANNUAL).click();
-    await completeStripeTestCheckout(page);
+    const creds = JSON.parse(
+      fs.readFileSync(CREDENTIALS_BILLING, "utf8"),
+    ) as { email: string };
+    await completeStripeTestCheckout(page, { email: creds.email });
 
     // Back in the app: Basic Annual becomes the current (trialing) plan…
     await expectPlanState(page, BASIC_ANNUAL, /current plan/i, 120_000);

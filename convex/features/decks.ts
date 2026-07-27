@@ -1619,6 +1619,13 @@ export const addSingleTextFromCollection = mutation({
 /**
  * Ensure content (translations + audio) exists for a specific card.
  * Called automatically when a card is displayed and has missing content.
+ *
+ * Deliberately NOT gated by `assertBillingCurrent` (decided 2026-07-26):
+ * the ensure* endpoints are the content pipeline's self-heal path for cards
+ * the user already owns, and blocking them while a payment is past due
+ * would corrupt the study experience the free tier still promises. The
+ * dunning block enforces at the spend boundary instead — `consumeQuota`
+ * (card creation, chat, etc.) — plus the app-wide overdue dialog.
  */
 export const ensureCardContent = mutation({
   args: {

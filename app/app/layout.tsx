@@ -3,6 +3,7 @@ import { api } from '@/convex/_generated/api';
 import { AppDataProvider } from '@/components/app/AppDataProvider';
 import { ClientAuthBoundary } from '@/components/ClientAuthBoundary';
 import { OnboardingGuard } from '@/components/app/OnboardingGuard';
+import { BillingGate } from '@/components/app/BillingGate';
 
 export default async function AppLayout({
   children,
@@ -29,6 +30,10 @@ export default async function AppLayout({
       preloadedHomeSummary={preloadedHomeSummary}
     >
       <ClientAuthBoundary>
+        {/* Sibling of OnboardingGuard, not a child: the guard renders null
+            for its children while redirecting, which would unmount the gate
+            (and its quota sync) mid-navigation. */}
+        <BillingGate />
         <OnboardingGuard>
           {children}
         </OnboardingGuard>

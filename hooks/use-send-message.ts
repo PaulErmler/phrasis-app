@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useMutation } from 'convex/react';
 import { ConvexError } from 'convex/values';
+import { isPaymentPastDueError } from '@/lib/utils';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { toast } from 'sonner';
@@ -71,6 +72,15 @@ export function useSendMessage({
           onSuccess();
         }
       } catch (error) {
+        // Swallowed silently: the reactive payment-overdue dialog is the
+        // canonical surface for this state (see isPaymentPastDueError).
+        if (isPaymentPastDueError(error)) {
+          if (setStatus) {
+            setStatus(CHAT_STATUS.READY);
+          }
+          return;
+        }
+
         if (
           error instanceof ConvexError &&
           (error.data as { code?: string })?.code === 'USAGE_LIMIT'
