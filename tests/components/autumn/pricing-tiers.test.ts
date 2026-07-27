@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Product, ProductItem } from 'autumn-js';
+import type { Plan, Variant } from 'atmn';
 
 // Only the pure tier helpers are under test; the module pulls the Autumn
 // React hooks in at import time.
@@ -9,6 +10,46 @@ vi.mock('autumn-js/react', () => ({
 }));
 
 import { previousTier, itemsAddedOver } from '@/components/autumn/pricing-table';
+import {
+  free as freePlan,
+  basic as basicPlan,
+  pro as proPlan,
+  ultra as ultraPlan,
+  pro_annual as proAnnualVariant,
+  ultra_annual as ultraAnnualVariant,
+} from '@/autumn.config';
+
+// Allowances and prices are read from the real billing config, so a grant
+// change there flows into the fixtures (and the expected increments below)
+// instead of silently diverging. Only the Product SHAPE is hand-built.
+const included = (
+  plan: Plan,
+  featureId: string,
+  resetInterval?: 'month' | 'one_off',
+): number => {
+  const item = plan.items?.find(
+    (i) =>
+      i.featureId === featureId &&
+      (resetInterval ? i.reset?.interval === resetInterval : i.reset === undefined),
+  );
+  if (item?.included === undefined) {
+    throw new Error(`Plan "${plan.id}" grants no ${resetInterval ?? 'unreset'} ${featureId}`);
+  }
+  return item.included;
+};
+
+const monthlyCredits = (plan: Plan) => included(plan, 'credits', 'month');
+
+const monthlyPrice = (plan: Plan): number => {
+  if (!plan.price) throw new Error(`Plan "${plan.id}" has no price`);
+  return plan.price.amount;
+};
+
+const annualPrice = (variant: Variant): number => {
+  const amount = variant.customize?.price?.amount;
+  if (amount === undefined) throw new Error(`Variant "${variant.id}" has no price`);
+  return amount;
+};
 
 const price = (amount: number, interval: string) =>
   ({ price: amount, interval }) as unknown as ProductItem;
@@ -46,47 +87,58 @@ function makePlan(
 const free = makePlan('free', {
   isFree: true,
   items: [
-    grant('credits', 200, null),
-    grant('credits', 30),
-    grant('sentences', 300, null),
-    grant('sentences', 50),
-    grant('courses', 1, null),
+    grant('credits', included(freePlan, 'credits', 'one_off'), null),
+    grant('credits', included(freePlan, 'credits', 'month')),
+    grant('sentences', included(freePlan, 'sentences', 'one_off'), null),
+    grant('sentences', included(freePlan, 'sentences', 'month')),
+    grant('courses', included(freePlan, 'courses'), null),
   ],
 });
 const basic = makePlan('basic', {
-  price: 8,
-  intervalGroup: 'month',
-  items: [grant('credits', 430), grant('sentences', 20000), grant('courses', 1, null)],
-});
-const pro = makePlan('pro', {
-  price: 16,
+  price: monthlyPrice(basicPlan),
   intervalGroup: 'month',
   items: [
-    grant('credits', 1030),
-    grant('sentences', 20000),
-    grant('courses', 10, null),
+    grant('credits', included(basicPlan, 'credits', 'month')),
+    grant('sentences', included(basicPlan, 'sentences', 'month')),
+    grant('courses', included(basicPlan, 'courses'), null),
+  ],
+});
+const pro = makePlan('pro', {
+  price: monthlyPrice(proPlan),
+  intervalGroup: 'month',
+  items: [
+    grant('credits', included(proPlan, 'credits', 'month')),
+    grant('sentences', included(proPlan, 'sentences', 'month')),
+    grant('courses', included(proPlan, 'courses'), null),
     grant('multiple_languages', 0, null),
   ],
 });
 const ultra = makePlan('ultra', {
-  price: 32,
+  price: monthlyPrice(ultraPlan),
   intervalGroup: 'month',
   items: [
-    grant('credits', 3030),
-    grant('sentences', 20000),
-    grant('courses', 10, null),
+    grant('credits', included(ultraPlan, 'credits', 'month')),
+    grant('sentences', included(ultraPlan, 'sentences', 'month')),
+    grant('courses', included(ultraPlan, 'courses'), null),
     grant('multiple_languages', 0, null),
   ],
 });
+// Annual variants inherit their entitlements from the base plans in config.
 const proAnnual = makePlan('pro_annual', {
-  price: 144,
+  price: annualPrice(proAnnualVariant),
   intervalGroup: 'year',
-  items: [grant('credits', 1030), grant('courses', 10, null)],
+  items: [
+    grant('credits', included(proPlan, 'credits', 'month')),
+    grant('courses', included(proPlan, 'courses'), null),
+  ],
 });
 const ultraAnnual = makePlan('ultra_annual', {
-  price: 288,
+  price: annualPrice(ultraAnnualVariant),
   intervalGroup: 'year',
-  items: [grant('credits', 3030), grant('courses', 10, null)],
+  items: [
+    grant('credits', included(ultraPlan, 'credits', 'month')),
+    grant('courses', included(ultraPlan, 'courses'), null),
+  ],
 });
 
 const ALL = [free, basic, pro, ultra, proAnnual, ultraAnnual];
@@ -123,9 +175,9 @@ describe('itemsAddedOver', () => {
   it('lists only what the tier actually adds, as an increment', () => {
     const added = itemsAddedOver(paidItems(ultra), pro);
     expect(added.map((i) => i.feature_id)).toEqual(['credits']);
-    // "Everything from Pro, plus 2,000 credits" — Pro's 1,030 is already
-    // counted by the line above, and 1,030 + 2,000 is Ultra's real 3,030.
-    expect(added[0].included_usage).toBe(2000);
+    // "Everything from Pro, plus N credits" — Pro's total is already counted
+    // by the line above, so only the delta up to Ultra's grant is listed.
+    expect(added[0].included_usage).toBe(monthlyCredits(ultraPlan) - monthlyCredits(proPlan));
   });
 
   // The grants are tuned so every step reads as a round number, and they
@@ -136,16 +188,25 @@ describe('itemsAddedOver', () => {
         (i) => i.feature_id === 'credits',
       )?.included_usage;
 
-    expect(creditsAdded(basic, free)).toBe(400);
-    expect(creditsAdded(pro, basic)).toBe(600);
-    expect(creditsAdded(ultra, pro)).toBe(2000);
+    const steps = [
+      [creditsAdded(basic, free), monthlyCredits(basicPlan) - monthlyCredits(freePlan)],
+      [creditsAdded(pro, basic), monthlyCredits(proPlan) - monthlyCredits(basicPlan)],
+      [creditsAdded(ultra, pro), monthlyCredits(ultraPlan) - monthlyCredits(proPlan)],
+    ] as const;
+    for (const [rendered, configDelta] of steps) {
+      expect(rendered).toBe(configDelta);
+      // The tuning invariant itself: every advertised step is round.
+      expect(configDelta % 100).toBe(0);
+    }
   });
 
   it('keeps a cap at its own total rather than an increment', () => {
     const added = itemsAddedOver(paidItems(pro), basic);
     // Courses is a simultaneous cap, not a pool that stacks: Pro allows 10
     // at once, not Basic's 1 plus another 9.
-    expect(added.find((i) => i.feature_id === 'courses')?.included_usage).toBe(10);
+    expect(added.find((i) => i.feature_id === 'courses')?.included_usage).toBe(
+      included(proPlan, 'courses'),
+    );
     // Boolean flags the lower tier lacks are carried over untouched.
     expect(added.map((i) => i.feature_id)).toContain('multiple_languages');
     // Both grant 20,000 sentences, so it is not repeated.
@@ -153,11 +214,14 @@ describe('itemsAddedOver', () => {
   });
 
   it('does not conflate a one-off starter grant with a recurring one', () => {
-    // Free gives 200 credits one-off + 30/month. Basic's 430/month must be
-    // compared against the 30/month, not the larger one-off grant — giving
-    // the round "plus 400 credits per month" the plans are tuned for.
+    // Free gives a one-off starter pot of credits plus a monthly trickle.
+    // Basic's monthly grant must be compared against the monthly trickle,
+    // not the larger one-off grant — giving the round "plus N credits per
+    // month" increment the plans are tuned for.
     const added = itemsAddedOver(paidItems(basic), free);
-    expect(added.find((i) => i.feature_id === 'credits')?.included_usage).toBe(400);
+    expect(added.find((i) => i.feature_id === 'credits')?.included_usage).toBe(
+      monthlyCredits(basicPlan) - monthlyCredits(freePlan),
+    );
   });
 
   it('drops equal allowances', () => {

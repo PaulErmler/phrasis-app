@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 
 vi.mock("motion/react", () => ({
   motion: new Proxy(
@@ -59,6 +59,29 @@ describe("PricingSection", () => {
     expect(screen.getByText("plans.basic.features.sentences")).toBeInTheDocument();
     expect(screen.queryByText("plans.pro.features.sentences")).toBeNull();
     expect(screen.queryByText("plans.ultra.features.sentences")).toBeNull();
+  });
+
+  // The price VALUES behind these catalog keys are pinned to autumn.config.ts
+  // by tests/unit/lib/autumn/pricing-config-consistency.test.ts; these two
+  // tests close the loop by proving the section renders exactly those keys.
+  it("headlines the effective per-month price on the default yearly billing", () => {
+    render(<PricingSection />);
+    expect(screen.getByText("plans.free.price")).toBeInTheDocument();
+    for (const plan of ["basic", "pro", "ultra"]) {
+      expect(screen.getByText(`plans.${plan}.priceYearlyPerMonth`)).toBeInTheDocument();
+      // With the billed-annually total as a subline.
+      expect(screen.getByText(`plans.${plan}.billedAnnually`)).toBeInTheDocument();
+    }
+  });
+
+  it("switches paid tiers to the monthly price when toggled", () => {
+    render(<PricingSection />);
+    fireEvent.click(screen.getByText("billing.monthly"));
+    for (const plan of ["basic", "pro", "ultra"]) {
+      expect(screen.getByText(`plans.${plan}.priceMonthly`)).toBeInTheDocument();
+      // The billed-annually subline only belongs to yearly billing.
+      expect(screen.queryByText(`plans.${plan}.billedAnnually`)).toBeNull();
+    }
   });
 
   it("renders traditional comparison section", () => {

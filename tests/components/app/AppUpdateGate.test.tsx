@@ -280,6 +280,59 @@ describe('AppUpdateGate', () => {
     expect(reloadMock).toHaveBeenCalledTimes(1);
   });
 
+  it('checks again when connectivity returns, without reloading the visible tab', async () => {
+    // Mount happens offline, so the gate learns nothing. Coming back online is
+    // the retry signal — but the user never left, so hiddenForMs is 0 and the
+    // update may only arm the toast, never yank the page.
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(mockVersionResponse(NEWER_BUILD));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await renderGate();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(reloadMock).not.toHaveBeenCalled();
+
+    // The update found via the online check still escalates on schedule.
+    await act(async () => {
+      vi.advanceTimersByTime(ESCALATE_AFTER_MS);
+    });
+    expect(toastInfoMock).toHaveBeenCalledTimes(1);
+    expect(reloadMock).not.toHaveBeenCalled();
+  });
+
+  it('goes fully quiet after unmount', async () => {
+    // The gate wraps the /app shell, which can unmount on sign-out. Its
+    // document/window listeners and the escalation timer must die with it —
+    // a reload or toast fired by a dead gate would hit whatever replaced it.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(mockVersionResponse(NEWER_BUILD));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { unmount } = await renderGate();
+    const checksWhileMounted = fetchMock.mock.calls.length;
+
+    unmount();
+
+    await goAwayAndReturn(HIDDEN_LONG_ENOUGH_MS);
+    await act(async () => {
+      window.dispatchEvent(new Event('online'));
+      vi.advanceTimersByTime(ESCALATE_AFTER_MS + MINUTE);
+    });
+
+    expect(fetchMock.mock.calls.length).toBe(checksWhileMounted);
+    expect(reloadMock).not.toHaveBeenCalled();
+    expect(toastInfoMock).not.toHaveBeenCalled();
+  });
+
   it('recovers from a chunk load failure exactly once', async () => {
     vi.stubGlobal(
       'fetch',
