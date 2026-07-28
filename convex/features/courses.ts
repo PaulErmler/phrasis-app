@@ -8,7 +8,12 @@ import {
 import { mutation, query, MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
-import { learningStyleValidator, currentLevelValidator, reviewModeValidator } from '../types';
+import {
+  learningStyleValidator,
+  currentLevelValidator,
+  reviewModeValidator,
+  autoRateThresholdsValidator,
+} from '../types';
 import { tutorialIdValidator } from './tutorialIds';
 import {
   getAuthUserId,
@@ -43,6 +48,7 @@ import {
   DEFAULT_INITIAL_REVIEW_COUNT,
   validateInitialReviewCount,
 } from '../../lib/scheduling';
+import { validateAutoRateThresholds } from '../../lib/autoRating';
 import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
 import {
   ONBOARDING_INITIAL_SEED_CARDS,
@@ -1164,6 +1170,8 @@ export const updateCourseSettings = mutation({
       v.union(v.literal('translate'), v.literal('transcribe')),
     ),
     ignorePunctuation: v.optional(v.boolean()),
+    autoRateFromAccuracy: v.optional(v.boolean()),
+    autoRateThresholds: v.optional(autoRateThresholdsValidator),
     schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))),
     studyContentFilter: v.optional(v.union(v.literal('custom'), v.literal('course'), v.literal('both'))),
   },
@@ -1173,6 +1181,9 @@ export const updateCourseSettings = mutation({
 
     if (args.initialReviewCount !== undefined) {
       validateInitialReviewCount(args.initialReviewCount);
+    }
+    if (args.autoRateThresholds !== undefined) {
+      validateAutoRateThresholds(args.autoRateThresholds);
     }
 
     const course = await ctx.db.get(args.courseId);
@@ -1237,6 +1248,8 @@ export const updateCourseSettings = mutation({
       'fullReviewTargetAudioMode',
       'writingInputMode',
       'ignorePunctuation',
+      'autoRateFromAccuracy',
+      'autoRateThresholds',
       'schedulingMode',
       'studyContentFilter',
     ] as const;
@@ -1366,6 +1379,8 @@ export const updateCourseSettings = mutation({
         fullReviewTargetAudioMode: args.fullReviewTargetAudioMode,
         writingInputMode: args.writingInputMode,
         ignorePunctuation: args.ignorePunctuation,
+        autoRateFromAccuracy: args.autoRateFromAccuracy,
+        autoRateThresholds: args.autoRateThresholds,
         schedulingMode: args.schedulingMode,
         studyContentFilter: args.studyContentFilter,
       });

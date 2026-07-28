@@ -629,6 +629,11 @@ export const reviewCard = mutation({
     forceReviewPhase: v.optional(v.boolean()),
     reviewMode: v.optional(reviewModeValidator),
     accuracy: v.optional(v.number()),
+    // Same review scored both ways, so stats keep both series regardless of
+    // the learner's `ignorePunctuation` setting. Only recorded when both are
+    // present — see recordReviewStats.
+    accuracyStrict: v.optional(v.number()),
+    accuracyLenient: v.optional(v.number()),
     wasDefaultRating: v.optional(v.boolean()),
     sessionId: v.optional(v.string()),
   },
@@ -659,9 +664,14 @@ export const reviewCard = mutation({
       );
     }
 
-    if (args.accuracy != null && (args.accuracy < 0 || args.accuracy > 1 || !Number.isFinite(args.accuracy))) {
-      throw new ConvexError('Invalid accuracy value, must be between 0 and 1');
-    }
+    const assertAccuracy = (value: number | undefined, name: string) => {
+      if (value != null && (value < 0 || value > 1 || !Number.isFinite(value))) {
+        throw new ConvexError(`Invalid ${name} value, must be between 0 and 1`);
+      }
+    };
+    assertAccuracy(args.accuracy, 'accuracy');
+    assertAccuracy(args.accuracyStrict, 'accuracyStrict');
+    assertAccuracy(args.accuracyLenient, 'accuracyLenient');
 
     // Build current scheduling state
     const cardState: CardSchedulingState = {
@@ -743,6 +753,8 @@ export const reviewCard = mutation({
       reviewMode: args.reviewMode,
       rating: args.rating,
       accuracy: args.accuracy,
+      accuracyStrict: args.accuracyStrict,
+      accuracyLenient: args.accuracyLenient,
       wasDefaultRating: args.wasDefaultRating,
       text,
       sessionId: args.sessionId,
@@ -798,6 +810,14 @@ export const reviewCard = mutation({
         wasFirstReview,
         wasDefaultRating: args.wasDefaultRating,
         accuracy: args.accuracy,
+        // Mirrors the both-present gate in recordReviewStats so undo reverses
+        // exactly what was written.
+        ...(args.accuracyStrict != null && args.accuracyLenient != null
+          ? {
+              accuracyStrict: args.accuracyStrict,
+              accuracyLenient: args.accuracyLenient,
+            }
+          : {}),
         reviewDepth:
           args.accuracy != null
             ? card.preReviewCount + (card.fsrsState?.reps ?? 0) + 1

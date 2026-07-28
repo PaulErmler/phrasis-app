@@ -19,6 +19,8 @@ export type {
 } from './wordAlign';
 export { scoreWordAlignment } from './score';
 export type { ScoreOptions } from './score';
+export { computeAccuracy, computeAccuracyPair } from './accuracy';
+export type { AccuracyPair } from './accuracy';
 export { getCompareConfig, toDiffOptions } from './languageConfig';
 export type {
   CompareConfig,

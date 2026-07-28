@@ -24,6 +24,7 @@ import {
   type CardTranslation,
   type CardAudioRecording,
   type CourseSettings,
+  type ReviewAccuracyPayload,
 } from './types';
 import type { SchedulingMode } from '@/convex/types';
 import { getUserTimezone } from '@/lib/timezone';
@@ -89,6 +90,13 @@ interface BaseState {
    * uses it together with `reviewMode === 'audio'` to decide whether to
    * auto-dismiss after a delay and show the auto-advance bar. */
   autoAdvance: boolean;
+  /**
+   * Push the accuracy-derived rating suggestion in from the writing card.
+   * Lives on the base state (not the reviewing state) so the effect that sets
+   * it doesn't have to re-run as the status union changes shape. `null` means
+   * "no opinion" and falls through to the phase default.
+   */
+  setAutoRating: (rating: ReviewRating | null) => void;
 }
 
 interface LoadingState extends BaseState {
@@ -190,7 +198,10 @@ interface ReviewingState extends BaseState {
   handleFlag: () => Promise<void>;
   handleRegenerateAudio: () => Promise<void>;
   handleUpdatePinnedActions: (actions: readonly string[]) => Promise<void>;
-  handleNext: (ratingOverride?: ReviewRating, accuracy?: number) => void;
+  handleNext: (
+    ratingOverride?: ReviewRating,
+    accuracy?: ReviewAccuracyPayload,
+  ) => void;
   setSelectedRating: (rating: ReviewRating) => void;
   /** Undo the most recent review (server-side; works across devices). The
    * restored card arrives via the reactive card query. Resolves true when a
@@ -453,6 +464,12 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const [selectedRating, setSelectedRating] = useState<ReviewRating | null>(
     null,
   );
+  // Accuracy-derived suggestion, pushed in from the writing card. It sits
+  // BELOW `selectedRating` in every resolution below, so a manual tap or
+  // number key always wins, and it is reset in lockstep with `selectedRating`
+  // — if the two ever drifted, the previous card's suggestion would show up
+  // highlighted on the next card.
+  const [autoRatingState, setAutoRating] = useState<ReviewRating | null>(null);
   const [isPendingMaster, setIsPendingMaster] = useState(false);
   const [isPendingHide, setIsPendingHide] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
@@ -799,6 +816,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   useEffect(() => {
     if (cardForReview?._id == null) return;
     setSelectedRating(null);
+    setAutoRating(null);
     setIsPendingMaster(false);
     setIsPendingHide(false);
     setIsExiting(false);
@@ -826,7 +844,11 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const progressDisplayEnabled = courseSettings?.progressDisplayEnabled ?? true;
 
   const handleReview = useCallback(
-    async (rating: ReviewRating, wasDefaultRating: boolean, accuracy?: number) => {
+    async (
+      rating: ReviewRating,
+      wasDefaultRating: boolean,
+      accuracy?: ReviewAccuracyPayload,
+    ) => {
       if (!cardForReview || isReviewing) return;
       reviewInitiatedByThisTabRef.current = true;
       setCardAnimationKey((k) => k + 1);
@@ -858,7 +880,11 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
           reviewMode,
           wasDefaultRating,
           sessionId,
-          ...(accuracy != null && { accuracy: accuracy / 100 }),
+          ...(accuracy != null && {
+            accuracy: accuracy.primary / 100,
+            accuracyStrict: accuracy.strict / 100,
+            accuracyLenient: accuracy.lenient / 100,
+          }),
         });
         setDailyReviewsToday(result.dailyReviewsToday);
         setDailyTimeMsToday(result.dailyTimeMsToday);
@@ -878,6 +904,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
           setProgressDisplayReady(false);
         }
         setSelectedRating(null);
+        setAutoRating(null);
       } catch (error) {
         console.error('Failed to review card:', error);
         if (predictedMilestone) {
@@ -921,6 +948,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
         // after an "again" rating on a small deck), so reset the per-card
         // state here explicitly.
         setSelectedRating(null);
+        setAutoRating(null);
         setIsExiting(false);
         cardShownAtRef.current = Date.now();
         setCardAnimationKey((k) => k + 1);
@@ -1152,7 +1180,10 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     courseSettings?.schedulingMode ?? 'learnAndReview';
   const isRadio = schedulingMode === 'radio';
 
-  const handleNext = useCallback(async (ratingOverride?: ReviewRating, accuracy?: number) => {
+  const handleNext = useCallback(async (
+    ratingOverride?: ReviewRating,
+    accuracy?: ReviewAccuracyPayload,
+  ) => {
     if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
       reviewInitiatedByThisTabRef.current = true;
@@ -1211,7 +1242,15 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     }
     const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
     const defaultRatingForPhase = getDefaultRating(phase);
-    const rating = ratingOverride ?? selectedRating ?? defaultRatingForPhase;
+    const rating =
+      ratingOverride ?? selectedRating ?? autoRatingState ?? defaultRatingForPhase;
+    // `wasDefaultRating` deliberately still means "the review landed on the
+    // phase default", NOT "the user accepted what was offered". Redefining it
+    // would change its meaning for audio and pre-review mode too, and it has
+    // no reader today (dailyStats.defaultRatingUsed / defaultRatingChanged are
+    // written and reversed but never queried). If auto-rate acceptance ever
+    // needs measuring, add an explicit `ratingSource` arg rather than
+    // reinterpreting these counters.
     handleReview(rating, rating === defaultRatingForPhase, accuracy);
   }, [
     cardForReview,
@@ -1220,6 +1259,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     isPendingHide,
     isRadio,
     selectedRating,
+    autoRatingState,
     reviewMode,
     handleReview,
     masterCardMutation,
@@ -1248,6 +1288,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     schedulingMode,
     reviewMode: (courseSettings?.reviewMode ?? 'audio') as 'audio' | 'full',
     autoAdvance: courseSettings?.autoAdvance ?? DEFAULT_AUTO_ADVANCE,
+    setAutoRating,
   };
 
   // Loading
@@ -1344,7 +1385,8 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const phase = effectivePhase(reviewMode, displayCard.schedulingPhase as SchedulingPhase);
   const validRatings = isRadio ? [] : getValidRatings(phase);
   const defaultRating = getDefaultRating(phase);
-  const activeRating = selectedRating ?? defaultRating;
+  // Manual choice first, then the accuracy suggestion, then the phase default.
+  const activeRating = selectedRating ?? autoRatingState ?? defaultRating;
 
   // Compute projected next-due interval for each rating
   const ratingIntervals: Record<string, string> = {};

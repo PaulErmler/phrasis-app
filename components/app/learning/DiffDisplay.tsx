@@ -1,13 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import {
-  charDiff,
-  alignWords,
-  scoreWordAlignment,
-  getCompareConfig,
-  toDiffOptions,
-} from '@/lib/textCompare';
+import { charDiff, getCompareConfig, toDiffOptions } from '@/lib/textCompare';
 import { WordDiff } from './WordDiff';
 import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
 import { getTextDirection } from '@/lib/languages';
@@ -23,24 +17,9 @@ interface DiffDisplayProps {
   ignorePunctuation?: boolean;
 }
 
-/** 0–100 accuracy. Word-weighted for languages with word boundaries; otherwise grapheme-level. */
-export function computeAccuracy(
-  expected: string,
-  actual: string,
-  language: string = 'en',
-  ignorePunctuation = false,
-): number {
-  const cfg = getCompareConfig(language, { ignorePunctuation });
-  const diffOpts = toDiffOptions(cfg);
-  if (cfg.hasWordBoundaries) {
-    return Math.round(
-      scoreWordAlignment(alignWords(expected, actual, diffOpts), {
-        ignorePunctuation,
-      }) * 100,
-    );
-  }
-  return Math.round(charDiff(expected, actual, diffOpts).accuracy * 100);
-}
+// Lives in lib/textCompare/accuracy.ts so non-React code (and the auto-rating
+// helper) can use it; re-exported here because this was its original home.
+export { computeAccuracy } from '@/lib/textCompare';
 
 export function DiffDisplay({
   expected,

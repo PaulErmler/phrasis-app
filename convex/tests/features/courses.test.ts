@@ -656,6 +656,58 @@ describe("features/courses", () => {
       expect(settings?.ignorePunctuation).toBe(false);
     });
 
+    // Same three-place regression class again — validator, PATCHABLE_KEYS and
+    // the hand-written insert object.
+    it("persists autoRateFromAccuracy on first insert", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        autoRateFromAccuracy: false,
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.autoRateFromAccuracy).toBe(false);
+    });
+
+    it("persists autoRateThresholds on first insert", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        autoRateThresholds: { hard: 40, good: 70 },
+      });
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.autoRateThresholds).toEqual({ hard: 40, good: 70 });
+    });
+
+    it("rejects auto-rate thresholds that are not ascending", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await expect(
+        asUser.mutation(api.features.courses.updateCourseSettings, {
+          courseId,
+          autoRateThresholds: { hard: 90, good: 20 },
+        }),
+      ).rejects.toThrow(/ascending/);
+    });
+
+    it("rejects auto-rate thresholds outside 0-100", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await expect(
+        asUser.mutation(api.features.courses.updateCourseSettings, {
+          courseId,
+          autoRateThresholds: { hard: 50, good: 140 },
+        }),
+      ).rejects.toThrow(/between 0 and 100/);
+    });
+
     it("persists the Practice Listening (target-before-base) fields on insert", async () => {
       const t = convexTest(schema, modules);
       const { asUser, courseId } = await makeActiveCourse(t);

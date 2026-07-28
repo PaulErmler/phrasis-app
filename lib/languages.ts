@@ -1756,15 +1756,19 @@ export type TranslationRule = {
 
 // --- Shared model stages (referenced by multiple rules) --------------------
 
-// Gemini 3.1 Flash Lite with `minimal` reasoning — primary for
+// Gemini 3.5 Flash Lite with `minimal` reasoning — primary for
 // `retranslation_custom` (flagged retranslations of user-created texts).
-// Kept on the cheaper Flash Lite tier (vs. Pro Medium for curriculum) on
-// the assumption that custom texts are mostly the user's own content where
-// a heavyweight cross-model second opinion adds less value than on curated
+// Kept on the Flash Lite tier (vs. Pro Medium for curriculum) on the
+// assumption that custom texts are mostly the user's own content where a
+// heavyweight cross-model second opinion adds less value than on curated
 // material. Minimal thinking still gives the retranslation a brief shot at
-// catching what the user flagged.
+// catching what the user flagged. Moved off 3.1 Flash Lite in Jul 2026:
+// 3.5 is a tier up in price ($0.30/$2.50 per M vs $0.25/$1.50, ~27% more
+// per retranslation at identical token counts) but this stage only fires
+// on a row the user has explicitly flagged as wrong, so it is both rare
+// and the one place where a better second opinion is worth paying for.
 const GEMINI_FLASH_LITE_MINIMAL: ModelStage = {
-  model: 'google/gemini-3.1-flash-lite',
+  model: 'google/gemini-3.5-flash-lite',
   reasoning: 'minimal',
   maxOutputTokens: 4_000,
 };
@@ -1853,8 +1857,8 @@ export const TRANSLATION_RULES = {
   },
   /**
    * Triggered by `flagTranslation` for flagged retranslations of CUSTOM
-   * (user-created) texts. Routes through Gemini 3.1 Flash Lite with
-   * `minimal` reasoning — kept on the cheaper Lite tier (vs. Pro Medium
+   * (user-created) texts. Routes through Gemini 3.5 Flash Lite with
+   * `minimal` reasoning — kept on the Lite tier (vs. Pro Medium
    * for curriculum) on the assumption that custom texts are mostly the
    * user's own content where a heavyweight cross-model second opinion
    * adds less value than on curated material. Worker behavior
@@ -1863,7 +1867,7 @@ export const TRANSLATION_RULES = {
    */
   retranslation_custom: {
     id: 'retranslation_custom',
-    label: 'Gemini 3.1 Flash Lite (minimal) — flagged custom retranslation',
+    label: 'Gemini 3.5 Flash Lite (minimal) — flagged custom retranslation',
     branches: [
       { maxChars: Infinity, primary: GEMINI_FLASH_LITE_MINIMAL },
     ],

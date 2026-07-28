@@ -11,6 +11,7 @@ import {
   deriveStreakDisplay,
 } from '../db/courseStats';
 import { getDailyStats } from '../db/stats/dailyStats';
+import { getCourseSettings } from '../db/courseSettings';
 import { EXTENDED_STATE_LABELS as STATE_LABELS } from '../lib/fsrsStates';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 import { normalizeLanguageCode } from '../../lib/languages';
@@ -63,6 +64,7 @@ export const getStatsPageData = query({
 
     // courseStats
     const stats = await dbGetCourseStats(ctx, userId, courseId);
+    const courseSettings = await getCourseSettings(ctx, courseId);
 
     // todayStats
     const todayStr = getTodayInTimezone(args.timezone);
@@ -168,7 +170,14 @@ export const getStatsPageData = query({
         totalCardsAddedManually: stats.totalCardsAddedManually ?? 0,
         totalAccuracySum: stats.totalAccuracySum ?? 0,
         totalAccuracyCount: stats.totalAccuracyCount ?? 0,
+        // Both punctuation variants, plus the setting that says which one to
+        // show. The tile picks client-side; the legacy pair above is the
+        // fallback for users whose history predates the split.
+        totalAccuracyStrictSum: stats.totalAccuracyStrictSum ?? 0,
+        totalAccuracyLenientSum: stats.totalAccuracyLenientSum ?? 0,
+        totalAccuracyDualCount: stats.totalAccuracyDualCount ?? 0,
       } : null,
+      ignorePunctuation: courseSettings?.ignorePunctuation ?? false,
       todayReps: todayDaily?.reps ?? 0,
       todayNewCards: todayDaily?.newCards ?? 0,
       todayTimeMs: todayDaily?.timeMs ?? 0,

@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import schema from "../../schema";
 import { api } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
 import { PROGRESS_DISPLAY_INTERVAL } from "../../../lib/constants/learning";
 import { llmPool } from "@/convex/lib/workpools";
 
@@ -803,6 +804,84 @@ describe("features/scheduling", () => {
       expect(replacement, "a replacement card should exist").toBeTruthy();
       expect(replacement?.radioPlayCount).toBe(12);
       expect(replacement?.radioRoundCounter).toBe(3);
+    });
+  });
+
+  describe("reviewCard — dual punctuation accuracy", () => {
+    async function reviewWith(
+      t: ReturnType<typeof convexTest>,
+      cardId: Id<"cards">,
+      extra: Record<string, number>,
+    ) {
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.scheduling.reviewCard, {
+        cardId,
+        rating: "good",
+        timezone: "UTC",
+        forceReviewPhase: true,
+        reviewMode: "full",
+        accuracy: 0.8,
+        ...extra,
+      });
+    }
+
+    const readDaily = (t: ReturnType<typeof convexTest>, courseId: Id<"courses">) =>
+      t.run(async (ctx) =>
+        ctx.db
+          .query("dailyStats")
+          .withIndex("by_userId_and_courseId_and_date", (q) =>
+            q.eq("userId", "user_A").eq("courseId", courseId),
+          )
+          .first(),
+      );
+
+    it("records both sums and a shared count when the pair is present", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, courseId } = await seedCardWithCourseAndStats(t);
+      await reviewWith(t, cardId, { accuracyStrict: 0.8, accuracyLenient: 0.95 });
+
+      const daily = await readDaily(t, courseId);
+      expect(daily?.accuracyStrictSum).toBeCloseTo(0.8);
+      expect(daily?.accuracyLenientSum).toBeCloseTo(0.95);
+      expect(daily?.accuracyDualCount).toBe(1);
+
+      const stats = await t.run(async (ctx) =>
+        ctx.db
+          .query("courseStats")
+          .withIndex("by_userId_and_courseId", (q) =>
+            q.eq("userId", "user_A").eq("courseId", courseId),
+          )
+          .first(),
+      );
+      expect(stats?.totalAccuracyStrictSum).toBeCloseTo(0.8);
+      expect(stats?.totalAccuracyLenientSum).toBeCloseTo(0.95);
+      expect(stats?.totalAccuracyDualCount).toBe(1);
+    });
+
+    // The two sums share one count, so a half-written pair would desynchronise
+    // the averages permanently. Neither is recorded unless both arrive.
+    it("records neither sum when only one half of the pair is sent", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, courseId } = await seedCardWithCourseAndStats(t);
+      await reviewWith(t, cardId, { accuracyStrict: 0.8 });
+
+      const daily = await readDaily(t, courseId);
+      expect(daily?.accuracyStrictSum).toBeUndefined();
+      expect(daily?.accuracyLenientSum).toBeUndefined();
+      expect(daily?.accuracyDualCount).toBeUndefined();
+      // The legacy series is unaffected by the gate.
+      expect(daily?.accuracySum).toBeCloseTo(0.8);
+    });
+
+    it("rejects an out-of-range value in either half", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedCardWithCourseAndStats(t);
+      await expect(
+        reviewWith(t, cardId, { accuracyStrict: 1.4, accuracyLenient: 0.9 }),
+      ).rejects.toThrow(/accuracyStrict/);
+      await expect(
+        reviewWith(t, cardId, { accuracyStrict: 0.9, accuracyLenient: -0.2 }),
+      ).rejects.toThrow(/accuracyLenient/);
     });
   });
 

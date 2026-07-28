@@ -587,6 +587,9 @@
       "autoRevealBaseOnSubmitDescription": "Unblur base text once all translations are submitted",
       "ignorePunctuation": "Ignore punctuation",
       "ignorePunctuationDescription": "Don't count commas, full stops and other punctuation towards the accuracy score",
+      "autoRateFromAccuracy": "Auto-rate from accuracy",
+      "autoRateFromAccuracyDescription": "Preselect a rating based on your writing score. You can still change it before continuing.",
+      "autoRateBoundary": "Boundary between {lower} and {upper}",
       "instantProceed": "Instant proceed on rating",
       "instantProceedDescription": "Advance to the next sentence immediately when a rating button is clicked"
     }

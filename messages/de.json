@@ -587,6 +587,9 @@
       "autoRevealBaseOnSubmitDescription": "Basistext einblenden, sobald alle Übersetzungen abgesendet sind",
       "ignorePunctuation": "Satzzeichen ignorieren",
       "ignorePunctuationDescription": "Kommas, Punkte und andere Satzzeichen nicht in die Genauigkeit einrechnen",
+      "autoRateFromAccuracy": "Automatisch nach Genauigkeit bewerten",
+      "autoRateFromAccuracyDescription": "Wählt anhand deiner Schreibgenauigkeit eine Bewertung vor. Du kannst sie vor dem Weitergehen weiterhin ändern.",
+      "autoRateBoundary": "Grenze zwischen {lower} und {upper}",
       "instantProceed": "Sofort weiter bei Bewertung",
       "instantProceedDescription": "Zum nächsten Satz wechseln, sobald eine Bewertung angeklickt wird"
     }

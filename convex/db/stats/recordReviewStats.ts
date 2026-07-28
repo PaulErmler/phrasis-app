@@ -41,6 +41,9 @@ export async function recordReviewStats(
     reviewMode?: 'audio' | 'full';
     rating: string;
     accuracy?: number;
+    /** Written only as a pair — see the courseStats patch below. */
+    accuracyStrict?: number;
+    accuracyLenient?: number;
     wasDefaultRating?: boolean;
     text?: Doc<'texts'> | null;
     sessionId?: string;
@@ -119,6 +122,16 @@ export async function recordReviewStats(
         totalAccuracyCount: (stats.totalAccuracyCount ?? 0) + 1,
       }
       : {}),
+    // Gated on BOTH being present, independently of `accuracy` above: the two
+    // sums share one count, so a half-written pair would desynchronise the
+    // averages permanently.
+    ...(args.accuracyStrict != null && args.accuracyLenient != null
+      ? {
+        totalAccuracyStrictSum: (stats.totalAccuracyStrictSum ?? 0) + args.accuracyStrict,
+        totalAccuracyLenientSum: (stats.totalAccuracyLenientSum ?? 0) + args.accuracyLenient,
+        totalAccuracyDualCount: (stats.totalAccuracyDualCount ?? 0) + 1,
+      }
+      : {}),
   });
 
   // --- Daily stats ---
@@ -143,6 +156,8 @@ export async function recordReviewStats(
     reviewMode: reviewModeForStats,
     rating: args.rating,
     accuracy: args.accuracy,
+    accuracyStrict: args.accuracyStrict,
+    accuracyLenient: args.accuracyLenient,
     wasDefaultRating: args.wasDefaultRating,
     hourOfDay,
     cardState: fsrsCardState,

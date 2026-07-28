@@ -94,6 +94,18 @@ export const schedulingModeValidator = v.union(
   v.literal('radio'),
 );
 
+// Writing mode: accuracy breakpoints that map a typed answer's score to an
+// FSRS rating. Percent points (0-100 integers), lower-inclusive — a score of
+// exactly `hard` rates "hard", a score of exactly `good` rates "good". `easy`
+// is optional and currently never written by the UI (the control ships with
+// three bands); when unset the top band is "good".
+// Invariant enforced on write: 0 <= hard <= good <= (easy ?? 100) <= 100.
+export const autoRateThresholdsValidator = v.object({
+  hard: v.number(),
+  good: v.number(),
+  easy: v.optional(v.number()),
+});
+
 // Source-of-content filter. `undefined` and 'both' behave identically (no filter).
 // 'custom' = study/auto-add only cards from collections with origin !== 'premade' (custom + chat).
 // 'course' = study/auto-add only cards from collections with origin === 'premade'.

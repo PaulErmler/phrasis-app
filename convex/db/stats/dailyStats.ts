@@ -70,6 +70,9 @@ export async function upsertDailyStats(
     reviewMode?: 'audio' | 'full' | 'radio';
     rating?: string;
     accuracy?: number;
+    /** Written only as a pair, sharing `accuracyDualCount`. */
+    accuracyStrict?: number;
+    accuracyLenient?: number;
     wasDefaultRating?: boolean;
     hourOfDay?: number;
     cardState?: number; // 0=new, 1=learning, 2=review, 3=relearning
@@ -160,6 +163,13 @@ export async function upsertDailyStats(
           accuracyCount: (existing.accuracyCount ?? 0) + 1,
         }
         : {}),
+      ...(args.accuracyStrict != null && args.accuracyLenient != null
+        ? {
+          accuracyStrictSum: (existing.accuracyStrictSum ?? 0) + args.accuracyStrict,
+          accuracyLenientSum: (existing.accuracyLenientSum ?? 0) + args.accuracyLenient,
+          accuracyDualCount: (existing.accuracyDualCount ?? 0) + 1,
+        }
+        : {}),
       ...(args.wasDefaultRating === true
         ? { defaultRatingUsed: (existing.defaultRatingUsed ?? 0) + 1 }
         : {}),
@@ -219,6 +229,13 @@ export async function upsertDailyStats(
       }
       : {}),
     ...(args.accuracy != null ? { accuracySum: args.accuracy, accuracyCount: 1 } : {}),
+    ...(args.accuracyStrict != null && args.accuracyLenient != null
+      ? {
+        accuracyStrictSum: args.accuracyStrict,
+        accuracyLenientSum: args.accuracyLenient,
+        accuracyDualCount: 1,
+      }
+      : {}),
     ...(args.wasDefaultRating === true ? { defaultRatingUsed: 1, defaultRatingChanged: 0 } : {}),
     ...(args.wasDefaultRating === false ? { defaultRatingUsed: 0, defaultRatingChanged: 1 } : {}),
   });

@@ -7,6 +7,7 @@ import {
   cardApprovalStatusValidator,
   schedulingModeValidator,
   studyContentFilterValidator,
+  autoRateThresholdsValidator,
   reviewRatingValidator,
   cardSchedulingSnapshotFields,
   cardRadioSnapshotFields,
@@ -126,6 +127,13 @@ export const courseSettingsFields = {
   // comma or full stop costs nothing. Unset = false = punctuation counts
   // (at PUNCT_WEIGHT, see lib/textCompare/score.ts).
   ignorePunctuation: v.optional(v.boolean()),
+  // Writing mode: preselect the FSRS rating from the typed answer's accuracy
+  // instead of always defaulting to "good". Unset = true (on by default); the
+  // rating is only ever preselected, never auto-submitted.
+  autoRateFromAccuracy: v.optional(v.boolean()),
+  // Accuracy breakpoints for the above. Unset = DEFAULT_AUTO_RATE_THRESHOLDS
+  // in lib/autoRating.ts (50 / 80).
+  autoRateThresholds: v.optional(autoRateThresholdsValidator),
   chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
@@ -603,6 +611,13 @@ export default defineSchema({
     totalReviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
     totalAccuracySum: v.optional(v.number()),
     totalAccuracyCount: v.optional(v.number()),
+    // Writing accuracy split by punctuation handling, so the headline number
+    // keeps its meaning when the learner toggles `ignorePunctuation`. Written
+    // as a trio — both sums share one count and are only ever incremented
+    // together. Rows predating this simply don't contribute.
+    totalAccuracyStrictSum: v.optional(v.number()), // punctuation always counted
+    totalAccuracyLenientSum: v.optional(v.number()), // punctuation always ignored
+    totalAccuracyDualCount: v.optional(v.number()),
   }).index('by_userId_and_courseId', ['userId', 'courseId']),
 
   // Daily stats table - one document per user + course + day
@@ -627,6 +642,10 @@ export default defineSchema({
     // Full review accuracy
     accuracySum: v.optional(v.number()),
     accuracyCount: v.optional(v.number()),
+    // Same punctuation split as courseStats — see there for the rationale.
+    accuracyStrictSum: v.optional(v.number()),
+    accuracyLenientSum: v.optional(v.number()),
+    accuracyDualCount: v.optional(v.number()),
     // Hour-of-day distribution (24-element array, index = hour 0-23)
     hourBuckets: v.optional(v.array(v.number())),
     // Card state distribution
@@ -683,6 +702,8 @@ export default defineSchema({
         wasFirstReview: v.boolean(), // pre-patch schedulingPhase === 'preReview' && preReviewCount === 0
         wasDefaultRating: v.optional(v.boolean()),
         accuracy: v.optional(v.number()),
+        accuracyStrict: v.optional(v.number()), // present iff the dual trio was written
+        accuracyLenient: v.optional(v.number()),
         reviewDepth: v.optional(v.number()), // reviewDepthAccuracy bucket, only when accuracy present
         languages: v.array(v.string()), // course languages whose per-language stats were incremented
         collectionId: v.optional(v.id('collections')),

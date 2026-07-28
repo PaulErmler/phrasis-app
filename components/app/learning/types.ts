@@ -116,9 +116,49 @@ export interface CourseSettings {
   writingInputMode?: 'translate' | 'transcribe';
   /** Writing mode: exclude punctuation from the accuracy score. Default false. */
   ignorePunctuation?: boolean;
+  /** Writing mode: preselect the rating from the accuracy score. Default true. */
+  autoRateFromAccuracy?: boolean;
+  /** Accuracy breakpoints for the above. Default 50 / 80. */
+  autoRateThresholds?: { hard: number; good: number; easy?: number };
   // Scheduling mode
   schedulingMode?: 'learn_new' | 'learnAndReview' | 'radio';
   // Language order overrides
   baseLanguageOrder?: string[];
   targetLanguageOrder?: string[];
+}
+
+/**
+ * Writing-mode accuracy for the card currently on screen, aggregated across
+ * target languages. Emitted whenever the submitted texts change.
+ *
+ * Two different numbers, for two different jobs:
+ *  - `avg*` is the recorded stat. It keeps the meaning it has always had (mean
+ *    across languages) and callers only persist it once `allSubmitted` is true,
+ *    so a half-answered card contributes nothing.
+ *  - `min*` drives the auto-rating. The weakest language should decide when the
+ *    card comes back — a perfect Spanish answer must not mask a failed
+ *    Japanese one — and it is available as soon as anything is submitted.
+ *
+ * Both punctuation variants are always computed, independently of the learner's
+ * `ignorePunctuation` setting, so stats can record both series in parallel.
+ * All values are 0-100; the `*` fields are null when nothing is submitted yet.
+ */
+export interface WritingAccuracySummary {
+  allSubmitted: boolean;
+  submittedCount: number;
+  targetCount: number;
+  avgWithPunctuation: number | null;
+  avgWithoutPunctuation: number | null;
+  minWithPunctuation: number | null;
+  minWithoutPunctuation: number | null;
+}
+
+/** The three accuracy figures sent to `reviewCard`, all 0-100. */
+export interface ReviewAccuracyPayload {
+  /** Scored under the learner's current setting — the historical series. */
+  primary: number;
+  /** Always punctuation-counted. */
+  strict: number;
+  /** Always punctuation-ignored. */
+  lenient: number;
 }

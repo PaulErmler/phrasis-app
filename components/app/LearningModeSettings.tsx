@@ -27,6 +27,7 @@ import {
   TimelineEventConnector,
 } from '@/components/app/learning/StepperPauseConnector';
 import { ReviewModeSwitcher } from '@/components/app/learning/ReviewModeSwitcher';
+import { AutoRateThresholdControl } from '@/components/app/learning/AutoRateBandSlider';
 import { CourseLanguageSettings } from '@/components/course/CourseLanguageSettings';
 import {
   DEFAULT_AUTO_PLAY,
@@ -48,6 +49,7 @@ import {
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
+import { languageNeedsRomanization } from '@/lib/languages';
 
 interface LearningModeSettingsProps {
   open: boolean;
@@ -91,6 +93,12 @@ export function LearningModeSettings({
   const targetLanguages = resolveLanguageOrder(
     courseSettings.targetLanguageOrder,
     targetProp,
+  );
+  // Computed from the raw props rather than the resolved order: these are the
+  // course's actual language lists, so the gate can't be affected by a future
+  // change to how ordering is resolved.
+  const courseSupportsRomanization = [...baseProp, ...targetProp].some(
+    languageNeedsRomanization,
   );
 
   // ---- existing setting handlers ----
@@ -489,6 +497,23 @@ export function LearningModeSettings({
     await updateSettings({
       courseId: courseSettings.courseId,
       ignorePunctuation: checked,
+    });
+  };
+
+  const handleAutoRateFromAccuracyChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      autoRateFromAccuracy: checked,
+    });
+  };
+
+  const handleAutoRateThresholdsCommit = async (next: {
+    hard: number;
+    good: number;
+  }) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      autoRateThresholds: next,
     });
   };
 
@@ -891,6 +916,64 @@ export function LearningModeSettings({
               className="mt-0.5"
             />
           </div>
+
+          {/* Writing-mode scoring: how the accuracy percentage is computed, and
+              what it then does with the rating. Both are writing-only, but this
+              section is shared with audio mode — hence the guard. */}
+          {reviewMode === 'full' && (
+            <>
+              <div className="settings-row">
+                <div className="space-y-0.5">
+                  <Label
+                    htmlFor="ignorePunctuation"
+                    className="text-sm font-medium"
+                  >
+                    {t('ignorePunctuation')}
+                  </Label>
+                  <p className="text-muted-xs">
+                    {t('ignorePunctuationDescription')}
+                  </p>
+                </div>
+                <Switch
+                  id="ignorePunctuation"
+                  checked={courseSettings.ignorePunctuation ?? false}
+                  onCheckedChange={handleIgnorePunctuationChange}
+                  className="mt-0.5"
+                />
+              </div>
+
+              <div className="space-y-0">
+                <div className="settings-row">
+                  <div className="space-y-0.5">
+                    <Label
+                      htmlFor="autoRateFromAccuracy"
+                      className="text-sm font-medium"
+                    >
+                      {t('autoRateFromAccuracy')}
+                    </Label>
+                    <p className="text-muted-xs">
+                      {t('autoRateFromAccuracyDescription')}
+                    </p>
+                  </div>
+                  <Switch
+                    id="autoRateFromAccuracy"
+                    checked={courseSettings.autoRateFromAccuracy ?? true}
+                    onCheckedChange={handleAutoRateFromAccuracyChange}
+                    className="mt-0.5"
+                  />
+                </div>
+
+                {(courseSettings.autoRateFromAccuracy ?? true) && (
+                  <div className="ml-4 mt-3 pl-3 border-l-2 border-border">
+                    <AutoRateThresholdControl
+                      thresholds={courseSettings.autoRateThresholds}
+                      onCommit={handleAutoRateThresholdsCommit}
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           <Separator />
 
@@ -1539,46 +1622,32 @@ export function LearningModeSettings({
             </div>
           )}
 
-          {/* Ignore punctuation in the accuracy score — writing mode only */}
-          {reviewMode === 'full' && (
+          {/* Show romanization — only when a language on this course actually
+              has a Latin transliteration to show. Hiding the control leaves the
+              stored value untouched: course languages are editable from this
+              same sheet, so clearing it would silently reset the preference
+              every time a language was removed and re-added. A stale `true` is
+              inert anyway — every consumer is gated on the translation
+              carrying a `romanization`, which the server only ever populates
+              for romanized languages. */}
+          {courseSupportsRomanization && (
             <div className="settings-row">
               <div className="space-y-0.5">
-                <Label
-                  htmlFor="ignorePunctuation"
-                  className="text-sm font-medium"
-                >
-                  {t('ignorePunctuation')}
+                <Label htmlFor="showRomanization" className="text-sm font-medium">
+                  {t('showRomanization')}
                 </Label>
                 <p className="text-muted-xs">
-                  {t('ignorePunctuationDescription')}
+                  {t('showRomanizationDescription')}
                 </p>
               </div>
               <Switch
-                id="ignorePunctuation"
-                checked={courseSettings.ignorePunctuation ?? false}
-                onCheckedChange={handleIgnorePunctuationChange}
+                id="showRomanization"
+                checked={courseSettings.showRomanization ?? true}
+                onCheckedChange={handleShowRomanizationChange}
                 className="mt-0.5"
               />
             </div>
           )}
-
-          {/* Show romanization */}
-          <div className="settings-row">
-            <div className="space-y-0.5">
-              <Label htmlFor="showRomanization" className="text-sm font-medium">
-                {t('showRomanization')}
-              </Label>
-              <p className="text-muted-xs">
-                {t('showRomanizationDescription')}
-              </p>
-            </div>
-            <Switch
-              id="showRomanization"
-              checked={courseSettings.showRomanization ?? true}
-              onCheckedChange={handleShowRomanizationChange}
-              className="mt-0.5"
-            />
-          </div>
 
           {/* Show progress bar */}
           <div className="settings-row">

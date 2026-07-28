@@ -654,6 +654,8 @@ describe("features/scheduling — undoLastReview", () => {
       forceReviewPhase: true,
       reviewMode: "full",
       accuracy: 0.8,
+      accuracyStrict: 0.8,
+      accuracyLenient: 0.95,
       wasDefaultRating: true,
     });
     await asUser.mutation(api.features.scheduling.undoLastReview, {
@@ -663,10 +665,18 @@ describe("features/scheduling — undoLastReview", () => {
     const stats = await getCourseStats(t, courseId);
     expect(stats?.totalAccuracySum ?? 0).toBe(0);
     expect(stats?.totalAccuracyCount ?? 0).toBe(0);
+    // The punctuation-split trio must reverse together with the legacy pair —
+    // a stranded sum or count would skew the average permanently.
+    expect(stats?.totalAccuracyStrictSum ?? 0).toBe(0);
+    expect(stats?.totalAccuracyLenientSum ?? 0).toBe(0);
+    expect(stats?.totalAccuracyDualCount ?? 0).toBe(0);
     expect(stats?.totalReviewsByMode?.full ?? 0).toBe(0);
     const daily = await getDaily(t, courseId);
     expect(daily?.accuracySum ?? 0).toBe(0);
     expect(daily?.accuracyCount ?? 0).toBe(0);
+    expect(daily?.accuracyStrictSum ?? 0).toBe(0);
+    expect(daily?.accuracyLenientSum ?? 0).toBe(0);
+    expect(daily?.accuracyDualCount ?? 0).toBe(0);
     expect(daily?.defaultRatingUsed ?? 0).toBe(0);
     expect(daily?.ratingCounts?.good).toBe(0);
     const depthRows = await t.run((ctx) =>

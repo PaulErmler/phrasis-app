@@ -48,12 +48,30 @@ A text-input-based review where the user types the translation for each target l
      `1 - distance/length` on the char path). Punctuation counts at
      `PUNCT_WEIGHT` (0.25 of a word) unless "Ignore punctuation" is on, in
      which case it is zero-weighted and rendered muted rather than as an error.
+   - **Both** punctuation variants are always computed (`computeAccuracyPair`
+     in `lib/textCompare/accuracy.ts`) and recorded, so the stat keeps its
+     meaning when the learner flips the setting. The pair runs two independent
+     comparisons rather than re-scoring one alignment: `normalize` strips
+     punctuation from *inside* words, so `don't` → `dont` changes the alignment
+     itself, not just the weights.
 5. The audio play button remains visible after submission. The user rates the card difficulty and advances.
+   - With **Auto-rate from accuracy** on (the default), the rating is
+     preselected from the score instead of always defaulting to "Good". It is
+     only ever *preselected* — nothing auto-submits, and a tap or number key
+     overrides it. Bands are lower-inclusive and configurable: by default
+     below 50% → Again, 50-79% → Hard, 80%+ → Good. "Easy" is never
+     auto-selected.
+   - With multiple target languages the rating uses the **minimum** accuracy
+     across the languages submitted so far, so a perfect answer in one language
+     can't mask a failed one in another. The *recorded stat* still uses the
+     average, and only once every language is submitted.
 
 ### Mode-specific settings
 
 | Setting | Description |
 |---------|-------------|
+| **Ignore punctuation** | Drop punctuation from the accuracy score. Lives at the end of the Review Settings section, above Auto-rate. |
+| **Auto-rate from accuracy** | Preselect the rating from the score (default on). Its threshold slider is an indented sub-setting — `AutoRateBandSlider`, built on `@radix-ui/react-slider` because the shadcn wrapper hardcodes its Track/Thumb classNames and Radix draws only one Range. Writes on `onValueCommit`, never `onValueChange`, so a drag is one mutation rather than one per pixel. |
 | **Automatically play Target Audio** | Main toggle controlling whether target language audio plays at all. When off, maps to `never`. Subtitle: "When to play target language audio". |
 | | Two mutually exclusive sub-options (shown when enabled): |
 | | - *After submitting text* (`afterSubmit`, default): target audio plays once automatically after the user submits their text for that language. Not included in the merged audio timeline. |
@@ -91,11 +109,24 @@ Two fields added to the `courseSettings` table:
 - `reviewMode` (`'audio' | 'full'`, optional, defaults to `'audio'`)
 - `fullReviewTargetAudioMode` (`'always' | 'afterSubmit' | 'never'`, optional, defaults to `'afterSubmit'`)
 - `ignorePunctuation` (`boolean`, optional, defaults to `false`) — exclude punctuation from the accuracy score
+- `autoRateFromAccuracy` (`boolean`, optional, defaults to **`true`**) — preselect the rating from the accuracy score
+- `autoRateThresholds` (`{ hard, good, easy? }`, optional, defaults to `{ hard: 50, good: 80 }`) — percent breakpoints, 0-100 integers, validated ascending on write
+
+Accuracy stats carry both punctuation variants. `courseStats` and `dailyStats`
+each gained `…StrictSum` / `…LenientSum` / `…DualCount` alongside the original
+`accuracySum` / `accuracyCount`. The two sums share one count and are written
+and reversed as a trio — a half-written pair would skew the average
+permanently. All fields are optional and no backfill exists (or is possible:
+recomputing a counterfactual score needs the typed text, which `reviewLogs`
+never stored and trims after `UNDO_DEPTH` entries anyway), so the split series
+simply starts at deploy. `reviewDepthAccuracy` was deliberately left on the
+single series — its consumer is an `internalQuery` with no frontend reader.
 
 ### Backend changes
 
 - `updateCourseSettings` mutation: accepts `reviewMode` and `fullReviewTargetAudioMode`.
 - `reviewCard` mutation: accepts optional `forceReviewPhase` boolean. When `true`, overrides the card's scheduling phase to `'review'` so FSRS ratings are accepted for pre-review cards.
+- `reviewCard` also accepts `accuracyStrict` / `accuracyLenient` beside `accuracy`. Because Convex validators reject unknown args, **the backend must be deployed before a client that sends them**.
 
 ### Audio behavior
 
