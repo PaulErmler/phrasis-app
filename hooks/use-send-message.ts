@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useMutation } from 'convex/react';
 import { ConvexError } from 'convex/values';
-import { isPaymentPastDueError } from '@/lib/utils';
+import { convexErrorCode } from '@/lib/utils';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { toast } from 'sonner';
@@ -72,54 +72,46 @@ export function useSendMessage({
           onSuccess();
         }
       } catch (error) {
-        // Swallowed silently: the reactive payment-overdue dialog is the
-        // canonical surface for this state (see isPaymentPastDueError).
-        if (isPaymentPastDueError(error)) {
-          if (setStatus) {
-            setStatus(CHAT_STATUS.READY);
+        if (error instanceof ConvexError) {
+          switch (convexErrorCode(error)) {
+            // Swallowed silently: the reactive payment-overdue dialog is the
+            // canonical surface for this state (see isPaymentPastDueError).
+            case 'PAYMENT_PAST_DUE': {
+              if (setStatus) {
+                setStatus(CHAT_STATUS.READY);
+              }
+              return;
+            }
+            case 'USAGE_LIMIT': {
+              const featureId =
+                (error.data as { featureId?: string })?.featureId ?? FEATURE_IDS.CHAT_MESSAGES;
+              if (onUsageLimit) {
+                onUsageLimit(featureId);
+              }
+              if (setStatus) {
+                setStatus(CHAT_STATUS.READY);
+              }
+              return;
+            }
+            case 'THREAD_MESSAGE_LIMIT': {
+              if (onThreadLimit) {
+                onThreadLimit();
+              }
+              if (setStatus) {
+                setStatus(CHAT_STATUS.READY);
+              }
+              return;
+            }
+            case 'MESSAGE_TOO_LONG': {
+              if (onMessageTooLong) {
+                onMessageTooLong();
+              }
+              if (setStatus) {
+                setStatus(CHAT_STATUS.READY);
+              }
+              return;
+            }
           }
-          return;
-        }
-
-        if (
-          error instanceof ConvexError &&
-          (error.data as { code?: string })?.code === 'USAGE_LIMIT'
-        ) {
-          const featureId =
-            (error.data as { featureId?: string })?.featureId ?? FEATURE_IDS.CHAT_MESSAGES;
-          if (onUsageLimit) {
-            onUsageLimit(featureId);
-          }
-          if (setStatus) {
-            setStatus(CHAT_STATUS.READY);
-          }
-          return;
-        }
-
-        if (
-          error instanceof ConvexError &&
-          (error.data as { code?: string })?.code === 'THREAD_MESSAGE_LIMIT'
-        ) {
-          if (onThreadLimit) {
-            onThreadLimit();
-          }
-          if (setStatus) {
-            setStatus(CHAT_STATUS.READY);
-          }
-          return;
-        }
-
-        if (
-          error instanceof ConvexError &&
-          (error.data as { code?: string })?.code === 'MESSAGE_TOO_LONG'
-        ) {
-          if (onMessageTooLong) {
-            onMessageTooLong();
-          }
-          if (setStatus) {
-            setStatus(CHAT_STATUS.READY);
-          }
-          return;
         }
 
         console.error('Failed to send message:', error);

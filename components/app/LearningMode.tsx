@@ -21,7 +21,10 @@ import { useLearningChatToggle } from '@/components/app/learning/LearningChatLay
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
-import { buildSessionSnapshot } from '@/components/app/learning/sessionSnapshot';
+import {
+  buildSessionSnapshot,
+  type SessionSnapshot,
+} from '@/components/app/learning/sessionSnapshot';
 import type { ReviewRating } from '@/lib/scheduling';
 import { autoRating } from '@/lib/autoRating';
 import type {
@@ -68,24 +71,14 @@ interface LearningModeProps {
    */
   onCardRated?: (
     rating: ReviewRating | undefined,
-    snapshot: {
-      sessionId: string;
-      dailyReviewsToday: number;
-      dailyTimeMsToday: number;
-      dailyNewWordsToday: number;
-    },
+    snapshot: SessionSnapshot,
   ) => void;
   /**
    * Fires after an undo actually reverted a review — the mirror image of
    * `onCardRated`, so the onboarding wizard can decrement its rated-card
    * counter and keep the lesson progress accurate.
    */
-  onCardUndone?: (snapshot: {
-    sessionId: string;
-    dailyReviewsToday: number;
-    dailyTimeMsToday: number;
-    dailyNewWordsToday: number;
-  }) => void;
+  onCardUndone?: (snapshot: SessionSnapshot) => void;
 }
 
 /**

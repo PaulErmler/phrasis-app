@@ -1,8 +1,10 @@
 type Granularity = 'grapheme' | 'word' | 'sentence';
 
+// Segmenter construction is measurable on hot paths (review writes,
+// migrations, edit flows). Cache per locale + granularity.
 const cache = new Map<string, Intl.Segmenter>();
 
-function getSegmenter(
+export function getSegmenter(
   locale: string,
   granularity: Granularity,
 ): Intl.Segmenter {

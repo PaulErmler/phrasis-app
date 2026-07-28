@@ -5,7 +5,7 @@ import {
   USER_PROVIDED_TRANSLATION_SOURCE,
   isTranslationVersionStale,
 } from '../../lib/languages';
-import { CLAIM_STALE_MS as LLM_CLAIM_STALE_MS } from '../features/llmTranslationQueue';
+import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -117,14 +117,7 @@ export async function buildTextContentBatchForLanguages(
     // "Retranslating" pill keys off this so it doesn't fire when the user
     // clicks "regenerate audio" (no LLM phase, no claim).
     Promise.all(
-      translationFetches.map((item) =>
-        ctx.db
-          .query('llmTranslationClaims')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', item.textId).eq('targetLanguage', item.lang),
-          )
-          .first(),
-      ),
+      translationFetches.map((item) => getLlmClaim(ctx, item.textId, item.lang)),
     ),
   ]);
 
@@ -210,8 +203,7 @@ export async function buildTextContentBatchForLanguages(
       const entry = translationMap.get(`${input.key}:${lang}`);
       const translatedText = entry?.text ?? '';
       const claimedAt = entry?.llmClaimedAt ?? null;
-      const llmClaimHeld =
-        claimedAt !== null && Date.now() - claimedAt < LLM_CLAIM_STALE_MS;
+      const llmClaimHeld = claimedAt !== null && isClaimFresh({ claimedAt });
       return {
         language: lang,
         text: translatedText,

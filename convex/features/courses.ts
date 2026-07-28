@@ -1,4 +1,4 @@
-import { v, ConvexError } from 'convex/values';
+import { v, ConvexError, type Infer } from 'convex/values';
 import {
   PLAYBACK_SPEED_MIN,
   PLAYBACK_SPEED_MAX,
@@ -11,8 +11,6 @@ import { Id } from '../_generated/dataModel';
 import {
   learningStyleValidator,
   currentLevelValidator,
-  reviewModeValidator,
-  autoRateThresholdsValidator,
 } from '../types';
 import { tutorialIdValidator } from './tutorialIds';
 import {
@@ -60,7 +58,12 @@ import {
   resolveStartingCollection,
 } from '../db/collections';
 import { createCardsFromTexts, updateCollectionProgress } from './decks';
-import { courseSettingsDocValidator } from '../schema';
+import {
+  courseSettingsDocValidator,
+  coursePatchableSettingsValidator,
+  onboardingProgressFields,
+  onboardingProgressDocValidator,
+} from '../schema';
 import { normalizePinnedCardActions } from '../../lib/cardActions';
 
 async function validateLanguageLimits(
@@ -302,46 +305,7 @@ export const getActiveCourse = query({
  */
 export const getOnboardingProgress = query({
   args: {},
-  returns: v.union(
-    v.object({
-      _id: v.id('onboardingProgress'),
-      _creationTime: v.number(),
-      userId: v.string(),
-      step: v.number(),
-      reviewMode: v.optional(reviewModeValidator),
-      currentLevel: v.optional(currentLevelValidator),
-      targetLanguages: v.optional(v.array(v.string())),
-      baseLanguages: v.optional(v.array(v.string())),
-      acquisitionSource: v.optional(v.string()),
-      acquisitionSourceFreeText: v.optional(v.string()),
-      learningGoals: v.optional(v.array(v.string())),
-      learningGoalFreeText: v.optional(v.string()),
-      dailyTimeGoalMinutes: v.optional(v.number()),
-      firstLessonCardsRated: v.optional(v.number()),
-      firstLessonSessionId: v.optional(v.string()),
-      firstLessonSummary: v.optional(
-        v.object({
-          cardsRated: v.number(),
-          sessionId: v.string(),
-          dailyReviewsToday: v.number(),
-          dailyTimeMsToday: v.number(),
-          dailyNewWordsToday: v.number(),
-        }),
-      ),
-      placementTest: v.optional(
-        v.object({
-          strategyVersion: v.optional(v.number()),
-          strategy: v.string(),
-          history: v.array(
-            v.object({ level: v.number(), knew: v.boolean() }),
-          ),
-          finalLevel: v.optional(v.number()),
-        }),
-      ),
-      completedAt: v.optional(v.number()),
-    }),
-    v.null(),
-  ),
+  returns: v.union(onboardingProgressDocValidator, v.null()),
   handler: async (ctx) => {
     try {
       const userId = await getAuthUserId(ctx);
@@ -656,57 +620,22 @@ export const unarchiveCourse = mutation({
 /**
  * Save onboarding progress.
  */
-// Field list reused for arg and return validators on the onboarding-progress
-// mutation. Extending this list is the single point where new wizard fields
-// get plumbed through (schema → mutation → page).
-const onboardingProgressFields = {
-  step: v.number(),
-  reviewMode: v.optional(reviewModeValidator),
-  targetLanguages: v.optional(v.array(v.string())),
-  currentLevel: v.optional(currentLevelValidator),
-  baseLanguages: v.optional(v.array(v.string())),
-  acquisitionSource: v.optional(v.string()),
-  acquisitionSourceFreeText: v.optional(v.string()),
-  learningGoals: v.optional(v.array(v.string())),
-  learningGoalFreeText: v.optional(v.string()),
-  dailyTimeGoalMinutes: v.optional(v.number()),
-  placementTest: v.optional(
-    v.object({
-      // See convex/schema.ts for the rationale on this version field.
-      strategyVersion: v.optional(v.number()),
-      strategy: v.string(),
-      history: v.array(
-        v.object({ level: v.number(), knew: v.boolean() }),
-      ),
-      finalLevel: v.optional(v.number()),
-    }),
-  ),
-  firstLessonCardsRated: v.optional(v.number()),
-  firstLessonSessionId: v.optional(v.string()),
-  firstLessonSummary: v.optional(
-    v.object({
-      cardsRated: v.number(),
-      sessionId: v.string(),
-      dailyReviewsToday: v.number(),
-      dailyTimeMsToday: v.number(),
-      dailyNewWordsToday: v.number(),
-    }),
-  ),
-};
+// Args for the onboarding-progress mutation, derived from the canonical
+// `onboardingProgressFields` in convex/schema.ts (the single point where new
+// wizard fields get plumbed through: schema → mutation → page). Omits
+// `userId` (derived from auth) and `completedAt` (the wizard can't set it —
+// only `finalizeOnboarding` does); `step` stays required.
+const saveOnboardingProgressArgs = v
+  .object(onboardingProgressFields)
+  .omit('userId', 'completedAt');
 
 export const saveOnboardingProgress = mutation({
-  args: onboardingProgressFields,
-  returns: v.object({
-    _id: v.id('onboardingProgress'),
-    _creationTime: v.number(),
-    userId: v.string(),
-    ...onboardingProgressFields,
-    // Not in args (wizard can't set this — only `finalizeOnboarding`
-    // does), but present on the returned Doc, so the validator must
-    // accept it. Always undefined on rows reachable by this mutation
-    // because `dbGetOnboardingProgress` filters out completed rows.
-    completedAt: v.optional(v.number()),
-  }),
+  args: saveOnboardingProgressArgs.fields,
+  // The returned Doc also carries `userId` and `completedAt`, so the
+  // validator must accept them. `completedAt` is always undefined on rows
+  // reachable by this mutation because `dbGetOnboardingProgress` filters
+  // out completed rows.
+  returns: onboardingProgressDocValidator,
   handler: async (ctx, args) => {
     const userId = await requireAuthUserId(ctx);
 
@@ -1106,74 +1035,19 @@ export const setCurrentSessionId = mutation({
 /**
  * Update the initialReviewCount for the user's active course.
  */
+// The updatable settings shape (and the mutation's arg/patch key list) is
+// derived from the schema's canonical `courseSettingsFields` — see
+// `coursePatchableSettingsValidator` in convex/schema.ts.
+type CoursePatchableSettings = Infer<typeof coursePatchableSettingsValidator>;
+
+const PATCHABLE_KEYS = Object.keys(
+  coursePatchableSettingsValidator.fields,
+) as Array<keyof CoursePatchableSettings>;
+
 export const updateCourseSettings = mutation({
   args: {
     courseId: v.id('courses'),
-    initialReviewCount: v.optional(v.number()),
-    cardsToAddBatchSize: v.optional(v.number()),
-    autoAddCards: v.optional(v.boolean()),
-    // Audio playback settings
-    highlightWords: v.optional(v.boolean()),
-    autoPlayAudio: v.optional(v.boolean()),
-    autoAdvance: v.optional(v.boolean()),
-    languageRepetitions: v.optional(v.record(v.string(), v.number())),
-    languageRepetitionPauses: v.optional(v.record(v.string(), v.number())),
-    languagePlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
-    pauseBaseToBase: v.optional(v.number()),
-    pauseBaseToTarget: v.optional(v.number()),
-    pauseTargetToTarget: v.optional(v.number()),
-    pauseBeforeAutoAdvance: v.optional(v.number()),
-    // Writing ("full") mode counterparts — see courseSettingsFields in schema.ts.
-    highlightWordsFull: v.optional(v.boolean()),
-    autoPlayAudioFull: v.optional(v.boolean()),
-    languageRepetitionsFull: v.optional(v.record(v.string(), v.number())),
-    languageRepetitionPausesFull: v.optional(v.record(v.string(), v.number())),
-    languagePlaybackSpeedsFull: v.optional(v.record(v.string(), v.number())),
-    pauseBaseToBaseFull: v.optional(v.number()),
-    pauseBaseToTargetFull: v.optional(v.number()),
-    pauseTargetToTargetFull: v.optional(v.number()),
-    pauseBeforeAutoAdvanceFull: v.optional(v.number()),
-    highlightWordsTranscribe: v.optional(v.boolean()),
-    autoPlayAudioTranscribe: v.optional(v.boolean()),
-    languageRepetitionsTranscribe: v.optional(v.record(v.string(), v.number())),
-    languageRepetitionPausesTranscribe: v.optional(v.record(v.string(), v.number())),
-    languagePlaybackSpeedsTranscribe: v.optional(v.record(v.string(), v.number())),
-    pauseTargetToTargetTranscribe: v.optional(v.number()),
-    transcribeAfterRepetitions: v.optional(v.record(v.string(), v.number())),
-    transcribeAfterRepetitionPauses: v.optional(v.record(v.string(), v.number())),
-    transcribeAfterPlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
-    playTargetBeforeBase: v.optional(v.boolean()),
-    playTargetAfterBase: v.optional(v.boolean()),
-    targetBeforeRepetitions: v.optional(v.record(v.string(), v.number())),
-    targetBeforeRepetitionPauses: v.optional(v.record(v.string(), v.number())),
-    targetBeforePlaybackSpeeds: v.optional(v.record(v.string(), v.number())),
-    pauseTargetToBase: v.optional(v.number()),
-    targetBeforeOnlyNewReps: v.optional(v.number()),
-    showProgressBar: v.optional(v.boolean()),
-    progressDisplayEnabled: v.optional(v.boolean()),
-    hideTargetLanguages: v.optional(v.boolean()),
-    autoRevealLanguages: v.optional(v.boolean()),
-    hideBaseLanguages: v.optional(v.boolean()),
-    autoRevealBaseLanguages: v.optional(v.boolean()),
-    hideBaseLanguagesFull: v.optional(v.boolean()),
-    autoRevealBaseOnSubmit: v.optional(v.boolean()),
-    showRomanization: v.optional(v.boolean()),
-    baseLanguageOrder: v.optional(v.array(v.string())),
-    targetLanguageOrder: v.optional(v.array(v.string())),
-    instantProceedAudio: v.optional(v.boolean()),
-    instantProceedFull: v.optional(v.boolean()),
-    reviewMode: v.optional(v.union(v.literal('audio'), v.literal('full'))),
-    fullReviewTargetAudioMode: v.optional(
-      v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
-    ),
-    writingInputMode: v.optional(
-      v.union(v.literal('translate'), v.literal('transcribe')),
-    ),
-    ignorePunctuation: v.optional(v.boolean()),
-    autoRateFromAccuracy: v.optional(v.boolean()),
-    autoRateThresholds: v.optional(autoRateThresholdsValidator),
-    schedulingMode: v.optional(v.union(v.literal('learn_new'), v.literal('learnAndReview'), v.literal('radio'))),
-    studyContentFilter: v.optional(v.union(v.literal('custom'), v.literal('course'), v.literal('both'))),
+    ...coursePatchableSettingsValidator.fields,
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -1192,70 +1066,8 @@ export const updateCourseSettings = mutation({
       throw new ConvexError('Course does not belong to user');
 
     // Build patch object with only provided fields
-    const PATCHABLE_KEYS = [
-      'initialReviewCount',
-      'cardsToAddBatchSize',
-      'autoAddCards',
-      'highlightWords',
-      'autoPlayAudio',
-      'autoAdvance',
-      'languageRepetitions',
-      'languageRepetitionPauses',
-      'languagePlaybackSpeeds',
-      'pauseBaseToBase',
-      'pauseBaseToTarget',
-      'pauseTargetToTarget',
-      'pauseBeforeAutoAdvance',
-      'highlightWordsFull',
-      'autoPlayAudioFull',
-      'languageRepetitionsFull',
-      'languageRepetitionPausesFull',
-      'languagePlaybackSpeedsFull',
-      'pauseBaseToBaseFull',
-      'pauseBaseToTargetFull',
-      'pauseTargetToTargetFull',
-      'pauseBeforeAutoAdvanceFull',
-      'highlightWordsTranscribe',
-      'autoPlayAudioTranscribe',
-      'languageRepetitionsTranscribe',
-      'languageRepetitionPausesTranscribe',
-      'languagePlaybackSpeedsTranscribe',
-      'pauseTargetToTargetTranscribe',
-      'transcribeAfterRepetitions',
-      'transcribeAfterRepetitionPauses',
-      'transcribeAfterPlaybackSpeeds',
-      'playTargetBeforeBase',
-      'playTargetAfterBase',
-      'targetBeforeRepetitions',
-      'targetBeforeRepetitionPauses',
-      'targetBeforePlaybackSpeeds',
-      'pauseTargetToBase',
-      'targetBeforeOnlyNewReps',
-      'showProgressBar',
-      'progressDisplayEnabled',
-      'hideTargetLanguages',
-      'autoRevealLanguages',
-      'hideBaseLanguages',
-      'autoRevealBaseLanguages',
-      'hideBaseLanguagesFull',
-      'autoRevealBaseOnSubmit',
-      'showRomanization',
-      'baseLanguageOrder',
-      'targetLanguageOrder',
-      'instantProceedAudio',
-      'instantProceedFull',
-      'reviewMode',
-      'fullReviewTargetAudioMode',
-      'writingInputMode',
-      'ignorePunctuation',
-      'autoRateFromAccuracy',
-      'autoRateThresholds',
-      'schedulingMode',
-      'studyContentFilter',
-    ] as const;
-
     const existing = await dbGetCourseSettings(ctx, args.courseId);
-    const patch: Record<string, unknown> = {};
+    const patch: Partial<CoursePatchableSettings> = {};
     for (const key of PATCHABLE_KEYS) {
       let value = args[key];
       if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
@@ -1284,7 +1096,8 @@ export const updateCourseSettings = mutation({
         }
         value = clamped;
       }
-      if (value !== undefined) patch[key] = value;
+      // Cast: TS can't correlate `key` with `value` across the loop's union.
+      if (value !== undefined) (patch as Record<string, unknown>)[key] = value;
     }
 
     // Safety net for the "at least one target play position" invariant. The UI
@@ -1313,76 +1126,15 @@ export const updateCourseSettings = mutation({
     if (existing) {
       await ctx.db.patch(existing._id, patch);
     } else {
+      // `patch` holds exactly the provided fields, with the loop's clamps and
+      // the both-toggles-off guard already applied — so first insert enforces
+      // the same ranges/invariants as the patch path. `initialReviewCount` is
+      // the one field the table requires, so it gets a default.
       await ctx.db.insert('courseSettings', {
         courseId: args.courseId,
+        ...patch,
         initialReviewCount:
           args.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT,
-        // Use the clamped patch value (set in the loop above) so the insert path
-        // enforces the [1, MAX_CARDS_PER_BATCH] range, not just the patch path.
-        cardsToAddBatchSize:
-          (patch.cardsToAddBatchSize as number | undefined) ??
-          args.cardsToAddBatchSize,
-        autoAddCards: args.autoAddCards,
-        highlightWords: args.highlightWords,
-        autoPlayAudio: args.autoPlayAudio,
-        autoAdvance: args.autoAdvance,
-        languageRepetitions: args.languageRepetitions,
-        languageRepetitionPauses: args.languageRepetitionPauses,
-        languagePlaybackSpeeds: (patch.languagePlaybackSpeeds as Record<string, number> | undefined) ?? args.languagePlaybackSpeeds,
-        pauseBaseToBase: args.pauseBaseToBase,
-        pauseBaseToTarget: args.pauseBaseToTarget,
-        pauseTargetToTarget: args.pauseTargetToTarget,
-        pauseBeforeAutoAdvance: args.pauseBeforeAutoAdvance,
-        highlightWordsFull: args.highlightWordsFull,
-        autoPlayAudioFull: args.autoPlayAudioFull,
-        languageRepetitionsFull: args.languageRepetitionsFull,
-        languageRepetitionPausesFull: args.languageRepetitionPausesFull,
-        languagePlaybackSpeedsFull: (patch.languagePlaybackSpeedsFull as Record<string, number> | undefined) ?? args.languagePlaybackSpeedsFull,
-        pauseBaseToBaseFull: args.pauseBaseToBaseFull,
-        pauseBaseToTargetFull: args.pauseBaseToTargetFull,
-        pauseTargetToTargetFull: args.pauseTargetToTargetFull,
-        pauseBeforeAutoAdvanceFull: args.pauseBeforeAutoAdvanceFull,
-        highlightWordsTranscribe: args.highlightWordsTranscribe,
-        autoPlayAudioTranscribe: args.autoPlayAudioTranscribe,
-        languageRepetitionsTranscribe: args.languageRepetitionsTranscribe,
-        languageRepetitionPausesTranscribe: args.languageRepetitionPausesTranscribe,
-        languagePlaybackSpeedsTranscribe: (patch.languagePlaybackSpeedsTranscribe as Record<string, number> | undefined) ?? args.languagePlaybackSpeedsTranscribe,
-        pauseTargetToTargetTranscribe: args.pauseTargetToTargetTranscribe,
-        transcribeAfterRepetitions: args.transcribeAfterRepetitions,
-        transcribeAfterRepetitionPauses: args.transcribeAfterRepetitionPauses,
-        transcribeAfterPlaybackSpeeds: (patch.transcribeAfterPlaybackSpeeds as Record<string, number> | undefined) ?? args.transcribeAfterPlaybackSpeeds,
-        playTargetBeforeBase: args.playTargetBeforeBase,
-        // Use the patched value so the both-toggles-off guard above also applies
-        // on first insert, not only on the patch path.
-        playTargetAfterBase:
-          (patch.playTargetAfterBase as boolean | undefined) ??
-          args.playTargetAfterBase,
-        targetBeforeRepetitions: args.targetBeforeRepetitions,
-        targetBeforeRepetitionPauses: args.targetBeforeRepetitionPauses,
-        targetBeforePlaybackSpeeds: (patch.targetBeforePlaybackSpeeds as Record<string, number> | undefined) ?? args.targetBeforePlaybackSpeeds,
-        pauseTargetToBase: args.pauseTargetToBase,
-        targetBeforeOnlyNewReps: (patch.targetBeforeOnlyNewReps as number | undefined) ?? args.targetBeforeOnlyNewReps,
-        showProgressBar: args.showProgressBar,
-        progressDisplayEnabled: args.progressDisplayEnabled,
-        hideTargetLanguages: args.hideTargetLanguages,
-        autoRevealLanguages: args.autoRevealLanguages,
-        hideBaseLanguages: args.hideBaseLanguages,
-        autoRevealBaseLanguages: args.autoRevealBaseLanguages,
-        hideBaseLanguagesFull: args.hideBaseLanguagesFull,
-        autoRevealBaseOnSubmit: args.autoRevealBaseOnSubmit,
-        showRomanization: args.showRomanization,
-        baseLanguageOrder: args.baseLanguageOrder,
-        targetLanguageOrder: args.targetLanguageOrder,
-        instantProceedAudio: args.instantProceedAudio,
-        instantProceedFull: args.instantProceedFull,
-        reviewMode: args.reviewMode,
-        fullReviewTargetAudioMode: args.fullReviewTargetAudioMode,
-        writingInputMode: args.writingInputMode,
-        ignorePunctuation: args.ignorePunctuation,
-        autoRateFromAccuracy: args.autoRateFromAccuracy,
-        autoRateThresholds: args.autoRateThresholds,
-        schedulingMode: args.schedulingMode,
-        studyContentFilter: args.studyContentFilter,
       });
     }
 

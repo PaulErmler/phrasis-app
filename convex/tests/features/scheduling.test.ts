@@ -2682,7 +2682,7 @@ describe("features/scheduling", () => {
 
     it("over-cap flag only increments counter — no enqueue, no charge", async () => {
       // Pre-seed flagCount=2 (the cap). Next flag bumps it to 3, which is
-      // past FLAG_RETRANSLATION_MAX, so the short-circuit returns before
+      // past FLAG_AUTO_RETRANSLATION_MAX, so the short-circuit returns before
       // claiming, enqueuing, or charging quota.
       const t = convexTest(schema, modules);
       const { cardId, translationId } = await seedFlaggableCard(t, {

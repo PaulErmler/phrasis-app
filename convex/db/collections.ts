@@ -22,6 +22,48 @@ export async function getActiveDataset(
 }
 
 /**
+ * Load the premade level collections shown across the app, plus the active
+ * dataset they belong to (or null pre-cutover).
+ *
+ * Only fetches the rows actually displayed — either the active dataset's ~20
+ * collections (one indexed scan of `by_datasetId_and_order`) or the seven
+ * legacy CEFR rows by name (one indexed `first()` each). Avoids the global
+ * `collections` scan that would otherwise grow with every user's custom and
+ * chat collections; custom collections have no `datasetId` and don't share
+ * names with LEGACY_LEVEL_ORDER, so both branches naturally exclude them.
+ */
+export async function getPremadeLevelCollections(
+  ctx: QueryCtx,
+): Promise<{
+  activeDataset: Doc<'datasets'> | null;
+  collections: Doc<'collections'>[];
+}> {
+  const activeDataset = await getActiveDataset(ctx);
+  let levelCollections: Doc<'collections'>[];
+  if (activeDataset) {
+    levelCollections = await ctx.db
+      .query('collections')
+      .withIndex('by_datasetId_and_order', (q) =>
+        q.eq('datasetId', activeDataset._id),
+      )
+      .collect();
+  } else {
+    const legacyDocs = await Promise.all(
+      LEGACY_LEVEL_ORDER.map((name) =>
+        ctx.db
+          .query('collections')
+          .withIndex('by_name', (q) => q.eq('name', name))
+          .first(),
+      ),
+    );
+    levelCollections = legacyDocs.filter(
+      (c): c is Doc<'collections'> => c !== null,
+    );
+  }
+  return { activeDataset, collections: levelCollections };
+}
+
+/**
  * Resolve the starting collection for a user's `currentLevel`, preferring the
  * active dataset's level. Falls back to the legacy collection if no active
  * dataset is found.
@@ -199,6 +241,57 @@ export async function getNextTextsFromRank(
 }
 
 /**
+ * Get or create the per-course origin collection (`'chat'` for AI-approved
+ * texts, `'custom'` for manually entered texts). Revalidates the id stored in
+ * courseSettings, inserts the collection if missing, and records it in
+ * courseSettings (patching the existing row or inserting a fallback one),
+ * appending it to `activeCustomCollectionIds` either way.
+ */
+async function getOrCreateOriginCollection(
+  ctx: MutationCtx,
+  courseId: Id<'courses'>,
+  kind: 'chat' | 'custom',
+): Promise<Doc<'collections'>> {
+  const settings = await getCourseSettings(ctx, courseId);
+
+  const existingId =
+    kind === 'chat' ? settings?.chatCollectionId : settings?.customCollectionId;
+  if (existingId) {
+    const existing = await ctx.db.get(existingId);
+    if (existing) return existing;
+  }
+
+  const collectionId = await ctx.db.insert('collections', {
+    name: kind === 'chat' ? 'Chat' : 'Custom',
+    textCount: 0,
+    origin: kind,
+  });
+
+  const settingsPatch =
+    kind === 'chat'
+      ? { chatCollectionId: collectionId }
+      : { customCollectionId: collectionId };
+  if (settings) {
+    const existingCustomIds = settings.activeCustomCollectionIds ?? [];
+    await ctx.db.patch(settings._id, {
+      ...settingsPatch,
+      activeCustomCollectionIds: [...existingCustomIds, collectionId],
+    });
+  } else {
+    await ctx.db.insert('courseSettings', {
+      courseId,
+      initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
+      ...settingsPatch,
+      activeCustomCollectionIds: [collectionId],
+    });
+  }
+
+  const collection = await ctx.db.get(collectionId);
+  if (!collection) throw new Error(`Failed to create ${kind} collection`);
+  return collection;
+}
+
+/**
  * Get or create the per-course chat collection used for AI-approved texts.
  * Returns the collection doc and whether courseSettings was updated.
  */
@@ -206,37 +299,7 @@ export async function getOrCreateChatCollection(
   ctx: MutationCtx,
   courseId: Id<'courses'>,
 ): Promise<Doc<'collections'>> {
-  const settings = await getCourseSettings(ctx, courseId);
-
-  if (settings?.chatCollectionId) {
-    const existing = await ctx.db.get(settings.chatCollectionId);
-    if (existing) return existing;
-  }
-
-  const collectionId = await ctx.db.insert('collections', {
-    name: 'Chat',
-    textCount: 0,
-    origin: 'chat',
-  });
-
-  if (settings) {
-    const existingCustomIds = settings.activeCustomCollectionIds ?? [];
-    await ctx.db.patch(settings._id, {
-      chatCollectionId: collectionId,
-      activeCustomCollectionIds: [...existingCustomIds, collectionId],
-    });
-  } else {
-    await ctx.db.insert('courseSettings', {
-      courseId,
-      initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
-      chatCollectionId: collectionId,
-      activeCustomCollectionIds: [collectionId],
-    });
-  }
-
-  const collection = await ctx.db.get(collectionId);
-  if (!collection) throw new Error('Failed to create chat collection');
-  return collection;
+  return getOrCreateOriginCollection(ctx, courseId, 'chat');
 }
 
 /**
@@ -246,35 +309,5 @@ export async function getOrCreateCustomCollection(
   ctx: MutationCtx,
   courseId: Id<'courses'>,
 ): Promise<Doc<'collections'>> {
-  const settings = await getCourseSettings(ctx, courseId);
-
-  if (settings?.customCollectionId) {
-    const existing = await ctx.db.get(settings.customCollectionId);
-    if (existing) return existing;
-  }
-
-  const collectionId = await ctx.db.insert('collections', {
-    name: 'Custom',
-    textCount: 0,
-    origin: 'custom',
-  });
-
-  if (settings) {
-    const existingCustomIds = settings.activeCustomCollectionIds ?? [];
-    await ctx.db.patch(settings._id, {
-      customCollectionId: collectionId,
-      activeCustomCollectionIds: [...existingCustomIds, collectionId],
-    });
-  } else {
-    await ctx.db.insert('courseSettings', {
-      courseId,
-      initialReviewCount: DEFAULT_INITIAL_REVIEW_COUNT,
-      customCollectionId: collectionId,
-      activeCustomCollectionIds: [collectionId],
-    });
-  }
-
-  const collection = await ctx.db.get(collectionId);
-  if (!collection) throw new Error('Failed to create custom collection');
-  return collection;
+  return getOrCreateOriginCollection(ctx, courseId, 'custom');
 }

@@ -257,8 +257,9 @@ export interface Language {
    */
   romanizationBackend?: 'local' | 'google-v3';
   /**
-   * Locale-keyed display-name overrides (e.g. { en: 'Spanish (Spain)' }) for
-   * codes where Intl.DisplayNames is ambiguous. Resolution falls back to the
+   * Locale-keyed display-name overrides (e.g. { de: 'Spanisch (Spanien)' })
+   * for codes where Intl.DisplayNames is ambiguous. The `en` value is derived
+   * from `name` when the override map is built. Resolution falls back to the
    * `en` value, then Intl. The `displayCode` is also registered as a lookup key.
    */
   displayNameOverrides?: Record<string, string>;
@@ -295,7 +296,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'en-GB',
     googleTranslateCode: 'en',
     compareLocale: 'en-GB',
-    displayNameOverrides: { en: 'English (UK)', de: 'Englisch (UK)' },
+    displayNameOverrides: { de: 'Englisch (UK)' },
     name: 'English (UK)',
     nativeName: 'English (UK)',
     flag: '🇬🇧',
@@ -321,7 +322,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'en-US',
     googleTranslateCode: 'en',
     compareLocale: 'en-US',
-    displayNameOverrides: { en: 'English (US)', de: 'Englisch (USA)' },
+    displayNameOverrides: { de: 'Englisch (USA)' },
     name: 'English (US)',
     nativeName: 'English (US)',
     flag: '🇺🇸',
@@ -342,7 +343,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'en-AU',
     googleTranslateCode: 'en',
     compareLocale: 'en-AU',
-    displayNameOverrides: { en: 'English (Australia)', de: 'Englisch (Australien)' },
+    displayNameOverrides: { de: 'Englisch (Australien)' },
     name: 'English (Australia)',
     nativeName: 'English (Australia)',
     flag: '🇦🇺',
@@ -366,7 +367,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'Spain',
     geminiBcp47: 'es-ES',
     azureSttLocale: 'es-ES',
-    displayNameOverrides: { en: 'Spanish (Spain)', de: 'Spanisch (Spanien)' },
+    displayNameOverrides: { de: 'Spanisch (Spanien)' },
     name: 'Spanish (Spain)',
     nativeName: 'Español (España)',
     flag: '🇪🇸',
@@ -394,7 +395,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'es-MX',
     googleTranslateCode: 'es',
     compareLocale: 'es-419',
-    displayNameOverrides: { en: 'Spanish (Latin America)', de: 'Spanisch (Lateinamerika)' },
+    displayNameOverrides: { de: 'Spanisch (Lateinamerika)' },
     name: 'Spanish (Latin America)',
     nativeName: 'Español (Latinoamérica)',
     flag: '🇲🇽',
@@ -418,7 +419,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'es-ES',
     googleTranslateCode: 'es',
     compareLocale: 'es',
-    displayNameOverrides: { en: 'Spanish (Mixed)', de: 'Spanisch (Gemischt)' },
+    displayNameOverrides: { de: 'Spanisch (Gemischt)' },
     variants: [
       { subCode: 'es', voiceLocalePrefix: 'es-ES' },
       { subCode: 'es_latam', voiceLocalePrefix: 'es-US' },
@@ -492,7 +493,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'Brazil',
     geminiBcp47: 'pt-BR',
     azureSttLocale: 'pt-BR',
-    displayNameOverrides: { en: 'Portuguese (Brazil)', de: 'Portugiesisch (Brasilien)' },
+    displayNameOverrides: { de: 'Portugiesisch (Brasilien)' },
     name: 'Portuguese (Brazil)',
     nativeName: 'Português',
     flag: '🇧🇷',
@@ -512,7 +513,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'pt-PT',
     googleTranslateCode: 'pt-PT',
     compareLocale: 'pt-PT',
-    displayNameOverrides: { en: 'Portuguese (Portugal)', de: 'Portugiesisch (Portugal)' },
+    displayNameOverrides: { de: 'Portugiesisch (Portugal)' },
     name: 'Portuguese (Portugal)',
     nativeName: 'Português (Portugal)',
     flag: '🇵🇹',
@@ -991,7 +992,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'zh-CN',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Chinese (Simplified)', de: 'Chinesisch (Vereinfacht)' },
+    displayNameOverrides: { de: 'Chinesisch (Vereinfacht)' },
     name: 'Chinese (Simplified)',
     nativeName: '中文（简体）',
     flag: '🇨🇳',
@@ -1017,7 +1018,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     compareLocale: 'zh-TW',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Chinese (Traditional)', de: 'Chinesisch (Traditionell)' },
+    displayNameOverrides: { de: 'Chinesisch (Traditionell)' },
     name: 'Chinese (Traditional)',
     nativeName: '中文（繁體）',
     flag: '🇹🇼',
@@ -1049,7 +1050,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     compareLocale: 'yue-Hans-HK',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Cantonese (Simplified)', de: 'Kantonesisch (Vereinfacht)' },
+    displayNameOverrides: { de: 'Kantonesisch (Vereinfacht)' },
     name: 'Cantonese (Simplified)',
     nativeName: '粵語（简体）',
     flag: '🇭🇰',
@@ -1083,7 +1084,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     compareLocale: 'yue-Hant-HK',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Cantonese (Traditional)', de: 'Kantonesisch (Traditionell)' },
+    displayNameOverrides: { de: 'Kantonesisch (Traditionell)' },
     name: 'Cantonese (Traditional)',
     nativeName: '粵語（繁體）',
     flag: '🇭🇰',
@@ -1153,7 +1154,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'Vietnam',
     geminiBcp47: 'vi-VN',
     azureSttLocale: 'vi-VN',
-    displayNameOverrides: { en: 'Vietnamese (Northern)', de: 'Vietnamesisch (Nord)' },
+    displayNameOverrides: { de: 'Vietnamesisch (Nord)' },
     name: 'Vietnamese (Northern)',
     nativeName: 'Tiếng Việt (miền Bắc)',
     flag: '🇻🇳',
@@ -1187,7 +1188,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Explicit: the default would be the internal code `vi_south`, which is not
     // a valid Intl locale for the answer comparator's segmenter.
     compareLocale: 'vi-VN',
-    displayNameOverrides: { en: 'Vietnamese (Southern)', de: 'Vietnamesisch (Süd)' },
+    displayNameOverrides: { de: 'Vietnamesisch (Süd)' },
     name: 'Vietnamese (Southern)',
     nativeName: 'Tiếng Việt (miền Nam)',
     flag: '🇻🇳',
@@ -1295,7 +1296,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     geminiBcp47: 'ar-001',
     azureSttLocale: 'ar-SA',
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Arabic (Modern Standard)', de: 'Arabisch (Hocharabisch)' },
+    displayNameOverrides: { de: 'Arabisch (Hocharabisch)' },
     name: 'Arabic (Modern Standard)',
     nativeName: 'العربية (الفصحى)',
     flag: '🌎',
@@ -1327,7 +1328,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     googleTranslateCode: 'ar',
     compareLocale: 'ar-SA',
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Arabic (Saudi)', de: 'Arabisch (Saudisch)' },
+    displayNameOverrides: { de: 'Arabisch (Saudisch)' },
     name: 'Arabic (Saudi)',
     nativeName: 'العربية (السعودية)',
     flag: '🇸🇦',
@@ -1355,7 +1356,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     googleTranslateCode: 'ar',
     compareLocale: 'ar-EG',
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Arabic (Egyptian)', de: 'Arabisch (Ägyptisch)' },
+    displayNameOverrides: { de: 'Arabisch (Ägyptisch)' },
     name: 'Arabic (Egyptian)',
     nativeName: 'العربية (المصرية)',
     flag: '🇪🇬',
@@ -1385,7 +1386,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     googleTranslateCode: 'ar',
     compareLocale: 'ar-IQ',
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Arabic (Iraqi)', de: 'Arabisch (Irakisch)' },
+    displayNameOverrides: { de: 'Arabisch (Irakisch)' },
     name: 'Arabic (Iraqi)',
     nativeName: 'العربية (العراقية)',
     flag: '🇮🇶',
@@ -1413,7 +1414,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     googleTranslateCode: 'ar',
     compareLocale: 'ar-LB',
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Arabic (Levantine)', de: 'Arabisch (Levantinisch)' },
+    displayNameOverrides: { de: 'Arabisch (Levantinisch)' },
     name: 'Arabic (Levantine)',
     nativeName: 'العربية (الشامية)',
     flag: '🇱🇧',
@@ -1494,7 +1495,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     geminiBcp47: 'sw-KE',
     azureSttLocale: 'sw-KE',
     compareLocale: 'sw-KE',
-    displayNameOverrides: { en: 'Swahili (Kenya)', de: 'Swahili (Kenia)' },
+    displayNameOverrides: { de: 'Swahili (Kenia)' },
     name: 'Swahili (Kenya)',
     nativeName: 'Kiswahili (Kenya)',
     flag: '🇰🇪',
@@ -1515,7 +1516,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'sw-TZ',
     googleTranslateCode: 'sw',
     compareLocale: 'sw-TZ',
-    displayNameOverrides: { en: 'Swahili (Tanzania)', de: 'Swahili (Tansania)' },
+    displayNameOverrides: { de: 'Swahili (Tansania)' },
     name: 'Swahili (Tanzania)',
     nativeName: 'Kiswahili (Tanzania)',
     flag: '🇹🇿',
@@ -1550,13 +1551,19 @@ const DISPLAY_CODE_TO_REGION: Record<string, string> = Object.fromEntries(
   ]),
 );
 
+// Internal code → Language. `getLanguageByCode` runs on hot per-card paths,
+// so the lookup is a prebuilt Map rather than an array scan (codes are unique).
+const LANGUAGE_BY_CODE = new Map(
+  SUPPORTED_LANGUAGES.map((lang) => [lang.code, lang] as const),
+);
+
 // ---------------------------------------------------------------------------
 // Language-metadata helpers
 // ---------------------------------------------------------------------------
 
 /** Get a language by its internal code (e.g. "es", "es_latam", "zh"). */
 export function getLanguageByCode(code: string): Language | undefined {
-  return SUPPORTED_LANGUAGES.find((lang) => lang.code === code);
+  return LANGUAGE_BY_CODE.get(code);
 }
 
 /**
@@ -1995,10 +2002,13 @@ export function generateCourseName(
 const NAME_OVERRIDES: Record<string, Record<string, string>> = (() => {
   const out: Record<string, Record<string, string>> = {};
   for (const lang of SUPPORTED_LANGUAGES) {
-    if (lang.displayNameOverrides) out[lang.code] = lang.displayNameOverrides;
+    if (lang.displayNameOverrides) {
+      // The `en` override is always the entry's canonical `name`, so it is
+      // injected here instead of being repeated in every literal.
+      out[lang.code] = { en: lang.name, ...lang.displayNameOverrides };
+    }
   }
-  const zh = SUPPORTED_LANGUAGES.find((l) => l.code === 'zh');
-  if (zh?.displayNameOverrides) out['zh-CN'] = zh.displayNameOverrides;
+  if (out['zh']) out['zh-CN'] = out['zh'];
   return out;
 })();
 

@@ -38,6 +38,8 @@ import {
   reviewRatingValidator,
   reviewModeValidator,
   asVoiceGender,
+  type SchedulingMode,
+  type StudyContentFilter,
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import { settledCount } from '../lib/collections';
@@ -58,7 +60,8 @@ import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
 import {
   claimLlmTranslationIfAvailable,
-  CLAIM_STALE_MS as LLM_CLAIM_STALE_MS,
+  getLlmClaim,
+  isClaimFresh,
 } from './llmTranslationQueue';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 import {
@@ -135,9 +138,6 @@ const cardResultFields = {
 };
 
 const cardResultValidator = v.object(cardResultFields);
-
-type SchedulingMode = 'learn_new' | 'learnAndReview' | 'radio';
-type StudyContentFilter = 'custom' | 'course' | 'both';
 
 /**
  * Fetch the top-K due cards for a scheduling mode, honoring the
@@ -340,12 +340,7 @@ export const getCardForReview = query({
       const claimsByLang = new Map<string, number | null>();
       await Promise.all(
         allLanguages.map(async (lang) => {
-          const claim = await ctx.db
-            .query('llmTranslationClaims')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', card.textId).eq('targetLanguage', lang),
-            )
-            .first();
+          const claim = await getLlmClaim(ctx, card.textId, lang);
           claimsByLang.set(lang, claim?.claimedAt ?? null);
         }),
       );
@@ -370,9 +365,7 @@ export const getCardForReview = query({
             .first();
           const translatedText = translation?.translatedText || '';
           const claimedAt = claimsByLang.get(lang) ?? null;
-          const llmClaimHeld =
-            claimedAt !== null &&
-            Date.now() - claimedAt < LLM_CLAIM_STALE_MS;
+          const llmClaimHeld = claimedAt !== null && isClaimFresh({ claimedAt });
           // Show the pill only for *re*translations — first-time
           // translations of new cards also hold a claim, but there's no
           // prior text to retranslate from, so the pill would be confusing
@@ -1339,16 +1332,12 @@ export const toggleFavoriteCard = mutation({
   },
 });
 
-/** Maximum auto-retranslations per flagged row. Shared with the card queries
- * (which use it to decide between "Retranslating" vs "Flagged" pill state). */
-const FLAG_RETRANSLATION_MAX = FLAG_AUTO_RETRANSLATION_MAX;
-
 /**
  * Flag a card as having bad translation content. The user sees a single
  * "Flag" affordance on the card; we then increment `flagCount` on every
  * non-source-language `translations` row for that card's text, and enqueue
  * a retranslation for each one whose post-increment count is within
- * `FLAG_RETRANSLATION_MAX` AND whose language is part of the user's
+ * `FLAG_AUTO_RETRANSLATION_MAX` AND whose language is part of the user's
  * course. Counts past the cap still increment the counter (for later
  * admin triage) but skip the retranslation work to bound cost.
  *
@@ -1444,7 +1433,7 @@ export const flagTranslation = mutation({
     // guaranteed in-course because we fetched from the course's language
     // set above.
     const enqueueable = withCounts.filter(
-      ({ nextCount }) => nextCount <= FLAG_RETRANSLATION_MAX,
+      ({ nextCount }) => nextCount <= FLAG_AUTO_RETRANSLATION_MAX,
     );
 
     if (enqueueable.length === 0) {
@@ -1594,26 +1583,25 @@ export const editCard = mutation({
     ];
 
     // Load existing translations for non-source languages
+    const nonSourceLanguages = allLanguages.filter(
+      (lang) => lang !== sourceLanguage,
+    );
     const existingTranslations = await Promise.all(
-      allLanguages
-        .filter((lang) => lang !== sourceLanguage)
-        .map((lang) =>
-          ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', card.textId).eq('targetLanguage', lang),
-            )
-            .first(),
-        ),
+      nonSourceLanguages.map((lang) =>
+        ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', card.textId).eq('targetLanguage', lang),
+          )
+          .first(),
+      ),
     );
     const existingTranslationMap = new Map<string, Doc<'translations'>>();
-    allLanguages
-      .filter((lang) => lang !== sourceLanguage)
-      .forEach((lang, i) => {
-        if (existingTranslations[i]) {
-          existingTranslationMap.set(lang, existingTranslations[i]!);
-        }
-      });
+    nonSourceLanguages.forEach((lang, i) => {
+      if (existingTranslations[i]) {
+        existingTranslationMap.set(lang, existingTranslations[i]!);
+      }
+    });
 
     // Build a map of submitted texts
     const submittedMap = new Map<string, string>();

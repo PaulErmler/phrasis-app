@@ -191,6 +191,40 @@ export const cardApprovalStatusValidator = v.union(
   v.literal('rejected'),
 );
 
+// Per-feature quota snapshot mirrored from Autumn (usageQuotas.features
+// values). Lives here (not in usage/helpers.ts, which re-exports it) so
+// schema.ts can share it without importing `_generated/server`.
+export type FeatureState = {
+  balance: number;
+  included: number;
+  used: number;
+  interval?: string;
+  unlimited?: boolean;
+};
+
+export const featureStateValidator = v.object({
+  balance: v.number(),
+  included: v.number(),
+  used: v.number(),
+  interval: v.optional(v.string()),
+  unlimited: v.optional(v.boolean()),
+});
+
+// Per-review-mode counters shared by the stats tables (courseStats
+// totalReviewsByMode, dailyStats reviewsByMode/timeMsByMode, and the
+// weekly/monthly/yearly reviewsByMode). Wrap with v.optional at call sites.
+export const reviewsByModeValidator = v.object({
+  audio: v.number(),
+  full: v.number(),
+  radio: v.optional(v.number()),
+});
+
+// `{language, text}` translation-entry list shared by the cardApprovals
+// table/mutations and the sentence-metadata action args.
+export const translationEntriesValidator = v.array(
+  v.object({ language: v.string(), text: v.string() }),
+);
+
 export type LearningStyle = Infer<typeof learningStyleValidator>;
 export type StudyContentFilter = Infer<typeof studyContentFilterValidator>;
 export type ReviewRating = Infer<typeof reviewRatingValidator>;

@@ -5,6 +5,7 @@ import { Doc } from '../_generated/dataModel';
 import { CREDIT_COSTS, FEATURE_IDS, type FeatureId } from '../features/featureIds';
 import { getActiveCourses } from '../db/courses';
 import { getUserSettings } from '../db/users';
+import { featureStateValidator, type FeatureState } from '../types';
 
 /**
  * Thrown by `assertBillingCurrent` while a payment is past due. Same
@@ -12,21 +13,9 @@ import { getUserSettings } from '../db/users';
  */
 export const PAYMENT_PAST_DUE = 'PAYMENT_PAST_DUE';
 
-export type FeatureState = {
-  balance: number;
-  included: number;
-  used: number;
-  interval?: string;
-  unlimited?: boolean;
-};
-
-export const featureStateValidator = v.object({
-  balance: v.number(),
-  included: v.number(),
-  used: v.number(),
-  interval: v.optional(v.string()),
-  unlimited: v.optional(v.boolean()),
-});
+// Definitions live in convex/types.ts (so schema.ts can share them without
+// importing this module); re-exported here for the existing importers.
+export { featureStateValidator, type FeatureState };
 
 async function getQuotaDoc(
   ctx: QueryCtx | MutationCtx,

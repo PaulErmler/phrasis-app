@@ -6,9 +6,10 @@ import {
   internalQuery,
   ActionCtx,
   MutationCtx,
+  QueryCtx,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { Id } from '../_generated/dataModel';
+import { Doc, Id } from '../_generated/dataModel';
 import { translateTextWithLLM, type ReasoningEffort } from './translationLLM';
 import {
   getMixedVariantByRegion,
@@ -59,6 +60,25 @@ import { asVoiceGender } from '../types';
  */
 export const CLAIM_STALE_MS = 10 * 60 * 1000;
 
+/** Point-read the (textId, targetLanguage) LLM translation claim, if any. */
+export async function getLlmClaim(
+  ctx: QueryCtx | MutationCtx,
+  textId: Id<'texts'>,
+  targetLanguage: string,
+): Promise<Doc<'llmTranslationClaims'> | null> {
+  return await ctx.db
+    .query('llmTranslationClaims')
+    .withIndex('by_text_and_language', (q) =>
+      q.eq('textId', textId).eq('targetLanguage', targetLanguage),
+    )
+    .first();
+}
+
+/** True while the claim is inside its CLAIM_STALE_MS freshness window. */
+export function isClaimFresh(claim: { claimedAt: number }): boolean {
+  return Date.now() - claim.claimedAt < CLAIM_STALE_MS;
+}
+
 /**
  * Retry budget for the Google fallback job (the LLM pool default of 8
  * attempts belongs to the quality path; the fallback is a last resort and
@@ -81,15 +101,10 @@ export async function claimLlmTranslationIfAvailable(
   textId: Id<'texts'>,
   targetLanguage: string,
 ): Promise<Id<'llmTranslationClaims'> | null> {
-  const existing = await ctx.db
-    .query('llmTranslationClaims')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', textId).eq('targetLanguage', targetLanguage),
-    )
-    .first();
+  const existing = await getLlmClaim(ctx, textId, targetLanguage);
 
   if (existing) {
-    if (Date.now() - existing.claimedAt < CLAIM_STALE_MS) {
+    if (isClaimFresh(existing)) {
       return null;
     }
     await ctx.db.delete(existing._id);
@@ -179,22 +194,13 @@ export const enqueueLlmTranslation = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx: MutationCtx, { args }: { args: LlmJobArgs }) => {
-    const claim = await ctx.db
-      .query('llmTranslationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-      )
-      .first();
+    const claim = await getLlmClaim(ctx, args.textId, args.targetLanguage);
     // A fresh claim already stamped with another job's workId means a live
     // pool job owns this (textId, language): enqueueing again would run the
     // translation twice and hijack that job's claim. Unreachable from the
     // claim-then-enqueue callers (their fresh claim is workId-less); kept as
     // a guard against callers that enqueue without re-claiming.
-    if (
-      claim &&
-      claim.workId !== undefined &&
-      Date.now() - claim.claimedAt < CLAIM_STALE_MS
-    ) {
+    if (claim && claim.workId !== undefined && isClaimFresh(claim)) {
       return null;
     }
 
@@ -251,16 +257,6 @@ export const processLlmTranslationForCard = internalAction({
   args: llmJobArgsValidator.fields,
   returns: v.null(),
   handler: async (ctx: ActionCtx, args: LlmJobArgs) => {
-    await runLlmTranslation(ctx, args);
-    return null;
-  },
-});
-
-async function runLlmTranslation(
-  ctx: ActionCtx,
-  args: LlmJobArgs,
-): Promise<void> {
-  {
     // Read metadata off the texts row — the worker is the single source of
     // truth for "what speaker/addressee/referent fields land in the prompt".
     const text = await ctx.runQuery(
@@ -273,7 +269,7 @@ async function runLlmTranslation(
       console.error('[llmTranslationQueue] text row missing', {
         textId: args.textId,
       });
-      return;
+      return null;
     }
 
     // Mixed-dialect targets (today: es_mixed) resolve to a concrete sub-
@@ -550,8 +546,9 @@ async function runLlmTranslation(
         skipTts: args.skipTts,
       },
     );
-  }
-}
+    return null;
+  },
+});
 
 /**
  * Pool onComplete for `processLlmTranslationForCard`. Guaranteed to run on
@@ -581,14 +578,7 @@ export const onLlmTranslationComplete = internalMutation({
       result: PoolRunResult;
     },
   ) => {
-    const claim = await ctx.db
-      .query('llmTranslationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q
-          .eq('textId', context.textId)
-          .eq('targetLanguage', context.targetLanguage),
-      )
-      .first();
+    const claim = await getLlmClaim(ctx, context.textId, context.targetLanguage);
     const ownsClaim =
       claim !== null && (claim.workId === undefined || claim.workId === workId);
 
@@ -685,14 +675,7 @@ export const onGoogleFallbackComplete = internalMutation({
       });
       return null;
     }
-    const claim = await ctx.db
-      .query('llmTranslationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q
-          .eq('textId', context.textId)
-          .eq('targetLanguage', context.targetLanguage),
-      )
-      .first();
+    const claim = await getLlmClaim(ctx, context.textId, context.targetLanguage);
     if (claim && (claim.workId === undefined || claim.workId === workId)) {
       await ctx.db.delete(claim._id);
     }

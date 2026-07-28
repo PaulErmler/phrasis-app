@@ -46,6 +46,25 @@ function viewFromPathname(pathname: string): {
   return { view: 'home' };
 }
 
+/** Keep-mounted view shell: the view stays mounted for the lifetime of the
+ *  layout and toggles between `display: contents` (visible) and
+ *  `display: none`, so switching tabs never loses view state. Must stay at
+ *  MODULE scope — declared inside `MainLayout` it would be a new component
+ *  type each render, remounting (and resetting) every view. */
+function KeepMountedView({
+  visible,
+  children,
+}: {
+  visible: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: visible ? 'contents' : 'none' }}>
+      <ViewErrorBoundary>{children}</ViewErrorBoundary>
+    </div>
+  );
+}
+
 export default function MainLayout({
   children: _children,
 }: {
@@ -344,83 +363,47 @@ export default function MainLayout({
       <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
       <main className="flex-1 min-h-0 flex flex-col relative z-0 overflow-hidden">
-        <div
-          style={{
-            display:
-                !isLearnOpen && activeView === 'home' && !isAddCardsRoute
-                  ? 'contents'
-                  : 'none',
-          }}
+        <KeepMountedView
+          visible={!isLearnOpen && activeView === 'home' && !isAddCardsRoute}
         >
-          <ViewErrorBoundary>
-            <HomeView
-              preloadedCourseSettings={preloadedCourseSettings}
-              onLearnOpen={handleLearnOpen}
-              onChatOpen={handleOpenChat}
-              onNavigateToContent={handleNavigateToAddCards}
-              onNavigateToChat={handleNavigateToChat}
-              onEnterTexts={handleNavigateToAddCards}
-              onTutorialReady={handleTutorialReady}
-              animateEntrance={justReturnedFromLearn}
-              isHidden={isLearnOpen || activeView !== 'home' || isAddCardsRoute}
+          <HomeView
+            preloadedCourseSettings={preloadedCourseSettings}
+            onLearnOpen={handleLearnOpen}
+            onChatOpen={handleOpenChat}
+            onNavigateToContent={handleNavigateToAddCards}
+            onNavigateToChat={handleNavigateToChat}
+            onEnterTexts={handleNavigateToAddCards}
+            onTutorialReady={handleTutorialReady}
+            animateEntrance={justReturnedFromLearn}
+            isHidden={isLearnOpen || activeView !== 'home' || isAddCardsRoute}
+            hasActiveCourse={hasActiveCourse}
+            onOpenCourseMenu={handleOpenCourseMenu}
+          />
+        </KeepMountedView>
+        {isAddCardsRoute && (
+          <KeepMountedView visible={!isLearnOpen}>
+            <AddCardsView onBack={() => {
+              setActiveView('home');
+              router.push('/app');
+            }} />
+          </KeepMountedView>
+        )}
+        {hasVisitedLibrary && (
+          <KeepMountedView visible={!isLearnOpen && activeView === 'library'}>
+            <LibraryView
               hasActiveCourse={hasActiveCourse}
               onOpenCourseMenu={handleOpenCourseMenu}
             />
-          </ViewErrorBoundary>
-        </div>
-        {isAddCardsRoute && (
-          <div style={{ display: !isLearnOpen ? 'contents' : 'none' }}>
-            <ViewErrorBoundary>
-              <AddCardsView onBack={() => {
-                setActiveView('home');
-                router.push('/app');
-              }} />
-            </ViewErrorBoundary>
-          </div>
-        )}
-        {hasVisitedLibrary && (
-          <div
-            style={{
-              display:
-                  !isLearnOpen && activeView === 'library'
-                    ? 'contents'
-                    : 'none',
-            }}
-          >
-            <ViewErrorBoundary>
-              <LibraryView
-                hasActiveCourse={hasActiveCourse}
-                onOpenCourseMenu={handleOpenCourseMenu}
-              />
-            </ViewErrorBoundary>
-          </div>
+          </KeepMountedView>
         )}
         {hasVisitedStats && (
-          <div
-            style={{
-              display:
-                  !isLearnOpen && activeView === 'stats'
-                    ? 'contents'
-                    : 'none',
-            }}
-          >
-            <ViewErrorBoundary>
-              <StatsView />
-            </ViewErrorBoundary>
-          </div>
+          <KeepMountedView visible={!isLearnOpen && activeView === 'stats'}>
+            <StatsView />
+          </KeepMountedView>
         )}
-        <div
-          style={{
-            display:
-                !isLearnOpen && activeView === 'settings'
-                  ? 'contents'
-                  : 'none',
-          }}
-        >
-          <ViewErrorBoundary>
-            <SettingsView activeView={activeView} />
-          </ViewErrorBoundary>
-        </div>
+        <KeepMountedView visible={!isLearnOpen && activeView === 'settings'}>
+          <SettingsView activeView={activeView} />
+        </KeepMountedView>
         {!isLearnOpen && activeView === 'chat' && chatThreadId && (
           <ViewErrorBoundary>
             <SimplifiedChatView
@@ -436,16 +419,16 @@ export default function MainLayout({
       </main>
 
       {!isAddCardsRoute && (
-        <div className="shrink-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))]" />
-      )}
-      {!isAddCardsRoute && (
-        <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
-          <BottomNav
-            currentView={activeView}
-            onViewChange={handleViewChange}
-            onLearnOpen={handleLearnOpen}
-          />
-        </div>
+        <>
+          <div className="shrink-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))]" />
+          <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
+            <BottomNav
+              currentView={activeView}
+              onViewChange={handleViewChange}
+              onLearnOpen={handleLearnOpen}
+            />
+          </div>
+        </>
       )}
 
       {isLearnOpen && (

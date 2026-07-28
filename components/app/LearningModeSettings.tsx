@@ -44,8 +44,7 @@ import {
   DEFAULT_PLAYBACK_SPEED,
   DEFAULT_PLAY_TARGET_BEFORE_BASE,
   DEFAULT_PLAY_TARGET_AFTER_BASE,
-  PLAYBACK_SPEED_MIN,
-  PLAYBACK_SPEED_MAX,
+  clampPlaybackSpeed,
 } from '@/lib/constants/audioPlayback';
 import { MAX_CARDS_PER_BATCH } from '@/lib/constants/learning';
 import { resolveLanguageOrder } from '@/lib/utils/languageOrder';
@@ -57,6 +56,147 @@ interface LearningModeSettingsProps {
   courseSettings: CourseSettings | null;
   baseLanguages: string[];
   targetLanguages: string[];
+}
+
+interface SettingSwitchRowProps {
+  id: string;
+  label: string;
+  /** When omitted, the row renders the Label directly (no space-y-0.5 wrapper). */
+  description?: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  /** Visually indent as a sub-setting. */
+  indented?: boolean;
+}
+
+/** One Label(+description)/Switch settings row. */
+function SettingSwitchRow({
+  id,
+  label,
+  description,
+  checked,
+  onCheckedChange,
+  indented,
+}: SettingSwitchRowProps) {
+  return (
+    <div
+      className={
+        indented
+          ? 'settings-row ml-4 mt-3 pl-3 border-l-2 border-border'
+          : 'settings-row'
+      }
+    >
+      {description !== undefined ? (
+        <div className="space-y-0.5">
+          <Label htmlFor={id} className="text-sm font-medium">
+            {label}
+          </Label>
+          <p className="text-muted-xs">{description}</p>
+        </div>
+      ) : (
+        <Label htmlFor={id} className="text-sm font-medium">
+          {label}
+        </Label>
+      )}
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        className="mt-0.5"
+      />
+    </div>
+  );
+}
+
+interface TimelineLanguageListProps {
+  languages: string[];
+  keyPrefix: string;
+  type: 'base' | 'target';
+  reps: Record<string, number>;
+  repPauses: Record<string, number>;
+  speeds: Record<string, number>;
+  defaultReps: number;
+  onPlaysChange: (language: string, value: number) => void;
+  onRepPauseChange: (language: string, value: number) => void;
+  onSpeedChange: (language: string, value: number) => void;
+  repPauseLabel: string;
+  speedLabel: string;
+  pauseLabel: string;
+  /** Between-language pause connector value + handler. */
+  pauseSeconds: number;
+  onPauseChange: (value: number) => void;
+  onMoveUp: (idx: number) => void;
+  onMoveDown: (idx: number) => void;
+}
+
+/**
+ * One timeline group: a card per language with a pause connector between
+ * consecutive languages. Returns a fragment so it adds no DOM node.
+ */
+function TimelineLanguageList({
+  languages,
+  keyPrefix,
+  type,
+  reps,
+  repPauses,
+  speeds,
+  defaultReps,
+  onPlaysChange,
+  onRepPauseChange,
+  onSpeedChange,
+  repPauseLabel,
+  speedLabel,
+  pauseLabel,
+  pauseSeconds,
+  onPauseChange,
+  onMoveUp,
+  onMoveDown,
+}: TimelineLanguageListProps) {
+  return (
+    <>
+      {languages.map((code, idx) => {
+        const plays = reps[code] ?? defaultReps;
+        const repPause = repPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
+        const nextCode = languages[idx + 1];
+        const nextPlays = nextCode ? (reps[nextCode] ?? defaultReps) : 0;
+
+        return (
+          <div
+            key={`${keyPrefix}${code}`}
+            className="w-full flex flex-col items-center"
+          >
+            <TimelineLanguageCard
+              code={code}
+              type={type}
+              plays={plays}
+              repPause={repPause}
+              speed={speeds[code] ?? DEFAULT_PLAYBACK_SPEED}
+              onPlaysChange={(v) => onPlaysChange(code, v)}
+              onRepPauseChange={(v) => onRepPauseChange(code, v)}
+              onSpeedChange={(v) => onSpeedChange(code, v)}
+              repPauseLabel={repPauseLabel}
+              speedLabel={speedLabel}
+              showReorderButtons={languages.length > 1}
+              canMoveUp={idx > 0}
+              canMoveDown={idx < languages.length - 1}
+              onMoveUp={() => onMoveUp(idx)}
+              onMoveDown={() => onMoveDown(idx)}
+            />
+
+            {/* Pause connector between consecutive languages */}
+            {idx < languages.length - 1 && (
+              <StepperPauseConnector
+                label={pauseLabel}
+                seconds={pauseSeconds}
+                onChange={onPauseChange}
+                lineOnly={plays === 0 || nextPlays === 0}
+              />
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
 }
 
 export function LearningModeSettings({
@@ -243,10 +383,7 @@ export function LearningModeSettings({
   };
 
   const handleLanguageSpeedChange = async (language: string, value: number) => {
-    const clamped = Math.max(
-      PLAYBACK_SPEED_MIN,
-      Math.min(PLAYBACK_SPEED_MAX, Math.round(value * 10) / 10),
-    );
+    const clamped = clampPlaybackSpeed(value);
     const next = { ...speeds, [language]: clamped };
     await updateSettings({
       courseId: courseSettings.courseId,
@@ -379,10 +516,7 @@ export function LearningModeSettings({
     language: string,
     value: number,
   ) => {
-    const clamped = Math.max(
-      PLAYBACK_SPEED_MIN,
-      Math.min(PLAYBACK_SPEED_MAX, Math.round(value * 10) / 10),
-    );
+    const clamped = clampPlaybackSpeed(value);
     const current = courseSettings.targetBeforePlaybackSpeeds ?? {};
     await updateSettings({
       courseId: courseSettings.courseId,
@@ -428,10 +562,7 @@ export function LearningModeSettings({
     language: string,
     value: number,
   ) => {
-    const clamped = Math.max(
-      PLAYBACK_SPEED_MIN,
-      Math.min(PLAYBACK_SPEED_MAX, Math.round(value * 10) / 10),
-    );
+    const clamped = clampPlaybackSpeed(value);
     const current = courseSettings.transcribeAfterPlaybackSpeeds ?? {};
     await updateSettings({
       courseId: courseSettings.courseId,
@@ -847,121 +978,64 @@ export function LearningModeSettings({
           )}
 
           {/* Auto-add cards */}
-          <div className="settings-row">
-            <div className="space-y-0.5">
-              <Label htmlFor="autoAdd" className="text-sm font-medium">
-                {t('autoAddCards')}
-              </Label>
-              <p className="text-muted-xs">{t('autoAddCardsDescription')}</p>
-            </div>
-            <Switch
-              id="autoAdd"
-              checked={courseSettings.autoAddCards !== false}
-              onCheckedChange={handleAutoAddChange}
-              className="mt-0.5"
-            />
-          </div>
+          <SettingSwitchRow
+            id="autoAdd"
+            label={t('autoAddCards')}
+            description={t('autoAddCardsDescription')}
+            checked={courseSettings.autoAddCards !== false}
+            onCheckedChange={handleAutoAddChange}
+          />
 
           {/* Auto-advance — audio mode only */}
           {reviewMode === 'audio' && (
-            <div className="settings-row">
-              <div className="space-y-0.5">
-                <Label htmlFor="autoAdvance" className="text-sm font-medium">
-                  {t('autoAdvance')}
-                </Label>
-                <p className="text-muted-xs">{t('autoAdvanceDescription')}</p>
-              </div>
-              <Switch
-                id="autoAdvance"
-                checked={autoAdvance}
-                onCheckedChange={handleAutoAdvanceChange}
-                className="mt-0.5"
-              />
-            </div>
+            <SettingSwitchRow
+              id="autoAdvance"
+              label={t('autoAdvance')}
+              description={t('autoAdvanceDescription')}
+              checked={autoAdvance}
+              onCheckedChange={handleAutoAdvanceChange}
+            />
           )}
 
           {/* Instant proceed on rating — both modes */}
-          <div className="settings-row">
-            <div className="space-y-0.5">
-              <Label htmlFor="instantProceed" className="text-sm font-medium">
-                {t('instantProceed')}
-              </Label>
-              <p className="text-muted-xs">{t('instantProceedDescription')}</p>
-            </div>
-            <Switch
-              id="instantProceed"
-              checked={instantProceed}
-              onCheckedChange={handleInstantProceedChange}
-              className="mt-0.5"
-            />
-          </div>
+          <SettingSwitchRow
+            id="instantProceed"
+            label={t('instantProceed')}
+            description={t('instantProceedDescription')}
+            checked={instantProceed}
+            onCheckedChange={handleInstantProceedChange}
+          />
 
           {/* Show every-N-cards celebration screen */}
-          <div className="settings-row">
-            <div className="space-y-0.5">
-              <Label
-                htmlFor="progressDisplayEnabled"
-                className="text-sm font-medium"
-              >
-                {t('progressDisplayEnabled')}
-              </Label>
-              <p className="text-muted-xs">
-                {t('progressDisplayEnabledDescription')}
-              </p>
-            </div>
-            <Switch
-              id="progressDisplayEnabled"
-              checked={courseSettings.progressDisplayEnabled !== false}
-              onCheckedChange={handleProgressDisplayEnabledChange}
-              className="mt-0.5"
-            />
-          </div>
+          <SettingSwitchRow
+            id="progressDisplayEnabled"
+            label={t('progressDisplayEnabled')}
+            description={t('progressDisplayEnabledDescription')}
+            checked={courseSettings.progressDisplayEnabled !== false}
+            onCheckedChange={handleProgressDisplayEnabledChange}
+          />
 
           {/* Writing-mode scoring: how the accuracy percentage is computed, and
               what it then does with the rating. Both are writing-only, but this
               section is shared with audio mode — hence the guard. */}
           {reviewMode === 'full' && (
             <>
-              <div className="settings-row">
-                <div className="space-y-0.5">
-                  <Label
-                    htmlFor="ignorePunctuation"
-                    className="text-sm font-medium"
-                  >
-                    {t('ignorePunctuation')}
-                  </Label>
-                  <p className="text-muted-xs">
-                    {t('ignorePunctuationDescription')}
-                  </p>
-                </div>
-                <Switch
-                  id="ignorePunctuation"
-                  checked={courseSettings.ignorePunctuation ?? false}
-                  onCheckedChange={handleIgnorePunctuationChange}
-                  className="mt-0.5"
-                />
-              </div>
+              <SettingSwitchRow
+                id="ignorePunctuation"
+                label={t('ignorePunctuation')}
+                description={t('ignorePunctuationDescription')}
+                checked={courseSettings.ignorePunctuation ?? false}
+                onCheckedChange={handleIgnorePunctuationChange}
+              />
 
               <div className="space-y-0">
-                <div className="settings-row">
-                  <div className="space-y-0.5">
-                    <Label
-                      htmlFor="autoRateFromAccuracy"
-                      className="text-sm font-medium"
-                    >
-                      {t('autoRateFromAccuracy')}
-                    </Label>
-                    <p className="text-muted-xs">
-                      {t('autoRateFromAccuracyDescription')}
-                    </p>
-                  </div>
-                  <Switch
-                    id="autoRateFromAccuracy"
-                    checked={courseSettings.autoRateFromAccuracy ?? true}
-                    onCheckedChange={handleAutoRateFromAccuracyChange}
-                    className="mt-0.5"
-                  />
-                </div>
+                <SettingSwitchRow
+                  id="autoRateFromAccuracy"
+                  label={t('autoRateFromAccuracy')}
+                  description={t('autoRateFromAccuracyDescription')}
+                  checked={courseSettings.autoRateFromAccuracy ?? true}
+                  onCheckedChange={handleAutoRateFromAccuracyChange}
+                />
 
                 {(courseSettings.autoRateFromAccuracy ?? true) && (
                   <div className="ml-4 mt-3 pl-3 border-l-2 border-border">
@@ -986,87 +1060,47 @@ export function LearningModeSettings({
           </p>
 
           {/* Highlight words */}
-          <div className="settings-row">
-            <div className="space-y-0.5">
-              <Label htmlFor="highlightWords" className="text-sm font-medium">
-                {t('highlightWords')}
-              </Label>
-              <p className="text-muted-xs">{t('highlightWordsDescription')}</p>
-            </div>
-            <Switch
-              id="highlightWords"
-              checked={highlightWords}
-              onCheckedChange={handleHighlightWordsChange}
-              className="mt-0.5"
-            />
-          </div>
+          <SettingSwitchRow
+            id="highlightWords"
+            label={t('highlightWords')}
+            description={t('highlightWordsDescription')}
+            checked={highlightWords}
+            onCheckedChange={handleHighlightWordsChange}
+          />
 
           {/* Auto-play audio */}
-          <div className="settings-row">
-            <div className="space-y-0.5">
-              <Label htmlFor="autoPlayAudio" className="text-sm font-medium">
-                {t('autoPlay')}
-              </Label>
-              <p className="text-muted-xs">
-                {t(
-                  isTranscribe
-                    ? 'autoPlayDescriptionTranscribe'
-                    : 'autoPlayDescription',
-                )}
-              </p>
-            </div>
-            <Switch
-              id="autoPlayAudio"
-              checked={autoPlay}
-              onCheckedChange={handleAutoPlayChange}
-              className="mt-0.5"
-            />
-          </div>
+          <SettingSwitchRow
+            id="autoPlayAudio"
+            label={t('autoPlay')}
+            description={t(
+              isTranscribe
+                ? 'autoPlayDescriptionTranscribe'
+                : 'autoPlayDescription',
+            )}
+            checked={autoPlay}
+            onCheckedChange={handleAutoPlayChange}
+          />
 
           {/* Practice Listening / Speaking — target before/after base (audio mode only).
               At least one must stay enabled; toggling the last-on one auto-enables
               the other. */}
           {reviewMode === 'audio' && (
             <>
-              <div className="settings-row">
-                <div className="space-y-0.5">
-                  <Label
-                    htmlFor="playTargetAfterBase"
-                    className="text-sm font-medium"
-                  >
-                    {t('practiceSpeaking')}
-                  </Label>
-                  <p className="text-muted-xs">
-                    {t('practiceSpeakingDescription')}
-                  </p>
-                </div>
-                <Switch
-                  id="playTargetAfterBase"
-                  checked={playTargetAfter}
-                  onCheckedChange={handlePlayTargetAfterBaseChange}
-                  className="mt-0.5"
-                />
-              </div>
+              <SettingSwitchRow
+                id="playTargetAfterBase"
+                label={t('practiceSpeaking')}
+                description={t('practiceSpeakingDescription')}
+                checked={playTargetAfter}
+                onCheckedChange={handlePlayTargetAfterBaseChange}
+              />
 
-              <div className="settings-row">
-                <div className="space-y-0.5">
-                  <Label
-                    htmlFor="playTargetBeforeBase"
-                    className="text-sm font-medium"
-                  >
-                    {t('practiceListening')}
-                  </Label>
-                  <p className="text-muted-xs">
-                    {t('practiceListeningDescription')}
-                  </p>
-                </div>
-                <Switch
-                  id="playTargetBeforeBase"
-                  checked={playTargetBefore}
-                  onCheckedChange={handlePlayTargetBeforeBaseChange}
-                  className="mt-0.5"
-                />
-              </div>
+              <SettingSwitchRow
+                id="playTargetBeforeBase"
+                label={t('practiceListening')}
+                description={t('practiceListeningDescription')}
+                checked={playTargetBefore}
+                onCheckedChange={handlePlayTargetBeforeBaseChange}
+              />
 
               {/* "Only new" — graduates a card from Practice Listening to
                   Practice Speaking after its initial N reviews, so it only shows
@@ -1100,67 +1134,39 @@ export function LearningModeSettings({
               setting is ignored. */}
           {reviewMode === 'full' && !isTranscribe && (
             <div className="space-y-0">
-              <div className="settings-row">
-                <div className="space-y-0.5">
-                  <Label
-                    htmlFor="targetAudioEnabled"
-                    className="text-sm font-medium"
-                  >
-                    {t('fullReviewTargetAudio')}
-                  </Label>
-                  <p className="text-muted-xs">
-                    {t('fullReviewTargetAudioDescription')}
-                  </p>
-                </div>
-                <Switch
-                  id="targetAudioEnabled"
-                  checked={fullReviewTargetAudioMode !== 'never'}
-                  onCheckedChange={(checked) => {
-                    handleFullReviewTargetAudioModeChange(
-                      checked ? 'afterSubmit' : 'never',
-                    );
-                  }}
-                  className="mt-0.5"
-                />
-              </div>
+              <SettingSwitchRow
+                id="targetAudioEnabled"
+                label={t('fullReviewTargetAudio')}
+                description={t('fullReviewTargetAudioDescription')}
+                checked={fullReviewTargetAudioMode !== 'never'}
+                onCheckedChange={(checked) => {
+                  handleFullReviewTargetAudioModeChange(
+                    checked ? 'afterSubmit' : 'never',
+                  );
+                }}
+              />
 
               {fullReviewTargetAudioMode !== 'never' && (
                 <div className="ml-4 mt-3 pl-3 border-l-2 border-border space-y-3">
-                  <div className="settings-row">
-                    <Label
-                      htmlFor="targetAudio_afterSubmit"
-                      className="text-sm font-medium"
-                    >
-                      {t('fullReviewTargetAudio_afterSubmit')}
-                    </Label>
-                    <Switch
-                      id="targetAudio_afterSubmit"
-                      checked={fullReviewTargetAudioMode === 'afterSubmit'}
-                      onCheckedChange={(checked) => {
-                        if (checked)
-                          handleFullReviewTargetAudioModeChange('afterSubmit');
-                      }}
-                      className="mt-0.5"
-                    />
-                  </div>
+                  <SettingSwitchRow
+                    id="targetAudio_afterSubmit"
+                    label={t('fullReviewTargetAudio_afterSubmit')}
+                    checked={fullReviewTargetAudioMode === 'afterSubmit'}
+                    onCheckedChange={(checked) => {
+                      if (checked)
+                        handleFullReviewTargetAudioModeChange('afterSubmit');
+                    }}
+                  />
 
-                  <div className="settings-row">
-                    <Label
-                      htmlFor="targetAudio_always"
-                      className="text-sm font-medium"
-                    >
-                      {t('fullReviewTargetAudio_always')}
-                    </Label>
-                    <Switch
-                      id="targetAudio_always"
-                      checked={fullReviewTargetAudioMode === 'always'}
-                      onCheckedChange={(checked) => {
-                        if (checked)
-                          handleFullReviewTargetAudioModeChange('always');
-                      }}
-                      className="mt-0.5"
-                    />
-                  </div>
+                  <SettingSwitchRow
+                    id="targetAudio_always"
+                    label={t('fullReviewTargetAudio_always')}
+                    checked={fullReviewTargetAudioMode === 'always'}
+                    onCheckedChange={(checked) => {
+                      if (checked)
+                        handleFullReviewTargetAudioModeChange('always');
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -1172,56 +1178,25 @@ export function LearningModeSettings({
                 the after-base group. */}
             {showBeforeTarget && targetLanguages.length > 0 && (
               <>
-                {targetLanguages.map((code, idx) => {
-                  const plays = beforeReps[code] ?? DEFAULT_REPETITIONS_TARGET_BEFORE;
-                  const repPause =
-                    beforeRepPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
-                  const nextCode = targetLanguages[idx + 1];
-                  const nextPlays = nextCode
-                    ? (beforeReps[nextCode] ?? DEFAULT_REPETITIONS_TARGET_BEFORE)
-                    : 0;
-
-                  return (
-                    <div
-                      key={`before-target-${code}`}
-                      className="w-full flex flex-col items-center"
-                    >
-                      <TimelineLanguageCard
-                        code={code}
-                        type="target"
-                        plays={plays}
-                        repPause={repPause}
-                        speed={beforeSpeeds[code] ?? DEFAULT_PLAYBACK_SPEED}
-                        onPlaysChange={(v) =>
-                          handleTargetBeforeRepetitionChange(code, v)
-                        }
-                        onRepPauseChange={(v) =>
-                          handleTargetBeforeRepetitionPauseChange(code, v)
-                        }
-                        onSpeedChange={(v) =>
-                          handleTargetBeforeSpeedChange(code, v)
-                        }
-                        repPauseLabel={t('pauseBetweenRepetitions')}
-                        speedLabel={t('playbackSpeed')}
-                        showReorderButtons={targetLanguages.length > 1}
-                        canMoveUp={idx > 0}
-                        canMoveDown={idx < targetLanguages.length - 1}
-                        onMoveUp={() => moveTargetUp(idx)}
-                        onMoveDown={() => moveTargetDown(idx)}
-                      />
-
-                      {/* Target → Target Pause connector (before-base group) */}
-                      {idx < targetLanguages.length - 1 && (
-                        <StepperPauseConnector
-                          label={t('pause')}
-                          seconds={pauseT2T}
-                          onChange={handlePauseTargetToTargetChange}
-                          lineOnly={plays === 0 || nextPlays === 0}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
+                <TimelineLanguageList
+                  languages={targetLanguages}
+                  keyPrefix="before-target-"
+                  type="target"
+                  reps={beforeReps}
+                  repPauses={beforeRepPauses}
+                  speeds={beforeSpeeds}
+                  defaultReps={DEFAULT_REPETITIONS_TARGET_BEFORE}
+                  onPlaysChange={handleTargetBeforeRepetitionChange}
+                  onRepPauseChange={handleTargetBeforeRepetitionPauseChange}
+                  onSpeedChange={handleTargetBeforeSpeedChange}
+                  repPauseLabel={t('pauseBetweenRepetitions')}
+                  speedLabel={t('playbackSpeed')}
+                  pauseLabel={t('pause')}
+                  pauseSeconds={pauseT2T}
+                  onPauseChange={handlePauseTargetToTargetChange}
+                  onMoveUp={moveTargetUp}
+                  onMoveDown={moveTargetDown}
+                />
 
                 {/* Before-target → Base Pause connector */}
                 {baseLanguages.length > 0 && (
@@ -1236,52 +1211,27 @@ export function LearningModeSettings({
             )}
 
             {/* Base languages */}
-            {showBaseTimeline && baseLanguages.map((code, idx) => {
-              const plays = reps[code] ?? DEFAULT_REPETITIONS_BASE;
-              const repPause =
-                repPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
-              const nextCode = baseLanguages[idx + 1];
-              const nextPlays = nextCode
-                ? (reps[nextCode] ?? DEFAULT_REPETITIONS_BASE)
-                : 0;
-
-              return (
-                <div
-                  key={`base-${code}`}
-                  className="w-full flex flex-col items-center"
-                >
-                  <TimelineLanguageCard
-                    code={code}
-                    type="base"
-                    plays={plays}
-                    repPause={repPause}
-                    speed={speeds[code] ?? DEFAULT_PLAYBACK_SPEED}
-                    onPlaysChange={(v) => handleRepetitionChange(code, v)}
-                    onRepPauseChange={(v) =>
-                      handleRepetitionPauseChange(code, v)
-                    }
-                    onSpeedChange={(v) => handleLanguageSpeedChange(code, v)}
-                    repPauseLabel={t('pauseBetweenRepetitions')}
-                    speedLabel={t('playbackSpeed')}
-                    showReorderButtons={baseLanguages.length > 1}
-                    canMoveUp={idx > 0}
-                    canMoveDown={idx < baseLanguages.length - 1}
-                    onMoveUp={() => moveBaseUp(idx)}
-                    onMoveDown={() => moveBaseDown(idx)}
-                  />
-
-                  {/* Base → Base Pause connector */}
-                  {idx < baseLanguages.length - 1 && (
-                    <StepperPauseConnector
-                      label={t('pause')}
-                      seconds={pauseB2B}
-                      onChange={handlePauseBaseToBaseChange}
-                      lineOnly={plays === 0 || nextPlays === 0}
-                    />
-                  )}
-                </div>
-              );
-            })}
+            {showBaseTimeline && (
+              <TimelineLanguageList
+                languages={baseLanguages}
+                keyPrefix="base-"
+                type="base"
+                reps={reps}
+                repPauses={repPauses}
+                speeds={speeds}
+                defaultReps={DEFAULT_REPETITIONS_BASE}
+                onPlaysChange={handleRepetitionChange}
+                onRepPauseChange={handleRepetitionPauseChange}
+                onSpeedChange={handleLanguageSpeedChange}
+                repPauseLabel={t('pauseBetweenRepetitions')}
+                speedLabel={t('playbackSpeed')}
+                pauseLabel={t('pause')}
+                pauseSeconds={pauseB2B}
+                onPauseChange={handlePauseBaseToBaseChange}
+                onMoveUp={moveBaseUp}
+                onMoveDown={moveBaseDown}
+              />
+            )}
 
             {/* After-base target languages ("Practice Speaking") — shown when
                 they're part of the main audio sequence */}
@@ -1298,52 +1248,25 @@ export function LearningModeSettings({
                 )}
 
                 {/* Target languages */}
-                {targetLanguages.map((code, idx) => {
-                  const plays = reps[code] ?? defaultTargetReps;
-                  const repPause =
-                    repPauses[code] ?? DEFAULT_PAUSE_BETWEEN_REPETITIONS;
-                  const nextCode = targetLanguages[idx + 1];
-                  const nextPlays = nextCode
-                    ? (reps[nextCode] ?? defaultTargetReps)
-                    : 0;
-
-                  return (
-                    <div
-                      key={`target-${code}`}
-                      className="w-full flex flex-col items-center"
-                    >
-                      <TimelineLanguageCard
-                        code={code}
-                        type="target"
-                        plays={plays}
-                        repPause={repPause}
-                        speed={speeds[code] ?? DEFAULT_PLAYBACK_SPEED}
-                        onPlaysChange={(v) => handleRepetitionChange(code, v)}
-                        onRepPauseChange={(v) =>
-                          handleRepetitionPauseChange(code, v)
-                        }
-                        onSpeedChange={(v) => handleLanguageSpeedChange(code, v)}
-                        repPauseLabel={t('pauseBetweenRepetitions')}
-                        speedLabel={t('playbackSpeed')}
-                        showReorderButtons={targetLanguages.length > 1}
-                        canMoveUp={idx > 0}
-                        canMoveDown={idx < targetLanguages.length - 1}
-                        onMoveUp={() => moveTargetUp(idx)}
-                        onMoveDown={() => moveTargetDown(idx)}
-                      />
-
-                      {/* Target → Target Pause connector */}
-                      {idx < targetLanguages.length - 1 && (
-                        <StepperPauseConnector
-                          label={t('pause')}
-                          seconds={pauseT2T}
-                          onChange={handlePauseTargetToTargetChange}
-                          lineOnly={plays === 0 || nextPlays === 0}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
+                <TimelineLanguageList
+                  languages={targetLanguages}
+                  keyPrefix="target-"
+                  type="target"
+                  reps={reps}
+                  repPauses={repPauses}
+                  speeds={speeds}
+                  defaultReps={defaultTargetReps}
+                  onPlaysChange={handleRepetitionChange}
+                  onRepPauseChange={handleRepetitionPauseChange}
+                  onSpeedChange={handleLanguageSpeedChange}
+                  repPauseLabel={t('pauseBetweenRepetitions')}
+                  speedLabel={t('playbackSpeed')}
+                  pauseLabel={t('pause')}
+                  pauseSeconds={pauseT2T}
+                  onPauseChange={handlePauseTargetToTargetChange}
+                  onMoveUp={moveTargetUp}
+                  onMoveDown={moveTargetDown}
+                />
               </>
             )}
 
@@ -1480,47 +1403,24 @@ export function LearningModeSettings({
           {/* Hide target languages + sub-setting — audio mode only */}
           {reviewMode === 'audio' && (
             <div className="space-y-0">
-              <div className="settings-row">
-                <div className="space-y-0.5">
-                  <Label
-                    htmlFor="hideTargetLanguages"
-                    className="text-sm font-medium"
-                  >
-                    {t('hideTargetLanguages')}
-                  </Label>
-                  <p className="text-muted-xs">
-                    {t('hideTargetLanguagesDescription')}
-                  </p>
-                </div>
-                <Switch
-                  id="hideTargetLanguages"
-                  checked={courseSettings.hideTargetLanguages ?? true}
-                  onCheckedChange={handleHideTargetLanguagesChange}
-                  className="mt-0.5"
-                />
-              </div>
+              <SettingSwitchRow
+                id="hideTargetLanguages"
+                label={t('hideTargetLanguages')}
+                description={t('hideTargetLanguagesDescription')}
+                checked={courseSettings.hideTargetLanguages ?? true}
+                onCheckedChange={handleHideTargetLanguagesChange}
+              />
 
               {/* Auto-reveal — visually indented as a sub-setting */}
               {(courseSettings.hideTargetLanguages ?? true) && (
-                <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
-                  <div className="space-y-0.5">
-                    <Label
-                      htmlFor="autoRevealLanguages"
-                      className="text-sm font-medium"
-                    >
-                      {t('autoRevealLanguages')}
-                    </Label>
-                    <p className="text-muted-xs">
-                      {t('autoRevealLanguagesDescription')}
-                    </p>
-                  </div>
-                  <Switch
-                    id="autoRevealLanguages"
-                    checked={courseSettings.autoRevealLanguages ?? true}
-                    onCheckedChange={handleAutoRevealLanguagesChange}
-                    className="mt-0.5"
-                  />
-                </div>
+                <SettingSwitchRow
+                  id="autoRevealLanguages"
+                  label={t('autoRevealLanguages')}
+                  description={t('autoRevealLanguagesDescription')}
+                  checked={courseSettings.autoRevealLanguages ?? true}
+                  onCheckedChange={handleAutoRevealLanguagesChange}
+                  indented
+                />
               )}
             </div>
           )}
@@ -1528,47 +1428,24 @@ export function LearningModeSettings({
           {/* Hide base languages + sub-setting — audio mode only */}
           {reviewMode === 'audio' && (
             <div className="space-y-0">
-              <div className="settings-row">
-                <div className="space-y-0.5">
-                  <Label
-                    htmlFor="hideBaseLanguages"
-                    className="text-sm font-medium"
-                  >
-                    {t('hideBaseLanguages')}
-                  </Label>
-                  <p className="text-muted-xs">
-                    {t('hideBaseLanguagesDescription')}
-                  </p>
-                </div>
-                <Switch
-                  id="hideBaseLanguages"
-                  checked={courseSettings.hideBaseLanguages === true}
-                  onCheckedChange={handleHideBaseLanguagesChange}
-                  className="mt-0.5"
-                />
-              </div>
+              <SettingSwitchRow
+                id="hideBaseLanguages"
+                label={t('hideBaseLanguages')}
+                description={t('hideBaseLanguagesDescription')}
+                checked={courseSettings.hideBaseLanguages === true}
+                onCheckedChange={handleHideBaseLanguagesChange}
+              />
 
               {/* Auto-reveal — visually indented as a sub-setting */}
               {courseSettings.hideBaseLanguages === true && (
-                <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
-                  <div className="space-y-0.5">
-                    <Label
-                      htmlFor="autoRevealBaseLanguages"
-                      className="text-sm font-medium"
-                    >
-                      {t('autoRevealBaseLanguages')}
-                    </Label>
-                    <p className="text-muted-xs">
-                      {t('autoRevealBaseLanguagesDescription')}
-                    </p>
-                  </div>
-                  <Switch
-                    id="autoRevealBaseLanguages"
-                    checked={courseSettings.autoRevealBaseLanguages ?? true}
-                    onCheckedChange={handleAutoRevealBaseLanguagesChange}
-                    className="mt-0.5"
-                  />
-                </div>
+                <SettingSwitchRow
+                  id="autoRevealBaseLanguages"
+                  label={t('autoRevealBaseLanguages')}
+                  description={t('autoRevealBaseLanguagesDescription')}
+                  checked={courseSettings.autoRevealBaseLanguages ?? true}
+                  onCheckedChange={handleAutoRevealBaseLanguagesChange}
+                  indented
+                />
               )}
             </div>
           )}
@@ -1577,47 +1454,24 @@ export function LearningModeSettings({
               only (independent of the audio-mode pair above) */}
           {reviewMode === 'full' && (
             <div className="space-y-0">
-              <div className="settings-row">
-                <div className="space-y-0.5">
-                  <Label
-                    htmlFor="hideBaseLanguagesFull"
-                    className="text-sm font-medium"
-                  >
-                    {t('hideBaseLanguages')}
-                  </Label>
-                  <p className="text-muted-xs">
-                    {t('hideBaseLanguagesDescription')}
-                  </p>
-                </div>
-                <Switch
-                  id="hideBaseLanguagesFull"
-                  checked={courseSettings.hideBaseLanguagesFull ?? isTranscribe}
-                  onCheckedChange={handleHideBaseLanguagesFullChange}
-                  className="mt-0.5"
-                />
-              </div>
+              <SettingSwitchRow
+                id="hideBaseLanguagesFull"
+                label={t('hideBaseLanguages')}
+                description={t('hideBaseLanguagesDescription')}
+                checked={courseSettings.hideBaseLanguagesFull ?? isTranscribe}
+                onCheckedChange={handleHideBaseLanguagesFullChange}
+              />
 
               {/* Auto-reveal on submit — visually indented as a sub-setting */}
               {(courseSettings.hideBaseLanguagesFull ?? isTranscribe) && (
-                <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
-                  <div className="space-y-0.5">
-                    <Label
-                      htmlFor="autoRevealBaseOnSubmit"
-                      className="text-sm font-medium"
-                    >
-                      {t('autoRevealBaseOnSubmit')}
-                    </Label>
-                    <p className="text-muted-xs">
-                      {t('autoRevealBaseOnSubmitDescription')}
-                    </p>
-                  </div>
-                  <Switch
-                    id="autoRevealBaseOnSubmit"
-                    checked={courseSettings.autoRevealBaseOnSubmit ?? true}
-                    onCheckedChange={handleAutoRevealBaseOnSubmitChange}
-                    className="mt-0.5"
-                  />
-                </div>
+                <SettingSwitchRow
+                  id="autoRevealBaseOnSubmit"
+                  label={t('autoRevealBaseOnSubmit')}
+                  description={t('autoRevealBaseOnSubmitDescription')}
+                  checked={courseSettings.autoRevealBaseOnSubmit ?? true}
+                  onCheckedChange={handleAutoRevealBaseOnSubmitChange}
+                  indented
+                />
               )}
             </div>
           )}
@@ -1631,39 +1485,23 @@ export function LearningModeSettings({
               carrying a `romanization`, which the server only ever populates
               for romanized languages. */}
           {courseSupportsRomanization && (
-            <div className="settings-row">
-              <div className="space-y-0.5">
-                <Label htmlFor="showRomanization" className="text-sm font-medium">
-                  {t('showRomanization')}
-                </Label>
-                <p className="text-muted-xs">
-                  {t('showRomanizationDescription')}
-                </p>
-              </div>
-              <Switch
-                id="showRomanization"
-                checked={courseSettings.showRomanization ?? true}
-                onCheckedChange={handleShowRomanizationChange}
-                className="mt-0.5"
-              />
-            </div>
+            <SettingSwitchRow
+              id="showRomanization"
+              label={t('showRomanization')}
+              description={t('showRomanizationDescription')}
+              checked={courseSettings.showRomanization ?? true}
+              onCheckedChange={handleShowRomanizationChange}
+            />
           )}
 
           {/* Show progress bar */}
-          <div className="settings-row">
-            <div className="space-y-0.5">
-              <Label htmlFor="showProgressBar" className="text-sm font-medium">
-                {t('showProgressBar')}
-              </Label>
-              <p className="text-muted-xs">{t('showProgressBarDescription')}</p>
-            </div>
-            <Switch
-              id="showProgressBar"
-              checked={courseSettings.showProgressBar ?? true}
-              onCheckedChange={handleShowProgressBarChange}
-              className="mt-0.5"
-            />
-          </div>
+          <SettingSwitchRow
+            id="showProgressBar"
+            label={t('showProgressBar')}
+            description={t('showProgressBarDescription')}
+            checked={courseSettings.showProgressBar ?? true}
+            onCheckedChange={handleShowProgressBarChange}
+          />
 
         </div>
 

@@ -7,6 +7,7 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { normalizePlans } from '../../lib/autumn/customer-shape';
+import { AUTUMN_API } from './autumnClient';
 
 /**
  * E2E test hooks for the payment-overdue (dunning) flow. Every function
@@ -174,7 +175,7 @@ export const getBillingDebugState = internalAction({
       { email: args.email },
     );
     const res = await fetch(
-      `https://api.useautumn.com/v1/customers/${encodeURIComponent(userId)}`,
+      `${AUTUMN_API}/customers/${encodeURIComponent(userId)}`,
       {
         headers: {
           Authorization: `Bearer ${key}`,

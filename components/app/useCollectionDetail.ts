@@ -3,7 +3,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useMutation, usePaginatedQuery } from 'convex/react';
 import type { OptimisticLocalStore } from 'convex/browser';
-import { ConvexError } from 'convex/values';
 import type { FunctionReturnType } from 'convex/server';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
@@ -16,6 +15,7 @@ import {
   settledCount,
 } from '@/convex/lib/collections';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
+import { convexErrorCode } from '@/lib/utils';
 import type { CollectionProgressItem } from './CollectionCarouselUI';
 
 export type CollectionTextMark = 'prioritized' | 'ignored';
@@ -488,9 +488,7 @@ export function useCollectionDetail({
         toast.success(t('cardsAdded', { count: result.cardsAdded }));
       }
     } catch (error) {
-      const code = error instanceof ConvexError
-        ? (error.data as { code?: string })?.code
-        : undefined;
+      const code = convexErrorCode(error);
       if (code === 'PAYMENT_PAST_DUE') {
         // Silent: the reactive payment-overdue dialog is the canonical
         // surface for this state.
@@ -526,9 +524,7 @@ export function useCollectionDetail({
       try {
         await addSingleText({ textId: textId as Id<'texts'> });
       } catch (error) {
-        const code = error instanceof ConvexError
-          ? (error.data as { code?: string })?.code
-          : undefined;
+        const code = convexErrorCode(error);
         if (code === 'PAYMENT_PAST_DUE') {
           // Silent: the reactive payment-overdue dialog is the canonical
           // surface for this state.

@@ -664,6 +664,23 @@ export const PricingCard = ({
   );
 };
 
+const FeatureBullet = ({
+  label,
+  secondary,
+}: {
+  label: React.ReactNode;
+  secondary?: string;
+}) => (
+  <div className="flex items-start gap-2 text-sm">
+    <div className="flex flex-col">
+      <span>{label}</span>
+      {secondary && (
+        <span className="text-sm text-muted-foreground">{secondary}</span>
+      )}
+    </div>
+  </div>
+);
+
 export const PricingFeatureList = ({
   items,
   everythingFrom,
@@ -710,39 +727,22 @@ export const PricingFeatureList = ({
         </p>
       )}
       <div className="space-y-3">
-        {items.filter((item) => !isFeatureHidden(item.feature_id ?? '')).map((item, index) => {
-          const label = getFeatureLabel(item);
-          return (
-            <div
-              key={index}
-              className="flex items-start gap-2 text-sm"
-            >
-              <div className="flex flex-col">
-                <span>{label}</span>
-                {item.display?.secondary_text && (
-                  <span className="text-sm text-muted-foreground">
-                    {item.display?.secondary_text}
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {items.filter((item) => !isFeatureHidden(item.feature_id ?? '')).map((item, index) => (
+          <FeatureBullet
+            key={index}
+            label={getFeatureLabel(item)}
+            secondary={item.display?.secondary_text}
+          />
+        ))}
         {extraFeatureKeys?.map((key) => (
-          <div key={key} className="flex items-start gap-2 text-sm">
-            <div className="flex flex-col">
-              <span>{t(key)}</span>
-            </div>
-          </div>
+          <FeatureBullet key={key} label={t(key)} />
         ))}
         {/* Not a metered Autumn item — every plan has it, so it only belongs
             on the base card. Higher tiers inherit it via "Everything from". */}
         {!everythingFrom && (
-          <div className="flex items-start gap-2 text-sm">
-            <div className="flex flex-col">
-              <span>{tFeatures ? tFeatures("detailedStatistics.pricingLabel") : "Detailed statistics"}</span>
-            </div>
-          </div>
+          <FeatureBullet
+            label={tFeatures ? tFeatures("detailedStatistics.pricingLabel") : "Detailed statistics"}
+          />
         )}
       </div>
     </div>
@@ -771,6 +771,16 @@ export const PricingCardButton = React.forwardRef<
     }
   };
 
+  // One element description rendered in both hover layers — reusing the same
+  // element object in two tree positions is legal React and keeps the DOM
+  // identical to spelling the pair out twice.
+  const label = (
+    <>
+      <span>{children}</span>
+      <span className="text-sm">→</span>
+    </>
+  );
+
   return (
     <Button
       className={cn(
@@ -788,12 +798,10 @@ export const PricingCardButton = React.forwardRef<
       ) : (
         <>
           <div className="flex items-center justify-between w-full transition-transform duration-300 group-hover:translate-y-[-130%]">
-            <span>{children}</span>
-            <span className="text-sm">→</span>
+            {label}
           </div>
           <div className="flex items-center justify-between w-full absolute px-4 translate-y-[130%] transition-transform duration-300 group-hover:translate-y-0 mt-2 group-hover:mt-0">
-            <span>{children}</span>
-            <span className="text-sm">→</span>
+            {label}
           </div>
         </>
       )}

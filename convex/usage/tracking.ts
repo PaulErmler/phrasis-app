@@ -9,8 +9,7 @@ import {
   normalizePlans,
   type AutumnPlan,
 } from '../../lib/autumn/customer-shape';
-
-const AUTUMN_API = 'https://api.useautumn.com/v1';
+import { AUTUMN_API, getSecretKey } from './autumnClient';
 
 /**
  * Pinned, because the customer payload's SHAPE is version-dependent and the
@@ -33,12 +32,6 @@ const AUTUMN_API = 'https://api.useautumn.com/v1';
  * the v1 `products` shape if one ever arrives.
  */
 const AUTUMN_API_VERSION = '2.2';
-
-function getSecretKey(): string {
-  const key = process.env.AUTUMN_SECRET_KEY;
-  if (!key) throw new Error('AUTUMN_SECRET_KEY environment variable is not set');
-  return key;
-}
 
 /** Fields returned per balance entry by `GET /customers/:id`. */
 export type AutumnBalanceEntry = {

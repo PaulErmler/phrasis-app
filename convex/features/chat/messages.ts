@@ -1,16 +1,19 @@
 import { v, ConvexError } from 'convex/values';
-import { internalAction, internalQuery, mutation, query } from '../../_generated/server';
+import {
+  internalAction,
+  internalQuery,
+  mutation,
+  query,
+  type MutationCtx,
+} from '../../_generated/server';
 import { paginationOptsValidator } from 'convex/server';
-import { internal } from '../../_generated/api';
-import { saveMessage } from '@convex-dev/agent';
-import { listUIMessages, syncStreams } from '@convex-dev/agent';
-import { components } from '../../_generated/api';
+import { internal, components } from '../../_generated/api';
+import { saveMessage, listUIMessages, syncStreams } from '@convex-dev/agent';
 import { requireAuthUserId, getAuthUserId } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
 import { consumeQuota } from '../../usage/helpers';
 import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
 import { agent } from './agent';
-import type { MutationCtx } from '../../_generated/server';
 import type { Id } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { trackEvent } from '../../db/stats/dailyStats';
@@ -270,14 +273,16 @@ export const listMessages = query({
     streams: v.optional(v.any()),
   }),
   handler: async (ctx, args) => {
+    const emptyResult = () => ({
+      page: [],
+      isDone: true,
+      continueCursor: '',
+      streams: emptyStreamsFor(args.streamArgs),
+    });
+
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      return {
-        page: [],
-        isDone: true,
-        continueCursor: '',
-        streams: emptyStreamsFor(args.streamArgs),
-      };
+      return emptyResult();
     }
 
     const thread = await ctx.runQuery(agentComponent.threads.getThread, {
@@ -285,12 +290,7 @@ export const listMessages = query({
     });
 
     if (!thread || thread.userId !== userId) {
-      return {
-        page: [],
-        isDone: true,
-        continueCursor: '',
-        streams: emptyStreamsFor(args.streamArgs),
-      };
+      return emptyResult();
     }
 
     const messages = await listUIMessages(ctx, agentComponent, {

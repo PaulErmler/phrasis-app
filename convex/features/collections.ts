@@ -5,7 +5,7 @@ import { internal } from '../_generated/api';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import {
-  getActiveDataset,
+  getPremadeLevelCollections,
   getCollectionProgress,
   getNextTextsFromRank,
 } from '../db/collections';
@@ -27,7 +27,6 @@ import {
 import {
   COLLECTION_PREVIEW_SIZE,
   MAX_PREVIEW_PAGE_SIZE,
-  LEGACY_LEVEL_ORDER,
   canUserAccessCollectionText,
   isPremadeLevelCollection,
 } from '../lib/collections';
@@ -38,7 +37,7 @@ import {
 } from '../../lib/languages';
 import { deleteAudioRow } from '../lib/audio';
 import { hasActiveTtsClaim } from './ttsProcessing';
-import { CLAIM_STALE_MS as LLM_CLAIM_STALE_MS } from './llmTranslationQueue';
+import { getLlmClaim, isClaimFresh } from './llmTranslationQueue';
 import { getCourseSettings } from '../db/courseSettings';
 import type { Doc, Id } from '../_generated/dataModel';
 import type { MutationCtx, QueryCtx } from '../_generated/server';
@@ -416,13 +415,8 @@ async function scheduleMissingTranslationsForText(
       // (races the pending audio write) or a fresh LLM claim (the in-flight
       // retranslation overwrites the row anyway).
       if (await hasActiveTtsClaim(ctx, text._id, lang)) continue;
-      const llmClaim = await ctx.db
-        .query('llmTranslationClaims')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', text._id).eq('targetLanguage', lang),
-        )
-        .first();
-      if (llmClaim && Date.now() - llmClaim.claimedAt < LLM_CLAIM_STALE_MS) {
+      const llmClaim = await getLlmClaim(ctx, text._id, lang);
+      if (llmClaim && isClaimFresh(llmClaim)) {
         continue;
       }
       // Keep mixed-dialect rows on their pinned dialect across regeneration.
@@ -660,31 +654,10 @@ export const ensureFirstSentencesAcrossLevelCollections = internalMutation({
   }),
   handler: async (ctx, args) => {
     // Load only the ~20 premade level collections via indexed lookups so this
-    // doesn't scan every user's custom/chat collections (which share the table).
-    // Custom collections have no `datasetId` and don't share names with
-    // LEGACY_LEVEL_ORDER, so both branches naturally exclude them.
-    const activeDataset = await getActiveDataset(ctx);
-    let levelCollections: Doc<'collections'>[];
-    if (activeDataset) {
-      levelCollections = await ctx.db
-        .query('collections')
-        .withIndex('by_datasetId_and_order', (q) =>
-          q.eq('datasetId', activeDataset._id),
-        )
-        .collect();
-    } else {
-      const legacyDocs = await Promise.all(
-        LEGACY_LEVEL_ORDER.map((name) =>
-          ctx.db
-            .query('collections')
-            .withIndex('by_name', (q) => q.eq('name', name))
-            .first(),
-        ),
-      );
-      levelCollections = legacyDocs.filter(
-        (c): c is Doc<'collections'> => c !== null,
-      );
-    }
+    // doesn't scan every user's custom/chat collections (which share the
+    // table) — see getPremadeLevelCollections for the read pattern.
+    const { collections: levelCollections } =
+      await getPremadeLevelCollections(ctx);
 
     await Promise.all(
       levelCollections.map((collection) =>

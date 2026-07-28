@@ -20,6 +20,7 @@ The tutorial system uses [driver.js](https://driverjs.com/) to guide users throu
 ```
 lib/tutorials/
 ├── types.ts               — TutorialDefinition / TutorialFactory / TranslateFn types
+├── tour-step.ts           — tourStep() helper: builds a DriveStep from an i18n key prefix
 ├── registry.ts            — Central registry; re-exports TUTORIAL_IDS from convex/features/tutorialIds.ts
 ├── use-tutorial.ts        — React hook that manages lifecycle
 ├── home-tour.ts           — Home screen overview tour
@@ -46,10 +47,9 @@ Tutorials are defined as **factories** (`TutorialFactory = (t: TranslateFn) => T
 
 ### Registry (`registry.ts`)
 
-All tutorial factories are registered at import time via `registerTutorial(id, factory)`. The registry exposes:
+All tutorial factories live in a static `tutorialFactories` record (tutorial ID → factory) inside `registry.ts`. The registry exposes:
 
-- `registerTutorial(id, factory)` — register a tutorial factory under its ID
-- `getTutorial(id, t)` — invoke the registered factory with a translate function; returns the `TutorialDefinition` (or `undefined`)
+- `getTutorial(id, t)` — look up the factory for `id` (own keys only, so prototype keys like `toString` never resolve) and invoke it with a translate function; returns the `TutorialDefinition` (or `undefined` for unknown IDs)
 - `TUTORIAL_IDS` — typed constant object for referencing IDs. It lives in `convex/features/tutorialIds.ts` (single source of truth shared with the backend's `tutorialIdValidator`) and is re-exported by `registry.ts`
 
 ```typescript
@@ -220,23 +220,21 @@ The driver instance is configured with `stagePadding: 8` and `stageRadius: 8` fo
 ### 1. Create the tour file
 
 Create `lib/tutorials/my-new-tour.ts`. The factory receives a translate
-function (`Tutorial` namespace in `messages/en.json` / `de.json`):
+function (`Tutorial` namespace in `messages/en.json` / `de.json`). Build
+steps with `tourStep(t, key, element?, side?, align?)`, which reads
+`${key}.title` / `${key}.description`; omit `element`/`side`/`align` for a
+centered modal-style popover. Raw `DriveStep` literals are still fine for
+special cases (e.g. an empty description or `onPopoverRender` hooks):
 
 ```typescript
 import type { DriveStep } from 'driver.js';
 import type { TutorialDefinition, TranslateFn } from './types';
+import { tourStep } from './tour-step';
 
 export function createMyNewTour(t: TranslateFn): TutorialDefinition {
   const steps: DriveStep[] = [
-    {
-      element: '[data-tutorial="my-element"]',
-      popover: {
-        title: t('myNewTour.step1.title'),
-        description: t('myNewTour.step1.description'),
-        side: 'bottom',
-        align: 'center',
-      },
-    },
+    tourStep(t, 'myNewTour.welcome'),  // centered welcome popover
+    tourStep(t, 'myNewTour.step1', '[data-tutorial="my-element"]', 'bottom', 'center'),
     // ... more steps
   ];
 
@@ -263,12 +261,15 @@ Also add the matching `v.literal('my_new_tour')` to `tutorialIdValidator` in the
 
 ### 3. Register it
 
-In `registry.ts`:
+In `registry.ts`, add an entry to the static `tutorialFactories` record:
 
 ```typescript
 import { createMyNewTour } from './my-new-tour';
 
-registerTutorial('my_new_tour', createMyNewTour);
+const tutorialFactories: Record<string, TutorialFactory> = {
+  // ... existing entries
+  my_new_tour: createMyNewTour,
+};
 ```
 
 ### 4. Add data-tutorial attributes

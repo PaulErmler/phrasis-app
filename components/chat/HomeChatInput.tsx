@@ -3,7 +3,6 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from 'convex/react';
-import { ConvexError } from 'convex/values';
 import { useTranslations } from 'next-intl';
 import {
   Sparkles,
@@ -24,7 +23,7 @@ import { FEATURE_IDS } from '@/convex/features/featureIds';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import LowQuotaDialog from '@/components/autumn/low-quota-dialog';
 import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
-import { cn, isPaymentPastDueError } from '@/lib/utils';
+import { cn, convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 
 /**
  * Compact single-row chat-input surface used on the home view. Matches the
@@ -104,18 +103,12 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
         setIsProcessing(false);
         return;
       }
-      if (
-        error instanceof ConvexError &&
-        (error.data as { code?: string })?.code === 'USAGE_LIMIT'
-      ) {
+      if (convexErrorCode(error) === 'USAGE_LIMIT') {
         setPaywallOpen(true);
         setIsProcessing(false);
         return;
       }
-      if (
-        error instanceof ConvexError &&
-        (error.data as { code?: string })?.code === 'MESSAGE_TOO_LONG'
-      ) {
+      if (convexErrorCode(error) === 'MESSAGE_TOO_LONG') {
         toast.error(tErrors('messageTooLong'));
         setIsProcessing(false);
         return;

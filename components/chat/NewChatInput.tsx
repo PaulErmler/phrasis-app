@@ -3,8 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from 'convex/react';
-import { ConvexError } from 'convex/values';
-import { isPaymentPastDueError } from '@/lib/utils';
+import { convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
@@ -99,18 +98,12 @@ export function NewChatInput({
           setIsProcessing(false);
           return;
         }
-        if (
-          error instanceof ConvexError &&
-          (error.data as { code?: string })?.code === 'USAGE_LIMIT'
-        ) {
+        if (convexErrorCode(error) === 'USAGE_LIMIT') {
           setPaywallOpen(true);
           setIsProcessing(false);
           return;
         }
-        if (
-          error instanceof ConvexError &&
-          (error.data as { code?: string })?.code === 'MESSAGE_TOO_LONG'
-        ) {
+        if (convexErrorCode(error) === 'MESSAGE_TOO_LONG') {
           toast.error(t('messageTooLong'));
           setIsProcessing(false);
           return;

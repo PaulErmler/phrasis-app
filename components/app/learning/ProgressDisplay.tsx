@@ -49,6 +49,19 @@ interface ProgressDisplayProps {
 const REVIEWS_CAP = 100;
 const NEW_WORDS_CAP = 200;
 
+/**
+ * Capped "+N[+]" new-words counter. `displayed` is the value actually shown
+ * (possibly mid-animation, already clamped to NEW_WORDS_CAP); the trailing
+ * "+" appears only when the true value exceeds the cap AND the displayed
+ * value has reached it — so an animating counter gains its "+" on the final
+ * tick, not before.
+ */
+function formatCappedNewWords(displayed: number, trueValue: number): string {
+  const overflow =
+    trueValue > NEW_WORDS_CAP && displayed >= NEW_WORDS_CAP ? '+' : '';
+  return `+${displayed}${overflow}`;
+}
+
 // Counter timing tuned to the bundled audio file (progress-success.mp3 ≈ 3.4s).
 // Hero lands ~700 ms before the audio finishes; supporting cells finish a hair
 // earlier so the eye lands on the hero as the "final" beat of the swell.
@@ -271,7 +284,6 @@ function CelebrationContent({
   // can legitimately reach the hundreds.
   const heroAnimTarget =
     hero.kind === 'reviewsToday' ? hero.value : Math.min(hero.value, NEW_WORDS_CAP);
-  const heroOverflowed = hero.kind !== 'reviewsToday' && hero.value > NEW_WORDS_CAP;
 
   // Memoised so the counter doesn't restart on every render.
   const heroEasing = useMemo(() => buildHeroEasing(heroAnimTarget), [heroAnimTarget]);
@@ -286,7 +298,6 @@ function CelebrationContent({
     COUNTER_DELAY_MS,
     true,
   );
-  const todayWordsOverflowed = dailyNewWordsToday > NEW_WORDS_CAP;
 
   // ----- Sound + Media Session + Auto-advance (mounts only when ready) -----
   // Pause state. The REF (`isPausedRef`) is the source of truth for any
@@ -437,7 +448,7 @@ function CelebrationContent({
   const heroDisplay =
     hero.kind === 'reviewsToday'
       ? animHero.toLocaleString()
-      : `+${animHero}${heroOverflowed && animHero >= NEW_WORDS_CAP ? '+' : ''}`;
+      : formatCappedNewWords(animHero, hero.value);
 
   return (
     <div
@@ -480,8 +491,6 @@ function CelebrationContent({
               >
                 {sessionWordCounts.perLanguage.map((lw) => {
                   const lang = getLanguageByCode(lw.language);
-                  const capped = Math.min(lw.count, NEW_WORDS_CAP);
-                  const overflow = lw.count > NEW_WORDS_CAP ? '+' : '';
                   return (
                     <span
                       key={lw.language}
@@ -489,7 +498,12 @@ function CelebrationContent({
                       aria-label={`${lang?.name ?? lw.language}: ${lw.count}`}
                     >
                       <span aria-hidden>{lang?.flag ?? '🌐'}</span>
-                      <span aria-hidden>+{capped}{overflow}</span>
+                      <span aria-hidden>
+                        {formatCappedNewWords(
+                          Math.min(lw.count, NEW_WORDS_CAP),
+                          lw.count,
+                        )}
+                      </span>
                     </span>
                   );
                 })}
@@ -517,7 +531,7 @@ function CelebrationContent({
             <StatCell
               icon={<BookOpen className="h-3.5 w-3.5" />}
               label={t('newWordsToday')}
-              value={`+${animTodayWords}${todayWordsOverflowed && animTodayWords >= NEW_WORDS_CAP ? '+' : ''}`}
+              value={formatCappedNewWords(animTodayWords, dailyNewWordsToday)}
             />
           </div>
         </motion.div>

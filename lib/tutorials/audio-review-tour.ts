@@ -1,77 +1,17 @@
 import type { DriveStep } from 'driver.js';
 import type { TutorialDefinition, TranslateFn } from './types';
+import { tourStep } from './tour-step';
 
 export function createAudioReviewTour(t: TranslateFn): TutorialDefinition {
   const steps: DriveStep[] = [
-    {
-      popover: {
-        title: t('audioReview.welcome.title'),
-        description: t('audioReview.welcome.description'),
-      },
-    },
-    {
-      element: '[data-tutorial="card-flashcard"]',
-      popover: {
-        title: t('audioReview.card.title'),
-        description: t('audioReview.card.description'),
-        side: 'bottom',
-        align: 'center',
-      },
-    },
-    {
-      element: '[data-tutorial="target-text-audio"]',
-      popover: {
-        title: t('audioReview.targetText.title'),
-        description: t('audioReview.targetText.description'),
-        side: 'bottom',
-        align: 'center',
-      },
-    },
-    {
-      element: '[data-tutorial="rating-buttons"]',
-      popover: {
-        title: t('audioReview.rating.title'),
-        description: t('audioReview.rating.description'),
-        side: 'top',
-        align: 'center',
-      },
-    },
-    {
-      element: '[data-tutorial="audio-controls"]',
-      popover: {
-        title: t('audioReview.audioControls.title'),
-        description: t('audioReview.audioControls.description'),
-        side: 'top',
-        align: 'center',
-      },
-    },
-    {
-      element: '[data-tutorial="undo-restart"]',
-      popover: {
-        title: t('audioReview.undoRestart.title'),
-        description: t('audioReview.undoRestart.description'),
-        side: 'top',
-        align: 'center',
-      },
-    },
-    {
-      element: '[data-tutorial="settings-button"]',
-      popover: {
-        title: t('audioReview.settings.title'),
-        description: t('audioReview.settings.description'),
-        side: 'bottom',
-        align: 'start',
-      },
-    },
-    {
-      element: '[data-tutorial="chat-button"]',
-      popover: {
-        title: t('chat.title'),
-        description: t('chat.description'),
-        side: 'top',
-        align: 'center',
-      },
-    },
+    tourStep(t, 'audioReview.welcome'),
+    tourStep(t, 'audioReview.card', '[data-tutorial="card-flashcard"]', 'bottom', 'center'),
+    tourStep(t, 'audioReview.targetText', '[data-tutorial="target-text-audio"]', 'bottom', 'center'),
+    tourStep(t, 'audioReview.rating', '[data-tutorial="rating-buttons"]', 'top', 'center'),
+    tourStep(t, 'audioReview.audioControls', '[data-tutorial="audio-controls"]', 'top', 'center'),
+    tourStep(t, 'audioReview.undoRestart', '[data-tutorial="undo-restart"]', 'top', 'center'),
+    tourStep(t, 'audioReview.settings', '[data-tutorial="settings-button"]', 'bottom', 'start'),
+    tourStep(t, 'chat', '[data-tutorial="chat-button"]', 'top', 'center'),
   ];
 
   return {

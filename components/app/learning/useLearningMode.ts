@@ -57,6 +57,38 @@ function effectivePhase(
   return reviewMode === 'full' ? 'review' : rawPhase;
 }
 
+/**
+ * Sticky "last resolved query value": while authenticated, a query that
+ * transiently flips back to `undefined` (refetch) keeps serving its last
+ * resolved value. Sign-out fully resets the stickiness so no stale value
+ * can flash back after re-auth while the queries are still loading.
+ */
+function useStickyQueryValue<T>(
+  value: T | undefined,
+  isAuthenticated: boolean,
+): T | undefined {
+  const lastRef = useRef<T | undefined>(undefined);
+  const receivedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      receivedRef.current = false;
+      lastRef.current = undefined;
+      return;
+    }
+    if (value !== undefined) {
+      receivedRef.current = true;
+      lastRef.current = value;
+    }
+  }, [isAuthenticated, value]);
+
+  return value !== undefined
+    ? value
+    : isAuthenticated && receivedRef.current
+      ? lastRef.current
+      : undefined;
+}
+
 // ============================================================================
 // Discriminated union return type
 // ============================================================================
@@ -281,79 +313,30 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const courseSettingsQuery = useQuery(api.features.courses.getActiveCourseSettings, {});
   const activeCourseQuery = useQuery(api.features.courses.getActiveCourse, {});
 
-  const lastCardRef = useRef<
-    Exclude<typeof cardForReviewQuery, undefined> | undefined
-  >(undefined);
+  const cardForReview = useStickyQueryValue(cardForReviewQuery, isAuthenticated);
+  const courseSettings = useStickyQueryValue(courseSettingsQuery, isAuthenticated);
+  const activeCourse = useStickyQueryValue(activeCourseQuery, isAuthenticated);
+
+  // Card-specific stickiness on top of the sticky values above: also filters
+  // out `null` (deck empty) so the auto-add gap can keep showing the
+  // just-reviewed card, and resets on collection change.
   const lastReviewingCardRef = useRef<
     NonNullable<typeof cardForReviewQuery> | undefined
   >(undefined);
-  const receivedCardRef = useRef(false);
-  const lastCourseSettingsRef = useRef<
-    Exclude<typeof courseSettingsQuery, undefined> | undefined
-  >(undefined);
-  const receivedCourseSettingsRef = useRef(false);
-  const lastActiveCourseRef = useRef<
-    Exclude<typeof activeCourseQuery, undefined> | undefined
-  >(undefined);
-  const receivedActiveCourseRef = useRef(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      receivedCardRef.current = false;
-      lastCardRef.current = undefined;
       lastReviewingCardRef.current = undefined;
-      receivedCourseSettingsRef.current = false;
-      lastCourseSettingsRef.current = undefined;
-      receivedActiveCourseRef.current = false;
-      lastActiveCourseRef.current = undefined;
       return;
-    }
-    if (cardForReviewQuery !== undefined) {
-      receivedCardRef.current = true;
-      lastCardRef.current = cardForReviewQuery;
     }
     if (cardForReviewQuery != null) {
       lastReviewingCardRef.current = cardForReviewQuery;
     }
-    if (courseSettingsQuery !== undefined) {
-      receivedCourseSettingsRef.current = true;
-      lastCourseSettingsRef.current = courseSettingsQuery;
-    }
-    if (activeCourseQuery !== undefined) {
-      receivedActiveCourseRef.current = true;
-      lastActiveCourseRef.current = activeCourseQuery;
-    }
-  }, [
-    isAuthenticated,
-    cardForReviewQuery,
-    courseSettingsQuery,
-    activeCourseQuery,
-  ]);
+  }, [isAuthenticated, cardForReviewQuery]);
 
   useEffect(() => {
     lastReviewingCardRef.current = undefined;
   }, [courseSettingsQuery?.activeCollectionId]);
-
-  const cardForReview =
-    cardForReviewQuery !== undefined
-      ? cardForReviewQuery
-      : isAuthenticated && receivedCardRef.current
-        ? lastCardRef.current
-        : undefined;
-
-  const courseSettings =
-    courseSettingsQuery !== undefined
-      ? courseSettingsQuery
-      : isAuthenticated && receivedCourseSettingsRef.current
-        ? lastCourseSettingsRef.current
-        : undefined;
-
-  const activeCourse =
-    activeCourseQuery !== undefined
-      ? activeCourseQuery
-      : isAuthenticated && receivedActiveCourseRef.current
-        ? lastActiveCourseRef.current
-        : undefined;
 
   // Undo-button state rides on the getCardForReview payload — one
   // subscription that invalidates once per review, instead of a parallel
@@ -842,6 +825,40 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // Opt-out: undefined (pre-migration rows or unset) defaults to enabled.
   const progressDisplayEnabled = courseSettings?.progressDisplayEnabled ?? true;
 
+  // Shared shape for mutations that animate the card out (master / hide /
+  // delete / radio advance): mark this tab as review initiator, bump the
+  // animation key, flip `isExiting` before the await, and clear `isReviewing`
+  // in finally. On rejection `isExiting` is restored so the card comes back —
+  // unless `alwaysClearExiting` is set, in which case the finally clears it
+  // unconditionally instead. (`handleReview` keeps its own copy of the
+  // prelude: its milestone prediction / rollback logic doesn't fit here.)
+  const runExitingMutation = useCallback(
+    async (
+      run: () => Promise<unknown>,
+      errorMessage: string,
+      options?: { alwaysClearExiting?: boolean },
+    ) => {
+      reviewInitiatedByThisTabRef.current = true;
+      setCardAnimationKey((k) => k + 1);
+      setIsExiting(true);
+      setIsReviewing(true);
+      try {
+        await run();
+      } catch (error) {
+        console.error(errorMessage, error);
+        if (!options?.alwaysClearExiting) {
+          setIsExiting(false);
+        }
+      } finally {
+        setIsReviewing(false);
+        if (options?.alwaysClearExiting) {
+          setIsExiting(false);
+        }
+      }
+    },
+    [],
+  );
+
   const handleReview = useCallback(
     async (
       rating: ReviewRating,
@@ -1141,19 +1158,11 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
 
   const handleDelete = useCallback(async () => {
     if (!cardForReview || isReviewing) return;
-    reviewInitiatedByThisTabRef.current = true;
-    setCardAnimationKey((k) => k + 1);
-    setIsExiting(true);
-    setIsReviewing(true);
-    try {
-      await deleteCardMutation({ cardId: cardForReview._id });
-    } catch (error) {
-      console.error('Failed to delete card:', error);
-      setIsExiting(false);
-    } finally {
-      setIsReviewing(false);
-    }
-  }, [cardForReview, isReviewing, deleteCardMutation]);
+    await runExitingMutation(
+      () => deleteCardMutation({ cardId: cardForReview._id }),
+      'Failed to delete card:',
+    );
+  }, [cardForReview, isReviewing, deleteCardMutation, runExitingMutation]);
 
   // --------------------------------------------------------------------------
   // Scheduling mode
@@ -1185,58 +1194,36 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   ) => {
     if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
-      reviewInitiatedByThisTabRef.current = true;
-      setCardAnimationKey((k) => k + 1);
-      setIsExiting(true);
-      setIsReviewing(true);
-      try {
-        await masterCardMutation({ cardId: cardForReview._id });
-      } catch (error) {
-        console.error('Failed to master card:', error);
-        setIsExiting(false);
-      } finally {
-        setIsReviewing(false);
-      }
+      await runExitingMutation(
+        () => masterCardMutation({ cardId: cardForReview._id }),
+        'Failed to master card:',
+      );
       return;
     }
     if (isPendingHide) {
-      reviewInitiatedByThisTabRef.current = true;
-      setCardAnimationKey((k) => k + 1);
-      setIsExiting(true);
-      setIsReviewing(true);
-      try {
-        await hideCardMutation({ cardId: cardForReview._id });
-      } catch (error) {
-        console.error('Failed to hide card:', error);
-        setIsExiting(false);
-      } finally {
-        setIsReviewing(false);
-      }
+      await runExitingMutation(
+        () => hideCardMutation({ cardId: cardForReview._id }),
+        'Failed to hide card:',
+      );
       return;
     }
     if (isRadio) {
       // Radio mode bypasses FSRS entirely: no rating, no stats, no
       // celebration. Just bump the play counter so the next-lowest counter
-      // rises to the front of the queue.
-      reviewInitiatedByThisTabRef.current = true;
-      setCardAnimationKey((k) => k + 1);
-      setIsExiting(true);
-      setIsReviewing(true);
-      try {
-        await advanceRadioCardMutation({
-          cardId: cardForReview._id,
-          timezone: getUserTimezone(),
-          timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
-        });
-      } catch (error) {
-        console.error('Failed to advance radio card:', error);
-      } finally {
-        setIsReviewing(false);
-        // Always clear `isExiting` in radio. The shared reset effect only
-        // fires when `cardForReview._id` changes, so on a same-id re-render
-        // (single-card decks) it would otherwise leave the card pane blank.
-        setIsExiting(false);
-      }
+      // rises to the front of the queue. `alwaysClearExiting`: the shared
+      // reset effect only fires when `cardForReview._id` changes, so on a
+      // same-id re-render (single-card decks) it would otherwise leave the
+      // card pane blank.
+      await runExitingMutation(
+        () =>
+          advanceRadioCardMutation({
+            cardId: cardForReview._id,
+            timezone: getUserTimezone(),
+            timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
+          }),
+        'Failed to advance radio card:',
+        { alwaysClearExiting: true },
+      );
       return;
     }
     const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
@@ -1261,6 +1248,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     autoRatingState,
     reviewMode,
     handleReview,
+    runExitingMutation,
     masterCardMutation,
     hideCardMutation,
     advanceRadioCardMutation,

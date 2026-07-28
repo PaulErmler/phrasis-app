@@ -74,6 +74,37 @@ export interface AudioPlayerState {
   speedByLanguage: Record<string, number>;
 }
 
+// Shared catch handler for `audio.play()` promises: interruption/autoplay-
+// policy rejections (AbortError/NotAllowedError) are expected and silently
+// ignored; anything else is logged under the given label.
+function ignorePlayInterrupt(label: string) {
+  return (err: { name?: string }) => {
+    if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
+    console.error(label, err);
+  };
+}
+
+// Run `fn` once the element has metadata — immediately if already loaded,
+// otherwise on the next `loadedmetadata` event.
+function whenMetadataReady(audio: HTMLAudioElement, fn: () => void) {
+  if (audio.readyState >= 1 /* HAVE_METADATA */) {
+    fn();
+  } else {
+    audio.addEventListener('loadedmetadata', fn, { once: true });
+  }
+}
+
+// Identity key for an audio set: changes on language changes, voice swaps,
+// and URL null↔present transitions, but not on signed-URL refreshes. Using
+// raw URL strings would cause needless remerges every time Convex refreshes
+// signed URLs while the set itself is unchanged.
+function audioIdentityKeyOf(recs: CardAudioRecording[]): string {
+  if (recs.length === 0) return '';
+  return recs
+    .map((a) => `${a.language}:${a.voiceName ?? 'none'}:${a.url ? '1' : '0'}`)
+    .join('|');
+}
+
 export function useAudioPlayer(
   options: UseAudioPlayerOptions,
 ): AudioPlayerState {
@@ -188,10 +219,7 @@ export function useAudioPlayer(
         // here guarantees the rAF effect resubscribes and highlights update.
         setIsPlaying(true);
       })
-      .catch((err) => {
-        if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
-        console.error('Audio play failed:', err);
-      });
+      .catch(ignorePlayInterrupt('Audio play failed:'));
   }, [getAudio, clock]);
 
   const pause = useCallback(() => {
@@ -348,25 +376,19 @@ export function useAudioPlayer(
   // --------------------------------------------------------------------------
   const allAudioReady = audioRecordings.length > 0 && audioRecordings.every((a) => a.url);
 
-  // Identity key for the audio set: changes on language changes, voice swaps,
-  // and URL null↔present transitions, but not on signed-URL refreshes. Using
-  // raw URL strings would cause needless remerges every time Convex refreshes
-  // signed URLs while allAudioReady stays true.
-  const audioIdentityKey = useMemo(() => {
-    if (audioRecordings.length === 0) return '';
-    return audioRecordings
-      .map((a) => `${a.language}:${a.voiceName ?? 'none'}:${a.url ? '1' : '0'}`)
-      .join('|');
-  }, [audioRecordings]);
+  // Identity key for the audio set — see `audioIdentityKeyOf`. Stable across
+  // signed-URL refreshes while allAudioReady stays true.
+  const audioIdentityKey = useMemo(
+    () => audioIdentityKeyOf(audioRecordings),
+    [audioRecordings],
+  );
 
   // Same identity-key formula for the peeked next card. Used to gate prefetching
   // and to verify cache-hit safety on card advance.
-  const nextAudioIdentityKey = useMemo(() => {
-    if (!nextCard || nextCard.audioRecordings.length === 0) return '';
-    return nextCard.audioRecordings
-      .map((a) => `${a.language}:${a.voiceName ?? 'none'}:${a.url ? '1' : '0'}`)
-      .join('|');
-  }, [nextCard]);
+  const nextAudioIdentityKey = useMemo(
+    () => (nextCard ? audioIdentityKeyOf(nextCard.audioRecordings) : ''),
+    [nextCard],
+  );
 
   // Pre-merge cache: keyed by the upcoming card's id. When the current card's
   // merge finishes and the next card's audio URLs are ready, we run
@@ -384,7 +406,6 @@ export function useAudioPlayer(
     Map<
       string,
       {
-        blobUrl: string;
         result: MergeResult;
         audioIdentityKey: string;
         settingsKey: string;
@@ -546,18 +567,11 @@ export function useAudioPlayer(
         ) {
           hasAutoPlayedForCardRef.current = true;
           onResetReviewFlagRef.current();
-          audio.play().catch((err) => {
-            if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
-            console.error('Auto-play failed:', err);
-          });
+          audio.play().catch(ignorePlayInterrupt('Auto-play failed:'));
         }
       };
 
-      if (audio.readyState >= 1 /* HAVE_METADATA */) {
-        doStart();
-      } else {
-        audio.addEventListener('loadedmetadata', doStart, { once: true });
-      }
+      whenMetadataReady(audio, doStart);
       return;
     }
 
@@ -670,25 +684,15 @@ export function useAudioPlayer(
                 !hasAutoPlayedForCardRef.current &&
                 initiatedByThisTab));
           if (shouldResumePlay) {
-            audio.play().catch((err) => {
-              if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
-              console.error('Resume playback failed:', err);
-            });
+            audio.play().catch(ignorePlayInterrupt('Resume playback failed:'));
           } else if (shouldAutoPlay) {
             hasAutoPlayedForCardRef.current = true;
             onResetReviewFlagRef.current();
-            audio.play().catch((err) => {
-              if (err.name === 'AbortError' || err.name === 'NotAllowedError') return;
-              console.error('Auto-play failed:', err);
-            });
+            audio.play().catch(ignorePlayInterrupt('Auto-play failed:'));
           }
         };
 
-        if (audio.readyState >= 1 /* HAVE_METADATA */) {
-          doResume();
-        } else {
-          audio.addEventListener('loadedmetadata', doResume, { once: true });
-        }
+        whenMetadataReady(audio, doResume);
       } catch (err) {
         if (!cancelled && !(err instanceof DOMException && err.name === 'AbortError')) {
           console.error('Audio merge failed:', err);
@@ -771,9 +775,8 @@ export function useAudioPlayer(
 
         // Replace any stale entry for this cardId and insert the fresh one.
         const prev = prefetchCacheRef.current.get(targetCardId);
-        if (prev) URL.revokeObjectURL(prev.blobUrl);
+        if (prev) URL.revokeObjectURL(prev.result.blobUrl);
         prefetchCacheRef.current.set(targetCardId, {
-          blobUrl: result.blobUrl,
           result,
           audioIdentityKey: targetAudioIdentityKey,
           settingsKey: targetSettingsKey,
@@ -786,7 +789,7 @@ export function useAudioPlayer(
           const oldestKey = prefetchCacheRef.current.keys().next().value;
           if (!oldestKey) break;
           const stale = prefetchCacheRef.current.get(oldestKey);
-          if (stale) URL.revokeObjectURL(stale.blobUrl);
+          if (stale) URL.revokeObjectURL(stale.result.blobUrl);
           prefetchCacheRef.current.delete(oldestKey);
         }
       } catch (err) {
@@ -860,7 +863,7 @@ export function useAudioPlayer(
       }
 
       for (const entry of cache.values()) {
-        URL.revokeObjectURL(entry.blobUrl);
+        URL.revokeObjectURL(entry.result.blobUrl);
       }
       cache.clear();
     };

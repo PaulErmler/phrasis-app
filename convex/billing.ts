@@ -8,14 +8,7 @@ import {
   type AutumnInvoiceEntry,
 } from './usage/tracking';
 import { normalizePlans, type AutumnPlan } from '../lib/autumn/customer-shape';
-
-const AUTUMN_API = 'https://api.useautumn.com/v1';
-
-function getSecretKey(): string {
-  const key = process.env.AUTUMN_SECRET_KEY;
-  if (!key) throw new Error('AUTUMN_SECRET_KEY environment variable is not set');
-  return key;
-}
+import { AUTUMN_API, getSecretKey } from './usage/autumnClient';
 
 async function autumnFetch<T>(
   method: 'GET' | 'POST',

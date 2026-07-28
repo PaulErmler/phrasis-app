@@ -31,11 +31,14 @@ import type {
   AcquisitionSource,
   LearningReason,
   DailyTimeGoalMinutes,
+  PlacementTestState,
+  FirstLessonSummary,
 } from './types';
 import { EMPTY_ONBOARDING_DATA } from './types';
 import {
   ogteToCurrentLevel,
   CURRENT_PLACEMENT_STRATEGY_VERSION,
+  type StrategyName,
 } from './lib/placementStrategies';
 
 import { LanguagePairStep } from './steps/LanguagePairStep';
@@ -261,21 +264,12 @@ interface SaveProgressArgs {
   learningGoals?: string[];
   learningGoalFreeText?: string;
   dailyTimeGoalMinutes?: number;
-  placementTest?: {
+  placementTest?: Omit<PlacementTestState, 'strategyVersion'> & {
     strategyVersion?: number;
-    strategy: string;
-    history: { level: number; knew: boolean }[];
-    finalLevel?: number;
   };
   firstLessonCardsRated?: number;
   firstLessonSessionId?: string;
-  firstLessonSummary?: {
-    cardsRated: number;
-    sessionId: string;
-    dailyReviewsToday: number;
-    dailyTimeMsToday: number;
-    dailyNewWordsToday: number;
-  };
+  firstLessonSummary?: FirstLessonSummary;
 }
 
 /**
@@ -397,45 +391,39 @@ function OnboardingWizard({
     [],
   );
 
-  const advance = useCallback((to: StepId) => {
-    setHistory((h) => (TRANSIENT_STEPS.has(stepId) ? h : [...h, stepId]));
-    setStepId(to);
-    // Persist the new step *immediately* (no debounce). Without this, a user
-    // who clicks Continue without changing any field never triggers `persist`,
-    // so the saved step stays behind and a reload resumes at the wrong place.
-    // Cancel any pending field-change debounce so its (now stale) save can't
-    // arrive after this immediate one and roll the step back.
+  // Persist the new step *immediately* (no debounce). Without this, a user
+  // who clicks Continue without changing any field never triggers `persist`,
+  // so the saved step stays behind and a reload resumes at the wrong place.
+  // Cancel any pending field-change debounce so its (now stale) save can't
+  // arrive after this immediate one and roll the step back.
+  const saveStepNow = useCallback((step: StepId, label: string) => {
     if (persistDebounceRef.current) {
       clearTimeout(persistDebounceRef.current);
       persistDebounceRef.current = null;
     }
-    const stepNum = PROGRESS_STEP_ORDER.indexOf(to) + 1;
+    const stepNum = PROGRESS_STEP_ORDER.indexOf(step) + 1;
     if (stepNum > 0) {
       saveProgress(buildProgressPayload(dataRef.current, stepNum))
-        .catch((err) => console.error('Failed to save advance step:', err));
+        .catch((err) => console.error(`Failed to save ${label} step:`, err));
     }
-  }, [stepId, TRANSIENT_STEPS, saveProgress]);
+  }, [saveProgress]);
+
+  const advance = useCallback((to: StepId) => {
+    setHistory((h) => (TRANSIENT_STEPS.has(stepId) ? h : [...h, stepId]));
+    setStepId(to);
+    saveStepNow(to, 'advance');
+  }, [stepId, TRANSIENT_STEPS, saveStepNow]);
 
   const back = useCallback(() => {
     setHistory((h) => {
       const prev = h[h.length - 1];
       if (prev) {
         setStepId(prev);
-        // Same rationale as in `advance`: cancel any pending debounce so a
-        // stale field-change save can't overwrite this immediate one.
-        if (persistDebounceRef.current) {
-          clearTimeout(persistDebounceRef.current);
-          persistDebounceRef.current = null;
-        }
-        const stepNum = PROGRESS_STEP_ORDER.indexOf(prev) + 1;
-        if (stepNum > 0) {
-          saveProgress(buildProgressPayload(dataRef.current, stepNum))
-            .catch((err) => console.error('Failed to save back step:', err));
-        }
+        saveStepNow(prev, 'back');
       }
       return h.slice(0, -1);
     });
-  }, [saveProgress]);
+  }, [saveStepNow]);
 
   // Progress bar percentage
   const progressIndex = useMemo(() => {
@@ -494,7 +482,7 @@ function OnboardingWizard({
   }, [cefrSlidLevel, persist, advance]);
 
   const onPlacementComplete = (result: {
-    strategy: import('./lib/placementStrategies').StrategyName;
+    strategy: StrategyName;
     history: { level: number; knew: boolean }[];
     finalOgteLevel: number;
     currentLevel: CurrentLevel;
@@ -695,7 +683,7 @@ function renderStep({
   data: OnboardingData;
   persist: (partial: Partial<OnboardingData>) => void;
   onPlacementComplete: (r: {
-    strategy: import('./lib/placementStrategies').StrategyName;
+    strategy: StrategyName;
     history: { level: number; knew: boolean }[];
     finalOgteLevel: number;
     currentLevel: CurrentLevel;
