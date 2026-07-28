@@ -36,28 +36,34 @@ import { toast } from 'sonner';
  */
 
 /**
- * Dev-only overrides for the two timing constants, so the silent-reload and
- * escalation paths can be exercised without waiting minutes or an hour:
+ * Opt-in for the timing overrides below, so the silent-reload and escalation
+ * paths can be exercised without waiting minutes or an hour:
  *
- *   NEXT_PUBLIC_UPDATE_HIDDEN_MS=3000 NEXT_PUBLIC_UPDATE_ESCALATE_MS=5000 pnpm dev
+ *   NEXT_PUBLIC_UPDATE_DEBUG=1 NEXT_PUBLIC_UPDATE_HIDDEN_MS=3000 \
+ *     NEXT_PUBLIC_UPDATE_ESCALATE_MS=5000 pnpm dev
  *
- * `NODE_ENV` is statically replaced at build time, so production always uses
- * the real values regardless of what is set in the environment.
+ * Deliberately a flag of its own rather than a `NODE_ENV !== 'production'`
+ * check. Every deployed build — staging included — is a production build, so
+ * keying on NODE_ENV made the one environment that most needs to verify this
+ * behaviour the one environment that could not. Shortening the windows is not a
+ * capability worth protecting: the worst it can do is reload sooner.
  */
-function devMs(raw: string | undefined, fallback: number): number {
-  if (process.env.NODE_ENV === 'production' || !raw) return fallback;
+const UPDATE_DEBUG = process.env.NEXT_PUBLIC_UPDATE_DEBUG === '1';
+
+function tunableMs(raw: string | undefined, fallback: number): number {
+  if (!UPDATE_DEBUG || !raw) return fallback;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 /** How long the tab must have been hidden before a silent reload is harmless. */
-const HIDDEN_LONG_ENOUGH_MS = devMs(
+const HIDDEN_LONG_ENOUGH_MS = tunableMs(
   process.env.NEXT_PUBLIC_UPDATE_HIDDEN_MS,
   10 * 60 * 1000,
 );
 
 /** How long an update may stay pending before we surface the toast. */
-const ESCALATE_AFTER_MS = devMs(
+const ESCALATE_AFTER_MS = tunableMs(
   process.env.NEXT_PUBLIC_UPDATE_ESCALATE_MS,
   60 * 60 * 1000,
 );
