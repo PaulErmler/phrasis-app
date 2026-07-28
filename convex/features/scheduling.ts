@@ -1625,9 +1625,13 @@ export const editCard = mutation({
       resolvedTextId = card.textId;
 
       if (changedLanguages.has(sourceLanguage)) {
+        // `romanizedText` and `romanizationSource` travel as a unit — the old
+        // transliteration no longer matches the new text, so its provenance
+        // tag has to go with it (mirrors the translation branch below).
         await ctx.db.patch(text._id, {
           text: submittedMap.get(sourceLanguage)!,
           romanizedText: undefined,
+          romanizationSource: undefined,
         });
       }
 
@@ -1802,40 +1806,62 @@ export const editCard = mutation({
     const { searchableText, searchableTextLanguages } =
       await buildCardSearchableText(ctx, resolvedTextId, resolvedText.text, courseLanguages);
 
-    // Insert replacement card with identical scheduling stats.
-    // Subtract 1ms from dueDate so this card sorts before any other card that
-    // happens to share the exact same dueDate (Convex uses _creationTime as the
-    // tiebreaker within equal index values, and the new doc would otherwise sort
-    // last, causing a different card to be returned by getCardForReview).
-    await insertCard(ctx, {
-      deckId: card.deckId,
-      textId: resolvedTextId,
-      collectionId: card.collectionId,
-      collectionOrigin: card.collectionOrigin,
-      dueDate: card.dueDate - 1,
-      isMastered: card.isMastered,
-      isHidden: card.isHidden,
-      isFavorite: card.isFavorite,
-      isGraduated: card.isGraduated ?? false,
-      schedulingPhase: card.schedulingPhase,
-      preReviewCount: card.preReviewCount,
-      radioRoundCounter: card.radioRoundCounter ?? 0,
-      // Preserve the true radio play-count so an in-place edit doesn't reset the
-      // "Only new" graduation (undefined for cards that predate the field).
-      radioPlayCount: card.radioPlayCount,
-      // Preserve the existing tiebreak so the edited card keeps its place in
-      // the radio rotation (or take a fresh random one if the original card
-      // predates this field).
-      radioOrderKey: card.radioOrderKey ?? randomRadioOrderKey(),
-      fsrsState: card.fsrsState,
-      lastReviewedAt: card.lastReviewedAt,
-      wordsTrackedLanguages: card.wordsTrackedLanguages,
-      searchableText,
-      searchableTextLanguages,
-    });
+    if (isUserOwned) {
+      // Path A edits the existing text row, so the card still points at the
+      // right content — only its derived search index needs refreshing. Patch
+      // in place: the card keeps its `_id`, `_creationTime` and `dueDate`, so
+      // it holds its exact position in the queue and costs three aggregate
+      // writes instead of the six a delete + insert would.
+      await patchCard(
+        ctx,
+        args.cardId,
+        {
+          searchableText,
+          searchableTextLanguages,
+          // Same defaults the replacement path applied, so cards predating
+          // these fields still get backfilled on edit.
+          isGraduated: card.isGraduated ?? false,
+          radioRoundCounter: card.radioRoundCounter ?? 0,
+          radioOrderKey: card.radioOrderKey ?? randomRadioOrderKey(),
+        },
+        card,
+      );
+    } else {
+      // Path B pointed the card at a brand-new text row, so the card document
+      // has to be replaced. Subtract 1ms from dueDate so this card sorts before
+      // any other card that happens to share the exact same dueDate (Convex
+      // uses _creationTime as the tiebreaker within equal index values, and the
+      // new doc would otherwise sort last, causing a different card to be
+      // returned by getCardForReview).
+      await insertCard(ctx, {
+        deckId: card.deckId,
+        textId: resolvedTextId,
+        collectionId: card.collectionId,
+        collectionOrigin: card.collectionOrigin,
+        dueDate: card.dueDate - 1,
+        isMastered: card.isMastered,
+        isHidden: card.isHidden,
+        isFavorite: card.isFavorite,
+        isGraduated: card.isGraduated ?? false,
+        schedulingPhase: card.schedulingPhase,
+        preReviewCount: card.preReviewCount,
+        radioRoundCounter: card.radioRoundCounter ?? 0,
+        // Preserve the true radio play-count so an in-place edit doesn't reset the
+        // "Only new" graduation (undefined for cards that predate the field).
+        radioPlayCount: card.radioPlayCount,
+        // Preserve the existing tiebreak so the edited card keeps its place in
+        // the radio rotation (or take a fresh random one if the original card
+        // predates this field).
+        radioOrderKey: card.radioOrderKey ?? randomRadioOrderKey(),
+        fsrsState: card.fsrsState,
+        lastReviewedAt: card.lastReviewedAt,
+        wordsTrackedLanguages: card.wordsTrackedLanguages,
+        searchableText,
+        searchableTextLanguages,
+      });
 
-    // Delete old card
-    await deleteCard(ctx, args.cardId);
+      await deleteCard(ctx, args.cardId);
+    }
     // Defensive cleanup: if the edit left the old text orphaned and user-created
     // (path A reuses the textId, so the new card normally still references it —
     // this is a no-op then), drop its now-unreferenced translations/audio/blobs.

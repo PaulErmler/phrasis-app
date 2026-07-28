@@ -358,7 +358,7 @@ describe('useLearningMode', () => {
       );
     });
 
-    it('fires twice when invoked twice in the same tick (guard state has not flushed)', async () => {
+    it('fires once when invoked twice in the same tick (the isReviewing state guard has not flushed yet, so a synchronous latch carries it)', async () => {
       const del = harness.mutationFor(REFS.deleteCardPermanently);
 
       const { result } = renderHook(() => useLearningMode());
@@ -368,7 +368,7 @@ describe('useLearningMode', () => {
         void state.handleDelete();
       });
 
-      expect(del).toHaveBeenCalledTimes(2);
+      expect(del).toHaveBeenCalledTimes(1);
     });
   });
 

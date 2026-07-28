@@ -1252,14 +1252,17 @@ describe("features/scheduling", () => {
         expect(texts[0].text).toBe("Hej");
         expect(texts[0].romanizedText).toBe("hej-rom");
 
-        // The card ROW is still replaced (insertCard + deleteCard runs on
-        // both paths) but points at the SAME textId, dueDate - 1 for the
-        // tiebreak.
+        // Path A patches the card in place: same _id, same dueDate, so it
+        // keeps its exact position in the queue.
         const cards = await ctx.db.query("cards").collect();
         expect(cards).toHaveLength(1);
-        expect(cards[0]._id).not.toBe(cardId);
+        expect(cards[0]._id).toBe(cardId);
         expect(cards[0].textId).toBe(textId);
-        expect(cards[0].dueDate).toBe(dueDate - 1);
+        expect(cards[0].dueDate).toBe(dueDate);
+        // Defaults the replacement path used to backfill are still applied.
+        expect(cards[0].isGraduated).toBe(false);
+        expect(cards[0].radioRoundCounter).toBe(0);
+        expect(cards[0].radioOrderKey).toEqual(expect.any(Number));
 
         // The translation row is patched in place: same _id, new text,
         // romanization dropped, re-tagged as user-provided, gender stamped
@@ -1306,13 +1309,14 @@ describe("features/scheduling", () => {
         expect(texts[0]._id).toBe(textId);
         expect(texts[0].text).toBe("Hejsan");
         expect(texts[0].romanizedText).toBeUndefined();
-        // Path A's source patch clears only romanizedText — unlike Path B,
-        // the stale romanizationSource tag survives on the text row.
-        expect(texts[0].romanizationSource).toBe("google-v3");
+        // `romanizedText` and `romanizationSource` travel as a unit — the
+        // provenance tag goes with the transliteration it described.
+        expect(texts[0].romanizationSource).toBeUndefined();
 
-        // Replacement card still points at the same textId.
+        // Card patched in place, still pointing at the same textId.
         const cards = await ctx.db.query("cards").collect();
         expect(cards).toHaveLength(1);
+        expect(cards[0]._id).toBe(cardId);
         expect(cards[0].textId).toBe(textId);
 
         // The unchanged en translation row is untouched in place.

@@ -825,6 +825,12 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // Opt-out: undefined (pre-migration rows or unset) defaults to enabled.
   const progressDisplayEnabled = courseSettings?.progressDisplayEnabled ?? true;
 
+  // Synchronous in-flight latch. The handlers' `isReviewing` checks read React
+  // state, which a second call in the same tick still sees as `false` (the
+  // setter hasn't re-rendered yet), so a double-click would fire the mutation
+  // twice. A ref flips immediately and closes that window.
+  const exitMutationInFlightRef = useRef(false);
+
   // Shared shape for mutations that animate the card out (master / hide /
   // delete / radio advance): mark this tab as review initiator, bump the
   // animation key, flip `isExiting` before the await, and clear `isReviewing`
@@ -838,6 +844,8 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
       errorMessage: string,
       options?: { alwaysClearExiting?: boolean },
     ) => {
+      if (exitMutationInFlightRef.current) return;
+      exitMutationInFlightRef.current = true;
       reviewInitiatedByThisTabRef.current = true;
       setCardAnimationKey((k) => k + 1);
       setIsExiting(true);
@@ -850,6 +858,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
           setIsExiting(false);
         }
       } finally {
+        exitMutationInFlightRef.current = false;
         setIsReviewing(false);
         if (options?.alwaysClearExiting) {
           setIsExiting(false);
@@ -866,6 +875,10 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
       accuracy?: ReviewAccuracyPayload,
     ) => {
       if (!cardForReview || isReviewing) return;
+      // Same synchronous latch as `runExitingMutation` — without it a
+      // same-tick double submit would record the review twice.
+      if (exitMutationInFlightRef.current) return;
+      exitMutationInFlightRef.current = true;
       reviewInitiatedByThisTabRef.current = true;
       setCardAnimationKey((k) => k + 1);
       setIsExiting(true);
@@ -929,6 +942,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
         }
         setIsExiting(false);
       } finally {
+        exitMutationInFlightRef.current = false;
         setIsReviewing(false);
       }
     },

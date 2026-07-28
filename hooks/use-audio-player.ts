@@ -126,7 +126,15 @@ export function useAudioPlayer(
   } = options;
 
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMerging, setIsMerging] = useState(false);
+  const [isMerging, setIsMergingState] = useState(false);
+  // Mirror of `isMerging` that updates synchronously. Effects declared after
+  // the merge effect run in the same commit that starts a merge, so they would
+  // otherwise read the pre-merge `false` out of their closure.
+  const isMergingRef = useRef(false);
+  const setIsMerging = useCallback((value: boolean) => {
+    isMergingRef.current = value;
+    setIsMergingState(value);
+  }, []);
   const [durationSec, setDurationSec] = useState(0);
   const [revealedLanguages, setRevealedLanguages] = useState<ReadonlySet<string>>(new Set());
   const [languageCues, setLanguageCues] = useState<ReadonlyArray<LanguageCue>>([]);
@@ -727,8 +735,11 @@ export function useAudioPlayer(
   useEffect(() => {
     if (!cardId) return;
     if (!nextCard) return;
-    // Don't contend with the current card's merge for CPU.
-    if (isMerging) return;
+    // Don't contend with the current card's merge for CPU. Read the ref, not
+    // the state: on mount this effect runs in the same commit as the merge
+    // effect that just started, so the state value is still `false` here.
+    // `isMerging` stays in the dep array so finishing a merge re-runs us.
+    if (isMergingRef.current) return;
     // Only prefetch when every clip URL is resolved — otherwise mergeCardAudio
     // would skip clips and produce a truncated blob we'd have to redo.
     const allNextUrlsReady =

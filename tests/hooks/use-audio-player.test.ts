@@ -331,24 +331,22 @@ describe('useAudioPlayer', () => {
       expect(revokeCallsFor(r4.blobUrl)).toBe(1);
     });
 
-    it('aborts the prefetch started while the first merge is in flight and revokes its late blob', async () => {
+    it('defers the prefetch until the current card has finished merging', async () => {
       const { result, rerender } = renderPlayer({
         nextCard: { cardId: 'card-2', audioRecordings: nextRecordings },
       });
 
-      // Mount: the prefetch effect's first run sees the pre-merge isMerging=false
-      // closure, so a prefetch starts immediately and is aborted when isMerging
-      // flips true.
-      expect(mergeCardAudioMock).toHaveBeenCalledTimes(2);
-      expect(pendingMerges[1].signal.aborted).toBe(true);
+      // Mount: only the current card's merge runs. The prefetch effect reads
+      // the synchronous isMerging mirror, so it does not start a merge it
+      // would immediately have to abort.
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(1);
 
+      // Once the current merge lands, the prefetch for card-2 kicks off.
       await resolveMerge(0, makeResult());
-      expect(mergeCardAudioMock).toHaveBeenCalledTimes(3);
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(2);
+      expect(pendingMerges[1].signal.aborted).toBe(false);
 
-      const rLate = await resolveMerge(1, makeResult());
-      expect(revokeCallsFor(rLate.blobUrl)).toBe(1);
-
-      const r2 = await resolveMerge(2, makeResult());
+      const r2 = await resolveMerge(1, makeResult());
       rerender(
         baseOptions({
           cardId: 'card-2',
@@ -356,7 +354,8 @@ describe('useAudioPlayer', () => {
           nextCard: null,
         }),
       );
-      expect(mergeCardAudioMock).toHaveBeenCalledTimes(3);
+      // Advancing adopts the prefetched blob instead of merging again.
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(2);
       expect(result.current.audioRef.current?.src).toBe(r2.blobUrl);
     });
   });
