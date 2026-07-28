@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import schema from "../../schema";
 import { api, internal } from "../../_generated/api";
@@ -122,7 +122,7 @@ const freeOnlyCustomer = {
   },
 };
 
-const asUser = (t: ReturnType<typeof convexTest>) =>
+const asUser = (t: TestConvex<typeof schema>) =>
   t.withIdentity({ subject: USER });
 
 /** Requests to a given Autumn path, in order. */
@@ -135,7 +135,7 @@ const callsTo = (path: string) => calls.filter((c) => c.url.includes(path));
 const syncPosts = () =>
   calls.filter((c) => c.method === "POST" && c.url.endsWith("/v1/customers"));
 
-const getQuotaDoc = (t: ReturnType<typeof convexTest>) =>
+const getQuotaDoc = (t: TestConvex<typeof schema>) =>
   t.run(async (ctx) =>
     ctx.db
       .query("usageQuotas")
@@ -147,7 +147,7 @@ const getQuotaDoc = (t: ReturnType<typeof convexTest>) =>
  * Put the quota mirror into the blocked state the overdue dialog acts from,
  * through the same mutation the real sync paths use.
  */
-const seedPastDueDoc = (t: ReturnType<typeof convexTest>) =>
+const seedPastDueDoc = (t: TestConvex<typeof schema>) =>
   t.mutation(internal.usage.helpers.syncAllFeatures, {
     userId: USER,
     features: { chat_messages: { balance: 0, included: 10, used: 10 } },

@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import schema from "../../schema";
 import { internal } from "../../_generated/api";
@@ -94,14 +94,14 @@ const customerPayload = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const runTrack = (t: ReturnType<typeof convexTest>) =>
+const runTrack = (t: TestConvex<typeof schema>) =>
   t.action(internal.usage.tracking.trackUsage, {
     userId: USER,
     featureId: "chat_messages",
     value: 1,
   });
 
-async function getQuotaDoc(t: ReturnType<typeof convexTest>) {
+async function getQuotaDoc(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) =>
     ctx.db
       .query("usageQuotas")

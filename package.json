@@ -13,6 +13,7 @@
     "seed-texts": "node scripts/uploadTexts.mjs",
     "update-translations": "node scripts/updateTranslations.mjs",
     "typecheck": "tsc --noEmit",
+    "typecheck:tests": "tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

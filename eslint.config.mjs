@@ -89,7 +89,7 @@ export default defineConfig([
     files: [
       'tests/**',
       'convex/tests/**',
-      '**/*.test.*',
+      '**/*.test.{ts,tsx,js,jsx}',
       'components/ai-elements/**',
     ],
     rules: {

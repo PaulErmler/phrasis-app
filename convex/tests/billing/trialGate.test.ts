@@ -22,6 +22,13 @@ const { gateTrialArgs } = autumnModule;
 
 const USER = "user_x";
 
+/**
+ * The gate's generic is bounded by the weak type `{ freeTrial?: boolean }`,
+ * which rejects a bare `{ productId }` literal — so args spell the optional
+ * field out (matching what the attach/checkout actions actually pass).
+ */
+type GateArgs = { productId: string; freeTrial?: boolean };
+
 /** Ctx double: the gate only ever touches auth.getUserIdentity. */
 const ctxAs = (identity: { subject: string } | null): ActionCtx =>
   ({ auth: { getUserIdentity: async () => identity } }) as never;
@@ -83,7 +90,7 @@ describe("gateTrialArgs", () => {
     stubCustomerFetch({
       body: { products: [freeProduct], trials_used: [] },
     });
-    const args = { productId: "basic" };
+    const args: GateArgs = { productId: "basic" };
     const result = await gateTrialArgs(ctxAs({ subject: USER }), "checkout", args);
 
     // Same object, no freeTrial injected — injecting `freeTrial: false` here
@@ -102,7 +109,7 @@ describe("gateTrialArgs", () => {
 
   it("treats an unknown customer (404) as history-free and passes args through", async () => {
     stubCustomerFetch({ ok: false, status: 404, body: { message: "not found" } });
-    const args = { productId: "basic" };
+    const args: GateArgs = { productId: "basic" };
     // A brand-new user's very first checkout happens before any Autumn
     // customer exists; blocking on 404 would break every first purchase.
     await expect(
@@ -117,7 +124,9 @@ describe("gateTrialArgs", () => {
     // A raw attach mid-trial would either grant a fresh trial or bill
     // immediately; only switchPlanDuringTrial carries the running trial over.
     await expect(
-      gateTrialArgs(ctxAs({ subject: USER }), "attach", { productId: "pro" }),
+      gateTrialArgs<GateArgs>(ctxAs({ subject: USER }), "attach", {
+        productId: "pro",
+      }),
     ).rejects.toThrow(/switchPlanDuringTrial/);
   });
 
@@ -125,7 +134,7 @@ describe("gateTrialArgs", () => {
     stubCustomerFetch({
       body: { products: [freeProduct, trialingProduct], trials_used: [{ product_id: "basic_annual" }] },
     });
-    const args = { productId: "pro" };
+    const args: GateArgs = { productId: "pro" };
     const result = await gateTrialArgs(ctxAs({ subject: USER }), "checkout", args);
 
     // The dialog needs the preview, but no checkout session that could
@@ -160,7 +169,9 @@ describe("gateTrialArgs", () => {
       // Passing args through on an outage would hand out trials to users
       // whose history simply couldn't be read.
       await expect(
-        gateTrialArgs(ctxAs({ subject: USER }), "attach", { productId: "pro" }),
+        gateTrialArgs<GateArgs>(ctxAs({ subject: USER }), "attach", {
+        productId: "pro",
+      }),
       ).rejects.toThrow(/trial eligibility/);
     } finally {
       consoleError.mockRestore();
@@ -169,7 +180,7 @@ describe("gateTrialArgs", () => {
 
   it("passes unauthenticated calls through without hitting Autumn — identify() rejects them", async () => {
     const fetchMock = stubCustomerFetch({ body: {} });
-    const args = { productId: "basic" };
+    const args: GateArgs = { productId: "basic" };
     // No identity means no customer id to gate on; the component's
     // identify() throws before any Autumn call executes, so a lookup here
     // would only leak requests for a caller that can never attach anything.

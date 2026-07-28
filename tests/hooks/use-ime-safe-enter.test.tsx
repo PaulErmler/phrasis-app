@@ -28,12 +28,12 @@ function flushCompositionClear() {
 }
 
 describe('useImeSafeEnter', () => {
-  let onSubmit: ReturnType<typeof vi.fn>;
+  let onSubmit: ReturnType<typeof vi.fn<() => void>>;
   let field: HTMLElement;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    onSubmit = vi.fn();
+    onSubmit = vi.fn<() => void>();
     render(<Harness onSubmit={onSubmit} />);
     field = screen.getByTestId('field');
   });

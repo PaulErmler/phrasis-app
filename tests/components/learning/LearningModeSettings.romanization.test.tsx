@@ -33,10 +33,11 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 } as unknown as typeof ResizeObserver;
 
-const SETTINGS: CourseSettings = {
+// Deliberately partial: the component only reads the fields under test.
+const SETTINGS = {
   courseId: 'course_1' as Id<'courses'>,
   reviewMode: 'full',
-};
+} as CourseSettings;
 
 function renderSettings(baseLanguages: string[], targetLanguages: string[]) {
   render(

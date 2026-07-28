@@ -1,8 +1,9 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 import schema from "../../schema";
 import { api } from "../../_generated/api";
+import { Id } from "../../_generated/dataModel";
 import {
   PLAYBACK_SPEED_MAX,
   PLAYBACK_SPEED_MIN,
@@ -11,7 +12,7 @@ import { MAX_CARDS_PER_BATCH } from "../../../lib/constants/learning";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
-async function seedQuota(t: ReturnType<typeof convexTest>, userId: string) {
+async function seedQuota(t: TestConvex<typeof schema>, userId: string) {
   await t.run(async (ctx) =>
     ctx.db.insert("usageQuotas", {
       userId,
@@ -33,7 +34,7 @@ async function seedQuota(t: ReturnType<typeof convexTest>, userId: string) {
 // Seed a quota doc with a custom `courses` feature, leaving the other features
 // generous. Used to exercise the plan-aware unarchive cooldown.
 async function seedCoursesQuota(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   userId: string,
   courses: { balance: number; included: number; unlimited?: boolean },
 ) {
@@ -384,7 +385,7 @@ describe("features/courses", () => {
   });
 
   describe("setCurrentSessionId", () => {
-    async function seedOwnedCourse(t: ReturnType<typeof convexTest>) {
+    async function seedOwnedCourse(t: TestConvex<typeof schema>) {
       return t.run(async (ctx) => {
         const courseId = await ctx.db.insert("courses", {
           userId: "user_A",
@@ -466,7 +467,7 @@ describe("features/courses", () => {
   });
 
   describe("updatePinnedCardActions", () => {
-    async function seedAuthenticated(t: ReturnType<typeof convexTest>) {
+    async function seedAuthenticated(t: TestConvex<typeof schema>) {
       await t.run(async (ctx) =>
         ctx.db.insert("userSettings", {
           userId: "user_A",
@@ -573,10 +574,10 @@ describe("features/courses", () => {
 
   describe("updateCourseSettings — audio playback", () => {
     const makeActiveCourse = async (
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
     ): Promise<{
-      asUser: ReturnType<ReturnType<typeof convexTest>["withIdentity"]>;
-      courseId: string;
+      asUser: ReturnType<TestConvex<typeof schema>["withIdentity"]>;
+      courseId: Id<"courses">;
     }> => {
       const courseId = await t.run(async (ctx) =>
         ctx.db.insert("courses", {
@@ -749,6 +750,44 @@ describe("features/courses", () => {
       });
     });
 
+    // The other four playback-speed records go through the same clamp loop as
+    // targetBeforePlaybackSpeeds above — pin each one on the insert branch.
+    it.each([
+      "languagePlaybackSpeeds",
+      "languagePlaybackSpeedsFull",
+      "languagePlaybackSpeedsTranscribe",
+      "transcribeAfterPlaybackSpeeds",
+    ] as const)("clamps %s to the allowed range server-side", async (field) => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        [field]: { de: 99, fr: 0.01 },
+      });
+      const s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.[field]).toEqual({
+        de: PLAYBACK_SPEED_MAX,
+        fr: PLAYBACK_SPEED_MIN,
+      });
+    });
+
+    it("silently drops non-finite playback speeds instead of storing them", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        languagePlaybackSpeeds: { de: 1.5, fr: Number.NaN },
+      });
+      const s = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(s?.languagePlaybackSpeeds).toEqual({ de: 1.5 });
+    });
+
     it("persists and clamps the 'Only new' Practice-Listening limit", async () => {
       const t = convexTest(schema, modules);
       const { asUser, courseId } = await makeActiveCourse(t);
@@ -848,6 +887,142 @@ describe("features/courses", () => {
       );
       expect(s?.playTargetBeforeBase).toBe(false);
       expect(s?.playTargetAfterBase).toBe(true);
+    });
+  });
+
+  describe("updateCourseSettings — insert/patch field parity", () => {
+    const makeCourse = async (t: TestConvex<typeof schema>) =>
+      t.run(async (ctx) =>
+        ctx.db.insert("courses", {
+          userId: "user_A",
+          baseLanguages: ["en"],
+          targetLanguages: ["de"],
+        }),
+      );
+
+    const readSettingsRow = async (
+      t: TestConvex<typeof schema>,
+      courseId: Awaited<ReturnType<typeof makeCourse>>,
+    ) =>
+      t.run(async (ctx) =>
+        ctx.db
+          .query("courseSettings")
+          .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+          .unique(),
+      );
+
+    // Every updateCourseSettings arg except courseId, each set to an in-range
+    // value distinguishable from the schema/server defaults. A field present in
+    // the validator + PATCHABLE_KEYS but missing from the hand-written insert
+    // object fails the toMatchObject below — the regression class the comments
+    // in the describe above call out, guarded here for all fields at once.
+    // Clamped fields use in-range values so clamps are no-ops, and
+    // playTargetBeforeBase stays true so the both-toggles-off guard is inert.
+    const fullArgs = {
+      initialReviewCount: 7,
+      cardsToAddBatchSize: 9,
+      autoAddCards: true,
+      highlightWords: true,
+      autoPlayAudio: true,
+      autoAdvance: true,
+      languageRepetitions: { de: 2 },
+      languageRepetitionPauses: { de: 3 },
+      languagePlaybackSpeeds: { de: 0.8 },
+      pauseBaseToBase: 1,
+      pauseBaseToTarget: 2,
+      pauseTargetToTarget: 3,
+      pauseBeforeAutoAdvance: 4,
+      highlightWordsFull: true,
+      autoPlayAudioFull: true,
+      languageRepetitionsFull: { de: 4 },
+      languageRepetitionPausesFull: { de: 5 },
+      languagePlaybackSpeedsFull: { de: 0.9 },
+      pauseBaseToBaseFull: 5,
+      pauseBaseToTargetFull: 6,
+      pauseTargetToTargetFull: 7,
+      pauseBeforeAutoAdvanceFull: 8,
+      highlightWordsTranscribe: true,
+      autoPlayAudioTranscribe: true,
+      languageRepetitionsTranscribe: { de: 6 },
+      languageRepetitionPausesTranscribe: { de: 7 },
+      languagePlaybackSpeedsTranscribe: { de: 1.1 },
+      pauseTargetToTargetTranscribe: 9,
+      transcribeAfterRepetitions: { de: 8 },
+      transcribeAfterRepetitionPauses: { de: 9 },
+      transcribeAfterPlaybackSpeeds: { de: 1.2 },
+      playTargetBeforeBase: true,
+      playTargetAfterBase: false,
+      targetBeforeRepetitions: { de: 10 },
+      targetBeforeRepetitionPauses: { de: 11 },
+      targetBeforePlaybackSpeeds: { de: 1.3 },
+      pauseTargetToBase: 10,
+      targetBeforeOnlyNewReps: 4,
+      showProgressBar: true,
+      progressDisplayEnabled: true,
+      hideTargetLanguages: true,
+      autoRevealLanguages: true,
+      hideBaseLanguages: true,
+      autoRevealBaseLanguages: true,
+      hideBaseLanguagesFull: true,
+      autoRevealBaseOnSubmit: true,
+      showRomanization: true,
+      baseLanguageOrder: ["en"] as string[],
+      targetLanguageOrder: ["de"] as string[],
+      instantProceedAudio: true,
+      instantProceedFull: true,
+      reviewMode: "full",
+      fullReviewTargetAudioMode: "afterSubmit",
+      writingInputMode: "transcribe",
+      ignorePunctuation: true,
+      autoRateFromAccuracy: false,
+      autoRateThresholds: { hard: 35, good: 65 },
+      schedulingMode: "radio",
+      studyContentFilter: "custom",
+    } as const;
+
+    it("insert branch persists every arg field verbatim", async () => {
+      const t = convexTest(schema, modules);
+      const courseId = await makeCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      // 59 = every arg in the validator except courseId; keep in sync.
+      expect(Object.keys(fullArgs)).toHaveLength(59);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        ...fullArgs,
+      });
+      const row = await readSettingsRow(t, courseId);
+      expect(row).toMatchObject(fullArgs);
+    });
+
+    it("patch branch yields a row identical to the insert branch", async () => {
+      const t = convexTest(schema, modules);
+      const insertCourseId = await makeCourse(t);
+      const patchCourseId = await makeCourse(t);
+      await t.run(async (ctx) =>
+        ctx.db.insert("courseSettings", {
+          courseId: patchCourseId,
+          initialReviewCount: 5,
+        }),
+      );
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId: insertCourseId,
+        ...fullArgs,
+      });
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId: patchCourseId,
+        ...fullArgs,
+      });
+      const inserted = await readSettingsRow(t, insertCourseId);
+      const patched = await readSettingsRow(t, patchCourseId);
+      const strip = (row: Record<string, unknown> | null) =>
+        Object.fromEntries(
+          Object.entries(row ?? {}).filter(
+            ([key]) => !["_id", "_creationTime", "courseId"].includes(key),
+          ),
+        );
+      expect(patched).toMatchObject(fullArgs);
+      expect(strip(patched)).toEqual(strip(inserted));
     });
   });
 });

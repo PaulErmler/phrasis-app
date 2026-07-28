@@ -20,7 +20,7 @@ vi.mock("@convex-dev/action-retrier", () => {
   return { ActionRetrier };
 });
 
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 import { generateText } from "ai";
 import schema from "../../schema";
@@ -86,7 +86,7 @@ describe("features/sentenceMetadata", () => {
     });
   });
 
-  async function seedText(t: ReturnType<typeof convexTest>) {
+  async function seedText(t: TestConvex<typeof schema>) {
     return t.run(async (ctx) => {
       const collectionId = await ctx.db.insert("collections", {
         name: "custom-user_A",

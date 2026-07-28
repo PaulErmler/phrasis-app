@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 
 import schema from "../../schema";
@@ -15,7 +15,7 @@ const modules = import.meta.glob("/convex/**/*.ts");
  * The "premade-edited" case (test #4 in the plan) is captured by inserting a
  * text with `userCreated: true` into the premade collection.
  */
-async function seedFilterFixture(t: ReturnType<typeof convexTest>) {
+async function seedFilterFixture(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) => {
     const userId = "user_F";
 
@@ -155,7 +155,7 @@ async function seedFilterFixture(t: ReturnType<typeof convexTest>) {
 }
 
 async function setFilter(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   courseId: Id<"courses">,
   filter: "custom" | "course" | "both",
 ) {

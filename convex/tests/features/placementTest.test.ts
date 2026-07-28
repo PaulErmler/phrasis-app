@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 
 import schema from "../../schema";
@@ -9,7 +9,7 @@ import type { Id } from "../../_generated/dataModel";
 const modules = import.meta.glob("/convex/**/*.ts");
 
 async function seedPlacementSentence(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   opts: {
     level: number;
     position: number;

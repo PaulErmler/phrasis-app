@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { getFunctionName } from "convex/server";
 import schema from "../../schema";
@@ -31,11 +31,12 @@ vi.mock("../../rateLimiter", () => ({
 
 import { textsMatchSemantic } from "../../lib/ttsSemanticValidation";
 import { rateLimiter } from "../../rateLimiter";
-// The workpools are module-mocked globally (convex/tests/setup.ts):
+// The workpools are module-mocked globally (tests/convexTestSetup.ts — outside convex/ on purpose, see vitest.config.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-tts-work-N'), so tests can assert claim→workId stamping and drive
 // the onComplete handlers by hand.
 import { ttsPool } from "@/convex/lib/workpools";
+import type { WorkId } from "@convex-dev/workpool";
 import { claimTtsIfAvailable } from "../../features/ttsProcessing";
 import { drainSchedulerAfterEach } from "../lib/drainScheduler";
 
@@ -62,7 +63,7 @@ beforeEach(() => {
   mockEnqueue.mockClear();
 });
 
-async function seedText(t: ReturnType<typeof convexTest>) {
+async function seedText(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) => {
     const collectionId = await ctx.db.insert("collections", {
       name: "A1",
@@ -80,7 +81,7 @@ async function seedText(t: ReturnType<typeof convexTest>) {
 }
 
 const getClaim = (
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   textId: Id<"texts">,
   language = "es",
 ) =>
@@ -104,7 +105,7 @@ const baseJobArgs = (textId: Id<"texts">) => ({
 
 describe("features/ttsProcessing", () => {
   describe("claimTtsIfAvailable", () => {
-    const claim = (t: ReturnType<typeof convexTest>, textId: Id<"texts">) =>
+    const claim = (t: TestConvex<typeof schema>, textId: Id<"texts">) =>
       t.run(async (ctx) => claimTtsIfAvailable(ctx as any, textId, "es"));
 
     it("acquires and returns the new claim's id when none exists", async () => {
@@ -388,7 +389,7 @@ describe("features/ttsProcessing", () => {
 
   describe("onTtsJobComplete", () => {
     const complete = (
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       textId: Id<"texts">,
       workId: string,
       result:
@@ -397,7 +398,7 @@ describe("features/ttsProcessing", () => {
         | { kind: "canceled" },
     ) =>
       t.mutation(internal.features.ttsProcessing.onTtsJobComplete, {
-        workId,
+        workId: workId as WorkId,
         context: { textId, language: "es" },
         result,
       });
@@ -490,7 +491,7 @@ describe("features/ttsProcessing", () => {
      * the exact source text, i.e. validation passes strictly).
      */
     async function runPipeline(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       textId: Id<"texts">,
       opts: { transcribed?: string } = {},
     ) {
@@ -556,7 +557,7 @@ describe("features/ttsProcessing", () => {
     }
 
     async function getAudio(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       textId: Id<"texts">,
     ) {
       return t.run(async (ctx) =>
@@ -570,7 +571,7 @@ describe("features/ttsProcessing", () => {
     }
 
     async function getMismatches(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       textId: Id<"texts">,
     ) {
       return t.run(async (ctx) =>
@@ -1101,7 +1102,7 @@ describe("features/ttsProcessing", () => {
 
   describe("backfillWordTimings", () => {
     /** Insert audio row + TTS claim. Returns ids for use in the action call. */
-    async function seedAudioAndClaim(t: ReturnType<typeof convexTest>) {
+    async function seedAudioAndClaim(t: TestConvex<typeof schema>) {
       const { textId } = await seedText(t);
       const storageId = await t.run(async (ctx) =>
         ctx.storage.store(new Blob([new Uint8Array([1, 2, 3])])),
@@ -1124,7 +1125,7 @@ describe("features/ttsProcessing", () => {
     }
 
     async function getAudio(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       textId: Id<"texts">,
     ) {
       return t.run(async (ctx) =>

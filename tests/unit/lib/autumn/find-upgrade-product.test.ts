@@ -8,7 +8,6 @@ import {
 
 function makeProduct(partial: Partial<Product> & { id: string }): Product {
   return {
-    id: partial.id,
     name: partial.name ?? partial.id,
     scenario: partial.scenario ?? 'upgrade',
     items: partial.items ?? [],
@@ -24,7 +23,14 @@ describe('findUpgradeProductFromPricingTable', () => {
 
   it('returns undefined when no product matches', () => {
     const products = [
-      makeProduct({ id: 'a', scenario: 'current', items: [] }),
+      // 'current' is not in autumn-js' ProductScenario union — the matcher
+      // only distinguishes 'upgrade'/'new' from everything else, so the
+      // legacy fixture value is kept as-is.
+      makeProduct({
+        id: 'a',
+        scenario: 'current' as unknown as Product['scenario'],
+        items: [],
+      }),
     ];
     expect(findUpgradeProductFromPricingTable(products, 'x', 0)).toBeUndefined();
   });

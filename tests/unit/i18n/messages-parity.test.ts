@@ -125,13 +125,13 @@ function placeholderSignature(message: string): string[] {
 const pairs = [
   {
     name: 'app catalogs (messages/{en,de}.json)',
-    en: appEn as Exclude<Catalog, string>,
-    de: appDe as Exclude<Catalog, string>,
+    en: appEn as unknown as Exclude<Catalog, string>,
+    de: appDe as unknown as Exclude<Catalog, string>,
   },
   {
     name: 'landing catalogs (messages/landing/{en,de}.json)',
-    en: landingEn as Exclude<Catalog, string>,
-    de: landingDe as Exclude<Catalog, string>,
+    en: landingEn as unknown as Exclude<Catalog, string>,
+    de: landingDe as unknown as Exclude<Catalog, string>,
   },
 ];
 

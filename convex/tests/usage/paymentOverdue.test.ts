@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import schema from "../../schema";
 import { api, internal } from "../../_generated/api";
@@ -31,7 +31,10 @@ beforeEach(() => {
   vi.stubEnv("AUTUMN_SECRET_KEY", "am_sk_test_stub");
 });
 
-const FEATURES = {
+const FEATURES: Record<
+  string,
+  { balance: number; included: number; used: number; unlimited?: boolean }
+> = {
   chat_messages: { balance: 10, included: 10, used: 0 },
 };
 
@@ -41,7 +44,7 @@ const FEATURES = {
  * returned nothing at all, which is a different (unknown) state.
  */
 function sync(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   planStatus: string | undefined,
   opts: {
     productsMissing?: boolean;
@@ -63,7 +66,7 @@ function sync(
   });
 }
 
-async function getQuotaDoc(t: ReturnType<typeof convexTest>) {
+async function getQuotaDoc(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) =>
     ctx.db
       .query("usageQuotas")
@@ -85,7 +88,7 @@ const withCourses = (state: {
  * pointing `activeCourseId` at one of them.
  */
 async function seedCourses(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   count: number,
   opts: { activeIndex?: number } = {},
 ): Promise<Id<"courses">[]> {
@@ -113,7 +116,7 @@ async function seedCourses(
 }
 
 async function readCourses(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   ids: Id<"courses">[],
 ) {
   return t.run(async (ctx) => Promise.all(ids.map((id) => ctx.db.get(id))));
@@ -486,6 +489,77 @@ describe("usage — server-side payment gate", () => {
       return releaseQuota(ctx as never, "user_A", "chat_messages", 1);
     });
     expect(result.balance).toBe(11);
+  });
+});
+
+describe("usage — quota used-clamp and sync-guard errors", () => {
+  it("consumeQuota reports QUOTA_NOT_SYNCED before any sync has run", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.run(async (ctx) => {
+        const { consumeQuota } = await import("../../usage/helpers");
+        return consumeQuota(ctx as never, "user_A", "chat_messages", 1);
+      }),
+    ).rejects.toThrow(/QUOTA_NOT_SYNCED/);
+  });
+
+  it("releaseQuota throws the no-doc error before any sync has run", async () => {
+    const t = convexTest(schema, modules);
+    await expect(
+      t.run(async (ctx) => {
+        const { releaseQuota } = await import("../../usage/helpers");
+        return releaseQuota(ctx as never, "user_A", "chat_messages", 1);
+      }),
+    ).rejects.toThrow(/No quota doc for user/);
+  });
+
+  it("releaseQuota throws the no-entry error for a feature missing from the doc", async () => {
+    const t = convexTest(schema, modules);
+    await sync(t, "active");
+    await expect(
+      t.run(async (ctx) => {
+        const { releaseQuota } = await import("../../usage/helpers");
+        return releaseQuota(ctx as never, "user_A", "courses", 1);
+      }),
+    ).rejects.toThrow(/No quota entry for feature "courses"/);
+  });
+
+  it("a release larger than used clamps used to 0 while still crediting balance", async () => {
+    const t = convexTest(schema, modules);
+    await sync(t, "active");
+    await t.run(async (ctx) => {
+      const { consumeQuota } = await import("../../usage/helpers");
+      return consumeQuota(ctx as never, "user_A", "chat_messages", 1);
+    });
+    let doc = await getQuotaDoc(t);
+    expect(doc?.features.chat_messages?.balance).toBe(9);
+    expect(doc?.features.chat_messages?.used).toBe(1);
+
+    const result = await t.run(async (ctx) => {
+      const { releaseQuota } = await import("../../usage/helpers");
+      return releaseQuota(ctx as never, "user_A", "chat_messages", 3);
+    });
+    expect(result.balance).toBe(12);
+    doc = await getQuotaDoc(t);
+    expect(doc?.features.chat_messages?.balance).toBe(12);
+    expect(doc?.features.chat_messages?.used).toBe(0);
+  });
+
+  it("an in-range release decrements used without clamping", async () => {
+    const t = convexTest(schema, modules);
+    await sync(t, "active");
+    await t.run(async (ctx) => {
+      const { consumeQuota } = await import("../../usage/helpers");
+      return consumeQuota(ctx as never, "user_A", "chat_messages", 2);
+    });
+    const result = await t.run(async (ctx) => {
+      const { releaseQuota } = await import("../../usage/helpers");
+      return releaseQuota(ctx as never, "user_A", "chat_messages", 1);
+    });
+    expect(result.balance).toBe(9);
+    const doc = await getQuotaDoc(t);
+    expect(doc?.features.chat_messages?.balance).toBe(9);
+    expect(doc?.features.chat_messages?.used).toBe(1);
   });
 });
 

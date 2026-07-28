@@ -107,7 +107,9 @@ const settings = (
   pauseT2B: 5,
   beforeOnlyNewReps: Infinity,
   ...overrides,
-});
+  // `defaultTargetReps` is intentionally absent unless overridden: these
+  // fixtures predate the field and pin the resolved-undefined fallback path.
+}) as ResolvedAudioSettings;
 
 const cue = (
   language: string,

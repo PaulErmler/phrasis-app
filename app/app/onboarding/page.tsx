@@ -284,7 +284,7 @@ interface SaveProgressArgs {
  * `persist`, immediate `advance`, immediate `back`) so a new field landing
  * on `OnboardingData` only needs threading through here.
  */
-function buildProgressPayload(
+export function buildProgressPayload(
   fd: OnboardingData,
   step: number,
 ): SaveProgressArgs {

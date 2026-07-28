@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { getFunctionName } from "convex/server";
 
@@ -14,11 +14,12 @@ import { generateText } from "ai";
 import schema from "../../schema";
 import { internal } from "../../_generated/api";
 import { Id } from "../../_generated/dataModel";
-// The workpools are module-mocked globally (convex/tests/setup.ts):
+// The workpools are module-mocked globally (tests/convexTestSetup.ts — outside convex/ on purpose, see vitest.config.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-llm-work-N'), so tests can assert claim→workId stamping and drive
 // the onComplete handlers by hand.
 import { llmPool } from "@/convex/lib/workpools";
+import type { WorkId } from "@convex-dev/workpool";
 import { drainSchedulerAfterEach } from "../lib/drainScheduler";
 
 const mockEnqueue = vi.mocked(llmPool.enqueueAction);
@@ -35,7 +36,7 @@ beforeEach(() => {
   mockEnqueue.mockClear();
 });
 
-async function seedText(t: ReturnType<typeof convexTest>) {
+async function seedText(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) => {
     const collectionId = await ctx.db.insert("collections", {
       name: "A1",
@@ -59,7 +60,7 @@ async function seedText(t: ReturnType<typeof convexTest>) {
 }
 
 const getClaim = (
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   textId: Id<"texts">,
   targetLanguage = "de",
 ) =>
@@ -194,7 +195,7 @@ describe("features/llmTranslationQueue", () => {
 
   describe("onLlmTranslationComplete", () => {
     const complete = (
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       textId: Id<"texts">,
       workId: string,
       result:
@@ -205,7 +206,7 @@ describe("features/llmTranslationQueue", () => {
       t.mutation(
         internal.features.llmTranslationQueue.onLlmTranslationComplete,
         {
-          workId,
+          workId: workId as WorkId,
           context: {
             textId,
             sourceLanguage: "en",
@@ -393,7 +394,7 @@ describe("features/llmTranslationQueue", () => {
 
   describe("onGoogleFallbackComplete", () => {
     const complete = (
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       textId: Id<"texts">,
       workId: string,
       result:
@@ -404,7 +405,7 @@ describe("features/llmTranslationQueue", () => {
       t.mutation(
         internal.features.llmTranslationQueue.onGoogleFallbackComplete,
         {
-          workId,
+          workId: workId as WorkId,
           context: { textId, targetLanguage: "de" },
           result,
         },
