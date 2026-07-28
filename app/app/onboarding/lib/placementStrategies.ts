@@ -1,11 +1,11 @@
 /**
  * Adaptive placement-test strategies.
  *
- * All three implement the same `PlacementStrategy` interface so the runtime
- * test runner and the comparison prototype can swap them with a single
- * identifier change. The active strategy is exported as `defaultStrategy`
- * at the bottom of this file — swap that one assignment to change what the
- * live onboarding uses.
+ * Seven strategy classes implement the same `PlacementStrategy` interface,
+ * so the runtime test runner can swap them with a single identifier change.
+ * The active strategy is named by the `DEFAULT_STRATEGY` string constant at
+ * the bottom of this file and instantiated via `createStrategy(name)` —
+ * change that one assignment to change what the live onboarding uses.
  */
 
 import { OGTE_MIN_LEVEL, OGTE_MAX_LEVEL } from '@/lib/constants/onboarding';
@@ -200,7 +200,7 @@ export class StaircaseStrategy implements PlacementStrategy {
 //   P(knew | trueLevel = T) = sigmoid(α · (T − L))
 // with α = 0.9. After each answer, posterior[i] *= likelihood; renormalize.
 // Ask at the posterior mode (good heuristic, cheap to compute).
-// Stop when peak posterior ≥ 0.55 OR after `MAX_QUESTIONS`.
+// Stop when peak posterior ≥ 0.55 OR after `BAYESIAN_MAX_QUESTIONS`.
 
 const BAYESIAN_ALPHA = 0.9;
 const BAYESIAN_STOP_POSTERIOR = 0.55;
@@ -773,11 +773,10 @@ export function createStrategy(name: StrategyName): PlacementStrategy {
   }
 }
 
-// Swap this single line to change the strategy the live onboarding uses,
-// after reviewing the prototype comparison page. `staircase-from-bottom`
-// gives users a fair chance to climb back up after a single miss
-// (terminates on the 3rd visit to any single level), instead of stopping
-// the moment the bisect interval empties.
+// Swap this single line to change the strategy the live onboarding uses.
+// `staircase-from-bottom` gives users a fair chance to climb back up after
+// a single miss (terminates on the 3rd visit to any single level), instead
+// of stopping the moment the bisect interval empties.
 export const DEFAULT_STRATEGY: StrategyName = 'staircase-from-bottom';
 
 // Maps the precise 1..20 OGTE level the placement test produces back onto the

@@ -1,3 +1,5 @@
+> **ARCHIVED** — Frozen review snapshot as of ~2026-07-05; line anchors have drifted since, and findings marked RESOLVED below were fixed after the review.
+
 # Codebase Review — July 2026
 
 Full-codebase review focused on code quality, frontend efficiency, and user experience.
@@ -81,7 +83,9 @@ not just performance. The view also maintains complex reconciliation state
 (e.g. `@tanstack/react-virtual` — no virtualization library is currently installed). This
 removes both the cap and the render cost.
 
-### F-5 · 🟡 · Effort S — Chat message list re-renders wholesale during streaming
+### F-5 · 🟡 · Effort S — Chat message list re-renders wholesale during streaming — **RESOLVED**
+
+**RESOLVED after this review:** `ChatMessages.tsx` now renders rows through a memoized `ChatMessageRow` component.
 
 [components/chat/ChatMessages.tsx:191](components/chat/ChatMessages.tsx#L191) maps
 `displayMessages` to `Message`/Streamdown markdown with zero memoization (no `React.memo`,
@@ -234,7 +238,9 @@ neighboring `customerData` validator shows the pattern).
 Bounded (~20 collections/dataset) so harmless today; add a `by_datasetId_and_code` index and
 it's O(1).
 
-### B-6 · 🟢 · Effort S — `diagCutoverState` does unbounded `.collect()` ×3
+### B-6 · 🟢 · Effort S — `diagCutoverState` does unbounded `.collect()` ×3 — **RESOLVED**
+
+**RESOLVED after this review:** `convex/admin/diagCutoverState.ts` has been deleted.
 
 [admin/diagCutoverState.ts:17-29](convex/admin/diagCutoverState.ts#L17-L29) collects all of
 `courses`, `courseSettings`, and `collectionProgress`. It's internal-only and self-labeled
@@ -278,12 +284,12 @@ protection.
 
 ### Q-3 · 🟢 · Effort ongoing — File-size ceiling
 
-Giants that have crossed the maintainability line (all verified line counts):
-[decks.ts](convex/features/decks.ts) 2,251 · [scheduling.ts](convex/features/scheduling.ts) 1,885 ·
-[languages.ts](lib/languages.ts) 1,814 · [useLearningMode.ts](components/app/learning/useLearningMode.ts) 1,366
+Giants that have crossed the maintainability line:
+[decks.ts](convex/features/decks.ts) · [scheduling.ts](convex/features/scheduling.ts) ·
+[languages.ts](lib/languages.ts) · [useLearningMode.ts](components/app/learning/useLearningMode.ts)
 (7 queries + 16 mutations in one hook — split into `useReviewSession`, `useCardActions`,
-`useReviewSettings`) · [LearningModeSettings.tsx](components/app/LearningModeSettings.tsx) 1,222 ·
-[onboarding/page.tsx](app/app/onboarding/page.tsx) 844. No single one is urgent; adopt a
+`useReviewSettings`) · [LearningModeSettings.tsx](components/app/LearningModeSettings.tsx) ·
+[onboarding/page.tsx](app/app/onboarding/page.tsx). No single one is urgent; adopt a
 "split when touched" rule rather than a big-bang refactor.
 
 ### Q-4 · 🟢 · Effort S — TypeScript strictness headroom

@@ -170,7 +170,7 @@ export async function hasFeatureAccess(
  * Decrement the local quota for a feature.
  * Does NOT check — caller must check first or use `consumeQuota`.
  */
-export async function decrementQuota(
+async function decrementQuota(
   ctx: MutationCtx,
   userId: string,
   featureId: string,
@@ -217,7 +217,7 @@ async function decrementQuotaForDoc(
  * Increment the local quota for a feature.
  * Used for release semantics (e.g. archiving a course frees a slot).
  */
-export async function incrementQuota(
+async function incrementQuota(
   ctx: MutationCtx,
   userId: string,
   featureId: string,

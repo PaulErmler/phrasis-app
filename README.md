@@ -14,7 +14,7 @@
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+ (CI pins 20)
 - pnpm
 
 ### Installation
@@ -85,15 +85,33 @@ pnpm seed-texts
 ### Other Commands
 
 ```bash
-# Build for production
-pnpm build
+# Type checking
+pnpm typecheck         # tsc --noEmit over the app
+pnpm typecheck:tests   # type-check the test files (tsconfig.test.json)
 
-# Start production server
-pnpm start
+# Tests — see TESTING.md for the full guide
+pnpm test              # all vitest projects (convex + app)
+pnpm test:convex       # Convex backend tests only (edge-runtime)
+pnpm test:app          # frontend tests only (jsdom)
+pnpm test:coverage     # v8 coverage report
+pnpm test:e2e          # Playwright (needs a dev server running)
 
-# Run linting
-pnpm lint
+# Lint & format
+pnpm lint              # ESLint
+pnpm lint:fix          # Prettier + ESLint --fix
+pnpm format            # Prettier over the repo
+
+# Build & deploy
+pnpm build             # next build
+pnpm start             # production server
+pnpm build:deploy      # convex deploy (runs the build) + prod migrations
+
+# Convex data snapshots (per git branch)
+pnpm snapshot          # export deployment data to .convex-snapshots/<branch>.zip
+pnpm snapshot:restore  # import that snapshot back (--replace)
 ```
+
+The testing setup (vitest projects, Playwright phases, `@live` tagging, testid conventions) is documented in [TESTING.md](./TESTING.md).
 
 ---
 
@@ -158,23 +176,41 @@ You can also add the MCP Servers for Convex, BetterAuth and AI Elements by setti
 ## Project Structure
 
 ```
-flexling-app/
 ├── app/                    # Next.js app router
-│   ├── page.tsx           # Landing page with auth
-│   ├── app/page.tsx       # Authenticated app page
-│   ├── auth/[path]/       # Auth routes (sign-in, sign-up, etc.)
-│   └── api/auth/          # Better Auth API routes
+│   ├── page.tsx            # Public landing page
+│   ├── app/                # Authenticated app
+│   │   ├── (main)/         # Main views (home, learn, library, stats, chat, …)
+│   │   ├── onboarding/     # Onboarding wizard (language pair → placement → first lesson)
+│   │   └── admin/          # Internal admin dashboard
+│   ├── auth/[path]/        # Auth routes (sign-in, sign-up, etc.)
+│   ├── api/auth/           # Better Auth API routes
+│   └── legal/              # Legal pages
 ├── components/
-│   └── ui/                # shadcn/ui components
-├── convex/                # Convex backend
-│   ├── schema.ts          # Database schema
-│   ├── myFunctions.ts     # Queries & mutations
-│   ├── auth.ts            # Better Auth server config
-│   └── _generated/        # Auto-generated Convex types
-├── lib/
-│   ├── auth-client.ts     # Better Auth client
-│   └── utils.ts           # Utility functions (cn, etc.)
-└── hooks/                 # Custom React hooks
+│   ├── app/                # Product UI (learning, library, stats, home, settings, …)
+│   ├── chat/               # AI chat UI
+│   ├── autumn/             # Billing / pricing UI
+│   ├── course/, home/, landing/, admin/, …
+│   └── ui/                 # shadcn/ui components
+├── convex/                 # Convex backend
+│   ├── schema.ts           # Database schema
+│   ├── features/           # Domain queries/mutations/actions (courses, decks, scheduling, chat, …)
+│   ├── db/                 # Table-level data-access helpers
+│   ├── lib/                # Shared backend logic (card content, TTS, STT, …)
+│   ├── usage/              # Autumn usage/quota tracking
+│   ├── admin/              # Admin & warmup operations
+│   ├── migrations/         # Dataset cutover + seed/ops utilities
+│   ├── billing.ts          # Billing enforcement
+│   ├── auth.ts             # Better Auth server config
+│   ├── tests/              # Backend vitest tests (see TESTING.md)
+│   └── _generated/         # Auto-generated Convex types
+├── lib/                    # Frontend/shared utilities (languages, scheduling, textCompare, autumn, tutorials, …)
+├── hooks/                  # Custom React hooks
+├── i18n/                   # next-intl setup
+├── messages/               # Locale files (en.json, de.json)
+├── tests/                  # Frontend vitest tests (see TESTING.md)
+├── e2e/                    # Playwright specs (see TESTING.md)
+├── documentation/          # Architecture & feature docs
+└── scripts/                # One-off / maintenance scripts
 ```
 
 ---
@@ -199,10 +235,10 @@ This project uses [shadcn/ui](https://ui.shadcn.com/) for UI components. shadcn/
 
 ```bash
 # Add a new component
-npx shadcn@latest add button
+pnpm dlx shadcn@latest add button
 
 # Add multiple components
-npx shadcn@latest add card dialog tabs
+pnpm dlx shadcn@latest add card dialog tabs
 ```
 
 ### Configuration
@@ -273,9 +309,11 @@ import { SignedIn, SignedOut, UserButton } from "@daveyplate/better-auth-ui";
 
 ### Writing Functions
 
+Real modules live under `convex/features/` (e.g. `convex/features/library.ts` exports `getLibraryCards`). The snippet below is a generic illustration of the function syntax — see `convex/_generated/ai/guidelines.md` for the project's authoritative Convex patterns.
+
 ```typescript
-// convex/myFunctions.ts
-import { query, mutation } from "./_generated/server";
+// convex/features/<feature>.ts (illustrative)
+import { query, mutation } from "../_generated/server";
 import { v } from "convex/values";
 
 // Query - real-time data fetching
@@ -301,13 +339,16 @@ export const createItem = mutation({
 
 ```tsx
 import { useQuery, useMutation } from 'convex/react';
-import { api } from '../convex/_generated/api';
+import { api } from '@/convex/_generated/api';
 
-// Use query (automatically re-renders when data changes)
-const items = useQuery(api.myFunctions.listItems, { limit: 10 });
+// Use query (automatically re-renders when data changes) — function refs
+// mirror the file layout, e.g. convex/features/library.ts → api.features.library.*
+const cards = useQuery(api.features.library.getLibraryCards, {
+  activeFilter: 'favorites',
+});
 
-// Use mutation
-const createItem = useMutation(api.myFunctions.createItem);
+// Use mutation (illustrative — see convex/features/ for real mutations)
+const createItem = useMutation(api.features.example.createItem);
 await createItem({ name: 'New Item' });
 ```
 
@@ -316,7 +357,7 @@ await createItem({ name: 'New Item' });
 Access your Convex dashboard to view data, logs, and manage deployments:
 
 ```bash
-npx convex dashboard
+pnpm exec convex dashboard
 ```
 
 ---

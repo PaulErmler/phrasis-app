@@ -232,20 +232,19 @@ export type LearningState =
 // Hook
 // ============================================================================
 
-// TODO: This hook is ~900 lines and three concerns are tangled inside it:
-//   1. Card-scheduling state machine (loading / noCardsDue / addingCards /
-//      reviewing + the FSRS mutations).
+// Scope note: three concerns remain coupled inside this hook —
+//   1. Card-scheduling state machine (loading / noCollection / noCardsDue /
+//      reviewing, the isAddingCards flag, and the FSRS mutations).
 //   2. Session counters (dailyReviewsToday, sessionCardCount, sessionId
-//      lifecycle) — partially extracted via `mintSessionId` at module
-//      scope; the rest remains coupled to `handleNext` / `handleReview`.
-//   3. Celebration / progress-display — extracted to `useCelebration` in
-//      this PR; still triggered from inside `handleReview`.
-// A full split into `useSessionCounters` / `useCardScheduling` /
-// `useCelebration` is its own PR with proper QA: the milestone-trigger
-// math, optimistic-flip ordering, and `dailyReviewsToday` hydration timing
-// all need to be preserved bit-for-bit. Don't attempt incrementally —
-// either land the full refactor with end-to-end coverage in one go, or
-// leave the current shape alone.
+//      lifecycle; `mintSessionId` lives at module scope) — coupled to
+//      `handleNext` / `handleReview`.
+//   3. Celebration triggering — the display state lives in
+//      `useCelebration`, but it is still driven from inside `handleReview`.
+// Any future split must preserve bit-for-bit: the milestone-trigger math,
+// the optimistic-flip ordering (predict before awaiting the mutation, roll
+// back if the server disagrees), and the `dailyReviewsToday` hydration
+// timing. Don't split incrementally — land a full refactor with
+// end-to-end coverage in one go, or leave the current shape alone.
 export interface UseLearningModeOptions {
   /** Seed the session id instead of minting fresh — used by onboarding
    *  to keep the same session across a mid-lesson reload so

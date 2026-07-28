@@ -1,3 +1,5 @@
+> **ARCHIVED** — Implemented; historical spec.
+
 # Onboarding & Tutorial Redesign — Agent Context Document
 
 This document provides everything needed to implement the redesigned onboarding and post-onboarding tutorial system.

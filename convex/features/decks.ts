@@ -1729,13 +1729,12 @@ async function scheduleContentForUpcomingCards(
     processed++;
   }
 
-  // NOTE: this used to also pre-generate full content (translations + audio)
-  // for the next CONTENT_LOOKAHEAD_SIZE not-yet-added texts of the active
-  // premade collection. Deliberately removed: audio is the dominant
-  // generation cost, the prioritized-marks drain makes the "next N by rank"
-  // prediction unreliable, and content for cards that ARE added is scheduled
-  // at add time (`prepareCardContent`). Preview browsing generates
-  // translations lazily and audio only on an explicit audio-icon click.
+  // Deliberately does NOT pre-generate content for not-yet-added texts of the
+  // active premade collection: audio is the dominant generation cost, the
+  // prioritized-marks drain makes any "next N by rank" prediction unreliable,
+  // and content for cards that ARE added is scheduled at add time
+  // (`prepareCardContent`). Preview browsing generates translations lazily
+  // and audio only on an explicit audio-icon click.
   return processed;
 }
 

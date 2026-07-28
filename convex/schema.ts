@@ -188,7 +188,8 @@ export default defineSchema({
     legacy: v.optional(v.boolean()), // true on old Essential/A1..C2 post-cutover
     // Explicit origin tag — source of truth for the content-source filter.
     // 'premade' = dataset-uploaded; 'custom' = user-typed; 'chat' = chat-approved.
-    // Optional during backfill; required after `runCollectionsOriginBackfill` completes.
+    // Backfilled for all existing rows; optional only in the validator — treat
+    // as required for new writes.
     origin: v.optional(
       v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
     ),
@@ -266,9 +267,9 @@ export default defineSchema({
     // manually-typed custom-text translations. Persisted so a future
     // strategy swap (new dataset version, new model, new prompt) can find
     // and regenerate rows produced by the prior method via a simple
-    // `translationSource != currentSource` migration. Optional for
-    // backward-compat with rows that landed before this field existed — the
-    // one-time backfill that tagged them has since run and been removed.
+    // `translationSource != currentSource` migration. Optional only in the
+    // validator for backward-compat; existing rows are tagged and new writes
+    // always populate it.
     translationSource: v.optional(v.string()),
     // Concrete regional variant chosen for this row when `targetLanguage` is a
     // mixed/aggregate code (today: "es_mixed"). Stored as a Google voice-locale
@@ -490,9 +491,9 @@ export default defineSchema({
   cards: defineTable({
     deckId: v.id('decks'), // Reference to the deck
     textId: v.id('texts'), // Reference to the text/sentence
-    collectionId: v.optional(v.id('collections')), // Reference to the source collection. Backfilled for all cards by runCardsCollectionBackfill; required after.
+    collectionId: v.optional(v.id('collections')), // Reference to the source collection. Backfilled for all existing cards; treat as required for new writes.
     // Denormalized from collections.origin at insert time. Powers the content-source filter
-    // index lookups in getCardForReview. Optional during backfill; required after.
+    // index lookups in getCardForReview. Backfilled for all existing cards; treat as required for new writes.
     collectionOrigin: v.optional(
       v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
     ),
@@ -864,8 +865,7 @@ export default defineSchema({
 
   // Unique words per user per course per language.
   // courseId is optional only to accommodate pre-migration rows; new writes
-  // always populate it (historical rows were rebuilt by a one-time stats
-  // backfill that has since run and been removed).
+  // always populate it.
   userWords: defineTable({
     userId: v.string(),
     courseId: v.optional(v.id('courses')),
@@ -973,15 +973,6 @@ export default defineSchema({
   })
     .index('by_userId_and_courseId', ['userId', 'courseId'])
     .index('by_userId_and_courseId_and_reviewNumber', ['userId', 'courseId', 'reviewNumber']),
-
-  // Per-user state left over from the (now-removed) one-shot retokenize
-  // migration. No longer read or written; the table is retained pending a
-  // separate schema-only cleanup so a deploy doesn't drop a still-populated
-  // table.
-  retokenizeMigrationState: defineTable({
-    userId: v.string(),
-    courseIds: v.array(v.id('courses')),
-  }).index('by_userId', ['userId']),
 
   // Usage quotas — local cache of Autumn entitlements for synchronous checks.
   // One document per user; features stored as a record keyed by feature ID.

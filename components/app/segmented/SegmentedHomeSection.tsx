@@ -36,13 +36,11 @@ type Level = HomeSummary['levels'][number];
 type CustomCollectionSummary = HomeSummary['customCollections'][number];
 
 interface SegmentedHomeSectionProps {
-  activeCourseId: Id<'courses'> | null;
   onNavigateToContent: () => void;
   onNavigateToChat: () => void;
 }
 
 export function SegmentedHomeSection({
-  activeCourseId,
   onNavigateToContent,
   onNavigateToChat,
 }: SegmentedHomeSectionProps) {
@@ -119,13 +117,12 @@ export function SegmentedHomeSection({
       </div>
 
       <TabsContent value="premade" className="flex flex-col gap-3">
-        <PremadeTab summary={summary} activeCourseId={activeCourseId} />
+        <PremadeTab summary={summary} />
       </TabsContent>
 
       <TabsContent value="custom" className="flex flex-col gap-3">
         <CustomTab
           customCollections={summary.customCollections}
-          activeCourseId={activeCourseId}
           onNavigateToContent={onNavigateToContent}
           onNavigateToChat={onNavigateToChat}
         />
@@ -138,13 +135,7 @@ export function SegmentedHomeSection({
 // Premade tab — CEFR-grouped rail + inline detail card (original preview)
 // ============================================================================
 
-function PremadeTab({
-  summary,
-  activeCourseId,
-}: {
-  summary: HomeSummary;
-  activeCourseId: Id<'courses'> | null;
-}) {
+function PremadeTab({ summary }: { summary: HomeSummary }) {
   const t = useTranslations('AppPage.collections.carousel');
   const setActiveCollection = useMutation(api.features.decks.setActiveCollection);
   const [optimisticActiveId, setOptimisticActiveId] = React.useState<Id<'collections'> | null>(null);
@@ -190,7 +181,7 @@ function PremadeTab({
     isAdding,
     handleAddCards,
     sentencesRemaining,
-  } = useCollectionDetail({ collections: items, activeCourseId });
+  } = useCollectionDetail({ collections: items });
 
   const handleSelect = React.useCallback(
     async (collectionId: Id<'collections'>) => {
@@ -456,12 +447,10 @@ function LevelChip({
 
 function CustomTab({
   customCollections,
-  activeCourseId,
   onNavigateToContent,
   onNavigateToChat,
 }: {
   customCollections: CustomCollectionSummary[];
-  activeCourseId: Id<'courses'> | null;
   onNavigateToContent: () => void;
   onNavigateToChat: () => void;
 }) {
@@ -530,7 +519,7 @@ function CustomTab({
     browse,
     isAdding,
     handleAddCards,
-  } = useCollectionDetail({ collections: items, activeCourseId });
+  } = useCollectionDetail({ collections: items });
 
   const handleToggleCollection = React.useCallback(
     async (collectionId: string) => {
@@ -544,7 +533,7 @@ function CustomTab({
   );
 
   // Keyed by the raw `collectionName` (e.g. "Custom"/"Chat") to match the
-  // lookup in CollectionCarouselUI (`collectionActions?.[collection.collectionName]`).
+  // `collectionActions[focusedItem.collectionName]` lookup below.
   const collectionActions = React.useMemo<Record<string, CollectionAction>>(() => {
     const actions: Record<string, CollectionAction> = {};
     for (const c of customCollections) {

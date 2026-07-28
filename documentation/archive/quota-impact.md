@@ -1,3 +1,5 @@
+> **ARCHIVED** — Implemented; historical spec. Its surviving rule (only non-archived courses count toward the course limit) now lives in `documentation/autumn-usage-tracking.md`.
+
 # Quota Impact: Course Archiving & Language Changes
 
 This document describes how the new course management features (archiving and multi-language support) should interact with the user quota system. Pass this to the quota implementation agent.

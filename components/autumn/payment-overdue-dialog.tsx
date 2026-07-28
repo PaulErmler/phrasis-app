@@ -20,28 +20,10 @@ import { toast } from "sonner";
 /**
  * App-wide dunning popup. Mounted once in BillingGate (from the /app layout)
  * so it covers every route including the standalone /app/learn page; opens
- * whenever the synced billing state is past due.
- *
- * There is no grace window: the dialog is a hard block from the moment we
- * see the overdue state. No dismiss button, no close X, and escape /
- * outside clicks are swallowed. This is UX only — the real enforcement is
- * `assertBillingCurrent` in convex/usage/helpers.ts, which fails every
- * quota-consuming mutation server-side.
- *
- * Two ways out, and only two:
- *  - Pay the outstanding invoice (`pastDueInvoiceUrl`, the Stripe-hosted
- *    page). This is the CTA because it is the only thing that actually
- *    settles the debt — the billing portal merely swaps the card on file
- *    and waits for Stripe's next retry.
- *  - Cancel, dropping to Free immediately. Behind a confirmation step
- *    because it archives every active course but one. The server refuses to
- *    cancel when the expanded invoices show the debt was already settled
- *    (outcome 'recovered'), so a user who just paid and clicks Cancel out
- *    of confusion cannot destroy the subscription they paid for.
- *
- * Excluded from /app/admin: the admin dashboard nests under the same layout,
- * and an admin whose own account goes past due would otherwise lose access to
- * it. `requireAdmin` still guards the underlying data.
+ * whenever the synced billing state is past due. Full policy (no grace
+ * window, the two exits, admin-route exclusion, `assertBillingCurrent`
+ * backstop): documentation/autumn-usage-tracking.md, "Past-due (dunning)
+ * flow".
  *
  * Split into this thin gate and the dialog proper: the inner component only
  * mounts while the block is active, so (a) its state (`confirmingCancel`,

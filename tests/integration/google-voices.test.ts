@@ -5,11 +5,10 @@
  * Uses `GET texttospeech.googleapis.com/v1/voices` once, then matches each
  * configured Google voice apiCode against the returned `name` values.
  *
- * Pairs with `tests/integration/azure-voices.test.ts`: together they guarantee
- * that for every language in SUPPORTED_LANGUAGES, the configured TTS provider
- * actually exposes the voices the app would call. The completeness checks in
+ * Only Google is covered: 'azure' and 'elevenlabs' are retired tombstone
+ * providers (lib/languages.ts) that no language routes to. The completeness checks in
  * `tests/unit/lib/voices.test.ts` ensure every language has *some* voice for
- * its active provider; these integration tests ensure those voices exist
+ * its active provider; this test ensures those voices exist
  * upstream.
  *
  * - Loads .env.local so developers don't have to export the key manually.

@@ -2,28 +2,12 @@
  * The single place that knows what Autumn's customer payloads look like.
  *
  * `GET /customers/:id` returns one of two unrelated shapes depending on the
- * `x-api-version` header, and the two families disagree about where state
- * lives. Verified 2026-07-26 against one live customer, same instant:
- *
- *   concept    | v1.x `products[]`            | v2.x `subscriptions[]`
- *   -----------|------------------------------|--------------------------------
- *   product id | `id`                         | `plan_id` (`id` is the row id)
- *   add-on     | `is_add_on`                  | `add_on`
- *   free plan  | `is_default`                 | `auto_enable`
- *   trialing   | `status: "trialing"`         | `status: "active"` + trial_ends_at
- *   past due   | `status: "past_due"`         | `status: "active"` + past_due: true
- *   trial end  | `current_period_end`         | `trial_ends_at`
- *
- * v2 has NO "trialing" and NO "past_due" status — it keeps `status` as the
- * lifecycle state and moves both into dedicated fields. So a check against
- * `status` alone is blind on v2, and one against the boolean alone is blind
- * on v1. Every consumer reads `AutumnPlan` instead, and this file is the only
- * place either set of field names appears.
- *
- * We can't simply standardise on one version: the client SDK is pinned to
- * v1.2 (`LATEST_API_VERSION` in autumn-js, not overridable through
- * `useCustomer()`), while `usage/tracking.ts` needs v2 for `balances`/`flags`
- * — v1.2 returns `features` instead.
+ * `x-api-version` header (v1.2 `products[]` vs v2.x `subscriptions[]`), and
+ * the two disagree about where trial/past-due state lives. Every consumer
+ * reads the version-independent `AutumnPlan` instead; this file is the only
+ * place either set of raw field names appears. Full field mapping table and
+ * why both versions coexist: documentation/autumn-usage-tracking.md,
+ * "v1.2 vs v2.x customer shapes (why both)".
  */
 
 /** Plan entry as it appears on `x-api-version: 1.2` (`products[]`). */

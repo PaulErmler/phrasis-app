@@ -1,16 +1,6 @@
 import type { ChatStatus } from '@/lib/types/chat';
 
 /**
- * Default conversation starter suggestions
- */
-export const DEFAULT_SUGGESTIONS = [
-  'Explain me the grammar of this sentence.',
-  "How can I say 'almost' in Spanish?",
-  'Can you give me a more polite version of this sentence?',
-  'Give me three more examples using this adjective.',
-] as const;
-
-/**
  * Chat status constants
  */
 export const CHAT_STATUS = {

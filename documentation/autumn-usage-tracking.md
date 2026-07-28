@@ -1,6 +1,6 @@
 # Autumn Integration & Usage Tracking
 
-This document describes how feature gating, usage quotas, and the Autumn billing SDK are wired together across the Phrasis codebase. Use it as a reference when adding new gated features, modifying quota enforcement, or debugging paywall/checkout flows.
+This document describes how feature gating, usage quotas, and the Autumn billing SDK are wired together across the Flexling codebase. Use it as a reference when adding new gated features, modifying quota enforcement, or debugging paywall/checkout flows.
 
 ---
 
@@ -139,7 +139,7 @@ All quota logic lives in `convex/usage/`:
 | `tracking.ts` | Node actions: `trackUsage` (POST to Autumn /track + re-sync), `syncQuotasForUser`, `getOrCreateCustomer` |
 | `actions.ts` | Public action: `syncQuotas` (called from frontend on app load) |
 | `queries.ts` | Public query: `getMyQuotas` (reactive, powers `useFeatureQuota` hook) |
-| `testOperations.ts` | Dev-only mutations for manually testing quota operations |
+| `testing.ts` | E2E test hooks for the payment-overdue flow, gated on `E2E_TEST_HOOKS=1`: `resolveUserId`, `setBillingOverride`, `clearBillingOverride`, `getBillingDebugState` |
 
 ### Key functions in `helpers.ts`
 
@@ -254,6 +254,23 @@ Records a usage event. As of March 17, 2026, this endpoint no longer auto-create
 | (no interval in raw balances) | `interval` (unused) |
 | `flags[id]` (presence) | `{ balance: 1, included: 1, used: 0, unlimited: true }` |
 
+### v1.2 vs v2.x customer shapes (why both)
+
+`GET /customers/:id` returns one of two unrelated shapes depending on the `x-api-version` header, and the two families disagree about where state lives. Verified 2026-07-26 against one live customer, same instant:
+
+| Concept | v1.x `products[]` | v2.x `subscriptions[]` |
+|---|---|---|
+| product id | `id` | `plan_id` (`id` is the row id) |
+| add-on | `is_add_on` | `add_on` |
+| free plan | `is_default` | `auto_enable` |
+| trialing | `status: "trialing"` | `status: "active"` + `trial_ends_at` |
+| past due | `status: "past_due"` | `status: "active"` + `past_due: true` |
+| trial end | `current_period_end` | `trial_ends_at` |
+
+v2 has NO `"trialing"` and NO `"past_due"` status — it keeps `status` as the lifecycle state and moves both into dedicated fields. So a check against `status` alone is blind on v2, and one against the boolean alone is blind on v1. Every consumer reads the version-independent `AutumnPlan` from `lib/autumn/customer-shape.ts` instead, and that file is the only place either set of raw field names appears.
+
+We can't simply standardise on one version: the client SDK is pinned to v1.2 (`LATEST_API_VERSION` in autumn-js, not overridable through `useCustomer()`), while `convex/usage/tracking.ts` needs v2 for `balances`/`flags` — v1.2 returns `features` instead.
+
 ---
 
 ## Quota Sync Lifecycle
@@ -268,17 +285,25 @@ Records a usage event. As of March 17, 2026, this endpoint no longer auto-create
 
 ## Backend Enforcement (Mutations)
 
-Mutations that change metered usage call `consumeQuota` or `releaseQuota`. The current enforcement points:
+Mutations that change metered usage call `consumeQuota` or `releaseQuota`. Only non-archived courses count toward the course limit (archiving a course releases its `COURSES` quota; unarchiving re-consumes it). The current enforcement points:
 
 | Mutation | File | Feature ID | Amount |
 |---|---|---|---|
 | `sendMessage` | `convex/features/chat/messages.ts` | `CHAT_MESSAGES` | 1 |
 | `approveCard` | `convex/features/chat/cardApprovals.ts` | `CUSTOM_SENTENCES` | 1 |
+| `createCustomText` | `convex/features/customTexts.ts` | `CUSTOM_SENTENCES` | 1 |
+| `createCustomTextsBatch` | `convex/features/customTexts.ts` | `CUSTOM_SENTENCES` | accepted batch size |
+| `autoFillTranslations` (via `consumeAutoFillQuota`) | `convex/features/customTexts.ts` | `TRANSLATION_AUTO_FILL` | 1 |
+| `transcribeAudio` (via `consumeTranscriptionQuota`) | `convex/features/chat/transcribe.ts` | `TRANSCRIPTIONS` | 1 |
+| `editCard` | `convex/features/scheduling.ts` | `CARD_EDITS` | 1 |
+| `regenerateCardAudio` | `convex/features/scheduling.ts` | `AUDIO_REGENERATIONS` | 1 |
+| `flagTranslation` | `convex/features/scheduling.ts` | `TRANSLATION_FLAGS` | 1 |
 | `createCourse` | `convex/features/courses.ts` | `COURSES` | consume 1 |
 | `completeOnboarding` (course creation) | `convex/features/courses.ts` | `COURSES` | consume 1 |
 | `unarchiveCourse` | `convex/features/courses.ts` | `COURSES` | consume 1 |
 | `archiveCourse` | `convex/features/courses.ts` | `COURSES` | release 1 (track `-1`) |
-| `addToUserDeck` | `convex/features/decks.ts` | `SENTENCES` | batch size |
+| `addCardsFromCollection` | `convex/features/decks.ts` | `SENTENCES` | batch size |
+| `addSingleTextFromCollection` | `convex/features/decks.ts` | `SENTENCES` | 1 |
 
 Typical consume pattern:
 
@@ -297,7 +322,31 @@ await releaseQuota(ctx, userId, FEATURE_IDS.SOME_FEATURE, amount);
 
 If `consumeQuota` or `releaseQuota` throws, the mutation aborts and the client receives the `ConvexError`.
 
-**Boolean features** (like `MULTIPLE_LANGUAGES`) are NOT enforced via `consumeQuota`. Instead, the frontend uses `useFeatureQuota` to read the boolean state and conditionally limits the UI (e.g., max 2 languages vs. max 5).
+**Boolean features** (like `MULTIPLE_LANGUAGES`) are NOT enforced via `consumeQuota`. Instead, the frontend uses `useFeatureQuota` to read the boolean state and conditionally limits the UI (e.g., max 2 languages vs. max 3).
+
+---
+
+## Past-due (dunning) flow
+
+When Autumn reports a plan as past due, `syncAllFeatures` stamps `pastDueSince` on the user's `usageQuotas` doc (and clears it once the state recovers). Everything below keys off that field.
+
+**No grace window.** From the moment the synced state shows past due, `PaymentOverdueDialog` (`components/autumn/payment-overdue-dialog.tsx`, mounted once in `BillingGate` from the /app layout) hard-blocks the app: no dismiss button, no close X, escape and outside clicks are swallowed. The dialog is UX only — the authoritative backstop is `assertBillingCurrent` in `convex/usage/helpers.ts`, which runs inside `consumeQuota` and fails every quota-consuming mutation with `PAYMENT_PAST_DUE` while `pastDueSince` is set.
+
+**Two exits, and only two:**
+
+1. **Pay the outstanding invoice** (`pastDueInvoiceUrl`, the Stripe-hosted page). This is the CTA because it is the only action that actually settles the debt — the billing portal merely swaps the card on file and waits for Stripe's next retry.
+2. **Cancel**, dropping to Free immediately, via the `cancelOverdueSubscription` action (`convex/billing.ts`). Behind a confirmation step because it archives every active course but one.
+
+**`cancelOverdueSubscription` outcomes** (the past-due state is re-derived from Autumn server-side, never trusted from the client):
+
+- `cancelled` — the plan was past due with an unsettled invoice; it is cancelled immediately and Stripe voids the outstanding invoice.
+- `recovered` — nothing needed cancelling: either Autumn no longer reports a past-due plan (payment landed, Stripe's retry succeeded, or a previous partial run already cancelled), or the plan still reads past_due but the expanded invoices show nothing unpaid — i.e. the user just paid the hosted invoice and Autumn's subscription state is lagging the Stripe webhook. Cancelling in that window would destroy a subscription that was just paid for, so the server refuses. Both branches re-sync the quota mirror first so a stale block clears instead of stranding the user.
+
+**Admin routes are excluded** from the dialog: /app/admin nests under the same layout, and an admin whose own account goes past due would otherwise lose access to the dashboard. `requireAdmin` still guards the underlying data.
+
+**Course auto-archive is deferred while past due.** The auto-archive in `syncAllFeatures` is deliberately suppressed during the past-due window; it runs in the follow-on sync after a cancel, once the plan really has shrunk to Free. That is the archival the cancel confirmation warns about.
+
+E2E coverage: `e2e/payment-overdue.spec.ts` forces the synced past-due state via the `E2E_TEST_HOOKS`-gated helpers in `convex/usage/testing.ts`.
 
 ---
 
@@ -364,8 +413,9 @@ The Autumn-provided checkout UI rendered as a dialog. Passed to `checkout({ dial
 ### `CourseLanguageSettings` (`components/course/CourseLanguageSettings.tsx`)
 
 Uses `useFeatureQuota(FEATURE_IDS.MULTIPLE_LANGUAGES)` to determine language limits:
-- **Has feature**: max 5 total languages, max 3 per group.
+- **Has feature**: max 3 total languages, max 2 per group.
 - **Doesn't have feature**: max 2 total languages, max 1 per group.
+- **Grandfathering**: if a saved course already exceeds the current caps (legacy Pro courses created when the limit was 5), the editor raises its limits to the existing language counts — nothing is force-removed; adding more is disabled instead.
 - Shows an inline upgrade banner with lock icon when the feature is not available.
 
 ---

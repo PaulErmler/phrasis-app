@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 
-import { StepperImportView } from '@/components/app/import-texts/prototypes/StepperImportView';
+import { StepperImportView } from '@/components/app/import-texts/StepperImportView';
 import type { ImportController } from '@/components/app/import-texts/useImportController';
 
 /**

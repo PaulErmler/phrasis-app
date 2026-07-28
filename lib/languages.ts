@@ -2,9 +2,15 @@
  * Language metadata for the Flexling app.
  *
  * This file owns:
- *   - The Language and TtsProvider types
- *   - SUPPORTED_LANGUAGES (pure metadata — no voices)
- *   - Language-metadata helpers (name lookup, short labels, romanization, …)
+ *   - The Language and TtsProvider types + SUPPORTED_LANGUAGES (pure
+ *     metadata — no voices)
+ *   - Language-metadata helpers: name lookup, short labels, romanization,
+ *     text direction / RTL detection, and mixed-variant resolution
+ *     (`resolveMixedVariant` for aggregate codes like `es_mixed`)
+ *   - Per-language content versioning (`translationVersion` / `ttsVersion`
+ *     and the staleness comparison that drives lazy regeneration)
+ *   - The TRANSLATION_RULES pipelines (model × reasoning × fallback chains
+ *     for the LLM translation worker) and translation post-processing
  *
  * Voice data and voice-selection helpers live in `lib/voices.ts`. They're
  * re-exported at the bottom of this file so existing imports of things like

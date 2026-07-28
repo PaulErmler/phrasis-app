@@ -198,19 +198,6 @@ export async function getNextTextsFromRank(
     .take(limit);
 }
 
-/** Next rank for appending a text at the end of a collection (max existing rank + 1). */
-export async function nextCollectionRank(
-  ctx: QueryCtx | MutationCtx,
-  collectionId: Id<'collections'>,
-): Promise<number> {
-  const last = await ctx.db
-    .query('texts')
-    .withIndex('by_collection_and_rank', (q) => q.eq('collectionId', collectionId))
-    .order('desc')
-    .first();
-  return (last?.collectionRank ?? 0) + 1;
-}
-
 /**
  * Get or create the per-course chat collection used for AI-approved texts.
  * Returns the collection doc and whether courseSettings was updated.

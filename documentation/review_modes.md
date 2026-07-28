@@ -1,10 +1,15 @@
 # Review Modes
 
-The `/learn` page supports two distinct review modes that users can switch between via the settings panel. The active mode is persisted per course in `courseSettings.reviewMode`.
+The `/learn` page supports two review modes that users can switch between via the settings panel. The active mode is persisted per course in `courseSettings.reviewMode`:
 
-## Audio Review Mode (default)
+- **Shadowing** (`reviewMode: 'audio'`, the default) — listen, translate in your head, say it aloud.
+- **Writing** (`reviewMode: 'full'`) — type the answer and get diff feedback. Writing further splits into two input styles via `courseSettings.writingInputMode` (see below).
 
-The original review experience. The user listens to audio playback of base and target languages, optionally with target text hidden/blurred, and rates the card based on recall.
+Shadowing also has a third *study* mode at the scheduling level: **Radio** (`courseSettings.schedulingMode: 'radio'`) — audio-only round-robin background playback that loops cards hands-free without affecting their FSRS schedule. Radio is only available in Shadowing.
+
+## Shadowing (`reviewMode: 'audio'`, default)
+
+The original review experience. The user listens to audio playback of base and target languages, optionally with target text hidden/blurred, says the sentence aloud, and rates the card based on recall.
 
 ### Mode-specific settings
 
@@ -21,11 +26,42 @@ Cards go through two phases:
 1. **Pre-review** — shown `initialReviewCount` times with binary ratings.
 2. **Review** — scheduled via FSRS with ratings: Again, Hard, Good, Easy.
 
-## Full Review Mode
+## Writing (`reviewMode: 'full'`)
 
-A text-input-based review where the user types the translation for each target language and sees a character-level diff of their answer against the expected text.
+A text-input-based review where the user types text for each target language and sees a character-level diff of their answer against the expected text.
 
-### Flow
+### Input styles: Translate vs Transcribe (`writingInputMode`)
+
+Writing has two input styles, stored in `courseSettings.writingInputMode`
+(`'translate' | 'transcribe'`, optional — see `convex/schema.ts`; ignored in
+Shadowing):
+
+- **Translate** (default) — base audio plays and the base text is shown; the
+  user types the translation for each target language.
+- **Transcribe** — target audio plays alone; the user types exactly what they
+  hear (listening-comprehension practice). The diff/accuracy pipeline is the
+  same as Translate.
+
+### Per-mode playback settings
+
+Playback settings are split per mode: the unsuffixed `courseSettings` fields
+(`languageRepetitions`, `pauseBaseToBase`, `autoPlayAudio`, `highlightWords`,
+…) remain authoritative for Shadowing (and Radio), the `*Full` counterparts
+hold the Writing/Translate values, and the `*Transcribe` counterparts hold the
+Writing/Transcribe values. Writing resolves every playback value along the
+chain
+
+```
+Transcribe:  *Transcribe ?? *Full ?? <unsuffixed audio field> ?? DEFAULT_*
+Translate:   *Full ?? <unsuffixed audio field> ?? DEFAULT_*
+```
+
+so documents without the suffixed fields behave identically in all modes. The
+first edit of a setting in a mode snapshots the effective value into that
+mode's field, after which the modes diverge for that field. Full details (and
+the pending backfill migration) in `docs/migrations/per-mode-settings-backfill.md`.
+
+### Flow (as seen in Translate; Transcribe differs only in the prompt)
 
 1. Base language translations are shown (read-only) with audio buttons.
 2. For each target language, a text input is displayed with an audio button and a submit button. When there is only one target language, the language label is hidden. When there are multiple, the full localized language name is shown.
@@ -39,8 +75,9 @@ A text-input-based review where the user types the translation for each target l
      `Intl.Segmenter` word tokens, Damerau–Levenshtein within a token) rendered
      by `WordDiff`. Tags: `equal` / `typo` (partial credit) / `wrong` /
      `missing` / `extra`.
-   - Languages **without** word boundaries (zh, zh_traditional, yue, ja, th —
-     `hasWordBoundaries: false` in `lib/languages.ts`) fall back to a
+   - Languages **without** word boundaries (zh, zh_traditional, yue,
+     yue_traditional, ja, th — `hasWordBoundaries: false` in
+     `lib/languages.ts`) fall back to a
      grapheme-level `charDiff` built on [jsdiff](https://github.com/kpdecker/jsdiff).
    - **Green**: correct. **Amber**: typo. **Red**: wrong or extra.
      **Dashed**: missing.
@@ -97,16 +134,17 @@ Cards skip the pre-review phase entirely. All cards are rated using FSRS ratings
 
 | Component | Path | Purpose |
 |-----------|------|---------|
-| `ReviewModeSwitcher` | `components/app/learning/ReviewModeSwitcher.tsx` | Split button at the top of settings to toggle between Audio and Full Review modes. |
-| `FullReviewCardContent` | `components/app/learning/FullReviewCardContent.tsx` | Card view for full review mode with text inputs and diff display. |
+| `ReviewModeSwitcher` | `components/app/learning/ReviewModeSwitcher.tsx` | Split button at the top of settings to toggle between Shadowing and Writing. |
+| `FullReviewCardContent` | `components/app/learning/FullReviewCardContent.tsx` | Card view for Writing mode with text inputs and diff display. |
 | `DiffDisplay` | `components/app/learning/DiffDisplay.tsx` | Picks the word- or character-level diff based on `hasWordBoundaries`, and exports `computeAccuracy`. |
 | `WordDiff` | `components/app/learning/WordDiff.tsx` | Word-aligned diff chips for space-separated scripts. |
 
 ### Data model changes
 
-Two fields added to the `courseSettings` table:
+Fields added to the `courseSettings` table:
 
 - `reviewMode` (`'audio' | 'full'`, optional, defaults to `'audio'`)
+- `writingInputMode` (`'translate' | 'transcribe'`, optional, defaults to `'translate'`) — Writing input style; ignored in Shadowing
 - `fullReviewTargetAudioMode` (`'always' | 'afterSubmit' | 'never'`, optional, defaults to `'afterSubmit'`)
 - `ignorePunctuation` (`boolean`, optional, defaults to `false`) — exclude punctuation from the accuracy score
 - `autoRateFromAccuracy` (`boolean`, optional, defaults to **`true`**) — preselect the rating from the accuracy score
@@ -130,9 +168,9 @@ single series — its consumer is an `internalQuery` with no frontend reader.
 
 ### Audio behavior
 
-In `useLearningAudio`, when in full review mode:
+In `useLearningAudio`, when in Writing mode:
 - Target languages are excluded from the merged audio unless `fullReviewTargetAudioMode === 'always'`.
-- Auto-advance is disabled (it is an audio-mode-only feature).
+- Auto-advance is disabled (it is a Shadowing-only feature).
 - Individual language audio playback after submit is handled inside `FullReviewCardContent` using the existing `AudioButton` mechanism.
 
 In the settings panel, the playback sequence preview (timeline) conditionally hides target language cards and their connectors when they are not part of the main audio sequence (i.e., when the target audio setting is `afterSubmit` or `never`).

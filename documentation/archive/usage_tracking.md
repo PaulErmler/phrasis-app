@@ -1,3 +1,5 @@
+> **ARCHIVED** — Fully superseded by `documentation/autumn-usage-tracking.md`.
+
 # Usage Tracking
 
 ## Overview

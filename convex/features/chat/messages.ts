@@ -19,11 +19,6 @@ import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS } from '../../config/aiModels';
 import { getLanguageByCode } from '../../../lib/languages';
 
-export type ListMessagesStreamArgs = {
-  kind: 'list';
-  includeStatuses?: ('streaming' | 'finished' | 'aborted')[];
-};
-
 const agentComponent = components.agent;
 
 /**

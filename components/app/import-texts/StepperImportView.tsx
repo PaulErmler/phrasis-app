@@ -37,9 +37,9 @@ import {
   HeaderToggle,
   SummaryBar,
   RowErrorBadges,
-} from '../ImportPrimitives';
-import type { ImportController } from '../useImportController';
-import type { RowStatus } from '../types';
+} from './ImportPrimitives';
+import type { ImportController } from './useImportController';
+import type { RowStatus } from './types';
 
 type Step = 0 | 1 | 2;
 

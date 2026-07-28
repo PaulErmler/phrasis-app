@@ -21,19 +21,14 @@
     "test:app": "vitest run --project=app",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "lint": "eslint . --ext .js,.jsx,.ts,.tsx,.mjs",
-    "lint:fix": "prettier --write . && eslint . --ext .js,.jsx,.ts,.tsx,.mjs --fix",
+    "lint": "eslint .",
+    "lint:fix": "prettier --write . && eslint . --fix",
     "format": "prettier --write .",
     "lint:staged": "lint-staged",
     "prepare": "husky install",
     "snapshot": "mkdir -p .convex-snapshots && convex export --env-file .env.local --path .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip && echo '[convex] Snapshot saved.'",
     "snapshot:restore": "convex import --replace -y --env-file .env.local .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip",
-    "landing:audio": "tsx --env-file=.env.local scripts/generate-landing-audio.mts",
-    "tts:prototype": "tsx --env-file=.env.local scripts/tts-prototype.ts",
-    "tts:probe": "tsx --env-file=.env.local scripts/tts-openrouter-format-probe.ts",
-    "tts:prompt-test": "tsx --env-file=.env.local scripts/tts-prompt-test.ts",
-    "tts:levantine": "tsx --env-file=.env.local scripts/tts-levantine-probe.mts",
-    "probe:languages": "tsx --env-file=.env.local scripts/probe-new-languages.ts"
+    "landing:audio": "tsx --env-file=.env.local scripts/generate-landing-audio.mts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.76",

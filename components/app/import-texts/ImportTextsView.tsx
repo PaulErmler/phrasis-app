@@ -7,7 +7,7 @@ import { ChevronLeft } from 'lucide-react';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import { useImportController } from './useImportController';
-import { StepperImportView } from './prototypes/StepperImportView';
+import { StepperImportView } from './StepperImportView';
 
 interface ImportTextsViewProps {
   onBack: () => void;

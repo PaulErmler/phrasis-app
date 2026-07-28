@@ -1,9 +1,8 @@
 # Testimonials
 
 Collected user quotes for a future testimonial section on the landing page.
-Quotes are kept verbatim — several reference the app's earlier name
-(Flexling) and may need updating or a shortened excerpt when the section is
-built.
+Quotes are kept verbatim and may need a shortened excerpt when the section
+is built.
 
 ---
 

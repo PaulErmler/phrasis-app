@@ -144,8 +144,6 @@ export interface CollectionBrowse {
 
 interface UseCollectionDetailOptions {
   collections: CollectionProgressItem[] | undefined;
-  /** Unused since the preview stopped pre-generating content on open; kept so call sites don't churn. */
-  activeCourseId: string | null;
 }
 
 export function useCollectionDetail({
