@@ -61,36 +61,23 @@
         "description": "Bei Fragen oder Problemen kannst du uns jederzeit kontaktieren."
       }
     },
-    "welcome": "Willkommen zurück, {viewer}!",
     "notifications": {
       "title": "Benachrichtigungen",
       "description": {
-        "default": "Erhalte Erinnerungen, um deine Phrasen zu üben.",
-        "granted": "Benachrichtigungen sind aktiviert! Du erhältst Übungserinnerungen.",
-        "unsupported": "Benachrichtigungen werden von deinem Browser nicht unterstützt."
+        "default": "Erhalte Erinnerungen, um deine Phrasen zu üben."
       },
-      "notAvailable": "Benachrichtigungen nicht verfügbar",
       "blocked": "Benachrichtigungen sind blockiert. Bitte aktiviere sie in deinen Browsereinstellungen, um Erinnerungen zu erhalten.",
-      "requesting": "Wird angefordert...",
-      "sendTest": "Test-Benachrichtigung senden",
-      "enable": "Benachrichtigungen aktivieren",
-      "enabled": "Benachrichtigungen aktiviert",
-      "testMessage": "Zeit, deine Phrasen zu üben! 🌟"
+      "enabled": "Benachrichtigungen aktiviert"
     },
     "flashcards": {
       "title": "Sätze",
-      "description": "Wiederhole deine Phrasen Satz für Satz — interaktiv und strukturiert.",
-      "goToFlashcard": "Zu den Sätzen",
-      "goToAudioFlashcard": "Zu den Audio-Sätzen"
+      "description": "Wiederhole deine Phrasen Satz für Satz — interaktiv und strukturiert."
     },
     "randomNumber": {
       "title": "Zufallszahlen",
       "description": "Eine einfache Convex-Demo mit Echtzeit-Updates.",
-      "generate": "Zufallszahl generieren",
-      "recent": "Letzte Zahlen:",
       "empty": "Noch keine Zahlen generiert."
     },
-    "contentSoon": "Demnächst: Entdecke neue Phrasen und auf dich zugeschnittene Inhalte.",
     "content": {
       "chat": {
         "title": "Chat",
@@ -112,7 +99,6 @@
         "emailSubject": "Feature-Feedback (Inhalte)"
       }
     },
-    "librarySoon": "Demnächst: Verwalte und organisiere deine gespeicherten Phrasen.",
     "library": {
       "title": "Bibliothek",
       "searchPlaceholder": "Sätze suchen...",
@@ -127,10 +113,8 @@
       "emptyDescription": "Füge Sätze aus einer Sammlung hinzu, um deine Bibliothek aufzubauen.",
       "emptySearchTitle": "Keine Ergebnisse",
       "emptySearchDescription": "Keine Sätze entsprechen deiner Suche oder den Filtern.",
-      "unhide": "Einblenden",
       "hide": "Ausblenden",
       "master": "Meistern",
-      "unmaster": "Nicht mehr gemeistert",
       "loadingCards": "Sätze werden geladen..."
     },
     "settings": {
@@ -176,7 +160,6 @@
         "selected": "Ausgewählt",
         "done": "Fertig",
         "open": "Öffnen",
-        "openWithRemaining": "Öffnen · {count} neu",
         "tabPremade": "Kurs",
         "tabCustom": "Eigene Inhalte",
         "sourceBadgeOff": "Aus",
@@ -191,18 +174,11 @@
           "Chat": "Chat"
         },
         "noLevels": "Noch keine vorgefertigten Levels verfügbar.",
-        "noCustomCollections": "Noch keine eigenen Sammlungen.",
-        "masteredCount": "{count} gemeistert",
-        "addedProgress": "{added}/{total} hinzugefügt",
         "cards": "{count, plural, one {# Satz} other {# Sätze}}",
-        "notStarted": "Nicht begonnen",
-        "addCards": "{count, plural, one {# Satz zum Deck hinzufügen} other {# Sätze zum Deck hinzufügen}}",
         "adding": "Wird hinzugefügt...",
         "complete": "Fertig",
-        "collectionComplete": "{name} abgeschlossen!",
         "allCardsAdded": "Alle Sätze dieser Sammlung wurden deinem Deck hinzugefügt.",
         "noMoreCards": "Keine weiteren Sätze aus {name} hinzuzufügen",
-        "nextCards": "{count, plural, one {Nächster Satz aus {name}} other {Nächste {count} Sätze aus {name}}}",
         "progress": "{added} / {total}",
         "failedToSelect": "Sammlung konnte nicht ausgewählt werden",
         "failedToAdd": "Sätze konnten nicht hinzugefügt werden",
@@ -248,13 +224,11 @@
           "inactive": "Inaktiv"
         },
         "detail": {
-          "totalCards": "{count, plural, one {# Satz} other {# Sätze}}",
           "progress": "Fortschritt",
           "select": "Auswählen",
           "selected": "Ausgewählt",
           "done": "Fertig",
           "allCardsAdded": "Alle Sätze dieser Sammlung wurden deinem Deck hinzugefügt.",
-          "nextSentences": "Nächste Sätze",
           "adding": "Wird hinzugefügt...",
           "addN": "{count} hinzufügen",
           "upgrade": "Upgrade",
@@ -352,7 +326,6 @@
     },
     "changeCourse": "Kurs wechseln",
     "currentCourseWithLanguages": "Kurs: {targetLanguages}",
-    "startLearning": "Lernen starten",
     "fullReview": "Schreiben",
     "audioReview": "Shadowing",
     "learnNew": "Neues lernen",
@@ -547,31 +520,19 @@
       "autoAdvance": "Automatisch weiter",
       "autoAdvanceDescription": "Zum nächsten Satz wechseln, nachdem das Audio fertig ist",
       "pauseBeforeAutoAdvance": "Vor dem Weitergehen",
-      "repetitions": "Wiederholungen",
-      "repetitionsDescription": "Wie oft jede Sprache pro Satz abgespielt wird",
-      "plays": "Wiedergaben",
       "pause": "Pause",
       "pauseBetweenRepetitions": "Pause zwischen Wiederholungen",
       "playbackSpeed": "Wiedergabegeschwindigkeit",
       "base": "Basis",
       "target": "Ziel",
-      "playbackSequence": "Wiedergabe-Reihenfolge",
       "playbackSequenceDescription": "Um die Reihenfolge zu ändern, bearbeite deine Kurssprachen.",
       "editLanguages": "Sprachen bearbeiten",
-      "pauseBaseToBase": "Basis → Basis Pause",
-      "pauseBaseToTarget": "Basis → Ziel Pause",
-      "pauseTargetToTarget": "Ziel → Ziel Pause",
       "autoAdvanceIndicator": "Automatisch zum nächsten Satz",
       "noAutoAdvance": "Manuell weiter (Tippe auf Weiter)",
-      "allSkipped": "Alle Sprachen auf 0 Plays gesetzt",
-      "seconds": "s",
-      "timesPlayed": "{count}x",
-      "pauseBetweenPlays": "{seconds}s dazwischen",
       "reviewModeAudio": "Shadowing",
       "reviewModeFull": "Schreiben",
       "reviewModeAudioDescription": "Hör zu, übersetze im Kopf und sprich dann jeden Satz laut nach, um deine Aussprache zu üben. Freihändig — perfekt zum Lernen beim Spazieren, Pendeln oder Entspannen.",
       "reviewModeFullDescription": "Tippe die Übersetzungen ein und sieh einen zeichengenauen Vergleich mit der richtigen Antwort. Ideal für aktives Üben — fördert Erinnerung und Rechtschreibung.",
-      "fullReviewSettings": "Schreiben-Einstellungen",
       "fullReviewTargetAudio": "Zielsprache automatisch abspielen",
       "fullReviewTargetAudioDescription": "Wann soll das Audio der Zielsprache abgespielt werden",
       "fullReviewTargetAudio_always": "Nach Basis-Audio",
@@ -650,10 +611,7 @@
     "input": {
       "placeholder": "Was möchtest du sagen?",
       "prompts": {
-        "grammar": "Erkläre mir die Grammatik dieses Satzes.",
-        "sayInLanguage": "Wie kann ich das einfacher sagen?",
-        "sayDifferently": "Wie kann ich das anders sagen?",
-        "moreExamples": "Gib mir drei weitere Beispiele mit diesem Verb."
+        "grammar": "Erkläre mir die Grammatik dieses Satzes."
       },
       "generalPrompts": {
         "howToSay": "Wie kann ich folgendes sagen:",
@@ -975,12 +933,30 @@
       "title": "Tägliches Zeitziel",
       "subtitle": "Wähle etwas, das du wirklich durchhalten kannst. <strong>Beständigkeit ist wichtiger als Minuten</strong> — 5 Minuten jeden Tag schlagen 30 Minuten einmal pro Woche, denn Spaced Repetition funktioniert nur, wenn du dranbleibst.",
       "options": {
-        "5": { "label": "5 Min./Tag", "description": "Kurze Gewohnheit" },
-        "10": { "label": "10 Min./Tag", "description": "Stetiger Fortschritt" },
-        "20": { "label": "20 Min./Tag", "description": "Ernsthaftes Tempo" },
-        "30": { "label": "30 Min./Tag", "description": "Voller Einsatz" },
-        "60": { "label": "1 Std./Tag", "description": "Marathon-Modus" },
-        "custom": { "label": "Eigene", "description": "Setze dein eigenes Ziel" }
+        "5": {
+          "label": "5 Min./Tag",
+          "description": "Kurze Gewohnheit"
+        },
+        "10": {
+          "label": "10 Min./Tag",
+          "description": "Stetiger Fortschritt"
+        },
+        "20": {
+          "label": "20 Min./Tag",
+          "description": "Ernsthaftes Tempo"
+        },
+        "30": {
+          "label": "30 Min./Tag",
+          "description": "Voller Einsatz"
+        },
+        "60": {
+          "label": "1 Std./Tag",
+          "description": "Marathon-Modus"
+        },
+        "custom": {
+          "label": "Eigene",
+          "description": "Setze dein eigenes Ziel"
+        }
       },
       "customLabel": "Setze dein eigenes Tagesziel ({min}–{max} Minuten)",
       "customPlaceholder": "z.B. 15",

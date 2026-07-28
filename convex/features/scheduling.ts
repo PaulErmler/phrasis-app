@@ -1,7 +1,10 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query, MutationCtx, QueryCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { buildCardSearchableText } from '../lib/cardContent';
+import {
+  buildCardSearchableText,
+  buildTextContentBatchForLanguages,
+} from '../lib/cardContent';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -45,24 +48,18 @@ import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import { settledCount } from '../lib/collections';
 import { getTodayInTimezone } from '../lib/dateUtils';
 import {
-  getAudioForText,
   deleteAudioRow,
   deleteAudioRowsForTextLanguage,
 } from '../lib/audio';
 import { soundsSame } from '../lib/textComparison';
 import {
-  ROMANIZATION_LANGUAGES,
   USER_PROVIDED_TRANSLATION_SOURCE,
   FLAG_AUTO_RETRANSLATION_MAX,
 } from '../../lib/languages';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
-import {
-  claimLlmTranslationIfAvailable,
-  getLlmClaim,
-  isClaimFresh,
-} from './llmTranslationQueue';
+import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 import {
   CARD_OVERRIDE_SPEED_MIN,
@@ -320,83 +317,46 @@ export const getCardForReview = query({
     );
     if (dueCards.length === 0) return null;
 
-    const allLanguages = [
-      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
-    ];
+    // Current + peeked-next card content in one batched pass. `rawRomanization`
+    // and `ignoreMissingWordTimings` keep this query's long-standing semantics:
+    // it surfaces stored romanization for every language and does not treat
+    // legacy timing-less audio as a content gap.
+    const texts = await Promise.all(dueCards.map((card) => ctx.db.get(card.textId)));
+    const contentInputs = dueCards.flatMap((card, i) => {
+      const text = texts[i];
+      return text
+        ? [
+            {
+              key: String(i),
+              textId: card.textId,
+              sourceText: text.text,
+              sourceLanguage: text.language,
+              sourceRomanization: text.romanizedText ?? undefined,
+            },
+          ]
+        : [];
+    });
+    const contentByKey = await buildTextContentBatchForLanguages(
+      ctx,
+      contentInputs,
+      course.baseLanguages,
+      course.targetLanguages,
+      { rawRomanization: true, ignoreMissingWordTimings: true },
+    );
 
-    const buildCardResult = async (card: Doc<'cards'>) => {
-      const text = await ctx.db.get(card.textId);
-      if (!text) return null;
-
-      const sourceLanguage = text.language;
-
-      const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
-
-      // Per-language LLM-claim lookup. A non-stale row in
-      // `llmTranslationClaims` means a `flagTranslation`-triggered LLM
-      // retranslation is currently in flight; the "Retranslating" pill
-      // keys off this rather than "audio is missing" so it doesn't fire
-      // when the user clicks "regenerate audio" (no LLM phase).
-      const claimsByLang = new Map<string, number | null>();
-      await Promise.all(
-        allLanguages.map(async (lang) => {
-          const claim = await getLlmClaim(ctx, card.textId, lang);
-          claimsByLang.set(lang, claim?.claimedAt ?? null);
-        }),
-      );
-
-      const translations = await Promise.all(
-        allLanguages.map(async (lang) => {
-          if (lang === sourceLanguage) {
-            return {
-              language: lang,
-              text: text.text,
-              isBaseLanguage: course.baseLanguages.includes(lang),
-              isTargetLanguage: course.targetLanguages.includes(lang),
-              romanization: text.romanizedText ?? undefined,
-              retranslating: false,
-            };
-          }
-          const translation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', card.textId).eq('targetLanguage', lang),
-            )
-            .first();
-          const translatedText = translation?.translatedText || '';
-          const claimedAt = claimsByLang.get(lang) ?? null;
-          const llmClaimHeld = claimedAt !== null && isClaimFresh({ claimedAt });
-          // Show the pill only for *re*translations — first-time
-          // translations of new cards also hold a claim, but there's no
-          // prior text to retranslate from, so the pill would be confusing
-          // pre-translation. Gate on `translatedText` being non-empty.
-          return {
-            language: lang,
-            text: translatedText,
-            isBaseLanguage: course.baseLanguages.includes(lang),
-            isTargetLanguage: course.targetLanguages.includes(lang),
-            romanization: translation?.romanizedText ?? undefined,
-            retranslating: llmClaimHeld && translatedText.length > 0,
-          };
-        }),
-      );
-
-      const hasMissingTranslation = translations.some(
-        (tr) => tr.language !== sourceLanguage && !tr.text,
-      );
-      const hasMissingAudio = audioRecordings.some((a) => !a.url);
-      const hasMissingRomanization = translations.some(
-        (tr) => ROMANIZATION_LANGUAGES.has(tr.language) && !tr.romanization,
-      );
+    const buildCardResult = (card: Doc<'cards'>, index: number) => {
+      const text = texts[index];
+      const content = contentByKey.get(String(index));
+      if (!text || !content) return null;
 
       return {
         _id: card._id,
         _creationTime: card._creationTime,
         textId: card.textId,
         sourceText: text.text,
-        sourceLanguage,
-        translations,
-        audioRecordings,
+        sourceLanguage: text.language,
+        translations: content.translations,
+        audioRecordings: content.audioRecordings,
         dueDate: card.dueDate,
         isMastered: card.isMastered,
         isHidden: card.isHidden,
@@ -406,15 +366,13 @@ export const getCardForReview = query({
         initialReviewCount,
         fsrsState: card.fsrsState ?? null,
         radioPlayCount: card.radioPlayCount,
-        hasMissingContent: hasMissingTranslation || hasMissingAudio || hasMissingRomanization,
+        hasMissingContent: content.hasMissingContent,
         audioSpeedOverrides: card.audioSpeedOverrides,
       };
     };
 
-    const [current, next] = await Promise.all([
-      buildCardResult(dueCards[0]),
-      dueCards[1] ? buildCardResult(dueCards[1]) : Promise.resolve(null),
-    ]);
+    const current = buildCardResult(dueCards[0], 0);
+    const next = dueCards[1] ? buildCardResult(dueCards[1], 1) : null;
 
     if (!current) return null;
 

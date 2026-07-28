@@ -61,36 +61,23 @@
         "description": "If you have any questions or run into issues, feel free to reach out to us."
       }
     },
-    "welcome": "Welcome back, {viewer}!",
     "notifications": {
       "title": "Notifications",
       "description": {
-        "default": "Get reminders to practice your phrases.",
-        "granted": "Notifications are enabled! You'll receive practice reminders.",
-        "unsupported": "Notifications are not supported by your browser."
+        "default": "Get reminders to practice your phrases."
       },
-      "notAvailable": "Notifications not available",
       "blocked": "Notifications are blocked. Please enable them in your browser settings to receive reminders.",
-      "requesting": "Requesting...",
-      "sendTest": "Send Test Notification",
-      "enable": "Enable Notifications",
-      "enabled": "Notifications enabled",
-      "testMessage": "Time to practice your phrases! 🌟"
+      "enabled": "Notifications enabled"
     },
     "flashcards": {
       "title": "Sentences",
-      "description": "Practice your phrases one sentence at a time — interactive and structured.",
-      "goToFlashcard": "Go to Sentences",
-      "goToAudioFlashcard": "Go to Audio Sentences"
+      "description": "Practice your phrases one sentence at a time — interactive and structured."
     },
     "randomNumber": {
       "title": "Random Numbers",
       "description": "A simple Convex demo showing real-time updates.",
-      "generate": "Generate Random Number",
-      "recent": "Recent numbers:",
       "empty": "No numbers generated yet."
     },
-    "contentSoon": "Coming Soon: Discover new phrases and content tailored for you.",
     "content": {
       "chat": {
         "title": "Chat",
@@ -112,7 +99,6 @@
         "emailSubject": "Feature feedback (Content)"
       }
     },
-    "librarySoon": "Coming Soon: Manage and organize your saved phrases.",
     "library": {
       "title": "Library",
       "searchPlaceholder": "Search sentences...",
@@ -127,10 +113,8 @@
       "emptyDescription": "Add sentences from a collection to start building your library.",
       "emptySearchTitle": "No results",
       "emptySearchDescription": "No sentences match your search or filters.",
-      "unhide": "Unhide",
       "hide": "Hide",
       "master": "Master",
-      "unmaster": "Unmaster",
       "loadingCards": "Loading sentences..."
     },
     "settings": {
@@ -176,7 +160,6 @@
         "selected": "Selected",
         "done": "Done",
         "open": "Open",
-        "openWithRemaining": "Open · {count} new",
         "tabPremade": "Course",
         "tabCustom": "Custom Content",
         "sourceBadgeOff": "Off",
@@ -191,18 +174,11 @@
           "Chat": "Chat"
         },
         "noLevels": "No premade levels available yet.",
-        "noCustomCollections": "No custom collections yet.",
-        "masteredCount": "{count} mastered",
-        "addedProgress": "{added}/{total} added",
         "cards": "{count, plural, one {# sentence} other {# sentences}}",
-        "notStarted": "Not started",
-        "addCards": "Add {count, plural, one {# sentence} other {# sentences}} to deck",
         "adding": "Adding...",
         "complete": "Done",
-        "collectionComplete": "{name} complete!",
         "allCardsAdded": "All sentences from this collection have been added to your deck.",
         "noMoreCards": "No more sentences to add from {name}",
-        "nextCards": "{count, plural, one {Next sentence from {name}} other {Next {count} sentences from {name}}}",
         "progress": "{added} / {total}",
         "failedToSelect": "Failed to select collection",
         "failedToAdd": "Failed to add sentences",
@@ -248,13 +224,11 @@
           "inactive": "Inactive"
         },
         "detail": {
-          "totalCards": "{count, plural, one {# sentence} other {# sentences}}",
           "progress": "Progress",
           "select": "Select",
           "selected": "Selected",
           "done": "Done",
           "allCardsAdded": "All sentences from this collection have been added to your deck.",
-          "nextSentences": "Next Sentences",
           "adding": "Adding...",
           "addN": "Add {count}",
           "upgrade": "Upgrade",
@@ -352,7 +326,6 @@
     },
     "changeCourse": "Change Course",
     "currentCourseWithLanguages": "Course: {targetLanguages}",
-    "startLearning": "Start Learning",
     "fullReview": "Writing",
     "audioReview": "Shadowing",
     "learnNew": "Learn New",
@@ -547,31 +520,19 @@
       "autoAdvance": "Auto-advance",
       "autoAdvanceDescription": "Advance to next card after audio finishes",
       "pauseBeforeAutoAdvance": "Before Advancing",
-      "repetitions": "Repetitions",
-      "repetitionsDescription": "How many times each language is played per sentence",
-      "plays": "Plays",
       "pause": "Pause",
       "pauseBetweenRepetitions": "Pause between repetitions",
       "playbackSpeed": "Playback speed",
       "base": "Base",
       "target": "Target",
-      "playbackSequence": "Playback Sequence",
       "playbackSequenceDescription": "To change the order, edit your course languages.",
       "editLanguages": "Edit Languages",
-      "pauseBaseToBase": "Base → Base Pause",
-      "pauseBaseToTarget": "Base → Target Pause",
-      "pauseTargetToTarget": "Target → Target Pause",
       "autoAdvanceIndicator": "Auto-advance to next sentence",
       "noAutoAdvance": "Manual advance (tap Next)",
-      "allSkipped": "All languages set to 0 plays",
-      "seconds": "s",
-      "timesPlayed": "{count}x",
-      "pauseBetweenPlays": "{seconds}s between",
       "reviewModeAudio": "Shadowing",
       "reviewModeFull": "Writing",
       "reviewModeAudioDescription": "Listen, translate in your head, then say each sentence aloud to practice your pronunciation. Hands-free — perfect for learning while walking, commuting, or relaxing.",
       "reviewModeFullDescription": "Type the translations and see a character-level comparison with the correct answer. Best for active practice — engages recall and spelling.",
-      "fullReviewSettings": "Writing Settings",
       "fullReviewTargetAudio": "Auto-play target audio",
       "fullReviewTargetAudioDescription": "When to play target language audio",
       "fullReviewTargetAudio_always": "After base audio",
@@ -650,10 +611,7 @@
     "input": {
       "placeholder": "What would you like to say?",
       "prompts": {
-        "grammar": "Explain me the grammar of this sentence.",
-        "sayInLanguage": "What is a simpler way to say this?",
-        "sayDifferently": "How can I say this differently?",
-        "moreExamples": "Give me three more examples using this verb."
+        "grammar": "Explain me the grammar of this sentence."
       },
       "generalPrompts": {
         "howToSay": "How can I say the following:",
@@ -975,12 +933,30 @@
       "title": "Daily time goal",
       "subtitle": "Pick something you can actually stick to. <strong>Consistency matters more than minutes</strong> — 5 minutes every day beats 30 minutes once a week, because spaced repetition only works if you show up.",
       "options": {
-        "5": { "label": "5 min/day", "description": "Quick daily habit" },
-        "10": { "label": "10 min/day", "description": "Steady progress" },
-        "20": { "label": "20 min/day", "description": "Serious pace" },
-        "30": { "label": "30 min/day", "description": "All-in" },
-        "60": { "label": "1 hour/day", "description": "Marathon mode" },
-        "custom": { "label": "Custom", "description": "Pick your own amount" }
+        "5": {
+          "label": "5 min/day",
+          "description": "Quick daily habit"
+        },
+        "10": {
+          "label": "10 min/day",
+          "description": "Steady progress"
+        },
+        "20": {
+          "label": "20 min/day",
+          "description": "Serious pace"
+        },
+        "30": {
+          "label": "30 min/day",
+          "description": "All-in"
+        },
+        "60": {
+          "label": "1 hour/day",
+          "description": "Marathon mode"
+        },
+        "custom": {
+          "label": "Custom",
+          "description": "Pick your own amount"
+        }
       },
       "customLabel": "Set your own daily target ({min}–{max} minutes)",
       "customPlaceholder": "e.g. 15",
