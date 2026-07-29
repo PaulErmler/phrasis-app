@@ -23,6 +23,7 @@ import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
 import { EVENTS, track } from '../analytics';
+import { sourcedTranslationEntriesValidator } from '../types';
 import {
   captureGeneration,
   openrouterCostUsd,
@@ -139,23 +140,10 @@ export const autoFillTranslations = action({
     targetLanguages: v.array(v.string()),
   },
   returns: v.object({
-    translations: v.array(
-      v.object({
-        language: v.string(),
-        text: v.string(),
-        // Concrete regional sub-locale chosen for this row when `language`
-        // is a mixed-dialect code (today: `es_mixed` → e.g. `'es-US'` or
-        // `'es-ES'`). Plumbed back to `createCustomText` so the row stored
-        // on the translations table records the variant the LLM saw,
-        // matching the deck-card path in `processLlmTranslationForCard`.
-        regionVariant: v.optional(v.string()),
-        // Identifier of the LLM that produced this translation (the autofill
-        // model, no reasoning). Plumbed back to `createCustomText` so a
-        // future strategy swap can target rows by source. Same format as
-        // the `translationSource` on deck-card rows.
-        translationSource: v.optional(v.string()),
-      }),
-    ),
+    // Provenance fields (`regionVariant`, `translationSource`) are plumbed
+    // back to `createCustomText` for persistence — see the validator's doc
+    // in convex/types.ts.
+    translations: sourcedTranslationEntriesValidator,
     metadata: sentenceMetadataValidator,
   }),
   handler: async (ctx, args) => {
@@ -456,22 +444,7 @@ function validateTranslationSet(
  */
 export const createCustomText = mutation({
   args: {
-    translations: v.array(
-      v.object({
-        language: v.string(),
-        text: v.string(),
-        // Forwarded from `autoFillTranslations` when the requested target is
-        // a mixed-dialect code (today: `es_mixed`). Persisted on the
-        // translations row so audio synthesis and STT validation downstream
-        // honor the variant the LLM actually produced.
-        regionVariant: v.optional(v.string()),
-        // Forwarded from `autoFillTranslations` (the autofill model id) for
-        // autofilled entries; the frontend uses `'user-provided'` for
-        // manually-typed entries. Persisted on the translations row so a
-        // future strategy swap can target rows by source.
-        translationSource: v.optional(v.string()),
-      }),
-    ),
+    translations: sourcedTranslationEntriesValidator,
     timezone: v.string(),
     metadata: v.optional(sentenceMetadataValidator),
   },
@@ -567,6 +540,7 @@ export const createCustomText = mutation({
           schedulePrepareCard: true,
           baseLanguages: course.baseLanguages,
           targetLanguages: course.targetLanguages,
+          userId,
         },
       );
     }
@@ -708,6 +682,7 @@ export const createCustomTextsBatch = mutation({
           schedulePrepareCard: true,
           baseLanguages: course.baseLanguages,
           targetLanguages: course.targetLanguages,
+          userId,
         },
       );
     }

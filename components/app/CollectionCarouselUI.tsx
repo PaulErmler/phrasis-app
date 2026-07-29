@@ -126,7 +126,12 @@ export function InlineCollectionDetail({
   );
 
   return (
-    <div className="rounded-xl border-2 bg-card overflow-hidden">
+    <div
+      className="rounded-xl border-2 bg-card overflow-hidden"
+      // Raw (unlocalized) collection name so e2e specs can target a specific
+      // tile — e.g. `collection-tile-Custom` — regardless of display locale.
+      data-testid={`collection-tile-${collection.collectionName}`}
+    >
       {/* Progress accent bar */}
       <div className="h-1.5 bg-muted">
         <div

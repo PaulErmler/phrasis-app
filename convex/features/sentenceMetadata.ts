@@ -1,7 +1,8 @@
 import { v } from 'convex/values';
 import { internalAction, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { translationEntriesValidator } from '../types';
+import { sourcedTranslationEntriesValidator } from '../types';
+import { trackException } from '../analytics';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
@@ -190,10 +191,16 @@ function safeExtractMetadata(raw: string): Partial<Metadata> {
  */
 const metadataJobArgs = v.object({
   textId: v.id('texts'),
-  translations: translationEntriesValidator,
+  translations: sourcedTranslationEntriesValidator,
   schedulePrepareCard: v.boolean(),
   baseLanguages: v.array(v.string()),
   targetLanguages: v.array(v.string()),
+  // Owner of the text. Scheduled functions run with no auth/request context,
+  // so a failure here reaches PostHog's error tracking anonymously via the
+  // Convex log stream — this id lets us re-capture the exception attributed
+  // to the affected user. Optional so jobs already scheduled before this
+  // field existed still validate.
+  userId: v.optional(v.string()),
 });
 
 /**
@@ -216,34 +223,47 @@ export const generateSentenceMetadata = internalAction({
   args: metadataJobArgs.fields,
   returns: v.null(),
   handler: async (ctx, args) => {
-    await ctx.runMutation(
-      internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
-      {
-        textId: args.textId,
-        metadata: undefined,
-        schedulePrepareCard: args.schedulePrepareCard,
-        baseLanguages: args.baseLanguages,
-        targetLanguages: args.targetLanguages,
-      },
-    );
+    try {
+      await ctx.runMutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId: args.textId,
+          metadata: undefined,
+          schedulePrepareCard: args.schedulePrepareCard,
+          baseLanguages: args.baseLanguages,
+          targetLanguages: args.targetLanguages,
+        },
+      );
 
-    await retrier.run(
-      // Convex 1.41 widened `ActionCtx.runMutation` with an optional
-      // `transactionLimits` arg, so the ctx no longer structurally matches the
-      // older `RunMutationCtx` that @convex-dev/action-retrier@0.3.0 declares.
-      // Runtime is compatible; this cast bridges the component's type lag.
-      ctx as unknown as Parameters<typeof retrier.run>[0],
-      internal.features.sentenceMetadata.fetchSentenceMetadata,
-      {
-        textId: args.textId,
-        translations: args.translations,
-        schedulePrepareCard: args.schedulePrepareCard,
-        baseLanguages: args.baseLanguages,
-        targetLanguages: args.targetLanguages,
-      },
-    );
+      await retrier.run(
+        // Convex 1.41 widened `ActionCtx.runMutation` with an optional
+        // `transactionLimits` arg, so the ctx no longer structurally matches the
+        // older `RunMutationCtx` that @convex-dev/action-retrier@0.3.0 declares.
+        // Runtime is compatible; this cast bridges the component's type lag.
+        ctx as unknown as Parameters<typeof retrier.run>[0],
+        internal.features.sentenceMetadata.fetchSentenceMetadata,
+        {
+          textId: args.textId,
+          translations: args.translations,
+          schedulePrepareCard: args.schedulePrepareCard,
+          baseLanguages: args.baseLanguages,
+          targetLanguages: args.targetLanguages,
+          userId: args.userId,
+        },
+      );
 
-    return null;
+      return null;
+    } catch (error) {
+      // The log-stream copy of this error is anonymous; re-capture it
+      // attributed to the text's owner, then rethrow so Convex still records
+      // the failure. Actions aren't transactional, so the capture survives
+      // the rethrow (unlike in mutations — see convex/analytics.ts).
+      await trackException(ctx, error, args.userId, {
+        textId: args.textId,
+        source: 'generateSentenceMetadata',
+      });
+      throw error;
+    }
   },
 });
 
@@ -257,65 +277,76 @@ export const fetchSentenceMetadata = internalAction({
   args: metadataJobArgs.fields,
   returns: v.null(),
   handler: async (ctx, args) => {
-    if (args.translations.length === 0) {
-      // Permanent error — nothing to retry. Log and return without throwing.
-      console.error(
-        'fetchSentenceMetadata: no translations',
-        args.textId,
+    try {
+      if (args.translations.length === 0) {
+        // Permanent error — nothing to retry. Log and return without throwing.
+        console.error(
+          'fetchSentenceMetadata: no translations',
+          args.textId,
+        );
+        return null;
+      }
+
+      const renderings = args.translations
+        .map((t) => {
+          const lang = getLanguageByCode(t.language);
+          return `[${lang?.name ?? t.language}]: ${t.text}`;
+        })
+        .join('\n');
+
+      const userPrompt = `Renderings of the same sentence:\n${renderings}\n\nReturn the metadata JSON now.`;
+
+      const openrouter = createOpenRouter({
+        apiKey: process.env.OPENROUTER_API_KEY,
+        extraBody: OPENROUTER_USAGE_ACCOUNTING,
+      });
+
+      const startedAt = Date.now();
+      const { text, usage, providerMetadata } = await generateText({
+        model: openrouter(OPENROUTER_MODELS.sentenceMetadata),
+        system: METADATA_SYSTEM_PROMPT,
+        prompt: userPrompt,
+      });
+
+      // Fires once per newly-created card and was previously both unmetered and
+      // unbilled — i.e. pure invisible cost that scales with content growth.
+      await captureGeneration(ctx, {
+        feature: 'sentence_metadata',
+        model: OPENROUTER_MODELS.sentenceMetadata,
+        provider: 'openrouter',
+        latencyMs: Date.now() - startedAt,
+        inputTokens: usage?.inputTokens,
+        outputTokens: usage?.outputTokens,
+        costUsd: openrouterCostUsd(providerMetadata),
+        traceId: openrouterGenerationId(providerMetadata),
+        sharedContent: true,
+        extra: { text_id: args.textId },
+      });
+
+      const metadata = safeExtractMetadata(text);
+
+      await ctx.runMutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId: args.textId,
+          metadata,
+          schedulePrepareCard: args.schedulePrepareCard,
+          baseLanguages: args.baseLanguages,
+          targetLanguages: args.targetLanguages,
+        },
       );
+
       return null;
-    }
-
-    const renderings = args.translations
-      .map((t) => {
-        const lang = getLanguageByCode(t.language);
-        return `[${lang?.name ?? t.language}]: ${t.text}`;
-      })
-      .join('\n');
-
-    const userPrompt = `Renderings of the same sentence:\n${renderings}\n\nReturn the metadata JSON now.`;
-
-    const openrouter = createOpenRouter({
-      apiKey: process.env.OPENROUTER_API_KEY,
-      extraBody: OPENROUTER_USAGE_ACCOUNTING,
-    });
-
-    const startedAt = Date.now();
-    const { text, usage, providerMetadata } = await generateText({
-      model: openrouter(OPENROUTER_MODELS.sentenceMetadata),
-      system: METADATA_SYSTEM_PROMPT,
-      prompt: userPrompt,
-    });
-
-    // Fires once per newly-created card and was previously both unmetered and
-    // unbilled — i.e. pure invisible cost that scales with content growth.
-    await captureGeneration(ctx, {
-      feature: 'sentence_metadata',
-      model: OPENROUTER_MODELS.sentenceMetadata,
-      provider: 'openrouter',
-      latencyMs: Date.now() - startedAt,
-      inputTokens: usage?.inputTokens,
-      outputTokens: usage?.outputTokens,
-      costUsd: openrouterCostUsd(providerMetadata),
-      traceId: openrouterGenerationId(providerMetadata),
-      sharedContent: true,
-      extra: { text_id: args.textId },
-    });
-
-    const metadata = safeExtractMetadata(text);
-
-    await ctx.runMutation(
-      internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
-      {
+    } catch (error) {
+      // Captured once per retrier attempt; PostHog groups them into one
+      // issue. Attribution matters here because the retrier eventually gives
+      // up and the failure never propagates back to a user-facing call.
+      await trackException(ctx, error, args.userId, {
         textId: args.textId,
-        metadata,
-        schedulePrepareCard: args.schedulePrepareCard,
-        baseLanguages: args.baseLanguages,
-        targetLanguages: args.targetLanguages,
-      },
-    );
-
-    return null;
+        source: 'fetchSentenceMetadata',
+      });
+      throw error;
+    }
   },
 });
 

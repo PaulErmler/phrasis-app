@@ -126,6 +126,7 @@ async function processApproval(
       schedulePrepareCard: true,
       baseLanguages: course.baseLanguages,
       targetLanguages: course.targetLanguages,
+      userId,
     },
   );
 
