@@ -68,6 +68,7 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
             // set them before deploying this.
             providers: ['google', 'apple'],
           }}
+          credentials={false}
           Link={Link}
           localization={authLocalization}
         >

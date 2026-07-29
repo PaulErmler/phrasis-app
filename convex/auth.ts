@@ -100,14 +100,10 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     // (https://better-auth.com/docs/authentication/apple).
     trustedOrigins: ['https://appleid.apple.com'],
     database: authComponent.adapter(ctx),
-    emailAndPassword: {
-      enabled: true,
-      requireEmailVerification: false,
-    },
-    // Account deletion is deliberately NOT self-serve (`user.deleteUser`
-    // stays disabled): deleting only the Better Auth user would orphan all
-    // app data and the Autumn/Stripe subscription. Deletion goes through
-    // features/accountDeletion.ts (support request, manual fulfillment).
+    // emailAndPassword: {
+    //   enabled: true,
+    //   requireEmailVerification: false,
+    // },
     socialProviders: {
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID as string,
