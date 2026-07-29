@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 
 import { getCardStateLabel, patchCard } from "../../../db/stats/cardAggregates";
@@ -102,7 +102,7 @@ type LegacyMasterySeed = {
 };
 
 async function seedLegacyMasteryFixture(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   opts: LegacyMasterySeed = {},
 ) {
   const {

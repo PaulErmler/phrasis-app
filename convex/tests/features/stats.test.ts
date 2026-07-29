@@ -1,13 +1,53 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
-import { describe, it, expect } from "vitest";
+import { convexTest, type TestConvex } from "convex-test";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// File-level aggregate mock (takes precedence over the zero-count stub in
+// tests/convexTestSetup.ts — see the precedent in
+// migrations/recalcUserCardAggregates.test.ts). `count()` records its args and
+// returns the value registered for the namespace's `:state` suffix, defaulting
+// to 0 so tests that don't register counts behave like the global stub.
+const countsByStateSuffix: Record<string, number> = {};
+const countCalls: Array<{
+  namespace: string;
+  bounds?: { upper?: { key: number; inclusive: boolean } };
+}> = [];
+
+vi.mock("@convex-dev/aggregate", () => {
+  class TableAggregate {
+    constructor(_component: unknown, _opts: unknown) {}
+    async insertIfDoesNotExist(): Promise<void> {}
+    async replaceOrInsert(): Promise<void> {}
+    async deleteIfExists(): Promise<void> {}
+    async count(
+      _ctx: unknown,
+      opts: {
+        namespace: string;
+        bounds?: { upper?: { key: number; inclusive: boolean } };
+      },
+    ): Promise<number> {
+      countCalls.push({ namespace: opts.namespace, bounds: opts.bounds });
+      const sep = opts.namespace.lastIndexOf(":");
+      const suffix = sep === -1 ? "" : opts.namespace.slice(sep + 1);
+      return countsByStateSuffix[suffix] ?? 0;
+    }
+  }
+  return { TableAggregate };
+});
 
 import schema from "../../schema";
 import { api } from "../../_generated/api";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
-async function seedActiveCourse(t: ReturnType<typeof convexTest>) {
+beforeEach(() => {
+  countCalls.length = 0;
+  for (const key of Object.keys(countsByStateSuffix)) {
+    delete countsByStateSuffix[key];
+  }
+});
+
+async function seedActiveCourse(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) => {
     const courseId = await ctx.db.insert("courses", {
       userId: "user_A",
@@ -124,6 +164,54 @@ describe("features/stats", () => {
       // Aggregate is mocked → all zero, but the shape must include relearning
       // separately so the progress display can color it independently.
       expect(res).toEqual({ new: 0, learning: 0, relearning: 0, review: 0 });
+    });
+  });
+
+  describe("getCardCounts — aggregate namespace mapping", () => {
+    it("maps each `${deckId}:state` namespace count to its matching return field", async () => {
+      const t = convexTest(schema, modules);
+      const { deckId } = await seedActiveCourse(t);
+      Object.assign(countsByStateSuffix, {
+        new: 1,
+        learning: 2,
+        review: 3,
+        relearning: 4,
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.stats.getCardCounts, {});
+
+      // Distinct per-namespace counts: transposing any two namespaces (or the
+      // Promise.all destructure) flips the corresponding fields.
+      expect(res).toEqual({ new: 1, learning: 2, review: 3, relearning: 4 });
+      expect(countCalls.map((c) => c.namespace).sort()).toEqual(
+        [
+          `${deckId}:learning`,
+          `${deckId}:new`,
+          `${deckId}:relearning`,
+          `${deckId}:review`,
+        ].sort(),
+      );
+    });
+
+    it("passes the now-inclusive due-date upper bound to every state count", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const before = Date.now();
+      await asUser.query(api.features.stats.getCardCounts, {});
+      const after = Date.now();
+
+      expect(countCalls).toHaveLength(4);
+      const firstKey = countCalls[0].bounds?.upper?.key;
+      for (const call of countCalls) {
+        expect(call.bounds?.upper?.inclusive).toBe(true);
+        // All four counts share one `now` snapshot taken inside the handler.
+        expect(call.bounds?.upper?.key).toBe(firstKey);
+        expect(call.bounds?.upper?.key).toBeGreaterThanOrEqual(before);
+        expect(call.bounds?.upper?.key).toBeLessThanOrEqual(after);
+      }
     });
   });
 

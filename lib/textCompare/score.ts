@@ -7,16 +7,27 @@ const WEIGHT_TYPO = 0.7;
 // dominate the percentage the way a wrong word does.
 const PUNCT_WEIGHT = 0.25;
 
+export interface ScoreOptions {
+  /** Give punctuation zero weight, so it drops out of both the numerator and
+   * the denominator. User setting (`courseSettings.ignorePunctuation`). */
+  ignorePunctuation?: boolean;
+}
+
 /** 0–1 word-weighted accuracy. Typos get partial credit; missing/extra/wrong = 0.
  * Punctuation tokens contribute at PUNCT_WEIGHT — equal punct gives that
  * weight in full, any other tag gives zero credit but still adds to the
- * denominator. */
-export function scoreWordAlignment(result: WordAlignResult): number {
+ * denominator — or at 0 when `ignorePunctuation` is set, which removes them
+ * from the score entirely while leaving them in the diff for display. */
+export function scoreWordAlignment(
+  result: WordAlignResult,
+  opts: ScoreOptions = {},
+): number {
+  const punctWeight = opts.ignorePunctuation ? 0 : PUNCT_WEIGHT;
   let expectedWeight = 0;
   let actualWeight = 0;
   let correct = 0;
   for (const w of result.words) {
-    const weight = w.kind === 'punct' ? PUNCT_WEIGHT : 1;
+    const weight = w.kind === 'punct' ? punctWeight : 1;
     switch (w.tag) {
     case 'equal':
       expectedWeight += weight;

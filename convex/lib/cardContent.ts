@@ -5,7 +5,7 @@ import {
   USER_PROVIDED_TRANSLATION_SOURCE,
   isTranslationVersionStale,
 } from '../../lib/languages';
-import { CLAIM_STALE_MS as LLM_CLAIM_STALE_MS } from '../features/llmTranslationQueue';
+import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -76,6 +76,17 @@ export async function buildTextContentBatchForLanguages(
   opts?: {
     /** Stamp `versionStale` on translation entries (see CardTranslationContent). */
     markVersionStale?: boolean;
+    /**
+     * Return stored romanization for every language instead of only for
+     * `ROMANIZATION_LANGUAGES` members. The review query has always surfaced
+     * whatever is stored; the gate exists for the browse/library paths.
+     */
+    rawRomanization?: boolean;
+    /**
+     * Leave `hasMissingWordTimings` out of `hasMissingContent`. The review
+     * query does not treat legacy timing-less audio as a content gap.
+     */
+    ignoreMissingWordTimings?: boolean;
   },
 ): Promise<Map<string, TextContentResult>> {
   const allLanguages = getCourseLanguages(baseLanguages, targetLanguages);
@@ -117,14 +128,7 @@ export async function buildTextContentBatchForLanguages(
     // "Retranslating" pill keys off this so it doesn't fire when the user
     // clicks "regenerate audio" (no LLM phase, no claim).
     Promise.all(
-      translationFetches.map((item) =>
-        ctx.db
-          .query('llmTranslationClaims')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', item.textId).eq('targetLanguage', item.lang),
-          )
-          .first(),
-      ),
+      translationFetches.map((item) => getLlmClaim(ctx, item.textId, item.lang)),
     ),
   ]);
 
@@ -194,7 +198,8 @@ export async function buildTextContentBatchForLanguages(
       // language is flipped off. See ROMANIZATION_LANGUAGES in
       // lib/languages.ts — it's derived from the Language entries so this
       // check stays in sync automatically.
-      const langNeedsRomanization = ROMANIZATION_LANGUAGES.has(lang);
+      const langNeedsRomanization =
+        opts?.rawRomanization || ROMANIZATION_LANGUAGES.has(lang);
       if (lang === input.sourceLanguage) {
         return {
           language: lang,
@@ -210,8 +215,7 @@ export async function buildTextContentBatchForLanguages(
       const entry = translationMap.get(`${input.key}:${lang}`);
       const translatedText = entry?.text ?? '';
       const claimedAt = entry?.llmClaimedAt ?? null;
-      const llmClaimHeld =
-        claimedAt !== null && Date.now() - claimedAt < LLM_CLAIM_STALE_MS;
+      const llmClaimHeld = claimedAt !== null && isClaimFresh({ claimedAt });
       return {
         language: lang,
         text: translatedText,
@@ -249,7 +253,7 @@ export async function buildTextContentBatchForLanguages(
         hasMissingTranslation ||
         hasMissingAudio ||
         hasMissingRomanization ||
-        hasMissingWordTimings,
+        (!opts?.ignoreMissingWordTimings && hasMissingWordTimings),
     });
   }
 

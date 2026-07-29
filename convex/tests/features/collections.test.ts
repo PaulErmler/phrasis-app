@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect, vi } from "vitest";
 import schema from "../../schema";
 import { api } from "../../_generated/api";
@@ -22,7 +22,7 @@ const firstPage = { numItems: 25, cursor: null };
 
 /** Level collection + active course for user_A, with `count` es texts. */
 async function seedCourseWithTexts(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   count: number,
 ) {
   return t.run(async (ctx) => {
@@ -67,7 +67,7 @@ async function seedCourseWithTexts(
  * which must never surface for user_A.
  */
 async function seedCustomCollection(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   count: number,
 ) {
   return t.run(async (ctx) => {
@@ -123,7 +123,7 @@ async function seedCustomCollection(
 }
 
 function insertCardFor(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   deckId: Id<"decks">,
   collId: Id<"collections">,
   textId: Id<"texts">,

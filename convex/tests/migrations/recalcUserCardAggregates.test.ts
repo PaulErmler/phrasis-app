@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Track calls to the aggregate component across all instances so we can
@@ -41,7 +41,7 @@ beforeEach(() => {
 });
 
 async function seedUserWithDecksAndCards(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   userId: string,
   decks: { cards: number }[],
 ): Promise<{ deckIds: Id<"decks">[]; cardIds: Id<"cards">[] }> {

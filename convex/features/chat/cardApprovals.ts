@@ -6,7 +6,7 @@ import { getActiveCourseForUser } from '../../db/courses';
 import {
   getOrCreateChatCollection,
 } from '../../db/collections';
-import { cardApprovalStatusValidator } from '../../types';
+import { cardApprovalStatusValidator, translationEntriesValidator } from '../../types';
 import type { Id, Doc } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
 import { consumeQuota } from '../../usage/helpers';
@@ -19,6 +19,17 @@ import {
   USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../../lib/languages';
 import { OPENROUTER_CHAT_REASONING, OPENROUTER_MODELS } from '../../config/aiModels';
+
+/**
+ * Require an authenticated user ID, throwing if not logged in.
+ * File-local so the wire message stays exactly 'Not authenticated'
+ * (db/users.requireAuthUserId throws 'Unauthenticated').
+ */
+async function requireUser(ctx: MutationCtx): Promise<string> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new ConvexError('Not authenticated');
+  return userId;
+}
 
 /**
  * Fetches an approval and validates the user is authorized to act on it.
@@ -134,7 +145,7 @@ export const createApprovalRequestInternal = internalMutation({
     threadId: v.string(),
     messageId: v.string(),
     toolCallId: v.string(),
-    translations: v.array(v.object({ language: v.string(), text: v.string() })),
+    translations: translationEntriesValidator,
     userId: v.string(),
   },
   returns: v.id('cardApprovals'),
@@ -198,8 +209,7 @@ export const approveCard = mutation({
     textId: v.optional(v.id('texts')),
   }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new ConvexError('Not authenticated');
+    const userId = await requireUser(ctx);
     await consumeQuota(ctx, userId, FEATURE_IDS.CUSTOM_SENTENCES, 1);
 
     const approval = await getAuthenticatedPendingApproval(
@@ -225,12 +235,11 @@ export const approveCard = mutation({
 export const updateApprovalTranslations = mutation({
   args: {
     approvalId: v.id('cardApprovals'),
-    translations: v.array(v.object({ language: v.string(), text: v.string() })),
+    translations: translationEntriesValidator,
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new ConvexError('Not authenticated');
+    const userId = await requireUser(ctx);
 
     const approval = await getAuthenticatedPendingApproval(
       ctx,
@@ -292,8 +301,7 @@ export const rejectCard = mutation({
   },
   returns: v.object({ success: v.boolean() }),
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new ConvexError('Not authenticated');
+    const userId = await requireUser(ctx);
 
     await getAuthenticatedPendingApproval(ctx, args.approvalId, userId);
 
@@ -317,7 +325,7 @@ export const getApprovalsByThread = query({
     v.object({
       _id: v.id('cardApprovals'),
       toolCallId: v.string(),
-      translations: v.array(v.object({ language: v.string(), text: v.string() })),
+      translations: translationEntriesValidator,
       status: cardApprovalStatusValidator,
     }),
   ),

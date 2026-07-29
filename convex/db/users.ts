@@ -40,28 +40,6 @@ export async function getUserSettings(
 }
 
 /**
- * Get or create user settings. Returns the existing settings or creates new ones.
- */
-export async function getOrCreateUserSettings(
-  ctx: MutationCtx,
-  userId: string,
-  defaults: Partial<
-    Omit<Doc<'userSettings'>, '_id' | '_creationTime' | 'userId'>
-  >,
-) {
-  const existing = await getUserSettings(ctx, userId);
-  if (existing) return existing;
-
-  const id = await ctx.db.insert('userSettings', {
-    userId,
-    hasCompletedOnboarding: defaults.hasCompletedOnboarding ?? false,
-    learningStyle: defaults.learningStyle,
-    activeCourseId: defaults.activeCourseId,
-  });
-  return (await ctx.db.get(id))!;
-}
-
-/**
  * Get the user's *active* onboarding progress row (i.e. an in-flight
  * onboarding that hasn't been finalized yet). Returns null once
  * `finalizeOnboarding` has stamped `completedAt` on the row — completed

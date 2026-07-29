@@ -3,12 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import {
-  usePreloadedQuery,
-  useQuery,
-  useMutation,
-  useAction,
-} from 'convex/react';
+import { usePreloadedQuery, useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
 import { BottomNav, type View } from '@/components/app/BottomNav';
@@ -27,7 +22,6 @@ import { SettingsView } from '@/components/app/SettingsView';
 import { LearnView } from '@/components/app/learning/LearnView';
 import { SimplifiedChatView } from '@/components/app/SimplifiedChatView';
 import { HelpDialog } from '@/components/app/HelpDialog';
-import { AppLoadingSplash } from '@/components/LogoSpinner';
 import { ViewErrorBoundary } from '@/components/app/ViewErrorBoundary';
 
 const VIEW_PATHS: Record<Exclude<View, 'chat'>, string> = {
@@ -50,6 +44,25 @@ function viewFromPathname(pathname: string): {
   const chatMatch = pathname.match(/^\/app\/chat\/(.+)/);
   if (chatMatch) return { view: 'chat', chatThreadId: chatMatch[1] };
   return { view: 'home' };
+}
+
+/** Keep-mounted view shell: the view stays mounted for the lifetime of the
+ *  layout and toggles between `display: contents` (visible) and
+ *  `display: none`, so switching tabs never loses view state. Must stay at
+ *  MODULE scope — declared inside `MainLayout` it would be a new component
+ *  type each render, remounting (and resetting) every view. */
+function KeepMountedView({
+  visible,
+  children,
+}: {
+  visible: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ display: visible ? 'contents' : 'none' }}>
+      <ViewErrorBoundary>{children}</ViewErrorBoundary>
+    </div>
+  );
 }
 
 export default function MainLayout({
@@ -75,7 +88,9 @@ export default function MainLayout({
   const t = useTranslations('AppPage');
   const locale = useLocale();
 
-  const settings = usePreloadedQuery(preloadedSettings);
+  // Result unused, but the hook call keeps the preloaded-settings
+  // subscription mounted for the lifetime of the layout.
+  const _settings = usePreloadedQuery(preloadedSettings);
   // activeCourse comes from AppDataProvider's always-mounted subscription —
   // subscribing here instead would start cold after the onboarding soft nav
   // and flash the stale preloaded null (no-course empty state).
@@ -147,16 +162,9 @@ export default function MainLayout({
     refreshPrefetchedThread();
   }, [refreshPrefetchedThread]);
 
-  const syncQuotas = useAction(api.usage.actions.syncQuotas);
-  const didSyncQuotas = useRef(false);
-
-  useEffect(() => {
-    if (didSyncQuotas.current) return;
-    didSyncQuotas.current = true;
-    syncQuotas().catch((err) => {
-      console.error('Failed to sync quotas on app load:', err);
-    });
-  }, [syncQuotas]);
+  // Quota syncing lives in BillingGate (mounted in the /app layout) so that
+  // routes outside this group — notably the standalone /app/learn page — are
+  // covered too.
 
   // Tab switching — pushState so browser back/forward works between tabs
   const handleViewChange = useCallback((view: View) => {
@@ -355,83 +363,47 @@ export default function MainLayout({
       <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
 
       <main className="flex-1 min-h-0 flex flex-col relative z-0 overflow-hidden">
-        <div
-          style={{
-            display:
-                !isLearnOpen && activeView === 'home' && !isAddCardsRoute
-                  ? 'contents'
-                  : 'none',
-          }}
+        <KeepMountedView
+          visible={!isLearnOpen && activeView === 'home' && !isAddCardsRoute}
         >
-          <ViewErrorBoundary>
-            <HomeView
-              preloadedCourseSettings={preloadedCourseSettings}
-              onLearnOpen={handleLearnOpen}
-              onChatOpen={handleOpenChat}
-              onNavigateToContent={handleNavigateToAddCards}
-              onNavigateToChat={handleNavigateToChat}
-              onEnterTexts={handleNavigateToAddCards}
-              onTutorialReady={handleTutorialReady}
-              animateEntrance={justReturnedFromLearn}
-              isHidden={isLearnOpen || activeView !== 'home' || isAddCardsRoute}
+          <HomeView
+            preloadedCourseSettings={preloadedCourseSettings}
+            onLearnOpen={handleLearnOpen}
+            onChatOpen={handleOpenChat}
+            onNavigateToContent={handleNavigateToAddCards}
+            onNavigateToChat={handleNavigateToChat}
+            onEnterTexts={handleNavigateToAddCards}
+            onTutorialReady={handleTutorialReady}
+            animateEntrance={justReturnedFromLearn}
+            isHidden={isLearnOpen || activeView !== 'home' || isAddCardsRoute}
+            hasActiveCourse={hasActiveCourse}
+            onOpenCourseMenu={handleOpenCourseMenu}
+          />
+        </KeepMountedView>
+        {isAddCardsRoute && (
+          <KeepMountedView visible={!isLearnOpen}>
+            <AddCardsView onBack={() => {
+              setActiveView('home');
+              router.push('/app');
+            }} />
+          </KeepMountedView>
+        )}
+        {hasVisitedLibrary && (
+          <KeepMountedView visible={!isLearnOpen && activeView === 'library'}>
+            <LibraryView
               hasActiveCourse={hasActiveCourse}
               onOpenCourseMenu={handleOpenCourseMenu}
             />
-          </ViewErrorBoundary>
-        </div>
-        {isAddCardsRoute && (
-          <div style={{ display: !isLearnOpen ? 'contents' : 'none' }}>
-            <ViewErrorBoundary>
-              <AddCardsView onBack={() => {
-                setActiveView('home');
-                router.push('/app');
-              }} />
-            </ViewErrorBoundary>
-          </div>
-        )}
-        {hasVisitedLibrary && (
-          <div
-            style={{
-              display:
-                  !isLearnOpen && activeView === 'library'
-                    ? 'contents'
-                    : 'none',
-            }}
-          >
-            <ViewErrorBoundary>
-              <LibraryView
-                hasActiveCourse={hasActiveCourse}
-                onOpenCourseMenu={handleOpenCourseMenu}
-              />
-            </ViewErrorBoundary>
-          </div>
+          </KeepMountedView>
         )}
         {hasVisitedStats && (
-          <div
-            style={{
-              display:
-                  !isLearnOpen && activeView === 'stats'
-                    ? 'contents'
-                    : 'none',
-            }}
-          >
-            <ViewErrorBoundary>
-              <StatsView />
-            </ViewErrorBoundary>
-          </div>
+          <KeepMountedView visible={!isLearnOpen && activeView === 'stats'}>
+            <StatsView />
+          </KeepMountedView>
         )}
-        <div
-          style={{
-            display:
-                !isLearnOpen && activeView === 'settings'
-                  ? 'contents'
-                  : 'none',
-          }}
-        >
-          <ViewErrorBoundary>
-            <SettingsView activeView={activeView} />
-          </ViewErrorBoundary>
-        </div>
+        <KeepMountedView visible={!isLearnOpen && activeView === 'settings'}>
+          <SettingsView activeView={activeView} />
+        </KeepMountedView>
         {!isLearnOpen && activeView === 'chat' && chatThreadId && (
           <ViewErrorBoundary>
             <SimplifiedChatView
@@ -447,16 +419,16 @@ export default function MainLayout({
       </main>
 
       {!isAddCardsRoute && (
-        <div className="shrink-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))]" />
-      )}
-      {!isAddCardsRoute && (
-        <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
-          <BottomNav
-            currentView={activeView}
-            onViewChange={handleViewChange}
-            onLearnOpen={handleLearnOpen}
-          />
-        </div>
+        <>
+          <div className="shrink-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))]" />
+          <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
+            <BottomNav
+              currentView={activeView}
+              onViewChange={handleViewChange}
+              onLearnOpen={handleLearnOpen}
+            />
+          </div>
+        </>
       )}
 
       {isLearnOpen && (

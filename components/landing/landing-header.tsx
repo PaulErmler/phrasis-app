@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { Menu, X, Download, Sun, Moon, Monitor } from 'lucide-react';
 import { useTheme } from 'next-themes';
@@ -63,7 +64,7 @@ export function LandingHeader({ isAuthenticated }: LandingHeaderProps) {
           <div className="relative flex items-center justify-between h-16 md:h-20">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-2.5 shrink-0">
-              <img
+              <Image
                 src="/icons/icon.svg"
                 alt="Flexling"
                 className="w-8 h-8 md:w-9 md:h-9"

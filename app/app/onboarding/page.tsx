@@ -31,11 +31,14 @@ import type {
   AcquisitionSource,
   LearningReason,
   DailyTimeGoalMinutes,
+  PlacementTestState,
+  FirstLessonSummary,
 } from './types';
 import { EMPTY_ONBOARDING_DATA } from './types';
 import {
   ogteToCurrentLevel,
   CURRENT_PLACEMENT_STRATEGY_VERSION,
+  type StrategyName,
 } from './lib/placementStrategies';
 
 import { LanguagePairStep } from './steps/LanguagePairStep';
@@ -52,9 +55,10 @@ import { WordProjectionStep } from './steps/WordProjectionStep';
 import type { OnboardingSessionSummary } from './components/OnboardingFirstLesson';
 import { FeatureTourStep } from './steps/FeatureTourStep';
 import { PlanPickStep } from './steps/PlanPickStep';
+import { TestimonialsStep } from './steps/TestimonialsStep';
 
 /**
- * New onboarding wizard. 13 steps with branching at the proficiency point.
+ * New onboarding wizard. 14 steps with branching at the proficiency point.
  *
  * Step / id / next:
  *   1.  language-pair         → acquisition
@@ -68,8 +72,9 @@ import { PlanPickStep } from './steps/PlanPickStep';
  *   8.  first-lesson          → stats-recap (or feature-tour on skip)
  *   9.  stats-recap           → word-projection
  *   10. word-projection       → feature-tour
- *   11. feature-tour          → plan-pick
- *   12. plan-pick             → done         (calls finalizeOnboarding)
+ *   11. feature-tour          → testimonials
+ *   12. testimonials          → plan-pick
+ *   13. plan-pick             → done         (calls finalizeOnboarding)
  *
  * `hasCompletedOnboarding` is the single source of truth for the auto-redirect
  * — it stays false until the very last step (`finalizeOnboarding`), so
@@ -89,6 +94,7 @@ type StepId =
   | 'stats-recap'
   | 'word-projection'
   | 'feature-tour'
+  | 'testimonials'
   | 'plan-pick';
 
 const PROGRESS_STEP_ORDER: StepId[] = [
@@ -103,6 +109,7 @@ const PROGRESS_STEP_ORDER: StepId[] = [
   'stats-recap',
   'word-projection',
   'feature-tour',
+  'testimonials',
   'plan-pick',
 ];
 
@@ -116,6 +123,7 @@ const POST_CUSTOMIZING_STEPS: ReadonlySet<StepId> = new Set<StepId>([
   'stats-recap',
   'word-projection',
   'feature-tour',
+  'testimonials',
   'plan-pick',
 ]);
 
@@ -256,21 +264,12 @@ interface SaveProgressArgs {
   learningGoals?: string[];
   learningGoalFreeText?: string;
   dailyTimeGoalMinutes?: number;
-  placementTest?: {
+  placementTest?: Omit<PlacementTestState, 'strategyVersion'> & {
     strategyVersion?: number;
-    strategy: string;
-    history: { level: number; knew: boolean }[];
-    finalLevel?: number;
   };
   firstLessonCardsRated?: number;
   firstLessonSessionId?: string;
-  firstLessonSummary?: {
-    cardsRated: number;
-    sessionId: string;
-    dailyReviewsToday: number;
-    dailyTimeMsToday: number;
-    dailyNewWordsToday: number;
-  };
+  firstLessonSummary?: FirstLessonSummary;
 }
 
 /**
@@ -279,7 +278,7 @@ interface SaveProgressArgs {
  * `persist`, immediate `advance`, immediate `back`) so a new field landing
  * on `OnboardingData` only needs threading through here.
  */
-function buildProgressPayload(
+export function buildProgressPayload(
   fd: OnboardingData,
   step: number,
 ): SaveProgressArgs {
@@ -332,22 +331,6 @@ function OnboardingWizard({
   // Live OGTE level the user has dialled in on the CEFR slider, kept in
   // wizard state so the Continue button can read it.
   const [cefrSlidLevel, setCefrSlidLevel] = useState<number>(8);
-  // Session snapshot from the embedded first lesson — drives the
-  // stats-recap + word-projection screens. Reads from `data.firstLessonSummary`
-  // (persisted in `onboardingProgress`) so a mid-flow reload doesn't drop
-  // the numbers; `setLessonSummary` writes to both local state and the
-  // server via `persist`.
-  const lessonSummary: OnboardingSessionSummary | null = data.firstLessonSummary;
-  const setLessonSummary = useCallback(
-    (s: OnboardingSessionSummary | null) => {
-      persist({ firstLessonSummary: s });
-    },
-    // `persist` is defined just below — adding it as a dep is the standard
-    // forward-ref pattern; React still wires the dependency correctly.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
-
   const dataRef = useRef(data);
   useLayoutEffect(() => {
     dataRef.current = data;
@@ -387,6 +370,19 @@ function OnboardingWizard({
     [saveProgress],
   );
 
+  // Session snapshot from the embedded first lesson — drives the
+  // stats-recap + word-projection screens. Reads from `data.firstLessonSummary`
+  // (persisted in `onboardingProgress`) so a mid-flow reload doesn't drop
+  // the numbers; `setLessonSummary` writes to both local state and the
+  // server via `persist`.
+  const lessonSummary: OnboardingSessionSummary | null = data.firstLessonSummary;
+  const setLessonSummary = useCallback(
+    (s: OnboardingSessionSummary | null) => {
+      persist({ firstLessonSummary: s });
+    },
+    [persist],
+  );
+
   // Steps excluded from back-history: transient/loading screens the user
   // shouldn't be able to revisit. The wizard skips these on back nav by
   // never pushing them onto the history stack in the first place.
@@ -395,45 +391,39 @@ function OnboardingWizard({
     [],
   );
 
-  const advance = useCallback((to: StepId) => {
-    setHistory((h) => (TRANSIENT_STEPS.has(stepId) ? h : [...h, stepId]));
-    setStepId(to);
-    // Persist the new step *immediately* (no debounce). Without this, a user
-    // who clicks Continue without changing any field never triggers `persist`,
-    // so the saved step stays behind and a reload resumes at the wrong place.
-    // Cancel any pending field-change debounce so its (now stale) save can't
-    // arrive after this immediate one and roll the step back.
+  // Persist the new step *immediately* (no debounce). Without this, a user
+  // who clicks Continue without changing any field never triggers `persist`,
+  // so the saved step stays behind and a reload resumes at the wrong place.
+  // Cancel any pending field-change debounce so its (now stale) save can't
+  // arrive after this immediate one and roll the step back.
+  const saveStepNow = useCallback((step: StepId, label: string) => {
     if (persistDebounceRef.current) {
       clearTimeout(persistDebounceRef.current);
       persistDebounceRef.current = null;
     }
-    const stepNum = PROGRESS_STEP_ORDER.indexOf(to) + 1;
+    const stepNum = PROGRESS_STEP_ORDER.indexOf(step) + 1;
     if (stepNum > 0) {
       saveProgress(buildProgressPayload(dataRef.current, stepNum))
-        .catch((err) => console.error('Failed to save advance step:', err));
+        .catch((err) => console.error(`Failed to save ${label} step:`, err));
     }
-  }, [stepId, TRANSIENT_STEPS, saveProgress]);
+  }, [saveProgress]);
+
+  const advance = useCallback((to: StepId) => {
+    setHistory((h) => (TRANSIENT_STEPS.has(stepId) ? h : [...h, stepId]));
+    setStepId(to);
+    saveStepNow(to, 'advance');
+  }, [stepId, TRANSIENT_STEPS, saveStepNow]);
 
   const back = useCallback(() => {
     setHistory((h) => {
       const prev = h[h.length - 1];
       if (prev) {
         setStepId(prev);
-        // Same rationale as in `advance`: cancel any pending debounce so a
-        // stale field-change save can't overwrite this immediate one.
-        if (persistDebounceRef.current) {
-          clearTimeout(persistDebounceRef.current);
-          persistDebounceRef.current = null;
-        }
-        const stepNum = PROGRESS_STEP_ORDER.indexOf(prev) + 1;
-        if (stepNum > 0) {
-          saveProgress(buildProgressPayload(dataRef.current, stepNum))
-            .catch((err) => console.error('Failed to save back step:', err));
-        }
+        saveStepNow(prev, 'back');
       }
       return h.slice(0, -1);
     });
-  }, [saveProgress]);
+  }, [saveStepNow]);
 
   // Progress bar percentage
   const progressIndex = useMemo(() => {
@@ -492,7 +482,7 @@ function OnboardingWizard({
   }, [cefrSlidLevel, persist, advance]);
 
   const onPlacementComplete = (result: {
-    strategy: import('./lib/placementStrategies').StrategyName;
+    strategy: StrategyName;
     history: { level: number; knew: boolean }[];
     finalOgteLevel: number;
     currentLevel: CurrentLevel;
@@ -575,6 +565,9 @@ function OnboardingWizard({
       return;
     case 'cefr-pick':
       onCefrPickContinue();
+      return;
+    case 'testimonials':
+      advance('plan-pick');
       return;
     default:
       return;
@@ -690,7 +683,7 @@ function renderStep({
   data: OnboardingData;
   persist: (partial: Partial<OnboardingData>) => void;
   onPlacementComplete: (r: {
-    strategy: import('./lib/placementStrategies').StrategyName;
+    strategy: StrategyName;
     history: { level: number; knew: boolean }[];
     finalOgteLevel: number;
     currentLevel: CurrentLevel;
@@ -814,7 +807,9 @@ function renderStep({
       />
     );
   case 'feature-tour':
-    return <FeatureTourStep onComplete={() => onAdvance('plan-pick')} />;
+    return <FeatureTourStep onComplete={() => onAdvance('testimonials')} />;
+  case 'testimonials':
+    return <TestimonialsStep />;
   case 'plan-pick':
     return <PlanPickStep onContinue={onFinalize} />;
   }

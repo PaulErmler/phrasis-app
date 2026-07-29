@@ -224,6 +224,8 @@ describe('getLocalizedLanguageNameByCode', () => {
     ar_lev: { en: 'Arabic (Levantine)', de: 'Arabisch (Levantinisch)' },
     sw: { en: 'Swahili (Kenya)', de: 'Swahili (Kenia)' },
     sw_tz: { en: 'Swahili (Tanzania)', de: 'Swahili (Tansania)' },
+    vi: { en: 'Vietnamese (Northern)', de: 'Vietnamesisch (Nord)' },
+    vi_south: { en: 'Vietnamese (Southern)', de: 'Vietnamesisch (Süd)' },
   };
 
   it('resolves the documented en + de override for every overridden code', () => {
@@ -235,6 +237,16 @@ describe('getLocalizedLanguageNameByCode', () => {
         names.de,
       );
     }
+  });
+
+  it('EXPECTED_NAMES covers every code that carries displayNameOverrides', () => {
+    // Without this, the table above is a silent allowlist: a new language
+    // with overrides (or a typo in one) sails through unasserted — vi and
+    // vi_south were both missing when this guard was added.
+    const overridden = SUPPORTED_LANGUAGES.filter(
+      (l) => l.displayNameOverrides,
+    ).map((l) => l.code);
+    expect(overridden.sort()).toEqual(Object.keys(EXPECTED_NAMES).sort());
   });
 });
 

@@ -47,13 +47,6 @@ export const LEGACY_TO_NEW_CODE: Record<string, string> = {
 };
 
 /**
- * Back-compat alias. Prefer `LEGACY_LEVEL_ORDER` in new code, and
- * `isPremadeLevelCollection(collection)` for membership checks against the
- * active dataset.
- */
-export const LEVEL_ORDER = LEGACY_LEVEL_ORDER;
-
-/**
  * Default batch size for the collection "Add N" button (and the course-
  * creation first-sentences warmup).
  */

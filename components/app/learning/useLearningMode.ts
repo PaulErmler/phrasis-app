@@ -24,6 +24,7 @@ import {
   type CardTranslation,
   type CardAudioRecording,
   type CourseSettings,
+  type ReviewAccuracyPayload,
 } from './types';
 import type { SchedulingMode } from '@/convex/types';
 import { getUserTimezone } from '@/lib/timezone';
@@ -54,6 +55,38 @@ function effectivePhase(
   rawPhase: SchedulingPhase,
 ): SchedulingPhase {
   return reviewMode === 'full' ? 'review' : rawPhase;
+}
+
+/**
+ * Sticky "last resolved query value": while authenticated, a query that
+ * transiently flips back to `undefined` (refetch) keeps serving its last
+ * resolved value. Sign-out fully resets the stickiness so no stale value
+ * can flash back after re-auth while the queries are still loading.
+ */
+function useStickyQueryValue<T>(
+  value: T | undefined,
+  isAuthenticated: boolean,
+): T | undefined {
+  const lastRef = useRef<T | undefined>(undefined);
+  const receivedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      receivedRef.current = false;
+      lastRef.current = undefined;
+      return;
+    }
+    if (value !== undefined) {
+      receivedRef.current = true;
+      lastRef.current = value;
+    }
+  }, [isAuthenticated, value]);
+
+  return value !== undefined
+    ? value
+    : isAuthenticated && receivedRef.current
+      ? lastRef.current
+      : undefined;
 }
 
 // ============================================================================
@@ -89,6 +122,13 @@ interface BaseState {
    * uses it together with `reviewMode === 'audio'` to decide whether to
    * auto-dismiss after a delay and show the auto-advance bar. */
   autoAdvance: boolean;
+  /**
+   * Push the accuracy-derived rating suggestion in from the writing card.
+   * Lives on the base state (not the reviewing state) so the effect that sets
+   * it doesn't have to re-run as the status union changes shape. `null` means
+   * "no opinion" and falls through to the phase default.
+   */
+  setAutoRating: (rating: ReviewRating | null) => void;
 }
 
 interface LoadingState extends BaseState {
@@ -190,7 +230,10 @@ interface ReviewingState extends BaseState {
   handleFlag: () => Promise<void>;
   handleRegenerateAudio: () => Promise<void>;
   handleUpdatePinnedActions: (actions: readonly string[]) => Promise<void>;
-  handleNext: (ratingOverride?: ReviewRating, accuracy?: number) => void;
+  handleNext: (
+    ratingOverride?: ReviewRating,
+    accuracy?: ReviewAccuracyPayload,
+  ) => void;
   setSelectedRating: (rating: ReviewRating) => void;
   /** Undo the most recent review (server-side; works across devices). The
    * restored card arrives via the reactive card query. Resolves true when a
@@ -221,20 +264,19 @@ export type LearningState =
 // Hook
 // ============================================================================
 
-// TODO: This hook is ~900 lines and three concerns are tangled inside it:
-//   1. Card-scheduling state machine (loading / noCardsDue / addingCards /
-//      reviewing + the FSRS mutations).
+// Scope note: three concerns remain coupled inside this hook —
+//   1. Card-scheduling state machine (loading / noCollection / noCardsDue /
+//      reviewing, the isAddingCards flag, and the FSRS mutations).
 //   2. Session counters (dailyReviewsToday, sessionCardCount, sessionId
-//      lifecycle) — partially extracted via `mintSessionId` at module
-//      scope; the rest remains coupled to `handleNext` / `handleReview`.
-//   3. Celebration / progress-display — extracted to `useCelebration` in
-//      this PR; still triggered from inside `handleReview`.
-// A full split into `useSessionCounters` / `useCardScheduling` /
-// `useCelebration` is its own PR with proper QA: the milestone-trigger
-// math, optimistic-flip ordering, and `dailyReviewsToday` hydration timing
-// all need to be preserved bit-for-bit. Don't attempt incrementally —
-// either land the full refactor with end-to-end coverage in one go, or
-// leave the current shape alone.
+//      lifecycle; `mintSessionId` lives at module scope) — coupled to
+//      `handleNext` / `handleReview`.
+//   3. Celebration triggering — the display state lives in
+//      `useCelebration`, but it is still driven from inside `handleReview`.
+// Any future split must preserve bit-for-bit: the milestone-trigger math,
+// the optimistic-flip ordering (predict before awaiting the mutation, roll
+// back if the server disagrees), and the `dailyReviewsToday` hydration
+// timing. Don't split incrementally — land a full refactor with
+// end-to-end coverage in one go, or leave the current shape alone.
 export interface UseLearningModeOptions {
   /** Seed the session id instead of minting fresh — used by onboarding
    *  to keep the same session across a mid-lesson reload so
@@ -271,79 +313,30 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const courseSettingsQuery = useQuery(api.features.courses.getActiveCourseSettings, {});
   const activeCourseQuery = useQuery(api.features.courses.getActiveCourse, {});
 
-  const lastCardRef = useRef<
-    Exclude<typeof cardForReviewQuery, undefined> | undefined
-  >(undefined);
+  const cardForReview = useStickyQueryValue(cardForReviewQuery, isAuthenticated);
+  const courseSettings = useStickyQueryValue(courseSettingsQuery, isAuthenticated);
+  const activeCourse = useStickyQueryValue(activeCourseQuery, isAuthenticated);
+
+  // Card-specific stickiness on top of the sticky values above: also filters
+  // out `null` (deck empty) so the auto-add gap can keep showing the
+  // just-reviewed card, and resets on collection change.
   const lastReviewingCardRef = useRef<
     NonNullable<typeof cardForReviewQuery> | undefined
   >(undefined);
-  const receivedCardRef = useRef(false);
-  const lastCourseSettingsRef = useRef<
-    Exclude<typeof courseSettingsQuery, undefined> | undefined
-  >(undefined);
-  const receivedCourseSettingsRef = useRef(false);
-  const lastActiveCourseRef = useRef<
-    Exclude<typeof activeCourseQuery, undefined> | undefined
-  >(undefined);
-  const receivedActiveCourseRef = useRef(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
-      receivedCardRef.current = false;
-      lastCardRef.current = undefined;
       lastReviewingCardRef.current = undefined;
-      receivedCourseSettingsRef.current = false;
-      lastCourseSettingsRef.current = undefined;
-      receivedActiveCourseRef.current = false;
-      lastActiveCourseRef.current = undefined;
       return;
-    }
-    if (cardForReviewQuery !== undefined) {
-      receivedCardRef.current = true;
-      lastCardRef.current = cardForReviewQuery;
     }
     if (cardForReviewQuery != null) {
       lastReviewingCardRef.current = cardForReviewQuery;
     }
-    if (courseSettingsQuery !== undefined) {
-      receivedCourseSettingsRef.current = true;
-      lastCourseSettingsRef.current = courseSettingsQuery;
-    }
-    if (activeCourseQuery !== undefined) {
-      receivedActiveCourseRef.current = true;
-      lastActiveCourseRef.current = activeCourseQuery;
-    }
-  }, [
-    isAuthenticated,
-    cardForReviewQuery,
-    courseSettingsQuery,
-    activeCourseQuery,
-  ]);
+  }, [isAuthenticated, cardForReviewQuery]);
 
   useEffect(() => {
     lastReviewingCardRef.current = undefined;
   }, [courseSettingsQuery?.activeCollectionId]);
-
-  const cardForReview =
-    cardForReviewQuery !== undefined
-      ? cardForReviewQuery
-      : isAuthenticated && receivedCardRef.current
-        ? lastCardRef.current
-        : undefined;
-
-  const courseSettings =
-    courseSettingsQuery !== undefined
-      ? courseSettingsQuery
-      : isAuthenticated && receivedCourseSettingsRef.current
-        ? lastCourseSettingsRef.current
-        : undefined;
-
-  const activeCourse =
-    activeCourseQuery !== undefined
-      ? activeCourseQuery
-      : isAuthenticated && receivedActiveCourseRef.current
-        ? lastActiveCourseRef.current
-        : undefined;
 
   // Undo-button state rides on the getCardForReview payload — one
   // subscription that invalidates once per review, instead of a parallel
@@ -453,6 +446,12 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const [selectedRating, setSelectedRating] = useState<ReviewRating | null>(
     null,
   );
+  // Accuracy-derived suggestion, pushed in from the writing card. It sits
+  // BELOW `selectedRating` in every resolution below, so a manual tap or
+  // number key always wins, and it is reset in lockstep with `selectedRating`
+  // — if the two ever drifted, the previous card's suggestion would show up
+  // highlighted on the next card.
+  const [autoRatingState, setAutoRating] = useState<ReviewRating | null>(null);
   const [isPendingMaster, setIsPendingMaster] = useState(false);
   const [isPendingHide, setIsPendingHide] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
@@ -799,6 +798,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   useEffect(() => {
     if (cardForReview?._id == null) return;
     setSelectedRating(null);
+    setAutoRating(null);
     setIsPendingMaster(false);
     setIsPendingHide(false);
     setIsExiting(false);
@@ -825,9 +825,60 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // Opt-out: undefined (pre-migration rows or unset) defaults to enabled.
   const progressDisplayEnabled = courseSettings?.progressDisplayEnabled ?? true;
 
+  // Synchronous in-flight latch. The handlers' `isReviewing` checks read React
+  // state, which a second call in the same tick still sees as `false` (the
+  // setter hasn't re-rendered yet), so a double-click would fire the mutation
+  // twice. A ref flips immediately and closes that window.
+  const exitMutationInFlightRef = useRef(false);
+
+  // Shared shape for mutations that animate the card out (master / hide /
+  // delete / radio advance): mark this tab as review initiator, bump the
+  // animation key, flip `isExiting` before the await, and clear `isReviewing`
+  // in finally. On rejection `isExiting` is restored so the card comes back —
+  // unless `alwaysClearExiting` is set, in which case the finally clears it
+  // unconditionally instead. (`handleReview` keeps its own copy of the
+  // prelude: its milestone prediction / rollback logic doesn't fit here.)
+  const runExitingMutation = useCallback(
+    async (
+      run: () => Promise<unknown>,
+      errorMessage: string,
+      options?: { alwaysClearExiting?: boolean },
+    ) => {
+      if (exitMutationInFlightRef.current) return;
+      exitMutationInFlightRef.current = true;
+      reviewInitiatedByThisTabRef.current = true;
+      setCardAnimationKey((k) => k + 1);
+      setIsExiting(true);
+      setIsReviewing(true);
+      try {
+        await run();
+      } catch (error) {
+        console.error(errorMessage, error);
+        if (!options?.alwaysClearExiting) {
+          setIsExiting(false);
+        }
+      } finally {
+        exitMutationInFlightRef.current = false;
+        setIsReviewing(false);
+        if (options?.alwaysClearExiting) {
+          setIsExiting(false);
+        }
+      }
+    },
+    [],
+  );
+
   const handleReview = useCallback(
-    async (rating: ReviewRating, wasDefaultRating: boolean, accuracy?: number) => {
+    async (
+      rating: ReviewRating,
+      wasDefaultRating: boolean,
+      accuracy?: ReviewAccuracyPayload,
+    ) => {
       if (!cardForReview || isReviewing) return;
+      // Same synchronous latch as `runExitingMutation` — without it a
+      // same-tick double submit would record the review twice.
+      if (exitMutationInFlightRef.current) return;
+      exitMutationInFlightRef.current = true;
       reviewInitiatedByThisTabRef.current = true;
       setCardAnimationKey((k) => k + 1);
       setIsExiting(true);
@@ -858,7 +909,11 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
           reviewMode,
           wasDefaultRating,
           sessionId,
-          ...(accuracy != null && { accuracy: accuracy / 100 }),
+          ...(accuracy != null && {
+            accuracy: accuracy.primary / 100,
+            accuracyStrict: accuracy.strict / 100,
+            accuracyLenient: accuracy.lenient / 100,
+          }),
         });
         setDailyReviewsToday(result.dailyReviewsToday);
         setDailyTimeMsToday(result.dailyTimeMsToday);
@@ -878,6 +933,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
           setProgressDisplayReady(false);
         }
         setSelectedRating(null);
+        setAutoRating(null);
       } catch (error) {
         console.error('Failed to review card:', error);
         if (predictedMilestone) {
@@ -886,6 +942,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
         }
         setIsExiting(false);
       } finally {
+        exitMutationInFlightRef.current = false;
         setIsReviewing(false);
       }
     },
@@ -921,6 +978,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
         // after an "again" rating on a small deck), so reset the per-card
         // state here explicitly.
         setSelectedRating(null);
+        setAutoRating(null);
         setIsExiting(false);
         cardShownAtRef.current = Date.now();
         setCardAnimationKey((k) => k + 1);
@@ -1114,34 +1172,27 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
 
   const handleDelete = useCallback(async () => {
     if (!cardForReview || isReviewing) return;
-    reviewInitiatedByThisTabRef.current = true;
-    setCardAnimationKey((k) => k + 1);
-    setIsExiting(true);
-    setIsReviewing(true);
-    try {
-      await deleteCardMutation({ cardId: cardForReview._id });
-    } catch (error) {
-      console.error('Failed to delete card:', error);
-      setIsExiting(false);
-    } finally {
-      setIsReviewing(false);
-    }
-  }, [cardForReview, isReviewing, deleteCardMutation]);
+    await runExitingMutation(
+      () => deleteCardMutation({ cardId: cardForReview._id }),
+      'Failed to delete card:',
+    );
+  }, [cardForReview, isReviewing, deleteCardMutation, runExitingMutation]);
 
   // --------------------------------------------------------------------------
   // Scheduling mode
   // --------------------------------------------------------------------------
+  const settingsCourseId = courseSettings?.courseId;
   const handleSchedulingModeChange = useCallback(
     (mode: SchedulingMode) => {
-      if (!courseSettings?.courseId) return;
+      if (!settingsCourseId) return;
       void updateCourseSettingsMutation({
-        courseId: courseSettings.courseId,
+        courseId: settingsCourseId,
         schedulingMode: mode,
       }).catch((error) => {
         console.error('Failed to update scheduling mode:', error);
       });
     },
-    [courseSettings?.courseId, updateCourseSettingsMutation],
+    [settingsCourseId, updateCourseSettingsMutation],
   );
 
   // --------------------------------------------------------------------------
@@ -1151,66 +1202,55 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     courseSettings?.schedulingMode ?? 'learnAndReview';
   const isRadio = schedulingMode === 'radio';
 
-  const handleNext = useCallback(async (ratingOverride?: ReviewRating, accuracy?: number) => {
+  const handleNext = useCallback(async (
+    ratingOverride?: ReviewRating,
+    accuracy?: ReviewAccuracyPayload,
+  ) => {
     if (!cardForReview || isReviewing) return;
     if (isPendingMaster) {
-      reviewInitiatedByThisTabRef.current = true;
-      setCardAnimationKey((k) => k + 1);
-      setIsExiting(true);
-      setIsReviewing(true);
-      try {
-        await masterCardMutation({ cardId: cardForReview._id });
-      } catch (error) {
-        console.error('Failed to master card:', error);
-        setIsExiting(false);
-      } finally {
-        setIsReviewing(false);
-      }
+      await runExitingMutation(
+        () => masterCardMutation({ cardId: cardForReview._id }),
+        'Failed to master card:',
+      );
       return;
     }
     if (isPendingHide) {
-      reviewInitiatedByThisTabRef.current = true;
-      setCardAnimationKey((k) => k + 1);
-      setIsExiting(true);
-      setIsReviewing(true);
-      try {
-        await hideCardMutation({ cardId: cardForReview._id });
-      } catch (error) {
-        console.error('Failed to hide card:', error);
-        setIsExiting(false);
-      } finally {
-        setIsReviewing(false);
-      }
+      await runExitingMutation(
+        () => hideCardMutation({ cardId: cardForReview._id }),
+        'Failed to hide card:',
+      );
       return;
     }
     if (isRadio) {
       // Radio mode bypasses FSRS entirely: no rating, no stats, no
       // celebration. Just bump the play counter so the next-lowest counter
-      // rises to the front of the queue.
-      reviewInitiatedByThisTabRef.current = true;
-      setCardAnimationKey((k) => k + 1);
-      setIsExiting(true);
-      setIsReviewing(true);
-      try {
-        await advanceRadioCardMutation({
-          cardId: cardForReview._id,
-          timezone: getUserTimezone(),
-          timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
-        });
-      } catch (error) {
-        console.error('Failed to advance radio card:', error);
-      } finally {
-        setIsReviewing(false);
-        // Always clear `isExiting` in radio. The shared reset effect only
-        // fires when `cardForReview._id` changes, so on a same-id re-render
-        // (single-card decks) it would otherwise leave the card pane blank.
-        setIsExiting(false);
-      }
+      // rises to the front of the queue. `alwaysClearExiting`: the shared
+      // reset effect only fires when `cardForReview._id` changes, so on a
+      // same-id re-render (single-card decks) it would otherwise leave the
+      // card pane blank.
+      await runExitingMutation(
+        () =>
+          advanceRadioCardMutation({
+            cardId: cardForReview._id,
+            timezone: getUserTimezone(),
+            timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
+          }),
+        'Failed to advance radio card:',
+        { alwaysClearExiting: true },
+      );
       return;
     }
     const phase = effectivePhase(reviewMode, cardForReview.schedulingPhase as SchedulingPhase);
     const defaultRatingForPhase = getDefaultRating(phase);
-    const rating = ratingOverride ?? selectedRating ?? defaultRatingForPhase;
+    const rating =
+      ratingOverride ?? selectedRating ?? autoRatingState ?? defaultRatingForPhase;
+    // `wasDefaultRating` deliberately still means "the review landed on the
+    // phase default", NOT "the user accepted what was offered". Redefining it
+    // would change its meaning for audio and pre-review mode too, and it has
+    // no reader today (dailyStats.defaultRatingUsed / defaultRatingChanged are
+    // written and reversed but never queried). If auto-rate acceptance ever
+    // needs measuring, add an explicit `ratingSource` arg rather than
+    // reinterpreting these counters.
     handleReview(rating, rating === defaultRatingForPhase, accuracy);
   }, [
     cardForReview,
@@ -1219,8 +1259,10 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     isPendingHide,
     isRadio,
     selectedRating,
+    autoRatingState,
     reviewMode,
     handleReview,
+    runExitingMutation,
     masterCardMutation,
     hideCardMutation,
     advanceRadioCardMutation,
@@ -1247,6 +1289,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     schedulingMode,
     reviewMode: (courseSettings?.reviewMode ?? 'audio') as 'audio' | 'full',
     autoAdvance: courseSettings?.autoAdvance ?? DEFAULT_AUTO_ADVANCE,
+    setAutoRating,
   };
 
   // Loading
@@ -1343,7 +1386,8 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   const phase = effectivePhase(reviewMode, displayCard.schedulingPhase as SchedulingPhase);
   const validRatings = isRadio ? [] : getValidRatings(phase);
   const defaultRating = getDefaultRating(phase);
-  const activeRating = selectedRating ?? defaultRating;
+  // Manual choice first, then the accuracy suggestion, then the phase default.
+  const activeRating = selectedRating ?? autoRatingState ?? defaultRating;
 
   // Compute projected next-due interval for each rating
   const ratingIntervals: Record<string, string> = {};

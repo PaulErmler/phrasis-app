@@ -45,7 +45,6 @@ vi.mock("next-intl", async () => {
 
 // Basic MediaRecorder / HTMLMediaElement shims for audio tests
 if (typeof window !== "undefined") {
-  // @ts-expect-error test shim
   window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
   window.HTMLMediaElement.prototype.pause = vi.fn();
   window.HTMLMediaElement.prototype.load = vi.fn();

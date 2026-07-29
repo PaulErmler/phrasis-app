@@ -23,6 +23,7 @@ import {
   ToolOutput,
 } from '@/components/ai-elements/tool';
 import { useSmoothText } from '@convex-dev/agent/react';
+import { dominantTextDirection } from '@/lib/languages';
 import type { ExtendedUIMessage } from '@/lib/types/chat';
 import type { ToolUIPart } from 'ai';
 import type { ReactNode } from 'react';
@@ -44,9 +45,12 @@ function SmoothMessageResponse({
   // preventing Streamdown from switching rendering paths mid-animation.
   const effectiveMode = isStreaming || isSmoothTextStreaming ? 'streaming' : 'static';
   const displayText = smoothText ?? text ?? '';
-  // Bidi handling (dir="auto" + text-left) lives inside MessageResponse.
+  // Bidi handling (dominant-script dir + text-left) lives inside
+  // MessageResponse; the direction is computed from the FULL received text
+  // rather than the animation buffer so a reply opening with an RTL token
+  // doesn't flip to RTL until the English catches up.
   return (
-    <MessageResponse mode={effectiveMode}>
+    <MessageResponse mode={effectiveMode} dir={dominantTextDirection(text ?? '')}>
       {displayText}
     </MessageResponse>
   );
@@ -286,7 +290,6 @@ interface ChatMessagesProps {
 export function ChatMessages({
   messages,
   isLoading,
-  threadId,
   toolRenderers,
   messageFooter,
   contentClassName,

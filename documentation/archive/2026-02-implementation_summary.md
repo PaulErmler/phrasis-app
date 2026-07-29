@@ -1,3 +1,5 @@
+> **ARCHIVED** — Historical snapshot (last updated 2026-02-21), superseded by `documentation/app_summary.md`.
+
 # Implementation Summary
 
 ## Data Model Overview

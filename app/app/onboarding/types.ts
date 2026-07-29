@@ -1,3 +1,5 @@
+import type { SessionSnapshot } from '@/components/app/learning/sessionSnapshot';
+
 export type ReviewMode = 'audio' | 'full';
 
 export type CurrentLevel =
@@ -45,12 +47,8 @@ export interface PlacementTestState {
 /** Snapshot of the embedded first-lesson session, persisted on
  *  `onboardingProgress.firstLessonSummary` so the stats-recap +
  *  word-projection screens have their data even after a mid-flow reload. */
-export interface FirstLessonSummary {
+export interface FirstLessonSummary extends SessionSnapshot {
   cardsRated: number;
-  sessionId: string;
-  dailyReviewsToday: number;
-  dailyTimeMsToday: number;
-  dailyNewWordsToday: number;
 }
 
 /**

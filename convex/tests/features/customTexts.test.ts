@@ -10,15 +10,17 @@ vi.mock("@openrouter/ai-sdk-provider", () => ({
   createOpenRouter: () => () => ({}),
 }));
 
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 import { generateText } from "ai";
 import schema from "../../schema";
 import { api } from "../../_generated/api";
+import { MAX_CARD_TEXT_LENGTH } from "../../../lib/constants/learning";
+import { DEFAULT_INITIAL_REVIEW_COUNT } from "../../../lib/scheduling";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
-async function seedActiveCourseWithQuota(t: ReturnType<typeof convexTest>) {
+async function seedActiveCourseWithQuota(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) => {
     const courseId = await ctx.db.insert("courses", {
       userId: "user_A",
@@ -168,6 +170,191 @@ describe("features/customTexts", () => {
       // serialization through `.collect()` for unset optionals can surface
       // as either `null` or `undefined`; either means "no tag".
       expect(byLang.fr ?? null).toBeNull();
+    });
+
+    it("throws INVALID_TIMEZONE for a malformed timezone", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(api.features.customTexts.createCustomText, {
+          translations: [
+            { language: "en", text: "Hello" },
+            { language: "es", text: "Hola" },
+          ],
+          timezone: "Not/A_Zone",
+        }),
+      ).rejects.toThrow(/INVALID_TIMEZONE/);
+    });
+
+    it("throws INVALID_LANGUAGES when a language appears twice", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      // en twice + es → nothing missing, nothing extra; only the duplicate
+      // sub-condition of the language check can fire here.
+      const rejection = expect(
+        asUser.mutation(api.features.customTexts.createCustomText, {
+          translations: [
+            { language: "en", text: "Hello" },
+            { language: "en", text: "Hi" },
+            { language: "es", text: "Hola" },
+          ],
+          timezone: "UTC",
+        }),
+      ).rejects;
+      await rejection.toThrow(/INVALID_LANGUAGES/);
+      await rejection.toThrow(/Missing: \[\]\. Extra: \[\]/);
+    });
+
+    it("throws EMPTY_TEXT for a zero-length entry", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(api.features.customTexts.createCustomText, {
+          translations: [
+            { language: "en", text: "" },
+            { language: "es", text: "Hola" },
+          ],
+          timezone: "UTC",
+        }),
+      ).rejects.toThrow(/EMPTY_TEXT/);
+    });
+
+    it("throws TEXT_TOO_LONG past MAX_CARD_TEXT_LENGTH", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await expect(
+        asUser.mutation(api.features.customTexts.createCustomText, {
+          translations: [
+            { language: "en", text: "x".repeat(MAX_CARD_TEXT_LENGTH + 1) },
+            { language: "es", text: "Hola" },
+          ],
+          timezone: "UTC",
+        }),
+      ).rejects.toThrow(/TEXT_TOO_LONG/);
+      // Validation precedes consumeQuota — nothing is charged.
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query("usageQuotas")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .first(),
+      );
+      expect(quota?.features.custom_sentences.used).toBe(0);
+    });
+  });
+
+  describe("createCustomText — custom collection get-or-create", () => {
+    async function getSettings(
+      t: TestConvex<typeof schema>,
+      courseId: Awaited<ReturnType<typeof seedActiveCourseWithQuota>>["courseId"],
+    ) {
+      return t.run(async (ctx) =>
+        ctx.db
+          .query("courseSettings")
+          .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+          .first(),
+      );
+    }
+
+    const validArgs = (suffix = "") => ({
+      translations: [
+        { language: "en", text: `Hello${suffix}` },
+        { language: "es", text: `Hola${suffix}` },
+      ],
+      timezone: "UTC",
+    });
+
+    it("creates the Custom collection and inserts a courseSettings row when none exists", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.customTexts.createCustomText,
+        validArgs(),
+      );
+
+      const text = await t.run(async (ctx) => ctx.db.get(res.textId));
+      const collection = await t.run(async (ctx) =>
+        ctx.db.get(text!.collectionId!),
+      );
+      expect(collection?.name).toBe("Custom");
+      expect(collection?.origin).toBe("custom");
+
+      const settings = await getSettings(t, courseId);
+      expect(settings?.customCollectionId).toBe(collection?._id);
+      expect(settings?.activeCustomCollectionIds).toEqual([collection?._id]);
+      expect(settings?.initialReviewCount).toBe(DEFAULT_INITIAL_REVIEW_COUNT);
+    });
+
+    it("patches existing courseSettings and appends to activeCustomCollectionIds", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedActiveCourseWithQuota(t);
+      const existingCollectionId = await t.run(async (ctx) => {
+        const id = await ctx.db.insert("collections", {
+          name: "Chat",
+          textCount: 0,
+          origin: "chat",
+        });
+        await ctx.db.insert("courseSettings", {
+          courseId,
+          initialReviewCount: 7,
+          chatCollectionId: id,
+          activeCustomCollectionIds: [id],
+        });
+        return id;
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.customTexts.createCustomText,
+        validArgs(),
+      );
+
+      const text = await t.run(async (ctx) => ctx.db.get(res.textId));
+      const settings = await getSettings(t, courseId);
+      expect(settings?.customCollectionId).toBe(text?.collectionId);
+      expect(settings?.activeCustomCollectionIds).toEqual([
+        existingCollectionId,
+        text?.collectionId,
+      ]);
+      // The pre-existing settings row is patched, not replaced.
+      expect(settings?.initialReviewCount).toBe(7);
+      expect(settings?.chatCollectionId).toBe(existingCollectionId);
+    });
+
+    it("reuses the same custom collection for subsequent texts", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const first = await asUser.mutation(
+        api.features.customTexts.createCustomText,
+        validArgs(" 1"),
+      );
+      const second = await asUser.mutation(
+        api.features.customTexts.createCustomText,
+        validArgs(" 2"),
+      );
+
+      const [firstText, secondText] = await t.run(async (ctx) =>
+        Promise.all([ctx.db.get(first.textId), ctx.db.get(second.textId)]),
+      );
+      expect(secondText?.collectionId).toBe(firstText?.collectionId);
+
+      const customCollections = await t.run(async (ctx) => {
+        const all = await ctx.db.query("collections").collect();
+        return all.filter((c) => c.origin === "custom");
+      });
+      expect(customCollections).toHaveLength(1);
+      expect(customCollections[0].textCount).toBe(2);
+
+      const settings = await getSettings(t, courseId);
+      expect(settings?.customCollectionId).toBe(firstText?.collectionId);
+      expect(settings?.activeCustomCollectionIds).toEqual([
+        firstText?.collectionId,
+      ]);
     });
   });
 

@@ -7,12 +7,16 @@ import {
   cardApprovalStatusValidator,
   schedulingModeValidator,
   studyContentFilterValidator,
+  autoRateThresholdsValidator,
   reviewRatingValidator,
   cardSchedulingSnapshotFields,
   cardRadioSnapshotFields,
   ttsQualityValidator,
   ttsProviderValidator,
   voiceGenderValidator,
+  featureStateValidator,
+  reviewsByModeValidator,
+  translationEntriesValidator,
 } from './types';
 
 
@@ -122,6 +126,17 @@ export const courseSettingsFields = {
   writingInputMode: v.optional(
     v.union(v.literal('translate'), v.literal('transcribe')),
   ),
+  // Writing mode: drop punctuation from the accuracy score, so a missing
+  // comma or full stop costs nothing. Unset = false = punctuation counts
+  // (at PUNCT_WEIGHT, see lib/textCompare/score.ts).
+  ignorePunctuation: v.optional(v.boolean()),
+  // Writing mode: preselect the FSRS rating from the typed answer's accuracy
+  // instead of always defaulting to "good". Unset = true (on by default); the
+  // rating is only ever preselected, never auto-submitted.
+  autoRateFromAccuracy: v.optional(v.boolean()),
+  // Accuracy breakpoints for the above. Unset = DEFAULT_AUTO_RATE_THRESHOLDS
+  // in lib/autoRating.ts (50 / 80).
+  autoRateThresholds: v.optional(autoRateThresholdsValidator),
   chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
@@ -141,6 +156,100 @@ export const courseSettingsDocValidator = v.object({
   _id: v.id('courseSettings'),
   _creationTime: v.number(),
   ...courseSettingsFields,
+});
+
+// The subset of course settings that `updateCourseSettings`
+// (convex/features/courses.ts) accepts and may patch, derived from the
+// canonical field set above so the two can't drift. Omits `courseId` (a
+// separate required arg there) and the fields managed by dedicated flows
+// (collection wiring, dataset reconciliation, session id, onboarding-seeded
+// daily goal); `.partial()` because a patch supplies only the fields it
+// changes.
+export const coursePatchableSettingsValidator = v
+  .object(courseSettingsFields)
+  .omit(
+    'courseId',
+    'activeCollectionId',
+    'dailyTimeGoalMinutes',
+    'chatCollectionId',
+    'customCollectionId',
+    'activeCustomCollectionIds',
+    'reconciledDatasetId',
+    'currentSessionId',
+  )
+  .partial();
+
+// Field validators for the `onboardingProgress` table. Extracted (mirroring
+// `courseSettingsFields`) so the onboarding query/mutation validators in
+// convex/features/courses.ts can share the shape with the schema and avoid
+// drift.
+export const onboardingProgressFields = {
+  userId: v.string(), // Links to auth user
+  step: v.number(), // Current step number in the new flow
+  reviewMode: v.optional(reviewModeValidator),
+  currentLevel: v.optional(currentLevelValidator),
+  targetLanguages: v.optional(v.array(v.string())),
+  baseLanguages: v.optional(v.array(v.string())),
+  // Survey answers.
+  acquisitionSource: v.optional(v.string()),
+  acquisitionSourceFreeText: v.optional(v.string()),
+  learningGoals: v.optional(v.array(v.string())),
+  learningGoalFreeText: v.optional(v.string()),
+  dailyTimeGoalMinutes: v.optional(v.number()),
+  // Placement-test working state. `history` accumulates as the user answers;
+  // `finalLevel` is set when the strategy reports `nextQuestionLevel() === null`.
+  placementTest: v.optional(
+    v.object({
+      // Schema-version of the placement state. Bump
+      // CURRENT_PLACEMENT_STRATEGY_VERSION in
+      // app/app/onboarding/lib/placementStrategies.ts whenever the shape
+      // of `history`/`strategy`/`finalLevel` changes — readers discard
+      // rows whose version doesn't match (kill-switch for resuming
+      // incompatible state). Optional so historical rows (written before
+      // this field existed) still validate; treat missing as version 0
+      // and discard on read.
+      strategyVersion: v.optional(v.number()),
+      strategy: v.string(), // 'bayesian' | 'binary' | 'staircase'
+      history: v.array(
+        v.object({ level: v.number(), knew: v.boolean() }),
+      ),
+      finalLevel: v.optional(v.number()),
+    }),
+  ),
+  // Number of cards the user has rated inside the embedded first lesson.
+  // Persisted so a reload mid-lesson resumes at the right card count and
+  // re-seeds which staged tutorials have already fired.
+  firstLessonCardsRated: v.optional(v.number()),
+  // Underlying `studySessions` row id for the embedded first lesson —
+  // captured on the first rated card and replayed into `useLearningMode`
+  // on the next mount so X/N progress and the +N new-words hero stay
+  // continuous across a mid-flow reload.
+  firstLessonSessionId: v.optional(v.string()),
+  // Snapshot of the embedded first-lesson session — written when the
+  // lesson completes (or skipped). Keeps the stats-recap +
+  // word-projection screens alive across a mid-flow reload.
+  firstLessonSummary: v.optional(
+    v.object({
+      cardsRated: v.number(),
+      sessionId: v.string(),
+      dailyReviewsToday: v.number(),
+      dailyTimeMsToday: v.number(),
+      dailyNewWordsToday: v.number(),
+    }),
+  ),
+  // Set by `finalizeOnboarding` (replaces the previous delete). When
+  // undefined, the row is in-progress and is the only row the wizard
+  // reads / writes. When set, the row is the permanent record of the
+  // user's onboarding answers — `getOnboardingProgress` filters these
+  // out so completed rows can't be accidentally re-edited.
+  completedAt: v.optional(v.number()),
+} as const;
+
+// Full `onboardingProgress` document validator (includes system fields).
+export const onboardingProgressDocValidator = v.object({
+  _id: v.id('onboardingProgress'),
+  _creationTime: v.number(),
+  ...onboardingProgressFields,
 });
 
 export default defineSchema({
@@ -176,7 +285,8 @@ export default defineSchema({
     legacy: v.optional(v.boolean()), // true on old Essential/A1..C2 post-cutover
     // Explicit origin tag — source of truth for the content-source filter.
     // 'premade' = dataset-uploaded; 'custom' = user-typed; 'chat' = chat-approved.
-    // Optional during backfill; required after `runCollectionsOriginBackfill` completes.
+    // Backfilled for all existing rows; optional only in the validator — treat
+    // as required for new writes.
     origin: v.optional(
       v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
     ),
@@ -254,9 +364,9 @@ export default defineSchema({
     // manually-typed custom-text translations. Persisted so a future
     // strategy swap (new dataset version, new model, new prompt) can find
     // and regenerate rows produced by the prior method via a simple
-    // `translationSource != currentSource` migration. Optional for
-    // backward-compat with rows that landed before this field existed — the
-    // one-time backfill that tagged them has since run and been removed.
+    // `translationSource != currentSource` migration. Optional only in the
+    // validator for backward-compat; existing rows are tagged and new writes
+    // always populate it.
     translationSource: v.optional(v.string()),
     // Concrete regional variant chosen for this row when `targetLanguage` is a
     // mixed/aggregate code (today: "es_mixed"). Stored as a Google voice-locale
@@ -392,67 +502,11 @@ export default defineSchema({
   // they participate in the live per-course settings surface. Everything
   // else (acquisition source, learning goals, placement-test history,
   // first-lesson summary) lives only on this row.
-  onboardingProgress: defineTable({
-    userId: v.string(), // Links to auth user
-    step: v.number(), // Current step number in the new flow
-    reviewMode: v.optional(reviewModeValidator),
-    currentLevel: v.optional(currentLevelValidator),
-    targetLanguages: v.optional(v.array(v.string())),
-    baseLanguages: v.optional(v.array(v.string())),
-    // Survey answers.
-    acquisitionSource: v.optional(v.string()),
-    acquisitionSourceFreeText: v.optional(v.string()),
-    learningGoals: v.optional(v.array(v.string())),
-    learningGoalFreeText: v.optional(v.string()),
-    dailyTimeGoalMinutes: v.optional(v.number()),
-    // Placement-test working state. `history` accumulates as the user answers;
-    // `finalLevel` is set when the strategy reports `nextQuestionLevel() === null`.
-    placementTest: v.optional(
-      v.object({
-        // Schema-version of the placement state. Bump
-        // CURRENT_PLACEMENT_STRATEGY_VERSION in
-        // app/app/onboarding/lib/placementStrategies.ts whenever the shape
-        // of `history`/`strategy`/`finalLevel` changes — readers discard
-        // rows whose version doesn't match (kill-switch for resuming
-        // incompatible state). Optional so historical rows (written before
-        // this field existed) still validate; treat missing as version 0
-        // and discard on read.
-        strategyVersion: v.optional(v.number()),
-        strategy: v.string(), // 'bayesian' | 'binary' | 'staircase'
-        history: v.array(
-          v.object({ level: v.number(), knew: v.boolean() }),
-        ),
-        finalLevel: v.optional(v.number()),
-      }),
-    ),
-    // Number of cards the user has rated inside the embedded first lesson.
-    // Persisted so a reload mid-lesson resumes at the right card count and
-    // re-seeds which staged tutorials have already fired.
-    firstLessonCardsRated: v.optional(v.number()),
-    // Underlying `studySessions` row id for the embedded first lesson —
-    // captured on the first rated card and replayed into `useLearningMode`
-    // on the next mount so X/N progress and the +N new-words hero stay
-    // continuous across a mid-flow reload.
-    firstLessonSessionId: v.optional(v.string()),
-    // Snapshot of the embedded first-lesson session — written when the
-    // lesson completes (or skipped). Keeps the stats-recap +
-    // word-projection screens alive across a mid-flow reload.
-    firstLessonSummary: v.optional(
-      v.object({
-        cardsRated: v.number(),
-        sessionId: v.string(),
-        dailyReviewsToday: v.number(),
-        dailyTimeMsToday: v.number(),
-        dailyNewWordsToday: v.number(),
-      }),
-    ),
-    // Set by `finalizeOnboarding` (replaces the previous delete). When
-    // undefined, the row is in-progress and is the only row the wizard
-    // reads / writes. When set, the row is the permanent record of the
-    // user's onboarding answers — `getOnboardingProgress` filters these
-    // out so completed rows can't be accidentally re-edited.
-    completedAt: v.optional(v.number()),
-  }).index('by_userId', ['userId']),
+  // Field definitions (and their comments) live in `onboardingProgressFields`
+  // above, shared with the onboarding query/mutation validators.
+  onboardingProgress: defineTable(onboardingProgressFields).index('by_userId', [
+    'userId',
+  ]),
 
   // Courses table - stores user language learning courses
   courses: defineTable({
@@ -478,9 +532,9 @@ export default defineSchema({
   cards: defineTable({
     deckId: v.id('decks'), // Reference to the deck
     textId: v.id('texts'), // Reference to the text/sentence
-    collectionId: v.optional(v.id('collections')), // Reference to the source collection. Backfilled for all cards by runCardsCollectionBackfill; required after.
+    collectionId: v.optional(v.id('collections')), // Reference to the source collection. Backfilled for all existing cards; treat as required for new writes.
     // Denormalized from collections.origin at insert time. Powers the content-source filter
-    // index lookups in getCardForReview. Optional during backfill; required after.
+    // index lookups in getCardForReview. Backfilled for all existing cards; treat as required for new writes.
     collectionOrigin: v.optional(
       v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
     ),
@@ -596,9 +650,16 @@ export default defineSchema({
     totalChatCardsApproved: v.optional(v.number()),
     totalCardsEdited: v.optional(v.number()),
     totalCardsAddedManually: v.optional(v.number()),
-    totalReviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
+    totalReviewsByMode: v.optional(reviewsByModeValidator),
     totalAccuracySum: v.optional(v.number()),
     totalAccuracyCount: v.optional(v.number()),
+    // Writing accuracy split by punctuation handling, so the headline number
+    // keeps its meaning when the learner toggles `ignorePunctuation`. Written
+    // as a trio — both sums share one count and are only ever incremented
+    // together. Rows predating this simply don't contribute.
+    totalAccuracyStrictSum: v.optional(v.number()), // punctuation always counted
+    totalAccuracyLenientSum: v.optional(v.number()), // punctuation always ignored
+    totalAccuracyDualCount: v.optional(v.number()),
   }).index('by_userId_and_courseId', ['userId', 'courseId']),
 
   // Daily stats table - one document per user + course + day
@@ -611,8 +672,8 @@ export default defineSchema({
     timeMs: v.number(),
     cardsReviewed: v.number(),
     // Review mode breakdown
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
-    timeMsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
+    reviewsByMode: v.optional(reviewsByModeValidator),
+    timeMsByMode: v.optional(reviewsByModeValidator),
     // Rating distribution
     ratingCounts: v.optional(v.object({
       stillLearning: v.number(), understood: v.number(),
@@ -623,6 +684,10 @@ export default defineSchema({
     // Full review accuracy
     accuracySum: v.optional(v.number()),
     accuracyCount: v.optional(v.number()),
+    // Same punctuation split as courseStats — see there for the rationale.
+    accuracyStrictSum: v.optional(v.number()),
+    accuracyLenientSum: v.optional(v.number()),
+    accuracyDualCount: v.optional(v.number()),
     // Hour-of-day distribution (24-element array, index = hour 0-23)
     hourBuckets: v.optional(v.array(v.number())),
     // Card state distribution
@@ -679,6 +744,8 @@ export default defineSchema({
         wasFirstReview: v.boolean(), // pre-patch schedulingPhase === 'preReview' && preReviewCount === 0
         wasDefaultRating: v.optional(v.boolean()),
         accuracy: v.optional(v.number()),
+        accuracyStrict: v.optional(v.number()), // present iff the dual trio was written
+        accuracyLenient: v.optional(v.number()),
         reviewDepth: v.optional(v.number()), // reviewDepthAccuracy bucket, only when accuracy present
         languages: v.array(v.string()), // course languages whose per-language stats were incremented
         collectionId: v.optional(v.id('collections')),
@@ -767,7 +834,7 @@ export default defineSchema({
     threadId: v.string(),
     messageId: v.string(),
     toolCallId: v.string(),
-    translations: v.array(v.object({ language: v.string(), text: v.string() })),
+    translations: translationEntriesValidator,
     userId: v.string(),
     status: cardApprovalStatusValidator,
     processedAt: v.optional(v.number()),
@@ -839,8 +906,7 @@ export default defineSchema({
 
   // Unique words per user per course per language.
   // courseId is optional only to accommodate pre-migration rows; new writes
-  // always populate it (historical rows were rebuilt by a one-time stats
-  // backfill that has since run and been removed).
+  // always populate it.
   userWords: defineTable({
     userId: v.string(),
     courseId: v.optional(v.id('courses')),
@@ -902,7 +968,7 @@ export default defineSchema({
     totalNewCards: v.number(),
     totalTimeMs: v.number(),
     activeDays: v.number(),
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
+    reviewsByMode: v.optional(reviewsByModeValidator),
   })
     .index('by_userId_and_courseId_and_week', ['userId', 'courseId', 'week'])
     .index('by_userId_and_courseId', ['userId', 'courseId']),
@@ -917,7 +983,7 @@ export default defineSchema({
     totalTimeMs: v.number(),
     activeDays: v.number(),
     activeWeeks: v.number(),
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
+    reviewsByMode: v.optional(reviewsByModeValidator),
   })
     .index('by_userId_and_courseId_and_month', ['userId', 'courseId', 'month'])
     .index('by_userId_and_courseId', ['userId', 'courseId']),
@@ -933,7 +999,7 @@ export default defineSchema({
     activeDays: v.number(),
     activeWeeks: v.number(),
     activeMonths: v.number(),
-    reviewsByMode: v.optional(v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) })),
+    reviewsByMode: v.optional(reviewsByModeValidator),
   })
     .index('by_userId_and_courseId_and_year', ['userId', 'courseId', 'year'])
     .index('by_userId_and_courseId', ['userId', 'courseId']),
@@ -949,35 +1015,39 @@ export default defineSchema({
     .index('by_userId_and_courseId', ['userId', 'courseId'])
     .index('by_userId_and_courseId_and_reviewNumber', ['userId', 'courseId', 'reviewNumber']),
 
-  // Per-user state left over from the (now-removed) one-shot retokenize
-  // migration. No longer read or written; the table is retained pending a
-  // separate schema-only cleanup so a deploy doesn't drop a still-populated
-  // table.
-  retokenizeMigrationState: defineTable({
-    userId: v.string(),
-    courseIds: v.array(v.id('courses')),
-  }).index('by_userId', ['userId']),
-
   // Usage quotas — local cache of Autumn entitlements for synchronous checks.
   // One document per user; features stored as a record keyed by feature ID.
   usageQuotas: defineTable({
     userId: v.string(),
-    features: v.record(
-      v.string(),
-      v.object({
-        balance: v.number(),
-        included: v.number(),
-        used: v.number(),
-        interval: v.optional(v.string()),
-        unlimited: v.optional(v.boolean()),
-      }),
-    ),
+    features: v.record(v.string(), featureStateValidator),
     lastSyncedAt: v.number(),
     // Current Autumn product (plan), captured during sync. Optional — rows
     // synced before this field existed (or users with no product) have none.
     planId: v.optional(v.string()),
     planName: v.optional(v.string()),
     planStatus: v.optional(v.string()),
+    // When the billing state first became past due (ms). Set on the
+    // transition into past_due, kept while it lasts, cleared on recovery.
+    // There is deliberately NO grace window: while this field is set,
+    // `assertBillingCurrent` (usage/helpers.ts) fails every quota-consuming
+    // mutation and the dunning dialog hard-blocks the UI. The timestamp
+    // itself only feeds the dialog's "overdue since {date}" copy; its
+    // presence is the single source of truth for the block.
+    pastDueSince: v.optional(v.number()),
+    // Stripe-hosted page for the outstanding invoice (from Autumn's
+    // ?expand=invoices). The overdue dialog's primary CTA — paying this is
+    // what actually settles the debt; the billing portal only swaps cards.
+    pastDueInvoiceUrl: v.optional(v.string()),
+  }).index('by_userId', ['userId']),
+
+  // E2E-only planStatus overrides, applied inside syncAllFeatures when the
+  // deployment has E2E_TEST_HOOKS=1 (dev/test only — see usage/testing.ts).
+  // Needed because a genuine past_due can't be produced synchronously in
+  // Stripe test mode (verified July 2026: a failed attach charge voids the
+  // invoice and drops the products instead of going past_due).
+  billingTestOverrides: defineTable({
+    userId: v.string(),
+    planStatus: v.string(),
   }).index('by_userId', ['userId']),
 
   // Admin allowlist for the /app/admin dashboard. The gate (requireAdmin in

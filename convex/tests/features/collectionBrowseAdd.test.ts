@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect, vi } from "vitest";
 
 import schema from "../../schema";
@@ -19,7 +19,7 @@ drainSchedulerAfterEach();
  */
 
 async function seedCourseWithTexts(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   count: number,
   quotaBalance = 100,
 ) {
@@ -138,7 +138,7 @@ async function withContentChainMocks(fn: () => Promise<void>) {
 }
 
 function getProgress(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   courseId: Id<"courses">,
   collId: Id<"collections">,
 ) {
@@ -155,7 +155,7 @@ function getProgress(
   );
 }
 
-function getDeckCards(t: ReturnType<typeof convexTest>, deckId: Id<"decks">) {
+function getDeckCards(t: TestConvex<typeof schema>, deckId: Id<"decks">) {
   return t.run(async (ctx) =>
     ctx.db
       .query("cards")

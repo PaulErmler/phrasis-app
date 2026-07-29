@@ -2,9 +2,15 @@
  * Language metadata for the Flexling app.
  *
  * This file owns:
- *   - The Language and TtsProvider types
- *   - SUPPORTED_LANGUAGES (pure metadata — no voices)
- *   - Language-metadata helpers (name lookup, short labels, romanization, …)
+ *   - The Language and TtsProvider types + SUPPORTED_LANGUAGES (pure
+ *     metadata — no voices)
+ *   - Language-metadata helpers: name lookup, short labels, romanization,
+ *     text direction / RTL detection, and mixed-variant resolution
+ *     (`resolveMixedVariant` for aggregate codes like `es_mixed`)
+ *   - Per-language content versioning (`translationVersion` / `ttsVersion`
+ *     and the staleness comparison that drives lazy regeneration)
+ *   - The TRANSLATION_RULES pipelines (model × reasoning × fallback chains
+ *     for the LLM translation worker) and translation post-processing
  *
  * Voice data and voice-selection helpers live in `lib/voices.ts`. They're
  * re-exported at the bottom of this file so existing imports of things like
@@ -116,7 +122,7 @@ export interface Language {
    * Named pipeline that decides which OpenRouter model(s) + reasoning levels
    * the translation worker uses for this language, with optional fallbacks
    * on truncation. Defined in TRANSLATION_RULES below. Unset →
-   * `gemini_35_flash_nitro_minimal` (Gemini 3.5 Flash Nitro, minimal
+   * `gemini_35_flash_nitro_minimal` (Gemini 3.6 Flash Nitro, minimal
    * reasoning, one same-config retry). No language currently pins a rule —
    * set one here only to route a language off the default.
    */
@@ -251,8 +257,9 @@ export interface Language {
    */
   romanizationBackend?: 'local' | 'google-v3';
   /**
-   * Locale-keyed display-name overrides (e.g. { en: 'Spanish (Spain)' }) for
-   * codes where Intl.DisplayNames is ambiguous. Resolution falls back to the
+   * Locale-keyed display-name overrides (e.g. { de: 'Spanisch (Spanien)' })
+   * for codes where Intl.DisplayNames is ambiguous. The `en` value is derived
+   * from `name` when the override map is built. Resolution falls back to the
    * `en` value, then Intl. The `displayCode` is also registered as a lookup key.
    */
   displayNameOverrides?: Record<string, string>;
@@ -289,7 +296,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'en-GB',
     googleTranslateCode: 'en',
     compareLocale: 'en-GB',
-    displayNameOverrides: { en: 'English (UK)', de: 'Englisch (UK)' },
+    displayNameOverrides: { de: 'Englisch (UK)' },
     name: 'English (UK)',
     nativeName: 'English (UK)',
     flag: '🇬🇧',
@@ -315,7 +322,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'en-US',
     googleTranslateCode: 'en',
     compareLocale: 'en-US',
-    displayNameOverrides: { en: 'English (US)', de: 'Englisch (USA)' },
+    displayNameOverrides: { de: 'Englisch (USA)' },
     name: 'English (US)',
     nativeName: 'English (US)',
     flag: '🇺🇸',
@@ -336,7 +343,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'en-AU',
     googleTranslateCode: 'en',
     compareLocale: 'en-AU',
-    displayNameOverrides: { en: 'English (Australia)', de: 'Englisch (Australien)' },
+    displayNameOverrides: { de: 'Englisch (Australien)' },
     name: 'English (Australia)',
     nativeName: 'English (Australia)',
     flag: '🇦🇺',
@@ -360,7 +367,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'Spain',
     geminiBcp47: 'es-ES',
     azureSttLocale: 'es-ES',
-    displayNameOverrides: { en: 'Spanish (Spain)', de: 'Spanisch (Spanien)' },
+    displayNameOverrides: { de: 'Spanisch (Spanien)' },
     name: 'Spanish (Spain)',
     nativeName: 'Español (España)',
     flag: '🇪🇸',
@@ -388,7 +395,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'es-MX',
     googleTranslateCode: 'es',
     compareLocale: 'es-419',
-    displayNameOverrides: { en: 'Spanish (Latin America)', de: 'Spanisch (Lateinamerika)' },
+    displayNameOverrides: { de: 'Spanisch (Lateinamerika)' },
     name: 'Spanish (Latin America)',
     nativeName: 'Español (Latinoamérica)',
     flag: '🇲🇽',
@@ -412,7 +419,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'es-ES',
     googleTranslateCode: 'es',
     compareLocale: 'es',
-    displayNameOverrides: { en: 'Spanish (Mixed)', de: 'Spanisch (Gemischt)' },
+    displayNameOverrides: { de: 'Spanisch (Gemischt)' },
     variants: [
       { subCode: 'es', voiceLocalePrefix: 'es-ES' },
       { subCode: 'es_latam', voiceLocalePrefix: 'es-US' },
@@ -486,7 +493,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'Brazil',
     geminiBcp47: 'pt-BR',
     azureSttLocale: 'pt-BR',
-    displayNameOverrides: { en: 'Portuguese (Brazil)', de: 'Portugiesisch (Brasilien)' },
+    displayNameOverrides: { de: 'Portugiesisch (Brasilien)' },
     name: 'Portuguese (Brazil)',
     nativeName: 'Português',
     flag: '🇧🇷',
@@ -506,7 +513,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'pt-PT',
     googleTranslateCode: 'pt-PT',
     compareLocale: 'pt-PT',
-    displayNameOverrides: { en: 'Portuguese (Portugal)', de: 'Portugiesisch (Portugal)' },
+    displayNameOverrides: { de: 'Portugiesisch (Portugal)' },
     name: 'Portuguese (Portugal)',
     nativeName: 'Português (Portugal)',
     flag: '🇵🇹',
@@ -985,7 +992,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'zh-CN',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Chinese (Simplified)', de: 'Chinesisch (Vereinfacht)' },
+    displayNameOverrides: { de: 'Chinesisch (Vereinfacht)' },
     name: 'Chinese (Simplified)',
     nativeName: '中文（简体）',
     flag: '🇨🇳',
@@ -1011,7 +1018,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     compareLocale: 'zh-TW',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Chinese (Traditional)', de: 'Chinesisch (Traditionell)' },
+    displayNameOverrides: { de: 'Chinesisch (Traditionell)' },
     name: 'Chinese (Traditional)',
     nativeName: '中文（繁體）',
     flag: '🇹🇼',
@@ -1043,7 +1050,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     compareLocale: 'yue-Hans-HK',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Cantonese (Simplified)', de: 'Kantonesisch (Vereinfacht)' },
+    displayNameOverrides: { de: 'Kantonesisch (Vereinfacht)' },
     name: 'Cantonese (Simplified)',
     nativeName: '粵語（简体）',
     flag: '🇭🇰',
@@ -1077,7 +1084,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     compareLocale: 'yue-Hant-HK',
     hasWordBoundaries: false,
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Cantonese (Traditional)', de: 'Kantonesisch (Traditionell)' },
+    displayNameOverrides: { de: 'Kantonesisch (Traditionell)' },
     name: 'Cantonese (Traditional)',
     nativeName: '粵語（繁體）',
     flag: '🇭🇰',
@@ -1147,7 +1154,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     regionLabel: 'Vietnam',
     geminiBcp47: 'vi-VN',
     azureSttLocale: 'vi-VN',
-    displayNameOverrides: { en: 'Vietnamese (Northern)', de: 'Vietnamesisch (Nord)' },
+    displayNameOverrides: { de: 'Vietnamesisch (Nord)' },
     name: 'Vietnamese (Northern)',
     nativeName: 'Tiếng Việt (miền Bắc)',
     flag: '🇻🇳',
@@ -1166,6 +1173,37 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     translationName: 'Northern Vietnamese',
     translationPromptNotes: 'Northern (Hanoi) Vietnamese vocabulary and particles.',
     translationVersion: 2,
+  },
+  {
+    code: 'vi_south',
+    displayCode: 'vi-VN',
+    regionLabel: 'Southern Vietnam',
+    // Gemini has no southern-specific locale — `vi-VN` is the only Vietnamese
+    // tag it takes — so the dialect is named in the prompt via `ttsPromptName`
+    // (the ar_lev / sw_tz pattern). Azure Fast Transcription likewise only
+    // lists `vi-VN`; it transcribes southern speech fine, so STT stays on.
+    geminiBcp47: 'vi-VN',
+    azureSttLocale: 'vi-VN',
+    googleTranslateCode: 'vi',
+    // Explicit: the default would be the internal code `vi_south`, which is not
+    // a valid Intl locale for the answer comparator's segmenter.
+    compareLocale: 'vi-VN',
+    displayNameOverrides: { de: 'Vietnamesisch (Süd)' },
+    name: 'Vietnamese (Southern)',
+    nativeName: 'Tiếng Việt (miền Nam)',
+    flag: '🇻🇳',
+    category: 'asian-southeast',
+    llmSupportTier: 'tier1',
+    ttsProvider: 'gemini',
+    ttsPromptName: 'Southern Vietnamese',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+    // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
+    // so the model produces Southern vocabulary/particles, not a regionless mix.
+    translationName: 'Southern Vietnamese',
+    translationPromptNotes:
+      'Southern (Saigon) Vietnamese vocabulary and particles.',
   },
   {
     code: 'th',
@@ -1258,7 +1296,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     geminiBcp47: 'ar-001',
     azureSttLocale: 'ar-SA',
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Arabic (Modern Standard)', de: 'Arabisch (Hocharabisch)' },
+    displayNameOverrides: { de: 'Arabisch (Hocharabisch)' },
     name: 'Arabic (Modern Standard)',
     nativeName: 'العربية (الفصحى)',
     flag: '🌎',
@@ -1290,7 +1328,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     googleTranslateCode: 'ar',
     compareLocale: 'ar-SA',
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Arabic (Saudi)', de: 'Arabisch (Saudisch)' },
+    displayNameOverrides: { de: 'Arabisch (Saudisch)' },
     name: 'Arabic (Saudi)',
     nativeName: 'العربية (السعودية)',
     flag: '🇸🇦',
@@ -1318,7 +1356,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     googleTranslateCode: 'ar',
     compareLocale: 'ar-EG',
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Arabic (Egyptian)', de: 'Arabisch (Ägyptisch)' },
+    displayNameOverrides: { de: 'Arabisch (Ägyptisch)' },
     name: 'Arabic (Egyptian)',
     nativeName: 'العربية (المصرية)',
     flag: '🇪🇬',
@@ -1348,7 +1386,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     googleTranslateCode: 'ar',
     compareLocale: 'ar-IQ',
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Arabic (Iraqi)', de: 'Arabisch (Irakisch)' },
+    displayNameOverrides: { de: 'Arabisch (Irakisch)' },
     name: 'Arabic (Iraqi)',
     nativeName: 'العربية (العراقية)',
     flag: '🇮🇶',
@@ -1376,7 +1414,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     googleTranslateCode: 'ar',
     compareLocale: 'ar-LB',
     romanizationBackend: 'local',
-    displayNameOverrides: { en: 'Arabic (Levantine)', de: 'Arabisch (Levantinisch)' },
+    displayNameOverrides: { de: 'Arabisch (Levantinisch)' },
     name: 'Arabic (Levantine)',
     nativeName: 'العربية (الشامية)',
     flag: '🇱🇧',
@@ -1457,7 +1495,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     geminiBcp47: 'sw-KE',
     azureSttLocale: 'sw-KE',
     compareLocale: 'sw-KE',
-    displayNameOverrides: { en: 'Swahili (Kenya)', de: 'Swahili (Kenia)' },
+    displayNameOverrides: { de: 'Swahili (Kenia)' },
     name: 'Swahili (Kenya)',
     nativeName: 'Kiswahili (Kenya)',
     flag: '🇰🇪',
@@ -1478,7 +1516,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     azureSttLocale: 'sw-TZ',
     googleTranslateCode: 'sw',
     compareLocale: 'sw-TZ',
-    displayNameOverrides: { en: 'Swahili (Tanzania)', de: 'Swahili (Tansania)' },
+    displayNameOverrides: { de: 'Swahili (Tansania)' },
     name: 'Swahili (Tanzania)',
     nativeName: 'Kiswahili (Tanzania)',
     flag: '🇹🇿',
@@ -1513,13 +1551,19 @@ const DISPLAY_CODE_TO_REGION: Record<string, string> = Object.fromEntries(
   ]),
 );
 
+// Internal code → Language. `getLanguageByCode` runs on hot per-card paths,
+// so the lookup is a prebuilt Map rather than an array scan (codes are unique).
+const LANGUAGE_BY_CODE = new Map(
+  SUPPORTED_LANGUAGES.map((lang) => [lang.code, lang] as const),
+);
+
 // ---------------------------------------------------------------------------
 // Language-metadata helpers
 // ---------------------------------------------------------------------------
 
 /** Get a language by its internal code (e.g. "es", "es_latam", "zh"). */
 export function getLanguageByCode(code: string): Language | undefined {
-  return SUPPORTED_LANGUAGES.find((lang) => lang.code === code);
+  return LANGUAGE_BY_CODE.get(code);
 }
 
 /**
@@ -1725,15 +1769,19 @@ export type TranslationRule = {
 
 // --- Shared model stages (referenced by multiple rules) --------------------
 
-// Gemini 3.1 Flash Lite with `minimal` reasoning — primary for
+// Gemini 3.5 Flash Lite with `minimal` reasoning — primary for
 // `retranslation_custom` (flagged retranslations of user-created texts).
-// Kept on the cheaper Flash Lite tier (vs. Pro Medium for curriculum) on
-// the assumption that custom texts are mostly the user's own content where
-// a heavyweight cross-model second opinion adds less value than on curated
+// Kept on the Flash Lite tier (vs. Pro Medium for curriculum) on the
+// assumption that custom texts are mostly the user's own content where a
+// heavyweight cross-model second opinion adds less value than on curated
 // material. Minimal thinking still gives the retranslation a brief shot at
-// catching what the user flagged.
+// catching what the user flagged. Moved off 3.1 Flash Lite in Jul 2026:
+// 3.5 is a tier up in price ($0.30/$2.50 per M vs $0.25/$1.50, ~27% more
+// per retranslation at identical token counts) but this stage only fires
+// on a row the user has explicitly flagged as wrong, so it is both rare
+// and the one place where a better second opinion is worth paying for.
 const GEMINI_FLASH_LITE_MINIMAL: ModelStage = {
-  model: 'google/gemini-3.1-flash-lite',
+  model: 'google/gemini-3.5-flash-lite',
   reasoning: 'minimal',
   maxOutputTokens: 4_000,
 };
@@ -1749,7 +1797,7 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
   reasoning: 'medium',
   maxOutputTokens: 8_000,
 };
-// Gemini 3.5 Flash via OpenRouter Nitro routing with `minimal` reasoning —
+// Gemini 3.6 Flash via OpenRouter Nitro routing with `minimal` reasoning —
 // the translation workhorse: primary + retry for
 // `gemini_35_flash_nitro_minimal`, the default rule for every language.
 // Nitro prioritizes throughput/latency; minimal thinking keeps quality on
@@ -1758,7 +1806,7 @@ const GEMINI_PRO_MEDIUM: ModelStage = {
 // convex/features/customTexts.ts) stays on the same model + effort as the
 // single-sentence pipeline by construction rather than by comment.
 export const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
-  model: 'google/gemini-3.5-flash:nitro',
+  model: 'google/gemini-3.6-flash:nitro',
   reasoning: 'minimal',
   maxOutputTokens: 4_000,
 };
@@ -1781,17 +1829,16 @@ export const TRANSLATION_RULES = {
   /**
    * Default for every language — no entry sets an explicit
    * `translationRule` anymore (set one only to route a language off this
-   * default, e.g. if 3.5 Flash regresses on it). Used for the initial LLM
+   * default, e.g. if 3.6 Flash regresses on it). Used for the initial LLM
    * translation of premade curriculum sentences and placement-test
    * material. Single branch — length-hybrid branching was retired so the
    * model + reasoning level is identical regardless of input length.
-   * Swapped in from Gemini 3 Flash in Jul 2026; every translated language
-   * carries a `translationVersion: 2` bump for that swap, so existing
-   * translations lazily regenerate on 3.5 Flash.
+   * Swapped in from Gemini 3.5 Flash in Jul 2026; existing translations are
+   * not mass-regenerated by a version bump — only new/missing rows use 3.6.
    */
   gemini_35_flash_nitro_minimal: {
     id: 'gemini_35_flash_nitro_minimal',
-    label: 'Gemini 3.5 Flash Nitro (minimal) → Gemini 3.5 Flash Nitro (minimal, retry) → Google',
+    label: 'Gemini 3.6 Flash Nitro (minimal) → Gemini 3.6 Flash Nitro (minimal, retry) → Google',
     branches: [
       {
         maxChars: Infinity,
@@ -1823,8 +1870,8 @@ export const TRANSLATION_RULES = {
   },
   /**
    * Triggered by `flagTranslation` for flagged retranslations of CUSTOM
-   * (user-created) texts. Routes through Gemini 3.1 Flash Lite with
-   * `minimal` reasoning — kept on the cheaper Lite tier (vs. Pro Medium
+   * (user-created) texts. Routes through Gemini 3.5 Flash Lite with
+   * `minimal` reasoning — kept on the Lite tier (vs. Pro Medium
    * for curriculum) on the assumption that custom texts are mostly the
    * user's own content where a heavyweight cross-model second opinion
    * adds less value than on curated material. Worker behavior
@@ -1833,7 +1880,7 @@ export const TRANSLATION_RULES = {
    */
   retranslation_custom: {
     id: 'retranslation_custom',
-    label: 'Gemini 3.1 Flash Lite (minimal) — flagged custom retranslation',
+    label: 'Gemini 3.5 Flash Lite (minimal) — flagged custom retranslation',
     branches: [
       { maxChars: Infinity, primary: GEMINI_FLASH_LITE_MINIMAL },
     ],
@@ -1955,10 +2002,13 @@ export function generateCourseName(
 const NAME_OVERRIDES: Record<string, Record<string, string>> = (() => {
   const out: Record<string, Record<string, string>> = {};
   for (const lang of SUPPORTED_LANGUAGES) {
-    if (lang.displayNameOverrides) out[lang.code] = lang.displayNameOverrides;
+    if (lang.displayNameOverrides) {
+      // The `en` override is always the entry's canonical `name`, so it is
+      // injected here instead of being repeated in every literal.
+      out[lang.code] = { en: lang.name, ...lang.displayNameOverrides };
+    }
   }
-  const zh = SUPPORTED_LANGUAGES.find((l) => l.code === 'zh');
-  if (zh?.displayNameOverrides) out['zh-CN'] = zh.displayNameOverrides;
+  if (out['zh']) out['zh-CN'] = out['zh'];
   return out;
 })();
 
@@ -2032,6 +2082,28 @@ export function isRtlLanguage(code: string): boolean {
 /** `dir` attribute value for text in the given language. */
 export function getTextDirection(code: string): 'rtl' | 'ltr' {
   return isRtlLanguage(code) ? 'rtl' : 'ltr';
+}
+
+const RTL_SCRIPT_RE =
+  /[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}]/gu;
+const LETTER_RE = /\p{L}/gu;
+
+/**
+ * Base direction for free-form text with no language code (chat markdown).
+ *
+ * HTML `dir="auto"` keys on the FIRST strong character, which misfires on
+ * the tutor's most common reply shape — an explanation that opens with a
+ * target-language token («"وإنت" means "And you?" …» flips the entire
+ * English paragraph to RTL, moving every period and colon to the wrong
+ * side). Counting strong characters keys the base direction to the
+ * dominant script instead; embedded runs of the other script are still
+ * reordered correctly by the bidi algorithm within that base.
+ */
+export function dominantTextDirection(text: string): 'rtl' | 'ltr' {
+  const rtl = text.match(RTL_SCRIPT_RE)?.length ?? 0;
+  if (rtl === 0) return 'ltr';
+  const letters = text.match(LETTER_RE)?.length ?? 0;
+  return rtl > letters - rtl ? 'rtl' : 'ltr';
 }
 
 /**

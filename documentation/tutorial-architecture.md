@@ -19,8 +19,9 @@ The tutorial system uses [driver.js](https://driverjs.com/) to guide users throu
 
 ```
 lib/tutorials/
-├── types.ts               — TutorialDefinition interface
-├── registry.ts            — Central registry, TUTORIAL_IDS constants
+├── types.ts               — TutorialDefinition / TutorialFactory / TranslateFn types
+├── tour-step.ts           — tourStep() helper: builds a DriveStep from an i18n key prefix
+├── registry.ts            — Central registry; re-exports TUTORIAL_IDS from convex/features/tutorialIds.ts
 ├── use-tutorial.ts        — React hook that manages lifecycle
 ├── home-tour.ts           — Home screen overview tour
 ├── audio-review-tour.ts   — Audio review learning mode tour
@@ -38,18 +39,21 @@ interface TutorialDefinition {
   id: string;              // Unique ID stored in completedTutorials
   steps: DriveStep[];      // driver.js step configuration
   prerequisite?: string;   // ID of a tutorial that must complete first
+  popoverClass?: string;   // Optional extra CSS class for the popovers
 }
 ```
 
+Tutorials are defined as **factories** (`TutorialFactory = (t: TranslateFn) => TutorialDefinition`) so step titles and descriptions come from `next-intl` — `useTutorial` calls `useTranslations('Tutorial')` and passes `t` through to the factory.
+
 ### Registry (`registry.ts`)
 
-All tutorials are registered at import time via `registerTutorial()`. The registry exposes:
+All tutorial factories live in a static `tutorialFactories` record (tutorial ID → factory) inside `registry.ts`. The registry exposes:
 
-- `getTutorial(id)` — look up a definition
-- `getAllTutorials()` — list all definitions
-- `TUTORIAL_IDS` — typed constant object for referencing IDs
+- `getTutorial(id, t)` — look up the factory for `id` (own keys only, so prototype keys like `toString` never resolve) and invoke it with a translate function; returns the `TutorialDefinition` (or `undefined` for unknown IDs)
+- `TUTORIAL_IDS` — typed constant object for referencing IDs. It lives in `convex/features/tutorialIds.ts` (single source of truth shared with the backend's `tutorialIdValidator`) and is re-exported by `registry.ts`
 
 ```typescript
+// convex/features/tutorialIds.ts (re-exported by lib/tutorials/registry.ts)
 export const TUTORIAL_IDS = {
   HOME_TOUR: 'home_tour',
   AUDIO_REVIEW_INTRO: 'audio_review_intro',
@@ -67,8 +71,12 @@ const { isActive, restartTutorial, completeTutorial } = useTutorial(
   {
     enabled: true,      // Gate on a condition (default: true)
     delayMs: 1200,      // Delay before auto-starting (default: 800)
+    extraSteps: [...],  // Extra DriveSteps appended after the tour's own steps
     onInteractiveStep: () => { ... },  // Called when a "try card" step is reached
     onComplete: () => { ... },         // Called when the tutorial finishes
+    stepCompleteOnClickIndex: 2,       // Clicking the highlighted element on this
+                                       // step (0-based) completes the tour and
+                                       // closes the driver (HomeView uses this)
   }
 );
 ```
@@ -81,7 +89,7 @@ The hook uses an effective completed list: Convex `getCompletedTutorials` when a
 3. The prerequisite tutorial (if any) is in the effective completed list
 4. Either the Convex query has returned or the localStorage cache has a value (so we don’t start before we know completion state)
 
-When Convex returns, the result is written to localStorage. When a tutorial is completed via `completeTutorial`, the mutation runs and the ID is appended to localStorage so the UI stays in sync. When `resetTutorials` is used (e.g. from the reset buttons), call `clearTutorialsLocalStorage()` so the cache is cleared.
+When Convex returns, the result is written to localStorage. When a tutorial is completed via `completeTutorial`, the mutation runs and the ID is appended to localStorage so the UI stays in sync.
 
 When `enabled` transitions from `false` → `true`, the auto-start guard resets, allowing the tutorial to fire. This is how the learning mode tutorials work: `enabled` is `state.status === 'reviewing'`, which becomes `true` once the card data has loaded.
 
@@ -97,8 +105,6 @@ When `enabled` transitions from `false` → `true`, the auto-start guard resets,
 | `showCompletionStep` | Show a standalone popover (title + description) |
 | `showChatStep` | Show the chat button highlight step |
 | `completeTutorial` | Mark the tutorial as complete in the DB (and update localStorage cache) |
-
-The module also exports `clearTutorialsLocalStorage()`: call it after `resetTutorials()` so the localStorage cache is cleared (e.g. from "Restart Home Tutorial" and "Reset All Tutorials" buttons).
 
 ---
 
@@ -118,7 +124,6 @@ completedTutorials: v.optional(v.array(v.string()))
 |----------|------|---------|
 | `getCompletedTutorials` | query | Returns `string[]` of completed tutorial IDs |
 | `completeTutorial` | mutation | Appends a tutorial ID to the array |
-| `resetTutorials` | mutation | Clears the array (for testing) |
 
 ---
 
@@ -214,23 +219,22 @@ The driver instance is configured with `stagePadding: 8` and `stageRadius: 8` fo
 
 ### 1. Create the tour file
 
-Create `lib/tutorials/my-new-tour.ts`:
+Create `lib/tutorials/my-new-tour.ts`. The factory receives a translate
+function (`Tutorial` namespace in `messages/en.json` / `de.json`). Build
+steps with `tourStep(t, key, element?, side?, align?)`, which reads
+`${key}.title` / `${key}.description`; omit `element`/`side`/`align` for a
+centered modal-style popover. Raw `DriveStep` literals are still fine for
+special cases (e.g. an empty description or `onPopoverRender` hooks):
 
 ```typescript
 import type { DriveStep } from 'driver.js';
-import type { TutorialDefinition } from './types';
+import type { TutorialDefinition, TranslateFn } from './types';
+import { tourStep } from './tour-step';
 
-export function createMyNewTour(): TutorialDefinition {
+export function createMyNewTour(t: TranslateFn): TutorialDefinition {
   const steps: DriveStep[] = [
-    {
-      element: '[data-tutorial="my-element"]',
-      popover: {
-        title: 'Step Title',
-        description: 'Step description.',
-        side: 'bottom',
-        align: 'center',
-      },
-    },
+    tourStep(t, 'myNewTour.welcome'),  // centered welcome popover
+    tourStep(t, 'myNewTour.step1', '[data-tutorial="my-element"]', 'bottom', 'center'),
     // ... more steps
   ];
 
@@ -242,22 +246,33 @@ export function createMyNewTour(): TutorialDefinition {
 }
 ```
 
-### 2. Register it
+### 2. Add the ID
 
-In `registry.ts`:
+In `convex/features/tutorialIds.ts` (single source of truth, shared with the backend):
 
 ```typescript
-import { createMyNewTour } from './my-new-tour';
-
-registerTutorial(createMyNewTour());
-
 export const TUTORIAL_IDS = {
   // ... existing
   MY_NEW_TOUR: 'my_new_tour',
 } as const;
 ```
 
-### 3. Add data-tutorial attributes
+Also add the matching `v.literal('my_new_tour')` to `tutorialIdValidator` in the same file.
+
+### 3. Register it
+
+In `registry.ts`, add an entry to the static `tutorialFactories` record:
+
+```typescript
+import { createMyNewTour } from './my-new-tour';
+
+const tutorialFactories: Record<string, TutorialFactory> = {
+  // ... existing entries
+  my_new_tour: createMyNewTour,
+};
+```
+
+### 4. Add data-tutorial attributes
 
 On the target component(s):
 
@@ -265,14 +280,13 @@ On the target component(s):
 <div data-tutorial="my-element">...</div>
 ```
 
-### 4. Trigger it
+### 5. Trigger it
 
-In the component where the tutorial should auto-start:
+In the component where the tutorial should auto-start (`driver.js/dist/driver.css` is already imported globally in `app/globals.css`):
 
 ```tsx
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
 import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
-import 'driver.js/dist/driver.css';
 
 function MyComponent() {
   useTutorial(TUTORIAL_IDS.MY_NEW_TOUR, {
@@ -283,7 +297,7 @@ function MyComponent() {
 }
 ```
 
-### 5. Interactive steps
+### 6. Interactive steps
 
 To pause the tutorial and let the user interact (e.g., complete a card), mark the step with `popoverClass: 'tutorial-try-card'` and use the `onInteractiveStep` callback:
 
@@ -298,7 +312,7 @@ useTutorial(TUTORIAL_IDS.MY_NEW_TOUR, {
 });
 ```
 
-### 6. Disabling interaction during a step
+### 7. Disabling interaction during a step
 
 Use `onPopoverRender` on the step to disable clicks, and clean up in the next step:
 
@@ -330,9 +344,9 @@ Use `onPopoverRender` on the step to disable clicks, and clean up in the next st
 
 ## Testing
 
-The `HomeView` includes two testing buttons (intended for development):
+There is no reset mutation or reset button. To make tutorials auto-fire again, clear `completedTutorials` on the user's `userSettings` doc (Convex dashboard) and remove the per-user localStorage cache (`phrasis_completed_tutorials_<userId>`) in the browser devtools.
 
-- **Restart Home Tutorial** — calls `resetTutorials()`, then `clearTutorialsLocalStorage()`, then restarts the home tour after a short delay
-- **Reset All Tutorials** — calls `resetTutorials()` and `clearTutorialsLocalStorage()` so all tutorials will trigger again on their next natural condition (e.g., entering a learning mode)
+To re-run a tour without resetting completion state, `useTutorial` returns `restartTutorial` (destroys any active driver instance and relaunches the tour):
 
-The `resetTutorials` mutation clears `completedTutorials` in the DB; `clearTutorialsLocalStorage()` clears the localStorage cache so the hook’s effective completed list stays in sync.
+- `HomeView` passes its `restartTutorial` up via the `onTutorialReady` prop; the main layout (`app/app/(main)/layout.tsx`) stores it in a ref and wires it to `HelpDialog`'s `onRestartTutorial` action (home view only).
+- `LearnView` passes `restartTutorial` into the learning UI as `onRestartTutorial`.

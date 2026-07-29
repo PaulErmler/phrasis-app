@@ -1,7 +1,10 @@
 import { v, ConvexError } from 'convex/values';
 import { mutation, query, MutationCtx, QueryCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { buildCardSearchableText } from '../lib/cardContent';
+import {
+  buildCardSearchableText,
+  buildTextContentBatchForLanguages,
+} from '../lib/cardContent';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, requireAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -28,7 +31,6 @@ import {
   scheduleCard,
   getValidRatings,
   DEFAULT_INITIAL_REVIEW_COUNT,
-  type ReviewRating,
   type CardSchedulingState,
 } from '../../lib/scheduling';
 import {
@@ -39,28 +41,25 @@ import {
   reviewRatingValidator,
   reviewModeValidator,
   asVoiceGender,
+  type SchedulingMode,
+  type StudyContentFilter,
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
 import { settledCount } from '../lib/collections';
 import { getTodayInTimezone } from '../lib/dateUtils';
 import {
-  getAudioForText,
   deleteAudioRow,
   deleteAudioRowsForTextLanguage,
 } from '../lib/audio';
 import { soundsSame } from '../lib/textComparison';
 import {
-  ROMANIZATION_LANGUAGES,
   USER_PROVIDED_TRANSLATION_SOURCE,
   FLAG_AUTO_RETRANSLATION_MAX,
 } from '../../lib/languages';
 import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { scheduleMissingContent } from './decks';
-import {
-  claimLlmTranslationIfAvailable,
-  CLAIM_STALE_MS as LLM_CLAIM_STALE_MS,
-} from './llmTranslationQueue';
+import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
 import {
   CARD_OVERRIDE_SPEED_MIN,
@@ -136,9 +135,6 @@ const cardResultFields = {
 };
 
 const cardResultValidator = v.object(cardResultFields);
-
-type SchedulingMode = 'learn_new' | 'learnAndReview' | 'radio';
-type StudyContentFilter = 'custom' | 'course' | 'both';
 
 /**
  * Fetch the top-K due cards for a scheduling mode, honoring the
@@ -321,90 +317,46 @@ export const getCardForReview = query({
     );
     if (dueCards.length === 0) return null;
 
-    const allLanguages = [
-      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
-    ];
+    // Current + peeked-next card content in one batched pass. `rawRomanization`
+    // and `ignoreMissingWordTimings` keep this query's long-standing semantics:
+    // it surfaces stored romanization for every language and does not treat
+    // legacy timing-less audio as a content gap.
+    const texts = await Promise.all(dueCards.map((card) => ctx.db.get(card.textId)));
+    const contentInputs = dueCards.flatMap((card, i) => {
+      const text = texts[i];
+      return text
+        ? [
+            {
+              key: String(i),
+              textId: card.textId,
+              sourceText: text.text,
+              sourceLanguage: text.language,
+              sourceRomanization: text.romanizedText ?? undefined,
+            },
+          ]
+        : [];
+    });
+    const contentByKey = await buildTextContentBatchForLanguages(
+      ctx,
+      contentInputs,
+      course.baseLanguages,
+      course.targetLanguages,
+      { rawRomanization: true, ignoreMissingWordTimings: true },
+    );
 
-    const buildCardResult = async (card: Doc<'cards'>) => {
-      const text = await ctx.db.get(card.textId);
-      if (!text) return null;
-
-      const sourceLanguage = text.language;
-
-      const audioRecordings = await getAudioForText(ctx, card.textId, allLanguages);
-
-      // Per-language LLM-claim lookup. A non-stale row in
-      // `llmTranslationClaims` means a `flagTranslation`-triggered LLM
-      // retranslation is currently in flight; the "Retranslating" pill
-      // keys off this rather than "audio is missing" so it doesn't fire
-      // when the user clicks "regenerate audio" (no LLM phase).
-      const claimsByLang = new Map<string, number | null>();
-      await Promise.all(
-        allLanguages.map(async (lang) => {
-          const claim = await ctx.db
-            .query('llmTranslationClaims')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', card.textId).eq('targetLanguage', lang),
-            )
-            .first();
-          claimsByLang.set(lang, claim?.claimedAt ?? null);
-        }),
-      );
-
-      const translations = await Promise.all(
-        allLanguages.map(async (lang) => {
-          if (lang === sourceLanguage) {
-            return {
-              language: lang,
-              text: text.text,
-              isBaseLanguage: course.baseLanguages.includes(lang),
-              isTargetLanguage: course.targetLanguages.includes(lang),
-              romanization: text.romanizedText ?? undefined,
-              retranslating: false,
-            };
-          }
-          const translation = await ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', card.textId).eq('targetLanguage', lang),
-            )
-            .first();
-          const translatedText = translation?.translatedText || '';
-          const claimedAt = claimsByLang.get(lang) ?? null;
-          const llmClaimHeld =
-            claimedAt !== null &&
-            Date.now() - claimedAt < LLM_CLAIM_STALE_MS;
-          // Show the pill only for *re*translations — first-time
-          // translations of new cards also hold a claim, but there's no
-          // prior text to retranslate from, so the pill would be confusing
-          // pre-translation. Gate on `translatedText` being non-empty.
-          return {
-            language: lang,
-            text: translatedText,
-            isBaseLanguage: course.baseLanguages.includes(lang),
-            isTargetLanguage: course.targetLanguages.includes(lang),
-            romanization: translation?.romanizedText ?? undefined,
-            retranslating: llmClaimHeld && translatedText.length > 0,
-          };
-        }),
-      );
-
-      const hasMissingTranslation = translations.some(
-        (tr) => tr.language !== sourceLanguage && !tr.text,
-      );
-      const hasMissingAudio = audioRecordings.some((a) => !a.url);
-      const hasMissingRomanization = translations.some(
-        (tr) => ROMANIZATION_LANGUAGES.has(tr.language) && !tr.romanization,
-      );
+    const buildCardResult = (card: Doc<'cards'>, index: number) => {
+      const text = texts[index];
+      const content = contentByKey.get(String(index));
+      if (!text || !content) return null;
 
       return {
         _id: card._id,
         _creationTime: card._creationTime,
         textId: card.textId,
         sourceText: text.text,
-        sourceLanguage,
-        translations,
-        audioRecordings,
+        sourceLanguage: text.language,
+        translations: content.translations,
+        audioRecordings: content.audioRecordings,
         dueDate: card.dueDate,
         isMastered: card.isMastered,
         isHidden: card.isHidden,
@@ -414,15 +366,13 @@ export const getCardForReview = query({
         initialReviewCount,
         fsrsState: card.fsrsState ?? null,
         radioPlayCount: card.radioPlayCount,
-        hasMissingContent: hasMissingTranslation || hasMissingAudio || hasMissingRomanization,
+        hasMissingContent: content.hasMissingContent,
         audioSpeedOverrides: card.audioSpeedOverrides,
       };
     };
 
-    const [current, next] = await Promise.all([
-      buildCardResult(dueCards[0]),
-      dueCards[1] ? buildCardResult(dueCards[1]) : Promise.resolve(null),
-    ]);
+    const current = buildCardResult(dueCards[0], 0);
+    const next = dueCards[1] ? buildCardResult(dueCards[1], 1) : null;
 
     if (!current) return null;
 
@@ -630,6 +580,11 @@ export const reviewCard = mutation({
     forceReviewPhase: v.optional(v.boolean()),
     reviewMode: v.optional(reviewModeValidator),
     accuracy: v.optional(v.number()),
+    // Same review scored both ways, so stats keep both series regardless of
+    // the learner's `ignorePunctuation` setting. Only recorded when both are
+    // present — see recordReviewStats.
+    accuracyStrict: v.optional(v.number()),
+    accuracyLenient: v.optional(v.number()),
     wasDefaultRating: v.optional(v.boolean()),
     sessionId: v.optional(v.string()),
   },
@@ -660,9 +615,14 @@ export const reviewCard = mutation({
       );
     }
 
-    if (args.accuracy != null && (args.accuracy < 0 || args.accuracy > 1 || !Number.isFinite(args.accuracy))) {
-      throw new ConvexError('Invalid accuracy value, must be between 0 and 1');
-    }
+    const assertAccuracy = (value: number | undefined, name: string) => {
+      if (value != null && (value < 0 || value > 1 || !Number.isFinite(value))) {
+        throw new ConvexError(`Invalid ${name} value, must be between 0 and 1`);
+      }
+    };
+    assertAccuracy(args.accuracy, 'accuracy');
+    assertAccuracy(args.accuracyStrict, 'accuracyStrict');
+    assertAccuracy(args.accuracyLenient, 'accuracyLenient');
 
     // Build current scheduling state
     const cardState: CardSchedulingState = {
@@ -744,6 +704,8 @@ export const reviewCard = mutation({
       reviewMode: args.reviewMode,
       rating: args.rating,
       accuracy: args.accuracy,
+      accuracyStrict: args.accuracyStrict,
+      accuracyLenient: args.accuracyLenient,
       wasDefaultRating: args.wasDefaultRating,
       text,
       sessionId: args.sessionId,
@@ -799,6 +761,14 @@ export const reviewCard = mutation({
         wasFirstReview,
         wasDefaultRating: args.wasDefaultRating,
         accuracy: args.accuracy,
+        // Mirrors the both-present gate in recordReviewStats so undo reverses
+        // exactly what was written.
+        ...(args.accuracyStrict != null && args.accuracyLenient != null
+          ? {
+              accuracyStrict: args.accuracyStrict,
+              accuracyLenient: args.accuracyLenient,
+            }
+          : {}),
         reviewDepth:
           args.accuracy != null
             ? card.preReviewCount + (card.fsrsState?.reps ?? 0) + 1
@@ -1320,16 +1290,12 @@ export const toggleFavoriteCard = mutation({
   },
 });
 
-/** Maximum auto-retranslations per flagged row. Shared with the card queries
- * (which use it to decide between "Retranslating" vs "Flagged" pill state). */
-const FLAG_RETRANSLATION_MAX = FLAG_AUTO_RETRANSLATION_MAX;
-
 /**
  * Flag a card as having bad translation content. The user sees a single
  * "Flag" affordance on the card; we then increment `flagCount` on every
  * non-source-language `translations` row for that card's text, and enqueue
  * a retranslation for each one whose post-increment count is within
- * `FLAG_RETRANSLATION_MAX` AND whose language is part of the user's
+ * `FLAG_AUTO_RETRANSLATION_MAX` AND whose language is part of the user's
  * course. Counts past the cap still increment the counter (for later
  * admin triage) but skip the retranslation work to bound cost.
  *
@@ -1425,7 +1391,7 @@ export const flagTranslation = mutation({
     // guaranteed in-course because we fetched from the course's language
     // set above.
     const enqueueable = withCounts.filter(
-      ({ nextCount }) => nextCount <= FLAG_RETRANSLATION_MAX,
+      ({ nextCount }) => nextCount <= FLAG_AUTO_RETRANSLATION_MAX,
     );
 
     if (enqueueable.length === 0) {
@@ -1575,26 +1541,25 @@ export const editCard = mutation({
     ];
 
     // Load existing translations for non-source languages
+    const nonSourceLanguages = allLanguages.filter(
+      (lang) => lang !== sourceLanguage,
+    );
     const existingTranslations = await Promise.all(
-      allLanguages
-        .filter((lang) => lang !== sourceLanguage)
-        .map((lang) =>
-          ctx.db
-            .query('translations')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', card.textId).eq('targetLanguage', lang),
-            )
-            .first(),
-        ),
+      nonSourceLanguages.map((lang) =>
+        ctx.db
+          .query('translations')
+          .withIndex('by_text_and_language', (q) =>
+            q.eq('textId', card.textId).eq('targetLanguage', lang),
+          )
+          .first(),
+      ),
     );
     const existingTranslationMap = new Map<string, Doc<'translations'>>();
-    allLanguages
-      .filter((lang) => lang !== sourceLanguage)
-      .forEach((lang, i) => {
-        if (existingTranslations[i]) {
-          existingTranslationMap.set(lang, existingTranslations[i]!);
-        }
-      });
+    nonSourceLanguages.forEach((lang, i) => {
+      if (existingTranslations[i]) {
+        existingTranslationMap.set(lang, existingTranslations[i]!);
+      }
+    });
 
     // Build a map of submitted texts
     const submittedMap = new Map<string, string>();
@@ -1660,9 +1625,13 @@ export const editCard = mutation({
       resolvedTextId = card.textId;
 
       if (changedLanguages.has(sourceLanguage)) {
+        // `romanizedText` and `romanizationSource` travel as a unit — the old
+        // transliteration no longer matches the new text, so its provenance
+        // tag has to go with it (mirrors the translation branch below).
         await ctx.db.patch(text._id, {
           text: submittedMap.get(sourceLanguage)!,
           romanizedText: undefined,
+          romanizationSource: undefined,
         });
       }
 
@@ -1837,40 +1806,62 @@ export const editCard = mutation({
     const { searchableText, searchableTextLanguages } =
       await buildCardSearchableText(ctx, resolvedTextId, resolvedText.text, courseLanguages);
 
-    // Insert replacement card with identical scheduling stats.
-    // Subtract 1ms from dueDate so this card sorts before any other card that
-    // happens to share the exact same dueDate (Convex uses _creationTime as the
-    // tiebreaker within equal index values, and the new doc would otherwise sort
-    // last, causing a different card to be returned by getCardForReview).
-    await insertCard(ctx, {
-      deckId: card.deckId,
-      textId: resolvedTextId,
-      collectionId: card.collectionId,
-      collectionOrigin: card.collectionOrigin,
-      dueDate: card.dueDate - 1,
-      isMastered: card.isMastered,
-      isHidden: card.isHidden,
-      isFavorite: card.isFavorite,
-      isGraduated: card.isGraduated ?? false,
-      schedulingPhase: card.schedulingPhase,
-      preReviewCount: card.preReviewCount,
-      radioRoundCounter: card.radioRoundCounter ?? 0,
-      // Preserve the true radio play-count so an in-place edit doesn't reset the
-      // "Only new" graduation (undefined for cards that predate the field).
-      radioPlayCount: card.radioPlayCount,
-      // Preserve the existing tiebreak so the edited card keeps its place in
-      // the radio rotation (or take a fresh random one if the original card
-      // predates this field).
-      radioOrderKey: card.radioOrderKey ?? randomRadioOrderKey(),
-      fsrsState: card.fsrsState,
-      lastReviewedAt: card.lastReviewedAt,
-      wordsTrackedLanguages: card.wordsTrackedLanguages,
-      searchableText,
-      searchableTextLanguages,
-    });
+    if (isUserOwned) {
+      // Path A edits the existing text row, so the card still points at the
+      // right content — only its derived search index needs refreshing. Patch
+      // in place: the card keeps its `_id`, `_creationTime` and `dueDate`, so
+      // it holds its exact position in the queue and costs three aggregate
+      // writes instead of the six a delete + insert would.
+      await patchCard(
+        ctx,
+        args.cardId,
+        {
+          searchableText,
+          searchableTextLanguages,
+          // Same defaults the replacement path applied, so cards predating
+          // these fields still get backfilled on edit.
+          isGraduated: card.isGraduated ?? false,
+          radioRoundCounter: card.radioRoundCounter ?? 0,
+          radioOrderKey: card.radioOrderKey ?? randomRadioOrderKey(),
+        },
+        card,
+      );
+    } else {
+      // Path B pointed the card at a brand-new text row, so the card document
+      // has to be replaced. Subtract 1ms from dueDate so this card sorts before
+      // any other card that happens to share the exact same dueDate (Convex
+      // uses _creationTime as the tiebreaker within equal index values, and the
+      // new doc would otherwise sort last, causing a different card to be
+      // returned by getCardForReview).
+      await insertCard(ctx, {
+        deckId: card.deckId,
+        textId: resolvedTextId,
+        collectionId: card.collectionId,
+        collectionOrigin: card.collectionOrigin,
+        dueDate: card.dueDate - 1,
+        isMastered: card.isMastered,
+        isHidden: card.isHidden,
+        isFavorite: card.isFavorite,
+        isGraduated: card.isGraduated ?? false,
+        schedulingPhase: card.schedulingPhase,
+        preReviewCount: card.preReviewCount,
+        radioRoundCounter: card.radioRoundCounter ?? 0,
+        // Preserve the true radio play-count so an in-place edit doesn't reset the
+        // "Only new" graduation (undefined for cards that predate the field).
+        radioPlayCount: card.radioPlayCount,
+        // Preserve the existing tiebreak so the edited card keeps its place in
+        // the radio rotation (or take a fresh random one if the original card
+        // predates this field).
+        radioOrderKey: card.radioOrderKey ?? randomRadioOrderKey(),
+        fsrsState: card.fsrsState,
+        lastReviewedAt: card.lastReviewedAt,
+        wordsTrackedLanguages: card.wordsTrackedLanguages,
+        searchableText,
+        searchableTextLanguages,
+      });
 
-    // Delete old card
-    await deleteCard(ctx, args.cardId);
+      await deleteCard(ctx, args.cardId);
+    }
     // Defensive cleanup: if the edit left the old text orphaned and user-created
     // (path A reuses the textId, so the new card normally still references it —
     // this is a no-op then), drop its now-unreferenced translations/audio/blobs.

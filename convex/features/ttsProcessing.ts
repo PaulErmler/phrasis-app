@@ -7,7 +7,7 @@ import {
   MutationCtx,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { Id } from '../_generated/dataModel';
+import { Doc, Id } from '../_generated/dataModel';
 import {
   synthesizeSpeech,
   transcribeAudio,
@@ -80,6 +80,20 @@ const TTS_TOKEN_MAX_WAIT_MS = 5_000;
  */
 const STT_TOKEN_MAX_WAIT_MS = 15_000;
 
+/** Point-read the (textId, language) TTS generation claim, if any. */
+async function getTtsClaim(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  language: string,
+): Promise<Doc<'ttsGenerationClaims'> | null> {
+  return await ctx.db
+    .query('ttsGenerationClaims')
+    .withIndex('by_text_and_language', (q) =>
+      q.eq('textId', textId).eq('language', language),
+    )
+    .first();
+}
+
 /**
  * Atomically check-and-insert a TTS generation claim. Returns the new claim's
  * `_id` iff the caller acquired the claim (and should enqueue the job), or
@@ -93,12 +107,7 @@ export async function claimTtsIfAvailable(
   textId: Id<'texts'>,
   language: string,
 ): Promise<Id<'ttsGenerationClaims'> | null> {
-  const existing = await ctx.db
-    .query('ttsGenerationClaims')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', textId).eq('language', language),
-    )
-    .first();
+  const existing = await getTtsClaim(ctx, textId, language);
 
   if (existing) {
     if (Date.now() - existing.claimedAt < TTS_CLAIM_STALE_MS) {
@@ -123,12 +132,7 @@ export async function hasActiveTtsClaim(
   textId: Id<'texts'>,
   language: string,
 ): Promise<boolean> {
-  const existing = await ctx.db
-    .query('ttsGenerationClaims')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', textId).eq('language', language),
-    )
-    .first();
+  const existing = await getTtsClaim(ctx, textId, language);
   if (!existing) return false;
   return Date.now() - existing.claimedAt < TTS_CLAIM_STALE_MS;
 }
@@ -390,12 +394,7 @@ export const enqueueTtsJob = internalMutation({
     ctx: MutationCtx,
     { provider, args }: { provider: TtsProvider; args: TtsJobArgs },
   ) => {
-    const claim = await ctx.db
-      .query('ttsGenerationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', args.language),
-      )
-      .first();
+    const claim = await getTtsClaim(ctx, args.textId, args.language);
     // A fresh claim already stamped with another job's workId means a live
     // pool job owns this (textId, language): enqueueing again would synthesize
     // twice and hijack that job's claim. Unreachable from the claim-then-
@@ -469,12 +468,7 @@ export const onTtsJobComplete = internalMutation({
         },
       );
     }
-    const claim = await ctx.db
-      .query('ttsGenerationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', context.textId).eq('language', context.language),
-      )
-      .first();
+    const claim = await getTtsClaim(ctx, context.textId, context.language);
     if (claim && (claim.workId === undefined || claim.workId === workId)) {
       await ctx.db.delete(claim._id);
     }
@@ -668,12 +662,7 @@ export const releaseTtsClaim = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const claim = await ctx.db
-      .query('ttsGenerationClaims')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', args.language),
-      )
-      .first();
+    const claim = await getTtsClaim(ctx, args.textId, args.language);
     if (claim && claim.workId === undefined) {
       await ctx.db.delete(claim._id);
     }

@@ -1,5 +1,9 @@
 import { diffArrays } from 'diff';
-import { normalize, type NormalizeOptions } from './normalize';
+import {
+  normalize,
+  isPunctuationOnly,
+  type NormalizeOptions,
+} from './normalize';
 import { segmentGraphemes } from './segment';
 import { damerauLevenshtein } from './editDistance';
 
@@ -8,6 +12,10 @@ export type CharChunkKind = 'equal' | 'added' | 'removed';
 export interface CharChunk {
   kind: CharChunkKind;
   text: string;
+  /** Set on a mismatched chunk that is pure punctuation while
+   * `ignorePunctuation` is on — it didn't affect the accuracy, so the UI
+   * renders it neutrally instead of as an error. */
+  ignored?: boolean;
 }
 
 export interface CharDiffResult {
@@ -36,10 +44,17 @@ export function charDiff(
   const actualGraphemes = segmentGraphemes(actualRender, locale);
 
   const changes = diffArrays(expectedGraphemes, actualGraphemes);
-  const chunks: CharChunk[] = changes.map((c) => ({
-    kind: c.added ? 'added' : c.removed ? 'removed' : 'equal',
-    text: c.value.join(''),
-  }));
+  const chunks: CharChunk[] = changes.map((c) => {
+    const kind: CharChunkKind = c.added
+      ? 'added'
+      : c.removed
+        ? 'removed'
+        : 'equal';
+    const text = c.value.join('');
+    const ignored =
+      opts.ignorePunctuation && kind !== 'equal' && isPunctuationOnly(text);
+    return ignored ? { kind, text, ignored: true } : { kind, text };
+  });
 
   const expectedNorm = segmentGraphemes(normalize(expected, opts), locale);
   const actualNorm = segmentGraphemes(normalize(actual, opts), locale);

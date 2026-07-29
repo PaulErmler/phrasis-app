@@ -32,6 +32,53 @@ describe('normalize', () => {
     expect(normalize('   ')).toBe('');
   });
 
+  describe('ignorePunctuation', () => {
+    it('keeps punctuation by default', () => {
+      expect(normalize('Hello, world!')).toBe('Hello, world!');
+    });
+
+    it('strips ASCII punctuation when requested', () => {
+      expect(normalize('Hello, world!', { ignorePunctuation: true })).toBe(
+        'Hello world',
+      );
+    });
+
+    it('strips CJK punctuation', () => {
+      // 。(U+3002) and 、(U+3001) are Unicode category Po, same as ASCII marks.
+      expect(
+        normalize('今日は暑いですね。', { ignorePunctuation: true }),
+      ).toBe('今日は暑いですね');
+      expect(normalize('はい、そうです。', { ignorePunctuation: true })).toBe(
+        'はい、そうです。'.replace(/[、。]/g, ''),
+      );
+    });
+
+    it('strips full-width and inverted marks', () => {
+      expect(normalize('本当に？', { ignorePunctuation: true })).toBe('本当に');
+      expect(normalize('¿Cómo estás?', { ignorePunctuation: true })).toBe(
+        'Cómo estás',
+      );
+    });
+
+    it('strips apostrophes inside words', () => {
+      expect(normalize("don't", { ignorePunctuation: true })).toBe('dont');
+      expect(normalize("l'eau", { ignorePunctuation: true })).toBe('leau');
+    });
+
+    it('leaves no stray whitespace behind', () => {
+      expect(normalize('Well , yes .', { ignorePunctuation: true })).toBe(
+        'Well yes',
+      );
+    });
+
+    it('does not strip currency or math symbols', () => {
+      // \p{S}, not \p{P} — meaningful content, so it stays.
+      expect(normalize('$5 + 3 = 8', { ignorePunctuation: true })).toBe(
+        '$5 + 3 = 8',
+      );
+    });
+  });
+
   it('applies NFC normalization', () => {
     // "é" as decomposed (e + combining acute) should be recomposed
     const decomposed = 'e\u0301';

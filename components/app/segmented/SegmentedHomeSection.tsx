@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Check, MessageSquare, PenLine } from 'lucide-react';
 import { useMutation, usePreloadedQuery, useQuery } from 'convex/react';
 import { useAppData } from '@/components/app/AppDataProvider';
+import { useScrollFocusedIntoView } from '@/hooks/use-scroll-focused-into-view';
 import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
@@ -36,13 +37,11 @@ type Level = HomeSummary['levels'][number];
 type CustomCollectionSummary = HomeSummary['customCollections'][number];
 
 interface SegmentedHomeSectionProps {
-  activeCourseId: Id<'courses'> | null;
   onNavigateToContent: () => void;
   onNavigateToChat: () => void;
 }
 
 export function SegmentedHomeSection({
-  activeCourseId,
   onNavigateToContent,
   onNavigateToChat,
 }: SegmentedHomeSectionProps) {
@@ -119,13 +118,12 @@ export function SegmentedHomeSection({
       </div>
 
       <TabsContent value="premade" className="flex flex-col gap-3">
-        <PremadeTab summary={summary} activeCourseId={activeCourseId} />
+        <PremadeTab summary={summary} />
       </TabsContent>
 
       <TabsContent value="custom" className="flex flex-col gap-3">
         <CustomTab
           customCollections={summary.customCollections}
-          activeCourseId={activeCourseId}
           onNavigateToContent={onNavigateToContent}
           onNavigateToChat={onNavigateToChat}
         />
@@ -138,13 +136,7 @@ export function SegmentedHomeSection({
 // Premade tab — CEFR-grouped rail + inline detail card (original preview)
 // ============================================================================
 
-function PremadeTab({
-  summary,
-  activeCourseId,
-}: {
-  summary: HomeSummary;
-  activeCourseId: Id<'courses'> | null;
-}) {
+function PremadeTab({ summary }: { summary: HomeSummary }) {
   const t = useTranslations('AppPage.collections.carousel');
   const setActiveCollection = useMutation(api.features.decks.setActiveCollection);
   const [optimisticActiveId, setOptimisticActiveId] = React.useState<Id<'collections'> | null>(null);
@@ -190,7 +182,7 @@ function PremadeTab({
     isAdding,
     handleAddCards,
     sentencesRemaining,
-  } = useCollectionDetail({ collections: items, activeCourseId });
+  } = useCollectionDetail({ collections: items });
 
   const handleSelect = React.useCallback(
     async (collectionId: Id<'collections'>) => {
@@ -295,35 +287,7 @@ function GroupedLevelRail({
   focusedId: Id<'collections'> | null;
   onFocus: (id: Id<'collections'>) => void;
 }) {
-  const railRef = React.useRef<HTMLDivElement>(null);
-
-  React.useEffect(() => {
-    // Horizontal-only "scroll into view if needed" — equivalent to
-    // `scrollIntoView({ block: 'nearest', inline: 'nearest' })` but
-    // operating only on the rail's scrollLeft, so the page is never
-    // nudged vertically (the mobile OS-chrome jog bug). If the focused
-    // chip is already fully visible we leave the rail where it is —
-    // the previous "always center" behavior shifted the rail on every
-    // selection, which surprised users who'd manually scrolled it.
-    const rail = railRef.current;
-    const el = rail?.querySelector(
-      `[data-focused="true"]`,
-    ) as HTMLElement | null;
-    if (!rail || !el) return;
-    const railRect = rail.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    if (elRect.left < railRect.left) {
-      rail.scrollTo({
-        left: rail.scrollLeft + (elRect.left - railRect.left),
-        behavior: 'smooth',
-      });
-    } else if (elRect.right > railRect.right) {
-      rail.scrollTo({
-        left: rail.scrollLeft + (elRect.right - railRect.right),
-        behavior: 'smooth',
-      });
-    }
-  }, [focusedId]);
+  const railRef = useScrollFocusedIntoView(focusedId);
 
   return (
     <div
@@ -381,20 +345,41 @@ function GroupedLevelRail({
   );
 }
 
-function LevelChip({
-  level,
+/**
+ * Shared chip shell used by both rails: progress-fill button with a label and
+ * an active-dot / complete-check indicator. The variant bits (button shell
+ * classes, label typography, incomplete fill color, whether the fill div is
+ * `aria-hidden`) are explicit props so `LevelChip` and `CustomChip` render
+ * exactly the DOM they always did.
+ */
+function ProgressChip({
+  displayName,
+  cardsAdded,
+  totalTexts,
   isActive,
   isFocused,
-  themeColor,
   onClick,
+  buttonClassName,
+  labelClassName,
+  incompleteFillColor,
+  fillAriaHidden,
 }: {
-  level: Level;
+  displayName: string | undefined;
+  cardsAdded: number;
+  totalTexts: number;
   isActive: boolean;
   isFocused: boolean;
-  themeColor: string;
   onClick: () => void;
+  /** Static class string for the button shell (width/padding variant). */
+  buttonClassName: string;
+  /** Static class string for the label (typography variant). */
+  labelClassName: string;
+  /** Progress-fill color while the collection is not yet complete. */
+  incompleteFillColor: string;
+  /** Whether the progress-fill div carries `aria-hidden`. */
+  fillAriaHidden: boolean;
 }) {
-  const pct = level.totalTexts > 0 ? Math.min(1, level.cardsAdded / level.totalTexts) : 0;
+  const pct = totalTexts > 0 ? Math.min(1, cardsAdded / totalTexts) : 0;
   const isComplete = pct >= 1;
   return (
     <button
@@ -402,13 +387,13 @@ function LevelChip({
       data-focused={isFocused}
       onClick={onClick}
       className={cn(
-        'relative flex h-14 w-14 flex-col items-center justify-center overflow-hidden rounded-lg border transition-all',
+        buttonClassName,
         isFocused
           ? 'border-primary bg-primary/5 shadow-sm ring-2 ring-primary'
           : 'border-border bg-card hover:bg-muted',
       )}
       aria-pressed={isFocused}
-      title={level.displayName}
+      title={displayName}
     >
       <div
         className="absolute bottom-0 left-0 right-0 transition-all"
@@ -416,16 +401,17 @@ function LevelChip({
           height: `${pct * 100}%`,
           backgroundColor: isComplete
             ? 'color-mix(in oklch, var(--success) 22%, transparent)'
-            : `color-mix(in oklch, ${themeColor} 22%, transparent)`,
+            : incompleteFillColor,
         }}
+        aria-hidden={fillAriaHidden ? true : undefined}
       />
       <span
         className={cn(
-          'relative z-10 font-mono text-[10px] font-bold tabular-nums tracking-tight',
+          labelClassName,
           isFocused ? 'text-foreground' : 'text-muted-foreground',
         )}
       >
-        {level.displayName}
+        {displayName}
       </span>
       <div className="relative z-10 flex h-3 items-center">
         {isActive ? (
@@ -449,6 +435,35 @@ function LevelChip({
   );
 }
 
+function LevelChip({
+  level,
+  isActive,
+  isFocused,
+  themeColor,
+  onClick,
+}: {
+  level: Level;
+  isActive: boolean;
+  isFocused: boolean;
+  themeColor: string;
+  onClick: () => void;
+}) {
+  return (
+    <ProgressChip
+      displayName={level.displayName}
+      cardsAdded={level.cardsAdded}
+      totalTexts={level.totalTexts}
+      isActive={isActive}
+      isFocused={isFocused}
+      onClick={onClick}
+      buttonClassName="relative flex h-14 w-14 flex-col items-center justify-center overflow-hidden rounded-lg border transition-all"
+      labelClassName="relative z-10 font-mono text-[10px] font-bold tabular-nums tracking-tight"
+      incompleteFillColor={`color-mix(in oklch, ${themeColor} 22%, transparent)`}
+      fillAriaHidden={false}
+    />
+  );
+}
+
 // ============================================================================
 // Custom tab — 2-chip scrollable rail (Manually Added + Chat), no tiering.
 // Same chip + inline-detail pattern as the premade tab.
@@ -456,12 +471,10 @@ function LevelChip({
 
 function CustomTab({
   customCollections,
-  activeCourseId,
   onNavigateToContent,
   onNavigateToChat,
 }: {
   customCollections: CustomCollectionSummary[];
-  activeCourseId: Id<'courses'> | null;
   onNavigateToContent: () => void;
   onNavigateToChat: () => void;
 }) {
@@ -530,7 +543,7 @@ function CustomTab({
     browse,
     isAdding,
     handleAddCards,
-  } = useCollectionDetail({ collections: items, activeCourseId });
+  } = useCollectionDetail({ collections: items });
 
   const handleToggleCollection = React.useCallback(
     async (collectionId: string) => {
@@ -544,7 +557,7 @@ function CustomTab({
   );
 
   // Keyed by the raw `collectionName` (e.g. "Custom"/"Chat") to match the
-  // lookup in CollectionCarouselUI (`collectionActions?.[collection.collectionName]`).
+  // `collectionActions[focusedItem.collectionName]` lookup below.
   const collectionActions = React.useMemo<Record<string, CollectionAction>>(() => {
     const actions: Record<string, CollectionAction> = {};
     for (const c of customCollections) {
@@ -678,29 +691,7 @@ function CustomChipRail({
   focusedId: Id<'collections'> | null;
   onFocus: (id: Id<'collections'>) => void;
 }) {
-  const railRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    // Horizontal-only "scroll into view if needed". See the matching
-    // comment on `GroupedLevelRail` for the mobile OS-chrome rationale.
-    const rail = railRef.current;
-    const el = rail?.querySelector(
-      `[data-focused="true"]`,
-    ) as HTMLElement | null;
-    if (!rail || !el) return;
-    const railRect = rail.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    if (elRect.left < railRect.left) {
-      rail.scrollTo({
-        left: rail.scrollLeft + (elRect.left - railRect.left),
-        behavior: 'smooth',
-      });
-    } else if (elRect.right > railRect.right) {
-      rail.scrollTo({
-        left: rail.scrollLeft + (elRect.right - railRect.right),
-        behavior: 'smooth',
-      });
-    }
-  }, [focusedId]);
+  const railRef = useScrollFocusedIntoView(focusedId);
 
   return (
     <div
@@ -748,61 +739,21 @@ function CustomChip({
   isFocused: boolean;
   onClick: () => void;
 }) {
-  const pct = item.totalTexts > 0 ? Math.min(1, item.cardsAdded / item.totalTexts) : 0;
-  const isComplete = pct >= 1;
   return (
-    <button
-      type="button"
-      data-focused={isFocused}
+    <ProgressChip
+      displayName={item.displayName}
+      cardsAdded={item.cardsAdded}
+      totalTexts={item.totalTexts}
+      isActive={item.isActive}
+      isFocused={isFocused}
       onClick={onClick}
       // Double the width of a level chip (28 vs 14 in tailwind units = 112px
       // vs 56px) so collection names like "Manually Added" fit comfortably.
-      className={cn(
-        'relative flex h-14 w-28 flex-col items-center justify-center overflow-hidden rounded-lg border px-2 transition-all',
-        isFocused
-          ? 'border-primary bg-primary/5 shadow-sm ring-2 ring-primary'
-          : 'border-border bg-card hover:bg-muted',
-      )}
-      aria-pressed={isFocused}
-      title={item.displayName}
-    >
-      <div
-        className="absolute bottom-0 left-0 right-0 transition-all"
-        style={{
-          height: `${pct * 100}%`,
-          backgroundColor: isComplete
-            ? 'color-mix(in oklch, var(--success) 22%, transparent)'
-            : 'color-mix(in oklch, var(--primary) 18%, transparent)',
-        }}
-        aria-hidden
-      />
-      <span
-        className={cn(
-          'relative z-10 truncate text-center text-[11px] font-semibold tabular-nums',
-          isFocused ? 'text-foreground' : 'text-muted-foreground',
-        )}
-      >
-        {item.displayName}
-      </span>
-      <div className="relative z-10 flex h-3 items-center">
-        {item.isActive ? (
-          <span
-            style={{
-              display: 'block',
-              width: '6px',
-              height: '6px',
-              borderRadius: '9999px',
-              backgroundColor: 'var(--primary)',
-              boxShadow:
-                '0 0 0 1.5px color-mix(in oklch, var(--primary) 25%, transparent)',
-            }}
-            aria-hidden
-          />
-        ) : isComplete ? (
-          <Check className="size-3 text-[color:var(--success)]" strokeWidth={3} />
-        ) : null}
-      </div>
-    </button>
+      buttonClassName="relative flex h-14 w-28 flex-col items-center justify-center overflow-hidden rounded-lg border px-2 transition-all"
+      labelClassName="relative z-10 truncate text-center text-[11px] font-semibold tabular-nums"
+      incompleteFillColor="color-mix(in oklch, var(--primary) 18%, transparent)"
+      fillAriaHidden
+    />
   );
 }
 

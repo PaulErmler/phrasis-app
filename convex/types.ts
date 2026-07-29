@@ -94,6 +94,18 @@ export const schedulingModeValidator = v.union(
   v.literal('radio'),
 );
 
+// Writing mode: accuracy breakpoints that map a typed answer's score to an
+// FSRS rating. Percent points (0-100 integers), lower-inclusive — a score of
+// exactly `hard` rates "hard", a score of exactly `good` rates "good". `easy`
+// is optional and currently never written by the UI (the control ships with
+// three bands); when unset the top band is "good".
+// Invariant enforced on write: 0 <= hard <= good <= (easy ?? 100) <= 100.
+export const autoRateThresholdsValidator = v.object({
+  hard: v.number(),
+  good: v.number(),
+  easy: v.optional(v.number()),
+});
+
 // Source-of-content filter. `undefined` and 'both' behave identically (no filter).
 // 'custom' = study/auto-add only cards from collections with origin !== 'premade' (custom + chat).
 // 'course' = study/auto-add only cards from collections with origin === 'premade'.
@@ -177,6 +189,40 @@ export const cardApprovalStatusValidator = v.union(
   v.literal('pending'),
   v.literal('approved'),
   v.literal('rejected'),
+);
+
+// Per-feature quota snapshot mirrored from Autumn (usageQuotas.features
+// values). Lives here (not in usage/helpers.ts, which re-exports it) so
+// schema.ts can share it without importing `_generated/server`.
+export type FeatureState = {
+  balance: number;
+  included: number;
+  used: number;
+  interval?: string;
+  unlimited?: boolean;
+};
+
+export const featureStateValidator = v.object({
+  balance: v.number(),
+  included: v.number(),
+  used: v.number(),
+  interval: v.optional(v.string()),
+  unlimited: v.optional(v.boolean()),
+});
+
+// Per-review-mode counters shared by the stats tables (courseStats
+// totalReviewsByMode, dailyStats reviewsByMode/timeMsByMode, and the
+// weekly/monthly/yearly reviewsByMode). Wrap with v.optional at call sites.
+export const reviewsByModeValidator = v.object({
+  audio: v.number(),
+  full: v.number(),
+  radio: v.optional(v.number()),
+});
+
+// `{language, text}` translation-entry list shared by the cardApprovals
+// table/mutations and the sentence-metadata action args.
+export const translationEntriesValidator = v.array(
+  v.object({ language: v.string(), text: v.string() }),
 );
 
 export type LearningStyle = Infer<typeof learningStyleValidator>;

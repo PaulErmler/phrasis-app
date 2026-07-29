@@ -1,3 +1,5 @@
+import { getSegmenter } from './textCompare/segment';
+
 export type Token = { normalized: string; original: string };
 
 /**
@@ -12,18 +14,12 @@ export function isAllLowercase(s: string): boolean {
 }
 
 // Segmenter construction is measurable on hot paths (review writes,
-// migrations, edit flows). Cache per normalized BCP-47 tag.
-const segmenterCache = new Map<string, Intl.Segmenter>();
+// migrations, edit flows) — `getSegmenter` caches per normalized BCP-47 tag.
 export function getWordSegmenter(language: string): Intl.Segmenter {
   // `es_latam` and similar underscore-separated tags aren't valid BCP-47;
   // Intl.Segmenter would throw. Normalize to hyphens.
   const bcp47 = language.replace(/_/g, '-');
-  let s = segmenterCache.get(bcp47);
-  if (!s) {
-    s = new Intl.Segmenter(bcp47, { granularity: 'word' });
-    segmenterCache.set(bcp47, s);
-  }
-  return s;
+  return getSegmenter(bcp47, 'word');
 }
 
 export function tokenizeText(text: string, language: string): Token[] {

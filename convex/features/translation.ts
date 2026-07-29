@@ -1,5 +1,8 @@
 /**
- * Shared translation helpers — used by features/decks.ts and testing/translation.ts.
+ * Shared translation helpers — used by features/decks.ts and
+ * features/llmTranslationQueue.ts; `toGoogleTranslateCode` is also exercised
+ * by tests/integration/google-translate-fallback.test.ts and
+ * convex/tests/features/translationCodes.test.ts.
  * No Convex function exports; just plain async helpers.
  *
  * Uses Google Cloud Translation API v2 (API key) for translations,
@@ -171,9 +174,8 @@ export async function translateText(
 
 /**
  * Source-language codes that Google Cloud Translation v3 romanizeText
- * actually supports (as of May 2026). The endpoint 400s with
- * "Source language is unsupported" for anything outside this set —
- * we used to discover that the hard way (he, th, yue all crashed in prod).
+ * supports. The endpoint 400s with "Source language is unsupported" for
+ * source languages outside this set.
  *
  * Keep this list in sync with
  * https://docs.cloud.google.com/translate/docs/advanced/romanize-text
@@ -248,9 +250,8 @@ async function romanizeViaGoogleV3Once(
   const romanized = data.romanizations?.[0]?.romanizedText;
   if (!romanized) {
     // Diagnostic dump for the empty-result case (200 OK, empty/missing
-    // romanizedText). Kept after the Arabic root-cause investigation
-    // because the bug appears to be a Google-side flake that retries can
-    // sometimes paper over.
+    // romanizedText) — a Google-side flake that retries can sometimes
+    // paper over.
     console.error('[translation] Google romanizeText v3 empty result', {
       sourceLanguage,
       googleLang,

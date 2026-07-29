@@ -1,6 +1,7 @@
 import { v } from 'convex/values';
 import { internalAction, internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
+import { translationEntriesValidator } from '../types';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS } from '../config/aiModels';
@@ -178,6 +179,19 @@ function safeExtractMetadata(raw: string): Partial<Metadata> {
 }
 
 /**
+ * Shared args for the two metadata actions below — the job payload that flows
+ * from `generateSentenceMetadata` through the retrier into
+ * `fetchSentenceMetadata` unchanged.
+ */
+const metadataJobArgs = v.object({
+  textId: v.id('texts'),
+  translations: translationEntriesValidator,
+  schedulePrepareCard: v.boolean(),
+  baseLanguages: v.array(v.string()),
+  targetLanguages: v.array(v.string()),
+});
+
+/**
  * Entry point used by manual custom-text creation, post-chat-approval, and the migration.
  *
  * Two-step orchestration:
@@ -194,15 +208,7 @@ function safeExtractMetadata(raw: string): Partial<Metadata> {
  *      in `decks.ts:scheduleMissingContent`.
  */
 export const generateSentenceMetadata = internalAction({
-  args: {
-    textId: v.id('texts'),
-    translations: v.array(
-      v.object({ language: v.string(), text: v.string() }),
-    ),
-    schedulePrepareCard: v.boolean(),
-    baseLanguages: v.array(v.string()),
-    targetLanguages: v.array(v.string()),
-  },
+  args: metadataJobArgs.fields,
   returns: v.null(),
   handler: async (ctx, args) => {
     await ctx.runMutation(
@@ -243,15 +249,7 @@ export const generateSentenceMetadata = internalAction({
  * LLM response degrades to a partial patch rather than a retry loop.
  */
 export const fetchSentenceMetadata = internalAction({
-  args: {
-    textId: v.id('texts'),
-    translations: v.array(
-      v.object({ language: v.string(), text: v.string() }),
-    ),
-    schedulePrepareCard: v.boolean(),
-    baseLanguages: v.array(v.string()),
-    targetLanguages: v.array(v.string()),
-  },
+  args: metadataJobArgs.fields,
   returns: v.null(),
   handler: async (ctx, args) => {
     if (args.translations.length === 0) {

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { useAction } from 'convex/react';
-import { ConvexError } from 'convex/values';
+import { convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from '@/lib/constants/chat';
@@ -85,10 +85,10 @@ export function useVoiceRecording(
             onTranscript(transcript);
             toast.success(SUCCESS_MESSAGES.VOICE_TRANSCRIBED);
           } catch (error) {
-            if (
-              error instanceof ConvexError &&
-              (error.data as { code?: string })?.code === 'USAGE_LIMIT'
-            ) {
+            if (isPaymentPastDueError(error)) {
+              // Silent: the reactive payment-overdue dialog is the
+              // canonical surface for this state.
+            } else if (convexErrorCode(error) === 'USAGE_LIMIT') {
               onUsageLimit?.();
             } else {
               console.error('Transcription error:', error);

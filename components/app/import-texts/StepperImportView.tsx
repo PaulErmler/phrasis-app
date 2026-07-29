@@ -29,6 +29,7 @@ import {
   getTextDirection,
 } from '@/lib/languages';
 import { MAX_CARD_TEXT_LENGTH } from '@/lib/constants/learning';
+import { useImeSafeEnter } from '@/hooks/use-ime-safe-enter';
 import {
   FileDropzone,
   DelimiterSelect,
@@ -36,9 +37,9 @@ import {
   HeaderToggle,
   SummaryBar,
   RowErrorBadges,
-} from '../ImportPrimitives';
-import type { ImportController } from '../useImportController';
-import type { RowStatus } from '../types';
+} from './ImportPrimitives';
+import type { ImportController } from './useImportController';
+import type { RowStatus } from './types';
 
 type Step = 0 | 1 | 2;
 
@@ -72,6 +73,7 @@ function ReviewRow({
   const [editingLang, setEditingLang] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { compositionProps, isComposingEvent } = useImeSafeEnter();
 
   useEffect(() => {
     if (editingLang) {
@@ -144,14 +146,26 @@ function ReviewRow({
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => {
                       // Enter saves; Shift+Enter inserts a newline; Esc cancels.
-                      if (e.key === 'Enter' && !e.shiftKey) {
+                      // isComposingEvent guards both: this text is in the target
+                      // language, where Enter confirms an IME conversion and
+                      // Escape cancels it — neither may hit the cell edit. See
+                      // `useImeSafeEnter`.
+                      if (
+                        e.key === 'Enter' &&
+                        !e.shiftKey &&
+                        !isComposingEvent(e)
+                      ) {
                         e.preventDefault();
                         commitEdit();
-                      } else if (e.key === 'Escape') {
+                      } else if (
+                        e.key === 'Escape' &&
+                        !isComposingEvent(e)
+                      ) {
                         e.preventDefault();
                         cancelEdit();
                       }
                     }}
+                    {...compositionProps}
                     rows={Math.min(6, Math.max(2, Math.ceil(draft.length / 50)))}
                     dir={getTextDirection(lang)}
                     className={cn(

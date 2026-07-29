@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, Download } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -97,12 +98,13 @@ export function HeroSection({ isAuthenticated }: HeroSectionProps) {
             className="flex items-center justify-center lg:justify-end"
           >
             <div className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-80 lg:h-80">
-              <img
+              <Image
                 src="/icons/icon.svg"
                 alt="Flexling language learning app logo"
                 className="w-full h-full drop-shadow-2xl"
                 width={320}
                 height={320}
+                priority
               />
             </div>
           </motion.div>

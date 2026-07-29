@@ -1,18 +1,8 @@
 import { ConvexError } from 'convex/values';
 import { QueryCtx } from '../_generated/server';
-import { Id, Doc } from '../_generated/dataModel';
+import { Doc } from '../_generated/dataModel';
 import { getUserSettings, requireAuthUserId } from './users';
 import { FEATURE_IDS } from '../features/featureIds';
-
-/**
- * Get a course by its ID.
- */
-export async function getCourseById(
-  ctx: QueryCtx,
-  courseId: Id<'courses'>,
-): Promise<Doc<'courses'> | null> {
-  return ctx.db.get(courseId);
-}
 
 /**
  * Get the active course for a user (via userSettings → activeCourseId).

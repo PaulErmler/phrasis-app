@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect, vi, afterEach } from "vitest";
 
 // Isolate the fan-out contract from `scheduleMissingContent`'s heavy
@@ -49,7 +49,7 @@ afterEach(() => {
  * with a matching `placementTestSentences` row. Returns the text ids in order.
  */
 async function seedPlacementCorpus(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   count: number,
 ): Promise<Id<"texts">[]> {
   return t.run(async (ctx) => {

@@ -400,11 +400,21 @@ function pauseAllAudioNow(): void {
 
 // ─── Step builders (exported for testing) ───────────────────────────────────
 
-export function buildCoreSteps(
+/** Steps shared verbatim between `buildCoreSteps` and `buildModeSwitchSteps`
+ *  — the reveal/input/audio/rating steps (including the mode-specific rating
+ *  copy) are identical in both walkthroughs, so they're built once here and
+ *  destructured by each builder. */
+function buildSharedModeSteps(
   t: TranslateFn,
   reviewMode: 'audio' | 'full',
-  transcribe = false,
-): DriveStep[] {
+  transcribe: boolean,
+): {
+  reveal: DriveStep;
+  input: DriveStep;
+  audioControls: DriveStep;
+  audioPlay: DriveStep;
+  rating: DriveStep;
+} {
   // Full review shows Again/Hard/Good/Easy from the very first card, while
   // audio review starts in the 2-button "still learning / understood"
   // warm-up. The rating-step copy differs accordingly.
@@ -417,31 +427,6 @@ export function buildCoreSteps(
     })
     : t(ratingKey);
 
-  const welcome: DriveStep = {
-    popover: {
-      title: reviewMode === 'full' ? t('core.welcomeFull.title') : t('core.welcomeAudio.title'),
-      description:
-        reviewMode === 'full'
-          ? t('core.welcomeFull.description')
-          : t('core.welcomeAudio.description'),
-    },
-  };
-  const card: DriveStep = {
-    element: '[data-tutorial="card-flashcard"]',
-    popover: {
-      title: t('core.card.title'),
-      description:
-        reviewMode === 'full'
-          ? t(
-            transcribe
-              ? 'core.card.descriptionFullTranscribe'
-              : 'core.card.descriptionFull',
-          )
-          : t('core.card.descriptionAudio'),
-      side: 'bottom',
-      align: 'center',
-    },
-  };
   const reveal: DriveStep = {
     element: '[data-tutorial="target-text-audio"]',
     popover: {
@@ -485,6 +470,43 @@ export function buildCoreSteps(
       title: t('core.rating.title'),
       description: ratingDescription,
       side: 'top',
+      align: 'center',
+    },
+  };
+
+  return { reveal, input, audioControls, audioPlay, rating };
+}
+
+export function buildCoreSteps(
+  t: TranslateFn,
+  reviewMode: 'audio' | 'full',
+  transcribe = false,
+): DriveStep[] {
+  const { reveal, input, audioControls, audioPlay, rating } =
+    buildSharedModeSteps(t, reviewMode, transcribe);
+
+  const welcome: DriveStep = {
+    popover: {
+      title: reviewMode === 'full' ? t('core.welcomeFull.title') : t('core.welcomeAudio.title'),
+      description:
+        reviewMode === 'full'
+          ? t('core.welcomeFull.description')
+          : t('core.welcomeAudio.description'),
+    },
+  };
+  const card: DriveStep = {
+    element: '[data-tutorial="card-flashcard"]',
+    popover: {
+      title: t('core.card.title'),
+      description:
+        reviewMode === 'full'
+          ? t(
+            transcribe
+              ? 'core.card.descriptionFullTranscribe'
+              : 'core.card.descriptionFull',
+          )
+          : t('core.card.descriptionAudio'),
+      side: 'bottom',
       align: 'center',
     },
   };
@@ -513,14 +535,8 @@ export function buildModeSwitchSteps(
   reviewMode: 'audio' | 'full',
   transcribe = false,
 ): DriveStep[] {
-  const ratingKey = reviewMode === 'full'
-    ? 'core.rating.descriptionFull'
-    : 'core.rating.descriptionAudio';
-  const ratingDescription = t.markup
-    ? t.markup(ratingKey, {
-      strong: (chunks: string) => `<strong>${chunks}</strong>`,
-    })
-    : t(ratingKey);
+  const { reveal, input, audioControls, audioPlay, rating } =
+    buildSharedModeSteps(t, reviewMode, transcribe);
 
   const welcome: DriveStep = {
     popover: {
@@ -530,52 +546,6 @@ export function buildModeSwitchSteps(
       description: reviewMode === 'full'
         ? t('modeSwitch.full.welcome.description')
         : t('modeSwitch.audio.welcome.description'),
-    },
-  };
-  const reveal: DriveStep = {
-    element: '[data-tutorial="target-text-audio"]',
-    popover: {
-      title: t('core.reveal.title'),
-      description: t('core.reveal.description'),
-      side: 'bottom',
-      align: 'center',
-    },
-  };
-  const inputKey = transcribe ? 'core.inputTranscribe' : 'core.input';
-  const input: DriveStep = {
-    element: '[data-tutorial="target-input-and-submit"]',
-    popover: {
-      title: t(`${inputKey}.title`),
-      description: t(`${inputKey}.description`),
-      side: 'top',
-      align: 'center',
-    },
-  };
-  const audioControls: DriveStep = {
-    element: '[data-tutorial="audio-controls"]',
-    popover: {
-      title: t('core.audioControls.title'),
-      description: t('core.audioControls.description'),
-      side: 'top',
-      align: 'center',
-    },
-  };
-  const audioPlay: DriveStep = {
-    element: '[data-tutorial="audio-play"]',
-    popover: {
-      title: t('core.audioPlay.title'),
-      description: t('core.audioPlay.description'),
-      side: 'top',
-      align: 'center',
-    },
-  };
-  const rating: DriveStep = {
-    element: '[data-tutorial="rating-buttons"]',
-    popover: {
-      title: t('core.rating.title'),
-      description: ratingDescription,
-      side: 'top',
-      align: 'center',
     },
   };
 

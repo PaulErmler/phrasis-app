@@ -5,10 +5,9 @@ import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getCourseSettings } from '../db/courseSettings';
 import {
-  getActiveDataset,
+  getPremadeLevelCollections,
   getCollectionProgressForCourse,
 } from '../db/collections';
-import { LEGACY_LEVEL_ORDER } from '../lib/collections';
 
 /**
  * Derive a CEFR tier for a legacy collection that lacks the `cefrTier` field.
@@ -85,40 +84,12 @@ export const getHomeSummary = query({
 
     const courseSettings = await getCourseSettings(ctx, course._id);
 
-    // --- Resolve the active premade dataset --------------------------------
-    // At most one dataset is active globally — its texts are translated into
-    // every target language via the `translations` table. If no dataset is
-    // active yet (pre-activation), fall back to listing legacy collections so
-    // the home view keeps rendering.
-    const activeDataset = await getActiveDataset(ctx);
-
-    // --- Premade levels ----------------------------------------------------
-    // Only fetch the rows actually displayed on the home view — either the
-    // active dataset's ~20 collections (one indexed scan) or the seven legacy
-    // CEFR rows by name (one indexed `first()` each). Avoids the global
-    // `collections` scan that would otherwise grow with every user's custom
-    // and chat collections.
-    let levelCollections: Doc<'collections'>[];
-    if (activeDataset) {
-      levelCollections = await ctx.db
-        .query('collections')
-        .withIndex('by_datasetId_and_order', (q) =>
-          q.eq('datasetId', activeDataset._id),
-        )
-        .collect();
-    } else {
-      const legacyDocs = await Promise.all(
-        LEGACY_LEVEL_ORDER.map((name) =>
-          ctx.db
-            .query('collections')
-            .withIndex('by_name', (q) => q.eq('name', name))
-            .first(),
-        ),
-      );
-      levelCollections = legacyDocs.filter(
-        (c): c is Doc<'collections'> => c !== null,
-      );
-    }
+    // --- Active premade dataset + premade levels ---------------------------
+    // At most one dataset is active globally; if none is active yet, the
+    // helper falls back to the legacy CEFR collections so the home view keeps
+    // rendering (see getPremadeLevelCollections for the read pattern).
+    const { activeDataset, collections: levelCollections } =
+      await getPremadeLevelCollections(ctx);
 
     // --- Progress rows for the active course (one indexed scan) ------------
     const progressRows = await getCollectionProgressForCourse(ctx, userId, course._id);

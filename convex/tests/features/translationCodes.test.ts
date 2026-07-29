@@ -43,6 +43,7 @@ const EXPECTED_GOOGLE: Record<string, string> = {
   ja: 'ja',
   ko: 'ko',
   vi: 'vi',
+  vi_south: 'vi',
   th: 'th',
   id: 'id',
   ar: 'ar',

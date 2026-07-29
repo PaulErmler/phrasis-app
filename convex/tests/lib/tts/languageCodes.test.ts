@@ -50,6 +50,7 @@ const EXPECTED_GEMINI: Record<string, string> = {
   ja: 'ja-JP',
   ko: 'ko-KR',
   vi: 'vi-VN',
+  vi_south: 'vi-VN',
   th: 'th-TH',
   id: 'id-ID',
   ar: 'ar-001',

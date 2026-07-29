@@ -21,22 +21,30 @@ interface WordDiffProps {
   language: string;
   hideAccuracy?: boolean;
   hideErrors?: boolean;
+  /** User setting — punctuation is still shown, just neutral and unscored. */
+  ignorePunctuation?: boolean;
 }
 
 export function computeWordAccuracy(
   expected: string,
   actual: string,
   language: string,
+  ignorePunctuation = false,
 ): number {
-  const diffOpts = toDiffOptions(getCompareConfig(language));
+  const diffOpts = toDiffOptions(getCompareConfig(language, { ignorePunctuation }));
   const result = alignWords(expected, actual, diffOpts);
-  return scoreWordAlignment(result);
+  return scoreWordAlignment(result, { ignorePunctuation });
 }
 
 interface AlignedSegment {
   correct: string;
   wrong: string | null;
   equal: boolean;
+  /** Punctuation-only mismatch while ignoring punctuation — it didn't cost
+   * accuracy, so it renders neutrally. A removed/added pair counts only when
+   * both sides are punctuation: a scored insertion next to a forgiven mark
+   * must still show as an error. */
+  ignored?: boolean;
 }
 
 function buildSegments(chunks: CharChunk[]): AlignedSegment[] {
@@ -48,21 +56,51 @@ function buildSegments(chunks: CharChunk[]): AlignedSegment[] {
     } else if (c.kind === 'removed') {
       const next = chunks[i + 1];
       if (next && next.kind === 'added') {
-        segments.push({ correct: c.text, wrong: next.text, equal: false });
+        segments.push({
+          correct: c.text,
+          wrong: next.text,
+          equal: false,
+          ignored: c.ignored && next.ignored,
+        });
         i++;
       } else {
-        segments.push({ correct: c.text, wrong: '', equal: false });
+        segments.push({
+          correct: c.text,
+          wrong: '',
+          equal: false,
+          ignored: c.ignored,
+        });
       }
     } else if (c.kind === 'added') {
-      segments.push({ correct: '', wrong: c.text, equal: false });
+      segments.push({
+        correct: '',
+        wrong: c.text,
+        equal: false,
+        ignored: c.ignored,
+      });
     }
   }
   return segments;
 }
 
-function PunctChip({ word }: { word: AlignedWord }) {
+function PunctChip({
+  word,
+  ignored = false,
+}: {
+  word: AlignedWord;
+  ignored?: boolean;
+}) {
   // -ml-1 cancels the parent's gap-x-1 so punctuation hugs the preceding word
   // like natural text.
+  if (ignored) {
+    // Punctuation isn't scored, so it must not be flagged either — no
+    // red/green marks for something that can't cost the user anything.
+    return (
+      <span className="-ml-1 rounded-sm bg-muted text-muted-foreground px-1 py-0.5">
+        {word.expected || word.actual}
+      </span>
+    );
+  }
   if (word.tag === 'equal') {
     return (
       <span className="-ml-1 rounded-sm bg-success/15 text-success px-1 py-0.5">
@@ -101,9 +139,17 @@ function PunctChip({ word }: { word: AlignedWord }) {
   );
 }
 
-function WordChip({ word, language }: { word: AlignedWord; language: string }) {
+function WordChip({
+  word,
+  language,
+  ignorePunctuation = false,
+}: {
+  word: AlignedWord;
+  language: string;
+  ignorePunctuation?: boolean;
+}) {
   if (word.kind === 'punct') {
-    return <PunctChip word={word} />;
+    return <PunctChip word={word} ignored={ignorePunctuation} />;
   }
 
   if (word.tag === 'equal') {
@@ -132,7 +178,9 @@ function WordChip({ word, language }: { word: AlignedWord; language: string }) {
 
   // typo or wrong: render expected word inline at baseline; for each diverging
   // character, float the user's incorrect characters above as a small annotation.
-  const diffOpts = toDiffOptions(getCompareConfig(language));
+  const diffOpts = toDiffOptions(
+    getCompareConfig(language, { ignorePunctuation }),
+  );
   const { chunks } = charDiff(word.expected, word.actual, diffOpts);
   const segments = buildSegments(chunks);
 
@@ -156,7 +204,11 @@ function WordChip({ word, language }: { word: AlignedWord; language: string }) {
           return (
             <span
               key={i}
-              className="text-destructive line-through text-[0.75em]"
+              className={
+                s.ignored
+                  ? 'text-muted-foreground text-[0.75em]'
+                  : 'text-destructive line-through text-[0.75em]'
+              }
             >
               {s.wrong}
             </span>
@@ -164,7 +216,7 @@ function WordChip({ word, language }: { word: AlignedWord; language: string }) {
         }
         return (
           <span key={i} className="relative inline-block">
-            {s.wrong !== null && s.wrong.length > 0 && (
+            {s.wrong !== null && s.wrong.length > 0 && !s.ignored && (
               <span
                 aria-hidden
                 className="absolute left-1/2 -translate-x-1/2 -top-2.5 text-[0.7rem] leading-none text-destructive line-through whitespace-pre pointer-events-none font-medium"
@@ -172,7 +224,13 @@ function WordChip({ word, language }: { word: AlignedWord; language: string }) {
                 {s.wrong}
               </span>
             )}
-            <span className={s.equal ? '' : underlineClass}>{s.correct}</span>
+            <span
+              className={
+                s.ignored ? 'text-muted-foreground' : s.equal ? '' : underlineClass
+              }
+            >
+              {s.correct}
+            </span>
           </span>
         );
       })}
@@ -186,19 +244,22 @@ export function WordDiff({
   language,
   hideAccuracy = false,
   hideErrors = false,
+  ignorePunctuation = false,
 }: WordDiffProps) {
   const diffOpts = useMemo(
-    () => toDiffOptions(getCompareConfig(language)),
-    [language],
+    () => toDiffOptions(getCompareConfig(language, { ignorePunctuation })),
+    [language, ignorePunctuation],
   );
 
   const { words, accuracy } = useMemo(() => {
     const result = alignWords(expected, actual, diffOpts);
     return {
       words: result.words,
-      accuracy: Math.round(scoreWordAlignment(result) * 100),
+      accuracy: Math.round(
+        scoreWordAlignment(result, { ignorePunctuation }) * 100,
+      ),
     };
-  }, [expected, actual, diffOpts]);
+  }, [expected, actual, diffOpts, ignorePunctuation]);
 
   const dir = getTextDirection(language);
 
@@ -236,7 +297,11 @@ export function WordDiff({
             key={`${i}-${w.tag}-${w.expected ?? ''}-${w.actual ?? ''}`}
             word={w.expected}
           >
-            <WordChip word={w} language={language} />
+            <WordChip
+              word={w}
+              language={language}
+              ignorePunctuation={ignorePunctuation}
+            />
           </AskAboutWord>
         ))}
       </p>

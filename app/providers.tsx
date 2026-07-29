@@ -25,6 +25,7 @@ export function AutumnWrapper({ children }: { children: React.ReactNode }) {
   const convex = useConvex();
 
   return (
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generated api typing doesn't match AutumnProvider's expected convexApi shape
     <AutumnProvider convex={convex} convexApi={(api as any).autumn}>
       {children}
     </AutumnProvider>

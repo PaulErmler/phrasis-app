@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useMutation, useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { ConvexError } from 'convex/values';
 import { getUserTimezone } from '@/lib/timezone';
+import { useReloadBlock } from '@/components/app/AppUpdateGate';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,7 +26,7 @@ import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FeatureGatedButton } from '@/components/feature_tracking/FeatureGatedButton';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { useCourseLanguages } from '@/hooks/use-course-languages';
-import { cn } from '@/lib/utils';
+import { cn, isPaymentPastDueError } from '@/lib/utils';
 
 interface EnterTextsViewProps {
   onBack: () => void;
@@ -76,10 +77,13 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
 
   const firstInputRef = useRef<HTMLInputElement>(null);
 
-  const orderedLanguages = [
-    ...baseLanguages.filter((l) => !targetLanguages.includes(l)),
-    ...targetLanguages,
-  ];
+  const orderedLanguages = useMemo(
+    () => [
+      ...baseLanguages.filter((l) => !targetLanguages.includes(l)),
+      ...targetLanguages,
+    ],
+    [baseLanguages, targetLanguages],
+  );
 
   const hasLanguages = orderedLanguages.length > 0;
 
@@ -107,6 +111,10 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
     userEditedLangs.size > 0 ||
     orderedLanguages.some((lang) => (texts[lang] ?? '').trim().length > 0);
   const canReset = hasLanguages && hasAnythingToReset && !isSaving && !isAutoFilling;
+
+  // An unsaved draft lives in component state only — a reload would silently
+  // discard whatever the user has typed.
+  useReloadBlock(hasAnythingToReset || isSaving || isAutoFilling);
 
   const handleReset = useCallback(() => {
     setTexts({});
@@ -187,6 +195,11 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
       });
       setAutoFillMetadata(metadata);
     } catch (err) {
+      // Silent: the reactive payment-overdue dialog is the canonical
+      // surface for this state (see isPaymentPastDueError).
+      if (isPaymentPastDueError(err)) {
+        return;
+      }
       if (
         err instanceof ConvexError &&
         typeof err.data === 'object' &&
@@ -250,6 +263,11 @@ export function EnterTextsView({ onBack, hideHeader = false, headerSlot }: Enter
       setTranslationSources({});
       firstInputRef.current?.focus();
     } catch (err) {
+      // Silent: the reactive payment-overdue dialog is the canonical
+      // surface for this state (see isPaymentPastDueError).
+      if (isPaymentPastDueError(err)) {
+        return;
+      }
       if (
         err instanceof ConvexError &&
         typeof err.data === 'object' &&

@@ -95,7 +95,7 @@ export const warmupChartLanguages = internalMutation({
     };
 
     let nextPhase: 'collections' | 'placement' | 'done';
-    let nextCursor: string | null = null;
+    let nextCursor: string | null;
 
     if (phase === 'collections') {
       const page = await ctx.db

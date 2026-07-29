@@ -54,7 +54,7 @@ export interface OnboardingWalkOptions {
  *   language-pair → acquisition → goal → daily-time → proficiency →
  *   (cefr-pick | placement-test + result | none) →
  *   customizing (auto) → first-lesson → stats-recap → word-projection →
- *   feature-tour → plan-pick → /app.
+ *   feature-tour → testimonials → plan-pick → /app.
  */
 export async function completeOnboardingFresh(
   page: Page,
@@ -219,7 +219,13 @@ export async function completeOnboardingFresh(
     await page.getByTestId("feature-tour-next").click();
   }
 
-  // 11. Plan pick — skip onto Free.
+  // 11. Testimonials — plain continue.
+  await expect(
+    page.getByTestId("onboarding-step-testimonials"),
+  ).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId("onboarding-continue").click();
+
+  // 12. Plan pick — skip onto Free.
   await expect(page.getByTestId("onboarding-step-plan-pick")).toBeVisible({
     timeout: 20_000,
   });
@@ -227,13 +233,13 @@ export async function completeOnboardingFresh(
     await page.getByTestId("plan-pick-skip").click();
   }
 
-  // 12. Wait for the post-wizard redirect to /app.
+  // 13. Wait for the post-wizard redirect to /app.
   await page.waitForURL(
     (url) => /\/app(\/|$)/.test(url.pathname) && !/onboarding/.test(url.pathname),
     { timeout: 30_000 },
   );
 
-  // 13. Confirm the server actually committed finalizeOnboarding before
+  // 14. Confirm the server actually committed finalizeOnboarding before
   // returning. The redirect above is driven by the mutation's OPTIMISTIC
   // update (see app/app/onboarding/page.tsx), so at this point the server may
   // not have the write yet — and callers immediately save storageState and
@@ -347,7 +353,7 @@ export async function openCardImport(page: Page): Promise<void> {
   const individualTab = page.getByTestId("add-cards-mode-individual");
   try {
     await expect(individualTab).toBeVisible({ timeout: 20_000 });
-  } catch (err) {
+  } catch {
     // One retry: in Next dev, the first hit of a route can stall on
     // on-demand compilation under parallel worker load. A hard reload picks
     // up the now-compiled bundle instantly.
@@ -424,4 +430,183 @@ export async function waitForInViewport(
       { timeout: timeoutMs, intervals: [100, 200, 400] },
     )
     .toBe(true);
+}
+
+// ---------------------------------------------------------------------------
+// Billing-spec helpers (shared by billing.spec.ts and payment-overdue.spec.ts)
+// ---------------------------------------------------------------------------
+
+/** Standard Stripe test cards. 0341 attaches fine but fails every charge. */
+export const STRIPE_TEST_CARD_OK = "4242 4242 4242 4242";
+export const STRIPE_TEST_CARD_CHARGE_FAILS = "4000 0000 0000 0341";
+
+export interface FreshUserPaths {
+  /** e.g. "billing" → e2e-billing-<ts>-<rand>@test.de */
+  prefix: string;
+  storageStatePath: string;
+  credentialsPath: string;
+}
+
+/**
+ * Sign up a brand-new user, walk the default onboarding, and persist the
+ * session + credentials to the given paths. Mirrors auth.setup.ts (which
+ * cannot be imported because it registers its own test() calls). Used by
+ * billing-state specs that need a fresh identity per invocation: billing
+ * state lives in Autumn/Stripe and survives suite runs, so shared fixture
+ * users can never be reused for it (and there is intentionally no cleanup
+ * — the app has no account deletion yet).
+ */
+export async function signUpFreshUser(
+  page: Page,
+  { prefix, storageStatePath, credentialsPath }: FreshUserPaths,
+): Promise<{ email: string; password: string; name: string }> {
+  const crypto = await import("node:crypto");
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const random = crypto.randomBytes(6).toString("hex");
+  const creds = {
+    email: `e2e-${prefix}-${Date.now()}-${random}@test.de`,
+    password: `E2ePass!${random}`,
+    name: `E2E ${prefix} ${random}`,
+  };
+
+  await page.goto("/auth/sign-up");
+  await page.waitForLoadState("domcontentloaded");
+  const nameField = page.getByLabel(/^name$/i);
+  if (await nameField.count()) {
+    await nameField.first().fill(creds.name);
+  }
+  await page.getByLabel(/email/i).first().fill(creds.email);
+  const passwordFields = page.getByLabel(/password/i);
+  const passwordCount = await passwordFields.count();
+  for (let i = 0; i < passwordCount; i++) {
+    await passwordFields.nth(i).fill(creds.password);
+  }
+  const acceptCookies = page.getByRole("button", { name: /accept all/i });
+  if (await acceptCookies.count()) {
+    await acceptCookies.first().click().catch(() => {});
+  }
+  await page
+    .getByRole("button", { name: /create an account|create account|^sign\s*up$/i })
+    .click();
+  await page.waitForURL(/\/app\/onboarding/, { timeout: 30_000 });
+
+  await completeOnboardingFresh(page, {});
+
+  fs.mkdirSync(path.dirname(storageStatePath), { recursive: true });
+  await page.context().storageState({ path: storageStatePath });
+  fs.writeFileSync(
+    credentialsPath,
+    JSON.stringify({ ...creds, createdAt: new Date().toISOString() }, null, 2),
+  );
+  return creds;
+}
+
+/**
+ * Neutralize driver.js tours for every document this page loads. A tour
+ * can mount at ANY moment after hydration and `body.driver-active`
+ * disables pointer events page-wide; injecting CSS before every document
+ * load wins all of those races at once (see billing.spec.ts history).
+ */
+export async function neutralizeTours(page: Page) {
+  await page.addInitScript(() => {
+    const style = document.createElement("style");
+    style.textContent = `
+      .driver-overlay, .driver-popover { display: none !important; }
+      body.driver-active, body.driver-active * { pointer-events: auto !important; }
+    `;
+    document.addEventListener("DOMContentLoaded", () =>
+      document.head.appendChild(style),
+    );
+  });
+}
+
+/**
+ * Fill Stripe's hosted test-mode checkout with the given test card and
+ * submit, then wait to be redirected off the Stripe domain. Handles both
+ * the plain-DOM and iframe-hosted card-field variants of the hosted page.
+ */
+export async function completeStripeTestCheckout(
+  page: Page,
+  { cardNumber = STRIPE_TEST_CARD_OK, email }: { cardNumber?: string; email?: string } = {},
+) {
+  await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30_000 });
+
+  const emailField = page.locator("input#email");
+  if (
+    email &&
+    (await emailField.count()) &&
+    (await emailField.isEditable().catch(() => false))
+  ) {
+    await emailField.fill(email);
+  }
+
+  // The inline card form only renders once the "Card" payment-method
+  // radio is checked, and the accordion renders asynchronously — so
+  // selecting the radio is part of the retry loop. Normal clicks on the
+  // styled row time out (the Link iframe overlays the hit area);
+  // force-checking the radio input works.
+  type CardFields = {
+    number: ReturnType<Page["locator"]>;
+    expiry: ReturnType<Page["locator"]>;
+    cvc: ReturnType<Page["locator"]>;
+  };
+  let fields: CardFields | undefined;
+  await expect(async () => {
+    const domFields = (): CardFields => ({
+      number: page.locator("input#cardNumber"),
+      expiry: page.locator("input#cardExpiry"),
+      cvc: page.locator("input#cardCvc"),
+    });
+    if (await page.locator("input#cardNumber").count()) {
+      fields = domFields();
+      return;
+    }
+    const cardRadio = page.getByRole("radio", { name: /^card$/i }).first();
+    if (await cardRadio.count()) {
+      await cardRadio.check({ force: true, timeout: 2_000 }).catch(() => {});
+      if (await page.locator("input#cardNumber").count()) {
+        fields = domFields();
+        return;
+      }
+    }
+    for (const frame of page.frames()) {
+      const inFrame = frame.locator('input[name="number"]');
+      if (await inFrame.count().catch(() => 0)) {
+        fields = {
+          number: inFrame,
+          expiry: frame.locator('input[name="expiry"]'),
+          cvc: frame.locator('input[name="cvc"]'),
+        };
+        return;
+      }
+    }
+    throw new Error("Stripe card fields not rendered yet");
+  }).toPass({ timeout: 45_000, intervals: [1_000] });
+
+  await fields!.number.fill(cardNumber);
+  await fields!.expiry.fill("12 / 34");
+  await fields!.cvc.fill("123");
+
+  const name = page.locator("input#billingName");
+  if ((await name.count()) && (await name.isVisible().catch(() => false))) {
+    await name.fill("E2E Billing Test");
+  }
+  const country = page.locator("select#billingCountry");
+  if (await country.count()) {
+    await country.selectOption("DE").catch(() => {});
+  }
+  const postal = page.locator("input#billingPostalCode");
+  if ((await postal.count()) && (await postal.isVisible().catch(() => false))) {
+    await postal.fill("10115");
+  }
+
+  await page
+    .locator("button.SubmitButton, button[type=submit]")
+    .first()
+    .click();
+
+  await page.waitForURL((url) => !/checkout\.stripe\.com/.test(url.href), {
+    timeout: 90_000,
+  });
 }

@@ -109,6 +109,7 @@ export function useChatMessages({
     {
       initialNumItems: 100,
       stream: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the agent lib's option type omits `stream`
     } as any,
   );
 

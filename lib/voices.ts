@@ -215,6 +215,11 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   ja: [...buildChirp3Pool('ja-JP', 'Japan'), ...GEMINI_CORE],
   ko: [...buildChirp3Pool('ko-KR', 'Korea'), ...GEMINI_CORE],
   vi: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...GEMINI_CORE],
+  // Southern Vietnamese runs on Gemini TTS (vi-VN locale + 'Southern
+  // Vietnamese' named in the prompt — Gemini has no southern locale). The
+  // Chirp3 vi-VN pool is listed dormant for a one-line provider revert; it
+  // carries no dialect distinction either.
+  vi_south: [...buildChirp3Pool('vi-VN', 'Vietnam'), ...GEMINI_CORE],
   th: [...buildChirp3Pool('th-TH', 'Thailand'), ...GEMINI_CORE],
   id: [...buildChirp3Pool('id-ID', 'Indonesia'), ...GEMINI_CORE],
   // Filipino runs on Gemini TTS (fil-PH). No Google Chirp3-HD fil voices, so

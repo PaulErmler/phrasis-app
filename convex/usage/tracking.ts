@@ -1,17 +1,37 @@
 "use node";
 
 import { v } from 'convex/values';
-import { internalAction } from '../_generated/server';
+import { internalAction, type ActionCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { type FeatureState } from './helpers';
+import {
+  currentPlans,
+  normalizePlans,
+  type AutumnPlan,
+} from '../../lib/autumn/customer-shape';
+import { AUTUMN_API, getSecretKey } from './autumnClient';
 
-const AUTUMN_API = 'https://api.useautumn.com/v1';
-
-function getSecretKey(): string {
-  const key = process.env.AUTUMN_SECRET_KEY;
-  if (!key) throw new Error('AUTUMN_SECRET_KEY environment variable is not set');
-  return key;
-}
+/**
+ * Pinned, because the customer payload's SHAPE is version-dependent and the
+ * two families disagree about where delinquency lives (verified 2026-07-26
+ * against one genuinely past-due customer):
+ *
+ *   v1.x (1.0/1.1/1.2/1.4) → `products[]`      status: 'past_due', no `past_due` field
+ *   v2.x (2.0/2.1/2.2)     → `subscriptions[]` status: 'active',   past_due: true
+ *
+ * So a check against either field alone is correct under exactly one family
+ * and blind under the other. This file wants the v2 shape (`subscriptions` +
+ * `purchases`); convex/billing.ts deliberately pins 1.2 for its own trial
+ * logic. Sending no header at all rode Autumn's moving default, which would
+ * eventually have swapped the shape under us and silently disabled the
+ * payment block. `balances` and `flags` are identical across 2.1/2.2 and the
+ * old default, so pinning changes nothing else.
+ *
+ * If Autumn retires this version the request 400s loudly (1.3 already does)
+ * rather than degrading quietly — and `normalizePlans` still falls back to
+ * the v1 `products` shape if one ever arrives.
+ */
+const AUTUMN_API_VERSION = '2.2';
 
 /** Fields returned per balance entry by `GET /customers/:id`. */
 export type AutumnBalanceEntry = {
@@ -20,33 +40,71 @@ export type AutumnBalanceEntry = {
   remaining: number;
   usage: number;
   unlimited: boolean;
-  overage_allowed: boolean;
-  next_reset_at: number | null;
 };
 
-type AutumnFlagEntry = {
-  id: string;
-  plan_id: string | null;
-  expires_at: number | null;
-  feature_id: string;
-};
-
-/** Entry in `subscriptions` / `purchases` on the v1 `GET /customers/:id` payload. */
-type AutumnPlanEntry = {
-  plan_id: string;
-  status: string; // 'active' | 'trialing' | ...
-  add_on: boolean;
-  past_due: boolean;
-  started_at: number;
-};
-
+/**
+ * Only the parts of the payload this file reads. Plan entries are left as
+ * `unknown` on purpose — lib/autumn/customer-shape.ts owns those field
+ * names, for either API family.
+ */
 type AutumnCustomerResponse = {
-  id: string;
   balances?: Record<string, AutumnBalanceEntry>;
-  flags?: Record<string, AutumnFlagEntry>;
-  subscriptions?: AutumnPlanEntry[];
-  purchases?: AutumnPlanEntry[];
+  /** Boolean features. Only the KEYS are read; the values carry no data we use. */
+  flags?: Record<string, unknown>;
+  subscriptions?: unknown;
+  purchases?: unknown;
+  products?: unknown;
+  /** Only present when the request asked for `?expand=invoices`. */
+  invoices?: AutumnInvoiceEntry[];
 };
+
+/** Entry in the expanded `invoices` array. Statuses per Autumn's docs. */
+export type AutumnInvoiceEntry = {
+  status?: string; // draft | open | paid | void | uncollectible
+  hosted_invoice_url?: string | null;
+  created_at?: number;
+};
+
+/** The customer still owes money on this invoice (hosted page or not). */
+function isUnpaidInvoice(i: AutumnInvoiceEntry): boolean {
+  return i.status === 'open' || i.status === 'uncollectible';
+}
+
+/**
+ * Whether any expanded invoice is still unpaid. Unlike
+ * `findPayableInvoiceUrl` this deliberately ignores whether a hosted page
+ * exists: for "has the debt been settled?" an unpaid invoice without a
+ * hosted page still counts as unpaid. Stripe flips an invoice to `paid`
+ * synchronously at payment time, which makes this the race-free signal for
+ * the cancel-while-overdue guard — the subscription's own past_due status
+ * clears only after the Stripe→Autumn webhook. Only meaningful when
+ * `invoices` was actually expanded; callers must treat a missing array as
+ * "unknown", not as "nothing unpaid".
+ */
+export function hasUnpaidInvoice(data: {
+  invoices?: AutumnInvoiceEntry[];
+}): boolean {
+  return (data.invoices ?? []).some(isUnpaidInvoice);
+}
+
+/**
+ * The Stripe-hosted page for the outstanding invoice, so the overdue dialog
+ * can send the user somewhere that actually settles the debt. Newest unpaid
+ * invoice wins; `draft` is excluded because it has no payable page yet.
+ */
+export function findPayableInvoiceUrl(
+  data: AutumnCustomerResponse,
+): string | undefined {
+  const unpaid = (data.invoices ?? [])
+    .filter(
+      (i) =>
+        isUnpaidInvoice(i) &&
+        typeof i.hosted_invoice_url === 'string' &&
+        i.hosted_invoice_url.length > 0,
+    )
+    .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
+  return unpaid[0]?.hosted_invoice_url ?? undefined;
+}
 
 /** "pro_yearly" → "Pro Yearly" — the v1 payload carries no display name. */
 function humanizePlanId(planId: string): string {
@@ -59,34 +117,68 @@ function humanizePlanId(planId: string): string {
 /** The auto-attached default plan (`autoEnable` in autumn.config.ts). */
 const FREE_PLAN_ID = 'free';
 
+export type DerivedBilling = {
+  /** Undefined only when Autumn reported no usable (non-expired) plan. */
+  plan?: { planId: string; planName: string; planStatus: string };
+  /**
+   * Any current plan is delinquent. This — not `plan.planStatus` — is what
+   * drives the payment block, so a co-existing healthy entry can never mask
+   * a past-due one.
+   */
+  anyPastDue: boolean;
+  /** Autumn returned no plans at all; leave the doc's plan fields untouched. */
+  productsMissing: boolean;
+};
+
 /**
- * Derive the customer's current plan from subscriptions (+ one-time
- * purchases as fallback). Add-ons are excluded; an active plan wins over
- * a trialing one; past_due is surfaced via planStatus. The auto-attached
- * default free plan is always listed as active, so paid plans are ranked
- * first — otherwise a trialing paid customer would be recorded as 'free'.
- * Returns undefined when nothing is attached — plan fields are then left
- * untouched on the local quota doc.
+ * Derive the customer's billing state from subscriptions (+ one-time
+ * purchases as fallback).
+ *
+ * Add-ons are excluded, as are `expired` and `scheduled` entries — neither
+ * describes what the customer holds right now. The auto-attached default
+ * free plan is always listed as active, so paid plans are ranked first,
+ * otherwise a trialing paid customer would be recorded as 'free'. Within a
+ * list, a past-due plan is picked first so `planStatus` (and the admin
+ * dashboard) surface the delinquency rather than hiding it behind a
+ * healthier sibling.
  */
-export function derivePlan(
-  data: AutumnCustomerResponse,
-): { planId: string; planName: string; planStatus: string } | undefined {
-  const candidates = [
-    ...(data.subscriptions ?? []),
-    ...(data.purchases ?? []),
-  ].filter((p) => !p.add_on);
-  const pick = (list: AutumnPlanEntry[]) =>
-    list.find((p) => p.status === 'active' && !p.past_due) ??
-    list.find((p) => p.status === 'active') ??
-    list.find((p) => p.status === 'trialing') ??
+export function derivePlan(data: AutumnCustomerResponse): DerivedBilling {
+  const all = normalizePlans(data);
+  if (all.length === 0) {
+    return { plan: undefined, anyPastDue: false, productsMissing: true };
+  }
+
+  const current = currentPlans(all).filter((p) => !p.isAddOn);
+  const anyPastDue = current.some((p) => p.isPastDue);
+
+  const pick = (list: AutumnPlan[]) =>
+    list.find((p) => p.isPastDue) ??
+    list.find((p) => p.rawStatus === 'active') ??
+    list.find((p) => p.isTrialing) ??
     list[0];
-  const paid = candidates.filter((p) => p.plan_id !== FREE_PLAN_ID);
-  const plan = pick(paid) ?? pick(candidates);
-  if (!plan) return undefined;
+  const paid = current.filter((p) => p.planId !== FREE_PLAN_ID);
+  const plan = pick(paid) ?? pick(current);
+
+  if (!plan) {
+    // Autumn answered, but everything it returned was expired / scheduled /
+    // an add-on: the customer currently holds nothing. Report no plan (so
+    // stale plan fields aren't overwritten with an expired one) but NOT
+    // `productsMissing` — this is a definitive answer, so the past-due state
+    // must still be allowed to clear. `productsMissing` is reserved for "the
+    // response was empty", where we genuinely don't know.
+    return { plan: undefined, anyPastDue, productsMissing: false };
+  }
+
   return {
-    planId: plan.plan_id,
-    planName: humanizePlanId(plan.plan_id),
-    planStatus: plan.past_due ? 'past_due' : plan.status,
+    plan: {
+      planId: plan.planId,
+      planName: humanizePlanId(plan.planId),
+      // Normalized back to a single string for the mirror and the admin
+      // dashboard: v2 reports a delinquent plan as 'active'.
+      planStatus: plan.isPastDue ? 'past_due' : plan.rawStatus,
+    },
+    anyPastDue,
+    productsMissing: false,
   };
 }
 
@@ -109,6 +201,7 @@ export const trackUsage = internalAction({
       headers: {
         Authorization: `Bearer ${secretKey}`,
         'Content-Type': 'application/json',
+        'x-api-version': AUTUMN_API_VERSION,
       },
       body: JSON.stringify({
         customer_id: args.userId,
@@ -126,15 +219,57 @@ export const trackUsage = internalAction({
     const customerData = await fetchCustomerData(secretKey, args.userId);
     if (!customerData) return null;
 
-    await ctx.runMutation(internal.usage.helpers.syncAllFeatures, {
-      userId: args.userId,
-      features: toFeaturesRecord(customerData),
-      ...(derivePlan(customerData) ?? {}),
-    });
-
+    await pushCustomerState(ctx, secretKey, args.userId, customerData);
     return null;
   },
 });
+
+/**
+ * Derive billing state from a customer payload and write it to the local
+ * mirror. When the customer is past due, re-fetches with `?expand=invoices`
+ * to capture the payable invoice URL — a second call, but only on the rare
+ * delinquent path, so healthy syncs stay at one request.
+ */
+async function pushCustomerState(
+  ctx: Pick<ActionCtx, 'runMutation'>,
+  secretKey: string,
+  userId: string,
+  customerData: AutumnCustomerResponse,
+): Promise<void> {
+  const billing = derivePlan(customerData);
+
+  let invoiceUrl: string | undefined;
+  if (billing.anyPastDue) {
+    const withInvoices =
+      customerData.invoices !== undefined
+        ? customerData
+        : await fetchCustomerData(secretKey, userId, true);
+    if (withInvoices) invoiceUrl = findPayableInvoiceUrl(withInvoices);
+    if (!invoiceUrl) {
+      // Loud, because the degradation is otherwise invisible: the overdue
+      // dialog silently falls back to the billing-portal CTA, which only
+      // swaps the card on file and never settles the debt. Expected only if
+      // Stripe genuinely has no open invoice yet — if it fires for a
+      // customer who demonstrably owes money, suspect `?expand=invoices`
+      // not being honored on this API version.
+      console.warn(
+        `Past due with no payable invoice URL for ${userId} ` +
+          `(x-api-version ${AUTUMN_API_VERSION}, invoices ` +
+          `${withInvoices?.invoices === undefined ? 'absent' : `n=${withInvoices.invoices.length}`}) ` +
+          `— the overdue dialog will fall back to the billing portal.`,
+      );
+    }
+  }
+
+  await ctx.runMutation(internal.usage.helpers.syncAllFeatures, {
+    userId,
+    features: toFeaturesRecord(customerData),
+    anyPastDue: billing.anyPastDue,
+    productsMissing: billing.productsMissing,
+    ...(invoiceUrl !== undefined ? { pastDueInvoiceUrl: invoiceUrl } : {}),
+    ...(billing.plan ?? {}),
+  });
+}
 
 /**
  * Fetch an existing customer via `GET /customers/:id`.
@@ -143,12 +278,18 @@ export const trackUsage = internalAction({
 export async function fetchCustomerData(
   secretKey: string,
   userId: string,
+  expandInvoices = false,
 ): Promise<AutumnCustomerResponse | null> {
   const res = await fetch(
-    `${AUTUMN_API}/customers/${encodeURIComponent(userId)}`,
+    `${AUTUMN_API}/customers/${encodeURIComponent(userId)}${
+      expandInvoices ? '?expand=invoices' : ''
+    }`,
     {
       method: 'GET',
-      headers: { Authorization: `Bearer ${secretKey}` },
+      headers: {
+        Authorization: `Bearer ${secretKey}`,
+        'x-api-version': AUTUMN_API_VERSION,
+      },
     },
   );
 
@@ -176,6 +317,7 @@ async function getOrCreateCustomer(
     headers: {
       Authorization: `Bearer ${secretKey}`,
       'Content-Type': 'application/json',
+      'x-api-version': AUTUMN_API_VERSION,
     },
     body: JSON.stringify({ id: userId }),
   });
@@ -229,18 +371,12 @@ export const syncQuotasInternal = internalAction({
 });
 
 export async function syncQuotasForUser(
-  ctx: { runMutation: (ref: any, args: any) => Promise<any> },
+  ctx: Pick<ActionCtx, 'runMutation'>,
   userId: string,
 ): Promise<void> {
   const secretKey = getSecretKey();
   const customerData = await getOrCreateCustomer(secretKey, userId);
   if (!customerData) return;
 
-  const features = toFeaturesRecord(customerData);
-
-  await ctx.runMutation(internal.usage.helpers.syncAllFeatures, {
-    userId,
-    features,
-    ...(derivePlan(customerData) ?? {}),
-  });
+  await pushCustomerState(ctx, secretKey, userId, customerData);
 }

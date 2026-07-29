@@ -10,7 +10,7 @@ Flexling is a language-learning web app (Next.js + Convex) that teaches vocabula
 | Backend / DB | Convex (real-time, serverless) |
 | Auth | Better Auth (`@convex-dev/better-auth`) |
 | Styling | Tailwind CSS v4, shadcn/ui (New York), Geist fonts |
-| AI | Google Gemini 2.5 Flash via `@convex-dev/agent` |
+| AI | OpenRouter via `@convex-dev/agent` — `z-ai/glm-5.2:nitro` tutor chat, Gemini Flash Lite models for metadata/titles/TTS validation (see `convex/config/aiModels.ts`) |
 | Billing | Autumn (`@useautumn/convex`) |
 | i18n | `next-intl` (en + de) |
 | Scheduling | ts-fsrs (spaced repetition) |
@@ -45,14 +45,14 @@ Flexling is a language-learning web app (Next.js + Convex) that teaches vocabula
 
 ### Chat / AI Assistant
 
-- AI chat powered by Gemini 2.5 Flash via `@convex-dev/agent`
+- AI chat powered by OpenRouter `z-ai/glm-5.2:nitro` via `@convex-dev/agent` (model roster in `convex/config/aiModels.ts`)
 - Can create flashcards through a tool-call → approval workflow
 - Available on the home page (`NewChatInput`) and inside the learning view (sidebar/slide panel)
 
 ### Feature Gating & Billing
 
 - Autumn manages subscription plans and usage quotas
-- Feature IDs: `chat_messages`, `courses`, `sentences`, `custom_sentences`, `multiple_languages`
+- Feature IDs (11, single source of truth in `convex/features/featureIds.ts`): `chat_messages`, `courses`, `sentences`, `custom_sentences`, `multiple_languages`, `transcriptions`, `card_edits`, `translation_auto_fill`, `audio_regenerations`, `translation_flags`, `credits` — credit-backed features (`chat_messages`, `custom_sentences`, `translation_auto_fill`) draw from the shared `credits` pool via `CREDIT_COSTS`
 - `FeatureGatedButton` and `useFeatureQuota` handle UI enforcement
 - Quotas synced from Autumn and cached locally in `usageQuotas` table
 
@@ -64,7 +64,7 @@ Flexling is a language-learning web app (Next.js + Convex) that teaches vocabula
 |------|---------|
 | `/` | Landing page |
 | `/auth/[path]` | Authentication (Better Auth) → redirects to `/app/onboarding` |
-| `/app/onboarding` | 7-step onboarding wizard |
+| `/app/onboarding` | Multi-step onboarding wizard (see `StepId` in `app/app/onboarding/page.tsx`) |
 | `/app` | Main app (home view, tab-based) |
 | `/app/content` | Content management tab |
 | `/app/library` | Library tab (card search) |
@@ -85,8 +85,7 @@ Flexling is a language-learning web app (Next.js + Convex) that teaches vocabula
 Top to bottom:
 1. `ProgressStatsCard` — streak, reps, sentences, time + `StartLearningButton` (Full Review / Audio Review)
 2. `NewChatInput` — quick chat entry
-3. `CollectionCarousel` — horizontal scroll of difficulty collections (Essential → C2)
-4. `CustomCollectionCarousel` — user-created collections
+3. `SegmentedHomeSection` — segmented collection browser (course level chips Essential → C2 / custom collections, with a compact switcher) rendering inline collection detail via `InlineCollectionDetail` from `components/app/CollectionCarouselUI.tsx`
 
 ### Learning View (`components/app/learning/LearnView.tsx`)
 
@@ -133,6 +132,52 @@ Top to bottom:
 | `userWords` | `userId`, `language`, `word` |
 | `reviewDepthAccuracy` | `userId`, `courseId`, `reviewNumber`, `accuracySum`, `count` |
 | `usageQuotas` | `userId`, `features` (record of balances) |
+
+## Scheduling & Shared Content Helpers
+
+### Shared Scheduling Logic (`lib/scheduling.ts`)
+
+All card-scheduling logic lives in one pure TypeScript module (its only dependency is `ts-fsrs` — no Convex or React imports), so the backend (`convex/features/scheduling.ts`) and the frontend (`components/app/learning/useLearningMode.ts`) share the exact same math:
+
+- `DEFAULT_INITIAL_REVIEW_COUNT = 5` — single source of truth (bounds `MIN_INITIAL_REVIEW_COUNT = 2` / `MAX_INITIAL_REVIEW_COUNT = 10`, checked by `validateInitialReviewCount`)
+- `scheduleCard(cardState, rating, initialReviewCount, now?, requestRetention?)` — the single entry-point for all scheduling, handling both phases. The `requestRetention` override is frontend-only; the backend always uses `DEFAULT_REQUEST_RETENTION` (0.95)
+- `createInitialCardState(now?)` — factory for a brand-new card's scheduling state
+- `getPreReviewInterval(reviewCount)` — pre-review interval in ms (1m, 3m, 5m, then 10m)
+- `getValidRatings(phase)` / `getDefaultRating(phase)` — UI helpers
+- `formatInterval(ms)` — human-readable interval strings
+- `simulateReviews(initialReviewCount, ratings, startTime?, requestRetention?)` — simulates a review sequence with each review at its exact due time (exercised by `tests/unit/lib/scheduling.test.ts`)
+
+FSRS configuration: `request_retention: 0.95`, `maximum_interval: 36500` (days), `enable_fuzz: false`, `enable_short_term: true`, `learning_steps: ['1m', '10m']`, `relearning_steps: ['10m']`.
+
+The pre-review → FSRS transition happens when the user selects "Understood", or when `preReviewCount` reaches `initialReviewCount − 2` — the −2 accounts for the 2 FSRS learning-step reviews needed to graduate, so total initial exposure = `initialReviewCount`.
+
+### Collection Preview & Content Generation
+
+The collection preview dialog (driven by `components/app/useCollectionDetail.ts`) is a paginated browse over functions in `convex/features/collections.ts`:
+
+- `browseCollectionTexts` (query) — paginated rows anchored at the sequential frontier (`collectionProgress.lastRankProcessed`), snapshotted once when the dialog opens so the range never shifts mid-session. `direction: 'after'` streams the not-yet-added zone; `'upTo'` pages the added-history feed. Each row carries `missingTranslationLanguages` for the client to batch into translation requests.
+- `requestPreviewTranslations` (mutation) — generates missing translations (never audio) for up to `MAX_PREVIEW_PAGE_SIZE` (25) texts as pages are revealed; deduped via per-(textId, language) claims and deliberately not quota-gated (translations are cheap; audio is the dominant cost and only happens on an explicit click or once a text becomes a card).
+- `prewarmPreviewTranslations` (mutation) — schedules the next page's translations whenever a page finishes loading, so "show more" usually renders instantly.
+- `requestPreviewAudio` (mutation) — generates audio for one (text, language) on an explicit audio-icon click; no-ops if audio exists or a TTS claim is in flight.
+
+Card content self-heals via the `useEnsureContent` hook (`hooks/use-ensure-content.ts`), which calls `decks.ensureCardContent` for cards flagged `hasMissingContent` (module-level dedup `Set`, batches of 5). At course creation, `ensureFirstSentencesAcrossLevelCollections` fans out one mutation per premade level collection to pre-generate content for each level's first `COLLECTION_PREVIEW_SIZE` (5) texts, so drilling into a level later shows no spinner. `COLLECTION_PREVIEW_SIZE` (defined in `convex/lib/collections.ts`) is also the default batch size for the collection "Add N" button.
+
+### Shared Database & Content Helpers
+
+**Database helpers (`convex/db/collections.ts`):**
+
+- `getCollectionProgress(ctx, userId, courseId, collectionId)` — indexed `collectionProgress` lookup (`by_userId_and_courseId_and_collectionId`); `getCollectionProgressForCourse(ctx, userId, courseId)` fetches all rows for a course in one indexed scan (used by the home view).
+- `getNextTextsFromRank(ctx, collectionId, afterRank, limit, options?)` — rank-based text pagination. `options.onlyCurriculum` restricts to seed/dataset texts (`userCreated === false`); `options.forUserId` scopes custom/chat collections to the requesting user. The flags are mutually exclusive; `onlyCurriculum` takes precedence.
+
+**Content batch helper (`convex/lib/cardContent.ts`):**
+
+- `buildTextContentBatchForLanguages(ctx, inputs, baseLanguages, targetLanguages, opts?)` — given an array of `TextContentInput` objects, batch-fetches all translations and audio recordings across the course languages, resolves storage URLs, and returns a `Map<string, TextContentResult>` with assembled translations, audio, and `hasMissingContent` per text. Used by `getDeckCards` (decks), `browseCollectionTexts` (collections), `getLibraryCards` (library), and `getSentencesForWord` (stats).
+- `getCourseLanguages(baseLanguages, targetLanguages)` — deduplicates base + target language arrays.
+
+**Audio helper (`convex/lib/audio.ts`):**
+
+- `getAudioForText(ctx, textId, languages)` — fetches audio recordings with resolved storage URLs for a single text across the given languages. Used by `getCardForReview` in `convex/features/scheduling.ts`.
+- Deletion helpers (`deleteAudioRow`, `deleteAudioRowsForTextLanguage`, `deleteStorageBlobIfUnreferenced`) keep audio rows and their storage blobs consistent.
 
 ## Stats Tracking
 
@@ -205,7 +250,7 @@ User timezone comes from `lib/timezone.ts` (`Intl.DateTimeFormat().resolvedOptio
 
 ### Stats Queries & Display
 
-All queries in `convex/features/stats.ts`, displayed in `components/app/StatsView.tsx`:
+All queries in `convex/features/stats.ts`, displayed in `components/app/stats/StatsView.tsx`:
 
 | Query | Returns |
 |-------|---------|
@@ -232,7 +277,7 @@ The StatsView displays: streak, words, reviews, time, average accuracy, due card
 
 ## Supported Languages
 
-Defined in `lib/languages.ts` — `SUPPORTED_LANGUAGES` array with code, name, nativeName, flag, and Chirp3 HD TTS voices. Currently: English, Spanish, French, German, Italian, Portuguese (Brazil), Russian, Hindi, Chinese (Simplified), Japanese, Vietnamese, Swedish, Finnish, and Dutch.
+Defined in `lib/languages.ts` — the `SUPPORTED_LANGUAGES` array (~58 entries) with code, name, nativeName, flag, and per-provider TTS voice config. See the array for the current list; hard-coding it here goes stale.
 
 ## i18n
 

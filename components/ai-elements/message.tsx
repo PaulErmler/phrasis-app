@@ -8,6 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { dominantTextDirection } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 import type { FileUIPart, UIMessage } from 'ai';
 import {
@@ -309,28 +310,39 @@ export const MessageBranchPage = ({
 export type MessageResponseProps = ComponentProps<typeof Streamdown> & {
   /**
    * Base text direction for the rendered markdown. Default 'auto':
-   * free-form model output has no language code, so first-strong-character
-   * detection makes fully-RTL replies (Arabic, Hebrew, Persian) render
-   * right-to-left while mixed-language replies keep the base direction of
-   * their first run; `text-left` keeps RTL content flush with the LTR
-   * chat layout. Lives on a wrapper div because Streamdown forwards rest
-   * props to the markdown renderer, not its root element.
+   * free-form model output has no language code, so the direction comes
+   * from the DOMINANT script of the text (`dominantTextDirection`) —
+   * fully-RTL replies (Arabic, Hebrew, Persian) render right-to-left,
+   * while an English explanation that merely OPENS with a target-language
+   * token stays LTR (the HTML dir="auto" first-strong heuristic would
+   * flip it wholesale, putting its punctuation on the wrong side).
+   * `text-left` keeps RTL content flush with the LTR chat layout. Lives
+   * on a wrapper div because Streamdown forwards rest props to the
+   * markdown renderer, not its root element.
    */
   dir?: 'auto' | 'ltr' | 'rtl';
 };
 
 export const MessageResponse = memo(
-  ({ className, dir = 'auto', ...props }: MessageResponseProps) => (
-    <div dir={dir} className="text-left">
-      <Streamdown
-        className={cn(
-          'size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
-          className,
-        )}
-        {...props}
-      />
-    </div>
-  ),
+  ({ className, dir = 'auto', children, ...props }: MessageResponseProps) => {
+    const resolvedDir =
+      dir === 'auto' && typeof children === 'string'
+        ? dominantTextDirection(children)
+        : dir;
+    return (
+      <div dir={resolvedDir} className="text-left">
+        <Streamdown
+          className={cn(
+            'size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
+            className,
+          )}
+          {...props}
+        >
+          {children}
+        </Streamdown>
+      </div>
+    );
+  },
   (prevProps, nextProps) =>
     prevProps.children === nextProps.children &&
     prevProps.mode === nextProps.mode &&
