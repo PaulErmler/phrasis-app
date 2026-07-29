@@ -7,18 +7,27 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+/** Loose shape of an agent UIMessage as returned by the admin queries. */
+type AgentMessageLike = {
+  text?: unknown;
+  parts?: Array<{ type?: string; text?: unknown }>;
+  role?: string;
+  key?: string;
+  _id?: string;
+};
+
 /**
  * Extract readable text from an agent UIMessage: prefer the convenience
  * `text` field, fall back to concatenating text parts.
  */
-function messageText(message: any): string {
+function messageText(message: AgentMessageLike): string {
   if (typeof message?.text === 'string' && message.text.length > 0) {
     return message.text;
   }
   const parts = Array.isArray(message?.parts) ? message.parts : [];
   return parts
-    .filter((p: any) => p?.type === 'text' && typeof p.text === 'string')
-    .map((p: any) => p.text)
+    .filter((p) => p?.type === 'text' && typeof p.text === 'string')
+    .map((p) => p.text)
     .join('\n');
 }
 
@@ -35,7 +44,7 @@ function ThreadMessages({ userId, threadId }: { userId: string; threadId: string
 
   return (
     <div className="space-y-2">
-      {results.map((message: any, i: number) => {
+      {results.map((message: AgentMessageLike, i: number) => {
         const text = messageText(message);
         const isUser = message?.role === 'user';
         if (!text) return null;

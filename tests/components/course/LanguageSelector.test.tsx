@@ -12,7 +12,6 @@ beforeAll(() => {
       unobserve() {}
       disconnect() {}
     }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (globalThis as any).ResizeObserver = StubResizeObserver;
   }
   if (
@@ -20,7 +19,6 @@ beforeAll(() => {
     !(Element.prototype as unknown as { scrollIntoView?: unknown })
       .scrollIntoView
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (Element.prototype as any).scrollIntoView = function () {};
   }
 });

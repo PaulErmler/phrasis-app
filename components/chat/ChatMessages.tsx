@@ -290,7 +290,6 @@ interface ChatMessagesProps {
 export function ChatMessages({
   messages,
   isLoading,
-  threadId,
   toolRenderers,
   messageFooter,
   contentClassName,

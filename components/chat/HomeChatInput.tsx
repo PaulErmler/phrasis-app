@@ -3,7 +3,6 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation } from 'convex/react';
-import { ConvexError } from 'convex/values';
 import { useTranslations } from 'next-intl';
 import {
   Sparkles,
@@ -18,12 +17,13 @@ import { toast } from 'sonner';
 
 import { api } from '@/convex/_generated/api';
 import { useVoiceRecording } from '@/hooks/use-voice-recording';
+import { useImeSafeEnter } from '@/hooks/use-ime-safe-enter';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import LowQuotaDialog from '@/components/autumn/low-quota-dialog';
 import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
-import { cn } from '@/lib/utils';
+import { cn, convexErrorCode, isPaymentPastDueError } from '@/lib/utils';
 
 /**
  * Compact single-row chat-input surface used on the home view. Matches the
@@ -49,6 +49,7 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
   const tErrors = useTranslations('Chat.errors');
   const tQuota = useTranslations('FeatureTracking');
   const router = useRouter();
+  const { compositionProps, isComposingEvent } = useImeSafeEnter();
 
   const [text, setText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -96,18 +97,18 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
         router.push(`/app/chat/${threadId}`);
       }
     } catch (error) {
-      if (
-        error instanceof ConvexError &&
-        (error.data as { code?: string })?.code === 'USAGE_LIMIT'
-      ) {
+      // Silent: the reactive payment-overdue dialog is the canonical
+      // surface for this state (see isPaymentPastDueError).
+      if (isPaymentPastDueError(error)) {
+        setIsProcessing(false);
+        return;
+      }
+      if (convexErrorCode(error) === 'USAGE_LIMIT') {
         setPaywallOpen(true);
         setIsProcessing(false);
         return;
       }
-      if (
-        error instanceof ConvexError &&
-        (error.data as { code?: string })?.code === 'MESSAGE_TOO_LONG'
-      ) {
+      if (convexErrorCode(error) === 'MESSAGE_TOO_LONG') {
         toast.error(tErrors('messageTooLong'));
         setIsProcessing(false);
         return;
@@ -143,11 +144,14 @@ export function HomeChatInput({ onChatCreated }: HomeChatInputProps) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
+              // isComposingEvent: Enter confirms an IME conversion (ja/zh/ko/vi)
+              // rather than sending. See `useImeSafeEnter`.
+              if (e.key === 'Enter' && !e.shiftKey && !isComposingEvent(e)) {
                 e.preventDefault();
                 void handleSubmit();
               }
             }}
+            {...compositionProps}
             placeholder={t('placeholder')}
             disabled={isProcessing}
             data-testid="chat-new-input"

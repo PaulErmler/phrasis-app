@@ -1,12 +1,12 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 import schema from "../../schema";
 import { api, internal } from "../../_generated/api";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
-async function seedCourse(t: ReturnType<typeof convexTest>) {
+async function seedCourse(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) => {
     const courseId = await ctx.db.insert("courses", {
       userId: "user_A",
@@ -23,7 +23,7 @@ async function seedCourse(t: ReturnType<typeof convexTest>) {
 }
 
 async function seedQuotas(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   features: Record<
     string,
     { balance: number; included: number; used: number; unlimited: boolean }
@@ -38,7 +38,7 @@ async function seedQuotas(
   });
 }
 
-async function seedPendingApproval(t: ReturnType<typeof convexTest>) {
+async function seedPendingApproval(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) =>
     ctx.db.insert("cardApprovals", {
       threadId: "thread_1",
@@ -54,7 +54,7 @@ async function seedPendingApproval(t: ReturnType<typeof convexTest>) {
   );
 }
 
-async function getQuotas(t: ReturnType<typeof convexTest>) {
+async function getQuotas(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) =>
     ctx.db
       .query("usageQuotas")

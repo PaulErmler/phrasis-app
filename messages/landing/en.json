@@ -259,6 +259,7 @@
     "title": "Flexible",
     "titleHighlight": "Pricing",
     "mostPopular": "Most Popular",
+    "everythingFrom": "Everything from {planName}, plus:",
     "billing": {
       "monthly": "Monthly",
       "yearly": "Yearly",
@@ -311,7 +312,7 @@
       },
       "pro": {
         "name": "Pro",
-        "description": "For maximum flexibility and polyglots.",
+        "description": "Everything you need to learn multiple languages.",
         "priceMonthly": "€16",
         "priceYearlyPerMonth": "€12",
         "period": "month",
@@ -320,11 +321,31 @@
         "cta": "Get Started",
         "features": {
           "sentences": "Unlimited ready-made sentences",
-          "credits": "1,200 credits per month",
+          "credits": "600 credits per month",
           "creditsHint": "Credits can be used for chat messages, custom cards and more",
           "courses": "Up to 10 courses",
           "multipleLanguages": "Up to 3 languages per course",
           "detailedStatistics": "Detailed statistics"
+        }
+      },
+      "ultra": {
+        "name": "Ultra",
+        "description": "Maximum customization and AI features.",
+        "priceMonthly": "€32",
+        "priceYearlyPerMonth": "€24",
+        "period": "month",
+        "billedAnnually": "€288 billed annually",
+        "trial": "7-day free trial",
+        "cta": "Get Started",
+        "features": {
+          "sentences": "Unlimited ready-made sentences",
+          "credits": "2,000 credits per month",
+          "creditsHint": "Credits can be used for chat messages, custom cards and more",
+          "courses": "Up to 10 courses",
+          "multipleLanguages": "Up to 3 languages per course",
+          "detailedStatistics": "Detailed statistics",
+          "priorityFeatureAccess": "Priority access to new features",
+          "prioritySupport": "Priority support"
         }
       }
     }
@@ -391,7 +412,7 @@
       {
         "question": "What languages does Flexling support?",
         "answer": [
-          "You can learn the following languages in Flexling: English, Spanish (Spain, Latin America, and a mixed Spain + Latin America variant), Catalan, French, German, Italian, Romanian, Portuguese (Brazil and Portugal), Dutch, Swedish, Norwegian (Bokmål), Danish, Finnish, Estonian, Latvian, Lithuanian, Greek, Polish, Czech, Slovak, Ukrainian, Croatian, Serbian, Slovenian, Hungarian, Russian, Hindi, Bengali, Tamil, Telugu, Hebrew, Turkish, Persian, Arabic (Modern Standard plus Saudi, Egyptian, Iraqi, and Levantine dialects), Chinese (Simplified and Traditional), Cantonese (Simplified and Traditional), Japanese, Korean, Vietnamese, Thai, Indonesian, Malay, Filipino, and Swahili (Kenya and Tanzania) — with more languages being added regularly.",
+          "You can learn the following languages in Flexling: English, Spanish (Spain, Latin America, and a mixed Spain + Latin America variant), Catalan, French, German, Italian, Romanian, Portuguese (Brazil and Portugal), Dutch, Swedish, Norwegian (Bokmål), Danish, Finnish, Estonian, Latvian, Lithuanian, Greek, Polish, Czech, Slovak, Ukrainian, Croatian, Serbian, Slovenian, Hungarian, Russian, Hindi, Bengali, Tamil, Telugu, Hebrew, Turkish, Persian, Arabic (Modern Standard plus Saudi, Egyptian, Iraqi, and Levantine dialects), Chinese (Simplified and Traditional), Cantonese (Simplified and Traditional), Japanese, Korean, Vietnamese (Northern and Southern), Thai, Indonesian, Malay, Filipino, and Swahili (Kenya and Tanzania) — with more languages being added regularly.",
           "Is your language not supported? Let us know and we will try to prioritize it."
         ]
       },

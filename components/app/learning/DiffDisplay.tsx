@@ -1,13 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import {
-  charDiff,
-  alignWords,
-  scoreWordAlignment,
-  getCompareConfig,
-  toDiffOptions,
-} from '@/lib/textCompare';
+import { charDiff, getCompareConfig, toDiffOptions } from '@/lib/textCompare';
 import { WordDiff } from './WordDiff';
 import { AccuracyFooter, CleanRevealedSentence } from './CleanRevealedSentence';
 import { getTextDirection } from '@/lib/languages';
@@ -19,23 +13,13 @@ interface DiffDisplayProps {
   language?: string;
   hideAccuracy?: boolean;
   hideErrors?: boolean;
+  /** `courseSettings.ignorePunctuation` — drop punctuation from the score. */
+  ignorePunctuation?: boolean;
 }
 
-/** 0–100 accuracy. Word-weighted for languages with word boundaries; otherwise grapheme-level. */
-export function computeAccuracy(
-  expected: string,
-  actual: string,
-  language: string = 'en',
-): number {
-  const cfg = getCompareConfig(language);
-  const diffOpts = toDiffOptions(cfg);
-  if (cfg.hasWordBoundaries) {
-    return Math.round(
-      scoreWordAlignment(alignWords(expected, actual, diffOpts)) * 100,
-    );
-  }
-  return Math.round(charDiff(expected, actual, diffOpts).accuracy * 100);
-}
+// Lives in lib/textCompare/accuracy.ts so non-React code (and the auto-rating
+// helper) can use it; re-exported here because this was its original home.
+export { computeAccuracy } from '@/lib/textCompare';
 
 export function DiffDisplay({
   expected,
@@ -43,6 +27,7 @@ export function DiffDisplay({
   language = 'en',
   hideAccuracy = false,
   hideErrors = false,
+  ignorePunctuation = false,
 }: DiffDisplayProps) {
   const cfg = getCompareConfig(language);
 
@@ -54,6 +39,7 @@ export function DiffDisplay({
         language={language}
         hideAccuracy={hideAccuracy}
         hideErrors={hideErrors}
+        ignorePunctuation={ignorePunctuation}
       />
     );
   }
@@ -65,6 +51,7 @@ export function DiffDisplay({
       language={language}
       hideAccuracy={hideAccuracy}
       hideErrors={hideErrors}
+      ignorePunctuation={ignorePunctuation}
     />
   );
 }
@@ -75,6 +62,7 @@ interface CharDiffViewProps {
   language: string;
   hideAccuracy: boolean;
   hideErrors: boolean;
+  ignorePunctuation: boolean;
 }
 
 function CharDiffView({
@@ -83,10 +71,11 @@ function CharDiffView({
   language,
   hideAccuracy,
   hideErrors,
+  ignorePunctuation,
 }: CharDiffViewProps) {
   const diffOpts = useMemo(
-    () => toDiffOptions(getCompareConfig(language)),
-    [language],
+    () => toDiffOptions(getCompareConfig(language, { ignorePunctuation })),
+    [language, ignorePunctuation],
   );
   const { chunks, accuracy } = useMemo(
     () => charDiff(expected, actual, diffOpts),
@@ -113,6 +102,18 @@ function CharDiffView({
     <div>
       <p dir={getTextDirection(language)} className="leading-relaxed text-left">
         {chunks.map((chunk, i) => {
+          // Punctuation-only mismatch while ignoring punctuation: it cost the
+          // user nothing, so don't render it as an error.
+          if (chunk.ignored) {
+            return (
+              <span
+                key={i}
+                className="bg-muted text-muted-foreground rounded-sm px-0.5"
+              >
+                {chunk.text}
+              </span>
+            );
+          }
           if (chunk.kind === 'added') {
             return (
               <span

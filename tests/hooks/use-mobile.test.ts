@@ -16,7 +16,6 @@ function setup(width: number) {
     removeListener: vi.fn(),
     dispatchEvent: vi.fn(),
   };
-  // @ts-expect-error test shim
   window.matchMedia = vi.fn().mockReturnValue(mql);
   Object.defineProperty(window, "innerWidth", {
     writable: true,

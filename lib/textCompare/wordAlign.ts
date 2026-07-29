@@ -9,7 +9,8 @@ export type AlignedKind = 'word' | 'punct';
 export interface AlignedWord {
   tag: WordTag;
   /** Whether this entry represents a word token or a punctuation token.
-   * Punctuation is shown in the diff but excluded from accuracy scoring. */
+   * Punctuation is always shown in the diff; `scoreWordAlignment` weights it
+   * at PUNCT_WEIGHT, or at 0 when the user opts to ignore punctuation. */
   kind: AlignedKind;
   /** The expected word (or '' for `extra`). Original surface form. */
   expected: string;
@@ -60,7 +61,9 @@ function tokenize(input: string, opts: WordAlignOptions): WordToken[] {
     // Skip pure whitespace; keep punctuation/symbols as their own tokens.
     if (!seg.text.trim()) continue;
     // For punctuation we only NFC-normalize. Case folding / diacritic stripping
-    // are meaningless for marks like ¿ or „ and would muddy comparisons.
+    // are meaningless for marks like ¿ or „ and would muddy comparisons — and
+    // `ignorePunctuation` must not strip these to '' either: the tokens stay so
+    // the diff can still render them, and `scoreWordAlignment` zero-weights them.
     const norm = seg.text.normalize('NFC');
     tokens.push({
       raw: seg.text,

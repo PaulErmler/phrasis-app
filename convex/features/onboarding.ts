@@ -243,6 +243,19 @@ export const processPlacementContentBatch = internalMutation({
 });
 
 /**
+ * Shared body of `ensurePlacementTranslations` and
+ * `enqueueMissingPlacementTranslations`: kick off the batched sweep and
+ * report the inline-first-page translation tally as `enqueued`.
+ */
+async function sweepAndCountEnqueued(
+  ctx: MutationCtx,
+  langs: { targetLanguage: string; sourceLanguage: string },
+): Promise<{ enqueued: number }> {
+  const { translationsScheduled } = await runPlacementContentSweep(ctx, langs);
+  return { enqueued: translationsScheduled };
+}
+
+/**
  * User-callable safety-net: when the placement test renders a card whose
  * translation isn't ready yet, the client invokes this so we can immediately
  * (re-)enqueue any missing placement-test translations for the target
@@ -260,11 +273,7 @@ export const ensurePlacementTranslations = mutation({
   handler: async (ctx, { targetLanguage, sourceLanguage }) => {
     const userId = await requireAuthUserId(ctx);
     void userId;
-    const { translationsScheduled } = await runPlacementContentSweep(ctx, {
-      targetLanguage,
-      sourceLanguage,
-    });
-    return { enqueued: translationsScheduled };
+    return sweepAndCountEnqueued(ctx, { targetLanguage, sourceLanguage });
   },
 });
 
@@ -283,13 +292,8 @@ export const enqueueMissingPlacementTranslations = internalMutation({
     sourceLanguage: v.string(),
   },
   returns: v.object({ enqueued: v.number() }),
-  handler: async (ctx, { targetLanguage, sourceLanguage }) => {
-    const { translationsScheduled } = await runPlacementContentSweep(ctx, {
-      targetLanguage,
-      sourceLanguage,
-    });
-    return { enqueued: translationsScheduled };
-  },
+  handler: async (ctx, { targetLanguage, sourceLanguage }) =>
+    sweepAndCountEnqueued(ctx, { targetLanguage, sourceLanguage }),
 });
 
 /**
@@ -417,9 +421,18 @@ export const getInitialCardsReadiness = query({
     sampleSize: v.number(),
   }),
   handler: async (ctx, { sampleSize = 3 }) => {
+    // Shared by every not-ready-yet early exit below; never mutated, only
+    // serialized on return.
+    const emptyReadiness = {
+      totalCards: 0,
+      translatedCards: 0,
+      audioReadyCards: 0,
+      sampleSize,
+    };
+
     const userId = await getAuthUserId(ctx);
     if (!userId) {
-      return { totalCards: 0, translatedCards: 0, audioReadyCards: 0, sampleSize };
+      return emptyReadiness;
     }
 
     const settings = await ctx.db
@@ -428,11 +441,11 @@ export const getInitialCardsReadiness = query({
       .first();
     const courseId = settings?.activeCourseId;
     if (!courseId) {
-      return { totalCards: 0, translatedCards: 0, audioReadyCards: 0, sampleSize };
+      return emptyReadiness;
     }
     const course = await ctx.db.get(courseId);
     if (!course) {
-      return { totalCards: 0, translatedCards: 0, audioReadyCards: 0, sampleSize };
+      return emptyReadiness;
     }
 
     const deck = await ctx.db
@@ -440,7 +453,7 @@ export const getInitialCardsReadiness = query({
       .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
       .first();
     if (!deck) {
-      return { totalCards: 0, translatedCards: 0, audioReadyCards: 0, sampleSize };
+      return emptyReadiness;
     }
 
     const cards = await ctx.db

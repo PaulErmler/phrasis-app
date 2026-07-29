@@ -16,9 +16,18 @@ const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
  *   4. chromium-serial      — specs that MUTATE shared user state (review
  *                             mode, locale, chat quota, cards). One worker,
  *                             serial within the project.
- *   5. course-management    — archives the onboarding course. Must run LAST
- *                             because it destroys shared user state that
- *                             every other spec depends on.
+ *   5. course-management    — archives the onboarding course. Must run after
+ *                             every spec that depends on the shared user's
+ *                             courses, because it destroys that state.
+ *   6. payment-overdue      — @live dunning journey with its OWN fresh user.
+ *                             A separate project (not a file in
+ *                             chromium-serial): `fullyParallel: false` only
+ *                             serializes tests within one FILE — separate
+ *                             files of a project still spread across
+ *                             workers, and two concurrent fresh-signup +
+ *                             onboarding walks (this + billing.spec.ts)
+ *                             saturate the translation/TTS queues (the
+ *                             documented flake source in auth.setup.ts).
  */
 export default defineConfig({
   testDir: "./e2e",
@@ -104,6 +113,20 @@ export default defineConfig({
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/user.json",
+      },
+    },
+    {
+      // Self-contained @live dunning journey (fresh user, Stripe checkout,
+      // billing override hooks). Chained AFTER everything else so its
+      // signup + onboarding walk never runs concurrently with another
+      // spec's — see the phase comment above. The spec sets its own
+      // storageState via test.use.
+      name: "payment-overdue",
+      testMatch: /payment-overdue\.spec\.ts/,
+      dependencies: ["course-management"],
+      fullyParallel: false,
+      use: {
+        ...devices["Desktop Chrome"],
       },
     },
   ],

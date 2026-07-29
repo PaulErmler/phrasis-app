@@ -230,7 +230,6 @@ export function HomeView({
           {/* Section title lives inside SegmentedHomeSection now, sharing a
               row with the compact Course/Custom switcher (top right). */}
           <SegmentedHomeSection
-            activeCourseId={courseSettings?.courseId ?? null}
             onNavigateToContent={onNavigateToContent}
             onNavigateToChat={onNavigateToChat}
           />

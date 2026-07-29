@@ -18,9 +18,6 @@ import { getLanguageByCode } from '@/lib/languages';
  * overflow-hidden` so `LanguageSelector` (which has its own internal
  * `CommandList` scroll) handles its own overflow without bleeding to the
  * page.
- *
- * Variant chosen post-prototype review — see
- * `app/prototypes/onboarding-language-pair/page.tsx`.
  */
 interface Props {
   source: string | null;

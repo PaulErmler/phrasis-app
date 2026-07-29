@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { Area, AreaChart, Line, LineChart, XAxis, YAxis, CartesianGrid } from 'recharts';
+import { Area, AreaChart, Line, LineChart, XAxis, YAxis, CartesianGrid, type TooltipProps } from 'recharts';
 import { ChartContainer, ChartTooltip, type ChartConfig } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import { formatTimeMs } from '@/lib/formatTime';
@@ -63,15 +63,6 @@ function getDailyValue(point: DailyPoint, metric: Metric): number {
   case 'reviews': return point.reps;
   case 'sentences': return point.newCards;
   case 'time': return point.timeMs;
-  }
-}
-
-function getMonthlyValue(point: MonthlyPoint, metric: Metric): number {
-  switch (metric) {
-  case 'words': return point.totalNewCards;
-  case 'reviews': return point.totalRepetitions;
-  case 'sentences': return point.totalNewCards;
-  case 'time': return point.totalTimeMs;
   }
 }
 
@@ -148,7 +139,7 @@ function formatTooltipDate(label: string): string {
   return `${mm}-${dd}-${String(year).slice(2)}`;
 }
 
-export function CumulativeLineChart({ dailyData, monthlyData, weeklyData, languageDailyData, timezone }: CumulativeLineChartProps) {
+export function CumulativeLineChart({ dailyData, weeklyData, languageDailyData, timezone }: CumulativeLineChartProps) {
   const t = useTranslations('StatsPage');
   const [metric, setMetric] = useState<Metric>('words');
   const [range, setRange] = useState<TimeRange>('month');
@@ -268,19 +259,23 @@ export function CumulativeLineChart({ dailyData, monthlyData, weeklyData, langua
     : chartData.length > 0 && chartData[chartData.length - 1]?.value > 0;
 
   // Custom tooltip
-  const renderTooltip = ({ active, payload, label }: any) => {
+  const renderTooltip = ({
+    active,
+    payload,
+    label,
+  }: TooltipProps<number, string>) => {
     if (!active || !payload?.length) return null;
-    const dateLabel = formatTooltipDate(label);
+    const dateLabel = formatTooltipDate(String(label ?? ''));
     return (
       <div className="rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
         <p className="font-medium text-muted-foreground mb-1">{dateLabel}</p>
-        {payload.map((entry: any, i: number) => (
+        {payload.map((entry, i) => (
           <div key={i} className="flex items-center gap-2">
             {isWordsByLanguage && (
               <div className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: entry.color }} />
             )}
             <span className="tabular-nums font-medium">
-              {formatValue(entry.value, metric)}{' '}
+              {formatValue(entry.value ?? 0, metric)}{' '}
               <span className="text-muted-foreground font-normal">
                 {isWordsByLanguage ? entry.name?.toUpperCase() : t(`metric.${metric}`).toLowerCase()}
               </span>

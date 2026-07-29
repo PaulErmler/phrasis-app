@@ -50,6 +50,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# build identity, written by scripts/build-id.mjs on every `pnpm build`
+.build-id.json
+
 data_preparation/translation_eval/data
 
 # data preparation 

@@ -98,8 +98,10 @@ import type * as retrier from "../retrier.js";
 import type * as tests_lib_drainScheduler from "../tests/lib/drainScheduler.js";
 import type * as types from "../types.js";
 import type * as usage_actions from "../usage/actions.js";
+import type * as usage_autumnClient from "../usage/autumnClient.js";
 import type * as usage_helpers from "../usage/helpers.js";
 import type * as usage_queries from "../usage/queries.js";
+import type * as usage_testing from "../usage/testing.js";
 import type * as usage_tracking from "../usage/tracking.js";
 
 import type {
@@ -199,8 +201,10 @@ declare const fullApi: ApiFromModules<{
   "tests/lib/drainScheduler": typeof tests_lib_drainScheduler;
   types: typeof types;
   "usage/actions": typeof usage_actions;
+  "usage/autumnClient": typeof usage_autumnClient;
   "usage/helpers": typeof usage_helpers;
   "usage/queries": typeof usage_queries;
+  "usage/testing": typeof usage_testing;
   "usage/tracking": typeof usage_tracking;
 }>;
 

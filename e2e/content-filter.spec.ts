@@ -3,10 +3,6 @@ import { test, expect } from "@playwright/test";
 /**
  * Content-source filter — smoke tests for the SegmentedHomeSection tab
  * badges and the home dropdown.
- *
- * The dev `/dev/*` prototype pages had their own e2e tests; those were
- * removed once the production filter UI shipped. Restore from git history
- * if the prototypes need to be re-validated.
  */
 
 test.describe("content filter — tab badges on home", () => {

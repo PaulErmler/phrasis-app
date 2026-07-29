@@ -255,7 +255,7 @@ function schedulePreReview(
   rating: ReviewRating,
   initialReviewCount: number,
   now: number,
-  requestRetention?: number,
+  _requestRetention?: number,
 ): ScheduleResult {
   const threshold = Math.max(initialReviewCount - 2, 0);
   const newPreReviewCount = cardState.preReviewCount + 1;

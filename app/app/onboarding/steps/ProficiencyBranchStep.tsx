@@ -44,6 +44,8 @@ export function ProficiencyBranchStep({ selected, onSelect }: Props) {
             Icon={Layers}
             title={t('branches.selfPick.title')}
             description={t('branches.selfPick.description')}
+            recommended
+            recommendedLabel={t('recommended')}
           />
           <BranchCard
             testId="proficiency-branch-test"
@@ -52,8 +54,6 @@ export function ProficiencyBranchStep({ selected, onSelect }: Props) {
             Icon={QuickTestIcon}
             title={t('branches.test.title')}
             description={t('branches.test.description')}
-            recommended
-            recommendedLabel={t('recommended')}
           />
         </div>
       </div>

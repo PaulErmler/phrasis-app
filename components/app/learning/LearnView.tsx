@@ -18,12 +18,16 @@ import { ChatPanel } from '@/components/chat/ChatPanel';
 import { createCardToolRenderer } from '@/components/chat/tools/CardToolRenderer';
 import { useCardApprovals } from '@/hooks/use-card-approvals';
 import { useScreenWakeLock } from '@/hooks/use-screen-wake-lock';
+import { useReloadBlock } from '@/components/app/AppUpdateGate';
 import { useThread } from '@/hooks/use-thread';
 import { Loader } from '@/components/ai-elements/loader';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
 import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
 import type { Id } from '@/convex/_generated/dataModel';
-import { buildSessionSnapshot } from '@/components/app/learning/sessionSnapshot';
+import {
+  buildSessionSnapshot,
+  type SessionSnapshot,
+} from '@/components/app/learning/sessionSnapshot';
 
 function WrappedChatPanel({
   threadId,
@@ -126,21 +130,11 @@ interface LearnViewProps {
    *  for the celebration screen. */
   onCardRated?: (
     rating: import('@/lib/scheduling').ReviewRating | undefined,
-    snapshot: {
-      sessionId: string;
-      dailyReviewsToday: number;
-      dailyTimeMsToday: number;
-      dailyNewWordsToday: number;
-    },
+    snapshot: SessionSnapshot,
   ) => void;
   /** Mirror of `onCardRated` for the undo direction — fires after an undo
    *  actually reverted a review, so the wizard can decrement its counter. */
-  onCardUndone?: (snapshot: {
-    sessionId: string;
-    dailyReviewsToday: number;
-    dailyTimeMsToday: number;
-    dailyNewWordsToday: number;
-  }) => void;
+  onCardUndone?: (snapshot: SessionSnapshot) => void;
   /** External autoplay override (onboarding-mode only). When true, autoplay
    *  stays gated regardless of course settings — used by the wizard to keep
    *  card audio silent while the first-lesson coachmarks are running so the
@@ -218,6 +212,11 @@ function LearnViewInner({
     batchSizeOverride: mode === 'onboarding' ? 2 : undefined,
   });
   useScreenWakeLock(state.status === 'reviewing');
+  // Hold off the silent update reload for the whole session, not just while
+  // reviewing: the merged audio plays through a detached `new Audio()` that
+  // keeps going when the tab is hidden ("listen all day"), so a hidden-long-
+  // enough tab is emphatically not idle here.
+  useReloadBlock(true);
   const reviewMode = state.status !== 'loading' ? (state.courseSettings?.reviewMode ?? 'audio') : 'audio';
   const schedulingMode = state.status !== 'loading'
     ? (state.courseSettings?.schedulingMode ?? 'learnAndReview')

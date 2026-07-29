@@ -76,6 +76,17 @@ export const PLAYBACK_SPEED_MAX = 2.0;
 export const PLAYBACK_SPEED_STEP = 0.1;
 
 /**
+ * Clamp a raw speed input into the general range, rounding to one decimal
+ * first (round, then clamp — matches the historical handler behavior).
+ */
+export function clampPlaybackSpeed(value: number): number {
+  return Math.max(
+    PLAYBACK_SPEED_MIN,
+    Math.min(PLAYBACK_SPEED_MAX, Math.round(value * 10) / 10),
+  );
+}
+
+/**
  * Persistent cycle used by LearningMode where the override is stored on the
  * card. `null` = "default" state — clears any stored override so the
  * course-level general speed applies.

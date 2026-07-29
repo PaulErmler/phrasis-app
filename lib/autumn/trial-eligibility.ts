@@ -1,25 +1,15 @@
-/**
- * Minimal subset of Autumn's CustomerProduct that trial gating needs.
- * Avoids depending on the (non-exported) full CustomerProduct type;
- * the fields here match what `useCustomer().customer.products[number]`
- * ships. `is_default: true` is Autumn's auto-assigned free plan that
- * every customer has — it never counts as a subscription.
- */
-export type CustomerProductLite = {
-  id: string;
-  status: string;
-  is_default: boolean;
-  is_add_on: boolean;
-  /** Autumn's legacy (v1.2) customer shape leaves this null while
-   *  trialing and reports the trial end via `current_period_end`. */
-  trial_ends_at?: number | null;
-  current_period_end?: number | null;
-};
+import {
+  findCurrentPaidPlan,
+  normalizePlans,
+  type AutumnCustomerLike,
+  type AutumnPlan,
+} from './customer-shape';
 
 /**
  * One consumed-trial record from `expand: ["trials_used"]`. Includes
- * trials that are still running. The legacy (v1.2) API names the plan
- * field `product_id`; newer API versions call it `plan_id`.
+ * trials that are still running. Only the count is ever used — the legacy
+ * (v1.2) API names the plan field `product_id` and newer versions call it
+ * `plan_id`, and we deliberately depend on neither.
  */
 export type TrialUsedLite = {
   product_id?: string;
@@ -40,29 +30,13 @@ export type TrialState = {
 };
 
 /**
- * Whether the user currently has any paid plan attached — including one
- * they are still trialing. Add-ons (`is_add_on`) are bolt-on usage
- * products, not subscriptions.
- */
-export function hasPaidPlanHistory(
-  products: CustomerProductLite[] | null | undefined,
-): boolean {
-  return (products ?? []).some((cp) => !cp.is_default && !cp.is_add_on);
-}
-
-/**
- * The paid product the customer is currently on: non-default, non-add-on,
- * not expired. A `scheduled` entry (a pending plan change that hasn't taken
- * effect yet) never wins over the currently active/trialing one, regardless
- * of the order Autumn returns the array in.
+ * The paid plan the customer is currently on. Accepts the raw plan array
+ * from either Autumn API family; see lib/autumn/customer-shape.ts.
  */
 export function findCurrentPaidProduct(
-  products: CustomerProductLite[] | null | undefined,
-): CustomerProductLite | undefined {
-  const candidates = (products ?? []).filter(
-    (cp) => !cp.is_default && !cp.is_add_on && cp.status !== "expired",
-  );
-  return candidates.find((cp) => cp.status !== "scheduled") ?? candidates[0];
+  products: unknown,
+): AutumnPlan | undefined {
+  return findCurrentPaidPlan(normalizePlans({ products }));
 }
 
 /**
@@ -83,21 +57,16 @@ export function findCurrentPaidProduct(
  *   `checkoutTrialParams`).
  */
 export function getTrialState(
-  customer:
-    | {
-        products?: unknown;
-        trials_used?: unknown;
-      }
-    | null
-    | undefined,
+  customer: (AutumnCustomerLike & { trials_used?: unknown }) | null | undefined,
 ): TrialState {
-  const products = (customer?.products ?? []) as CustomerProductLite[];
+  const plans = normalizePlans(customer);
   const trialsUsed = (customer?.trials_used ?? []) as TrialUsedLite[];
 
-  const trialing = products.find(
-    (cp) => !cp.is_default && !cp.is_add_on && cp.status === "trialing",
+  const trialing = plans.find(
+    (p) => !p.isDefault && !p.isAddOn && p.isTrialing,
   );
-  const hasPaidPlan = hasPaidPlanHistory(products);
+  // Add-ons are bolt-on usage products, not subscriptions.
+  const hasPaidPlan = plans.some((p) => !p.isDefault && !p.isAddOn);
   // A running trial also implies "trialed" — fallback for customers
   // fetched without the trials_used expand.
   const everTrialed = trialsUsed.length > 0 || trialing !== undefined;
@@ -105,8 +74,7 @@ export function getTrialState(
   return {
     everTrialed,
     onTrial: trialing !== undefined,
-    trialEndsAt:
-      trialing?.trial_ends_at ?? trialing?.current_period_end ?? undefined,
+    trialEndsAt: trialing?.trialEndsAt,
     hasPaidPlan,
     trialEligible: !everTrialed && !hasPaidPlan,
   };

@@ -16,13 +16,30 @@ export const OPENROUTER_MODELS = {
   translationAutoFill: GEMINI_35_FLASH_NITRO_MINIMAL.model,
   /** Linguistic metadata inference (register, gender, addresseeNumber) for
    *  newly-created cards. Runs once per row, including during bulk import,
-   *  so we pick the cheaper/faster lite tier. */
-  sentenceMetadata: 'google/gemini-3.1-flash-lite',
-  /** Short thread title from first user message */
+   *  so we stay on the lite tier. 3.5 Flash Lite is a tier up from 3.1
+   *  ($0.30/$2.50 per M vs $0.25/$1.50) — ~33% more per call at identical
+   *  token counts, taken for the newer model's accuracy on cross-lingual
+   *  gender/register inference. */
+  sentenceMetadata: 'google/gemini-3.5-flash-lite',
+  /** Short thread title from first user message. Left on 3.1 Flash Lite —
+   *  a 4-word title in the user's own language is the one job here where
+   *  the newer model buys nothing. */
   threadTitle: 'google/gemini-3.1-flash-lite',
   /** Lenient TTS validation — decides whether an STT transcription is
    *  semantically equivalent to the original (ignores phonetic name
-   *  spellings, digits-vs-words, punctuation, etc.). */
+   *  spellings, digits-vs-words, punctuation, etc.). Only invoked after the
+   *  strict Levenshtein check already failed, so every call is a judgment
+   *  call on a near-miss.
+   *
+   *  DELIBERATELY held on 3.1 Flash Lite while sentenceMetadata moved to
+   *  3.5 (Jul 2026). A 35-case eval found both models perfect on ordinary
+   *  artifacts (diacritics, kana/kanji, 他/她, matra drift, dropped
+   *  negations), but on cases where the audio spoke different words for the
+   *  same meaning — a word-order swap, a dropped Japanese copula — 3.5
+   *  answered "match" where 3.1 answered "mismatch". 3.5 reasons about
+   *  semantic equivalence; the question here is whether the TTS spoke THIS
+   *  text, so that regression would ship broken audio. Re-test before
+   *  moving this off 3.1. */
   ttsValidation: 'google/gemini-3.1-flash-lite',
 } as const;
 

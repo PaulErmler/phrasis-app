@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 
 import schema from "../../schema";
@@ -18,7 +18,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 /** Seed a user with an active course, stats row, deck, and one due card
  * (including a translation so word tracking runs). Mirrors the seeding in
  * scheduling.test.ts. */
-async function seed(t: ReturnType<typeof convexTest>) {
+async function seed(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) => {
     const collectionId = await ctx.db.insert("collections", {
       name: "A1",
@@ -83,7 +83,7 @@ async function seed(t: ReturnType<typeof convexTest>) {
 
 /** Add a second due card (later dueDate than the first) to an existing deck. */
 async function addCard(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   deckId: Id<"decks">,
   collectionId: Id<"collections">,
   dueOffsetMs = -500,
@@ -110,11 +110,11 @@ async function addCard(
   });
 }
 
-const getCard = (t: ReturnType<typeof convexTest>, cardId: Id<"cards">) =>
+const getCard = (t: TestConvex<typeof schema>, cardId: Id<"cards">) =>
   t.run((ctx) => ctx.db.get(cardId));
 
 const getDaily = (
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   courseId: Id<"courses">,
 ) =>
   t.run((ctx) =>
@@ -127,7 +127,7 @@ const getDaily = (
   );
 
 const getCourseStats = (
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   courseId: Id<"courses">,
 ) =>
   t.run((ctx) =>
@@ -654,6 +654,8 @@ describe("features/scheduling — undoLastReview", () => {
       forceReviewPhase: true,
       reviewMode: "full",
       accuracy: 0.8,
+      accuracyStrict: 0.8,
+      accuracyLenient: 0.95,
       wasDefaultRating: true,
     });
     await asUser.mutation(api.features.scheduling.undoLastReview, {
@@ -663,10 +665,18 @@ describe("features/scheduling — undoLastReview", () => {
     const stats = await getCourseStats(t, courseId);
     expect(stats?.totalAccuracySum ?? 0).toBe(0);
     expect(stats?.totalAccuracyCount ?? 0).toBe(0);
+    // The punctuation-split trio must reverse together with the legacy pair —
+    // a stranded sum or count would skew the average permanently.
+    expect(stats?.totalAccuracyStrictSum ?? 0).toBe(0);
+    expect(stats?.totalAccuracyLenientSum ?? 0).toBe(0);
+    expect(stats?.totalAccuracyDualCount ?? 0).toBe(0);
     expect(stats?.totalReviewsByMode?.full ?? 0).toBe(0);
     const daily = await getDaily(t, courseId);
     expect(daily?.accuracySum ?? 0).toBe(0);
     expect(daily?.accuracyCount ?? 0).toBe(0);
+    expect(daily?.accuracyStrictSum ?? 0).toBe(0);
+    expect(daily?.accuracyLenientSum ?? 0).toBe(0);
+    expect(daily?.accuracyDualCount ?? 0).toBe(0);
     expect(daily?.defaultRatingUsed ?? 0).toBe(0);
     expect(daily?.ratingCounts?.good).toBe(0);
     const depthRows = await t.run((ctx) =>

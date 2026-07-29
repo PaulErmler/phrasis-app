@@ -18,7 +18,6 @@ function installMatchMedia(matches: boolean) {
     removeListener: vi.fn(),
     dispatchEvent: vi.fn(),
   };
-  // @ts-expect-error test shim
   window.matchMedia = vi.fn().mockImplementation(() => mql);
   return {
     trigger(next: boolean) {

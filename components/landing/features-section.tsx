@@ -2,7 +2,6 @@
 
 import { useTranslations } from 'next-intl';
 import { motion } from 'motion/react';
-import { cn } from '@/lib/utils';
 import { landingFeatureConfig } from '@/components/landing/features-config';
 import { LandingSquircleIcon } from '@/components/landing/landing-squircle-icon';
 

@@ -29,10 +29,10 @@ import { getActiveCourseForUser, requireActiveCourse } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import {
   findNextIncompleteCollection,
-  getActiveDataset,
   getCollectionProgress as getCollectionProgressHelper,
   getNextCollection,
   getNextTextsFromRank,
+  getPremadeLevelCollections,
 } from '../db/collections';
 import { translateText, romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
@@ -67,7 +67,8 @@ import { claimTtsIfAvailable, hasActiveTtsClaim } from './ttsProcessing';
 import { languageSupportsStt } from '../../lib/languages';
 import {
   claimLlmTranslationIfAvailable,
-  CLAIM_STALE_MS as LLM_CLAIM_STALE_MS,
+  getLlmClaim,
+  isClaimFresh,
 } from './llmTranslationQueue';
 import { llmPool } from '../lib/workpools';
 import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
@@ -160,6 +161,48 @@ export async function scheduleTranslationForLanguage(
 }
 
 /**
+ * Resolve the curated gender for `voiceName` and enqueue the TTS job — the
+ * shared tail of `scheduleAudioForLanguage` and
+ * `storeTranslationAndScheduleTTS`. Claim acquisition deliberately stays at
+ * the call sites so write ordering is unchanged.
+ */
+async function enqueueTtsForVoice(
+  ctx: MutationCtx,
+  {
+    textId,
+    text,
+    language,
+    voiceName,
+    regionVariant,
+  }: {
+    textId: Id<'texts'>;
+    text: string;
+    language: string;
+    voiceName: string;
+    regionVariant: string | undefined;
+  },
+): Promise<void> {
+  const voiceGender = getVoiceGenderByApiCode(voiceName);
+  if (voiceGender === undefined) {
+    throw new Error(
+      `Cannot enqueue TTS: voice "${voiceName}" for language "${language}" is not in the curated voice list.`,
+    );
+  }
+  await ctx.runMutation(internal.features.ttsProcessing.enqueueTtsJob, {
+    provider: getTtsProviderForLanguage(language),
+    args: {
+      textId,
+      text,
+      language,
+      voiceName,
+      voiceGender,
+      speed: 1,
+      regionVariant,
+    },
+  });
+}
+
+/**
  * Claim + enqueue a TTS job for (text, language) — the enqueue slice shared
  * by `scheduleMissingContent`, `storeTranslationAndScheduleTTS`'s siblings,
  * and the preview audio-icon click (`requestPreviewAudio`). For the text's
@@ -186,23 +229,12 @@ export async function scheduleAudioForLanguage(
   const voiceName = regionVariant
     ? getVoiceForLanguageVariant(language, regionVariant, audioSpeakerGender)
     : getVoiceForLanguage(language, audioSpeakerGender);
-  const voiceGender = getVoiceGenderByApiCode(voiceName);
-  if (voiceGender === undefined) {
-    throw new Error(
-      `Cannot enqueue TTS: voice "${voiceName}" for language "${language}" is not in the curated voice list.`,
-    );
-  }
-  await ctx.runMutation(internal.features.ttsProcessing.enqueueTtsJob, {
-    provider: getTtsProviderForLanguage(language),
-    args: {
-      textId: text._id,
-      text: isSource ? text.text : translation!.translatedText,
-      language,
-      voiceName,
-      voiceGender,
-      speed: 1,
-      regionVariant,
-    },
+  await enqueueTtsForVoice(ctx, {
+    textId: text._id,
+    text: isSource ? text.text : translation!.translatedText,
+    language,
+    voiceName,
+    regionVariant,
   });
   return true;
 }
@@ -289,14 +321,7 @@ export async function scheduleMissingContent(
         ),
       ),
       Promise.all(
-        langsNeedingTranslation.map((lang) =>
-          ctx.db
-            .query('llmTranslationClaims')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('targetLanguage', lang),
-            )
-            .first(),
-        ),
+        langsNeedingTranslation.map((lang) => getLlmClaim(ctx, textId, lang)),
       ),
     ]);
 
@@ -424,7 +449,7 @@ export async function scheduleMissingContent(
     // Defer while an LLM retranslation is in flight — it will overwrite the row
     // anyway, so deleting now just races the pending write.
     const llmClaim = llmClaimMap.get(lang) ?? null;
-    if (llmClaim && Date.now() - llmClaim.claimedAt < LLM_CLAIM_STALE_MS) continue;
+    if (llmClaim && isClaimFresh(llmClaim)) continue;
 
     if (translation.regionVariant) {
       sweptRegionVariants.set(lang, translation.regionVariant);
@@ -542,8 +567,7 @@ export async function scheduleMissingContent(
           // the batched Promise.all above; no per-iteration DB read here.
           const existingLlmClaim = llmClaimMap.get(lang) ?? null;
           const llmRetranslationInFlight =
-            existingLlmClaim !== null &&
-            Date.now() - existingLlmClaim.claimedAt < LLM_CLAIM_STALE_MS;
+            existingLlmClaim !== null && isClaimFresh(existingLlmClaim);
           if (llmRetranslationInFlight) {
             // Skip — the LLM worker owns the next TTS enqueue for this row.
           } else if (
@@ -693,30 +717,9 @@ export const getCollectionProgress = query({
     const courseId = settings.activeCourseId;
 
     // Fetch only the premade rows actually displayed: the active dataset's ~20
-    // collections (one indexed scan) or the seven legacy CEFR rows by name.
-    // Avoids loading every user's custom/chat collections on this query.
-    const activeDataset = await getActiveDataset(ctx);
-    let collections: Doc<'collections'>[];
-    if (activeDataset) {
-      collections = await ctx.db
-        .query('collections')
-        .withIndex('by_datasetId_and_order', (q) =>
-          q.eq('datasetId', activeDataset._id),
-        )
-        .collect();
-    } else {
-      const legacyDocs = await Promise.all(
-        LEGACY_LEVEL_ORDER.map((name) =>
-          ctx.db
-            .query('collections')
-            .withIndex('by_name', (q) => q.eq('name', name))
-            .first(),
-        ),
-      );
-      collections = legacyDocs.filter(
-        (c): c is Doc<'collections'> => c !== null,
-      );
-    }
+    // collections (one indexed scan) or the seven legacy CEFR rows by name —
+    // see getPremadeLevelCollections for the read pattern.
+    const { collections } = await getPremadeLevelCollections(ctx);
 
     const result = await Promise.all(
       collections.map(async (collection) => {
@@ -1619,6 +1622,13 @@ export const addSingleTextFromCollection = mutation({
 /**
  * Ensure content (translations + audio) exists for a specific card.
  * Called automatically when a card is displayed and has missing content.
+ *
+ * Deliberately NOT gated by `assertBillingCurrent` (decided 2026-07-26):
+ * the ensure* endpoints are the content pipeline's self-heal path for cards
+ * the user already owns, and blocking them while a payment is past due
+ * would corrupt the study experience the free tier still promises. The
+ * dunning block enforces at the spend boundary instead — `consumeQuota`
+ * (card creation, chat, etc.) — plus the app-wide overdue dialog.
  */
 export const ensureCardContent = mutation({
   args: {
@@ -1722,13 +1732,12 @@ async function scheduleContentForUpcomingCards(
     processed++;
   }
 
-  // NOTE: this used to also pre-generate full content (translations + audio)
-  // for the next CONTENT_LOOKAHEAD_SIZE not-yet-added texts of the active
-  // premade collection. Deliberately removed: audio is the dominant
-  // generation cost, the prioritized-marks drain makes the "next N by rank"
-  // prediction unreliable, and content for cards that ARE added is scheduled
-  // at add time (`prepareCardContent`). Preview browsing generates
-  // translations lazily and audio only on an explicit audio-icon click.
+  // Deliberately does NOT pre-generate content for not-yet-added texts of the
+  // active premade collection: audio is the dominant generation cost, the
+  // prioritized-marks drain makes any "next N by rank" prediction unreliable,
+  // and content for cards that ARE added is scheduled at add time
+  // (`prepareCardContent`). Preview browsing generates translations lazily
+  // and audio only on an explicit audio-icon click.
   return processed;
 }
 
@@ -1914,121 +1923,119 @@ export const processTranslationForCard = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    {
-      const existingRow = await ctx.runQuery(
-        internal.features.decks.getTranslationForTextLanguage,
-        {
-          textId: args.textId,
-          targetLanguage: args.targetLanguage,
-        },
-      );
+    const existingRow = await ctx.runQuery(
+      internal.features.decks.getTranslationForTextLanguage,
+      {
+        textId: args.textId,
+        targetLanguage: args.targetLanguage,
+      },
+    );
 
-      // Mixed-dialect targets (today: es_mixed) pick a deterministic
-      // sub-variant per text. The Google translate target is the sub-code so
-      // we get regional spelling/vocab; the persisted row keeps the mixed
-      // code as `targetLanguage` and records the chosen variant.
-      //
-      // Variant pin: prefer the existing row's persisted regionVariant, then
-      // the pre-delete capture (`preferredRegionVariant`), then a fresh
-      // deterministic pick — regeneration must not flip the card's dialect.
-      // All three resolve to null for non-mixed targets.
-      const mixed =
-        (existingRow?.regionVariant
-          ? getMixedVariantByRegion(args.targetLanguage, existingRow.regionVariant)
-          : null) ??
-        (args.preferredRegionVariant
-          ? getMixedVariantByRegion(args.targetLanguage, args.preferredRegionVariant)
-          : null) ??
-        resolveMixedVariant(args.targetLanguage, args.textId as string);
-      const translateTarget = mixed ? mixed.subCode : args.targetLanguage;
-      const regionVariant = mixed?.regionVariant;
+    // Mixed-dialect targets (today: es_mixed) pick a deterministic
+    // sub-variant per text. The Google translate target is the sub-code so
+    // we get regional spelling/vocab; the persisted row keeps the mixed
+    // code as `targetLanguage` and records the chosen variant.
+    //
+    // Variant pin: prefer the existing row's persisted regionVariant, then
+    // the pre-delete capture (`preferredRegionVariant`), then a fresh
+    // deterministic pick — regeneration must not flip the card's dialect.
+    // All three resolve to null for non-mixed targets.
+    const mixed =
+      (existingRow?.regionVariant
+        ? getMixedVariantByRegion(args.targetLanguage, existingRow.regionVariant)
+        : null) ??
+      (args.preferredRegionVariant
+        ? getMixedVariantByRegion(args.targetLanguage, args.preferredRegionVariant)
+        : null) ??
+      resolveMixedVariant(args.targetLanguage, args.textId as string);
+    const translateTarget = mixed ? mixed.subCode : args.targetLanguage;
+    const regionVariant = mixed?.regionVariant;
 
-      let translation: string;
-      let romanizedText: string | undefined;
+    let translation: string;
+    let romanizedText: string | undefined;
 
-      // Honor `replaceExisting`: a retranslation that fell back to Google
-      // must Google-translate fresh rather than reuse the stale existing
-      // translatedText — otherwise the audio would be regenerated against
-      // an unchanged translation and we'd write the same row back.
-      const reuseExisting = !args.replaceExisting && existingRow !== null;
-      if (reuseExisting) {
-        translation = existingRow!.translatedText;
-        // `=== undefined`: respect the empty-string sentinel from a prior
-        // failed attempt so we don't keep re-running the 3-retry burst.
-        if (
-          ROMANIZATION_LANGUAGES.has(translateTarget) &&
-          existingRow!.romanizedText === undefined
-        ) {
-          try {
-            romanizedText = await romanizeText(translation, translateTarget);
-          } catch {
-            // 3 retries already exhausted — persist sentinel so subsequent
-            // ensureContent runs see "tried" and skip rescheduling.
-            romanizedText = '';
-          }
-        } else {
-          romanizedText = existingRow!.romanizedText;
+    // Honor `replaceExisting`: a retranslation that fell back to Google
+    // must Google-translate fresh rather than reuse the stale existing
+    // translatedText — otherwise the audio would be regenerated against
+    // an unchanged translation and we'd write the same row back.
+    const reuseExisting = !args.replaceExisting && existingRow !== null;
+    if (reuseExisting) {
+      translation = existingRow!.translatedText;
+      // `=== undefined`: respect the empty-string sentinel from a prior
+      // failed attempt so we don't keep re-running the 3-retry burst.
+      if (
+        ROMANIZATION_LANGUAGES.has(translateTarget) &&
+        existingRow!.romanizedText === undefined
+      ) {
+        try {
+          romanizedText = await romanizeText(translation, translateTarget);
+        } catch {
+          // 3 retries already exhausted — persist sentinel so subsequent
+          // ensureContent runs see "tried" and skip rescheduling.
+          romanizedText = '';
         }
       } else {
-        // Post-process before romanization so the derived romanizedText is
-        // computed from the cleaned text.
-        translation = postProcessTranslation(
-          translateTarget,
-          await translateText(args.text, args.sourceLanguage, translateTarget),
-        );
-        if (ROMANIZATION_LANGUAGES.has(translateTarget)) {
-          try {
-            romanizedText = await romanizeText(translation, translateTarget);
-          } catch (err) {
-            // 3 retries already exhausted — persist the empty-string
-            // sentinel so ensureContent doesn't reschedule another burst.
-            console.error(
-              `Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
-              err instanceof Error ? err.message : err,
-            );
-            romanizedText = '';
-          }
+        romanizedText = existingRow!.romanizedText;
+      }
+    } else {
+      // Post-process before romanization so the derived romanizedText is
+      // computed from the cleaned text.
+      translation = postProcessTranslation(
+        translateTarget,
+        await translateText(args.text, args.sourceLanguage, translateTarget),
+      );
+      if (ROMANIZATION_LANGUAGES.has(translateTarget)) {
+        try {
+          romanizedText = await romanizeText(translation, translateTarget);
+        } catch (err) {
+          // 3 retries already exhausted — persist the empty-string
+          // sentinel so ensureContent doesn't reschedule another burst.
+          console.error(
+            `Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
+            err instanceof Error ? err.message : err,
+          );
+          romanizedText = '';
         }
       }
-
-      const voiceName = regionVariant
-        ? getVoiceForLanguageVariant(
-          args.targetLanguage,
-          regionVariant,
-          args.audioSpeakerGender,
-        )
-        : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
-
-      // Source travels with the romanization value (real or sentinel) so a
-      // future strategy swap can target rows produced by the old method.
-      // Resolved from `translateTarget` (the actual code romanizeText was
-      // given) so mixed dialects record the sub-code's source.
-      const romanizationSource =
-        romanizedText !== undefined
-          ? getRomanizationSource(translateTarget)
-          : undefined;
-
-      await ctx.runMutation(
-        internal.features.decks.storeTranslationAndScheduleTTS,
-        {
-          textId: args.textId,
-          targetLanguage: args.targetLanguage,
-          translatedText: translation,
-          voiceName,
-          romanizedText,
-          romanizationSource,
-          // Legacy Google Translate path (used as the fallback when the LLM
-          // queue's stage chain exhausts, or for languages explicitly pinned
-          // to `translationProvider: 'google'`).
-          translationSource: GOOGLE_TRANSLATE_SOURCE,
-          regionVariant,
-          replaceExisting: args.replaceExisting,
-          speakerGender: asVoiceGender(args.audioSpeakerGender),
-          expectedClaimId: args.claimId,
-          skipTts: args.skipTts,
-        },
-      );
     }
+
+    const voiceName = regionVariant
+      ? getVoiceForLanguageVariant(
+        args.targetLanguage,
+        regionVariant,
+        args.audioSpeakerGender,
+      )
+      : getVoiceForLanguage(args.targetLanguage, args.audioSpeakerGender);
+
+    // Source travels with the romanization value (real or sentinel) so a
+    // future strategy swap can target rows produced by the old method.
+    // Resolved from `translateTarget` (the actual code romanizeText was
+    // given) so mixed dialects record the sub-code's source.
+    const romanizationSource =
+      romanizedText !== undefined
+        ? getRomanizationSource(translateTarget)
+        : undefined;
+
+    await ctx.runMutation(
+      internal.features.decks.storeTranslationAndScheduleTTS,
+      {
+        textId: args.textId,
+        targetLanguage: args.targetLanguage,
+        translatedText: translation,
+        voiceName,
+        romanizedText,
+        romanizationSource,
+        // Legacy Google Translate path (used as the fallback when the LLM
+        // queue's stage chain exhausts, or for languages explicitly pinned
+        // to `translationProvider: 'google'`).
+        translationSource: GOOGLE_TRANSLATE_SOURCE,
+        regionVariant,
+        replaceExisting: args.replaceExisting,
+        speakerGender: asVoiceGender(args.audioSpeakerGender),
+        expectedClaimId: args.claimId,
+        skipTts: args.skipTts,
+      },
+    );
 
     return null;
   },
@@ -2134,12 +2141,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // landing after the owner's would silently revert it (worst case: a
     // flag-retranslation's text overwritten while its audio survives).
     if (args.expectedClaimId !== undefined) {
-      const llmClaim = await ctx.db
-        .query('llmTranslationClaims')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', args.textId).eq('targetLanguage', args.targetLanguage),
-        )
-        .first();
+      const llmClaim = await getLlmClaim(ctx, args.textId, args.targetLanguage);
       if (llmClaim?._id !== args.expectedClaimId) {
         return null;
       }
@@ -2323,27 +2325,13 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     if (!existingAudioForVoice) {
       const claimed = await claimTtsIfAvailable(ctx, args.textId, args.targetLanguage);
       if (claimed) {
-        const voiceGender = getVoiceGenderByApiCode(args.voiceName);
-        if (voiceGender === undefined) {
-          throw new Error(
-            `Cannot enqueue TTS: voice "${args.voiceName}" for language "${args.targetLanguage}" is not in the curated voice list.`,
-          );
-        }
-        await ctx.runMutation(
-          internal.features.ttsProcessing.enqueueTtsJob,
-          {
-            provider: getTtsProviderForLanguage(args.targetLanguage),
-            args: {
-              textId: args.textId,
-              text: translatedText,
-              language: args.targetLanguage,
-              voiceName: args.voiceName,
-              voiceGender,
-              speed: 1,
-              regionVariant: args.regionVariant,
-            },
-          },
-        );
+        await enqueueTtsForVoice(ctx, {
+          textId: args.textId,
+          text: translatedText,
+          language: args.targetLanguage,
+          voiceName: args.voiceName,
+          regionVariant: args.regionVariant,
+        });
       }
     }
 

@@ -52,20 +52,9 @@ export interface ResolvedAudioSettings {
 }
 
 /**
- * Resolve the per-language playback speed for a card, applying the per-card
- * override when present and falling back to the course-level general speed.
- */
-export function resolveLanguageSpeeds(
-  cs: CourseSettings | null,
-  cardOverrides?: Record<string, number>,
-): Record<string, number> {
-  return mergeSpeeds(cs?.languagePlaybackSpeeds ?? {}, cardOverrides);
-}
-
-/**
  * Merge a general per-language speed map with per-card overrides. Overrides win,
- * then the general value, then the global default. Used for both the after-base
- * target group (via `resolveLanguageSpeeds`) and the before-base target group.
+ * then the general value, then the global default. Used via `resolveAudioSettings`
+ * for both the after-base and before-base target groups.
  */
 function mergeSpeeds(
   general: Record<string, number>,

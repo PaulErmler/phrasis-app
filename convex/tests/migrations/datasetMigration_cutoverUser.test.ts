@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 
 import schema from "../../schema";
@@ -17,7 +17,7 @@ type SeedOptions = {
 };
 
 async function seedCourseWithLegacyA1(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   opts: SeedOptions = {},
 ) {
   const {
@@ -114,7 +114,7 @@ async function seedCourseWithLegacyA1(
 }
 
 async function readDestProgress(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   userId: string,
   courseId: Id<"courses">,
   collectionId: Id<"collections">,

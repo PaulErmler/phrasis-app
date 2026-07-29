@@ -66,9 +66,11 @@ describe("features/chat/messages", () => {
         streamArgs: { kind: "list", startOrder: 0 },
       });
       expect(res.streams).toBeDefined();
-      expect(res.streams.kind).toBe("list");
-      expect(Array.isArray(res.streams.messages)).toBe(true);
-      expect(res.streams.messages).toHaveLength(0);
+      const streams = res.streams!;
+      expect(streams.kind).toBe("list");
+      if (streams.kind !== "list") throw new Error("narrowed by the expect above");
+      expect(Array.isArray(streams.messages)).toBe(true);
+      expect(streams.messages).toHaveLength(0);
     });
   });
 

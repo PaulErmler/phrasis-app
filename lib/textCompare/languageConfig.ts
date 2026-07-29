@@ -5,10 +5,19 @@ import { SUPPORTED_LANGUAGES } from '../languages';
  * Kept separate so callers don't accidentally rely on hasWordBoundaries
  * flowing through those functions (it doesn't — it's a caller-side branch). */
 export interface DiffOptions extends Required<
-  Pick<NormalizeOptions, 'foldCase' | 'foldDiacritics' | 'collapseWhitespace'>
+  Pick<
+    NormalizeOptions,
+    'foldCase' | 'foldDiacritics' | 'collapseWhitespace' | 'ignorePunctuation'
+  >
 > {
   /** BCP-47 locale passed to Intl.Segmenter */
   locale: string;
+}
+
+/** Caller-supplied settings that aren't derived from the language. */
+export interface CompareOverrides {
+  /** User setting (`courseSettings.ignorePunctuation`). Defaults to false. */
+  ignorePunctuation?: boolean;
 }
 
 export interface CompareConfig extends DiffOptions {
@@ -21,6 +30,7 @@ const DEFAULT: CompareConfig = {
   foldCase: false,
   foldDiacritics: false,
   collapseWhitespace: true,
+  ignorePunctuation: false,
   hasWordBoundaries: true,
 };
 
@@ -36,8 +46,15 @@ const PER_LANGUAGE: Record<string, Partial<CompareConfig>> = Object.fromEntries(
   }),
 );
 
-export function getCompareConfig(languageCode: string): CompareConfig {
-  return { ...DEFAULT, ...(PER_LANGUAGE[languageCode] ?? {}) };
+export function getCompareConfig(
+  languageCode: string,
+  overrides: CompareOverrides = {},
+): CompareConfig {
+  return {
+    ...DEFAULT,
+    ...(PER_LANGUAGE[languageCode] ?? {}),
+    ignorePunctuation: overrides.ignorePunctuation ?? DEFAULT.ignorePunctuation,
+  };
 }
 
 /** Strip hasWordBoundaries before passing to charDiff/alignWords so option

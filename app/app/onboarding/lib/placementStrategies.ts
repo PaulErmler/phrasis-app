@@ -1,14 +1,15 @@
 /**
  * Adaptive placement-test strategies.
  *
- * All three implement the same `PlacementStrategy` interface so the runtime
- * test runner and the comparison prototype can swap them with a single
- * identifier change. The active strategy is exported as `defaultStrategy`
- * at the bottom of this file — swap that one assignment to change what the
- * live onboarding uses.
+ * Seven strategy classes implement the same `PlacementStrategy` interface,
+ * so the runtime test runner can swap them with a single identifier change.
+ * The active strategy is named by the `DEFAULT_STRATEGY` string constant at
+ * the bottom of this file and instantiated via `createStrategy(name)` —
+ * change that one assignment to change what the live onboarding uses.
  */
 
 import { OGTE_MIN_LEVEL, OGTE_MAX_LEVEL } from '@/lib/constants/onboarding';
+import type { CurrentLevel } from '../types';
 
 // Re-exported under the strategy-local names; the canonical bounds live in
 // lib/constants/onboarding.ts so the server's starting-collection resolution
@@ -63,16 +64,54 @@ function clampLevel(n: number): number {
   return Math.round(n);
 }
 
+/** Shared base: every strategy records its (level, knew) answers the same
+ *  way and exposes them verbatim via `history()`. Each subclass still
+ *  resets `this.answers = []` in its own `init()`. */
+abstract class BaseStrategy implements PlacementStrategy {
+  abstract readonly name: StrategyName;
+  protected answers: PlacementAnswer[] = [];
+
+  abstract init(opts?: { userGuess?: number }): void;
+  abstract nextQuestionLevel(): number | null;
+  abstract recordAnswer(level: number, knew: boolean): void;
+  abstract finalLevel(): number;
+  abstract state(): unknown;
+
+  history(): readonly PlacementAnswer[] {
+    return this.answers;
+  }
+}
+
+/** Shared `finalLevel()` rule for the two reversal-terminated staircases:
+ *  mean of the last `reversalsNeeded` reversal levels when the test
+ *  terminated on reversals; otherwise fall back below. */
+function reversalMeanFinalLevel(
+  reversalLevels: readonly number[],
+  answers: readonly PlacementAnswer[],
+  reversalsNeeded: number,
+): number {
+  if (reversalLevels.length >= reversalsNeeded) {
+    const lastThree = reversalLevels.slice(-reversalsNeeded);
+    const mean = lastThree.reduce((a, b) => a + b, 0) / lastThree.length;
+    return clampLevel(mean);
+  }
+  // Fallback: average of all asked levels weighted toward yes answers.
+  const yesLevels = answers.filter((a) => a.knew).map((a) => a.level);
+  if (yesLevels.length > 0) {
+    return clampLevel(yesLevels.reduce((a, b) => a + b, 0) / yesLevels.length);
+  }
+  return MIN_LEVEL;
+}
+
 // ─── Binary search ──────────────────────────────────────────────────────────
 // Maintain [lo, hi]. Ask at mid. Yes → lo = mid + 1, No → hi = mid - 1.
 // Final level: highest mid where the user said "yes", or `lo - 1` if no yes yet.
 
-export class BinaryStrategy implements PlacementStrategy {
+export class BinaryStrategy extends BaseStrategy {
   readonly name = 'binary' as const;
   private lo = MIN_LEVEL;
   private hi = MAX_LEVEL;
   private lastYesLevel: number | null = null;
-  private answers: PlacementAnswer[] = [];
 
   init(): void {
     this.lo = MIN_LEVEL;
@@ -102,10 +141,6 @@ export class BinaryStrategy implements PlacementStrategy {
     return MIN_LEVEL;
   }
 
-  history(): readonly PlacementAnswer[] {
-    return this.answers;
-  }
-
   state(): unknown {
     return { lo: this.lo, hi: this.hi, lastYesLevel: this.lastYesLevel, answers: this.answers };
   }
@@ -120,12 +155,11 @@ const STAIRCASE_REVERSALS = 3;
 const STAIRCASE_MAX_QUESTIONS = 12;
 const STAIRCASE_DEFAULT_START = 8;
 
-export class StaircaseStrategy implements PlacementStrategy {
+export class StaircaseStrategy extends BaseStrategy {
   readonly name = 'staircase' as const;
   private current = STAIRCASE_DEFAULT_START;
   private lastDirection: 'up' | 'down' | null = null;
   private reversalLevels: number[] = [];
-  private answers: PlacementAnswer[] = [];
   private done = false;
 
   init(opts?: { userGuess?: number }): void {
@@ -167,21 +201,7 @@ export class StaircaseStrategy implements PlacementStrategy {
   }
 
   finalLevel(): number {
-    if (this.reversalLevels.length >= STAIRCASE_REVERSALS) {
-      const lastThree = this.reversalLevels.slice(-STAIRCASE_REVERSALS);
-      const mean = lastThree.reduce((a, b) => a + b, 0) / lastThree.length;
-      return clampLevel(mean);
-    }
-    // Fallback: average of all asked levels weighted toward yes answers.
-    const yesLevels = this.answers.filter((a) => a.knew).map((a) => a.level);
-    if (yesLevels.length > 0) {
-      return clampLevel(yesLevels.reduce((a, b) => a + b, 0) / yesLevels.length);
-    }
-    return MIN_LEVEL;
-  }
-
-  history(): readonly PlacementAnswer[] {
-    return this.answers;
+    return reversalMeanFinalLevel(this.reversalLevels, this.answers, STAIRCASE_REVERSALS);
   }
 
   state(): unknown {
@@ -200,7 +220,7 @@ export class StaircaseStrategy implements PlacementStrategy {
 //   P(knew | trueLevel = T) = sigmoid(α · (T − L))
 // with α = 0.9. After each answer, posterior[i] *= likelihood; renormalize.
 // Ask at the posterior mode (good heuristic, cheap to compute).
-// Stop when peak posterior ≥ 0.55 OR after `MAX_QUESTIONS`.
+// Stop when peak posterior ≥ 0.55 OR after `BAYESIAN_MAX_QUESTIONS`.
 
 const BAYESIAN_ALPHA = 0.9;
 const BAYESIAN_STOP_POSTERIOR = 0.55;
@@ -211,10 +231,9 @@ function sigmoid(x: number): number {
   return 1 / (1 + Math.exp(-x));
 }
 
-export class BayesianStrategy implements PlacementStrategy {
+export class BayesianStrategy extends BaseStrategy {
   readonly name = 'bayesian' as const;
   private posterior: number[] = [];
-  private answers: PlacementAnswer[] = [];
 
   init(): void {
     // Uniform prior. Could be peaked at userGuess later if helpful.
@@ -264,10 +283,6 @@ export class BayesianStrategy implements PlacementStrategy {
     return this.peak().level;
   }
 
-  history(): readonly PlacementAnswer[] {
-    return this.answers;
-  }
-
   state(): unknown {
     return {
       posterior: this.posterior.map((p, i) => ({ level: i + MIN_LEVEL, p })),
@@ -291,12 +306,11 @@ const TRANSFORMED_REVERSALS = 3;
 const TRANSFORMED_MAX_QUESTIONS = 14;
 const TRANSFORMED_DEFAULT_START = 8;
 
-export class TransformedStaircaseStrategy implements PlacementStrategy {
+export class TransformedStaircaseStrategy extends BaseStrategy {
   readonly name = 'transformed-staircase' as const;
   private current = TRANSFORMED_DEFAULT_START;
   private lastDirection: 'up' | 'down' | null = null;
   private reversalLevels: number[] = [];
-  private answers: PlacementAnswer[] = [];
   private done = false;
   private consecutiveYes = 0;
 
@@ -356,20 +370,7 @@ export class TransformedStaircaseStrategy implements PlacementStrategy {
   }
 
   finalLevel(): number {
-    if (this.reversalLevels.length >= TRANSFORMED_REVERSALS) {
-      const lastThree = this.reversalLevels.slice(-TRANSFORMED_REVERSALS);
-      const mean = lastThree.reduce((a, b) => a + b, 0) / lastThree.length;
-      return clampLevel(mean);
-    }
-    const yesLevels = this.answers.filter((a) => a.knew).map((a) => a.level);
-    if (yesLevels.length > 0) {
-      return clampLevel(yesLevels.reduce((a, b) => a + b, 0) / yesLevels.length);
-    }
-    return MIN_LEVEL;
-  }
-
-  history(): readonly PlacementAnswer[] {
-    return this.answers;
+    return reversalMeanFinalLevel(this.reversalLevels, this.answers, TRANSFORMED_REVERSALS);
   }
 
   state(): unknown {
@@ -406,13 +407,12 @@ const ANCHOR_HARD_QUESTION_CAP = 12;     // safety ceiling across both phases
 
 type AnchorPhase = 'coarse' | 'fine' | 'done';
 
-export class AnchorVerifyStrategy implements PlacementStrategy {
+export class AnchorVerifyStrategy extends BaseStrategy {
   readonly name = 'anchor-verify' as const;
   private current = ANCHOR_DEFAULT;
   private batchYes = 0;
   private batchCount = 0;
   private jumps = 0;
-  private answers: PlacementAnswer[] = [];
   private phase: AnchorPhase = 'coarse';
   // Fine-phase state
   private fineAsked = 0;
@@ -535,10 +535,6 @@ export class AnchorVerifyStrategy implements PlacementStrategy {
     return clampLevel(Math.max(...yes));
   }
 
-  history(): readonly PlacementAnswer[] {
-    return this.answers;
-  }
-
   state(): unknown {
     return {
       phase: this.phase,
@@ -576,11 +572,10 @@ export class AnchorVerifyStrategy implements PlacementStrategy {
 const SFB_VISITS_TO_LOCK = 3;
 const SFB_HARD_CAP = 30; // safety ceiling — never reachable in practice (a perfect ascent from L01 to L20 + 3 visits at L20 is only 22 asks)
 
-export class StaircaseFromBottomStrategy implements PlacementStrategy {
+export class StaircaseFromBottomStrategy extends BaseStrategy {
   readonly name = 'staircase-from-bottom' as const;
   private current = MIN_LEVEL;
   private visits: Map<number, number> = new Map();
-  private answers: PlacementAnswer[] = [];
   private lockedLevel: number | null = null;
 
   init(): void {
@@ -627,10 +622,6 @@ export class StaircaseFromBottomStrategy implements PlacementStrategy {
     return best;
   }
 
-  history(): readonly PlacementAnswer[] {
-    return this.answers;
-  }
-
   state(): unknown {
     return {
       current: this.current,
@@ -663,14 +654,13 @@ export class StaircaseFromBottomStrategy implements PlacementStrategy {
 
 const RAMP_SEQUENCE = [1, 2, 3, 5, 8, 12, 17, 20] as const;
 
-export class RampBisectStrategy implements PlacementStrategy {
+export class RampBisectStrategy extends BaseStrategy {
   readonly name = 'ramp-bisect' as const;
   private phase: 'ramp' | 'bisect' | 'done' = 'ramp';
   private rampIdx = 0;
   private lo = MIN_LEVEL;        // last "knew" + 1 (or MIN_LEVEL if no yes yet)
   private hi = MAX_LEVEL;        // last "didn't know" - 1 (or MAX_LEVEL if no no yet)
   private lastYesLevel: number | null = null;
-  private answers: PlacementAnswer[] = [];
 
   init(): void {
     this.phase = 'ramp';
@@ -736,10 +726,6 @@ export class RampBisectStrategy implements PlacementStrategy {
     return MIN_LEVEL;
   }
 
-  history(): readonly PlacementAnswer[] {
-    return this.answers;
-  }
-
   state(): unknown {
     return {
       phase: this.phase,
@@ -773,26 +759,17 @@ export function createStrategy(name: StrategyName): PlacementStrategy {
   }
 }
 
-// Swap this single line to change the strategy the live onboarding uses,
-// after reviewing the prototype comparison page. `staircase-from-bottom`
-// gives users a fair chance to climb back up after a single miss
-// (terminates on the 3rd visit to any single level), instead of stopping
-// the moment the bisect interval empties.
+// Swap this single line to change the strategy the live onboarding uses.
+// `staircase-from-bottom` gives users a fair chance to climb back up after
+// a single miss (terminates on the 3rd visit to any single level), instead
+// of stopping the moment the bisect interval empties.
 export const DEFAULT_STRATEGY: StrategyName = 'staircase-from-bottom';
 
 // Maps the precise 1..20 OGTE level the placement test produces back onto the
 // 6-bucket currentLevel enum the existing `createCourse` flow expects (see
 // convex/lib/collections.ts:79). Used at completeOnboarding time so we can
 // keep the existing downstream pipeline unchanged.
-export function ogteToCurrentLevel(
-  level: number,
-):
-  | 'beginner'
-  | 'elementary'
-  | 'intermediate'
-  | 'upper_intermediate'
-  | 'advanced'
-  | 'proficient' {
+export function ogteToCurrentLevel(level: number): CurrentLevel {
   if (level <= 2) return 'beginner';
   if (level <= 5) return 'elementary';
   if (level <= 8) return 'intermediate';
@@ -804,15 +781,7 @@ export function ogteToCurrentLevel(
 // Maps the 6-bucket currentLevel back to a representative OGTE level. Used
 // when the user self-picks a level so the placement-test corpus can show them
 // sample sentences at the right level.
-export function currentLevelToOgte(
-  level:
-    | 'beginner'
-    | 'elementary'
-    | 'intermediate'
-    | 'upper_intermediate'
-    | 'advanced'
-    | 'proficient',
-): number {
+export function currentLevelToOgte(level: CurrentLevel): number {
   switch (level) {
   case 'beginner':
     return 1;

@@ -144,6 +144,8 @@ export async function reverseReviewStats(
     wasFirstReview,
     wasDefaultRating,
     accuracy,
+    accuracyStrict,
+    accuracyLenient,
     reviewDepth,
     collectionId,
   } = reversal;
@@ -161,6 +163,13 @@ export async function reverseReviewStats(
         ? {
           totalAccuracySum: Math.max(0, (stats.totalAccuracySum ?? 0) - accuracy),
           totalAccuracyCount: dec(stats.totalAccuracyCount),
+        }
+        : {}),
+      ...(accuracyStrict != null && accuracyLenient != null
+        ? {
+          totalAccuracyStrictSum: Math.max(0, (stats.totalAccuracyStrictSum ?? 0) - accuracyStrict),
+          totalAccuracyLenientSum: Math.max(0, (stats.totalAccuracyLenientSum ?? 0) - accuracyLenient),
+          totalAccuracyDualCount: dec(stats.totalAccuracyDualCount),
         }
         : {}),
     });
@@ -197,6 +206,13 @@ export async function reverseReviewStats(
         ? {
           accuracySum: Math.max(0, (daily.accuracySum ?? 0) - accuracy),
           accuracyCount: dec(daily.accuracyCount),
+        }
+        : {}),
+      ...(accuracyStrict != null && accuracyLenient != null
+        ? {
+          accuracyStrictSum: Math.max(0, (daily.accuracyStrictSum ?? 0) - accuracyStrict),
+          accuracyLenientSum: Math.max(0, (daily.accuracyLenientSum ?? 0) - accuracyLenient),
+          accuracyDualCount: dec(daily.accuracyDualCount),
         }
         : {}),
       ...(wasDefaultRating === true

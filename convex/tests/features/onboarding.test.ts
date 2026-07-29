@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 
 import schema from "../../schema";
@@ -59,7 +59,7 @@ console.error = (...args: unknown[]) => {
   realConsoleError(...args);
 };
 
-async function seedQuota(t: ReturnType<typeof convexTest>, userId: string) {
+async function seedQuota(t: TestConvex<typeof schema>, userId: string) {
   await t.run(async (ctx) =>
     ctx.db.insert("usageQuotas", {
       userId,
@@ -83,7 +83,7 @@ async function seedQuota(t: ReturnType<typeof convexTest>, userId: string) {
  * `getNextTextsFromRank` can pull the first 10 cards during completeOnboarding.
  */
 async function seedEssentialCollection(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
 ): Promise<Id<"collections">> {
   return t.run(async (ctx) => {
     const id = await ctx.db.insert("collections", {
@@ -110,7 +110,7 @@ async function seedEssentialCollection(
  * has something to hit. Returns the collection ids keyed by code ("L06" …).
  */
 async function seedActiveDataset(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
   levels: number[],
 ): Promise<Record<string, Id<"collections">>> {
   return t.run(async (ctx) => {
@@ -151,7 +151,7 @@ async function seedActiveDataset(
  * Seed the `placement-test-pool` collection with 5 English texts.
  */
 async function seedPlacementPool(
-  t: ReturnType<typeof convexTest>,
+  t: TestConvex<typeof schema>,
 ): Promise<Id<"collections">> {
   return t.run(async (ctx) => {
     const id = await ctx.db.insert("collections", {
@@ -179,7 +179,7 @@ async function seedPlacementPool(
  * scheduler doesn't race against vitest teardown and surface as an unhandled
  * rejection.
  */
-async function drainScheduled(t: ReturnType<typeof convexTest>) {
+async function drainScheduled(t: TestConvex<typeof schema>) {
   try {
     await t.finishInProgressScheduledFunctions();
   } catch {
@@ -391,7 +391,7 @@ describe("completeOnboarding", () => {
 
 describe("completeOnboarding — starting level → collection", () => {
   async function getActiveCollectionId(
-    t: ReturnType<typeof convexTest>,
+    t: TestConvex<typeof schema>,
     courseId: Id<"courses">,
   ): Promise<Id<"collections"> | undefined> {
     return t.run(async (ctx) => {
@@ -684,5 +684,208 @@ describe("finalizeOnboarding", () => {
       return row?.completedAt;
     });
     expect(secondCompletedAt).toBe(firstCompletedAt);
+  });
+});
+
+describe("getOnboardingProgress", () => {
+  it("returns a fully-populated in-progress row field-by-field", async () => {
+    const t = convexTest(schema, modules);
+    const rowId = await t.run(async (ctx) =>
+      ctx.db.insert("onboardingProgress", {
+        userId: "user_A",
+        step: 9,
+        reviewMode: "audio",
+        currentLevel: "intermediate",
+        targetLanguages: ["es"],
+        baseLanguages: ["en"],
+        acquisitionSource: "reddit",
+        acquisitionSourceFreeText: "saw a post about it",
+        learningGoals: ["travel", "work"],
+        learningGoalFreeText: "order food abroad",
+        dailyTimeGoalMinutes: 20,
+        firstLessonCardsRated: 4,
+        firstLessonSessionId: "sess_1",
+        firstLessonSummary: {
+          cardsRated: 10,
+          sessionId: "sess_1",
+          dailyReviewsToday: 10,
+          dailyTimeMsToday: 300_000,
+          dailyNewWordsToday: 12,
+        },
+        placementTest: {
+          strategyVersion: 2,
+          strategy: "staircase",
+          history: [
+            { level: 8, knew: true },
+            { level: 10, knew: false },
+          ],
+          finalLevel: 9,
+        },
+      }),
+    );
+
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const progress = await asUser.query(
+      api.features.courses.getOnboardingProgress,
+      {},
+    );
+
+    expect(progress).toEqual({
+      _id: rowId,
+      _creationTime: expect.any(Number),
+      userId: "user_A",
+      step: 9,
+      reviewMode: "audio",
+      currentLevel: "intermediate",
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      acquisitionSource: "reddit",
+      acquisitionSourceFreeText: "saw a post about it",
+      learningGoals: ["travel", "work"],
+      learningGoalFreeText: "order food abroad",
+      dailyTimeGoalMinutes: 20,
+      firstLessonCardsRated: 4,
+      firstLessonSessionId: "sess_1",
+      firstLessonSummary: {
+        cardsRated: 10,
+        sessionId: "sess_1",
+        dailyReviewsToday: 10,
+        dailyTimeMsToday: 300_000,
+        dailyNewWordsToday: 12,
+      },
+      placementTest: {
+        strategyVersion: 2,
+        strategy: "staircase",
+        history: [
+          { level: 8, knew: true },
+          { level: 10, knew: false },
+        ],
+        finalLevel: 9,
+      },
+    });
+    expect(progress?.completedAt).toBeUndefined();
+  });
+});
+
+describe("prepareLanguagePair", () => {
+  it("schedules the two immediate warmups and the 60s audio backstop with wrapped language args", async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    const before = Date.now();
+    await asUser.mutation(api.features.onboarding.prepareLanguagePair, {
+      sourceLanguage: "en",
+      targetLanguage: "es",
+    });
+    const after = Date.now();
+
+    const scheduled = await t.run(async (ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(scheduled).toHaveLength(3);
+
+    // Level-collection warmup: single languages wrapped into arrays.
+    const warmup = scheduled.find((s) =>
+      s.name.includes("ensureFirstSentencesAcrossLevelCollections"),
+    );
+    expect(warmup).toBeDefined();
+    expect(warmup!.args).toEqual([
+      { baseLanguages: ["en"], targetLanguages: ["es"] },
+    ]);
+    expect(warmup!.scheduledTime).toBeLessThanOrEqual(after);
+
+    const placement = scheduled.find((s) =>
+      s.name.includes("enqueueMissingPlacementTranslations"),
+    );
+    expect(placement).toBeDefined();
+    expect(placement!.args).toEqual([
+      { targetLanguage: "es", sourceLanguage: "en" },
+    ]);
+    expect(placement!.scheduledTime).toBeLessThanOrEqual(after);
+
+    const backstop = scheduled.find((s) =>
+      s.name.includes("ensureAudioForTestTranslations"),
+    );
+    expect(backstop).toBeDefined();
+    expect(backstop!.args).toEqual([
+      { targetLanguage: "es", sourceLanguage: "en" },
+    ]);
+    expect(backstop!.scheduledTime).toBeGreaterThanOrEqual(before + 60_000);
+    expect(backstop!.scheduledTime).toBeLessThanOrEqual(after + 60_000);
+
+    await drainScheduled(t);
+  });
+});
+
+describe("getInitialCardsReadiness", () => {
+  const zeros = (sampleSize: number) => ({
+    totalCards: 0,
+    translatedCards: 0,
+    audioReadyCards: 0,
+    sampleSize,
+  });
+
+  it("returns zeros with the default sampleSize of 3 when unauthenticated", async () => {
+    const t = convexTest(schema, modules);
+    const res = await t.query(
+      api.features.onboarding.getInitialCardsReadiness,
+      {},
+    );
+    expect(res).toEqual(zeros(3));
+  });
+
+  it("returns zeros (passing sampleSize through) when there is no active course", async () => {
+    const t = convexTest(schema, modules);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const res = await asUser.query(
+      api.features.onboarding.getInitialCardsReadiness,
+      { sampleSize: 5 },
+    );
+    expect(res).toEqual(zeros(5));
+  });
+
+  it("returns zeros when the active course row no longer exists", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      const courseId = await ctx.db.insert("courses", {
+        userId: "user_A",
+        baseLanguages: ["en"],
+        targetLanguages: ["es"],
+      });
+      await ctx.db.insert("userSettings", {
+        userId: "user_A",
+        hasCompletedOnboarding: false,
+        activeCourseId: courseId,
+      });
+      await ctx.db.delete(courseId);
+    });
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const res = await asUser.query(
+      api.features.onboarding.getInitialCardsReadiness,
+      {},
+    );
+    expect(res).toEqual(zeros(3));
+  });
+
+  it("returns zeros when the course has no deck yet", async () => {
+    const t = convexTest(schema, modules);
+    await t.run(async (ctx) => {
+      const courseId = await ctx.db.insert("courses", {
+        userId: "user_A",
+        baseLanguages: ["en"],
+        targetLanguages: ["es"],
+      });
+      await ctx.db.insert("userSettings", {
+        userId: "user_A",
+        hasCompletedOnboarding: false,
+        activeCourseId: courseId,
+      });
+    });
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const res = await asUser.query(
+      api.features.onboarding.getInitialCardsReadiness,
+      {},
+    );
+    expect(res).toEqual(zeros(3));
   });
 });

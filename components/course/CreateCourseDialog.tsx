@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import {
@@ -17,7 +17,6 @@ import { toast } from 'sonner';
 import { LanguageSelector } from './LanguageSelector';
 import { DifficultySelector, LEVEL_ICONS } from './DifficultySelector';
 import { CurrentLevel } from './types';
-import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 
 interface CreateCourseDialogProps {
   open: boolean;
@@ -30,7 +29,6 @@ export function CreateCourseDialog({
 }: CreateCourseDialogProps) {
   const t = useTranslations('AppPage.courses.createDialog');
   const tLevels = useTranslations('Onboarding.difficulty');
-  const locale = useLocale();
 
   const [step, setStep] = useState(1);
   const [targetLanguage, setTargetLanguage] = useState<string>('');
@@ -118,10 +116,6 @@ export function CreateCourseDialog({
   const handleBaseLanguageToggle = (code: string) => {
     setBaseLanguage(code);
   };
-
-  const targetLanguageName = targetLanguage
-    ? getLocalizedLanguageNameByCode(targetLanguage, locale)
-    : undefined;
 
   const levelOptions = [
     {

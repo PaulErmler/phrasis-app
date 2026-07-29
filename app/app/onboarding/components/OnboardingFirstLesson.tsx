@@ -5,6 +5,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { LearnViewOnboarding } from '@/components/app/learning/LearnView';
+import type { SessionSnapshot } from '@/components/app/learning/sessionSnapshot';
 import { ReviewModeSwitcher } from '@/components/app/learning/ReviewModeSwitcher';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
@@ -26,12 +27,8 @@ import type { ReviewRating } from '@/lib/scheduling';
  * desktop, and keyboard nav consistently.
  */
 
-export interface OnboardingSessionSummary {
+export interface OnboardingSessionSummary extends SessionSnapshot {
   cardsRated: number;
-  sessionId: string;
-  dailyReviewsToday: number;
-  dailyTimeMsToday: number;
-  dailyNewWordsToday: number;
 }
 
 interface Props {
@@ -184,15 +181,7 @@ export function OnboardingFirstLesson({
   });
 
   const handleCardRated = useCallback(
-    (
-      _rating: ReviewRating | undefined,
-      snapshot: {
-        sessionId: string;
-        dailyReviewsToday: number;
-        dailyTimeMsToday: number;
-        dailyNewWordsToday: number;
-      },
-    ) => {
+    (_rating: ReviewRating | undefined, snapshot: SessionSnapshot) => {
       setCardsRated((n) => {
         const next = n + 1;
         // Defer parent-state updates until after React commits this one —
@@ -239,12 +228,7 @@ export function OnboardingFirstLesson({
   // useOnboardingLessonTutorial claims each stage once, so dropping back
   // below a stage's card count can't re-trigger it.
   const handleCardUndone = useCallback(
-    (snapshot: {
-      sessionId: string;
-      dailyReviewsToday: number;
-      dailyTimeMsToday: number;
-      dailyNewWordsToday: number;
-    }) => {
+    (snapshot: SessionSnapshot) => {
       setCardsRated((n) => {
         const next = Math.max(0, n - 1);
         queueMicrotask(() => {

@@ -124,6 +124,21 @@ export function StatsView() {
   const isLoading = pageData === undefined || dailyData === undefined;
   const cs = pageData?.courseStats;
 
+  // Show whichever punctuation variant matches how the learner currently
+  // scores their writing, so the number means what the app just told them it
+  // means. Reviews recorded before the two series existed only exist in the
+  // legacy pair, which is the fallback — otherwise the tile would vanish for
+  // anyone who hasn't reviewed since the split shipped.
+  const accuracy =
+    cs && cs.totalAccuracyDualCount > 0
+      ? {
+        sum: pageData?.ignorePunctuation
+          ? cs.totalAccuracyLenientSum
+          : cs.totalAccuracyStrictSum,
+        count: cs.totalAccuracyDualCount,
+      }
+      : { sum: cs?.totalAccuracySum ?? 0, count: cs?.totalAccuracyCount ?? 0 };
+
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -142,8 +157,8 @@ export function StatsView() {
           reviews={cs?.totalRepetitions ?? 0}
           sentences={cs?.totalCards ?? 0}
           timeMs={cs?.totalTimeMs ?? 0}
-          accuracySum={cs?.totalAccuracySum ?? 0}
-          accuracyCount={cs?.totalAccuracyCount ?? 0}
+          accuracySum={accuracy.sum}
+          accuracyCount={accuracy.count}
           languageWordCounts={pageData?.languageWordCounts ?? []}
           todayReps={pageData?.todayReps ?? 0}
           todayNewCards={pageData?.todayNewCards ?? 0}

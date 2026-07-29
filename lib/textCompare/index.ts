@@ -1,4 +1,4 @@
-export { normalize } from './normalize';
+export { normalize, isPunctuationOnly, PUNCTUATION_RE } from './normalize';
 export type { NormalizeOptions } from './normalize';
 export { segmentGraphemes, segmentWords } from './segment';
 export { damerauLevenshtein } from './editDistance';
@@ -18,5 +18,12 @@ export type {
   WordAlignOptions,
 } from './wordAlign';
 export { scoreWordAlignment } from './score';
+export type { ScoreOptions } from './score';
+export { computeAccuracy, computeAccuracyPair } from './accuracy';
+export type { AccuracyPair } from './accuracy';
 export { getCompareConfig, toDiffOptions } from './languageConfig';
-export type { CompareConfig, DiffOptions } from './languageConfig';
+export type {
+  CompareConfig,
+  CompareOverrides,
+  DiffOptions,
+} from './languageConfig';

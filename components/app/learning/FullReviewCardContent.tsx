@@ -17,14 +17,24 @@ import {
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
   DEFAULT_PLAYBACK_SPEED,
 } from '@/lib/constants/audioPlayback';
-import { DiffDisplay, computeAccuracy } from './DiffDisplay';
+import { DiffDisplay } from './DiffDisplay';
+import { computeAccuracyPair, type AccuracyPair } from '@/lib/textCompare';
 import { ClickableWords } from './ClickableWords';
-import { getLocalizedLanguageNameByCode, getTextDirection } from '@/lib/languages';
-import { useButtonPlayback } from '@/hooks/use-button-playback';
+import {
+  getLanguageByCode,
+  getLocalizedLanguageNameByCode,
+  getTextDirection,
+} from '@/lib/languages';
+import { useImeSafeEnter } from '@/hooks/use-ime-safe-enter';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
-import { useActiveCue, type MergedPlayback } from '@/hooks/use-active-cue';
+import type { MergedPlayback } from '@/hooks/use-active-cue';
 import type { ClockBinding } from '@/hooks/use-karaoke-index';
-import type { CardTranslation, CardAudioRecording } from './types';
+import { useCardPlayback, displayReviewCount } from './useCardPlayback';
+import type {
+  CardTranslation,
+  CardAudioRecording,
+  WritingAccuracySummary,
+} from './types';
 import type { Id } from '@/convex/_generated/dataModel';
 import type { PinnableCardAction } from '@/lib/cardActions';
 
@@ -68,6 +78,8 @@ interface FullReviewCardContentProps {
   hideBaseLanguages?: boolean;
   /** Un-blur base text once every target translation is submitted. */
   autoRevealBaseOnSubmit?: boolean;
+  /** Exclude punctuation from the accuracy score ("Ignore punctuation"). */
+  ignorePunctuation?: boolean;
   /**
    * Post-submit playback settings ("Translation Entered" timeline group), per
    * language. Missing entry = 1 play; speed falls back to the per-language
@@ -85,7 +97,7 @@ interface FullReviewCardContentProps {
   suppressAutoPlay?: boolean;
   allRevealed?: boolean;
   onAllSubmittedChange?: (allSubmitted: boolean) => void;
-  onAccuracyChange?: (accuracy: number | null) => void;
+  onAccuracyChange?: (summary: WritingAccuracySummary | null) => void;
   bare?: boolean;
   showRomanization?: boolean;
   /** Clears submission stack when the reviewed card changes */
@@ -141,6 +153,7 @@ export function FullReviewCardContent({
   transcribeMode = false,
   hideBaseLanguages = false,
   autoRevealBaseOnSubmit = true,
+  ignorePunctuation = false,
   afterSubmitRepetitions,
   afterSubmitRepetitionPauses,
   afterSubmitPlaybackSpeeds,
@@ -168,23 +181,8 @@ export function FullReviewCardContent({
   const t = useTranslations('LearningMode');
   const locale = useLocale();
 
-  const buttonPlayback = useButtonPlayback();
-  // Merged playback resolves to the active cue at cue-change frequency; the
-  // per-frame word position ticks inside the highlight leaves via
-  // clockBinding (useKaraokeIndex) — no 60 fps re-render of this card.
-  const mergedCue = useActiveCue(mergedPlayback);
-  const activeClip = useMemo<ButtonPlaybackActive | null>(() => {
-    if (mergedCue) return { language: mergedCue.language, localTime: 0 };
-    return buttonPlayback.active;
-  }, [mergedCue, buttonPlayback.active]);
-  const clockBinding = useMemo<ClockBinding | undefined>(() => {
-    if (!mergedCue || !mergedPlayback) return undefined;
-    return {
-      clock: mergedPlayback.clock,
-      cueStartSec: mergedCue.cueStartSec,
-      speed: mergedCue.speed,
-    };
-  }, [mergedCue, mergedPlayback]);
+  const { buttonPlayback, activeClip, clockBinding } =
+    useCardPlayback(mergedPlayback);
 
   // Reveal-sweep / post-submit auto-play uses raw <Audio> elements; route their
   // progress through the shared button-playback channel so <ClickableWords>
@@ -194,12 +192,23 @@ export function FullReviewCardContent({
   const buttonStopRef = useRef(buttonPlayback.onStop);
   buttonStopRef.current = buttonPlayback.onStop;
 
-  const displayReviewCount =
-    schedulingPhase === 'review' && fsrsState != null
-      ? preReviewCount + fsrsState.reps
-      : preReviewCount;
+  // Fingerprint of everything derived from `translations` below. The role flag is
+  // part of it because `targetTranslations` filters on it: two languages could
+  // swap base/target roles with their text unchanged, and the key has to move
+  // for that (it also has to rebuild the inputs map, which it now does).
+  const translationKey = translations
+    .map((tr) => `${tr.language}\u0000${tr.isTargetLanguage ? 'T' : 'B'}\u0000${tr.text}`)
+    .join('|');
 
-  const targetTranslations = translations.filter((tr) => tr.isTargetLanguage);
+  // `translations` is a fresh array on every render, so keying on the fingerprint
+  // rather than the array is what lets the accuracy memo below actually memoize.
+  // Depending on `translations` here is precisely the thing being avoided — the
+  // disable is load-bearing, not an oversight.
+  const targetTranslations = useMemo(
+    () => translations.filter((tr) => tr.isTargetLanguage),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [translationKey],
+  );
   const showLanguageLabel = targetTranslations.length > 1;
 
   const [inputs, setInputs] = useState<Map<string, LanguageInputState>>(
@@ -220,8 +229,14 @@ export function FullReviewCardContent({
   const inputRefsByLanguage = useRef<Record<string, HTMLInputElement | null>>({});
   const submissionOrderRef = useRef<string[]>([]);
   submissionOrderRef.current = submissionOrder;
+  // `inputs` gets a new identity on every keystroke, so the accuracy memo below
+  // re-runs while the learner types the NEXT language — with nothing changed
+  // about the answers already submitted. Keyed on the actual comparison inputs,
+  // so each distinct answer is diffed exactly once. Pure cache (same key always
+  // yields the same value), so a StrictMode double render is harmless. Cleared
+  // when the card changes, below.
+  const pairCacheRef = useRef(new Map<string, AccuracyPair>());
 
-  const translationKey = translations.map((tr) => tr.language + tr.text).join('|');
   const [prevTranslationKey, setPrevTranslationKey] = useState(translationKey);
   if (translationKey !== prevTranslationKey) {
     setPrevTranslationKey(translationKey);
@@ -231,6 +246,7 @@ export function FullReviewCardContent({
     setSubmissionOrder([]);
     setManuallyRevealedBase(new Set());
     autoPlayedRef.current = new Set();
+    pairCacheRef.current.clear();
   }
 
   useEffect(() => {
@@ -246,23 +262,84 @@ export function FullReviewCardContent({
     onAllSubmittedChangeRef.current?.(allSubmitted);
   }, [allSubmitted]);
 
-  // Compute average accuracy across all target languages when all are submitted
+  // Accuracy across the target languages submitted SO FAR. Deliberately not
+  // gated on `allSubmitted`: the auto-rating needs a running figure as each
+  // language lands, and the consumer decides separately when to persist a stat.
+  //
+  // Note `ignorePunctuation` is absent from the deps — both variants are always
+  // computed, so the summary is setting-independent and both stat series can be
+  // populated in parallel. The setting only picks which one is acted on.
+  const accuracySummary = useMemo<WritingAccuracySummary | null>(() => {
+    if (targetTranslations.length === 0) return null;
+
+    const pairs = targetTranslations
+      .filter((tr) => inputs.get(tr.language)?.submitted)
+      .map((tr) => {
+        const userText = inputs.get(tr.language)?.userText ?? '';
+        const cacheKey = `${tr.language}\u0000${tr.text}\u0000${userText}`;
+        const cached = pairCacheRef.current.get(cacheKey);
+        if (cached) return cached;
+        const pair = computeAccuracyPair(tr.text, userText, tr.language);
+        pairCacheRef.current.set(cacheKey, pair);
+        return pair;
+      });
+
+    const base = {
+      allSubmitted,
+      submittedCount: pairs.length,
+      targetCount: targetTranslations.length,
+    };
+    if (pairs.length === 0) {
+      return {
+        ...base,
+        avgWithPunctuation: null,
+        avgWithoutPunctuation: null,
+        minWithPunctuation: null,
+        minWithoutPunctuation: null,
+      };
+    }
+
+    const mean = (ns: number[]) =>
+      Math.round(ns.reduce((sum, n) => sum + n, 0) / ns.length);
+    const strict = pairs.map((p) => p.withPunctuation);
+    const lenient = pairs.map((p) => p.withoutPunctuation);
+
+    return {
+      ...base,
+      avgWithPunctuation: mean(strict),
+      avgWithoutPunctuation: mean(lenient),
+      minWithPunctuation: Math.min(...strict),
+      minWithoutPunctuation: Math.min(...lenient),
+    };
+  }, [allSubmitted, inputs, targetTranslations]);
+
   const onAccuracyChangeRef = useRef(onAccuracyChange);
   onAccuracyChangeRef.current = onAccuracyChange;
+  // Emit only on STRUCTURAL change, not referential. `inputs` gets a new identity
+  // on every keystroke, so the memo above re-produces a new (but equal) object
+  // whenever the learner types into a language that isn't submitted yet.
+  // Emitting that unconditionally makes the parent store it in state and
+  // re-render on every character. (The old code emitted a bare number and was
+  // saved by React's same-value bailout; an object needs the comparison done
+  // explicitly.)
+  const lastEmittedSummaryRef = useRef<WritingAccuracySummary | null>(null);
   useEffect(() => {
-    if (!allSubmitted) {
-      onAccuracyChangeRef.current?.(null);
-      return;
-    }
-    let total = 0;
-    let count = 0;
-    for (const tr of targetTranslations) {
-      const userText = inputs.get(tr.language)?.userText ?? '';
-      total += computeAccuracy(tr.text, userText, tr.language);
-      count++;
-    }
-    onAccuracyChangeRef.current?.(count > 0 ? Math.round(total / count) : null);
-  }, [allSubmitted, inputs, targetTranslations]);
+    const prev = lastEmittedSummaryRef.current;
+    const unchanged =
+      prev === accuracySummary ||
+      (prev != null &&
+        accuracySummary != null &&
+        prev.allSubmitted === accuracySummary.allSubmitted &&
+        prev.submittedCount === accuracySummary.submittedCount &&
+        prev.targetCount === accuracySummary.targetCount &&
+        prev.avgWithPunctuation === accuracySummary.avgWithPunctuation &&
+        prev.avgWithoutPunctuation === accuracySummary.avgWithoutPunctuation &&
+        prev.minWithPunctuation === accuracySummary.minWithPunctuation &&
+        prev.minWithoutPunctuation === accuracySummary.minWithoutPunctuation);
+    if (unchanged) return;
+    lastEmittedSummaryRef.current = accuracySummary;
+    onAccuracyChangeRef.current?.(accuracySummary);
+  }, [accuracySummary]);
 
   const onAudioPlayRef = useRef(onAudioPlay);
   onAudioPlayRef.current = onAudioPlay;
@@ -475,7 +552,7 @@ export function FullReviewCardContent({
   return (
     <div data-tutorial="card-content-full" className="flex flex-col flex-1 min-h-0">
       <CardShell
-        reviewCount={displayReviewCount}
+        reviewCount={displayReviewCount(preReviewCount, schedulingPhase, fsrsState)}
         sourceText={sourceText}
         translations={translations}
         audioRecordings={audioRecordings}
@@ -572,6 +649,7 @@ export function FullReviewCardContent({
                   isFirstTarget={index === 0}
                   allRevealed={allRevealed}
                   showRomanization={showRomanization}
+                  ignorePunctuation={ignorePunctuation}
                   highlightEnabled={highlightEnabled}
                   activeClip={activeClip}
                   clockBinding={clockBinding}
@@ -619,6 +697,7 @@ interface TargetLanguageInputProps {
   isFirstTarget?: boolean;
   allRevealed?: boolean;
   showRomanization?: boolean;
+  ignorePunctuation?: boolean;
   highlightEnabled: boolean;
   activeClip: ButtonPlaybackActive | null;
   clockBinding?: ClockBinding;
@@ -660,6 +739,7 @@ function TargetLanguageInput({
   isFirstTarget = false,
   allRevealed = false,
   showRomanization = true,
+  ignorePunctuation = false,
   highlightEnabled,
   activeClip,
   clockBinding,
@@ -674,6 +754,7 @@ function TargetLanguageInput({
 }: TargetLanguageInputProps) {
   const isActive = activeClip?.language === translation.language;
   const t = useTranslations('LearningMode');
+  const { compositionProps, isComposingEvent } = useImeSafeEnter();
   const [showClean, setShowClean] = useState(false);
   const autoPlayAudioRef = useRef<HTMLAudioElement | null>(null);
   // Read via ref inside the playback effect: the object is rebuilt each
@@ -782,7 +863,9 @@ function TargetLanguageInput({
   }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !state.submitted) {
+    // IME users (ja/zh/ko/vi) press Enter to confirm a conversion — that
+    // keystroke is typing, not a submit. See `useImeSafeEnter`.
+    if (e.key === 'Enter' && !state.submitted && !isComposingEvent(e)) {
       e.preventDefault();
       onSubmit(translation.language);
     }
@@ -792,6 +875,10 @@ function TargetLanguageInput({
     ? getLocalizedLanguageNameByCode(translation.language, locale)
     : null;
 
+  // BCP-47 tag (not the internal `zh_traditional`-style code) so the OS offers
+  // the right IME / keyboard layout when this field is focused.
+  const inputLang = getLanguageByCode(translation.language)?.displayCode;
+
   const hasUserText = !!state.userText.trim();
 
   if (allRevealed && !state.submitted) {
@@ -800,50 +887,19 @@ function TargetLanguageInput({
         className="space-y-1"
         {...(isFirstTarget ? { 'data-tutorial': 'target-input-full' } : {})}
       >
-        {languageDisplayName ? (
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground uppercase">
-              {languageDisplayName}
-            </span>
-            <div className="flex items-center">
-              <AudioButton
-                url={audioUrl}
-                language={translation.language}
-                onPlay={onAudioPlay}
-                onTimeUpdate={onButtonTimeUpdate}
-                onStop={onButtonStop}
-                speed={speed}
-              />
-              {onSpeedCycle && (
-                <CardSpeedBadge
-                  override={speedOverride}
-                  generalSpeed={generalSpeed}
-                  onCycle={onSpeedCycle}
-                />
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-end">
-            <div className="flex items-center">
-              <AudioButton
-                url={audioUrl}
-                language={translation.language}
-                onPlay={onAudioPlay}
-                onTimeUpdate={onButtonTimeUpdate}
-                onStop={onButtonStop}
-                speed={speed}
-              />
-              {onSpeedCycle && (
-                <CardSpeedBadge
-                  override={speedOverride}
-                  generalSpeed={generalSpeed}
-                  onCycle={onSpeedCycle}
-                />
-              )}
-            </div>
-          </div>
-        )}
+        <TargetRowHeader
+          languageDisplayName={languageDisplayName}
+          audioUrl={audioUrl}
+          language={translation.language}
+          onAudioPlay={onAudioPlay}
+          onButtonTimeUpdate={onButtonTimeUpdate}
+          onButtonStop={onButtonStop}
+          speed={speed}
+          wrapAudio
+          speedOverride={speedOverride}
+          generalSpeed={generalSpeed}
+          onSpeedCycle={onSpeedCycle}
+        />
         {hasUserText ? (
           <div className="flex items-start gap-2">
             <div className="flex-1 min-w-0">
@@ -853,25 +909,16 @@ function TargetLanguageInput({
                 language={translation.language}
                 hideAccuracy={false}
                 hideErrors={showClean}
+                ignorePunctuation={ignorePunctuation}
               />
             </div>
             <div className="flex shrink-0 gap-2 pt-0.5">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowClean((v) => !v)}
-                    className={`h-9 w-9 shrink-0 ${showClean ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
-                    aria-label={showClean ? t('showCorrections') : t('showSentence')}
-                  >
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {showClean ? t('showCorrections') : t('showSentence')}
-                </TooltipContent>
-              </Tooltip>
+              <ShowCleanToggle
+                showClean={showClean}
+                onToggle={() => setShowClean((v) => !v)}
+                showCorrectionsLabel={t('showCorrections')}
+                showSentenceLabel={t('showSentence')}
+              />
             </div>
           </div>
         ) : (
@@ -901,50 +948,19 @@ function TargetLanguageInput({
         className="space-y-1"
         {...(isFirstTarget ? { 'data-tutorial': 'target-input-full' } : {})}
       >
-        {languageDisplayName ? (
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground uppercase">
-              {languageDisplayName}
-            </span>
-            <div className="flex items-center">
-              <AudioButton
-                url={audioUrl}
-                language={translation.language}
-                onPlay={onAudioPlay}
-                onTimeUpdate={onButtonTimeUpdate}
-                onStop={onButtonStop}
-                speed={speed}
-              />
-              {onSpeedCycle && (
-                <CardSpeedBadge
-                  override={speedOverride}
-                  generalSpeed={generalSpeed}
-                  onCycle={onSpeedCycle}
-                />
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="flex justify-end">
-            <div className="flex items-center">
-              <AudioButton
-                url={audioUrl}
-                language={translation.language}
-                onPlay={onAudioPlay}
-                onTimeUpdate={onButtonTimeUpdate}
-                onStop={onButtonStop}
-                speed={speed}
-              />
-              {onSpeedCycle && (
-                <CardSpeedBadge
-                  override={speedOverride}
-                  generalSpeed={generalSpeed}
-                  onCycle={onSpeedCycle}
-                />
-              )}
-            </div>
-          </div>
-        )}
+        <TargetRowHeader
+          languageDisplayName={languageDisplayName}
+          audioUrl={audioUrl}
+          language={translation.language}
+          onAudioPlay={onAudioPlay}
+          onButtonTimeUpdate={onButtonTimeUpdate}
+          onButtonStop={onButtonStop}
+          speed={speed}
+          wrapAudio
+          speedOverride={speedOverride}
+          generalSpeed={generalSpeed}
+          onSpeedCycle={onSpeedCycle}
+        />
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
             {hasUserText ? (
@@ -954,6 +970,7 @@ function TargetLanguageInput({
                 language={translation.language}
                 hideAccuracy={false}
                 hideErrors={showClean}
+                ignorePunctuation={ignorePunctuation}
               />
             ) : (
               <ClickableWords
@@ -984,22 +1001,12 @@ function TargetLanguageInput({
               <TooltipContent side="bottom">{revertTooltip}</TooltipContent>
             </Tooltip>
             {hasUserText && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowClean((v) => !v)}
-                    className={`h-9 w-9 shrink-0 ${showClean ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
-                    aria-label={showClean ? t('showCorrections') : t('showSentence')}
-                  >
-                    <FileText className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">
-                  {showClean ? t('showCorrections') : t('showSentence')}
-                </TooltipContent>
-              </Tooltip>
+              <ShowCleanToggle
+                showClean={showClean}
+                onToggle={() => setShowClean((v) => !v)}
+                showCorrectionsLabel={t('showCorrections')}
+                showSentenceLabel={t('showSentence')}
+              />
             )}
           </div>
         </div>
@@ -1017,30 +1024,17 @@ function TargetLanguageInput({
       className="space-y-1"
       {...(isFirstTarget ? { 'data-tutorial': 'target-input-full' } : {})}
     >
-      {languageDisplayName ? (
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground uppercase">
-            {languageDisplayName}
-          </span>
-          <AudioButton
-            url={audioUrl}
-            language={translation.language}
-            onPlay={onAudioPlay}
-            onTimeUpdate={onButtonTimeUpdate}
-            onStop={onButtonStop}
-          />
-        </div>
-      ) : (
-        <div className="flex justify-end">
-          <AudioButton
-            url={audioUrl}
-            language={translation.language}
-            onPlay={onAudioPlay}
-            onTimeUpdate={onButtonTimeUpdate}
-            onStop={onButtonStop}
-          />
-        </div>
-      )}
+      <TargetRowHeader
+        languageDisplayName={languageDisplayName}
+        audioUrl={audioUrl}
+        language={translation.language}
+        onAudioPlay={onAudioPlay}
+        onButtonTimeUpdate={onButtonTimeUpdate}
+        onButtonStop={onButtonStop}
+        wrapAudio={false}
+        speedOverride={speedOverride}
+        generalSpeed={generalSpeed}
+      />
       <div
         className="flex items-center gap-2"
         {...(isFirstTarget ? { 'data-tutorial': 'target-input-and-submit' } : {})}
@@ -1051,7 +1045,9 @@ function TargetLanguageInput({
           value={state.userText}
           onChange={(e) => onInputChange(translation.language, e.target.value)}
           onKeyDown={handleKeyDown}
+          {...compositionProps}
           placeholder={placeholder}
+          lang={inputLang}
           dir={getTextDirection(translation.language)}
           className="flex-1 text-left"
           autoComplete="off"
@@ -1072,5 +1068,110 @@ function TargetLanguageInput({
         </Button>
       </div>
     </div>
+  );
+}
+
+interface TargetRowHeaderProps {
+  /** Localized language name, or null when the label row is hidden. */
+  languageDisplayName: string | null;
+  audioUrl: string | null;
+  language: string;
+  onAudioPlay?: () => void;
+  onButtonTimeUpdate: (language: string, localTime: number) => void;
+  onButtonStop: (language: string) => void;
+  /** Effective playback speed; omitted on the input row (AudioButton defaults to 1). */
+  speed?: number;
+  /**
+   * Wrap the audio button in the flex container that also hosts the speed
+   * badge (revealed/submitted rows). The input row renders the bare button
+   * with no badge.
+   */
+  wrapAudio: boolean;
+  /** Stored override value, or null when none is stored. */
+  speedOverride: number | null;
+  /** Course-level general speed for this language. */
+  generalSpeed: number;
+  /** Cycle handler; null clears the override. */
+  onSpeedCycle?: (next: number | null) => void;
+}
+
+/** Label + audio-button header row shared by the three TargetLanguageInput branches. */
+function TargetRowHeader({
+  languageDisplayName,
+  audioUrl,
+  language,
+  onAudioPlay,
+  onButtonTimeUpdate,
+  onButtonStop,
+  speed,
+  wrapAudio,
+  speedOverride,
+  generalSpeed,
+  onSpeedCycle,
+}: TargetRowHeaderProps) {
+  const audioButton = (
+    <AudioButton
+      url={audioUrl}
+      language={language}
+      onPlay={onAudioPlay}
+      onTimeUpdate={onButtonTimeUpdate}
+      onStop={onButtonStop}
+      speed={speed}
+    />
+  );
+  const audio = wrapAudio ? (
+    <div className="flex items-center">
+      {audioButton}
+      {onSpeedCycle && (
+        <CardSpeedBadge
+          override={speedOverride}
+          generalSpeed={generalSpeed}
+          onCycle={onSpeedCycle}
+        />
+      )}
+    </div>
+  ) : (
+    audioButton
+  );
+  return languageDisplayName ? (
+    <div className="flex items-center justify-between">
+      <span className="text-xs font-medium text-muted-foreground uppercase">
+        {languageDisplayName}
+      </span>
+      {audio}
+    </div>
+  ) : (
+    <div className="flex justify-end">{audio}</div>
+  );
+}
+
+/** Toggle between the corrected diff and the clean sentence for a submitted answer. */
+function ShowCleanToggle({
+  showClean,
+  onToggle,
+  showCorrectionsLabel,
+  showSentenceLabel,
+}: {
+  showClean: boolean;
+  onToggle: () => void;
+  showCorrectionsLabel: string;
+  showSentenceLabel: string;
+}) {
+  const label = showClean ? showCorrectionsLabel : showSentenceLabel;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={onToggle}
+          className={`h-9 w-9 shrink-0 ${showClean ? 'ring-2 ring-primary border-primary bg-primary/5' : ''}`}
+          aria-label={label}
+        >
+          <FileText className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
   );
 }

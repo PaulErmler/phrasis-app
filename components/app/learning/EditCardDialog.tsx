@@ -25,7 +25,8 @@ import { ConvexError } from 'convex/values';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import UsageLimitDialog from '@/components/autumn/usage-limit-dialog';
 import { MAX_CARD_TEXT_LENGTH } from '@/lib/constants/learning';
-import { cn } from '@/lib/utils';
+import { cn, isPaymentPastDueError } from '@/lib/utils';
+import { useReloadBlock } from '@/components/app/AppUpdateGate';
 import type { CardTranslation } from './types';
 
 interface EditCardDialogProps {
@@ -49,6 +50,10 @@ export function EditCardDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [limitDialogOpen, setLimitDialogOpen] = useState(false);
 
+  // The dialog can be opened from LibraryView, outside LearnView's blanket
+  // block, and its draft lives only in this state.
+  useReloadBlock(open);
+
   useLayoutEffect(() => {
     if (open) {
       const initial: Record<string, string> = {};
@@ -68,7 +73,10 @@ export function EditCardDialog({
       await editCard({ cardId, translations: translationArgs, timezone: getUserTimezone() });
       onOpenChange(false);
     } catch (err) {
-      if (
+      if (isPaymentPastDueError(err)) {
+        // Silent: the reactive payment-overdue dialog is the canonical
+        // surface for this state.
+      } else if (
         err instanceof ConvexError &&
         typeof err.data === 'object' &&
         err.data !== null &&

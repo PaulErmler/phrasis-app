@@ -86,16 +86,16 @@ describe("features/translationLLM", () => {
       });
     });
 
-    it("retranslation_custom: forced via ruleOverride uses Gemini 3.1 Flash Lite (minimal)", () => {
+    it("retranslation_custom: forced via ruleOverride uses Gemini 3.5 Flash Lite (minimal)", () => {
       const stages = resolveTranslationStages("de", 100, {
         ruleOverride: "retranslation_custom",
       });
-      // Custom-text retranslations stay on the cheaper Flash Lite tier
-      // with a `minimal` thinking pass so the retranslation has a real
-      // shot at catching what the user flagged.
+      // Custom-text retranslations stay on the Flash Lite tier with a
+      // `minimal` thinking pass so the retranslation has a real shot at
+      // catching what the user flagged.
       expect(stages.length).toBe(1);
       expect(stages[0]).toEqual({
-        model: "google/gemini-3.1-flash-lite",
+        model: "google/gemini-3.5-flash-lite",
         reasoning: "minimal",
         maxOutputTokens: 4_000,
       });

@@ -1,14 +1,39 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
-import { describe, it, expect, vi } from "vitest";
+import { convexTest, type TestConvex } from "convex-test";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import schema from "../../schema";
 import { api, internal } from "../../_generated/api";
 import type { Id } from "../../_generated/dataModel";
-import { scheduleMissingContent } from "../../features/decks";
+import {
+  scheduleMissingContent,
+  scheduleAudioForLanguage,
+} from "../../features/decks";
+import { getActiveDataset } from "../../db/collections";
 import { USER_PROVIDED_TRANSLATION_SOURCE } from "../../../lib/languages";
+// The workpools are module-mocked globally (tests/convexTestSetup.ts):
+// `enqueueAction` is a vi.fn() resolving to unique fake workIds
+// ('test-tts-work-N'), so tests can assert the enqueue payload directly.
+import { ttsPool } from "../../lib/workpools";
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
+
+// Partial module mock: every real language's voice pickers only ever return
+// curated apiCodes, so `scheduleAudioForLanguage`'s "not in the curated voice
+// list" throw is unreachable with real data. Route a sentinel language to an
+// uncurated voice name; every real code passes through to the actual picker.
+vi.mock("@/lib/voices", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/voices")>();
+  return {
+    ...actual,
+    getVoiceForLanguage: (code: string, speakerGender?: string) =>
+      code === "zz_uncurated"
+        ? "zz-uncurated-voice"
+        : actual.getVoiceForLanguage(code, speakerGender),
+  };
+});
+
+const mockEnqueueTts = vi.mocked(ttsPool.enqueueAction);
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -16,7 +41,7 @@ const modules = import.meta.glob("/convex/**/*.ts");
 // context so its logs don't race vitest teardown.
 drainSchedulerAfterEach();
 
-async function seedCourse(t: ReturnType<typeof convexTest>) {
+async function seedCourse(t: TestConvex<typeof schema>) {
   return t.run(async (ctx) => {
     const collA1 = await ctx.db.insert("collections", {
       name: "A1",
@@ -279,7 +304,7 @@ describe("features/decks", () => {
     const TEST_VOICE = "es-ES-test-voice";
 
     async function seedTextWithTaggedTranslation(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       args: { existingSource: string },
     ) {
       return t.run(async (ctx) => {
@@ -736,7 +761,7 @@ describe("features/decks", () => {
     // resolution at the top of scheduleMissingContent is a no-op and the
     // resolved voice gender the sweep compares against is 'female'.
     async function seedTextWithSpanish(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       args: {
         translation: {
           speakerGender?: "male" | "female";
@@ -793,7 +818,7 @@ describe("features/decks", () => {
     // scheduled re-translation functions haven't fired yet — we observe the
     // exact post-sweep state.
     async function runSweepAndGetSpanish(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       textId: Id<"texts">,
     ) {
       return t.run(async (ctx) => {
@@ -858,7 +883,7 @@ describe("features/decks", () => {
     // re-synthesized; audio stamped at/above current — or unstamped — survives.
     // Provider + gender are kept matching so ONLY the version check can fire.
     async function seedPtPtAudio(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       ttsVersion: number | undefined,
     ) {
       return t.run(async (ctx) => {
@@ -892,7 +917,7 @@ describe("features/decks", () => {
     }
 
     async function getPtPtAudio(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       textId: Id<"texts">,
     ) {
       return t.run(async (ctx) => {
@@ -945,7 +970,7 @@ describe("features/decks", () => {
     // check fires (no gender drift), and the audio matches provider+gender+version
     // so it is deleted purely as the cascade of the stale translation.
     async function seedStaleTranslation(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       userCreated: boolean,
     ) {
       return t.run(async (ctx) => {
@@ -985,7 +1010,7 @@ describe("features/decks", () => {
     }
 
     async function runSweep(
-      t: ReturnType<typeof convexTest>,
+      t: TestConvex<typeof schema>,
       textId: Id<"texts">,
     ) {
       return t.run(async (ctx) => {
@@ -1029,6 +1054,505 @@ describe("features/decks", () => {
       // userCreated translations are user-owned → never version-regenerated.
       expect(tr).not.toBeNull();
       expect(audio).not.toBeNull();
+    });
+  });
+
+  describe("scheduleAudioForLanguage", () => {
+    beforeEach(() => {
+      // Clear calls only — the setup-file implementation (unique fake
+      // workIds) must stay installed.
+      mockEnqueueTts.mockClear();
+    });
+
+    async function seedBareText(t: TestConvex<typeof schema>, language: string) {
+      return t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language,
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        return { textId };
+      });
+    }
+
+    const getClaims = (t: TestConvex<typeof schema>) =>
+      t.run(async (ctx) => ctx.db.query("ttsGenerationClaims").collect());
+
+    it("returns false without claiming when the language is not the source and no translation exists", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedBareText(t, "en");
+      const res = await t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        return scheduleAudioForLanguage(ctx, text, "es", "female", null);
+      });
+      expect(res).toBe(false);
+      // Early return fires BEFORE the claim attempt — no claim row either.
+      expect(await getClaims(t)).toEqual([]);
+      expect(mockEnqueueTts).not.toHaveBeenCalled();
+    });
+
+    it("returns false and does not enqueue while a fresh TTS claim holds the slot", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedBareText(t, "en");
+      await t.run(async (ctx) => {
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "es",
+          translatedText: "Hola",
+        });
+        await ctx.db.insert("ttsGenerationClaims", {
+          textId,
+          language: "es",
+          claimedAt: Date.now(),
+        });
+      });
+      const res = await t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        const translation = await ctx.db
+          .query("translations")
+          .withIndex("by_text_and_language", (q) =>
+            q.eq("textId", textId).eq("targetLanguage", "es"),
+          )
+          .first();
+        return scheduleAudioForLanguage(ctx, text, "es", "female", translation);
+      });
+      expect(res).toBe(false);
+      expect(mockEnqueueTts).not.toHaveBeenCalled();
+    });
+
+    it("enqueues the source text via getVoiceForLanguage for the text's own language", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedBareText(t, "es");
+      // Pin the random pick: es runs on Gemini, its female pool is
+      // [Leda, Gacrux] and index 0 is Leda.
+      const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+      try {
+        const res = await t.run(async (ctx) => {
+          const text = (await ctx.db.get(textId))!;
+          return scheduleAudioForLanguage(ctx, text, "es", "female", null);
+        });
+        expect(res).toBe(true);
+      } finally {
+        randomSpy.mockRestore();
+      }
+      expect(mockEnqueueTts).toHaveBeenCalledTimes(1);
+      // Full pool payload as flattened by enqueueTtsJob (args + provider).
+      expect(mockEnqueueTts.mock.calls[0][2]).toEqual({
+        textId,
+        text: "Hello", // source text — no translation involved
+        language: "es",
+        voiceName: "Leda",
+        voiceGender: "female",
+        speed: 1,
+        regionVariant: undefined,
+        provider: "gemini",
+      });
+      const claims = await getClaims(t);
+      expect(claims).toHaveLength(1);
+      // enqueueTtsJob stamps the pool workId onto the claim just acquired.
+      expect(claims[0].workId).toMatch(/^test-tts-work-/);
+    });
+
+    it("enqueues the stored translation's text via getVoiceForLanguage when it has no regionVariant", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedBareText(t, "en");
+      await t.run(async (ctx) => {
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "es",
+          translatedText: "Hola traducida",
+        });
+      });
+      const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+      try {
+        const res = await t.run(async (ctx) => {
+          const text = (await ctx.db.get(textId))!;
+          const translation = await ctx.db
+            .query("translations")
+            .withIndex("by_text_and_language", (q) =>
+              q.eq("textId", textId).eq("targetLanguage", "es"),
+            )
+            .first();
+          return scheduleAudioForLanguage(ctx, text, "es", "female", translation);
+        });
+        expect(res).toBe(true);
+      } finally {
+        randomSpy.mockRestore();
+      }
+      expect(mockEnqueueTts).toHaveBeenCalledTimes(1);
+      expect(mockEnqueueTts.mock.calls[0][2]).toEqual({
+        textId,
+        text: "Hola traducida", // translated text, not the source
+        language: "es",
+        voiceName: "Leda", // plain pick — no variant suffix
+        voiceGender: "female",
+        speed: 1,
+        regionVariant: undefined,
+        provider: "gemini",
+      });
+    });
+
+    it("forwards the translation's regionVariant through the variant voice picker", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedBareText(t, "en");
+      await t.run(async (ctx) => {
+        await ctx.db.insert("translations", {
+          textId,
+          targetLanguage: "es_mixed",
+          translatedText: "Hola variante",
+          regionVariant: "es-US",
+        });
+      });
+      // Pinned pick within the es_mixed @es-US female sub-pool
+      // [Leda@es-US, Gacrux@es-US] → index 0.
+      const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0);
+      try {
+        const res = await t.run(async (ctx) => {
+          const text = (await ctx.db.get(textId))!;
+          const translation = await ctx.db
+            .query("translations")
+            .withIndex("by_text_and_language", (q) =>
+              q.eq("textId", textId).eq("targetLanguage", "es_mixed"),
+            )
+            .first();
+          return scheduleAudioForLanguage(
+            ctx,
+            text,
+            "es_mixed",
+            "female",
+            translation,
+          );
+        });
+        expect(res).toBe(true);
+      } finally {
+        randomSpy.mockRestore();
+      }
+      expect(mockEnqueueTts).toHaveBeenCalledTimes(1);
+      expect(mockEnqueueTts.mock.calls[0][2]).toEqual({
+        textId,
+        text: "Hola variante",
+        language: "es_mixed",
+        voiceName: "Leda@es-US", // locale-pinned variant pick
+        voiceGender: "female",
+        speed: 1,
+        regionVariant: "es-US", // forwarded so STT validates in the same locale
+        provider: "gemini",
+      });
+    });
+
+    it("throws when the picked voice is not in the curated list", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedBareText(t, "zz_uncurated");
+      await expect(
+        t.run(async (ctx) => {
+          const text = (await ctx.db.get(textId))!;
+          return scheduleAudioForLanguage(
+            ctx,
+            text,
+            "zz_uncurated",
+            "female",
+            null,
+          );
+        }),
+      ).rejects.toThrow(/is not in the curated voice list/);
+      expect(mockEnqueueTts).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("storeTranslationAndScheduleTTS — TTS enqueue path", () => {
+    beforeEach(() => {
+      mockEnqueueTts.mockClear();
+    });
+
+    async function seedTextOnly(t: TestConvex<typeof schema>) {
+      return t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert("collections", {
+          name: "A1",
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert("texts", {
+          text: "Hello",
+          language: "en",
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+        });
+        return { textId };
+      });
+    }
+
+    async function seedAudioForVoice(
+      t: TestConvex<typeof schema>,
+      textId: Id<"texts">,
+      voiceName: string,
+    ) {
+      await t.run(async (ctx) => {
+        const storageId = await ctx.storage.store(
+          new Blob([new Uint8Array([1, 2, 3])]),
+        );
+        await ctx.db.insert("audioRecordings", {
+          textId,
+          language: "es",
+          voiceName,
+          storageId,
+          ttsQuality: "validated",
+          ttsProvider: "gemini",
+          voiceGender: "female",
+        });
+      });
+    }
+
+    it("claims and enqueues TTS for the freshly stored translation with the exact payload", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextOnly(t);
+
+      await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+        textId,
+        targetLanguage: "es",
+        translatedText: "Hola",
+        voiceName: "Leda", // curated Gemini voice — the enqueue path accepts it
+      });
+
+      expect(mockEnqueueTts).toHaveBeenCalledTimes(1);
+      expect(mockEnqueueTts.mock.calls[0][2]).toEqual({
+        textId,
+        text: "Hola",
+        language: "es",
+        voiceName: "Leda",
+        voiceGender: "female", // resolved from the curated list, not an arg
+        speed: 1,
+        regionVariant: undefined,
+        provider: "gemini",
+      });
+      const claims = await t.run(async (ctx) =>
+        ctx.db.query("ttsGenerationClaims").collect(),
+      );
+      expect(claims).toHaveLength(1);
+      expect(claims[0].workId).toMatch(/^test-tts-work-/);
+    });
+
+    it("skips claim + enqueue when audio for the same voice already exists", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextOnly(t);
+      await seedAudioForVoice(t, textId, "Leda");
+
+      await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+        textId,
+        targetLanguage: "es",
+        translatedText: "Hola",
+        voiceName: "Leda",
+      });
+
+      expect(mockEnqueueTts).not.toHaveBeenCalled();
+      // The per-voice guard short-circuits BEFORE claiming — no claim row.
+      const claims = await t.run(async (ctx) =>
+        ctx.db.query("ttsGenerationClaims").collect(),
+      );
+      expect(claims).toEqual([]);
+    });
+
+    it("still enqueues when existing audio is for a different voice only (per-voice dedupe)", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextOnly(t);
+      await seedAudioForVoice(t, textId, "Gacrux");
+
+      await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+        textId,
+        targetLanguage: "es",
+        translatedText: "Hola",
+        voiceName: "Leda",
+      });
+
+      expect(mockEnqueueTts).toHaveBeenCalledTimes(1);
+      expect(mockEnqueueTts.mock.calls[0][2]).toMatchObject({
+        voiceName: "Leda",
+      });
+    });
+
+    it("does not double-enqueue on a second landing for the same voice (claim held)", async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextOnly(t);
+
+      await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+        textId,
+        targetLanguage: "es",
+        translatedText: "Hola",
+        voiceName: "Leda",
+      });
+      // Second landing (e.g. Google fallback racing the LLM path): the audio
+      // row hasn't been written yet (the worker is mocked), so the per-voice
+      // guard passes — the fresh claim from the first call blocks the enqueue.
+      await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+        textId,
+        targetLanguage: "es",
+        translatedText: "Hola",
+        voiceName: "Leda",
+      });
+
+      expect(mockEnqueueTts).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("getCollectionProgress — active dataset branch", () => {
+    it("returns the active dataset's collections with progress values, excluding legacy by-name rows", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedCourse(t); // seeds legacy "A1" (no datasetId)
+      await t.run(async (ctx) => {
+        const datasetId = await ctx.db.insert("datasets", {
+          slug: "ogte-curated",
+          version: "1.0.0",
+          publishedAt: Date.now(),
+          isActive: true,
+        });
+        const l01 = await ctx.db.insert("collections", {
+          name: "L01",
+          textCount: 50,
+          datasetId,
+          code: "L01",
+          order: 1,
+          origin: "premade",
+        });
+        await ctx.db.insert("collections", {
+          name: "L02",
+          textCount: 40,
+          datasetId,
+          code: "L02",
+          order: 2,
+          origin: "premade",
+        });
+        await ctx.db.insert("collectionProgress", {
+          userId: "user_A",
+          courseId,
+          collectionId: l01,
+          cardsAdded: 5,
+          ignoredCount: 2,
+          prioritizedCount: 1,
+        });
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(
+        api.features.decks.getCollectionProgress,
+        {},
+      );
+
+      // Dataset branch replaces the legacy by-name scan entirely — the "A1"
+      // row from seedCourse is absent.
+      expect(res.map((c) => c.collectionName)).toEqual(["L01", "L02"]);
+      expect(res[0]).toMatchObject({
+        cardsAdded: 5,
+        ignoredCount: 2,
+        prioritizedCount: 1,
+        totalTexts: 50,
+        order: 1,
+      });
+      expect(res[1]).toMatchObject({
+        cardsAdded: 0,
+        ignoredCount: 0,
+        prioritizedCount: 0,
+        totalTexts: 40,
+        order: 2,
+      });
+    });
+
+    it("sorts order-bearing rows first, then order-less rows by legacy CEFR position", async () => {
+      const t = convexTest(schema, modules);
+      await seedCourse(t);
+      await t.run(async (ctx) => {
+        const datasetId = await ctx.db.insert("datasets", {
+          slug: "ogte-curated",
+          version: "1.0.0",
+          publishedAt: Date.now(),
+          isActive: true,
+        });
+        // Order-less dataset rows inserted FIRST: the by_datasetId_and_order
+        // index yields undefined-order rows before ordered ones, so the final
+        // ordering below can only come from the two-tier sort.
+        await ctx.db.insert("collections", {
+          name: "B1",
+          textCount: 10,
+          datasetId,
+        });
+        await ctx.db.insert("collections", {
+          name: "A2",
+          textCount: 10,
+          datasetId,
+        });
+        await ctx.db.insert("collections", {
+          name: "L02",
+          textCount: 40,
+          datasetId,
+          code: "L02",
+          order: 2,
+          origin: "premade",
+        });
+        await ctx.db.insert("collections", {
+          name: "L01",
+          textCount: 50,
+          datasetId,
+          code: "L01",
+          order: 1,
+          origin: "premade",
+        });
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(
+        api.features.decks.getCollectionProgress,
+        {},
+      );
+
+      // Two tiers: `order` ascending first, then legacy CEFR position
+      // (A2 before B1 in LEGACY_LEVEL_ORDER).
+      expect(res.map((c) => c.collectionName)).toEqual([
+        "L01",
+        "L02",
+        "A2",
+        "B1",
+      ]);
+      expect(res.map((c) => c.order)).toEqual([1, 2, undefined, undefined]);
+    });
+  });
+
+  describe("getActiveDataset", () => {
+    it("returns the active dataset row, ignoring inactive ones", async () => {
+      const t = convexTest(schema, modules);
+      const activeId = await t.run(async (ctx) => {
+        await ctx.db.insert("datasets", {
+          slug: "ogte-curated",
+          version: "0.9.0",
+          publishedAt: Date.now(),
+          isActive: false,
+        });
+        return ctx.db.insert("datasets", {
+          slug: "ogte-curated",
+          version: "1.0.0",
+          publishedAt: Date.now(),
+          isActive: true,
+        });
+      });
+      const active = await t.run(async (ctx) => getActiveDataset(ctx));
+      expect(active?._id).toBe(activeId);
+      expect(active?.version).toBe("1.0.0");
+    });
+
+    it("returns null when no dataset is active", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("datasets", {
+          slug: "ogte-curated",
+          version: "0.9.0",
+          publishedAt: Date.now(),
+          isActive: false,
+        });
+      });
+      expect(await t.run(async (ctx) => getActiveDataset(ctx))).toBeNull();
     });
   });
 });

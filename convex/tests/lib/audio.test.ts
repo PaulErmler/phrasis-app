@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import { convexTest } from "convex-test";
+import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 import schema from "../../schema";
 import {
@@ -16,7 +16,7 @@ const modules = import.meta.glob("../../**/*.ts");
  * another row still points at it would corrupt that text's audio.
  */
 describe("deleteAudioRow — reference-aware blob cleanup", () => {
-  async function seedTwoRowsSharingOneBlob(t: ReturnType<typeof convexTest>) {
+  async function seedTwoRowsSharingOneBlob(t: TestConvex<typeof schema>) {
     return t.run(async (ctx) => {
       const collectionId = await ctx.db.insert("collections", {
         name: "c",

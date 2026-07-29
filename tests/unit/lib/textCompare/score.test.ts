@@ -61,4 +61,57 @@ describe('scoreWordAlignment', () => {
     expect(score).toBeGreaterThanOrEqual(0);
     expect(score).toBeLessThanOrEqual(1);
   });
+
+  describe('ignorePunctuation', () => {
+    /** 3 equal words plus one punctuation token with the given tag. */
+    function withPunct(tag: WordTag): WordAlignResult {
+      const words: AlignedWord[] = [
+        { tag: 'equal', kind: 'word', expected: 'a', actual: 'a' },
+        { tag: 'equal', kind: 'word', expected: 'b', actual: 'b' },
+        { tag: 'equal', kind: 'word', expected: 'c', actual: 'c' },
+        {
+          tag,
+          kind: 'punct',
+          expected: tag === 'extra' ? '' : '.',
+          actual: tag === 'missing' ? '' : '.',
+        },
+      ];
+      const counts = { equal: 3, typo: 0, wrong: 0, missing: 0, extra: 0 };
+      counts[tag] += 1;
+      return { words, counts };
+    }
+
+    it.each<WordTag>(['missing', 'extra', 'wrong'])(
+      'gives full credit despite a %s punctuation token',
+      (tag) => {
+        expect(
+          scoreWordAlignment(withPunct(tag), { ignorePunctuation: true }),
+        ).toBe(1);
+      },
+    );
+
+    it('still penalizes punctuation when the option is off', () => {
+      expect(scoreWordAlignment(withPunct('missing'))).toBeLessThan(1);
+    });
+
+    it('leaves word-level scoring untouched', () => {
+      const r = makeResult({ equal: 1, wrong: 1 });
+      expect(scoreWordAlignment(r, { ignorePunctuation: true })).toBeCloseTo(
+        scoreWordAlignment(r),
+      );
+    });
+
+    it('returns 1 when the answer is punctuation only', () => {
+      const words: AlignedWord[] = [
+        { tag: 'missing', kind: 'punct', expected: '.', actual: '' },
+      ];
+      const result: WordAlignResult = {
+        words,
+        counts: { equal: 0, typo: 0, wrong: 0, missing: 1, extra: 0 },
+      };
+      // Everything is zero-weighted, so the denominator is 0 → treated as
+      // "nothing to get wrong" rather than a divide-by-zero.
+      expect(scoreWordAlignment(result, { ignorePunctuation: true })).toBe(1);
+    });
+  });
 });

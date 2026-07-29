@@ -42,6 +42,7 @@ const EXPECTED_COMPARE: Record<string, { locale: string; hasWordBoundaries: bool
   ja: { locale: 'ja', hasWordBoundaries: false },
   ko: { locale: 'ko', hasWordBoundaries: true },
   vi: { locale: 'vi', hasWordBoundaries: true },
+  vi_south: { locale: 'vi-VN', hasWordBoundaries: true },
   th: { locale: 'th', hasWordBoundaries: false },
   id: { locale: 'id', hasWordBoundaries: true },
   ar: { locale: 'ar', hasWordBoundaries: true },

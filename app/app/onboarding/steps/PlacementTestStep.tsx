@@ -91,6 +91,9 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
   const nextLevel = strategy.nextQuestionLevel();
   const historyArr = strategy.history();
   const historyLen = historyArr.length;
+  // `strategy` mutates `historyArr` in place, so its identity is stable and
+  // `historyLen` is the real invalidation signal — not "unnecessary".
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const history = useMemo(() => [...historyArr], [historyLen, historyArr]);
   const isDone = nextLevel === null;
   const finalLevel = strategy.finalLevel();

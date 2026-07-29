@@ -10,7 +10,7 @@ export function PWASplashScreen() {
   useEffect(() => {
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true;
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
     const alreadyShown = sessionStorage.getItem('pwa-splash-shown');
 
     if (!isStandalone || alreadyShown) return;

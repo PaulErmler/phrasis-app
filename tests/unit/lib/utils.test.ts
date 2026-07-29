@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ConvexError } from 'convex/values';
-import { cn, isAuthError } from '@/lib/utils';
+import { cn, isAuthError, isPaymentPastDueError } from '@/lib/utils';
 
 describe('cn', () => {
   it('joins class names', () => {
@@ -44,5 +44,32 @@ describe('isAuthError', () => {
     expect(isAuthError(undefined)).toBe(false);
     expect(isAuthError('Unauthenticated')).toBe(false);
     expect(isAuthError({})).toBe(false);
+  });
+});
+
+describe('isPaymentPastDueError', () => {
+  it('detects a ConvexError carrying code PAYMENT_PAST_DUE', () => {
+    expect(
+      isPaymentPastDueError(new ConvexError({ code: 'PAYMENT_PAST_DUE' })),
+    ).toBe(true);
+  });
+
+  it('returns false for a ConvexError with another code', () => {
+    expect(isPaymentPastDueError(new ConvexError({ code: 'USAGE_LIMIT' }))).toBe(
+      false,
+    );
+    expect(isPaymentPastDueError(new ConvexError('PAYMENT_PAST_DUE'))).toBe(
+      false,
+    );
+  });
+
+  it('returns false for a plain Error', () => {
+    expect(isPaymentPastDueError(new Error('PAYMENT_PAST_DUE'))).toBe(false);
+  });
+
+  it('returns false for non-error values', () => {
+    expect(isPaymentPastDueError(undefined)).toBe(false);
+    expect(isPaymentPastDueError(null)).toBe(false);
+    expect(isPaymentPastDueError({ code: 'PAYMENT_PAST_DUE' })).toBe(false);
   });
 });

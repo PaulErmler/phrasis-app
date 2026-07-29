@@ -21,8 +21,16 @@ import { useLearningChatToggle } from '@/components/app/learning/LearningChatLay
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
-import { buildSessionSnapshot } from '@/components/app/learning/sessionSnapshot';
+import {
+  buildSessionSnapshot,
+  type SessionSnapshot,
+} from '@/components/app/learning/sessionSnapshot';
 import type { ReviewRating } from '@/lib/scheduling';
+import { autoRating } from '@/lib/autoRating';
+import type {
+  WritingAccuracySummary,
+  ReviewAccuracyPayload,
+} from './learning/types';
 import type { AudioPlayerState } from '@/hooks/use-audio-player';
 import PaywallDialog from '@/components/autumn/paywall-dialog';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
@@ -63,24 +71,14 @@ interface LearningModeProps {
    */
   onCardRated?: (
     rating: ReviewRating | undefined,
-    snapshot: {
-      sessionId: string;
-      dailyReviewsToday: number;
-      dailyTimeMsToday: number;
-      dailyNewWordsToday: number;
-    },
+    snapshot: SessionSnapshot,
   ) => void;
   /**
    * Fires after an undo actually reverted a review — the mirror image of
    * `onCardRated`, so the onboarding wizard can decrement its rated-card
    * counter and keep the lesson progress accurate.
    */
-  onCardUndone?: (snapshot: {
-    sessionId: string;
-    dailyReviewsToday: number;
-    dailyTimeMsToday: number;
-    dailyNewWordsToday: number;
-  }) => void;
+  onCardUndone?: (snapshot: SessionSnapshot) => void;
 }
 
 /**
@@ -122,7 +120,8 @@ export function LearningMode({
     [audio.isPlaying, audio.clock, audio.languageCues, audio.speedByLanguage],
   );
   const [allSubmitted, setAllSubmitted] = useState(false);
-  const [fullReviewAccuracy, setFullReviewAccuracy] = useState<number | null>(null);
+  const [writingAccuracy, setWritingAccuracy] =
+    useState<WritingAccuracySummary | null>(null);
   const [audioAllTargetsRevealed, setAudioAllTargetsRevealed] = useState(true);
   const [audioRevealNonce, setAudioRevealNonce] = useState(0);
 
@@ -141,7 +140,7 @@ export function LearningMode({
   useEffect(() => {
     setFullReviewRevealed(false);
     setAllSubmitted(false);
-    setFullReviewAccuracy(null);
+    setWritingAccuracy(null);
   }, [cardId, reviewingReviewMode, reviewingWritingInputMode]);
 
   // Warm the celebration sound's HTTP cache at session start so the very
@@ -241,16 +240,57 @@ export function LearningMode({
     [reviewingCardId, setCardAudioSpeedOverrideMutation],
   );
 
+  // Auto-rating: derive a rating from the WORST target language submitted so
+  // far, so a perfect answer in one language can't mask a failed one in
+  // another. Pushed into the hook rather than computed there because the
+  // summary lives here. It only ever preselects — nothing advances the card.
+  const settingsForAutoRate =
+    state.status === 'reviewing' ? state.courseSettings : null;
+  const autoRateEnabled =
+    (settingsForAutoRate?.reviewMode ?? 'audio') === 'full' &&
+    (settingsForAutoRate?.autoRateFromAccuracy ?? true);
+  const autoRateAccuracy = (settingsForAutoRate?.ignorePunctuation ?? false)
+    ? writingAccuracy?.minWithoutPunctuation
+    : writingAccuracy?.minWithPunctuation;
+  const autoRateThresholds = settingsForAutoRate?.autoRateThresholds;
+  const setAutoRating = state.setAutoRating;
+  useEffect(() => {
+    setAutoRating(
+      autoRating({
+        enabled: autoRateEnabled,
+        accuracy: autoRateAccuracy,
+        thresholds: autoRateThresholds,
+      }),
+    );
+  }, [autoRateEnabled, autoRateAccuracy, autoRateThresholds, setAutoRating]);
+
   // Wrap handleNext to include accuracy from full review mode + notify the
   // onboarding container (if any) that a card was just rated, along with a
   // session-state snapshot so the wizard can show the celebration screen.
   const handleNextWithAccuracy = useCallback(
     (ratingOverride?: ReviewRating) => {
       if (state.status !== 'reviewing') return;
-      state.handleNext(ratingOverride, fullReviewAccuracy ?? undefined);
+      // Only a fully answered card contributes to the accuracy stats — the
+      // same rule as before this became a summary. Both punctuation variants
+      // are recorded together; `primary` is whichever one matches the learner's
+      // setting, so the historical series keeps the meaning it always had.
+      const summary = writingAccuracy;
+      const accuracy: ReviewAccuracyPayload | undefined =
+        summary?.allSubmitted &&
+        summary.avgWithPunctuation != null &&
+        summary.avgWithoutPunctuation != null
+          ? {
+            primary: (state.courseSettings.ignorePunctuation ?? false)
+              ? summary.avgWithoutPunctuation
+              : summary.avgWithPunctuation,
+            strict: summary.avgWithPunctuation,
+            lenient: summary.avgWithoutPunctuation,
+          }
+          : undefined;
+      state.handleNext(ratingOverride, accuracy);
       onCardRated?.(ratingOverride, buildSessionSnapshot(state));
     },
-    [state, fullReviewAccuracy, onCardRated],
+    [state, writingAccuracy, onCardRated],
   );
   // Mirror of handleNextWithAccuracy for the undo direction — only notifies
   // when a review was actually reverted (empty stack / races resolve false).
@@ -490,10 +530,11 @@ export function LearningMode({
         autoRevealBaseOnSubmit={
           state.courseSettings.autoRevealBaseOnSubmit ?? true
         }
+        ignorePunctuation={state.courseSettings.ignorePunctuation ?? false}
         suppressAutoPlay={state.settingsOpen}
         allRevealed={fullReviewRevealed}
         onAllSubmittedChange={setAllSubmitted}
-        onAccuracyChange={setFullReviewAccuracy}
+        onAccuracyChange={setWritingAccuracy}
         showRomanization={state.courseSettings.showRomanization ?? true}
         cardId={state.cardId}
         shortcutsDisabled={state.settingsOpen || editDialogOpen}
@@ -747,7 +788,6 @@ function NoCardsDueWithFilter({
   );
   const updateSettings = useUpdateStudyContentFilter();
 
-  const isFilteredOut = emptyReason?.reason === 'filtered_out';
   const isDeckEmpty = emptyReason?.reason === 'no_cards';
   const activeFilter = emptyReason?.reason === 'filtered_out'
     ? emptyReason.activeFilter

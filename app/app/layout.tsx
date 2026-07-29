@@ -3,6 +3,8 @@ import { api } from '@/convex/_generated/api';
 import { AppDataProvider } from '@/components/app/AppDataProvider';
 import { ClientAuthBoundary } from '@/components/ClientAuthBoundary';
 import { OnboardingGuard } from '@/components/app/OnboardingGuard';
+import { BillingGate } from '@/components/app/BillingGate';
+import { AppUpdateGate } from '@/components/app/AppUpdateGate';
 
 export default async function AppLayout({
   children,
@@ -29,9 +31,18 @@ export default async function AppLayout({
       preloadedHomeSummary={preloadedHomeSummary}
     >
       <ClientAuthBoundary>
-        <OnboardingGuard>
-          {children}
-        </OnboardingGuard>
+        {/* Wraps rather than sits beside the guard so useReloadBlock is
+            reachable from every view — notably LearnView, whose detached
+            audio element cannot be detected from outside the hook tree. */}
+        <AppUpdateGate>
+          {/* Sibling of OnboardingGuard, not a child: the guard renders null
+              for its children while redirecting, which would unmount the gate
+              (and its quota sync) mid-navigation. */}
+          <BillingGate />
+          <OnboardingGuard>
+            {children}
+          </OnboardingGuard>
+        </AppUpdateGate>
       </ClientAuthBoundary>
     </AppDataProvider>
   );

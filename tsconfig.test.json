@@ -1,0 +1,22 @@
+{
+  /* Typechecks the test dirs that the base config excludes (tests/,
+   * convex/tests/, e2e/) alongside the sources they import. Run via
+   * `pnpm typecheck:tests`. */
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    /* Extra typeRoot resolves the `/// <reference types="vite/client" />`
+     * directives in convex/tests — see tests/typeshims/. */
+    "typeRoots": ["./node_modules/@types", "./tests/typeshims"],
+    /* Keep the incremental artifact out of the repo root so eslint/git
+     * never see it. */
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.test.tsbuildinfo"
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

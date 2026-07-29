@@ -369,6 +369,63 @@ export const autoFillTranslations = action({
 });
 
 /**
+ * Validate a set of translations against the active course's language set.
+ *
+ * Checks, in order: the provided languages cover exactly the course's
+ * base ∪ target languages (no missing, no extras, no duplicates), then each
+ * entry's text is non-empty and within MAX_CARD_TEXT_LENGTH. Returns the
+ * first failure (or null if valid) so callers choose their own failure mode:
+ * `createCustomText` throws a ConvexError with the full payload, while
+ * `createCustomTextsBatch` reports `{ code, message }` in its `skipped` list.
+ */
+function validateTranslationSet(
+  course: { baseLanguages: string[]; targetLanguages: string[] },
+  translations: { language: string; text: string }[],
+):
+  | { code: 'INVALID_LANGUAGES'; message: string }
+  | { code: 'EMPTY_TEXT'; message: string; language: string }
+  | { code: 'TEXT_TOO_LONG'; message: string; language: string; maxLength: number }
+  | null {
+  const requiredLanguages = [
+    ...new Set([...course.baseLanguages, ...course.targetLanguages]),
+  ];
+  const providedLanguages = translations.map((t) => t.language);
+
+  const missing = requiredLanguages.filter((lang) => !providedLanguages.includes(lang));
+  const extras = providedLanguages.filter((lang) => !requiredLanguages.includes(lang));
+  if (
+    missing.length > 0 ||
+    extras.length > 0 ||
+    new Set(providedLanguages).size !== providedLanguages.length
+  ) {
+    return {
+      code: 'INVALID_LANGUAGES',
+      message: `Translations must cover exactly the course languages. Missing: ${JSON.stringify(missing)}. Extra: ${JSON.stringify(extras)}.`,
+    };
+  }
+
+  for (const { language, text } of translations) {
+    if (text.length === 0) {
+      return {
+        code: 'EMPTY_TEXT',
+        message: `Empty text for language "${language}".`,
+        language,
+      };
+    }
+    if (text.length > MAX_CARD_TEXT_LENGTH) {
+      return {
+        code: 'TEXT_TOO_LONG',
+        message: `Text for language "${language}" exceeds the maximum length of ${MAX_CARD_TEXT_LENGTH} characters.`,
+        language,
+        maxLength: MAX_CARD_TEXT_LENGTH,
+      };
+    }
+  }
+
+  return null;
+}
+
+/**
  * Create a custom text entry with translations for all course languages.
  */
 export const createCustomText = mutation({
@@ -410,40 +467,9 @@ export const createCustomText = mutation({
     if (!active) throw new ConvexError('No active course found');
     const { course } = active;
 
-    const requiredLanguages = [
-      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
-    ];
-    const providedLanguages = args.translations.map((t) => t.language);
-
-    const missing = requiredLanguages.filter((lang) => !providedLanguages.includes(lang));
-    const extras = providedLanguages.filter((lang) => !requiredLanguages.includes(lang));
-    if (
-      missing.length > 0 ||
-      extras.length > 0 ||
-      new Set(providedLanguages).size !== providedLanguages.length
-    ) {
-      throw new ConvexError({
-        code: 'INVALID_LANGUAGES',
-        message: `Translations must cover exactly the course languages. Missing: ${JSON.stringify(missing)}. Extra: ${JSON.stringify(extras)}.`,
-      });
-    }
-
-    for (const { language, text } of args.translations) {
-      if (text.length === 0) {
-        throw new ConvexError({
-          code: 'EMPTY_TEXT',
-          message: `Empty text for language "${language}".`,
-          language,
-        });
-      }
-      if (text.length > MAX_CARD_TEXT_LENGTH) {
-        throw new ConvexError({
-          code: 'TEXT_TOO_LONG',
-          message: `Text for language "${language}" exceeds the maximum length of ${MAX_CARD_TEXT_LENGTH} characters.`,
-          language,
-          maxLength: MAX_CARD_TEXT_LENGTH,
-        });
-      }
+    const validationError = validateTranslationSet(course, args.translations);
+    if (validationError) {
+      throw new ConvexError(validationError);
     }
 
     await consumeQuota(ctx, userId, FEATURE_IDS.CUSTOM_SENTENCES, 1);
@@ -586,52 +612,20 @@ export const createCustomTextsBatch = mutation({
     if (!active) throw new ConvexError('No active course found');
     const { course } = active;
 
-    const requiredLanguages = [
-      ...new Set([...course.baseLanguages, ...course.targetLanguages]),
-    ];
-
     const skipped: { index: number; code: string; message: string }[] = [];
     const accepted: { index: number; translations: { language: string; text: string }[] }[] = [];
 
     for (let i = 0; i < args.items.length; i++) {
       const { translations } = args.items[i];
-      const providedLanguages = translations.map((t) => t.language);
-      const missing = requiredLanguages.filter((l) => !providedLanguages.includes(l));
-      const extras = providedLanguages.filter((l) => !requiredLanguages.includes(l));
-      if (
-        missing.length > 0 ||
-        extras.length > 0 ||
-        new Set(providedLanguages).size !== providedLanguages.length
-      ) {
+      const validationError = validateTranslationSet(course, translations);
+      if (validationError) {
         skipped.push({
           index: i,
-          code: 'INVALID_LANGUAGES',
-          message: `Translations must cover exactly the course languages. Missing: ${JSON.stringify(missing)}. Extra: ${JSON.stringify(extras)}.`,
+          code: validationError.code,
+          message: validationError.message,
         });
         continue;
       }
-      let tooLong: string | null = null;
-      for (const { language, text } of translations) {
-        if (text.length === 0) {
-          tooLong = language;
-          skipped.push({
-            index: i,
-            code: 'EMPTY_TEXT',
-            message: `Empty text for language "${language}".`,
-          });
-          break;
-        }
-        if (text.length > MAX_CARD_TEXT_LENGTH) {
-          tooLong = language;
-          skipped.push({
-            index: i,
-            code: 'TEXT_TOO_LONG',
-            message: `Text for language "${language}" exceeds the maximum length of ${MAX_CARD_TEXT_LENGTH} characters.`,
-          });
-          break;
-        }
-      }
-      if (tooLong !== null) continue;
       accepted.push({ index: i, translations });
     }
 

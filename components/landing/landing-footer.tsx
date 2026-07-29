@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import { ThemeSwitcher } from '@/components/ThemeSwitcher';
@@ -16,7 +17,7 @@ export function LandingFooter() {
           {/* Column 1: Brand */}
           <div className="space-y-3">
             <div className="flex items-center gap-2.5">
-              <img
+              <Image
                 src="/icons/icon.svg"
                 alt="Flexling"
                 className="w-8 h-8"

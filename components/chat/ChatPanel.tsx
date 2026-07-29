@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { MessageSquarePlus } from 'lucide-react';
 import { useChat } from '@/hooks/use-chat';
+import { useReloadBlock } from '@/components/app/AppUpdateGate';
 import { ChatMessages } from '@/components/chat/ChatMessages';
 import type { ToolRenderer, MessageFooterRenderer } from '@/components/chat/ChatMessages';
 import { ChatInput } from '@/components/chat/ChatInput';
@@ -99,6 +100,9 @@ export function ChatPanel({
   }, []);
 
   const chat = useChat({ threadId, cardId, onUsageLimit: handleUsageLimit, onThreadLimit: handleThreadLimit });
+  // Reloading mid-stream drops the response the user is waiting on. Registered
+  // here rather than in the two chat surfaces so both get it from one place.
+  useReloadBlock(chat.status === 'submitted' || chat.status === 'streaming');
   const t = useTranslations('Chat.attachments');
   const tLimit = useTranslations('Chat.threadLimit');
 
