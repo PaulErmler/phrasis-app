@@ -28,6 +28,18 @@
 	     answers the encryption question so every upload skips the prompt. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<!-- Reversed iOS OAuth client ID — required by the Google Sign-In SDK
+	     (@capgo/capacitor-social-login); it hard-crashes without this URL
+	     scheme registered. Client IDs are public identifiers. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.378109007514-051m7hn395t3sramuivep6fu16gvqkle</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Flexling uses the microphone for voice input in the AI tutor chat and to practice your pronunciation.</string>
 	<!-- Local-dev only in practice: lets the Simulator load the Mac's dev

@@ -39,8 +39,12 @@ const config: CapacitorConfig = {
       ? {
         // Staging environment — same shape as the store build, offline page
         // included (its retry URL comes from the generated app-url.js).
+        // *.cloudflareaccess.com keeps the Cloudflare Zero Trust login flow
+        // inside the WebView — otherwise it opens in Safari and the
+        // CF_Authorization cookie never reaches the app ("invalid login
+        // session").
         url: 'https://dev.flexling.com/app',
-        allowNavigation: ['dev.flexling.com'],
+        allowNavigation: ['dev.flexling.com', '*.cloudflareaccess.com'],
         errorPath: 'error.html',
       }
       : {

@@ -249,11 +249,14 @@ export default function MainLayout({
 
   const handleLearnClose = useCallback(() => {
     setJustReturnedFromLearn(true);
-    // Sync ref BEFORE history.back() to avoid a race where the popstate
-    // swipe-back guard sees a stale `true` value and re-pushes /app/learn.
     isLearnOpenRef.current = false;
     setIsLearnOpen(false);
-    history.back();
+    // Always land on Home, regardless of which tab opened the session.
+    // replaceState (not pushState) swaps the /app/learn entry so the history
+    // stack doesn't grow learn→home→learn on repeated sessions; browser
+    // back from Home still returns to the pre-learn view.
+    setActiveView('home');
+    history.replaceState(null, '', VIEW_PATHS['home']);
     refreshPrefetchedThread();
     const startedAt = learnStartedAtRef.current;
     learnStartedAtRef.current = null;
