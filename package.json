@@ -28,12 +28,21 @@
     "prepare": "husky install",
     "snapshot": "mkdir -p .convex-snapshots && convex export --env-file .env.local --path .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip && echo '[convex] Snapshot saved.'",
     "snapshot:restore": "convex import --replace -y --env-file .env.local .convex-snapshots/$(git rev-parse --abbrev-ref HEAD | tr '/' '_').zip",
-    "landing:audio": "tsx --env-file=.env.local scripts/generate-landing-audio.mts"
+    "landing:audio": "tsx --env-file=.env.local scripts/generate-landing-audio.mts",
+    "store:assets": "tsx scripts/store-screenshots.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.76",
     "@ai-sdk/openai": "^2.0.108",
     "@breezystack/lamejs": "^1.2.7",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/core": "^8.4.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/network": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.3",
+    "@capgo/capacitor-social-login": "^8.3.39",
     "@convex-dev/action-retrier": "^0.3.0",
     "@convex-dev/agent": "^0.3.2",
     "@convex-dev/aggregate": "^0.2.1",
@@ -144,6 +153,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/ios": "^8.4.2",
     "@convex-dev/eslint-plugin": "^1.2.2",
     "@edge-runtime/vm": "^5.0.0",
     "@eslint/js": "^10.0.1",

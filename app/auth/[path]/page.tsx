@@ -2,6 +2,7 @@ import { AuthView } from '@daveyplate/better-auth-ui';
 import { authViewPaths } from '@daveyplate/better-auth-ui/server';
 import { getMessages } from 'next-intl/server';
 import Link from 'next/link';
+import { NativeSocialButtons } from '@/components/auth/NativeSocialButtons';
 
 export const dynamicParams = false;
 
@@ -37,7 +38,7 @@ export default async function AuthPage({
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4">
-      <div className="w-full max-w-md mx-auto flex justify-center">
+      <div className="w-full max-w-md mx-auto flex flex-col items-center">
         <AuthView
           path={path}
           localization={authLocalization}
@@ -50,6 +51,9 @@ export default async function AuthPage({
             cardFooter: <TermsFooter authLocalization={authLocalization} />,
           })}
         />
+        {/* Store-app shell only (self-hides on the web): native token-based
+            social sign-in — the redirect buttons are disabled there. */}
+        {(path === 'sign-in' || path === 'sign-up') && <NativeSocialButtons />}
       </div>
     </main>
   );
