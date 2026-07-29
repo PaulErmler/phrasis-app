@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Flexling</title>
+  <style>
+    /* Tokens mirrored from app/globals.css (:root / .dark) so this page
+       matches the app's theme in both modes. */
+    :root {
+      --background: oklch(1 0 0);
+      --foreground: oklch(0.145 0 0);
+      --muted-foreground: oklch(0.556 0 0);
+      --primary: oklch(0.7162 0.119 217.31);
+      --primary-foreground: oklch(0.98 0.02 217.31);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: oklch(0.145 0 0);
+        --foreground: oklch(0.985 0 0);
+        --muted-foreground: oklch(0.708 0 0);
+        --primary-foreground: oklch(0.28 0.07 217.31);
+      }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      display: flex; align-items: center; justify-content: center;
+      background: var(--background); color: var(--foreground);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 24px calc(24px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-left));
+      text-align: center;
+    }
+    .wrap { max-width: 320px; display: flex; flex-direction: column; align-items: center; }
+    .logo { width: 88px; height: 88px; margin-bottom: 28px; }
+    .logo svg { width: 100%; height: 100%; }
+    h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 8px; }
+    p { font-size: 14px; line-height: 1.55; color: var(--muted-foreground); margin-bottom: 28px; }
+    button {
+      background: var(--primary); color: var(--primary-foreground);
+      border: none; border-radius: 8px;
+      font: inherit; font-size: 14px; font-weight: 500;
+      height: 40px; padding: 0 32px; cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    button:active { opacity: 0.75; }
+    .spinner {
+      width: 14px; height: 14px; margin-right: 8px;
+      border: 2px solid var(--primary-foreground); border-top-color: transparent;
+      border-radius: 50%; display: inline-block; vertical-align: -2px;
+      animation: spin 0.8s linear infinite; visibility: hidden;
+    }
+    .retrying .spinner { visibility: visible; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo" aria-hidden="true"><svg width="100%" height="100%" viewBox="0 0 1080 1080" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g id="Logo" transform="matrix(1,0,0,1,10.4078,-2.02192)">
+        <g transform="matrix(0.773236,-0.562296,0.562296,0.773236,-305.217,420.198)">
+            <path d="M339.475,975.88L199.696,892.251L199.696,316.402C199.696,270.01 237.361,232.346 283.753,232.346L952.399,232.346C998.791,232.346 1036.45,270.01 1036.45,316.402L1036.45,552.835C973.054,506.327 871.423,486.824 805.137,489.109L797.018,489.489C780.135,490.036 763.879,490.827 747.472,495.045L741.642,496.621C682.037,510.949 632.283,548.419 597.504,598.496L593.924,603.898C576.326,630.325 563.151,657.612 553.494,687.772C552.405,691.529 551.275,695.274 550.097,699.004C546.987,707.092 543.932,710.956 535.879,714.842C531.093,717.14 531.093,717.14 524.791,720.862L517.72,725.179L510.407,729.582L502.898,734.104L481.32,747.096L476.547,749.97L476.05,746.82C484.394,733.095 494.325,721.271 505.758,710.093C516.399,699.752 526.422,689.355 535.445,677.544C563.947,638.99 591.607,593.574 584.56,543.339L583.475,537.746C569.557,465.782 502.383,392.912 444.17,352.458L439.058,349.078C432.514,344.708 427.759,341.104 419.621,342.6C412.401,345.702 412.401,345.702 403.464,358.843C362.098,424.705 324.955,517.416 340.502,596.459L341.748,601.755C350.5,640.22 366.535,670.126 398.15,694.115L404.154,698.546C418.225,708.99 431.906,716.662 448.325,722.869L453.169,724.604C443.965,738.296 433.675,750.13 422.102,761.869C408.155,775.966 394.306,790.124 382.066,805.756C348.866,849.932 328.634,898.548 336.141,954.491L337.124,960.869L338.171,968.775L339.475,975.88ZM1036.45,662.158L1036.45,985.048C1036.45,1031.44 998.791,1069.11 952.399,1069.11L450.51,1042.31L376.272,997.895C373.637,988.057 371.483,978.126 370.24,968.08L369.62,962.194C366.294,937.802 366.494,916.087 371.233,891.917C380.918,855.591 398.68,838.7 429.197,818.528C433.137,815.929 437.058,813.302 440.961,810.649C463.375,795.339 486.182,780.892 509.645,767.242C522.348,759.966 534.661,752.596 546.478,743.935L549.497,741.677C564.918,763.263 584.651,780.04 607.217,793.703C675.572,832.668 760.999,834.486 835.432,814.877L840.14,813.618C920.542,792.216 985.685,728.414 1036.45,662.158Z" style="fill:rgb(212,91,43);"/>
+        </g>
+        <g transform="matrix(0.909087,-0.296024,0.296024,0.909087,-215.914,163.929)">
+            <path d="M463.217,1068.13L199.696,982.321L199.696,316.402C199.696,270.01 237.361,232.346 283.753,232.346L952.399,232.346C998.791,232.346 1036.45,270.01 1036.45,316.402L1036.45,459.336C966.702,400.974 823.714,413.929 745.018,442.513L737.413,445.382C721.525,451.116 706.308,456.889 692.005,465.967L686.947,469.267C634.68,501.301 598.929,552.305 581.314,610.674L579.578,616.918C571.001,647.487 566.897,677.509 567.026,709.177C567.15,713.087 567.232,716.998 567.264,720.909C566.803,729.562 565.091,734.181 558.631,740.364C554.789,744.028 554.789,744.028 549.945,749.514L544.552,755.804L538.956,762.25L533.211,768.87L516.7,787.89L513.048,792.098L511.602,789.255C515.3,773.625 521.094,759.312 528.516,745.15C535.444,732.027 541.766,719.044 546.701,705.023C561.904,659.552 574.186,607.813 551.97,562.21L549.211,557.226C513.75,493.078 427.355,444.513 359.495,424.014L353.589,422.378C346.015,420.242 340.379,418.283 333.102,422.219C327.192,427.399 327.192,427.399 322.75,442.657C303.745,518.075 297.049,617.725 336.246,688.104L339.066,692.756C359.269,726.638 383.755,750.13 421.233,763.183L428.313,765.543C444.92,771.132 460.302,774.204 477.836,775.037L482.979,775.192C478.453,791.057 472.32,805.49 464.938,820.229C456.026,837.944 447.227,855.687 440.412,874.334C422.477,926.603 418.248,979.092 442.664,1029.98L445.568,1035.75L449.005,1042.94L452.798,1049.96C456.114,1056.12 459.599,1062.17 463.217,1068.13ZM1036.45,479.549L1036.45,985.048C1036.45,1031.44 998.791,1069.11 952.399,1069.11L501.129,1069.11C492.956,1057.35 485.306,1045.25 479.293,1032.38L476.885,1026.97C466.19,1004.8 459.673,984.081 456.716,959.629C454.71,922.088 466.388,900.537 489.184,871.927C492.128,868.239 495.047,864.53 497.939,860.801C514.53,839.317 531.761,818.533 549.862,798.305C559.696,787.461 569.132,776.649 577.697,764.762L579.871,761.682C601.204,777.451 625.154,787.313 650.836,793.34C727.883,809.291 809.696,784.64 874.435,743.003L878.525,740.351C961.103,686.941 1005.11,583.772 1032.31,493.135L1034.18,486.731C1034.93,484.275 1035.74,481.895 1036.45,479.549Z" style="fill:rgb(255,179,0);"/>
+        </g>
+        <g transform="matrix(0.95607,0,0,0.956362,-52.3228,-24.3766)">
+            <path d="M600.364,1069.11L283.753,1069.11C237.361,1069.11 199.696,1031.45 199.696,985.074L199.696,316.377C199.696,269.999 237.361,232.346 283.753,232.346L952.399,232.346C998.791,232.346 1036.45,269.999 1036.45,316.377L1036.45,985.074C1036.45,1031.45 998.791,1069.11 952.399,1069.11L651.452,1069.11C634.843,1057.11 618.204,1044.77 604.282,1029.88L600.318,1025.49C583.283,1007.73 570.673,990.051 560.29,967.723C546.759,932.658 551.19,908.558 564.008,874.306C565.665,869.889 567.292,865.46 568.888,861.02C578.012,835.463 587.96,810.373 598.908,785.541C604.902,772.19 610.526,758.991 614.99,745.041L616.103,741.44C641.27,749.826 667.097,751.788 693.383,749.568C771.583,740.882 841.743,692.125 890.409,632.508L893.476,628.721C955.46,552.391 965.361,440.7 963.161,346.125L962.96,339.457C962.776,329.751 963.713,320.824 957.437,313.038C873.077,278.468 740.5,335.237 674.312,386.931L667.97,392.012C654.637,402.38 641.955,412.578 631.166,425.634L627.379,430.336C587.599,476.966 569.397,536.514 570.72,597.451L571.002,603.923C572.312,635.636 577.705,665.444 587.633,695.507C588.961,699.185 590.25,702.877 591.491,706.585C593.733,714.953 593.535,719.874 589.307,727.751C586.787,732.422 586.787,732.422 583.88,739.137L580.7,746.785L577.375,754.645L573.962,762.716L564.151,785.906L561.982,791.036L559.727,788.782C558.403,772.779 559.481,757.38 562.153,741.621C564.678,727.003 566.669,712.704 567.02,697.849C567.397,649.92 563.056,596.937 527.812,560.465L523.646,556.581C470.065,506.58 372.879,487.158 302.006,488.677L295.884,488.95C288.021,489.264 282.056,489.146 276.355,495.141C272.339,501.894 272.339,501.894 272.84,517.772C278.12,595.344 302.607,692.141 361.668,746.909L365.791,750.457C395.491,776.412 426.048,791.163 465.726,791.971L473.188,792.022C490.71,792.194 506.288,790.354 523.217,785.718L528.156,784.273C528.764,800.755 527.402,816.373 524.946,832.668C521.957,852.267 519.084,871.856 518.378,891.691C517.508,946.927 529.738,998.13 568.712,1038.95L573.257,1043.53L578.754,1049.3L584.532,1054.8C589.689,1059.72 594.976,1064.48 600.364,1069.11Z" style="fill:rgb(44,181,212);"/>
+        </g>
+    </g>
+</svg>
+</div>
+    <h1 data-i18n-title>You're offline</h1>
+    <p data-i18n-body>Flexling needs an internet connection. We'll reconnect automatically as soon as you're back online.</p>
+    <button id="retry" onclick="goBack()"><span class="spinner"></span><span data-i18n-button>Try again</span></button>
+  </div>
+  <script src="./app-url.js"></script>
+  <script>
+    // app-url.js is generated per environment by scripts/cap-sync.mjs;
+    // production is the fallback if it's ever missing.
+    var APP_URL = window.FLEXLING_APP_URL || 'https://flexling.com/app';
+
+    if ((navigator.language || '').toLowerCase().indexOf('de') === 0) {
+      document.querySelector('[data-i18n-title]').textContent = 'Du bist offline';
+      document.querySelector('[data-i18n-body]').textContent =
+        'Flexling braucht eine Internetverbindung. Sobald du wieder online bist, geht es automatisch weiter.';
+      document.querySelector('[data-i18n-button]').textContent = 'Erneut versuchen';
+    }
+
+    function goBack() {
+      document.getElementById('retry').classList.add('retrying');
+      window.location.replace(APP_URL);
+    }
+
+    /**
+     * This page can appear for transient reasons (a cancelled navigation,
+     * a brief connection blip) — not only genuine offline. So it heals
+     * itself: poll the server and return the moment it's reachable. The
+     * sessionStorage guard stops a reload loop if the server responds but
+     * the app page itself keeps failing.
+     */
+    var AUTO_KEY = 'flexling_offline_auto_retries';
+    function autoReturn() {
+      var tries = Number(sessionStorage.getItem(AUTO_KEY) || '0');
+      if (tries >= 3) return; // give up on silent retries; manual button remains
+      sessionStorage.setItem(AUTO_KEY, String(tries + 1));
+      goBack();
+    }
+    function probe() {
+      fetch(APP_URL, { method: 'HEAD', mode: 'no-cors', cache: 'no-store' })
+        .then(autoReturn)
+        .catch(function () {});
+    }
+    // Reset the guard after a while so a later, unrelated outage gets
+    // fresh silent retries.
+    setTimeout(function () { sessionStorage.removeItem(AUTO_KEY); }, 60000);
+    window.addEventListener('online', probe);
+    setInterval(probe, 3000);
+    probe();
+  </script>
+</body>
+</html>

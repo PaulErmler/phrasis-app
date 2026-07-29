@@ -3,6 +3,8 @@
 import { useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { reportError } from '@/lib/report-error';
+
 export default function AppError({
   error,
   reset,
@@ -13,7 +15,7 @@ export default function AppError({
   const t = useTranslations('ErrorPage');
 
   useEffect(() => {
-    console.error(error);
+    reportError(error, { boundary: 'app-main', digest: error.digest });
   }, [error]);
 
   return (

@@ -131,6 +131,15 @@
       "attribution": {
         "label": "Quellenangaben",
         "text": "Viele der Sätze stammen aus dem umfangreichen Datensatz von <tatoeba>Tatoeba</tatoeba>, veröffentlicht unter einer <ccby>CC-BY-Lizenz</ccby>."
+      },
+      "deleteAccount": {
+        "button": "Konto löschen",
+        "title": "Konto wirklich löschen?",
+        "description": "Dein Konto, deine Kurse und dein Lernfortschritt werden innerhalb von 30 Tagen dauerhaft gelöscht. Das kann nicht rückgängig gemacht werden. Du wirst jetzt abgemeldet.",
+        "confirm": "Konto endgültig löschen",
+        "cancel": "Abbrechen",
+        "success": "Löschung beantragt — dein Konto wird innerhalb von 30 Tagen gelöscht.",
+        "error": "Die Löschung konnte nicht beantragt werden. Versuche es erneut oder schreibe an support@flexling.com."
       }
     },
     "deckCards": {
@@ -743,6 +752,8 @@
   "PaymentOverdue": {
     "title": "Zahlung überfällig",
     "description": "Deine letzte Zahlung ist fehlgeschlagen. Bitte aktualisiere deine Zahlungsmethode, um dein Abo aktiv zu halten.",
+    "nativeDescription": "Es gibt ein Problem mit deinem Abo. Kontaktiere uns unter support@flexling.com — wir kümmern uns darum.",
+    "contactUs": "Kontakt",
     "blockedDescription": "Deine Zahlung ist seit dem {date} überfällig. Der Zugriff ist pausiert, bis die Zahlung abgeschlossen ist.",
     "payInvoiceButton": "Rechnung bezahlen",
     "payButton": "Zahlungsmethode aktualisieren",
@@ -1520,5 +1531,31 @@
     "noWordsYet": "Noch keine Wörter",
     "loadMore": "Mehr laden",
     "clearSearch": "Suche zurücksetzen"
+  },
+  "Consent": {
+    "banner": {
+      "title": "Cookies und Analyse",
+      "description": "Dürfen wir Analyse-Cookies und Sitzungsaufzeichnungen verwenden, um die App zu verbessern? Details:",
+      "privacyLink": "Datenschutzerklärung",
+      "accept": "Alle akzeptieren",
+      "reject": "Optionale ablehnen",
+      "customize": "Anpassen"
+    },
+    "settings": {
+      "title": "Cookie-Einstellungen",
+      "description": "Wähle aus, was wir messen dürfen. Deine Auswahl gilt für diesen Browser und lässt sich jederzeit ändern.",
+      "save": "Einstellungen speichern"
+    },
+    "categories": {
+      "necessary": {
+        "title": "Unbedingt erforderlich",
+        "description": "Hält dich angemeldet und merkt sich Sprache und Ansicht. Ohne diese funktioniert die App nicht, deshalb lassen sie sich nicht abschalten."
+      },
+      "analytics": {
+        "title": "Produktanalyse und Sitzungsaufzeichnung",
+        "description": "Hilft uns zu sehen, welche Funktionen genutzt werden, wo das Onboarding scheitert und auf welche Fehler Nutzerinnen und Nutzer stoßen. Enthält Bildschirmaufzeichnungen, bei denen alles, was du in Formularfelder eingibst, schon im Browser verborgen wird. Wenn du ablehnst, messen wir die Nutzung weiterhin ohne Cookies und ohne Aufzeichnungen."
+      }
+    },
+    "footerLink": "Cookie-Einstellungen"
   }
 }

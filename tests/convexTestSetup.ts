@@ -51,3 +51,22 @@ vi.mock('@convex-dev/aggregate', () => {
   }
   return { TableAggregate };
 });
+
+/**
+ * Stub the PostHog Convex client for the same reason as the mocks above: the
+ * `posthog` component is not registered with convex-test, and production code
+ * constructs `new PostHog(components.posthog)` at module load.
+ *
+ * All methods are no-op spies, so suites that care can assert an event fired
+ * (`vi.mocked(posthog.capture)`) without any of them needing network access or
+ * a project token. Analytics must never be the reason a test fails.
+ */
+vi.mock('@/convex/posthog', () => ({
+  posthog: {
+    capture: vi.fn(async () => undefined),
+    identify: vi.fn(async () => undefined),
+    captureException: vi.fn(async () => undefined),
+    groupIdentify: vi.fn(async () => undefined),
+    alias: vi.fn(async () => undefined),
+  },
+}));

@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { setUserLocale } from '@/i18n/locale';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { cn } from '@/lib/utils';
 
 const locales = [
@@ -45,6 +46,7 @@ export function LanguageSwitcher({
   }, []);
 
   const handleLocaleChange = (newLocale: string) => {
+    capture(CLIENT_EVENTS.LOCALE_CHANGED, { from: locale, to: newLocale });
     startTransition(() => {
       setUserLocale(newLocale as 'en' | 'de');
     });

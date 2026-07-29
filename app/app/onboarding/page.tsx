@@ -23,6 +23,27 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ChevronLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ConvexError } from 'convex/values';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import { reportError } from '@/lib/report-error';
+import { convexErrorCode } from '@/lib/utils';
+
+/**
+ * One sink for the wizard's swallow points: console + error tracking (the
+ * exception) plus the `onboarding_failed` funnel event (the count). Every
+ * catch in this flow deliberately lets the user continue, so without this
+ * pairing a failure would be visible in neither the funnel nor the feed.
+ */
+function reportOnboardingFailure(
+  err: unknown,
+  {
+    op,
+    ...eventProps
+  }: { op: string; step: string; reason: string } & Record<string, unknown>,
+): void {
+  reportError(err, { op });
+  capture(CLIENT_EVENTS.ONBOARDING_FAILED, eventProps);
+}
 
 import type {
   OnboardingData,
@@ -56,6 +77,7 @@ import type { OnboardingSessionSummary } from './components/OnboardingFirstLesso
 import { FeatureTourStep } from './steps/FeatureTourStep';
 import { PlanPickStep } from './steps/PlanPickStep';
 import { TestimonialsStep } from './steps/TestimonialsStep';
+import { useIsNativeApp } from '@/hooks/use-native-app';
 
 /**
  * New onboarding wizard. 14 steps with branching at the proficiency point.
@@ -180,7 +202,14 @@ function OnboardingContent() {
     if (!isAuthenticated || syncedRef.current) return;
     syncedRef.current = true;
     syncQuotas().catch((err) => {
-      console.error('Failed to sync quotas during onboarding:', err);
+      // Non-fatal, but it decides whether `completeOnboarding` can consume a
+      // COURSES unit later — a failure here surfaces as an unexplained
+      // USAGE_LIMIT three steps down, so it needs to be visible.
+      reportOnboardingFailure(err, {
+        op: 'onboarding.syncQuotas',
+        step: 'mount',
+        reason: 'sync_quotas_failed',
+      });
     });
   }, [syncQuotas, isAuthenticated]);
 
@@ -324,6 +353,7 @@ function OnboardingWizard({
   router,
 }: WizardProps) {
   const t = useTranslations('Onboarding.wizard');
+  const isNative = useIsNativeApp();
   const [data, setData] = useState<OnboardingData>(initial);
   const [stepId, setStepId] = useState<StepId>(initialStepId);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -414,6 +444,31 @@ function OnboardingWizard({
     saveStepNow(to, 'advance');
   }, [stepId, TRANSIENT_STEPS, saveStepNow]);
 
+  /**
+   * Funnel instrumentation. One event per step entry, carrying how long the
+   * previous step took — which is enough to build both the drop-off funnel and
+   * the per-step timing chart from a single event type.
+   *
+   * Driven off `stepId` rather than wired into `advance`/`back` so it cannot be
+   * bypassed: the flow also lands on steps via resume-from-`onboardingProgress`
+   * and via the branch jumps out of `proficiency`.
+   */
+  const stepEnteredAtRef = useRef<number>(Date.now());
+  const previousStepRef = useRef<StepId | null>(null);
+  useEffect(() => {
+    const now = Date.now();
+    const previousStep = previousStepRef.current;
+    capture(CLIENT_EVENTS.ONBOARDING_STEP_VIEWED, {
+      step: stepId,
+      step_index: PROGRESS_STEP_ORDER.indexOf(stepId) + 1,
+      previous_step: previousStep ?? undefined,
+      previous_step_duration_ms:
+        previousStep === null ? undefined : now - stepEnteredAtRef.current,
+    });
+    previousStepRef.current = stepId;
+    stepEnteredAtRef.current = now;
+  }, [stepId]);
+
   const back = useCallback(() => {
     setHistory((h) => {
       const prev = h[h.length - 1];
@@ -432,8 +487,11 @@ function OnboardingWizard({
     );
     return Math.max(0, idx);
   }, [stepId]);
-  const totalSteps = PROGRESS_STEP_ORDER.length;
-  const progressPct = ((progressIndex + 1) / totalSteps) * 100;
+  // plan-pick never shows the bar (and the store-app shell skips the step
+  // entirely), so it's excluded from the denominator — otherwise the last
+  // visible value is 92% and the bar never completes.
+  const totalSteps = PROGRESS_STEP_ORDER.length - 1;
+  const progressPct = Math.min(100, ((progressIndex + 1) / totalSteps) * 100);
 
   // ─── Per-step rendering & controls ─────────────────────────────────────
 
@@ -448,8 +506,15 @@ function OnboardingWizard({
     try {
       await prepareLanguagePair({ sourceLanguage: source, targetLanguage: target });
     } catch (err) {
-      console.error('prepareLanguagePair failed:', err);
-      // Non-fatal — content warmup is best-effort.
+      // Non-fatal — content warmup is best-effort, and we advance regardless.
+      // But "advanced anyway" is exactly the state that later shows up as a
+      // placement test with no content, so record why.
+      reportOnboardingFailure(err, {
+        op: 'onboarding.prepareLanguagePair',
+        step: 'language-pair',
+        reason: 'prepare_language_pair_failed',
+        advanced_anyway: true,
+      });
     }
     advance('acquisition');
   };
@@ -511,7 +576,16 @@ function OnboardingWizard({
     try {
       await completeOnboarding();
     } catch (err) {
-      console.error('completeOnboarding failed:', err);
+      // The single worst failure in the flow: CustomizingStep lets the progress
+      // bar finish and advances regardless, so the user walks into the first
+      // lesson with no course. Without this event it is invisible.
+      reportOnboardingFailure(err, {
+        op: 'onboarding.completeOnboarding',
+        step: 'customizing',
+        reason: 'complete_onboarding_failed',
+        advanced_anyway: true,
+        code: err instanceof ConvexError ? convexErrorCode(err) : undefined,
+      });
       toast.error(t('errors.completeFailed'));
     }
   }, [completeOnboarding, t]);
@@ -521,10 +595,28 @@ function OnboardingWizard({
     try {
       await finalizeOnboarding();
     } catch (err) {
-      console.error('finalizeOnboarding failed:', err);
+      // Navigates to /app regardless, where OnboardingGuard sees
+      // hasCompletedOnboarding === false and bounces the user straight back
+      // here — the classic "onboarding loop" report, now traceable.
+      reportOnboardingFailure(err, {
+        op: 'onboarding.finalizeOnboarding',
+        step: 'plan-pick',
+        reason: 'finalize_onboarding_failed',
+        will_bounce_back: true,
+      });
     }
     router.push('/app');
   }, [finalizeOnboarding, router]);
+
+  // A session persisted at plan-pick can resume inside the store-app shell
+  // (e.g. onboarding started in the browser, continued in the app). The shell
+  // never shows the plan picker, so finalize straight away.
+  const autoFinalized = useRef(false);
+  useEffect(() => {
+    if (!isNative || stepId !== 'plan-pick' || autoFinalized.current) return;
+    autoFinalized.current = true;
+    void onFinalize();
+  }, [isNative, stepId, onFinalize]);
 
   // Continue-button enable state per step.
   const continueDisabled = (): boolean => {
@@ -567,7 +659,13 @@ function OnboardingWizard({
       onCefrPickContinue();
       return;
     case 'testimonials':
-      advance('plan-pick');
+      // The store-app shell must not show the plan picker (store payment
+      // policies) — onboarding finishes on the auto-enabled free tier.
+      if (isNative) {
+        await onFinalize();
+      } else {
+        advance('plan-pick');
+      }
       return;
     default:
       return;
@@ -587,19 +685,28 @@ function OnboardingWizard({
   // during render — `react-hooks/refs` can't tell these aren't refs, so the
   // rule fires a false positive here.
    
-  const stepNode = renderStep({
-    stepId,
-    data,
-    persist,
-    onPlacementComplete,
-    onCustomizingReady,
-    customizingMountAction,
-    setCefrSlidLevel,
-    lessonSummary,
-    setLessonSummary,
-    onAdvance: advance,
-    onFinalize,
-  });
+  // In the store-app shell the plan picker never renders — the auto-finalize
+  // effect above is already navigating to /app, so bridge with a spinner.
+  const stepNode =
+    isNative && stepId === 'plan-pick' ? (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    ) : (
+      renderStep({
+        stepId,
+        data,
+        persist,
+        onPlacementComplete,
+        onCustomizingReady,
+        customizingMountAction,
+        setCefrSlidLevel,
+        lessonSummary,
+        setLessonSummary,
+        onAdvance: advance,
+        onFinalize,
+      })
+    );
 
   return (
     <div className="h-dvh max-h-dvh flex flex-col overflow-hidden">
@@ -607,7 +714,7 @@ function OnboardingWizard({
           lesson's own chrome takes over) and on the final plan-pick step
           (the pricing CTAs need the full canvas). */}
       {stepId !== 'first-lesson' && stepId !== 'plan-pick' ? (
-        <div className="bg-background border-b shrink-0">
+        <div className="bg-background border-b shrink-0 pt-[var(--safe-top)]">
           <div className="container mx-auto px-4 py-3">
             <Progress value={progressPct} className="h-1.5" />
           </div>
@@ -626,7 +733,7 @@ function OnboardingWizard({
       </main>
 
       {!stepHasOwnAdvance ? (
-        <div className="border-t bg-background shrink-0">
+        <div className="border-t bg-background shrink-0 pb-[var(--safe-bottom)]">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between gap-4">
               {history.length > 0 && !POST_CUSTOMIZING_STEPS.has(stepId) ? (

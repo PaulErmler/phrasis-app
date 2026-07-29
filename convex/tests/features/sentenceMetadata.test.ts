@@ -213,6 +213,25 @@ describe("features/sentenceMetadata", () => {
           text?.audioSpeakerGender === "female",
       ).toBe(true);
     });
+
+    it("rethrows LLM infrastructure failures so the retrier still sees them", async () => {
+      // The exception-attribution wrapper must capture-and-rethrow, not
+      // swallow — a swallowed error would defeat retrier backoff.
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      vi.mocked(generateText).mockRejectedValueOnce(new Error("network down"));
+
+      await expect(
+        t.action(internal.features.sentenceMetadata.fetchSentenceMetadata, {
+          textId,
+          translations: [{ language: "es", text: "Hola" }],
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+          userId: "user_A",
+        }),
+      ).rejects.toThrow("network down");
+    });
   });
 
   describe("generateSentenceMetadata", () => {
@@ -245,6 +264,46 @@ describe("features/sentenceMetadata", () => {
       // audioSpeakerGender was coin-flipped on the first pass and preserved
       // since the LLM returned a non-definitive "neutral" speakerGender.
       expect(text?.audioSpeakerGender === "male" || text?.audioSpeakerGender === "female").toBe(true);
+    });
+
+    it("accepts translation entries carrying provenance fields (regression)", async () => {
+      // Producers (`createCustomText`, chat approval) forward entries that
+      // can carry `translationSource` / `regionVariant`. The job validator
+      // used to allow only `{language, text}` and threw an
+      // ArgumentValidationError at execution time — silently, since the
+      // scheduling mutation had already returned success.
+      const t = convexTest(schema, modules);
+      const { textId } = await seedText(t);
+      vi.mocked(generateText).mockResolvedValueOnce({ text: "{}" } as any);
+
+      await t.action(
+        internal.features.sentenceMetadata.generateSentenceMetadata,
+        {
+          textId,
+          translations: [
+            {
+              language: "es",
+              text: "Hola",
+              translationSource: "user-provided",
+              regionVariant: "es-US",
+            },
+            {
+              language: "en",
+              text: "Hello",
+              translationSource: "openrouter/some-model-none",
+            },
+          ],
+          schedulePrepareCard: false,
+          baseLanguages: ["en"],
+          targetLanguages: ["es"],
+          userId: "user_A",
+        },
+      );
+
+      // The metadata step ran instead of dying on args validation: the card
+      // was unblocked with a coin-flipped voice gender.
+      const text = await t.run(async (ctx) => ctx.db.get(textId));
+      expect(["male", "female"]).toContain(text?.audioSpeakerGender);
     });
   });
 

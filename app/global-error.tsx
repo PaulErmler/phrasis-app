@@ -1,12 +1,29 @@
 'use client';
 
+import { useEffect } from 'react';
+
+import { posthog } from '@/lib/posthog/client';
+
 export default function GlobalError({
-  error: _error,
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    // This boundary replaces the root layout, so it is the only place a crash
+    // in the layout itself (providers, fonts, intl) can be observed at all.
+    // Called directly rather than via `reportError`, which pulls in more of the
+    // app than is safe to trust at this point — and guarded, because a throw
+    // here would crash the crash page itself.
+    try {
+      posthog.captureException(error, { boundary: 'global-error', digest: error.digest });
+    } catch {
+      // Nothing left to report to.
+    }
+  }, [error]);
+
   return (
     <html lang="en">
       <body>

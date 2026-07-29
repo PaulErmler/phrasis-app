@@ -9,12 +9,25 @@ vi.mock("ai", () => ({
 vi.mock("@openrouter/ai-sdk-provider", () => ({
   createOpenRouter: () => () => ({}),
 }));
+// Stub the action-retrier so `retrier.run(ctx, fnRef, args)` delegates to
+// `ctx.runAction` instead of the (unregistered) component — needed by the
+// tests that replay the scheduled `generateSentenceMetadata` job.
+vi.mock("@convex-dev/action-retrier", () => {
+  class ActionRetrier {
+    constructor(_component: unknown, _opts: unknown) {}
+    async run(ctx: any, fnRef: any, args: any): Promise<string> {
+      await ctx.runAction(fnRef, args);
+      return "job_stub";
+    }
+  }
+  return { ActionRetrier };
+});
 
 import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 import { generateText } from "ai";
 import schema from "../../schema";
-import { api } from "../../_generated/api";
+import { api, internal } from "../../_generated/api";
 import { MAX_CARD_TEXT_LENGTH } from "../../../lib/constants/learning";
 import { DEFAULT_INITIAL_REVIEW_COUNT } from "../../../lib/scheduling";
 
@@ -170,6 +183,59 @@ describe("features/customTexts", () => {
       // serialization through `.collect()` for unset optionals can surface
       // as either `null` or `undefined`; either means "no tag".
       expect(byLang.fr ?? null).toBeNull();
+    });
+
+    it("pure-manual save schedules a metadata job that the job validator accepts (regression)", async () => {
+      // Regression for a production ArgumentValidationError: the no-metadata
+      // branch forwarded `args.translations` (carrying `translationSource` /
+      // `regionVariant`) into `generateSentenceMetadata`, whose validator
+      // only allowed `{language, text}`. The mutation itself succeeded, so
+      // the failure was silent. Replay the scheduled job exactly as the
+      // scheduler would to prove the forwarded args pass validation.
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.customTexts.createCustomText,
+        {
+          translations: [
+            {
+              language: "en",
+              text: "God keeps whole civilizations together.",
+              translationSource: "user-provided",
+            },
+            {
+              language: "es",
+              text: "Dios mantiene unidas civilizaciones enteras.",
+              translationSource: "user-provided",
+              regionVariant: "es-US",
+            },
+          ],
+          timezone: "UTC",
+          // no metadata → pure-manual branch
+        },
+      );
+
+      const jobs = await t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      const metadataJobs = jobs.filter((j) =>
+        j.name.includes("generateSentenceMetadata"),
+      );
+      expect(metadataJobs).toHaveLength(1);
+      const jobArgs = metadataJobs[0].args[0] as any;
+      // The job carries the text's owner for exception attribution.
+      expect(jobArgs.userId).toBe("user_A");
+
+      await t.action(
+        internal.features.sentenceMetadata.generateSentenceMetadata,
+        jobArgs,
+      );
+
+      // The metadata step ran instead of dying on args validation: the card
+      // was unblocked with a coin-flipped voice gender.
+      const text = await t.run(async (ctx) => ctx.db.get(res.textId));
+      expect(["male", "female"]).toContain(text?.audioSpeakerGender);
     });
 
     it("throws INVALID_TIMEZONE for a malformed timezone", async () => {
@@ -544,6 +610,50 @@ describe("features/customTexts", () => {
           expect(row.translationSource).toBe("user-provided");
         }
       }
+    });
+
+    it("schedules metadata jobs the job validator accepts, tagged with the owner (regression)", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourseWithQuota(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.mutation(
+        api.features.customTexts.createCustomTextsBatch,
+        {
+          items: [
+            {
+              translations: [
+                { language: "en", text: "One" },
+                { language: "es", text: "Uno" },
+              ],
+            },
+            {
+              translations: [
+                { language: "en", text: "Two" },
+                { language: "es", text: "Dos" },
+              ],
+            },
+          ],
+          timezone: "UTC",
+        },
+      );
+      expect(res.createdTextIds).toHaveLength(2);
+
+      const jobs = await t.run(async (ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      const metadataJobs = jobs.filter((j) =>
+        j.name.includes("generateSentenceMetadata"),
+      );
+      expect(metadataJobs).toHaveLength(2);
+      for (const job of metadataJobs) {
+        expect((job.args[0] as any).userId).toBe("user_A");
+      }
+      // Replay one job through the real action to prove the forwarded args
+      // pass its validator.
+      await t.action(
+        internal.features.sentenceMetadata.generateSentenceMetadata,
+        metadataJobs[0].args[0] as any,
+      );
     });
 
     it("returns skipped entries for invalid rows without aborting the batch", async () => {

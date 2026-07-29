@@ -14,6 +14,8 @@ import { ChevronLeft, MessageSquarePlus, PanelLeft } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { getUserTimezone } from '@/lib/timezone';
+import { reportError } from '@/lib/report-error';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { HomeView } from '@/components/app/HomeView';
 import { AddCardsView } from '@/components/app/AddCardsView';
 import { LibraryView } from '@/components/app/LibraryView';
@@ -151,7 +153,12 @@ export default function MainLayout({
     null,
   );
   const refreshPrefetchedThread = useCallback(() => {
-    getOrCreateEmptyThread({}).then(setPrefetchedThreadId).catch(() => {});
+    getOrCreateEmptyThread({})
+      .then(setPrefetchedThreadId)
+      // Non-fatal: LearnView creates a thread on demand if this never lands.
+      // Reported rather than swallowed, because a persistent failure here is
+      // invisible to the user and shows up only as chat feeling slow.
+      .catch((err) => reportError(err, { op: 'prefetchEmptyThread' }));
   }, [getOrCreateEmptyThread]);
 
   const didPrefetchThread = useRef(false);
@@ -217,6 +224,11 @@ export default function MainLayout({
     router.push('/app/content/add-cards');
   }, [router]);
 
+  // Wall-clock start of the current learn session, used to derive its duration
+  // on close. Deliberately a ref: this must not trigger a re-render of a layout
+  // that owns every tab in the app.
+  const learnStartedAtRef = useRef<number | null>(null);
+
   // Learn overlay — pushState so the browser back button can close it
   const handleLearnOpen = useCallback(() => {
     setIsLearnOpen(true);
@@ -224,17 +236,37 @@ export default function MainLayout({
     setHasVisitedLibrary(false);
     history.pushState(null, '', '/app/learn');
     refreshPrefetchedThread();
-  }, [refreshPrefetchedThread]);
+    learnStartedAtRef.current = Date.now();
+    // Session-level, not per-review: the per-review detail already lives in
+    // dailyStats/courseStats, and duplicating it into PostHog would dominate
+    // the event bill for no analytical gain.
+    capture(CLIENT_EVENTS.REVIEW_SESSION_STARTED, {
+      course_id: activeCourse?._id,
+      target_languages: activeCourse?.targetLanguages,
+      current_level: activeCourse?.currentLevel,
+    });
+  }, [refreshPrefetchedThread, activeCourse]);
 
   const handleLearnClose = useCallback(() => {
     setJustReturnedFromLearn(true);
-    // Sync ref BEFORE history.back() to avoid a race where the popstate
-    // swipe-back guard sees a stale `true` value and re-pushes /app/learn.
     isLearnOpenRef.current = false;
     setIsLearnOpen(false);
-    history.back();
+    // Always land on Home, regardless of which tab opened the session.
+    // replaceState (not pushState) swaps the /app/learn entry so the history
+    // stack doesn't grow learn→home→learn on repeated sessions; browser
+    // back from Home still returns to the pre-learn view.
+    setActiveView('home');
+    history.replaceState(null, '', VIEW_PATHS['home']);
     refreshPrefetchedThread();
-  }, [refreshPrefetchedThread]);
+    const startedAt = learnStartedAtRef.current;
+    learnStartedAtRef.current = null;
+    capture(CLIENT_EVENTS.REVIEW_SESSION_ENDED, {
+      duration_ms: startedAt === null ? undefined : Date.now() - startedAt,
+      course_id: activeCourse?._id,
+      target_languages: activeCourse?.targetLanguages,
+      current_level: activeCourse?.currentLevel,
+    });
+  }, [refreshPrefetchedThread, activeCourse]);
 
   // Sync state when the user navigates with browser back/forward buttons
   // (including iOS/Android edge-swipe back gestures).
@@ -286,7 +318,7 @@ export default function MainLayout({
   return (
     <div className="h-dvh max-h-dvh md:h-screen md:max-h-screen flex flex-col overflow-hidden">
       {!isAddCardsRoute && (
-        <header className="fixed top-0 left-0 right-0 z-20 border-b bg-background pt-[env(safe-area-inset-top)]">
+        <header className="fixed top-0 left-0 right-0 z-20 border-b bg-background pt-[var(--safe-top)]">
           <div className="header-bar">
             {activeView === 'home' ? (
               <Button
@@ -357,7 +389,7 @@ export default function MainLayout({
       )}
 
       {!isAddCardsRoute && (
-        <div className="shrink-0 h-[calc(3.5rem+env(safe-area-inset-top))]" />
+        <div className="shrink-0 h-[calc(3.5rem+var(--safe-top))]" />
       )}
 
       <CourseMenu open={courseMenuOpen} onOpenChange={setCourseMenuOpen} />
@@ -420,7 +452,7 @@ export default function MainLayout({
 
       {!isAddCardsRoute && (
         <>
-          <div className="shrink-0 h-[calc(4rem+env(safe-area-inset-bottom,0px))]" />
+          <div className="shrink-0 h-[calc(4rem+var(--safe-bottom))]" />
           <div className={`fixed bottom-0 left-0 right-0 z-20 ${isLearnOpen ? 'pointer-events-none' : ''}`}>
             <BottomNav
               currentView={activeView}

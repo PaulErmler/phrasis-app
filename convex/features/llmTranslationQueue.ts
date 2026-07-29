@@ -28,6 +28,7 @@ import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
 import { llmPool } from '../lib/workpools';
 import { asVoiceGender } from '../types';
+import { captureGeneration } from '../lib/posthogAi';
 
 /**
  * LLM translation pipeline, built on the `llmPool` workpool
@@ -457,6 +458,35 @@ export const processLlmTranslationForCard = internalAction({
         reasoning: stage.reasoning as ReasoningEffort | undefined,
         maxOutputTokens: stage.maxOutputTokens,
       });
+      // One cost event per stage attempt, failures included: a stage that
+      // truncates still burned tokens, and the failure rate of the cheap first
+      // stage is exactly what decides whether the fallback chain is worth its
+      // price. `translateTextWithLLM` has no ctx of its own, so it hands the
+      // numbers back and the capture happens here.
+      if (result.telemetry) {
+        await captureGeneration(ctx, {
+          feature: 'translation',
+          model: result.telemetry.model,
+          provider: 'openrouter',
+          latencyMs: result.telemetry.latencyMs,
+          inputTokens: result.telemetry.inputTokens,
+          outputTokens: result.telemetry.outputTokens,
+          costUsd: result.telemetry.costUsd,
+          traceId: result.telemetry.generationId,
+          isError: !result.ok,
+          error: result.ok ? undefined : result.reason,
+          // Reused by every user who reaches this sentence — see the
+          // attribution note on `captureGeneration`.
+          sharedContent: true,
+          extra: {
+            text_id: args.textId,
+            target_language: args.targetLanguage,
+            stage_index: i,
+            stage_count: stages.length,
+            reasoning: stage.reasoning ?? 'none',
+          },
+        });
+      }
       if (result.ok) {
         winningStage = stage;
         break;

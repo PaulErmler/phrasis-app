@@ -6,6 +6,9 @@ import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import { transcribeAudio as runStt, reserveAzureSttSlot } from '../../lib/stt';
 import { getActiveCourseForUser } from '../../db/courses';
+import { EVENTS, track } from '../../analytics';
+import { captureGeneration } from '../../lib/posthogAi';
+import { costForAudioMs } from '../../config/aiCosts';
 
 export const consumeTranscriptionQuota = internalMutation({
   args: { userId: v.string() },
@@ -59,15 +62,42 @@ export const transcribeAudio = action({
       { userId },
     );
 
+    const startedAt = Date.now();
     try {
       const baseMime = (args.mimeType ?? 'audio/webm').split(';')[0].trim();
       const blob = new Blob([args.audio], { type: baseMime });
       await reserveAzureSttSlot(ctx, { maxWaitMs: 3000 });
-      const { text } = await runStt(blob, undefined, {
+      const { text, audioDurationMs } = await runStt(blob, undefined, {
         autoDetectCourseLanguages: courseLanguages,
+      });
+
+      await captureGeneration(ctx, {
+        distinctId: userId,
+        feature: 'chat_voice_input',
+        model: 'azure-fast-transcription',
+        provider: 'azure',
+        latencyMs: Date.now() - startedAt,
+        costUsd:
+          audioDurationMs !== undefined
+            ? costForAudioMs('azureStt', audioDurationMs)
+            : undefined,
+        extra: {
+          audio_duration_ms: audioDurationMs,
+          transcript_chars: text.length,
+        },
+      });
+      await track(ctx, userId, EVENTS.VOICE_TRANSCRIBED, {
+        audio_duration_ms: audioDurationMs,
+        transcript_chars: text.length,
       });
       return text;
     } catch (error) {
+      // This is an action, so nothing rolls back when it throws — unlike the
+      // mutation paths, the failure event genuinely persists.
+      await track(ctx, userId, EVENTS.VOICE_TRANSCRIPTION_FAILED, {
+        latency_ms: Date.now() - startedAt,
+        message: error instanceof Error ? error.message : String(error),
+      });
       console.error('Transcription error:', error);
       throw new ConvexError(
         error instanceof Error ? error.message : 'Failed to transcribe audio',

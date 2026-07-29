@@ -20,6 +20,7 @@ import { getFeatureI18nKey, isFeatureConsumable } from "@/lib/features/feature-m
 import { isCreditBackedFeature } from "@/convex/features/featureIds";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
+import { useIsNativeApp } from "@/hooks/use-native-app";
 
 export interface LowQuotaDialogProps {
   open: boolean;
@@ -48,13 +49,18 @@ export default function LowQuotaDialog({
   const consumable = isFeatureConsumable(featureId);
   const creditBacked = isCreditBackedFeature(featureId);
 
-  const upgradeProduct = findUpgradeProductFromPricingTable(
-    products ?? undefined,
-    featureId,
-    included,
-    consumable,
-    findCurrentIntervalGroup(customer, products ?? undefined),
-  );
+  // Store builds must not offer upgrades — forcing "no upgrade available"
+  // routes every branch below to the neutral contact-support copy.
+  const isNative = useIsNativeApp();
+  const upgradeProduct = isNative
+    ? undefined
+    : findUpgradeProductFromPricingTable(
+      products ?? undefined,
+      featureId,
+      included,
+      consumable,
+      findCurrentIntervalGroup(customer, products ?? undefined),
+    );
 
   const handleUpgrade = async () => {
     if (!upgradeProduct) return;

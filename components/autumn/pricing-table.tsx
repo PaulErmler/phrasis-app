@@ -3,6 +3,7 @@ import React from "react";
 import { useCustomer, usePricingTable, ProductDetails } from "autumn-js/react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { CLIENT_EVENTS, capture } from "@/lib/posthog/events";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { CarouselDots } from "@/components/ui/carousel-dots";
+import { useIsNativeApp } from "@/hooks/use-native-app";
 
 /** Sort key for plan cards: Free first, then paid plans by ascending price. */
 function productSortPrice(product: Product): number {
@@ -129,7 +131,19 @@ export function itemsAddedOver(
   });
 }
 
-export default function PricingTable({
+/**
+ * Store builds must not show plans or prices (Play/App Store payment
+ * policies) — the shell renders nothing wherever a pricing table would be.
+ */
+export default function PricingTable(
+  props: React.ComponentProps<typeof PricingTableInner>,
+) {
+  const isNative = useIsNativeApp();
+  if (isNative) return null;
+  return <PricingTableInner {...props} />;
+}
+
+function PricingTableInner({
   productDetails,
   excludeFreePlan = false,
   recommendedProductIds,
@@ -312,6 +326,15 @@ export default function PricingTable({
                     product.scenario === "scheduled",
 
                   onClick: async () => {
+                    // The click, not the outcome — pairing this with
+                    // `checkout_redirected` below is what separates "didn't
+                    // want it" from "wanted it and the flow broke".
+                    capture(CLIENT_EVENTS.PLAN_CTA_CLICKED, {
+                      product_id: product.id,
+                      scenario: product.scenario,
+                      trial_eligible: trialState.trialEligible,
+                      on_trial: trialState.onTrial,
+                    });
                     if (product.id && customer) {
                       await checkout({
                         productId: product.id,

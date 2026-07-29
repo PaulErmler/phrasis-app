@@ -25,6 +25,8 @@
 
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
+import { OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import { openrouterCostUsd, openrouterGenerationId } from '../lib/posthogAi';
 import { postProcessTranslation } from '../../lib/languages';
 
 /**
@@ -50,13 +52,41 @@ export const MAX_OUTPUT_TOKENS = 5_000;
  */
 export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
 
+/**
+ * What the call cost and how long it took, regardless of outcome.
+ *
+ * Carried on every result branch — including failures — because a stage that
+ * truncates still burned tokens, and a cost dashboard that only counts
+ * successes understates the bill exactly where it hurts most.
+ *
+ * This module is a plain async function with no Convex `ctx`, so it cannot
+ * report to PostHog itself; the queue worker that owns the ctx does the
+ * capturing and this is how the numbers reach it.
+ */
+export type LlmCallTelemetry = {
+  model: string;
+  latencyMs: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** Real USD from OpenRouter usage accounting; undefined if the call never landed. */
+  costUsd?: number;
+  /** OpenRouter generation id, for reconciliation against their dashboard. */
+  generationId?: string;
+};
+
 export type LlmTranslationFailure =
-  | { ok: false; reason: 'truncated'; detail?: string }
-  | { ok: false; reason: 'empty'; detail?: string }
-  | { ok: false; reason: 'http_error'; detail?: string };
+  | { ok: false; reason: 'truncated'; detail?: string; telemetry?: LlmCallTelemetry }
+  | { ok: false; reason: 'empty'; detail?: string; telemetry?: LlmCallTelemetry }
+  | { ok: false; reason: 'http_error'; detail?: string; telemetry?: LlmCallTelemetry };
 
 export type LlmTranslationResult =
-  | { ok: true; text: string; inputTokens: number; outputTokens: number }
+  | {
+    ok: true;
+    text: string;
+    inputTokens: number;
+    outputTokens: number;
+    telemetry: LlmCallTelemetry;
+  }
   | LlmTranslationFailure;
 
 /**
@@ -228,7 +258,12 @@ export async function translateTextWithLLM(
   const effort = args.reasoning;
   const maxOutputTokens = args.maxOutputTokens ?? MAX_OUTPUT_TOKENS;
 
-  const openrouter = createOpenRouter({ apiKey });
+  // Usage accounting on: this is the highest-volume LLM path in the app and was
+  // previously the largest unmeasured line on the bill.
+  const openrouter = createOpenRouter({
+    apiKey,
+    extraBody: OPENROUTER_USAGE_ACCOUNTING,
+  });
 
   const startedAt = Date.now();
   let result: Awaited<ReturnType<typeof generateText>>;
@@ -264,6 +299,14 @@ export async function translateTextWithLLM(
       ok: false,
       reason: 'http_error',
       detail: detail.slice(0, 200),
+      // No usage figures exist — the request never produced a billable
+      // generation — but the latency and model are still worth charting.
+      telemetry: {
+        model: args.model,
+        latencyMs: Date.now() - startedAt,
+        inputTokens: 0,
+        outputTokens: 0,
+      },
     };
   }
 
@@ -277,6 +320,14 @@ export async function translateTextWithLLM(
   );
   const inputTokens = result.usage.inputTokens ?? 0;
   const outputTokens = result.usage.outputTokens ?? 0;
+  const telemetry: LlmCallTelemetry = {
+    model: args.model,
+    latencyMs: elapsedMs,
+    inputTokens,
+    outputTokens,
+    costUsd: openrouterCostUsd(result.providerMetadata),
+    generationId: openrouterGenerationId(result.providerMetadata),
+  };
 
   // Truncation: the model hit maxOutputTokens. Visible content may or may
   // not be present, but we don't trust it — for reasoning-on calls, hitting
@@ -295,6 +346,7 @@ export async function translateTextWithLLM(
       ok: false,
       reason: 'truncated',
       detail: `finishReason=length, output_tokens=${outputTokens}`,
+      telemetry,
     };
   }
 
@@ -307,7 +359,12 @@ export async function translateTextWithLLM(
       finishReason,
       outputTokens,
     });
-    return { ok: false, reason: 'empty', detail: `finishReason=${finishReason}` };
+    return {
+      ok: false,
+      reason: 'empty',
+      detail: `finishReason=${finishReason}`,
+      telemetry,
+    };
   }
 
   console.log('[translationLLM] ok', {
@@ -322,5 +379,5 @@ export async function translateTextWithLLM(
     mtLen: mt.length,
   });
 
-  return { ok: true, text: mt, inputTokens, outputTokens };
+  return { ok: true, text: mt, inputTokens, outputTokens, telemetry };
 }

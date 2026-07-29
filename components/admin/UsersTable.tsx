@@ -219,7 +219,7 @@ export function UsersTable() {
                     className="block hover:underline"
                   >
                     <span className="font-medium">{user.name || '—'}</span>
-                    <span className="block text-xs text-muted-foreground">
+                    <span className="block text-xs text-muted-foreground" data-ph-mask>
                       {user.email}
                     </span>
                   </Link>

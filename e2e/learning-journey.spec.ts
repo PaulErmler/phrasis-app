@@ -2,8 +2,17 @@ import { test, expect } from "@playwright/test";
 import {
   dismissTour,
   isSelectedTestId,
+  neutralizeTours,
   waitForInViewport,
 } from "./helpers";
+
+// Tours can mount at ANY moment after hydration and their overlay
+// intercepts pointer events (a home_tour overlay swallowed the learn-CTA
+// click for a full test budget). The CSS injection wins every such race;
+// one-shot dismissTour calls below stay as belt-and-braces.
+test.beforeEach(async ({ page }) => {
+  await neutralizeTours(page);
+});
 
 /**
  * Learning journey (LIVE) — the critical end-to-end chain:

@@ -43,7 +43,7 @@ export function BottomNav({ currentView, onViewChange, onLearnOpen }: BottomNavP
   );
 
   return (
-    <nav className="w-full bg-background/80 backdrop-blur-md border-t border-border/50 overflow-visible pb-[env(safe-area-inset-bottom,0px)]">
+    <nav className="w-full bg-background/80 backdrop-blur-md border-t border-border/50 overflow-visible pb-[var(--safe-bottom)]">
       <div className="container mx-auto">
         <div className="grid grid-cols-5 items-center h-16 relative">
           {NAV_ITEMS.map(renderNavButton)}

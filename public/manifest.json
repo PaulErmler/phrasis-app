@@ -1,11 +1,15 @@
 {
+  "id": "/app",
   "name": "Flexling - Language Learning",
   "short_name": "Flexling",
   "description": "Master languages with Flexling. Learn, practice pronunciation, and build fluency fast.",
+  "lang": "en",
   "start_url": "/app",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0d1117",
   "theme_color": "#10b981",
+  "categories": ["education", "productivity"],
   "icons": [
     {
       "src": "/icons/icon-192x192.png",

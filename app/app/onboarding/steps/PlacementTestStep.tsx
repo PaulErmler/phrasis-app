@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
@@ -395,7 +396,15 @@ export function PlacementTestStep({ targetLanguage, sourceLanguage, initialOgteL
                   variant="outline"
                   size="sm"
                   className="shrink-0"
-                  onClick={runEnsureTranslations}
+                  onClick={() => {
+                    // Visible only after the silent auto-retry already failed,
+                    // so every one of these is a user staring at a placement
+                    // test with missing content.
+                    capture(CLIENT_EVENTS.PLACEMENT_CONTENT_RETRY, {
+                      trigger: 'manual',
+                    });
+                    runEnsureTranslations();
+                  }}
                   data-testid="placement-content-retry"
                 >
                   <RefreshCw className="h-3.5 w-3.5 mr-1.5" />

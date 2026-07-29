@@ -398,10 +398,18 @@ export function LibraryView({
 
   return (
     <div className="flex-1 min-h-0 overflow-y-auto px-4 pb-20" style={{ scrollbarGutter: 'stable' }}>
-      {/* Sticky search + filters card */}
-      <div className="sticky top-0 z-10 bg-background">
+      {/* Sticky search + filters card. -mx-4/px-4 makes the opaque background
+          span the scroll container's horizontal padding too — otherwise card
+          edges slide past in the gutters beside the sticky block. */}
+      <div className="sticky top-0 z-10 bg-background -mx-4 px-4">
+        {/* Soft edge below the sticky block: scrolling cards fade in under
+            it instead of popping out at a hard line. */}
+        <div
+          className="absolute inset-x-0 top-full h-4 bg-gradient-to-b from-background to-transparent pointer-events-none"
+          aria-hidden
+        />
         <div className="max-w-xl mx-auto w-full pt-6">
-          <div className="card-surface p-4 space-y-3">
+          <div className="card-surface p-3 space-y-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
@@ -422,82 +430,79 @@ export function LibraryView({
               )}
             </div>
 
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground shrink-0">
-                {t('filtersLabel')}
-              </span>
-              <div className="flex flex-wrap gap-2 justify-end">
-                <Toggle
-                  pressed={activeFilter === 'mastered'}
-                  onPressedChange={() => toggleFilter('mastered')}
-                  variant="outline"
-                  size="sm"
-                  aria-label={t('filterMastered')}
-                  data-testid="library-filter-mastered"
-                >
-                  <CircleCheck className="h-3.5 w-3.5" />
-                  {t('filterMastered')}
-                </Toggle>
-                <Toggle
-                  pressed={activeFilter === 'hidden'}
-                  onPressedChange={() => toggleFilter('hidden')}
-                  variant="outline"
-                  size="sm"
-                  aria-label={t('filterHidden')}
-                  data-testid="library-filter-hidden"
-                >
-                  <EyeOff className="h-3.5 w-3.5" />
-                  {t('filterHidden')}
-                </Toggle>
-                <Toggle
-                  pressed={activeFilter === 'favorites'}
-                  onPressedChange={() => toggleFilter('favorites')}
-                  variant="outline"
-                  size="sm"
-                  aria-label={t('filterFavorites')}
-                  data-testid="library-filter-favorites"
-                >
-                  <Star className="h-3.5 w-3.5" />
-                  {t('filterFavorites')}
-                </Toggle>
-              </div>
-            </div>
+            {/* All filters as one compact chip row — status toggles, then a
+                divider, then source toggles. Labels live on the chips. */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Toggle
+                pressed={activeFilter === 'mastered'}
+                onPressedChange={() => toggleFilter('mastered')}
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                aria-label={t('filterMastered')}
+                data-testid="library-filter-mastered"
+              >
+                <CircleCheck className="h-3 w-3" />
+                {t('filterMastered')}
+              </Toggle>
+              <Toggle
+                pressed={activeFilter === 'hidden'}
+                onPressedChange={() => toggleFilter('hidden')}
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                aria-label={t('filterHidden')}
+                data-testid="library-filter-hidden"
+              >
+                <EyeOff className="h-3 w-3" />
+                {t('filterHidden')}
+              </Toggle>
+              <Toggle
+                pressed={activeFilter === 'favorites'}
+                onPressedChange={() => toggleFilter('favorites')}
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                aria-label={t('filterFavorites')}
+                data-testid="library-filter-favorites"
+              >
+                <Star className="h-3 w-3" />
+                {t('filterFavorites')}
+              </Toggle>
 
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground shrink-0">
-                {t('sourceLabel')}
-              </span>
-              <div className="flex flex-wrap gap-2 justify-end">
-                <Toggle
-                  pressed={sourceFilter === 'custom'}
-                  onPressedChange={() => toggleSource('custom')}
-                  variant="outline"
-                  size="sm"
-                  aria-label={t('filterCustom')}
-                  data-testid="library-source-custom"
-                >
-                  <PenLine className="h-3.5 w-3.5" />
-                  {t('filterCustom')}
-                </Toggle>
-                <Toggle
-                  pressed={sourceFilter === 'premade'}
-                  onPressedChange={() => toggleSource('premade')}
-                  variant="outline"
-                  size="sm"
-                  aria-label={t('filterPremade')}
-                  data-testid="library-source-premade"
-                >
-                  <BookOpen className="h-3.5 w-3.5" />
-                  {t('filterPremade')}
-                </Toggle>
-              </div>
+              <div className="h-4 w-px bg-border mx-0.5" aria-hidden />
+
+              <Toggle
+                pressed={sourceFilter === 'custom'}
+                onPressedChange={() => toggleSource('custom')}
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                aria-label={t('filterCustom')}
+                data-testid="library-source-custom"
+              >
+                <PenLine className="h-3 w-3" />
+                {t('filterCustom')}
+              </Toggle>
+              <Toggle
+                pressed={sourceFilter === 'premade'}
+                onPressedChange={() => toggleSource('premade')}
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 text-xs gap-1"
+                aria-label={t('filterPremade')}
+                data-testid="library-source-premade"
+              >
+                <BookOpen className="h-3 w-3" />
+                {t('filterPremade')}
+              </Toggle>
             </div>
           </div>
         </div>
       </div>
 
       {/* Card list */}
-      <div className="max-w-xl mx-auto w-full pt-2.5 pb-4 space-y-4">
+      <div className="max-w-xl mx-auto w-full pt-2.5 pb-4 space-y-3">
         {isLoading && (
           <div className="card-surface p-4 flex items-center justify-center h-[180px]">
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -531,6 +536,7 @@ export function LibraryView({
               <div key={card._id} data-testid="library-card">
                 <LearningCardContent
                   bare
+                  compact
                   preReviewCount={card.preReviewCount}
                   schedulingPhase={card.schedulingPhase}
                   fsrsState={card.fsrsState}

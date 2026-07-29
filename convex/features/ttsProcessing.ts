@@ -16,7 +16,13 @@ import {
 } from './tts';
 import { languageSupportsStt } from '../../lib/languages';
 import { textsMatchForLanguage } from '../lib/textComparison';
-import { textsMatchSemantic } from '../lib/ttsSemanticValidation';
+import {
+  textsMatchSemantic,
+  type SemanticValidationTelemetry,
+} from '../lib/ttsSemanticValidation';
+import { captureGeneration } from '../lib/posthogAi';
+import { costForAudioMs, costForCharacters } from '../config/aiCosts';
+import { OPENROUTER_MODELS } from '../config/aiModels';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import { TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import { reserveRateLimitToken } from '../lib/rateLimitReserve';
@@ -186,6 +192,7 @@ async function synthesizeAndValidate(
     await reserveRateLimitToken(ctx, rateLimitName, {
       maxWaitMs: TTS_TOKEN_MAX_WAIT_MS,
     });
+    const synthStartedAt = Date.now();
     const blob = await synthesizeSpeech(
       args.text,
       args.voiceName,
@@ -193,6 +200,29 @@ async function synthesizeAndValidate(
       args.provider,
       args.language,
     );
+    // Google bills per character of input text, so the cost is exactly
+    // derivable. Gemini TTS goes through OpenRouter, whose per-request cost is
+    // only retrievable by a follow-up lookup on the generation id — recorded
+    // here without a cost figure so the call volume is at least visible, and
+    // flagged so a zero can't be mistaken for "free".
+    await captureGeneration(ctx, {
+      feature: 'tts_synthesis',
+      model: args.voiceName,
+      provider: args.provider,
+      latencyMs: Date.now() - synthStartedAt,
+      costUsd:
+        args.provider === 'google'
+          ? costForCharacters('googleTts', args.text.length)
+          : undefined,
+      sharedContent: true,
+      extra: {
+        text_id: args.textId,
+        language: args.language,
+        character_count: args.text.length,
+        attempt,
+        cost_source: args.provider === 'google' ? 'rate_table' : 'unavailable',
+      },
+    });
     const storageId: Id<'_storage'> = await ctx.storage.store(blob);
     lastStorageId = storageId;
 
@@ -231,12 +261,33 @@ async function synthesizeAndValidate(
     // over a transient queue spike.
     await reserveAzureSttSlot(ctx, { maxWaitMs: STT_TOKEN_MAX_WAIT_MS });
 
+    const sttStartedAt = Date.now();
     try {
-      const { text: transcribed, wordTimings } = await transcribeAudio(
-        blob,
-        args.language,
-        { regionVariant: args.regionVariant },
-      );
+      const { text: transcribed, wordTimings, audioDurationMs } =
+        await transcribeAudio(blob, args.language, {
+          regionVariant: args.regionVariant,
+        });
+
+      // Every synthesized clip is round-tripped through Azure to validate it.
+      // That makes this one of the largest spend lines in the app and, until
+      // now, an entirely invisible one — it is billed to no feature and no user.
+      await captureGeneration(ctx, {
+        feature: 'tts_validation_stt',
+        model: 'azure-fast-transcription',
+        provider: 'azure',
+        latencyMs: Date.now() - sttStartedAt,
+        costUsd:
+          audioDurationMs !== undefined
+            ? costForAudioMs('azureStt', audioDurationMs)
+            : undefined,
+        sharedContent: true,
+        extra: {
+          text_id: args.textId,
+          language: args.language,
+          audio_duration_ms: audioDurationMs,
+          attempt,
+        },
+      });
 
       // Cheap strict check first. For Chinese/Korean this compares
       // pinyin/hangul-romanized strings so the STT model's homophone-character
@@ -248,11 +299,33 @@ async function synthesizeAndValidate(
       // let bad audio through.
       let isMatch = textsMatchForLanguage(args.text, transcribed, args.language);
       if (!isMatch) {
+        // Only reached on a near-miss, so its volume is itself a signal: a
+        // spike here means TTS quality regressed for some language.
+        const judgeTelemetry: SemanticValidationTelemetry[] = [];
         const semantic = await textsMatchSemantic(
           args.text,
           transcribed,
           args.language,
+          (telemetry) => judgeTelemetry.push(telemetry),
         );
+        for (const telemetry of judgeTelemetry) {
+          await captureGeneration(ctx, {
+            feature: 'tts_validation_judge',
+            model: OPENROUTER_MODELS.ttsValidation,
+            provider: 'openrouter',
+            latencyMs: telemetry.latencyMs,
+            inputTokens: telemetry.inputTokens,
+            outputTokens: telemetry.outputTokens,
+            costUsd: telemetry.costUsd,
+            traceId: telemetry.generationId,
+            sharedContent: true,
+            extra: {
+              text_id: args.textId,
+              language: args.language,
+              verdict: semantic,
+            },
+          });
+        }
         if (semantic === 'match') isMatch = true;
       }
 

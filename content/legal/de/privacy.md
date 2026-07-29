@@ -1,6 +1,6 @@
 ---
 title: 'Datenschutzerklärung'
-lastUpdated: '2026-03-21'
+lastUpdated: '2026-07-28'
 ---
 
 # Datenschutzerklärung
@@ -64,11 +64,12 @@ Bei der aktiven Nutzung der Flexling-Anwendung werden die folgenden Daten durch 
 
 Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Erfüllung des Nutzungsvertrags). Diese Daten sind für die Erbringung des Kerndienstes erforderlich.
 
-### 4.4 Nach Einwilligung erhobene Daten (Opt-In)
+### 4.4 Nutzungsanalyse
 
-Nach Ihrer ausdrücklichen Einwilligung über unser Cookie-Banner erheben wir zusätzlich Nutzungsverhalten, Klick- und Analysedaten. Details in Abschnitt 7 (Cookies).
+Wir messen, wie unsere Dienste genutzt werden, um sie zu verbessern. Details zum Anbieter finden Sie in Abschnitt 5C.
 
-Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO i. V. m. § 25 TTDSG.
+- **Ohne Einwilligung** erfolgt die Messung cookielos: Es werden weder Daten auf Ihrem Endgerät gespeichert noch von diesem ausgelesen, es finden keine Sitzungsaufzeichnungen statt, und Besuche werden über einen serverseitigen, täglich neu erzeugten Hashwert gezählt. Bei angemeldeten Nutzerinnen und Nutzern werden zusätzlich einzelne serverseitig erzeugte Nutzungsereignisse (z. B. dass eine Nachricht gesendet oder ein Kurs erstellt wurde) mit Ihrer pseudonymen Konto-ID verknüpft. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse: Verbesserung, Absicherung und Kostensteuerung unserer Dienste). Sie können dieser Verarbeitung jederzeit widersprechen (Art. 21 DSGVO, siehe Abschnitt 10).
+- **Erst nach Ihrer ausdrücklichen Einwilligung** über unser Cookie-Banner setzen wir zusätzlich Analyse-Cookies ein, zeichnen Sitzungen auf (sämtliche Texteingaben werden bereits im Browser maskiert) und übermitteln die Inhalte von KI-Chatnachrichten zur Qualitätsanalyse (siehe Abschnitt 6). Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO i. V. m. § 25 Abs. 1 TTDSG.
 
 ## 5. Drittanbieter und Auftragsverarbeiter
 
@@ -111,13 +112,6 @@ Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO (Vertragserfüllung).
 Drittlandtransfer: Absicherung durch SCCs gemäß Art. 46 Abs. 2 lit. c DSGVO.
 Datenschutzerklärung: [https://www.convex.dev/privacy](https://www.convex.dev/privacy)
 
-**Sentry** (Functional Software Inc., USA)
-Zweck: Fehlerprotokollierung und Monitoring zur Sicherstellung der technischen Stabilität.
-Daten: IP-Adresse, technische Gerätedaten, Fehlermeldungen, ggf. Stack Traces.
-Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO. Berechtigtes Interesse: Aufrechterhaltung des sicheren und stabilen Betriebs unserer Dienste.
-Drittlandtransfer: Absicherung durch SCCs. Sentry bietet ein Data Processing Addendum (DPA) an.
-Datenschutzerklärung: [https://sentry.io/privacy/](https://sentry.io/privacy/)
-
 **Stripe & Autumn** (Stripe Inc., USA / Autumn, USA)
 Zweck: Zahlungsabwicklung und Abonnementverwaltung. Autumn (useautumn.com) dient als Billing-Schicht und leitet Zahlungsvorgänge an Stripe weiter.
 Daten: Name, E-Mail-Adresse, Zahlungsdaten, Rechnungsadresse, Transaktionsdaten.
@@ -136,36 +130,38 @@ Datenschutzerklärung: [https://resend.com/legal/privacy-policy](https://resend.
 | Anbieter       | Zweck                          | Daten                                  | Standort   |
 |----------------|--------------------------------|----------------------------------------|------------|
 | Convex         | Datenbank                      | Alle Nutzerdaten                       | USA (SCCs) |
-| Sentry         | Fehlerprotokollierung          | IP, technische Daten                   | USA (SCCs) |
 | Stripe/Autumn  | Zahlungsabwicklung             | Name, E-Mail, Zahlungs-/Rechnungsdaten | USA (DPF)  |
 | Resend         | Transaktionale E-Mails         | E-Mail-Adresse                         | USA (SCCs) |
 
-### C) Optionale Dienste – nur nach Einwilligung (Opt-In)
+### C) Analyse und optionale Dienste
 
-Die folgenden Dienste werden ausschließlich nach Ihrer ausdrücklichen Einwilligung über unser Cookie-Banner aktiviert (Art. 6 Abs. 1 lit. a DSGVO i. V. m. § 25 TTDSG). Sie können Ihre Einwilligung jederzeit widerrufen.
+Der Newsletter wird ausschließlich nach Ihrer ausdrücklichen Einwilligung genutzt. Für die Analyse sind die Rechtsgrundlagen geteilt, wie beim nachfolgenden Dienst beschrieben: Die cookielose Nutzungsmessung stützt sich auf berechtigtes Interesse; alles, was Daten auf Ihrem Endgerät speichert, Ihren Bildschirm aufzeichnet oder KI-Chatinhalte übermittelt, erfordert Ihre Einwilligung über das Cookie-Banner und kann jederzeit widerrufen werden.
 
 **Resend – Newsletter**
 Wenn Sie unseren Newsletter abonnieren, nutzen wir Resend auch für den Newsletter-Versand. Die Anmeldung erfolgt im Double-Opt-In-Verfahren: Sie erhalten nach der Anmeldung eine Bestätigungs-E-Mail und müssen Ihre Adresse aktiv bestätigen. Die Abmeldung ist jederzeit über den Abmeldelink in jeder E-Mail möglich.
 Daten: E-Mail-Adresse, Bestätigungszeitpunkt.
 Rechtsgrundlage: Art. 6 Abs. 1 lit. a DSGVO (Einwilligung).
 
-**Google Tag / GTAG** (Google Ireland Ltd., Irland / Google LLC, USA)
-Zweck: Erhebung von Besucherstatistiken. (Opt-In über Cookie-Banner.)
-Daten: IP-Adresse, aufgerufene Seiten, Klickverhalten, Geräteinformationen.
-Drittlandtransfer: Google ist nach dem EU-U.S. Data Privacy Framework zertifiziert (Art. 45 DSGVO).
-Datenschutzerklärung: [https://policies.google.com/privacy](https://policies.google.com/privacy)
-
 **PostHog** (PostHog Inc., USA / EU-Server Frankfurt)
-Zweck: Seiten- und Produktanalyse. (Opt-In über Cookie-Banner.)
-Daten: IP-Adresse, Klicks, Navigation, Nutzungsverhalten.
-Drittlandtransfer: Daten werden nach Möglichkeit auf EU-Servern verarbeitet; bei Verarbeitung außerhalb der EU Absicherung durch SCCs.
+Zweck: Produktanalyse, Sitzungsaufzeichnung (Session Replay) und Fehlerberichterstattung.
+Daten:
+- *Produktanalyse:* aufgerufene Seiten, Klicks, Navigation, Funktionsnutzung, Geräte- und Browserinformationen, IP-Adresse; bei angemeldeten Nutzerinnen und Nutzern zusätzlich serverseitige Nutzungsereignisse (z. B. Anzahl gesendeter Nachrichten, hinzugefügte Karten, Tarifwechsel), verknüpft mit Ihrer pseudonymen Konto-ID.
+- *Sitzungsaufzeichnung* (nur mit Einwilligung): eine Rekonstruktion Ihres Bildschirms und Ihrer Interaktionen innerhalb der Anwendung. Sämtliche Eingaben in Formularfelder werden bereits in Ihrem Browser unkenntlich gemacht und erreichen PostHog nicht. Ebenso werden in der Anwendung angezeigte E-Mail-Adressen maskiert. Auf Administrationsseiten findet keine Aufzeichnung statt.
+- *Fehlerberichterstattung:* Fehlermeldungen, Stack Traces und der technische Kontext eines Fehlers.
+- *KI-Nutzung:* siehe Abschnitt 6 — mit Ihrer Einwilligung werden auch die Inhalte von KI-Chatnachrichten an PostHog übermittelt.
+
+Rechtsgrundlagen:
+- *Produktanalyse und Fehlerberichterstattung ohne Gerätespeicherung:* Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse: Verbesserung, Absicherung und Kostensteuerung unserer Dienste). Ohne Ihre Einwilligung erfolgt die Messung cookielos: Es werden weder Daten auf Ihrem Endgerät gespeichert noch von diesem ausgelesen, es findet keine Sitzungsaufzeichnung statt, und Besuche werden über einen serverseitigen, täglich neu erzeugten Hashwert gezählt. Sie können dieser Verarbeitung jederzeit widersprechen (Art. 21 DSGVO, siehe Abschnitt 10).
+- *Analyse-Cookies, Sitzungsaufzeichnung und KI-Inhalte:* Art. 6 Abs. 1 lit. a DSGVO i. V. m. § 25 Abs. 1 TTDSG (Einwilligung über das Cookie-Banner, jederzeit widerrufbar über den Link „Cookie-Einstellungen").
+
+Speicherdauer: Analyse-Ereignisse und Fehlerberichte bis zu 12 Monate; Sitzungsaufzeichnungen bis zu 30 Tage.
+Drittlandtransfer: Die Verarbeitung erfolgt auf EU-Servern in Frankfurt; bei Verarbeitung außerhalb der EU Absicherung durch SCCs.
 Datenschutzerklärung: [https://posthog.com/privacy](https://posthog.com/privacy)
 
 | Anbieter    | Zweck              | Daten                         | Standort      |
 |-------------|--------------------|-------------------------------|---------------|
 | Resend      | Newsletter         | E-Mail-Adresse                | USA (SCCs)    |
-| Google Tag  | Analyse/Marketing  | IP, Seiten, Klicks            | USA/EU (DPF)  |
-| PostHog     | Produktanalyse     | IP, Klicks, Nutzungsverhalten | USA/EU (SCCs) |
+| PostHog     | Produktanalyse, Session Replay, Fehlerberichte | IP, Klicks, Nutzungsverhalten, maskierte Bildschirmaufzeichnungen, Fehlerberichte, KI-Chatinhalte | EU (Frankfurt) |
 
 ## 6. KI-Funktionen und Drittanbieter-KI-Dienste
 
@@ -194,21 +190,31 @@ Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO. Mit OpenRouter besteht ein AVV.
 Drittlandtransfer: Absicherung durch SCCs gemäß Art. 46 Abs. 2 lit. c DSGVO.
 Datenschutzerklärung: [https://openrouter.ai/privacy](https://openrouter.ai/privacy)
 
+**PostHog** (PostHog Inc., USA / EU-Server Frankfurt) – Analyse der KI-Nutzung
+Zweck: Analyse von Nutzung, Qualität und Kosten unserer KI-Funktionen.
+Daten: Technische Metadaten jedes KI-Aufrufs (verwendetes Modell, Antwortzeit, Token-Anzahl, Kosten), verknüpft mit Ihrer pseudonymen Konto-ID. Mit Ihrer Einwilligung zusätzlich die Inhalte von KI-Chatnachrichten sowie die zugehörigen KI-Antworten.
+Rechtsgrundlage: technische Metadaten Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse: Kostensteuerung und Qualitätssicherung); Nachrichteninhalte Art. 6 Abs. 1 lit. a DSGVO (Einwilligung über das Cookie-Banner). Bei Ablehnung werden keine KI-Inhalte an PostHog übermittelt.
+Drittlandtransfer: Die Verarbeitung erfolgt auf EU-Servern in Frankfurt.
+Datenschutzerklärung: [https://posthog.com/privacy](https://posthog.com/privacy)
+
 | Anbieter    | Zweck                         | Daten                             | Standort        |
 |-------------|-------------------------------|-----------------------------------|-----------------|
 | OpenAI      | KI-Antworten, Transkription   | Nachrichteninhalte, Audiodaten    | USA (DPF, AVV)  |
 | Google      | KI-Antworten, Text-to-Speech  | Nachrichteninhalte, Textinhalte   | USA (DPF, AVV)  |
 | OpenRouter  | KI-Gateway (multi-model)      | Nachrichteninhalte                | USA (SCCs, AVV) |
+| PostHog     | Analyse der KI-Nutzung | Aufruf-Metadaten; Inhalte nur mit Einwilligung | EU (Frankfurt) |
 
 ## 7. Cookies und Einwilligung
 
 Wir verwenden Cookies und ähnliche Technologien gemäß § 25 TTDSG und Art. 6 DSGVO.
 
-**Technisch notwendige Cookies:** Diese sind für den Betrieb der Website erforderlich und werden ohne Einwilligung gesetzt. Rechtsgrundlage: § 25 Abs. 2 Nr. 2 TTDSG i. V. m. Art. 6 Abs. 1 lit. f DSGVO.
+**Technisch notwendige Cookies:** Diese sind für den Betrieb der Website erforderlich und werden ohne Einwilligung gesetzt. Rechtsgrundlage: § 25 Abs. 2 Nr. 2 TTDSG i. V. m. Art. 6 Abs. 1 lit. f DSGVO. Dies sind: Ihre Anmeldesitzung, Ihre gewählte Oberflächensprache und Ihre Seitenleisten-Einstellung.
 
-**Analyse- und Marketing-Cookies:** Diese werden nur nach Ihrer ausdrücklichen Einwilligung über unser Cookie-Banner gesetzt. Rechtsgrundlage: § 25 Abs. 1 TTDSG i. V. m. Art. 6 Abs. 1 lit. a DSGVO.
+**Analyse-Cookies:** Diese werden nur nach Ihrer ausdrücklichen Einwilligung über unser Cookie-Banner gesetzt und ausschließlich für PostHog verwendet (siehe Abschnitt 5C). Rechtsgrundlage: § 25 Abs. 1 TTDSG i. V. m. Art. 6 Abs. 1 lit. a DSGVO. Marketing- oder Werbe-Cookies setzen wir nicht ein.
 
-Sie können Ihre Einwilligung jederzeit über unser Cookie-Banner widerrufen. Darüber hinaus können Sie die Nutzung von Cookies auf Browserebene einschränken oder deaktivieren; dies kann die Funktionalität unserer Dienste beeinträchtigen.
+Bis zu Ihrer Entscheidung werden über die oben genannten technisch notwendigen Cookies hinaus keine Daten auf Ihrem Endgerät gespeichert oder von diesem ausgelesen.
+
+Sie können Ihre Einwilligung jederzeit über den Link **„Cookie-Einstellungen"** im Fußbereich jeder Seite widerrufen oder ändern. Darüber hinaus können Sie die Nutzung von Cookies auf Browserebene einschränken oder deaktivieren; dies kann die Funktionalität unserer Dienste beeinträchtigen.
 
 ## 8. Datensicherheit
 
