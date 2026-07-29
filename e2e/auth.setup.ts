@@ -89,10 +89,16 @@ async function fillSignUp(
     await passwordFields.nth(i).fill(creds.password);
   }
 
-  const acceptCookies = page.getByRole("button", { name: /accept all/i });
-  if (await acceptCookies.count()) {
-    await acceptCookies.first().click().catch(() => {});
-  }
+  // Locale-proof: the banner copy is translated (en/de), so match the testid
+  // rather than the accessible name. Bounded wait instead of an instant
+  // count() check — the banner mounts only after the PostHog SDK boots, so
+  // the instant check raced it and consent stayed 'pending' in the saved
+  // storageState, leaving the banner to intercept clicks in dependent specs.
+  const acceptCookies = page.getByTestId("consent-accept").first();
+  await acceptCookies
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => acceptCookies.click())
+    .catch(() => {}); // no banner: PostHog key absent or already answered
 
   await page
     .getByRole("button", { name: /create an account|create account|^sign\s*up$/i })

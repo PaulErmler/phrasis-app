@@ -5,6 +5,8 @@ import { ClientAuthBoundary } from '@/components/ClientAuthBoundary';
 import { OnboardingGuard } from '@/components/app/OnboardingGuard';
 import { BillingGate } from '@/components/app/BillingGate';
 import { AppUpdateGate } from '@/components/app/AppUpdateGate';
+import { PostHogIdentify } from '@/components/analytics/PostHogIdentify';
+import { ConsentSync } from '@/components/analytics/ConsentSync';
 
 export default async function AppLayout({
   children,
@@ -31,6 +33,10 @@ export default async function AppLayout({
       preloadedHomeSummary={preloadedHomeSummary}
     >
       <ClientAuthBoundary>
+        {/* Outside AppUpdateGate: identity has to be attached before any other
+            event fires, and the gate can hold rendering back on a stale bundle. */}
+        <PostHogIdentify />
+        <ConsentSync />
         {/* Wraps rather than sits beside the guard so useReloadBlock is
             reachable from every view — notably LearnView, whose detached
             audio element cannot be detected from outside the hook tree. */}

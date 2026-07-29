@@ -40,6 +40,7 @@ import {
 import { getDailyStats } from '../db/stats/dailyStats';
 import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
 import { consumeQuota, hasFeatureAccess, releaseQuota } from '../usage/helpers';
+import { EVENTS, track } from '../analytics';
 import { MAX_COURSES_PER_USER, ARCHIVE_COOLDOWN_MS } from '../../lib/constants/courses';
 import { FEATURE_IDS } from './featureIds';
 import {
@@ -150,6 +151,7 @@ export const getUserSettings = query({
       activeCourseId: v.optional(v.id('courses')),
       completedTutorials: v.optional(v.array(v.string())),
       pinnedCardActions: v.optional(v.array(v.string())),
+      analyticsConsent: v.optional(v.boolean()),
     }),
     v.null(),
   ),
@@ -529,6 +531,10 @@ export const archiveCourse = mutation({
       });
     }
 
+    await track(ctx, userId, EVENTS.COURSE_ARCHIVED, {
+      course_id: args.courseId,
+    });
+
     return null;
   },
 });
@@ -749,6 +755,13 @@ export const createCourse = mutation({
         targetLanguages: args.targetLanguages,
       },
     );
+
+    await track(ctx, userId, EVENTS.COURSE_CREATED, {
+      course_id: courseId,
+      base_languages: args.baseLanguages,
+      target_languages: args.targetLanguages,
+      current_level: args.currentLevel,
+    });
 
     return { courseId, deckId };
   },

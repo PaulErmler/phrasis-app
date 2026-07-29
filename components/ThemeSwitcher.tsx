@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Moon, Sun, Monitor } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,11 @@ export function ThemeSwitcher({ className }: { className?: string }) {
   const { setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
   const t = useTranslations('Theme');
+
+  const selectTheme = (theme: 'light' | 'dark' | 'system') => {
+    capture(CLIENT_EVENTS.THEME_CHANGED, { theme });
+    setTheme(theme);
+  };
 
   React.useEffect(() => {
     setMounted(true);
@@ -61,13 +67,13 @@ export function ThemeSwitcher({ className }: { className?: string }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => setTheme('light')}>
+        <DropdownMenuItem onClick={() => selectTheme('light')}>
           <Sun className="mr-2 size-4" /> {t('light')}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('dark')}>
+        <DropdownMenuItem onClick={() => selectTheme('dark')}>
           <Moon className="mr-2 size-4" /> {t('dark')}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setTheme('system')}>
+        <DropdownMenuItem onClick={() => selectTheme('system')}>
           <Monitor className="mr-2 size-4" /> {t('system')}
         </DropdownMenuItem>
       </DropdownMenuContent>

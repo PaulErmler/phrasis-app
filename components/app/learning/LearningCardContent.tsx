@@ -12,6 +12,8 @@ import type { CardTranslation, CardAudioRecording } from './types';
 import type { PinnableCardAction } from '@/lib/cardActions';
 
 interface LearningCardContentProps {
+  /** Denser paddings + smaller sentence text for list contexts (library). */
+  compact?: boolean;
   preReviewCount: number;
   /** When in FSRS phase, total reviews = preReviewCount + fsrsState.reps */
   schedulingPhase?: 'preReview' | 'review';
@@ -75,6 +77,7 @@ interface LearningCardContentProps {
 }
 
 export function LearningCardContent({
+  compact = false,
   preReviewCount,
   schedulingPhase,
   fsrsState,
@@ -185,6 +188,7 @@ export function LearningCardContent({
   return (
     <div data-tutorial="card-content" className="flex flex-col flex-1 min-h-0">
       <CardShell
+        compact={compact}
         reviewCount={displayReviewCount(preReviewCount, schedulingPhase, fsrsState)}
         sourceText={sourceText}
         translations={translations}
@@ -265,7 +269,7 @@ export function LearningCardContent({
                       isActive={!!isActive}
                       enabled={highlightEnabled}
                       interactive={!isBlurred}
-                      className={`body-large ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                      className={`${compact ? 'text-base leading-relaxed' : 'body-large'} ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
                       // Onboarding's word-tap tutorial targets the longest
                       // target-language word via this data attribute.
                       coachmarkAnchorForLongestWord={index === 0 ? 'word-tap' : undefined}

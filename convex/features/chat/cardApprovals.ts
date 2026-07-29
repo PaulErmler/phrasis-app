@@ -2,6 +2,7 @@ import { v, ConvexError } from 'convex/values';
 import { mutation, query, internalMutation } from '../../_generated/server';
 import { internal } from '../../_generated/api';
 import { getAuthUserId } from '../../db/users';
+import { EVENTS, track } from '../../analytics';
 import { getActiveCourseForUser } from '../../db/courses';
 import {
   getOrCreateChatCollection,
@@ -125,6 +126,7 @@ async function processApproval(
       schedulePrepareCard: true,
       baseLanguages: course.baseLanguages,
       targetLanguages: course.targetLanguages,
+      userId,
     },
   );
 
@@ -224,6 +226,11 @@ export const approveCard = mutation({
     if (active) {
       await trackEvent(ctx, { userId, courseId: active.course._id, field: 'chatCardsApproved' });
     }
+    await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
+      outcome: 'approved',
+      thread_id: approval.threadId,
+      edited_languages: approval.userEditedLanguages ?? [],
+    });
 
     return { success: true, textId };
   },
@@ -303,11 +310,22 @@ export const rejectCard = mutation({
   handler: async (ctx, args) => {
     const userId = await requireUser(ctx);
 
-    await getAuthenticatedPendingApproval(ctx, args.approvalId, userId);
+    const approval = await getAuthenticatedPendingApproval(
+      ctx,
+      args.approvalId,
+      userId,
+    );
 
     await ctx.db.patch(args.approvalId, {
       status: 'rejected',
       processedAt: Date.now(),
+    });
+
+    // The reject rate is the quality signal for the createCard tool — a rise
+    // here means the model is proposing cards people don't want.
+    await track(ctx, userId, EVENTS.CHAT_CARD_APPROVAL, {
+      outcome: 'rejected',
+      thread_id: approval.threadId,
     });
 
     return { success: true };

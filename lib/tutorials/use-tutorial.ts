@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useRef, useCallback, useState, useSyncExter
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import { reportError } from '@/lib/report-error';
 import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TutorialId } from '@/convex/features/tutorialIds';
 import { getTutorial } from './registry';
@@ -186,10 +188,13 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   const completeTutorial = useCallback(() => {
     const prev = getSnapshot();
     if (!prev.includes(tutorialId)) {
+      // Only on the first completion — re-running a tutorial should not count
+      // again, or the completion rate can exceed its own start count.
       writeCompleted([...prev, tutorialId]);
+      capture(CLIENT_EVENTS.TUTORIAL_COMPLETED, { tutorial_id: tutorialId });
     }
     completeMutation({ tutorialId }).catch((e) =>
-      console.error('Failed to persist tutorial completion:', e),
+      reportError(e, { op: 'tutorial.persistCompletion', tutorialId }),
     );
   }, [tutorialId, completeMutation]);
 
@@ -239,6 +244,11 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
         clickHandler = null;
       };
     }
+
+    capture(CLIENT_EVENTS.TUTORIAL_STARTED, {
+      tutorial_id: tutorialId,
+      step_count: resolvedSteps.length,
+    });
 
     const d = driver({
       animate: true,

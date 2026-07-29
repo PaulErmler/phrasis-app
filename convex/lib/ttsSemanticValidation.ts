@@ -10,13 +10,28 @@
 
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { OPENROUTER_MODELS } from '../config/aiModels';
+import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import { openrouterCostUsd, openrouterGenerationId } from './posthogAi';
 
 export type SemanticMatchResult = 'match' | 'mismatch' | 'error';
 
 const openrouter = createOpenRouter({
   apiKey: process.env.OPENROUTER_API_KEY,
+  extraBody: OPENROUTER_USAGE_ACCOUNTING,
 });
+
+/**
+ * What one validator call cost. Reported through a caller-supplied sink rather
+ * than the return value so the `SemanticMatchResult` contract — and the tests
+ * that mock this function against it — stay unchanged.
+ */
+export type SemanticValidationTelemetry = {
+  latencyMs: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  costUsd?: number;
+  generationId?: string;
+};
 
 const SYSTEM_PROMPT = `You validate TTS audio by comparing the original text to a transcription produced by an automatic speech-to-text model (Scribe). Scribe transcribes by sound, so cosmetic differences that reflect pronunciation rather than meaning should pass.
 
@@ -72,12 +87,22 @@ export async function textsMatchSemantic(
   original: string,
   transcribed: string,
   language: string,
+  onTelemetry?: (telemetry: SemanticValidationTelemetry) => void,
 ): Promise<SemanticMatchResult> {
+  const startedAt = Date.now();
   try {
-    const { text } = await generateText({
+    const { text, usage, providerMetadata } = await generateText({
       model: openrouter(OPENROUTER_MODELS.ttsValidation),
       system: SYSTEM_PROMPT,
       prompt: `Language: ${language}\nOriginal: ${original}\nTranscribed: ${transcribed}`,
+    });
+
+    onTelemetry?.({
+      latencyMs: Date.now() - startedAt,
+      inputTokens: usage?.inputTokens,
+      outputTokens: usage?.outputTokens,
+      costUsd: openrouterCostUsd(providerMetadata),
+      generationId: openrouterGenerationId(providerMetadata),
     });
 
     const cleaned = text

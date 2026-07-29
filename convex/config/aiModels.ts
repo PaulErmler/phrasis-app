@@ -69,6 +69,18 @@ export const OPENROUTER_CHAT_EXTRA_BODY = {
   },
 } as const;
 
+/**
+ * Minimal OpenRouter body that turns on usage accounting.
+ *
+ * Every non-chat OpenRouter call spreads this in so its real USD cost lands on
+ * `providerMetadata.openrouter.usage.cost` and can be reported to PostHog. Chat
+ * uses `OPENROUTER_CHAT_EXTRA_BODY` above, which already includes it alongside
+ * the routing constraints chat specifically needs.
+ */
+export const OPENROUTER_USAGE_ACCOUNTING = {
+  usage: { include: true },
+} as const;
+
 /** Default OpenRouter provider options for the chat agent. */
 export const OPENROUTER_CHAT_PROVIDER_OPTIONS = {
   openrouter: {

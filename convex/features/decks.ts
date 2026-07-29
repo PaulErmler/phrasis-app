@@ -35,6 +35,9 @@ import {
   getPremadeLevelCollections,
 } from '../db/collections';
 import { translateText, romanizeText } from './translation';
+import { captureGeneration } from '../lib/posthogAi';
+import { EVENTS, track } from '../analytics';
+import { costForCharacters } from '../config/aiCosts';
 import { getRomanizationSource } from '../lib/localRomanization';
 import {
   GOOGLE_TRANSLATE_SOURCE,
@@ -1555,6 +1558,18 @@ export const addCardsFromCollection = mutation({
       await ctx.db.patch(deck._id, { cardCount: deck.cardCount + totalCardsInserted });
     }
 
+    // One event per batch with a count — not one per card. Adding 50 cards is
+    // a single user decision, and modelling it as 50 events would both distort
+    // the behavioural picture and multiply the bill.
+    if (totalCardsInserted > 0) {
+      await track(ctx, userId, EVENTS.CARDS_ADDED, {
+        count: totalCardsInserted,
+        source: 'collection',
+        collection_id: args.collectionId,
+        deck_size_after: deck.cardCount + totalCardsInserted,
+      });
+    }
+
     return {
       cardsAdded: totalCardsInserted,
       totalCardsInDeck: deck.cardCount + totalCardsInserted,
@@ -1980,10 +1995,27 @@ export const processTranslationForCard = internalAction({
     } else {
       // Post-process before romanization so the derived romanizedText is
       // computed from the cleaned text.
+      const translateStartedAt = Date.now();
       translation = postProcessTranslation(
         translateTarget,
         await translateText(args.text, args.sourceLanguage, translateTarget),
       );
+      // Google bills per character of source text. This is the final fallback
+      // after the LLM stage chain has given up, so its volume doubles as a
+      // health signal for the LLM translation pipeline.
+      await captureGeneration(ctx, {
+        feature: 'machine_translation',
+        model: 'google-translate-v2',
+        provider: 'google',
+        latencyMs: Date.now() - translateStartedAt,
+        costUsd: costForCharacters('googleTranslate', args.text.length),
+        sharedContent: true,
+        extra: {
+          text_id: args.textId,
+          target_language: translateTarget,
+          character_count: args.text.length,
+        },
+      });
       if (ROMANIZATION_LANGUAGES.has(translateTarget)) {
         try {
           romanizedText = await romanizeText(translation, translateTarget);

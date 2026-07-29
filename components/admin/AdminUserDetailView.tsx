@@ -65,7 +65,9 @@ function AdminUserDetailContent({ userId }: { userId: string }) {
             )}
             <div className="min-w-0">
               <h1 className="text-lg font-bold truncate">{detail.name || '—'}</h1>
-              <p className="text-sm text-muted-foreground truncate">{detail.email}</p>
+              <p className="text-sm text-muted-foreground truncate" data-ph-mask>
+                {detail.email}
+              </p>
             </div>
             <div className="ml-auto flex flex-wrap items-center gap-2 text-xs">
               {detail.planName && (

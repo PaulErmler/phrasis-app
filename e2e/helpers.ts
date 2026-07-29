@@ -159,13 +159,45 @@ export async function completeOnboardingFresh(
     await page.getByTestId("placement-result-continue").click();
   }
 
-  // 6. Customizing — auto-advances after the bar + completeOnboarding mutation.
-  await expect(page.getByTestId("onboarding-step-customizing")).toBeVisible({
-    timeout: 30_000,
-  });
-  await expect(
-    page.getByTestId("onboarding-step-first-lesson-intro"),
-  ).toBeVisible({ timeout: 60_000 });
+  // 6. Customizing — auto-advances after the bar + completeOnboarding
+  // mutation. Under @live load a transient backend error can crash the
+  // wizard into the view error boundary mid-transition (seen when failing
+  // OpenRouter/TTS actions saturate the local dev backend); retry through
+  // it — wizard progress is server-persisted, so a remount resumes where it
+  // left off. Accept first-lesson-intro directly in the first poll in case
+  // customizing auto-advanced before we sampled it.
+  await expect
+    .poll(
+      async () => {
+        await dismissErrorBoundary(page);
+        if (
+          await page
+            .getByTestId("onboarding-step-first-lesson-intro")
+            .isVisible()
+            .catch(() => false)
+        ) {
+          return true;
+        }
+        return page
+          .getByTestId("onboarding-step-customizing")
+          .isVisible()
+          .catch(() => false);
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true);
+  await expect
+    .poll(
+      async () => {
+        await dismissErrorBoundary(page);
+        return page
+          .getByTestId("onboarding-step-first-lesson-intro")
+          .isVisible()
+          .catch(() => false);
+      },
+      { timeout: 60_000 },
+    )
+    .toBe(true);
 
   // 7. First lesson intro (mode picker → Start or Skip).
   // Skip jumps straight to feature-tour (stats-recap + word-projection are
@@ -292,10 +324,48 @@ export type TourId =
   | "completion";
 
 /**
+ * Best-effort recovery from the per-segment view error boundary
+ * ("Something went wrong" + "Try again"). Under @live load the local Convex
+ * dev backend can transiently error a query — every OpenRouter/TTS action
+ * retrying with backoff saturates it — which crashes whatever view is open
+ * into the boundary. Clicking retry remounts the segment exactly like a
+ * user would; persistent crashes still fail the spec at its next assertion.
+ */
+export async function dismissErrorBoundary(page: Page): Promise<void> {
+  const retry = page.getByRole("button", { name: /try again/i }).first();
+  if (await retry.isVisible().catch(() => false)) {
+    await retry.click().catch(() => {});
+    await page.waitForTimeout(500);
+  }
+}
+
+/**
+ * Best-effort dismissal of the cookie-consent banner. The banner is fixed,
+ * bottom-anchored and z-100, so while visible it intercepts clicks on any
+ * bottom-of-viewport control (the import wizard's Next/Submit, the learn
+ * CTA, …). It only mounts while PostHog reports consent 'pending' — normally
+ * never in specs, because `signUpAndOnboard` records the decision into the
+ * saved storageState — but a spec running with fresh or stale storage can
+ * still get it at any moment after the PostHog SDK boots.
+ */
+export async function dismissConsent(page: Page): Promise<void> {
+  const accept = page.getByTestId("consent-accept").first();
+  if (await accept.isVisible().catch(() => false)) {
+    await accept.click().catch(() => {});
+    await accept
+      .waitFor({ state: "detached", timeout: 3_000 })
+      .catch(() => {});
+  }
+}
+
+/**
  * Dismiss a driver.js onboarding popover. When `id` is provided, only the
  * matching tour (by `popoverClass="phrasis-tutorial-<id>"`) is targeted;
  * otherwise any `.driver-popover` is dismissed. Always strips any lingering
  * `.driver-overlay` SVG so the backdrop never intercepts subsequent clicks.
+ * Also clears the consent banner (see `dismissConsent`) — every spec that
+ * needs overlays gone calls this helper, and the tour wait doubles as time
+ * for the PostHog SDK to boot and mount the banner.
  */
 export async function dismissTour(
   page: Page,
@@ -319,6 +389,8 @@ export async function dismissTour(
     await popover.waitFor({ state: "visible", timeout: waitMs });
   } catch {
     await nukeOverlays();
+    await dismissConsent(page);
+    await dismissErrorBoundary(page);
     return;
   }
 
@@ -335,6 +407,8 @@ export async function dismissTour(
   await overlay
     .waitFor({ state: "detached", timeout: 3_000 })
     .catch(nukeOverlays);
+  await dismissConsent(page);
+  await dismissErrorBoundary(page);
 }
 
 /**
@@ -482,10 +556,18 @@ export async function signUpFreshUser(
   for (let i = 0; i < passwordCount; i++) {
     await passwordFields.nth(i).fill(creds.password);
   }
-  const acceptCookies = page.getByRole("button", { name: /accept all/i });
-  if (await acceptCookies.count()) {
-    await acceptCookies.first().click().catch(() => {});
-  }
+  // Locale-proof: the banner copy is translated (en/de), so match the testid
+  // rather than the accessible name. The banner mounts only after the
+  // PostHog SDK boots (async), so an instant count() check races it — wait a
+  // bounded moment instead. Recording the decision here matters beyond this
+  // page: PostHog persists it into localStorage, so the saved storageState
+  // carries it and the banner never overlays (and steals clicks from)
+  // bottom-anchored controls in dependent specs.
+  const acceptCookies = page.getByTestId("consent-accept").first();
+  await acceptCookies
+    .waitFor({ state: "visible", timeout: 5_000 })
+    .then(() => acceptCookies.click())
+    .catch(() => {}); // no banner: PostHog key absent or already answered
   await page
     .getByRole("button", { name: /create an account|create account|^sign\s*up$/i })
     .click();

@@ -482,6 +482,13 @@ export default defineSchema({
     // Whitelist + max enforced by `normalizePinnedCardActions` in
     // `lib/cardActions.ts`. Empty or undefined = use DEFAULT_PINNED_CARD_ACTIONS.
     pinnedCardActions: v.optional(v.array(v.string())),
+    // Mirror of the browser's analytics-consent choice, synced by
+    // `features/consent.setAnalyticsConsent`. Gates whether AI chat *content*
+    // may be attached to PostHog cost events (see chat/messages.ts) — the
+    // privacy policy promises "if you decline, no AI content is transmitted".
+    // undefined = never synced, treated as declined. Account-scoped where the
+    // browser choice is device-scoped, so the last device to sync wins.
+    analyticsConsent: v.optional(v.boolean()),
   }).index('by_userId', ['userId']),
 
   // Onboarding progress table — stores the user's onboarding answers.

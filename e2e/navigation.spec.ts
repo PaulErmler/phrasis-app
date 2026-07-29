@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { dismissTour } from "./helpers";
+import { dismissErrorBoundary, dismissTour } from "./helpers";
 
 /**
  * Crossing-navigation smoke — exercises the bottom nav inside the authed
@@ -23,10 +23,17 @@ test.describe("authed navigation shell", () => {
     ];
 
     for (const t of targets) {
+      // Under parallel-phase load a view query can hit Convex's 1s execution
+      // cap and crash the mounted view into its error boundary; the nav
+      // shell lives outside the boundary, but recover the view anyway so a
+      // crashed segment can't leave the shell in a weird state. First
+      // compiles of a route under a busy dev server can also push past 10s,
+      // hence the 20s ceilings.
+      await dismissErrorBoundary(page);
       const button = page.getByTestId(`bottom-nav-${t.view}`);
-      await expect(button).toBeVisible({ timeout: 10_000 });
+      await expect(button).toBeVisible({ timeout: 20_000 });
       await button.click();
-      await expect(page).toHaveURL(t.urlFragment, { timeout: 10_000 });
+      await expect(page).toHaveURL(t.urlFragment, { timeout: 20_000 });
     }
   });
 

@@ -21,8 +21,11 @@ import { getPaywallTitle, getPaywallMessage, filterProductsByFeatureIncrease } f
 import { getFeatureI18nKey, isFeatureConsumable, getFeaturePaywallKey } from "@/lib/features/feature-meta";
 import { isCreditBackedFeature } from "@/convex/features/featureIds";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
+import { usePaywallImpression } from "@/lib/posthog/use-impression";
 import { cn } from "@/lib/utils";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
+import UsageLimitDialog from "@/components/autumn/usage-limit-dialog";
+import { useIsNativeApp } from "@/hooks/use-native-app";
 
 export interface PaywallDialogProps {
   open: boolean;
@@ -31,7 +34,26 @@ export interface PaywallDialogProps {
   entityId?: string;
 }
 
+/**
+ * Store builds must not show upgrade prompts or prices, so the shell gets the
+ * neutral limit-reached dialog (contact support) instead of the paywall.
+ */
 export default function PaywallDialog(params?: PaywallDialogProps) {
+  const isNative = useIsNativeApp();
+  if (!params) return <></>;
+  if (isNative) {
+    return (
+      <UsageLimitDialog
+        open={params.open}
+        setOpen={params.setOpen}
+        featureId={params.featureId}
+      />
+    );
+  }
+  return <PaywallDialogInner {...params} />;
+}
+
+function PaywallDialogInner(params?: PaywallDialogProps) {
   const t = useTranslations("Paywall");
   const tFeatures = useTranslations("Features");
   const { data: preview, isLoading } = usePaywall({
@@ -77,6 +99,15 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
     consumable,
     intervalGroup,
   ]);
+
+  // Top of the upgrade funnel. Above the early return because hooks must run in
+  // the same order every render — `params` is null until the paywall is
+  // triggered, so both arguments are guarded rather than the call site.
+  //
+  // Edge-triggered on `open`, not fired per render: this dialog re-renders
+  // whenever an Autumn query settles, and an inflated impression count is the
+  // denominator of every conversion rate on the monetization dashboard.
+  usePaywallImpression(params?.open ?? false, params?.featureId ?? 'unknown');
 
   if (!params) {
     return <></>;

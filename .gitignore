@@ -98,3 +98,7 @@ data_preparation/ogte-dataset/data/
 scripts/_tmp-tagalog-sample.ts
 tagalog-sample/
 .claude/scheduled_tasks.lock
+
+# Local Claude Code worktrees — never commit
+.claude/worktrees/
+native/shell/app-url.js

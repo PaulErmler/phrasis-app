@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Flexling</string>
+    <string name="title_activity_main">Flexling</string>
+    <string name="package_name">com.flexling.app</string>
+    <string name="custom_url_scheme">com.flexling.app</string>
+</resources>

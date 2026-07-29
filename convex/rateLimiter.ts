@@ -1,4 +1,4 @@
-import { RateLimiter, MINUTE, SECOND } from '@convex-dev/rate-limiter';
+import { RateLimiter, HOUR, MINUTE, SECOND } from '@convex-dev/rate-limiter';
 import { components } from './_generated/api';
 import type { TtsProvider } from './types';
 
@@ -42,6 +42,16 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: 10 * SECOND,
     capacity: 100,
     shards: 10,
+  },
+  // Account-deletion requests send a real email to support@ (see
+  // features/accountDeletion.ts). Keyed per user — the cap exists so a
+  // scripted loop can't flood the inbox or burn Resend quota, while a human
+  // double-checking their request still gets through.
+  accountDeletionRequest: {
+    kind: 'token bucket',
+    rate: 2,
+    period: HOUR,
+    capacity: 2,
   },
 });
 

@@ -9,7 +9,7 @@ import {
 import { paginationOptsValidator } from 'convex/server';
 import { internal, components } from '../../_generated/api';
 import { saveMessage, listUIMessages, syncStreams } from '@convex-dev/agent';
-import { requireAuthUserId, getAuthUserId } from '../../db/users';
+import { requireAuthUserId, getAuthUserId, getUserSettings } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
 import { consumeQuota } from '../../usage/helpers';
 import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
@@ -17,9 +17,15 @@ import { agent } from './agent';
 import type { Id } from '../../_generated/dataModel';
 import { THREAD_MESSAGE_LIMIT, MAX_MESSAGE_LENGTH } from './constants';
 import { trackEvent } from '../../db/stats/dailyStats';
+import { EVENTS, track, trackException } from '../../analytics';
+import {
+  captureGeneration,
+  openrouterCostUsd,
+  openrouterGenerationId,
+} from '../../lib/posthogAi';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { OPENROUTER_MODELS } from '../../config/aiModels';
+import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../../config/aiModels';
 import { getLanguageByCode } from '../../../lib/languages';
 
 const agentComponent = components.agent;
@@ -219,6 +225,12 @@ export const sendMessage = mutation({
       );
     }
 
+    // The privacy policy promises that declining analytics stops chat content
+    // from reaching PostHog. The consent choice lives in the browser, mirrored
+    // to `userSettings` by ConsentSync; unset means never synced → withhold.
+    const settings = await getUserSettings(ctx, userId);
+    const includeAiContent = settings?.analyticsConsent === true;
+
     await ctx.scheduler.runAfter(
       0,
       internal.features.chat.messages.generateResponse,
@@ -227,6 +239,8 @@ export const sendMessage = mutation({
         promptMessageId: messageId,
         cardContextSection,
         languageSection,
+        prompt: args.prompt,
+        includeAiContent,
       },
     );
 
@@ -235,6 +249,18 @@ export const sendMessage = mutation({
     if (active) {
       await trackEvent(ctx, { userId, courseId: active.course._id, field: 'chatMessagesSent' });
     }
+
+    // Captured server-side rather than from the composer: the browser can be
+    // closed the instant the send resolves, and this is the event every chat
+    // funnel is anchored on.
+    await track(ctx, userId, EVENTS.CHAT_MESSAGE_SENT, {
+      thread_id: args.threadId,
+      thread_message_index: userMessageCount,
+      message_chars: args.prompt.length,
+      has_card_context: args.cardId !== undefined,
+      base_languages: active?.course.baseLanguages,
+      target_languages: active?.course.targetLanguages,
+    });
 
     return messageId;
   },
@@ -316,6 +342,15 @@ export const generateResponse = internalAction({
     promptMessageId: v.string(),
     cardContextSection: v.optional(v.string()),
     languageSection: v.optional(v.string()),
+    // Passed through from sendMessage purely so the cost event can carry the
+    // prompt as `$ai_input`. Re-reading it from the agent component here would
+    // cost an extra query for data the caller already had in hand.
+    prompt: v.optional(v.string()),
+    // Whether the user's synced analytics consent allows attaching the prompt
+    // and response text to the `$ai_generation` cost event. Tokens, cost and
+    // latency are captured either way (legitimate-interest telemetry); the
+    // *content* is consent-gated. Resolved in sendMessage, which has db access.
+    includeAiContent: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -357,7 +392,21 @@ export const generateResponse = internalAction({
       let totalCostUsd = 0;
       let billedUserId: string | undefined;
 
-      await agent.streamText(
+      // One `$ai_generation` per LLM step is emitted after the stream finishes
+      // rather than from inside `usageHandler`: the handler runs mid-stream, and
+      // the response text needed for `$ai_output_choices` only exists once the
+      // whole thing has resolved. Steps are collected here and flushed below.
+      const steps: Array<{
+        model: string;
+        provider: string;
+        inputTokens?: number;
+        outputTokens?: number;
+        costUsd: number;
+        generationId?: string;
+      }> = [];
+      const startedAt = Date.now();
+
+      const result = await agent.streamText(
         ctx,
         { threadId: args.threadId },
         {
@@ -366,17 +415,78 @@ export const generateResponse = internalAction({
         },
         {
           saveStreamDeltas: { chunking: "word", throttleMs: 500 },
-          usageHandler: async (_usageCtx, { userId, providerMetadata }) => {
-            const openrouterUsage = (
+          usageHandler: async (
+            _usageCtx,
+            { userId, providerMetadata, usage, model, provider },
+          ) => {
+            const openrouter = (
               providerMetadata as
-                | { openrouter?: { usage?: { cost?: number } } }
+                | { openrouter?: { id?: string; usage?: { cost?: number } } }
                 | undefined
-            )?.openrouter?.usage;
-            totalCostUsd += openrouterUsage?.cost ?? 0;
+            )?.openrouter;
+            const stepCostUsd = openrouter?.usage?.cost ?? 0;
+            totalCostUsd += stepCostUsd;
             billedUserId = userId ?? billedUserId;
+            steps.push({
+              model,
+              provider,
+              inputTokens: usage?.inputTokens,
+              outputTokens: usage?.outputTokens,
+              costUsd: stepCostUsd,
+              // OpenRouter's generation id — the join key back to their dashboard
+              // when a cost figure needs to be reconciled.
+              generationId: openrouter?.id,
+            });
           },
         },
       );
+
+      // Safe to await: `agent.streamText` only resolves after the stream has
+      // finished (see the billing comment above), so this promise is already
+      // settled. Wrapped anyway — a missing transcript must not cost the user
+      // their reply.
+      let responseText: string | undefined;
+      try {
+        responseText = await result.text;
+      } catch {
+        responseText = undefined;
+      }
+
+      const latencyPerStepMs = steps.length
+        ? (Date.now() - startedAt) / steps.length
+        : 0;
+      for (const [index, step] of steps.entries()) {
+        const isFinalStep = index === steps.length - 1;
+        await captureGeneration(ctx, {
+          distinctId: billedUserId,
+          feature: 'chat',
+          model: step.model,
+          provider: step.provider,
+          latencyMs: latencyPerStepMs,
+          inputTokens: step.inputTokens,
+          outputTokens: step.outputTokens,
+          costUsd: step.costUsd,
+          // Prompt on the first step, completion on the last: the intermediate
+          // steps are tool loops with no user-facing text of their own.
+          // Content only with synced consent — the privacy policy promises
+          // that declining keeps chat text out of PostHog.
+          input:
+            args.includeAiContent && index === 0 && args.prompt
+              ? [{ role: 'user', content: args.prompt }]
+              : undefined,
+          outputChoices:
+            args.includeAiContent && isFinalStep && responseText
+              ? [{ role: 'assistant', content: responseText }]
+              : undefined,
+          traceId: step.generationId,
+          extra: {
+            thread_id: args.threadId,
+            step_index: index,
+            step_count: steps.length,
+            has_card_context: args.cardContextSection !== undefined,
+          },
+        });
+      }
 
       // Integer micro-USD math: IEEE-754 division can land an exact multiple
       // of the step an epsilon above an integer (0.035 / 0.005 → 7.000…001),
@@ -402,6 +512,13 @@ export const generateResponse = internalAction({
       }
     } catch (error) {
       console.error('Failed to generate AI response:', error);
+      // Caught, so the Convex dashboard's exception destination never sees it.
+      // A silently failed reply is the single most user-visible chat bug there
+      // is, so report it explicitly.
+      await trackException(ctx, error, undefined, {
+        op: 'chat.generateResponse',
+        threadId: args.threadId,
+      });
     }
 
     return null;
@@ -421,14 +538,30 @@ export const generateThreadTitle = internalAction({
     try {
       const openrouter = createOpenRouter({
         apiKey: process.env.OPENROUTER_API_KEY,
+        // Makes OpenRouter report the actual USD cost of this call. Titles are
+        // cheap individually but fire once per thread, so they are worth a line
+        // on the cost dashboard rather than an unexplained gap.
+        extraBody: OPENROUTER_USAGE_ACCOUNTING,
       });
-      const { text } = await generateText({
+      const startedAt = Date.now();
+      const { text, usage, providerMetadata } = await generateText({
         model: openrouter(OPENROUTER_MODELS.threadTitle),
         system: `You generate short titles for chat conversations. Respond with ONLY the title, nothing else.
 The title MUST be written in the SAME language the user wrote their message in. Do NOT translate into any other language.
 For example: if the user writes in English, respond in English. If the user writes in German, respond in German.
 Maximum 4 words. No quotes. No period.`,
         prompt: args.userMessage,
+      });
+      await captureGeneration(ctx, {
+        feature: 'chat_title',
+        model: OPENROUTER_MODELS.threadTitle,
+        provider: 'openrouter',
+        latencyMs: Date.now() - startedAt,
+        inputTokens: usage?.inputTokens,
+        outputTokens: usage?.outputTokens,
+        costUsd: openrouterCostUsd(providerMetadata),
+        traceId: openrouterGenerationId(providerMetadata),
+        extra: { thread_id: args.threadId },
       });
       const title = text.trim().slice(0, 80);
       if (title) {

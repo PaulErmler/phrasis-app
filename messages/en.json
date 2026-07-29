@@ -131,6 +131,15 @@
       "attribution": {
         "label": "Attributions",
         "text": "A lot of the sentences are from <tatoeba>Tatoeba</tatoeba>'s massive dataset, released under a <ccby>CC-BY License</ccby>."
+      },
+      "deleteAccount": {
+        "button": "Delete Account",
+        "title": "Delete your account?",
+        "description": "Your account, your courses, and your learning progress will be permanently deleted within 30 days. This cannot be undone. You will be signed out now.",
+        "confirm": "Delete my account",
+        "cancel": "Cancel",
+        "success": "Deletion requested — your account will be deleted within 30 days.",
+        "error": "Could not request the deletion. Please try again or email support@flexling.com."
       }
     },
     "deckCards": {
@@ -743,6 +752,8 @@
   "PaymentOverdue": {
     "title": "Payment overdue",
     "description": "Your last payment failed. Please update your payment method to keep your subscription active.",
+    "nativeDescription": "There is a problem with your subscription. Contact us at support@flexling.com and we'll sort it out.",
+    "contactUs": "Contact Us",
     "blockedDescription": "Your payment has been overdue since {date}. Access is paused until your payment is completed.",
     "payInvoiceButton": "Pay invoice",
     "payButton": "Update payment method",
@@ -1520,5 +1531,31 @@
     "noWordsYet": "No words yet",
     "loadMore": "Load more",
     "clearSearch": "Clear search"
+  },
+  "Consent": {
+    "banner": {
+      "title": "Cookies and analytics",
+      "description": "May we use analytics cookies and session recordings to improve the app? Details:",
+      "privacyLink": "Privacy policy",
+      "accept": "Accept all",
+      "reject": "Reject optional",
+      "customize": "Customise"
+    },
+    "settings": {
+      "title": "Cookie settings",
+      "description": "Choose what we may measure. Your choice applies to this browser and can be changed whenever you like.",
+      "save": "Save settings"
+    },
+    "categories": {
+      "necessary": {
+        "title": "Strictly necessary",
+        "description": "Keeps you signed in and remembers your language and layout. The app cannot work without these, so they cannot be switched off."
+      },
+      "analytics": {
+        "title": "Product analytics and session replay",
+        "description": "Helps us see which features are used, where onboarding breaks, and what errors people hit. Includes recordings of your screen in which everything you type into form fields is hidden before it leaves your browser. If you decline, we still measure usage without cookies and without recordings."
+      }
+    },
+    "footerLink": "Cookie settings"
   }
 }

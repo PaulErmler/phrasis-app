@@ -14,8 +14,22 @@ test.describe("auth pages", () => {
 
     await expect(page.getByLabel(/email/i)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByLabel(/password/i)).toBeVisible();
+    // The email/password submit is labeled "Login" (better-auth-ui's
+    // SIGN_IN_ACTION default). Anchor the regex so it can never collide with
+    // the "Sign in with Google" / "Sign in with Apple" social buttons — the
+    // old unanchored /sign in|log in/i actually matched those, never the
+    // submit, and went strict-mode-ambiguous when Apple became the second
+    // provider.
     await expect(
-      page.getByRole("button", { name: /sign in|log in/i }),
+      page.getByRole("button", { name: /^(login|log in|sign in)$/i }),
+    ).toBeVisible();
+    // Web auth deliberately offers redirect-based social sign-in (the
+    // Capacitor shell swaps these for NativeSocialButtons' token flow).
+    await expect(
+      page.getByRole("button", { name: /^sign in with google$/i }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /^sign in with apple$/i }),
     ).toBeVisible();
   });
 

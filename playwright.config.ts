@@ -94,6 +94,7 @@ export default defineConfig({
         /learning-settings\.spec\.ts/,
         /learning-undo\.spec\.ts/,
         /settings\.spec\.ts/,
+        /add-cards-live\.spec\.ts/,
         /add-cards-import-live\.spec\.ts/,
         /content-filter-live\.spec\.ts/,
         /billing\.spec\.ts/,

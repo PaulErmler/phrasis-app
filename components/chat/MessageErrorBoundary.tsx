@@ -4,6 +4,8 @@ import { Component } from 'react';
 import type { ReactNode, ErrorInfo } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
+import { reportError } from '@/lib/report-error';
+
 interface MessageErrorBoundaryProps {
   children: ReactNode;
   fallbackMessage?: string;
@@ -28,7 +30,10 @@ export class MessageErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('MessageErrorBoundary caught error:', error, errorInfo);
+    reportError(error, {
+      boundary: 'chat-message',
+      componentStack: errorInfo.componentStack,
+    });
   }
 
   render() {
@@ -79,7 +84,10 @@ export class ChatErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ChatErrorBoundary caught error:', error, errorInfo);
+    reportError(error, {
+      boundary: 'chat-panel',
+      componentStack: errorInfo.componentStack,
+    });
   }
 
   render() {

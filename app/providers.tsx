@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
 import { NextIntlClientProvider } from 'next-intl';
 
 import { authClient } from '@/lib/auth-client';
+import { useIsNativeApp } from '@/hooks/use-native-app';
 import { AutumnProvider } from "autumn-js/react";
 import { api } from "../convex/_generated/api";
 import { useConvex } from "convex/react";
@@ -34,6 +35,7 @@ export function AutumnWrapper({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children, locale, messages, timeZone }: Props) {
   const router = useRouter();
+  const isNative = useIsNativeApp();
   const authLocalization = (messages.Auth as AuthMessages) || {};
 
   return (
@@ -56,8 +58,15 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
             // Clear router cache (protected routes)
             router.refresh();
           }}
-          social={{
-            providers: ['google'],
+          // Redirect-based OAuth breaks inside the store-app WebView (Google
+          // blocks it) — the shell uses NativeSocialButtons' token flow
+          // instead, so the redirect buttons are dropped there.
+          social={isNative ? undefined : {
+            // 'apple' requires APPLE_CLIENT_ID, APPLE_TEAM_ID, APPLE_KEY_ID
+            // and APPLE_PRIVATE_KEY in the Convex deployment (the client
+            // secret is minted from them at runtime, see convex/auth.ts) —
+            // set them before deploying this.
+            providers: ['google', 'apple'],
           }}
           credentials={false}
           Link={Link}

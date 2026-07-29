@@ -369,6 +369,14 @@ export async function mergeCardAudio(
       }
     };
 
+    // Base group with all reps zeroed (or no playable recordings) while base
+    // languages are still part of the composition: the group is silent, but it
+    // keeps its place in the sequence so the pauses around it — which the user
+    // still sees in settings — play as silence instead of vanishing. orderedBase
+    // is empty only when base is deliberately excluded (e.g. transcribe mode);
+    // there, no phantom pauses are added.
+    const baseSilenced = baseEntries.length === 0 && orderedBase.length > 0;
+
     // Sequence: [before-target] → base → [after-target]. The pause-before-advance
     // is always appended last (after whatever final group exists), so auto-advance
     // works identically whether or not "Practice Speaking" (after) is enabled.
@@ -381,19 +389,19 @@ export async function mergeCardAudio(
         beforeRepPause,
         (lang) => !afterLangs.has(lang),
       );
-      if (baseEntries.length > 0) {
+      if (baseEntries.length > 0 || baseSilenced) {
         cursor += settings.pauseT2B;
       } else if (afterTargetEntries.length > 0) {
-        // No base between the two target groups (e.g. all base reps zeroed) —
-        // separate them with the target↔target pause so the before/after plays
-        // don't butt together with zero silence.
+        // No base in the composition between the two target groups — separate
+        // them with the target↔target pause so the before/after plays don't
+        // butt together with zero silence.
         cursor += settings.pauseT2T;
       }
     }
 
     scheduleGroup(baseEntries, settings.pauseB2B, repPause);
 
-    if (baseEntries.length > 0 && afterTargetEntries.length > 0) {
+    if ((baseEntries.length > 0 || baseSilenced) && afterTargetEntries.length > 0) {
       cursor += settings.pauseB2T;
     }
 

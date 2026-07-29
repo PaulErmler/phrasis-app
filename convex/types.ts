@@ -219,10 +219,33 @@ export const reviewsByModeValidator = v.object({
   radio: v.optional(v.number()),
 });
 
-// `{language, text}` translation-entry list shared by the cardApprovals
-// table/mutations and the sentence-metadata action args.
+// `{language, text}` translation-entry list used by the cardApprovals
+// table/mutations. Also the stored document shape — do not widen; producers
+// that carry provenance use `sourcedTranslationEntriesValidator` below.
 export const translationEntriesValidator = v.array(
   v.object({ language: v.string(), text: v.string() }),
+);
+
+// Translation entries plus optional provenance, shared by the custom-text
+// producers (`createCustomText` args, `autoFillTranslations` returns) and the
+// sentence-metadata job args:
+// - `regionVariant`: concrete regional sub-locale chosen for a row whose
+//   `language` is a mixed-dialect code (today: `es_mixed` → e.g. `'es-US'`),
+//   persisted on the translations row so downstream audio synthesis and STT
+//   validation honor the variant the LLM actually produced.
+// - `translationSource`: id of the LLM that produced the text, or
+//   `'user-provided'` for manually-typed entries, persisted so a future
+//   strategy swap can target rows by source.
+// Consumers that only read `{language, text}` (the sentence-metadata job)
+// still accept this shape — requiring callers to strip the extras caused a
+// production ArgumentValidationError.
+export const sourcedTranslationEntriesValidator = v.array(
+  v.object({
+    language: v.string(),
+    text: v.string(),
+    regionVariant: v.optional(v.string()),
+    translationSource: v.optional(v.string()),
+  }),
 );
 
 export type LearningStyle = Infer<typeof learningStyleValidator>;

@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import Link from 'next/link';
 import { FooterControls } from '@/components/landing/footer-controls';
+import { ConsentSettingsLink } from '@/components/consent/ConsentSettingsLink';
 
 export async function Footer() {
   const t = await getTranslations('Footer');
@@ -30,6 +31,9 @@ export async function Footer() {
             >
               {t('legal.privacy')}
             </Link>
+            <span className="text-muted-foreground">•</span>
+            {/* The withdrawal mechanism the privacy policy promises. */}
+            <ConsentSettingsLink />
           </div>
 
           <FooterControls />
