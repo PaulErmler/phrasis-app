@@ -17,6 +17,9 @@ import { DEFAULT_PLAYBACK_SPEED } from '@/lib/constants/audioPlayback';
 import type { PinnableCardAction } from '@/lib/cardActions';
 
 interface CardShellProps {
+  /** Denser paddings + smaller sentence text for list contexts (library),
+   *  where the review-screen sizing looks oversized. */
+  compact?: boolean;
   reviewCount: number;
   sourceText: string;
   translations: CardTranslation[];
@@ -97,6 +100,7 @@ interface CardShellProps {
 }
 
 export function CardShell({
+  compact = false,
   reviewCount,
   sourceText,
   translations,
@@ -172,7 +176,7 @@ export function CardShell({
   const cardSurface = (
     <div className="card-surface overflow-hidden" data-tutorial="card-flashcard">
       {/* Card top bar: metadata left, actions right */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-2">
+      <div className={compact ? 'flex items-center justify-between px-3 pt-3 pb-1.5' : 'flex items-center justify-between px-4 pt-4 pb-2'}>
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="text-xs">
             {t('reviewCount', { count: reviewCount })}
@@ -207,7 +211,7 @@ export function CardShell({
       </div>
 
       {/* Card text content */}
-      <div className="px-6 pb-6 space-y-4">
+      <div className={compact ? 'px-4 pb-4 space-y-3' : 'px-6 pb-6 space-y-4'}>
         {/* Base language texts */}
         <div className="space-y-2" data-tutorial="base-languages">
           {baseTranslations.map((translation) => {
@@ -235,7 +239,7 @@ export function CardShell({
               !isAudioRevealed &&
               !(manuallyRevealedLanguages?.has(translation.language) ?? false);
             // Base text matches the target rows' weight/size — no bolding.
-            const baseTextClass = 'body-large';
+            const baseTextClass = compact ? 'text-base leading-relaxed' : 'body-large';
             return (
               <div
                 key={translation.language}
@@ -295,7 +299,7 @@ export function CardShell({
             // dir="auto": no language code in scope for the raw source text;
             // first-strong-character detection handles RTL sources.
             // text-left keeps RTL sources flush with the LTR layout.
-            <p dir="auto" className="body-large text-left">{sourceText}</p>
+            <p dir="auto" className={compact ? 'text-base leading-relaxed text-left' : 'body-large text-left'}>{sourceText}</p>
           )}
         </div>
 

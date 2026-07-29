@@ -30,7 +30,7 @@ export function ConsentBanner() {
         // Bottom padding clears the iOS home indicator; the root layout already
         // opts into `viewport-fit=cover`. Same safe-area inset the BottomNav
         // uses, floored at the normal padding so it never collapses.
-        className="fixed inset-x-0 bottom-0 z-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom,0px))]"
+        className="fixed inset-x-0 bottom-0 z-100 p-4 pb-[max(1rem,var(--safe-bottom))]"
         role="dialog"
         aria-modal="false"
         aria-label={t('banner.title')}

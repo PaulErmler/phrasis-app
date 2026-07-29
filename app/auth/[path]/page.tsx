@@ -37,7 +37,7 @@ export default async function AuthPage({
   const isSignUp = path === 'sign-up';
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4">
+    <main className="min-h-screen flex items-center justify-center p-4 pt-[calc(1rem+var(--safe-top))] pb-[calc(1rem+var(--safe-bottom))]">
       <div className="w-full max-w-md mx-auto flex flex-col items-center">
         <AuthView
           path={path}

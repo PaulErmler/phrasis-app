@@ -160,7 +160,7 @@ export function LearningControls({
   ]);
 
   return (
-    <div className="relative pb-[max(1rem,env(safe-area-inset-bottom))]">
+    <div className="relative pb-[max(1rem,var(--safe-bottom))]">
       <div className="hidden lg:block pointer-events-none absolute top-0 left-1/2 -translate-x-1/2 w-[100vw] border-t border-border" />
 
       <div className="border-t lg:border-t-0">

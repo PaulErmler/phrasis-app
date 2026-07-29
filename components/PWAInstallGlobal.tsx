@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 
 import '@khmyznikov/pwa-install';
+import { useIsNativeApp } from '@/hooks/use-native-app';
 
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 
@@ -11,7 +12,11 @@ import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
  * This element is hidden and will show a dialog when triggered by PWAInstallButton.
  */
 export function PWAInstallGlobal() {
+  // Store-app shell: nothing to install (and no install to track).
+  const isNative = useIsNativeApp();
+
   useEffect(() => {
+    if (isNative) return;
     // The install *outcome* is observable after all: Chromium fires
     // `appinstalled` on window regardless of where the install started (our
     // dialog, the omnibox icon, the browser menu). Pairs with
@@ -20,8 +25,9 @@ export function PWAInstallGlobal() {
     const onInstalled = () => capture(CLIENT_EVENTS.PWA_INSTALLED);
     window.addEventListener('appinstalled', onInstalled);
     return () => window.removeEventListener('appinstalled', onInstalled);
-  }, []);
+  }, [isNative]);
 
+  if (isNative) return null;
   return (
     <pwa-install
       manual-apple="true"

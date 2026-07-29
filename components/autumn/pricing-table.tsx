@@ -28,6 +28,7 @@ import {
   type CarouselApi,
 } from "@/components/ui/carousel";
 import { CarouselDots } from "@/components/ui/carousel-dots";
+import { useIsNativeApp } from "@/hooks/use-native-app";
 
 /** Sort key for plan cards: Free first, then paid plans by ascending price. */
 function productSortPrice(product: Product): number {
@@ -130,7 +131,19 @@ export function itemsAddedOver(
   });
 }
 
-export default function PricingTable({
+/**
+ * Store builds must not show plans or prices (Play/App Store payment
+ * policies) — the shell renders nothing wherever a pricing table would be.
+ */
+export default function PricingTable(
+  props: React.ComponentProps<typeof PricingTableInner>,
+) {
+  const isNative = useIsNativeApp();
+  if (isNative) return null;
+  return <PricingTableInner {...props} />;
+}
+
+function PricingTableInner({
   productDetails,
   excludeFreePlan = false,
   recommendedProductIds,

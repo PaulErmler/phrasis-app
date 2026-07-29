@@ -61,6 +61,11 @@
 }
 
 :root {
+  /* Device notch/home-indicator insets, slightly trimmed: iOS (26 especially)
+     reports generous values that leave headers and the bottom nav floating.
+     Tune the two subtractions here — every safe-area consumer uses these. */
+  --safe-top: max(0px, calc(env(safe-area-inset-top, 0px) - 12px));
+  --safe-bottom: max(0px, calc(env(safe-area-inset-bottom, 0px) - 12px));
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   /* Elevated surfaces (library rows, stats, settings blocks, dialogs, collection tiles, driver.js): use --card / bg-card / .card-surface */
@@ -185,7 +190,7 @@
 @layer components {
   /* Layout */
   .sticky-header {
-    @apply sticky top-0 z-10 border-b bg-background pt-[env(safe-area-inset-top)];
+    @apply sticky top-0 z-10 border-b bg-background pt-[var(--safe-top)];
   }
   .header-bar {
     @apply container mx-auto px-4 h-14 flex items-center justify-between;
@@ -240,7 +245,7 @@
 
   /* Sheet / panel layout */
   .sheet-header {
-    @apply sticky top-0 z-10 border-b bg-background px-4 min-h-14 flex items-center justify-between pt-[env(safe-area-inset-top)];
+    @apply sticky top-0 z-10 border-b bg-background px-4 min-h-14 flex items-center justify-between pt-[var(--safe-top)];
   }
   .sheet-body {
     @apply flex-1 overflow-y-auto px-4 py-6;
@@ -333,6 +338,23 @@
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
   max-width: 360px;
   padding: 20px !important;
+}
+
+/* driver.js sizes its SVG overlay to window.innerHeight, which stops short
+   of the bottom safe area in the iOS shell — this strip dims the leftover
+   band so the spotlight backdrop reaches the screen edge. Below the popover
+   (z 1e9), above everything else; full env() on purpose (must hit the
+   physical edge, not the trimmed --safe-bottom). */
+body.driver-active::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(env(safe-area-inset-bottom, 0px) + 2px);
+  background: rgb(0 0 0 / var(--driver-overlay-opacity));
+  z-index: 999999999;
+  pointer-events: none;
 }
 
 /* WebKit: stable compositing for SVG spotlight seam flicker on iOS */

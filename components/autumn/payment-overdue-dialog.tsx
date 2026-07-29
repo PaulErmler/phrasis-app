@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Loader2 } from "lucide-react";
+import { CreditCard, Loader2, Mail } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { CLIENT_EVENTS, capture } from "@/lib/posthog/events";
 import { useImpression } from "@/lib/posthog/use-impression";
@@ -18,6 +18,7 @@ import type { FunctionReturnType } from "convex/server";
 import { api } from "@/convex/_generated/api";
 import { useCustomer } from "autumn-js/react";
 import { toast } from "sonner";
+import { useIsNativeApp } from "@/hooks/use-native-app";
 
 /**
  * App-wide dunning popup. Mounted once in BillingGate (from the /app layout)
@@ -76,6 +77,9 @@ function PaymentOverdueDialogContent({
 }) {
   const t = useTranslations("PaymentOverdue");
   const locale = useLocale();
+  // Store builds must not link out to Stripe (invoice or billing portal) —
+  // they get contact-support instead; the cancel path stays available.
+  const isNative = useIsNativeApp();
   // Same expand (and therefore the same SWR cache key) as the pricing
   // table / paywall / checkout surfaces, so the refetch after a cancel
   // updates what /app/settings displays — without it the settings page
@@ -187,16 +191,18 @@ function PaymentOverdueDialogContent({
         ) : (
           <>
             <p className="px-6 mt-1 text-muted-foreground">
-              {t("description")}
+              {isNative ? t("nativeDescription") : t("description")}
             </p>
-            <p
-              data-testid="payment-overdue-notice"
-              className="px-6 mt-2 mb-2 text-muted-foreground"
-            >
-              {t("blockedDescription", {
-                date: new Date(pastDueSince).toLocaleDateString(locale),
-              })}
-            </p>
+            {!isNative && (
+              <p
+                data-testid="payment-overdue-notice"
+                className="px-6 mt-2 mb-2 text-muted-foreground"
+              >
+                {t("blockedDescription", {
+                  date: new Date(pastDueSince).toLocaleDateString(locale),
+                })}
+              </p>
+            )}
           </>
         )}
 
@@ -240,22 +246,36 @@ function PaymentOverdueDialogContent({
               >
                 {t("cancelButton")}
               </Button>
-              <Button
-                size="sm"
-                className="font-medium shadow transition min-w-20 gap-1.5"
-                data-testid="payment-overdue-pay"
-                onClick={invoiceUrl ? handlePay : handlePortal}
-                disabled={busy !== null}
-              >
-                {busy === "pay" || busy === "portal" ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <>
-                    <CreditCard className="h-3.5 w-3.5" />
-                    {invoiceUrl ? t("payInvoiceButton") : t("payButton")}
-                  </>
-                )}
-              </Button>
+              {isNative ? (
+                <Button
+                  size="sm"
+                  className="font-medium shadow transition min-w-20 gap-1.5"
+                  data-testid="payment-overdue-contact"
+                  asChild
+                >
+                  <a href="mailto:support@flexling.com">
+                    <Mail className="h-3.5 w-3.5" />
+                    {t("contactUs")}
+                  </a>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  className="font-medium shadow transition min-w-20 gap-1.5"
+                  data-testid="payment-overdue-pay"
+                  onClick={invoiceUrl ? handlePay : handlePortal}
+                  disabled={busy !== null}
+                >
+                  {busy === "pay" || busy === "portal" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <>
+                      <CreditCard className="h-3.5 w-3.5" />
+                      {invoiceUrl ? t("payInvoiceButton") : t("payButton")}
+                    </>
+                  )}
+                </Button>
+              )}
             </>
           )}
         </DialogFooter>

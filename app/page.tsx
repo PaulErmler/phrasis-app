@@ -3,6 +3,7 @@ import './landing-page.css';
 import { getToken } from '@/lib/auth-server';
 import { LandingJsonLd } from '@/components/landing/landing-json-ld';
 import { LandingPageClient } from '@/components/landing/landing-page-client';
+import { NativeShellRedirect } from '@/components/NativeShellRedirect';
 
 const siteUrl = process.env.SITE_URL ?? 'https://flexling.com';
 
@@ -21,6 +22,7 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <NativeShellRedirect />
       <LandingJsonLd siteUrl={siteUrl} />
       <main className="flex-1">
         <LandingPageClient isAuthenticated={isAuthenticated} />

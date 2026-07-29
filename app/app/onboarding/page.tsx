@@ -77,6 +77,7 @@ import type { OnboardingSessionSummary } from './components/OnboardingFirstLesso
 import { FeatureTourStep } from './steps/FeatureTourStep';
 import { PlanPickStep } from './steps/PlanPickStep';
 import { TestimonialsStep } from './steps/TestimonialsStep';
+import { useIsNativeApp } from '@/hooks/use-native-app';
 
 /**
  * New onboarding wizard. 14 steps with branching at the proficiency point.
@@ -352,6 +353,7 @@ function OnboardingWizard({
   router,
 }: WizardProps) {
   const t = useTranslations('Onboarding.wizard');
+  const isNative = useIsNativeApp();
   const [data, setData] = useState<OnboardingData>(initial);
   const [stepId, setStepId] = useState<StepId>(initialStepId);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -485,8 +487,11 @@ function OnboardingWizard({
     );
     return Math.max(0, idx);
   }, [stepId]);
-  const totalSteps = PROGRESS_STEP_ORDER.length;
-  const progressPct = ((progressIndex + 1) / totalSteps) * 100;
+  // plan-pick never shows the bar (and the store-app shell skips the step
+  // entirely), so it's excluded from the denominator — otherwise the last
+  // visible value is 92% and the bar never completes.
+  const totalSteps = PROGRESS_STEP_ORDER.length - 1;
+  const progressPct = Math.min(100, ((progressIndex + 1) / totalSteps) * 100);
 
   // ─── Per-step rendering & controls ─────────────────────────────────────
 
@@ -603,6 +608,16 @@ function OnboardingWizard({
     router.push('/app');
   }, [finalizeOnboarding, router]);
 
+  // A session persisted at plan-pick can resume inside the store-app shell
+  // (e.g. onboarding started in the browser, continued in the app). The shell
+  // never shows the plan picker, so finalize straight away.
+  const autoFinalized = useRef(false);
+  useEffect(() => {
+    if (!isNative || stepId !== 'plan-pick' || autoFinalized.current) return;
+    autoFinalized.current = true;
+    void onFinalize();
+  }, [isNative, stepId, onFinalize]);
+
   // Continue-button enable state per step.
   const continueDisabled = (): boolean => {
     switch (stepId) {
@@ -644,7 +659,13 @@ function OnboardingWizard({
       onCefrPickContinue();
       return;
     case 'testimonials':
-      advance('plan-pick');
+      // The store-app shell must not show the plan picker (store payment
+      // policies) — onboarding finishes on the auto-enabled free tier.
+      if (isNative) {
+        await onFinalize();
+      } else {
+        advance('plan-pick');
+      }
       return;
     default:
       return;
@@ -664,19 +685,28 @@ function OnboardingWizard({
   // during render — `react-hooks/refs` can't tell these aren't refs, so the
   // rule fires a false positive here.
    
-  const stepNode = renderStep({
-    stepId,
-    data,
-    persist,
-    onPlacementComplete,
-    onCustomizingReady,
-    customizingMountAction,
-    setCefrSlidLevel,
-    lessonSummary,
-    setLessonSummary,
-    onAdvance: advance,
-    onFinalize,
-  });
+  // In the store-app shell the plan picker never renders — the auto-finalize
+  // effect above is already navigating to /app, so bridge with a spinner.
+  const stepNode =
+    isNative && stepId === 'plan-pick' ? (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    ) : (
+      renderStep({
+        stepId,
+        data,
+        persist,
+        onPlacementComplete,
+        onCustomizingReady,
+        customizingMountAction,
+        setCefrSlidLevel,
+        lessonSummary,
+        setLessonSummary,
+        onAdvance: advance,
+        onFinalize,
+      })
+    );
 
   return (
     <div className="h-dvh max-h-dvh flex flex-col overflow-hidden">
@@ -684,7 +714,7 @@ function OnboardingWizard({
           lesson's own chrome takes over) and on the final plan-pick step
           (the pricing CTAs need the full canvas). */}
       {stepId !== 'first-lesson' && stepId !== 'plan-pick' ? (
-        <div className="bg-background border-b shrink-0">
+        <div className="bg-background border-b shrink-0 pt-[var(--safe-top)]">
           <div className="container mx-auto px-4 py-3">
             <Progress value={progressPct} className="h-1.5" />
           </div>
@@ -703,7 +733,7 @@ function OnboardingWizard({
       </main>
 
       {!stepHasOwnAdvance ? (
-        <div className="border-t bg-background shrink-0">
+        <div className="border-t bg-background shrink-0 pb-[var(--safe-bottom)]">
           <div className="container mx-auto px-4 py-3">
             <div className="flex items-center justify-between gap-4">
               {history.length > 0 && !POST_CUSTOMIZING_STEPS.has(stepId) ? (
