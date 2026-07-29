@@ -131,6 +131,15 @@
       "attribution": {
         "label": "Quellenangaben",
         "text": "Viele der Sätze stammen aus dem umfangreichen Datensatz von <tatoeba>Tatoeba</tatoeba>, veröffentlicht unter einer <ccby>CC-BY-Lizenz</ccby>."
+      },
+      "deleteAccount": {
+        "button": "Konto löschen",
+        "title": "Konto wirklich löschen?",
+        "description": "Dein Konto, deine Kurse und dein Lernfortschritt werden innerhalb von 30 Tagen dauerhaft gelöscht. Das kann nicht rückgängig gemacht werden. Du wirst jetzt abgemeldet.",
+        "confirm": "Konto endgültig löschen",
+        "cancel": "Abbrechen",
+        "success": "Löschung beantragt — dein Konto wird innerhalb von 30 Tagen gelöscht.",
+        "error": "Die Löschung konnte nicht beantragt werden. Versuche es erneut oder schreibe an support@flexling.com."
       }
     },
     "deckCards": {
@@ -743,6 +752,8 @@
   "PaymentOverdue": {
     "title": "Zahlung überfällig",
     "description": "Deine letzte Zahlung ist fehlgeschlagen. Bitte aktualisiere deine Zahlungsmethode, um dein Abo aktiv zu halten.",
+    "nativeDescription": "Es gibt ein Problem mit deinem Abo. Kontaktiere uns unter support@flexling.com — wir kümmern uns darum.",
+    "contactUs": "Kontakt",
     "blockedDescription": "Deine Zahlung ist seit dem {date} überfällig. Der Zugriff ist pausiert, bis die Zahlung abgeschlossen ist.",
     "payInvoiceButton": "Rechnung bezahlen",
     "payButton": "Zahlungsmethode aktualisieren",
@@ -1524,7 +1535,7 @@
   "Consent": {
     "banner": {
       "title": "Cookies und Analyse",
-      "description": "Dürfen wir Analyse-Cookies und Sitzungsaufzeichnungen (deine Texteingaben bleiben verborgen) verwenden, um die App zu verbessern? Details:",
+      "description": "Dürfen wir Analyse-Cookies und Sitzungsaufzeichnungen verwenden, um die App zu verbessern? Details:",
       "privacyLink": "Datenschutzerklärung",
       "accept": "Alle akzeptieren",
       "reject": "Optionale ablehnen",

@@ -13,6 +13,8 @@ import { authClient } from '@/lib/auth-client';
 import { LogOut, Mail } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import PricingTable from '@/components/autumn/pricing-table';
+import { useIsNativeApp } from '@/hooks/use-native-app';
+import { DeleteAccountSection } from '@/components/app/DeleteAccountSection';
 
 const SUPPORT_EMAIL = 'support@flexling.com';
 
@@ -20,6 +22,7 @@ export function SettingsView({ activeView }: { activeView: View }) {
   const t = useTranslations('AppPage');
   const tFooter = useTranslations('Footer');
   const tAuth = useTranslations('Auth');
+  const isNative = useIsNativeApp();
   const authUser = useQuery(api.auth.getAuthUser);
   const userEmail = (authUser as Record<string, unknown> | null | undefined)?.email as string | undefined;
 
@@ -73,9 +76,15 @@ export function SettingsView({ activeView }: { activeView: View }) {
               <LanguageSwitcher />
             </div>
 
-            <Separator/> 
-
-            <PricingTable />
+            {/* Plans are not shown in the store-app shell (store payment
+                policies) — PricingTable also self-hides, this just keeps the
+                separators from doubling up. */}
+            {!isNative && (
+              <>
+                <Separator />
+                <PricingTable />
+              </>
+            )}
 
             <Separator />
 
@@ -177,6 +186,7 @@ export function SettingsView({ activeView }: { activeView: View }) {
                 <LogOut className="h-4 w-4 mr-2" />
                 {tAuth('SIGN_OUT')}
               </Button>
+              <DeleteAccountSection />
             </div>
           </CardContent>
         </Card>

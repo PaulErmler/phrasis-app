@@ -57,9 +57,10 @@ and `convex deploy` fail without it. Everything else degrades gracefully: a buil
 with no `NEXT_PUBLIC_POSTHOG_KEY` simply never initializes PostHog.
 
 `POSTHOG_PERSONAL_API_KEY` is deliberately **not** set. It would enable local
-feature-flag evaluation, which makes the component run its own internal cron —
-and this project is cron-free by design. Flags, if ever needed, work through the
-action-only remote `evaluateFlag` path with no key and no cron.
+feature-flag evaluation, which makes the component poll PostHog for flag
+definitions in a background refresh loop — pointless load while nothing uses
+flags. Flags, if ever needed, work through the action-only remote
+`evaluateFlag` path with no key, or by setting the key to get local evaluation.
 
 ### 4. Enable session replay
 

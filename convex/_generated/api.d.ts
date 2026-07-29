@@ -47,6 +47,7 @@ import type * as db_stats_yearlyStats from "../db/stats/yearlyStats.js";
 import type * as db_translationSeed from "../db/translationSeed.js";
 import type * as db_userProfiles from "../db/userProfiles.js";
 import type * as db_users from "../db/users.js";
+import type * as features_accountDeletion from "../features/accountDeletion.js";
 import type * as features_chat_agent from "../features/chat/agent.js";
 import type * as features_chat_cardApprovals from "../features/chat/cardApprovals.js";
 import type * as features_chat_constants from "../features/chat/constants.js";
@@ -155,6 +156,7 @@ declare const fullApi: ApiFromModules<{
   "db/translationSeed": typeof db_translationSeed;
   "db/userProfiles": typeof db_userProfiles;
   "db/users": typeof db_users;
+  "features/accountDeletion": typeof features_accountDeletion;
   "features/chat/agent": typeof features_chat_agent;
   "features/chat/cardApprovals": typeof features_chat_cardApprovals;
   "features/chat/constants": typeof features_chat_constants;
@@ -256,5 +258,6 @@ export declare const components: {
   llmPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"llmPool">;
   ttsPool: import("@convex-dev/workpool/_generated/component.js").ComponentApi<"ttsPool">;
   migrations: import("@convex-dev/migrations/_generated/component.js").ComponentApi<"migrations">;
+  resend: import("@convex-dev/resend/_generated/component.js").ComponentApi<"resend">;
   posthog: import("@posthog/convex/_generated/component.js").ComponentApi<"posthog">;
 };

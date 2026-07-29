@@ -104,19 +104,10 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
       enabled: true,
       requireEmailVerification: false,
     },
-    user: {
-      // In-app account deletion — required by App Store Guideline 5.1.1(v)
-      // for any app with account creation. The onDelete trigger above cleans
-      // up the userProfiles mirror.
-      deleteUser: {
-        enabled: true,
-      },
-    },
-    session: {
-      // Lets social-only accounts (no password to re-enter) pass the
-      // delete-account freshness check if they signed in within a day.
-      freshAge: 60 * 60 * 24,
-    },
+    // Account deletion is deliberately NOT self-serve (`user.deleteUser`
+    // stays disabled): deleting only the Better Auth user would orphan all
+    // app data and the Autumn/Stripe subscription. Deletion goes through
+    // features/accountDeletion.ts (support request, manual fulfillment).
     socialProviders: {
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID as string,
@@ -132,15 +123,30 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
       process.env.APPLE_KEY_ID &&
       process.env.APPLE_PRIVATE_KEY
         ? {
-          apple: async () => ({
-            clientId: process.env.APPLE_CLIENT_ID as string,
-            clientSecret: await appleClientSecret(),
-            // Audience of identity tokens minted by the native iOS app
-            // (the Capacitor shell signs in with an idToken, not a
-            // browser redirect).
-            appBundleIdentifier:
-                process.env.APPLE_APP_BUNDLE_IDENTIFIER ?? 'com.flexling.app',
-          }),
+          apple: async () => {
+            // Better Auth resolves ALL providers together — if this throws,
+            // Google/email sign-in break too. A bad Apple key must only
+            // disable Apple (returning null skips the provider).
+            try {
+              return {
+                clientId: process.env.APPLE_CLIENT_ID as string,
+                clientSecret: await appleClientSecret(),
+                // Audience of identity tokens minted by the native iOS app
+                // (the Capacitor shell signs in with an idToken, not a
+                // browser redirect).
+                appBundleIdentifier:
+                    process.env.APPLE_APP_BUNDLE_IDENTIFIER ?? 'com.flexling.app',
+              };
+            } catch (err) {
+              console.error(
+                'Sign in with Apple disabled: client secret generation failed ' +
+                  '(check APPLE_PRIVATE_KEY formatting):',
+                err,
+              );
+              // `enabled: false` makes Better Auth skip the provider.
+              return { enabled: false, clientId: '', clientSecret: '' };
+            }
+          },
         }
         : {}),
     },

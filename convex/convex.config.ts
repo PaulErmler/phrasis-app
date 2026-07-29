@@ -9,6 +9,7 @@ import actionRetrier from '@convex-dev/action-retrier/convex.config';
 import rateLimiter from '@convex-dev/rate-limiter/convex.config';
 import workpool from '@convex-dev/workpool/convex.config';
 import migrations from '@convex-dev/migrations/convex.config';
+import resend from '@convex-dev/resend/convex.config';
 
 const app = defineApp({
   env: {
@@ -31,14 +32,17 @@ app.use(workpool, { name: 'ttsPool' });
 // Batched, resumable data migrations. Chained after every deploy via
 // `npx convex run migrations:runAll --prod` (completed ones are skipped).
 app.use(migrations);
+// Transactional email (account-deletion requests to support@). Needs
+// RESEND_API_KEY in the deployment env.
+app.use(resend);
 /**
  * Server-side analytics, cost events and exception capture.
  *
  * `POSTHOG_PERSONAL_API_KEY` is deliberately NOT forwarded: setting it turns on
- * local feature-flag evaluation, which makes the component run its own internal
- * cron to refresh flag definitions. This project is cron-free by design, and
- * nothing here needs flags. If they're ever wanted, the action-only remote
- * `evaluateFlag` path works without the key and without a cron.
+ * local feature-flag evaluation, which makes the component poll PostHog for
+ * flag definitions in a background refresh loop — pointless load while nothing
+ * here uses flags. If they're ever wanted, either forward the key or use the
+ * action-only remote `evaluateFlag` path, which works without it.
  */
 app.use(posthog, {
   env: {
