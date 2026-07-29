@@ -186,7 +186,10 @@ describe('mergeCardAudio — sequencing', () => {
     expect(r!.speedByLanguage).toEqual({ en: 1, es: 2 });
   });
 
-  it('base reps all zero: the two target groups are separated by pauseT2T', async () => {
+  it('base reps all zero: the silent base group keeps its surrounding pauses', async () => {
+    // The base language is still in the composition — it just plays 0 times.
+    // The pauses the user sees around it (pauseT2B, pauseB2T) must still
+    // elapse as silence instead of the groups snapping together.
     const r = await mergeCardAudio(
       recs(['en', 'es']),
       ['en'],
@@ -194,14 +197,72 @@ describe('mergeCardAudio — sequencing', () => {
       settings({
         playTargetBefore: true,
         playTargetAfter: true,
-        reps: { en: 0, es: 1 }, // base en filtered out (reps 0); after es kept
+        reps: { en: 0, es: 1 }, // base en silent (reps 0); after es kept
+        beforeReps: { es: 1 },
+        pauseT2B: 4,
+        pauseB2T: 5,
+      }),
+    );
+    expect(r!.languageCues).toEqual([
+      cue('es', 0, 1, false), // before play (es also plays after → no reveal)
+      cue('es', 10, 1, true), // 1.0s before + 4s pauseT2B + silent base + 5s pauseB2T
+    ]);
+    expect(r!.durationSec).toBe(11);
+  });
+
+  it('base reps zero, after-only: pauseB2T still plays as leading silence', async () => {
+    // Regression: zeroing base reps used to drop pauseB2T entirely, so the
+    // target blasted out instantly even though settings still showed a pause.
+    const r = await mergeCardAudio(
+      recs(['en', 'es']),
+      ['en'],
+      ['es'],
+      settings({
+        reps: { en: 0, es: 1 },
+        pauseB2T: 5,
+      }),
+    );
+    expect(r!.languageCues).toEqual([
+      cue('es', 5, 1, true), // 5s leading silence (pauseB2T), then the target
+    ]);
+    expect(r!.durationSec).toBe(6);
+  });
+
+  it('base reps zero, before-only: pauseT2B still elapses as trailing silence', async () => {
+    const r = await mergeCardAudio(
+      recs(['en', 'es']),
+      ['en'],
+      ['es'],
+      settings({
+        playTargetBefore: true,
+        playTargetAfter: false,
+        reps: { en: 0 },
+        beforeReps: { es: 1 },
+        pauseT2B: 5,
+      }),
+    );
+    expect(r!.languageCues).toEqual([cue('es', 0, 1, true)]);
+    expect(r!.durationSec).toBe(6); // 1.0s before clip + 5s pauseT2B silence
+  });
+
+  it('no base in the composition (e.g. transcribe): no phantom pauses added', async () => {
+    // orderedBase empty means base is deliberately excluded — target groups
+    // are separated by pauseT2T and no base-adjacent silence appears.
+    const r = await mergeCardAudio(
+      recs(['es']),
+      [],
+      ['es'],
+      settings({
+        playTargetBefore: true,
+        playTargetAfter: true,
+        reps: { es: 1 },
         beforeReps: { es: 1 },
         pauseT2T: 3,
       }),
     );
     expect(r!.languageCues).toEqual([
-      cue('es', 0, 1, false), // before play (es also plays after → no reveal)
-      cue('es', 4, 1, true), // 1.0s before + 3s pauseT2T (no base between)
+      cue('es', 0, 1, false),
+      cue('es', 4, 1, true), // 1.0s before + 3s pauseT2T (no base in composition)
     ]);
     expect(r!.durationSec).toBe(5);
   });
