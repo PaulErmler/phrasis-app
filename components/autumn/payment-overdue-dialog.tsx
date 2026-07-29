@@ -10,6 +10,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { CreditCard, Loader2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { CLIENT_EVENTS, capture } from "@/lib/posthog/events";
+import { useImpression } from "@/lib/posthog/use-impression";
 import { usePathname } from "next/navigation";
 import { useAction, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
@@ -102,11 +104,20 @@ function PaymentOverdueDialogContent({
   }, []);
 
   const invoiceUrl = quotas.pastDueInvoiceUrl;
+
+  // This dialog is a hard block on the whole app, so its volume is a direct
+  // measure of involuntary churn. `open` is unconditional here (the component
+  // only mounts while past due), so the impression is edge-triggered on mount.
+  useImpression(CLIENT_EVENTS.PAYMENT_PAST_DUE_SHOWN, true, {
+    has_invoice_url: quotas.pastDueInvoiceUrl !== undefined,
+    active_course_count: quotas.activeCourseCount,
+  });
   // Free keeps exactly one active course, so everything above that goes.
   const coursesArchived = Math.max(quotas.activeCourseCount - 1, 0);
 
   const handlePay = () => {
     if (!invoiceUrl) return;
+    capture(CLIENT_EVENTS.CHECKOUT_REDIRECTED, { flow: 'past_due_invoice' });
     setBusy("pay");
     window.location.href = invoiceUrl;
   };

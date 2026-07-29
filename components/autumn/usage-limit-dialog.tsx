@@ -9,6 +9,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Mail } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { CLIENT_EVENTS } from "@/lib/posthog/events";
+import { useImpression } from "@/lib/posthog/use-impression";
 import { getFeatureI18nKey } from "@/lib/features/feature-meta";
 import { isCreditBackedFeature } from "@/convex/features/featureIds";
 
@@ -30,6 +32,13 @@ export default function UsageLimitDialog({
 }: UsageLimitDialogProps) {
   const t = useTranslations("Paywall");
   const tFeatures = useTranslations("Features");
+
+  // Distinct from the paywall: this is the dead-end variant with no upgrade
+  // path, so its volume is a signal that a feature needs a plan to sell into.
+  useImpression(CLIENT_EVENTS.PAYWALL_SHOWN, open, {
+    feature_id: featureId,
+    variant: 'no_upgrade_path',
+  });
 
   const featureName = tFeatures(
     `${isCreditBackedFeature(featureId) ? "credits" : getFeatureI18nKey(featureId)}.name`,

@@ -26,6 +26,8 @@ import { useCustomer, usePricingTable } from "autumn-js/react";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useLocale, useTranslations } from "next-intl";
+import { CLIENT_EVENTS, capture } from "@/lib/posthog/events";
+import { reportError } from "@/lib/report-error";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -181,6 +183,13 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
                   // Card is normally on file during a trial; if Autumn
                   // still needs payment action, send the user there.
                   if (result.paymentUrl) {
+                    // Last event before the user leaves our domain. The session
+                    // (and any replay) ends here and resumes as a fresh page
+                    // load on return, so the funnel needs this bookend.
+                    capture(CLIENT_EVENTS.CHECKOUT_REDIRECTED, {
+                      product_id: checkoutResult.product.id,
+                      flow: 'trial_switch',
+                    });
                     window.location.href = result.paymentUrl;
                     return;
                   }
@@ -191,6 +200,12 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
                     quantity: option.quantity,
                   }));
 
+                  // Autumn's `attach` hands off to Stripe's hosted page, so
+                  // this is the last thing observable on our domain.
+                  capture(CLIENT_EVENTS.CHECKOUT_REDIRECTED, {
+                    product_id: checkoutResult.product.id,
+                    flow: trialState.trialEligible ? 'trial_start' : 'purchase',
+                  });
                   await attach({
                     productId: checkoutResult.product.id,
                     ...(params.checkoutParams || {}),
@@ -202,7 +217,11 @@ export default function CheckoutDialog(params: CheckoutDialogProps) {
               } catch (e) {
                 // Surface the failure — a silently-reset dialog looks like
                 // nothing happened (this hid the trial-gate rejection).
-                console.error("Checkout failed:", e);
+                capture(CLIENT_EVENTS.CHECKOUT_FAILED, {
+                  product_id: checkoutResult.product.id,
+                  is_trial_switch: isTrialSwitch,
+                });
+                reportError(e, { op: 'checkout.confirm' });
                 toast.error(t("confirmError"));
               } finally {
                 setLoading(false);

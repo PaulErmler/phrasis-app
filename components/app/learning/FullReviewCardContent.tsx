@@ -1046,7 +1046,11 @@ function TargetLanguageInput({
           onChange={(e) => onInputChange(translation.language, e.target.value)}
           onKeyDown={handleKeyDown}
           {...compositionProps}
-          placeholder={placeholder}
+          // FSI/PDI-isolate the placeholder: the input's dir follows the
+          // target language, but the placeholder is UI-locale text — for RTL
+          // targets the bidi algorithm would otherwise drag the trailing
+          // "..." to the visual start.
+          placeholder={`\u{2068}${placeholder}\u{2069}`}
           lang={inputLang}
           dir={getTextDirection(translation.language)}
           className="flex-1 text-left"

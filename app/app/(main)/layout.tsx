@@ -14,6 +14,8 @@ import { ChevronLeft, MessageSquarePlus, PanelLeft } from 'lucide-react';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { getUserTimezone } from '@/lib/timezone';
+import { reportError } from '@/lib/report-error';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { HomeView } from '@/components/app/HomeView';
 import { AddCardsView } from '@/components/app/AddCardsView';
 import { LibraryView } from '@/components/app/LibraryView';
@@ -151,7 +153,12 @@ export default function MainLayout({
     null,
   );
   const refreshPrefetchedThread = useCallback(() => {
-    getOrCreateEmptyThread({}).then(setPrefetchedThreadId).catch(() => {});
+    getOrCreateEmptyThread({})
+      .then(setPrefetchedThreadId)
+      // Non-fatal: LearnView creates a thread on demand if this never lands.
+      // Reported rather than swallowed, because a persistent failure here is
+      // invisible to the user and shows up only as chat feeling slow.
+      .catch((err) => reportError(err, { op: 'prefetchEmptyThread' }));
   }, [getOrCreateEmptyThread]);
 
   const didPrefetchThread = useRef(false);
@@ -217,6 +224,11 @@ export default function MainLayout({
     router.push('/app/content/add-cards');
   }, [router]);
 
+  // Wall-clock start of the current learn session, used to derive its duration
+  // on close. Deliberately a ref: this must not trigger a re-render of a layout
+  // that owns every tab in the app.
+  const learnStartedAtRef = useRef<number | null>(null);
+
   // Learn overlay — pushState so the browser back button can close it
   const handleLearnOpen = useCallback(() => {
     setIsLearnOpen(true);
@@ -224,7 +236,16 @@ export default function MainLayout({
     setHasVisitedLibrary(false);
     history.pushState(null, '', '/app/learn');
     refreshPrefetchedThread();
-  }, [refreshPrefetchedThread]);
+    learnStartedAtRef.current = Date.now();
+    // Session-level, not per-review: the per-review detail already lives in
+    // dailyStats/courseStats, and duplicating it into PostHog would dominate
+    // the event bill for no analytical gain.
+    capture(CLIENT_EVENTS.REVIEW_SESSION_STARTED, {
+      course_id: activeCourse?._id,
+      target_languages: activeCourse?.targetLanguages,
+      current_level: activeCourse?.currentLevel,
+    });
+  }, [refreshPrefetchedThread, activeCourse]);
 
   const handleLearnClose = useCallback(() => {
     setJustReturnedFromLearn(true);
@@ -234,7 +255,15 @@ export default function MainLayout({
     setIsLearnOpen(false);
     history.back();
     refreshPrefetchedThread();
-  }, [refreshPrefetchedThread]);
+    const startedAt = learnStartedAtRef.current;
+    learnStartedAtRef.current = null;
+    capture(CLIENT_EVENTS.REVIEW_SESSION_ENDED, {
+      duration_ms: startedAt === null ? undefined : Date.now() - startedAt,
+      course_id: activeCourse?._id,
+      target_languages: activeCourse?.targetLanguages,
+      current_level: activeCourse?.currentLevel,
+    });
+  }, [refreshPrefetchedThread, activeCourse]);
 
   // Sync state when the user navigates with browser back/forward buttons
   // (including iOS/Android edge-swipe back gestures).

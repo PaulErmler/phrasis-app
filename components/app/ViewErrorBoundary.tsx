@@ -4,6 +4,8 @@ import { Component } from 'react';
 import type { ErrorInfo, ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 
+import { reportError } from '@/lib/report-error';
+
 interface ViewErrorBoundaryInnerProps {
   title: string;
   description: string;
@@ -39,7 +41,10 @@ class ViewErrorBoundaryInner extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ViewErrorBoundary caught error:', error, errorInfo);
+    reportError(error, {
+      boundary: 'view',
+      componentStack: errorInfo.componentStack,
+    });
   }
 
   render() {

@@ -54,7 +54,11 @@ export function SettingsView({ activeView }: { activeView: View }) {
                 </label>
                 <div className="flex items-center gap-2 p-3 surface-muted">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm">{userEmail}</span>
+                  {/* Hidden from session replay — masking happens in the
+                      browser, so the address never reaches PostHog. */}
+                  <span className="text-sm" data-ph-mask>
+                    {userEmail}
+                  </span>
                 </div>
               </div>
             )}

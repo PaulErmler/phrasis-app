@@ -21,7 +21,13 @@ import { trackEvent } from '../db/stats/dailyStats';
 import { isValidTimezone } from '../lib/dateUtils';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { OPENROUTER_MODELS } from '../config/aiModels';
+import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import { EVENTS, track } from '../analytics';
+import {
+  captureGeneration,
+  openrouterCostUsd,
+  openrouterGenerationId,
+} from '../lib/posthogAi';
 import { resolveAudioSpeakerGender } from '../../lib/languages';
 import { validateSentenceMetadata } from './sentenceMetadata';
 
@@ -282,9 +288,11 @@ export const autoFillTranslations = action({
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY,
+      extraBody: OPENROUTER_USAGE_ACCOUNTING,
     });
 
-    const { text } = await generateText({
+    const startedAt = Date.now();
+    const { text, usage, providerMetadata } = await generateText({
       model: openrouter(OPENROUTER_MODELS.translationAutoFill),
       system: TRANSLATION_SYSTEM_PROMPT,
       prompt: userPrompt,
@@ -298,6 +306,24 @@ export const autoFillTranslations = action({
             effort: AUTOFILL_REASONING as 'low' | 'medium' | 'high',
           },
         },
+      },
+    });
+
+    // Billed as a flat 1 unit of `translation_auto_fill` regardless of how many
+    // languages were requested, so the real cost only becomes visible here.
+    await captureGeneration(ctx, {
+      distinctId: userId,
+      feature: 'translation_autofill',
+      model: OPENROUTER_MODELS.translationAutoFill,
+      provider: 'openrouter',
+      latencyMs: Date.now() - startedAt,
+      inputTokens: usage?.inputTokens,
+      outputTokens: usage?.outputTokens,
+      costUsd: openrouterCostUsd(providerMetadata),
+      traceId: openrouterGenerationId(providerMetadata),
+      extra: {
+        target_language_count: targetLanguages.length,
+        target_languages: targetLanguages,
       },
     });
 
@@ -547,6 +573,7 @@ export const createCustomText = mutation({
 
     // Track manual card creation event
     await trackEvent(ctx, { userId, courseId: course._id, timezone: args.timezone, field: 'cardsAddedManually' });
+    await track(ctx, userId, EVENTS.CARDS_ADDED, { count: 1, source: 'manual' });
 
     return { textId };
   },
@@ -696,6 +723,14 @@ export const createCustomTextsBatch = mutation({
       timezone: args.timezone,
       field: 'cardsAddedManually',
       count: accepted.length,
+    });
+
+    // `skipped` is the interesting half: a high skip rate means the import
+    // parser is rejecting what people actually paste.
+    await track(ctx, userId, EVENTS.CARDS_ADDED, {
+      count: accepted.length,
+      skipped: skipped.length,
+      source: 'bulk_import',
     });
 
     return { createdTextIds, skipped };

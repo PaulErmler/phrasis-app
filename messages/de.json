@@ -1520,5 +1520,31 @@
     "noWordsYet": "Noch keine Wörter",
     "loadMore": "Mehr laden",
     "clearSearch": "Suche zurücksetzen"
+  },
+  "Consent": {
+    "banner": {
+      "title": "Cookies und Analyse",
+      "description": "Dürfen wir Analyse-Cookies und Sitzungsaufzeichnungen (deine Texteingaben bleiben verborgen) verwenden, um die App zu verbessern? Details:",
+      "privacyLink": "Datenschutzerklärung",
+      "accept": "Alle akzeptieren",
+      "reject": "Optionale ablehnen",
+      "customize": "Anpassen"
+    },
+    "settings": {
+      "title": "Cookie-Einstellungen",
+      "description": "Wähle aus, was wir messen dürfen. Deine Auswahl gilt für diesen Browser und lässt sich jederzeit ändern.",
+      "save": "Einstellungen speichern"
+    },
+    "categories": {
+      "necessary": {
+        "title": "Unbedingt erforderlich",
+        "description": "Hält dich angemeldet und merkt sich Sprache und Ansicht. Ohne diese funktioniert die App nicht, deshalb lassen sie sich nicht abschalten."
+      },
+      "analytics": {
+        "title": "Produktanalyse und Sitzungsaufzeichnung",
+        "description": "Hilft uns zu sehen, welche Funktionen genutzt werden, wo das Onboarding scheitert und auf welche Fehler Nutzerinnen und Nutzer stoßen. Enthält Bildschirmaufzeichnungen, bei denen alles, was du in Formularfelder eingibst, schon im Browser verborgen wird. Wenn du ablehnst, messen wir die Nutzung weiterhin ohne Cookies und ohne Aufzeichnungen."
+      }
+    },
+    "footerLink": "Cookie-Einstellungen"
   }
 }

@@ -3,6 +3,7 @@
 import { useState, type ComponentProps } from 'react';
 import { Lock } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { Button } from '@/components/ui/button';
 import { FeatureBadge } from './FeatureBadge';
 import { useFeatureQuota } from './useFeatureQuota';
@@ -45,7 +46,16 @@ export function FeatureGatedButton({
         <Button
           {...buttonProps}
           className={className}
-          onClick={() => setPaywallOpen(true)}
+          onClick={() => {
+            // Covers every gated surface in one place — the other 17
+            // `consumeQuota` sites all reject inside a mutation, whose rollback
+            // would discard any event the backend tried to record.
+            capture(CLIENT_EVENTS.QUOTA_EXHAUSTED, {
+              feature_id: featureId,
+              surface: 'gated_button',
+            });
+            setPaywallOpen(true);
+          }}
         >
           <Lock className="h-4 w-4" />
           {label}

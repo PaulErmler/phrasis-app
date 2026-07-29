@@ -4,7 +4,12 @@ import { internal } from '../_generated/api';
 import { translationEntriesValidator } from '../types';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { OPENROUTER_MODELS } from '../config/aiModels';
+import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import {
+  captureGeneration,
+  openrouterCostUsd,
+  openrouterGenerationId,
+} from '../lib/posthogAi';
 import { getLanguageByCode, resolveAudioSpeakerGender } from '../../lib/languages';
 import { retrier } from '../retrier';
 
@@ -272,12 +277,29 @@ export const fetchSentenceMetadata = internalAction({
 
     const openrouter = createOpenRouter({
       apiKey: process.env.OPENROUTER_API_KEY,
+      extraBody: OPENROUTER_USAGE_ACCOUNTING,
     });
 
-    const { text } = await generateText({
+    const startedAt = Date.now();
+    const { text, usage, providerMetadata } = await generateText({
       model: openrouter(OPENROUTER_MODELS.sentenceMetadata),
       system: METADATA_SYSTEM_PROMPT,
       prompt: userPrompt,
+    });
+
+    // Fires once per newly-created card and was previously both unmetered and
+    // unbilled — i.e. pure invisible cost that scales with content growth.
+    await captureGeneration(ctx, {
+      feature: 'sentence_metadata',
+      model: OPENROUTER_MODELS.sentenceMetadata,
+      provider: 'openrouter',
+      latencyMs: Date.now() - startedAt,
+      inputTokens: usage?.inputTokens,
+      outputTokens: usage?.outputTokens,
+      costUsd: openrouterCostUsd(providerMetadata),
+      traceId: openrouterGenerationId(providerMetadata),
+      sharedContent: true,
+      extra: { text_id: args.textId },
     });
 
     const metadata = safeExtractMetadata(text);

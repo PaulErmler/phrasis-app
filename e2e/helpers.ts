@@ -482,7 +482,9 @@ export async function signUpFreshUser(
   for (let i = 0; i < passwordCount; i++) {
     await passwordFields.nth(i).fill(creds.password);
   }
-  const acceptCookies = page.getByRole("button", { name: /accept all/i });
+  // Locale-proof: the banner copy is translated (en/de), so match the testid
+  // rather than the accessible name.
+  const acceptCookies = page.getByTestId("consent-accept");
   if (await acceptCookies.count()) {
     await acceptCookies.first().click().catch(() => {});
   }

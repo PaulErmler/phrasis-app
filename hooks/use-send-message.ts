@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import { ERROR_MESSAGES, CHAT_STATUS } from '@/lib/constants/chat';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
 import type { ChatStatus } from '@/lib/types/chat';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import { reportError } from '@/lib/report-error';
 
 interface UseSendMessageProps {
   threadId: string;
@@ -73,7 +75,17 @@ export function useSendMessage({
         }
       } catch (error) {
         if (error instanceof ConvexError) {
-          switch (convexErrorCode(error)) {
+          const code = convexErrorCode(error);
+          // Captured here rather than in `sendMessage`: the mutation threw, so
+          // everything it scheduled — including any analytics event — rolled
+          // back with it. The client is the only place these failures exist.
+          capture(CLIENT_EVENTS.CHAT_MESSAGE_FAILED, {
+            code: code ?? 'UNKNOWN',
+            message_chars: prompt.length,
+            has_card_context: cardId !== undefined,
+          });
+
+          switch (code) {
             // Swallowed silently: the reactive payment-overdue dialog is the
             // canonical surface for this state (see isPaymentPastDueError).
             case 'PAYMENT_PAST_DUE': {
@@ -85,6 +97,7 @@ export function useSendMessage({
             case 'USAGE_LIMIT': {
               const featureId =
                 (error.data as { featureId?: string })?.featureId ?? FEATURE_IDS.CHAT_MESSAGES;
+              capture(CLIENT_EVENTS.QUOTA_EXHAUSTED, { feature_id: featureId, surface: 'chat' });
               if (onUsageLimit) {
                 onUsageLimit(featureId);
               }
@@ -114,7 +127,7 @@ export function useSendMessage({
           }
         }
 
-        console.error('Failed to send message:', error);
+        reportError(error, { op: 'sendMessage', threadId });
         toast.error(ERROR_MESSAGES.FAILED_TO_SEND);
 
         if (setStatus) {

@@ -10,6 +10,7 @@ import { query } from './_generated/server';
 import { betterAuth } from 'better-auth';
 import authConfig from './auth.config';
 import { upsertUserProfile, deleteUserProfile } from './db/userProfiles';
+import { EVENTS, track } from './analytics';
 
 const siteUrl = process.env.SITE_URL;
 if (!siteUrl) throw new Error('Missing required Convex environment variable: SITE_URL');
@@ -28,6 +29,12 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
     user: {
       onCreate: async (ctx, doc) => {
         await upsertUserProfile(ctx, doc);
+        // Top of every funnel. `doc._id` is the Better Auth user id — the same
+        // string the client identifies with and Autumn bills, so this event
+        // lands on the person the rest of the timeline accrues to. No email or
+        // name here: person data reaches PostHog only via the consent-gated
+        // client-side identify.
+        await track(ctx, doc._id, EVENTS.USER_SIGNED_UP);
       },
       onUpdate: async (ctx, newDoc) => {
         await upsertUserProfile(ctx, newDoc);

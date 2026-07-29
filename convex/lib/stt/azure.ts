@@ -93,7 +93,7 @@ export async function transcribeAudio(
   blob: Blob,
   internalLanguageCode?: string,
   opts: TranscribeOptions = {},
-): Promise<{ text: string; wordTimings: WordTiming[] }> {
+): Promise<{ text: string; wordTimings: WordTiming[]; audioDurationMs?: number }> {
   const apiKey = process.env.AZURE_SPEECH_API_KEY;
   const region = process.env.AZURE_SPEECH_REGION;
   if (!apiKey) throw new Error('AZURE_SPEECH_API_KEY is not configured');
@@ -153,5 +153,9 @@ export async function transcribeAudio(
     }
   }
 
-  return { text, wordTimings };
+  // Azure bills per hour of audio, and this is the figure it billed on — so
+  // it is the only honest input for a cost event. Optional because the field is
+  // absent on some response shapes; callers fall back to skipping the cost
+  // rather than inventing one.
+  return { text, wordTimings, audioDurationMs: data.durationMilliseconds };
 }

@@ -12,6 +12,7 @@ import { getCourseSettings } from '../db/courseSettings';
 import { getCollectionProgress } from '../db/collections';
 import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
+import { EVENTS, track } from '../analytics';
 import { updateWordTextsForEdit } from '../db/stats/wordTracking';
 import { recordReviewStats } from '../db/stats/recordReviewStats';
 import { recordRadioPlayStats } from '../db/stats/recordRadioPlayStats';
@@ -98,6 +99,30 @@ async function authorizeCardAccess(ctx: MutationCtx, cardId: Id<'cards'>) {
     throw new ConvexError('Unauthorized');
 
   return { userId, card, deck, course };
+}
+
+/**
+ * One `card_action` event for every deliberate action a user takes on a card.
+ *
+ * Deliberately NOT fired on review — ratings are the highest-frequency thing in
+ * the app and are already recorded, with far more detail, in `dailyStats` /
+ * `courseStats` / `reviewDepthAccuracy`. These are the low-volume, intentful
+ * actions: the ones that say something about how people curate their deck.
+ */
+async function trackCardAction(
+  ctx: MutationCtx,
+  userId: string,
+  action: string,
+  card: Doc<'cards'>,
+  extra?: Record<string, unknown>,
+): Promise<void> {
+  await track(ctx, userId, EVENTS.CARD_ACTION, {
+    action,
+    card_id: card._id,
+    collection_id: card.collectionId,
+    scheduling_phase: card.schedulingPhase,
+    ...extra,
+  });
 }
 
 // ============================================================================
@@ -965,8 +990,9 @@ export const masterCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { card } = await authorizeCardAccess(ctx, args.cardId);
+    const { userId, card } = await authorizeCardAccess(ctx, args.cardId);
     await patchCard(ctx, args.cardId, { isMastered: true }, card);
+    await trackCardAction(ctx, userId, 'master', card);
     return null;
   },
 });
@@ -980,8 +1006,9 @@ export const hideCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { card } = await authorizeCardAccess(ctx, args.cardId);
+    const { userId, card } = await authorizeCardAccess(ctx, args.cardId);
     await patchCard(ctx, args.cardId, { isHidden: true }, card);
+    await trackCardAction(ctx, userId, 'hide', card);
     return null;
   },
 });
@@ -1047,8 +1074,11 @@ export const deleteCardPermanently = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { card } = await authorizeCardAccess(ctx, args.cardId);
+    const { userId, card } = await authorizeCardAccess(ctx, args.cardId);
     const textId = card.textId;
+    // Tracked before the delete — `card` is still readable, and the event is
+    // rolled back with the mutation if the cascade throws.
+    await trackCardAction(ctx, userId, 'delete', card);
     await deleteCard(ctx, args.cardId);
     await cascadeCleanupTextIfOrphaned(ctx, textId);
     return null;
@@ -1279,13 +1309,10 @@ export const toggleFavoriteCard = mutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { card } = await authorizeCardAccess(ctx, args.cardId);
-    await patchCard(
-      ctx,
-      args.cardId,
-      { isFavorite: !(card.isFavorite ?? false) },
-      card,
-    );
+    const { userId, card } = await authorizeCardAccess(ctx, args.cardId);
+    const nextFavorite = !(card.isFavorite ?? false);
+    await patchCard(ctx, args.cardId, { isFavorite: nextFavorite }, card);
+    await trackCardAction(ctx, userId, nextFavorite ? 'favorite' : 'unfavorite', card);
     return null;
   },
 });
@@ -1453,6 +1480,13 @@ export const flagTranslation = mutation({
       anyEnqueued = true;
     }
 
+    // Flag volume per language is the clearest quality signal the app has for
+    // the translation pipeline.
+    await trackCardAction(ctx, userId, 'flag_translation', card, {
+      retranslated: anyEnqueued,
+      target_languages: course.targetLanguages,
+    });
+
     return { retranslated: anyEnqueued };
   },
 });
@@ -1498,6 +1532,8 @@ export const regenerateCardAudio = mutation({
       course.baseLanguages,
       course.targetLanguages,
     );
+
+    await trackCardAction(ctx, userId, 'regenerate_audio', card);
 
     return null;
   },
@@ -1892,6 +1928,10 @@ export const editCard = mutation({
       course.baseLanguages,
       course.targetLanguages,
     );
+
+    await trackCardAction(ctx, userId, 'edit', card, {
+      changed_languages: [...changedLanguages],
+    });
 
     return null;
   },

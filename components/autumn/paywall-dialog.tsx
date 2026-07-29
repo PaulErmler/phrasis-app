@@ -21,6 +21,7 @@ import { getPaywallTitle, getPaywallMessage, filterProductsByFeatureIncrease } f
 import { getFeatureI18nKey, isFeatureConsumable, getFeaturePaywallKey } from "@/lib/features/feature-meta";
 import { isCreditBackedFeature } from "@/convex/features/featureIds";
 import { useFeatureQuota } from "@/components/feature_tracking/useFeatureQuota";
+import { usePaywallImpression } from "@/lib/posthog/use-impression";
 import { cn } from "@/lib/utils";
 import CheckoutDialog from "@/components/autumn/checkout-dialog";
 
@@ -77,6 +78,15 @@ export default function PaywallDialog(params?: PaywallDialogProps) {
     consumable,
     intervalGroup,
   ]);
+
+  // Top of the upgrade funnel. Above the early return because hooks must run in
+  // the same order every render — `params` is null until the paywall is
+  // triggered, so both arguments are guarded rather than the call site.
+  //
+  // Edge-triggered on `open`, not fired per render: this dialog re-renders
+  // whenever an Autumn query settles, and an inflated impression count is the
+  // denominator of every conversion rate on the monetization dashboard.
+  usePaywallImpression(params?.open ?? false, params?.featureId ?? 'unknown');
 
   if (!params) {
     return <></>;

@@ -6,6 +6,7 @@ import {
   type MutationCtx,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
+import { EVENTS, track } from '../analytics';
 import type { Id } from '../_generated/dataModel';
 import {
   requireAuthUserId,
@@ -401,6 +402,20 @@ export const finalizeOnboarding = mutation({
     const progress = await getOnboardingProgress(ctx, userId);
     if (progress) {
       await ctx.db.patch(progress._id, { completedAt: Date.now() });
+    }
+
+    // Server-side so it survives the tab being closed on the redirect to /app.
+    // `alreadyFinalized` guards against a double-submit inflating the
+    // activation numerator against a client-side event's denominator.
+    if (!alreadyFinalized) {
+      await track(ctx, userId, EVENTS.ONBOARDING_COMPLETED, {
+        acquisition_source: progress?.acquisitionSource,
+        learning_goals: progress?.learningGoals,
+        daily_time_goal_minutes: progress?.dailyTimeGoalMinutes,
+        current_level: progress?.currentLevel,
+        base_languages: progress?.baseLanguages,
+        target_languages: progress?.targetLanguages,
+      });
     }
 
     return { alreadyFinalized };

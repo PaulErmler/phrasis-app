@@ -23,6 +23,27 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ChevronLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ConvexError } from 'convex/values';
+import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
+import { reportError } from '@/lib/report-error';
+import { convexErrorCode } from '@/lib/utils';
+
+/**
+ * One sink for the wizard's swallow points: console + error tracking (the
+ * exception) plus the `onboarding_failed` funnel event (the count). Every
+ * catch in this flow deliberately lets the user continue, so without this
+ * pairing a failure would be visible in neither the funnel nor the feed.
+ */
+function reportOnboardingFailure(
+  err: unknown,
+  {
+    op,
+    ...eventProps
+  }: { op: string; step: string; reason: string } & Record<string, unknown>,
+): void {
+  reportError(err, { op });
+  capture(CLIENT_EVENTS.ONBOARDING_FAILED, eventProps);
+}
 
 import type {
   OnboardingData,
@@ -180,7 +201,14 @@ function OnboardingContent() {
     if (!isAuthenticated || syncedRef.current) return;
     syncedRef.current = true;
     syncQuotas().catch((err) => {
-      console.error('Failed to sync quotas during onboarding:', err);
+      // Non-fatal, but it decides whether `completeOnboarding` can consume a
+      // COURSES unit later — a failure here surfaces as an unexplained
+      // USAGE_LIMIT three steps down, so it needs to be visible.
+      reportOnboardingFailure(err, {
+        op: 'onboarding.syncQuotas',
+        step: 'mount',
+        reason: 'sync_quotas_failed',
+      });
     });
   }, [syncQuotas, isAuthenticated]);
 
@@ -414,6 +442,31 @@ function OnboardingWizard({
     saveStepNow(to, 'advance');
   }, [stepId, TRANSIENT_STEPS, saveStepNow]);
 
+  /**
+   * Funnel instrumentation. One event per step entry, carrying how long the
+   * previous step took — which is enough to build both the drop-off funnel and
+   * the per-step timing chart from a single event type.
+   *
+   * Driven off `stepId` rather than wired into `advance`/`back` so it cannot be
+   * bypassed: the flow also lands on steps via resume-from-`onboardingProgress`
+   * and via the branch jumps out of `proficiency`.
+   */
+  const stepEnteredAtRef = useRef<number>(Date.now());
+  const previousStepRef = useRef<StepId | null>(null);
+  useEffect(() => {
+    const now = Date.now();
+    const previousStep = previousStepRef.current;
+    capture(CLIENT_EVENTS.ONBOARDING_STEP_VIEWED, {
+      step: stepId,
+      step_index: PROGRESS_STEP_ORDER.indexOf(stepId) + 1,
+      previous_step: previousStep ?? undefined,
+      previous_step_duration_ms:
+        previousStep === null ? undefined : now - stepEnteredAtRef.current,
+    });
+    previousStepRef.current = stepId;
+    stepEnteredAtRef.current = now;
+  }, [stepId]);
+
   const back = useCallback(() => {
     setHistory((h) => {
       const prev = h[h.length - 1];
@@ -448,8 +501,15 @@ function OnboardingWizard({
     try {
       await prepareLanguagePair({ sourceLanguage: source, targetLanguage: target });
     } catch (err) {
-      console.error('prepareLanguagePair failed:', err);
-      // Non-fatal — content warmup is best-effort.
+      // Non-fatal — content warmup is best-effort, and we advance regardless.
+      // But "advanced anyway" is exactly the state that later shows up as a
+      // placement test with no content, so record why.
+      reportOnboardingFailure(err, {
+        op: 'onboarding.prepareLanguagePair',
+        step: 'language-pair',
+        reason: 'prepare_language_pair_failed',
+        advanced_anyway: true,
+      });
     }
     advance('acquisition');
   };
@@ -511,7 +571,16 @@ function OnboardingWizard({
     try {
       await completeOnboarding();
     } catch (err) {
-      console.error('completeOnboarding failed:', err);
+      // The single worst failure in the flow: CustomizingStep lets the progress
+      // bar finish and advances regardless, so the user walks into the first
+      // lesson with no course. Without this event it is invisible.
+      reportOnboardingFailure(err, {
+        op: 'onboarding.completeOnboarding',
+        step: 'customizing',
+        reason: 'complete_onboarding_failed',
+        advanced_anyway: true,
+        code: err instanceof ConvexError ? convexErrorCode(err) : undefined,
+      });
       toast.error(t('errors.completeFailed'));
     }
   }, [completeOnboarding, t]);
@@ -521,7 +590,15 @@ function OnboardingWizard({
     try {
       await finalizeOnboarding();
     } catch (err) {
-      console.error('finalizeOnboarding failed:', err);
+      // Navigates to /app regardless, where OnboardingGuard sees
+      // hasCompletedOnboarding === false and bounces the user straight back
+      // here — the classic "onboarding loop" report, now traceable.
+      reportOnboardingFailure(err, {
+        op: 'onboarding.finalizeOnboarding',
+        step: 'plan-pick',
+        reason: 'finalize_onboarding_failed',
+        will_bounce_back: true,
+      });
     }
     router.push('/app');
   }, [finalizeOnboarding, router]);

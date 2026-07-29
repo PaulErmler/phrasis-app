@@ -8,7 +8,8 @@ import { PWAInstallGlobal } from '@/components/PWAInstallGlobal';
 import { getUserLocale } from '@/i18n/locale';
 import { getMessages, getTimeZone } from 'next-intl/server';
 import { Toaster } from '@/components/ui/sonner';
-import { ConsentManager } from './consent-manager';
+import { PostHogProvider } from '@/components/analytics/PostHogProvider';
+import { ConsentBanner } from '@/components/consent/ConsentBanner';
 import { getToken } from '@/lib/auth-server';
 import { AutumnWrapper } from './providers';
 
@@ -94,7 +95,12 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ConsentManager>
+        {/*
+          PostHog sits outermost so `usePostHog()` resolves everywhere below,
+          including inside the Convex and intl providers. It writes nothing to
+          the device until the banner is answered — see lib/posthog/client.ts.
+        */}
+        <PostHogProvider>
           <ServiceWorkerRegistration />
           <PWAInstallGlobal />
           <ConvexClientProvider initialToken={initialToken}>
@@ -103,9 +109,11 @@ export default async function RootLayout({
                 {children}
               </AutumnWrapper>
               <Toaster position="top-center" />
+              {/* Inside NextIntlClientProvider — the banner is translated. */}
+              <ConsentBanner />
             </Providers>
           </ConvexClientProvider>
-        </ConsentManager>
+        </PostHogProvider>
       </body>
     </html>
   );

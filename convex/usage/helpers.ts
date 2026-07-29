@@ -6,6 +6,7 @@ import { CREDIT_COSTS, FEATURE_IDS, type FeatureId } from '../features/featureId
 import { getActiveCourses } from '../db/courses';
 import { getUserSettings } from '../db/users';
 import { featureStateValidator, type FeatureState } from '../types';
+import { EVENTS, identifyUser, track } from '../analytics';
 
 /**
  * Thrown by `assertBillingCurrent` while a payment is past due. Same
@@ -467,6 +468,66 @@ export const syncAllFeatures = internalMutation({
           });
         }
       }
+    }
+
+    /**
+     * Plan attributes on the PostHog person. This is the single funnel every
+     * piece of Autumn state passes through, so it is the one place that can
+     * keep them fresh — and it lets every other event be segmented by plan
+     * without the client ever learning the plan id (`getMyQuotas` deliberately
+     * withholds it).
+     *
+     * Fired only on change: this funnel runs on every app open (BillingGate →
+     * syncQuotas), and re-identifying an unchanged plan each time is pure
+     * event noise. Credit balances are deliberately not person properties — a
+     * balance is a point-in-time fact that belongs on events, and its churn
+     * would defeat this change gate.
+     *
+     * `plan_changed` is the missing bookend of the checkout funnel: the
+     * client's `checkout_redirected` is the last observable step before
+     * Stripe, and this is the first observable step after — activation,
+     * cancellation, trial conversion and dunning all land here. Mirrors the
+     * persistence rules above: `productsMissing` or an unknown plan keep the
+     * stored identity, so a sync that learned nothing reports nothing.
+     */
+    const planPersisted = !args.productsMissing && args.planId !== undefined;
+    const previous = {
+      plan_id: doc?.planId,
+      plan_name: doc?.planName,
+      plan_status: doc?.planStatus,
+      past_due: doc?.pastDueSince !== undefined,
+      courses_included: doc?.features[FEATURE_IDS.COURSES]?.included,
+    };
+    const next = {
+      plan_id: planPersisted ? args.planId : previous.plan_id,
+      plan_name: planPersisted ? args.planName : previous.plan_name,
+      plan_status: planPersisted ? effectiveStatus : previous.plan_status,
+      past_due: stillPastDue,
+      courses_included: newIncluded,
+    };
+
+    const planIdentityChanged =
+      next.plan_id !== previous.plan_id ||
+      next.plan_status !== previous.plan_status ||
+      next.past_due !== previous.past_due;
+    const anyPersonPropChanged =
+      planIdentityChanged ||
+      next.plan_name !== previous.plan_name ||
+      next.courses_included !== previous.courses_included;
+
+    if (anyPersonPropChanged) {
+      await identifyUser(ctx, args.userId, next);
+    }
+    if (planIdentityChanged) {
+      // First-ever sync reports { from_plan_id: undefined } — that is the
+      // free-plan attach at signup, the top of the monetization funnel.
+      await track(ctx, args.userId, EVENTS.PLAN_CHANGED, {
+        from_plan_id: previous.plan_id,
+        to_plan_id: next.plan_id,
+        from_status: previous.plan_status,
+        to_status: next.plan_status,
+        past_due: stillPastDue,
+      });
     }
 
     return null;
