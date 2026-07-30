@@ -36,6 +36,9 @@ const messages = {
   LanguageSelector: {
     searchPlaceholder: "Search languages…",
     noResults: "No languages match.",
+    experimentalBadge: "Experimental",
+    experimentalBadgeTooltip:
+      "Newly added — translation and voice quality are still being tuned. Please report issues.",
     categories: {
       germanic: "Germanic & Nordic",
       romance: "Romance",

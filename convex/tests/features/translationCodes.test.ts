@@ -30,6 +30,7 @@ const EXPECTED_GOOGLE: Record<string, string> = {
   nl: 'nl',
   sv: 'sv',
   da: 'da',
+  is: 'is',
   fi: 'fi',
   el: 'el',
   hi: 'hi',

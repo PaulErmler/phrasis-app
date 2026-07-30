@@ -49,6 +49,8 @@ const EXPECTED_AZURE: Record<string, string> = {
   id: 'id-ID',
   sv: 'sv-SE',
   da: 'da-DK',
+  // Symmetric default (no explicit azureSttLocale) — live-verified Jul 2026.
+  is: 'is-IS',
   fi: 'fi-FI',
   nl: 'nl-NL',
   el: 'el-GR',
