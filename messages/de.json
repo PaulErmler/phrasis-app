@@ -592,6 +592,8 @@
   "LanguageSelector": {
     "searchPlaceholder": "Sprachen suchen…",
     "noResults": "Keine Sprache passt.",
+    "experimentalBadge": "Experimentell",
+    "experimentalBadgeTooltip": "Neu hinzugefügt – Übersetzungs- und Stimmqualität werden noch optimiert. Bitte melde Probleme.",
     "categories": {
       "germanic": "Germanisch & Nordisch",
       "romance": "Romanisch",

@@ -210,6 +210,14 @@ export interface Language {
    * stays available for any rows already referencing them.
    */
   hiddenFromPicker?: boolean;
+  /**
+   * When `true`, picker surfaces (`LanguageSelector`) show a user-facing
+   * "Experimental" badge next to this language. Independent of the
+   * internal-only `llmSupportTier` — set it on newly added languages while
+   * translation/voice quality is still being tuned, and remove the flag once
+   * the language has proven itself.
+   */
+  experimental?: true;
 
   // --- Provider locale codes + display overrides --------------------------
   // Single source of truth for the per-language data that used to live in
@@ -827,6 +835,26 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     translationVersion: 2,
+  },
+  {
+    code: 'is',
+    displayCode: 'is',
+    regionLabel: 'Iceland',
+    // `is-IS` is a documented Gemini TTS locale (Preview stage as of Jul 2026).
+    geminiBcp47: 'is-IS',
+    // No `azureSttLocale`: the symmetric default resolves to `is-IS`, which
+    // Azure Fast Transcription accepts (verified with a live probe, Jul 2026 —
+    // the docs table alone has been wrong before, see sw_tz).
+    name: 'Icelandic',
+    nativeName: 'Íslenska',
+    flag: '🇮🇸',
+    category: 'germanic',
+    llmSupportTier: 'tier2',
+    ttsProvider: 'gemini',
+    needsRomanization: false,
+    supportsKaraoke: true,
+    supportsStt: true,
+    experimental: true,
   },
   {
     code: 'fi',
