@@ -29,6 +29,7 @@ const EXPECTED_COMPARE: Record<string, { locale: string; hasWordBoundaries: bool
   nl: { locale: 'nl', hasWordBoundaries: true },
   sv: { locale: 'sv', hasWordBoundaries: true },
   da: { locale: 'da', hasWordBoundaries: true },
+  is: { locale: 'is', hasWordBoundaries: true },
   fi: { locale: 'fi', hasWordBoundaries: true },
   el: { locale: 'el', hasWordBoundaries: true },
   hi: { locale: 'hi', hasWordBoundaries: true },

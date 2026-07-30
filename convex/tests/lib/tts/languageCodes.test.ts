@@ -36,6 +36,7 @@ const EXPECTED_GEMINI: Record<string, string> = {
   nl: 'nl-NL',
   sv: 'sv-SE',
   da: 'da-DK',
+  is: 'is-IS',
   fi: 'fi-FI',
   el: 'el-GR',
   hi: 'hi-IN',

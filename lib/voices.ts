@@ -228,6 +228,7 @@ export const VOICE_POOLS: Record<string, Voice[]> = {
   sv: [...buildChirp3Pool('sv-SE', 'Sweden'), ...GEMINI_CORE],
   nb: [...buildChirp3Pool('nb-NO', 'Norway'), ...GEMINI_CORE],
   da: [...buildChirp3Pool('da-DK', 'Denmark'), ...GEMINI_CORE],
+  is: [...GEMINI_CORE],
   fi: [...buildChirp3Pool('fi-FI', 'Finland'), ...GEMINI_CORE],
   nl: [...buildChirp3Pool('nl-NL', 'Netherlands'), ...GEMINI_CORE],
   el: [...buildChirp3Pool('el-GR', 'Greece'), ...GEMINI_CORE],

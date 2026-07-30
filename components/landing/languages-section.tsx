@@ -22,6 +22,7 @@ export function LanguagesSection() {
         code: l.code,
         flag: l.flag,
         name: getLocalizedLanguageNameByCode(l.code, locale),
+        experimental: l.experimental ?? false,
       }))
       .sort((a, b) => a.name.localeCompare(b.name, locale));
   }, [locale]);
@@ -52,9 +53,15 @@ export function LanguagesSection() {
             <li
               key={lang.code}
               className="flex items-center gap-2 rounded-full border border-border/40 bg-card px-3.5 py-1.5 text-sm md:text-base"
+              title={lang.experimental ? t('experimentalBadgeTooltip') : undefined}
             >
               <span aria-hidden="true">{lang.flag}</span>
               <span>{lang.name}</span>
+              {lang.experimental && (
+                <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  {t('experimentalBadge')}
+                </span>
+              )}
             </li>
           ))}
           <li>
