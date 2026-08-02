@@ -1057,6 +1057,20 @@ export default defineSchema({
     planStatus: v.string(),
   }).index('by_userId', ['userId']),
 
+  // E2E-only capture of transactional auth emails (verification / password
+  // reset) and the scheduled welcome email. While the deployment has
+  // E2E_TEST_HOOKS=1, lib/authEmails.ts + lib/welcomeEmail.ts write here
+  // INSTEAD of sending real mail, so Playwright can follow the links
+  // (features/authEmailTesting.ts) and fake @test.de signup addresses
+  // never bounce real sends.
+  testAuthEmails: defineTable({
+    email: v.string(), // recipient, lowercase
+    kind: v.union(v.literal('verify'), v.literal('reset'), v.literal('welcome')),
+    url: v.optional(v.string()), // reset link ('reset' emails)
+    otp: v.optional(v.string()), // verification code ('verify' emails)
+    subject: v.string(),
+  }).index('by_email', ['email']),
+
   // Admin allowlist for the /app/admin dashboard. The gate (requireAdmin in
   // convex/admin/lib.ts) requires BOTH fields to match the caller's Better
   // Auth user. Manage rows via `npx convex run admin/manage:setAdmin` (or the

@@ -102,3 +102,9 @@ tagalog-sample/
 # Local Claude Code worktrees — never commit
 .claude/worktrees/
 native/shell/app-url.js
+
+# Kanban board — symlink into Paul's Obsidian vault (machine-specific path,
+# see CLAUDE.md). Recreate with:
+# ln -s "$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/PaulsVault/projects/Flexling" board
+/board
+store-assets/

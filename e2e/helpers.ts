@@ -571,7 +571,10 @@ export async function signUpFreshUser(
   await page
     .getByRole("button", { name: /create an account|create account|^sign\s*up$/i })
     .click();
-  await page.waitForURL(/\/app\/onboarding/, { timeout: 30_000 });
+  // Email verification is required (convex/auth.ts), so the submit alone
+  // does not create a session. Enter the captured 6-digit code to land
+  // logged-in on /app/onboarding.
+  await completeEmailVerification(page, creds.email);
 
   await completeOnboardingFresh(page, {});
 
@@ -582,6 +585,93 @@ export async function signUpFreshUser(
     JSON.stringify({ ...creds, createdAt: new Date().toISOString() }, null, 2),
   );
   return creds;
+}
+
+// ---------------------------------------------------------------------------
+// Auth-email helpers (email verification + password reset)
+// ---------------------------------------------------------------------------
+
+export interface CapturedAuthEmail {
+  id: string;
+  /** Reset link — present on 'reset' emails. */
+  url?: string;
+  /** 6-digit verification code — present on 'verify' emails. */
+  otp?: string;
+  subject: string;
+}
+
+/**
+ * Read the most recent captured auth email for an address via the
+ * E2E_TEST_HOOKS-gated Convex hook (convex/features/authEmailTesting.ts).
+ * While that flag is set on the dev deployment, the backend captures
+ * verification codes / reset links into a table instead of sending real
+ * mail, so specs can use them. Polls until an email newer than
+ * `opts.afterId` appears (pass the previous capture's id to wait for a
+ * re-send), then returns it.
+ */
+export async function fetchAuthEmail(
+  email: string,
+  kind: "verify" | "reset",
+  opts: { afterId?: string; timeoutMs?: number } = {},
+): Promise<CapturedAuthEmail> {
+  const { execFileSync } = await import("node:child_process");
+  const path = await import("node:path");
+  const repoRoot = path.resolve(__dirname, "..");
+  const timeoutMs = opts.timeoutMs ?? 30_000;
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const out = execFileSync(
+      "npx",
+      [
+        "convex",
+        "run",
+        "features/authEmailTesting:latestAuthEmail",
+        JSON.stringify({ email, kind }),
+      ],
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+    // `convex run` prints the function's return value (JSON) on stdout,
+    // possibly surrounded by CLI noise — parse the last JSON-looking chunk.
+    const lines = out.trim().split("\n");
+    let result: CapturedAuthEmail | null = null;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      if (!lines[i].trim()) continue;
+      try {
+        result = JSON.parse(lines.slice(i).join("\n"));
+        break;
+      } catch {
+        /* keep scanning upwards */
+      }
+    }
+    if (result?.id && result.id !== opts.afterId) return result;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `No ${kind} auth email captured for ${email} within ${timeoutMs}ms ` +
+          "(is E2E_TEST_HOOKS=1 set on the dev deployment?)",
+      );
+    }
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
+}
+
+/**
+ * Complete the email-verification step after submitting the sign-up form.
+ * better-auth-ui navigates to /auth/email-verification, where entering the
+ * emailed 6-digit code verifies the address AND creates a session
+ * (autoSignInAfterVerification in convex/auth.ts), landing the user on
+ * /app/onboarding.
+ */
+export async function completeEmailVerification(
+  page: Page,
+  email: string,
+): Promise<void> {
+  await page.waitForURL(/\/auth\/email-verification/, { timeout: 30_000 });
+  const { otp } = await fetchAuthEmail(email, "verify");
+  if (!otp) throw new Error("Captured verification email has no otp code");
+  // input-otp renders a single hidden input; filling all 6 digits
+  // auto-submits the form (see better-auth-ui's EmailVerificationForm).
+  await page.locator("input[data-input-otp]").fill(otp);
+  await page.waitForURL(/\/app\/onboarding/, { timeout: 30_000 });
 }
 
 /**

@@ -1,9 +1,8 @@
 import { ConvexError } from 'convex/values';
-import { Resend } from '@convex-dev/resend';
 import { mutation } from '../_generated/server';
-import { components } from '../_generated/api';
 import { authComponent } from '../auth';
 import { rateLimiter } from '../rateLimiter';
+import { resend } from '../lib/resendClient';
 
 /**
  * Account deletion works as a REQUEST: the user asks in-app (App Store
@@ -13,12 +12,6 @@ import { rateLimiter } from '../rateLimiter';
  */
 
 const SUPPORT_EMAIL = 'support@flexling.com';
-
-// testMode would silently swallow mail to real addresses — the component
-// only delivers to Resend test inboxes while it's on.
-export const resend: Resend = new Resend(components.resend, {
-  testMode: false,
-});
 
 export const requestAccountDeletion = mutation({
   args: {},

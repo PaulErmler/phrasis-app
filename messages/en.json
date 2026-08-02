@@ -119,6 +119,24 @@
     },
     "settings": {
       "account": "Account",
+      "password": {
+        "changeButton": "Change password",
+        "setButton": "Set a password",
+        "setDescription": "You signed in with Google or Apple. Set a password to also be able to log in with your email address.",
+        "setEmailSent": "Check your inbox — we sent you a link to set your password.",
+        "setEmailError": "Could not send the email. Please try again later.",
+        "title": "Change password",
+        "description": "For your security, your other devices will be signed out.",
+        "current": "Current password",
+        "new": "New password",
+        "confirm": "Confirm new password",
+        "mismatch": "The passwords do not match.",
+        "tooShort": "The new password must be at least 8 characters long.",
+        "save": "Save",
+        "cancel": "Cancel",
+        "success": "Password changed.",
+        "error": "Could not change the password. Please check your current password."
+      },
       "language": "App Language",
       "contactPrompt": {
         "title": "Need anything?",

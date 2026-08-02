@@ -53,6 +53,38 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: HOUR,
     capacity: 2,
   },
+  // Better Auth transactional email (verification + password reset, see
+  // convex/auth.ts). Both are triggered by unauthenticated endpoints that
+  // send real mail, and with requireEmailVerification every unverified
+  // sign-in attempt re-sends the verification email — so this cap is
+  // load-bearing, not defensive. Keyed per lowercased recipient address;
+  // when the bucket is empty the callbacks silently skip sending (never
+  // throw — a 500 there would leak whether the account exists).
+  authEmail: {
+    kind: 'token bucket',
+    rate: 5,
+    period: HOUR,
+    capacity: 5,
+  },
+  // Global (unkeyed) backstop over the same sends: the per-address bucket
+  // above doesn't bound aggregate volume, so scripted signups across many
+  // distinct addresses could otherwise burn Resend quota and sender
+  // reputation without limit. Sized far above legitimate traffic.
+  authEmailGlobal: {
+    kind: 'token bucket',
+    rate: 100,
+    period: HOUR,
+    capacity: 30,
+  },
+  // Global cap on notification emails to the support inbox
+  // (lib/adminEmails.ts): every signup fires one with no auth in front of
+  // it, so mass signups would otherwise flood the inbox 1:1.
+  adminEmail: {
+    kind: 'token bucket',
+    rate: 20,
+    period: HOUR,
+    capacity: 20,
+  },
 });
 
 // Partial because 'azure' and 'elevenlabs' linger in `TtsProvider` only as

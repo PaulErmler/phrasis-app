@@ -89,10 +89,10 @@ Verfolge Streak, gelernte Wörter, Hörzeit und Genauigkeit — und sieh zu, wie
 **Subtitle** (≤30): `Audio flashcards & AI tutor` (27)
 
 **Keywords** (≤100, comma-separated, no spaces):
-`language,learn,spanish,french,flashcards,spaced repetition,anki,glossika,audio,shadowing,speak,srs` (98)
+`language,learn,flashcards,spaced repetition,anki,glossika,audio,shadowing,speak,srs,arabic,levantine,clozemaster` (98)
 
 **Promotional text** (≤170):
-`Learn hands-free with audio flashcards, master grammar with an AI tutor that turns answers into cards, and let spaced repetition do the remembering. Free to start.` (162)
+`Learn hands-free with audio flashcards, master grammar with an AI tutor that turns answers into flash cards, and let spaced repetition do the remembering.` (162)
 
 **Description**: use the Play full description above (fits well under 4000).
 

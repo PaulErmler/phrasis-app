@@ -70,6 +70,11 @@ export function Providers({ children, locale, messages, timeZone }: Props) {
           }}
           Link={Link}
           localization={authLocalization}
+          // Code-based email verification: after sign-up (or an unverified
+          // sign-in) the UI navigates to /auth/email-verification, where
+          // entering the emailed 6-digit code verifies AND signs the user
+          // in (autoSignInAfterVerification in convex/auth.ts).
+          emailVerification={{ otp: true }}
         >
           {children}
         </AuthUIProvider>

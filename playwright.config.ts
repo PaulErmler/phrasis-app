@@ -31,6 +31,11 @@ const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
  */
 export default defineConfig({
   testDir: "./e2e",
+  // Sets E2E_TEST_HOOKS=1 on the dev deployment for the duration of the
+  // run (auth-email capture + convex-run test hooks) and removes it again
+  // afterwards, so normal dev usage sends real auth emails.
+  globalSetup: "./e2e/global-setup.ts",
+  globalTeardown: "./e2e/global-teardown.ts",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: [["list"], ["html", { open: "never" }]],
@@ -124,6 +129,21 @@ export default defineConfig({
       // storageState via test.use.
       name: "payment-overdue",
       testMatch: /payment-overdue\.spec\.ts/,
+      dependencies: ["course-management"],
+      fullyParallel: false,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      // Email verification + password-reset journey with its own fresh
+      // user and captured auth emails (E2E_TEST_HOOKS=1, set for the run
+      // by global-setup.ts — see convex/features/authEmailTesting.ts). Chained
+      // after course-management so its fresh signup never races the
+      // fixture users' warmup fan-out; it never walks onboarding, so it is
+      // cheap. The spec sets its own (empty) storageState via test.use.
+      name: "email-auth",
+      testMatch: /email-auth\.spec\.ts/,
       dependencies: ["course-management"],
       fullyParallel: false,
       use: {

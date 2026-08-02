@@ -119,6 +119,24 @@
     },
     "settings": {
       "account": "Konto",
+      "password": {
+        "changeButton": "Passwort ändern",
+        "setButton": "Passwort festlegen",
+        "setDescription": "Du hast dich mit Google oder Apple angemeldet. Lege ein Passwort fest, um dich auch mit deiner E-Mail-Adresse anmelden zu können.",
+        "setEmailSent": "Sieh in dein Postfach — wir haben dir einen Link zum Festlegen deines Passworts geschickt.",
+        "setEmailError": "Die E-Mail konnte nicht gesendet werden. Bitte versuche es später erneut.",
+        "title": "Passwort ändern",
+        "description": "Zu deiner Sicherheit wirst du auf allen anderen Geräten abgemeldet.",
+        "current": "Aktuelles Passwort",
+        "new": "Neues Passwort",
+        "confirm": "Neues Passwort bestätigen",
+        "mismatch": "Die Passwörter stimmen nicht überein.",
+        "tooShort": "Das neue Passwort muss mindestens 8 Zeichen lang sein.",
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "success": "Passwort geändert.",
+        "error": "Das Passwort konnte nicht geändert werden. Bitte prüfe dein aktuelles Passwort."
+      },
       "language": "App-Sprache",
       "contactPrompt": {
         "title": "Brauchst du noch etwas?",

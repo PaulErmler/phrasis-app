@@ -1,21 +1,18 @@
 'use client';
 
-import { Quote, Star } from 'lucide-react';
+import { Quote } from 'lucide-react';
 import { TESTIMONIALS } from '../fixtures';
 
 /**
  * "Wall of love" — real user quotes (docs/testimonials.md) styled with the
  * app's design tokens. Used as a store screenshot, not an in-app screen.
+ * No star ratings: these are community quotes, not store reviews (and Apple
+ * flags implied-rating imagery under Guideline 2.3.7).
  */
 export function TestimonialsScreen() {
   return (
     <div className="min-h-dvh bg-background text-foreground flex flex-col">
       <div className="px-6 pt-14 pb-6 text-center space-y-2">
-        <div className="flex items-center justify-center gap-1" aria-hidden>
-          {Array.from({ length: 5 }, (_, i) => (
-            <Star key={i} className="h-5 w-5 fill-amber-400 text-amber-400" />
-          ))}
-        </div>
         <h1 className="text-2xl font-bold">Loved by language learners</h1>
         <p className="text-sm text-muted-foreground">
           What the community says about Flexling
