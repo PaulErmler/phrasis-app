@@ -41,7 +41,11 @@ export function ChangePasswordSection({ email }: { email: string | undefined }) 
     let cancelled = false;
     authClient
       .listAccounts()
-      .then(({ data }) => {
+      // Explicit structural type: better-auth's inferred client types have
+      // proven environment-sensitive (the fresh Docker install's `next build`
+      // degraded this callback param to an implicit any and failed the
+      // deploy typecheck, while local tsc inferred it fine).
+      .then(({ data }: { data: Array<{ providerId: string }> | null }) => {
         if (cancelled) return;
         setHasCredential(
           (data ?? []).some((account) => account.providerId === 'credential'),
