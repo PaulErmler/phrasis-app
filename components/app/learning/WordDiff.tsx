@@ -170,7 +170,7 @@ function WordChip({
 
   if (word.tag === 'missing') {
     return (
-      <span className="rounded-sm border border-dashed border-success/50 bg-success/10 text-success px-1 py-0.5 font-medium">
+      <span className="rounded-sm border border-dashed border-amber-500/60 bg-amber-500/10 text-amber-700 dark:text-amber-300 px-1 py-0.5 font-medium">
         {word.expected}
       </span>
     );

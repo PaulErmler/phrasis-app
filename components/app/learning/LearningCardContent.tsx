@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
+import type { CardOriginPill } from './cardOriginPill';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
 import type { MergedPlayback } from '@/hooks/use-active-cue';
@@ -18,6 +19,8 @@ interface LearningCardContentProps {
   /** When in FSRS phase, total reviews = preReviewCount + fsrsState.reps */
   schedulingPhase?: 'preReview' | 'review';
   fsrsState?: { reps: number } | null;
+  /** Source-collection pill ("A1.2"); absent/null = hidden. */
+  originPill?: CardOriginPill | null;
   sourceText: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
@@ -45,6 +48,10 @@ interface LearningCardContentProps {
   revealedLanguages?: ReadonlySet<string>;
   /** When this value changes (e.g. incremented by parent), all target lines are manually revealed. */
   revealAllSignal?: number;
+  /** Restart-card signal: any change re-blurs every manually revealed line. */
+  resetSignal?: number;
+  /** Replay-target signal (T shortcut): any change replays the first target-language clip. */
+  replayTargetSignal?: number;
   /** Reports whether every target translation is visible (not blurred). */
   onAllTargetsRevealedChange?: (allRevealed: boolean) => void;
   bare?: boolean;
@@ -81,6 +88,7 @@ export function LearningCardContent({
   preReviewCount,
   schedulingPhase,
   fsrsState,
+  originPill,
   sourceText,
   translations,
   audioRecordings,
@@ -106,6 +114,8 @@ export function LearningCardContent({
   autoRevealBaseLanguages = false,
   revealedLanguages,
   revealAllSignal = 0,
+  resetSignal,
+  replayTargetSignal,
   onAllTargetsRevealedChange,
   bare = false,
   showRomanization = true,
@@ -185,11 +195,24 @@ export function LearningCardContent({
     });
   }, [revealAllSignal, targetLanguages]);
 
+  // Restart-card signal: drop manual reveals so the card re-blurs (the
+  // parent resets the audio-driven reveals separately). Mount value is
+  // ignored — same stale-nonce contract as revealAllSignal above.
+  const lastResetSignalRef = useRef(resetSignal);
+  useEffect(() => {
+    if (resetSignal === undefined || resetSignal === lastResetSignalRef.current) {
+      return;
+    }
+    lastResetSignalRef.current = resetSignal;
+    setManuallyRevealed(new Set());
+  }, [resetSignal]);
+
   return (
     <div data-tutorial="card-content" className="flex flex-col flex-1 min-h-0">
       <CardShell
         compact={compact}
         reviewCount={displayReviewCount(preReviewCount, schedulingPhase, fsrsState)}
+        originPill={originPill}
         sourceText={sourceText}
         translations={translations}
         audioRecordings={audioRecordings}
@@ -290,6 +313,7 @@ export function LearningCardContent({
                       onTimeUpdate={buttonPlayback.onTimeUpdate}
                       onStop={buttonPlayback.onStop}
                       speed={effectiveSpeed}
+                      playSignal={index === 0 ? replayTargetSignal : undefined}
                     />
                     {onSpeedCycle && (
                       <CardSpeedBadge

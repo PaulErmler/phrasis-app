@@ -1,7 +1,12 @@
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { UNDO_DEPTH } from '../../lib/constants/learning';
-import { SchedulingMode, StudyContentFilter } from '../types';
+import {
+  freePlayFace,
+  type FreePlayFace,
+  type SchedulingMode,
+  type StudyContentFilter,
+} from '../types';
 
 /**
  * Per-(user, course) undo stack for learning-mode reviews and radio plays.
@@ -50,27 +55,62 @@ export async function takeLatestReviewLogs(
 }
 
 /**
+ * The study context an undo is scoped to. `face` disambiguates the two free-play
+ * rotations, which share one `schedulingMode` but keep separate per-card counters
+ * — undo must not pop a listening play while the user is looking at the typing
+ * queue, since restoring `radio*` counters would leave the visible queue
+ * unchanged. Null outside free play.
+ */
+export type StudyContext = {
+  schedulingMode: SchedulingMode;
+  face: FreePlayFace | null;
+  studyContentFilter: StudyContentFilter;
+};
+
+/** Resolve the undo/queue scope from course settings, defaults included. The
+ *  single place this defaulting lives, so the count query and the mutation
+ *  can't drift apart. */
+export function studyContextFromSettings(
+  settings: Doc<'courseSettings'> | null,
+): StudyContext {
+  const schedulingMode: SchedulingMode =
+    settings?.schedulingMode ?? 'learnAndReview';
+  return {
+    schedulingMode,
+    face: freePlayFace(schedulingMode, settings?.reviewMode ?? 'audio'),
+    studyContentFilter: settings?.studyContentFilter ?? 'both',
+  };
+}
+
+/**
  * The undoable prefix of the stack: newest-first consecutive entries whose
  * study context matches the CURRENT course settings, stopping at the first
- * mismatch. Entries logged under another mode/filter block everything older
- * beneath them — switching settings back does NOT resurface old entries once
- * newer mismatching reviews sit on top (they only become reachable again if
- * those newer reviews are themselves undone). Shared by getUndoableReviewCount
- * and undoLastReview so the button state and the mutation can't disagree.
+ * mismatch. Entries logged under another mode/face/filter block everything
+ * older beneath them — switching settings back does NOT resurface old entries
+ * once newer mismatching reviews sit on top (they only become reachable again
+ * if those newer reviews are themselves undone). Shared by
+ * getUndoableReviewCount and undoLastReview so the button state and the
+ * mutation can't disagree.
+ *
+ * Note that merely toggling review mode logs nothing, so flipping between the
+ * free-play faces and back leaves the stack intact — a boundary only forms
+ * once a card is actually played in the other face.
  */
 export async function takeUndoableLogs(
   ctx: QueryCtx,
   userId: string,
   courseId: Id<'courses'>,
-  currentMode: SchedulingMode,
-  currentFilter: StudyContentFilter,
+  current: StudyContext,
 ): Promise<Doc<'reviewLogs'>[]> {
   const newestFirst = await takeLatestReviewLogs(ctx, userId, courseId, UNDO_DEPTH);
   const prefix: Doc<'reviewLogs'>[] = [];
   for (const entry of newestFirst) {
     if (
-      entry.schedulingMode !== currentMode ||
-      entry.studyContentFilter !== currentFilter
+      entry.schedulingMode !== current.schedulingMode ||
+      entry.studyContentFilter !== current.studyContentFilter ||
+      // `kind` IS the free-play face ('radio' | 'freeStudy'); 'review' entries
+      // belong to the FSRS modes and are scoped by schedulingMode alone.
+      (entry.kind !== 'review' && entry.kind !== current.face)
     ) {
       break;
     }

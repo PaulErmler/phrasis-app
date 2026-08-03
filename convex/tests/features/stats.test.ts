@@ -5,8 +5,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // File-level aggregate mock (takes precedence over the zero-count stub in
 // tests/convexTestSetup.ts — see the precedent in
 // migrations/recalcUserCardAggregates.test.ts). `count()` records its args and
-// returns the value registered for the namespace's `:state` suffix, defaulting
-// to 0 so tests that don't register counts behave like the global stub.
+// returns the value registered for the namespace's tail, defaulting to 0 so
+// tests that don't register counts behave like the global stub. Lookup tries
+// the two-segment tail first (`origin:state`, for the filter-aware
+// cardsByOriginStateAndDueDate namespaces `${deckId}:${origin}:${state}`),
+// then the last segment (`state`, for `${deckId}:${state}`).
 const countsByStateSuffix: Record<string, number> = {};
 const countCalls: Array<{
   namespace: string;
@@ -27,9 +30,10 @@ vi.mock("@convex-dev/aggregate", () => {
       },
     ): Promise<number> {
       countCalls.push({ namespace: opts.namespace, bounds: opts.bounds });
-      const sep = opts.namespace.lastIndexOf(":");
-      const suffix = sep === -1 ? "" : opts.namespace.slice(sep + 1);
-      return countsByStateSuffix[suffix] ?? 0;
+      const parts = opts.namespace.split(":");
+      const tail2 = parts.slice(-2).join(":");
+      const tail1 = parts[parts.length - 1] ?? "";
+      return countsByStateSuffix[tail2] ?? countsByStateSuffix[tail1] ?? 0;
     }
   }
   return { TableAggregate };
@@ -211,6 +215,127 @@ describe("features/stats", () => {
         expect(call.bounds?.upper?.key).toBe(firstKey);
         expect(call.bounds?.upper?.key).toBeGreaterThanOrEqual(before);
         expect(call.bounds?.upper?.key).toBeLessThanOrEqual(after);
+      }
+    });
+  });
+
+  describe("getFilteredCardCounts", () => {
+    const NOW = 1_754_000_000_000;
+
+    it("returns null when unauthenticated", async () => {
+      const t = convexTest(schema, modules);
+      const res = await t.query(api.features.stats.getFilteredCardCounts, {
+        now: NOW,
+      });
+      expect(res).toBeNull();
+    });
+
+    it("'both' (and omitted filter) counts the unsplit `${deckId}:state` namespaces", async () => {
+      const t = convexTest(schema, modules);
+      const { deckId } = await seedActiveCourse(t);
+      Object.assign(countsByStateSuffix, {
+        new: 1,
+        learning: 2,
+        review: 3,
+        relearning: 4,
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "both",
+        now: NOW,
+      });
+      expect(res).toEqual({ new: 1, learning: 2, review: 3, relearning: 4 });
+      expect(countCalls.map((c) => c.namespace).sort()).toEqual(
+        [
+          `${deckId}:learning`,
+          `${deckId}:new`,
+          `${deckId}:relearning`,
+          `${deckId}:review`,
+        ].sort(),
+      );
+
+      countCalls.length = 0;
+      const resDefault = await asUser.query(
+        api.features.stats.getFilteredCardCounts,
+        { now: NOW },
+      );
+      expect(resDefault).toEqual(res);
+      expect(countCalls).toHaveLength(4);
+    });
+
+    it("'course' counts only the premade origin namespaces", async () => {
+      const t = convexTest(schema, modules);
+      const { deckId } = await seedActiveCourse(t);
+      Object.assign(countsByStateSuffix, {
+        // Unsplit namespaces — must NOT be used by the filtered path.
+        new: 100,
+        learning: 100,
+        review: 100,
+        relearning: 100,
+        "premade:new": 5,
+        "premade:learning": 6,
+        "premade:review": 7,
+        "premade:relearning": 8,
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "course",
+        now: NOW,
+      });
+      expect(res).toEqual({ new: 5, learning: 6, review: 7, relearning: 8 });
+      expect(countCalls.map((c) => c.namespace).sort()).toEqual(
+        [
+          `${deckId}:premade:learning`,
+          `${deckId}:premade:new`,
+          `${deckId}:premade:relearning`,
+          `${deckId}:premade:review`,
+        ].sort(),
+      );
+    });
+
+    it("'custom' sums the custom and chat origin namespaces", async () => {
+      const t = convexTest(schema, modules);
+      const { deckId } = await seedActiveCourse(t);
+      Object.assign(countsByStateSuffix, {
+        "custom:new": 1,
+        "chat:new": 2,
+        "custom:learning": 3,
+        "chat:learning": 4,
+        "custom:review": 5,
+        "chat:review": 6,
+        "custom:relearning": 7,
+        "chat:relearning": 8,
+      });
+
+      const asUser = t.withIdentity({ subject: "user_A" });
+      const res = await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "custom",
+        now: NOW,
+      });
+      expect(res).toEqual({ new: 3, learning: 7, review: 11, relearning: 15 });
+      const namespaces = countCalls.map((c) => c.namespace);
+      expect(namespaces).toHaveLength(8);
+      expect(namespaces).toContain(`${deckId}:custom:new`);
+      expect(namespaces).toContain(`${deckId}:chat:new`);
+      // Legacy cards without a resolved origin are 'both'-only by design.
+      expect(namespaces.some((n) => n.includes(":none:"))).toBe(false);
+      expect(namespaces.some((n) => n.includes(":premade:"))).toBe(false);
+    });
+
+    it("uses the client-supplied `now` (not the wall clock) as the inclusive due bound", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      await asUser.query(api.features.stats.getFilteredCardCounts, {
+        filter: "custom",
+        now: NOW,
+      });
+      expect(countCalls.length).toBeGreaterThan(0);
+      for (const call of countCalls) {
+        expect(call.bounds?.upper?.key).toBe(NOW);
+        expect(call.bounds?.upper?.inclusive).toBe(true);
       }
     });
   });

@@ -9,6 +9,7 @@ import { reportError } from '@/lib/report-error';
 import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TutorialId } from '@/convex/features/tutorialIds';
 import { getTutorial } from './registry';
+import type { TutorialContext } from './types';
 
 const STORAGE_PREFIX = 'phrasis_completed_tutorials';
 
@@ -99,6 +100,9 @@ interface UseTutorialOptions {
   onComplete?: () => void;
   /** When the user clicks the highlighted element on this step (0-based index), complete the tutorial and close the driver. */
   stepCompleteOnClickIndex?: number;
+  /** Runtime context forwarded to the tour factory (e.g. reviewMode so the
+   *  home tour anchors the Radio vs Free Study button). */
+  context?: TutorialContext;
 }
 
 export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions = {}) {
@@ -109,8 +113,12 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     onInteractiveStep,
     onComplete,
     stepCompleteOnClickIndex,
+    context,
   } = options;
   const driverRef = useRef<Driver | null>(null);
+  // When true, the next onDestroyStarted tears down without marking complete
+  // (e.g. host view hid mid-tour — we want to re-offer later, not persist).
+  const suppressCompleteRef = useRef(false);
   const [isActive, setIsActive] = useState(false);
   const t = useTranslations('Tutorial');
 
@@ -135,7 +143,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   const completed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const isCompleted = completed.includes(tutorialId);
 
-  const tutorial = getTutorial(tutorialId, t);
+  const tutorial = getTutorial(tutorialId, t, context);
   const prerequisiteMet = tutorial?.prerequisite
     ? completed.includes(tutorial.prerequisite)
     : true;
@@ -208,7 +216,15 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       const candidates = document.querySelectorAll<HTMLElement>(step.element);
       for (const el of candidates) {
         const rect = el.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
+        // `visibility: hidden` keeps its layout box (e.g. the due-count
+        // pills reserve their width while counts load), so a pure rect
+        // check would highlight a blank rectangle — treat it as absent and
+        // let the step degrade to a centered popover instead.
+        if (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          getComputedStyle(el).visibility !== 'hidden'
+        ) {
           return { ...step, element: el };
         }
       }
@@ -220,12 +236,25 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       return step?.popover && 'popoverClass' in step.popover && step.popover.popoverClass === 'tutorial-try-card';
     };
 
+    const completeOnClickIndices = new Set<number>();
     if (
       stepCompleteOnClickIndex != null &&
       stepCompleteOnClickIndex >= 0 &&
       stepCompleteOnClickIndex < resolvedSteps.length
     ) {
-      const step = resolvedSteps[stepCompleteOnClickIndex];
+      completeOnClickIndices.add(stepCompleteOnClickIndex);
+    }
+    // The closing step of a tour is a call-to-action that highlights the
+    // element the user is invited to click. That click must count as
+    // finishing the tour: it often navigates away (e.g. the home tour's
+    // Learn + Review CTA opens the learn view), which hides the host and
+    // would otherwise hit the suppress-complete path below — leaving the
+    // tour unfinished and re-running it on every visit.
+    if (resolvedSteps.length > 0) {
+      completeOnClickIndices.add(resolvedSteps.length - 1);
+    }
+    for (const index of completeOnClickIndices) {
+      const step = resolvedSteps[index];
       let clickHandler: (() => void) | null = null;
       let targetElement: Element | null = null;
       step.onHighlighted = (element, _s, opts) => {
@@ -261,9 +290,13 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       popoverClass: `phrasis-tutorial-${tutorialId}`,
       steps: resolvedSteps,
       onDestroyStarted: () => {
-        completeTutorial();
+        const skipComplete = suppressCompleteRef.current;
+        suppressCompleteRef.current = false;
+        if (!skipComplete) {
+          completeTutorial();
+          onCompleteRef.current?.();
+        }
         setIsActive(false);
-        onCompleteRef.current?.();
         driverRef.current = null;
         d.destroy();
       },
@@ -294,6 +327,16 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
 
     return () => clearTimeout(timer);
   }, [shouldStart, delayMs]);
+
+  // Hide an in-flight tour when the host disables it (e.g. user left Home)
+  // without marking it complete, so it can auto-start again on return.
+  useEffect(() => {
+    if (enabled) return;
+    const active = driverRef.current;
+    if (!active) return;
+    suppressCompleteRef.current = true;
+    active.destroy();
+  }, [enabled]);
 
   const moveToInteractiveWait = useCallback(() => {
     if (driverRef.current) {

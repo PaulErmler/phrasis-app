@@ -304,6 +304,12 @@
           "title": "Was ist dein aktuelles Level?",
           "subtitle": "Wähle dein Sprachniveau"
         },
+        "step4": {
+          "title": "Setz dir ein Tagesziel",
+          "subtitle": "Wie viele Minuten möchtest du täglich lernen?",
+          "minutesUnit": "Min. / Tag",
+          "customPlaceholder": "Eigenes"
+        },
         "creating": "Kurs wird erstellt...",
         "success": "Kurs erfolgreich erstellt!",
         "error": "Kurs konnte nicht erstellt werden",
@@ -359,6 +365,8 @@
     "learnAndReview": "Wiederholen",
     "radioMode": "Radio",
     "radioRequiresCards": "Füge zuerst ein paar Karten hinzu, bevor du den Radio-Modus startest.",
+    "freeStudyMode": "Freies Üben",
+    "freeStudyRequiresCards": "Füge zuerst ein paar Karten hinzu, bevor du mit dem freien Üben startest.",
     "contentFilter": {
       "label": "Quelle:",
       "valueBoth": "Alle Inhalte",
@@ -369,6 +377,44 @@
       "new": "N",
       "learning": "L",
       "review": "W"
+    },
+    "dueCounts": {
+      "new": "{count} neu",
+      "learning": "{count} lernen",
+      "review": "{count} wiederholen"
+    },
+    "dailyGoal": {
+      "label": "Tagesziel",
+      "cta": "Tagesziel festlegen",
+      "reached": "Tagesziel erreicht",
+      "progress": "{done} / {goal} Min.",
+      "editTitle": "Tagesziel festlegen",
+      "customPlaceholder": "Eigenes",
+      "minutesUnit": "Min.",
+      "set": "Ok"
+    },
+    "projections": {
+      "wordsBig": "{words} Wörter",
+      "sentencesBig": "{sentences} Sätze",
+      "endOfYearLabel": "bis Ende {year}",
+      "oneYearLabel": "in einem Jahr",
+      "endOfMonthLabel": "bis Ende {month}",
+      "counterfactualLabel": "wenn jeder Tag wie heute wäre",
+      "sessionYieldBig": "im Schnitt +{words} Wörter",
+      "sessionYieldLabel": "pro {goal}-Min.-Einheit",
+      "perStudyHourLabel": "pro Lernstunde",
+      "nextLevelBig": "{code} in ~{days, plural, one {# Tag} other {# Tagen}}",
+      "atCurrentSpeedLabel": "bei deinem aktuellen Tempo",
+      "goalBasisLabel": "wenn du dein Tagesziel erreichst",
+      "nextLevelCompleteLabel": "bis zum Abschluss des letzten Levels",
+      "levelByYearEndBig": "~{code}",
+      "levelByYearEndLabel": "dein Level Ende {year}",
+      "inDaysLabel": "in ~{days, plural, one {# Tag} other {# Tagen}}",
+      "studyTimeBig": "{hours} Std. gelernt",
+      "aroundDateLabel": "um den {date}",
+      "cycleHint": "Tippen für die nächste Statistik",
+      "empty": "Lerne weiter, um Prognosen freizuschalten",
+      "avgSentencesBig": "im Schnitt ~{rate} Sätze"
     },
     "customContent": "Karten hinzufügen",
     "stats": {
@@ -393,6 +439,8 @@
     "baseLanguage": "Ausgangssprache",
     "targetLanguage": "Zielsprache",
     "reviewCount": "{count, plural, =0 {Neu} one {{count} Wiederholung} other {{count} Wiederholungen}}",
+    "cardOriginCustom": "Eigene",
+    "cardOriginChat": "Chat",
     "nextReview": "Nächste Wiederholung in {time}",
     "nextReviewNow": "Jetzt fällig",
     "ratings": {
@@ -434,7 +482,9 @@
       "next": "Weiter",
       "reveal": "Anzeigen",
       "pause": "Pause",
-      "play": "Abspielen"
+      "play": "Abspielen",
+      "restartAudio": "Audio von vorn",
+      "restartCard": "Satz neu starten"
     },
     "schedulingMode": {
       "learn": "L",
@@ -507,12 +557,18 @@
       "iconHide": "Satz ausblenden (erscheint nach der nächsten Wiederholung nicht mehr)",
       "iconEdit": "Redewendung in diesem Satz bearbeiten",
       "shortcuts": "Tastenkürzel",
-      "shortcutRating": "Tasten 1–4 zum Bewerten.",
-      "shortcutPause": "Leertaste zum Pausieren der Audio-Wiedergabe.",
-      "shortcutReveal": "Eingabetaste oder Pfeil nach rechts zum Aufdecken oder zum nächsten Satz.",
-      "shortcutRevertSubmission": "Pfeil nach links: zuletzt abgeschickte Übersetzung zurücknehmen (Schreiben).",
+      "shortcutRevealNext": "Verdecktes aufdecken, dann nächster Satz",
+      "shortcutPlayPause": "Audio abspielen oder pausieren",
+      "shortcutPrevious": "Vorheriger Satz (letzte Bewertung rückgängig)",
+      "shortcutPreviousWriting": "Letzte Abgabe zurücknehmen, dann vorheriger Satz",
+      "shortcutRestartAudio": "Audio von vorn abspielen",
+      "shortcutReplayTarget": "Zielsprachen-Audio erneut abspielen",
+      "shortcutRestartCard": "Satz neu starten",
+      "shortcutRate": "Satz bewerten",
       "cardsPerBatch": "Sätze pro Stapel",
       "cardsPerBatchDescription": "Anzahl der Sätze, die auf einmal hinzugefügt werden",
+      "dailyGoal": "Tagesziel",
+      "dailyGoalDescription": "Lernminuten, die du dir pro Tag vornimmst",
       "reviewSettings": "Wiederholungseinstellungen",
       "autoAddCards": "Sätze automatisch hinzufügen",
       "autoAddCardsDescription": "Automatisch neue Sätze hinzufügen, wenn keine mehr fällig sind",
@@ -528,10 +584,20 @@
       "practiceSpeaking": "Sprechen üben",
       "practiceSpeakingDescription": "Die Zielsprache nach der Ausgangssprache abspielen",
       "onlyNew": "Nur neue Karten",
-      "onlyNewDescription": "Hörverstehen nur bei neuen Karten üben – lege eine Anzahl anfänglicher Wiederholungen fest",
+      "strategyOnlyNew": "Nur neue Sätze",
+      "strategyOnlyNewDescription": "Hörverstehen für so viele erste Wiederholungen eines Satzes üben",
+      "strategyUntilGood": "Bis Bewertung Gut",
+      "strategyUntilGoodDescription": "Hörverstehen so lange üben, bis du den Satz so oft mit Gut oder Einfach bewertet hast",
+      "strategyContinuous": "Durchgehend",
+      "strategyContinuousDescription": "Hörverstehen bei jedem Satz und jeder Wiederholung üben — es endet nie",
+      "showTranslationOnNew": "Übersetzung bei neuen Sätzen anzeigen",
+      "showTranslationOnNewDescription": "Zeigt die Übersetzung zum Abtippen bei den ersten Wiederholungen eines Satzes — danach beginnt der Test ohne Hilfe",
+      "showTranslationOnlyNewDescription": "Anzahl der anfänglichen Wiederholungen mit sichtbarer Übersetzung",
       "uiSettings": "Anzeigeeinstellungen",
       "showProgressBar": "Fortschrittsbalken",
       "showProgressBarDescription": "Audio-Fortschrittsbalken und Wiedergabesteuerung anzeigen",
+      "showCardOrigin": "Kartenherkunft",
+      "showCardOriginDescription": "Zeigt, aus welcher Sammlung eine Karte stammt",
       "progressDisplayEnabled": "Zwischenfortschritt anzeigen",
       "progressDisplayEnabledDescription": "Hilft dir, motiviert zu bleiben",
       "hideTargetLanguages": "Zielsprachen ausblenden",
@@ -1123,14 +1189,18 @@
       "summary": "Du hast gerade {words, plural, =1 {1 Wort} other {# Wörter}} in {minutes, plural, =1 {1 Minute} other {# Minuten}} gelernt.",
       "headline": "In diesem Tempo wirst du können",
       "perDay": "{minutes} Min./Tag",
+      "timelineToday": "Heute",
+      "timelineTodaySub": "deine erste Lerneinheit",
+      "timelineIn30Days": "In 30 Tagen",
+      "timelineIn30DaysSub": "ein Monat mit deinem Tagesziel",
+      "timelineYearEndSub": "in {days} Tagen",
       "adjustLabel": "Tägliches Ziel anpassen",
-      "milestones": {
-        "1mo": "1 Monat",
-        "6mo": "6 Monate",
-        "1y": "1 Jahr"
-      },
       "wordsUnit": "Wörter",
-      "continue": "Weiter"
+      "continue": "Weiter",
+      "custom": "Eigenes",
+      "customPlaceholder": "Minuten",
+      "minutesUnit": "Min.",
+      "set": "Übernehmen"
     },
     "featureTour": {
       "title": "Noch ein paar Dinge",
@@ -1230,11 +1300,11 @@
       },
       "input": {
         "title": "Übersetzung eintippen",
-        "description": "Tippe die Übersetzung in der Zielsprache hier ein und drücke Senden. Du bekommst sofortiges Feedback zu jedem Wort."
+        "description": "Tippe die Übersetzung in der Zielsprache hier ein und drücke Senden. Bei neuen Sätzen wird die Übersetzung beim ersten Mal angezeigt — tippe sie einfach ab, um sie zu lernen; spätere Wiederholungen testen dich ohne sie. Du bekommst sofortiges Feedback zu jedem Wort."
       },
       "inputTranscribe": {
         "title": "Tippe ein, was du hörst",
-        "description": "Tippe genau ein, was du in der Zielsprache hörst, und drücke Senden. Du bekommst sofortiges Feedback zu jedem Wort."
+        "description": "Tippe genau ein, was du in der Zielsprache hörst, und drücke Senden. Bei neuen Sätzen wird der Text beim ersten Mal angezeigt — tippe ihn einfach ab, um ihn zu lernen; spätere Wiederholungen testen dich ohne ihn. Du bekommst sofortiges Feedback zu jedem Wort."
       },
       "audioControls": {
         "title": "Audio läuft automatisch",
@@ -1299,6 +1369,10 @@
         "title": "Radio",
         "description": "Audio-only Hintergrund-Wiedergabe – deine Karten laufen freihändig in Schleife und beeinflussen den Wiederholungsplan nicht. Nur beim Shadowing verfügbar."
       },
+      "freeStudyMode": {
+        "title": "Freies Lernen",
+        "description": "Stöbere frei durch deine Sätze im Schreibmodus — ohne Planung, ohne Bewertungen. Nur im Schreibmodus verfügbar."
+      },
       "reviewModeToggle": {
         "title": "Shadowing vs. Schreiben",
         "description": "Wechsle zwischen Shadowing (Satz hören und laut nachsprechen) und Schreiben (Übersetzung eintippen und direkt Rückmeldung erhalten)."
@@ -1306,6 +1380,14 @@
       "contentSource": {
         "title": "Wähle deine Quelle",
         "description": "Lege fest, ob du nur vorgefertigte Sätze, nur deine eigenen Karten oder beides gleichzeitig üben willst."
+      },
+      "dueCounts": {
+        "title": "Was auf dich wartet",
+        "description": "Diese Pillen zeigen, wie viele Sätze bei deiner aktuellen Inhaltsauswahl neu sind, gerade gelernt werden und zur Wiederholung anstehen."
+      },
+      "projections": {
+        "title": "Deine Prognose",
+        "description": "Diese rotierende Prognose rechnet deinen Fortschritt hoch — zum Beispiel, wie viele Wörter du bei deinem aktuellen Tempo bis Jahresende kennst. Tippe darauf für den nächsten Fakt."
       },
       "difficultySelection": {
         "title": "Schwierigkeitsauswahl",
@@ -1357,7 +1439,7 @@
       },
       "input": {
         "title": "Übersetzung eingeben",
-        "description": "Hier gibst du die Übersetzung ein. Du kannst auch das Audio der Zielsprache anhören, bevor du sie eintippst."
+        "description": "Hier gibst du die Übersetzung ein. Bei einem neuen Satz wird die Übersetzung einmal angezeigt, damit du sie abtippen kannst — ab der nächsten Wiederholung übersetzt du selbst. Du kannst auch das Audio der Zielsprache anhören, bevor du tippst."
       },
       "rating": {
         "title": "Bewerte deine Antwort",

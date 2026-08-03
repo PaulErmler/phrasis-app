@@ -11,7 +11,7 @@ import { fetchAuthEmail } from "./helpers";
  * Requires E2E_TEST_HOOKS=1 on the dev deployment (set for the run by
  * global-setup.ts): auth emails are then captured into the
  * `testAuthEmails` table instead of being sent (convex/lib/authEmails.ts),
- * and `fetchAuthEmail` reads the codes/links back via `npx convex run`.
+ * and `fetchAuthEmail` reads the codes/links back via `pnpm exec convex run`.
  *
  * ORDERING IS SIGNIFICANT for the rate-limit test: the `authEmail` bucket
  * (convex/rateLimiter.ts) holds 5 tokens per address per hour. The journey
@@ -25,7 +25,7 @@ test.describe.configure({ mode: "serial", retries: 0 });
 
 const random = crypto.randomBytes(6).toString("hex");
 const creds = {
-  email: `e2e-emailauth-${Date.now()}-${random}@test.de`,
+  email: `e2e-emailauth-${Date.now()}-${random}@flexling.com`,
   password: `E2ePass!${random}`,
   newPassword: `E2eNewPass!${random}`,
   name: `E2E emailauth ${random}`,
@@ -218,7 +218,7 @@ test.describe("email/password auth journey", () => {
   });
 
   test("forgot password for an unknown address leaks nothing", async ({ page }) => {
-    const unknown = `e2e-nobody-${Date.now()}-${random}@test.de`;
+    const unknown = `e2e-nobody-${Date.now()}-${random}@flexling.com`;
     await page.goto("/auth/forgot-password");
     await page.waitForLoadState("domcontentloaded");
     await acceptCookiesIfShown(page);

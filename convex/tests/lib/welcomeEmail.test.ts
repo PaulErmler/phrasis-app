@@ -50,7 +50,9 @@ describe("capture mode (E2E_TEST_HOOKS=1)", () => {
 
     await t.run(async (ctx) => {
       const runCtx = ctx as unknown as AuthEmailCtx;
-      await sendWelcomeEmail(runCtx, { to: "User@Test.de", name: "Anna" });
+      // Mixed-case recipient — capture normalizes to lowercase so the
+      // by_email index lookup in authEmailTesting.ts matches.
+      await sendWelcomeEmail(runCtx, { to: "User@Flexling.com", name: "Anna" });
     });
 
     const rows = await t.run((ctx) =>
@@ -58,7 +60,7 @@ describe("capture mode (E2E_TEST_HOOKS=1)", () => {
     );
     expect(rows).toMatchObject([
       {
-        email: "user@test.de",
+        email: "user@flexling.com",
         kind: "welcome",
         subject: WELCOME_EMAIL_SUBJECT,
       },

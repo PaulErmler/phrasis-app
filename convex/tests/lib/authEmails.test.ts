@@ -71,11 +71,11 @@ describe("capture mode (E2E_TEST_HOOKS=1)", () => {
       // Mixed-case recipient — capture normalizes to lowercase so the
       // by_email index lookup in authEmailTesting.ts matches.
       await sendVerificationOtpEmail(runCtx, {
-        to: "User@Test.de",
+        to: "User@Flexling.com",
         otp: "654321",
       });
       await sendResetPasswordEmail(runCtx, {
-        to: "user@test.de",
+        to: "user@flexling.com",
         url: "https://flexling.com/reset?token=r1",
       });
     });
@@ -85,14 +85,14 @@ describe("capture mode (E2E_TEST_HOOKS=1)", () => {
     );
     expect(rows).toMatchObject([
       {
-        email: "user@test.de",
+        email: "user@flexling.com",
         kind: "verify",
         otp: "654321",
         // Code in the subject → copiable from the inbox list.
         subject: `${AUTH_EMAIL_COPY.verify.subject}: 654321`,
       },
       {
-        email: "user@test.de",
+        email: "user@flexling.com",
         kind: "reset",
         url: "https://flexling.com/reset?token=r1",
         subject: AUTH_EMAIL_COPY.reset.subject,

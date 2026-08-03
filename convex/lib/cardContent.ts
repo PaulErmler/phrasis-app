@@ -6,6 +6,7 @@ import {
   isTranslationVersionStale,
 } from '../../lib/languages';
 import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
+import { appendSearchSegments } from '../../lib/wordTokenize';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -299,10 +300,15 @@ export async function buildCardSearchableText(
     (t): t is NonNullable<typeof t> => t !== null,
   );
 
+  // CJK/Thai parts get their Intl.Segmenter word tokens appended so Convex's
+  // whitespace/punctuation tokenizer can match mid-sentence words (it has no
+  // CJK segmentation of its own). Romanizations are Latin and stay as-is.
   const parts = [
-    sourceText,
+    resolvedText?.language
+      ? appendSearchSegments(sourceText, resolvedText.language)
+      : sourceText,
     resolvedText?.romanizedText,
-    ...foundTranslations.map((t) => t.text),
+    ...foundTranslations.map((t) => appendSearchSegments(t.text, t.lang)),
     ...foundTranslations.map((t) => t.romanization),
   ];
 
@@ -310,4 +316,81 @@ export async function buildCardSearchableText(
     searchableText: parts.filter(Boolean).join(' '),
     searchableTextLanguages: foundTranslations.map((t) => t.lang),
   };
+}
+
+/** Caches for `buildSearchableTextPatchForCard`, scoped by the caller. */
+export interface SearchableTextRebuildCaches {
+  /** deck → course languages (null when the deck/course no longer resolves). */
+  deckLanguages: Map<Id<'decks'>, string[] | null>;
+  /**
+   * Optional memo of built results keyed by (textId, languages) — valid
+   * across cards because the build depends only on those two inputs.
+   */
+  built?: Map<string, { searchableText: string; searchableTextLanguages: string[] }>;
+}
+
+/**
+ * Per-card core of the `searchableText` rebuild, shared by the live fan-out
+ * (`rebuildSearchableTextForText` in features/decks.ts) and the migration
+ * (`rebuildCardSearchableText` in migrations.ts): resolve the card's deck →
+ * course languages (memoized in the caller-provided cache), build the search
+ * string, and return it as a patch — or `undefined` when the deck/course no
+ * longer resolves or the stored fields are already current.
+ */
+export async function buildSearchableTextPatchForCard(
+  ctx: ContentCtx,
+  card: Pick<
+    Doc<'cards'>,
+    'deckId' | 'textId' | 'searchableText' | 'searchableTextLanguages'
+  >,
+  text: Doc<'texts'>,
+  caches: SearchableTextRebuildCaches,
+): Promise<
+  { searchableText: string; searchableTextLanguages: string[] } | undefined
+> {
+  let languages = caches.deckLanguages.get(card.deckId);
+  if (languages === undefined) {
+    const deck = await ctx.db.get(card.deckId);
+    const course = deck ? await ctx.db.get(deck.courseId) : null;
+    languages = course
+      ? [...course.baseLanguages, ...course.targetLanguages]
+      : null;
+    caches.deckLanguages.set(card.deckId, languages);
+  }
+  if (!languages) return undefined;
+
+  const builtKey = `${card.textId}|${languages.join('|')}`;
+  let built = caches.built?.get(builtKey);
+  if (!built) {
+    built = await buildCardSearchableText(
+      ctx,
+      card.textId,
+      text.text,
+      languages,
+      text,
+    );
+    caches.built?.set(builtKey, built);
+  }
+  return isSearchableTextCurrent(card, built) ? undefined : built;
+}
+
+/**
+ * Whether a card's stored search fields already match a freshly built
+ * result, so rebuild passes (live fan-out and migration) can skip the write.
+ * A card with `searchableTextLanguages` unset is never current — the rebuild
+ * stamps the field.
+ */
+export function isSearchableTextCurrent(
+  card: Pick<Doc<'cards'>, 'searchableText' | 'searchableTextLanguages'>,
+  built: { searchableText: string; searchableTextLanguages: string[] },
+): boolean {
+  return (
+    card.searchableText === built.searchableText &&
+    card.searchableTextLanguages !== undefined &&
+    card.searchableTextLanguages.length ===
+      built.searchableTextLanguages.length &&
+    card.searchableTextLanguages.every(
+      (l, i) => l === built.searchableTextLanguages[i],
+    )
+  );
 }

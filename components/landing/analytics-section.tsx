@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Flame, RotateCcw, Clock,
   TrendingUp, BookOpen, Zap, MessageSquare,
@@ -150,6 +150,96 @@ function MiniChart({ range }: { range: TimeRange }) {
   );
 }
 
+// Shared pill styling, matching the in-app due-count pills.
+const PILL_CLASS =
+  'rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums whitespace-nowrap';
+
+/**
+ * Tiny static replica of the in-app daily-goal ring (deliberately not the
+ * real component — landing visuals stay self-contained). Shows a fixed
+ * 14 / 20 min ≈ 70% arc.
+ */
+function MiniGoalRing({ size = 38, strokeWidth = 3.5 }: { size?: number; strokeWidth?: number }) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const fraction = 14 / 20;
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0" aria-hidden>
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="var(--muted)"
+        strokeWidth={strokeWidth}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="var(--primary)"
+        strokeLinecap="round"
+        strokeWidth={strokeWidth}
+        strokeDasharray={`${circumference} ${circumference}`}
+        strokeDashoffset={circumference * (1 - fraction)}
+        style={{ transformOrigin: 'center', transform: 'rotate(-90deg)' }}
+      />
+    </svg>
+  );
+}
+
+const PROJECTION_FACT_KEYS = [
+  'projectionFacts.wordsByYearEnd',
+  'projectionFacts.nextLevel',
+  'projectionFacts.wordsPerSession',
+] as const;
+
+const PROJECTION_INTERVAL_MS = 3500;
+
+/**
+ * Mini replica of the in-app rotating forecast slot: cycles three static
+ * demo facts with a vertical slide+fade. No auto-cycle under
+ * prefers-reduced-motion (the first fact stays put).
+ */
+function MiniProjection() {
+  const t = useTranslations('LandingPage.analytics');
+  const reducedMotion = useReducedMotion();
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    const id = setInterval(
+      () => setIdx((i) => (i + 1) % PROJECTION_FACT_KEYS.length),
+      PROJECTION_INTERVAL_MS,
+    );
+    return () => clearInterval(id);
+  }, [reducedMotion]);
+
+  return (
+    <div className="flex items-center justify-between gap-3 border-t border-border/40 pt-2.5">
+      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+        {t('projectionLabel')}
+      </span>
+      <div className="relative h-4 min-w-0 flex-1 overflow-hidden text-right">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={idx}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="block truncate text-xs font-semibold text-primary tabular-nums leading-4"
+          >
+            {t(PROJECTION_FACT_KEYS[idx])}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
 function MiniSessionSnapshot() {
   const stats = [
     { icon: RotateCcw, label: 'Reps', value: '847', today: '24 today' },
@@ -158,25 +248,42 @@ function MiniSessionSnapshot() {
   ];
 
   return (
-    <div className="flex items-end gap-3">
-      <div className="flex flex-col items-center gap-0.5">
-        <div className="flex items-center justify-center h-9 w-9 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--streak-active) 15%, transparent)' }}>
-          <Flame className="h-4 w-4" style={{ color: 'var(--streak-active)' }} />
-        </div>
-        <span className="text-base font-bold tabular-nums" style={{ color: 'var(--streak-active)' }}>24</span>
-        <span className="text-[10px] text-muted-foreground">Streak</span>
-      </div>
-      <div className="w-px self-stretch bg-border/60" />
-      <div className="flex-1 grid grid-cols-3 gap-1">
-        {stats.map(({ icon: Icon, label, value, today }) => (
-          <div key={label} className="flex flex-col items-center text-center gap-0.5">
-            <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-base font-semibold tabular-nums leading-tight">{value}</span>
-            <span className="text-[10px] text-muted-foreground leading-none">{label}</span>
-            <span className="text-[10px] font-medium text-primary tabular-nums leading-none mt-0.5">{today}</span>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex items-center gap-2">
+          <MiniGoalRing />
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold tabular-nums leading-tight">14 / 20 min</span>
+            <span className="text-[10px] text-muted-foreground leading-none">Daily goal</span>
           </div>
-        ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={cn(PILL_CLASS, 'bg-primary/10 text-primary')}>5 new</span>
+          <span className={cn(PILL_CLASS, 'bg-accent-orange/10 text-accent-orange')}>3 learning</span>
+          <span className={cn(PILL_CLASS, 'bg-success/10 text-success')}>12 review</span>
+        </div>
       </div>
+      <div className="flex items-end gap-3">
+        <div className="flex flex-col items-center gap-0.5">
+          <div className="flex items-center justify-center h-9 w-9 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--streak-active) 15%, transparent)' }}>
+            <Flame className="h-4 w-4" style={{ color: 'var(--streak-active)' }} />
+          </div>
+          <span className="text-base font-bold tabular-nums" style={{ color: 'var(--streak-active)' }}>24</span>
+          <span className="text-[10px] text-muted-foreground">Streak</span>
+        </div>
+        <div className="w-px self-stretch bg-border/60" />
+        <div className="flex-1 grid grid-cols-3 gap-1">
+          {stats.map(({ icon: Icon, label, value, today }) => (
+            <div key={label} className="flex flex-col items-center text-center gap-0.5">
+              <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-base font-semibold tabular-nums leading-tight">{value}</span>
+              <span className="text-[10px] text-muted-foreground leading-none">{label}</span>
+              <span className="text-[10px] font-medium text-primary tabular-nums leading-none mt-0.5">{today}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <MiniProjection />
     </div>
   );
 }

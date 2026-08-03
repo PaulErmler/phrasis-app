@@ -18,4 +18,16 @@ export interface TutorialDefinition {
   popoverClass?: string;
 }
 
-export type TutorialFactory = (t: TranslateFn) => TutorialDefinition;
+/**
+ * Optional runtime context a tour factory can branch on. The home tour uses
+ * `reviewMode` to anchor the free-play step to the button that actually
+ * renders: Radio in Shadowing, Free Study in Writing.
+ */
+export interface TutorialContext {
+  reviewMode?: 'audio' | 'full';
+}
+
+export type TutorialFactory = (
+  t: TranslateFn,
+  ctx?: TutorialContext,
+) => TutorialDefinition;

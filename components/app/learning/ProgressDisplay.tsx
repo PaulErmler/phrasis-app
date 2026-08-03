@@ -21,6 +21,7 @@ import {
   setupMediaSession,
   setMediaSessionPlaybackState,
 } from '@/lib/audio/mediaSession';
+import type { SchedulingMode } from '@/convex/types';
 
 type CardCounts = { new: number; learning: number; relearning: number; review: number };
 
@@ -31,7 +32,7 @@ interface ProgressDisplayProps {
   dailyReviewsToday: number;
   dailyTimeMsToday: number;
   dailyNewWordsToday: number;
-  schedulingMode: 'learn_new' | 'learnAndReview' | 'radio';
+  schedulingMode: SchedulingMode;
   /** Auto-advance + auto-advance bar are audio-mode only. */
   reviewMode: 'audio' | 'full';
   /** Mirrors `courseSettings.autoAdvance`. Even in audio mode, the

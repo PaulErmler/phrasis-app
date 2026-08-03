@@ -5,6 +5,7 @@ import { useQuery } from 'convex/react';
 
 import { api } from '@/convex/_generated/api';
 import { posthog } from '@/lib/posthog/client';
+import { resetPreservingConsent } from '@/lib/posthog/consent';
 
 /**
  * Ties the browser's PostHog identity to the signed-in user.
@@ -40,7 +41,7 @@ export function PostHogIdentify() {
     // that would hand every page load a brand-new anonymous id.
     if (user === null && identifiedIdRef.current !== null) {
       identifiedIdRef.current = null;
-      posthog.reset();
+      resetPreservingConsent();
     }
   }, [user]);
 

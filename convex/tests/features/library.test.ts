@@ -3,6 +3,9 @@ import { convexTest, type TestConvex } from "convex-test";
 import { describe, it, expect } from "vitest";
 import schema from "../../schema";
 import { api } from "../../_generated/api";
+import type { Id } from "../../_generated/dataModel";
+import { buildCardSearchableText } from "../../lib/cardContent";
+import { augmentSearchQuery } from "../../features/library";
 
 const modules = import.meta.glob("/convex/**/*.ts");
 
@@ -476,5 +479,176 @@ describe("features/library", () => {
       expect(res[1].sourceText).toBe("custom-138");
       expect(res[99].sourceText).toBe("custom-40");
     });
+  });
+});
+
+// The CJK fix has two halves: `buildCardSearchableText` appends
+// Intl.Segmenter word tokens to the indexed string, and `getLibraryCards`
+// appends them to the query. convex-test models Convex's real behavior
+// closely enough to exercise both: the document side is split on whitespace
+// only (an unsegmented CJK sentence stays one un-matchable word) and query
+// terms are OR'd with prefix matching.
+describe("CJK search (no-word-boundary languages)", () => {
+  async function seedZhCourse(t: TestConvex<typeof schema>) {
+    return t.run(async (ctx) => {
+      const collectionId = await ctx.db.insert("collections", {
+        name: "A1",
+        textCount: 0,
+      });
+      const courseId = await ctx.db.insert("courses", {
+        userId: "user_A",
+        baseLanguages: ["en"],
+        targetLanguages: ["zh"],
+      });
+      await ctx.db.insert("userSettings", {
+        userId: "user_A",
+        hasCompletedOnboarding: true,
+        activeCourseId: courseId,
+      });
+      const deckId = await ctx.db.insert("decks", {
+        courseId,
+        name: "deck",
+        cardCount: 1,
+      });
+      const textId = await ctx.db.insert("texts", {
+        text: "你真的体贴",
+        language: "zh",
+        userCreated: false,
+        collectionId,
+        collectionRank: 1,
+      });
+      const translationId = await ctx.db.insert("translations", {
+        textId,
+        targetLanguage: "en",
+        translatedText: "You are really considerate",
+        romanizedText: "ni zhende titie",
+      });
+      const cardId = await ctx.db.insert("cards", {
+        deckId,
+        textId,
+        collectionId,
+        collectionOrigin: "premade",
+        dueDate: 0,
+        isMastered: false,
+        isHidden: false,
+        schedulingPhase: "preReview",
+        preReviewCount: 0,
+      });
+      return { courseId, deckId, textId, translationId, cardId };
+    });
+  }
+
+  async function buildSearchableTextFor(
+    t: TestConvex<typeof schema>,
+    cardId: Id<"cards">,
+  ) {
+    // Stamp the card with the real index-side builder so the test covers the
+    // exact string production writes.
+    await t.run(async (ctx) => {
+      const card = (await ctx.db.get(cardId))!;
+      const deck = (await ctx.db.get(card.deckId))!;
+      const course = (await ctx.db.get(deck.courseId))!;
+      const built = await buildCardSearchableText(
+        ctx,
+        card.textId,
+        (await ctx.db.get(card.textId))!.text,
+        [...course.baseLanguages, ...course.targetLanguages],
+      );
+      await ctx.db.patch(cardId, built);
+    });
+  }
+
+  it("finds a word in the middle of an unspaced Chinese sentence", async () => {
+    const t = convexTest(schema, modules);
+    const { cardId } = await seedZhCourse(t);
+    await buildSearchableTextFor(t, cardId);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const res = await asUser.query(api.features.library.getLibraryCards, {
+      searchQuery: "体贴",
+    });
+    expect(res.map((c) => c.sourceText)).toEqual(["你真的体贴"]);
+  });
+
+  it("finds a query spanning segment boundaries via query-side segmentation", async () => {
+    const t = convexTest(schema, modules);
+    const { cardId } = await seedZhCourse(t);
+    await buildSearchableTextFor(t, cardId);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const res = await asUser.query(api.features.library.getLibraryCards, {
+      searchQuery: "真的体贴",
+    });
+    expect(res.map((c) => c.sourceText)).toEqual(["你真的体贴"]);
+  });
+
+  it("still matches via romanization and translation text", async () => {
+    const t = convexTest(schema, modules);
+    const { cardId } = await seedZhCourse(t);
+    await buildSearchableTextFor(t, cardId);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    for (const searchQuery of ["zhende", "considerate"]) {
+      const res = await asUser.query(api.features.library.getLibraryCards, {
+        searchQuery,
+      });
+      expect(res.map((c) => c.sourceText)).toEqual(["你真的体贴"]);
+    }
+  });
+
+  it("matches a punctuated query and search does not throw", async () => {
+    const t = convexTest(schema, modules);
+    const { cardId } = await seedZhCourse(t);
+    await buildSearchableTextFor(t, cardId);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const res = await asUser.query(api.features.library.getLibraryCards, {
+      searchQuery: "你真的体贴。",
+    });
+    expect(res.map((c) => c.sourceText)).toEqual(["你真的体贴"]);
+  });
+
+  describe("augmentSearchQuery — 16-term budget", () => {
+    // Convex tokenizes the query on punctuation as well as whitespace, so the
+    // budget must count terms the same way — exceeding 16 terms makes the
+    // real search index throw instead of returning results.
+    const termCount = (q: string) =>
+      q.split(/[^\p{L}\p{N}]+/u).filter(Boolean).length;
+
+    it("stays within 16 terms for a long punctuated Japanese query", () => {
+      const query = "私は日本語を勉強しています、友達と毎日話します。";
+      const augmented = augmentSearchQuery(query, ["en", "ja"]);
+      expect(termCount(augmented)).toBeLessThanOrEqual(16);
+      // Still actually augmented — segments were appended.
+      expect(termCount(augmented)).toBeGreaterThan(termCount(query));
+    });
+
+    it("stays within 16 terms for a multi-clause Chinese paste", () => {
+      const query =
+        "你好，我叫小明。我喜欢学习语言，也喜欢旅行。你呢，你喜欢什么？";
+      const augmented = augmentSearchQuery(query, ["en", "zh"]);
+      expect(termCount(augmented)).toBeLessThanOrEqual(16);
+    });
+
+    it("returns space-delimited queries unchanged", () => {
+      expect(augmentSearchQuery("hello world", ["en", "es"])).toBe(
+        "hello world",
+      );
+    });
+  });
+
+  it("does not match a card whose searchableText was never segmented (pre-migration state)", async () => {
+    // Documents the failure mode the migration exists to fix: the raw
+    // sentence is one whitespace-token, so the mid-sentence word can only
+    // match after the rebuild.
+    const t = convexTest(schema, modules);
+    const { cardId } = await seedZhCourse(t);
+    await t.run(async (ctx) => {
+      await ctx.db.patch(cardId, {
+        searchableText: "你真的体贴 You are really considerate",
+        searchableTextLanguages: ["en"],
+      });
+    });
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const res = await asUser.query(api.features.library.getLibraryCards, {
+      searchQuery: "体贴",
+    });
+    expect(res).toEqual([]);
   });
 });

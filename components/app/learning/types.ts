@@ -1,4 +1,5 @@
 import { Id } from '@/convex/_generated/dataModel';
+import type { SchedulingMode } from '@/convex/types';
 
 // ============================================================================
 // Shared constants
@@ -53,6 +54,7 @@ export interface CourseSettings {
   activeCollectionId?: Id<'collections'>;
   cardsToAddBatchSize?: number;
   autoAddCards?: boolean;
+  dailyTimeGoalMinutes?: number;
   // Audio playback settings
   highlightWords?: boolean;
   autoPlayAudio?: boolean;
@@ -98,6 +100,16 @@ export interface CourseSettings {
   // "Only new": Practice Listening only on a card's initial N reviews.
   // 0 / undefined = always (∞); 1-10 = limit.
   targetBeforeOnlyNewReps?: number;
+  // Practice Listening duration strategy — 'onlyNew' (the rep window above),
+  // 'untilGood' (off after N FSRS good/easy ratings), or 'continuous' (never
+  // off). Unset = legacy doc; inferred from targetBeforeOnlyNewReps.
+  targetBeforeListeningStrategy?: 'onlyNew' | 'untilGood' | 'continuous';
+  targetBeforeUntilGoodReps?: number; // 1-10, default 1
+  // Writing mode: show the translation to copy-type on a card's first N
+  // reviews. undefined = on; window mirrors targetBeforeOnlyNewReps (0 = ∞),
+  // default 1.
+  showTranslationOnNew?: boolean;
+  showTranslationOnlyNewReps?: number;
   showProgressBar?: boolean;
   progressDisplayEnabled?: boolean;
   hideTargetLanguages?: boolean;
@@ -120,8 +132,10 @@ export interface CourseSettings {
   autoRateFromAccuracy?: boolean;
   /** Accuracy breakpoints for the above. Default 50 / 80. */
   autoRateThresholds?: { hard: number; good: number; easy?: number };
+  /** Show the card's source collection (e.g. "A1.2") in the card header. Default false. */
+  showCardOrigin?: boolean;
   // Scheduling mode
-  schedulingMode?: 'learn_new' | 'learnAndReview' | 'radio';
+  schedulingMode?: SchedulingMode;
   // Language order overrides
   baseLanguageOrder?: string[];
   targetLanguageOrder?: string[];

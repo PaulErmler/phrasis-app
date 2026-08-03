@@ -3,6 +3,7 @@ import { Id, Doc } from '../../_generated/dataModel';
 import { getCourseStatsForMutation } from '../courseStats';
 import { getTodayInTimezone } from '../../lib/dateUtils';
 import { FSRS_STATE_LABELS as CARD_STATE_KEYS } from '../../lib/fsrsStates';
+import type { StatsReviewMode } from '../../types';
 
 export async function getDailyStats(
   ctx: QueryCtx,
@@ -56,7 +57,8 @@ const EMPTY_RATING_COUNTS = () => ({
   stillLearning: 0, understood: 0,
   again: 0, hard: 0, good: 0, easy: 0,
 });
-const EMPTY_MODE_COUNTS = () => ({ audio: 0, full: 0, radio: 0 });
+/** Zeroed per-mode review counts; shared by the weekly/monthly/yearly upserts. */
+export const EMPTY_MODE_COUNTS = () => ({ audio: 0, full: 0, radio: 0, freeStudy: 0 });
 const EMPTY_CARD_STATE = () => ({ new: 0, learning: 0, review: 0, relearning: 0 });
 
 export async function upsertDailyStats(
@@ -67,7 +69,7 @@ export async function upsertDailyStats(
     date: string;
     timeMs: number;
     isNewCard: boolean;
-    reviewMode?: 'audio' | 'full' | 'radio';
+    reviewMode?: StatsReviewMode;
     rating?: string;
     accuracy?: number;
     /** Written only as a pair, sharing `accuracyDualCount`. */
@@ -119,9 +121,10 @@ export async function upsertDailyStats(
       }
     }
 
-    // Mode counts. `radio` is optional in the stored shape (added later),
-    // so we coalesce both the merged previous shape and the per-key read.
-    type ModeCounts = { audio: number; full: number; radio: number };
+    // Mode counts. `radio`/`freeStudy` are optional in the stored shape
+    // (added later), so we coalesce both the merged previous shape and the
+    // per-key read.
+    type ModeCounts = { audio: number; full: number; radio: number; freeStudy: number };
     let reviewsByMode: ModeCounts | undefined;
     let timeMsByMode: ModeCounts | undefined;
     if (args.reviewMode) {
@@ -217,14 +220,12 @@ export async function upsertDailyStats(
     ...(args.reviewMode
       ? {
         reviewsByMode: {
-          audio: args.reviewMode === 'audio' ? 1 : 0,
-          full: args.reviewMode === 'full' ? 1 : 0,
-          radio: args.reviewMode === 'radio' ? 1 : 0,
+          ...EMPTY_MODE_COUNTS(),
+          [args.reviewMode]: 1,
         },
         timeMsByMode: {
-          audio: args.reviewMode === 'audio' ? args.timeMs : 0,
-          full: args.reviewMode === 'full' ? args.timeMs : 0,
-          radio: args.reviewMode === 'radio' ? args.timeMs : 0,
+          ...EMPTY_MODE_COUNTS(),
+          [args.reviewMode]: args.timeMs,
         },
       }
       : {}),

@@ -1,10 +1,17 @@
 import { v } from 'convex/values';
 import { paginationOptsValidator } from 'convex/server';
-import { query, internalQuery } from '../_generated/server';
+import { query, internalQuery, QueryCtx } from '../_generated/server';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
-import { cardsByState, cardsByDueDate, cardsByStateAndDueDate } from '../db/stats/cardAggregates';
+import {
+  cardsByState,
+  cardsByDueDate,
+  cardsByStateAndDueDate,
+  cardsByOriginStateAndDueDate,
+  type OriginBucket,
+} from '../db/stats/cardAggregates';
+import { studyContentFilterValidator, type StudyContentFilter } from '../types';
 import {
   getCourseStats as dbGetCourseStats,
   getTodayInTimezone,
@@ -834,6 +841,67 @@ export const getDueCardCount = internalQuery({
   },
 });
 
+/**
+ * Shared implementation for the due-count queries below: resolve the caller's
+ * active deck, then count due cards per FSRS state via aggregates. `filter`
+ * 'both' uses the state-only aggregate (counts everything, including legacy
+ * cards without a resolved origin); 'course'/'custom' sum the per-origin
+ * aggregate buckets.
+ */
+async function countDueCardsByState(
+  ctx: QueryCtx,
+  filter: StudyContentFilter,
+  now: number,
+): Promise<{
+  new: number;
+  learning: number;
+  relearning: number;
+  review: number;
+} | null> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return null;
+  const active = await getActiveCourseForUser(ctx, userId);
+  if (!active) return null;
+  const deck = await getDeckByCourseId(ctx, active.course._id);
+  if (!deck) return null;
+
+  const dueBounds = { upper: { key: now, inclusive: true } };
+
+  const countState = async (state: string): Promise<number> => {
+    if (filter === 'both') {
+      return cardsByStateAndDueDate.count(ctx, {
+        namespace: `${deck._id}:${state}`,
+        bounds: dueBounds,
+      });
+    }
+    const origins: OriginBucket[] =
+      filter === 'course' ? ['premade'] : ['custom', 'chat'];
+    const counts = await Promise.all(
+      origins.map((origin) =>
+        cardsByOriginStateAndDueDate.count(ctx, {
+          namespace: `${deck._id}:${origin}:${state}`,
+          bounds: dueBounds,
+        }),
+      ),
+    );
+    return counts.reduce((a, b) => a + b, 0);
+  };
+
+  const [newCount, learningCount, reviewCount, relearningCount] = await Promise.all([
+    countState('new'),
+    countState('learning'),
+    countState('review'),
+    countState('relearning'),
+  ]);
+
+  return {
+    new: newCount,
+    learning: learningCount,
+    relearning: relearningCount,
+    review: reviewCount,
+  };
+}
+
 /** Due card counts by state for the active deck (O(log n) via aggregates). */
 export const getCardCounts = query({
   args: {},
@@ -847,29 +915,41 @@ export const getCardCounts = query({
     v.null(),
   ),
   handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return null;
-    const deck = await getDeckByCourseId(ctx, active.course._id);
-    if (!deck) return null;
+    return countDueCardsByState(ctx, 'both', Date.now());
+  },
+});
 
-    const now = Date.now();
-    const dueBounds = { upper: { key: now, inclusive: true } };
-
-    const [newCount, learningCount, reviewCount, relearningCount] = await Promise.all([
-      cardsByStateAndDueDate.count(ctx, { namespace: `${deck._id}:new`, bounds: dueBounds }),
-      cardsByStateAndDueDate.count(ctx, { namespace: `${deck._id}:learning`, bounds: dueBounds }),
-      cardsByStateAndDueDate.count(ctx, { namespace: `${deck._id}:review`, bounds: dueBounds }),
-      cardsByStateAndDueDate.count(ctx, { namespace: `${deck._id}:relearning`, bounds: dueBounds }),
-    ]);
-
-    return {
-      new: newCount,
-      learning: learningCount,
-      relearning: relearningCount,
-      review: reviewCount,
-    };
+/**
+ * Filter-aware due card counts by state for the active deck (O(log n) via
+ * aggregates). Powers the homescreen due-count pills next to the content
+ * filter dropdown.
+ *
+ * `filter` is an explicit arg (not read from courseSettings) so the client
+ * can pass its optimistically-updated filter value and the counts flip in the
+ * same frame as the dropdown. `now` is client-supplied per the no-wall-clock
+ * query guideline (a stable, minute-quantized value also keeps the query
+ * cacheable). A skewed `now` only shifts the caller's own counts — harmless.
+ *
+ * Semantics mirror `fetchDueCardsWithFilter` (scheduling.ts): 'both' counts
+ * everything (including legacy cards without a resolved origin), 'course'
+ * counts origin 'premade', 'custom' counts origins 'custom' + 'chat'.
+ */
+export const getFilteredCardCounts = query({
+  args: {
+    filter: v.optional(studyContentFilterValidator),
+    now: v.number(),
+  },
+  returns: v.union(
+    v.object({
+      new: v.number(),
+      learning: v.number(),
+      relearning: v.number(),
+      review: v.number(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    return countDueCardsByState(ctx, args.filter ?? 'both', args.now);
   },
 });
 

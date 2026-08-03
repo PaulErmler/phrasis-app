@@ -5,7 +5,7 @@ const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 /**
  * Playwright configuration.
  *
- * Execution phases (one shared test user throughout):
+ * Execution phases (one shared test user throughout, except noted):
  *
  *   1. setup                — auth.setup.ts creates a fresh user + onboarding.
  *   2. tutorial             — runs tutorial.spec.ts FIRST; tours are one-shot
@@ -13,21 +13,21 @@ const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
  *                             before this project runs.
  *   3. chromium-parallel    — stateless / read-only specs. Multiple workers,
  *                             fullyParallel.
- *   4. chromium-serial      — specs that MUTATE shared user state (review
- *                             mode, locale, chat quota, cards). One worker,
- *                             serial within the project.
- *   5. course-management    — archives the onboarding course. Must run after
- *                             every spec that depends on the shared user's
- *                             courses, because it destroys that state.
- *   6. payment-overdue      — @live dunning journey with its OWN fresh user.
- *                             A separate project (not a file in
- *                             chromium-serial): `fullyParallel: false` only
- *                             serializes tests within one FILE — separate
- *                             files of a project still spread across
- *                             workers, and two concurrent fresh-signup +
- *                             onboarding walks (this + billing.spec.ts)
- *                             saturate the translation/TTS queues (the
- *                             documented flake source in auth.setup.ts).
+ *   4. chromium-serial      — specs that MUTATE the shared fixture user
+ *                             (review mode, chat quota, cards, etc.).
+ *                             workers:1 so they cannot race each other.
+ *   5. billing-live         — billing.spec.ts with its OWN fresh user. Depends
+ *                             only on chromium-parallel so it overlaps in
+ *                             wall-clock with chromium-serial.
+ *   6. settings-serial      — change-password (revokeOtherSessions) + locale.
+ *                             workers:1, after chromium-serial so password
+ *                             rotation cannot log out concurrent live specs.
+ *                             Rewrites e2e/.auth/user.json for downstream.
+ *   7. course-management    — archives the onboarding course. Waits for both
+ *                             shared-user serial work and billing-live.
+ *   8. payment-overdue      — @live dunning journey with its OWN fresh user.
+ *   9. email-auth           — email verification + password-reset with its
+ *                             own fresh user (empty storageState).
  */
 export default defineConfig({
   testDir: "./e2e",
@@ -85,27 +85,52 @@ export default defineConfig({
       },
     },
     {
-      // Specs that mutate shared user state — chat quota, threads, card
-      // ratings, review mode, locale, etc. These must not race each other,
-      // and must run after the read-only phase has completed.
-      // billing.spec.ts (@live) signs up its own fresh e2e-billing-* user
-      // (billing state lives in Autumn/Stripe and survives suite runs, so
-      // it cannot reuse a shared fixture) and walks the trial → upgrade →
-      // downgrade journey against Stripe test mode.
+      // Shared-fixture mutators — review mode, ratings, chat quota, cards,
+      // content filter, etc. Must not race each other (workers:1). Do NOT
+      // put change-password here (see settings-serial) or billing (own user).
       name: "chromium-serial",
       testMatch: [
         /chat-live\.spec\.ts/,
         /learning-journey\.spec\.ts/,
         /learning-settings\.spec\.ts/,
         /learning-undo\.spec\.ts/,
-        /settings\.spec\.ts/,
+        /daily-goal\.spec\.ts/,
+        /free-study\.spec\.ts/,
+        /course-settings-sweep\.spec\.ts/,
         /add-cards-live\.spec\.ts/,
         /add-cards-import-live\.spec\.ts/,
         /content-filter-live\.spec\.ts/,
-        /billing\.spec\.ts/,
       ],
       dependencies: ["chromium-parallel"],
       fullyParallel: false,
+      workers: 1,
+      use: {
+        ...devices["Desktop Chrome"],
+        storageState: "e2e/.auth/user.json",
+      },
+    },
+    {
+      // Own-user Stripe/Autumn trial journey. Parallel with chromium-serial
+      // (only shares chromium-parallel as a dependency) so the long checkout
+      // walk overlaps shared-fixture live specs instead of extending the
+      // serial queue.
+      name: "billing-live",
+      testMatch: /billing\.spec\.ts/,
+      dependencies: ["chromium-parallel"],
+      fullyParallel: false,
+      use: {
+        ...devices["Desktop Chrome"],
+      },
+    },
+    {
+      // Session-critical settings: changePassword with revokeOtherSessions
+      // invalidates every other browser context still holding the old
+      // cookie. Isolate to one worker after shared-user mutating specs.
+      name: "settings-serial",
+      testMatch: /settings\.spec\.ts/,
+      dependencies: ["chromium-serial"],
+      fullyParallel: false,
+      workers: 1,
       use: {
         ...devices["Desktop Chrome"],
         storageState: "e2e/.auth/user.json",
@@ -114,7 +139,7 @@ export default defineConfig({
     {
       name: "course-management",
       testMatch: /course-management\.spec\.ts/,
-      dependencies: ["chromium-serial"],
+      dependencies: ["settings-serial", "billing-live"],
       fullyParallel: false,
       use: {
         ...devices["Desktop Chrome"],

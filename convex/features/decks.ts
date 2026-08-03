@@ -9,7 +9,7 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
-import { insertCard } from '../db/stats/cardAggregates';
+import { insertCard, patchCard } from '../db/stats/cardAggregates';
 import {
   getVoiceForLanguage,
   getVoiceForLanguageVariant,
@@ -74,7 +74,11 @@ import {
   isClaimFresh,
 } from './llmTranslationQueue';
 import { llmPool } from '../lib/workpools';
-import { buildTextContentBatchForLanguages, buildCardSearchableText } from '../lib/cardContent';
+import {
+  buildTextContentBatchForLanguages,
+  buildCardSearchableText,
+  buildSearchableTextPatchForCard,
+} from '../lib/cardContent';
 import {
   LEGACY_LEVEL_ORDER,
   collectionRemaining,
@@ -85,6 +89,7 @@ import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { consumeQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
+import { FREE_PLAY_MODES } from '../lib/freePlay';
 import { isCollectionAccessible, requireAccessibleText } from './collections';
 import {
   applyMarkCounterDelta,
@@ -984,10 +989,14 @@ export async function createCardsFromTexts(
         preReviewCount: 0,
         radioRoundCounter: 0,
         radioPlayCount: 0,
-        // Random tiebreak so that even brand-new cards inserted in a single
+        // Random tiebreaks so that even brand-new cards inserted in a single
         // batch (which would otherwise share creation time + counter) end up
-        // in a shuffled radio order rather than insertion order.
+        // in a shuffled free-play order rather than insertion order. The two
+        // faces roll separately so their rotations never correlate.
         radioOrderKey: Math.floor(Math.random() * 0x7fffffff),
+        freeStudyRoundCounter: 0,
+        freeStudyPlayCount: 0,
+        freeStudyOrderKey: Math.floor(Math.random() * 0x7fffffff),
         searchableText,
         searchableTextLanguages,
       });
@@ -1680,9 +1689,11 @@ export const ensureCardContent = mutation({
 });
 
 /**
- * Query the next N upcoming (due) cards for a given scheduling mode. The card
- * set differs by mode: `learn_new` pulls only new (non-graduated) cards via
- * the graduated index, while `learnAndReview` / `radio` pull all due cards.
+ * Query the next N upcoming cards for a given scheduling mode. The card set
+ * differs by mode: `learn_new` pulls only new (non-graduated) cards via the
+ * graduated index, `learnAndReview` pulls all due cards, and free play
+ * (`radio`, either face) has no due filter at all — its rotations serve by
+ * round counter, so the cards to warm are each face's rotation head.
  */
 async function getUpcomingCardsForMode(
   ctx: MutationCtx,
@@ -1690,6 +1701,17 @@ async function getUpcomingCardsForMode(
   mode: SchedulingMode,
   now: number,
 ): Promise<Doc<'cards'>[]> {
+  if (mode === 'radio') {
+    // Both faces: the Radio and Free Study rotations advance independently,
+    // so their heads can be entirely different cards.
+    const [radioHead, freeStudyHead] = await Promise.all([
+      FREE_PLAY_MODES.radio.fetch(ctx, deckId, ENSURE_CONTENT_LOOKAHEAD),
+      FREE_PLAY_MODES.freeStudy.fetch(ctx, deckId, ENSURE_CONTENT_LOOKAHEAD),
+    ]);
+    const byId = new Map<Id<'cards'>, Doc<'cards'>>();
+    for (const card of [...radioHead, ...freeStudyHead]) byId.set(card._id, card);
+    return [...byId.values()];
+  }
   if (mode === 'learn_new') {
     return ctx.db
       .query('cards')
@@ -1786,9 +1808,14 @@ export const ensureUpcomingCardsContent = mutation({
 });
 
 // Scheduling modes whose upcoming card sets differ for content purposes.
-// `radio` shares `learnAndReview`'s due-card selection, so warming these two
-// covers all three modes.
-const WARMABLE_SCHEDULING_MODES: SchedulingMode[] = ['learn_new', 'learnAndReview'];
+// Free play's rotations serve by round counter with no due filter, so its
+// upcoming cards are NOT covered by the due-based modes and must be warmed
+// separately (both faces — see getUpcomingCardsForMode).
+const WARMABLE_SCHEDULING_MODES: SchedulingMode[] = [
+  'learn_new',
+  'learnAndReview',
+  'radio',
+];
 
 /**
  * Ensure content for the upcoming cards across *all* scheduling modes, so any
@@ -2202,6 +2229,11 @@ export const storeTranslationAndScheduleTTS = internalMutation({
     // punctuation-only change — audio is kept and TTS must not be enqueued.
     let audioUnchangedBySound = false;
 
+    // Set when this write changed content that belongs in the cards'
+    // searchableText (new/replaced translation, newly-filled romanization) —
+    // triggers the batched rebuild fan-out below.
+    let searchableContentChanged = false;
+
     if (!existing) {
       await ctx.db.insert('translations', {
         textId: args.textId,
@@ -2227,6 +2259,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         // Freshly produced row → stamp the language's current method version.
         translationVersion: getCurrentTranslationVersion(args.targetLanguage),
       });
+      searchableContentChanged = true;
     } else if (args.replaceExisting) {
       // Audio decision for retranslations, made here where old and new text
       // are both in hand: a punctuation/'_'-only change sounds identical, so
@@ -2281,6 +2314,7 @@ export const storeTranslationAndScheduleTTS = internalMutation({
         patch.speakerGender = args.speakerGender;
       }
       await ctx.db.patch(existing._id, patch);
+      searchableContentChanged = true;
     } else {
       const patch: Partial<{
         romanizedText: string;
@@ -2333,7 +2367,17 @@ export const storeTranslationAndScheduleTTS = internalMutation({
       }
       if (Object.keys(patch).length > 0) {
         await ctx.db.patch(existing._id, patch);
+        // Only a real romanization value changes the search string — the
+        // metadata fills (source/variant/gender/version) don't, and the
+        // empty-string sentinel is filtered out of searchableText anyway.
+        if (patch.romanizedText) {
+          searchableContentChanged = true;
+        }
       }
+    }
+
+    if (searchableContentChanged) {
+      await scheduleSearchableTextRebuild(ctx, args.textId);
     }
 
     // `audioUnchangedBySound`: the retained audio may live under a different
@@ -2430,6 +2474,11 @@ export const storeSourceRomanization = internalMutation({
         romanizedText: args.romanizedText,
         romanizationSource: args.romanizationSource,
       });
+      // A newly-landed source romanization belongs in the cards' search
+      // string (the empty-string "tried, failed" sentinel doesn't).
+      if (args.romanizedText !== '') {
+        await scheduleSearchableTextRebuild(ctx, args.textId);
+      }
     }
     return null;
   },
@@ -2504,6 +2553,120 @@ export const storeTranslationRomanization = internalMutation({
         romanizedText: args.romanizedText,
         romanizationSource: args.romanizationSource,
       });
+      // A newly-landed romanization belongs in the cards' search string
+      // (the empty-string "tried, failed" sentinel doesn't).
+      if (args.romanizedText !== '') {
+        await scheduleSearchableTextRebuild(ctx, args.textId);
+      }
+    }
+    return null;
+  },
+});
+
+const REBUILD_SEARCHABLE_BATCH = 50;
+
+/**
+ * Content lands in bursts — a text gets its translations and romanizations
+ * for every course language within seconds, and each store used to schedule
+ * its own full rebuild over every card referencing the text (premade texts
+ * are shared across all users' decks, so one burst multiplied into thousands
+ * of redundant card patches). Debounce: one pending rebuild per text,
+ * marked on the text row; stores inside the window piggyback on it (the
+ * rebuild reads content at run time, so it picks up everything the burst
+ * wrote).
+ */
+const SEARCHABLE_REBUILD_DEBOUNCE_MS = 10_000;
+
+async function scheduleSearchableTextRebuild(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+): Promise<void> {
+  const text = await ctx.db.get(textId);
+  if (!text) return;
+  const now = Date.now();
+  if (
+    text.searchableRebuildScheduledAt !== undefined &&
+    text.searchableRebuildScheduledAt > now
+  ) {
+    return;
+  }
+  await ctx.db.patch(textId, {
+    searchableRebuildScheduledAt: now + SEARCHABLE_REBUILD_DEBOUNCE_MS,
+  });
+  await ctx.scheduler.runAfter(
+    SEARCHABLE_REBUILD_DEBOUNCE_MS,
+    internal.features.decks.rebuildSearchableTextForText,
+    { textId },
+  );
+}
+
+/**
+ * Rebuild `searchableText` on every card referencing a text, in batches with
+ * self-continuation.
+ *
+ * Scheduled by the three late-content write funnels
+ * (`storeTranslationAndScheduleTTS`, `storeSourceRomanization`,
+ * `storeTranslationRomanization`) so search stays correct for content that
+ * lands AFTER a card was created. The review-time staleness check in
+ * `reviewCard` only compares language sets — it misses retranslations and
+ * late romanization fills entirely, and only fires when the card is actually
+ * reviewed — so it stays as a backstop, not the primary path.
+ *
+ * The rebuilt string depends only on (textId, course languages), so it is
+ * computed once per distinct language list and reused across the batch;
+ * unchanged cards are skipped so repeated triggers stay cheap.
+ */
+export const rebuildSearchableTextForText = internalMutation({
+  args: {
+    textId: v.id('texts'),
+    cursor: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    // Text may have been cascade-deleted while this job was queued.
+    const text = await ctx.db.get(args.textId);
+    if (!text) return null;
+
+    // First batch: release the debounce marker so content landing from here
+    // on schedules a fresh rebuild (this run reads content as of now).
+    if (args.cursor === undefined && text.searchableRebuildScheduledAt !== undefined) {
+      await ctx.db.patch(args.textId, {
+        searchableRebuildScheduledAt: undefined,
+      });
+    }
+
+    const page = await ctx.db
+      .query('cards')
+      .withIndex('by_textId', (q) => q.eq('textId', args.textId))
+      .paginate({
+        numItems: REBUILD_SEARCHABLE_BATCH,
+        cursor: args.cursor ?? null,
+      });
+
+    // Shared per-page caches: deck→languages resolved once per deck, built
+    // strings memoized per (textId, languages) — every card here shares one
+    // text, so the build runs once per distinct language list.
+    const caches = {
+      deckLanguages: new Map<Id<'decks'>, string[] | null>(),
+      built: new Map<
+        string,
+        { searchableText: string; searchableTextLanguages: string[] }
+      >(),
+    };
+
+    for (const card of page.page) {
+      const built = await buildSearchableTextPatchForCard(ctx, card, text, caches);
+      if (built) {
+        await patchCard(ctx, card._id, { ...built }, card);
+      }
+    }
+
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.decks.rebuildSearchableTextForText,
+        { textId: args.textId, cursor: page.continueCursor },
+      );
     }
     return null;
   },

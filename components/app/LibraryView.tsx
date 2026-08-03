@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Toggle } from '@/components/ui/toggle';
 import { Search, Star, EyeOff, CircleCheck, X, Loader2, PenLine, BookOpen } from 'lucide-react';
 import { LearningCardContent } from '@/components/app/learning/LearningCardContent';
+import { buildCardOriginPill } from '@/components/app/learning/cardOriginPill';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
 import { useAppData } from '@/components/app/AppDataProvider';
@@ -540,6 +541,11 @@ export function LibraryView({
                   preReviewCount={card.preReviewCount}
                   schedulingPhase={card.schedulingPhase}
                   fsrsState={card.fsrsState}
+                  originPill={buildCardOriginPill(
+                    courseSettings?.showCardOrigin ?? false,
+                    card,
+                    tLearn,
+                  )}
                   sourceText={card.sourceText}
                   translations={card.translations}
                   audioRecordings={card.audioRecordings}

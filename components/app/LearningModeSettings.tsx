@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { X, Headphones, PenLine, Settings2, Languages, Ear } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -21,6 +22,11 @@ import {
   type CourseSettings,
 } from '@/components/app/learning/types';
 import { StepperControl } from '@/components/app/learning/StepperControl';
+import {
+  DAILY_TIME_PRESETS,
+  DAILY_TIME_CUSTOM_MIN,
+  DAILY_TIME_CUSTOM_MAX,
+} from '@/lib/constants/dailyGoal';
 import { TimelineLanguageCard } from '@/components/app/learning/TimelineLanguageCard';
 import {
   StepperPauseConnector,
@@ -105,6 +111,48 @@ function SettingSwitchRow({
         className="mt-0.5"
       />
     </div>
+  );
+}
+
+/**
+ * One selectable listening-duration strategy: radio + title/description, with
+ * an optional inline stepper for the strategy's X. The inactive rows dim and
+ * their steppers are inert (clicking anywhere on the row selects it instead).
+ */
+function ListeningStrategyRow({
+  value,
+  active,
+  title,
+  description,
+  stepper,
+}: {
+  value: string;
+  active: boolean;
+  title: string;
+  description: string;
+  stepper?: React.ReactNode;
+}) {
+  return (
+    <label
+      className={cn(
+        'flex items-center justify-between gap-3 rounded-lg border p-2.5 transition-colors cursor-pointer',
+        active ? 'border-primary/40 bg-primary/5' : 'opacity-60 hover:opacity-90',
+      )}
+      data-testid={`listening-strategy-${value}`}
+    >
+      <div className="flex items-center gap-2.5 min-w-0">
+        <RadioGroupItem value={value} className="shrink-0" />
+        <div className="space-y-0.5 min-w-0">
+          <span className="text-sm font-medium leading-none block">{title}</span>
+          <p className="text-muted-xs">{description}</p>
+        </div>
+      </div>
+      {stepper != null && (
+        <div className={cn('shrink-0', !active && 'pointer-events-none')}>
+          {stepper}
+        </div>
+      )}
+    </label>
   );
 }
 
@@ -258,6 +306,14 @@ export function LearningModeSettings({
     });
   };
 
+  const handleDailyGoalChange = async (value: number) => {
+    if (value < DAILY_TIME_CUSTOM_MIN || value > DAILY_TIME_CUSTOM_MAX) return;
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      dailyTimeGoalMinutes: value,
+    });
+  };
+
   const handleInitialReviewsChange = async (value: number) => {
     if (value < 1 || value > 20) return;
     await updateSettings({
@@ -306,6 +362,13 @@ export function LearningModeSettings({
     await updateSettings({
       courseId: courseSettings.courseId,
       showProgressBar: checked,
+    });
+  };
+
+  const handleShowCardOriginChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      showCardOrigin: checked,
     });
   };
 
@@ -570,13 +633,54 @@ export function LearningModeSettings({
     });
   };
 
-  // "Only new": limit Practice Listening to a card's initial N reviews. Stored
-  // as 0 (= ∞ / always) or 1-10; the stepper's ∞ position maps to 0.
+  // Listening-duration strategy: when does a card graduate from Practice
+  // Listening to Practice Speaking? Writing the strategy also normalizes a
+  // legacy ∞ rep window (stored 0) to 1 when switching onto 'onlyNew', since
+  // "continuously" is its own strategy now and 0 would contradict it.
+  const handleListeningStrategyChange = async (value: string) => {
+    const strategy = value as 'onlyNew' | 'untilGood' | 'continuous';
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      targetBeforeListeningStrategy: strategy,
+      ...(strategy === 'onlyNew' && !(onlyNewStored && onlyNewStored > 0)
+        ? { targetBeforeOnlyNewReps: 1 }
+        : {}),
+    });
+  };
+
+  // "Only new" rep window: integer 1-10 (∞ lives on the 'continuous' strategy).
   const handleTargetBeforeOnlyNewChange = async (value: number) => {
-    const clamped = value <= 0 ? 0 : Math.min(10, Math.max(1, Math.floor(value)));
+    const clamped = Math.min(10, Math.max(1, Math.floor(value)));
     await updateSettings({
       courseId: courseSettings.courseId,
       targetBeforeOnlyNewReps: clamped,
+    });
+  };
+
+  // "Until rated Good" threshold: integer 1-10.
+  const handleTargetBeforeUntilGoodChange = async (value: number) => {
+    const clamped = Math.min(10, Math.max(1, Math.floor(value)));
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      targetBeforeUntilGoodReps: clamped,
+    });
+  };
+
+  // ---- "Show translation on new sentences" (writing mode) ----
+
+  const handleShowTranslationOnNewChange = async (checked: boolean) => {
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      showTranslationOnNew: checked,
+    });
+  };
+
+  // Same stored window semantics as targetBeforeOnlyNewReps: 0 = ∞, 1-10.
+  const handleShowTranslationOnlyNewChange = async (value: number) => {
+    const clamped = value <= 0 ? 0 : Math.min(10, Math.max(1, Math.floor(value)));
+    await updateSettings({
+      courseId: courseSettings.courseId,
+      showTranslationOnlyNewReps: clamped,
     });
   };
 
@@ -748,12 +852,21 @@ export function LearningModeSettings({
   const transcribeAfterSpeeds =
     courseSettings.transcribeAfterPlaybackSpeeds ?? {};
   const pauseT2B = courseSettings.pauseTargetToBase ?? DEFAULT_PAUSE_TARGET_TO_BASE;
-  // "Only new" stepper: stored 0/undefined = ∞ (always), shown at the BOTTOM
-  // position (UI value 0) so "+" steps ∞ → 1 and "−" steps 1 → ∞. 1-10 map to
-  // themselves. The stored value already uses 0 for ∞, so no remapping needed.
+  // Listening-duration strategy. Docs from before the strategy field encode
+  // "continuously" as onlyNewReps 0/undefined — mirror resolveAudioSettings'
+  // legacy inference so the radio selection always matches actual playback.
   const onlyNewStored = courseSettings.targetBeforeOnlyNewReps;
+  const listeningStrategy =
+    courseSettings.targetBeforeListeningStrategy ??
+    (onlyNewStored && onlyNewStored > 0 ? 'onlyNew' : 'continuous');
+  // Per-strategy X values. "Only new" no longer owns an ∞ position (that is
+  // the 'continuous' strategy now), so its stepper floors at 1.
   const onlyNewUiValue =
-    onlyNewStored && onlyNewStored > 0 ? Math.min(10, onlyNewStored) : 0;
+    onlyNewStored && onlyNewStored > 0 ? Math.min(10, onlyNewStored) : 1;
+  const untilGoodUiValue = Math.min(
+    10,
+    Math.max(1, courseSettings.targetBeforeUntilGoodReps ?? 1),
+  );
   // The after-base target section shows in audio mode only when "Practice
   // Speaking" is on; full mode keeps its existing "always" gating (the
   // before/after toggles don't apply there — see useLearningAudio). Transcribe
@@ -977,6 +1090,25 @@ export function LearningModeSettings({
             </div>
           )}
 
+          {/* Daily study-time goal. Editable post-onboarding; the original
+           * onboarding answer stays preserved on the onboardingProgress row. */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">{t('dailyGoal')}</Label>
+                <p className="text-muted-xs">{t('dailyGoalDescription')}</p>
+              </div>
+              <StepperControl
+                value={
+                  courseSettings.dailyTimeGoalMinutes ?? DAILY_TIME_PRESETS[2]
+                }
+                min={DAILY_TIME_CUSTOM_MIN}
+                max={DAILY_TIME_CUSTOM_MAX}
+                onChange={handleDailyGoalChange}
+              />
+            </div>
+          </div>
+
           {/* Auto-add cards */}
           <SettingSwitchRow
             id="autoAdd"
@@ -1020,6 +1152,43 @@ export function LearningModeSettings({
               section is shared with audio mode — hence the guard. */}
           {reviewMode === 'full' && (
             <>
+              {/* "Show translation on new sentences" — the copy-through assist:
+                  the answer is displayed above the input on a card's first N
+                  reviews. Defaults on / N = 1; the stepper's ∞ position (0)
+                  keeps the translation visible on every review. */}
+              <div className="space-y-0">
+                <SettingSwitchRow
+                  id="showTranslationOnNew"
+                  label={t('showTranslationOnNew')}
+                  description={t('showTranslationOnNewDescription')}
+                  checked={courseSettings.showTranslationOnNew ?? true}
+                  onCheckedChange={handleShowTranslationOnNewChange}
+                />
+
+                {(courseSettings.showTranslationOnNew ?? true) && (
+                  <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
+                    <div className="space-y-0.5">
+                      <Label
+                        htmlFor="showTranslationOnlyNewReps"
+                        className="text-sm font-medium"
+                      >
+                        {t('onlyNew')}
+                      </Label>
+                      <p className="text-muted-xs">
+                        {t('showTranslationOnlyNewDescription')}
+                      </p>
+                    </div>
+                    <StepperControl
+                      value={courseSettings.showTranslationOnlyNewReps ?? 1}
+                      min={0}
+                      max={10}
+                      onChange={handleShowTranslationOnlyNewChange}
+                      formatValue={(v) => (v <= 0 ? '∞' : String(v))}
+                    />
+                  </div>
+                )}
+              </div>
+
               <SettingSwitchRow
                 id="ignorePunctuation"
                 label={t('ignorePunctuation')}
@@ -1102,28 +1271,52 @@ export function LearningModeSettings({
                 onCheckedChange={handlePlayTargetBeforeBaseChange}
               />
 
-              {/* "Only new" — graduates a card from Practice Listening to
-                  Practice Speaking after its initial N reviews, so it only shows
-                  (and only takes effect) when BOTH are on. ∞ (default) keeps
-                  Practice Listening on every review. */}
+              {/* Listening duration — when a card graduates from Practice
+                  Listening to Practice Speaking. Only shows (and only takes
+                  effect) when BOTH are on: 'continuous' is the no-graduation
+                  strategy, the old "Only new = ∞" position. */}
               {playTargetBefore && playTargetAfter && (
-                <div className="settings-row ml-4 mt-3 pl-3 border-l-2 border-border">
-                  <div className="space-y-0.5">
-                    <Label
-                      htmlFor="targetBeforeOnlyNewReps"
-                      className="text-sm font-medium"
-                    >
-                      {t('onlyNew')}
-                    </Label>
-                    <p className="text-muted-xs">{t('onlyNewDescription')}</p>
-                  </div>
-                  <StepperControl
-                    value={onlyNewUiValue}
-                    min={0}
-                    max={10}
-                    onChange={handleTargetBeforeOnlyNewChange}
-                    formatValue={(v) => (v <= 0 ? '∞' : String(v))}
-                  />
+                <div className="ml-4 mt-3 pl-3 border-l-2 border-border space-y-2">
+                  <RadioGroup
+                    value={listeningStrategy}
+                    onValueChange={handleListeningStrategyChange}
+                    className="space-y-2"
+                  >
+                    <ListeningStrategyRow
+                      value="onlyNew"
+                      active={listeningStrategy === 'onlyNew'}
+                      title={t('strategyOnlyNew')}
+                      description={t('strategyOnlyNewDescription')}
+                      stepper={
+                        <StepperControl
+                          value={onlyNewUiValue}
+                          min={1}
+                          max={10}
+                          onChange={handleTargetBeforeOnlyNewChange}
+                        />
+                      }
+                    />
+                    <ListeningStrategyRow
+                      value="untilGood"
+                      active={listeningStrategy === 'untilGood'}
+                      title={t('strategyUntilGood')}
+                      description={t('strategyUntilGoodDescription')}
+                      stepper={
+                        <StepperControl
+                          value={untilGoodUiValue}
+                          min={1}
+                          max={10}
+                          onChange={handleTargetBeforeUntilGoodChange}
+                        />
+                      }
+                    />
+                    <ListeningStrategyRow
+                      value="continuous"
+                      active={listeningStrategy === 'continuous'}
+                      title={t('strategyContinuous')}
+                      description={t('strategyContinuousDescription')}
+                    />
+                  </RadioGroup>
                 </div>
               )}
             </>
@@ -1501,6 +1694,15 @@ export function LearningModeSettings({
             description={t('showProgressBarDescription')}
             checked={courseSettings.showProgressBar ?? true}
             onCheckedChange={handleShowProgressBarChange}
+          />
+
+          {/* Show card origin (source-collection pill on the card header) */}
+          <SettingSwitchRow
+            id="showCardOrigin"
+            label={t('showCardOrigin')}
+            description={t('showCardOriginDescription')}
+            checked={courseSettings.showCardOrigin ?? false}
+            onCheckedChange={handleShowCardOriginChange}
           />
 
         </div>

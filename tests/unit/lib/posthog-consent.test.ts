@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   status: 'pending' as 'granted' | 'denied' | 'pending',
   optIn: vi.fn(),
   optOut: vi.fn(),
+  reset: vi.fn(),
 }));
 
 vi.mock('@/lib/posthog/client', () => ({
@@ -14,6 +15,7 @@ vi.mock('@/lib/posthog/client', () => ({
     get_explicit_consent_status: () => mocks.status,
     opt_in_capturing: mocks.optIn,
     opt_out_capturing: mocks.optOut,
+    reset: mocks.reset,
   },
 }));
 
@@ -21,6 +23,7 @@ import {
   denyConsent,
   grantConsent,
   notifyConsentReady,
+  resetPreservingConsent,
   setConsent,
   subscribeToConsent,
   useConsentStatus,
@@ -32,6 +35,7 @@ describe('consent', () => {
     mocks.status = 'pending';
     mocks.optIn.mockClear();
     mocks.optOut.mockClear();
+    mocks.reset.mockClear();
   });
 
   it('does nothing before the SDK is ready', () => {
@@ -102,6 +106,37 @@ describe('consent', () => {
    * content was withheld for a user who had consented (the consent-before-signup
    * path, on every fresh page load).
    */
+  /**
+   * The regression this exists for: `posthog.reset()` on sign-out also cleared
+   * the stored consent record, so the banner reappeared after every logout.
+   */
+  it('restores a granted choice across reset without re-firing $opt_in', () => {
+    mocks.ready = true;
+    mocks.status = 'granted';
+    resetPreservingConsent();
+    expect(mocks.reset).toHaveBeenCalledTimes(1);
+    expect(mocks.optIn).toHaveBeenCalledWith({ captureEventName: null });
+    expect(mocks.optOut).not.toHaveBeenCalled();
+  });
+
+  it('restores a denied choice across reset', () => {
+    mocks.ready = true;
+    mocks.status = 'denied';
+    resetPreservingConsent();
+    expect(mocks.reset).toHaveBeenCalledTimes(1);
+    expect(mocks.optOut).toHaveBeenCalledTimes(1);
+    expect(mocks.optIn).not.toHaveBeenCalled();
+  });
+
+  it('leaves a pending status pending across reset', () => {
+    mocks.ready = true;
+    mocks.status = 'pending';
+    resetPreservingConsent();
+    expect(mocks.reset).toHaveBeenCalledTimes(1);
+    expect(mocks.optIn).not.toHaveBeenCalled();
+    expect(mocks.optOut).not.toHaveBeenCalled();
+  });
+
   it('reports initializing before boot, then surfaces a stored grant as a status change', () => {
     mocks.ready = false;
     mocks.status = 'granted';

@@ -101,3 +101,17 @@ export function setConsent(granted: boolean): void {
   if (granted) grantConsent();
   else denyConsent();
 }
+
+/**
+ * `posthog.reset()` clears the stored opt-in/out choice along with identity.
+ * Sign-out must forget who the user was, not whether they consented — so
+ * capture the explicit status first and re-apply it after.
+ */
+export function resetPreservingConsent(): void {
+  const status = posthog.get_explicit_consent_status();
+  posthog.reset();
+  // Not a fresh opt-in, just restoring the record — don't re-fire `$opt_in`.
+  if (status === 'granted') posthog.opt_in_capturing({ captureEventName: null });
+  else if (status === 'denied') posthog.opt_out_capturing();
+  notify();
+}

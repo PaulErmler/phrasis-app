@@ -17,6 +17,13 @@ import { toast } from 'sonner';
 import { LanguageSelector } from './LanguageSelector';
 import { DifficultySelector, LEVEL_ICONS } from './DifficultySelector';
 import { CurrentLevel } from './types';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import {
+  DAILY_TIME_PRESETS,
+  DAILY_TIME_CUSTOM_MIN,
+  DAILY_TIME_CUSTOM_MAX,
+} from '@/lib/constants/dailyGoal';
 
 interface CreateCourseDialogProps {
   open: boolean;
@@ -34,19 +41,33 @@ export function CreateCourseDialog({
   const [targetLanguage, setTargetLanguage] = useState<string>('');
   const [baseLanguage, setBaseLanguage] = useState<string>('');
   const [difficulty, setDifficulty] = useState<CurrentLevel | null>(null);
+  const [dailyGoal, setDailyGoal] = useState<number | null>(null);
+  const [customGoal, setCustomGoal] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const createCourse = useMutation(api.features.courses.createCourse);
   const setActiveCourse = useMutation(api.features.courses.setActiveCourse);
+  const updateCourseSettings = useMutation(
+    api.features.courses.updateCourseSettings,
+  );
 
-  const totalSteps = 3;
+  const totalSteps = 4;
   const progress = (step / totalSteps) * 100;
+
+  const parsedCustomGoal = Number.parseInt(customGoal, 10);
+  const customGoalValid =
+    Number.isFinite(parsedCustomGoal) &&
+    parsedCustomGoal >= DAILY_TIME_CUSTOM_MIN &&
+    parsedCustomGoal <= DAILY_TIME_CUSTOM_MAX;
+  const effectiveGoal = customGoalValid ? parsedCustomGoal : dailyGoal;
 
   const resetForm = () => {
     setStep(1);
     setTargetLanguage('');
     setBaseLanguage('');
     setDifficulty(null);
+    setDailyGoal(null);
+    setCustomGoal('');
     setIsSubmitting(false);
   };
 
@@ -65,6 +86,8 @@ export function CreateCourseDialog({
       return baseLanguage !== '';
     case 3:
       return difficulty !== null;
+    case 4:
+      return effectiveGoal !== null;
     default:
       return false;
     }
@@ -85,7 +108,7 @@ export function CreateCourseDialog({
   };
 
   const handleCreate = async () => {
-    if (!targetLanguage || !baseLanguage || !difficulty) {
+    if (!targetLanguage || !baseLanguage || !difficulty || effectiveGoal == null) {
       return;
     }
 
@@ -97,8 +120,18 @@ export function CreateCourseDialog({
         currentLevel: difficulty,
       });
 
-      // Set the newly created course as active
+      // Activate first: if the goal write below fails, the user still ends
+      // up on a working course (and can set the goal from the home ring)
+      // instead of being stranded with a created-but-inactive course that a
+      // retry would duplicate.
       await setActiveCourse({ courseId: result.courseId });
+
+      // Persist the daily goal (createCourse doesn't take it — the goal is
+      // a courseSettings field, patchable via updateCourseSettings).
+      await updateCourseSettings({
+        courseId: result.courseId,
+        dailyTimeGoalMinutes: effectiveGoal,
+      });
 
       handleClose(false);
       resetForm();
@@ -216,6 +249,61 @@ export function CreateCourseDialog({
               onSelectLevel={setDifficulty}
               levelOptions={levelOptions}
             />
+          )}
+
+          {step === 4 && (
+            <div className="flex h-full flex-col gap-4 overflow-y-auto py-6">
+              <div>
+                <h3 className="text-lg font-semibold">{t('step4.title')}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t('step4.subtitle')}
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {DAILY_TIME_PRESETS.map((minutes) => (
+                  <button
+                    key={minutes}
+                    type="button"
+                    onClick={() => {
+                      setDailyGoal(minutes);
+                      setCustomGoal('');
+                    }}
+                    data-testid={`course-dialog-goal-${minutes}`}
+                    className={cn(
+                      'flex min-h-14 flex-col items-center justify-center rounded-lg border transition-colors',
+                      dailyGoal === minutes && !customGoalValid
+                        ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary'
+                        : 'text-foreground hover:bg-muted',
+                    )}
+                  >
+                    <span className="text-lg font-semibold tabular-nums">
+                      {minutes}
+                    </span>
+                    <span className="text-muted-xs">{t('step4.minutesUnit')}</span>
+                  </button>
+                ))}
+                <div
+                  className={cn(
+                    'flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg border px-2 transition-colors',
+                    customGoalValid &&
+                      'border-primary bg-primary/10 ring-1 ring-primary',
+                  )}
+                >
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    min={DAILY_TIME_CUSTOM_MIN}
+                    max={DAILY_TIME_CUSTOM_MAX}
+                    value={customGoal}
+                    onChange={(e) => setCustomGoal(e.target.value)}
+                    placeholder={t('step4.customPlaceholder')}
+                    className="h-7 border-0 bg-transparent p-0 text-center text-lg font-semibold tabular-nums shadow-none focus-visible:ring-0"
+                    data-testid="course-dialog-goal-custom"
+                  />
+                  <span className="text-muted-xs">{t('step4.minutesUnit')}</span>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 

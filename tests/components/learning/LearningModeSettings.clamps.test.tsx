@@ -179,29 +179,38 @@ describe('LearningModeSettings — client clamp handlers', () => {
     }
   });
 
-  it('clamps "only new" to 0 (∞) below 1 and floors into 1–10', async () => {
+  it('clamps both listening-strategy steppers into 1–10 (∞ is the Continuously strategy now)', async () => {
     renderSettings({
       reviewMode: 'audio',
       playTargetBeforeBase: true,
       playTargetAfterBase: true,
     });
-    // cardsPerBatch is min 1, initial reviews min 1/max 20 — only-new is the
-    // sole stepper with the 0..10 range.
-    const onlyNew = steppers.find((s) => s.min === 0 && s.max === 10);
-    expect(onlyNew).toBeDefined();
+    // cardsPerBatch is min 1/uncapped-ish, initial reviews min 1/max 20 — the
+    // two strategy steppers ("Only new" reps, "Until rated Good" count) are
+    // the only 1..10 ranges, rendered in that order.
+    const strategySteppers = steppers.filter((s) => s.min === 1 && s.max === 10);
+    expect(strategySteppers).toHaveLength(2);
+    const [onlyNew, untilGood] = strategySteppers;
 
     for (const [input, expected] of [
-      [-1, 0],
-      [0, 0],
+      [-1, 1],
+      [0, 1],
       [0.5, 1],
       [10, 10],
       [50, 10],
     ] as const) {
       updateSettings.mockClear();
-      await onlyNew!.onChange(input);
+      await onlyNew.onChange(input);
       expect(updateSettings).toHaveBeenCalledWith({
         courseId: COURSE_ID,
         targetBeforeOnlyNewReps: expected,
+      });
+
+      updateSettings.mockClear();
+      await untilGood.onChange(input);
+      expect(updateSettings).toHaveBeenCalledWith({
+        courseId: COURSE_ID,
+        targetBeforeUntilGoodReps: expected,
       });
     }
   });

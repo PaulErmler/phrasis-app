@@ -1,4 +1,5 @@
 import { getSegmenter } from './textCompare/segment';
+import { getLanguageByCode } from './languages';
 
 export type Token = { normalized: string; original: string };
 
@@ -20,6 +21,34 @@ export function getWordSegmenter(language: string): Intl.Segmenter {
   // Intl.Segmenter would throw. Normalize to hyphens.
   const bcp47 = language.replace(/_/g, '-');
   return getSegmenter(bcp47, 'word');
+}
+
+/**
+ * For languages written without word boundaries (zh/ja/yue/th — see
+ * `hasWordBoundaries` in lib/languages.ts), append the Intl.Segmenter word
+ * tokens to the text so whitespace/punctuation-tokenized search engines
+ * (Convex full-text search) can match words in the middle of a sentence.
+ * The original text is kept in front so anything that matched before keeps
+ * matching. No-op for space-delimited languages.
+ */
+export function appendSearchSegments(text: string, language: string): string {
+  const segments = searchSegments(text, language);
+  if (segments.length === 0) return text;
+  return `${text} ${segments.join(' ')}`;
+}
+
+/**
+ * Deduped Intl.Segmenter word tokens for a language written without word
+ * boundaries; empty for space-delimited languages. Single source of the
+ * no-boundary guard + dedupe, shared by the index side
+ * (`appendSearchSegments`) and the query side (`augmentSearchQuery` in
+ * convex/features/library.ts) so the two can never segment differently.
+ */
+export function searchSegments(text: string, language: string): string[] {
+  if (getLanguageByCode(language)?.hasWordBoundaries !== false) {
+    return [];
+  }
+  return [...new Set(tokenizeText(text, language).map((t) => t.original))];
 }
 
 export function tokenizeText(text: string, language: string): Token[] {

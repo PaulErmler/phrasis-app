@@ -304,6 +304,12 @@
           "title": "What's your current level?",
           "subtitle": "Select your proficiency level"
         },
+        "step4": {
+          "title": "Set a daily goal",
+          "subtitle": "How many minutes do you want to study each day?",
+          "minutesUnit": "min / day",
+          "customPlaceholder": "Custom"
+        },
         "creating": "Creating course...",
         "success": "Course created successfully!",
         "error": "Failed to create course",
@@ -359,6 +365,8 @@
     "learnAndReview": "Learn & Review",
     "radioMode": "Radio",
     "radioRequiresCards": "Add some cards before starting Radio mode.",
+    "freeStudyMode": "Free Study",
+    "freeStudyRequiresCards": "Add some cards before starting Free Study.",
     "contentFilter": {
       "label": "Source:",
       "valueBoth": "All content",
@@ -369,6 +377,44 @@
       "new": "N",
       "learning": "L",
       "review": "R"
+    },
+    "dueCounts": {
+      "new": "{count} new",
+      "learning": "{count} learning",
+      "review": "{count} review"
+    },
+    "dailyGoal": {
+      "label": "Daily goal",
+      "cta": "Set daily goal",
+      "reached": "Daily goal reached",
+      "progress": "{done} / {goal} min",
+      "editTitle": "Set daily goal",
+      "customPlaceholder": "Custom",
+      "minutesUnit": "min",
+      "set": "Set"
+    },
+    "projections": {
+      "wordsBig": "{words} words",
+      "sentencesBig": "{sentences} sentences",
+      "endOfYearLabel": "by end of {year}",
+      "oneYearLabel": "one year from today",
+      "endOfMonthLabel": "by end of {month}",
+      "counterfactualLabel": "if every day were like today",
+      "sessionYieldBig": "on average +{words} words",
+      "sessionYieldLabel": "per {goal}-min session",
+      "perStudyHourLabel": "per study-hour",
+      "nextLevelBig": "{code} in ~{days, plural, one {# day} other {# days}}",
+      "atCurrentSpeedLabel": "at your current speed",
+      "goalBasisLabel": "if you hit your daily goal",
+      "nextLevelCompleteLabel": "to finish your final level",
+      "levelByYearEndBig": "~{code}",
+      "levelByYearEndLabel": "your level by end of {year}",
+      "inDaysLabel": "in ~{days, plural, one {# day} other {# days}}",
+      "studyTimeBig": "{hours} h studied",
+      "aroundDateLabel": "around {date}",
+      "cycleHint": "Tap for the next stat",
+      "empty": "Continue studying to unlock projections",
+      "avgSentencesBig": "on average ~{rate} sentences"
     },
     "customContent": "Add Cards",
     "stats": {
@@ -393,6 +439,8 @@
     "baseLanguage": "Base Language",
     "targetLanguage": "Target Language",
     "reviewCount": "{count, plural, =0 {New} one {{count} review} other {{count} reviews}}",
+    "cardOriginCustom": "Custom",
+    "cardOriginChat": "Chat",
     "nextReview": "Next review in {time}",
     "nextReviewNow": "Due now",
     "ratings": {
@@ -434,7 +482,9 @@
       "next": "Next",
       "reveal": "Reveal",
       "pause": "Pause",
-      "play": "Play"
+      "play": "Play",
+      "restartAudio": "Restart audio",
+      "restartCard": "Restart sentence"
     },
     "schedulingMode": {
       "learn": "L",
@@ -507,12 +557,18 @@
       "iconHide": "Hide sentence (won't appear again after next review)",
       "iconEdit": "Edit the phrase text on this sentence",
       "shortcuts": "Shortcuts",
-      "shortcutRating": "Keys 1–4 for rating.",
-      "shortcutPause": "Space bar to pause audio.",
-      "shortcutReveal": "Enter or right arrow to reveal hidden content or go to the next sentence.",
-      "shortcutRevertSubmission": "Left arrow to undo your last submitted translation (Writing).",
+      "shortcutRevealNext": "Reveal hidden text, then next sentence",
+      "shortcutPlayPause": "Play or pause the audio",
+      "shortcutPrevious": "Previous sentence (undo last review)",
+      "shortcutPreviousWriting": "Revert last submission, then previous sentence",
+      "shortcutRestartAudio": "Restart the audio",
+      "shortcutReplayTarget": "Replay the target-language audio",
+      "shortcutRestartCard": "Restart the sentence",
+      "shortcutRate": "Rate the sentence",
       "cardsPerBatch": "Sentences per batch",
       "cardsPerBatchDescription": "Number of sentences to add at once",
+      "dailyGoal": "Daily goal",
+      "dailyGoalDescription": "Minutes of study you aim for each day",
       "reviewSettings": "Review Settings",
       "autoAddCards": "Auto-add sentences",
       "autoAddCardsDescription": "Automatically add new sentences when none are due",
@@ -528,10 +584,20 @@
       "practiceSpeaking": "Practice Speaking",
       "practiceSpeakingDescription": "Play the target language after the base language",
       "onlyNew": "Only new",
-      "onlyNewDescription": "Only practice listening on new cards by setting a number of initial repetitions",
+      "strategyOnlyNew": "Only new sentences",
+      "strategyOnlyNewDescription": "Practice listening for this many first repetitions of a sentence",
+      "strategyUntilGood": "Until rated Good",
+      "strategyUntilGoodDescription": "Keep practicing listening until you’ve rated the sentence Good or Easy this many times",
+      "strategyContinuous": "Continuously",
+      "strategyContinuousDescription": "Practice listening on every sentence, every repetition — it never switches off",
+      "showTranslationOnNew": "Show translation on new sentences",
+      "showTranslationOnNewDescription": "Show the translation to copy-type on a sentence’s first reviews — the unassisted test starts afterwards",
+      "showTranslationOnlyNewDescription": "Number of initial reviews that show the translation",
       "uiSettings": "UI Settings",
       "showProgressBar": "Progress bar",
       "showProgressBarDescription": "Show the audio progress bar and seek controls",
+      "showCardOrigin": "Card origin",
+      "showCardOriginDescription": "Show which collection each card came from",
       "progressDisplayEnabled": "Show intermediate progress",
       "progressDisplayEnabledDescription": "Helps you stay motivated",
       "hideTargetLanguages": "Hide target languages",
@@ -1123,14 +1189,18 @@
       "summary": "Right now you learned {words, plural, =1 {1 word} other {# words}} in {minutes, plural, =1 {1 minute} other {# minutes}}.",
       "headline": "At this pace, you'll know",
       "perDay": "{minutes} min/day",
+      "timelineToday": "Today",
+      "timelineTodaySub": "your first session",
+      "timelineIn30Days": "In 30 days",
+      "timelineIn30DaysSub": "a month at your daily goal",
+      "timelineYearEndSub": "{days} days from now",
       "adjustLabel": "Tune your daily goal",
-      "milestones": {
-        "1mo": "1 month",
-        "6mo": "6 months",
-        "1y": "1 year"
-      },
       "wordsUnit": "words",
-      "continue": "Continue"
+      "continue": "Continue",
+      "custom": "Custom",
+      "customPlaceholder": "Minutes",
+      "minutesUnit": "min",
+      "set": "Set"
     },
     "featureTour": {
       "title": "A few more things",
@@ -1230,11 +1300,11 @@
       },
       "input": {
         "title": "Type your translation",
-        "description": "Type the target-language translation here and hit submit. You'll get instant feedback on each word."
+        "description": "Type the target-language translation here and hit submit. New sentences show the translation the first time — just type it out to learn it; later reviews test you without it. You’ll get instant feedback on each word."
       },
       "inputTranscribe": {
         "title": "Type what you hear",
-        "description": "Type exactly what you hear in the target language and hit submit. You'll get instant feedback on each word."
+        "description": "Type exactly what you hear in the target language and hit submit. New sentences show the text the first time — just type it out to learn it; later reviews test you without it. You’ll get instant feedback on each word."
       },
       "audioControls": {
         "title": "Audio plays automatically",
@@ -1299,6 +1369,10 @@
         "title": "Radio",
         "description": "Audio-only background playback — your cards loop hands-free without affecting their spaced-repetition schedule. Only available in Shadowing."
       },
+      "freeStudyMode": {
+        "title": "Free Study",
+        "description": "Browse your sentences freely in Writing mode — no scheduling, no ratings. Only available in Writing."
+      },
       "reviewModeToggle": {
         "title": "Shadowing vs Writing",
         "description": "Switch between Shadowing (hear the sentence and say it aloud) and Writing (type the translation and get instant feedback)."
@@ -1306,6 +1380,14 @@
       "contentSource": {
         "title": "Pick your source",
         "description": "Choose whether to study only premade sentences, only your own custom cards, or both at once."
+      },
+      "dueCounts": {
+        "title": "What’s waiting for you",
+        "description": "These pills show how many sentences are new, currently being learned, and due for review with your current content selection."
+      },
+      "projections": {
+        "title": "Your forecast",
+        "description": "This rotating forecast projects your progress — like how many words you’ll know by the end of the year at your current pace. Tap it to see the next fact."
       },
       "difficultySelection": {
         "title": "Difficulty Selection",
@@ -1357,7 +1439,7 @@
       },
       "input": {
         "title": "Enter Your Translation",
-        "description": "Here you enter the translation. You can also listen to the audio of the target language before typing it in."
+        "description": "Here you enter the translation. On a new sentence the translation is shown once so you can type it out — from the next review you translate on your own. You can also listen to the target-language audio before typing."
       },
       "rating": {
         "title": "Rate Your Answer",

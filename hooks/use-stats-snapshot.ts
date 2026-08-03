@@ -1,6 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+
+const useBrowserLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 type SnapshotData = Record<string, number>;
 
@@ -13,8 +16,8 @@ interface UseStatsSnapshotOptions {
 
 /**
  * Tracks numeric values against a localStorage snapshot for delta animation.
- * Reads the previous snapshot synchronously on mount, compares to current values,
- * and saves the current values after a settle timeout.
+ * Reads the previous snapshot before the first paint, compares to current
+ * values, and saves the current values after a settle timeout.
  *
  * Used by both ProgressStatsCard (homescreen) and NumbersRow (stats page) to
  * animate only the delta since the user last saw the values.
@@ -32,30 +35,37 @@ export function useStatsSnapshot(
     }).format(new Date())
     : null;
 
-  // Read snapshot from localStorage synchronously on first render
-  const [initialSnap] = useState<SnapshotData>(() => {
-    if (typeof window === 'undefined') return {};
+  // Starts empty on both server and client so the first client render
+  // reproduces the server HTML exactly — reading localStorage in a useState
+  // initializer would make the SSR pass (no snapshot) and hydration pass
+  // (snapshot present) disagree, and every counter/ring seeded from `prev`
+  // would render a different number. The read is deferred to a layout
+  // effect instead: it fires synchronously before paint, so the snapshot is
+  // in place for the first frame the user actually sees. Same trick as
+  // hooks/use-cached-query.ts.
+  const prevRef = useRef<SnapshotData>({});
+  const [, bumpEpoch] = useState(0);
+  const hydratedKeyRef = useRef<string | null>(null);
+
+  useBrowserLayoutEffect(() => {
+    if (hydratedKeyRef.current === storageKey) return;
+    hydratedKeyRef.current = storageKey;
     try {
       const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (dateScoped && parsed.__date !== today) return {};
-        const { __date: _, ...rest } = parsed;
-        return rest;
-      }
+      if (!stored) return;
+      const parsed = JSON.parse(stored);
+      if (dateScoped && parsed.__date !== today) return;
+      const { __date: _, ...rest } = parsed;
+      prevRef.current = rest;
+      bumpEpoch((e) => e + 1);
     } catch { /* ignore */ }
-    return {};
-  });
-
-  const prevRef = useRef<SnapshotData>(initialSnap);
+  }, [storageKey, dateScoped, today]);
 
   // Detect if any tracked value has changed from the snapshot
   const changed = Object.keys(values).some(
     (k) => values[k] !== (prevRef.current[k] ?? 0),
   );
 
-  // After settling, update the ref and persist to localStorage
-  const [, setSettledEpoch] = useState(0);
   const valuesJson = JSON.stringify(values);
 
   useEffect(() => {
@@ -69,7 +79,7 @@ export function useStatsSnapshot(
         const toStore = dateScoped ? { __date: today, ...vals } : vals;
         localStorage.setItem(storageKey, JSON.stringify(toStore));
       } catch { /* ignore */ }
-      setSettledEpoch((e) => e + 1);
+      bumpEpoch((e) => e + 1);
     }, settleDuration);
 
     return () => clearTimeout(timer);

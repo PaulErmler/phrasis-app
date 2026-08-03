@@ -18,6 +18,8 @@ import {
   SessionProgressBar,
 } from '@/components/app/learning';
 import { useLearningChatToggle } from '@/components/app/learning/LearningChatLayout';
+import { buildCardOriginPill } from '@/components/app/learning/cardOriginPill';
+import { shouldShowTranslationAssist } from '@/components/app/learning/firstExposure';
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
@@ -124,6 +126,11 @@ export function LearningMode({
     useState<WritingAccuracySummary | null>(null);
   const [audioAllTargetsRevealed, setAudioAllTargetsRevealed] = useState(true);
   const [audioRevealNonce, setAudioRevealNonce] = useState(0);
+  // Monotonic signals for the keyboard shortcuts: T replays the target clip,
+  // Shift+R resets the card. Never reset — the children treat any change as
+  // a fresh request (same contract as audioRevealNonce).
+  const [targetReplayNonce, setTargetReplayNonce] = useState(0);
+  const [cardResetNonce, setCardResetNonce] = useState(0);
 
   const cardId = state.status === 'reviewing' ? state.cardId : null;
   const reviewingReviewMode =
@@ -302,6 +309,42 @@ export function LearningMode({
   const handleRevealAllAudioTargets = useCallback(() => {
     setAudioRevealNonce((n) => n + 1);
   }, []);
+  // Stepwise back (Left Arrow): the writing card registers a revert handler
+  // that unwinds one submitted translation per press and reports whether it
+  // consumed the press; only when nothing is left to revert does the press
+  // fall through to undoing the last review.
+  const revertHandlerRef = useRef<(() => boolean) | null>(null);
+  const registerRevertHandler = useCallback((fn: (() => boolean) | null) => {
+    revertHandlerRef.current = fn;
+  }, []);
+  // Returns whether anything was actually taken back — the ← shortcut only
+  // consumes the keypress when it acts (see LearningControls).
+  const handleBack = useCallback((): boolean => {
+    if (revertHandlerRef.current?.()) return true;
+    if (state.status !== 'reviewing') return false;
+    if (!state.canUndo || state.isReviewing || state.isUndoing) return false;
+    void handleUndoWithNotify();
+    return true;
+  }, [state, handleUndoWithNotify]);
+  const handleReplayTarget = useCallback(() => {
+    setTargetReplayNonce((n) => n + 1);
+  }, []);
+  // Restart the current card from scratch: re-blur everything, drop typed and
+  // submitted translations, clear the picked rating, and replay the merged
+  // audio from 0 (deliberately unconditional, like the R shortcut — the user
+  // just asked for a restart).
+  const handleRestartCard = useCallback(() => {
+    if (state.status !== 'reviewing') return;
+    setFullReviewRevealed(false);
+    setAllSubmitted(false);
+    setWritingAccuracy(null);
+    setCardResetNonce((n) => n + 1);
+    state.setSelectedRating(null);
+    audio.resetRevealed();
+    audio.pause();
+    audio.seekTo(0);
+    if (audio.durationSec > 0) audio.play();
+  }, [state, audio]);
   const handleEdit = useCallback(() => {
     audio.pause();
     setEditDialogOpen(true);
@@ -467,6 +510,23 @@ export function LearningMode({
     }
     : undefined;
 
+  // Card-origin pill: premade cards show the collection shorthand ("A1.2")
+  // tinted with its CEFR color; custom/chat cards get a short localized
+  // bucket label. Gated by the off-by-default course setting.
+  const originPill = buildCardOriginPill(
+    state.courseSettings.showCardOrigin ?? false,
+    state,
+    t,
+  );
+
+  // "Show translation on new sentences" (writing mode): the answer is shown
+  // above the input to copy-type on the card's first N reviews.
+  const firstExposure = shouldShowTranslationAssist(
+    state.courseSettings,
+    state.preReviewCount,
+    state.fsrsState?.reps ?? 0,
+  );
+
   const cardContent =
     reviewMode === 'full' ? (
       <FullReviewCardContent
@@ -478,6 +538,8 @@ export function LearningMode({
         preReviewCount={state.preReviewCount}
         schedulingPhase={state.phase}
         fsrsState={state.fsrsState}
+        firstExposure={firstExposure}
+        originPill={originPill}
         sourceText={state.sourceText}
         translations={state.translations}
         audioRecordings={state.audioRecordings}
@@ -537,7 +599,9 @@ export function LearningMode({
         onAccuracyChange={setWritingAccuracy}
         showRomanization={state.courseSettings.showRomanization ?? true}
         cardId={state.cardId}
-        shortcutsDisabled={state.settingsOpen || editDialogOpen}
+        onRegisterRevert={registerRevertHandler}
+        resetSignal={cardResetNonce}
+        replayTargetSignal={targetReplayNonce}
         highlightEnabled={
           (isTranscribe
             ? (state.courseSettings.highlightWordsTranscribe ??
@@ -570,6 +634,7 @@ export function LearningMode({
         preReviewCount={state.preReviewCount}
         schedulingPhase={state.phase}
         fsrsState={state.fsrsState}
+        originPill={originPill}
         sourceText={state.sourceText}
         translations={state.translations}
         audioRecordings={state.audioRecordings}
@@ -594,6 +659,8 @@ export function LearningMode({
         revealedLanguages={audio.revealedLanguages}
         showRomanization={state.courseSettings.showRomanization ?? true}
         revealAllSignal={audioRevealNonce}
+        resetSignal={cardResetNonce}
+        replayTargetSignal={targetReplayNonce}
         onAllTargetsRevealedChange={setAudioAllTargetsRevealed}
         highlightEnabled={state.courseSettings.highlightWords === true}
         flaggedInSession={state.flaggedInSession}
@@ -610,7 +677,7 @@ export function LearningMode({
       />
     );
 
-  const isRadio = state.courseSettings.schedulingMode === 'radio';
+  const isFreePlay = state.courseSettings.schedulingMode === 'radio';
 
   return (
     <div className="flex flex-col h-full">
@@ -618,9 +685,9 @@ export function LearningMode({
           persisted, hydrated on mount) so the fill level always matches when
           the milestone celebration will fire, even after a reload or a break
           mid-day. Onboarding keeps its in-memory session counter (0/10 lesson
-          progress). Radio mode never shows the bar since plays don't count
-          toward the milestone. */}
-      {!isRadio &&
+          progress). Free play never shows the bar in either face, since plays
+          don't count toward the milestone. */}
+      {!isFreePlay &&
         state.courseSettings.progressDisplayEnabled !== false && (
         <SessionProgressBar
           current={mode === 'onboarding' ? state.sessionCardCount : state.dailyReviewsToday}
@@ -673,12 +740,23 @@ export function LearningMode({
         onNext={handleNextWithAccuracy}
         onUndo={handleUndoWithNotify}
         undoDisabled={!state.canUndo || state.isReviewing || state.isUndoing}
+        onBack={handleBack}
+        onRestartCard={handleRestartCard}
+        onReplayTarget={handleReplayTarget}
         isReviewing={state.isReviewing}
         instantProceed={instantProceed}
         isFullReview={reviewMode === 'full'}
         fullReviewRevealed={fullReviewRevealed || allSubmitted}
         onReveal={handleReveal}
-        shortcutsDisabled={state.settingsOpen || editDialogOpen}
+        shortcutsDisabled={
+          // Any overlay that owns the keyboard must silence the session
+          // shortcuts — with a confirm dialog open, a stray ← would undo
+          // the previous review behind the modal.
+          state.settingsOpen ||
+          editDialogOpen ||
+          deleteConfirmOpen ||
+          flagConfirmOpen
+        }
         isAudioReview={reviewMode === 'audio'}
         audioAllTargetsRevealed={audioAllTargetsRevealed}
         onRevealAllAudioTargets={handleRevealAllAudioTargets}

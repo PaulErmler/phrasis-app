@@ -9,6 +9,10 @@ import { neutralizeTours } from "./helpers";
  * for a translated string change. Also covers the change-password dialog
  * using the shared fixture user's saved credentials (the password is
  * changed and then changed back, so downstream state stays intact).
+ *
+ * Lives in the `settings-serial` Playwright project (workers:1, after
+ * chromium-serial) because changePassword uses revokeOtherSessions and
+ * must not race other shared-fixture specs.
  */
 test.describe("settings", () => {
   // driver.js tours can mount at any moment after hydration and their
@@ -31,6 +35,10 @@ test.describe("settings", () => {
   });
 
   test("change password via the settings dialog", async ({ page }) => {
+    // Three live better-auth round trips (wrong password, change, change
+    // back) plus the consent-banner wait don't reliably fit the 30s default.
+    test.setTimeout(60_000);
+
     // The shared fixture user was created by auth.setup.ts, which saves
     // its credentials next to the storage state.
     const credsPath = path.resolve(__dirname, ".auth/credentials-a.json");
@@ -47,7 +55,14 @@ test.describe("settings", () => {
     const save = () => page.getByTestId("settings-change-password-save");
 
     const changePassword = async (from: string, to: string) => {
+      // The dialog has a 200ms exit animation and Radix keeps the content
+      // mounted (plus `pointer-events: none` on <body>) for its duration.
+      // Flipping `open` back to true inside that window leaves Presence
+      // stuck — the click lands, but the content never re-mounts. Wait for
+      // the previous instance to be fully gone before re-opening.
+      await expect(currentField()).toBeHidden({ timeout: 10_000 });
       await page.getByTestId("settings-change-password").click();
+      await expect(currentField()).toBeVisible({ timeout: 10_000 });
       await currentField().fill(from);
       await newField().fill(to);
       await confirmField().fill(to);
@@ -95,7 +110,8 @@ test.describe("settings", () => {
     // CRITICAL: changePassword with revokeOtherSessions rotates the
     // session cookie — the stored fixture still holds the old, now-revoked
     // token, which would silently log out every later spec. Persist the
-    // fresh session over it.
+    // fresh session over it. This file runs in the settings-serial project
+    // (after chromium-serial) so the revoke cannot race concurrent live specs.
     await page.context().storageState({
       path: path.resolve(__dirname, ".auth/user.json"),
     });

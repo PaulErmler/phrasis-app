@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { usePreloadedQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -15,9 +16,13 @@ import {
   Clock,
   Snowflake,
   BookOpen,
+  Check,
 } from 'lucide-react';
 import { formatTimeMs } from '@/lib/formatTime';
 import { StartLearningButton } from '@/components/app/StartLearningButton';
+import { DailyGoalRing } from '@/components/app/stats/DailyGoalRing';
+import { DailyGoalQuickEdit } from '@/components/app/stats/DailyGoalQuickEdit';
+import { RotatingProjection } from '@/components/app/stats/RotatingProjection';
 import { CEFR_COLORS, isCefr } from '@/components/app/segmented/cefr';
 import { getLanguageByCode } from '@/lib/languages';
 import { cn } from '@/lib/utils';
@@ -58,10 +63,7 @@ function StatColumn({
 
   return (
     <div
-      className={cn(
-        'flex flex-col items-center text-center gap-1',
-        className,
-      )}
+      className={cn('flex flex-col items-center text-center gap-1', className)}
     >
       <div className="text-muted-foreground">{icon}</div>
       <p className="text-lg font-semibold tabular-nums leading-tight whitespace-nowrap">
@@ -79,14 +81,16 @@ function StatColumn({
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
               className={todayClassName}
             >
-              {todayPrefix}{displayValue} {todayLabel}
+              {todayPrefix}
+              {displayValue} {todayLabel}
             </motion.p>
           )}
         </AnimatePresence>
       ) : (
         displayValue != null && (
           <p className={todayClassName}>
-            {todayPrefix}{displayValue} {todayLabel}
+            {todayPrefix}
+            {displayValue} {todayLabel}
           </p>
         )
       )}
@@ -96,7 +100,6 @@ function StatColumn({
 
 export function ProgressStatsCard({
   onStartLearn,
-  reviewMode,
   onReviewModeChange,
   animateEntrance,
   skipLiveStats,
@@ -104,7 +107,6 @@ export function ProgressStatsCard({
   hasPlayableCards,
 }: {
   onStartLearn: (schedulingMode: SchedulingMode) => void;
-  reviewMode: ReviewMode;
   onReviewModeChange: (mode: ReviewMode) => void;
   animateEntrance?: boolean;
   skipLiveStats?: boolean;
@@ -116,15 +118,31 @@ export function ProgressStatsCard({
 
   const queryArgs = skipLiveStats ? ('skip' as const) : { timezone };
   const cacheSuffix = courseId ? `_${courseId}` : '';
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
-  const stats = useCachedQuery(api.features.courses.getCourseStats, queryArgs, `courseStats${cacheSuffix}`);
-  const todayStats = useCachedQuery(api.features.courses.getTodayStats, queryArgs, `todayStats_${today}${cacheSuffix}`);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(
+    new Date(),
+  );
+  const stats = useCachedQuery(
+    api.features.courses.getCourseStats,
+    queryArgs,
+    `courseStats${cacheSuffix}`,
+  );
+  const todayStats = useCachedQuery(
+    api.features.courses.getTodayStats,
+    queryArgs,
+    `todayStats_${today}${cacheSuffix}`,
+  );
 
-  const snapshotKey = courseId ? `todayStats_snapshot_${courseId}` : 'todayStats_snapshot';
+  const snapshotKey = courseId
+    ? `todayStats_snapshot_${courseId}`
+    : 'todayStats_snapshot';
 
   const { prev, changed: statsActuallyChanged } = useStatsSnapshot(
     snapshotKey,
-    { reps: todayStats?.reps ?? 0, newCards: todayStats?.newCards ?? 0, timeMs: todayStats?.timeMs ?? 0 },
+    {
+      reps: todayStats?.reps ?? 0,
+      newCards: todayStats?.newCards ?? 0,
+      timeMs: todayStats?.timeMs ?? 0,
+    },
     { dateScoped: true },
   );
 
@@ -137,7 +155,7 @@ export function ProgressStatsCard({
   // Home summary powers the "current level" header strip — preloaded
   // server-side in app/app/layout.tsx so the level header is available on
   // the first paint and the card height doesn't grow when the data arrives.
-  const { preloadedHomeSummary } = useAppData();
+  const { preloadedHomeSummary, preloadedCourseSettings } = useAppData();
   const homeSummary = usePreloadedQuery(preloadedHomeSummary);
 
   // Only render the level header when a *premade* CEFR level is active.
@@ -152,14 +170,17 @@ export function ProgressStatsCard({
   // multiple target languages, "Spanish A1.2" for a single language. Falls
   // back to the raw level code if none of the codes resolve to a Language
   // (e.g. during loading or in misconfigured tests).
-  const targetLanguageNames =
-    (stats?.targetLanguages ?? [])
-      .map((code) => getLanguageByCode(code)?.name)
-      .filter((n): n is string => !!n);
+  const targetLanguageNames = (stats?.targetLanguages ?? [])
+    .map((code) => getLanguageByCode(code)?.name)
+    .filter((n): n is string => !!n);
+  // Difficulty label ("A1.2"), not the internal dataset code ("L02").
+  const activeLevelName = activeLevel
+    ? (activeLevel.displayName ?? activeLevel.code)
+    : null;
   const levelLabel = activeLevel
     ? targetLanguageNames.length > 0
-      ? `${targetLanguageNames.join(' · ')} ${activeLevel.code}`
-      : activeLevel.code
+      ? `${targetLanguageNames.join(' · ')} ${activeLevelName}`
+      : activeLevelName
     : null;
 
   // Progress within the active premade level.
@@ -196,13 +217,42 @@ export function ProgressStatsCard({
     450,
     statsActuallyChanged,
   );
+  // Raw timeMs, NOT gated on `hasLearned`: undo decrements reps but
+  // deliberately never time, so after undoing a whole day reps === 0 while
+  // timeMs stays. The ring arc and `goalReached` below use raw timeMs — the
+  // minute label must agree with them instead of animating down to
+  // "0 / 20 min" under a fully-lapped "goal reached" ring.
   const animatedTimeMs = useAnimatedCounter(
-    hasLearned ? todayStats.timeMs : 0,
+    todayStats?.timeMs ?? 0,
     prev.timeMs,
     1500,
     600,
     statsActuallyChanged,
   );
+
+  // Daily goal (per-course, editable via the ring's quick-edit popover).
+  // `preloadedCourseSettings` is optimistically patched by
+  // `useUpdateDailyGoal`, so goal edits re-render the ring instantly.
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
+  const goalMinutes = courseSettings?.dailyTimeGoalMinutes;
+  const goalTodayMs = todayStats?.timeMs ?? 0;
+  const goalReached =
+    goalMinutes != null &&
+    goalMinutes > 0 &&
+    goalTodayMs >= goalMinutes * 60_000;
+
+  // The home view is kept mounted (KeepMountedView) — "navigating to home"
+  // is a hidden→visible flip of `skipLiveStats`, not a remount. Bump an
+  // epoch on each falling edge so the goal ring replays its sweep on every
+  // visit; mount-keyed animations would fire exactly once per session.
+  const [visitEpoch, setVisitEpoch] = React.useState(0);
+  const prevHiddenRef = React.useRef(skipLiveStats);
+  React.useEffect(() => {
+    if (prevHiddenRef.current && !skipLiveStats) {
+      setVisitEpoch((e) => e + 1);
+    }
+    prevHiddenRef.current = skipLiveStats;
+  }, [skipLiveStats]);
 
   const content = (
     <div className="space-y-2">
@@ -261,7 +311,10 @@ export function ProgressStatsCard({
                   isInactive && 'bg-transparent',
                   isFrozen && 'bg-primary/15',
                   isActive && 'bg-streak-active/15',
-                  !isInactive && !isFrozen && !isActive && 'bg-accent-orange/10',
+                  !isInactive &&
+                    !isFrozen &&
+                    !isActive &&
+                    'bg-accent-orange/10',
                 )}
                 animate={
                   isInactive
@@ -276,7 +329,11 @@ export function ProgressStatsCard({
                   isInactive
                     ? { duration: 0.3 }
                     : isFrozen
-                      ? { duration: 2, repeat: Infinity, repeatType: 'reverse' as const }
+                      ? {
+                          duration: 2,
+                          repeat: Infinity,
+                          repeatType: 'reverse' as const,
+                        }
                       : isActive
                         ? { duration: 1, ease: 'easeOut' }
                         : { duration: 0.3 }
@@ -288,22 +345,40 @@ export function ProgressStatsCard({
                       key="snowflake"
                       initial={{ opacity: 0, scale: 0.5, rotate: -90 }}
                       animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                      exit={{ opacity: 0, scale: 0.3, rotate: 90, filter: 'blur(4px)' }}
+                      exit={{
+                        opacity: 0,
+                        scale: 0.3,
+                        rotate: 90,
+                        filter: 'blur(4px)',
+                      }}
                       transition={{ duration: 0.4 }}
                     >
-                      <Snowflake className="h-5 w-5" style={{ color: 'var(--primary)' }} />
+                      <Snowflake
+                        className="h-5 w-5"
+                        style={{ color: 'var(--primary)' }}
+                      />
                     </motion.div>
                   ) : (
                     <motion.div
                       key="flame"
-                      initial={{ opacity: 0, scale: 0.3, rotate: 90, filter: 'blur(4px)' }}
+                      initial={{
+                        opacity: 0,
+                        scale: 0.3,
+                        rotate: 90,
+                        filter: 'blur(4px)',
+                      }}
                       animate={{
                         opacity: 1,
-                        scale: isActive && statsActuallyChanged ? [0.3, 1.3, 1] : 1,
-                        rotate: isActive && statsActuallyChanged ? [90, -10, 0] : 0,
+                        scale:
+                          isActive && statsActuallyChanged ? [0.3, 1.3, 1] : 1,
+                        rotate:
+                          isActive && statsActuallyChanged ? [90, -10, 0] : 0,
                         filter: 'blur(0px)',
                       }}
-                      transition={{ duration: isActive && statsActuallyChanged ? 1.4 : 0.4, ease: 'easeOut' }}
+                      transition={{
+                        duration: isActive && statsActuallyChanged ? 1.4 : 0.4,
+                        ease: 'easeOut',
+                      }}
                     >
                       <Flame
                         className="h-5 w-5 transition-colors duration-400"
@@ -333,7 +408,9 @@ export function ProgressStatsCard({
               >
                 {streak}
               </span>
-              <span className="text-muted-xs leading-none">{t('stats.streak')}</span>
+              <span className="text-muted-xs leading-none">
+                {t('stats.streak')}
+              </span>
             </div>
 
             {/* Divider */}
@@ -353,7 +430,11 @@ export function ProgressStatsCard({
                 icon={<MessageSquare className="h-4 w-4" />}
                 label={t('stats.sentences')}
                 value={String(cards)}
-                todayValue={hasLearned && todayStats.newCards > 0 ? animatedNew : undefined}
+                todayValue={
+                  hasLearned && todayStats.newCards > 0
+                    ? animatedNew
+                    : undefined
+                }
                 todayPrefix="+"
                 todayLabel={t('stats.new')}
                 animateToday={statsActuallyChanged}
@@ -368,21 +449,105 @@ export function ProgressStatsCard({
                 icon={<Clock className="h-4 w-4" />}
                 label={t('stats.time')}
                 value={time}
-                todayValue={hasLearned && todayStats.timeMs > 0 ? animatedTimeMs : undefined}
+                todayValue={
+                  hasLearned && todayStats.timeMs > 0
+                    ? animatedTimeMs
+                    : undefined
+                }
                 todayFormatter={formatTimeMs}
                 todayLabel={t('stats.today')}
                 animateToday={statsActuallyChanged}
               />
             </div>
           </div>
+
+          {/* Daily-goal row — ring sweeps on every visit (visitEpoch) and
+           * animates only the delta since the user last looked (snapshot).
+           * Left part opens the quick-edit popover (the whole block is the
+           * tap target — no separate edit icon); the right side is the
+           * rotating projection slot (its own tap target — cycles stats).
+           * Courses without a goal (created outside onboarding) get a
+           * "Set daily goal" button in the ring's place instead. */}
+          <div className="-mx-4 border-t" />
+          <div className="flex w-full items-center gap-2">
+            <DailyGoalQuickEdit>
+              {goalMinutes != null && goalMinutes > 0 ? (
+                <button
+                  type="button"
+                  className="-mx-1 -my-1 flex min-w-0 items-center gap-3 rounded-lg px-1 py-1 text-left transition-colors hover:bg-muted/60 active:scale-[0.98]"
+                  data-testid="daily-goal-row"
+                >
+                  <DailyGoalRing
+                    goalMinutes={goalMinutes}
+                    todayMs={goalTodayMs}
+                    fromMs={statsActuallyChanged ? prev.timeMs : 0}
+                    replayKey={visitEpoch}
+                    size={36}
+                  >
+                    {goalReached ? (
+                      <Check
+                        className="h-4 w-4"
+                        style={{ color: 'var(--streak-active)' }}
+                      />
+                    ) : (
+                      <span className="text-[10px] font-bold tabular-nums leading-none text-primary">
+                        {Math.floor(animatedTimeMs / 60_000)}
+                      </span>
+                    )}
+                  </DailyGoalRing>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <span
+                      className="whitespace-nowrap text-sm font-medium tabular-nums leading-tight"
+                      style={
+                        goalReached
+                          ? { color: 'var(--streak-active)' }
+                          : undefined
+                      }
+                    >
+                      {t('dailyGoal.progress', {
+                        done: Math.floor(animatedTimeMs / 60_000),
+                        goal: goalMinutes,
+                      })}
+                    </span>
+                    <span className="whitespace-nowrap text-muted-xs leading-none">
+                      {goalReached
+                        ? t('dailyGoal.reached')
+                        : t('dailyGoal.label')}
+                    </span>
+                  </div>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="-mx-1 -my-1 flex items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted/60 active:scale-[0.98]"
+                  data-testid="daily-goal-set-cta"
+                >
+                  {/* Empty dashed ring stands in for the goal circle. */}
+                  <span
+                    aria-hidden
+                    className="h-6 w-6 shrink-0 rounded-full border-2 border-dashed border-primary/50"
+                  />
+                  <span className="whitespace-nowrap text-sm font-medium text-primary">
+                    {t('dailyGoal.cta')}
+                  </span>
+                </button>
+              )}
+            </DailyGoalQuickEdit>
+            <RotatingProjection
+              skip={!!skipLiveStats}
+              replayKey={visitEpoch}
+              hasStudiedToday={hasLearned}
+              cacheSuffix={cacheSuffix}
+            />
+          </div>
         </div>
       </div>
       <div className="card-surface p-3">
         <StartLearningButton
           onStartLearn={onStartLearn}
-          reviewMode={reviewMode}
           onReviewModeChange={onReviewModeChange}
           hasPlayableCards={hasPlayableCards}
+          skipLiveCounts={skipLiveStats}
         />
       </div>
     </div>

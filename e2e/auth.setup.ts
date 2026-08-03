@@ -67,7 +67,7 @@ const CREDENTIALS_DIR = path.resolve(__dirname, ".auth");
 function generateCredentials(prefix: string) {
   const random = crypto.randomBytes(6).toString("hex");
   return {
-    email: `e2e-${prefix}-${Date.now()}-${random}@test.de`,
+    email: `e2e-${prefix}-${Date.now()}-${random}@flexling.com`,
     password: `E2ePass!${random}`,
     name: `E2E ${prefix} ${random}`,
   };

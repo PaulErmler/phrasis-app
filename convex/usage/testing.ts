@@ -12,11 +12,11 @@ import { AUTUMN_API } from './autumnClient';
 /**
  * E2E test hooks for the payment-overdue (dunning) flow. Every function
  * here throws unless the deployment has `E2E_TEST_HOOKS=1` set — enable it
- * ONLY on dev/test deployments (`npx convex env set E2E_TEST_HOOKS 1`),
+ * ONLY on dev/test deployments (`pnpm exec convex env set E2E_TEST_HOOKS 1`),
  * never in production.
  *
  * Invoked from Playwright specs via
- * `npx convex run usage/testing:<fn> '<json>'` (see e2e/payment-overdue.spec.ts).
+ * `pnpm exec convex run usage/testing:<fn> '<json>'` (see e2e/payment-overdue.spec.ts).
  *
  * Why an override instead of a real failed payment: a genuine `past_due`
  * only arises from a failed RENEWAL invoice, and Stripe test clocks can't

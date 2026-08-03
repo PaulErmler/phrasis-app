@@ -43,6 +43,12 @@ export interface AudioButtonProps {
    * Without it, the historical behavior stays: null url = disabled spinner.
    */
   onRequestGenerate?: () => Promise<unknown> | void;
+  /**
+   * Keyboard replay channel: any change to this nonce (re)starts the clip
+   * from the beginning, exactly as if the button had been clicked. The mount
+   * value is ignored so a stale nonce never auto-plays a fresh card.
+   */
+  playSignal?: number;
 }
 
 export function AudioButton({
@@ -55,6 +61,7 @@ export function AudioButton({
   onStop,
   speed = 1,
   onRequestGenerate,
+  playSignal,
 }: AudioButtonProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -152,6 +159,12 @@ export function AudioButton({
     // GENERATE_TIMEOUT_MS guard does, if the job dies without a trace).
   };
 
+  // True while a play is spinning up (awaiting getPeak / play()). During
+  // that window `isPlaying` is still false and the element still paused, so
+  // a second trigger (e.g. the T shortcut ~100ms after a click) would start
+  // a concurrent play() on the same element and desync the button state.
+  const playInFlightRef = useRef(false);
+
   const handlePlay = async () => {
     if (!url) return;
 
@@ -163,6 +176,8 @@ export function AudioButton({
       return;
     }
 
+    if (playInFlightRef.current) return;
+    playInFlightRef.current = true;
     setIsLoading(true);
     onPlay?.();
     try {
@@ -210,12 +225,29 @@ export function AudioButton({
     } catch (error) {
       console.error('Error playing audio:', error);
     } finally {
+      playInFlightRef.current = false;
       setIsLoading(false);
     }
   };
 
   const handlePlayRef = useRef(handlePlay);
   handlePlayRef.current = handlePlay;
+
+  // Keyboard replay: restart from 0 on every nonce change. A clip that is
+  // already playing is rewound in place; otherwise this is a plain click.
+  const lastPlaySignalRef = useRef(playSignal);
+  useEffect(() => {
+    if (playSignal === undefined || playSignal === lastPlaySignalRef.current) {
+      return;
+    }
+    lastPlaySignalRef.current = playSignal;
+    const audio = audioRef.current;
+    if (audio && !audio.paused) {
+      audio.currentTime = 0;
+      return;
+    }
+    void handlePlayRef.current();
+  }, [playSignal]);
 
   // Generated audio arrived (url flipped non-null after a generate click):
   // leave the generating state and auto-play. `play()` may be rejected by

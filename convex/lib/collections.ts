@@ -118,6 +118,44 @@ export function isPremadeLevelCollection(collection: Doc<'collections'>): boolea
 }
 
 /**
+ * Derive a CEFR tier from a legacy collection's name (rows created before
+ * the `cefrTier` field existed): Essential maps to Pre-A1, A1..C2 names ARE
+ * their tier, anything else (custom/chat names) has none.
+ */
+export function deriveLegacyCefrTier(name: string): string | null {
+  if (name === 'Essential') return 'Pre-A1';
+  return (LEGACY_LEVEL_ORDER as readonly string[]).includes(name)
+    ? name
+    : null;
+}
+
+/**
+ * Non-null variant for premade-level rows, where the name is always a level
+ * name so the null branch can't occur in practice; falls back to the name
+ * itself to keep the historical behavior anyway.
+ */
+export function deriveLegacyCefrTierForLevel(name: string): string {
+  return deriveLegacyCefrTier(name) ?? name;
+}
+
+/**
+ * Display fields for the card-origin pill, shared by `getCardForReview` and
+ * `getLibraryCards`. The label is the stored shorthand ("A1.2"); the CEFR
+ * tier drives the pill color on the client.
+ */
+export function cardOriginPillFields(collection: Doc<'collections'> | null): {
+  collectionLabel: string | null;
+  collectionCefrTier: string | null;
+} {
+  if (!collection) return { collectionLabel: null, collectionCefrTier: null };
+  return {
+    collectionLabel: collection.displayName ?? collection.name,
+    collectionCefrTier:
+      collection.cefrTier ?? deriveLegacyCefrTier(collection.name),
+  };
+}
+
+/**
  * Whether `text` is within `userId`'s scope inside its collection. Mirrors
  * getNextTextsFromRank's scoping: premade level collections only serve
  * curriculum rows (a user fork living in a shared level collection is another

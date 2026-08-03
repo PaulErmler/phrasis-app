@@ -1,13 +1,17 @@
 /**
  * Shared date utilities for Convex backend.
  * All functions operate on "YYYY-MM-DD" date strings.
+ *
+ * Date arithmetic and timezone formatting delegate to lib/dateStrings so the
+ * underlying implementations live in one place; the exports here are kept as
+ * thin wrappers because many Convex modules import them.
  */
+
+import { addDays, daysBetween, dateInTimezone } from '../../lib/dateStrings';
 
 /** Compute "today" in the user's IANA timezone as a "YYYY-MM-DD" string. */
 export function getTodayInTimezone(timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(
-    new Date(),
-  );
+  return dateInTimezone(Date.now(), timezone);
 }
 
 /** True if `timezone` is an IANA zone accepted by Intl.DateTimeFormat. */
@@ -23,28 +27,17 @@ export function isValidTimezone(timezone: string): boolean {
 
 /** Determine the next day after a "YYYY-MM-DD" date string. */
 export function getNextDay(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d + 1));
-  const yyyy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  return addDays(dateStr, 1);
 }
 
 /** Determine the previous day before a "YYYY-MM-DD" date string. */
 export function getPreviousDay(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d - 1));
-  const yyyy = date.getUTCFullYear();
-  const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(date.getUTCDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
+  return addDays(dateStr, -1);
 }
 
 /** Whole days since a "YYYY-MM-DD" date, relative to now (UTC). */
 export function daysSince(dateStr: string): number {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return Math.floor((Date.now() - Date.UTC(y, m - 1, d)) / (24 * 60 * 60 * 1000));
+  return daysBetween(dateStr, new Date().toISOString().slice(0, 10));
 }
 
 /** Extract month string "YYYY-MM" from a "YYYY-MM-DD" date string. */

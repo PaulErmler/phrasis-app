@@ -657,6 +657,121 @@ describe("features/courses", () => {
       expect(settings?.ignorePunctuation).toBe(false);
     });
 
+    // Daily goal — editable post-onboarding (removed from the validator's
+    // omit list), clamped to 1..120, and never touching the frozen
+    // onboardingProgress row that preserves the user's original answer.
+    it("persists dailyTimeGoalMinutes on first insert and on patch", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        dailyTimeGoalMinutes: 30,
+      });
+      let settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.dailyTimeGoalMinutes).toBe(30);
+
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        dailyTimeGoalMinutes: 10,
+      });
+      settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.dailyTimeGoalMinutes).toBe(10);
+    });
+
+    it("clamps dailyTimeGoalMinutes to 1..120 and rounds fractions", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        dailyTimeGoalMinutes: 0,
+      });
+      let settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.dailyTimeGoalMinutes).toBe(1);
+
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        dailyTimeGoalMinutes: 999,
+      });
+      settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.dailyTimeGoalMinutes).toBe(120);
+
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        dailyTimeGoalMinutes: 14.6,
+      });
+      settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.dailyTimeGoalMinutes).toBe(15);
+    });
+
+    it("drops non-finite numeric values instead of storing them", async () => {
+      // NaN/±Infinity are valid float64s, so they pass v.number() and
+      // survive Math.max/min/round — without the finite guard a NaN goal
+      // poisons the daily-goal ring and every projection.
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        dailyTimeGoalMinutes: 30,
+      });
+
+      for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+        await asUser.mutation(api.features.courses.updateCourseSettings, {
+          courseId,
+          dailyTimeGoalMinutes: bad,
+          targetBeforeOnlyNewReps: bad,
+          targetBeforeUntilGoodReps: bad,
+        });
+      }
+      const settings = await asUser.query(
+        api.features.courses.getActiveCourseSettings,
+        {},
+      );
+      expect(settings?.dailyTimeGoalMinutes).toBe(30);
+      expect(settings?.targetBeforeOnlyNewReps ?? undefined).not.toBeNaN();
+      expect(settings?.targetBeforeUntilGoodReps ?? undefined).not.toBeNaN();
+    });
+
+    it("leaves onboardingProgress.dailyTimeGoalMinutes untouched when the goal changes", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await t.run(async (ctx) => {
+        await ctx.db.insert("onboardingProgress", {
+          userId: "user_A",
+          step: 99,
+          dailyTimeGoalMinutes: 20,
+        });
+      });
+
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        dailyTimeGoalMinutes: 60,
+      });
+
+      const progress = await t.run(async (ctx) =>
+        ctx.db
+          .query("onboardingProgress")
+          .withIndex("by_userId", (q) => q.eq("userId", "user_A"))
+          .unique(),
+      );
+      expect(progress?.dailyTimeGoalMinutes).toBe(20);
+    });
+
     // Same three-place regression class again — validator, PATCHABLE_KEYS and
     // the hand-written insert object.
     it("persists autoRateFromAccuracy on first insert", async () => {
@@ -816,6 +931,49 @@ describe("features/courses", () => {
       });
       s = await asUser.query(api.features.courses.getActiveCourseSettings, {});
       expect(s?.targetBeforeOnlyNewReps).toBe(0);
+    });
+
+    it("clamps showTranslationOnlyNewReps to 0-10 (0 = ∞) like the listening limit", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        showTranslationOnlyNewReps: 50,
+      });
+      let s = await asUser.query(api.features.courses.getActiveCourseSettings, {});
+      expect(s?.showTranslationOnlyNewReps).toBe(10);
+
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        showTranslationOnlyNewReps: 0,
+      });
+      s = await asUser.query(api.features.courses.getActiveCourseSettings, {});
+      expect(s?.showTranslationOnlyNewReps).toBe(0);
+    });
+
+    it("clamps targetBeforeUntilGoodReps to 1-10 (no ∞ position)", async () => {
+      const t = convexTest(schema, modules);
+      const { asUser, courseId } = await makeActiveCourse(t);
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforeUntilGoodReps: 0,
+      });
+      let s = await asUser.query(api.features.courses.getActiveCourseSettings, {});
+      expect(s?.targetBeforeUntilGoodReps).toBe(1);
+
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforeUntilGoodReps: 50,
+      });
+      s = await asUser.query(api.features.courses.getActiveCourseSettings, {});
+      expect(s?.targetBeforeUntilGoodReps).toBe(10);
+
+      await asUser.mutation(api.features.courses.updateCourseSettings, {
+        courseId,
+        targetBeforeListeningStrategy: "untilGood",
+      });
+      s = await asUser.query(api.features.courses.getActiveCourseSettings, {});
+      expect(s?.targetBeforeListeningStrategy).toBe("untilGood");
     });
 
     it("clamps cardsToAddBatchSize to MAX_CARDS_PER_BATCH on first insert", async () => {

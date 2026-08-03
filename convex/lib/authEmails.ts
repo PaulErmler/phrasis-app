@@ -11,7 +11,7 @@ import { resend } from './resendClient';
  * the duration of a Playwright run by e2e/global-setup.ts), emails are
  * written to the `testAuthEmails` table INSTEAD of being sent, so Playwright
  * can use the codes/links (features/authEmailTesting.ts) and the fake
- * `@test.de` signup addresses never turn into real bounces.
+ * `@flexling.com` signup addresses never turn into real bounces.
  */
 
 export const SUPPORT_EMAIL = 'support@flexling.com';

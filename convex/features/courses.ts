@@ -11,6 +11,7 @@ import { Id } from '../_generated/dataModel';
 import {
   learningStyleValidator,
   currentLevelValidator,
+  reviewsByModeValidator,
 } from '../types';
 import { tutorialIdValidator } from './tutorialIds';
 import {
@@ -49,6 +50,10 @@ import {
 } from '../../lib/scheduling';
 import { validateAutoRateThresholds } from '../../lib/autoRating';
 import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
+import {
+  DAILY_TIME_CUSTOM_MIN,
+  DAILY_TIME_CUSTOM_MAX,
+} from '../../lib/constants/dailyGoal';
 import {
   ONBOARDING_INITIAL_SEED_CARDS,
   ONBOARDING_CARDS_BATCH_SIZE,
@@ -344,13 +349,7 @@ export const getCourseStats = query({
       totalChatCardsApproved: v.optional(v.number()),
       totalCardsEdited: v.optional(v.number()),
       totalCardsAddedManually: v.optional(v.number()),
-      totalReviewsByMode: v.optional(
-        v.object({
-          audio: v.number(),
-          full: v.number(),
-          radio: v.optional(v.number()),
-        }),
-      ),
+      totalReviewsByMode: v.optional(reviewsByModeValidator),
       totalAccuracySum: v.optional(v.number()),
       totalAccuracyCount: v.optional(v.number()),
       // Course language config — exposed so the home view can label the
@@ -425,9 +424,7 @@ export const getTodayStats = query({
       reps: v.number(),
       newCards: v.number(),
       timeMs: v.number(),
-      reviewsByMode: v.optional(
-        v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) }),
-      ),
+      reviewsByMode: v.optional(reviewsByModeValidator),
       accuracyAvg: v.optional(v.number()),
       chatMessagesSent: v.optional(v.number()),
       chatCardsApproved: v.optional(v.number()),
@@ -1083,12 +1080,32 @@ export const updateCourseSettings = mutation({
     const patch: Partial<CoursePatchableSettings> = {};
     for (const key of PATCHABLE_KEYS) {
       let value = args[key];
+      // NaN/±Infinity survive Math.max/min/round/floor and Convex stores
+      // them as float64 — a NaN goal then poisons the daily-goal ring and
+      // every projection until manually repaired. Drop such values instead.
+      if (typeof value === 'number' && !Number.isFinite(value)) continue;
       if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
         value = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(value)));
       }
       // "Only new" Practice-Listening limit: integer 1-10, or 0 for ∞ (always).
-      if (key === 'targetBeforeOnlyNewReps' && typeof value === 'number') {
+      // Same window for the writing-mode "Show translation on new sentences".
+      if (
+        (key === 'targetBeforeOnlyNewReps' ||
+          key === 'showTranslationOnlyNewReps') &&
+        typeof value === 'number'
+      ) {
         value = Math.max(0, Math.min(10, Math.floor(value)));
+      }
+      // "Until rated good" needs at least one good rating — 0 would mean
+      // Listening never plays rather than always, so the floor is 1.
+      if (key === 'targetBeforeUntilGoodReps' && typeof value === 'number') {
+        value = Math.max(1, Math.min(10, Math.floor(value)));
+      }
+      if (key === 'dailyTimeGoalMinutes' && typeof value === 'number') {
+        value = Math.max(
+          DAILY_TIME_CUSTOM_MIN,
+          Math.min(DAILY_TIME_CUSTOM_MAX, Math.round(value)),
+        );
       }
       if (
         (key === 'languagePlaybackSpeeds' ||
