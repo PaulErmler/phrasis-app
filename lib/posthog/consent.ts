@@ -74,12 +74,67 @@ export function useConsentStatus(): ConsentStatus {
 }
 
 /**
+ * The stored opt-in/out survives sign-out (`resetPreservingConsent`), which is
+ * right for the same person returning but must not carry over to a different
+ * person on a shared device. This key records which signed-in user the stored
+ * choice belongs to; a choice made before sign-in (the signup flow) is unowned
+ * until the first identified user adopts it.
+ */
+const CONSENT_OWNER_KEY = 'phrasis_consent_owner';
+
+function readConsentOwner(): string | null {
+  try {
+    return window.localStorage.getItem(CONSENT_OWNER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeConsentOwner(userId: string | null): void {
+  try {
+    if (userId === null) window.localStorage.removeItem(CONSENT_OWNER_KEY);
+    else window.localStorage.setItem(CONSENT_OWNER_KEY, userId);
+  } catch {
+    // Storage unavailable — reconcile degrades to trusting the device record,
+    // which is the pre-ownership behaviour.
+  }
+}
+
+/**
+ * Scope the device's stored consent choice to the signed-in person. Called
+ * once the auth user is known (`ConsentSync`), and gates the server-side
+ * mirror: returns true only when the stored granted/denied choice belongs to
+ * `userId` — adopting an unowned choice (made pre-auth during signup) on the
+ * way. When the choice belongs to a *different* user, it is cleared back to
+ * pending so the banner asks the new person instead of silently applying —
+ * and syncing — their predecessor's answer.
+ */
+export function reconcileConsentOwner(userId: string): boolean {
+  if (!isPostHogReady()) return false;
+  const status = posthog.get_explicit_consent_status();
+  if (status !== 'granted' && status !== 'denied') return false;
+  const owner = readConsentOwner();
+  if (owner === null) {
+    writeConsentOwner(userId);
+    return true;
+  }
+  if (owner === userId) return true;
+  posthog.clear_opt_in_out_capturing();
+  writeConsentOwner(null);
+  notify();
+  return false;
+}
+
+/**
  * Accept: PostHog switches out of cookieless mode, starts using cookies and
  * localStorage, and session replay becomes available.
  */
 export function grantConsent(): void {
   if (!isPostHogReady()) return;
   posthog.opt_in_capturing();
+  // A fresh choice belongs to whoever is (or is about to be) signed in — drop
+  // any stale owner so the next reconcile adopts it for the current user.
+  writeConsentOwner(null);
   notify();
 }
 
@@ -94,6 +149,7 @@ export function grantConsent(): void {
 export function denyConsent(): void {
   if (!isPostHogReady()) return;
   posthog.opt_out_capturing();
+  writeConsentOwner(null);
   notify();
 }
 

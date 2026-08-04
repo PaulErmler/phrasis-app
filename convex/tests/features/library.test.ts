@@ -631,6 +631,27 @@ describe("CJK search (no-word-boundary languages)", () => {
         "hello world",
       );
     });
+
+    it("truncates a base query that itself exceeds 16 terms", () => {
+      // The regression this exists for: the budget only capped the APPENDED
+      // segments — a pasted 20-word sentence sailed through unchanged and
+      // made the search throw instead of returning partial results.
+      const twentyWords = Array.from({ length: 20 }, (_, i) => `word${i}`).join(
+        " ",
+      );
+      const augmented = augmentSearchQuery(twentyWords, ["en", "es"]);
+      expect(termCount(augmented)).toBeLessThanOrEqual(16);
+      // The kept terms are the first 16, in order.
+      expect(augmented.split(" ")[0]).toBe("word0");
+      expect(augmented.split(" ")).toHaveLength(16);
+    });
+
+    it("truncates an over-cap CJK paste after counting Convex-style terms", () => {
+      const longMixed =
+        "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen 你真的体贴";
+      const augmented = augmentSearchQuery(longMixed, ["en", "zh"]);
+      expect(termCount(augmented)).toBeLessThanOrEqual(16);
+    });
   });
 
   it("does not match a card whose searchableText was never segmented (pre-migration state)", async () => {

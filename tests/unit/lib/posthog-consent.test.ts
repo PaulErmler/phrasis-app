@@ -1,13 +1,21 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-  ready: false,
-  status: 'pending' as 'granted' | 'denied' | 'pending',
-  optIn: vi.fn(),
-  optOut: vi.fn(),
-  reset: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  const state = {
+    ready: false,
+    status: 'pending' as 'granted' | 'denied' | 'pending',
+    optIn: vi.fn(),
+    optOut: vi.fn(),
+    reset: vi.fn(),
+    clearOptInOut: vi.fn(),
+  };
+  // Mirror the real SDK: clearing the record returns the status to pending.
+  state.clearOptInOut.mockImplementation(() => {
+    state.status = 'pending';
+  });
+  return state;
+});
 
 vi.mock('@/lib/posthog/client', () => ({
   isPostHogReady: () => mocks.ready,
@@ -16,6 +24,7 @@ vi.mock('@/lib/posthog/client', () => ({
     opt_in_capturing: mocks.optIn,
     opt_out_capturing: mocks.optOut,
     reset: mocks.reset,
+    clear_opt_in_out_capturing: mocks.clearOptInOut,
   },
 }));
 
@@ -23,6 +32,7 @@ import {
   denyConsent,
   grantConsent,
   notifyConsentReady,
+  reconcileConsentOwner,
   resetPreservingConsent,
   setConsent,
   subscribeToConsent,
@@ -36,6 +46,8 @@ describe('consent', () => {
     mocks.optIn.mockClear();
     mocks.optOut.mockClear();
     mocks.reset.mockClear();
+    mocks.clearOptInOut.mockClear();
+    window.localStorage.clear();
   });
 
   it('does nothing before the SDK is ready', () => {
@@ -135,6 +147,82 @@ describe('consent', () => {
     expect(mocks.reset).toHaveBeenCalledTimes(1);
     expect(mocks.optIn).not.toHaveBeenCalled();
     expect(mocks.optOut).not.toHaveBeenCalled();
+  });
+
+  /**
+   * The regression this exists for: `resetPreservingConsent` keeps the stored
+   * choice across sign-out (right for the same person returning), but that
+   * choice is keyed to the device — a *different* user signing in on a shared
+   * browser inherited their predecessor's grant: no banner, replay on, and
+   * ConsentSync wrote the predecessor's answer onto the new account.
+   */
+  describe('reconcileConsentOwner', () => {
+    it('adopts an unowned choice for the first identified user (consent-before-signup)', () => {
+      mocks.ready = true;
+      mocks.status = 'granted';
+      expect(reconcileConsentOwner('userA')).toBe(true);
+      // Same user again: still theirs.
+      expect(reconcileConsentOwner('userA')).toBe(true);
+      expect(mocks.clearOptInOut).not.toHaveBeenCalled();
+    });
+
+    it('keeps the choice across sign-out and re-sign-in of the same user', () => {
+      mocks.ready = true;
+      mocks.status = 'granted';
+      reconcileConsentOwner('userA');
+      resetPreservingConsent();
+      expect(reconcileConsentOwner('userA')).toBe(true);
+      expect(mocks.clearOptInOut).not.toHaveBeenCalled();
+    });
+
+    it('clears a different user’s stored choice back to pending instead of applying it', () => {
+      mocks.ready = true;
+      mocks.status = 'granted';
+      reconcileConsentOwner('userA');
+      resetPreservingConsent();
+
+      const listener = vi.fn();
+      const unsubscribe = subscribeToConsent(listener);
+      expect(reconcileConsentOwner('userB')).toBe(false);
+      unsubscribe();
+
+      expect(mocks.clearOptInOut).toHaveBeenCalledTimes(1);
+      // The banner must be re-rendered (it re-appears for the new person).
+      expect(listener).toHaveBeenCalled();
+      expect(mocks.status).toBe('pending');
+    });
+
+    it('lets the new user’s own answer be adopted after a foreign choice was cleared', () => {
+      mocks.ready = true;
+      mocks.status = 'granted';
+      reconcileConsentOwner('userA');
+      expect(reconcileConsentOwner('userB')).toBe(false);
+
+      // userB answers the re-shown banner.
+      mocks.status = 'denied';
+      denyConsent();
+      expect(reconcileConsentOwner('userB')).toBe(true);
+    });
+
+    it('a fresh explicit choice reassigns ownership to the current user', () => {
+      mocks.ready = true;
+      mocks.status = 'granted';
+      reconcileConsentOwner('userA');
+      // userA changes their answer via the settings dialog — still userA's.
+      mocks.status = 'denied';
+      denyConsent();
+      expect(reconcileConsentOwner('userA')).toBe(true);
+    });
+
+    it('returns false with nothing to own (pending / not ready)', () => {
+      mocks.ready = false;
+      mocks.status = 'granted';
+      expect(reconcileConsentOwner('userA')).toBe(false);
+      mocks.ready = true;
+      mocks.status = 'pending';
+      expect(reconcileConsentOwner('userA')).toBe(false);
+      expect(mocks.clearOptInOut).not.toHaveBeenCalled();
+    });
   });
 
   it('reports initializing before boot, then surfaces a stored grant as a status change', () => {

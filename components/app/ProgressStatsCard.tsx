@@ -8,6 +8,7 @@ import { useAppData } from '@/components/app/AppDataProvider';
 import { useCachedQuery } from '@/hooks/use-cached-query';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
 import { useStatsSnapshot } from '@/hooks/use-stats-snapshot';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Flame,
@@ -116,11 +117,17 @@ export function ProgressStatsCard({
   const t = useTranslations('AppPage');
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const queryArgs = skipLiveStats ? ('skip' as const) : { timezone };
   const cacheSuffix = courseId ? `_${courseId}` : '';
+  // Ticked once a minute so `today` flips at local midnight and the goal
+  // ring / streak / today-stats queries re-fetch the new day — the server
+  // cannot roll them over on its own (queries re-run on data changes, not
+  // on time passing). The projection slot next to them already ticks; before
+  // this the ring froze on "Goal reached!" while the projection advanced.
+  const nowMinute = useNowMinute(skipLiveStats);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(
-    new Date(),
+    new Date(nowMinute),
   );
+  const queryArgs = skipLiveStats ? ('skip' as const) : { timezone, today };
   const stats = useCachedQuery(
     api.features.courses.getCourseStats,
     queryArgs,

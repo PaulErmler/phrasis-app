@@ -74,7 +74,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     kind: 'token bucket',
     rate: 100,
     period: HOUR,
-    capacity: 30,
+    capacity: 50,
   },
   // Global cap on notification emails to the support inbox
   // (lib/adminEmails.ts): every signup fires one with no auth in front of

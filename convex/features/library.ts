@@ -93,6 +93,12 @@ export function augmentSearchQuery(
   // queries like `私は、学生ですか？` and the augmented query would exceed the
   // 16-term cap, which makes the search throw instead of returning results.
   const baseTerms = searchQuery.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  // A raw query can itself exceed the cap (a pasted 20-word sentence) — that
+  // makes the search throw rather than return partial results, so truncate
+  // the base to the first MAX_SEARCH_TERMS terms before budgeting extras.
+  if (baseTerms.length > MAX_SEARCH_TERMS) {
+    return baseTerms.slice(0, MAX_SEARCH_TERMS).join(' ');
+  }
   const seen = new Set(baseTerms);
   const extra: string[] = [];
   for (const lang of new Set(courseLanguages)) {

@@ -28,6 +28,22 @@ export const PROJECTION_CAP_WORDS = 10_000;
  */
 export const FIRST_SESSION_DAMPENER = 7;
 
+/**
+ * The 'goal' basis rate is all-time words per study-minute — measured over a
+ * short lifetime it is just a first-session rate wearing an all-time hat, so
+ * it gets the same dampener, faded out linearly as real history accumulates.
+ * At or beyond this many minutes of total study the rate is trusted as-is.
+ */
+export const GOAL_BASIS_FULL_TRUST_MINUTES = 300;
+
+/**
+ * The year-end level walk has no natural ceiling the way word indicators have
+ * PROJECTION_CAP_WORDS — an inflated pace would happily promise C2.4 to a
+ * 15-minute-old account. Cap the projected climb at this many levels above
+ * the current one (an ambitious but plausible year).
+ */
+export const MAX_LEVEL_JUMP_YEAR_END = 4;
+
 /** Pace window: trailing days considered (or course age if younger). */
 export const PACE_WINDOW_DAYS = 90;
 /** Exponential decay half-life in days (recent days weigh more). */
@@ -254,10 +270,18 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
   } else if (currentWords > 0 && totalTimeMs > 60_000 && goalMinutes != null) {
     // Long pause: no recent activity, but real all-time history. Frame
     // everything as goal-conditional ("if you hit your goal daily…").
+    // An all-time rate measured over a short lifetime is as inflated as a
+    // first session (all cards new, warm-up reviews), so it gets the same
+    // dampener, fading to 1 as history approaches full trust — without this,
+    // a user who studied 15 minutes and stopped lands here once the pace
+    // window empties and is promised thousands of words a year.
     basis = 'goal';
-    const allTimeWpm = currentWords / (totalTimeMs / 60_000);
+    const totalMinutes = totalTimeMs / 60_000;
+    const trust = Math.min(1, totalMinutes / GOAL_BASIS_FULL_TRUST_MINUTES);
+    const dampener = FIRST_SESSION_DAMPENER - (FIRST_SESSION_DAMPENER - 1) * trust;
+    const allTimeWpm = currentWords / totalMinutes / dampener;
     wordsPerDay = allTimeWpm * goalMinutes;
-    cardsPerDay = (currentSentences / (totalTimeMs / 60_000)) * goalMinutes;
+    cardsPerDay = (currentSentences / totalMinutes / dampener) * goalMinutes;
     minutesPerDay = goalMinutes;
     wordsPerMinute = allTimeWpm;
   } else {
@@ -389,11 +413,18 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
       }
     }
 
-    // Walk the level ladder with the year's remaining card budget.
+    // Walk the level ladder with the year's remaining card budget, capped at
+    // MAX_LEVEL_JUMP_YEAR_END steps — the word indicators have
+    // PROJECTION_CAP_WORDS to keep a hot week honest; this is the level
+    // equivalent, so an inflated pace can't promise the top of the ladder.
     if (daysToYearEnd >= MIN_DAYS_FOR_YEAR_HORIZON) {
       let budget = cardsPerDay * daysToYearEnd;
       let idx = activeLevelIndex;
-      while (idx < levels.length - 1 && budget >= remainingOf(levels[idx])) {
+      const maxIdx = Math.min(
+        levels.length - 1,
+        activeLevelIndex + MAX_LEVEL_JUMP_YEAR_END,
+      );
+      while (idx < maxIdx && budget >= remainingOf(levels[idx])) {
         budget -= remainingOf(levels[idx]);
         idx++;
       }

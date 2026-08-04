@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
 import {
   Sheet,
   SheetContent,
@@ -44,6 +45,9 @@ export function CreateCourseDialog({
   const [dailyGoal, setDailyGoal] = useState<number | null>(null);
   const [customGoal, setCustomGoal] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Course created by a partially-failed submit; a retry reuses it instead
+  // of creating a duplicate. Cleared on success and on form reset.
+  const createdCourseIdRef = useRef<Id<'courses'> | null>(null);
 
   const createCourse = useMutation(api.features.courses.createCourse);
   const setActiveCourse = useMutation(api.features.courses.setActiveCourse);
@@ -69,6 +73,7 @@ export function CreateCourseDialog({
     setDailyGoal(null);
     setCustomGoal('');
     setIsSubmitting(false);
+    createdCourseIdRef.current = null;
   };
 
   const handleClose = (open: boolean) => {
@@ -114,25 +119,34 @@ export function CreateCourseDialog({
 
     setIsSubmitting(true);
     try {
-      const result = await createCourse({
-        targetLanguages: [targetLanguage],
-        baseLanguages: [baseLanguage],
-        currentLevel: difficulty,
-      });
+      // A previous attempt may have created (and activated) the course and
+      // only failed on the goal write below — a retry must reuse it, not
+      // create a duplicate (or, on the single-course free tier, dead-end on
+      // USAGE_LIMIT inside a dialog whose course already exists behind it).
+      let courseId = createdCourseIdRef.current;
+      if (courseId === null) {
+        const result = await createCourse({
+          targetLanguages: [targetLanguage],
+          baseLanguages: [baseLanguage],
+          currentLevel: difficulty,
+        });
+        courseId = result.courseId;
+        createdCourseIdRef.current = courseId;
+      }
 
-      // Activate first: if the goal write below fails, the user still ends
-      // up on a working course (and can set the goal from the home ring)
-      // instead of being stranded with a created-but-inactive course that a
-      // retry would duplicate.
-      await setActiveCourse({ courseId: result.courseId });
+      // Activate before the goal write: if that write fails, the user still
+      // ends up on a working course (and can set the goal from the home
+      // ring). Idempotent, so re-running it on a retry is harmless.
+      await setActiveCourse({ courseId });
 
       // Persist the daily goal (createCourse doesn't take it — the goal is
       // a courseSettings field, patchable via updateCourseSettings).
       await updateCourseSettings({
-        courseId: result.courseId,
+        courseId,
         dailyTimeGoalMinutes: effectiveGoal,
       });
 
+      createdCourseIdRef.current = null;
       handleClose(false);
       resetForm();
     } catch (error) {

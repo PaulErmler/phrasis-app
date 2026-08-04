@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 
 import { api } from '@/convex/_generated/api';
-import { useConsentStatus } from '@/lib/posthog/consent';
+import { reconcileConsentOwner, useConsentStatus } from '@/lib/posthog/consent';
 
 /**
  * Mirrors the browser's analytics-consent choice to `userSettings` so the
@@ -20,6 +20,7 @@ import { useConsentStatus } from '@/lib/posthog/consent';
  */
 export function ConsentSync() {
   const status = useConsentStatus();
+  const user = useQuery(api.auth.getAuthUser);
   const setAnalyticsConsent = useMutation(api.features.consent.setAnalyticsConsent);
   const lastSyncedRef = useRef<'granted' | 'denied' | null>(null);
 
@@ -31,6 +32,13 @@ export function ConsentSync() {
     // so a non-reactive guard would silently skip a grant that was already
     // stored before this page load (initializing → granted IS a status change).
     if (status !== 'granted' && status !== 'denied') return;
+    // The device's stored choice may belong to a previous user of a shared
+    // browser (`resetPreservingConsent` keeps it across sign-out). Wait for
+    // the auth user, then only mirror a choice this user owns — reconcile
+    // clears a foreign choice back to pending (re-showing the banner) instead
+    // of writing the predecessor's answer onto this account.
+    if (!user?._id) return;
+    if (!reconcileConsentOwner(String(user._id))) return;
     if (lastSyncedRef.current === status) return;
 
     lastSyncedRef.current = status;
@@ -40,7 +48,7 @@ export function ConsentSync() {
       // only withhold content, never leak it.
       lastSyncedRef.current = null;
     });
-  }, [status, setAnalyticsConsent]);
+  }, [status, user, setAnalyticsConsent]);
 
   return null;
 }
