@@ -69,6 +69,7 @@ import type * as features_placementTest from "../features/placementTest.js";
 import type * as features_projections from "../features/projections.js";
 import type * as features_scheduling from "../features/scheduling.js";
 import type * as features_sentenceMetadata from "../features/sentenceMetadata.js";
+import type * as features_signupNotification from "../features/signupNotification.js";
 import type * as features_stats from "../features/stats.js";
 import type * as features_translation from "../features/translation.js";
 import type * as features_translationLLM from "../features/translationLLM.js";
@@ -188,6 +189,7 @@ declare const fullApi: ApiFromModules<{
   "features/projections": typeof features_projections;
   "features/scheduling": typeof features_scheduling;
   "features/sentenceMetadata": typeof features_sentenceMetadata;
+  "features/signupNotification": typeof features_signupNotification;
   "features/stats": typeof features_stats;
   "features/translation": typeof features_translation;
   "features/translationLLM": typeof features_translationLLM;

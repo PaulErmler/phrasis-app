@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { sendAdminNotificationEmail } from "../../lib/adminEmails";
+import {
+  buildSignupNotification,
+  sendAdminNotificationEmail,
+  type SignupNotificationInput,
+} from "../../lib/adminEmails";
 import type { AuthEmailCtx } from "../../lib/authEmails";
 import { describePlanChange } from "../../usage/helpers";
 
@@ -31,6 +35,118 @@ describe("sendAdminNotificationEmail", () => {
     await expect(
       sendAdminNotificationEmail(ctx, { subject: "x", lines: ["y"] }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("buildSignupNotification", () => {
+  const fullInput: SignupNotificationInput = {
+    name: "Anna Schmidt",
+    email: "anna@example.com",
+    emailVerified: true,
+    onboarding: {
+      step: 12,
+      completedAt: 1_754_000_000_000,
+      currentLevel: "elementary",
+      placementTest: {
+        strategy: "bayesian",
+        history: [
+          { level: 1, knew: true },
+          { level: 3, knew: true },
+          { level: 5, knew: false },
+        ],
+        finalLevel: 4,
+      },
+      firstLessonCardsRated: 8,
+      firstLessonSummary: {
+        cardsRated: 8,
+        sessionId: "s1",
+        dailyReviewsToday: 8,
+        dailyTimeMsToday: 272_000,
+        dailyNewWordsToday: 6,
+      },
+      dailyTimeGoalMinutes: 20,
+      learningGoals: ["travel", "family"],
+      learningGoalFreeText: "moving to Madrid",
+      acquisitionSource: "tiktok",
+      acquisitionSourceFreeText: "saw a video",
+    },
+    course: {
+      baseLanguages: ["en"],
+      targetLanguages: ["es"],
+      currentLevel: "elementary",
+    },
+    stats: { totalRepetitions: 23, totalTimeMs: 432_000 },
+  };
+
+  it("reports course, completed onboarding, and activity for a full signup", () => {
+    const { subject, lines } = buildSignupNotification(fullInput);
+    expect(subject).toBe("New signup: anna@example.com — Spanish (Spain) ← English");
+    expect(lines).toEqual([
+      "Name: Anna Schmidt",
+      "Email: anna@example.com (verified)",
+      "Course: Spanish (Spain) ← English · elementary",
+      "Onboarding: completed",
+      "Placement: level 4 after 3 answers",
+      "First lesson: 8 cards · 6 new words · 5 min",
+      "Daily goal: 20 min/day",
+      'Goals: travel, family, "moving to Madrid"',
+      'Found us via: tiktok — "saw a video"',
+      "Study so far: 23 reps · 7 min",
+    ]);
+  });
+
+  it("degrades to the bare facts for an abandoned pre-onboarding signup", () => {
+    const { subject, lines } = buildSignupNotification({
+      name: "",
+      email: "ghost@example.com",
+      emailVerified: false,
+      onboarding: null,
+      course: null,
+      stats: null,
+    });
+    expect(subject).toBe("New signup: ghost@example.com");
+    expect(lines).toEqual([
+      "Name: (none)",
+      "Email: ghost@example.com (not verified yet)",
+      "Course: none created",
+      "Onboarding: not started",
+    ]);
+  });
+
+  it("reports the reached step and unfinished placement for a mid-onboarding user", () => {
+    const { lines } = buildSignupNotification({
+      ...fullInput,
+      onboarding: {
+        ...fullInput.onboarding!,
+        completedAt: undefined,
+        step: 7,
+        placementTest: {
+          strategy: "bayesian",
+          history: [{ level: 1, knew: true }],
+          finalLevel: undefined,
+        },
+        firstLessonSummary: undefined,
+        firstLessonCardsRated: 3,
+      },
+      stats: { totalRepetitions: 0, totalTimeMs: 0 },
+    });
+    expect(lines).toContain("Onboarding: in progress — reached step 7");
+    expect(lines).toContain("Placement: unfinished (1 answers)");
+    expect(lines).toContain("First lesson: 3 cards rated");
+    // Zero-activity stats stay silent instead of shouting "0 reps".
+    expect(lines.some((l) => l.startsWith("Study so far"))).toBe(false);
+  });
+
+  it("falls back to the self-assessed level when there is no placement test", () => {
+    const { lines } = buildSignupNotification({
+      ...fullInput,
+      onboarding: {
+        ...fullInput.onboarding!,
+        placementTest: undefined,
+        currentLevel: "upper_intermediate",
+      },
+    });
+    expect(lines).toContain("Self-assessed level: upper intermediate");
   });
 });
 

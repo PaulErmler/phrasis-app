@@ -19,7 +19,7 @@ import {
   sendVerificationOtpEmail,
   type AuthEmailCtx,
 } from './lib/authEmails';
-import { sendAdminNotificationEmail } from './lib/adminEmails';
+import { SIGNUP_NOTIFICATION_DELAY_MS } from './lib/adminEmails';
 import {
   WELCOME_EMAIL_DELAY_MS,
   WELCOME_EMAIL_JITTER_MS,
@@ -59,16 +59,15 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
           internal.features.welcomeEmail.sendScheduled,
           { userId: doc._id },
         );
-        // Heads-up to the support inbox. Fires at account creation — for
-        // email+password signups that's before verification, so a few of
-        // these may never activate.
-        await sendAdminNotificationEmail(ctx, {
-          subject: `New signup: ${doc.email}`,
-          lines: [
-            `Name: ${doc.name || '(none)'}`,
-            `Email: ${doc.email}`,
-          ],
-        });
+        // Heads-up to the support inbox, ~20 minutes in — by then the user
+        // has had a chance to finish onboarding, so the notification can
+        // report their course, onboarding progress, and survey answers
+        // (features/signupNotification.ts re-reads everything at send time).
+        await ctx.scheduler.runAfter(
+          SIGNUP_NOTIFICATION_DELAY_MS,
+          internal.features.signupNotification.sendScheduled,
+          { userId: doc._id },
+        );
       },
       onUpdate: async (ctx, newDoc) => {
         await upsertUserProfile(ctx, newDoc);
