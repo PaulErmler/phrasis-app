@@ -50,10 +50,7 @@ import {
 } from '../../lib/scheduling';
 import { validateAutoRateThresholds } from '../../lib/autoRating';
 import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
-import {
-  DAILY_TIME_CUSTOM_MIN,
-  DAILY_TIME_CUSTOM_MAX,
-} from '../../lib/constants/dailyGoal';
+import { clampDailyGoal } from '../../lib/constants/dailyGoal';
 import {
   ONBOARDING_INITIAL_SEED_CARDS,
   ONBOARDING_CARDS_BATCH_SIZE,
@@ -669,18 +666,13 @@ export const saveOnboardingProgress = mutation({
     }
 
     // Same clamp window as updateCourseSettings — completeOnboarding copies
-    // this value verbatim onto courseSettings, so an unclamped write here is
-    // a side door around that mutation's guard (a NaN/Infinity goal poisons
-    // the daily-goal ring and every projection until manually repaired).
+    // this value onto courseSettings, so an unclamped write here would be a
+    // side door around that mutation's guard. Non-finite values are dropped
+    // (leaving any previously stored goal intact) rather than written.
     if (args.dailyTimeGoalMinutes !== undefined) {
-      if (!Number.isFinite(args.dailyTimeGoalMinutes)) {
-        delete args.dailyTimeGoalMinutes;
-      } else {
-        args.dailyTimeGoalMinutes = Math.max(
-          DAILY_TIME_CUSTOM_MIN,
-          Math.min(DAILY_TIME_CUSTOM_MAX, Math.round(args.dailyTimeGoalMinutes)),
-        );
-      }
+      const clamped = clampDailyGoal(args.dailyTimeGoalMinutes);
+      if (clamped === undefined) delete args.dailyTimeGoalMinutes;
+      else args.dailyTimeGoalMinutes = clamped;
     }
 
     const existingProgress = await dbGetOnboardingProgress(ctx, userId);
@@ -865,7 +857,10 @@ export const completeOnboarding = mutation({
       // ONBOARDING_INITIAL_SEED_CARDS / ONBOARDING_FIRST_LESSON_CARDS in
       // lib/constants/onboarding.ts for the rationale.
       cardsToAddBatchSize: ONBOARDING_CARDS_BATCH_SIZE,
-      dailyTimeGoalMinutes: progress.dailyTimeGoalMinutes,
+      // Clamped on the way in too: rows written before the boundary guard
+      // existed can still carry an out-of-range or non-finite goal, and this
+      // is the copy that actually reaches the homescreen ring.
+      dailyTimeGoalMinutes: clampDailyGoal(progress.dailyTimeGoalMinutes),
     });
 
     // Auto-create a deck
@@ -1123,10 +1118,9 @@ export const updateCourseSettings = mutation({
         value = Math.max(1, Math.min(10, Math.floor(value)));
       }
       if (key === 'dailyTimeGoalMinutes' && typeof value === 'number') {
-        value = Math.max(
-          DAILY_TIME_CUSTOM_MIN,
-          Math.min(DAILY_TIME_CUSTOM_MAX, Math.round(value)),
-        );
+        // Non-finite values were already skipped by the guard above, so this
+        // never returns undefined here.
+        value = clampDailyGoal(value);
       }
       if (
         (key === 'languagePlaybackSpeeds' ||

@@ -21,3 +21,22 @@ export function parseCustomGoal(value: string): number | null {
     ? parsed
     : null;
 }
+
+/**
+ * Clamp a stored goal into the valid window, or `undefined` when there is
+ * nothing storable. NaN/±Infinity survive Math.max/min/round and Convex
+ * persists them as float64, where a poisoned goal breaks the homescreen ring
+ * and every projection until repaired by hand — so non-finite values are
+ * dropped rather than clamped.
+ *
+ * Single source of the server-side clamp, shared by every path that writes
+ * `dailyTimeGoalMinutes`: `updateCourseSettings`, `saveOnboardingProgress`,
+ * and the `completeOnboarding` copy from the wizard row onto the course.
+ */
+export function clampDailyGoal(value: number | undefined): number | undefined {
+  if (value === undefined || !Number.isFinite(value)) return undefined;
+  return Math.max(
+    DAILY_TIME_CUSTOM_MIN,
+    Math.min(DAILY_TIME_CUSTOM_MAX, Math.round(value)),
+  );
+}
