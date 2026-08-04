@@ -43,6 +43,7 @@ async function seedFreePlayDeck(
     fsrsReps?: number;
     isMastered?: boolean;
     isHidden?: boolean;
+    origin?: "premade" | "custom" | "chat";
   }>,
   face: "freeStudy" | "radio" = "freeStudy",
 ) {
@@ -96,6 +97,7 @@ async function seedFreePlayDeck(
         fsrsReps,
         isMastered = false,
         isHidden = false,
+        origin,
       } = cards[i];
       const textId = await ctx.db.insert("texts", {
         text,
@@ -141,6 +143,7 @@ async function seedFreePlayDeck(
         freeStudyOrderKey: orderKey ?? i,
         ...(radioCounter != null ? { radioRoundCounter: radioCounter } : {}),
         ...(radioOrderKey != null ? { radioOrderKey } : {}),
+        ...(origin != null ? { collectionOrigin: origin } : {}),
       });
       cardIds.push(cardId);
     }
@@ -161,6 +164,21 @@ async function setReviewMode(
       .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
       .first();
     await ctx.db.patch(settings!._id, { reviewMode });
+  });
+}
+
+/** Set the course's content-source filter (All / Course only / My content). */
+async function setStudyContentFilter(
+  t: TestConvex<typeof schema>,
+  courseId: Awaited<ReturnType<typeof seedFreePlayDeck>>["courseId"],
+  studyContentFilter: "both" | "course" | "custom",
+) {
+  await t.run(async (ctx) => {
+    const settings = await ctx.db
+      .query("courseSettings")
+      .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+      .first();
+    await ctx.db.patch(settings!._id, { studyContentFilter });
   });
 }
 
@@ -781,6 +799,103 @@ describe("features/scheduling — free play", () => {
       expect(viaNew.nextRoundCounter).toBeGreaterThan(
         viaAlias.nextRadioRoundCounter,
       );
+    });
+  });
+});
+
+// ----------------------------------------------------------------------------
+// Content filter (studyContentFilter) — the rotation, the catch-up floor, and
+// the home-screen gate must all see the SAME filtered population.
+// ----------------------------------------------------------------------------
+describe("features/scheduling — free play under a content filter", () => {
+  it("serves only cards of the allowed origin", async () => {
+    const t = convexTest(schema, modules);
+    const { courseId } = await seedFreePlayDeck(t, [
+      { counter: 0, text: "custom-low", origin: "custom" },
+      { counter: 3, text: "premade-high", origin: "premade" },
+    ]);
+    await setStudyContentFilter(t, courseId, "course");
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const res = await asUser.query(api.features.scheduling.getCardForReview, {});
+    // The custom card has the lowest counter but is filtered out.
+    expect(res?.sourceText).toBe("premade-high");
+  });
+
+  /**
+   * The regression this exists for: the advance's catch-up floor was read
+   * from the UNfiltered rotation, so with "Course only" active a hidden
+   * custom card stuck at counter 0 anchored the floor — a fresh premade card
+   * jumped to 1 instead of past the premade veterans and was re-served
+   * dozens of times in a row.
+   */
+  it("computes the catch-up floor from the filtered rotation", async () => {
+    const t = convexTest(schema, modules);
+    const { courseId, cardIds } = await seedFreePlayDeck(t, [
+      { counter: 0, text: "fresh", origin: "premade" },
+      { counter: 50, text: "veteran-a", origin: "premade" },
+      { counter: 51, text: "veteran-b", origin: "premade" },
+      // Filtered out under 'course' — must NOT anchor the floor at 0.
+      { counter: 0, text: "invisible-custom", origin: "custom" },
+    ]);
+    await setStudyContentFilter(t, courseId, "course");
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const r = await asUser.mutation(
+      api.features.scheduling.advanceFreePlayCard,
+      { cardId: cardIds[0], timezone: "UTC" },
+    );
+    // Floor = veteran-a's 50 → land at 51 (one past), not 1.
+    expect(r.nextRoundCounter).toBe(51);
+  });
+
+  it("still floors against other allowed-origin cards under 'custom' (custom + chat merge)", async () => {
+    const t = convexTest(schema, modules);
+    const { courseId, cardIds } = await seedFreePlayDeck(t, [
+      { counter: 0, text: "fresh-custom", origin: "custom" },
+      { counter: 20, text: "chat-veteran", origin: "chat" },
+      { counter: 0, text: "invisible-premade", origin: "premade" },
+    ]);
+    await setStudyContentFilter(t, courseId, "custom");
+    const asUser = t.withIdentity({ subject: "user_A" });
+    const r = await asUser.mutation(
+      api.features.scheduling.advanceFreePlayCard,
+      { cardId: cardIds[0], timezone: "UTC" },
+    );
+    expect(r.nextRoundCounter).toBe(21);
+  });
+
+  describe("hasPlayableCards", () => {
+    it("is false when the filter hides every card", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedFreePlayDeck(t, [
+        { counter: 0, origin: "premade" },
+      ]);
+      await setStudyContentFilter(t, courseId, "custom");
+      const asUser = t.withIdentity({ subject: "user_A" });
+      expect(
+        await asUser.query(api.features.scheduling.hasPlayableCards, {}),
+      ).toBe(false);
+    });
+
+    it("is true when at least one allowed-origin card exists", async () => {
+      const t = convexTest(schema, modules);
+      const { courseId } = await seedFreePlayDeck(t, [
+        { counter: 0, origin: "premade" },
+        { counter: 0, origin: "chat" },
+      ]);
+      await setStudyContentFilter(t, courseId, "custom");
+      const asUser = t.withIdentity({ subject: "user_A" });
+      expect(
+        await asUser.query(api.features.scheduling.hasPlayableCards, {}),
+      ).toBe(true);
+    });
+
+    it("keeps the unfiltered behaviour for 'both'", async () => {
+      const t = convexTest(schema, modules);
+      await seedFreePlayDeck(t, [{ counter: 0 }]);
+      const asUser = t.withIdentity({ subject: "user_A" });
+      expect(
+        await asUser.query(api.features.scheduling.hasPlayableCards, {}),
+      ).toBe(true);
     });
   });
 });

@@ -88,11 +88,6 @@ export function randomOrderKey(): number {
   return Math.floor(Math.random() * 0x7fffffff);
 }
 
-/** The active face's rotation config, or null outside free play.
- *  Face-specific fields/indexes/snapshots live in convex/lib/freePlay.ts. */
-function freePlayConfig(face: FreePlayFace | null) {
-  return face ? FREE_PLAY_MODES[face] : null;
-}
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
@@ -198,6 +193,46 @@ const cardResultValidator = v.object(cardResultFields);
  * Cards inserted before the origin backfill won't match the new indexes;
  * they're handled by the fallback unfiltered query in the 'both' branch.
  */
+/**
+ * The free-play rotation exactly as the client is served it: unfiltered for
+ * 'both', otherwise one origin-keyed query per allowed origin merged by the
+ * face's (counter, order key, _creationTime) sort. Shared by the serving path
+ * (`fetchDueCardsWithFilter`) and the advance's catch-up floor
+ * (`advanceFreePlayCardImpl`) so the floor is always computed over the same
+ * population the queue draws from — an unfiltered floor can sit far below the
+ * filtered queue (a filtered-out card stuck at counter 0), letting a new card
+ * be re-served dozens of times before it "catches up" to cards the user can
+ * never even be shown.
+ */
+async function fetchFreePlayRotation(
+  ctx: QueryCtx,
+  deckId: Id<'decks'>,
+  face: FreePlayFace,
+  filter: StudyContentFilter,
+  take: number,
+): Promise<Doc<'cards'>[]> {
+  const cfg = FREE_PLAY_MODES[face];
+  if (filter === 'both') {
+    return cfg.fetch(ctx, deckId, take);
+  }
+  const allowedOrigins: Array<'premade' | 'custom' | 'chat'> =
+    filter === 'course' ? ['premade'] : ['custom', 'chat'];
+  const perOrigin = await Promise.all(
+    allowedOrigins.map((origin) => cfg.fetchByOrigin(ctx, deckId, origin, take)),
+  );
+  const merged = perOrigin.flat();
+  merged.sort((a, b) => {
+    const ca = a[cfg.counterField] ?? 0;
+    const cb = b[cfg.counterField] ?? 0;
+    if (ca !== cb) return ca - cb;
+    const oa = a[cfg.orderField] ?? Number.POSITIVE_INFINITY;
+    const ob = b[cfg.orderField] ?? Number.POSITIVE_INFINITY;
+    if (oa !== ob) return oa - ob;
+    return a._creationTime - b._creationTime;
+  });
+  return merged.slice(0, take);
+}
+
 async function fetchDueCardsWithFilter(
   ctx: QueryCtx,
   deckId: Id<'decks'>,
@@ -207,7 +242,9 @@ async function fetchDueCardsWithFilter(
   now: number,
   take: number,
 ): Promise<Doc<'cards'>[]> {
-  const freePlay = freePlayConfig(face);
+  if (face) {
+    return fetchFreePlayRotation(ctx, deckId, face, filter, take);
+  }
   if (filter === 'both') {
     if (schedulingMode === 'learn_new') {
       return ctx.db
@@ -222,9 +259,6 @@ async function fetchDueCardsWithFilter(
         )
         .order('asc')
         .take(take);
-    }
-    if (freePlay) {
-      return freePlay.fetch(ctx, deckId, take);
     }
     return ctx.db
       .query('cards')
@@ -259,9 +293,6 @@ async function fetchDueCardsWithFilter(
           .order('asc')
           .take(take);
       }
-      if (freePlay) {
-        return freePlay.fetchByOrigin(ctx, deckId, origin, take);
-      }
       return ctx.db
         .query('cards')
         .withIndex('by_deck_hidden_mastered_origin_dueDate', (q) =>
@@ -277,25 +308,14 @@ async function fetchDueCardsWithFilter(
     }),
   );
 
-  // Merge by the mode's sort key (free play: counter+order; else: dueDate),
-  // tiebreak by _creationTime to mirror Convex's default index ordering.
+  // Merge by dueDate, tiebreak by _creationTime to mirror Convex's default
+  // index ordering. (Free play never reaches here — it exits early through
+  // fetchFreePlayRotation, which merges by the face's counter+order key.)
   const merged = perOriginResults.flat();
-  if (freePlay) {
-    merged.sort((a, b) => {
-      const ca = a[freePlay.counterField] ?? 0;
-      const cb = b[freePlay.counterField] ?? 0;
-      if (ca !== cb) return ca - cb;
-      const oa = a[freePlay.orderField] ?? Number.POSITIVE_INFINITY;
-      const ob = b[freePlay.orderField] ?? Number.POSITIVE_INFINITY;
-      if (oa !== ob) return oa - ob;
-      return a._creationTime - b._creationTime;
-    });
-  } else {
-    merged.sort((a, b) => {
-      if (a.dueDate !== b.dueDate) return a.dueDate - b.dueDate;
-      return a._creationTime - b._creationTime;
-    });
-  }
+  merged.sort((a, b) => {
+    if (a.dueDate !== b.dueDate) return a.dueDate - b.dueDate;
+    return a._creationTime - b._creationTime;
+  });
   return merged.slice(0, take);
 }
 
@@ -1176,10 +1196,19 @@ async function advanceFreePlayCardImpl(
   }
   const cfg = FREE_PLAY_MODES[face];
 
-  // Fetch the two lowest-counter playable cards. The first should be the
-  // card we just played; the second tells us the floor that the played
+  // Fetch the two lowest-counter playable cards — from the same
+  // origin-filtered rotation the card was served from, or the floor could
+  // come from a card the active content filter never serves (stuck at a far
+  // lower counter), neutering the catch-up jump below. The first should be
+  // the card we just played; the second tells us the floor that the played
   // card needs to catch up to.
-  const lowestTwo = await cfg.fetch(ctx, deck._id, 2);
+  const lowestTwo = await fetchFreePlayRotation(
+    ctx,
+    deck._id,
+    face,
+    settings?.studyContentFilter ?? 'both',
+    2,
+  );
 
   const pickedCounter = card[cfg.counterField] ?? 0;
   // Identify the floor card — the second-lowest, excluding `card` itself.
@@ -1275,10 +1304,11 @@ export const advanceRadioCard = mutation({
  * (non-hidden, non-mastered). Used by the home screen to gate the free-play
  * button (Radio / Free Study) — free play is meaningless on an empty deck.
  *
- * Uses the minimal `by_deckId_and_isHidden_and_isMastered` index: free play
- * doesn't care about due-ness, and a trailing field like `dueDate`,
- * `lastReviewedAt`, or the rotation counters would needlessly broaden the
- * read set and refire the subscription every time those fields change.
+ * Uses the narrowest index that answers the question (free play doesn't care
+ * about due-ness): the plain hidden/mastered index for 'both', the
+ * origin-keyed one when a content filter is active. `.first()` keeps the read
+ * set to a single document either way, so the subscription doesn't refire on
+ * unrelated rotation-counter writes.
  */
 export const hasPlayableCards = query({
   args: {},
@@ -1293,17 +1323,40 @@ export const hasPlayableCards = query({
     const deck = await getDeckByCourseId(ctx, active.course._id);
     if (!deck) return false;
 
-    const first = await ctx.db
-      .query('cards')
-      .withIndex('by_deckId_and_isHidden_and_isMastered', (q) =>
-        q
-          .eq('deckId', deck._id)
-          .eq('isHidden', false)
-          .eq('isMastered', false),
-      )
-      .first();
-
-    return first !== null;
+    // Same content-filter scoping as the free-play queue itself, or the
+    // button lights up for cards the filter will never serve (e.g. filter
+    // "My content" with only premade cards) and the user taps into an
+    // instant empty state.
+    const settings = await getCourseSettings(ctx, active.course._id);
+    const filter = settings?.studyContentFilter ?? 'both';
+    if (filter === 'both') {
+      const first = await ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_isHidden_and_isMastered', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false),
+        )
+        .first();
+      return first !== null;
+    }
+    const allowedOrigins: Array<'premade' | 'custom' | 'chat'> =
+      filter === 'course' ? ['premade'] : ['custom', 'chat'];
+    for (const origin of allowedOrigins) {
+      const first = await ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_origin_dueDate', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .eq('collectionOrigin', origin),
+        )
+        .first();
+      if (first !== null) return true;
+    }
+    return false;
   },
 });
 

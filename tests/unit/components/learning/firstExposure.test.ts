@@ -37,4 +37,14 @@ describe('shouldShowTranslationAssist', () => {
     expect(shouldShowTranslationAssist(settings, 1, 0)).toBe(true);
     expect(shouldShowTranslationAssist(settings, 1, 1)).toBe(false);
   });
+
+  it('never shows in transcribe mode — the shown target would BE the answer', () => {
+    // Even with the widest window (0 = always) and a brand-new card.
+    expect(
+      shouldShowTranslationAssist({ showTranslationOnlyNewReps: 0 }, 0, 0, true),
+    ).toBe(false);
+    expect(shouldShowTranslationAssist(undefined, 0, 0, true)).toBe(false);
+    // Explicit false matches the default-arg behaviour.
+    expect(shouldShowTranslationAssist(undefined, 0, 0, false)).toBe(true);
+  });
 });

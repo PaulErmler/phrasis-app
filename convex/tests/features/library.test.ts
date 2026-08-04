@@ -608,8 +608,13 @@ describe("CJK search (no-word-boundary languages)", () => {
     // Convex tokenizes the query on punctuation as well as whitespace, so the
     // budget must count terms the same way — exceeding 16 terms makes the
     // real search index throw instead of returning results.
+    //
+    // Enumerates the SEPARATORS rather than the keepers, on purpose: this
+    // oracle used to be a verbatim copy of the production regex, which made
+    // every assertion below tautological and let a combining-mark bug ship
+    // that shredded Hindi/Thai/Hebrew queries. See searchQueryScripts.test.ts.
     const termCount = (q: string) =>
-      q.split(/[^\p{L}\p{N}]+/u).filter(Boolean).length;
+      q.split(/[\s\p{P}\p{S}]+/u).filter(Boolean).length;
 
     it("stays within 16 terms for a long punctuated Japanese query", () => {
       const query = "私は日本語を勉強しています、友達と毎日話します。";
@@ -630,6 +635,27 @@ describe("CJK search (no-word-boundary languages)", () => {
       expect(augmentSearchQuery("hello world", ["en", "es"])).toBe(
         "hello world",
       );
+    });
+
+    it("truncates a base query that itself exceeds 16 terms", () => {
+      // The regression this exists for: the budget only capped the APPENDED
+      // segments — a pasted 20-word sentence sailed through unchanged and
+      // made the search throw instead of returning partial results.
+      const twentyWords = Array.from({ length: 20 }, (_, i) => `word${i}`).join(
+        " ",
+      );
+      const augmented = augmentSearchQuery(twentyWords, ["en", "es"]);
+      expect(termCount(augmented)).toBeLessThanOrEqual(16);
+      // The kept terms are the first 16, in order.
+      expect(augmented.split(" ")[0]).toBe("word0");
+      expect(augmented.split(" ")).toHaveLength(16);
+    });
+
+    it("truncates an over-cap CJK paste after counting Convex-style terms", () => {
+      const longMixed =
+        "one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen 你真的体贴";
+      const augmented = augmentSearchQuery(longMixed, ["en", "zh"]);
+      expect(termCount(augmented)).toBeLessThanOrEqual(16);
     });
   });
 

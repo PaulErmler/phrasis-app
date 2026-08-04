@@ -75,7 +75,7 @@ const libraryCardValidator = v.object({
 const LIBRARY_LIMIT = 100;
 
 // Convex full-text search accepts at most 16 terms per query.
-const MAX_SEARCH_TERMS = 16;
+export const MAX_SEARCH_TERMS = 16;
 
 /**
  * Mirror of the index-side CJK/Thai segmentation (see
@@ -92,8 +92,26 @@ export function augmentSearchQuery(
   // on punctuation as well as whitespace — a plain `/\s+/` count undercounts
   // queries like `私は、学生ですか？` and the augmented query would exceed the
   // 16-term cap, which makes the search throw instead of returning results.
-  const baseTerms = searchQuery.split(/[^\p{L}\p{N}]+/u).filter(Boolean);
-  const seen = new Set(baseTerms);
+  //
+  // `\p{M}` is load-bearing: combining marks (Devanagari matras, Thai tone
+  // marks, niqqud, harakat) are neither letters nor digits, so without it a
+  // mark counts as a SEPARATOR — मैं counts as two terms and, once the
+  // truncation below rebuilds the query from these pieces, is emitted as the
+  // bare consonant म. That shreds every abugida and pointed-abjad query into
+  // fragments that match nothing.
+  const baseTerms = searchQuery.split(/[^\p{L}\p{N}\p{M}]+/u).filter(Boolean);
+
+  // A raw query can itself exceed the cap (a pasted 20-word sentence), which
+  // makes the search throw rather than return partial results. Truncate to
+  // the first MAX_SEARCH_TERMS terms — but keep going, so a query that still
+  // has room gets its CJK segments appended instead of being returned bare.
+  const overCap = baseTerms.length > MAX_SEARCH_TERMS;
+  const keptTerms = overCap ? baseTerms.slice(0, MAX_SEARCH_TERMS) : baseTerms;
+  // Under the cap the ORIGINAL string is preserved verbatim (punctuation and
+  // all) — only an over-cap query is rebuilt from its terms.
+  const base = overCap ? keptTerms.join(' ') : searchQuery;
+
+  const seen = new Set(keptTerms);
   const extra: string[] = [];
   for (const lang of new Set(courseLanguages)) {
     for (const original of searchSegments(searchQuery, lang)) {
@@ -103,9 +121,9 @@ export function augmentSearchQuery(
       }
     }
   }
-  const room = MAX_SEARCH_TERMS - baseTerms.length;
-  if (room <= 0 || extra.length === 0) return searchQuery;
-  return [searchQuery, ...extra.slice(0, room)].join(' ');
+  const room = MAX_SEARCH_TERMS - keptTerms.length;
+  if (room <= 0 || extra.length === 0) return base;
+  return [base, ...extra.slice(0, room)].join(' ');
 }
 
 export const getLibraryCards = query({

@@ -520,11 +520,14 @@ export function LearningMode({
   );
 
   // "Show translation on new sentences" (writing mode): the answer is shown
-  // above the input to copy-type on the card's first N reviews.
+  // above the input to copy-type on the card's first N reviews — never in
+  // transcribe, where the shown target would BE the answer (gate lives in
+  // the helper).
   const firstExposure = shouldShowTranslationAssist(
     state.courseSettings,
     state.preReviewCount,
     state.fsrsState?.reps ?? 0,
+    isTranscribe,
   );
 
   const cardContent =
@@ -751,11 +754,15 @@ export function LearningMode({
         shortcutsDisabled={
           // Any overlay that owns the keyboard must silence the session
           // shortcuts — with a confirm dialog open, a stray ← would undo
-          // the previous review behind the modal.
+          // the previous review behind the modal. Dialogs/menus that manage
+          // their own open state (help, card menu) are caught structurally in
+          // LearningControls' handler; the chat panel isn't a dialog and traps
+          // no focus, so it must be listed here.
           state.settingsOpen ||
           editDialogOpen ||
           deleteConfirmOpen ||
-          flagConfirmOpen
+          flagConfirmOpen ||
+          chatContext.isChatOpen
         }
         isAudioReview={reviewMode === 'audio'}
         audioAllTargetsRevealed={audioAllTargetsRevealed}

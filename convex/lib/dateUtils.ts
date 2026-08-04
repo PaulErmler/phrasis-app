@@ -14,6 +14,30 @@ export function getTodayInTimezone(timezone: string): string {
   return dateInTimezone(Date.now(), timezone);
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Resolve "today" for a query from an optional client-supplied date string.
+ *
+ * Convex queries never re-run because time passed, so a query that derives
+ * today from `Date.now()` keeps serving yesterday's row after local midnight
+ * until an unrelated write invalidates it. Callers that need the day to roll
+ * over pass a client-computed date (ticked via `useNowMinute`); it is
+ * accepted only when well-formed and within ±1 day of the server's view of
+ * that timezone — anything else falls back to the server date, so a hostile
+ * or skewed client can only shift its own display by a day.
+ */
+export function resolveClientToday(timezone: string, clientToday?: string): string {
+  const serverToday = getTodayInTimezone(timezone);
+  if (clientToday === undefined) return serverToday;
+  if (!DATE_RE.test(clientToday)) return serverToday;
+  // addDays(x, 0) canonicalizes ("2026-08-00" → "2026-07-31") so a
+  // non-canonical-but-plausible date can't slip through as a raw map key.
+  const canonical = addDays(clientToday, 0);
+  if (Math.abs(daysBetween(serverToday, canonical)) > 1) return serverToday;
+  return canonical;
+}
+
 /** True if `timezone` is an IANA zone accepted by Intl.DateTimeFormat. */
 export function isValidTimezone(timezone: string): boolean {
   if (typeof timezone !== 'string' || timezone.length === 0) return false;

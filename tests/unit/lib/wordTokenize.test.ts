@@ -26,6 +26,15 @@ describe('getWordSegmenter', () => {
   it('caches the segmenter per normalized tag', () => {
     expect(getWordSegmenter('pt_br')).toBe(getWordSegmenter('pt-br'));
   });
+
+  it('resolves registry compareLocale for codes whose hyphenated form is invalid BCP-47', () => {
+    // "zh-traditional" / "yue-traditional" have an over-long variant subtag —
+    // Intl.Segmenter throws RangeError on them, and the tokenizer fallback
+    // would swallow a whole unspaced sentence as one token. The registry's
+    // compareLocale (zh-TW / yue-Hant-HK) must be used instead.
+    expect(() => getWordSegmenter('zh_traditional')).not.toThrow();
+    expect(() => getWordSegmenter('yue_traditional')).not.toThrow();
+  });
 });
 
 describe('tokenizeText — space-delimited language (en)', () => {
@@ -104,11 +113,41 @@ describe('tokenizeText — no-word-boundary language (ja)', () => {
   });
 });
 
+describe('tokenizeText — Traditional-script codes (zh_traditional / yue_traditional)', () => {
+  it('segments Traditional Chinese into words, not one sentence-token', () => {
+    expect(originals('你真的體貼', 'zh_traditional')).toEqual([
+      '你',
+      '真的',
+      '體貼',
+    ]);
+  });
+
+  it('segments Traditional Cantonese into words', () => {
+    expect(originals('你真的體貼', 'yue_traditional')).toEqual([
+      '你',
+      '真的',
+      '體貼',
+    ]);
+  });
+});
+
 describe('appendSearchSegments', () => {
   it('appends segmented words for Chinese so mid-sentence words become tokens', () => {
     const out = appendSearchSegments('你真的体贴', 'zh');
     expect(out.startsWith('你真的体贴 ')).toBe(true);
     expect(out.split(' ')).toContain('体贴');
+  });
+
+  it('appends segmented words for Traditional Chinese and Cantonese', () => {
+    // The changelog's CJK-search fix claims these languages work; without the
+    // compareLocale resolution the "segments" were the whole sentence again
+    // and an infix query like 體貼 matched nothing.
+    expect(appendSearchSegments('你真的體貼', 'zh_traditional').split(' ')).toContain(
+      '體貼',
+    );
+    expect(appendSearchSegments('你真的體貼', 'yue_traditional').split(' ')).toContain(
+      '體貼',
+    );
   });
 
   it('appends segmented words for Japanese', () => {

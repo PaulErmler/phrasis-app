@@ -194,6 +194,68 @@ describe('LearningControls — window shortcuts', () => {
     expect(handlers.onSelectRating).not.toHaveBeenCalled();
   });
 
+  /**
+   * The regression these exist for: only Space and Enter had a "focus is on
+   * an interactive control" escape hatch, so with the help dialog (or the
+   * card-actions menu) open, pressing 1 / ← / Shift+R rated, undid, or
+   * restarted the card *behind* the overlay. Radix traps focus inside its
+   * dialogs, so containment in a [role="dialog"] is the structural signal.
+   */
+  it('ignores every shortcut when the event target sits inside a dialog', () => {
+    const handlers = makeHandlers();
+    render(
+      <>
+        <div role="dialog">
+          <button data-testid="dialog-button">shortcut legend</button>
+        </div>
+        <LearningControls
+          validRatings={RATINGS}
+          activeRating="good"
+          ratingIntervals={{}}
+          isPlaying={false}
+          isMerging={false}
+          durationSec={12}
+          undoDisabled={false}
+          isReviewing={false}
+          {...handlers}
+        />
+      </>,
+    );
+    const inDialog = screen.getByTestId('dialog-button');
+    for (const key of ['1', 'ArrowLeft', 'r', 't', 'R']) {
+      fireEvent.keyDown(inDialog, { key });
+    }
+    fireEvent.keyDown(inDialog, { key: 'R', shiftKey: true });
+    expect(handlers.onSelectRating).not.toHaveBeenCalled();
+    expect(handlers.onBack).not.toHaveBeenCalled();
+    expect(handlers.onSeek).not.toHaveBeenCalled();
+    expect(handlers.onReplayTarget).not.toHaveBeenCalled();
+    expect(handlers.onRestartCard).not.toHaveBeenCalled();
+  });
+
+  /**
+   * driver.js binds its own ArrowLeft/ArrowRight on window (keyup) while a
+   * tour runs and marks the run with a body class; without this guard one ←
+   * press both stepped the tour back AND undid the review behind the overlay.
+   */
+  it('ignores every shortcut while a driver.js tour is active', () => {
+    const handlers = makeHandlers();
+    renderControls(handlers);
+    document.body.classList.add('driver-active');
+    try {
+      for (const key of [' ', 'Enter', 'ArrowLeft', 'r', 't', '1']) {
+        fireEvent.keyDown(window, { key });
+      }
+      expect(handlers.onPlay).not.toHaveBeenCalled();
+      expect(handlers.onNext).not.toHaveBeenCalled();
+      expect(handlers.onBack).not.toHaveBeenCalled();
+      expect(handlers.onSeek).not.toHaveBeenCalled();
+      expect(handlers.onSelectRating).not.toHaveBeenCalled();
+    } finally {
+      document.body.classList.remove('driver-active');
+    }
+  });
+
   it('R and Space no-op while the merged audio is not ready', () => {
     const handlers = makeHandlers();
     renderControls(handlers, { durationSec: 0 });

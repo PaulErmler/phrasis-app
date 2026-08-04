@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
 import {
   Sheet,
   SheetContent,
@@ -44,6 +45,15 @@ export function CreateCourseDialog({
   const [dailyGoal, setDailyGoal] = useState<number | null>(null);
   const [customGoal, setCustomGoal] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Course created by a partially-failed submit, stamped with the answers it
+  // was created FROM. A retry reuses it instead of creating a duplicate — but
+  // only while those answers still hold: without the signature, going Back
+  // and switching the language would silently re-activate the original course
+  // and never create the one the user just asked for.
+  const createdCourseRef = useRef<{
+    courseId: Id<'courses'>;
+    signature: string;
+  } | null>(null);
 
   const createCourse = useMutation(api.features.courses.createCourse);
   const setActiveCourse = useMutation(api.features.courses.setActiveCourse);
@@ -61,6 +71,10 @@ export function CreateCourseDialog({
     parsedCustomGoal <= DAILY_TIME_CUSTOM_MAX;
   const effectiveGoal = customGoalValid ? parsedCustomGoal : dailyGoal;
 
+  /** The answers `createCourse` is called with — see `createdCourseRef`. */
+  const courseSignature = () =>
+    JSON.stringify([targetLanguage, baseLanguage, difficulty]);
+
   const resetForm = () => {
     setStep(1);
     setTargetLanguage('');
@@ -69,6 +83,7 @@ export function CreateCourseDialog({
     setDailyGoal(null);
     setCustomGoal('');
     setIsSubmitting(false);
+    createdCourseRef.current = null;
   };
 
   const handleClose = (open: boolean) => {
@@ -114,25 +129,42 @@ export function CreateCourseDialog({
 
     setIsSubmitting(true);
     try {
-      const result = await createCourse({
-        targetLanguages: [targetLanguage],
-        baseLanguages: [baseLanguage],
-        currentLevel: difficulty,
-      });
+      // A previous attempt may have created (and activated) the course and
+      // only failed on the goal write below — a retry must reuse it, not
+      // create a duplicate (or, on the single-course free tier, dead-end on
+      // USAGE_LIMIT inside a dialog whose course already exists behind it).
+      // Reuse only when the course still matches what the form now says; the
+      // goal is deliberately not part of the signature, since changing only
+      // the goal is exactly the retry the stored course is meant to serve.
+      const signature = courseSignature();
+      const remembered = createdCourseRef.current;
+      let courseId =
+        remembered && remembered.signature === signature
+          ? remembered.courseId
+          : null;
+      if (courseId === null) {
+        const result = await createCourse({
+          targetLanguages: [targetLanguage],
+          baseLanguages: [baseLanguage],
+          currentLevel: difficulty,
+        });
+        courseId = result.courseId;
+        createdCourseRef.current = { courseId, signature };
+      }
 
-      // Activate first: if the goal write below fails, the user still ends
-      // up on a working course (and can set the goal from the home ring)
-      // instead of being stranded with a created-but-inactive course that a
-      // retry would duplicate.
-      await setActiveCourse({ courseId: result.courseId });
+      // Activate before the goal write: if that write fails, the user still
+      // ends up on a working course (and can set the goal from the home
+      // ring). Idempotent, so re-running it on a retry is harmless.
+      await setActiveCourse({ courseId });
 
       // Persist the daily goal (createCourse doesn't take it — the goal is
       // a courseSettings field, patchable via updateCourseSettings).
       await updateCourseSettings({
-        courseId: result.courseId,
+        courseId,
         dailyTimeGoalMinutes: effectiveGoal,
       });
 
+      createdCourseRef.current = null;
       handleClose(false);
       resetForm();
     } catch (error) {

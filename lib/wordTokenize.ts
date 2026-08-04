@@ -17,9 +17,13 @@ export function isAllLowercase(s: string): boolean {
 // Segmenter construction is measurable on hot paths (review writes,
 // migrations, edit flows) — `getSegmenter` caches per normalized BCP-47 tag.
 export function getWordSegmenter(language: string): Intl.Segmenter {
-  // `es_latam` and similar underscore-separated tags aren't valid BCP-47;
-  // Intl.Segmenter would throw. Normalize to hyphens.
-  const bcp47 = language.replace(/_/g, '-');
+  // Internal codes are not BCP-47: `zh_traditional` → "zh-traditional" has a
+  // variant subtag over 8 chars, so Intl.Segmenter throws RangeError and the
+  // caller's fallback treats the whole sentence as one token. The registry's
+  // `compareLocale` (zh-TW, yue-Hant-HK, …) is the valid tag for exactly this
+  // purpose; only underscore-normalize codes that don't carry one.
+  const bcp47 =
+    getLanguageByCode(language)?.compareLocale ?? language.replace(/_/g, '-');
   return getSegmenter(bcp47, 'word');
 }
 

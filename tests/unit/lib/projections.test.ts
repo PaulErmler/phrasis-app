@@ -4,6 +4,7 @@ import {
   decayedDailyPace,
   projectFirstSession,
   roundFriendly,
+  MAX_LEVEL_JUMP_YEAR_END,
   PACE_DECAY,
   PROJECTION_CAP_WORDS,
   type ProjectionInputs,
@@ -240,13 +241,48 @@ describe('computeIndicators', () => {
       }),
     );
     expect(basis).toBe('firstSession');
-    // wordsPerDay = (30/10) × 20 / 7 = 8.57 → floor of the extraction formula.
+    // wordsPerDay = 30 words / 1 active day / 7 — the goal no longer scales
+    // the pace; the average actual minutes per active day do.
     const oneYear = byKind(indicators, 'oneYearWords') as { words: number };
     expect(oneYear).toBeDefined();
     expect(oneYear.words).toBeLessThan(30 + ((30 / 10) * 20 * 365) / 2);
     // Rate stats need observed basis.
     expect(byKind(indicators, 'sentencesPerHour')).toBeUndefined();
     expect(byKind(indicators, 'counterfactualWords')).toBeUndefined();
+  });
+
+  /**
+   * The regression this exists for: the first-session pace was scaled to the
+   * DAILY GOAL before the ÷7 dampener. A user with a 5-minute goal who
+   * studied 17.5 minutes (27 sentences) had today's output cut 3.5× by the
+   * goal scaling and 7× by the dampener — "A1.1 in ~124 days" rendered next
+   * to a day that alone covered a sixth of the level. Pace now extrapolates
+   * from the average actual minutes per active day.
+   */
+  it('firstSession pace uses average actual study time, not the daily goal', () => {
+    const { basis, indicators } = computeIndicators(
+      baseInputs({
+        courseAgeDays: 1,
+        goalMinutes: 5,
+        dailyWords: recentDays(47, 1),
+        dailyNewCards: recentDays(27, 1),
+        dailyMinutes: recentDays(17.45, 1),
+        currentWords: 47,
+        currentSentences: 27,
+        totalTimeMs: 17.45 * 60_000,
+        levels: [
+          { code: 'Pre-A1', totalTexts: 163, cardsAdded: 27, ignoredCount: 0 },
+          { code: 'A1.1', totalTexts: 150, cardsAdded: 0, ignoredCount: 0 },
+        ],
+        activeLevelIndex: 0,
+      }),
+    );
+    expect(basis).toBe('firstSession');
+    const nl = byKind(indicators, 'nextLevel') as { etaDays: number };
+    expect(nl).toBeDefined();
+    // cardsPerDay = 27/day ÷ 7 ≈ 3.86 → 136 remaining ≈ 36 days (was ~124
+    // when the 5-minute goal scaled the rate down first).
+    expect(nl.etaDays).toBe(36);
   });
 
   it('paused user (no recent activity, real history) falls to goal basis', () => {
@@ -260,6 +296,72 @@ describe('computeIndicators', () => {
     expect(basis).toBe('goal');
     expect(byKind(indicators, 'oneYearWords')).toBeDefined();
     expect(byKind(indicators, 'sentencesPerHour')).toBeUndefined();
+  });
+
+  /**
+   * The regression these exist for: the goal basis took the raw all-time
+   * words-per-minute — for a user who studied 15 minutes and stopped, that is
+   * a first-session rate without the first-session dampener, so once the pace
+   * window emptied they were promised "10,000+ words in one year" and the
+   * ladder walk crowned them C2 by December.
+   */
+  describe('goal basis with a tiny lifetime history', () => {
+    // 45 words / 20 sentences in 15 lifetime minutes, then a long pause.
+    const tinyHistory = () =>
+      baseInputs({
+        dailyWords: [],
+        dailyNewCards: [],
+        dailyMinutes: [],
+        currentWords: 45,
+        currentSentences: 20,
+        totalTimeMs: 15 * 60_000,
+        goalMinutes: 20,
+        // Mid-year so the year-end indicators are in play.
+        today: '2026-06-01',
+      });
+
+    it('dampens the all-time rate like a first session', () => {
+      const { basis, indicators } = computeIndicators(tinyHistory());
+      expect(basis).toBe('goal');
+      const oneYear = byKind(indicators, 'oneYearWords') as {
+        words: number;
+        capped: boolean;
+      };
+      // Undampened: 45 + (45/15)*20*365 ≈ 21,945 → capped "10,000+".
+      // Dampened (~÷6.7): ≈ 3,300 — plausible, and far below the cap.
+      expect(oneYear).toBeDefined();
+      expect(oneYear.capped).toBe(false);
+      expect(oneYear.words).toBeLessThan(5000);
+    });
+
+    it('does not dampen a long real history', () => {
+      // 58 lifetime hours: trust is full, rate is taken as-is.
+      const { indicators } = computeIndicators(
+        baseInputs({ dailyWords: [], dailyNewCards: [], dailyMinutes: [] }),
+      );
+      const oneYear = byKind(indicators, 'oneYearWords') as { words: number };
+      // 1200 words / 3480 min ≈ 0.345 wpm × 20 min × 365 ≈ +2,517.
+      expect(oneYear.words).toBeGreaterThan(3000);
+    });
+
+    it('caps the year-end level walk at MAX_LEVEL_JUMP_YEAR_END levels', () => {
+      const manyLevels = Array.from({ length: 12 }, (_, i) => ({
+        code: `L${i}`,
+        totalTexts: 10,
+        cardsAdded: 0,
+        ignoredCount: 0,
+      }));
+      const { indicators } = computeIndicators(
+        baseInputs({
+          // Huge card pace so the uncapped walk would eat the whole ladder.
+          dailyNewCards: recentDays(50, 90),
+          levels: manyLevels,
+          activeLevelIndex: 0,
+        }),
+      );
+      const lv = byKind(indicators, 'levelByYearEnd') as { code: string };
+      expect(lv.code).toBe(`L${MAX_LEVEL_JUMP_YEAR_END}`);
+    });
   });
 
   it('zero history returns empty', () => {

@@ -8,6 +8,10 @@ import type { CourseSettings } from './types';
  * count the "Only new" Practice-Listening limit uses) is below the configured
  * window. Window semantics mirror `targetBeforeOnlyNewReps`: 0 = always show
  * (∞), 1-10 = first N reviews. Defaults: enabled, N = 1 (first exposure only).
+ *
+ * Never in transcribe mode: there the target audio IS the prompt, so printing
+ * the target sentence above the input would hand over the answer (the
+ * transcribe hideBaseLanguages default exists for the same reason).
  */
 export function shouldShowTranslationAssist(
   settings:
@@ -16,7 +20,9 @@ export function shouldShowTranslationAssist(
     | undefined,
   preReviewCount: number,
   fsrsReps: number,
+  isTranscribe = false,
 ): boolean {
+  if (isTranscribe) return false;
   if (!(settings?.showTranslationOnNew ?? true)) return false;
   const reps = settings?.showTranslationOnlyNewReps ?? 1;
   const limit = reps <= 0 ? Infinity : reps;

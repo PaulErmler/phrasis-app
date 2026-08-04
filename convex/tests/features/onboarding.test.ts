@@ -234,6 +234,91 @@ describe("completeOnboarding", () => {
     await drainScheduled(t);
   });
 
+  /**
+   * The boundary clamp in `saveOnboardingProgress` only defends NEW writes —
+   * an `onboardingProgress` row written before that guard existed can still
+   * carry an out-of-range or non-finite goal, and THIS is the copy that
+   * reaches `courseSettings` and the homescreen ring. Seeded via `ctx.db`
+   * to reproduce exactly that pre-existing-row case.
+   */
+  it("clamps a poisoned daily goal from an existing progress row", async () => {
+    const t = convexTest(schema, modules);
+    await seedEssentialCollection(t);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("onboardingProgress", {
+        userId: "user_A",
+        step: 6,
+        targetLanguages: ["es"],
+        baseLanguages: ["en"],
+        currentLevel: "beginner",
+        reviewMode: "audio",
+        dailyTimeGoalMinutes: Number.POSITIVE_INFINITY,
+      });
+      await ctx.db.insert("userSettings", {
+        userId: "user_A",
+        hasCompletedOnboarding: false,
+      });
+    });
+
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+
+    const settings = await t.run(async (ctx) =>
+      ctx.db
+        .query("courseSettings")
+        .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+        .first(),
+    );
+    // Dropped, not stored as Infinity — the ring reads "Set daily goal"
+    // instead of "14 / Infinity min".
+    expect(settings?.dailyTimeGoalMinutes).toBeUndefined();
+
+    await drainScheduled(t);
+  });
+
+  it("clamps an out-of-range daily goal from an existing progress row", async () => {
+    const t = convexTest(schema, modules);
+    await seedEssentialCollection(t);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    await t.run(async (ctx) => {
+      await ctx.db.insert("onboardingProgress", {
+        userId: "user_A",
+        step: 6,
+        targetLanguages: ["es"],
+        baseLanguages: ["en"],
+        currentLevel: "beginner",
+        reviewMode: "audio",
+        dailyTimeGoalMinutes: 9999,
+      });
+      await ctx.db.insert("userSettings", {
+        userId: "user_A",
+        hasCompletedOnboarding: false,
+      });
+    });
+
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+
+    const settings = await t.run(async (ctx) =>
+      ctx.db
+        .query("courseSettings")
+        .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+        .first(),
+    );
+    expect(settings?.dailyTimeGoalMinutes).toBe(120);
+
+    await drainScheduled(t);
+  });
+
   it("is idempotent — a second call returns the same course/deck and does not double-consume quota", async () => {
     const t = convexTest(schema, modules);
     await seedEssentialCollection(t);

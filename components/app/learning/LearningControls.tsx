@@ -112,6 +112,22 @@ export function LearningControls({
       if (shortcutsDisabled) return;
       const target = e.target;
       if (isEditableTarget(target)) return;
+      // Overlays own the keyboard. Radix traps focus inside dialogs and
+      // menus, so containment catches the help dialog, the card-actions
+      // menu, and any future overlay without each one having to be wired
+      // into `shortcutsDisabled`. The driver.js tour has no focus trap —
+      // it's detected via the body class it sets while active (its own
+      // arrow-key navigation keeps working; ← must not also undo a review
+      // behind the overlay).
+      if (document.body.classList.contains('driver-active')) return;
+      if (
+        target instanceof HTMLElement &&
+        target.closest(
+          '[role="dialog"], [role="alertdialog"], [role="menu"], [data-radix-popper-content-wrapper]',
+        )
+      ) {
+        return;
+      }
       if (e.key === ' ' || e.code === 'Space') {
         // Let Space activate focused interactive controls so keyboard
         // navigation and accessibility are not broken.
