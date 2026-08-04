@@ -251,21 +251,27 @@ export function computeIndicators(inputs: ProjectionInputs): ProjectionResult {
     // Fresh account: dampened first-session extrapolation (matches the
     // numbers onboarding just promised).
     basis = 'firstSession';
-    const goal = goalMinutes ?? windowMinutes / activeDays;
+    // Average ACTUAL study time per active day — not the daily goal. A user
+    // who studies 17 minutes against a 5-minute goal would otherwise see
+    // their pace cut 3.5× by the goal scaling on top of the ÷7 dampener,
+    // compounding into a day-one level ETA (~4 months for a level their
+    // real throughput clears in days) that reads as broken next to the
+    // day's own stats.
+    const minutesPerActiveDay = windowMinutes / activeDays;
     // Unrounded rates — see firstSessionDailyRate for why rounding a
     // per-day pace here would zero out slow sessions or overstate fast ones.
     wordsPerDay = Math.min(
       PROJECTION_CAP_WORDS,
-      firstSessionDailyRate(windowWords, windowMinutes, goal),
+      firstSessionDailyRate(windowWords, windowMinutes, minutesPerActiveDay),
     );
     cardsPerDay =
       windowCards <= 0
         ? 0
         : Math.min(
             PROJECTION_CAP_WORDS,
-            firstSessionDailyRate(windowCards, windowMinutes, goal),
+            firstSessionDailyRate(windowCards, windowMinutes, minutesPerActiveDay),
           );
-    minutesPerDay = goal;
+    minutesPerDay = minutesPerActiveDay;
     wordsPerMinute = windowWords / Math.max(windowMinutes, 5) / FIRST_SESSION_DAMPENER;
   } else if (currentWords > 0 && totalTimeMs > 60_000 && goalMinutes != null) {
     // Long pause: no recent activity, but real all-time history. Frame
