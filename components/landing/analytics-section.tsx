@@ -249,20 +249,6 @@ function MiniSessionSnapshot() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div className="flex items-center gap-2">
-          <MiniGoalRing />
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold tabular-nums leading-tight">14 / 20 min</span>
-            <span className="text-[10px] text-muted-foreground leading-none">Daily goal</span>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={cn(PILL_CLASS, 'bg-primary/10 text-primary')}>5 new</span>
-          <span className={cn(PILL_CLASS, 'bg-accent-orange/10 text-accent-orange')}>3 learning</span>
-          <span className={cn(PILL_CLASS, 'bg-success/10 text-success')}>12 review</span>
-        </div>
-      </div>
       <div className="flex items-end gap-3">
         <div className="flex flex-col items-center gap-0.5">
           <div className="flex items-center justify-center h-9 w-9 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--streak-active) 15%, transparent)' }}>
@@ -281,6 +267,22 @@ function MiniSessionSnapshot() {
               <span className="text-[10px] font-medium text-primary tabular-nums leading-none mt-0.5">{today}</span>
             </div>
           ))}
+        </div>
+      </div>
+      {/* Daily goal + due pills below the stats, mirroring the in-app card
+       * where the goal row sits at the bottom of the progress card. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex items-center gap-2">
+          <MiniGoalRing />
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold tabular-nums leading-tight">14 / 20 min</span>
+            <span className="text-[10px] text-muted-foreground leading-none">Daily goal</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={cn(PILL_CLASS, 'bg-primary/10 text-primary')}>5 new</span>
+          <span className={cn(PILL_CLASS, 'bg-accent-orange/10 text-accent-orange')}>3 learning</span>
+          <span className={cn(PILL_CLASS, 'bg-success/10 text-success')}>12 review</span>
         </div>
       </div>
       <MiniProjection />

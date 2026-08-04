@@ -106,6 +106,9 @@ native/shell/app-url.js
 # Kanban Markdown extension — local task board (see LachyFS.kanban-markdown)
 /.devtool
 
+# Cursor editor state / debug artifacts — never commit
+/.cursor/
+
 # Kanban board — symlink into Paul's Obsidian vault (machine-specific path,
 # see CLAUDE.md). Recreate with:
 # ln -s "$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/PaulsVault/projects/Flexling" board

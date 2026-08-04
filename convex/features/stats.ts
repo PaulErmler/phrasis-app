@@ -902,9 +902,16 @@ async function countDueCardsByState(
   };
 }
 
-/** Due card counts by state for the active deck (O(log n) via aggregates). */
+/**
+ * Due card counts by state for the active deck (O(log n) via aggregates).
+ *
+ * `now` follows the no-wall-clock query guideline like getFilteredCardCounts
+ * below (a stable, minute-quantized value keeps the query cacheable). It stays
+ * OPTIONAL for back-compat: already-shipped client bundles call with `{}` and
+ * keep the historical wall-clock behavior.
+ */
 export const getCardCounts = query({
-  args: {},
+  args: { now: v.optional(v.number()) },
   returns: v.union(
     v.object({
       new: v.number(),
@@ -914,8 +921,8 @@ export const getCardCounts = query({
     }),
     v.null(),
   ),
-  handler: async (ctx) => {
-    return countDueCardsByState(ctx, 'both', Date.now());
+  handler: async (ctx, args) => {
+    return countDueCardsByState(ctx, 'both', args.now ?? Date.now());
   },
 });
 

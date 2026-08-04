@@ -217,6 +217,20 @@ describe("features/stats", () => {
         expect(call.bounds?.upper?.key).toBeLessThanOrEqual(after);
       }
     });
+
+    it("uses a client-supplied `now` verbatim as the due-date bound", async () => {
+      const t = convexTest(schema, modules);
+      await seedActiveCourse(t);
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      const NOW = 1_754_000_000_000;
+      await asUser.query(api.features.stats.getCardCounts, { now: NOW });
+
+      expect(countCalls).toHaveLength(4);
+      for (const call of countCalls) {
+        expect(call.bounds?.upper?.key).toBe(NOW);
+      }
+    });
   });
 
   describe("getFilteredCardCounts", () => {

@@ -425,9 +425,13 @@ export function ReviewModesDemo() {
                                 />
                               </div>
                             )}
-                            <div className="h-9 overflow-hidden">
+                            {/* min-h (not fixed h + overflow-hidden): the diff
+                             * is taller than the input row it replaces — its
+                             * floating correction marks sit above the chips
+                             * and were clipped by a fixed 36px box. */}
+                            <div className="min-h-9">
                               {submitted && ft ? (
-                                <DiffDisplay expected={ft.expected} actual={typed} language={tr.language} hideAccuracy />
+                                <DiffDisplay expected={ft.expected} actual={typed} language={tr.language} omitAccuracy />
                               ) : (
                                 <div className="flex items-center gap-2">
                                   <Input

@@ -12,6 +12,8 @@ interface DiffDisplayProps {
   /** Target-language code, e.g. 'en', 'ja'. Drives locale-aware segmentation. */
   language?: string;
   hideAccuracy?: boolean;
+  /** Drop the accuracy footer entirely (see WordDiff.omitAccuracy). */
+  omitAccuracy?: boolean;
   hideErrors?: boolean;
   /** `courseSettings.ignorePunctuation` — drop punctuation from the score. */
   ignorePunctuation?: boolean;
@@ -26,6 +28,7 @@ export function DiffDisplay({
   actual,
   language = 'en',
   hideAccuracy = false,
+  omitAccuracy = false,
   hideErrors = false,
   ignorePunctuation = false,
 }: DiffDisplayProps) {
@@ -38,6 +41,7 @@ export function DiffDisplay({
         actual={actual}
         language={language}
         hideAccuracy={hideAccuracy}
+        omitAccuracy={omitAccuracy}
         hideErrors={hideErrors}
         ignorePunctuation={ignorePunctuation}
       />
@@ -50,6 +54,7 @@ export function DiffDisplay({
       actual={actual}
       language={language}
       hideAccuracy={hideAccuracy}
+      omitAccuracy={omitAccuracy}
       hideErrors={hideErrors}
       ignorePunctuation={ignorePunctuation}
     />
@@ -61,6 +66,7 @@ interface CharDiffViewProps {
   actual: string;
   language: string;
   hideAccuracy: boolean;
+  omitAccuracy: boolean;
   hideErrors: boolean;
   ignorePunctuation: boolean;
 }
@@ -70,6 +76,7 @@ function CharDiffView({
   actual,
   language,
   hideAccuracy,
+  omitAccuracy,
   hideErrors,
   ignorePunctuation,
 }: CharDiffViewProps) {
@@ -141,7 +148,9 @@ function CharDiffView({
           );
         })}
       </p>
-      <AccuracyFooter accuracy={accuracyPct} hideAccuracy={hideAccuracy} />
+      {!omitAccuracy && (
+        <AccuracyFooter accuracy={accuracyPct} hideAccuracy={hideAccuracy} />
+      )}
     </div>
   );
 }

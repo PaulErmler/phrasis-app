@@ -23,7 +23,6 @@ const modules = import.meta.glob("/convex/**/*.ts");
  * Union-typed keys are exercised with every literal member, not just one.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyValidator = any;
 
 /** All sample values to try for a validator (unions fan out per literal). */
@@ -108,6 +107,7 @@ describe("updateCourseSettings — exhaustive settings sweep", () => {
         } catch (e) {
           throw new Error(
             `updateCourseSettings threw for { ${key}: ${JSON.stringify(sample)} }: ${String(e)}`,
+            { cause: e },
           );
         }
         // The read query's return validator must still accept the row —

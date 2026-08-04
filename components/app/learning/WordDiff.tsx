@@ -20,6 +20,9 @@ interface WordDiffProps {
   actual: string;
   language: string;
   hideAccuracy?: boolean;
+  /** Drop the accuracy footer entirely (no invisible height-keeper) — for
+   * embeds like the landing demo where the reserved line reads as dead space. */
+  omitAccuracy?: boolean;
   hideErrors?: boolean;
   /** User setting — punctuation is still shown, just neutral and unscored. */
   ignorePunctuation?: boolean;
@@ -243,6 +246,7 @@ export function WordDiff({
   actual,
   language,
   hideAccuracy = false,
+  omitAccuracy = false,
   hideErrors = false,
   ignorePunctuation = false,
 }: WordDiffProps) {
@@ -305,7 +309,9 @@ export function WordDiff({
           </AskAboutWord>
         ))}
       </p>
-      <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
+      {!omitAccuracy && (
+        <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
+      )}
     </div>
   );
 }
