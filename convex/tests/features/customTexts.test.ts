@@ -485,8 +485,8 @@ describe("features/customTexts", () => {
         },
       );
       // Every autofill row carries a `translationSource` tag now — the
-      // autofill model id plus its `minimal` reasoning suffix. The exact
-      // slug is owned by OPENROUTER_MODELS.translationAutoFill in
+      // autofill model id plus its `none` (no-thinking) reasoning suffix.
+      // The exact slug is owned by OPENROUTER_MODELS.translationAutoFill in
       // convex/config/aiModels.ts; we just assert the shape
       // (language/text/translationSource) rather than re-spelling it here.
       expect(res.translations).toHaveLength(1);
@@ -494,7 +494,7 @@ describe("features/customTexts", () => {
         language: "es",
         text: "Hola",
       });
-      expect(res.translations[0].translationSource).toMatch(/-minimal$/);
+      expect(res.translations[0].translationSource).toMatch(/-none$/);
       expect(res.metadata.register).toBe("neutral");
       // Verify the system prompt was passed through.
       expect(generateText).toHaveBeenCalled();

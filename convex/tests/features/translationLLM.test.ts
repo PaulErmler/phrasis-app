@@ -14,29 +14,45 @@ vi.mock("@openrouter/ai-sdk-provider", () => ({
 
 import { generateText } from "ai";
 import {
+  buildJudgePrompt,
   buildPrompt,
   MAX_OUTPUT_TOKENS,
+  translateBestOfN,
   translateTextWithLLM,
 } from "../../features/translationLLM";
-import { resolveTranslationStages } from "../../../lib/languages";
+import {
+  GEMINI_35_FLASH_NITRO_MINIMAL,
+  LUNA_BO3,
+  resolveTranslationStages,
+} from "../../../lib/languages";
 
 describe("features/translationLLM", () => {
   describe("translation rules", () => {
-    it("default rule: Gemini 3.6 Flash Nitro (minimal) primary AND fallback", () => {
-      // No language sets `translationRule` → all default to
-      // `gemini_35_flash_nitro_minimal`. Length-hybrid branching was
-      // retired — every source length runs the same chain. Fallback is the
-      // same config as primary; it only exists to retry once on transient
-      // HTTP errors before Google.
+    it("default rule: Luna best-of-3 primary, Gemini 3.6 Flash Nitro fallback", () => {
+      // No language sets `translationRule` → all default to `luna_bo3`
+      // (Aug 2026 eval winner). The Gemini stage stays as the fallback so a
+      // Luna outage degrades to the previous production config before the
+      // Google safety net.
       const stages = resolveTranslationStages("nl", 12);
       expect(stages.length).toBe(2);
-      const nitroMinimal = {
-        model: "google/gemini-3.6-flash:nitro",
-        reasoning: "minimal",
+      expect(stages[0]).toEqual(LUNA_BO3);
+      expect(stages[1]).toEqual(GEMINI_35_FLASH_NITRO_MINIMAL);
+    });
+
+    it("LUNA_BO3 stage shape: no-thinking Luna, price cap, 1+2 sampling, no-thinking judge", () => {
+      expect(LUNA_BO3).toEqual({
+        model: "openai/gpt-5.6-luna:nitro",
+        reasoning: "none",
         maxOutputTokens: 4_000,
-      };
-      expect(stages[0]).toEqual(nitroMinimal);
-      expect(stages[1]).toEqual(nitroMinimal);
+        provider: { max_price: { completion: 2 } },
+        samples: { total: 3, extraTemperature: 1 },
+        judge: {
+          model: "openai/gpt-5.6-luna:nitro",
+          reasoning: "none",
+          provider: { max_price: { completion: 2 } },
+          maxRetries: 2,
+        },
+      });
     });
 
     it("default rule is length-agnostic — same chain for short and long inputs", () => {
@@ -47,28 +63,13 @@ describe("features/translationLLM", () => {
       expect(short).toEqual(long);
     });
 
-    it("de uses the gemini_35_flash_nitro_minimal default (minimal thinking, primary + fallback)", () => {
-      const stages = resolveTranslationStages("de", 12);
-      expect(stages.length).toBe(2);
-      const nitroMinimal = {
-        model: "google/gemini-3.6-flash:nitro",
-        reasoning: "minimal",
-        maxOutputTokens: 4_000,
-      };
-      expect(stages[0]).toEqual(nitroMinimal);
-      expect(stages[1]).toEqual(nitroMinimal);
-    });
-
-    it("fr uses the gemini_35_flash_nitro_minimal default (minimal thinking, primary + fallback)", () => {
-      const stages = resolveTranslationStages("fr", 12);
-      expect(stages.length).toBe(2);
-      const nitroMinimal = {
-        model: "google/gemini-3.6-flash:nitro",
-        reasoning: "minimal",
-        maxOutputTokens: 4_000,
-      };
-      expect(stages[0]).toEqual(nitroMinimal);
-      expect(stages[1]).toEqual(nitroMinimal);
+    it("de and fr use the luna_bo3 default", () => {
+      for (const code of ["de", "fr"]) {
+        const stages = resolveTranslationStages(code, 12);
+        expect(stages.length).toBe(2);
+        expect(stages[0]).toEqual(LUNA_BO3);
+        expect(stages[1]).toEqual(GEMINI_35_FLASH_NITRO_MINIMAL);
+      }
     });
 
     it("retranslation_high: forced via ruleOverride uses Gemini 3.1 Pro (medium) as a second opinion", () => {
@@ -101,11 +102,11 @@ describe("features/translationLLM", () => {
       });
     });
 
-    it("zh uses the gemini_35_flash_nitro_minimal default (with a translationVersion bump)", () => {
+    it("zh uses the luna_bo3 default (with a translationVersion bump)", () => {
       const stages = resolveTranslationStages("zh", 12);
       expect(stages.length).toBe(2);
-      expect(stages[0].model).toBe("google/gemini-3.6-flash:nitro");
-      expect(stages[0].reasoning).toBe("minimal");
+      expect(stages[0].model).toBe("openai/gpt-5.6-luna:nitro");
+      expect(stages[0].samples).toEqual({ total: 3, extraTemperature: 1 });
       expect(stages[1].model).toBe("google/gemini-3.6-flash:nitro");
       expect(stages[1].reasoning).toBe("minimal");
     });
@@ -113,10 +114,8 @@ describe("features/translationLLM", () => {
     it("unknown language code falls through to the default rule", () => {
       const stages = resolveTranslationStages("zz", 100);
       expect(stages.length).toBe(2);
-      expect(stages[0].model).toBe("google/gemini-3.6-flash:nitro");
-      expect(stages[0].reasoning).toBe("minimal");
+      expect(stages[0].model).toBe("openai/gpt-5.6-luna:nitro");
       expect(stages[1].model).toBe("google/gemini-3.6-flash:nitro");
-      expect(stages[1].reasoning).toBe("minimal");
     });
   });
 
@@ -370,6 +369,233 @@ describe("features/translationLLM", () => {
       expect(callArg.providerOptions).toEqual({
         openrouter: { reasoning: { effort: "minimal" } },
       });
+    });
+
+    it("maps reasoning='none' to reasoning:{enabled:false} (NOT field omission)", async () => {
+      // Luna reasons adaptively (and bills hidden tokens) unless thinking is
+      // explicitly disabled — 'none' must be sent as {enabled: false}.
+      mockOpenRouterOk("Hallo.");
+      await translateTextWithLLM({ ...callArgs, reasoning: "none" });
+      const callArg = vi.mocked(generateText).mock.calls[0][0];
+      expect(callArg.providerOptions).toEqual({
+        openrouter: { reasoning: { enabled: false } },
+      });
+    });
+
+    it("passes provider constraints and temperature through to the call", async () => {
+      mockOpenRouterOk("Hallo.");
+      await translateTextWithLLM({
+        ...callArgs,
+        reasoning: "none",
+        provider: { max_price: { completion: 2 } },
+        temperature: 1,
+      });
+      const callArg = vi.mocked(generateText).mock.calls[0][0];
+      expect(callArg.temperature).toBe(1);
+      expect(callArg.providerOptions).toEqual({
+        openrouter: {
+          reasoning: { enabled: false },
+          provider: { max_price: { completion: 2 } },
+        },
+      });
+    });
+  });
+
+  describe("translateBestOfN", () => {
+    const originalKey = process.env.OPENROUTER_API_KEY;
+
+    beforeEach(() => {
+      vi.mocked(generateText).mockReset();
+      process.env.OPENROUTER_API_KEY = "test-key";
+    });
+    afterEach(() => {
+      if (originalKey === undefined) {
+        delete process.env.OPENROUTER_API_KEY;
+      } else {
+        process.env.OPENROUTER_API_KEY = originalKey;
+      }
+    });
+
+    const promptArgs = {
+      text: "Could you repeat that?",
+      sourceLang: "en",
+      targetLang: "is",
+      targetLangName: "Icelandic",
+      targetLangNativeName: "Íslenska",
+      targetRegion: "Iceland",
+      addressesSomeone: true,
+      referentGender: "male" as const,
+    };
+
+    const stage = {
+      model: "openai/gpt-5.6-luna:nitro",
+      reasoning: "none" as const,
+      maxOutputTokens: 4_000,
+      provider: { max_price: { completion: 2 } },
+      samples: { total: 3, extraTemperature: 1 },
+      judge: {
+        model: "openai/gpt-5.6-luna:nitro",
+        reasoning: "none" as const,
+        provider: { max_price: { completion: 2 } },
+        maxRetries: 2,
+      },
+    };
+
+    function mockCall(content: string, finishReason = "stop") {
+      vi.mocked(generateText).mockResolvedValueOnce({
+        text: content,
+        finishReason,
+        usage: { inputTokens: 100, outputTokens: 10, totalTokens: 110 },
+      } as any);
+    }
+
+    it("skips the judge when all candidates agree", async () => {
+      mockCall("Geturðu endurtekið þetta?");
+      mockCall("Geturðu endurtekið þetta?");
+      mockCall("Geturðu endurtekið þetta?");
+      const bo = await translateBestOfN({ ...promptArgs, stage });
+      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(3);
+      expect(bo.result.ok && bo.result.text).toBe("Geturðu endurtekið þetta?");
+      expect(bo.meta).toEqual({
+        nUnique: 1,
+        judgeUsed: false,
+        judgeFallback: false,
+        candidateFailures: 0,
+      });
+      expect(bo.telemetryList).toHaveLength(3);
+    });
+
+    it("runs the anchor at temp 0 and extras at extraTemperature, all with no-thinking + price cap", async () => {
+      mockCall("A.");
+      mockCall("A.");
+      mockCall("A.");
+      await translateBestOfN({ ...promptArgs, stage });
+      const calls = vi.mocked(generateText).mock.calls.map((c) => c[0]);
+      expect(calls.map((c) => c.temperature)).toEqual([0, 1, 1]);
+      for (const c of calls) {
+        expect(c.providerOptions).toEqual({
+          openrouter: {
+            reasoning: { enabled: false },
+            provider: { max_price: { completion: 2 } },
+          },
+        });
+      }
+    });
+
+    it("asks the judge when candidates differ and returns its pick", async () => {
+      mockCall("A.");
+      mockCall("B.");
+      mockCall("C.");
+      mockCall("2"); // judge verdict (1-based id into the shuffled list)
+      const bo = await translateBestOfN({ ...promptArgs, stage });
+      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(4);
+      expect(bo.meta.judgeUsed).toBe(true);
+      expect(bo.meta.judgeFallback).toBe(false);
+      expect(bo.meta.nUnique).toBe(3);
+      expect(bo.result.ok).toBe(true);
+      if (bo.result.ok) {
+        expect(["A.", "B.", "C."]).toContain(bo.result.text);
+      }
+      // Judge prompt contained all three candidates.
+      const judgePrompt = vi.mocked(generateText).mock.calls[3][0].prompt as string;
+      expect(judgePrompt).toContain('<candidate id="1">');
+      expect(judgePrompt).toContain('<candidate id="3">');
+      expect(judgePrompt).toContain("<source>Could you repeat that?</source>");
+      // 3 candidates + 1 judge in the telemetry, roles tagged.
+      expect(bo.telemetryList.map((t) => t.role)).toEqual([
+        "candidate",
+        "candidate",
+        "candidate",
+        "judge",
+      ]);
+    });
+
+    it("falls back to the temp-0 anchor on an unparseable judge verdict", async () => {
+      mockCall("A.");
+      mockCall("B.");
+      mockCall("C.");
+      mockCall("I think they are all lovely");
+      const bo = await translateBestOfN({ ...promptArgs, stage });
+      expect(bo.meta.judgeFallback).toBe(true);
+      // Anchor-first order: candidate #1 (temp 0) survived, so it's the pick.
+      expect(bo.result.ok && bo.result.text).toBe("A.");
+    });
+
+    it("retries the judge on transport errors, then succeeds", async () => {
+      mockCall("A.");
+      mockCall("B.");
+      mockCall("C.");
+      vi.mocked(generateText).mockRejectedValueOnce(new Error("network down"));
+      mockCall("1");
+      const bo = await translateBestOfN({ ...promptArgs, stage });
+      expect(bo.meta.judgeUsed).toBe(true);
+      expect(bo.meta.judgeFallback).toBe(false);
+      const judgeEntries = bo.telemetryList.filter((t) => t.role === "judge");
+      expect(judgeEntries.map((t) => t.judgeAttempt)).toEqual([1, 2]);
+      expect(judgeEntries[0].error).toMatch(/network down/);
+    });
+
+    it("falls back to the anchor when the judge exhausts all retries", async () => {
+      mockCall("A.");
+      mockCall("B.");
+      mockCall("C.");
+      vi.mocked(generateText).mockRejectedValue(new Error("permanently down"));
+      const bo = await translateBestOfN({ ...promptArgs, stage });
+      expect(bo.meta.judgeFallback).toBe(true);
+      expect(bo.result.ok && bo.result.text).toBe("A.");
+      // 1 initial + maxRetries=2 → 3 judge attempts.
+      expect(bo.telemetryList.filter((t) => t.role === "judge")).toHaveLength(3);
+    });
+
+    it("survives individual candidate failures as long as one candidate lands", async () => {
+      vi.mocked(generateText).mockRejectedValueOnce(new Error("boom"));
+      mockCall("B.");
+      mockCall("", "length"); // truncated → dropped from the pool
+      const bo = await translateBestOfN({ ...promptArgs, stage });
+      expect(bo.result.ok && bo.result.text).toBe("B.");
+      expect(bo.meta).toEqual({
+        nUnique: 1,
+        judgeUsed: false,
+        judgeFallback: false,
+        candidateFailures: 2,
+      });
+      const errors = bo.telemetryList.filter((t) => t.error !== undefined);
+      expect(errors).toHaveLength(2);
+    });
+
+    it("fails the stage only when ALL candidates fail", async () => {
+      vi.mocked(generateText).mockRejectedValue(new Error("everything down"));
+      const bo = await translateBestOfN({ ...promptArgs, stage });
+      expect(bo.result.ok).toBe(false);
+      if (!bo.result.ok) {
+        expect(bo.result.reason).toBe("http_error");
+        expect(bo.result.detail).toMatch(/all 3 candidates failed/);
+      }
+      expect(bo.meta.candidateFailures).toBe(3);
+      expect(bo.meta.judgeUsed).toBe(false);
+    });
+  });
+
+  describe("buildJudgePrompt", () => {
+    it("mirrors the translation prompt's context block and lists candidates", () => {
+      const args = {
+        text: "Hi.",
+        sourceLang: "en",
+        targetLang: "is",
+        targetLangName: "Icelandic",
+        targetLangNativeName: "Íslenska",
+        targetRegion: "Iceland",
+        addressesSomeone: true,
+        formality: "neutral" as const,
+        referentGender: "female" as const,
+      };
+      const p = buildJudgePrompt(args, ["Halló.", "Hæ."]);
+      expect(p).toContain("<referent_gender>female</referent_gender>");
+      expect(p).toContain("<register>neutral</register>");
+      expect(p).toContain('<candidate id="1">Halló.</candidate>');
+      expect(p).toContain('<candidate id="2">Hæ.</candidate>');
+      expect(p).toMatch(/Icelandic \(Íslenska\) translation reviewer/);
+      expect(p).toMatch(/Output only the id number/);
     });
   });
 });

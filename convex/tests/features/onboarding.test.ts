@@ -625,6 +625,49 @@ describe("finalizeOnboarding", () => {
     expect(row?.placementTest?.finalLevel).toBe(7);
   });
 
+  it("re-syncs a goal retuned after course creation (word-projection picker) onto courseSettings", async () => {
+    const t = convexTest(schema, modules);
+    await seedEssentialCollection(t);
+    await seedQuota(t, "user_A");
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    // Initial pick: 10 min. completeOnboarding copies it to courseSettings.
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 6,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "beginner",
+      reviewMode: "audio",
+      dailyTimeGoalMinutes: 10,
+    });
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+    await drainScheduled(t);
+
+    // The word-projection step retunes the goal — that picker only writes
+    // the onboardingProgress row, after the courseSettings copy was made.
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 10,
+      targetLanguages: ["es"],
+      baseLanguages: ["en"],
+      currentLevel: "beginner",
+      reviewMode: "audio",
+      dailyTimeGoalMinutes: 30,
+    });
+
+    await asUser.mutation(api.features.onboarding.finalizeOnboarding, {});
+
+    const courseSettings = await t.run(async (ctx) =>
+      ctx.db
+        .query("courseSettings")
+        .withIndex("by_courseId", (q) => q.eq("courseId", courseId))
+        .first(),
+    );
+    expect(courseSettings?.dailyTimeGoalMinutes).toBe(30);
+  });
+
   it("works when the user has no progress row (defensive — userSettings stays well-formed)", async () => {
     const t = convexTest(schema, modules);
     const asUser = t.withIdentity({ subject: "user_A" });

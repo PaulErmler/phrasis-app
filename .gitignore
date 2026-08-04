@@ -54,6 +54,10 @@ next-env.d.ts
 .build-id.json
 
 data_preparation/translation_eval/data
+# local eval prototype scripts (Luna translation pipeline evals, Aug 2026)
+data_preparation/translation_eval/run_3way_flores.py
+data_preparation/translation_eval/run_pipeline_proto_de.py
+data_preparation/translation_eval/run_pipeline_proto_is.py
 
 # data preparation 
 data_preparation/data/intermediate_outputs

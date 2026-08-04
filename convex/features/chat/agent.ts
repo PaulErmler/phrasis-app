@@ -7,6 +7,7 @@ import type { ToolCallOptions } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import {
   OPENROUTER_CHAT_EXTRA_BODY,
+  OPENROUTER_CHAT_MODEL_SETTINGS,
   OPENROUTER_CHAT_PROVIDER_OPTIONS,
   OPENROUTER_MODELS,
 } from '../../config/aiModels';
@@ -85,7 +86,7 @@ export const agent: Agent = new Agent(components.agent, {
   languageModel: createOpenRouter({
     apiKey: process.env.OPENROUTER_API_KEY,
     extraBody: OPENROUTER_CHAT_EXTRA_BODY,
-  })(OPENROUTER_MODELS.languageTeacher),
+  })(OPENROUTER_MODELS.languageTeacher, OPENROUTER_CHAT_MODEL_SETTINGS),
   providerOptions: OPENROUTER_CHAT_PROVIDER_OPTIONS,
 
   instructions: `
@@ -100,16 +101,26 @@ Language of your reply
 Creating flashcards
 - Each createCard call must include one translation per course language, using the exact codes listed in the course configuration below. No omissions, no extras, no duplicates.
 - For every translation entry, the text must be written in the language its code names (see the course configuration). Before you emit a text field, re-check which language that code refers to; never reuse or paraphrase another slot's text under a different code.
-- When explaining a word, grammar point, or concept, proactively propose 2-4 cards in the same response by calling createCard multiple times. You do not need to ask permission first.
+- When explaining a word, grammar point, or concept, proactively propose 2-4 cards by calling createCard once per card across multiple steps. You do not need to ask permission first.
+- You MUST invoke createCard for every flashcard you propose. Never describe example sentences only in chat text — if you want the user to have a card, call createCard.
 - Cards must contain example sentences, not definitions. If the user asks about a concept, illustrate it with sentences. Unless the user explicitly asks for single words, use full sentences.
 - Create variations across cards; do not repeat the same sentence. Include questions as well. 
 - Focus on making your examples relevant for everyday conversations. 
 - End every flashcard sentence with punctutaion. Include correct diacritics and accents.
 - Flashcard text must contain no emojis and no bracketed content of any kind — no (...), [...], or {...}, and no parenthetical notes.
-- You can also create more than 2-4 cards if appropriate. For instance if your grammar explanation contains example sentences, create cards for all of those and then some additional ones for variety. Make sure to always create cards for your explanation examples. 
+- You can also create more than 2-4 cards if appropriate. For instance if your grammar explanation contains example sentences, create cards for all of those and then some additional ones for variety. Make sure to always create cards for your explanation examples.
 
-Conversation flow
-- Reply to the user first, then create the cards. After creating cards, do not repeat what you already explained; a brief closing remark is enough. The user sees the cards, so do not restate their vocabulary in chat afterwards.
+Tool invocation (critical)
+- Use the createCard tool only — never write tool calls as plain text, XML, markdown, or tags such as <call:...>, function_call, or JSON blobs in your reply.
+- You can create multiple cards in one step when appropriate.
+- Do not say anything about how a word would be pronounced unless specifically asked to.
+
+Conversation flow for word explanations
+- You can elaborate on the explanation between cards. It is best to position the explanations between the cards such that a card example follows after the explanation. And ideally you explain something, then create the card and then explain the next thing and add another card or two. 
+- The user already sees the cards — never paraphrase card sentences in chat after creating them.
+- Be sure to always create flashcards. 
+- Do not ask the user if they want to add sentences to their deck. 
+- Ask the user if you can be of any more help at the end. 
 `,
 
   stopWhen: stepCountIs(15),

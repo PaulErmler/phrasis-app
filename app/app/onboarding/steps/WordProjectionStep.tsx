@@ -1,13 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BookOpen, CalendarDays, Sparkles } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { getUserTimezone } from '@/lib/timezone';
 import {
   addDays,
@@ -63,18 +62,19 @@ export function WordProjectionStep({
   // card. Pull the post-commit value via `getTodayStats` instead; fall
   // back to the snapshot until the query resolves.
   //
-  // The same problem affects the new-words count when the user reaches
-  // this screen via the skip path on an abort/restart cycle: `summary`
-  // is null (skip wipes it), so falling back to `summary?.dailyNewWords`
-  // would always show 0 even though today's actual count is positive.
-  // Pull words live from `getNewWordsForCelebration`, summing BOTH
-  // buckets — the query splits today's unique words into `session`
-  // (current session id) and `today` (other sessions). They're disjoint,
-  // so the total is `session.length + today.length`. Using only one
-  // bucket undercounts the projection — e.g. abort + restart + rate one
-  // more card would put 5 prior-session words in `today` and 1 in
-  // `session`, so `today.length` alone reports 5 / `session.length`
-  // alone reports 1 instead of the correct total of 6.
+  // The live words query sums BOTH buckets — it splits today's unique words
+  // into `session` (current session id) and `today` (other sessions), which
+  // are disjoint. Using only one bucket undercounts the projection — e.g.
+  // abort + restart + rate one more card would put 5 prior-session words in
+  // `today` and 1 in `session`.
+  //
+  // The query exists to catch the snapshot UNDERcounting, so it may only
+  // ever raise the number. Both sources are scoped to "today" in the
+  // user's timezone, so a resolved-but-EMPTY result is not proof of zero:
+  // the day may have rolled over since the lesson (wizard resumed after
+  // midnight), or the query degraded (auth blip, no active course). Zeroing
+  // out words the user actually earned would project "you'll know 0 words"
+  // — take whichever source reports more instead.
   const timezone = useMemo(() => getUserTimezone(), []);
   const todayStats = useQuery(api.features.courses.getTodayStats, { timezone });
   const celebrationWords = useQuery(
@@ -84,10 +84,25 @@ export function WordProjectionStep({
       timezone,
     },
   );
-  const newWords = celebrationWords
+  const queryWords = celebrationWords
     ? celebrationWords.session.length + celebrationWords.today.length
-    : (summary?.dailyNewWordsToday ?? 0);
+    : 0;
+  const newWords = Math.max(queryWords, summary?.dailyNewWordsToday ?? 0);
   const liveTimeMs = todayStats?.timeMs ?? summary?.dailyTimeMsToday ?? 0;
+
+  // Last line of defense: a projection from 0 words is meaningless (every
+  // milestone reads "0 words"), so once the live query has resolved and
+  // both sources still report zero, silently advance to the next step
+  // instead of rendering the screen. Reachable only via degraded paths —
+  // the wizard already routes an explicit lesson-skip past this screen.
+  const skipStep = celebrationWords !== undefined && newWords === 0;
+  const skippedRef = useRef(false);
+  useEffect(() => {
+    if (skipStep && !skippedRef.current) {
+      skippedRef.current = true;
+      onContinue();
+    }
+  }, [skipStep, onContinue]);
   const sessionMinutes = liveTimeMs > 0 ? Math.max(1, liveTimeMs / 60_000) : 3;
   const minutes = Math.round(sessionMinutes);
   // Local mirror so the slider feels instant; the wizard's persist call
@@ -103,6 +118,9 @@ export function WordProjectionStep({
     setLocalGoal(next);
     onDailyTimeChange?.(next);
   };
+
+  // Don't flash the zero-state while the advance effect fires.
+  if (skipStep) return null;
 
   return (
     <div
