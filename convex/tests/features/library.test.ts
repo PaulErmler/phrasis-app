@@ -608,8 +608,13 @@ describe("CJK search (no-word-boundary languages)", () => {
     // Convex tokenizes the query on punctuation as well as whitespace, so the
     // budget must count terms the same way — exceeding 16 terms makes the
     // real search index throw instead of returning results.
+    //
+    // Enumerates the SEPARATORS rather than the keepers, on purpose: this
+    // oracle used to be a verbatim copy of the production regex, which made
+    // every assertion below tautological and let a combining-mark bug ship
+    // that shredded Hindi/Thai/Hebrew queries. See searchQueryScripts.test.ts.
     const termCount = (q: string) =>
-      q.split(/[^\p{L}\p{N}]+/u).filter(Boolean).length;
+      q.split(/[\s\p{P}\p{S}]+/u).filter(Boolean).length;
 
     it("stays within 16 terms for a long punctuated Japanese query", () => {
       const query = "私は日本語を勉強しています、友達と毎日話します。";
