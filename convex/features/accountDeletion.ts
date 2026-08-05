@@ -3,6 +3,7 @@ import { mutation } from '../_generated/server';
 import { authComponent } from '../auth';
 import { rateLimiter } from '../rateLimiter';
 import { resend } from '../lib/resendClient';
+import { SUPPORT_EMAIL } from '../lib/authEmails';
 
 /**
  * Account deletion works as a REQUEST: the user asks in-app (App Store
@@ -11,7 +12,6 @@ import { resend } from '../lib/resendClient';
  * email, and the account is deleted manually within the promised 30 days.
  */
 
-const SUPPORT_EMAIL = 'support@flexling.com';
 
 export const requestAccountDeletion = mutation({
   args: {},

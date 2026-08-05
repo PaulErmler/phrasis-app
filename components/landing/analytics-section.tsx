@@ -150,46 +150,6 @@ function MiniChart({ range }: { range: TimeRange }) {
   );
 }
 
-// Shared pill styling, matching the in-app due-count pills.
-const PILL_CLASS =
-  'rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums whitespace-nowrap';
-
-/**
- * Tiny static replica of the in-app daily-goal ring (deliberately not the
- * real component — landing visuals stay self-contained). Shows a fixed
- * 14 / 20 min ≈ 70% arc.
- */
-function MiniGoalRing({ size = 38, strokeWidth = 3.5 }: { size?: number; strokeWidth?: number }) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const fraction = 14 / 20;
-
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0" aria-hidden>
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke="var(--muted)"
-        strokeWidth={strokeWidth}
-      />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke="var(--primary)"
-        strokeLinecap="round"
-        strokeWidth={strokeWidth}
-        strokeDasharray={`${circumference} ${circumference}`}
-        strokeDashoffset={circumference * (1 - fraction)}
-        style={{ transformOrigin: 'center', transform: 'rotate(-90deg)' }}
-      />
-    </svg>
-  );
-}
-
 const PROJECTION_FACT_KEYS = [
   'projectionFacts.wordsByYearEnd',
   'projectionFacts.nextLevel',
@@ -267,22 +227,6 @@ function MiniSessionSnapshot() {
               <span className="text-[10px] font-medium text-primary tabular-nums leading-none mt-0.5">{today}</span>
             </div>
           ))}
-        </div>
-      </div>
-      {/* Daily goal + due pills below the stats, mirroring the in-app card
-       * where the goal row sits at the bottom of the progress card. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div className="flex items-center gap-2">
-          <MiniGoalRing />
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold tabular-nums leading-tight">14 / 20 min</span>
-            <span className="text-[10px] text-muted-foreground leading-none">Daily goal</span>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={cn(PILL_CLASS, 'bg-primary/10 text-primary')}>5 new</span>
-          <span className={cn(PILL_CLASS, 'bg-accent-orange/10 text-accent-orange')}>3 learning</span>
-          <span className={cn(PILL_CLASS, 'bg-success/10 text-success')}>12 review</span>
         </div>
       </div>
       <MiniProjection />

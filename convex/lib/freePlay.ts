@@ -154,3 +154,21 @@ export const FREE_PLAY_MODES = {
         : null,
   },
 } as const;
+
+/**
+ * A fresh, uniform-random integer used as the free-play (radio / free-study)
+ * rotation tiebreak. Re-rolled on every advance so each round-robin loop
+ * visits cards in a different order. After the first full loop, the order is
+ * also fully decoupled from review's `dueDate`-driven sequence; for decks
+ * that pre-date the field, every card starts with an `undefined` order key
+ * and the very first loop falls back to `_creationTime` order until each
+ * card has been played once. 32-bit space gives collision-free tiebreaking
+ * in any plausible deck size.
+ *
+ * Lives here rather than in features/scheduling.ts so card-creation paths
+ * (features/decks.ts) can stamp an initial key without importing from a
+ * sibling feature module.
+ */
+export function randomOrderKey(): number {
+  return Math.floor(Math.random() * 0x7fffffff);
+}

@@ -92,15 +92,18 @@ describe("features/projections — getProjections", () => {
     expect(res).toBeNull();
   });
 
-  it("returns null for a malformed today string", async () => {
+  it("falls back to the server date for a malformed today string", async () => {
     const t = convexTest(schema, modules);
-    await seedActiveCourse(t);
+    const { courseId } = await seedActiveCourse(t);
+    await seedHistory(t, courseId, 10);
     const asUser = t.withIdentity({ subject: "user_A" });
     const res = await asUser.query(api.features.projections.getProjections, {
       timezone: TZ,
       today: "not-a-date",
     });
-    expect(res).toBeNull();
+    // `resolveClientToday` degrades to the server's view rather than blanking
+    // the whole slot, matching every other client-date consumer.
+    expect(res?.today).toBe(todayUtc());
   });
 
   it("clamps a skewed client date to the server's view of the timezone", async () => {
@@ -113,6 +116,26 @@ describe("features/projections — getProjections", () => {
       today: addDays(todayUtc(), 30),
     });
     expect(res?.today).toBe(todayUtc());
+  });
+
+  it("canonicalizes a non-canonical but regex-passing date instead of using it raw", async () => {
+    const t = convexTest(schema, modules);
+    const { courseId } = await seedActiveCourse(t);
+    await seedHistory(t, courseId, 10);
+    const asUser = t.withIdentity({ subject: "user_A" });
+    // "<yyyy>-<mm>-00" passes a bare /^\d{4}-\d{2}-\d{2}$/ and resolves to the
+    // last day of the previous month — within the ±1 clamp only when that is
+    // adjacent to today. Whatever comes back must be a real calendar date, so
+    // it can serve as a `dailyStats` index bound and a wordsByDate map key.
+    const server = todayUtc();
+    const res = await asUser.query(api.features.projections.getProjections, {
+      timezone: TZ,
+      today: `${server.slice(0, 8)}00`,
+    });
+    expect(res?.today).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(res?.today?.endsWith("-00")).toBe(false);
+    // Canonical means it round-trips through the date arithmetic unchanged.
+    expect(addDays(res!.today!, 0)).toBe(res?.today);
   });
 
   it("active user gets observed-basis indicators incl. words, sentences and rates", async () => {

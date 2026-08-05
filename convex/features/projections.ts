@@ -10,7 +10,7 @@ import {
   getPremadeLevelCollections,
   getCollectionProgressForCourse,
 } from '../db/collections';
-import { getTodayInTimezone, isValidTimezone } from '../lib/dateUtils';
+import { isValidTimezone, resolveClientToday } from '../lib/dateUtils';
 import { normalizeLanguageCode } from '../../lib/languages';
 import {
   addDays,
@@ -23,8 +23,6 @@ import {
   type DailyEntry,
   type LevelInfo,
 } from '../../lib/projections';
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * The homescreen slot stays locked until the learner has this much study time
@@ -140,12 +138,13 @@ export const getProjections = query({
     // Intl.DateTimeFormat below throw and error the whole projection slot.
     const timezone = isValidTimezone(args.timezone) ? args.timezone : 'UTC';
 
-    let today = args.today;
-    if (!DATE_RE.test(today)) return null;
-    const serverToday = getTodayInTimezone(timezone);
-    if (Math.abs(daysBetween(serverToday, today)) > 1) {
-      today = serverToday;
-    }
+    // Well-formed, canonicalized and clamped to ±1 day of the server's view of
+    // the zone. Canonicalization matters here beyond the clamp: `today` is used
+    // below as an index bound and as a `wordsByDate` map key, and a
+    // non-canonical-but-plausible value like "2026-08-00" would pass a bare
+    // regex, survive the clamp (it resolves to Jul 31), then miss the map and
+    // push `endOfMonth` a month out.
+    const today = resolveClientToday(timezone, args.today);
 
     const startDate = addDays(today, -(PACE_WINDOW_DAYS - 1));
 

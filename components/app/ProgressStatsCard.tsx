@@ -28,6 +28,7 @@ import { CEFR_COLORS, isCefr } from '@/components/app/segmented/cefr';
 import { getLanguageByCode } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 import type { ReviewMode, SchedulingMode } from '@/convex/types';
+import { dateInTimezone } from '@/lib/dateStrings';
 
 function StatColumn({
   icon,
@@ -124,9 +125,7 @@ export function ProgressStatsCard({
   // on time passing). The projection slot next to them already ticks; before
   // this the ring froze on "Goal reached!" while the projection advanced.
   const nowMinute = useNowMinute(skipLiveStats);
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(
-    new Date(nowMinute),
-  );
+  const today = dateInTimezone(nowMinute, timezone);
   const queryArgs = skipLiveStats ? ('skip' as const) : { timezone, today };
   const stats = useCachedQuery(
     api.features.courses.getCourseStats,

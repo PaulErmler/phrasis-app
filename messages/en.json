@@ -391,16 +391,17 @@
       "editTitle": "Set daily goal",
       "customPlaceholder": "Custom",
       "minutesUnit": "min",
-      "set": "Set"
+      "set": "Set",
+      "saveError": "Could not save your daily goal. Please try again."
     },
     "projections": {
-      "wordsBig": "{words} words",
-      "sentencesBig": "{sentences} sentences",
+      "wordsBig": "{words} total words",
+      "sentencesBig": "{sentences} total sentences",
       "endOfYearLabel": "by end of {year}",
       "oneYearLabel": "one year from today",
       "endOfMonthLabel": "by end of {month}",
       "counterfactualLabel": "if every day were like today",
-      "sessionYieldBig": "on average +{words} words",
+      "sessionYieldBig": "on average +{words} new words",
       "sessionYieldLabel": "per {goal}-min session",
       "perStudyHourLabel": "per study-hour",
       "nextLevelBig": "{code} in ~{days, plural, one {# day} other {# days}}",
@@ -414,7 +415,7 @@
       "aroundDateLabel": "around {date}",
       "cycleHint": "Tap for the next stat",
       "empty": "Continue studying to unlock projections",
-      "avgSentencesBig": "on average ~{rate} sentences"
+      "avgSentencesBig": "on average ~{rate} new sentences"
     },
     "customContent": "Add Cards",
     "stats": {
@@ -484,7 +485,7 @@
       "pause": "Pause",
       "play": "Play",
       "restartAudio": "Restart audio",
-      "restartCard": "Restart sentence"
+      "restartCard": "Reset Card"
     },
     "schedulingMode": {
       "learn": "L",
@@ -563,7 +564,7 @@
       "shortcutPreviousWriting": "Revert last submission, then previous sentence",
       "shortcutRestartAudio": "Restart the audio",
       "shortcutReplayTarget": "Replay the target-language audio",
-      "shortcutRestartCard": "Restart the sentence",
+      "shortcutRestartCard": "Reset the card",
       "shortcutRate": "Rate the sentence",
       "cardsPerBatch": "Sentences per batch",
       "cardsPerBatchDescription": "Number of sentences to add at once",
@@ -969,14 +970,18 @@
       }
     },
     "languagePair": {
-      "title": "Pick your language pair",
-      "subtitle": "What you speak, and what you want to learn.",
-      "iSpeak": "I speak…",
-      "iWantToLearn": "I want to learn…",
-      "readyTitle": "Ready when you are.",
-      "readyHint": "Tap Continue, or tap a language above to change it.",
-      "fromPlaceholder": "From",
-      "toPlaceholder": "To"
+      "speakTitle": "What language do you already speak?",
+      "learnTitle": "Which language do you want to learn?",
+      "speakHint": "This will be your base language",
+      "learnHint": "The language you’re studying — not the one you already know.",
+      "stepOf": "Step {current} of 2",
+      "stepReady": "Ready",
+      "readyTitle": "Looking good.",
+      "readyHint": "Tap a language to change it, or swap if they’re the wrong way around.",
+      "speakRole": "I speak",
+      "learnRole": "I learn",
+      "swap": "Swap languages",
+      "popular": "Popular"
     },
     "acquisition": {
       "title": "Where did you hear about us?",
@@ -1075,8 +1080,7 @@
           "title": "Test me — find my level",
           "description": "Short adaptive test, about 5–20 questions. Most accurate."
         }
-      },
-      "recommended": "Recommended"
+      }
     },
     "cefrPick": {
       "title": "Find your level",
@@ -1234,10 +1238,6 @@
       "back": "Back",
       "next": "Next",
       "done": "Done"
-    },
-    "testimonials": {
-      "title": "Loved by language learners",
-      "subtitle": "Here's what other learners say about Flexling."
     },
     "planPick": {
       "title": "Thank you for joining",

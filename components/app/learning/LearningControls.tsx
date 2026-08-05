@@ -128,6 +128,12 @@ export function LearningControls({
       ) {
         return;
       }
+      // No session shortcut is a modifier chord, so none of them may shadow a
+      // browser/system one — Cmd+R (reload), Alt+← / Alt+→ (back/forward),
+      // Ctrl+Enter, and so on. Guarded once here so it covers Space,
+      // Enter/→, ← and the letter/digit shortcuts alike; Shift is excluded
+      // because Shift+R (restart card) is a real shortcut.
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === ' ' || e.code === 'Space') {
         // Let Space activate focused interactive controls so keyboard
         // navigation and accessibility are not broken.
@@ -178,16 +184,12 @@ export function LearningControls({
       }
       if (e.key === 'ArrowLeft') {
         if (!onBack || e.repeat) return;
-        // Cmd+← / Alt+← are browser-back chords — never shadow them.
-        if (e.metaKey || e.ctrlKey || e.altKey) return;
         // Only consume the key when back actually acts — on the first card
         // with nothing to undo, ← keeps its default behavior instead of
         // being silently swallowed.
         if (onBack()) e.preventDefault();
         return;
       }
-      // Letter shortcuts must never shadow browser/system chords (Cmd+R!).
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'r' || e.key === 'R') {
         if (e.repeat) return;
         if (e.shiftKey) {

@@ -1,6 +1,7 @@
 import { Migrations } from '@convex-dev/migrations';
 import { components, internal } from './_generated/api';
 import type { DataModel } from './_generated/dataModel';
+import type { MutationCtx } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
 import {
   DEFAULT_AUTO_PLAY,
@@ -139,14 +140,13 @@ export const stripTrailingUnderscores = migrations.define({
  * `isPremadeLevelCollection` fallback `createCardsFromTexts` uses for legacy
  * CEFR rows.
  *
- * Patching via raw `ctx.db` (the migrations component's path) is mostly
- * aggregate-safe: three of the card aggregates key only on deckId, dueDate,
- * and the state label. `cardsByOriginStateAndDueDate` however DOES namespace
- * on `collectionOrigin` — this stays safe because this migration runs
- * before `cardOriginAggregateBackfill` in `runAll` (patched cards are
- * inserted with their final origin) and any drift from cards aggregated
- * live during the deploy window is repaired by
- * `recalcCardAggregatesAfterBackfills`, the final step of `runAll`.
+ * Patching via raw `ctx.db` (the migrations component's path) is aggregate-safe
+ * for three of the four card aggregates — they key only on deckId, dueDate and
+ * the state label. `cardsByOriginStateAndDueDate` however DOES namespace on
+ * `collectionOrigin`, so a raw patch would strand the card's entry in its old
+ * namespace with nothing to ever clean it up (`deleteCard` would look under the
+ * new origin). `migrateOne` therefore moves the entry itself, in the same
+ * transaction as the patch — see the `replaceOrInsert` call below.
  */
 export function cardCollectionBackfillPatch(
   card: Pick<Doc<'cards'>, 'collectionId' | 'collectionOrigin'>,
@@ -168,17 +168,41 @@ export function cardCollectionBackfillPatch(
   return Object.keys(patch).length > 0 ? patch : undefined;
 }
 
+/**
+ * The full `migrateOne` body, extracted so it can be exercised against a
+ * convex-test db (the migrations component itself isn't registered there —
+ * same approach as the other migration suites).
+ */
+export async function cardCollectionBackfillOne(
+  ctx: MutationCtx,
+  doc: Doc<'cards'>,
+): Promise<Partial<Doc<'cards'>> | undefined> {
+  if (doc.collectionId !== undefined && doc.collectionOrigin !== undefined) {
+    return undefined;
+  }
+  const collectionId =
+    doc.collectionId ?? (await ctx.db.get(doc.textId))?.collectionId;
+  const collection = collectionId ? await ctx.db.get(collectionId) : null;
+  const patch = cardCollectionBackfillPatch(doc, collectionId, collection);
+  if (!patch) return undefined;
+
+  // `collectionOrigin` is part of `cardsByOriginStateAndDueDate`'s namespace,
+  // so the entry has to move with the doc. Only cards aggregated live during
+  // the deploy→backfill window actually have one (they land under origin
+  // 'none'); for everything else `replaceOrInsert` just inserts under the
+  // final origin, which `cardOriginAggregateBackfill` then no-ops over.
+  if (patch.collectionOrigin !== undefined) {
+    await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, doc, {
+      ...doc,
+      ...patch,
+    });
+  }
+  return patch;
+}
+
 export const cardCollectionBackfill = migrations.define({
   table: 'cards',
-  migrateOne: async (ctx, doc) => {
-    if (doc.collectionId !== undefined && doc.collectionOrigin !== undefined) {
-      return undefined;
-    }
-    const collectionId =
-      doc.collectionId ?? (await ctx.db.get(doc.textId))?.collectionId;
-    const collection = collectionId ? await ctx.db.get(collectionId) : null;
-    return cardCollectionBackfillPatch(doc, collectionId, collection);
-  },
+  migrateOne: (ctx, doc) => cardCollectionBackfillOne(ctx, doc),
 });
 
 /**
@@ -223,8 +247,13 @@ export const rebuildCardSearchableText = migrations.define({
  * Populate the filter-aware `cardsByOriginStateAndDueDate` aggregate for all
  * pre-existing cards. Writes only to the aggregate component (no doc patch),
  * and `insertIfDoesNotExist` makes it idempotent — cards written live through
- * the `cardAggregates.ts` helpers during the deploy→backfill gap are simply
+ * the `cardAggregates.ts` helpers during the deploy→backfill gap, and cards
+ * already inserted by `cardCollectionBackfill`'s `replaceOrInsert`, are simply
  * skipped. Must run after `cardCollectionBackfill` so origins are final.
+ *
+ * This is what makes `getFilteredCardCounts` stop reading zero for users on a
+ * `course` / `custom` content filter, so it runs as early as its dependency
+ * allows — ahead of the much more expensive `rebuildCardSearchableText`.
  */
 export const cardOriginAggregateBackfill = migrations.define({
   table: 'cards',
@@ -235,32 +264,28 @@ export const cardOriginAggregateBackfill = migrations.define({
 });
 
 /**
- * Final step of the deploy series: self-heal any card-aggregate drift from
- * the deploy→backfill window. A card reviewed after deploy but before
- * `cardCollectionBackfill` gets aggregated under origin `none`; the backfill
- * then raw-patches `collectionOrigin` without moving that entry, leaving an
- * orphan that `deleteCard` would never clean up. Rebuilding per deck (clear +
- * re-insert via the recalc chain, one deck per scheduled mutation) removes
- * any such orphans. Runs last in `runAll`, so both backfills are complete.
+ * Everything a deploy needs, in order. Completed migrations are skipped.
+ *
+ * Ordering rationale:
+ *  - `cardCollectionBackfill` must precede `cardOriginAggregateBackfill` so
+ *    every card is aggregated under its final origin.
+ *  - `cardOriginAggregateBackfill` comes next because it is what un-zeroes the
+ *    filtered home-screen counts; nothing depends on the searchable-text
+ *    rebuild, so that full-table pass goes last.
+ *
+ * There is deliberately no blanket aggregate rebuild at the end. The only
+ * drift it existed to repair — a card aggregated under origin 'none' during
+ * the deploy window, then raw-patched to a real origin — is now handled in
+ * `cardCollectionBackfill` itself, which moves the entry in the same
+ * transaction as the patch. A per-deck clear + re-insert would have blanked
+ * `cardsByState` / `cardsByDueDate` / `cardsByStateAndDueDate` (all already
+ * correct) for the whole userbase mid-session. `migrations/
+ * recalcUserCardAggregates.ts` stays available as a per-user repair tool.
  */
-export const recalcCardAggregatesAfterBackfills = migrations.define({
-  table: 'decks',
-  migrateOne: async (ctx, deck) => {
-    await ctx.scheduler.runAfter(
-      0,
-      internal.migrations.recalcUserCardAggregates.processBatch,
-      { deckIds: [deck._id], deckIdx: 0 },
-    );
-    return undefined;
-  },
-});
-
-/** Everything a deploy needs, in order. Completed migrations are skipped. */
 export const runAll = migrations.runner([
   internal.migrations.perModeSettingsBackfill,
   internal.migrations.stripTrailingUnderscores,
   internal.migrations.cardCollectionBackfill,
-  internal.migrations.rebuildCardSearchableText,
   internal.migrations.cardOriginAggregateBackfill,
-  internal.migrations.recalcCardAggregatesAfterBackfills,
+  internal.migrations.rebuildCardSearchableText,
 ]);

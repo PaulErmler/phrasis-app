@@ -1,6 +1,24 @@
 import type { CourseSettings } from './types';
 
 /**
+ * Transcribe = writing mode with the input driven by target audio rather than
+ * the base sentence. Shared with `shouldShowTranslationAssist`'s gate and the
+ * render path in LearningMode, which need the same answer at different points
+ * in the component body.
+ */
+export function isTranscribeMode(
+  settings:
+    | Pick<CourseSettings, 'reviewMode' | 'writingInputMode'>
+    | null
+    | undefined,
+): boolean {
+  return (
+    (settings?.reviewMode ?? 'audio') === 'full' &&
+    (settings?.writingInputMode ?? 'translate') === 'transcribe'
+  );
+}
+
+/**
  * "Show translation on new sentences" (writing mode): should the card render
  * the target translation above the input for copy-typing ("Abschreiben")?
  *

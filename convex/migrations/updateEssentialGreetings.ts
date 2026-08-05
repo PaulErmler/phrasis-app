@@ -44,9 +44,21 @@ import {
  * future sweep can target them. */
 const CURATED_SOURCE = 'curated-manual';
 
-/** Spacing between scheduled translation jobs, to avoid an OCC burst of
- * concurrent searchableText rebuilds against the same card docs. */
-const JOB_STAGGER_MS = 250;
+/**
+ * Spacing between scheduled translation jobs, to avoid an OCC burst of
+ * concurrent searchableText rebuilds against the same card docs.
+ *
+ * Must keep the whole job train inside `SEARCHABLE_REBUILD_DEBOUNCE_MS`
+ * (10s, convex/features/decks.ts): each translation store schedules a
+ * `rebuildSearchableTextForText` fan-out unless one is already pending for
+ * that text, and these three texts are the most common onboarding sentences,
+ * so every extra fan-out repaginates `cards by_textId` across the entire
+ * userbase. `jobIndex` restarts per sentence, so the last job of a text lands
+ * at (58 - 1 + sentenceIndex) × stagger: ~5.9s here, comfortably inside the
+ * window. At the previous 250ms it landed at ~14.8s and triggered a second
+ * full rebuild for every text.
+ */
+const JOB_STAGGER_MS = 100;
 
 export const run = internalMutation({
   args: {},

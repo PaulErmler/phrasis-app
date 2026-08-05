@@ -89,7 +89,7 @@ import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import { consumeQuota, checkQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARDS_PER_BATCH, ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
-import { FREE_PLAY_MODES } from '../lib/freePlay';
+import { FREE_PLAY_MODES, randomOrderKey } from '../lib/freePlay';
 import { isCollectionAccessible, requireAccessibleText } from './collections';
 import {
   applyMarkCounterDelta,
@@ -993,10 +993,10 @@ export async function createCardsFromTexts(
         // batch (which would otherwise share creation time + counter) end up
         // in a shuffled free-play order rather than insertion order. The two
         // faces roll separately so their rotations never correlate.
-        radioOrderKey: Math.floor(Math.random() * 0x7fffffff),
+        radioOrderKey: randomOrderKey(),
         freeStudyRoundCounter: 0,
         freeStudyPlayCount: 0,
-        freeStudyOrderKey: Math.floor(Math.random() * 0x7fffffff),
+        freeStudyOrderKey: randomOrderKey(),
         searchableText,
         searchableTextLanguages,
       });

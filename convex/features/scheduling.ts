@@ -52,8 +52,12 @@ import {
   type FreePlayFace,
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
-import { cardOriginPillFields, settledCount } from '../lib/collections';
-import { FREE_PLAY_MODES } from '../lib/freePlay';
+import {
+  cardOriginPillFields,
+  originsForFilter,
+  settledCount,
+} from '../lib/collections';
+import { FREE_PLAY_MODES, randomOrderKey } from '../lib/freePlay';
 import { getTodayInTimezone } from '../lib/dateUtils';
 import {
   deleteAudioRow,
@@ -73,20 +77,6 @@ import {
   CARD_OVERRIDE_SPEED_MIN,
   CARD_OVERRIDE_SPEED_MAX,
 } from '../../lib/constants/audioPlayback';
-
-/**
- * A fresh, uniform-random integer used as the free-play (radio / free-study)
- * rotation tiebreak. Re-rolled on every advance so each round-robin loop
- * visits cards in a different order. After the first full loop, the order is
- * also fully decoupled from review's `dueDate`-driven sequence; for decks
- * that pre-date the field, every card starts with an `undefined` order key
- * and the very first loop falls back to `_creationTime` order until each
- * card has been played once. 32-bit space gives collision-free tiebreaking
- * in any plausible deck size.
- */
-export function randomOrderKey(): number {
-  return Math.floor(Math.random() * 0x7fffffff);
-}
 
 
 /**
@@ -215,8 +205,7 @@ async function fetchFreePlayRotation(
   if (filter === 'both') {
     return cfg.fetch(ctx, deckId, take);
   }
-  const allowedOrigins: Array<'premade' | 'custom' | 'chat'> =
-    filter === 'course' ? ['premade'] : ['custom', 'chat'];
+  const allowedOrigins = originsForFilter(filter);
   const perOrigin = await Promise.all(
     allowedOrigins.map((origin) => cfg.fetchByOrigin(ctx, deckId, origin, take)),
   );
@@ -274,8 +263,7 @@ async function fetchDueCardsWithFilter(
   }
 
   // Filtered path: run one query per allowed origin and merge results.
-  const allowedOrigins: Array<'premade' | 'custom' | 'chat'> =
-    filter === 'course' ? ['premade'] : ['custom', 'chat'];
+  const allowedOrigins = originsForFilter(filter);
   const perOriginResults = await Promise.all(
     allowedOrigins.map((origin) => {
       if (schedulingMode === 'learn_new') {
@@ -1341,8 +1329,7 @@ export const hasPlayableCards = query({
         .first();
       return first !== null;
     }
-    const allowedOrigins: Array<'premade' | 'custom' | 'chat'> =
-      filter === 'course' ? ['premade'] : ['custom', 'chat'];
+    const allowedOrigins = originsForFilter(filter);
     for (const origin of allowedOrigins) {
       const first = await ctx.db
         .query('cards')

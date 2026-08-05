@@ -1,9 +1,8 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-
-const useBrowserLayoutEffect =
-  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+import {useEffect, useRef, useState } from 'react';
+import { useBrowserLayoutEffect } from '@/hooks/use-isomorphic-layout-effect';
+import { dateInTimezone } from '@/lib/dateStrings';
 
 type SnapshotData = Record<string, number>;
 
@@ -30,9 +29,10 @@ export function useStatsSnapshot(
   const { settleDuration = 2500, dateScoped = false } = options ?? {};
 
   const today = dateScoped
-    ? new Intl.DateTimeFormat('en-CA', {
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    }).format(new Date())
+    ? dateInTimezone(
+      Date.now(),
+      Intl.DateTimeFormat().resolvedOptions().timeZone,
+    )
     : null;
 
   // Starts empty on both server and client so the first client render

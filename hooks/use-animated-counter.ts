@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-
-const useBrowserLayoutEffect =
-  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+import { useRef, useState } from 'react';
+import { useBrowserLayoutEffect } from '@/hooks/use-isomorphic-layout-effect';
 
 export type CounterEasing = 'easeOut' | 'linear' | ((t: number) => number);
 

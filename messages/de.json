@@ -391,16 +391,17 @@
       "editTitle": "Tagesziel festlegen",
       "customPlaceholder": "Eigenes",
       "minutesUnit": "Min.",
-      "set": "Ok"
+      "set": "Ok",
+      "saveError": "Dein Tagesziel konnte nicht gespeichert werden. Bitte versuche es erneut."
     },
     "projections": {
-      "wordsBig": "{words} Wörter",
-      "sentencesBig": "{sentences} Sätze",
+      "wordsBig": "{words} Wörter gesamt",
+      "sentencesBig": "{sentences} Sätze gesamt",
       "endOfYearLabel": "bis Ende {year}",
       "oneYearLabel": "in einem Jahr",
       "endOfMonthLabel": "bis Ende {month}",
       "counterfactualLabel": "wenn jeder Tag wie heute wäre",
-      "sessionYieldBig": "im Schnitt +{words} Wörter",
+      "sessionYieldBig": "im Schnitt +{words} neue Wörter",
       "sessionYieldLabel": "pro {goal}-Min.-Einheit",
       "perStudyHourLabel": "pro Lernstunde",
       "nextLevelBig": "{code} in ~{days, plural, one {# Tag} other {# Tagen}}",
@@ -414,7 +415,7 @@
       "aroundDateLabel": "um den {date}",
       "cycleHint": "Tippen für die nächste Statistik",
       "empty": "Lerne weiter, um Prognosen freizuschalten",
-      "avgSentencesBig": "im Schnitt ~{rate} Sätze"
+      "avgSentencesBig": "im Schnitt ~{rate} neue Sätze"
     },
     "customContent": "Karten hinzufügen",
     "stats": {
@@ -484,7 +485,7 @@
       "pause": "Pause",
       "play": "Abspielen",
       "restartAudio": "Audio von vorn",
-      "restartCard": "Satz neu starten"
+      "restartCard": "Karte zurücksetzen"
     },
     "schedulingMode": {
       "learn": "L",
@@ -563,7 +564,7 @@
       "shortcutPreviousWriting": "Letzte Abgabe zurücknehmen, dann vorheriger Satz",
       "shortcutRestartAudio": "Audio von vorn abspielen",
       "shortcutReplayTarget": "Zielsprachen-Audio erneut abspielen",
-      "shortcutRestartCard": "Satz neu starten",
+      "shortcutRestartCard": "Karte zurücksetzen",
       "shortcutRate": "Satz bewerten",
       "cardsPerBatch": "Sätze pro Stapel",
       "cardsPerBatchDescription": "Anzahl der Sätze, die auf einmal hinzugefügt werden",
@@ -969,14 +970,18 @@
       }
     },
     "languagePair": {
-      "title": "Wähle dein Sprachenpaar",
-      "subtitle": "Was du sprichst und was du lernen möchtest.",
-      "iSpeak": "Ich spreche…",
-      "iWantToLearn": "Ich möchte lernen…",
-      "readyTitle": "Bereit, wenn du es bist.",
-      "readyHint": "Tippe auf Weiter, oder tippe oben auf eine Sprache, um sie zu ändern.",
-      "fromPlaceholder": "Von",
-      "toPlaceholder": "Nach"
+      "speakTitle": "Welche Sprache sprichst du schon?",
+      "learnTitle": "Welche Sprache möchtest du lernen?",
+      "speakHint": "Das wird deine Ausgangssprache",
+      "learnHint": "Die Sprache, die du lernst — nicht die, die du schon kannst.",
+      "stepOf": "Schritt {current} von 2",
+      "stepReady": "Bereit",
+      "readyTitle": "Sieht gut aus.",
+      "readyHint": "Tippe auf eine Sprache zum Ändern, oder tausche sie, falls sie vertauscht sind.",
+      "speakRole": "Ich spreche",
+      "learnRole": "Ich lerne",
+      "swap": "Sprachen tauschen",
+      "popular": "Beliebt"
     },
     "acquisition": {
       "title": "Wo hast du von uns gehört?",
@@ -1075,8 +1080,7 @@
           "title": "Teste mich — find mein Niveau",
           "description": "Kurzer adaptiver Test, etwa 5–20 Fragen. Am genauesten."
         }
-      },
-      "recommended": "Empfohlen"
+      }
     },
     "cefrPick": {
       "title": "Finde dein Niveau",
@@ -1234,10 +1238,6 @@
       "back": "Zurück",
       "next": "Weiter",
       "done": "Fertig"
-    },
-    "testimonials": {
-      "title": "Von Sprachlernern geliebt",
-      "subtitle": "Das sagen andere Lernende über Flexling."
     },
     "planPick": {
       "title": "Danke, dass du dabei bist",

@@ -6,6 +6,7 @@ import { useTranslations, useFormatter } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import { useCachedQuery } from '@/hooks/use-cached-query';
 import { getUserTimezone } from '@/lib/timezone';
+import { dateInTimezone } from '@/lib/dateStrings';
 import { cn } from '@/lib/utils';
 
 const ROTATE_INTERVAL_MS = 8000;
@@ -17,23 +18,11 @@ type Indicator = NonNullable<
   ReturnType<typeof useProjections>['data']
 >['indicators'][number];
 
-// Formatter construction is ~100µs and this component re-renders on every
-// rotation tick and pan gesture — cache per timezone at module level.
-const dateFmtCache = new Map<string, Intl.DateTimeFormat>();
-function todayIn(timezone: string): string {
-  let fmt = dateFmtCache.get(timezone);
-  if (!fmt) {
-    fmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone });
-    dateFmtCache.set(timezone, fmt);
-  }
-  return fmt.format(new Date());
-}
-
 function useProjections(skip: boolean, cacheSuffix: string) {
   // getUserTimezone falls back to 'UTC' when the browser reports an empty
   // zone — matching the rest of the app instead of sending '' to the query.
   const timezone = getUserTimezone();
-  const today = todayIn(timezone);
+  const today = dateInTimezone(Date.now(), timezone);
   const data = useCachedQuery(
     api.features.projections.getProjections,
     skip ? ('skip' as const) : { timezone, today },
@@ -148,12 +137,6 @@ export function RotatingProjection({
     setIdx((i) => (frames.length ? (i + 1) % frames.length : 0));
   }, [frames.length]);
 
-  const back = React.useCallback(() => {
-    setIdx((i) =>
-      frames.length ? (i - 1 + frames.length) % frames.length : 0,
-    );
-  }, [frames.length]);
-
   React.useEffect(() => {
     if (skip || reducedMotion || frames.length < 2) return;
     const id = setInterval(advance, ROTATE_INTERVAL_MS);
@@ -171,7 +154,10 @@ export function RotatingProjection({
     return (
       <span
         aria-hidden
-        className={cn('ml-auto block h-9 w-36 shrink-0 sm:w-40', className)}
+        className={cn(
+          'ml-auto block h-9 w-48 shrink-0 md:w-56 lg:w-64',
+          className,
+        )}
         data-testid="rotating-projection-pending"
         /* Keep the tour anchor during loading so the projections step
          * doesn't degrade to an unanchored popover when the tour fires
@@ -184,7 +170,10 @@ export function RotatingProjection({
     // Zero-history teaser (basis 'empty'): static, not a rotating button.
     return (
       <span
-        className={cn('ml-auto max-w-40 text-right text-muted-xs', className)}
+        className={cn(
+          'ml-auto max-w-48 text-right text-muted-xs md:max-w-56 lg:max-w-64',
+          className,
+        )}
         data-testid="rotating-projection-empty"
         data-tutorial="projections"
       >
@@ -200,26 +189,28 @@ export function RotatingProjection({
     <motion.button
       type="button"
       onClick={advance}
-      onPanEnd={(_, info) => {
-        // Flickable: swipe up spins to the next fact, down to the previous.
-        if (info.offset.y < -12 || info.velocity.y < -180) advance();
-        else if (info.offset.y > 12 || info.velocity.y > 180) back();
-      }}
+      // Deliberately no vertical pan gesture: it needed `touch-none`, which
+      // swallowed any scroll that happened to start on this ~144×36px widget
+      // and left the home screen stuck. Tap already advances, and that is the
+      // affordance the label advertises.
       data-testid="rotating-projection"
       data-tutorial="projections"
       aria-label={`${big} — ${label}. ${t('cycleHint')}`}
       className={cn(
-        'group -my-1 ml-auto flex min-w-0 shrink touch-none items-center gap-1 rounded-lg px-2 py-1 text-right',
+        'group -my-1 ml-auto flex min-w-0 shrink items-center gap-1 rounded-lg px-2 py-1 text-right sm:shrink-0',
         'transition-[background-color,transform] hover:bg-muted/60 active:scale-[0.97]',
         className,
       )}
     >
       <div className="flex min-w-0 flex-col items-end gap-1">
         {/* Screen readers get the current fact as plain text; the 3D drum
-         * below is presentation-only. */}
-        <span className="sr-only" aria-live="polite">
-          {`${big} — ${label}`}
-        </span>
+         * below is presentation-only. Deliberately NOT a live region: the
+         * facts rotate on an 8s timer, so `aria-live` turned this into an
+         * unsolicited announcement every 8 seconds for anyone parked on the
+         * home screen. The button's own aria-label carries the same text and
+         * re-announces on focus/activation, which is the only time the user
+         * actually asked for it. */}
+        <span className="sr-only">{`${big} — ${label}`}</span>
         {/* Rotating 3D block: the facts are faces of a solid block turning
          * around its horizontal axis — one face visible at rest; advancing
          * tips the current face away over the top while the next rolls in
@@ -227,7 +218,7 @@ export function RotatingProjection({
          * by half the block depth). */}
         <div
           aria-hidden
-          className="relative h-9 w-36 max-w-full sm:w-40"
+          className="relative h-9 w-48 max-w-full md:w-56 lg:w-64"
           style={{ perspective: 260 }}
         >
           {frames.map((f, i) => {

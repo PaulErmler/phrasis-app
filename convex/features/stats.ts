@@ -9,8 +9,8 @@ import {
   cardsByDueDate,
   cardsByStateAndDueDate,
   cardsByOriginStateAndDueDate,
-  type OriginBucket,
 } from '../db/stats/cardAggregates';
+import { originsForFilter } from '../lib/collections';
 import { studyContentFilterValidator, type StudyContentFilter } from '../types';
 import {
   getCourseStats as dbGetCourseStats,
@@ -874,8 +874,7 @@ async function countDueCardsByState(
         bounds: dueBounds,
       });
     }
-    const origins: OriginBucket[] =
-      filter === 'course' ? ['premade'] : ['custom', 'chat'];
+    const origins = originsForFilter(filter);
     const counts = await Promise.all(
       origins.map((origin) =>
         cardsByOriginStateAndDueDate.count(ctx, {

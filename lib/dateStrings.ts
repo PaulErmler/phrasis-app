@@ -41,7 +41,23 @@ export function endOfYear(dateStr: string): string {
 
 /** A timestamp's calendar date in the given IANA timezone ("YYYY-MM-DD"). */
 export function dateInTimezone(ms: number, timezone: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(
-    new Date(ms),
-  );
+  return dateFormatterFor(timezone).format(new Date(ms));
+}
+
+/**
+ * Cached `en-CA` (ISO-ordered) date formatters, keyed by IANA zone.
+ *
+ * Constructing an `Intl.DateTimeFormat` costs ~100µs, and the callers here are
+ * hot: the homescreen re-derives "today" on every render and on a per-minute
+ * tick, and the projection slot re-renders on every rotation. A process only
+ * ever sees a handful of zones, so an unbounded map is fine.
+ */
+const dateFormatterCache = new Map<string, Intl.DateTimeFormat>();
+function dateFormatterFor(timezone: string): Intl.DateTimeFormat {
+  let fmt = dateFormatterCache.get(timezone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat('en-CA', { timeZone: timezone });
+    dateFormatterCache.set(timezone, fmt);
+  }
+  return fmt;
 }

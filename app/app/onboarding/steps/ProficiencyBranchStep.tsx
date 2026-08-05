@@ -44,8 +44,6 @@ export function ProficiencyBranchStep({ selected, onSelect }: Props) {
             Icon={Layers}
             title={t('branches.selfPick.title')}
             description={t('branches.selfPick.description')}
-            recommended
-            recommendedLabel={t('recommended')}
           />
           <BranchCard
             testId="proficiency-branch-test"
@@ -67,8 +65,6 @@ function BranchCard({
   Icon,
   title,
   description,
-  recommended,
-  recommendedLabel,
   testId,
 }: {
   selected: boolean;
@@ -76,8 +72,6 @@ function BranchCard({
   Icon: React.ComponentType<{ className?: string }>;
   title: string;
   description: string;
-  recommended?: boolean;
-  recommendedLabel?: string;
   testId?: string;
 }) {
   return (
@@ -91,12 +85,7 @@ function BranchCard({
         selected && 'border-primary bg-primary/5 ring-2 ring-primary/20',
       )}
     >
-      {recommended ? (
-        <span className="absolute -top-2 right-3 rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-2 py-0.5 uppercase tracking-wide">
-          {recommendedLabel}
-        </span>
-      ) : null}
-      <Icon className={cn('h-7 w-7', selected || recommended ? 'text-primary' : 'text-muted-foreground')} />
+      <Icon className={cn('h-7 w-7', selected ? 'text-primary' : 'text-muted-foreground')} />
       <div>
         <div className="font-semibold">{title}</div>
         <div className="text-sm text-muted-foreground mt-1">{description}</div>

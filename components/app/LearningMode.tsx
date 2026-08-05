@@ -6,7 +6,7 @@ import { useMutation, useQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
-import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
+import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import { LearningModeSettings } from '@/components/app/LearningModeSettings';
 import {
   LearningCardContent,
@@ -19,7 +19,10 @@ import {
 } from '@/components/app/learning';
 import { useLearningChatToggle } from '@/components/app/learning/LearningChatLayout';
 import { buildCardOriginPill } from '@/components/app/learning/cardOriginPill';
-import { shouldShowTranslationAssist } from '@/components/app/learning/firstExposure';
+import {
+  isTranscribeMode,
+  shouldShowTranslationAssist,
+} from '@/components/app/learning/firstExposure';
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
@@ -253,9 +256,24 @@ export function LearningMode({
   // summary lives here. It only ever preselects — nothing advances the card.
   const settingsForAutoRate =
     state.status === 'reviewing' ? state.courseSettings : null;
+  // A copy-through card ("Abschreiben") prints the target above the input, so
+  // a verbatim copy scores 100%. That is not recall, so it must neither
+  // preselect a rating nor reach the accuracy series — otherwise instantProceed
+  // graduates the card on a copy and the stats read as a perfect answer.
+  // Recomputed here because the render-time `firstExposure` below sits after
+  // this component's early returns, and hooks have to run before those.
+  const autoRateFirstExposure =
+    state.status === 'reviewing' &&
+    shouldShowTranslationAssist(
+      state.courseSettings,
+      state.preReviewCount,
+      state.fsrsState?.reps ?? 0,
+      isTranscribeMode(state.courseSettings),
+    );
   const autoRateEnabled =
     (settingsForAutoRate?.reviewMode ?? 'audio') === 'full' &&
-    (settingsForAutoRate?.autoRateFromAccuracy ?? true);
+    (settingsForAutoRate?.autoRateFromAccuracy ?? true) &&
+    !autoRateFirstExposure;
   const autoRateAccuracy = (settingsForAutoRate?.ignorePunctuation ?? false)
     ? writingAccuracy?.minWithoutPunctuation
     : writingAccuracy?.minWithPunctuation;
@@ -281,7 +299,9 @@ export function LearningMode({
       // same rule as before this became a summary. Both punctuation variants
       // are recorded together; `primary` is whichever one matches the learner's
       // setting, so the historical series keeps the meaning it always had.
-      const summary = writingAccuracy;
+      // Copy-through cards are excluded outright: the answer was on screen, so
+      // the score measures typing, not recall.
+      const summary = autoRateFirstExposure ? undefined : writingAccuracy;
       const accuracy: ReviewAccuracyPayload | undefined =
         summary?.allSubmitted &&
         summary.avgWithPunctuation != null &&
@@ -297,7 +317,7 @@ export function LearningMode({
       state.handleNext(ratingOverride, accuracy);
       onCardRated?.(ratingOverride, buildSessionSnapshot(state));
     },
-    [state, writingAccuracy, onCardRated],
+    [state, writingAccuracy, autoRateFirstExposure, onCardRated],
   );
   // Mirror of handleNextWithAccuracy for the undo direction — only notifies
   // when a review was actually reverted (empty stack / races resolve false).
@@ -476,9 +496,7 @@ export function LearningMode({
   const instantProceed = reviewMode === 'full'
     ? (state.courseSettings.instantProceedFull ?? true)
     : (state.courseSettings.instantProceedAudio ?? false);
-  const isTranscribe =
-    reviewMode === 'full' &&
-    (state.courseSettings.writingInputMode ?? 'translate') === 'transcribe';
+  const isTranscribe = isTranscribeMode(state.courseSettings);
   // Transcribe: the post-submit replay rides the same per-language afterSubmit
   // machinery as Translate, gated by the transcribe auto-play setting
   // (chained `*Transcribe ?? *Full ?? audio`).
@@ -871,7 +889,7 @@ function NoCardsDueWithFilter({
     api.features.scheduling.getCardForReviewEmptyReason,
     {},
   );
-  const updateSettings = useUpdateStudyContentFilter();
+  const updateSettings = useUpdateCourseSettings();
 
   const isDeckEmpty = emptyReason?.reason === 'no_cards';
   const activeFilter = emptyReason?.reason === 'filtered_out'

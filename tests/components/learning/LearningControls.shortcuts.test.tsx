@@ -141,6 +141,29 @@ describe('LearningControls — window shortcuts', () => {
     expect(handlers.onBack).not.toHaveBeenCalled();
   });
 
+  it('Cmd+→/Alt+→ (browser forward) are never intercepted', () => {
+    const handlers = makeHandlers();
+    renderControls(handlers);
+    // Alt+→ is browser-forward on Windows/Linux, Cmd+→ on macOS. The
+    // ArrowLeft branch always guarded these; ArrowRight consumed them and
+    // advanced the card instead.
+    fireEvent.keyDown(window, { key: 'ArrowRight', metaKey: true });
+    fireEvent.keyDown(window, { key: 'ArrowRight', altKey: true });
+    fireEvent.keyDown(window, { key: 'ArrowRight', ctrlKey: true });
+    expect(handlers.onNext).not.toHaveBeenCalled();
+  });
+
+  it('modified Enter and Space are never intercepted', () => {
+    const handlers = makeHandlers();
+    renderControls(handlers);
+    fireEvent.keyDown(window, { key: 'Enter', ctrlKey: true });
+    fireEvent.keyDown(window, { key: 'Enter', metaKey: true });
+    fireEvent.keyDown(window, { key: ' ', code: 'Space', ctrlKey: true });
+    expect(handlers.onNext).not.toHaveBeenCalled();
+    expect(handlers.onPlay).not.toHaveBeenCalled();
+    expect(handlers.onPause).not.toHaveBeenCalled();
+  });
+
   it('Cmd+R (browser reload) is never intercepted', () => {
     const handlers = makeHandlers();
     renderControls(handlers);

@@ -62,43 +62,49 @@ export function StartLearningButton({
     onStartLearn('radio');
   };
 
+  // Three equal columns are tight on SE (~375px): icon-above there so labels
+  // like "Learn & Review" don't shatter mid-word; icon-left from ~400px up
+  // (XR and larger) where there's room beside the icon.
+  const modeBtnClass =
+    'h-auto min-h-10 w-full items-center justify-center whitespace-normal py-2 max-[399px]:flex-col max-[399px]:gap-1 max-[399px]:px-1.5 min-[400px]:flex-row min-[400px]:gap-1.5 min-[400px]:px-2 min-[400px]:has-[>svg]:px-2';
+  const modeLabelClass =
+    'min-w-0 text-xs leading-snug [overflow-wrap:normal] [word-break:keep-all] max-[399px]:text-center min-[400px]:text-left min-[400px]:text-sm';
+  const modeIconClass = 'h-4 w-4 shrink-0 min-[400px]:h-5 min-[400px]:w-5';
+
   return (
     <div className="space-y-2" data-tutorial="start-learning">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-1.5 min-[400px]:gap-2">
         <Button
           size="lg"
           variant="outline"
-          className="h-auto min-h-10 w-full flex-col gap-1 whitespace-normal py-2.5 sm:flex-row sm:gap-2"
+          className={modeBtnClass}
           onClick={() => onStartLearn('learn_new')}
           data-tutorial="learn-new"
         >
-          <BookOpen className="h-5 w-5 shrink-0" />
-          <span className="min-w-0 break-words leading-snug">{t('learnNew')}</span>
+          <BookOpen className={modeIconClass} />
+          <span className={modeLabelClass}>{t('learnNew')}</span>
         </Button>
         <Button
           size="lg"
-          className="h-auto min-h-10 w-full flex-col gap-1 whitespace-normal py-2.5 sm:flex-row sm:gap-2"
+          className={modeBtnClass}
           onClick={() => onStartLearn('learnAndReview')}
           data-tutorial="learn-and-review"
         >
-          <RefreshCw className="h-5 w-5 shrink-0" />
-          <span className="min-w-0 break-words leading-snug">{t('learnAndReview')}</span>
+          <RefreshCw className={modeIconClass} />
+          <span className={modeLabelClass}>{t('learnAndReview')}</span>
         </Button>
         <Button
           size="lg"
           variant={hasPlayableCards ? 'outline' : 'secondary'}
           aria-disabled={!hasPlayableCards}
-          className={cn(
-            'h-auto min-h-10 w-full flex-col gap-1 whitespace-normal py-2.5 sm:flex-row sm:gap-2',
-            !hasPlayableCards && 'opacity-50',
-          )}
+          className={cn(modeBtnClass, !hasPlayableCards && 'opacity-50')}
           onClick={handleFreePlayClick}
           /* Face-dependent anchor: the home tour branches on `reviewMode` to
            * pick the matching step + copy (see lib/tutorials/home-tour.ts). */
           data-tutorial={freePlay.tutorial}
         >
-          <freePlay.Icon className="h-5 w-5 shrink-0" />
-          <span className="min-w-0 break-words leading-snug">{freePlay.label}</span>
+          <freePlay.Icon className={modeIconClass} />
+          <span className={modeLabelClass}>{freePlay.label}</span>
         </Button>
       </div>
 

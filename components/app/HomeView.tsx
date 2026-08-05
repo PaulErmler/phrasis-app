@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import { HomeChatInput } from '@/components/chat/HomeChatInput';
 import { SegmentedHomeSection } from '@/components/app/segmented/SegmentedHomeSection';
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
@@ -72,22 +73,7 @@ export function HomeView({
     api.features.scheduling.hasPlayableCards,
     isHidden ? 'skip' : {},
   );
-  const updateCourseSettings = useMutation(
-    api.features.courses.updateCourseSettings,
-  ).withOptimisticUpdate((localStore, args) => {
-    const current = localStore.getQuery(
-      api.features.courses.getActiveCourseSettings,
-      {},
-    );
-    if (current !== undefined && current !== null) {
-      const { courseId, ...updates } = args;
-      localStore.setQuery(
-        api.features.courses.getActiveCourseSettings,
-        {},
-        { ...current, ...updates },
-      );
-    }
-  });
+  const updateCourseSettings = useUpdateCourseSettings();
 
   const ensureAllModesContent = useMutation(
     api.features.decks.ensureUpcomingCardsContentAllModes,

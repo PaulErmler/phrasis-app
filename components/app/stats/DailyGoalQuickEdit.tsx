@@ -3,9 +3,10 @@
 import * as React from 'react';
 import { usePreloadedQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 
 import { useAppData } from '@/components/app/AppDataProvider';
-import { useUpdateDailyGoal } from '@/hooks/use-update-daily-goal';
+import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import {
   Popover,
   PopoverContent,
@@ -36,7 +37,7 @@ export function DailyGoalQuickEdit({
 }) {
   const { preloadedCourseSettings } = useAppData();
   const settings = usePreloadedQuery(preloadedCourseSettings);
-  const updateGoal = useUpdateDailyGoal();
+  const updateGoal = useUpdateCourseSettings();
   const t = useTranslations('AppPage.dailyGoal');
 
   const [open, setOpen] = React.useState(false);
@@ -49,10 +50,18 @@ export function DailyGoalQuickEdit({
   const applyGoal = async (minutes: number) => {
     setOpen(false);
     setCustomValue('');
-    await updateGoal({
-      courseId: settings.courseId,
-      dailyTimeGoalMinutes: minutes,
-    });
+    try {
+      await updateGoal({
+        courseId: settings.courseId,
+        dailyTimeGoalMinutes: minutes,
+      });
+    } catch (error) {
+      // The popover is already closed and the optimistic update has rolled
+      // back, so without this the ring silently snaps to the old goal and the
+      // rejection surfaces only as an unhandled promise.
+      console.error('Error updating daily goal:', error);
+      toast.error(t('saveError'));
+    }
   };
 
   const parsedCustom = parseCustomGoal(customValue);

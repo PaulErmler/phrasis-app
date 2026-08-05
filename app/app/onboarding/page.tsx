@@ -76,11 +76,10 @@ import { WordProjectionStep } from './steps/WordProjectionStep';
 import type { OnboardingSessionSummary } from './components/OnboardingFirstLesson';
 import { FeatureTourStep } from './steps/FeatureTourStep';
 import { PlanPickStep } from './steps/PlanPickStep';
-import { TestimonialsStep } from './steps/TestimonialsStep';
 import { useIsNativeApp } from '@/hooks/use-native-app';
 
 /**
- * New onboarding wizard. 14 steps with branching at the proficiency point.
+ * New onboarding wizard. 13 steps with branching at the proficiency point.
  *
  * Step / id / next:
  *   1.  language-pair         → acquisition
@@ -94,9 +93,8 @@ import { useIsNativeApp } from '@/hooks/use-native-app';
  *   8.  first-lesson          → stats-recap (or feature-tour on skip)
  *   9.  stats-recap           → word-projection
  *   10. word-projection       → feature-tour
- *   11. feature-tour          → testimonials
- *   12. testimonials          → plan-pick
- *   13. plan-pick             → done         (calls finalizeOnboarding)
+ *   11. feature-tour          → plan-pick
+ *   12. plan-pick             → done         (calls finalizeOnboarding)
  *
  * `hasCompletedOnboarding` is the single source of truth for the auto-redirect
  * — it stays false until the very last step (`finalizeOnboarding`), so
@@ -116,7 +114,6 @@ type StepId =
   | 'stats-recap'
   | 'word-projection'
   | 'feature-tour'
-  | 'testimonials'
   | 'plan-pick';
 
 const PROGRESS_STEP_ORDER: StepId[] = [
@@ -131,7 +128,6 @@ const PROGRESS_STEP_ORDER: StepId[] = [
   'stats-recap',
   'word-projection',
   'feature-tour',
-  'testimonials',
   'plan-pick',
 ];
 
@@ -145,9 +141,18 @@ const POST_CUSTOMIZING_STEPS: ReadonlySet<StepId> = new Set<StepId>([
   'stats-recap',
   'word-projection',
   'feature-tour',
-  'testimonials',
   'plan-pick',
 ]);
+
+/** Map a persisted 1-based step number onto the current wizard order. */
+function resumeStepId(savedStep: number): StepId {
+  // Testimonials used to sit at index 12; plan-pick was 13. After removal,
+  // plan-pick is 12. Anything past the end (stale plan-pick = 13) lands on
+  // plan-pick; index 12 now is plan-pick too, so users left on testimonials
+  // skip ahead cleanly.
+  if (savedStep > PROGRESS_STEP_ORDER.length) return 'plan-pick';
+  return PROGRESS_STEP_ORDER[savedStep - 1] ?? 'language-pair';
+}
 
 export default function OnboardingPage() {
   return (
@@ -237,7 +242,7 @@ function OnboardingContent() {
   // refreshes return to the same step the user left off on.
   const initialStepId: StepId =
     onboardingProgress?.step
-      ? PROGRESS_STEP_ORDER[onboardingProgress.step - 1] ?? 'language-pair'
+      ? resumeStepId(onboardingProgress.step)
       : 'language-pair';
   const initialFlowData: OnboardingData = {
     ...EMPTY_ONBOARDING_DATA,
@@ -658,15 +663,6 @@ function OnboardingWizard({
     case 'cefr-pick':
       onCefrPickContinue();
       return;
-    case 'testimonials':
-      // The store-app shell must not show the plan picker (store payment
-      // policies) — onboarding finishes on the auto-enabled free tier.
-      if (isNative) {
-        await onFinalize();
-      } else {
-        advance('plan-pick');
-      }
-      return;
     default:
       return;
     }
@@ -914,9 +910,7 @@ function renderStep({
       />
     );
   case 'feature-tour':
-    return <FeatureTourStep onComplete={() => onAdvance('testimonials')} />;
-  case 'testimonials':
-    return <TestimonialsStep />;
+    return <FeatureTourStep onComplete={() => onAdvance('plan-pick')} />;
   case 'plan-pick':
     return <PlanPickStep onContinue={onFinalize} />;
   }

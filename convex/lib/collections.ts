@@ -176,3 +176,19 @@ export function canUserAccessCollectionText(
     : text.userId === userId;
 }
 
+
+/**
+ * The `collectionOrigin` values a study content filter admits.
+ *
+ * The 'both' filter is deliberately not representable here: every caller
+ * short-circuits it onto an unfiltered index query (or the unfiltered
+ * aggregate namespace) rather than fanning out across all three origins, so
+ * asking this function for 'both' would be a bug. Cards with no
+ * `collectionOrigin` land in the 'none' bucket and are served only by that
+ * unfiltered path.
+ */
+export function originsForFilter(
+  filter: 'course' | 'custom',
+): Array<'premade' | 'custom' | 'chat'> {
+  return filter === 'course' ? ['premade'] : ['custom', 'chat'];
+}

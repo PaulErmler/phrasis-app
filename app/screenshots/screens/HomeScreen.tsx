@@ -121,29 +121,35 @@ function ProgressStatsCardMock() {
           the Convex-backed ContentFilterDropdown) */}
       <div className="card-surface p-3">
         <div className="space-y-2">
-          <div className="grid gap-2 grid-cols-3">
+          <div className="grid grid-cols-3 gap-1.5 min-[400px]:gap-2">
             <Button
               size="lg"
               variant="outline"
-              className="h-auto min-h-10 w-full flex-col gap-1 whitespace-normal py-2.5 sm:flex-row sm:gap-2"
+              className="h-auto min-h-10 w-full items-center justify-center whitespace-normal py-2 max-[399px]:flex-col max-[399px]:gap-1 max-[399px]:px-1.5 min-[400px]:flex-row min-[400px]:gap-1.5 min-[400px]:px-2 min-[400px]:has-[>svg]:px-2"
             >
-              <BookOpen className="h-5 w-5 shrink-0" />
-              <span className="min-w-0 break-words leading-snug">{t('learnNew')}</span>
+              <BookOpen className="h-4 w-4 shrink-0 min-[400px]:h-5 min-[400px]:w-5" />
+              <span className="min-w-0 text-xs leading-snug [overflow-wrap:normal] [word-break:keep-all] max-[399px]:text-center min-[400px]:text-left min-[400px]:text-sm">
+                {t('learnNew')}
+              </span>
             </Button>
             <Button
               size="lg"
-              className="h-auto min-h-10 w-full flex-col gap-1 whitespace-normal py-2.5 sm:flex-row sm:gap-2"
+              className="h-auto min-h-10 w-full items-center justify-center whitespace-normal py-2 max-[399px]:flex-col max-[399px]:gap-1 max-[399px]:px-1.5 min-[400px]:flex-row min-[400px]:gap-1.5 min-[400px]:px-2 min-[400px]:has-[>svg]:px-2"
             >
-              <RefreshCw className="h-5 w-5 shrink-0" />
-              <span className="min-w-0 break-words leading-snug">{t('learnAndReview')}</span>
+              <RefreshCw className="h-4 w-4 shrink-0 min-[400px]:h-5 min-[400px]:w-5" />
+              <span className="min-w-0 text-xs leading-snug [overflow-wrap:normal] [word-break:keep-all] max-[399px]:text-center min-[400px]:text-left min-[400px]:text-sm">
+                {t('learnAndReview')}
+              </span>
             </Button>
             <Button
               size="lg"
               variant="outline"
-              className="h-auto min-h-10 w-full flex-col gap-1 whitespace-normal py-2.5 sm:flex-row sm:gap-2"
+              className="h-auto min-h-10 w-full items-center justify-center whitespace-normal py-2 max-[399px]:flex-col max-[399px]:gap-1 max-[399px]:px-1.5 min-[400px]:flex-row min-[400px]:gap-1.5 min-[400px]:px-2 min-[400px]:has-[>svg]:px-2"
             >
-              <Radio className="h-5 w-5 shrink-0" />
-              <span className="min-w-0 break-words leading-snug">{t('radioMode')}</span>
+              <Radio className="h-4 w-4 shrink-0 min-[400px]:h-5 min-[400px]:w-5" />
+              <span className="min-w-0 text-xs leading-snug [overflow-wrap:normal] [word-break:keep-all] max-[399px]:text-center min-[400px]:text-left min-[400px]:text-sm">
+                {t('radioMode')}
+              </span>
             </Button>
           </div>
 

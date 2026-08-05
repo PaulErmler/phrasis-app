@@ -2,8 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useMutation } from 'convex/react';
-import { api } from '@/convex/_generated/api';
+import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import {
   Sheet,
   SheetContent,
@@ -256,22 +255,7 @@ export function LearningModeSettings({
 }: LearningModeSettingsProps) {
   const t = useTranslations('LearningMode.settingsPanel');
   const [courseSettingsOpen, setCourseSettingsOpen] = useState(false);
-  const updateSettings = useMutation(
-    api.features.courses.updateCourseSettings,
-  ).withOptimisticUpdate((localStore, args) => {
-    const current = localStore.getQuery(
-      api.features.courses.getActiveCourseSettings,
-      {},
-    );
-    if (current !== undefined && current !== null) {
-      const { courseId, ...updates } = args;
-      localStore.setQuery(
-        api.features.courses.getActiveCourseSettings,
-        {},
-        { ...current, ...updates },
-      );
-    }
-  });
+  const updateSettings = useUpdateCourseSettings();
 
   if (!courseSettings) return null;
   const baseLanguages = resolveLanguageOrder(
