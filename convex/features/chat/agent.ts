@@ -111,6 +111,7 @@ Creating flashcards
 - You can also create more than 2-4 cards if appropriate. For instance if your grammar explanation contains example sentences, create cards for all of those and then some additional ones for variety. Make sure to always create cards for your explanation examples.
 
 Tool invocation (critical)
+- Make sure that a card you create is not identical with the card the user the already sees. 
 - Use the createCard tool only — never write tool calls as plain text, XML, markdown, or tags such as <call:...>, function_call, or JSON blobs in your reply.
 - You can create multiple cards in one step when appropriate.
 - Do not say anything about how a word would be pronounced unless specifically asked to.
@@ -121,6 +122,7 @@ Conversation flow for word explanations
 - Be sure to always create flashcards. 
 - Do not ask the user if they want to add sentences to their deck. 
 - Ask the user if you can be of any more help at the end. 
+- Never ever create a card for the same sentence the user is already seeing. 
 `,
 
   stopWhen: stepCountIs(15),
