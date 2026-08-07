@@ -1,35 +1,53 @@
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
+import { resolveAudioPayload } from './audioAssets';
 
 /**
- * Delete an `audioRecordings` row and, only when it is the LAST row referencing
- * its storage blob, delete the blob too.
+ * Delete an `audioRecordings` row and clean up what it referenced:
  *
- * Blobs can be shared across rows/texts: `editCard` (convex/features/scheduling.ts)
- * copies a text's audio into a new text by reusing the same `storageId` instead
- * of re-synthesizing. Deleting a blob whenever any one row goes away would
- * corrupt the other text's audio. The reverse lookup uses the `by_storageId`
- * index; because the row is deleted first, the query naturally excludes it and
- * a remaining match means the blob is still referenced.
+ *  - Pointer rows (`assetId` set): when the row was the LAST pointer at its
+ *    asset, the asset is deleted too, and the asset's blob is dropped unless
+ *    something else still references it. Assets shared by other texts survive
+ *    untouched — deleting one text's audio never affects the others.
+ *  - Legacy payload rows: the blob is dropped only when no other legacy row
+ *    (an `editCard`-era `storageId` copy) and no asset still references it.
  *
- * This is the safe audio-delete path — route `audioRecordings` deletions through
- * it (reconcile invalidation, regen, retranslation, manual regenerate, and orphan
- * cascade) so no blob is ever dropped while still in use. The one exception is a
- * row whose blob is already known to be gone (`storage.getUrl` returned null), as
- * in `scheduleMissingContent`'s stale-file cleanup: there is no blob left to
- * reference-protect, so a plain `ctx.db.delete(row._id)` is correct there.
+ * This is the safe audio-delete path — route `audioRecordings` deletions
+ * through it (reconcile invalidation, regen, retranslation, manual regenerate,
+ * and orphan cascade) so no blob is ever dropped while still in use.
+ *
+ * `opts.blobAlreadyGone` skips the storage delete for rows whose blob is
+ * already known to be missing (`storage.getUrl` returned null), as in
+ * `scheduleMissingContent`'s stale-file cleanup — row/asset bookkeeping still
+ * runs, but there is no blob left to delete.
  */
 export async function deleteAudioRow(
   ctx: MutationCtx,
   row: Doc<'audioRecordings'>,
+  opts?: { blobAlreadyGone?: boolean },
 ): Promise<void> {
   await ctx.db.delete(row._id);
-  const stillReferenced = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_storageId', (q) => q.eq('storageId', row.storageId))
-    .first();
-  if (!stillReferenced) {
-    await ctx.storage.delete(row.storageId);
+
+  const assetId = row.assetId;
+  if (assetId !== undefined) {
+    const stillPointed = await ctx.db
+      .query('audioRecordings')
+      .withIndex('by_assetId', (q) => q.eq('assetId', assetId))
+      .first();
+    if (!stillPointed) {
+      const asset = await ctx.db.get(assetId);
+      if (asset) {
+        await ctx.db.delete(asset._id);
+        if (!opts?.blobAlreadyGone) {
+          await deleteStorageBlobIfUnreferenced(ctx, asset.storageId);
+        }
+      }
+    }
+    return;
+  }
+
+  if (row.storageId !== undefined && !opts?.blobAlreadyGone) {
+    await deleteStorageBlobIfUnreferenced(ctx, row.storageId);
   }
 }
 
@@ -55,21 +73,25 @@ export async function deleteAudioRowsForTextLanguage(
 }
 
 /**
- * Reference-aware blob delete by `storageId` for callers that no longer hold the
- * row (e.g. `storeAudioRecording` after patching a row to a NEW blob). Deletes
- * the old blob only when no `audioRecordings` row references it any more.
+ * Reference-aware blob delete by `storageId` for callers that no longer hold
+ * a referencing document. The blob is deleted only when neither a legacy
+ * `audioRecordings` row nor an `audioAssets` row references it any more.
  */
 export async function deleteStorageBlobIfUnreferenced(
   ctx: MutationCtx,
   storageId: Id<'_storage'>,
 ): Promise<void> {
-  const stillReferenced = await ctx.db
+  const referencedByLegacyRow = await ctx.db
     .query('audioRecordings')
     .withIndex('by_storageId', (q) => q.eq('storageId', storageId))
     .first();
-  if (!stillReferenced) {
-    await ctx.storage.delete(storageId);
-  }
+  if (referencedByLegacyRow) return;
+  const referencedByAsset = await ctx.db
+    .query('audioAssets')
+    .withIndex('by_storageId', (q) => q.eq('storageId', storageId))
+    .first();
+  if (referencedByAsset) return;
+  await ctx.storage.delete(storageId);
 }
 
 export interface AudioWordTiming {
@@ -85,7 +107,7 @@ export interface AudioResult {
   wordTimings: AudioWordTiming[] | null;
   /**
    * TTS validation state — 'unknown' while a synthesis attempt is still in
-   * flight (the row is inserted at attempt 0 before validation), 'validated'
+   * flight (the asset is created at attempt 0 before validation), 'validated'
    * after STT roundtrip matched, 'unvalidated' for languages without STT
    * support or when all retries mismatched. Used by callers to decide
    * whether the audio currently behind `url` is the final one.
@@ -95,7 +117,8 @@ export interface AudioResult {
 
 /**
  * Fetch audio recordings with resolved storage URLs for a single text
- * across the given languages.
+ * across the given languages. Resolves each row through its shared
+ * `audioAssets` payload (legacy rows fall back to their own fields).
  */
 export async function getAudioForText(
   ctx: QueryCtx,
@@ -113,17 +136,21 @@ export async function getAudioForText(
     ),
   );
 
+  const payloads = await Promise.all(
+    records.map((rec) => (rec ? resolveAudioPayload(ctx, rec) : null)),
+  );
+
   const urlEntries = await Promise.all(
-    records.map((rec) =>
-      rec?.storageId ? ctx.storage.getUrl(rec.storageId) : null,
+    payloads.map((payload) =>
+      payload ? ctx.storage.getUrl(payload.storageId) : null,
     ),
   );
 
   return languages.map((lang, i) => ({
     language: lang,
-    voiceName: records[i]?.voiceName ?? null,
+    voiceName: payloads[i]?.voiceName ?? null,
     url: urlEntries[i] ?? null,
-    wordTimings: records[i]?.wordTimings ?? null,
-    ttsQuality: records[i]?.ttsQuality ?? null,
+    wordTimings: payloads[i]?.wordTimings ?? null,
+    ttsQuality: payloads[i]?.ttsQuality ?? null,
   }));
 }

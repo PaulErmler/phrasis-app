@@ -445,16 +445,46 @@ export default defineSchema({
     .index('by_textId', ['textId'])
     .index('by_text_and_language', ['textId', 'targetLanguage']),
 
-  // Audio recordings table - stores audio files for texts
-  audioRecordings: defineTable({
-    textId: v.id('texts'),
+  // Content-addressed audio store. One row per unique
+  // (language, voiceGender, regionVariant, spoken string) — every text whose
+  // audio speaks that exact string points at the same asset via
+  // `audioRecordings.assetId`, so identical sentences are synthesized once and
+  // the blob is stored once. The asset OWNS its storage blob: regenerating
+  // audio patches the asset in place (new `storageId`), upgrading every
+  // pointing text at once; the asset (and blob) is deleted when the last
+  // pointer goes. See convex/lib/audioAssets.ts for the key/lookup helpers.
+  audioAssets: defineTable({
+    // ---- content-address key ----
     language: v.string(), // Base language code (e.g., "en", "es", "de")
-    voiceName: v.string(), // Full voice identifier (e.g., "en-US-Chirp3-HD-Leda")
-    storageId: v.id('_storage'), // Convex file storage reference
-    ttsQuality: v.optional(ttsQualityValidator), // TTS validation status
-    ttsProvider: v.optional(ttsProviderValidator), // TTS provider used (missing = legacy google)
-    voiceGender: v.optional(voiceGenderValidator), // Gender of the synthesized voice (missing = legacy row; falls back to curated-list lookup on read)
-    speed: v.optional(v.number()), // Playback speed used at synthesis time (missing = legacy row, assume 0.9)
+    voiceGender: voiceGenderValidator, // Gender-level key — voice pick within a gender is random anyway
+    // Concrete dialect pin for mixed-language rows (e.g. 'es-ES' vs 'es-US'),
+    // part of the key so accents never collide. Undefined for non-mixed
+    // languages and source-language audio.
+    regionVariant: v.optional(v.string()),
+    // SHA-256 hex of the RAW spoken string (exactly what was sent to TTS — no
+    // trimming/normalization; that belongs to card-edit comparison only).
+    // Hashing keeps the index key bounded regardless of text length.
+    spokenTextHash: v.string(),
+    // The raw spoken string itself. Compared on lookup so a hash collision can
+    // only cause a spurious cache miss, never wrong audio.
+    spokenText: v.string(),
+    // ---- owned payload ----
+    storageId: v.id('_storage'),
+    // Full voice identifier (e.g., "en-US-Chirp3-HD-Leda"). Also the last
+    // column of `by_key`: today asset identity is GENDER-level (all lookups
+    // and upserts use the 4-field prefix, so one asset exists per
+    // string+gender and a regeneration replaces it whatever voice it picked
+    // — that's what propagates regen to every sharer). The extra column is
+    // forward-compat for a user-selectable favorite voice: switching
+    // `findAudioAssetByKey`/`upsertAudioAsset` to include `.eq('voiceName',…)`
+    // gives per-voice assets with no schema or index migration.
+    voiceName: v.string(),
+    ttsProvider: v.optional(ttsProviderValidator), // missing = legacy google
+    // 'unknown' = a synthesis job is mid-flight on this asset (attempt-0 early
+    // write); completed audio is 'validated'/'unvalidated' (or undefined on
+    // legacy rows carried over by the backfill, which is also "completed").
+    ttsQuality: v.optional(ttsQualityValidator),
+    speed: v.number(),
     // Word-level timestamps from Azure Fast Transcription, captured during TTS
     // validation. Seconds relative to the audio blob. Only populated when
     // validation succeeded.
@@ -469,14 +499,53 @@ export default defineSchema({
     ),
     // Version of the TTS setup (voice pool + Gemini prompt + provider) this
     // audio was produced under, per the language's `ttsVersion` in
-    // lib/languages.ts. Bumping a language's config version makes
-    // `scheduleMissingContent` delete + re-synthesize rows with a strictly-lower
-    // stamped version. This is what regenerates audio after a prompt-only change
-    // on an already-Gemini language (e.g. pt_pt's `ttsPromptName`), where the
-    // provider-mismatch path wouldn't fire. Same "undefined === current"
-    // semantics as `translations.translationVersion`; pre-versioning rows were
-    // backfilled to baseline (v1) by a one-time migration, so a later
-    // ttsVersion bump correctly regenerates pre-existing audio.
+    // lib/languages.ts. A stamped version below the language's current config
+    // makes cache lookups MISS (the asset is never served to new texts), and
+    // the sweep-triggered re-synthesis patches this same asset in place —
+    // healing every pointing text at once. Same "undefined === current"
+    // semantics as the other content-version stamps.
+    ttsVersion: v.optional(v.number()),
+  })
+    .index('by_key', [
+      'language',
+      'voiceGender',
+      'regionVariant',
+      'spokenTextHash',
+      'voiceName',
+    ])
+    // Reverse lookup for reference-aware blob deletes (a blob can transiently
+    // be shared between an asset and un-migrated legacy audioRecordings rows).
+    .index('by_storageId', ['storageId']),
+
+  // Audio pointer table: one row per (textId, language), pointing at the
+  // shared `audioAssets` row that owns the actual audio. The legacy payload
+  // fields below are only populated on rows written before the audioAssets
+  // backfill (`migrations:backfillAudioAssets`); new rows are thin pointers
+  // and the fields will be dropped once the backfill has completed in prod.
+  // Transition scaffolding + the planned narrow-phase commit are documented
+  // in docs/migrations/audio-assets-transition.md.
+  audioRecordings: defineTable({
+    textId: v.id('texts'),
+    language: v.string(), // Base language code (e.g., "en", "es", "de")
+    // Pointer into `audioAssets`. Always set on new rows; missing only on
+    // legacy rows still carrying their own payload.
+    assetId: v.optional(v.id('audioAssets')),
+    // ---- legacy payload (pre-audioAssets rows only) ----
+    voiceName: v.optional(v.string()), // Full voice identifier (e.g., "en-US-Chirp3-HD-Leda")
+    storageId: v.optional(v.id('_storage')), // Convex file storage reference
+    ttsQuality: v.optional(ttsQualityValidator), // TTS validation status
+    ttsProvider: v.optional(ttsProviderValidator), // TTS provider used (missing = legacy google)
+    voiceGender: v.optional(voiceGenderValidator), // Gender of the synthesized voice (missing = legacy row; falls back to curated-list lookup on read)
+    speed: v.optional(v.number()), // Playback speed used at synthesis time (missing = legacy row, assume 0.9)
+    wordTimings: v.optional(
+      v.array(
+        v.object({
+          word: v.string(),
+          start: v.number(),
+          end: v.number(),
+        }),
+      ),
+    ),
     ttsVersion: v.optional(v.number()),
   })
     .index('by_textId', ['textId'])
@@ -486,10 +555,12 @@ export default defineSchema({
       'language',
       'voiceName',
     ])
-    // Reverse lookup from a storage blob to the rows that reference it. Used by
-    // the reference-aware `deleteAudioRow` helper so a blob is deleted only when
-    // it is the LAST audioRecordings row pointing at it — blobs can be shared
-    // across texts because `editCard` copies audio by reusing `storageId`.
+    // Reference counting for shared assets: an asset (and its blob) is deleted
+    // only when no row points at it any more.
+    .index('by_assetId', ['assetId'])
+    // Reverse lookup from a storage blob to the LEGACY rows that reference it.
+    // Kept until the backfill completes — blobs can be shared across legacy
+    // rows because `editCard` used to copy audio by reusing `storageId`.
     .index('by_storageId', ['storageId']),
 
   // Placement-test sentence index. The actual English source text lives in

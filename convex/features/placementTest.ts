@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { query } from '../_generated/server';
 import type { Doc } from '../_generated/dataModel';
 import { getAuthUserId } from '../db/users';
+import { resolveAudioPayload } from '../lib/audioAssets';
 import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
 
 /**
@@ -89,8 +90,11 @@ export const getPlacementSentence = query({
         q.eq('textId', text._id).eq('language', resolvedSourceLanguage),
       )
       .first();
-    const sourceAudioUrl = sourceAudio
-      ? await ctx.storage.getUrl(sourceAudio.storageId)
+    const sourcePayload = sourceAudio
+      ? await resolveAudioPayload(ctx, sourceAudio)
+      : null;
+    const sourceAudioUrl = sourcePayload
+      ? await ctx.storage.getUrl(sourcePayload.storageId)
       : null;
 
     let translation: Doc<'translations'> | null = null;
@@ -109,8 +113,11 @@ export const getPlacementSentence = query({
         )
         .first();
     }
-    const targetAudioUrl = targetAudio
-      ? await ctx.storage.getUrl(targetAudio.storageId)
+    const targetPayload = targetAudio
+      ? await resolveAudioPayload(ctx, targetAudio)
+      : null;
+    const targetAudioUrl = targetPayload
+      ? await ctx.storage.getUrl(targetPayload.storageId)
       : null;
 
     return {
