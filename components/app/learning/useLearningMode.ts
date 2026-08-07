@@ -174,6 +174,20 @@ interface ReviewingState extends BaseState {
    *  Feeds the "Only new" Practice-Listening limit, which in radio counts
    *  max(active reviews, radio plays). */
   radioPlayCount: number;
+  /** True Free Study play count for this card (0 when never played there).
+   *  The writing face's analogue of radioPlayCount: free play advances neither
+   *  preReviewCount nor the FSRS reps, so this is what retires the
+   *  "show translation on new sentences" copy-typing assist in Free Study. */
+  freeStudyPlayCount: number;
+  /** FSRS good/easy ratings collected by this card (0 for pre-field cards).
+   *  Feeds the "until rated good" Practice-Listening strategy. */
+  goodReviewCount: number;
+  /** Source-collection shorthand ("A1.2"), origin bucket, and CEFR tier
+   * (pill color key) for the optional card-origin pill. Null when the
+   * collection can't be resolved. */
+  collectionLabel: string | null;
+  collectionOrigin: 'premade' | 'custom' | 'chat' | null;
+  collectionCefrTier: string | null;
   sourceText: string;
   sourceLanguage: string;
   translations: CardTranslation[];
@@ -234,7 +248,7 @@ interface ReviewingState extends BaseState {
     ratingOverride?: ReviewRating,
     accuracy?: ReviewAccuracyPayload,
   ) => void;
-  setSelectedRating: (rating: ReviewRating) => void;
+  setSelectedRating: (rating: ReviewRating | null) => void;
   /** Undo the most recent review (server-side; works across devices). The
    * restored card arrives via the reactive card query. Resolves true when a
    * review was actually undone (false on an empty stack or error). */
@@ -353,8 +367,8 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
         : 0;
 
   const reviewCardMutation = useMutation(api.features.scheduling.reviewCard);
-  const advanceRadioCardMutation = useMutation(
-    api.features.scheduling.advanceRadioCard,
+  const advanceFreePlayCardMutation = useMutation(
+    api.features.scheduling.advanceFreePlayCard,
   );
   const undoLastReviewMutation = useMutation(
     api.features.scheduling.undoLastReview,
@@ -1200,7 +1214,11 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   // --------------------------------------------------------------------------
   const schedulingMode: SchedulingMode =
     courseSettings?.schedulingMode ?? 'learnAndReview';
-  const isRadio = schedulingMode === 'radio';
+  // Free play bypasses FSRS in both its faces: no rating, no scheduling write,
+  // no celebration. Which rotation it advances, and whether it runs hands-free,
+  // follow from `reviewMode` (see `freePlayFace` in convex/types.ts and
+  // `isHandsFree` in useLearningAudio) — the server resolves the face itself.
+  const isFreePlay = schedulingMode === 'radio';
 
   const handleNext = useCallback(async (
     ratingOverride?: ReviewRating,
@@ -1221,21 +1239,23 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
       );
       return;
     }
-    if (isRadio) {
-      // Radio mode bypasses FSRS entirely: no rating, no stats, no
-      // celebration. Just bump the play counter so the next-lowest counter
-      // rises to the front of the queue. `alwaysClearExiting`: the shared
-      // reset effect only fires when `cardForReview._id` changes, so on a
-      // same-id re-render (single-card decks) it would otherwise leave the
-      // card pane blank.
+    if (isFreePlay) {
+      // Free play bypasses FSRS entirely: no rating, no scheduling write, no
+      // celebration. Just bump the active face's play counter so the
+      // next-lowest counter rises to the front of the queue — the mutation
+      // reads the face off course settings, so it can never advance a
+      // different rotation than the one being served.
+      // `alwaysClearExiting`: the shared reset effect only fires when
+      // `cardForReview._id` changes, so on a same-id re-render (single-card
+      // decks) it would otherwise leave the card pane blank.
       await runExitingMutation(
         () =>
-          advanceRadioCardMutation({
+          advanceFreePlayCardMutation({
             cardId: cardForReview._id,
             timezone: getUserTimezone(),
             timeSpentMs: Math.max(0, Date.now() - cardShownAtRef.current),
           }),
-        'Failed to advance radio card:',
+        'Failed to advance free-play card:',
         { alwaysClearExiting: true },
       );
       return;
@@ -1257,7 +1277,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     isReviewing,
     isPendingMaster,
     isPendingHide,
-    isRadio,
+    isFreePlay,
     selectedRating,
     autoRatingState,
     reviewMode,
@@ -1265,7 +1285,7 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     runExitingMutation,
     masterCardMutation,
     hideCardMutation,
-    advanceRadioCardMutation,
+    advanceFreePlayCardMutation,
   ]);
 
   // ============================================================================
@@ -1382,16 +1402,17 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
   }
 
   // Reviewing — in full review mode, always use FSRS ratings (skip pre-review).
-  // In radio mode, skip rating UI entirely (no FSRS, no rating buttons).
+  // In free play (radio / free study), skip rating UI entirely (no FSRS, no
+  // rating buttons — LearningControls falls back to a plain Next button).
   const phase = effectivePhase(reviewMode, displayCard.schedulingPhase as SchedulingPhase);
-  const validRatings = isRadio ? [] : getValidRatings(phase);
+  const validRatings = isFreePlay ? [] : getValidRatings(phase);
   const defaultRating = getDefaultRating(phase);
   // Manual choice first, then the accuracy suggestion, then the phase default.
   const activeRating = selectedRating ?? autoRatingState ?? defaultRating;
 
   // Compute projected next-due interval for each rating
   const ratingIntervals: Record<string, string> = {};
-  if (!isRadio) {
+  if (!isFreePlay) {
     const cardState: CardSchedulingState = {
       schedulingPhase: phase,
       preReviewCount: displayCard.preReviewCount,
@@ -1443,6 +1464,11 @@ export function useLearningMode(options: UseLearningModeOptions = {}): LearningS
     preReviewCount: displayCard.preReviewCount,
     fsrsState: displayCard.fsrsState,
     radioPlayCount: displayCard.radioPlayCount ?? 0,
+    freeStudyPlayCount: displayCard.freeStudyPlayCount ?? 0,
+    goodReviewCount: displayCard.goodReviewCount ?? 0,
+    collectionLabel: displayCard.collectionLabel,
+    collectionOrigin: displayCard.collectionOrigin,
+    collectionCefrTier: displayCard.collectionCefrTier,
     sourceText: displayCard.sourceText,
     sourceLanguage: displayCard.sourceLanguage,
     translations: sortedTranslations,

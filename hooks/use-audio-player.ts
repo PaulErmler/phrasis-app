@@ -50,6 +50,9 @@ export interface AudioPlayerState {
   pause: () => void;
   stop: () => void;
   seekTo: (seconds: number) => void;
+  /** Re-blur every timeline-revealed language ("restart card"); the next
+   *  playback pass reveals them again cue by cue. */
+  resetRevealed: () => void;
   audioRef: React.RefObject<HTMLAudioElement | null>;
   isPlaying: boolean;
   isMerging: boolean;
@@ -258,6 +261,10 @@ export function useAudioPlayer(
       updateMediaSessionPosition(audio.duration, audio.currentTime);
     }
   }, [clock]);
+
+  const resetRevealed = useCallback(() => {
+    setRevealedLanguages(new Set());
+  }, []);
 
   const clearCurrentAudio = useCallback(() => {
     const audio = getAudio();
@@ -885,6 +892,7 @@ export function useAudioPlayer(
     pause,
     stop,
     seekTo,
+    resetRevealed,
     audioRef,
     isPlaying,
     isMerging,

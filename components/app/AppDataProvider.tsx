@@ -26,6 +26,13 @@ export interface AppDataValue extends AppData {
    *  flash the no-course empty state; reading the always-warm value from
    *  context instead means the course is present by the time home mounts. */
   activeCourse: FunctionReturnType<typeof api.features.courses.getActiveCourse>;
+  /** Live course settings — same always-warm rationale as `activeCourse`.
+   *  Home reads `reviewMode` from here so the Shadowing/Writing toggle
+   *  doesn't flash the 'audio' default while a stale null preload catches up
+   *  after the onboarding soft nav. */
+  courseSettings: FunctionReturnType<
+    typeof api.features.courses.getActiveCourseSettings
+  >;
 }
 
 const AppDataContext = createContext<AppDataValue | null>(null);
@@ -41,6 +48,7 @@ export function AppDataProvider({
   // throws) while unauthenticated, then streams the real value once auth
   // and course creation land.
   const activeCourse = usePreloadedQuery(preloadedActiveCourse);
+  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const value = useMemo(
     () => ({
       preloadedSettings,
@@ -48,6 +56,7 @@ export function AppDataProvider({
       preloadedCourseSettings,
       preloadedHomeSummary,
       activeCourse,
+      courseSettings,
     }),
     [
       preloadedSettings,
@@ -55,6 +64,7 @@ export function AppDataProvider({
       preloadedCourseSettings,
       preloadedHomeSummary,
       activeCourse,
+      courseSettings,
     ],
   );
   return (

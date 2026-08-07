@@ -346,7 +346,7 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       // mount — the popover then never opens (or unmounts instantly), and
       // the first word may be a different word on the next attempt. Each
       // attempt re-pauses audio (playback can have resumed on a card
-      // advance) and re-reads the current first word before clicking it.
+      // advance) before clicking the current first word.
       //
       // The play/pause button is the same physical element regardless of
       // state — only the inner Lucide icon swaps (`lucide-pause` vs
@@ -358,6 +358,11 @@ test.describe("chat (live)", { tag: "@live" }, () => {
       // the regex below matches.
       const playPauseBtn = page.locator('[data-tutorial="audio-play"]').first();
       const askBtn = page.getByTestId("ask-ai-button").first();
+      // Radix tags the trigger of the OPEN popover with data-state="open",
+      // so this always resolves to the word the popover actually belongs to.
+      const openWord = page
+        .locator('[data-testid="clickable-word"][data-state="open"]')
+        .first();
       let cleanedWord = "";
       let popoverOpen = false;
       for (let attempt = 0; attempt < 4 && !popoverOpen; attempt++) {
@@ -372,27 +377,36 @@ test.describe("chat (live)", { tag: "@live" }, () => {
           await page.waitForTimeout(150);
         }
 
-        const word = page.getByTestId("clickable-word").first();
-        const rawWord = ((await word.innerText().catch(() => "")) || "").trim();
-        cleanedWord = rawWord.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, "");
-        if (!cleanedWord) {
-          await page.waitForTimeout(500);
-          continue;
-        }
-        await word.click({ force: true }).catch(() => {});
-        popoverOpen = await askBtn
+        await page
+          .getByTestId("clickable-word")
+          .first()
+          .click({ force: true })
+          .catch(() => {});
+        const opened = await askBtn
           .waitFor({ state: "visible", timeout: 3_000 })
           .then(() => true)
           .catch(() => false);
+        if (!opened) {
+          await page.waitForTimeout(500);
+          continue;
+        }
+
+        // Read the word from the OPEN trigger rather than from the pre-click
+        // DOM: if the card advanced between the click and the popover mount,
+        // the pre-click read names a word that is no longer on screen and the
+        // prompt assertion below would look for the wrong text. An empty read
+        // means the popover unmounted under us — retry the whole unit.
+        const rawWord = (
+          (await openWord.innerText().catch(() => "")) || ""
+        ).trim();
+        cleanedWord = rawWord.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, "");
+        popoverOpen = cleanedWord.length > 0;
+        if (!popoverOpen) await page.waitForTimeout(500);
       }
       expect(
         popoverOpen,
-        "Ask AI button should appear inside the word popover after clicking a clickable-word",
+        "Ask AI button should appear inside the word popover, anchored to a word with a non-empty display after stripping punctuation",
       ).toBe(true);
-      expect(
-        cleanedWord.length,
-        "Clickable word should have a non-empty display after stripping punctuation.",
-      ).toBeGreaterThan(0);
 
       // Use a forced click on the Ask AI button as a belt-and-suspenders
       // measure — even with audio paused the popover can re-position briefly

@@ -642,10 +642,10 @@ describe("usage — e2e test hooks gating", () => {
     await t.run(async (ctx) => {
       await ctx.db.insert("userProfiles", {
         userId: "user_A",
-        email: "someone@test.de",
+        email: "someone@flexling.com",
         name: "Someone",
         createdAt: Date.now(),
-        searchText: "someone@test.de someone",
+        searchText: "someone@flexling.com someone",
       });
     });
     await t.mutation(internal.usage.helpers.syncAllFeatures, {
@@ -660,7 +660,7 @@ describe("usage — e2e test hooks gating", () => {
 
     await expect(
       t.mutation(internal.usage.testing.setBillingOverride, {
-        email: "someone@test.de",
+        email: "someone@flexling.com",
         planStatus: "past_due",
       }),
     ).rejects.toThrow(/no paid plan/i);
@@ -670,7 +670,7 @@ describe("usage — e2e test hooks gating", () => {
     const t = convexTest(schema, modules);
     await expect(
       t.mutation(internal.usage.testing.setBillingOverride, {
-        email: "someone@test.de",
+        email: "someone@flexling.com",
         planStatus: "past_due",
       }),
     ).rejects.toThrow(/test hooks are disabled/);
@@ -732,17 +732,17 @@ describe("usage — e2e test hooks gating", () => {
     await t.run(async (ctx) => {
       await ctx.db.insert("userProfiles", {
         userId: "user_A",
-        email: "someone@test.de",
+        email: "someone@flexling.com",
         name: "Someone",
         createdAt: Date.now(),
-        searchText: "someone@test.de someone",
+        searchText: "someone@flexling.com someone",
       });
     });
     await sync(t, "active");
 
     // Mixed case exercises the email normalization in requireUserIdByEmail.
     await t.mutation(internal.usage.testing.setBillingOverride, {
-      email: "Someone@test.de",
+      email: "Someone@flexling.com",
       planStatus: "past_due",
     });
     let doc = await getQuotaDoc(t);
@@ -750,7 +750,7 @@ describe("usage — e2e test hooks gating", () => {
     expect(doc?.pastDueSince).toBeDefined();
 
     await t.mutation(internal.usage.testing.clearBillingOverride, {
-      email: "someone@test.de",
+      email: "someone@flexling.com",
     });
     doc = await getQuotaDoc(t);
     expect(doc?.planStatus).toBe("active");

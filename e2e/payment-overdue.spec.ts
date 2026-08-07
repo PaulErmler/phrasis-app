@@ -34,7 +34,7 @@ import {
  * subscribe with 0341 and wait for the trial to convert.
  *
  * Prerequisites (one-time, dev deployment only):
- *   - `npx convex env set E2E_TEST_HOOKS 1` — the usage/testing:* hooks
+ *   - `pnpm exec convex env set E2E_TEST_HOOKS 1` — the usage/testing:* hooks
  *     throw without it. NEVER set this in production.
  *   - The Stripe test-mode Customer Portal configuration must be saved
  *     once (Stripe dashboard → Settings → Billing → Customer portal),
@@ -61,8 +61,8 @@ let email: string;
 /** Run a usage/testing:* Convex hook on the dev deployment. */
 function convexTestHook(fn: string, args: Record<string, unknown>): unknown {
   const out = execFileSync(
-    "npx",
-    ["convex", "run", `usage/testing:${fn}`, JSON.stringify(args)],
+    "pnpm",
+    ["exec", "convex", "run", `usage/testing:${fn}`, JSON.stringify(args)],
     { cwd: REPO_ROOT, encoding: "utf8" },
   );
   // `convex run` prints the function's return value (JSON) on stdout,

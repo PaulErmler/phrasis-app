@@ -139,7 +139,7 @@ export async function recordReviewStats(
   // that radio plays don't inflate the celebration milestone or the in-learn
   // progress bar. `repsAfter` (total reps incl. radio) is intentionally unused.
   // Default to 'audio' when the caller omits a mode — this path is the
-  // active-review path (radio uses `recordRadioPlayStats`), so the review
+  // active-review path (free play uses `recordFreePlayStats`), so the review
   // must count toward `reviewsByMode.audio`/`full` for the milestone math.
   const reviewModeForStats = args.reviewMode ?? 'audio';
   const {

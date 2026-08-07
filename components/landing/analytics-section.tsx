@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import {
   Flame, RotateCcw, Clock,
   TrendingUp, BookOpen, Zap, MessageSquare,
@@ -150,6 +150,56 @@ function MiniChart({ range }: { range: TimeRange }) {
   );
 }
 
+const PROJECTION_FACT_KEYS = [
+  'projectionFacts.wordsByYearEnd',
+  'projectionFacts.nextLevel',
+  'projectionFacts.wordsPerSession',
+] as const;
+
+const PROJECTION_INTERVAL_MS = 3500;
+
+/**
+ * Mini replica of the in-app rotating forecast slot: cycles three static
+ * demo facts with a vertical slide+fade. No auto-cycle under
+ * prefers-reduced-motion (the first fact stays put).
+ */
+function MiniProjection() {
+  const t = useTranslations('LandingPage.analytics');
+  const reducedMotion = useReducedMotion();
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (reducedMotion) return;
+    const id = setInterval(
+      () => setIdx((i) => (i + 1) % PROJECTION_FACT_KEYS.length),
+      PROJECTION_INTERVAL_MS,
+    );
+    return () => clearInterval(id);
+  }, [reducedMotion]);
+
+  return (
+    <div className="flex items-center justify-between gap-3 border-t border-border/40 pt-2.5">
+      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+        {t('projectionLabel')}
+      </span>
+      <div className="relative h-4 min-w-0 flex-1 overflow-hidden text-right">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={idx}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className="block truncate text-xs font-semibold text-primary tabular-nums leading-4"
+          >
+            {t(PROJECTION_FACT_KEYS[idx])}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}
+
 function MiniSessionSnapshot() {
   const stats = [
     { icon: RotateCcw, label: 'Reps', value: '847', today: '24 today' },
@@ -158,25 +208,28 @@ function MiniSessionSnapshot() {
   ];
 
   return (
-    <div className="flex items-end gap-3">
-      <div className="flex flex-col items-center gap-0.5">
-        <div className="flex items-center justify-center h-9 w-9 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--streak-active) 15%, transparent)' }}>
-          <Flame className="h-4 w-4" style={{ color: 'var(--streak-active)' }} />
-        </div>
-        <span className="text-base font-bold tabular-nums" style={{ color: 'var(--streak-active)' }}>24</span>
-        <span className="text-[10px] text-muted-foreground">Streak</span>
-      </div>
-      <div className="w-px self-stretch bg-border/60" />
-      <div className="flex-1 grid grid-cols-3 gap-1">
-        {stats.map(({ icon: Icon, label, value, today }) => (
-          <div key={label} className="flex flex-col items-center text-center gap-0.5">
-            <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-base font-semibold tabular-nums leading-tight">{value}</span>
-            <span className="text-[10px] text-muted-foreground leading-none">{label}</span>
-            <span className="text-[10px] font-medium text-primary tabular-nums leading-none mt-0.5">{today}</span>
+    <div className="space-y-3">
+      <div className="flex items-end gap-3">
+        <div className="flex flex-col items-center gap-0.5">
+          <div className="flex items-center justify-center h-9 w-9 rounded-xl" style={{ backgroundColor: 'color-mix(in srgb, var(--streak-active) 15%, transparent)' }}>
+            <Flame className="h-4 w-4" style={{ color: 'var(--streak-active)' }} />
           </div>
-        ))}
+          <span className="text-base font-bold tabular-nums" style={{ color: 'var(--streak-active)' }}>24</span>
+          <span className="text-[10px] text-muted-foreground">Streak</span>
+        </div>
+        <div className="w-px self-stretch bg-border/60" />
+        <div className="flex-1 grid grid-cols-3 gap-1">
+          {stats.map(({ icon: Icon, label, value, today }) => (
+            <div key={label} className="flex flex-col items-center text-center gap-0.5">
+              <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-base font-semibold tabular-nums leading-tight">{value}</span>
+              <span className="text-[10px] text-muted-foreground leading-none">{label}</span>
+              <span className="text-[10px] font-medium text-primary tabular-nums leading-none mt-0.5">{today}</span>
+            </div>
+          ))}
+        </div>
       </div>
+      <MiniProjection />
     </div>
   );
 }

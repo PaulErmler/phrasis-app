@@ -88,6 +88,9 @@ export const reviewModeValidator = v.union(
   v.literal('full'),
 );
 
+// 'radio' is the single *free play* scheduling mode — the endless, FSRS-free
+// round-robin through the whole deck. Which of its two faces you get is
+// derived from `reviewMode`, not stored: see `freePlayFace` below.
 export const schedulingModeValidator = v.union(
   v.literal('learn_new'),
   v.literal('learnAndReview'),
@@ -136,15 +139,28 @@ export const cardSchedulingSnapshotFields = {
   fsrsState: v.optional(fsrsStateValidator), // Populated when card enters FSRS review phase
   isGraduated: v.optional(v.boolean()), // One-way flag: true once card graduates from initial learning (FSRS state >= Review)
   lastReviewedAt: v.optional(v.number()), // Timestamp of last review (pre-review, FSRS, and radio plays)
+  goodReviewCount: v.optional(v.number()), // # of FSRS good/easy ratings (pre-review "understood" excluded). Drives the "until rated good" Practice-Listening strategy. Undefined = 0 for pre-field cards.
 } as const;
 
-// The card fields that `advanceRadioCard` mutates (minus `lastReviewedAt`,
-// which lives in the scheduling set above). Shared by the `cards` table and
-// the `reviewLogs.prevRadio` undo snapshot.
+// The card fields free play mutates in its LISTENING face (minus
+// `lastReviewedAt`, which lives in the scheduling set above). Shared by the
+// `cards` table and the `reviewLogs.prevRadio` undo snapshot.
 export const cardRadioSnapshotFields = {
   radioRoundCounter: v.optional(v.number()), // Radio mode: # of times this card has been played in radio mode. Lowest counter plays next; new cards default to 0 so they play first. Optional for backward compat — undefined treated as 0.
   radioOrderKey: v.optional(v.number()), // Radio mode: random tiebreak within equal `radioRoundCounter`. Re-rolled on each play so the round-robin order shuffles every loop and never matches the review (`dueDate`-driven) order. Optional for backward compat.
   radioPlayCount: v.optional(v.number()), // Radio mode: true count of radio plays (+1 per play, NOT subject to radioRoundCounter's catch-up jump). Drives the "Only new" Practice-Listening limit. Optional/undefined for pre-existing cards — treated as the card's review count (preReviewCount + FSRS reps) so they don't reset to "new".
+} as const;
+
+// Free Study's rotation state — the writing-face counterpart of the radio
+// fields above, deliberately separate so the two faces shuffle and track
+// independently (listening to a card must not count as having typed it).
+// Shared by the `cards` table and the `reviewLogs.prevFreeStudy` undo
+// snapshot. Same undefined-first index semantics as radio: no backfill,
+// unplayed cards sort first.
+export const cardFreeStudySnapshotFields = {
+  freeStudyRoundCounter: v.optional(v.number()), // Rotation position; lowest plays next, undefined treated as 0.
+  freeStudyOrderKey: v.optional(v.number()), // Random tiebreak within equal counters, re-rolled on each play.
+  freeStudyPlayCount: v.optional(v.number()), // True +1-per-play count ("has this card been studied here yet?"). Unlike radioPlayCount it seeds from 0, not the review count — it has no Practice-Listening consumer.
 } as const;
 
 export const ttsQualityValidator = v.union(
@@ -217,7 +233,13 @@ export const reviewsByModeValidator = v.object({
   audio: v.number(),
   full: v.number(),
   radio: v.optional(v.number()),
+  freeStudy: v.optional(v.number()),
 });
+
+// Union of the per-mode stat bucket keys above ('audio' | 'full' | 'radio' |
+// 'freeStudy'). Single source of truth for the stats writers' `reviewMode`
+// parameters so a new mode can't be added to the validator but missed there.
+export type StatsReviewMode = keyof Infer<typeof reviewsByModeValidator>;
 
 // `{language, text}` translation-entry list used by the cardApprovals
 // table/mutations. Also the stored document shape — do not widen; producers
@@ -259,3 +281,30 @@ export type TtsQuality = Infer<typeof ttsQualityValidator>;
 export type TtsProvider = Infer<typeof ttsProviderValidator>;
 export type VoiceGender = Infer<typeof voiceGenderValidator>;
 export type CardApprovalStatus = Infer<typeof cardApprovalStatusValidator>;
+
+/**
+ * Free play ('radio') is ONE scheduling mode with two faces, chosen by the
+ * review mode rather than stored:
+ *
+ *   Shadowing (`reviewMode: 'audio'`) → "Radio":      hands-free listening loop
+ *   Writing   (`reviewMode: 'full'`)  → "Free Study": user-paced typing loop
+ *
+ * The faces share the round-robin mechanic but keep entirely separate per-card
+ * rotation state (`cards.radio*` vs `cards.freeStudy*`, one index pair each),
+ * so practising a card by listening never counts as having typed it, and vice
+ * versa. Switching the review-mode toggle therefore switches queue AND
+ * presentation live, mid-session.
+ *
+ * The face is also the value stored in `reviewLogs.kind`, which is what lets
+ * undo restore the right rotation snapshot.
+ */
+export type FreePlayFace = 'radio' | 'freeStudy';
+
+/** The active free-play rotation, or null when not in free play. */
+export function freePlayFace(
+  schedulingMode: SchedulingMode,
+  reviewMode: ReviewMode,
+): FreePlayFace | null {
+  if (schedulingMode !== 'radio') return null;
+  return reviewMode === 'audio' ? 'radio' : 'freeStudy';
+}

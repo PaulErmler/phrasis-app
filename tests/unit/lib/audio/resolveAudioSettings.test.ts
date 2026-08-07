@@ -107,6 +107,35 @@ describe('resolveAudioSettings — "Only new" limit mapping', () => {
       resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 3 })).beforeOnlyNewReps,
     ).toBe(3);
   });
+
+  it('infers the strategy for legacy docs: positive rep window → onlyNew, 0/unset (old ∞) → continuous', () => {
+    expect(resolveAudioSettings(null).listeningStrategy).toBe('continuous');
+    expect(
+      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 0 })).listeningStrategy,
+    ).toBe('continuous');
+    expect(
+      resolveAudioSettings(cs({ targetBeforeOnlyNewReps: 3 })).listeningStrategy,
+    ).toBe('onlyNew');
+  });
+
+  it('a stored strategy always wins over the legacy inference', () => {
+    const u = resolveAudioSettings(
+      cs({
+        targetBeforeListeningStrategy: 'untilGood',
+        targetBeforeUntilGoodReps: 3,
+        targetBeforeOnlyNewReps: 0, // would infer 'continuous' without the stored value
+      }),
+    );
+    expect(u.listeningStrategy).toBe('untilGood');
+    expect(u.beforeUntilGoodReps).toBe(3);
+    expect(
+      resolveAudioSettings(
+        cs({ targetBeforeListeningStrategy: 'continuous', targetBeforeOnlyNewReps: 3 }),
+      ).listeningStrategy,
+    ).toBe('continuous');
+    // untilGood reps default to 1 when unset.
+    expect(resolveAudioSettings(null).beforeUntilGoodReps).toBe(1);
+  });
 });
 
 describe('applyOnlyNewListening', () => {
@@ -175,5 +204,67 @@ describe('applyOnlyNewListening', () => {
       radioReviewCount: 2,
     });
     expect(stillNew.playTargetBefore).toBe(true);
+  });
+});
+
+describe('applyOnlyNewListening — "until rated good" strategy', () => {
+  const untilGood = (reps: number, overrides: Record<string, unknown> = {}) => ({
+    ...resolveAudioSettings(
+      cs({
+        playTargetBeforeBase: true,
+        targetBeforeListeningStrategy: 'untilGood',
+        targetBeforeUntilGoodReps: reps,
+        ...overrides,
+      }),
+    ),
+  });
+
+  it('keeps Practice Listening on until the card has enough good/easy ratings', () => {
+    const s = untilGood(2);
+    expect(applyOnlyNewListening(s, { reviewCount: 99, goodReviewCount: 0 }).playTargetBefore).toBe(true);
+    expect(applyOnlyNewListening(s, { reviewCount: 99, goodReviewCount: 1 }).playTargetBefore).toBe(true);
+    expect(applyOnlyNewListening(s, { reviewCount: 99, goodReviewCount: 2 }).playTargetBefore).toBe(false);
+  });
+
+  it('treats a missing good count as 0 (pre-field cards stay in listening practice)', () => {
+    const s = untilGood(1);
+    expect(applyOnlyNewListening(s, { reviewCount: 99 }).playTargetBefore).toBe(true);
+  });
+
+  it('ignores the review count and the onlyNew limit entirely', () => {
+    // onlyNew limit of 1 would have graduated this card long ago; the
+    // strategy switch makes the good count the only signal.
+    const s = untilGood(1, { targetBeforeOnlyNewReps: 1 });
+    expect(applyOnlyNewListening(s, { reviewCount: 50, goodReviewCount: 0 }).playTargetBefore).toBe(true);
+    expect(applyOnlyNewListening(s, { reviewCount: 0, goodReviewCount: 1 }).playTargetBefore).toBe(false);
+  });
+
+  it('still requires both Practice groups on', () => {
+    const s = untilGood(1, { playTargetAfterBase: false });
+    expect(s.playTargetAfter).toBe(false);
+    expect(applyOnlyNewListening(s, { reviewCount: 0, goodReviewCount: 5 })).toBe(s);
+  });
+});
+
+describe("applyOnlyNewListening — 'continuous' strategy", () => {
+  it('never graduates a card, no matter the counts', () => {
+    const s = {
+      ...resolveAudioSettings(
+        cs({
+          playTargetBeforeBase: true,
+          targetBeforeListeningStrategy: 'continuous',
+          // A rep window that would have graduated the card long ago under
+          // 'onlyNew' — must be ignored entirely.
+          targetBeforeOnlyNewReps: 1,
+        }),
+      ),
+    };
+    expect(
+      applyOnlyNewListening(s, {
+        reviewCount: 99,
+        radioReviewCount: 99,
+        goodReviewCount: 99,
+      }),
+    ).toBe(s);
   });
 });

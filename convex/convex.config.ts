@@ -23,6 +23,7 @@ app.use(autumn);
 app.use(aggregate, { name: 'cardsByState' });
 app.use(aggregate, { name: 'cardsByDueDate' });
 app.use(aggregate, { name: 'cardsByStateAndDueDate' });
+app.use(aggregate, { name: 'cardsByOriginStateAndDueDate' });
 app.use(actionRetrier);
 app.use(rateLimiter);
 // Content-generation pools (LLM translation / TTS synthesis). Separate

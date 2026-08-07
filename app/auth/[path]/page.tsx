@@ -35,10 +35,18 @@ export default async function AuthPage({
   const authLocalization = (messages.Auth as Record<string, string>) || {};
 
   const isSignUp = path === 'sign-up';
+  const isSignInOrUp = path === 'sign-in' || isSignUp;
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4 pt-[calc(1rem+var(--safe-top))] pb-[calc(1rem+var(--safe-bottom))]">
       <div className="w-full max-w-md mx-auto flex flex-col items-center">
+        {/* Brand header */}
+        <div className="mb-6 flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- static SVG asset */}
+          <img src="/icons/icon.svg" alt="" className="h-10 w-10" />
+          <span className="text-2xl font-bold tracking-tight">Flexling</span>
+        </div>
+
         <AuthView
           path={path}
           localization={authLocalization}
@@ -46,14 +54,32 @@ export default async function AuthPage({
           classNames={{
             base: 'w-full',
             content: 'flex flex-col-reverse',
+            // The reset-password footer only holds a "Go back" button that
+            // calls window.history.back() — a no-op when the page is opened
+            // from the emailed reset link in a fresh tab. Hide it; a
+            // successful reset redirects to sign-in anyway.
+            ...(path === 'reset-password' ? { footer: 'hidden' } : {}),
           }}
+          {...(isSignInOrUp && {
+            // cardHeader REPLACES the default title block, so it recreates the
+            // title and adds the store-shell social buttons directly beneath —
+            // inside the card, above the email form (NativeSocialButtons
+            // self-hides on the regular website, leaving just the title).
+            cardHeader: (
+              <>
+                <div className="text-lg font-semibold md:text-xl">
+                  {isSignUp
+                    ? authLocalization.SIGN_UP || 'Sign Up'
+                    : authLocalization.SIGN_IN || 'Sign In'}
+                </div>
+                <NativeSocialButtons />
+              </>
+            ),
+          })}
           {...(isSignUp && {
             cardFooter: <TermsFooter authLocalization={authLocalization} />,
           })}
         />
-        {/* Store-app shell only (self-hides on the web): native token-based
-            social sign-in — the redirect buttons are disabled there. */}
-        {(path === 'sign-in' || path === 'sign-up') && <NativeSocialButtons />}
       </div>
     </main>
   );

@@ -2,7 +2,11 @@ import { test, type Page } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { completeOnboardingFresh, type OnboardingWalkOptions } from "./helpers";
+import {
+  completeEmailVerification,
+  completeOnboardingFresh,
+  type OnboardingWalkOptions,
+} from "./helpers";
 
 /**
  * Setup project — runs before every chromium spec.
@@ -47,8 +51,11 @@ import { completeOnboardingFresh, type OnboardingWalkOptions } from "./helpers";
  * matching — so locale flips, copy tweaks, or language renames cannot
  * break this fixture.
  *
- * Email verification is disabled in convex/auth.ts (`requireEmailVerification:
- * false`), so the accounts are immediately usable.
+ * Email verification is REQUIRED (convex/auth.ts). global-setup.ts sets
+ * E2E_TEST_HOOKS=1 on the dev deployment for the run, so auth emails are
+ * captured into a table instead of being sent (convex/lib/authEmails.ts);
+ * `completeEmailVerification` reads the captured 6-digit code and enters
+ * it, which signs the fresh user in.
  */
 
 test.describe.configure({ mode: "serial" });
@@ -60,7 +67,10 @@ const CREDENTIALS_DIR = path.resolve(__dirname, ".auth");
 function generateCredentials(prefix: string) {
   const random = crypto.randomBytes(6).toString("hex");
   return {
-    email: `e2e-${prefix}-${Date.now()}-${random}@test.de`,
+    // Shape is load-bearing: `isE2EFixtureAddress` (convex/lib/authEmails.ts)
+    // matches it to suppress the deferred welcome / signup-notification mails,
+    // which fire after E2E_TEST_HOOKS is gone and would otherwise hard-bounce.
+    email: `e2e-${prefix}-${Date.now()}-${random}@flexling.com`,
     password: `E2ePass!${random}`,
     name: `E2E ${prefix} ${random}`,
   };
@@ -104,7 +114,9 @@ async function fillSignUp(
     .getByRole("button", { name: /create an account|create account|^sign\s*up$/i })
     .click();
 
-  await page.waitForURL(/\/app\/onboarding/, { timeout: 30_000 });
+  // Verification required: the submit does not create a session. Enter the
+  // captured 6-digit code to land logged-in on /app/onboarding.
+  await completeEmailVerification(page, creds.email);
 }
 
 async function signUpAndOnboard(

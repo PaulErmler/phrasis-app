@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/tooltip';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
+import type { CardOriginPill } from './cardOriginPill';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import {
   DEFAULT_PAUSE_BETWEEN_REPETITIONS,
@@ -50,6 +51,8 @@ interface FullReviewCardContentProps {
   /** When in FSRS phase, total reviews = preReviewCount + fsrsState.reps */
   schedulingPhase?: 'preReview' | 'review';
   fsrsState?: { reps: number } | null;
+  /** Source-collection pill ("A1.2"); absent/null = hidden. */
+  originPill?: CardOriginPill | null;
   sourceText: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
@@ -102,8 +105,25 @@ interface FullReviewCardContentProps {
   showRomanization?: boolean;
   /** Clears submission stack when the reviewed card changes */
   cardId?: Id<'cards'>;
-  /** When true, Left Arrow revert is disabled (e.g. settings or edit dialog open) */
-  shortcutsDisabled?: boolean;
+  /**
+   * Registers a "revert one submitted translation" handler with the parent
+   * for the stepwise-back shortcut (Left Arrow). The handler returns true
+   * when it consumed the press (something was reverted); false lets the
+   * parent fall through to undoing the last review. Unregistered (null) on
+   * unmount.
+   */
+  onRegisterRevert?: (fn: (() => boolean) | null) => void;
+  /**
+   * "Show translation on new sentences": the answer is rendered above the
+   * input for copy-typing ("Abschreiben"). Computed by LearningMode from the
+   * course setting + the card's review count (see the firstExposure const
+   * there) so onboarding and the main app share one predicate.
+   */
+  firstExposure?: boolean;
+  /** Restart-card signal: any change clears typed/submitted translations and manual base reveals. */
+  resetSignal?: number;
+  /** Replay-target signal (T shortcut): any change replays the first target-language clip. */
+  replayTargetSignal?: number;
   /** Karaoke word highlighting toggle (defaults true). */
   highlightEnabled?: boolean;
   /** Client-only session flag: did the viewer click flag on this card? */
@@ -132,6 +152,7 @@ export function FullReviewCardContent({
   preReviewCount,
   schedulingPhase,
   fsrsState,
+  originPill,
   sourceText,
   translations,
   audioRecordings,
@@ -164,7 +185,10 @@ export function FullReviewCardContent({
   bare = false,
   showRomanization = true,
   cardId,
-  shortcutsDisabled = false,
+  onRegisterRevert,
+  firstExposure = false,
+  resetSignal,
+  replayTargetSignal,
   highlightEnabled = true,
   flaggedInSession = false,
   mergedPlayback,
@@ -483,25 +507,47 @@ export function FullReviewCardContent({
     applyRevertToLanguage(language);
   }, [applyRevertToLanguage]);
 
+  // Left Arrow itself is bound centrally in LearningControls; this component
+  // only contributes the "revert one submission" step of the stepwise-back
+  // behavior via the registration channel.
+  const onRegisterRevertRef = useRef(onRegisterRevert);
+  onRegisterRevertRef.current = onRegisterRevert;
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (shortcutsDisabled || e.key !== 'ArrowLeft') return;
-      const target = e.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement ||
-        (target instanceof HTMLElement && target.isContentEditable)
-      ) {
-        return;
-      }
-      if (submissionOrderRef.current.length === 0) return;
-      e.preventDefault();
+    const register = onRegisterRevertRef.current;
+    if (!register) return;
+    register(() => {
+      if (submissionOrderRef.current.length === 0) return false;
       revertLastSubmitted();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [shortcutsDisabled, revertLastSubmitted]);
+      return true;
+    });
+    return () => register(null);
+  }, [revertLastSubmitted]);
+
+  // Restart-card signal: back to the freshly-dealt state. Initialized to the
+  // mount value so a stale nonce never wipes a fresh card (same contract as
+  // revealAllSignal in LearningCardContent).
+  const lastResetSignalRef = useRef(resetSignal);
+  useEffect(() => {
+    if (resetSignal === undefined || resetSignal === lastResetSignalRef.current) {
+      return;
+    }
+    lastResetSignalRef.current = resetSignal;
+    setInputs(
+      new Map(
+        targetTranslations.map((tr) => [
+          tr.language,
+          { submitted: false, userText: '' },
+        ]),
+      ),
+    );
+    setSubmissionOrder([]);
+    setManuallyRevealedBase(new Set());
+    autoPlayedRef.current = new Set();
+    const raf = requestAnimationFrame(() => {
+      firstInputRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [resetSignal, targetTranslations]);
 
   // "Hide base languages" (writing mode): blur base rows until every target is
   // submitted (when auto-reveal-on-submit is on), the post-rating reveal fires,
@@ -553,6 +599,7 @@ export function FullReviewCardContent({
     <div data-tutorial="card-content-full" className="flex flex-col flex-1 min-h-0">
       <CardShell
         reviewCount={displayReviewCount(preReviewCount, schedulingPhase, fsrsState)}
+        originPill={originPill}
         sourceText={sourceText}
         translations={translations}
         audioRecordings={audioRecordings}
@@ -647,7 +694,9 @@ export function FullReviewCardContent({
                   inputRef={assignInputRef(translation.language, index)}
                   autoFocus={index === 0}
                   isFirstTarget={index === 0}
+                  playSignal={index === 0 ? replayTargetSignal : undefined}
                   allRevealed={allRevealed}
+                  firstExposure={firstExposure}
                   showRomanization={showRomanization}
                   ignorePunctuation={ignorePunctuation}
                   highlightEnabled={highlightEnabled}
@@ -695,7 +744,14 @@ interface TargetLanguageInputProps {
   inputRef?: React.RefCallback<HTMLInputElement | null>;
   autoFocus?: boolean;
   isFirstTarget?: boolean;
+  /** Keyboard replay nonce, forwarded to this row's AudioButton (first target only). */
+  playSignal?: number;
   allRevealed?: boolean;
+  /**
+   * Card's first-ever exposure: show the target sentence above the input so
+   * the first rep is a copy-through instead of an impossible recall test.
+   */
+  firstExposure?: boolean;
   showRomanization?: boolean;
   ignorePunctuation?: boolean;
   highlightEnabled: boolean;
@@ -737,7 +793,9 @@ function TargetLanguageInput({
   inputRef,
   autoFocus,
   isFirstTarget = false,
+  playSignal,
   allRevealed = false,
+  firstExposure = false,
   showRomanization = true,
   ignorePunctuation = false,
   highlightEnabled,
@@ -895,6 +953,7 @@ function TargetLanguageInput({
           onButtonTimeUpdate={onButtonTimeUpdate}
           onButtonStop={onButtonStop}
           speed={speed}
+          playSignal={playSignal}
           wrapAudio
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
@@ -956,6 +1015,7 @@ function TargetLanguageInput({
           onButtonTimeUpdate={onButtonTimeUpdate}
           onButtonStop={onButtonStop}
           speed={speed}
+          playSignal={playSignal}
           wrapAudio
           speedOverride={speedOverride}
           generalSpeed={generalSpeed}
@@ -1024,17 +1084,61 @@ function TargetLanguageInput({
       className="space-y-1"
       {...(isFirstTarget ? { 'data-tutorial': 'target-input-full' } : {})}
     >
-      <TargetRowHeader
-        languageDisplayName={languageDisplayName}
-        audioUrl={audioUrl}
-        language={translation.language}
-        onAudioPlay={onAudioPlay}
-        onButtonTimeUpdate={onButtonTimeUpdate}
-        onButtonStop={onButtonStop}
-        wrapAudio={false}
-        speedOverride={speedOverride}
-        generalSpeed={generalSpeed}
-      />
+      {firstExposure ? (
+        // First exposure: the answer to copy shares the row with its audio
+        // button (mirrors the audio-mode target-row layout) — the header row
+        // would leave the button floating alone above the sentence.
+        <>
+          {languageDisplayName && (
+            <span className="text-xs font-medium text-muted-foreground uppercase">
+              {languageDisplayName}
+            </span>
+          )}
+          <div
+            className="flex items-start gap-2"
+            data-testid="first-exposure-answer"
+          >
+            <div className="flex-1 min-w-0">
+              <ClickableWords
+                text={translation.text || '...'}
+                language={translation.language}
+                wordTimings={wordTimings}
+                localTime={activeClip?.localTime ?? 0}
+                clockBinding={isActive ? clockBinding : undefined}
+                isActive={isActive}
+                enabled={highlightEnabled}
+                className="body-large text-muted-foreground"
+              />
+              {showRomanization && translation.romanization && (
+                <p className="text-xs text-muted-foreground leading-tight">
+                  {translation.romanization}
+                </p>
+              )}
+            </div>
+            <AudioButton
+              url={audioUrl}
+              language={translation.language}
+              onPlay={onAudioPlay}
+              onTimeUpdate={onButtonTimeUpdate}
+              onStop={onButtonStop}
+              playSignal={playSignal}
+            />
+          </div>
+        </>
+      ) : (
+        <TargetRowHeader
+          languageDisplayName={languageDisplayName}
+          audioUrl={audioUrl}
+          language={translation.language}
+          onAudioPlay={onAudioPlay}
+          onButtonTimeUpdate={onButtonTimeUpdate}
+          onButtonStop={onButtonStop}
+          playSignal={playSignal}
+          wrapAudio={false}
+          speedOverride={speedOverride}
+          generalSpeed={generalSpeed}
+        />
+      )}
       <div
         className="flex items-center gap-2"
         {...(isFirstTarget ? { 'data-tutorial': 'target-input-and-submit' } : {})}
@@ -1085,6 +1189,8 @@ interface TargetRowHeaderProps {
   onButtonStop: (language: string) => void;
   /** Effective playback speed; omitted on the input row (AudioButton defaults to 1). */
   speed?: number;
+  /** Keyboard replay nonce forwarded to the AudioButton (first target only). */
+  playSignal?: number;
   /**
    * Wrap the audio button in the flex container that also hosts the speed
    * badge (revealed/submitted rows). The input row renders the bare button
@@ -1108,6 +1214,7 @@ function TargetRowHeader({
   onButtonTimeUpdate,
   onButtonStop,
   speed,
+  playSignal,
   wrapAudio,
   speedOverride,
   generalSpeed,
@@ -1121,6 +1228,7 @@ function TargetRowHeader({
       onTimeUpdate={onButtonTimeUpdate}
       onStop={onButtonStop}
       speed={speed}
+      playSignal={playSignal}
     />
   );
   const audio = wrapAudio ? (

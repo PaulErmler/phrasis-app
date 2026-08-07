@@ -221,7 +221,11 @@ function LearnViewInner({
   const schedulingMode = state.status !== 'loading'
     ? (state.courseSettings?.schedulingMode ?? 'learnAndReview')
     : 'learnAndReview';
-  const isRadio = schedulingMode === 'radio';
+  // Free play is one mode; `reviewMode` picks the face. Only the listening
+  // face (Radio) runs hands-free — the writing face (Free Study) is a
+  // user-paced typing session.
+  const isFreePlay = schedulingMode === 'radio';
+  const isHandsFree = isFreePlay && reviewMode === 'audio';
   const isOnboarding = mode === 'onboarding';
   const tutorialId = reviewMode === 'full' ? TUTORIAL_IDS.FULL_REVIEW_INTRO : TUTORIAL_IDS.AUDIO_REVIEW_INTRO;
   // Autoplay is gated while the tutorial popovers are up, and the audio hook
@@ -232,14 +236,15 @@ function LearnViewInner({
   const playAfterTutorialRef = useRef<() => void>(() => {});
   const { isActive, isCompleted, restartTutorial } = useTutorial(tutorialId, {
     delayMs: 1000,
-    // Radio mode is its own flow — don't trigger the audio-review tutorial
-    // when the user explicitly chose to listen.
+    // Free play is its own flow — don't trigger the review tutorials when
+    // the user explicitly chose it (its writing face also hides the rating
+    // buttons the full-review tour anchors on).
     // Onboarding flow: suppressed — coachmarks are the only teaching layer.
     enabled:
       !isOnboarding &&
       state.status === 'reviewing' &&
       !state.settingsOpen &&
-      !isRadio,
+      !isFreePlay,
     onComplete: () => playAfterTutorialRef.current(),
   });
   // `progressDisplayActive` lives on BaseState so it persists across status
@@ -258,19 +263,21 @@ function LearnViewInner({
   const hasInflightCardAction =
     state.status === 'reviewing' && state.hasInflightCardAction;
   const { audio, openSettings, userAutoPlay } = useLearningAudio(state, {
-    // Radio mode forces autoplay + auto-advance. The tutorial gates and the
-    // celebration pause don't apply (no tutorial in radio, no celebration in
-    // radio). In onboarding mode, the in-app `useTutorial` is suppressed so
-    // `isCompleted` would stay false forever and block every card's autoplay
-    // — gate the tutorial-completion check on `mode !== 'onboarding'`.
+    // Free play's listening face forces autoplay + auto-advance. Neither
+    // face runs the tutorial or the celebration, so those gates don't apply
+    // to free play at all — including the pending-completion state, which
+    // would otherwise block autoplay forever there. In onboarding mode the
+    // in-app `useTutorial` is suppressed so `isCompleted` would likewise stay
+    // false — hence the `mode !== 'onboarding'` check.
     // `hasInflightCardAction` keeps the user on the current card while a
     // flag retranslation or audio regenerate is mid-flight — auto-advancing
     // before the new content lands would skip past the very thing they
     // asked for.
     disableAutoAdvance:
-      (!isRadio && reviewMode === 'audio' && isActive) || hasInflightCardAction,
+      (!isHandsFree && reviewMode === 'audio' && isActive) ||
+      hasInflightCardAction,
     disableAutoPlay:
-      !isRadio &&
+      !isFreePlay &&
       (isActive ||
         (!isOnboarding && !isCompleted) ||
         progressDisplayActive ||
@@ -375,6 +382,9 @@ function LearnViewInner({
       onHelpOpen={audio.pause}
       reviewMode={reviewMode}
       schedulingMode={schedulingMode}
+      ratingCount={
+        state.status === 'reviewing' ? state.validRatings.length : undefined
+      }
     />
   );
 

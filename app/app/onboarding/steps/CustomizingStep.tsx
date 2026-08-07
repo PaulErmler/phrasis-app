@@ -3,13 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2 } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
 
 /**
  * "Customizing your first lesson…" step.
  *
- * Continuously-rising progress bar over a fixed duration. The actual course
- * creation happens via `onMountAction` (a thin wrapper the wizard supplies to
+ * Linear progress bar over a fixed duration. The actual course creation
+ * happens via `onMountAction` (a thin wrapper the wizard supplies to
  * call `completeOnboarding`) — fired once on mount, idempotent so re-entry
  * after a back-nav doesn't break.
  *
@@ -29,7 +28,7 @@ interface Props {
   durationMs?: number;
   /** Time to hold the bar at exactly 100% before advancing — gives the
    *  user a clear "done" beat instead of snapping forward the instant the
-   *  RAF finishes. */
+   *  animation finishes. */
   holdMs?: number;
 }
 
@@ -69,23 +68,17 @@ export function CustomizingStep({
     };
   }, [onMountAction]);
 
-  // Continuously rising bar — RAF-driven so it stays smooth on low-end devices.
+  // Plain linear fill 0 → 100 over `durationMs`.
   useEffect(() => {
     let raf = 0;
     let holdTimer: ReturnType<typeof setTimeout> | null = null;
     const tick = (now: number) => {
       if (startedAtRef.current === null) startedAtRef.current = now;
-      const elapsed = now - startedAtRef.current;
-      const fraction = Math.min(1, elapsed / durationMs);
-      // Ease-out cubic so the bar settles smoothly into 100%.
-      const eased = 1 - Math.pow(1 - fraction, 3);
-      setPct(fraction >= 1 ? 100 : eased * 100);
+      const fraction = Math.min(1, (now - startedAtRef.current) / durationMs);
+      setPct(fraction * 100);
       if (fraction < 1) {
         raf = requestAnimationFrame(tick);
       } else {
-        // Force exact 100% (mitigates rounding) and hold for `holdMs` before
-        // signalling the animation is done — gives the user a clear "fully
-        // done" beat before the wizard advances.
         setPct(100);
         holdTimer = setTimeout(() => setAnimationDone(true), holdMs);
       }
@@ -107,7 +100,6 @@ export function CustomizingStep({
     }
   }, [animationDone, actionDone, onReady]);
 
-  // Pick a copy line based on the bar's progress for visual flavor.
   const beatIdx = Math.min(BEAT_COUNT - 1, Math.floor((pct / 100) * BEAT_COUNT));
 
   return (
@@ -118,8 +110,11 @@ export function CustomizingStep({
       <Loader2 className="h-10 w-10 animate-spin text-primary mb-6" />
       <h2 className="text-2xl font-bold mb-2">{t('title')}</h2>
       <p className="text-muted-foreground mb-6 min-h-[1.25rem]">{t(`beats.${beatIdx}`)}</p>
-      <div className="w-full max-w-sm">
-        <Progress value={pct} className="h-1.5" />
+      <div className="w-full max-w-sm h-1.5 rounded-full bg-primary/20 overflow-hidden">
+        <div
+          className="h-full bg-primary rounded-full"
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );

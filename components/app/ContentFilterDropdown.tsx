@@ -6,7 +6,7 @@ import { usePreloadedQuery } from 'convex/react';
 import { useTranslations } from 'next-intl';
 
 import { useAppData } from '@/components/app/AppDataProvider';
-import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
+import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import {
   Select,
   SelectContent,
@@ -34,7 +34,7 @@ export function ContentFilterDropdown() {
   // when the row appears.
   const { preloadedCourseSettings } = useAppData();
   const settings = usePreloadedQuery(preloadedCourseSettings);
-  const updateSettings = useUpdateStudyContentFilter();
+  const updateSettings = useUpdateCourseSettings();
   const t = useTranslations('AppPage.contentFilter');
 
   if (!settings) return null;

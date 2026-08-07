@@ -31,6 +31,7 @@ vi.mock("@convex-dev/aggregate", () => {
 import schema from "../../schema";
 import { internal } from "../../_generated/api";
 import { EXTENDED_STATE_LABELS } from "../../lib/fsrsStates";
+import { ORIGIN_BUCKETS } from "../../db/stats/cardAggregates";
 import type { Id } from "../../_generated/dataModel";
 
 const modules = import.meta.glob("/convex/**/*.ts");
@@ -91,7 +92,7 @@ async function seedUserWithDecksAndCards(
 }
 
 describe("migrations/recalcUserCardAggregates", () => {
-  it("clears all three aggregate namespaces for every deck the user owns", async () => {
+  it("clears all aggregate namespaces for every deck, one deck per scheduled mutation", async () => {
     vi.useFakeTimers();
     try {
       const t = convexTest(schema, modules);
@@ -104,9 +105,19 @@ describe("migrations/recalcUserCardAggregates", () => {
         userId: "user_A",
       });
 
+      // `run` only enumerates decks — a single deck's clear is 32 aggregate
+      // calls (states × origin buckets), so clearing every deck in the entry
+      // mutation could blow the mutation limits and fail half-cleared. The
+      // clears happen one deck per scheduled continuation instead.
+      expect(calls.clear).toHaveLength(0);
+
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+
       // Each deck triggers: 1 cardsByState.clear + 1 cardsByDueDate.clear +
-      // EXTENDED_STATE_LABELS.length cardsByStateAndDueDate.clear.
-      const perDeck = 2 + EXTENDED_STATE_LABELS.length;
+      // per state label: 1 cardsByStateAndDueDate.clear + one
+      // cardsByOriginStateAndDueDate.clear per origin bucket.
+      const perDeck =
+        2 + EXTENDED_STATE_LABELS.length * (1 + ORIGIN_BUCKETS.length);
       expect(calls.clear).toHaveLength(deckIds.length * perDeck);
 
       // The two deckId-only namespaces show up once per deck.
@@ -115,12 +126,20 @@ describe("migrations/recalcUserCardAggregates", () => {
         expect(hits).toHaveLength(2);
       }
 
-      // Each `${deckId}:${state}` namespace is cleared once.
+      // Each `${deckId}:${state}` namespace is cleared once, and each
+      // `${deckId}:${origin}:${state}` namespace once.
       for (const deckId of deckIds) {
         for (const state of EXTENDED_STATE_LABELS) {
           const ns = `${deckId}:${state}`;
           const hits = calls.clear.filter((c) => c.namespace === ns);
           expect(hits).toHaveLength(1);
+          for (const origin of ORIGIN_BUCKETS) {
+            const originNs = `${deckId}:${origin}:${state}`;
+            const originHits = calls.clear.filter(
+              (c) => c.namespace === originNs,
+            );
+            expect(originHits).toHaveLength(1);
+          }
         }
       }
     } finally {
@@ -128,7 +147,7 @@ describe("migrations/recalcUserCardAggregates", () => {
     }
   });
 
-  it("re-inserts every card on all three aggregates after draining the scheduler", async () => {
+  it("re-inserts every card on all four aggregates after draining the scheduler", async () => {
     vi.useFakeTimers();
     try {
       const t = convexTest(schema, modules);
@@ -142,11 +161,11 @@ describe("migrations/recalcUserCardAggregates", () => {
       });
       await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-      // Each card should be inserted into all 3 aggregates exactly once.
-      expect(calls.insert).toHaveLength(cardIds.length * 3);
+      // Each card should be inserted into all 4 aggregates exactly once.
+      expect(calls.insert).toHaveLength(cardIds.length * 4);
       for (const cardId of cardIds) {
         const hits = calls.insert.filter((c) => c.docId === cardId);
-        expect(hits).toHaveLength(3);
+        expect(hits).toHaveLength(4);
       }
     } finally {
       vi.useRealTimers();

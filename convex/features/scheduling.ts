@@ -15,13 +15,17 @@ import { trackEvent } from '../db/stats/dailyStats';
 import { EVENTS, track } from '../analytics';
 import { updateWordTextsForEdit } from '../db/stats/wordTracking';
 import { recordReviewStats } from '../db/stats/recordReviewStats';
-import { recordRadioPlayStats } from '../db/stats/recordRadioPlayStats';
+import { recordFreePlayStats } from '../db/stats/recordFreePlayStats';
 import {
   reverseReviewStats,
-  reverseRadioPlayStats,
+  reverseFreePlayStats,
   readTodayCounters,
 } from '../db/stats/reverseReviewStats';
-import { logReview, takeUndoableLogs } from '../db/reviewLogs';
+import {
+  logReview,
+  takeUndoableLogs,
+  studyContextFromSettings,
+} from '../db/reviewLogs';
 import {
   getDailyStats,
   floorToCelebration,
@@ -42,11 +46,22 @@ import {
   reviewRatingValidator,
   reviewModeValidator,
   asVoiceGender,
+  freePlayFace,
   type SchedulingMode,
   type StudyContentFilter,
+  type FreePlayFace,
 } from '../types';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../lib/constants/learning';
-import { settledCount } from '../lib/collections';
+import {
+  cardOriginPillFields,
+  originsForFilter,
+  settledCount,
+} from '../lib/collections';
+import {
+  FREE_PLAY_MODES,
+  fetchFreePlayRotation,
+  randomOrderKey,
+} from '../lib/freePlay';
 import { getTodayInTimezone } from '../lib/dateUtils';
 import {
   deleteAudioRow,
@@ -67,19 +82,6 @@ import {
   CARD_OVERRIDE_SPEED_MAX,
 } from '../../lib/constants/audioPlayback';
 
-/**
- * A fresh, uniform-random integer used as the radio-mode tiebreak. Re-rolled
- * on every `advanceRadioCard` so each round-robin loop visits cards in a
- * different order. After the first full loop, the order is also fully
- * decoupled from review's `dueDate`-driven sequence; for decks that pre-date
- * this field, every card starts with `radioOrderKey === undefined` and the
- * very first loop falls back to `_creationTime` order until each card has
- * been played once. 32-bit space gives collision-free tiebreaking in any
- * plausible deck size.
- */
-function randomRadioOrderKey(): number {
-  return Math.floor(Math.random() * 0x7fffffff);
-}
 
 /**
  * Authenticate the user and verify ownership of a card via deck → course.
@@ -155,8 +157,26 @@ const cardResultFields = {
   // "Only new" Practice-Listening limit can count radio plays (which don't bump
   // the FSRS review count). Undefined for cards that predate the field.
   radioPlayCount: v.optional(v.number()),
+  // True count of Free Study plays for this card, the writing face's analogue
+  // of radioPlayCount. Surfaced so the "show translation on new sentences"
+  // copy-typing assist can retire itself in free play, which advances neither
+  // preReviewCount nor the FSRS reps. Undefined for cards that predate it.
+  freeStudyPlayCount: v.optional(v.number()),
+  // FSRS good/easy count — the "until rated good" Practice-Listening strategy.
+  goodReviewCount: v.optional(v.number()),
   hasMissingContent: v.boolean(),
   audioSpeedOverrides: v.optional(v.record(v.string(), v.number())),
+  // Source-collection shorthand ("A1.2"), origin bucket, and CEFR tier (the
+  // pill's color key), for the optional card-origin pill. Null for cards
+  // whose collection can't be resolved.
+  collectionLabel: v.union(v.string(), v.null()),
+  collectionOrigin: v.union(
+    v.literal('premade'),
+    v.literal('custom'),
+    v.literal('chat'),
+    v.null(),
+  ),
+  collectionCefrTier: v.union(v.string(), v.null()),
 };
 
 const cardResultValidator = v.object(cardResultFields);
@@ -172,14 +192,29 @@ const cardResultValidator = v.object(cardResultFields);
  * Cards inserted before the origin backfill won't match the new indexes;
  * they're handled by the fallback unfiltered query in the 'both' branch.
  */
+/**
+ * The free-play rotation exactly as the client is served it: unfiltered for
+ * 'both', otherwise one origin-keyed query per allowed origin merged by the
+ * face's (counter, order key, _creationTime) sort. Shared by the serving path
+ * (`fetchDueCardsWithFilter`) and the advance's catch-up floor
+ * (`advanceFreePlayCardImpl`) so the floor is always computed over the same
+ * population the queue draws from — an unfiltered floor can sit far below the
+ * filtered queue (a filtered-out card stuck at counter 0), letting a new card
+ * be re-served dozens of times before it "catches up" to cards the user can
+ * never even be shown.
+ */
 async function fetchDueCardsWithFilter(
   ctx: QueryCtx,
   deckId: Id<'decks'>,
   schedulingMode: SchedulingMode,
+  face: FreePlayFace | null,
   filter: StudyContentFilter,
   now: number,
   take: number,
 ): Promise<Doc<'cards'>[]> {
+  if (face) {
+    return fetchFreePlayRotation(ctx, deckId, face, filter, take);
+  }
   if (filter === 'both') {
     if (schedulingMode === 'learn_new') {
       return ctx.db
@@ -191,15 +226,6 @@ async function fetchDueCardsWithFilter(
             .eq('isMastered', false)
             .eq('isGraduated', false)
             .lte('dueDate', now),
-        )
-        .order('asc')
-        .take(take);
-    }
-    if (schedulingMode === 'radio') {
-      return ctx.db
-        .query('cards')
-        .withIndex('by_deck_hidden_mastered_radioCounter_radioOrder', (q) =>
-          q.eq('deckId', deckId).eq('isHidden', false).eq('isMastered', false),
         )
         .order('asc')
         .take(take);
@@ -218,8 +244,7 @@ async function fetchDueCardsWithFilter(
   }
 
   // Filtered path: run one query per allowed origin and merge results.
-  const allowedOrigins: Array<'premade' | 'custom' | 'chat'> =
-    filter === 'course' ? ['premade'] : ['custom', 'chat'];
+  const allowedOrigins = originsForFilter(filter);
   const perOriginResults = await Promise.all(
     allowedOrigins.map((origin) => {
       if (schedulingMode === 'learn_new') {
@@ -233,19 +258,6 @@ async function fetchDueCardsWithFilter(
               .eq('collectionOrigin', origin)
               .eq('isGraduated', false)
               .lte('dueDate', now),
-          )
-          .order('asc')
-          .take(take);
-      }
-      if (schedulingMode === 'radio') {
-        return ctx.db
-          .query('cards')
-          .withIndex('by_deck_hidden_mastered_origin_radioCounter_radioOrder', (q) =>
-            q
-              .eq('deckId', deckId)
-              .eq('isHidden', false)
-              .eq('isMastered', false)
-              .eq('collectionOrigin', origin),
           )
           .order('asc')
           .take(take);
@@ -265,25 +277,14 @@ async function fetchDueCardsWithFilter(
     }),
   );
 
-  // Merge by the mode's sort key (radio: counter+order; else: dueDate),
-  // tiebreak by _creationTime to mirror Convex's default index ordering.
+  // Merge by dueDate, tiebreak by _creationTime to mirror Convex's default
+  // index ordering. (Free play never reaches here — it exits early through
+  // fetchFreePlayRotation, which merges by the face's counter+order key.)
   const merged = perOriginResults.flat();
-  if (schedulingMode === 'radio') {
-    merged.sort((a, b) => {
-      const ca = a.radioRoundCounter ?? 0;
-      const cb = b.radioRoundCounter ?? 0;
-      if (ca !== cb) return ca - cb;
-      const oa = a.radioOrderKey ?? Number.POSITIVE_INFINITY;
-      const ob = b.radioOrderKey ?? Number.POSITIVE_INFINITY;
-      if (oa !== ob) return oa - ob;
-      return a._creationTime - b._creationTime;
-    });
-  } else {
-    merged.sort((a, b) => {
-      if (a.dueDate !== b.dueDate) return a.dueDate - b.dueDate;
-      return a._creationTime - b._creationTime;
-    });
-  }
+  merged.sort((a, b) => {
+    if (a.dueDate !== b.dueDate) return a.dueDate - b.dueDate;
+    return a._creationTime - b._creationTime;
+  });
   return merged.slice(0, take);
 }
 
@@ -325,8 +326,8 @@ export const getCardForReview = query({
     // Load settings (initialReviewCount + schedulingMode + studyContentFilter) from the courseSettings table
     const settings = await getCourseSettings(ctx, course._id);
     const initialReviewCount = settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
-    const schedulingMode: SchedulingMode = settings?.schedulingMode ?? 'learnAndReview';
-    const studyContentFilter: StudyContentFilter = settings?.studyContentFilter ?? 'both';
+    const studyContext = studyContextFromSettings(settings);
+    const { schedulingMode, studyContentFilter } = studyContext;
 
     const now = Date.now();
 
@@ -336,6 +337,7 @@ export const getCardForReview = query({
       ctx,
       deck._id,
       schedulingMode,
+      studyContext.face,
       studyContentFilter,
       now,
       2,
@@ -347,6 +349,12 @@ export const getCardForReview = query({
     // it surfaces stored romanization for every language and does not treat
     // legacy timing-less audio as a content gap.
     const texts = await Promise.all(dueCards.map((card) => ctx.db.get(card.textId)));
+    // Source collections for the card-origin pill (max 2 point reads).
+    const collections = await Promise.all(
+      dueCards.map((card) =>
+        card.collectionId ? ctx.db.get(card.collectionId) : null,
+      ),
+    );
     const contentInputs = dueCards.flatMap((card, i) => {
       const text = texts[i];
       return text
@@ -374,6 +382,8 @@ export const getCardForReview = query({
       const content = contentByKey.get(String(index));
       if (!text || !content) return null;
 
+      const collection = collections[index];
+
       return {
         _id: card._id,
         _creationTime: card._creationTime,
@@ -391,8 +401,12 @@ export const getCardForReview = query({
         initialReviewCount,
         fsrsState: card.fsrsState ?? null,
         radioPlayCount: card.radioPlayCount,
+        freeStudyPlayCount: card.freeStudyPlayCount,
+        goodReviewCount: card.goodReviewCount,
         hasMissingContent: content.hasMissingContent,
         audioSpeedOverrides: card.audioSpeedOverrides,
+        ...cardOriginPillFields(collection),
+        collectionOrigin: card.collectionOrigin ?? collection?.origin ?? null,
       };
     };
 
@@ -420,13 +434,7 @@ export const getCardForReview = query({
     // Undo stack depth under the CURRENT study context — shares
     // takeUndoableLogs with undoLastReview so the button and the mutation
     // can't disagree.
-    const undoable = await takeUndoableLogs(
-      ctx,
-      userId,
-      course._id,
-      schedulingMode,
-      studyContentFilter,
-    );
+    const undoable = await takeUndoableLogs(ctx, userId, course._id, studyContext);
 
     return {
       ...current,
@@ -512,8 +520,8 @@ export const getCardForReviewEmptyReason = query({
     if (!deck) return { reason: 'no_session' as const };
 
     const settings = await getCourseSettings(ctx, active.course._id);
-    const schedulingMode: SchedulingMode = settings?.schedulingMode ?? 'learnAndReview';
-    const studyContentFilter: StudyContentFilter = settings?.studyContentFilter ?? 'both';
+    const { schedulingMode, studyContentFilter, face } =
+      studyContextFromSettings(settings);
     const now = Date.now();
 
     // Cheap probe: any usable (non-hidden, non-mastered) card in the deck?
@@ -571,6 +579,7 @@ export const getCardForReviewEmptyReason = query({
       ctx,
       deck._id,
       schedulingMode,
+      face,
       otherFilter,
       now,
       1,
@@ -746,6 +755,11 @@ export const reviewCard = mutation({
         preReviewCount: result.preReviewCount,
         dueDate: dueDateWithJitter,
         lastReviewedAt: Date.now(),
+        // Only FSRS good/easy count (never pre-review "understood") — drives
+        // the "until rated good" Practice-Listening strategy.
+        ...(args.rating === 'good' || args.rating === 'easy'
+          ? { goodReviewCount: (card.goodReviewCount ?? 0) + 1 }
+          : {}),
         ...searchableTextPatch,
         ...(result.fsrsState && { fsrsState: result.fsrsState }),
         ...isGraduatedPatch,
@@ -777,6 +791,7 @@ export const reviewCard = mutation({
         fsrsState: card.fsrsState,
         isGraduated: card.isGraduated,
         lastReviewedAt: card.lastReviewedAt,
+        goodReviewCount: card.goodReviewCount,
       },
       statsReversal: {
         hourOfDay,
@@ -877,16 +892,9 @@ export const undoLastReview = mutation({
     const { course } = active;
 
     const settings = await getCourseSettings(ctx, course._id);
-    const schedulingMode: SchedulingMode = settings?.schedulingMode ?? 'learnAndReview';
-    const studyContentFilter: StudyContentFilter = settings?.studyContentFilter ?? 'both';
+    const studyContext = studyContextFromSettings(settings);
 
-    const undoable = await takeUndoableLogs(
-      ctx,
-      userId,
-      course._id,
-      schedulingMode,
-      studyContentFilter,
-    );
+    const undoable = await takeUndoableLogs(ctx, userId, course._id, studyContext);
 
     for (const log of undoable) {
       const card = await ctx.db.get(log.cardId);
@@ -911,23 +919,25 @@ export const undoLastReview = mutation({
             fsrsState: log.prevCard.fsrsState,
             isGraduated: log.prevCard.isGraduated,
             lastReviewedAt: log.prevCard.lastReviewedAt,
+            goodReviewCount: log.prevCard.goodReviewCount,
           },
           card,
         );
         await reverseReviewStats(ctx, { userId, courseId: course._id, log });
-      } else if (log.kind === 'radio' && log.prevRadio) {
-        await patchCard(
-          ctx,
-          log.cardId,
-          {
-            radioRoundCounter: log.prevRadio.radioRoundCounter,
-            radioOrderKey: log.prevRadio.radioOrderKey,
-            radioPlayCount: log.prevRadio.radioPlayCount,
-            lastReviewedAt: log.prevRadio.lastReviewedAt,
-          },
-          card,
-        );
-        await reverseRadioPlayStats(ctx, { userId, courseId: course._id, log });
+      } else if (log.kind === 'radio' || log.kind === 'freeStudy') {
+        const patch = FREE_PLAY_MODES[log.kind].undoPatch(log);
+        if (!patch) {
+          // Malformed entry (kind without its snapshot) — discard defensively.
+          await ctx.db.delete(log._id);
+          continue;
+        }
+        await patchCard(ctx, log.cardId, patch, card);
+        await reverseFreePlayStats(ctx, {
+          userId,
+          courseId: course._id,
+          log,
+          mode: log.kind,
+        });
       } else {
         // Malformed entry (kind without its snapshot) — discard defensively.
         await ctx.db.delete(log._id);
@@ -974,8 +984,7 @@ export const getUndoableReviewCount = query({
       ctx,
       userId,
       active.course._id,
-      settings?.schedulingMode ?? 'learnAndReview',
-      settings?.studyContentFilter ?? 'both',
+      studyContextFromSettings(settings),
     );
     return undoable.length;
   },
@@ -1110,26 +1119,140 @@ export const unhideCard = mutation({
 });
 
 /**
- * Advance to the next card in radio mode.
+ * Advance to the next card in free play, in whichever face the user's review
+ * mode puts them (Shadowing → radio rotation, Writing → free-study rotation).
  *
- * Bumps the card's `radioRoundCounter` so the next-lowest counter rises to
- * the front, re-rolls `radioOrderKey` so the round-robin shuffles every loop
- * (and stays decoupled from the review/dueDate order), and records radio
- * playtime in the per-mode stats.
+ * The face is resolved from course settings rather than passed in, so the
+ * rotation advanced here is always the one the client is being served from —
+ * there is no argument the client could get out of sync with.
+ *
+ * Bumps the card's round counter so the next-lowest counter rises to the
+ * front, re-rolls the order key so the round-robin shuffles every loop (and
+ * stays decoupled from the review/dueDate order), and records playtime in
+ * the per-face stats.
  *
  * Catch-up rule: a brand-new card (counter 0) joining a deck whose other
  * cards are all at e.g. 100 should not replay 99 more times. After playing,
  * its counter jumps to `max(picked, floorOfOthers) + 1` so it lands one
  * step past the rest of the deck — strictly above every other playable
  * card. This guarantees the just-played card is never re-picked as the
- * next card while any other playable card exists (the random `radioOrderKey`
+ * next card while any other playable card exists (the random order-key
  * tiebreak only kicks in at equal counters, which can no longer include
  * the played card).
  *
- * Stats: writes `dailyStats.reviewsByMode.radio` + `timeMsByMode.radio` and
- * the equivalent rollups, plus `courseStats.totalReviewsByMode.radio` and
- * the streak. Word tracking, FSRS state, accuracy, ratings, and collection
- * progress are explicitly skipped — radio is passive listening.
+ * Stats: writes the face's `dailyStats.reviewsByMode` + `timeMsByMode`
+ * buckets and the equivalent rollups, plus `courseStats.totalReviewsByMode`
+ * and the streak. Word tracking, FSRS state, accuracy, ratings, and
+ * collection progress are explicitly skipped — free play never touches the
+ * spaced-repetition schedule.
+ */
+async function advanceFreePlayCardImpl(
+  ctx: MutationCtx,
+  args: { cardId: Id<'cards'>; timezone: string; timeSpentMs?: number },
+): Promise<{ nextRoundCounter: number }> {
+  const { userId, card, deck } = await authorizeCardAccess(ctx, args.cardId);
+
+  // Settings first: they decide WHICH rotation this advance touches, so they
+  // have to be read before the queue fetch and the patch.
+  const settings = await getCourseSettings(ctx, deck.courseId);
+  const face = freePlayFace(
+    settings?.schedulingMode ?? 'learnAndReview',
+    settings?.reviewMode ?? 'audio',
+  );
+  if (!face) {
+    // The client only calls this from a free-play session; landing here means
+    // the mode changed underneath it, so there is no rotation to advance.
+    throw new ConvexError('Not in free play');
+  }
+  const cfg = FREE_PLAY_MODES[face];
+
+  // Fetch the two lowest-counter playable cards — from the same
+  // origin-filtered rotation the card was served from, or the floor could
+  // come from a card the active content filter never serves (stuck at a far
+  // lower counter), neutering the catch-up jump below. The first should be
+  // the card we just played; the second tells us the floor that the played
+  // card needs to catch up to.
+  const lowestTwo = await fetchFreePlayRotation(
+    ctx,
+    deck._id,
+    face,
+    settings?.studyContentFilter ?? 'both',
+    2,
+  );
+
+  const pickedCounter = card[cfg.counterField] ?? 0;
+  // Identify the floor card — the second-lowest, excluding `card` itself.
+  // If the just-played card is no longer the lowest (e.g. it was favorited
+  // or another tab advanced concurrently), `lowestTwo[0]` may differ from
+  // `card`; in that case the floor is whichever of the two is not `card`.
+  const floorCard = lowestTwo.find((c) => c._id !== card._id) ?? null;
+  const floorCounter = floorCard ? (floorCard[cfg.counterField] ?? 0) : pickedCounter;
+  // Land strictly above the floor so the played card cannot tie with the
+  // rest of the round; combined with ascending counter ordering this rules
+  // out an immediate repeat as long as ≥1 other playable card exists.
+  const newCounter = Math.max(pickedCounter, floorCounter) + 1;
+
+  // Separate from the round counter (a rotation position subject to the
+  // catch-up jump above): a true +1-per-play count. The seed for cards that
+  // predate the field is face-specific — see `playCountSeed` in
+  // convex/lib/freePlay.ts.
+  const newPlayCount = (card[cfg.playCountField] ?? cfg.playCountSeed(card)) + 1;
+
+  const patch: Partial<Doc<'cards'>> = { lastReviewedAt: Date.now() };
+  patch[cfg.counterField] = newCounter;
+  patch[cfg.playCountField] = newPlayCount;
+  // Re-roll the random tiebreak each play so the order changes between
+  // loops and never aligns with the review (`dueDate`-driven) order.
+  patch[cfg.orderField] = randomOrderKey();
+  await patchCard(ctx, args.cardId, patch, card);
+
+  await recordFreePlayStats(ctx, {
+    userId,
+    courseId: deck.courseId,
+    timezone: args.timezone,
+    timeSpentMs: args.timeSpentMs,
+    mode: face,
+  });
+
+  // Log the play for the learn-mode undo stack. Restoring the pre-play
+  // rotation state puts this card back at the front (advancing only ever
+  // raises counters, so nothing can have slotted in below it since).
+  // `kind` carries the face — that is what scopes the undo stack to the
+  // rotation the user is actually looking at (see takeUndoableLogs).
+  await logReview(ctx, {
+    userId,
+    courseId: deck.courseId,
+    cardId: args.cardId,
+    reviewedAt: Date.now(),
+    timezone: args.timezone,
+    kind: face,
+    date: getTodayInTimezone(args.timezone),
+    schedulingMode: 'radio',
+    studyContentFilter: settings?.studyContentFilter ?? 'both',
+    ...cfg.logSnapshot(card),
+  });
+
+  return { nextRoundCounter: newCounter };
+}
+
+export const advanceFreePlayCard = mutation({
+  args: {
+    cardId: v.id('cards'),
+    timezone: v.string(),
+    timeSpentMs: v.optional(v.number()),
+  },
+  returns: v.object({
+    nextRoundCounter: v.number(),
+  }),
+  handler: async (ctx, args) => advanceFreePlayCardImpl(ctx, args),
+});
+
+/**
+ * @deprecated Back-compat alias for client bundles built before the
+ * radio→free-play rename (open tabs, cached PWA/Capacitor builds). Same
+ * behavior as `advanceFreePlayCard`, but keeps the old name and the old
+ * `nextRadioRoundCounter` return field. Remove once the deploy has soaked —
+ * tracked in `.devtool/features/remove-advance-radio-card-alias-2026-08-03.md`.
  */
 export const advanceRadioCard = mutation({
   args: {
@@ -1141,97 +1264,21 @@ export const advanceRadioCard = mutation({
     nextRadioRoundCounter: v.number(),
   }),
   handler: async (ctx, args) => {
-    const { userId, card, deck } = await authorizeCardAccess(ctx, args.cardId);
-
-    // Fetch the two lowest-counter playable cards. The first should be the
-    // card we just played; the second tells us the floor that the played
-    // card needs to catch up to.
-    const lowestTwo = await ctx.db
-      .query('cards')
-      .withIndex('by_deck_hidden_mastered_radioCounter_radioOrder', (q) =>
-        q
-          .eq('deckId', deck._id)
-          .eq('isHidden', false)
-          .eq('isMastered', false),
-      )
-      .order('asc')
-      .take(2);
-
-    const pickedCounter = card.radioRoundCounter ?? 0;
-    // Identify the floor card — the second-lowest, excluding `card` itself.
-    // If the just-played card is no longer the lowest (e.g. it was favorited
-    // or another tab advanced concurrently), `lowestTwo[0]` may differ from
-    // `card`; in that case the floor is whichever of the two is not `card`.
-    const floorCard = lowestTwo.find((c) => c._id !== card._id) ?? null;
-    const floorCounter = floorCard ? (floorCard.radioRoundCounter ?? 0) : pickedCounter;
-    // Land strictly above the floor so the played card cannot tie with the
-    // rest of the round; combined with ascending counter ordering this rules
-    // out an immediate repeat as long as ≥1 other playable card exists.
-    const newCounter = Math.max(pickedCounter, floorCounter) + 1;
-
-    // Separate from radioRoundCounter (a rotation position subject to the
-    // catch-up jump above): a true +1-per-play count for the "Only new"
-    // Practice-Listening limit. Seed from the card's review count for cards that
-    // predate the field so an already-practiced card doesn't reset to "new".
-    const reviewCount = card.preReviewCount + (card.fsrsState?.reps ?? 0);
-    const newPlayCount = (card.radioPlayCount ?? reviewCount) + 1;
-
-    await patchCard(
-      ctx,
-      args.cardId,
-      {
-        radioRoundCounter: newCounter,
-        radioPlayCount: newPlayCount,
-        // Re-roll the random tiebreak each play so the order changes between
-        // loops and never aligns with the review (`dueDate`-driven) order.
-        radioOrderKey: randomRadioOrderKey(),
-        lastReviewedAt: Date.now(),
-      },
-      card,
-    );
-
-    await recordRadioPlayStats(ctx, {
-      userId,
-      courseId: deck.courseId,
-      timezone: args.timezone,
-      timeSpentMs: args.timeSpentMs,
-    });
-
-    // Log the play for the learn-mode undo stack. Restoring the pre-play
-    // rotation state puts this card back at the front (advancing only ever
-    // raises counters, so nothing can have slotted in below it since).
-    const radioSettings = await getCourseSettings(ctx, deck.courseId);
-    await logReview(ctx, {
-      userId,
-      courseId: deck.courseId,
-      cardId: args.cardId,
-      reviewedAt: Date.now(),
-      timezone: args.timezone,
-      kind: 'radio',
-      date: getTodayInTimezone(args.timezone),
-      schedulingMode: 'radio',
-      studyContentFilter: radioSettings?.studyContentFilter ?? 'both',
-      prevRadio: {
-        radioRoundCounter: card.radioRoundCounter,
-        radioOrderKey: card.radioOrderKey,
-        radioPlayCount: card.radioPlayCount,
-        lastReviewedAt: card.lastReviewedAt,
-      },
-    });
-
-    return { nextRadioRoundCounter: newCounter };
+    const { nextRoundCounter } = await advanceFreePlayCardImpl(ctx, args);
+    return { nextRadioRoundCounter: nextRoundCounter };
   },
 });
 
 /**
  * Whether the user's active deck has at least one playable card
- * (non-hidden, non-mastered). Used by the home screen to gate the Radio
- * mode button — radio is meaningless on an empty deck.
+ * (non-hidden, non-mastered). Used by the home screen to gate the free-play
+ * button (Radio / Free Study) — free play is meaningless on an empty deck.
  *
- * Uses the minimal `by_deckId_and_isHidden_and_isMastered` index: radio
- * doesn't care about due-ness, and a trailing field like `dueDate`,
- * `lastReviewedAt`, or the radio counters would needlessly broaden the
- * read set and refire the subscription every time those fields change.
+ * Uses the narrowest index that answers the question (free play doesn't care
+ * about due-ness): the plain hidden/mastered index for 'both', the
+ * origin-keyed one when a content filter is active. `.first()` keeps the read
+ * set to a single document either way, so the subscription doesn't refire on
+ * unrelated rotation-counter writes.
  */
 export const hasPlayableCards = query({
   args: {},
@@ -1246,17 +1293,39 @@ export const hasPlayableCards = query({
     const deck = await getDeckByCourseId(ctx, active.course._id);
     if (!deck) return false;
 
-    const first = await ctx.db
-      .query('cards')
-      .withIndex('by_deckId_and_isHidden_and_isMastered', (q) =>
-        q
-          .eq('deckId', deck._id)
-          .eq('isHidden', false)
-          .eq('isMastered', false),
-      )
-      .first();
-
-    return first !== null;
+    // Same content-filter scoping as the free-play queue itself, or the
+    // button lights up for cards the filter will never serve (e.g. filter
+    // "My content" with only premade cards) and the user taps into an
+    // instant empty state.
+    const settings = await getCourseSettings(ctx, active.course._id);
+    const filter = settings?.studyContentFilter ?? 'both';
+    if (filter === 'both') {
+      const first = await ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_isHidden_and_isMastered', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false),
+        )
+        .first();
+      return first !== null;
+    }
+    const allowedOrigins = originsForFilter(filter);
+    for (const origin of allowedOrigins) {
+      const first = await ctx.db
+        .query('cards')
+        .withIndex('by_deck_hidden_mastered_origin_dueDate', (q) =>
+          q
+            .eq('deckId', deck._id)
+            .eq('isHidden', false)
+            .eq('isMastered', false)
+            .eq('collectionOrigin', origin),
+        )
+        .first();
+      if (first !== null) return true;
+    }
+    return false;
   },
 });
 
@@ -1858,7 +1927,9 @@ export const editCard = mutation({
           // these fields still get backfilled on edit.
           isGraduated: card.isGraduated ?? false,
           radioRoundCounter: card.radioRoundCounter ?? 0,
-          radioOrderKey: card.radioOrderKey ?? randomRadioOrderKey(),
+          radioOrderKey: card.radioOrderKey ?? randomOrderKey(),
+          freeStudyRoundCounter: card.freeStudyRoundCounter ?? 0,
+          freeStudyOrderKey: card.freeStudyOrderKey ?? randomOrderKey(),
         },
         card,
       );
@@ -1881,14 +1952,21 @@ export const editCard = mutation({
         isGraduated: card.isGraduated ?? false,
         schedulingPhase: card.schedulingPhase,
         preReviewCount: card.preReviewCount,
+        // Preserve the "until rated good" Practice-Listening progress — losing
+        // this on edit would restart listening for an already-graduated card.
+        goodReviewCount: card.goodReviewCount,
+        audioSpeedOverrides: card.audioSpeedOverrides,
         radioRoundCounter: card.radioRoundCounter ?? 0,
         // Preserve the true radio play-count so an in-place edit doesn't reset the
         // "Only new" graduation (undefined for cards that predate the field).
         radioPlayCount: card.radioPlayCount,
         // Preserve the existing tiebreak so the edited card keeps its place in
         // the radio rotation (or take a fresh random one if the original card
-        // predates this field).
-        radioOrderKey: card.radioOrderKey ?? randomRadioOrderKey(),
+        // predates this field). Same treatment for the free-study rotation.
+        radioOrderKey: card.radioOrderKey ?? randomOrderKey(),
+        freeStudyRoundCounter: card.freeStudyRoundCounter ?? 0,
+        freeStudyPlayCount: card.freeStudyPlayCount,
+        freeStudyOrderKey: card.freeStudyOrderKey ?? randomOrderKey(),
         fsrsState: card.fsrsState,
         lastReviewedAt: card.lastReviewedAt,
         wordsTrackedLanguages: card.wordsTrackedLanguages,

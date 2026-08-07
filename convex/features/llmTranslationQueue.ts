@@ -10,7 +10,11 @@ import {
 } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Doc, Id } from '../_generated/dataModel';
-import { translateTextWithLLM, type ReasoningEffort } from './translationLLM';
+import {
+  translateBestOfN,
+  translateTextWithLLM,
+  type ReasoningEffort,
+} from './translationLLM';
 import {
   getMixedVariantByRegion,
   getTranslationConfigForLanguage,
@@ -452,40 +456,87 @@ export const processLlmTranslationForCard = internalAction({
     let winningStage: (typeof stages)[number] | null = null;
     for (let i = 0; i < stages.length; i++) {
       const stage = stages[i];
-      result = await translateTextWithLLM({
-        ...promptArgs,
-        model: stage.model,
-        reasoning: stage.reasoning as ReasoningEffort | undefined,
-        maxOutputTokens: stage.maxOutputTokens,
-      });
-      // One cost event per stage attempt, failures included: a stage that
-      // truncates still burned tokens, and the failure rate of the cheap first
-      // stage is exactly what decides whether the fallback chain is worth its
-      // price. `translateTextWithLLM` has no ctx of its own, so it hands the
-      // numbers back and the capture happens here.
-      if (result.telemetry) {
-        await captureGeneration(ctx, {
-          feature: 'translation',
-          model: result.telemetry.model,
-          provider: 'openrouter',
-          latencyMs: result.telemetry.latencyMs,
-          inputTokens: result.telemetry.inputTokens,
-          outputTokens: result.telemetry.outputTokens,
-          costUsd: result.telemetry.costUsd,
-          traceId: result.telemetry.generationId,
-          isError: !result.ok,
-          error: result.ok ? undefined : result.reason,
-          // Reused by every user who reaches this sentence — see the
-          // attribution note on `captureGeneration`.
-          sharedContent: true,
-          extra: {
-            text_id: args.textId,
-            target_language: args.targetLanguage,
-            stage_index: i,
-            stage_count: stages.length,
-            reasoning: stage.reasoning ?? 'none',
-          },
+
+      // Shared PostHog dimensions for every capture this stage produces.
+      const stageExtra = {
+        text_id: args.textId,
+        target_language: args.targetLanguage,
+        stage_index: i,
+        stage_count: stages.length,
+        reasoning: stage.reasoning ?? 'none',
+      };
+
+      if (stage.samples) {
+        // Best-of-N stage: several candidate calls + possibly a judge, each
+        // reported as its own generation event. `suspect_hidden_reasoning`
+        // flags calls whose output-token count dwarfs the visible text — the
+        // tell for providers that ignore `reasoning: {enabled: false}` and
+        // silently bill thinking tokens (observed on Luna's Azure endpoints
+        // during the Aug 2026 eval).
+        const bo = await translateBestOfN({ ...promptArgs, stage });
+        for (const t of bo.telemetryList) {
+          const visibleTokenEstimate =
+            t.role === 'candidate' && bo.result.ok
+              ? Math.max(16, Math.ceil(bo.result.text.length / 2))
+              : undefined;
+          await captureGeneration(ctx, {
+            feature: 'translation',
+            model: t.model,
+            provider: 'openrouter',
+            latencyMs: t.latencyMs,
+            inputTokens: t.inputTokens,
+            outputTokens: t.outputTokens,
+            costUsd: t.costUsd,
+            traceId: t.generationId,
+            isError: t.error !== undefined,
+            error: t.error,
+            sharedContent: true,
+            extra: {
+              ...stageExtra,
+              strategy: `bo${stage.samples.total}`,
+              role: t.role,
+              candidate_index: t.candidateIndex,
+              judge_attempt: t.judgeAttempt,
+              n_unique: bo.meta.nUnique,
+              judge_fallback: bo.meta.judgeFallback,
+              suspect_hidden_reasoning:
+                visibleTokenEstimate !== undefined &&
+                t.outputTokens > 4 * visibleTokenEstimate,
+            },
+          });
+        }
+        result = bo.result;
+      } else {
+        result = await translateTextWithLLM({
+          ...promptArgs,
+          model: stage.model,
+          reasoning: stage.reasoning as ReasoningEffort | undefined,
+          maxOutputTokens: stage.maxOutputTokens,
+          provider: stage.provider,
         });
+        // One cost event per stage attempt, failures included: a stage that
+        // truncates still burned tokens, and the failure rate of the cheap first
+        // stage is exactly what decides whether the fallback chain is worth its
+        // price. `translateTextWithLLM` has no ctx of its own, so it hands the
+        // numbers back and the capture happens here.
+        if (result.telemetry) {
+          await captureGeneration(ctx, {
+            feature: 'translation',
+            model: result.telemetry.model,
+            provider: 'openrouter',
+            latencyMs: result.telemetry.latencyMs,
+            inputTokens: result.telemetry.inputTokens,
+            outputTokens: result.telemetry.outputTokens,
+            costUsd: result.telemetry.costUsd,
+            traceId: result.telemetry.generationId,
+            isError: !result.ok,
+            error: result.ok ? undefined : result.reason,
+            // Reused by every user who reaches this sentence — see the
+            // attribution note on `captureGeneration`.
+            sharedContent: true,
+            extra: stageExtra,
+          });
+        }
       }
       if (result.ok) {
         winningStage = stage;

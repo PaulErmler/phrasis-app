@@ -11,6 +11,7 @@ import {
   reviewRatingValidator,
   cardSchedulingSnapshotFields,
   cardRadioSnapshotFields,
+  cardFreeStudySnapshotFields,
   ttsQualityValidator,
   ttsProviderValidator,
   voiceGenderValidator,
@@ -93,6 +94,32 @@ export const courseSettingsFields = {
   // preReviewCount + FSRS reps in audio mode, and max(that, radioPlayCount)
   // in radio mode (radio plays don't bump the FSRS review count).
   targetBeforeOnlyNewReps: v.optional(v.number()),
+  // Practice Listening duration strategy — when a card graduates from
+  // Listening (target-before-base) to Speaking-only:
+  //   'onlyNew'    — after the card's first targetBeforeOnlyNewReps reviews;
+  //   'untilGood'  — after targetBeforeUntilGoodReps FSRS good/easy ratings
+  //                  (pre-review "Understood" doesn't count, see
+  //                  cards.goodReviewCount);
+  //   'continuous' — never (Listening plays on every review).
+  // Unset = legacy docs from before the strategy existed; resolveAudioSettings
+  // infers it from targetBeforeOnlyNewReps (>0 → 'onlyNew', else 'continuous',
+  // matching the old "0/undefined = ∞" convention). Each strategy keeps its
+  // own X so switching back and forth is lossless.
+  targetBeforeListeningStrategy: v.optional(
+    v.union(
+      v.literal('onlyNew'),
+      v.literal('untilGood'),
+      v.literal('continuous'),
+    ),
+  ),
+  targetBeforeUntilGoodReps: v.optional(v.number()), // 1-10, default 1 (no ∞ — that's 'continuous')
+  // Writing mode: show the target translation above the input on a card's
+  // first N reviews so the user copy-types it ("Abschreiben"); the unassisted
+  // test starts afterwards. Unset = true (on). The rep window mirrors
+  // targetBeforeOnlyNewReps: 0 = always show (∞), 1-10 = first N reviews
+  // (preReviewCount + FSRS reps), default 1.
+  showTranslationOnNew: v.optional(v.boolean()),
+  showTranslationOnlyNewReps: v.optional(v.number()),
   showProgressBar: v.optional(v.boolean()), // whether to show the audio progress bar
   progressDisplayEnabled: v.optional(v.boolean()), // celebrate every PROGRESS_DISPLAY_INTERVAL reviews (default true)
   hideTargetLanguages: v.optional(v.boolean()), // blur target language text by default
@@ -116,7 +143,12 @@ export const courseSettingsFields = {
   // (different courses can have different pacing targets).
   dailyTimeGoalMinutes: v.optional(v.number()),
   // Scheduling mode
-  schedulingMode: v.optional(schedulingModeValidator), // 'learnAndReview' (default), 'learn_new', or 'radio' (round-robin playback, no FSRS)
+  // 'learnAndReview' (default), 'learn_new', or 'radio' — the single free-play
+  // mode: round-robin through the whole deck, no FSRS. Free play has two faces
+  // chosen by `reviewMode` (Radio while listening, Free Study while typing),
+  // each with its own card rotation; the face is derived, never stored. See
+  // `freePlayFace` in convex/types.ts.
+  schedulingMode: v.optional(schedulingModeValidator),
   fullReviewTargetAudioMode: v.optional(
     v.union(v.literal('always'), v.literal('afterSubmit'), v.literal('never')),
   ), // When to play target audio in full review mode
@@ -137,6 +169,9 @@ export const courseSettingsFields = {
   // Accuracy breakpoints for the above. Unset = DEFAULT_AUTO_RATE_THRESHOLDS
   // in lib/autoRating.ts (50 / 80).
   autoRateThresholds: v.optional(autoRateThresholdsValidator),
+  // Show which collection each card came from (e.g. "A1.2") as a pill in the
+  // card header while learning. Unset = false = hidden.
+  showCardOrigin: v.optional(v.boolean()),
   chatCollectionId: v.optional(v.id('collections')), // Per-course collection for chat-approved texts
   customCollectionId: v.optional(v.id('collections')), // Per-course collection for manually entered texts
   activeCustomCollectionIds: v.optional(v.array(v.id('collections'))), // Selected custom collections for auto-add
@@ -162,15 +197,16 @@ export const courseSettingsDocValidator = v.object({
 // (convex/features/courses.ts) accepts and may patch, derived from the
 // canonical field set above so the two can't drift. Omits `courseId` (a
 // separate required arg there) and the fields managed by dedicated flows
-// (collection wiring, dataset reconciliation, session id, onboarding-seeded
-// daily goal); `.partial()` because a patch supplies only the fields it
-// changes.
+// (collection wiring, dataset reconciliation, session id); `.partial()`
+// because a patch supplies only the fields it changes.
+// `dailyTimeGoalMinutes` is patchable (goal editors on home/settings);
+// the user's original onboarding answer stays preserved on the frozen
+// `onboardingProgress` row.
 export const coursePatchableSettingsValidator = v
   .object(courseSettingsFields)
   .omit(
     'courseId',
     'activeCollectionId',
-    'dailyTimeGoalMinutes',
     'chatCollectionId',
     'customCollectionId',
     'activeCustomCollectionIds',
@@ -311,6 +347,11 @@ export default defineSchema({
     // sentinel — bumping the source identifier on the failing method is
     // how you re-attempt those rows.
     romanizationSource: v.optional(v.string()),
+    // Debounce marker for the searchableText rebuild fan-out: timestamp until
+    // which a scheduled `rebuildSearchableTextForText` is already pending for
+    // this text. Content stores within that window skip re-scheduling — see
+    // scheduleSearchableTextRebuild in convex/features/decks.ts.
+    searchableRebuildScheduledAt: v.optional(v.number()),
     userCreated: v.boolean(), // false for uploaded data, true for user-created
     userId: v.optional(v.string()), // User who created (for user-created texts)
     collectionId: v.id('collections'), // Reference to collection (required for all texts)
@@ -545,11 +586,12 @@ export default defineSchema({
     collectionOrigin: v.optional(
       v.union(v.literal('premade'), v.literal('custom'), v.literal('chat')),
     ),
-    // Scheduling + radio state mutated by reviewCard / advanceRadioCard.
-    // Shared with the `reviewLogs` undo snapshots — definitions and field
-    // comments live in convex/types.ts.
+    // Scheduling + free-play rotation state mutated by reviewCard /
+    // advanceFreePlayCard (one rotation per face). Shared with the `reviewLogs`
+    // undo snapshots — definitions and field comments live in convex/types.ts.
     ...cardSchedulingSnapshotFields,
     ...cardRadioSnapshotFields,
+    ...cardFreeStudySnapshotFields,
     isMastered: v.boolean(), // Whether the card has been mastered
     isHidden: v.boolean(), // Whether the card is hidden from review
     isFavorite: v.optional(v.boolean()), // Whether the card is marked as a favorite
@@ -574,6 +616,13 @@ export default defineSchema({
       'isMastered',
       'radioRoundCounter',
       'radioOrderKey',
+    ])
+    .index('by_deck_hidden_mastered_studyCounter_studyOrder', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'freeStudyRoundCounter',
+      'freeStudyOrderKey',
     ])
     .index('by_deckId_and_isHidden_and_lastReviewedAt', ['deckId', 'isHidden', 'lastReviewedAt'])
     .index('by_deckId_and_isHidden_and_isMastered_and_lastReviewedAt', ['deckId', 'isHidden', 'isMastered', 'lastReviewedAt'])
@@ -608,6 +657,14 @@ export default defineSchema({
       'collectionOrigin',
       'radioRoundCounter',
       'radioOrderKey',
+    ])
+    .index('by_deck_hidden_mastered_origin_studyCounter_studyOrder', [
+      'deckId',
+      'isHidden',
+      'isMastered',
+      'collectionOrigin',
+      'freeStudyRoundCounter',
+      'freeStudyOrderKey',
     ])
     // Library source-filter variants — origin appended to each state-aware
     // library index so every (state × origin) combo resolves via a pure index
@@ -727,12 +784,15 @@ export default defineSchema({
     cardId: v.id('cards'),
     reviewedAt: v.number(),
     timezone: v.string(), // timezone the review's stats were recorded under
-    kind: v.union(v.literal('review'), v.literal('radio')),
+    // 'review' for the FSRS modes; for free play this carries the FACE
+    // ('radio' = listening, 'freeStudy' = typing), which both selects the
+    // rotation snapshot below and scopes the undo stack.
+    kind: v.union(v.literal('review'), v.literal('radio'), v.literal('freeStudy')),
     date: v.string(), // "YYYY-MM-DD" day key of the stats rows the review incremented; week/month/year keys derived
     // Study context at review time. Undo only applies while the CURRENT
     // course settings match — the undoable stack is the newest-first
     // consecutive run of matching entries, so entries logged under another
-    // mode/filter block everything older beneath them.
+    // mode/face/filter block everything older beneath them.
     schedulingMode: schedulingModeValidator,
     studyContentFilter: studyContentFilterValidator,
 
@@ -759,11 +819,20 @@ export default defineSchema({
       }),
     ),
 
-    // kind === 'radio': pre-play radio rotation state (shared field set with
-    // the cards table) + lastReviewedAt, which advanceRadioCard also stamps.
+    // kind === 'radio': pre-play listening-face rotation state (shared field
+    // set with the cards table) + lastReviewedAt, which the advance also stamps.
     prevRadio: v.optional(
       v.object({
         ...cardRadioSnapshotFields,
+        lastReviewedAt: v.optional(v.number()),
+      }),
+    ),
+
+    // kind === 'freeStudy': pre-play writing-face rotation state, mirroring
+    // prevRadio for the typing round-robin.
+    prevFreeStudy: v.optional(
+      v.object({
+        ...cardFreeStudySnapshotFields,
         lastReviewedAt: v.optional(v.number()),
       }),
     ),
@@ -1056,6 +1125,24 @@ export default defineSchema({
     userId: v.string(),
     planStatus: v.string(),
   }).index('by_userId', ['userId']),
+
+  // E2E-only capture of transactional auth emails (verification / password
+  // reset) and the scheduled welcome email. While the deployment has
+  // E2E_TEST_HOOKS=1, lib/authEmails.ts + lib/welcomeEmail.ts write here
+  // INSTEAD of sending real mail, so Playwright can follow the links
+  // (features/authEmailTesting.ts).
+  //
+  // The flag protects only mail sent DURING the run. The deferred sends
+  // (welcome ~24h, signup notification ~20min) fire after global-teardown has
+  // removed it, so what keeps fake @flexling.com addresses from bouncing real
+  // sends is `isE2EFixtureAddress` in lib/authEmails.ts, not this table.
+  testAuthEmails: defineTable({
+    email: v.string(), // recipient, lowercase
+    kind: v.union(v.literal('verify'), v.literal('reset'), v.literal('welcome')),
+    url: v.optional(v.string()), // reset link ('reset' emails)
+    otp: v.optional(v.string()), // verification code ('verify' emails)
+    subject: v.string(),
+  }).index('by_email', ['email']),
 
   // Admin allowlist for the /app/admin dashboard. The gate (requireAdmin in
   // convex/admin/lib.ts) requires BOTH fields to match the caller's Better

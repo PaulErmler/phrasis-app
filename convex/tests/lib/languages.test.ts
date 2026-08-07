@@ -135,6 +135,10 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
     expect(getCurrentTranslationVersion("yue")).toBe(3);
     expect(getCurrentTranslationVersion("yue_traditional")).toBe(3);
     expect(getCurrentTranslationVersion("th")).toBe(3);
+    // Icelandic: bumped with the Aug 2026 Luna best-of-3 switch — the only
+    // language whose existing rows regenerate under the new rule (native
+    // speaker flagged systematic register/imperative errors).
+    expect(getCurrentTranslationVersion("is")).toBe(2);
   });
 
   it("populates targetRegion correctly for region-specific variants", () => {
@@ -185,13 +189,16 @@ describe("lib/languages — getTranslationConfigForLanguage", () => {
 });
 
 describe("lib/languages — resolveTranslationStages", () => {
-  it("returns the default gemini_35_flash_nitro_minimal chain (primary + one fallback) for an unruled language", () => {
+  it("returns the default luna_bo3 chain (Luna best-of-3 + Gemini fallback) for an unruled language", () => {
     const stages = resolveTranslationStages("nl", 50);
     expect(stages.length).toBe(2);
-    expect(stages[0].model).toBe("google/gemini-3.6-flash:nitro");
-    expect(stages[0].reasoning).toBe("minimal");
-    // The single fallback retries the same config before the Google safety net.
-    expect(stages[1]).toEqual(stages[0]);
+    expect(stages[0].model).toBe("openai/gpt-5.6-luna:nitro");
+    expect(stages[0].reasoning).toBe("none");
+    expect(stages[0].samples).toEqual({ total: 3, extraTemperature: 1 });
+    // The fallback is the pre-Aug-2026 production config, before the Google
+    // safety net.
+    expect(stages[1].model).toBe("google/gemini-3.6-flash:nitro");
+    expect(stages[1].reasoning).toBe("minimal");
   });
 
   it("is length-agnostic (length-hybrid branching was retired)", () => {
@@ -200,28 +207,18 @@ describe("lib/languages — resolveTranslationStages", () => {
     );
   });
 
-  it("de uses gemini_35_flash_nitro_minimal (primary + one fallback)", () => {
-    const stages = resolveTranslationStages("de", 50);
-    expect(stages.length).toBe(2);
-    const nitroMinimal = {
-      model: "google/gemini-3.6-flash:nitro",
-      reasoning: "minimal",
-      maxOutputTokens: 4_000,
-    };
-    expect(stages[0]).toEqual(nitroMinimal);
-    expect(stages[1]).toEqual(nitroMinimal);
-  });
-
-  it("fr uses gemini_35_flash_nitro_minimal (primary + one fallback)", () => {
-    const stages = resolveTranslationStages("fr", 50);
-    expect(stages.length).toBe(2);
-    const nitroMinimal = {
-      model: "google/gemini-3.6-flash:nitro",
-      reasoning: "minimal",
-      maxOutputTokens: 4_000,
-    };
-    expect(stages[0]).toEqual(nitroMinimal);
-    expect(stages[1]).toEqual(nitroMinimal);
+  it("de and fr use the luna_bo3 default (Luna best-of-3 + Gemini fallback)", () => {
+    for (const code of ["de", "fr"]) {
+      const stages = resolveTranslationStages(code, 50);
+      expect(stages.length).toBe(2);
+      expect(stages[0].model).toBe("openai/gpt-5.6-luna:nitro");
+      expect(stages[0].judge?.model).toBe("openai/gpt-5.6-luna:nitro");
+      expect(stages[1]).toEqual({
+        model: "google/gemini-3.6-flash:nitro",
+        reasoning: "minimal",
+        maxOutputTokens: 4_000,
+      });
+    }
   });
 
   it("ruleOverride forces the retranslation_high chain regardless of language", () => {

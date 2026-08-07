@@ -5,7 +5,12 @@ The `/learn` page supports two review modes that users can switch between via th
 - **Shadowing** (`reviewMode: 'audio'`, the default) — listen, translate in your head, say it aloud.
 - **Writing** (`reviewMode: 'full'`) — type the answer and get diff feedback. Writing further splits into two input styles via `courseSettings.writingInputMode` (see below).
 
-Shadowing also has a third *study* mode at the scheduling level: **Radio** (`courseSettings.schedulingMode: 'radio'`) — audio-only round-robin background playback that loops cards hands-free without affecting their FSRS schedule. Radio is only available in Shadowing.
+There is also a *free play* mode at the scheduling level (`courseSettings.schedulingMode: 'radio'`) — an endless round-robin through the whole deck that never touches the FSRS schedule. It is a single scheduling mode with two **faces**, chosen by the review mode rather than stored:
+
+- **Radio** (`reviewMode: 'audio'`) — hands-free background playback that loops cards on its own, forcing autoplay and auto-advance regardless of the user's settings.
+- **Free Study** (`reviewMode: 'full'`) — the typing counterpart: same endless shuffle, but user-paced like any other Writing session.
+
+Flipping the Shadowing/Writing switcher mid-session therefore switches faces live — queue, playback behaviour, card UI and the header pill all follow. The two faces keep **separate per-card rotations** (`cards.radio*` vs `cards.freeStudy*`, one index pair each), so practising a card by listening never counts as having typed it, and vice versa. The active face is derived by `freePlayFace()` in `convex/types.ts`; `reviewLogs.kind` stores it so undo restores the right rotation.
 
 ## Shadowing (`reviewMode: 'audio'`, default)
 
@@ -46,7 +51,8 @@ Shadowing):
 
 Playback settings are split per mode: the unsuffixed `courseSettings` fields
 (`languageRepetitions`, `pauseBaseToBase`, `autoPlayAudio`, `highlightWords`,
-…) remain authoritative for Shadowing (and Radio), the `*Full` counterparts
+…) remain authoritative for Shadowing (including free play's Radio face; its
+Free Study face resolves the Writing chain like any other typing session), the `*Full` counterparts
 hold the Writing/Translate values, and the `*Transcribe` counterparts hold the
 Writing/Transcribe values. Writing resolves every playback value along the
 chain

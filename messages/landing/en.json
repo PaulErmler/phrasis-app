@@ -51,7 +51,7 @@
       },
       "customisation": {
         "title": "Make it yours",
-        "body": "Bring your own sentences, import a spreadsheet, or let AI generate them. Your material, your way."
+        "body": "Bring your own sentences, import a spreadsheet, or let AI generate them. Content that is relevant to you increases retention."
       },
       "feedback": {
         "title": "Instant feedback",
@@ -75,6 +75,8 @@
     "reviewModeBody": "Shadow the cards that are due and spaced repetition schedules each one for the perfect moment to remember it.",
     "radioTitle": "Radio",
     "radioBody": "Let sentences and their translations play all day — passive listening that gets the language into your ear, without touching your spaced-repetition schedule.",
+    "freeStudyTitle": "Free Study",
+    "freeStudyBody": "Don't want a session to touch your spaced-repetition schedule? Free Study shuffles endlessly through all your sentences so you can practice typing at your own pace — nothing gets scheduled, nothing counts against your reviews.",
     "missingTitle": "Missing a way to learn?",
     "missingBody": "Let us know and we'll try our best to adapt Flexling to your needs.",
     "missingCta": "Suggest a way to learn",
@@ -200,7 +202,13 @@
     "activityBody": "See exactly what words you learned recently and stay motivated as your vocabulary expands.",
     "wordCloudHint": "Click any word to see the sentences you learned with that word",
     "insightsTitle": "Session Snapshot",
-    "insightsBody": "After every review, see exactly what you accomplished: repetitions, new words, and time spent — all updated live the moment you finish.",
+    "insightsBody": "After every review, see exactly what you accomplished: your daily-goal ring fills as you study, badges show what's waiting, and a rotating forecast projects where your pace is taking you.",
+    "projectionLabel": "Your forecast",
+    "projectionFacts": {
+      "wordsByYearEnd": "~2,400 words by end of 2026",
+      "nextLevel": "Next level (B1) in ~9 weeks",
+      "wordsPerSession": "≈ 12 new words per session"
+    },
     "habitsTitle": "Find Your Peak Hours",
     "habitsBody": "Discover when you learn best. A breakdown of your study hours reveals your natural rhythm so you can schedule sessions when you're sharpest.",
     "goalsTitle": "See The Big Picture",

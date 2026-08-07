@@ -9,6 +9,7 @@ import { AudioProgressBar } from './AudioProgressBar';
 import { CardActionsMenu, type CardActionsMenuProps } from './CardActionsMenu';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
+import type { CardOriginPill } from './cardOriginPill';
 import type { CardTranslation, CardAudioRecording } from './types';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
 import type { ClockBinding } from '@/hooks/use-karaoke-index';
@@ -21,6 +22,10 @@ interface CardShellProps {
    *  where the review-screen sizing looks oversized. */
   compact?: boolean;
   reviewCount: number;
+  /** Source-collection pill ("A1.2", "Custom") shown next to the
+   *  review-count badge, tinted with the collection's CEFR color. Absent/null
+   *  = pill hidden (setting off, or the collection couldn't be resolved). */
+  originPill?: CardOriginPill | null;
   sourceText: string;
   translations: CardTranslation[];
   audioRecordings: CardAudioRecording[];
@@ -102,6 +107,7 @@ interface CardShellProps {
 export function CardShell({
   compact = false,
   reviewCount,
+  originPill,
   sourceText,
   translations,
   audioRecordings,
@@ -181,6 +187,26 @@ export function CardShell({
           <Badge variant="secondary" className="text-xs">
             {t('reviewCount', { count: reviewCount })}
           </Badge>
+          {originPill && (
+            <Badge
+              variant="outline"
+              className="font-mono text-xs"
+              // CEFR-tinted like the home-screen level chips: transparent
+              // fill of the tier color, tier-colored text. Custom/chat pills
+              // carry no color and keep the neutral outline look.
+              style={
+                originPill.color
+                  ? {
+                      borderColor: 'transparent',
+                      backgroundColor: `color-mix(in oklch, ${originPill.color} 15%, transparent)`,
+                      color: originPill.color,
+                    }
+                  : undefined
+              }
+            >
+              {originPill.label}
+            </Badge>
+          )}
           {translationStatePill && (
             <Badge
               // Transparent warning fill (15% alpha of theme's --color-warning).

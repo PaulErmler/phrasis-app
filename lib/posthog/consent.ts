@@ -101,3 +101,26 @@ export function setConsent(granted: boolean): void {
   if (granted) grantConsent();
   else denyConsent();
 }
+
+/**
+ * `posthog.reset()` clears the stored opt-in/out choice along with identity.
+ * Sign-out must forget who the user was, not whether they consented — so
+ * capture the explicit status first and re-apply it after.
+ *
+ * The consent record is deliberately scoped to the DEVICE, not the person: we
+ * assume one browser profile belongs to one user. On a shared device the next
+ * person to sign in therefore inherits the previous answer instead of being
+ * asked again. Scoping it per user id was tried and removed — it cannot be
+ * done safely from here, because PostHog boots (and session replay starts)
+ * before the auth query resolves, and `clear_opt_in_out_capturing()` resets
+ * the stored record without stopping capture. Anything better has to gate
+ * `posthog.init()` on the signed-in identity, not patch it afterwards.
+ */
+export function resetPreservingConsent(): void {
+  const status = posthog.get_explicit_consent_status();
+  posthog.reset();
+  // Not a fresh opt-in, just restoring the record — don't re-fire `$opt_in`.
+  if (status === 'granted') posthog.opt_in_capturing({ captureEventName: null });
+  else if (status === 'denied') posthog.opt_out_capturing();
+  notify();
+}

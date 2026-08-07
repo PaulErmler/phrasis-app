@@ -19,6 +19,11 @@ import {
   PLACEMENT_CONTENT_BATCH_SIZE,
   PLACEMENT_SENTENCES_QUERY_CAP,
 } from '../../lib/constants/onboarding';
+import {
+  DAILY_TIME_CUSTOM_MIN,
+  DAILY_TIME_CUSTOM_MAX,
+} from '../../lib/constants/dailyGoal';
+import { getCourseSettings } from '../db/courseSettings';
 import { scheduleMissingContent } from './decks';
 
 /**
@@ -345,7 +350,12 @@ export const ensureAudioForTestTranslations = internalMutation({
  *
  * The course/deck/cards (and the per-course `dailyTimeGoalMinutes` on
  * `courseSettings`) are created earlier in `completeOnboarding`
- * (`convex/features/courses.ts`). Keeping the flag-set deferred to this
+ * (`convex/features/courses.ts`). Because the word-projection step lets the
+ * user retune the goal AFTER that copy was made (its picker only writes the
+ * `onboardingProgress` row), this mutation re-syncs the final goal value
+ * onto the active course's `courseSettings` — otherwise the home-screen
+ * goal ring and projections would keep the stale pre-projection value.
+ * Keeping the flag-set deferred to this
  * final step means the `OnboardingGuard` redirect logic stays the single
  * source of truth: as long as `hasCompletedOnboarding` is false the user
  * is in onboarding, the wizard resumes from `onboardingProgress.step` on
@@ -402,6 +412,32 @@ export const finalizeOnboarding = mutation({
     const progress = await getOnboardingProgress(ctx, userId);
     if (progress) {
       await ctx.db.patch(progress._id, { completedAt: Date.now() });
+
+      // Sync the wizard's final daily-goal answer onto the active course.
+      // Same clamp window as `updateCourseSettings` so a hand-crafted
+      // progress write can't smuggle an out-of-range goal past it.
+      const goal = progress.dailyTimeGoalMinutes;
+      if (
+        typeof goal === 'number' &&
+        Number.isFinite(goal) &&
+        settings?.activeCourseId
+      ) {
+        const courseSettings = await getCourseSettings(
+          ctx,
+          settings.activeCourseId,
+        );
+        if (courseSettings) {
+          const clamped = Math.max(
+            DAILY_TIME_CUSTOM_MIN,
+            Math.min(DAILY_TIME_CUSTOM_MAX, Math.round(goal)),
+          );
+          if (courseSettings.dailyTimeGoalMinutes !== clamped) {
+            await ctx.db.patch(courseSettings._id, {
+              dailyTimeGoalMinutes: clamped,
+            });
+          }
+        }
+      }
     }
 
     // Server-side so it survives the tab being closed on the redirect to /app.

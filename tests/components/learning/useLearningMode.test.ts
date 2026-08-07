@@ -21,7 +21,7 @@ const harness = vi.hoisted(() => {
   const REFS = {
     getCardForReview: 'scheduling.getCardForReview',
     reviewCard: 'scheduling.reviewCard',
-    advanceRadioCard: 'scheduling.advanceRadioCard',
+    advanceFreePlayCard: 'scheduling.advanceFreePlayCard',
     undoLastReview: 'scheduling.undoLastReview',
     masterCard: 'scheduling.masterCard',
     hideCard: 'scheduling.hideCard',
@@ -81,7 +81,7 @@ vi.mock('@/convex/_generated/api', () => {
         scheduling: {
           getCardForReview: REFS.getCardForReview,
           reviewCard: REFS.reviewCard,
-          advanceRadioCard: REFS.advanceRadioCard,
+          advanceFreePlayCard: REFS.advanceFreePlayCard,
           undoLastReview: REFS.undoLastReview,
           masterCard: REFS.masterCard,
           hideCard: REFS.hideCard,
@@ -217,6 +217,23 @@ describe('useLearningMode', () => {
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
+  });
+
+  describe('scheduling phase exposure', () => {
+    it('full mode forces the effective phase to review (FSRS ratings)', () => {
+      seedReviewing(
+        { schedulingPhase: 'preReview', preReviewCount: 0 },
+        { reviewMode: 'full' },
+      );
+      const { result } = renderHook(() => useLearningMode());
+      expect(reviewing(result).phase).toBe('review');
+    });
+
+    it('audio mode keeps the stored phase', () => {
+      seedReviewing({ schedulingPhase: 'preReview', preReviewCount: 0 });
+      const { result } = renderHook(() => useLearningMode());
+      expect(reviewing(result).phase).toBe('preReview');
+    });
   });
 
   describe('sticky query values', () => {
@@ -456,10 +473,10 @@ describe('useLearningMode', () => {
     });
   });
 
-  describe('handleNext — radio branch', () => {
-    it('fires advanceRadioCard once and always clears isExiting on success', async () => {
+  describe('handleNext — free-play branch', () => {
+    it('fires advanceFreePlayCard once and always clears isExiting on success', async () => {
       seedReviewing({}, { schedulingMode: 'radio' });
-      const radio = harness.mutationFor(REFS.advanceRadioCard);
+      const radio = harness.mutationFor(REFS.advanceFreePlayCard);
       const review = harness.mutationFor(REFS.reviewCard);
       const gate = deferred();
       radio.mockReturnValueOnce(gate.promise);
@@ -485,15 +502,15 @@ describe('useLearningMode', () => {
         await gate.promise;
       });
 
-      // Radio's finally clears isExiting unconditionally (same-id decks
+      // Free play's finally clears isExiting unconditionally (same-id decks
       // would otherwise stay blank).
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
     });
 
-    it('clears isExiting and isReviewing even when advanceRadioCard rejects', async () => {
+    it('clears isExiting and isReviewing even when advanceFreePlayCard rejects', async () => {
       seedReviewing({}, { schedulingMode: 'radio' });
-      const radio = harness.mutationFor(REFS.advanceRadioCard);
+      const radio = harness.mutationFor(REFS.advanceFreePlayCard);
       radio.mockRejectedValueOnce(new Error('boom'));
 
       const { result } = renderHook(() => useLearningMode());
@@ -505,10 +522,40 @@ describe('useLearningMode', () => {
       expect(reviewing(result).isExiting).toBe(false);
       expect(reviewing(result).isReviewing).toBe(false);
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to advance radio card:',
+        'Failed to advance free-play card:',
         expect.any(Error),
       );
     });
+
+    // Free play is one mode; the server resolves which rotation to advance
+    // from `reviewMode`, so the client fires the same mutation in both faces
+    // and never rates.
+    it.each(['audio', 'full'] as const)(
+      'routes free play to advanceFreePlayCard in %s review mode, with no ratings and no reviewCard call',
+      async (reviewMode) => {
+        seedReviewing({}, { schedulingMode: 'radio', reviewMode });
+        const freePlay = harness.mutationFor(REFS.advanceFreePlayCard);
+        const review = harness.mutationFor(REFS.reviewCard);
+
+        const { result } = renderHook(() => useLearningMode());
+        expect(reviewing(result).validRatings).toEqual([]);
+
+        await act(async () => {
+          await reviewing(result).handleNext();
+        });
+
+        expect(freePlay).toHaveBeenCalledTimes(1);
+        const args = freePlay.mock.calls[0][0] as Record<string, unknown>;
+        expect(args.cardId).toBe('card1');
+        expect(typeof args.timezone).toBe('string');
+        expect(typeof args.timeSpentMs).toBe('number');
+        // No face argument — the server reads it off course settings.
+        expect(args).not.toHaveProperty('mode');
+        expect(review).not.toHaveBeenCalled();
+        expect(reviewing(result).isExiting).toBe(false);
+        expect(reviewing(result).isReviewing).toBe(false);
+      },
+    );
   });
 
   describe('handleNext — review branch', () => {

@@ -1,5 +1,7 @@
 import { MutationCtx } from '../../_generated/server';
 import { Id } from '../../_generated/dataModel';
+import type { StatsReviewMode } from '../../types';
+import { EMPTY_MODE_COUNTS } from './dailyStats';
 
 export { getISOWeekString } from '../../lib/dateUtils';
 
@@ -11,7 +13,7 @@ export async function upsertWeeklyStats(
     week: string;
     timeMs: number;
     isNewCard: boolean;
-    reviewMode?: 'audio' | 'full' | 'radio';
+    reviewMode?: StatsReviewMode;
     isFirstActivityToday: boolean;
   },
 ): Promise<{ isFirstActivityThisWeek: boolean }> {
@@ -23,12 +25,10 @@ export async function upsertWeeklyStats(
     .first();
 
   if (existing) {
-    // `radio` was added later and is optional in the stored shape, so
-    // coalesce against an empty triple before bumping a key.
-    const prevMode: { audio: number; full: number; radio: number } = {
-      audio: 0,
-      full: 0,
-      radio: 0,
+    // `radio`/`freeStudy` were added later and are optional in the stored
+    // shape, so coalesce against an empty set before bumping a key.
+    const prevMode: Record<StatsReviewMode, number> = {
+      ...EMPTY_MODE_COUNTS(),
       ...(existing.reviewsByMode ?? {}),
     };
     await ctx.db.patch(existing._id, {
@@ -54,9 +54,8 @@ export async function upsertWeeklyStats(
     ...(args.reviewMode
       ? {
         reviewsByMode: {
-          audio: args.reviewMode === 'audio' ? 1 : 0,
-          full: args.reviewMode === 'full' ? 1 : 0,
-          radio: args.reviewMode === 'radio' ? 1 : 0,
+          ...EMPTY_MODE_COUNTS(),
+          [args.reviewMode]: 1,
         },
       }
       : {}),

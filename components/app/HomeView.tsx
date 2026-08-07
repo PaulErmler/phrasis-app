@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Preloaded, usePreloadedQuery, useMutation, useQuery } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import { HomeChatInput } from '@/components/chat/HomeChatInput';
 import { SegmentedHomeSection } from '@/components/app/segmented/SegmentedHomeSection';
 import { ProgressStatsCard } from '@/components/app/ProgressStatsCard';
 import { NoCourseEmptyState } from '@/components/app/NoCourseEmptyState';
+import { useAppData } from '@/components/app/AppDataProvider';
 import { useTutorial } from '@/lib/tutorials/use-tutorial';
 import { TUTORIAL_IDS } from '@/lib/tutorials/registry';
 import { MessageSquare, PenLine, Loader2 } from 'lucide-react';
@@ -21,7 +23,6 @@ import type { ReviewMode, SchedulingMode } from '@/convex/types';
 const warmedCourseIds = new Set<string>();
 
 export function HomeView({
-  preloadedCourseSettings,
   onLearnOpen,
   onChatOpen,
   onNavigateToContent,
@@ -33,9 +34,6 @@ export function HomeView({
   hasActiveCourse,
   onOpenCourseMenu,
 }: {
-  preloadedCourseSettings: Preloaded<
-    typeof api.features.courses.getActiveCourseSettings
-  >;
   onLearnOpen: () => void;
   onChatOpen: (threadId: string) => void;
   onNavigateToContent: () => void;
@@ -49,16 +47,23 @@ export function HomeView({
 }) {
   const t = useTranslations('AppPage');
 
+  const { courseSettings } = useAppData();
+
   const { restartTutorial } = useTutorial(TUTORIAL_IDS.HOME_TOUR, {
     delayMs: 1200,
     stepCompleteOnClickIndex: 2,
+    // Home stays mounted across tabs (KeepMountedView). Only auto-start
+    // when home is actually visible so the overlay doesn't pop over
+    // Settings / Library / Learn.
+    enabled: !isHidden,
+    // Anchors the free-play step to the button that actually renders:
+    // Radio (Shadowing) vs Free Study (Writing).
+    context: { reviewMode: courseSettings?.reviewMode ?? 'audio' },
   });
 
   useEffect(() => {
     onTutorialReady?.(restartTutorial);
   }, [onTutorialReady, restartTutorial]);
-
-  const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   // Drives the disabled state of the Radio button on the home screen — radio
   // mode is meaningless on an empty deck. Skipped while HomeView is hidden
   // (e.g. user is mid-LearnView) so the subscription doesn't refire on every
@@ -68,22 +73,7 @@ export function HomeView({
     api.features.scheduling.hasPlayableCards,
     isHidden ? 'skip' : {},
   );
-  const updateCourseSettings = useMutation(
-    api.features.courses.updateCourseSettings,
-  ).withOptimisticUpdate((localStore, args) => {
-    const current = localStore.getQuery(
-      api.features.courses.getActiveCourseSettings,
-      {},
-    );
-    if (current !== undefined && current !== null) {
-      const { courseId, ...updates } = args;
-      localStore.setQuery(
-        api.features.courses.getActiveCourseSettings,
-        {},
-        { ...current, ...updates },
-      );
-    }
-  });
+  const updateCourseSettings = useUpdateCourseSettings();
 
   const ensureAllModesContent = useMutation(
     api.features.decks.ensureUpcomingCardsContentAllModes,
@@ -187,7 +177,6 @@ export function HomeView({
         <ProgressStatsCard
           key={courseSettings?.courseId}
           onStartLearn={handleStartLearn}
-          reviewMode={courseSettings?.reviewMode ?? 'audio'}
           onReviewModeChange={handleReviewModeChange}
           animateEntrance={animateEntrance}
           skipLiveStats={isHidden}
