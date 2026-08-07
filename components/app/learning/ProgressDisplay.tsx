@@ -7,6 +7,7 @@ import { motion } from 'motion/react';
 import { BookOpen, ChevronRight, Clock, Pause, Play, RotateCcw } from 'lucide-react';
 import { api } from '@/convex/_generated/api';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
+import { useNowMinute } from '@/hooks/use-now-minute';
 import { formatTimeMs } from '@/lib/formatTime';
 import { getLanguageByCode } from '@/lib/languages';
 import { getUserTimezone } from '@/lib/timezone';
@@ -21,6 +22,7 @@ import {
   setupMediaSession,
   setMediaSessionPlaybackState,
 } from '@/lib/audio/mediaSession';
+import type { SchedulingMode } from '@/convex/types';
 
 type CardCounts = { new: number; learning: number; relearning: number; review: number };
 
@@ -31,7 +33,7 @@ interface ProgressDisplayProps {
   dailyReviewsToday: number;
   dailyTimeMsToday: number;
   dailyNewWordsToday: number;
-  schedulingMode: 'learn_new' | 'learnAndReview' | 'radio';
+  schedulingMode: SchedulingMode;
   /** Auto-advance + auto-advance bar are audio-mode only. */
   reviewMode: 'audio' | 'full';
   /** Mirrors `courseSettings.autoAdvance`. Even in audio mode, the
@@ -180,7 +182,10 @@ export function ProgressDisplay(props: ProgressDisplayProps) {
   const { ready = true } = props;
   // Resolve user's IANA zone once per mount; it's a constant for the runtime.
   const timezone = useMemo(() => getUserTimezone(), []);
-  const cardCountsQuery = useQuery(api.features.stats.getCardCounts, {});
+  // Minute-stable `now` per the no-wall-clock query guideline; the re-subscribe
+  // gap on a minute tick is bridged by the lastCardCountsRef cache below.
+  const now = useNowMinute();
+  const cardCountsQuery = useQuery(api.features.stats.getCardCounts, { now });
   const celebrationWordsQuery = useQuery(
     api.features.stats.getNewWordsForCelebration,
     { sessionId: props.sessionId, timezone },

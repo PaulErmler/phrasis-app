@@ -74,7 +74,6 @@ export default function MainLayout({
 }) {
   const {
     preloadedSettings,
-    preloadedCourseSettings,
     activeCourse,
   } = useAppData();
 
@@ -399,7 +398,6 @@ export default function MainLayout({
           visible={!isLearnOpen && activeView === 'home' && !isAddCardsRoute}
         >
           <HomeView
-            preloadedCourseSettings={preloadedCourseSettings}
             onLearnOpen={handleLearnOpen}
             onChatOpen={handleOpenChat}
             onNavigateToContent={handleNavigateToAddCards}

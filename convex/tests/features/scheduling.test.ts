@@ -938,6 +938,38 @@ describe("features/scheduling", () => {
       expect(audio?.wordTimings).toEqual([{ word: "Hej", start: 0, end: 0.5 }]);
     });
 
+    it("preserves goodReviewCount and audioSpeedOverrides on the replacement card", async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId: oldTextId } = await seedSharedCardWithAudio(t);
+      // "Until rated Good" listening progress + per-card speed overrides —
+      // both were silently dropped by the replace path before, resetting
+      // Practice Listening for an already-graduated card on every edit.
+      await t.run(async (ctx) => {
+        await ctx.db.patch(cardId, {
+          goodReviewCount: 3,
+          audioSpeedOverrides: { sv: 0.8 },
+        });
+      });
+      const asUser = t.withIdentity({ subject: "user_A" });
+
+      await asUser.mutation(api.features.scheduling.editCard, {
+        cardId,
+        translations: [
+          { language: "sv", text: "Hej" },
+          { language: "en", text: "Hi there" },
+        ],
+        timezone: "UTC",
+      });
+
+      const allCards = await t.run(async (ctx) =>
+        ctx.db.query("cards").collect(),
+      );
+      const replacement = allCards.find((c) => c.textId !== oldTextId);
+      expect(replacement, "a replacement card should exist").toBeTruthy();
+      expect(replacement!.goodReviewCount).toBe(3);
+      expect(replacement!.audioSpeedOverrides).toEqual({ sv: 0.8 });
+    });
+
     it("copies audio for a punctuation-only edit (sounds identical) but not for an audible one", async () => {
       const t = convexTest(schema, modules);
       const { cardId, textId: oldTextId } = await seedSharedCardWithAudio(t);
@@ -1642,7 +1674,7 @@ describe("features/scheduling", () => {
   // ============================================================================
   //
   // Radio mode bypasses FSRS entirely. Cards are picked by `radioRoundCounter`
-  // (lowest first), and `advanceRadioCard` only patches `radioRoundCounter` +
+  // (lowest first), and the free-play advance only patches `radioRoundCounter` +
   // `lastReviewedAt` — it must NOT touch FSRS state, dueDate, schedulingPhase,
   // or daily stats. The catch-up rule keeps a freshly-added card (counter 0)
   // from monopolizing the queue when other cards are at a high counter.
@@ -1826,14 +1858,14 @@ describe("features/scheduling", () => {
     });
 
     // ------------------------------------------------------------------------
-    // advanceRadioCard
+    // advanceFreePlayCard
     // ------------------------------------------------------------------------
-    describe("advanceRadioCard", () => {
+    describe("advanceFreePlayCard (listening face)", () => {
       it("rejects unauthenticated callers", async () => {
         const t = convexTest(schema, modules);
         const { cardIds } = await seedRadioDeck(t, [{ counter: 0 }]);
         await expect(
-          t.mutation(api.features.scheduling.advanceRadioCard, {
+          t.mutation(api.features.scheduling.advanceFreePlayCard, {
             cardId: cardIds[0],
             timezone: "UTC",
           }),
@@ -1845,7 +1877,7 @@ describe("features/scheduling", () => {
         const { cardIds } = await seedRadioDeck(t, [{ counter: 0 }]);
         const asOther = t.withIdentity({ subject: "user_B" });
         await expect(
-          asOther.mutation(api.features.scheduling.advanceRadioCard, {
+          asOther.mutation(api.features.scheduling.advanceFreePlayCard, {
             cardId: cardIds[0],
             timezone: "UTC",
           }),
@@ -1857,10 +1889,10 @@ describe("features/scheduling", () => {
         const { cardIds } = await seedRadioDeck(t, [{ counter: 4 }]);
         const asUser = t.withIdentity({ subject: "user_A" });
         const result = await asUser.mutation(
-          api.features.scheduling.advanceRadioCard,
+          api.features.scheduling.advanceFreePlayCard,
           { cardId: cardIds[0], timezone: "UTC" },
         );
-        expect(result.nextRadioRoundCounter).toBe(5);
+        expect(result.nextRoundCounter).toBe(5);
         const card = await t.run(async (ctx) => ctx.db.get(cardIds[0]));
         expect(card?.radioRoundCounter).toBe(5);
       });
@@ -1876,10 +1908,10 @@ describe("features/scheduling", () => {
         ]);
         const asUser = t.withIdentity({ subject: "user_A" });
         const result = await asUser.mutation(
-          api.features.scheduling.advanceRadioCard,
+          api.features.scheduling.advanceFreePlayCard,
           { cardId: cardIds[0], timezone: "UTC" },
         );
-        expect(result.nextRadioRoundCounter).toBe(6);
+        expect(result.nextRoundCounter).toBe(6);
       });
 
       it("catches a fresh card up to one past the floor instead of incrementing by 1", async () => {
@@ -1897,10 +1929,10 @@ describe("features/scheduling", () => {
         ]);
         const asUser = t.withIdentity({ subject: "user_A" });
         const result = await asUser.mutation(
-          api.features.scheduling.advanceRadioCard,
+          api.features.scheduling.advanceFreePlayCard,
           { cardId: cardIds[2], timezone: "UTC" },
         );
-        expect(result.nextRadioRoundCounter).toBe(101);
+        expect(result.nextRoundCounter).toBe(101);
         const card = await t.run(async (ctx) => ctx.db.get(cardIds[2]));
         expect(card?.radioRoundCounter).toBe(101);
       });
@@ -1919,14 +1951,14 @@ describe("features/scheduling", () => {
         });
         const asUser = t.withIdentity({ subject: "user_A" });
 
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
         });
         let card = await t.run(async (ctx) => ctx.db.get(cardIds[0]));
         expect(card?.radioPlayCount).toBe(5);
 
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
         });
@@ -1939,7 +1971,7 @@ describe("features/scheduling", () => {
         const { cardIds } = await seedRadioDeck(t, [{ counter: 0 }]);
         const before = await t.run(async (ctx) => ctx.db.get(cardIds[0]));
         const asUser = t.withIdentity({ subject: "user_A" });
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
         });
@@ -1957,7 +1989,7 @@ describe("features/scheduling", () => {
         const { cardIds } = await seedRadioDeck(t, [{ counter: 0 }]);
         const before = Date.now();
         const asUser = t.withIdentity({ subject: "user_A" });
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
         });
@@ -1986,7 +2018,7 @@ describe("features/scheduling", () => {
           );
           if (!next) break;
           playOrder.push(next.sourceText);
-          await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+          await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
             cardId: next._id,
             timezone: "UTC",
           });
@@ -2007,29 +2039,29 @@ describe("features/scheduling", () => {
         const counters: number[] = [];
         for (let i = 0; i < 4; i++) {
           const r = await asUser.mutation(
-            api.features.scheduling.advanceRadioCard,
+            api.features.scheduling.advanceFreePlayCard,
             { cardId: cardIds[0], timezone: "UTC" },
           );
-          counters.push(r.nextRadioRoundCounter);
+          counters.push(r.nextRoundCounter);
         }
         expect(counters).toEqual([1, 2, 3, 4]);
       });
     });
 
     // ------------------------------------------------------------------------
-    // advanceRadioCard — stats tracking
+    // advanceFreePlayCard — stats tracking
     // ------------------------------------------------------------------------
     //
     // Radio plays write LIGHT stats: dailyStats reps/timeMs/reviewsByMode.radio
     // /timeMsByMode.radio + courseStats totals + weekly/monthly/yearly rollups
     // + streak. Word tracking, accuracy, ratings, hour buckets, card-state
     // breakdown, and collection progress are intentionally skipped.
-    describe("advanceRadioCard — stats", () => {
+    describe("advanceFreePlayCard — stats (listening face)", () => {
       it("writes dailyStats with reviewsByMode.radio + timeMsByMode.radio", async () => {
         const t = convexTest(schema, modules);
         const { cardIds, courseId } = await seedRadioDeck(t, [{ counter: 0 }]);
         const asUser = t.withIdentity({ subject: "user_A" });
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
           timeSpentMs: 7500,
@@ -2060,7 +2092,7 @@ describe("features/scheduling", () => {
         const { cardIds, courseId } = await seedRadioDeck(t, [{ counter: 0 }]);
         const asUser = t.withIdentity({ subject: "user_A" });
         for (const ms of [1000, 2000, 3000]) {
-          await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+          await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
             cardId: cardIds[0],
             timezone: "UTC",
             timeSpentMs: ms,
@@ -2084,7 +2116,7 @@ describe("features/scheduling", () => {
         const t = convexTest(schema, modules);
         const { cardIds, courseId } = await seedRadioDeck(t, [{ counter: 0 }]);
         const asUser = t.withIdentity({ subject: "user_A" });
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
           // 1 hour of "background" time should not all credit as study.
@@ -2105,7 +2137,7 @@ describe("features/scheduling", () => {
         const t = convexTest(schema, modules);
         const { cardIds, courseId } = await seedRadioDeck(t, [{ counter: 0 }]);
         const asUser = t.withIdentity({ subject: "user_A" });
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
         });
@@ -2125,7 +2157,7 @@ describe("features/scheduling", () => {
         const t = convexTest(schema, modules);
         const { cardIds, courseId } = await seedRadioDeck(t, [{ counter: 0 }]);
         const asUser = t.withIdentity({ subject: "user_A" });
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
           timeSpentMs: 4000,
@@ -2151,7 +2183,7 @@ describe("features/scheduling", () => {
         const t = convexTest(schema, modules);
         const { cardIds, courseId } = await seedRadioDeck(t, [{ counter: 0 }]);
         const asUser = t.withIdentity({ subject: "user_A" });
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
         });
@@ -2172,7 +2204,7 @@ describe("features/scheduling", () => {
         const t = convexTest(schema, modules);
         const { cardIds, courseId } = await seedRadioDeck(t, [{ counter: 0 }]);
         const asUser = t.withIdentity({ subject: "user_A" });
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
           timeSpentMs: 2500,
@@ -2213,7 +2245,7 @@ describe("features/scheduling", () => {
         const t = convexTest(schema, modules);
         const { cardIds, courseId } = await seedRadioDeck(t, [{ counter: 0 }]);
         const asUser = t.withIdentity({ subject: "user_A" });
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
           timeSpentMs: 5000,
@@ -2248,7 +2280,7 @@ describe("features/scheduling", () => {
         const t = convexTest(schema, modules);
         const { cardIds, courseId } = await seedRadioDeck(t, [{ counter: 0 }]);
         const asUser = t.withIdentity({ subject: "user_A" });
-        await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+        await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
           cardId: cardIds[0],
           timezone: "UTC",
           timeSpentMs: 5000,
@@ -2307,7 +2339,7 @@ describe("features/scheduling", () => {
         const asUser = t.withIdentity({ subject: "user_A" });
         const seen: number[] = [42];
         for (let i = 0; i < 5; i++) {
-          await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+          await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
             cardId: cardIds[0],
             timezone: "UTC",
           });
@@ -2343,7 +2375,7 @@ describe("features/scheduling", () => {
             {},
           );
           if (!next) break;
-          await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+          await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
             cardId: next._id,
             timezone: "UTC",
           });

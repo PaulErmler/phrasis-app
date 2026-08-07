@@ -1,4 +1,9 @@
-import type { TutorialDefinition, TutorialFactory, TranslateFn } from './types';
+import type {
+  TutorialDefinition,
+  TutorialFactory,
+  TutorialContext,
+  TranslateFn,
+} from './types';
 import { createHomeTour } from './home-tour';
 import { createAudioReviewTour } from './audio-review-tour';
 import { createFullReviewTour } from './full-review-tour';
@@ -11,9 +16,13 @@ const tutorialFactories: Record<string, TutorialFactory> = {
   full_review_intro: createFullReviewTour,
 };
 
-export function getTutorial(id: string, t: TranslateFn): TutorialDefinition | undefined {
+export function getTutorial(
+  id: string,
+  t: TranslateFn,
+  ctx?: TutorialContext,
+): TutorialDefinition | undefined {
   // Own-key guard: without it, prototype keys like 'toString' would resolve
   // through the object's prototype chain to a non-factory.
   if (!Object.hasOwn(tutorialFactories, id)) return undefined;
-  return tutorialFactories[id](t);
+  return tutorialFactories[id](t, ctx);
 }

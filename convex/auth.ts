@@ -4,14 +4,27 @@ import {
   type GenericCtx,
 } from '@convex-dev/better-auth';
 import { convex } from '@convex-dev/better-auth/plugins';
+import { requireRunMutationCtx } from '@convex-dev/better-auth/utils';
 import { components, internal } from './_generated/api';
 import { DataModel } from './_generated/dataModel';
 import { query } from './_generated/server';
 import { betterAuth } from 'better-auth';
 import { SignJWT, importPKCS8 } from 'jose';
 import authConfig from './auth.config';
+import { emailOTP } from 'better-auth/plugins';
 import { upsertUserProfile, deleteUserProfile } from './db/userProfiles';
 import { EVENTS, track } from './analytics';
+import {
+  sendResetPasswordEmail,
+  sendVerificationOtpEmail,
+  type AuthEmailCtx,
+} from './lib/authEmails';
+import { SIGNUP_NOTIFICATION_DELAY_MS } from './lib/adminEmails';
+import {
+  WELCOME_EMAIL_DELAY_MS,
+  WELCOME_EMAIL_JITTER_MS,
+} from './lib/welcomeEmail';
+import { rateLimiter } from './rateLimiter';
 
 const siteUrl = process.env.SITE_URL;
 if (!siteUrl) throw new Error('Missing required Convex environment variable: SITE_URL');
@@ -36,6 +49,25 @@ export const authComponent = createClient<DataModel>(components.betterAuth, {
         // name here: person data reaches PostHog only via the consent-gated
         // client-side identify.
         await track(ctx, doc._id, EVENTS.USER_SIGNED_UP);
+        // Personal founder welcome email, ~1 day in (jittered so it doesn't
+        // land at exactly signup + 24h). Enqueued here so it's atomic with
+        // user creation; features/welcomeEmail.ts re-checks at send time
+        // that the account still exists and got verified.
+        const jitter = (Math.random() * 2 - 1) * WELCOME_EMAIL_JITTER_MS;
+        await ctx.scheduler.runAfter(
+          WELCOME_EMAIL_DELAY_MS + jitter,
+          internal.features.welcomeEmail.sendScheduled,
+          { userId: doc._id },
+        );
+        // Heads-up to the support inbox, ~20 minutes in — by then the user
+        // has had a chance to finish onboarding, so the notification can
+        // report their course, onboarding progress, and survey answers
+        // (features/signupNotification.ts re-reads everything at send time).
+        await ctx.scheduler.runAfter(
+          SIGNUP_NOTIFICATION_DELAY_MS,
+          internal.features.signupNotification.sendScheduled,
+          { userId: doc._id },
+        );
       },
       onUpdate: async (ctx, newDoc) => {
         await upsertUserProfile(ctx, newDoc);
@@ -92,6 +124,26 @@ async function appleClientSecret(): Promise<string> {
   return jwt;
 }
 
+/**
+ * Rate gate for the unauthenticated transactional auth emails (verification
+ * codes + password-reset links): per-recipient bucket first, then the
+ * global backstop — in that order, so an address already at its own limit
+ * doesn't burn global tokens. Callers silently skip the send on false; the
+ * callbacks must never throw, since a 500 there would leak whether the
+ * account exists.
+ */
+async function allowAuthEmail(
+  ctx: AuthEmailCtx,
+  email: string,
+): Promise<boolean> {
+  const perAddress = await rateLimiter.limit(ctx, 'authEmail', {
+    key: email.toLowerCase(),
+  });
+  if (!perAddress.ok) return false;
+  const global = await rateLimiter.limit(ctx, 'authEmailGlobal');
+  return global.ok;
+}
+
 export const createAuth = (ctx: GenericCtx<DataModel>) => {
   return betterAuth({
     baseURL: siteUrl,
@@ -100,10 +152,42 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
     // (https://better-auth.com/docs/authentication/apple).
     trustedOrigins: ['https://appleid.apple.com'],
     database: authComponent.adapter(ctx),
-    // emailAndPassword: {
-    //   enabled: true,
-    //   requireEmailVerification: false,
-    // },
+    emailAndPassword: {
+      enabled: true,
+      // Unverified accounts cannot sign in (403 EMAIL_NOT_VERIFIED, handled
+      // by better-auth-ui); this also turns on Better Auth's built-in
+      // email-enumeration protection for sign-up.
+      requireEmailVerification: true,
+      // A password reset logs every other device/session out.
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }) => {
+        // The callback runs inside the component's HTTP action (action
+        // ctx, no db) — requireRunMutationCtx accepts mutation OR action
+        // ctx and only rejects the query ctx createAuth can also receive.
+        const runCtx = requireRunMutationCtx(ctx);
+        if (!(await allowAuthEmail(runCtx, user.email))) return;
+        await sendResetPasswordEmail(runCtx, { to: user.email, url });
+      },
+    },
+    // Verification is CODE-based: no sendVerificationEmail here — the
+    // emailOTP plugin below (overrideDefaultEmailVerification) injects an
+    // OTP sender in its place, so sign-up and unverified sign-ins email a
+    // 6-digit code instead of a link.
+    emailVerification: {
+      sendOnSignUp: true,
+      // Re-send the code on every unverified sign-in attempt, so a user
+      // who lost the first email can just try logging in. Rate-limited in
+      // sendVerificationOTP below.
+      sendOnSignIn: true,
+      // Submitting the code both verifies and signs the user in
+      // (better-auth-ui's /auth/email-verification form then redirects to
+      // the AuthView redirectTo, /app/onboarding).
+      autoSignInAfterVerification: true,
+    },
+    // Account deletion is deliberately NOT self-serve (`user.deleteUser`
+    // stays disabled): deleting only the Better Auth user would orphan all
+    // app data and the Autumn/Stripe subscription. Deletion goes through
+    // features/accountDeletion.ts (support request, manual fulfillment).
     socialProviders: {
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID as string,
@@ -147,6 +231,36 @@ export const createAuth = (ctx: GenericCtx<DataModel>) => {
         : {}),
     },
     plugins: [
+      // Code-based email verification: replaces the default link-based
+      // verification email with a 6-digit OTP (5-minute expiry). The
+      // /auth/email-verification form submits it via
+      // authClient.emailOtp.verifyEmail.
+      emailOTP({
+        overrideDefaultEmailVerification: true,
+        // The plugin also exposes passwordless OTP sign-in endpoints;
+        // keep them from ever creating accounts.
+        disableSignUp: true,
+        // Re-sends deliver the SAME unexpired code instead of rotating it.
+        // The plugin stores a fresh OTP BEFORE calling sendVerificationOTP,
+        // so with the default 'rotate' a rate-limited (silently dropped)
+        // send would invalidate the code the user already received.
+        resendStrategy: 'reuse',
+        // Encrypt codes at rest (with the Better Auth secret) so they
+        // aren't readable via dashboard/DB access. Must stay 'encrypted',
+        // NOT 'hashed': tryReuseOTP can't recover a hashed code and
+        // silently falls back to rotating, reintroducing the dropped-send
+        // invalidation problem above.
+        storeOTP: 'encrypted',
+        async sendVerificationOTP({ email, otp, type }) {
+          // Only email verification is offered in the UI. The plugin's
+          // other OTP types (passwordless sign-in, OTP password reset)
+          // are unused — never email codes for them.
+          if (type !== 'email-verification') return;
+          const runCtx = requireRunMutationCtx(ctx);
+          if (!(await allowAuthEmail(runCtx, email))) return;
+          await sendVerificationOtpEmail(runCtx, { to: email, otp });
+        },
+      }),
       convex({ authConfig }),
     ],
   });

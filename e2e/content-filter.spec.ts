@@ -31,3 +31,18 @@ test.describe("content filter — subtle dropdown on home", () => {
     });
   });
 });
+
+test.describe("due-count pills on home", () => {
+  test("filter-aware pills render next to the content filter", async ({
+    page,
+  }) => {
+    await page.goto("/app");
+    await page.waitForLoadState("domcontentloaded");
+    // Pills render once getFilteredCardCounts resolves (even all-zero counts
+    // return an object). They share a row with the filter dropdown.
+    await expect(page.getByTestId("due-counts-pills")).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId("content-filter-trigger")).toBeVisible();
+  });
+});

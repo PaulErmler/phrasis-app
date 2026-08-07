@@ -7,6 +7,7 @@ import { getActiveCourses } from '../db/courses';
 import { getUserSettings } from '../db/users';
 import { featureStateValidator, type FeatureState } from '../types';
 import { EVENTS, identifyUser, track } from '../analytics';
+import { sendAdminNotificationEmail } from '../lib/adminEmails';
 
 /**
  * Thrown by `assertBillingCurrent` while a payment is past due. Same
@@ -528,9 +529,64 @@ export const syncAllFeatures = internalMutation({
         to_status: next.plan_status,
         past_due: stillPastDue,
       });
+      // Notify the support inbox about real subscription events. The
+      // first-ever sync is the automatic free-plan attach at signup —
+      // already covered by the signup notification, so skip it.
+      if (previous.plan_id !== undefined) {
+        const profile = await ctx.db
+          .query('userProfiles')
+          .withIndex('by_userId', (q) => q.eq('userId', args.userId))
+          .first();
+        const who = profile
+          ? `${profile.name || '(no name)'} <${profile.email}>`
+          : args.userId;
+        await sendAdminNotificationEmail(ctx, {
+          subject: `${describePlanChange(previous, next)}: ${profile?.email ?? args.userId}`,
+          lines: [
+            `User: ${who}`,
+            `Plan: ${planLabel(previous)} → ${planLabel(next)}`,
+          ],
+        });
+      }
     }
 
     return null;
   },
 });
+
+type PlanIdentity = {
+  plan_id?: string;
+  plan_name?: string;
+  plan_status?: string;
+};
+
+// The auto-attached default plan — see FREE_PLAN_ID in usage/tracking.ts.
+const FREE_PLAN_ID = 'free';
+
+function planLabel(p: PlanIdentity): string {
+  if (p.plan_id === undefined) return 'none';
+  return `${p.plan_name ?? p.plan_id} (${p.plan_status ?? 'unknown'})`;
+}
+
+/**
+ * Human subject line for the admin notification about a plan identity
+ * change. Exported for tests.
+ */
+export function describePlanChange(
+  previous: PlanIdentity,
+  next: PlanIdentity,
+): string {
+  const fromPaid =
+    previous.plan_id !== undefined && previous.plan_id !== FREE_PLAN_ID;
+  const toPaid = next.plan_id !== undefined && next.plan_id !== FREE_PLAN_ID;
+  if (!fromPaid && toPaid) {
+    return next.plan_status === 'trialing' ? 'Trial started' : 'New subscription';
+  }
+  if (fromPaid && !toPaid) return 'Subscription cancelled';
+  if (fromPaid && toPaid && previous.plan_id !== next.plan_id) {
+    return 'Plan changed';
+  }
+  // Same plan, status flip: trial conversion, past_due, recovery, ...
+  return 'Plan status changed';
+}
 

@@ -22,6 +22,18 @@ export function getCardStateLabel(doc: Doc<'cards'>): string {
   return FSRS_STATE_LABELS[doc.fsrsState?.state ?? 0] ?? 'new';
 }
 
+/**
+ * Origin bucket for the filter-aware aggregate. 'none' collects legacy cards
+ * whose `collectionOrigin` was never resolved — they are only counted under
+ * the unfiltered 'both' path, mirroring `fetchDueCardsWithFilter`.
+ */
+export const ORIGIN_BUCKETS = ['premade', 'custom', 'chat', 'none'] as const;
+export type OriginBucket = (typeof ORIGIN_BUCKETS)[number];
+
+export function getCardOriginBucket(doc: Doc<'cards'>): OriginBucket {
+  return doc.collectionOrigin ?? 'none';
+}
+
 // ============================================================================
 // Aggregate instances
 // ============================================================================
@@ -55,6 +67,28 @@ export const cardsByStateAndDueDate = new TableAggregate<{
 });
 
 /**
+ * Cards grouped by [deckId:originBucket:stateLabel], sorted by dueDate.
+ * Enables O(log n) filter-aware due counts: e.g. count due 'new' cards whose
+ * source is 'premade' (the content filter's 'course' option). The unfiltered
+ * 'both' path keeps using `cardsByStateAndDueDate` (4 counts instead of 16).
+ *
+ * NOTE: `collectionOrigin` is part of this aggregate's namespace. Any write
+ * that patches `collectionOrigin` outside the helpers below (e.g. a re-run of
+ * `cardCollectionBackfill` that actually patches docs) must be followed by
+ * the per-user recalc migration to repair drift.
+ */
+export const cardsByOriginStateAndDueDate = new TableAggregate<{
+  Namespace: string; // `${deckId}:${originBucket}:${stateLabel}`
+  Key: number; // dueDate
+  DataModel: DataModel;
+  TableName: 'cards';
+}>(components.cardsByOriginStateAndDueDate, {
+  namespace: (doc) =>
+    `${doc.deckId}:${getCardOriginBucket(doc)}:${getCardStateLabel(doc)}`,
+  sortKey: (doc) => doc.dueDate,
+});
+
+/**
  * Cards sorted by [deckId, dueDate].
  * Enables O(log n) count of due cards: count where dueDate <= now.
  */
@@ -84,6 +118,7 @@ export async function insertCard(
   await cardsByState.insertIfDoesNotExist(ctx, doc);
   await cardsByDueDate.insertIfDoesNotExist(ctx, doc);
   await cardsByStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+  await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
   return id;
 }
 
@@ -113,6 +148,7 @@ export async function patchCard(
   await cardsByState.replaceOrInsert(ctx, resolvedOld, newDoc);
   await cardsByDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
   await cardsByStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
+  await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, resolvedOld, newDoc);
 
   if (!resolvedOld.isMastered && newDoc.isMastered && newDoc.collectionId) {
     await bumpCardsMastered(ctx, newDoc.deckId, newDoc.collectionId);
@@ -223,6 +259,11 @@ export async function clearAggregatesForDeck(
   await cardsByDueDate.clear(ctx, { namespace: deckId });
   for (const state of EXTENDED_STATE_LABELS) {
     await cardsByStateAndDueDate.clear(ctx, { namespace: `${deckId}:${state}` });
+    for (const origin of ORIGIN_BUCKETS) {
+      await cardsByOriginStateAndDueDate.clear(ctx, {
+        namespace: `${deckId}:${origin}:${state}`,
+      });
+    }
   }
 }
 
@@ -238,5 +279,6 @@ export async function deleteCard(
   await cardsByState.deleteIfExists(ctx, oldDoc);
   await cardsByDueDate.deleteIfExists(ctx, oldDoc);
   await cardsByStateAndDueDate.deleteIfExists(ctx, oldDoc);
+  await cardsByOriginStateAndDueDate.deleteIfExists(ctx, oldDoc);
   await ctx.db.delete(cardId);
 }

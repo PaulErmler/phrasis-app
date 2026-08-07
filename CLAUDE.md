@@ -11,3 +11,21 @@ Convex agent skills for common tasks can be installed by running
 `npx convex ai-files install`.
 
 <!-- convex-ai-end -->
+
+## Changelog
+
+After completing a change that alters user-visible behavior, create an entry
+file `changelog/unreleased/YYYY-MM-DD-<slug>.md` following the format in
+`changelog/README.md` (1–2 sentences, written for the end user, no code
+jargon). Skip internal refactors, tests, CI/tooling, and dependency bumps.
+The entries are rolled up monthly into a user-facing summary via the
+`/changelog-roll` skill.
+
+## Kanban board
+
+The project kanban board lives at `board/Flexling Board.md` (a gitignored
+symlink into Paul's Obsidian vault; may be absent on other machines). Columns:
+Not Started, Prioritized, Doing, Done, Archived — cards are `- [ ] item`
+lines under the `##` column headings. When explicitly working on a board
+item you may move it to Doing/Done, but never add priorities or reorder the
+Prioritized column — prioritization is Paul's job.

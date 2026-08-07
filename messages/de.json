@@ -119,6 +119,24 @@
     },
     "settings": {
       "account": "Konto",
+      "password": {
+        "changeButton": "Passwort ändern",
+        "setButton": "Passwort festlegen",
+        "setDescription": "Du hast dich mit Google oder Apple angemeldet. Lege ein Passwort fest, um dich auch mit deiner E-Mail-Adresse anmelden zu können.",
+        "setEmailSent": "Sieh in dein Postfach — wir haben dir einen Link zum Festlegen deines Passworts geschickt.",
+        "setEmailError": "Die E-Mail konnte nicht gesendet werden. Bitte versuche es später erneut.",
+        "title": "Passwort ändern",
+        "description": "Zu deiner Sicherheit wirst du auf allen anderen Geräten abgemeldet.",
+        "current": "Aktuelles Passwort",
+        "new": "Neues Passwort",
+        "confirm": "Neues Passwort bestätigen",
+        "mismatch": "Die Passwörter stimmen nicht überein.",
+        "tooShort": "Das neue Passwort muss mindestens 8 Zeichen lang sein.",
+        "save": "Speichern",
+        "cancel": "Abbrechen",
+        "success": "Passwort geändert.",
+        "error": "Das Passwort konnte nicht geändert werden. Bitte prüfe dein aktuelles Passwort."
+      },
       "language": "App-Sprache",
       "contactPrompt": {
         "title": "Brauchst du noch etwas?",
@@ -286,6 +304,12 @@
           "title": "Was ist dein aktuelles Level?",
           "subtitle": "Wähle dein Sprachniveau"
         },
+        "step4": {
+          "title": "Setz dir ein Tagesziel",
+          "subtitle": "Wie viele Minuten möchtest du täglich lernen?",
+          "minutesUnit": "Min. / Tag",
+          "customPlaceholder": "Eigenes"
+        },
         "creating": "Kurs wird erstellt...",
         "success": "Kurs erfolgreich erstellt!",
         "error": "Kurs konnte nicht erstellt werden",
@@ -341,6 +365,8 @@
     "learnAndReview": "Wiederholen",
     "radioMode": "Radio",
     "radioRequiresCards": "Füge zuerst ein paar Karten hinzu, bevor du den Radio-Modus startest.",
+    "freeStudyMode": "Freies Üben",
+    "freeStudyRequiresCards": "Füge zuerst ein paar Karten hinzu, bevor du mit dem freien Üben startest.",
     "contentFilter": {
       "label": "Quelle:",
       "valueBoth": "Alle Inhalte",
@@ -351,6 +377,45 @@
       "new": "N",
       "learning": "L",
       "review": "W"
+    },
+    "dueCounts": {
+      "new": "{count} neu",
+      "learning": "{count} lernen",
+      "review": "{count} wiederholen"
+    },
+    "dailyGoal": {
+      "label": "Tagesziel",
+      "cta": "Tagesziel festlegen",
+      "reached": "Tagesziel erreicht",
+      "progress": "{done} / {goal} Min.",
+      "editTitle": "Tagesziel festlegen",
+      "customPlaceholder": "Eigenes",
+      "minutesUnit": "Min.",
+      "set": "Ok",
+      "saveError": "Dein Tagesziel konnte nicht gespeichert werden. Bitte versuche es erneut."
+    },
+    "projections": {
+      "wordsBig": "{words} Wörter gesamt",
+      "sentencesBig": "{sentences} Sätze gesamt",
+      "endOfYearLabel": "bis Ende {year}",
+      "oneYearLabel": "in einem Jahr",
+      "endOfMonthLabel": "bis Ende {month}",
+      "counterfactualLabel": "wenn jeder Tag wie heute wäre",
+      "sessionYieldBig": "im Schnitt +{words} neue Wörter",
+      "sessionYieldLabel": "pro {goal}-Min.-Einheit",
+      "perStudyHourLabel": "pro Lernstunde",
+      "nextLevelBig": "{code} in ~{days, plural, one {# Tag} other {# Tagen}}",
+      "atCurrentSpeedLabel": "bei deinem aktuellen Tempo",
+      "goalBasisLabel": "wenn du dein Tagesziel erreichst",
+      "nextLevelCompleteLabel": "bis zum Abschluss des letzten Levels",
+      "levelByYearEndBig": "~{code}",
+      "levelByYearEndLabel": "dein Level Ende {year}",
+      "inDaysLabel": "in ~{days, plural, one {# Tag} other {# Tagen}}",
+      "studyTimeBig": "{hours} Std. gelernt",
+      "aroundDateLabel": "um den {date}",
+      "cycleHint": "Tippen für die nächste Statistik",
+      "empty": "Lerne weiter, um Prognosen freizuschalten",
+      "avgSentencesBig": "im Schnitt ~{rate} neue Sätze"
     },
     "customContent": "Karten hinzufügen",
     "stats": {
@@ -375,6 +440,8 @@
     "baseLanguage": "Ausgangssprache",
     "targetLanguage": "Zielsprache",
     "reviewCount": "{count, plural, =0 {Neu} one {{count} Wiederholung} other {{count} Wiederholungen}}",
+    "cardOriginCustom": "Eigene",
+    "cardOriginChat": "Chat",
     "nextReview": "Nächste Wiederholung in {time}",
     "nextReviewNow": "Jetzt fällig",
     "ratings": {
@@ -416,7 +483,9 @@
       "next": "Weiter",
       "reveal": "Anzeigen",
       "pause": "Pause",
-      "play": "Abspielen"
+      "play": "Abspielen",
+      "restartAudio": "Audio von vorn",
+      "restartCard": "Karte zurücksetzen"
     },
     "schedulingMode": {
       "learn": "L",
@@ -489,12 +558,18 @@
       "iconHide": "Satz ausblenden (erscheint nach der nächsten Wiederholung nicht mehr)",
       "iconEdit": "Redewendung in diesem Satz bearbeiten",
       "shortcuts": "Tastenkürzel",
-      "shortcutRating": "Tasten 1–4 zum Bewerten.",
-      "shortcutPause": "Leertaste zum Pausieren der Audio-Wiedergabe.",
-      "shortcutReveal": "Eingabetaste oder Pfeil nach rechts zum Aufdecken oder zum nächsten Satz.",
-      "shortcutRevertSubmission": "Pfeil nach links: zuletzt abgeschickte Übersetzung zurücknehmen (Schreiben).",
+      "shortcutRevealNext": "Verdecktes aufdecken, dann nächster Satz",
+      "shortcutPlayPause": "Audio abspielen oder pausieren",
+      "shortcutPrevious": "Vorheriger Satz (letzte Bewertung rückgängig)",
+      "shortcutPreviousWriting": "Letzte Abgabe zurücknehmen, dann vorheriger Satz",
+      "shortcutRestartAudio": "Audio von vorn abspielen",
+      "shortcutReplayTarget": "Zielsprachen-Audio erneut abspielen",
+      "shortcutRestartCard": "Karte zurücksetzen",
+      "shortcutRate": "Satz bewerten",
       "cardsPerBatch": "Sätze pro Stapel",
       "cardsPerBatchDescription": "Anzahl der Sätze, die auf einmal hinzugefügt werden",
+      "dailyGoal": "Tagesziel",
+      "dailyGoalDescription": "Lernminuten, die du dir pro Tag vornimmst",
       "reviewSettings": "Wiederholungseinstellungen",
       "autoAddCards": "Sätze automatisch hinzufügen",
       "autoAddCardsDescription": "Automatisch neue Sätze hinzufügen, wenn keine mehr fällig sind",
@@ -510,10 +585,20 @@
       "practiceSpeaking": "Sprechen üben",
       "practiceSpeakingDescription": "Die Zielsprache nach der Ausgangssprache abspielen",
       "onlyNew": "Nur neue Karten",
-      "onlyNewDescription": "Hörverstehen nur bei neuen Karten üben – lege eine Anzahl anfänglicher Wiederholungen fest",
+      "strategyOnlyNew": "Nur neue Sätze",
+      "strategyOnlyNewDescription": "Hörverstehen für so viele erste Wiederholungen eines Satzes üben",
+      "strategyUntilGood": "Bis Bewertung Gut",
+      "strategyUntilGoodDescription": "Hörverstehen so lange üben, bis du den Satz so oft mit Gut oder Einfach bewertet hast",
+      "strategyContinuous": "Durchgehend",
+      "strategyContinuousDescription": "Hörverstehen bei jedem Satz und jeder Wiederholung üben — es endet nie",
+      "showTranslationOnNew": "Übersetzung bei neuen Sätzen anzeigen",
+      "showTranslationOnNewDescription": "Zeigt die Übersetzung zum Abtippen bei den ersten Wiederholungen eines Satzes — danach beginnt der Test ohne Hilfe",
+      "showTranslationOnlyNewDescription": "Anzahl der anfänglichen Wiederholungen mit sichtbarer Übersetzung",
       "uiSettings": "Anzeigeeinstellungen",
       "showProgressBar": "Fortschrittsbalken",
       "showProgressBarDescription": "Audio-Fortschrittsbalken und Wiedergabesteuerung anzeigen",
+      "showCardOrigin": "Kartenherkunft",
+      "showCardOriginDescription": "Zeigt, aus welcher Sammlung eine Karte stammt",
       "progressDisplayEnabled": "Zwischenfortschritt anzeigen",
       "progressDisplayEnabledDescription": "Hilft dir, motiviert zu bleiben",
       "hideTargetLanguages": "Zielsprachen ausblenden",
@@ -885,14 +970,18 @@
       }
     },
     "languagePair": {
-      "title": "Wähle dein Sprachenpaar",
-      "subtitle": "Was du sprichst und was du lernen möchtest.",
-      "iSpeak": "Ich spreche…",
-      "iWantToLearn": "Ich möchte lernen…",
-      "readyTitle": "Bereit, wenn du es bist.",
-      "readyHint": "Tippe auf Weiter, oder tippe oben auf eine Sprache, um sie zu ändern.",
-      "fromPlaceholder": "Von",
-      "toPlaceholder": "Nach"
+      "speakTitle": "Welche Sprache sprichst du schon?",
+      "learnTitle": "Welche Sprache möchtest du lernen?",
+      "speakHint": "Das wird deine Ausgangssprache",
+      "learnHint": "Die Sprache, die du lernst — nicht die, die du schon kannst.",
+      "stepOf": "Schritt {current} von 2",
+      "stepReady": "Bereit",
+      "readyTitle": "Sieht gut aus.",
+      "readyHint": "Tippe auf eine Sprache zum Ändern, oder tausche sie, falls sie vertauscht sind.",
+      "speakRole": "Ich spreche",
+      "learnRole": "Ich lerne",
+      "swap": "Sprachen tauschen",
+      "popular": "Beliebt"
     },
     "acquisition": {
       "title": "Wo hast du von uns gehört?",
@@ -991,8 +1080,7 @@
           "title": "Teste mich — find mein Niveau",
           "description": "Kurzer adaptiver Test, etwa 5–20 Fragen. Am genauesten."
         }
-      },
-      "recommended": "Empfohlen"
+      }
     },
     "cefrPick": {
       "title": "Finde dein Niveau",
@@ -1105,14 +1193,18 @@
       "summary": "Du hast gerade {words, plural, =1 {1 Wort} other {# Wörter}} in {minutes, plural, =1 {1 Minute} other {# Minuten}} gelernt.",
       "headline": "In diesem Tempo wirst du können",
       "perDay": "{minutes} Min./Tag",
+      "timelineToday": "Heute",
+      "timelineTodaySub": "deine erste Lerneinheit",
+      "timelineIn30Days": "In 30 Tagen",
+      "timelineIn30DaysSub": "ein Monat mit deinem Tagesziel",
+      "timelineYearEndSub": "in {days} Tagen",
       "adjustLabel": "Tägliches Ziel anpassen",
-      "milestones": {
-        "1mo": "1 Monat",
-        "6mo": "6 Monate",
-        "1y": "1 Jahr"
-      },
       "wordsUnit": "Wörter",
-      "continue": "Weiter"
+      "continue": "Weiter",
+      "custom": "Eigenes",
+      "customPlaceholder": "Minuten",
+      "minutesUnit": "Min.",
+      "set": "Übernehmen"
     },
     "featureTour": {
       "title": "Noch ein paar Dinge",
@@ -1146,10 +1238,6 @@
       "back": "Zurück",
       "next": "Weiter",
       "done": "Fertig"
-    },
-    "testimonials": {
-      "title": "Von Sprachlernern geliebt",
-      "subtitle": "Das sagen andere Lernende über Flexling."
     },
     "planPick": {
       "title": "Danke, dass du dabei bist",
@@ -1212,11 +1300,11 @@
       },
       "input": {
         "title": "Übersetzung eintippen",
-        "description": "Tippe die Übersetzung in der Zielsprache hier ein und drücke Senden. Du bekommst sofortiges Feedback zu jedem Wort."
+        "description": "Tippe die Übersetzung in der Zielsprache hier ein und drücke Senden. Bei neuen Sätzen wird die Übersetzung beim ersten Mal angezeigt — tippe sie einfach ab, um sie zu lernen; spätere Wiederholungen testen dich ohne sie. Du bekommst sofortiges Feedback zu jedem Wort."
       },
       "inputTranscribe": {
         "title": "Tippe ein, was du hörst",
-        "description": "Tippe genau ein, was du in der Zielsprache hörst, und drücke Senden. Du bekommst sofortiges Feedback zu jedem Wort."
+        "description": "Tippe genau ein, was du in der Zielsprache hörst, und drücke Senden. Bei neuen Sätzen wird der Text beim ersten Mal angezeigt — tippe ihn einfach ab, um ihn zu lernen; spätere Wiederholungen testen dich ohne ihn. Du bekommst sofortiges Feedback zu jedem Wort."
       },
       "audioControls": {
         "title": "Audio läuft automatisch",
@@ -1281,6 +1369,10 @@
         "title": "Radio",
         "description": "Audio-only Hintergrund-Wiedergabe – deine Karten laufen freihändig in Schleife und beeinflussen den Wiederholungsplan nicht. Nur beim Shadowing verfügbar."
       },
+      "freeStudyMode": {
+        "title": "Freies Lernen",
+        "description": "Stöbere frei durch deine Sätze im Schreibmodus — ohne Planung, ohne Bewertungen. Nur im Schreibmodus verfügbar."
+      },
       "reviewModeToggle": {
         "title": "Shadowing vs. Schreiben",
         "description": "Wechsle zwischen Shadowing (Satz hören und laut nachsprechen) und Schreiben (Übersetzung eintippen und direkt Rückmeldung erhalten)."
@@ -1288,6 +1380,14 @@
       "contentSource": {
         "title": "Wähle deine Quelle",
         "description": "Lege fest, ob du nur vorgefertigte Sätze, nur deine eigenen Karten oder beides gleichzeitig üben willst."
+      },
+      "dueCounts": {
+        "title": "Was auf dich wartet",
+        "description": "Diese Pillen zeigen, wie viele Sätze bei deiner aktuellen Inhaltsauswahl neu sind, gerade gelernt werden und zur Wiederholung anstehen."
+      },
+      "projections": {
+        "title": "Deine Prognose",
+        "description": "Diese rotierende Prognose rechnet deinen Fortschritt hoch — zum Beispiel, wie viele Wörter du bei deinem aktuellen Tempo bis Jahresende kennst. Tippe darauf für den nächsten Fakt."
       },
       "difficultySelection": {
         "title": "Schwierigkeitsauswahl",
@@ -1339,7 +1439,7 @@
       },
       "input": {
         "title": "Übersetzung eingeben",
-        "description": "Hier gibst du die Übersetzung ein. Du kannst auch das Audio der Zielsprache anhören, bevor du sie eintippst."
+        "description": "Hier gibst du die Übersetzung ein. Bei einem neuen Satz wird die Übersetzung einmal angezeigt, damit du sie abtippen kannst — ab der nächsten Wiederholung übersetzt du selbst. Du kannst auch das Audio der Zielsprache anhören, bevor du tippst."
       },
       "rating": {
         "title": "Bewerte deine Antwort",

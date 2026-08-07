@@ -27,6 +27,7 @@ import { ConvexError } from 'convex/values';
 import { CLIENT_EVENTS, capture } from '@/lib/posthog/events';
 import { reportError } from '@/lib/report-error';
 import { convexErrorCode } from '@/lib/utils';
+import { shouldAdvanceOnEnter } from './lib/enterToAdvance';
 
 /**
  * One sink for the wizard's swallow points: console + error tracking (the
@@ -76,11 +77,10 @@ import { WordProjectionStep } from './steps/WordProjectionStep';
 import type { OnboardingSessionSummary } from './components/OnboardingFirstLesson';
 import { FeatureTourStep } from './steps/FeatureTourStep';
 import { PlanPickStep } from './steps/PlanPickStep';
-import { TestimonialsStep } from './steps/TestimonialsStep';
 import { useIsNativeApp } from '@/hooks/use-native-app';
 
 /**
- * New onboarding wizard. 14 steps with branching at the proficiency point.
+ * New onboarding wizard. 13 steps with branching at the proficiency point.
  *
  * Step / id / next:
  *   1.  language-pair         → acquisition
@@ -94,9 +94,8 @@ import { useIsNativeApp } from '@/hooks/use-native-app';
  *   8.  first-lesson          → stats-recap (or feature-tour on skip)
  *   9.  stats-recap           → word-projection
  *   10. word-projection       → feature-tour
- *   11. feature-tour          → testimonials
- *   12. testimonials          → plan-pick
- *   13. plan-pick             → done         (calls finalizeOnboarding)
+ *   11. feature-tour          → plan-pick
+ *   12. plan-pick             → done         (calls finalizeOnboarding)
  *
  * `hasCompletedOnboarding` is the single source of truth for the auto-redirect
  * — it stays false until the very last step (`finalizeOnboarding`), so
@@ -116,7 +115,6 @@ type StepId =
   | 'stats-recap'
   | 'word-projection'
   | 'feature-tour'
-  | 'testimonials'
   | 'plan-pick';
 
 const PROGRESS_STEP_ORDER: StepId[] = [
@@ -131,7 +129,6 @@ const PROGRESS_STEP_ORDER: StepId[] = [
   'stats-recap',
   'word-projection',
   'feature-tour',
-  'testimonials',
   'plan-pick',
 ];
 
@@ -145,9 +142,18 @@ const POST_CUSTOMIZING_STEPS: ReadonlySet<StepId> = new Set<StepId>([
   'stats-recap',
   'word-projection',
   'feature-tour',
-  'testimonials',
   'plan-pick',
 ]);
+
+/** Map a persisted 1-based step number onto the current wizard order. */
+function resumeStepId(savedStep: number): StepId {
+  // Testimonials used to sit at index 12; plan-pick was 13. After removal,
+  // plan-pick is 12. Anything past the end (stale plan-pick = 13) lands on
+  // plan-pick; index 12 now is plan-pick too, so users left on testimonials
+  // skip ahead cleanly.
+  if (savedStep > PROGRESS_STEP_ORDER.length) return 'plan-pick';
+  return PROGRESS_STEP_ORDER[savedStep - 1] ?? 'language-pair';
+}
 
 export default function OnboardingPage() {
   return (
@@ -237,7 +243,7 @@ function OnboardingContent() {
   // refreshes return to the same step the user left off on.
   const initialStepId: StepId =
     onboardingProgress?.step
-      ? PROGRESS_STEP_ORDER[onboardingProgress.step - 1] ?? 'language-pair'
+      ? resumeStepId(onboardingProgress.step)
       : 'language-pair';
   const initialFlowData: OnboardingData = {
     ...EMPTY_ONBOARDING_DATA,
@@ -658,15 +664,6 @@ function OnboardingWizard({
     case 'cefr-pick':
       onCefrPickContinue();
       return;
-    case 'testimonials':
-      // The store-app shell must not show the plan picker (store payment
-      // policies) — onboarding finishes on the auto-enabled free tier.
-      if (isNative) {
-        await onFinalize();
-      } else {
-        advance('plan-pick');
-      }
-      return;
     default:
       return;
     }
@@ -680,6 +677,30 @@ function OnboardingWizard({
     stepId === 'word-projection' ||
     stepId === 'feature-tour' ||
     stepId === 'plan-pick';
+
+  // Enter advances the wizard, so a keyboard user can answer the whole flow
+  // without reaching for the mouse. Only on steps that render the shared
+  // Continue button — the rest own their advance and their own CTAs.
+  //
+  // Bubble phase on purpose: Coachmark listens in the CAPTURE phase and
+  // stopPropagation()s, so while a coachmark is up Enter dismisses it and
+  // never reaches this. Radix dialogs likewise handle Enter inside their own
+  // focus trap.
+  const onContinueRef = useRef(onContinue);
+  useLayoutEffect(() => {
+    onContinueRef.current = onContinue;
+  });
+  const continueBlocked = continueDisabled() || isSubmitting;
+  useEffect(() => {
+    if (stepHasOwnAdvance || continueBlocked) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!shouldAdvanceOnEnter(e)) return;
+      e.preventDefault();
+      void onContinueRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [stepHasOwnAdvance, continueBlocked]);
 
   // Passes useCallback values + useState setters into a plain function called
   // during render — `react-hooks/refs` can't tell these aren't refs, so the
@@ -914,9 +935,7 @@ function renderStep({
       />
     );
   case 'feature-tour':
-    return <FeatureTourStep onComplete={() => onAdvance('testimonials')} />;
-  case 'testimonials':
-    return <TestimonialsStep />;
+    return <FeatureTourStep onComplete={() => onAdvance('plan-pick')} />;
   case 'plan-pick':
     return <PlanPickStep onContinue={onFinalize} />;
   }

@@ -9,6 +9,7 @@ import { reportError } from '@/lib/report-error';
 import { driver, type Driver, type DriveStep } from 'driver.js';
 import type { TutorialId } from '@/convex/features/tutorialIds';
 import { getTutorial } from './registry';
+import type { TutorialContext } from './types';
 
 const STORAGE_PREFIX = 'phrasis_completed_tutorials';
 
@@ -91,6 +92,25 @@ function writeCompleted(ids: string[]) {
   notifyStorageListeners();
 }
 
+/**
+ * Why a tour is being torn down. Only the reason decides whether the tour
+ * counts as finished:
+ *  - `completed` — reached the end, or the user clicked the closing CTA.
+ *  - `dismissed` — the user closed it (X / Esc / overlay click). Counts as
+ *    finished: re-offering a tour someone deliberately closed is worse than
+ *    dropping it.
+ *  - `hidden` — the host view disabled the tour mid-flight, or we are stepping
+ *    aside for an interactive step / restart / unmount. Does NOT persist, so
+ *    the tour can be offered again.
+ */
+type TeardownReason = 'completed' | 'dismissed' | 'hidden';
+
+const TEARDOWN_PERSISTS_COMPLETION: Record<TeardownReason, boolean> = {
+  completed: true,
+  dismissed: true,
+  hidden: false,
+};
+
 interface UseTutorialOptions {
   enabled?: boolean;
   delayMs?: number;
@@ -99,6 +119,9 @@ interface UseTutorialOptions {
   onComplete?: () => void;
   /** When the user clicks the highlighted element on this step (0-based index), complete the tutorial and close the driver. */
   stepCompleteOnClickIndex?: number;
+  /** Runtime context forwarded to the tour factory (e.g. reviewMode so the
+   *  home tour anchors the Radio vs Free Study button). */
+  context?: TutorialContext;
 }
 
 export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions = {}) {
@@ -109,8 +132,12 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     onInteractiveStep,
     onComplete,
     stepCompleteOnClickIndex,
+    context,
   } = options;
   const driverRef = useRef<Driver | null>(null);
+  // Guards the re-entrancy of teardown → driver.destroy() → onDestroyStarted
+  // → teardown on driver's internal close paths.
+  const isTearingDownRef = useRef(false);
   const [isActive, setIsActive] = useState(false);
   const t = useTranslations('Tutorial');
 
@@ -135,7 +162,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   const completed = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   const isCompleted = completed.includes(tutorialId);
 
-  const tutorial = getTutorial(tutorialId, t);
+  const tutorial = getTutorial(tutorialId, t, context);
   const prerequisiteMet = tutorial?.prerequisite
     ? completed.includes(tutorial.prerequisite)
     : true;
@@ -198,6 +225,47 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     );
   }, [tutorialId, completeMutation]);
 
+  /**
+   * Why every teardown goes through one helper.
+   *
+   * driver.js's public `destroy()` is `g(false)`, which deliberately SKIPS
+   * `onDestroyStarted` (driver.js 1.4.0, dist/driver.js.mjs:594-604 — `g(true)`
+   * fires the hook and returns early; `g(false)` does the real teardown). Only
+   * driver's own close paths (close button, Esc, overlay click, stepping past
+   * the last step) go through `g(true)`.
+   *
+   * So anything WE call `destroy()` on never runs the hook. Hanging
+   * completion-persistence or state cleanup off `onDestroyStarted` therefore
+   * silently no-ops for every teardown the app initiates — which is exactly
+   * how the home tour ended up never marking itself complete and re-running on
+   * every return to Home. `teardown` owns that bookkeeping instead, and
+   * `onDestroyStarted` merely delegates to it.
+   */
+  const teardown = useCallback(
+    (reason: TeardownReason, target?: Driver | null) => {
+      const active = target ?? driverRef.current;
+      if (!active || isTearingDownRef.current) return;
+      isTearingDownRef.current = true;
+      try {
+        if (TEARDOWN_PERSISTS_COMPLETION[reason]) {
+          completeTutorial();
+          onCompleteRef.current?.();
+        }
+        driverRef.current = null;
+        setIsActive(false);
+        active.destroy();
+      } finally {
+        isTearingDownRef.current = false;
+      }
+    },
+    [completeTutorial],
+  );
+
+  const teardownRef = useRef(teardown);
+  useLayoutEffect(() => {
+    teardownRef.current = teardown;
+  });
+
   const launchDriver = useCallback(() => {
     if (!tutorial) return;
 
@@ -208,7 +276,15 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       const candidates = document.querySelectorAll<HTMLElement>(step.element);
       for (const el of candidates) {
         const rect = el.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
+        // `visibility: hidden` keeps its layout box (e.g. the due-count
+        // pills reserve their width while counts load), so a pure rect
+        // check would highlight a blank rectangle — treat it as absent and
+        // let the step degrade to a centered popover instead.
+        if (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          getComputedStyle(el).visibility !== 'hidden'
+        ) {
           return { ...step, element: el };
         }
       }
@@ -220,19 +296,32 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       return step?.popover && 'popoverClass' in step.popover && step.popover.popoverClass === 'tutorial-try-card';
     };
 
+    const completeOnClickIndices = new Set<number>();
     if (
       stepCompleteOnClickIndex != null &&
       stepCompleteOnClickIndex >= 0 &&
       stepCompleteOnClickIndex < resolvedSteps.length
     ) {
-      const step = resolvedSteps[stepCompleteOnClickIndex];
+      completeOnClickIndices.add(stepCompleteOnClickIndex);
+    }
+    // The closing step of a tour is a call-to-action that highlights the
+    // element the user is invited to click. That click must count as
+    // finishing the tour: it often navigates away (e.g. the home tour's
+    // Learn + Review CTA opens the learn view), which hides the host and
+    // would otherwise hit the suppress-complete path below — leaving the
+    // tour unfinished and re-running it on every visit.
+    if (resolvedSteps.length > 0) {
+      completeOnClickIndices.add(resolvedSteps.length - 1);
+    }
+    for (const index of completeOnClickIndices) {
+      const step = resolvedSteps[index];
       let clickHandler: (() => void) | null = null;
       let targetElement: Element | null = null;
       step.onHighlighted = (element, _s, opts) => {
         targetElement = element ?? null;
         if (!targetElement) return;
         clickHandler = () => {
-          opts.driver.destroy();
+          teardownRef.current('completed', opts.driver);
         };
         targetElement.addEventListener('click', clickHandler, true);
       };
@@ -260,12 +349,12 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
       stageRadius: 8,
       popoverClass: `phrasis-tutorial-${tutorialId}`,
       steps: resolvedSteps,
+      // Fires only on driver's own close paths (close button, Esc, overlay
+      // click, stepping past the last step) — never on our own destroy()
+      // calls. `d` is passed explicitly so the real teardown still runs even
+      // if driverRef was already cleared.
       onDestroyStarted: () => {
-        completeTutorial();
-        setIsActive(false);
-        onCompleteRef.current?.();
-        driverRef.current = null;
-        d.destroy();
+        teardownRef.current('dismissed', d);
       },
       onHighlightStarted: (_element, _step, opts) => {
         const stepIndex = opts.state.activeIndex ?? 0;
@@ -278,7 +367,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     driverRef.current = d;
     setIsActive(true);
     d.drive();
-  }, [tutorial, tutorialId, completeTutorial, stepCompleteOnClickIndex]);
+  }, [tutorial, tutorialId, stepCompleteOnClickIndex]);
 
   const launchDriverRef = useRef(launchDriver);
   useLayoutEffect(() => {
@@ -295,12 +384,24 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
     return () => clearTimeout(timer);
   }, [shouldStart, delayMs]);
 
+  // Hide an in-flight tour when the host disables it (e.g. user left Home)
+  // without marking it complete, so it can auto-start again on return.
+  useEffect(() => {
+    if (enabled) return;
+    teardownRef.current('hidden');
+  }, [enabled]);
+
+  // Never leave an orphaned full-screen overlay behind if the host unmounts
+  // mid-tour. Does not persist completion — the user never finished it.
+  useEffect(
+    () => () => {
+      teardownRef.current('hidden');
+    },
+    [],
+  );
+
   const moveToInteractiveWait = useCallback(() => {
-    if (driverRef.current) {
-      driverRef.current.destroy();
-      driverRef.current = null;
-      setIsActive(false);
-    }
+    teardownRef.current('hidden');
   }, []);
 
   const showCompletionStep = useCallback((title: string, description: string) => {
@@ -350,11 +451,7 @@ export function useTutorial(tutorialId: TutorialId, options: UseTutorialOptions 
   }, [completeTutorial]);
 
   const restartTutorial = useCallback(() => {
-    if (driverRef.current) {
-      driverRef.current.destroy();
-      driverRef.current = null;
-    }
-    setIsActive(false);
+    teardownRef.current('hidden');
     launchDriver();
   }, [launchDriver]);
 

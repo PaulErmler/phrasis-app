@@ -51,7 +51,7 @@
       },
       "customisation": {
         "title": "Mach es zu deinem",
-        "body": "Bring eigene Sätze mit, importiere eine Tabelle oder lass die KI sie erstellen. Dein Material, dein Weg."
+        "body": "Bring eigene Sätze mit, importiere eine Tabelle oder lass die KI sie erstellen. Inhalt, der für dich relevant ist, bleibt besser im Gedächtnis."
       },
       "feedback": {
         "title": "Sofortiges Feedback",
@@ -75,6 +75,8 @@
     "reviewModeBody": "Sprich die fälligen Karten nach, und Spaced Repetition plant jede einzelne für den perfekten Moment, sie dir zu merken.",
     "radioTitle": "Radio",
     "radioBody": "Lass Sätze und ihre Übersetzungen den ganzen Tag laufen — passives Hören, das dir die Sprache ins Ohr bringt, ohne deinen Spaced-Repetition-Plan zu beeinflussen.",
+    "freeStudyTitle": "Freies Üben",
+    "freeStudyBody": "Soll eine Session deinen Spaced-Repetition-Plan nicht beeinflussen? Freies Üben mischt endlos durch alle deine Sätze, sodass du in deinem Tempo tippen kannst — nichts wird eingeplant, nichts zählt auf deine Wiederholungen.",
     "missingTitle": "Fehlt dir eine Lernart?",
     "missingBody": "Sag uns Bescheid und wir versuchen unser Bestes, Flexling an deine Bedürfnisse anzupassen.",
     "missingCta": "Lernart vorschlagen",
@@ -200,7 +202,13 @@
     "activityBody": "Sieh deine Lerngewohnheit auf einen Blick. Jeder Tag, an dem du übst, erscheint im Kalender — beobachte, wie deine Serie wächst und bleibe motiviert.",
     "wordCloudHint": "Klicke auf ein Wort, um die Sätze zu sehen, mit denen du es gelernt hast",
     "insightsTitle": "Sitzungsübersicht",
-    "insightsBody": "Nach jeder Wiederholung siehst du genau, was du geschafft hast: Wiederholungen, neue Wörter und aufgewendete Zeit — live aktualisiert, sobald du fertig bist.",
+    "insightsBody": "Nach jeder Wiederholung siehst du genau, was du geschafft hast: Dein Tagesziel-Ring füllt sich beim Lernen, Badges zeigen, was auf dich wartet, und eine rotierende Prognose zeigt, wohin dich dein Tempo bringt.",
+    "projectionLabel": "Deine Prognose",
+    "projectionFacts": {
+      "wordsByYearEnd": "~2.400 Wörter bis Ende 2026",
+      "nextLevel": "Nächstes Level (B1) in ~9 Wochen",
+      "wordsPerSession": "≈ 12 neue Wörter pro Session"
+    },
     "habitsTitle": "Finde deine besten Stunden",
     "habitsBody": "Entdecke, wann du am besten lernst. Eine Aufschlüsselung deiner Lernstunden zeigt deinen natürlichen Rhythmus, damit du Sitzungen planen kannst, wenn du am aufnahmefähigsten bist.",
     "goalsTitle": "Sieh das große Ganze",

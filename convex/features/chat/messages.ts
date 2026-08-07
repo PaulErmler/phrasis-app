@@ -23,9 +23,14 @@ import {
   openrouterCostUsd,
   openrouterGenerationId,
 } from '../../lib/posthogAi';
-import { generateText } from 'ai';
+import { generateText, type ModelMessage } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
-import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../../config/aiModels';
+import {
+  OPENROUTER_CHAT_PROVIDER_OPTIONS,
+  OPENROUTER_INPUT_CACHE_CONTROL,
+  OPENROUTER_MODELS,
+  OPENROUTER_USAGE_ACCOUNTING,
+} from '../../config/aiModels';
 import { getLanguageByCode } from '../../../lib/languages';
 
 const agentComponent = components.agent;
@@ -371,15 +376,15 @@ export const generateResponse = internalAction({
         }
       }
 
-      const parts: string[] = [agent.options.instructions ?? ''];
+      const staticInstructions = agent.options.instructions ?? '';
+      const dynamicContextParts: string[] = [];
       if (languageSection) {
-        parts.push(languageSection);
+        dynamicContextParts.push(languageSection);
       }
       if (args.cardContextSection) {
-        parts.push(args.cardContextSection);
+        dynamicContextParts.push(args.cardContextSection);
       }
-
-      const system = parts.join('\n\n');
+      const dynamicContext = dynamicContextParts.join('\n\n');
 
       // Dynamic chat billing: 1 credit was consumed up-front in
       // `sendMessage`; here we accumulate the actual OpenRouter cost across
@@ -411,7 +416,60 @@ export const generateResponse = internalAction({
         { threadId: args.threadId },
         {
           promptMessageId: args.promptMessageId,
-          system,
+          // Leave the AI SDK `system` slot empty — static instructions are
+          // injected via prepareStep with message-level cache_control so
+          // OpenRouter can cache the stable prefix across turns/steps.
+          //
+          // '' is deliberate and load-bearing: `undefined` would re-trigger
+          // @convex-dev/agent's `?? options.instructions` fallback and inject
+          // the instructions a second time. The cost is one empty
+          // `{role:'system', content:''}` block prepended at prompt
+          // conversion (the SDK only skips nullish `system`) — it is added
+          // AFTER prepareStep runs, so it cannot be filtered there. It is
+          // byte-stable across all requests (cache-neutral) and OpenAI
+          // endpoints accept empty system content; revisit if a future
+          // provider rejects it.
+          system: '',
+          allowSystemInMessages: true,
+          providerOptions: {
+            openrouter: {
+              ...OPENROUTER_CHAT_PROVIDER_OPTIONS.openrouter,
+              // Documented OpenRouter param: sticky-routing key. All requests
+              // of a thread go to the same provider endpoint, which is what
+              // makes automatic prefix caching actually hit across the
+              // multi-step tool loop (spread above must be kept — per-call
+              // providerOptions REPLACES the agent-level default, so dropping
+              // it would silently lose reasoning.effort).
+              session_id: args.threadId,
+            },
+          },
+          // Re-inject on every step: AI SDK rebuilds each step from
+          // initialPrompt.messages + prior step outputs, so a step-0-only
+          // prefix is dropped on tool-loop continuations (and with it the
+          // "don't summarize" instructions).
+          prepareStep: ({ messages }) => {
+            const prefix: ModelMessage[] = [
+              {
+                role: 'system',
+                content: staticInstructions,
+                providerOptions: {
+                  openrouter: {
+                    cacheControl: OPENROUTER_INPUT_CACHE_CONTROL,
+                  },
+                },
+              },
+            ];
+
+            // Keep dynamic course/card context out of the cached system block.
+            if (dynamicContext) {
+              prefix.push({
+                role: 'system',
+                content: dynamicContext,
+              });
+            }
+
+            return { messages: [...prefix, ...messages] };
+          },
         },
         {
           saveStreamDeltas: { chunking: "word", throttleMs: 500 },

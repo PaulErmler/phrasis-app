@@ -5,7 +5,7 @@ import { Check, MessageSquare, PenLine } from 'lucide-react';
 import { useMutation, usePreloadedQuery, useQuery } from 'convex/react';
 import { useAppData } from '@/components/app/AppDataProvider';
 import { useScrollFocusedIntoView } from '@/hooks/use-scroll-focused-into-view';
-import { useUpdateStudyContentFilter } from '@/hooks/use-update-study-content-filter';
+import { useUpdateCourseSettings } from '@/hooks/use-update-course-settings';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { api } from '@/convex/_generated/api';
@@ -53,7 +53,7 @@ export function SegmentedHomeSection({
   const { preloadedHomeSummary, preloadedCourseSettings } = useAppData();
   const summary = usePreloadedQuery(preloadedHomeSummary);
   const settings = usePreloadedQuery(preloadedCourseSettings);
-  const updateSettings = useUpdateStudyContentFilter();
+  const updateSettings = useUpdateCourseSettings();
   const t = useTranslations('AppPage.collections.carousel');
   const [currentTab, setCurrentTab] = React.useState<'premade' | 'custom'>('premade');
 

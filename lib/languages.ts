@@ -855,6 +855,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     supportsKaraoke: true,
     supportsStt: true,
     experimental: true,
+    // Bumped 1 → 2 with the Aug 2026 switch to the Luna best-of-3 pipeline:
+    // native-speaker feedback flagged systematic errors in the existing
+    // Icelandic rows (archaic register, wrong imperatives), so Icelandic —
+    // and only Icelandic — lazily regenerates its existing translations
+    // through the new rule.
+    translationVersion: 2,
   },
   {
     code: 'fi',
@@ -1709,21 +1715,40 @@ export function isTranslationVersionStale(
 //   1. Define a new entry in TRANSLATION_RULES below.
 //   2. Set `translationRule: '<id>'` on the Language entries that should use it.
 //   3. If a language has no `translationRule` (currently: all of them), it
-//      falls back to `gemini_35_flash_nitro_minimal`.
+//      falls back to `luna_bo3`.
 // ---------------------------------------------------------------------------
+
+/**
+ * Reasoning / thinking effort for a translation stage. `undefined` = send no
+ * reasoning field at all. `'none'` = explicitly disable thinking
+ * (`reasoning: { enabled: false }` on the wire) — required for models like
+ * GPT-5.6 Luna where omitting the field is NOT the same as disabling
+ * (standard mode reasons adaptively on some inputs). `'minimal'` is
+ * Gemini-3-specific — OpenRouter maps it to Google's `thinkingLevel:
+ * 'minimal'`, strictly below `'low'`. The `@openrouter/ai-sdk-provider`
+ * types only enumerate `'low' | 'medium' | 'high'`; the cast lives in
+ * `translateTextWithLLM`.
+ */
+export type StageReasoning =
+  | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+
+/**
+ * OpenRouter provider-routing constraints for a stage. `max_price.completion`
+ * caps routing at $N per million output tokens — used to pin promo-priced
+ * models (Luna) to their cheap endpoints and exclude expensive variants
+ * (Azure serves Luna at $6.00–6.60/M out and was observed burning ~1k hidden
+ * reasoning tokens per call, ~10× the request cost).
+ */
+export type StageProviderConstraints = {
+  max_price?: { completion: number };
+};
 
 /** One leg of a translation rule — an OpenRouter model + optional reasoning. */
 export type ModelStage = {
   /** OpenRouter slug, e.g. `'google/gemini-3.1-flash-lite'`. */
   model: string;
-  /**
-   * Reasoning / thinking effort. `undefined` = no thinking. `'minimal'` is
-   * Gemini-3-specific — OpenRouter maps it to Google's `thinkingLevel:
-   * 'minimal'`, strictly below `'low'`. The `@openrouter/ai-sdk-provider`
-   * types only enumerate `'low' | 'medium' | 'high'`; the cast lives in
-   * `translateTextWithLLM`.
-   */
-  reasoning?: 'minimal' | 'low' | 'medium' | 'high';
+  /** See {@link StageReasoning}. */
+  reasoning?: StageReasoning;
   /**
    * Per-stage cap on response tokens. Tuned so reasoning-heavy stages have
    * the headroom their thinking traces need (DeepSeek V4 Flash with `high`
@@ -1732,6 +1757,33 @@ export type ModelStage = {
    * applies the constant `DEFAULT_MAX_OUTPUT_TOKENS` when this is unset.
    */
   maxOutputTokens?: number;
+  /** See {@link StageProviderConstraints}. */
+  provider?: StageProviderConstraints;
+  /**
+   * Best-of-N sampling. When set, the stage runs `total` candidate calls in
+   * parallel — candidate #1 at temperature 0 (this stage's own config), the
+   * remaining `total - 1` at `extraTemperature` — deduplicates the outputs,
+   * and (only when >1 unique candidate survives) asks `judge` to pick.
+   * Candidate calls fail independently: the stage succeeds as long as one
+   * candidate returns usable text; only a full wipe-out advances the rule to
+   * the next fallback stage. A stage without `samples` is a single call,
+   * byte-for-byte as before this field existed.
+   */
+  samples?: { total: number; extraTemperature: number };
+  /**
+   * Judge configuration for `samples` stages. The judge sees the same
+   * `<context>` block as the translation prompt plus the shuffled unique
+   * candidates and returns the id of the best one. Transport failures are
+   * retried up to `maxRetries` extra times; exhausted retries or an
+   * unparseable verdict fall back to the temp-0 candidate — the stage still
+   * succeeds. Ignored when `samples` is unset.
+   */
+  judge?: {
+    model: string;
+    reasoning?: StageReasoning;
+    provider?: StageProviderConstraints;
+    maxRetries?: number;
+  };
 };
 
 /**
@@ -1749,6 +1801,38 @@ export const GOOGLE_TRANSLATE_SOURCE = 'google-translate-v2';
 export const USER_PROVIDED_TRANSLATION_SOURCE = 'user-provided';
 
 /**
+ * Provenance slug for hand-curated translations shipped by a migration
+ * (see convex/migrations/updateEssentialGreetings.ts). Like user-provided
+ * rows, these were authored by a human and must never be regenerated.
+ */
+export const CURATED_TRANSLATION_SOURCE = 'curated-manual';
+
+/**
+ * Translation provenances that no automated pass may overwrite or delete.
+ *
+ * The version-stale regeneration sweep deletes and re-generates any row whose
+ * `translationVersion` is below the language's current one. That is correct for
+ * machine output, but both of these were written by a person: `user-provided`
+ * by the user, `curated-manual` by us. Curated rows in particular live on
+ * PREMADE texts, so the sweep's `!text.userCreated` guard does not cover them —
+ * a `translationVersion` bump would silently undo the curation.
+ *
+ * Use `isProtectedTranslationSource` at every provenance guard rather than
+ * comparing against a single constant, so adding a provenance protects it
+ * everywhere at once.
+ */
+export const PROTECTED_TRANSLATION_SOURCES: readonly string[] = [
+  USER_PROVIDED_TRANSLATION_SOURCE,
+  CURATED_TRANSLATION_SOURCE,
+];
+
+export function isProtectedTranslationSource(
+  source: string | undefined | null,
+): boolean {
+  return source != null && PROTECTED_TRANSLATION_SOURCES.includes(source);
+}
+
+/**
  * Build the `translationSource` string for an LLM translation from the
  * model slug and reasoning level. Persisted on each translation row so a
  * future strategy swap can find + regenerate rows produced by the old
@@ -1760,7 +1844,7 @@ export const USER_PROVIDED_TRANSLATION_SOURCE = 'user-provided';
  */
 export function getTranslationSource(
   model: string,
-  reasoning?: 'minimal' | 'low' | 'medium' | 'high',
+  reasoning?: StageReasoning,
 ): string {
   return `${model}-${reasoning ?? 'none'}`;
 }
@@ -1768,9 +1852,12 @@ export function getTranslationSource(
 /**
  * Same as `getTranslationSource` but accepts a `ModelStage`. Convenience
  * for the LLM queue worker, which already carries the stage object.
+ * Best-of-N stages get a `-bo<total>` marker so rows written by the sampled
+ * pipeline are distinguishable from single-call rows of the same model.
  */
 export function getTranslationSourceFromStage(stage: ModelStage): string {
-  return getTranslationSource(stage.model, stage.reasoning);
+  const base = getTranslationSource(stage.model, stage.reasoning);
+  return stage.samples ? `${base}-bo${stage.samples.total}` : base;
 }
 
 type LengthBranch = {
@@ -1840,6 +1927,40 @@ export const GEMINI_35_FLASH_NITRO_MINIMAL: ModelStage = {
 };
 
 /**
+ * OpenRouter routing cap shared by every Luna call in the app (translation,
+ * autofill, chat): never route to an endpoint charging more than $2 per
+ * million output tokens. Keeps OpenAI's own endpoints ($0.30–1.20/M out),
+ * excludes the Azure variants ($6.00–6.60/M) — the endpoints that were
+ * observed silently burning ~1k hidden reasoning tokens per call during the
+ * Aug 2026 eval.
+ */
+export const LUNA_PROVIDER_CONSTRAINTS: StageProviderConstraints = {
+  max_price: { completion: 2 },
+};
+
+// GPT-5.6 Luna best-of-3 — the translation workhorse since Aug 2026.
+// Selected by a multi-round eval (FLORES de/is, native-speaker feedback set,
+// 500 Tatoeba EN→IS with COMET-22 + blind ratings): no-thinking Luna beat
+// Gemini 3.6 Flash minimal on every signal at ~6% of its cost, and the
+// temp-0 + 2× temp-1 + Luna-judge variant was the strongest configuration
+// (blind raters strictly preferred it over the old default ~2.2:1).
+// `reasoning: 'none'` is load-bearing: Luna reasons adaptively unless
+// thinking is explicitly disabled, and hidden reasoning tokens are billed.
+export const LUNA_BO3: ModelStage = {
+  model: 'openai/gpt-5.6-luna:nitro',
+  reasoning: 'none',
+  maxOutputTokens: 4_000,
+  provider: LUNA_PROVIDER_CONSTRAINTS,
+  samples: { total: 3, extraTemperature: 1 },
+  judge: {
+    model: 'openai/gpt-5.6-luna:nitro',
+    reasoning: 'none',
+    provider: LUNA_PROVIDER_CONSTRAINTS,
+    maxRetries: 2,
+  },
+};
+
+/**
  * Maximum number of auto-retranslations triggered by user flags on a single
  * translation row. The first flag enqueues a retranslation via
  * `retranslation_high` / `retranslation_custom`; the second flag (and
@@ -1857,12 +1978,31 @@ export const TRANSLATION_RULES = {
   /**
    * Default for every language — no entry sets an explicit
    * `translationRule` anymore (set one only to route a language off this
-   * default, e.g. if 3.6 Flash regresses on it). Used for the initial LLM
+   * default, e.g. if Luna regresses on it). Used for the initial LLM
    * translation of premade curriculum sentences and placement-test
-   * material. Single branch — length-hybrid branching was retired so the
-   * model + reasoning level is identical regardless of input length.
-   * Swapped in from Gemini 3.5 Flash in Jul 2026; existing translations are
-   * not mass-regenerated by a version bump — only new/missing rows use 3.6.
+   * material. Swapped in from `gemini_35_flash_nitro_minimal` in Aug 2026
+   * on eval evidence (see `LUNA_BO3`); existing translations are not
+   * mass-regenerated by the rule swap — only new/missing rows (and
+   * languages whose `translationVersion` was bumped, currently Icelandic)
+   * go through Luna. The Gemini stage stays as the fallback so a Luna
+   * outage degrades to the previous production config before the Google
+   * safety net.
+   */
+  luna_bo3: {
+    id: 'luna_bo3',
+    label: 'Luna best-of-3 (no thinking, judge) → Gemini 3.6 Flash Nitro (minimal) → Google',
+    branches: [
+      {
+        maxChars: Infinity,
+        primary: LUNA_BO3,
+        fallbacks: [GEMINI_35_FLASH_NITRO_MINIMAL],
+      },
+    ],
+  },
+  /**
+   * The pre-Aug-2026 default, kept as the revert path and as the in-rule
+   * fallback stage of `luna_bo3`. No language routes here by default
+   * anymore.
    */
   gemini_35_flash_nitro_minimal: {
     id: 'gemini_35_flash_nitro_minimal',
@@ -1920,8 +2060,8 @@ export type TranslationRuleId = keyof typeof TRANSLATION_RULES;
 /**
  * Resolve the ordered stages the translation worker should try for a given
  * (language, source-text-length) pair. Returns `[primary, ...fallbacks]` from
- * the matching branch of the language's rule (or the
- * `gemini_35_flash_nitro_minimal` default when the language doesn't set one).
+ * the matching branch of the language's rule (or the `luna_bo3` default when
+ * the language doesn't set one).
  *
  * `opts.ruleOverride` bypasses the per-language rule lookup — used by
  * `flagTranslation` to force the `retranslation_high` chain regardless of the
@@ -1934,7 +2074,7 @@ export function resolveTranslationStages(
 ): ModelStage[] {
   const lang = getLanguageByCode(code);
   const ruleId: TranslationRuleId =
-    opts?.ruleOverride ?? lang?.translationRule ?? 'gemini_35_flash_nitro_minimal';
+    opts?.ruleOverride ?? lang?.translationRule ?? 'luna_bo3';
   // Cast through `TranslationRule` so each branch is typed as the union with
   // optional `fallbacks`. `satisfies` above narrows literals (some branches
   // don't declare `fallbacks`), which would otherwise drop that property

@@ -1,6 +1,7 @@
 import { Migrations } from '@convex-dev/migrations';
 import { components, internal } from './_generated/api';
 import type { DataModel } from './_generated/dataModel';
+import type { MutationCtx } from './_generated/server';
 import type { Doc } from './_generated/dataModel';
 import {
   DEFAULT_AUTO_PLAY,
@@ -10,8 +11,12 @@ import {
 } from '../lib/constants/audioPlayback';
 import {
   postProcessTranslation,
-  USER_PROVIDED_TRANSLATION_SOURCE,
+  isProtectedTranslationSource,
 } from '../lib/languages';
+import { buildSearchableTextPatchForCard } from './lib/cardContent';
+import type { Id } from './_generated/dataModel';
+import { isPremadeLevelCollection } from './lib/collections';
+import { cardsByOriginStateAndDueDate } from './db/stats/cardAggregates';
 
 // App-wide migrations via @convex-dev/migrations: batched, resumable, with
 // state tracking so completed migrations are skipped on re-run. `runAll` is
@@ -104,7 +109,8 @@ export function stripTrailingUnderscoresPatch(
     'targetLanguage' | 'translatedText' | 'romanizedText' | 'translationSource'
   >,
 ): Partial<Doc<'translations'>> | undefined {
-  if (doc.translationSource === USER_PROVIDED_TRANSLATION_SOURCE) {
+  // Never rewrite human-authored text (user-provided or hand-curated).
+  if (isProtectedTranslationSource(doc.translationSource)) {
     return undefined;
   }
   const patch: Partial<Doc<'translations'>> = {};
@@ -124,8 +130,163 @@ export const stripTrailingUnderscores = migrations.define({
   migrateOne: (_ctx, doc) => stripTrailingUnderscoresPatch(doc),
 });
 
-/** Everything a deploy needs, in order. Completed migrations are skipped. */
+/**
+ * Safety net for `cards.collectionId` / `cards.collectionOrigin`. The schema
+ * comments declare both "backfilled for all existing cards", but the original
+ * backfill ran out-of-band and isn't tracked in `runAll` — this makes the
+ * guarantee durable. Expected to patch ~0 docs.
+ *
+ * `collectionId` is recovered via the card's text (`texts.collectionId` is
+ * required), `collectionOrigin` from the collection's `origin` with the same
+ * `isPremadeLevelCollection` fallback `createCardsFromTexts` uses for legacy
+ * CEFR rows.
+ *
+ * Patching via raw `ctx.db` (the migrations component's path) is aggregate-safe
+ * for three of the four card aggregates — they key only on deckId, dueDate and
+ * the state label. `cardsByOriginStateAndDueDate` however DOES namespace on
+ * `collectionOrigin`, so a raw patch would strand the card's entry in its old
+ * namespace with nothing to ever clean it up (`deleteCard` would look under the
+ * new origin). `migrateOne` therefore moves the entry itself, in the same
+ * transaction as the patch — see the `replaceOrInsert` call below.
+ */
+export function cardCollectionBackfillPatch(
+  card: Pick<Doc<'cards'>, 'collectionId' | 'collectionOrigin'>,
+  resolvedCollectionId: Id<'collections'> | undefined,
+  collection: Doc<'collections'> | null,
+): Partial<Doc<'cards'>> | undefined {
+  const patch: Partial<Doc<'cards'>> = {};
+  if (card.collectionId === undefined && resolvedCollectionId !== undefined) {
+    patch.collectionId = resolvedCollectionId;
+  }
+  if (card.collectionOrigin === undefined) {
+    const origin =
+      collection?.origin ??
+      (collection && isPremadeLevelCollection(collection)
+        ? ('premade' as const)
+        : undefined);
+    if (origin !== undefined) patch.collectionOrigin = origin;
+  }
+  return Object.keys(patch).length > 0 ? patch : undefined;
+}
+
+/**
+ * The full `migrateOne` body, extracted so it can be exercised against a
+ * convex-test db (the migrations component itself isn't registered there —
+ * same approach as the other migration suites).
+ */
+export async function cardCollectionBackfillOne(
+  ctx: MutationCtx,
+  doc: Doc<'cards'>,
+): Promise<Partial<Doc<'cards'>> | undefined> {
+  if (doc.collectionId !== undefined && doc.collectionOrigin !== undefined) {
+    return undefined;
+  }
+  const collectionId =
+    doc.collectionId ?? (await ctx.db.get(doc.textId))?.collectionId;
+  const collection = collectionId ? await ctx.db.get(collectionId) : null;
+  const patch = cardCollectionBackfillPatch(doc, collectionId, collection);
+  if (!patch) return undefined;
+
+  // `collectionOrigin` is part of `cardsByOriginStateAndDueDate`'s namespace,
+  // so the entry has to move with the doc. Only cards aggregated live during
+  // the deploy→backfill window actually have one (they land under origin
+  // 'none'); for everything else `replaceOrInsert` just inserts under the
+  // final origin, which `cardOriginAggregateBackfill` then no-ops over.
+  if (patch.collectionOrigin !== undefined) {
+    await cardsByOriginStateAndDueDate.replaceOrInsert(ctx, doc, {
+      ...doc,
+      ...patch,
+    });
+  }
+  return patch;
+}
+
+export const cardCollectionBackfill = migrations.define({
+  table: 'cards',
+  migrateOne: (ctx, doc) => cardCollectionBackfillOne(ctx, doc),
+});
+
+/**
+ * Full rebuild of `cards.searchableText` via the current
+ * `buildCardSearchableText`. Fixes two things at once:
+ *
+ * 1. CJK/Thai segmentation — Convex's search tokenizer splits only on
+ *    whitespace/punctuation, so sentences in languages without word
+ *    boundaries (zh/ja/yue/th) were indexed as one giant token and
+ *    mid-sentence words could never match. The builder now appends
+ *    Intl.Segmenter word tokens.
+ * 2. Historically stale rows — translations/romanizations that landed after
+ *    card creation never updated the search string (the review-time check
+ *    only compares language sets); going forward the store mutations in
+ *    convex/features/decks.ts schedule `rebuildSearchableTextForText`, and
+ *    this pass heals everything written before that.
+ *
+ * Unchanged cards return no patch, so re-runs are cheap. Direct `db.patch`
+ * by the component is aggregate-safe: the card aggregates never key on the
+ * two fields this migration writes.
+ */
+export async function rebuildCardSearchableTextPatch(
+  ctx: Parameters<typeof buildSearchableTextPatchForCard>[0],
+  doc: Doc<'cards'>,
+): Promise<Partial<Doc<'cards'>> | undefined> {
+  const text = await ctx.db.get(doc.textId);
+  if (!text) return undefined;
+  // Per-doc cache: migrateOne sees one card at a time, so the deck→languages
+  // memo can't span cards here (it does in the live fan-out, which shares one
+  // cache across a pagination page).
+  return buildSearchableTextPatchForCard(ctx, doc, text, {
+    deckLanguages: new Map(),
+  });
+}
+
+export const rebuildCardSearchableText = migrations.define({
+  table: 'cards',
+  migrateOne: (ctx, doc) => rebuildCardSearchableTextPatch(ctx, doc),
+});
+
+/**
+ * Populate the filter-aware `cardsByOriginStateAndDueDate` aggregate for all
+ * pre-existing cards. Writes only to the aggregate component (no doc patch),
+ * and `insertIfDoesNotExist` makes it idempotent — cards written live through
+ * the `cardAggregates.ts` helpers during the deploy→backfill gap, and cards
+ * already inserted by `cardCollectionBackfill`'s `replaceOrInsert`, are simply
+ * skipped. Must run after `cardCollectionBackfill` so origins are final.
+ *
+ * This is what makes `getFilteredCardCounts` stop reading zero for users on a
+ * `course` / `custom` content filter, so it runs as early as its dependency
+ * allows — ahead of the much more expensive `rebuildCardSearchableText`.
+ */
+export const cardOriginAggregateBackfill = migrations.define({
+  table: 'cards',
+  migrateOne: async (ctx, doc) => {
+    await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+    return undefined;
+  },
+});
+
+/**
+ * Everything a deploy needs, in order. Completed migrations are skipped.
+ *
+ * Ordering rationale:
+ *  - `cardCollectionBackfill` must precede `cardOriginAggregateBackfill` so
+ *    every card is aggregated under its final origin.
+ *  - `cardOriginAggregateBackfill` comes next because it is what un-zeroes the
+ *    filtered home-screen counts; nothing depends on the searchable-text
+ *    rebuild, so that full-table pass goes last.
+ *
+ * There is deliberately no blanket aggregate rebuild at the end. The only
+ * drift it existed to repair — a card aggregated under origin 'none' during
+ * the deploy window, then raw-patched to a real origin — is now handled in
+ * `cardCollectionBackfill` itself, which moves the entry in the same
+ * transaction as the patch. A per-deck clear + re-insert would have blanked
+ * `cardsByState` / `cardsByDueDate` / `cardsByStateAndDueDate` (all already
+ * correct) for the whole userbase mid-session. `migrations/
+ * recalcUserCardAggregates.ts` stays available as a per-user repair tool.
+ */
 export const runAll = migrations.runner([
   internal.migrations.perModeSettingsBackfill,
   internal.migrations.stripTrailingUnderscores,
+  internal.migrations.cardCollectionBackfill,
+  internal.migrations.cardOriginAggregateBackfill,
+  internal.migrations.rebuildCardSearchableText,
 ]);

@@ -54,6 +54,10 @@ next-env.d.ts
 .build-id.json
 
 data_preparation/translation_eval/data
+# local eval prototype scripts (Luna translation pipeline evals, Aug 2026)
+data_preparation/translation_eval/run_3way_flores.py
+data_preparation/translation_eval/run_pipeline_proto_de.py
+data_preparation/translation_eval/run_pipeline_proto_is.py
 
 # data preparation 
 data_preparation/data/intermediate_outputs
@@ -102,3 +106,15 @@ tagalog-sample/
 # Local Claude Code worktrees — never commit
 .claude/worktrees/
 native/shell/app-url.js
+
+# Kanban Markdown extension — local task board (see LachyFS.kanban-markdown)
+/.devtool
+
+# Cursor editor state / debug artifacts — never commit
+/.cursor/
+
+# Kanban board — symlink into Paul's Obsidian vault (machine-specific path,
+# see CLAUDE.md). Recreate with:
+# ln -s "$HOME/Library/Mobile Documents/iCloud~md~obsidian/Documents/PaulsVault/projects/Flexling" board
+/board
+store-assets/

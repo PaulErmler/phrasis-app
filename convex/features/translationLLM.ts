@@ -23,11 +23,12 @@
  * translation rather than a missing/truncated row.
  */
 
-import { generateText } from 'ai';
+import { generateText, type JSONValue } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
 import { openrouterCostUsd, openrouterGenerationId } from '../lib/posthogAi';
 import { postProcessTranslation } from '../../lib/languages';
+import type { ModelStage, StageProviderConstraints } from '../../lib/languages';
 
 /**
  * Default cap on tokens per response when the caller doesn't supply a
@@ -50,7 +51,8 @@ export const MAX_OUTPUT_TOKENS = 5_000;
  * strictly lower than `'low'`. We allow `'minimal'` here and cast at the
  * SDK boundary in `translateTextWithLLM` below.
  */
-export type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
+export type ReasoningEffort =
+  | 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 /**
  * What the call cost and how long it took, regardless of outcome.
@@ -145,8 +147,12 @@ export type TranslationPromptArgs = {
   previousTranslation?: string;
 };
 
-/** Build the user-message string for one translation call. */
-export function buildPrompt(args: TranslationPromptArgs): string {
+/**
+ * The `<context>` block lines shared by the translation prompt and the
+ * best-of-N judge prompt — the judge must see exactly the constraints the
+ * candidates were generated under.
+ */
+function buildContextLines(args: TranslationPromptArgs): string[] {
   const speakerLine = `  <speaker_gender>${args.speakerGender ?? 'unspecified'}</speaker_gender>`;
   const referentLine = `  <referent_gender>${args.referentGender}</referent_gender>`;
   const contextLines: string[] = [speakerLine, referentLine];
@@ -158,13 +164,24 @@ export function buildPrompt(args: TranslationPromptArgs): string {
       `  <register>${args.formality ?? 'neutral'}</register>`,
     );
   }
-  // If the native name matches the English name (English variants, romance
-  // languages already in Latin script with same spelling), drop the parens to
-  // avoid a redundant "German (German)".
-  const fullName =
-    args.targetLangNativeName && args.targetLangNativeName !== args.targetLangName
-      ? `${args.targetLangName} (${args.targetLangNativeName})`
-      : args.targetLangName;
+  return contextLines;
+}
+
+/**
+ * "German (Deutsch)"-style display name. If the native name matches the
+ * English name (English variants, romance languages already in Latin script
+ * with same spelling), drop the parens to avoid a redundant "German (German)".
+ */
+function fullLanguageName(args: TranslationPromptArgs): string {
+  return args.targetLangNativeName && args.targetLangNativeName !== args.targetLangName
+    ? `${args.targetLangName} (${args.targetLangNativeName})`
+    : args.targetLangName;
+}
+
+/** Build the user-message string for one translation call. */
+export function buildPrompt(args: TranslationPromptArgs): string {
+  const contextLines = buildContextLines(args);
+  const fullName = fullLanguageName(args);
 
   // Optional arc-context block. Only emitted when at least one neighbor was
   // returned by the worker's sliding-window query; the model still translates
@@ -215,6 +232,40 @@ export function buildPrompt(args: TranslationPromptArgs): string {
   ].join('\n');
 }
 
+/**
+ * Build the judge prompt for a best-of-N stage. Ported from the Aug 2026
+ * eval harness (data_preparation/translation_eval, `build_judge_prompt`) —
+ * the configuration that blind raters preferred ~2.2:1 over single-call
+ * output. The candidate list MUST already be shuffled by the caller so
+ * position never encodes which temperature produced a candidate.
+ */
+export function buildJudgePrompt(
+  args: TranslationPromptArgs,
+  candidates: string[],
+): string {
+  const fullName = fullLanguageName(args);
+  const plainName = args.targetLangName;
+  return [
+    `You are a professional English-to-${fullName} translation reviewer. Below is an English source sentence, its translation context, and ${candidates.length} candidate ${plainName} translations. Choose the single best candidate.`,
+    ``,
+    `<context>`,
+    ...buildContextLines(args),
+    `</context>`,
+    ``,
+    `<instructions>`,
+    `Judge each candidate on: (1) accuracy and completeness of meaning, (2) natural, idiomatic ${plainName} as used in ${args.targetRegion} today, and (3) strict adherence to the context constraints — grammatical agreement with the given speaker/referent/addressee genders, and the requested register ('informal' and 'neutral' both mean the casual T-form; only 'formal' means the polite V-form or honorific). A candidate that violates the gender or register constraints, or uses archaic or unnatural phrasing, loses to one that satisfies them.`,
+    `</instructions>`,
+    ``,
+    `<source>${args.text}</source>`,
+    ``,
+    `<candidates>`,
+    ...candidates.map((c, i) => `  <candidate id="${i + 1}">${c}</candidate>`),
+    `</candidates>`,
+    ``,
+    `Output only the id number of the best candidate. No commentary.`,
+  ].join('\n');
+}
+
 /** Strip a wrapping quote pair if present (some models still wrap despite instructions). */
 function stripWrappingQuotes(s: string): string {
   if (s.length < 2) return s;
@@ -226,22 +277,63 @@ function stripWrappingQuotes(s: string): string {
 }
 
 /**
+ * Map a reasoning value + optional provider-routing constraints to the
+ * per-call `providerOptions.openrouter` body.
+ *
+ * `'none'` MUST be sent as `reasoning: { enabled: false }` — merely omitting
+ * the field is not equivalent for models like GPT-5.6 Luna, which reason
+ * adaptively (and bill the hidden tokens) unless thinking is explicitly
+ * disabled. Other efforts pass through as `{ effort }`; the SDK's typed enum
+ * only lists 'low' | 'medium' | 'high' but OpenRouter accepts the rest at
+ * runtime, hence the loose object shape.
+ */
+export function openrouterCallOptions(
+  effort: ReasoningEffort | undefined,
+  provider?: StageProviderConstraints,
+): Record<string, Record<string, JSONValue>> | undefined {
+  const opts: Record<string, JSONValue> = {};
+  if (effort === 'none') {
+    opts.reasoning = { enabled: false };
+  } else if (effort) {
+    opts.reasoning = { effort };
+  }
+  if (provider) {
+    // StageProviderConstraints is plain JSON data; TS can't prove it without
+    // index signatures, hence the cast.
+    opts.provider = provider as JSONValue;
+  }
+  return Object.keys(opts).length > 0 ? { openrouter: opts } : undefined;
+}
+
+type LlmCallConfig = {
+  model: string;
+  reasoning?: ReasoningEffort;
+  /**
+   * Per-call cap on response tokens. Set by the queue worker from the
+   * matching `ModelStage.maxOutputTokens` so reasoning-heavy stages get the
+   * extra headroom their thinking trace needs. Falls back to
+   * `MAX_OUTPUT_TOKENS` when omitted.
+   */
+  maxOutputTokens?: number;
+  /**
+   * Sampling temperature. Defaults to 0 (deterministic) — only best-of-N
+   * candidate calls pass a non-zero value.
+   */
+  temperature?: number;
+  /**
+   * OpenRouter provider-routing constraints (e.g. a `max_price` cap). Sent
+   * per-call via `providerOptions.openrouter.provider`.
+   */
+  provider?: StageProviderConstraints;
+};
+
+/**
  * Call OpenRouter to translate one sentence. Returns a tagged result so the
  * caller can fall back to Google Translate on truncation/empty/HTTP failure
  * without losing the user's translation.
  */
 export async function translateTextWithLLM(
-  args: TranslationPromptArgs & {
-    model: string;
-    reasoning?: ReasoningEffort;
-    /**
-     * Per-call cap on response tokens. Set by the queue worker from the
-     * matching `ModelStage.maxOutputTokens` so reasoning-heavy stages get the
-     * extra headroom their thinking trace needs. Falls back to
-     * `MAX_OUTPUT_TOKENS` when omitted.
-     */
-    maxOutputTokens?: number;
-  },
+  args: TranslationPromptArgs & LlmCallConfig,
 ): Promise<LlmTranslationResult> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -266,25 +358,15 @@ export async function translateTextWithLLM(
   });
 
   const startedAt = Date.now();
+  const providerOptions = openrouterCallOptions(effort, args.provider);
   let result: Awaited<ReturnType<typeof generateText>>;
   try {
     result = await generateText({
       model: openrouter(args.model),
       prompt,
-      temperature: 0,
+      temperature: args.temperature ?? 0,
       maxOutputTokens,
-      // Cast: the SDK provider's typed enum is `'high' | 'medium' | 'low'`
-      // but OpenRouter accepts `'minimal'` at runtime (mapped to Gemini's
-      // `thinkingLevel: 'minimal'`). See the `ReasoningEffort` type above.
-      ...(effort
-        ? {
-          providerOptions: {
-            openrouter: {
-              reasoning: { effort: effort as 'low' | 'medium' | 'high' },
-            },
-          },
-        }
-        : {}),
+      ...(providerOptions ? { providerOptions } : {}),
     });
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -380,4 +462,253 @@ export async function translateTextWithLLM(
   });
 
   return { ok: true, text: mt, inputTokens, outputTokens, telemetry };
+}
+
+// ─── Best-of-N sampling + judge ────────────────────────────────────────────
+
+/**
+ * Telemetry entry for one call inside a best-of-N stage. `role` and
+ * `candidateIndex` let the queue worker report each call as its own
+ * generation event without a schema change (they land in PostHog `extra`).
+ */
+export type BestOfNTelemetry = LlmCallTelemetry & {
+  role: 'candidate' | 'judge';
+  /** 0 = the temp-0 anchor; 1..N-1 = the extra-temperature samples. */
+  candidateIndex?: number;
+  /** 1-based judge attempt number (retries increment it). */
+  judgeAttempt?: number;
+  /** Set when this call failed; the stage may still have succeeded. */
+  error?: string;
+};
+
+export type BestOfNResult = {
+  /**
+   * Same contract as `translateTextWithLLM`'s result: `ok: true` carries the
+   * judge-picked text; failures use the existing reason vocabulary so the
+   * queue's fallback handling is unchanged. The `telemetry` on this result is
+   * the WINNING candidate's — the full per-call list is `telemetryList`.
+   */
+  result: LlmTranslationResult;
+  telemetryList: BestOfNTelemetry[];
+  meta: {
+    nUnique: number;
+    judgeUsed: boolean;
+    /** True when the judge failed/was unparseable and we fell back to the anchor. */
+    judgeFallback: boolean;
+    candidateFailures: number;
+  };
+};
+
+/**
+ * Deterministic Fisher–Yates shuffle seeded on a string (FNV-1a hash + LCG).
+ * Used to randomize candidate order for the judge without `Math.random`, so
+ * a retried Convex action presents the identical ordering.
+ */
+function seededShuffle<T>(items: T[], seed: string): T[] {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  const next = () => {
+    h = (Math.imul(h, 1664525) + 1013904223) >>> 0;
+    return h / 4294967296;
+  };
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(next() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/** Cap for judge responses — the verdict is a single number. */
+const JUDGE_MAX_OUTPUT_TOKENS = 200;
+
+/**
+ * Parse the judge's "output only the id number" verdict. Returns the 1-based
+ * candidate id, or null when unparseable / out of range.
+ */
+function parseJudgeVerdict(text: string, candidateCount: number): number | null {
+  const match = text.trim().match(/\d+/);
+  if (!match) return null;
+  const id = Number(match[0]);
+  return id >= 1 && id <= candidateCount ? id : null;
+}
+
+/**
+ * Best-of-N translation: `stage.samples.total` parallel candidate calls
+ * (anchor at temp 0, the rest at `extraTemperature`), dedupe, then a judge
+ * pick when more than one unique candidate survives.
+ *
+ * Failure posture (deliberate, mirrors the eval harness):
+ *  - Candidate calls fail independently; one usable candidate is enough.
+ *  - The judge is retried up to `stage.judge.maxRetries` extra times on
+ *    transport errors; an exhausted or unparseable judge falls back to the
+ *    temp-0 anchor — the stage still succeeds.
+ *  - Only a full candidate wipe-out returns `ok: false`, advancing the rule
+ *    to its next fallback stage.
+ */
+export async function translateBestOfN(
+  args: TranslationPromptArgs & { stage: ModelStage },
+): Promise<BestOfNResult> {
+  const { stage } = args;
+  const samples = stage.samples;
+  if (!samples) {
+    throw new Error('translateBestOfN called with a stage without samples');
+  }
+  const telemetryList: BestOfNTelemetry[] = [];
+
+  // ── Candidates: anchor (temp 0) + extras, all in parallel ────────────────
+  const candidateConfigs = Array.from({ length: samples.total }, (_, i) => ({
+    index: i,
+    temperature: i === 0 ? 0 : samples.extraTemperature,
+  }));
+  const candidateResults = await Promise.all(
+    candidateConfigs.map(async ({ index, temperature }) => {
+      const res = await translateTextWithLLM({
+        ...args,
+        model: stage.model,
+        reasoning: stage.reasoning,
+        maxOutputTokens: stage.maxOutputTokens,
+        provider: stage.provider,
+        temperature,
+      });
+      if (res.telemetry) {
+        telemetryList.push({
+          ...res.telemetry,
+          role: 'candidate',
+          candidateIndex: index,
+          ...(res.ok ? {} : { error: res.reason }),
+        });
+      }
+      return { index, res };
+    }),
+  );
+
+  const usable = candidateResults.filter(
+    (c): c is { index: number; res: Extract<LlmTranslationResult, { ok: true }> } =>
+      c.res.ok && c.res.text.length > 0,
+  );
+  const candidateFailures = samples.total - usable.length;
+
+  if (usable.length === 0) {
+    const firstFailure = candidateResults[0].res as LlmTranslationFailure;
+    return {
+      result: {
+        ok: false,
+        reason: firstFailure.reason,
+        detail: `all ${samples.total} candidates failed; first: ${firstFailure.detail ?? firstFailure.reason}`,
+        telemetry: firstFailure.telemetry,
+      },
+      telemetryList,
+      meta: { nUnique: 0, judgeUsed: false, judgeFallback: false, candidateFailures },
+    };
+  }
+
+  // Dedupe on the post-processed text, anchor-first order preserved so the
+  // judge-fallback pick is deterministic (temp-0 anchor when it survived).
+  const uniqueTexts: string[] = [];
+  for (const { res } of usable) {
+    if (!uniqueTexts.includes(res.text)) uniqueTexts.push(res.text);
+  }
+  const winnerByText = (text: string) =>
+    usable.find(({ res }) => res.text === text) ?? usable[0];
+
+  if (uniqueTexts.length === 1) {
+    const winner = winnerByText(uniqueTexts[0]);
+    return {
+      result: winner.res,
+      telemetryList,
+      meta: { nUnique: 1, judgeUsed: false, judgeFallback: false, candidateFailures },
+    };
+  }
+
+  // ── Judge over the shuffled unique candidates ────────────────────────────
+  const judge = stage.judge ?? {
+    model: stage.model,
+    reasoning: stage.reasoning,
+    provider: stage.provider,
+  };
+  const shuffled = seededShuffle(uniqueTexts, `${args.targetLang}:${args.text}`);
+  const judgePrompt = buildJudgePrompt(args, shuffled);
+  const maxAttempts = 1 + (judge.maxRetries ?? 2);
+  const judgeProviderOptions = openrouterCallOptions(judge.reasoning, judge.provider);
+
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  const openrouter = createOpenRouter({ apiKey, extraBody: OPENROUTER_USAGE_ACCOUNTING });
+
+  let pickedText: string | null = null;
+  let judgeFallback = false;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const startedAt = Date.now();
+    try {
+      const judgeResult = await generateText({
+        model: openrouter(judge.model),
+        prompt: judgePrompt,
+        temperature: 0,
+        maxOutputTokens: JUDGE_MAX_OUTPUT_TOKENS,
+        ...(judgeProviderOptions ? { providerOptions: judgeProviderOptions } : {}),
+      });
+      telemetryList.push({
+        model: judge.model,
+        latencyMs: Date.now() - startedAt,
+        inputTokens: judgeResult.usage.inputTokens ?? 0,
+        outputTokens: judgeResult.usage.outputTokens ?? 0,
+        costUsd: openrouterCostUsd(judgeResult.providerMetadata),
+        generationId: openrouterGenerationId(judgeResult.providerMetadata),
+        role: 'judge',
+        judgeAttempt: attempt,
+      });
+      const verdict = parseJudgeVerdict(judgeResult.text, shuffled.length);
+      if (verdict === null) {
+        // Unparseable verdicts are a model-behavior problem, not transport —
+        // retrying the identical prompt rarely helps. Fall back to the anchor.
+        judgeFallback = true;
+        console.warn('[translationLLM] bo3 judge verdict unparseable', {
+          targetLang: args.targetLang,
+          judgeModel: judge.model,
+          verdictPreview: judgeResult.text.slice(0, 80),
+        });
+      } else {
+        pickedText = shuffled[verdict - 1];
+      }
+      break;
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      telemetryList.push({
+        model: judge.model,
+        latencyMs: Date.now() - startedAt,
+        inputTokens: 0,
+        outputTokens: 0,
+        role: 'judge',
+        judgeAttempt: attempt,
+        error: detail.slice(0, 200),
+      });
+      if (attempt === maxAttempts) {
+        judgeFallback = true;
+        console.warn('[translationLLM] bo3 judge failed after retries', {
+          targetLang: args.targetLang,
+          judgeModel: judge.model,
+          attempts: maxAttempts,
+          detail: detail.slice(0, 200),
+        });
+      }
+    }
+  }
+
+  // Judge fallback: deterministic anchor-first pick (uniqueTexts preserves
+  // candidate order, anchor first when it survived).
+  const finalText = pickedText ?? uniqueTexts[0];
+  const winner = winnerByText(finalText);
+  return {
+    result: { ...winner.res, text: finalText },
+    telemetryList,
+    meta: {
+      nUnique: uniqueTexts.length,
+      judgeUsed: true,
+      judgeFallback,
+      candidateFailures,
+    },
+  };
 }

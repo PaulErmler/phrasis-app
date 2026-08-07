@@ -53,6 +53,8 @@ const SETTINGS: ResolvedAudioSettings = {
   beforeSpeeds: {},
   pauseT2B: 0,
   beforeOnlyNewReps: Infinity,
+  listeningStrategy: 'continuous',
+  beforeUntilGoodReps: 1,
 };
 
 function rec(

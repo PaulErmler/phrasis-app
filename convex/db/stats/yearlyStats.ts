@@ -1,5 +1,7 @@
 import { MutationCtx } from '../../_generated/server';
 import { Id } from '../../_generated/dataModel';
+import type { StatsReviewMode } from '../../types';
+import { EMPTY_MODE_COUNTS } from './dailyStats';
 
 export { getYearString } from '../../lib/dateUtils';
 
@@ -11,7 +13,7 @@ export async function upsertYearlyStats(
     year: string;
     timeMs: number;
     isNewCard: boolean;
-    reviewMode?: 'audio' | 'full' | 'radio';
+    reviewMode?: StatsReviewMode;
     isFirstActivityToday: boolean;
     isFirstActivityThisWeek: boolean;
     isFirstActivityThisMonth: boolean;
@@ -25,10 +27,8 @@ export async function upsertYearlyStats(
     .first();
 
   if (existing) {
-    const prevMode: { audio: number; full: number; radio: number } = {
-      audio: 0,
-      full: 0,
-      radio: 0,
+    const prevMode: Record<StatsReviewMode, number> = {
+      ...EMPTY_MODE_COUNTS(),
       ...(existing.reviewsByMode ?? {}),
     };
     await ctx.db.patch(existing._id, {
@@ -58,9 +58,8 @@ export async function upsertYearlyStats(
     ...(args.reviewMode
       ? {
         reviewsByMode: {
-          audio: args.reviewMode === 'audio' ? 1 : 0,
-          full: args.reviewMode === 'full' ? 1 : 0,
-          radio: args.reviewMode === 'radio' ? 1 : 0,
+          ...EMPTY_MODE_COUNTS(),
+          [args.reviewMode]: 1,
         },
       }
       : {}),

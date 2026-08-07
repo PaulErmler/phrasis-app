@@ -9,9 +9,10 @@ import {
   getYearString,
 } from '../../lib/dateUtils';
 import { FSRS_STATE_LABELS } from '../../lib/fsrsStates';
+import type { StatsReviewMode } from '../../types';
 
 /**
- * Mirror images of `recordReviewStats` / `recordRadioPlayStats` for the
+ * Mirror images of `recordReviewStats` / `recordFreePlayStats` for the
  * learn-mode undo feature. Each reversal decrements exactly the counters its
  * counterpart incremented, keyed by the values stored in the review log entry
  * (day key, hour bucket, resolved mode, languages) rather than recomputed —
@@ -64,11 +65,16 @@ export const UNREVERSED_STAT_FIELDS: Record<string, readonly string[]> = {
 const dec = (value: number | undefined, by = 1): number =>
   Math.max(0, (value ?? 0) - by);
 
-type ModeCounts = { audio: number; full: number; radio?: number };
+type ModeCounts = {
+  audio: number;
+  full: number;
+  radio?: number;
+  freeStudy?: number;
+};
 
 function decModeCount(
   counts: ModeCounts | undefined,
-  mode: 'audio' | 'full' | 'radio',
+  mode: StatsReviewMode,
 ): ModeCounts | undefined {
   if (!counts) return undefined;
   return { ...counts, [mode]: dec(counts[mode]) };
@@ -84,7 +90,7 @@ async function reversePeriodRollups(
     wasFirstReview: boolean;
     /** Mode to decrement in `reviewsByMode`, or undefined when the original
      * upsert was called without a mode (and therefore didn't bump it). */
-    reviewMode?: 'audio' | 'full' | 'radio';
+    reviewMode?: StatsReviewMode;
   },
 ): Promise<void> {
   const reversalPatch = (row: {
@@ -295,33 +301,34 @@ export async function reverseReviewStats(
   }
 }
 
-/** Reverse the stat increments of one logged radio play (kind 'radio'). */
-export async function reverseRadioPlayStats(
+/** Reverse the stat increments of one logged free play (kind 'radio' or 'freeStudy'). */
+export async function reverseFreePlayStats(
   ctx: MutationCtx,
   args: {
     userId: string;
     courseId: Id<'courses'>;
     log: Doc<'reviewLogs'>;
+    mode: Extract<StatsReviewMode, 'radio' | 'freeStudy'>;
   },
 ): Promise<void> {
-  const { userId, courseId, log } = args;
+  const { userId, courseId, log, mode } = args;
 
   const stats = await getCourseStatsForMutation(ctx, userId, courseId);
   if (stats) {
     await ctx.db.patch(stats._id, {
       totalRepetitions: dec(stats.totalRepetitions),
-      totalReviewsByMode: decModeCount(stats.totalReviewsByMode, 'radio'),
+      totalReviewsByMode: decModeCount(stats.totalReviewsByMode, mode),
     });
   }
 
-  // recordRadioPlayStats goes through upsertDailyStats, which bumps reps AND
-  // cardsReviewed for radio plays too — mirror both.
+  // recordFreePlayStats goes through upsertDailyStats, which bumps reps AND
+  // cardsReviewed for free plays too — mirror both.
   const daily = await getDailyStats(ctx, userId, courseId, log.date);
   if (daily) {
     await ctx.db.patch(daily._id, {
       reps: dec(daily.reps),
       cardsReviewed: dec(daily.cardsReviewed),
-      reviewsByMode: decModeCount(daily.reviewsByMode, 'radio'),
+      reviewsByMode: decModeCount(daily.reviewsByMode, mode),
     });
   }
 
@@ -330,7 +337,7 @@ export async function reverseRadioPlayStats(
     courseId,
     date: log.date,
     wasFirstReview: false,
-    reviewMode: 'radio',
+    reviewMode: mode,
   });
 }
 

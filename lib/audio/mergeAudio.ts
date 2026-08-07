@@ -49,6 +49,14 @@ export interface ResolvedAudioSettings {
   // N reviews. `Infinity` (the default) = always. Applied per-card via
   // `applyOnlyNewListening` before the merge — `mergeCardAudio` itself ignores it.
   beforeOnlyNewReps: number;
+  // Which per-card condition graduates the card out of Practice Listening:
+  // 'onlyNew' compares the review count against `beforeOnlyNewReps`,
+  // 'untilGood' compares the card's FSRS good/easy count against
+  // `beforeUntilGoodReps`, 'continuous' never graduates (Listening plays on
+  // every review). Applied via `applyOnlyNewListening`. Docs without a stored
+  // strategy resolve via legacy inference — see `resolveAudioSettings`.
+  listeningStrategy: 'onlyNew' | 'untilGood' | 'continuous';
+  beforeUntilGoodReps: number;
 }
 
 /**
@@ -149,6 +157,20 @@ export function resolveAudioSettings(
       cs?.targetBeforeOnlyNewReps && cs.targetBeforeOnlyNewReps > 0
         ? cs.targetBeforeOnlyNewReps
         : Infinity,
+    // Legacy inference: docs from before the strategy field encode
+    // "continuously" as onlyNewReps 0/undefined (the old ∞ position). A
+    // stored strategy always wins; without one, a positive rep window means
+    // 'onlyNew' and anything else means 'continuous' — behavior-identical to
+    // the pre-strategy resolution, so old docs never change behavior.
+    listeningStrategy:
+      cs?.targetBeforeListeningStrategy ??
+      (cs?.targetBeforeOnlyNewReps && cs.targetBeforeOnlyNewReps > 0
+        ? 'onlyNew'
+        : 'continuous'),
+    beforeUntilGoodReps:
+      cs?.targetBeforeUntilGoodReps && cs.targetBeforeUntilGoodReps > 0
+        ? cs.targetBeforeUntilGoodReps
+        : 1,
   };
 }
 
@@ -171,15 +193,27 @@ export function resolveAudioSettings(
  */
 export function applyOnlyNewListening(
   settings: ResolvedAudioSettings,
-  opts: { reviewCount: number; radioReviewCount?: number },
+  opts: {
+    reviewCount: number;
+    radioReviewCount?: number;
+    /** The card's FSRS good/easy count — consulted by the 'untilGood' strategy. */
+    goodReviewCount?: number;
+  },
 ): ResolvedAudioSettings {
-  if (
-    !settings.playTargetBefore ||
-    !settings.playTargetAfter ||
-    settings.beforeOnlyNewReps === Infinity
-  ) {
+  if (!settings.playTargetBefore || !settings.playTargetAfter) {
     return settings;
   }
+  // 'continuous': Listening never graduates — every card, every review.
+  if (settings.listeningStrategy === 'continuous') return settings;
+  if (settings.listeningStrategy === 'untilGood') {
+    // Radio never rates cards, so radio plays can't graduate a card here —
+    // deliberate: without ratings there's no "rated good" signal.
+    if ((opts.goodReviewCount ?? 0) < settings.beforeUntilGoodReps) {
+      return settings;
+    }
+    return { ...settings, playTargetBefore: false };
+  }
+  if (settings.beforeOnlyNewReps === Infinity) return settings;
   const count =
     opts.radioReviewCount != null
       ? Math.max(opts.reviewCount, opts.radioReviewCount)

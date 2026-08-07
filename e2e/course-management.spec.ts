@@ -183,8 +183,12 @@ test.describe("course management", () => {
     }
     await page.getByTestId("course-dialog-next").first().click();
 
-    // Step 3: level + create.
+    // Step 3: level.
     await page.getByRole("button", { name: /beginner/i }).first().click();
+    await page.getByTestId("course-dialog-next").first().click();
+
+    // Step 4: daily goal + create.
+    await page.getByTestId("course-dialog-goal-20").first().click();
     await page.getByTestId("course-dialog-create").first().click();
 
     await expect(async () => {

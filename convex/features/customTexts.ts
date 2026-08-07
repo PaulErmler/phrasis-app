@@ -9,10 +9,10 @@ import { consumeQuota } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import { MAX_CARD_TEXT_LENGTH, MAX_IMPORT_BATCH } from '../../lib/constants/learning';
 import {
-  GEMINI_35_FLASH_NITRO_MINIMAL,
   getLanguageByCode,
   getTranslationSource,
   isMixedLanguage,
+  LUNA_BO3,
   postProcessTranslation,
   resolveMixedVariant,
   USER_PROVIDED_TRANSLATION_SOURCE,
@@ -22,6 +22,7 @@ import { isValidTimezone } from '../lib/dateUtils';
 import { generateText } from 'ai';
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { OPENROUTER_MODELS, OPENROUTER_USAGE_ACCOUNTING } from '../config/aiModels';
+import { openrouterCallOptions } from './translationLLM';
 import { EVENTS, track } from '../analytics';
 import { sourcedTranslationEntriesValidator } from '../types';
 import {
@@ -57,11 +58,23 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
 });
 
 /**
- * Reasoning effort for the autofill call — taken from the single-sentence
- * pipeline's GEMINI_35_FLASH_NITRO_MINIMAL stage so the two pipelines
- * can't drift apart. Also baked into each row's `translationSource` tag.
+ * Reasoning setting for the autofill call — taken from the single-sentence
+ * pipeline's LUNA_BO3 stage so the two pipelines can't drift apart
+ * (`'none'` → `reasoning: {enabled: false}` on the wire; Luna otherwise
+ * reasons adaptively and bills the hidden tokens). Also baked into each
+ * row's `translationSource` tag.
  */
-const AUTOFILL_REASONING = GEMINI_35_FLASH_NITRO_MINIMAL.reasoning;
+const AUTOFILL_REASONING = LUNA_BO3.reasoning;
+
+/**
+ * Output cap for the bulk-JSON autofill response. Previously uncapped — a
+ * latent unbounded-cost/truncation blind spot. ~200 tokens per requested
+ * target language covers translations + metadata comfortably; the floor
+ * keeps single-language requests from being starved by the JSON envelope.
+ */
+function autofillMaxOutputTokens(targetLanguageCount: number): number {
+  return Math.max(2_000, 200 * targetLanguageCount);
+}
 
 const TRANSLATION_SYSTEM_PROMPT = `You are an expert multilingual translator for a language-learning app. You will receive one or more sentences that the user has already written in specific languages, plus a list of target language codes that still need translations.
 
@@ -280,21 +293,15 @@ export const autoFillTranslations = action({
     });
 
     const startedAt = Date.now();
+    // Reasoning + Luna price cap via the shared mapping in translationLLM so
+    // `'none'` is correctly sent as `reasoning: {enabled: false}`.
+    const providerOptions = openrouterCallOptions(AUTOFILL_REASONING, LUNA_BO3.provider);
     const { text, usage, providerMetadata } = await generateText({
       model: openrouter(OPENROUTER_MODELS.translationAutoFill),
       system: TRANSLATION_SYSTEM_PROMPT,
       prompt: userPrompt,
-      // Cast: the SDK provider's typed enum is `'high' | 'medium' | 'low'`
-      // but OpenRouter accepts `'minimal'` at runtime (mapped to Gemini's
-      // `thinkingLevel: 'minimal'`) — same boundary cast as
-      // translateTextWithLLM in translationLLM.ts.
-      providerOptions: {
-        openrouter: {
-          reasoning: {
-            effort: AUTOFILL_REASONING as 'low' | 'medium' | 'high',
-          },
-        },
-      },
+      maxOutputTokens: autofillMaxOutputTokens(targetLanguages.length),
+      ...(providerOptions ? { providerOptions } : {}),
     });
 
     // Billed as a flat 1 unit of `translation_auto_fill` regardless of how many

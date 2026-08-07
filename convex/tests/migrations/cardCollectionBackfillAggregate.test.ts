@@ -1,0 +1,210 @@
+/// <reference types="vite/client" />
+import { convexTest, type TestConvex } from 'convex-test';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// File-level aggregate mock (same precedent as features/stats.test.ts and
+// migrations/recalcUserCardAggregates.test.ts). We only care about the
+// namespace-affecting calls, so `replaceOrInsert` records the origin it moved
+// the entry FROM and TO.
+const replaceCalls: Array<{ from?: string; to?: string }> = [];
+const insertCalls: Array<{ origin?: string }> = [];
+
+vi.mock('@convex-dev/aggregate', () => {
+  class TableAggregate {
+    constructor(
+      _component: unknown,
+      private opts: { namespace: (doc: unknown) => string },
+    ) {}
+    async insertIfDoesNotExist(_ctx: unknown, doc: unknown): Promise<void> {
+      insertCalls.push({ origin: this.opts.namespace(doc) });
+    }
+    async replaceOrInsert(
+      _ctx: unknown,
+      oldDoc: unknown,
+      newDoc: unknown,
+    ): Promise<void> {
+      replaceCalls.push({
+        from: this.opts.namespace(oldDoc),
+        to: this.opts.namespace(newDoc),
+      });
+    }
+    async deleteIfExists(): Promise<void> {}
+    async count(): Promise<number> {
+      return 0;
+    }
+    async clear(): Promise<void> {}
+  }
+  return { TableAggregate };
+});
+
+import schema from '../../schema';
+import { cardCollectionBackfillOne } from '../../migrations';
+import type { Doc, Id } from '../../_generated/dataModel';
+
+const modules = import.meta.glob('/convex/**/*.ts');
+
+beforeEach(() => {
+  replaceCalls.length = 0;
+  insertCalls.length = 0;
+});
+
+type SeedOpts = {
+  collectionOrigin?: Doc<'cards'>['collectionOrigin'];
+  withCollectionId?: boolean;
+  collectionName?: string;
+  collectionOriginField?: Doc<'collections'>['origin'];
+};
+
+async function seedCard(t: TestConvex<typeof schema>, opts: SeedOpts = {}) {
+  return t.run(async (ctx) => {
+    const collectionId = await ctx.db.insert('collections', {
+      name: opts.collectionName ?? 'A1',
+      textCount: 1,
+      ...(opts.collectionOriginField
+        ? { origin: opts.collectionOriginField }
+        : {}),
+    });
+    const courseId = await ctx.db.insert('courses', {
+      userId: 'user_A',
+      baseLanguages: ['en'],
+      targetLanguages: ['es'],
+    });
+    const deckId = await ctx.db.insert('decks', {
+      courseId,
+      name: 'deck',
+      cardCount: 1,
+    });
+    const textId = await ctx.db.insert('texts', {
+      text: 'Hello.',
+      language: 'en',
+      userCreated: false,
+      collectionId,
+      collectionRank: 1,
+    });
+    const cardId = await ctx.db.insert('cards', {
+      deckId,
+      textId,
+      dueDate: 0,
+      isMastered: false,
+      isHidden: false,
+      schedulingPhase: 'preReview',
+      preReviewCount: 0,
+      ...(opts.withCollectionId === false ? {} : { collectionId }),
+      ...(opts.collectionOrigin
+        ? { collectionOrigin: opts.collectionOrigin }
+        : {}),
+    });
+    return { cardId, deckId, collectionId };
+  });
+}
+
+async function runOne(t: TestConvex<typeof schema>, cardId: Id<'cards'>) {
+  return t.run(async (ctx) => {
+    const doc = (await ctx.db.get(cardId))!;
+    const patch = await cardCollectionBackfillOne(ctx, doc);
+    if (patch) await ctx.db.patch(cardId, patch);
+    // `t.run` serializes the result, turning `undefined` into `null`.
+    return patch ?? null;
+  });
+}
+
+describe('cardCollectionBackfill — origin-aggregate consistency', () => {
+  it('moves the origin-aggregate entry when it stamps collectionOrigin', async () => {
+    const t = convexTest(schema, modules);
+    // A legacy CEFR collection with no `origin` field — resolves to 'premade'.
+    const { cardId, deckId } = await seedCard(t);
+
+    const patch = await runOne(t, cardId);
+
+    expect(patch).toEqual({ collectionOrigin: 'premade' });
+    // The entry must move OUT of the 'none' namespace it would have been
+    // aggregated under during the deploy window, and INTO the final origin.
+    // Without this the old entry is orphaned forever: `deleteCard` looks it up
+    // under the new origin and never finds it.
+    expect(replaceCalls).toEqual([
+      {
+        from: `${deckId}:none:new`,
+        to: `${deckId}:premade:new`,
+      },
+    ]);
+  });
+
+  it('moves the entry for a custom collection too', async () => {
+    const t = convexTest(schema, modules);
+    const { cardId, deckId } = await seedCard(t, {
+      collectionName: 'My cards',
+      collectionOriginField: 'custom',
+    });
+
+    await runOne(t, cardId);
+
+    expect(replaceCalls).toEqual([
+      { from: `${deckId}:none:new`, to: `${deckId}:custom:new` },
+    ]);
+  });
+
+  it('touches no aggregate when the card already has both fields', async () => {
+    const t = convexTest(schema, modules);
+    const { cardId } = await seedCard(t, { collectionOrigin: 'premade' });
+
+    const patch = await runOne(t, cardId);
+
+    expect(patch).toBeNull();
+    expect(replaceCalls).toEqual([]);
+  });
+
+  it('touches no aggregate when only collectionId is backfilled', async () => {
+    const t = convexTest(schema, modules);
+    // Origin already set, id missing — the patch must not carry an origin, so
+    // the aggregate namespace is unchanged and nothing needs moving.
+    const { cardId, collectionId } = await seedCard(t, {
+      withCollectionId: false,
+      collectionOrigin: 'chat',
+    });
+
+    const patch = await runOne(t, cardId);
+
+    expect(patch).toEqual({ collectionId });
+    expect(replaceCalls).toEqual([]);
+  });
+
+  it('is idempotent — a second pass is a no-op', async () => {
+    const t = convexTest(schema, modules);
+    const { cardId } = await seedCard(t);
+
+    await runOne(t, cardId);
+    replaceCalls.length = 0;
+    const second = await runOne(t, cardId);
+
+    expect(second).toBeNull();
+    expect(replaceCalls).toEqual([]);
+  });
+});
+
+describe('runAll deploy chain', () => {
+  it('no longer schedules a blanket per-deck aggregate rebuild', async () => {
+    const mod = await import('../../migrations');
+    // `recalcCardAggregatesAfterBackfills` cleared cardsByState /
+    // cardsByDueDate / cardsByStateAndDueDate — all already correct — for
+    // EVERY deck, so users mid-session saw zeroed due counts while their deck
+    // rebuilt. It is unnecessary now that cardCollectionBackfill moves the one
+    // namespaced entry itself. `migrations/recalcUserCardAggregates.ts` stays
+    // as the per-user repair tool.
+    expect('recalcCardAggregatesAfterBackfills' in mod).toBe(false);
+  });
+
+  it('backfills the origin aggregate before the full-table searchable rebuild', async () => {
+    const src = await import('node:fs/promises').then((fs) =>
+      fs.readFile(new URL('../../migrations.ts', import.meta.url), 'utf8'),
+    );
+    const chain = src.slice(src.indexOf('export const runAll'));
+    const originAt = chain.indexOf('cardOriginAggregateBackfill');
+    const collectionAt = chain.indexOf('cardCollectionBackfill');
+    const rebuildAt = chain.indexOf('rebuildCardSearchableText');
+    // Origins must be final before they are aggregated...
+    expect(collectionAt).toBeLessThan(originAt);
+    // ...and the aggregate — which is what un-zeroes getFilteredCardCounts —
+    // must not sit behind the most expensive step in the chain.
+    expect(originAt).toBeLessThan(rebuildAt);
+  });
+});

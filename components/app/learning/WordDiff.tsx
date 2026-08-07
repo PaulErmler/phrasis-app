@@ -20,6 +20,9 @@ interface WordDiffProps {
   actual: string;
   language: string;
   hideAccuracy?: boolean;
+  /** Drop the accuracy footer entirely (no invisible height-keeper) — for
+   * embeds like the landing demo where the reserved line reads as dead space. */
+  omitAccuracy?: boolean;
   hideErrors?: boolean;
   /** User setting — punctuation is still shown, just neutral and unscored. */
   ignorePunctuation?: boolean;
@@ -170,7 +173,7 @@ function WordChip({
 
   if (word.tag === 'missing') {
     return (
-      <span className="rounded-sm border border-dashed border-success/50 bg-success/10 text-success px-1 py-0.5 font-medium">
+      <span className="rounded-sm border border-dashed border-amber-500/60 bg-amber-500/10 text-amber-700 dark:text-amber-300 px-1 py-0.5 font-medium">
         {word.expected}
       </span>
     );
@@ -243,6 +246,7 @@ export function WordDiff({
   actual,
   language,
   hideAccuracy = false,
+  omitAccuracy = false,
   hideErrors = false,
   ignorePunctuation = false,
 }: WordDiffProps) {
@@ -305,7 +309,9 @@ export function WordDiff({
           </AskAboutWord>
         ))}
       </p>
-      <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
+      {!omitAccuracy && (
+        <AccuracyFooter accuracy={accuracy} hideAccuracy={hideAccuracy} />
+      )}
     </div>
   );
 }

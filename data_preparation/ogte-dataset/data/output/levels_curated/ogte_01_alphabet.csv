@@ -1,7 +1,7 @@
 id,text,pedagogy,max_wfs,rarest_word,word_count,added_for,register,formality,ogte_level,arc_id
-538123,Hi.,10.00,1067,hi,1,hi,direct-address,informal,01,1
-373330,Hello!,10.00,1927,hello,1,hello,direct-address,neutral,01,1
-30316,Hi! How are you?,10.00,1067,hi,4,are|hi|how|you,direct-address,informal,01,1
+538123,Hello.,10.00,1927,hello,1,hello,direct-address,neutral,01,1
+373330,How are you?,10.00,67,how,3,are|how|you,direct-address,informal,01,1
+30316,Hello. How are you?,10.00,1927,hello,4,are|hello|how|you,direct-address,informal,01,1
 x1_1,"Good, thanks!",,354,thanks,2,good,direct-address,informal,01,1
 x1_2,And you?,,11,you,2,and,direct-address,neutral,01,1
 x1_3,"I'm good, too.",,119,too,3,too,descriptive,n/a,01,1

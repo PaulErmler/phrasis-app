@@ -8,15 +8,7 @@ import {
   getPremadeLevelCollections,
   getCollectionProgressForCourse,
 } from '../db/collections';
-
-/**
- * Derive a CEFR tier for a legacy collection that lacks the `cefrTier` field.
- * Essential maps to Pre-A1; A1..C2 names already correspond to their own tier.
- */
-function deriveLegacyCefrTier(name: string): string {
-  if (name === 'Essential') return 'Pre-A1';
-  return name;
-}
+import { deriveLegacyCefrTierForLevel } from '../lib/collections';
 
 /**
  * Single-shot query for the new segmented home view. Returns all premade
@@ -112,7 +104,8 @@ export const getHomeSummary = query({
         // Legacy collections don't carry a `cefrTier` field. Map by name:
         // "Essential" → Pre-A1 (so it groups separately from A1 in the home
         // view); all other legacy names (A1..C2) ARE the CEFR tier name.
-        cefrTier: collection.cefrTier ?? deriveLegacyCefrTier(collection.name),
+        cefrTier:
+          collection.cefrTier ?? deriveLegacyCefrTierForLevel(collection.name),
         order: collection.order ?? 0,
         displayName: collection.displayName ?? collection.name,
         totalTexts: collection.textCount + carry,

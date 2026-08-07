@@ -198,6 +198,50 @@ describe("features/scheduling — undoLastReview", () => {
     );
   });
 
+  it("increments goodReviewCount on FSRS good only and restores it on undo", async () => {
+    const t = convexTest(schema, modules);
+    const { cardId } = await seed(t);
+    const asUser = t.withIdentity({ subject: "user_A" });
+
+    // Pre-review 'understood' must NOT count — the "until rated good"
+    // strategy only listens to FSRS good/easy.
+    await asUser.mutation(api.features.scheduling.reviewCard, {
+      cardId,
+      rating: "understood",
+      timezone: "UTC",
+      timeSpentMs: 1_000,
+    });
+    expect((await getCard(t, cardId))?.goodReviewCount).toBeUndefined();
+
+    // 'understood' jumped the card into FSRS review — 'good' counts now.
+    await asUser.mutation(api.features.scheduling.reviewCard, {
+      cardId,
+      rating: "good",
+      timezone: "UTC",
+      timeSpentMs: 1_000,
+    });
+    expect((await getCard(t, cardId))?.goodReviewCount).toBe(1);
+
+    // 'again' leaves the counter untouched.
+    await asUser.mutation(api.features.scheduling.reviewCard, {
+      cardId,
+      rating: "again",
+      timezone: "UTC",
+      timeSpentMs: 1_000,
+    });
+    expect((await getCard(t, cardId))?.goodReviewCount).toBe(1);
+
+    // Undo the 'again' → still 1; undo the 'good' → back to unset.
+    await asUser.mutation(api.features.scheduling.undoLastReview, {
+      timezone: "UTC",
+    });
+    expect((await getCard(t, cardId))?.goodReviewCount).toBe(1);
+    await asUser.mutation(api.features.scheduling.undoLastReview, {
+      timezone: "UTC",
+    });
+    expect((await getCard(t, cardId))?.goodReviewCount).toBeUndefined();
+  });
+
   it("reverses counting stats but keeps time, streak, and words", async () => {
     const t = convexTest(schema, modules);
     const { cardId, courseId, collectionId } = await seed(t);
@@ -476,7 +520,7 @@ describe("features/scheduling — undoLastReview", () => {
     });
     const asUser = t.withIdentity({ subject: "user_A" });
 
-    await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+    await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
       cardId: cardA,
       timezone: "UTC",
       timeSpentMs: 3_000,
@@ -558,7 +602,7 @@ describe("features/scheduling — undoLastReview", () => {
     // Radio-play B under radio, then switch back: B's newer mismatching entry
     // permanently blocks A's.
     await t.run((ctx) => ctx.db.patch(settingsId, { schedulingMode: "radio" }));
-    await asUser.mutation(api.features.scheduling.advanceRadioCard, {
+    await asUser.mutation(api.features.scheduling.advanceFreePlayCard, {
       cardId: cardB,
       timezone: "UTC",
     });

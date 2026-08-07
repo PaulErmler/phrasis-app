@@ -6,15 +6,19 @@ import {
   cardsByState,
   cardsByDueDate,
   cardsByStateAndDueDate,
+  cardsByOriginStateAndDueDate,
   clearAggregatesForDeck,
 } from '../db/stats/cardAggregates';
 
 const BATCH_SIZE = 100;
 
 /**
- * Entry point: rebuild all three card aggregates for every card under every
- * deck the given user owns. Clears the affected namespaces first, then walks
- * each deck's cards in batches via the scheduler.
+ * Entry point: rebuild all four card aggregates for every card under every
+ * deck the given user owns. Only enumerates the decks here — clearing and
+ * re-inserting happens one deck per scheduled mutation, because a single
+ * deck's clear is 32 aggregate namespace calls (states × origin buckets) and
+ * doing every deck in one transaction can blow the mutation limits and fail
+ * half-cleared.
  *
  * Run from the dashboard:
  *   migrations/recalcUserCardAggregates:run { userId: "..." }
@@ -36,10 +40,6 @@ export const run = internalMutation({
       for (const deck of decks) deckIds.push(deck._id);
     }
 
-    for (const deckId of deckIds) {
-      await clearAggregatesForDeck(ctx, deckId);
-    }
-
     if (deckIds.length > 0) {
       await ctx.scheduler.runAfter(
         0,
@@ -53,20 +53,33 @@ export const run = internalMutation({
 });
 
 /**
- * Process one batch of cards from the current deck, then either continue
- * paginating that deck or advance to the next deck.
+ * Self-continuing worker. For each deck: first invocation (no `cleared`
+ * flag) only clears that deck's aggregate namespaces and reschedules;
+ * subsequent invocations page through the deck's cards and re-insert, then
+ * advance to the next deck (which starts with its own clear-only step).
  */
 export const processBatch = internalMutation({
   args: {
     deckIds: v.array(v.id('decks')),
     deckIdx: v.number(),
     cursor: v.optional(v.string()),
+    cleared: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     if (args.deckIdx >= args.deckIds.length) {
       return { processed: 0, isDone: true };
     }
     const deckId = args.deckIds[args.deckIdx];
+
+    if (!args.cleared) {
+      await clearAggregatesForDeck(ctx, deckId);
+      await ctx.scheduler.runAfter(
+        0,
+        internal.migrations.recalcUserCardAggregates.processBatch,
+        { deckIds: args.deckIds, deckIdx: args.deckIdx, cleared: true },
+      );
+      return { processed: 0, isDone: false };
+    }
 
     const result = await ctx.db
       .query('cards')
@@ -77,6 +90,7 @@ export const processBatch = internalMutation({
       await cardsByState.insertIfDoesNotExist(ctx, doc);
       await cardsByDueDate.insertIfDoesNotExist(ctx, doc);
       await cardsByStateAndDueDate.insertIfDoesNotExist(ctx, doc);
+      await cardsByOriginStateAndDueDate.insertIfDoesNotExist(ctx, doc);
     }
 
     const advanceDeck = result.isDone;
@@ -91,6 +105,7 @@ export const processBatch = internalMutation({
             deckIds: args.deckIds,
             deckIdx: nextDeckIdx,
             cursor: result.continueCursor,
+            cleared: true,
           },
       );
     }

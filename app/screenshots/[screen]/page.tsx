@@ -5,6 +5,10 @@ import { ChatScreen } from '../screens/ChatScreen';
 import { ReviewScreen } from '../screens/ReviewScreen';
 import { StatsScreen } from '../screens/StatsScreen';
 import { TestimonialsScreen } from '../screens/TestimonialsScreen';
+import { LanguagesScreen } from '../screens/LanguagesScreen';
+import { CustomScreen } from '../screens/CustomScreen';
+import { WritingScreen } from '../screens/WritingScreen';
+import { RadioScreen } from '../screens/RadioScreen';
 
 /**
  * Store-screenshot pages (scripts/store-screenshots.ts renders these with
@@ -24,6 +28,10 @@ const SCREENS = {
   review: ReviewScreen,
   stats: StatsScreen,
   testimonials: TestimonialsScreen,
+  languages: LanguagesScreen,
+  custom: CustomScreen,
+  writing: WritingScreen,
+  radio: RadioScreen,
 } as const;
 
 export default async function ScreenshotPage({

@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import PricingTable from '@/components/autumn/pricing-table';
 import { useIsNativeApp } from '@/hooks/use-native-app';
 import { DeleteAccountSection } from '@/components/app/DeleteAccountSection';
+import { ChangePasswordSection } from '@/components/app/ChangePasswordSection';
 
 const SUPPORT_EMAIL = 'support@flexling.com';
 
@@ -47,129 +48,107 @@ export function SettingsView({ activeView }: { activeView: View }) {
       style={{ scrollbarGutter: 'stable' }}
     >
       <div className="app-view">
-        <Card>
-          <CardContent className="space-y-6">
-            {/* User Email Section */}
-            {userEmail && (
+        <div className="space-y-4">
+          {/* Language + account */}
+          <Card>
+            <CardContent className="space-y-6">
               <div className="space-y-2">
-                <label className="label-form">
-                  {t('settings.account')}
-                </label>
-                <div className="flex items-center gap-2 p-3 surface-muted">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  {/* Hidden from session replay — masking happens in the
-                      browser, so the address never reaches PostHog. */}
-                  <span className="text-sm" data-ph-mask>
-                    {userEmail}
-                  </span>
-                </div>
+                <label className="label-form">{t('settings.language')}</label>
+                <LanguageSwitcher />
               </div>
-            )}
 
-            <Separator />
+              <Separator />
 
-            {/* Language Section */}
-            <div className="space-y-2">
-              <label className="label-form">
-                {t('settings.language')}
-              </label>
-              <LanguageSwitcher />
-            </div>
+              <div className="space-y-4">
+                <label className="label-form">{t('settings.account')}</label>
+                {userEmail && (
+                  <div className="flex items-center gap-2 p-3 surface-muted">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    {/* Hidden from session replay — masking happens in the
+                        browser, so the address never reaches PostHog. */}
+                    <span className="text-sm" data-ph-mask>
+                      {userEmail}
+                    </span>
+                  </div>
+                )}
+                <ChangePasswordSection email={userEmail} />
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Plans are not shown in the store-app shell (store payment
-                policies) — PricingTable also self-hides, this just keeps the
-                separators from doubling up. */}
-            {!isNative && (
-              <>
-                <Separator />
+          {/* Plans are not shown in the store-app shell (store payment
+              policies) — PricingTable also self-hides, this just keeps an
+              empty card from rendering. */}
+          {!isNative && (
+            <Card>
+              <CardContent>
                 <PricingTable />
-              </>
-            )}
+              </CardContent>
+            </Card>
+          )}
 
-            <Separator />
+          {/* Support & legal */}
+          <Card>
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <label className="label-form">
+                  {t('settings.contactPrompt.title')}
+                </label>
+                <p className="text-sm text-muted-foreground">
+                  {t('settings.contactPrompt.description')}
+                </p>
+                <Button variant="outline" className="w-full sm:w-auto" asChild>
+                  <a
+                    href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(t('settings.contactPrompt.emailSubject'))}`}
+                  >
+                    <Mail className="h-4 w-4" />
+                    {t('help.contactUs')}
+                  </a>
+                </Button>
+              </div>
 
-            <div className="space-y-3">
-              <label className="label-form">
-                {t('settings.contactPrompt.title')}
-              </label>
-              <p className="text-sm text-muted-foreground">
-                {t('settings.contactPrompt.description')}
-              </p>
-              <Button variant="outline" className="w-full sm:w-auto" asChild>
-                <a
-                  href={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(t('settings.contactPrompt.emailSubject'))}`}
+              <Separator />
+
+              <div className="space-y-2">
+                <label className="label-form">{t('settings.legal.label')}</label>
+                <nav
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
+                  aria-label={t('settings.legal.label')}
                 >
-                  <Mail className="h-4 w-4" />
-                  {t('help.contactUs')}
-                </a>
-              </Button>
-            </div>
+                  <Link
+                    href="/legal/impressum"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {tFooter('legal.impressum')}
+                  </Link>
+                  <span aria-hidden>•</span>
+                  <Link
+                    href="/legal/agb"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {tFooter('legal.agb')}
+                  </Link>
+                  <span aria-hidden>•</span>
+                  <Link
+                    href="/legal/privacy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    {tFooter('legal.privacy')}
+                  </Link>
+                </nav>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Separator />
-
-            {/* Legal */}
-            <div className="space-y-2">
-              <label className="label-form">{t('settings.legal.label')}</label>
-              <nav
-                className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground"
-                aria-label={t('settings.legal.label')}
-              >
-                <Link
-                  href="/legal/impressum"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  {tFooter('legal.impressum')}
-                </Link>
-                <span aria-hidden>•</span>
-                <Link
-                  href="/legal/agb"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  {tFooter('legal.agb')}
-                </Link>
-                <span aria-hidden>•</span>
-                <Link
-                  href="/legal/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  {tFooter('legal.privacy')}
-                </Link>
-              </nav>
-            </div>
-
-            <Separator />
-
-            {/* Attribution Section */}
-            <div className="space-y-2">
-              <label className="label-form">
-                {t('settings.attribution.label')}
-              </label>
-              <p className="text-sm text-muted-foreground">
-                {t.rich('settings.attribution.text', {
-                  tatoeba: (chunks) => (
-                    <a href="http://tatoeba.org/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                      {chunks}
-                    </a>
-                  ),
-                  ccby: (chunks) => (
-                    <a href="http://creativecommons.org/licenses/by/2.0/fr/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                      {chunks}
-                    </a>
-                  ),
-                })}
-              </p>
-            </div>
-
-            <Separator />
-
-            {/* Sign Out Section */}
-            <div className="space-y-2">
+          {/* Sign out / delete */}
+          <Card>
+            <CardContent className="space-y-2">
               <Button
                 variant="destructive"
                 className="w-full"
@@ -187,9 +166,25 @@ export function SettingsView({ activeView }: { activeView: View }) {
                 {tAuth('SIGN_OUT')}
               </Button>
               <DeleteAccountSection />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          {/* Attribution footer — deliberately below everything else. */}
+          <p className="px-2 pb-2 text-xs text-muted-foreground text-center">
+            {t.rich('settings.attribution.text', {
+              tatoeba: (chunks) => (
+                <a href="http://tatoeba.org/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+                  {chunks}
+                </a>
+              ),
+              ccby: (chunks) => (
+                <a href="http://creativecommons.org/licenses/by/2.0/fr/" target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
+                  {chunks}
+                </a>
+              ),
+            })}
+          </p>
+        </div>
       </div>
     </div>
   );

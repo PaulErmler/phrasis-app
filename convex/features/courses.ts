@@ -11,6 +11,7 @@ import { Id } from '../_generated/dataModel';
 import {
   learningStyleValidator,
   currentLevelValidator,
+  reviewsByModeValidator,
 } from '../types';
 import { tutorialIdValidator } from './tutorialIds';
 import {
@@ -34,9 +35,9 @@ import {
 import {
   getCourseStats as dbGetCourseStats,
   createCourseStats,
-  getTodayInTimezone,
   deriveStreakDisplay,
 } from '../db/courseStats';
+import { resolveClientToday } from '../lib/dateUtils';
 import { getDailyStats } from '../db/stats/dailyStats';
 import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
 import { consumeQuota, hasFeatureAccess, releaseQuota } from '../usage/helpers';
@@ -49,6 +50,7 @@ import {
 } from '../../lib/scheduling';
 import { validateAutoRateThresholds } from '../../lib/autoRating';
 import { MAX_CARDS_PER_BATCH } from '../../lib/constants/learning';
+import { clampDailyGoal } from '../../lib/constants/dailyGoal';
 import {
   ONBOARDING_INITIAL_SEED_CARDS,
   ONBOARDING_CARDS_BATCH_SIZE,
@@ -323,7 +325,12 @@ export const getOnboardingProgress = query({
  * Get stats for the user's active course.
  */
 export const getCourseStats = query({
-  args: { timezone: v.string() },
+  // `today` is client-supplied (ticked by useNowMinute) so the streak and
+  // goal ring roll over at the user's local midnight — a query re-runs on
+  // data changes, never on time passing, so deriving today from Date.now()
+  // here would freeze yesterday's view until an unrelated write. Validated
+  // and clamped to ±1 day of the server's view in resolveClientToday.
+  args: { timezone: v.string(), today: v.optional(v.string()) },
   returns: v.union(
     v.object({
       totalRepetitions: v.number(),
@@ -344,13 +351,7 @@ export const getCourseStats = query({
       totalChatCardsApproved: v.optional(v.number()),
       totalCardsEdited: v.optional(v.number()),
       totalCardsAddedManually: v.optional(v.number()),
-      totalReviewsByMode: v.optional(
-        v.object({
-          audio: v.number(),
-          full: v.number(),
-          radio: v.optional(v.number()),
-        }),
-      ),
+      totalReviewsByMode: v.optional(reviewsByModeValidator),
       totalAccuracySum: v.optional(v.number()),
       totalAccuracyCount: v.optional(v.number()),
       // Course language config — exposed so the home view can label the
@@ -371,7 +372,7 @@ export const getCourseStats = query({
       const stats = await dbGetCourseStats(ctx, userId, active.course._id);
       if (!stats) return null;
 
-      const todayStr = getTodayInTimezone(args.timezone);
+      const todayStr = resolveClientToday(args.timezone, args.today);
       // Re-derive the live streak state at read time — the stored streak goes
       // stale between activities (it's only recomputed when the user studies),
       // so a lapsed streak must show 0 and the frozen/pending states must be
@@ -419,15 +420,14 @@ export const getCourseStats = query({
  * Get today's learning stats for the user's active course.
  */
 export const getTodayStats = query({
-  args: { timezone: v.string() },
+  // `today` client-supplied for local-midnight rollover — see getCourseStats.
+  args: { timezone: v.string(), today: v.optional(v.string()) },
   returns: v.union(
     v.object({
       reps: v.number(),
       newCards: v.number(),
       timeMs: v.number(),
-      reviewsByMode: v.optional(
-        v.object({ audio: v.number(), full: v.number(), radio: v.optional(v.number()) }),
-      ),
+      reviewsByMode: v.optional(reviewsByModeValidator),
       accuracyAvg: v.optional(v.number()),
       chatMessagesSent: v.optional(v.number()),
       chatCardsApproved: v.optional(v.number()),
@@ -441,7 +441,7 @@ export const getTodayStats = query({
     if (!userId) return null;
     const active = await getActiveCourseForUser(ctx, userId);
     if (!active) return null;
-    const todayStr = getTodayInTimezone(args.timezone);
+    const todayStr = resolveClientToday(args.timezone, args.today);
     const daily = await getDailyStats(ctx, userId, active.course._id, todayStr);
     if (!daily) return null;
     return {
@@ -665,6 +665,16 @@ export const saveOnboardingProgress = mutation({
       );
     }
 
+    // Same clamp window as updateCourseSettings — completeOnboarding copies
+    // this value onto courseSettings, so an unclamped write here would be a
+    // side door around that mutation's guard. Non-finite values are dropped
+    // (leaving any previously stored goal intact) rather than written.
+    if (args.dailyTimeGoalMinutes !== undefined) {
+      const clamped = clampDailyGoal(args.dailyTimeGoalMinutes);
+      if (clamped === undefined) delete args.dailyTimeGoalMinutes;
+      else args.dailyTimeGoalMinutes = clamped;
+    }
+
     const existingProgress = await dbGetOnboardingProgress(ctx, userId);
     let progressId;
     if (existingProgress) {
@@ -847,7 +857,10 @@ export const completeOnboarding = mutation({
       // ONBOARDING_INITIAL_SEED_CARDS / ONBOARDING_FIRST_LESSON_CARDS in
       // lib/constants/onboarding.ts for the rationale.
       cardsToAddBatchSize: ONBOARDING_CARDS_BATCH_SIZE,
-      dailyTimeGoalMinutes: progress.dailyTimeGoalMinutes,
+      // Clamped on the way in too: rows written before the boundary guard
+      // existed can still carry an out-of-range or non-finite goal, and this
+      // is the copy that actually reaches the homescreen ring.
+      dailyTimeGoalMinutes: clampDailyGoal(progress.dailyTimeGoalMinutes),
     });
 
     // Auto-create a deck
@@ -1083,12 +1096,31 @@ export const updateCourseSettings = mutation({
     const patch: Partial<CoursePatchableSettings> = {};
     for (const key of PATCHABLE_KEYS) {
       let value = args[key];
+      // NaN/±Infinity survive Math.max/min/round/floor and Convex stores
+      // them as float64 — a NaN goal then poisons the daily-goal ring and
+      // every projection until manually repaired. Drop such values instead.
+      if (typeof value === 'number' && !Number.isFinite(value)) continue;
       if (key === 'cardsToAddBatchSize' && typeof value === 'number') {
         value = Math.max(1, Math.min(MAX_CARDS_PER_BATCH, Math.floor(value)));
       }
       // "Only new" Practice-Listening limit: integer 1-10, or 0 for ∞ (always).
-      if (key === 'targetBeforeOnlyNewReps' && typeof value === 'number') {
+      // Same window for the writing-mode "Show translation on new sentences".
+      if (
+        (key === 'targetBeforeOnlyNewReps' ||
+          key === 'showTranslationOnlyNewReps') &&
+        typeof value === 'number'
+      ) {
         value = Math.max(0, Math.min(10, Math.floor(value)));
+      }
+      // "Until rated good" needs at least one good rating — 0 would mean
+      // Listening never plays rather than always, so the floor is 1.
+      if (key === 'targetBeforeUntilGoodReps' && typeof value === 'number') {
+        value = Math.max(1, Math.min(10, Math.floor(value)));
+      }
+      if (key === 'dailyTimeGoalMinutes' && typeof value === 'number') {
+        // Non-finite values were already skipped by the guard above, so this
+        // never returns undefined here.
+        value = clampDailyGoal(value);
       }
       if (
         (key === 'languagePlaybackSpeeds' ||
